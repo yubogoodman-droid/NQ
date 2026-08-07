@@ -42,6 +42,10 @@ python examples/run_backtest.py --csv your_nq_5m.csv
 ```bash
 python3 examples/chart_today.py
 # 輸出: output/nq_w_bottom_today.html
+
+# 部署 GitHub Pages（外網可開）
+python3 examples/chart_today.py --pages
+# 輸出: docs/index.html → https://yubogoodman-droid.github.io/NQ/
 ```
 
 ## TradingView
