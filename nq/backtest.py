@@ -31,18 +31,25 @@ def run_backtest(
     1. 觸及停損
     2. 觸及停利
     3. 持倉超過 max_bars_hold 根 K 強制平倉
+
+    持倉期間忽略新的進場訊號，平倉後下一根 K 起才可再進。
     """
     strategy = strategy or NQWBottomStrategy()
-    signals = strategy.generate_signals(df)
+    signals = sorted(strategy.generate_signals(df), key=lambda s: s.bar_idx)
     results: list[TradeResult] = []
+    position_open_until = -1  # 持倉中：此 K index（含）之前不接受新進場
 
     for sig in signals:
         entry_idx = sig.bar_idx
+        if entry_idx <= position_open_until:
+            continue
+
         end_idx = min(entry_idx + max_bars_hold, len(df) - 1)
 
         exit_price = df["close"].iloc[end_idx]
         exit_time = df.index[end_idx]
         exit_reason = "time_stop"
+        exit_idx = end_idx
 
         for i in range(entry_idx + 1, end_idx + 1):
             low = df["low"].iloc[i]
@@ -52,12 +59,16 @@ def run_backtest(
                 exit_price = sig.stop_loss
                 exit_time = df.index[i]
                 exit_reason = "stop_loss"
+                exit_idx = i
                 break
             if high >= sig.target:
                 exit_price = sig.target
                 exit_time = df.index[i]
                 exit_reason = "take_profit"
+                exit_idx = i
                 break
+
+        position_open_until = exit_idx
 
         pnl_points = exit_price - sig.entry
         results.append(
