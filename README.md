@@ -45,8 +45,17 @@ python3 examples/chart_today.py
 
 # 部署 GitHub Pages（外網可開）
 python3 examples/chart_today.py --pages
-# 輸出: docs/index.html → https://yubogoodman-droid.github.io/NQ/
+# 輸出: docs/index.html
 ```
+
+### 外網開啟
+
+1. **GitHub Pages（永久）**  
+   到 [Repo Settings → Pages](https://github.com/yubogoodman-droid/NQ/settings/pages)，Source 選 **GitHub Actions**，儲存後重新執行 workflow。  
+   網址：`https://yubogoodman-droid.github.io/NQ/`
+
+2. **HTML Preview（免部署）**  
+   https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
 ## TradingView
 
