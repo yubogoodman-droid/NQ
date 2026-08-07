@@ -40,12 +40,11 @@ python examples/run_backtest.py --csv your_nq_5m.csv
 ### 產生今日 HTML 圖表
 
 ```bash
-python3 examples/chart_today.py
-# 輸出: output/nq_w_bottom_today.html
+# 交易卡片報告（每筆分開，手機版，推薦）
+python3 examples/chart_today.py --report --pages
 
-# 部署 GitHub Pages（外網可開）
-python3 examples/chart_today.py --pages
-# 輸出: docs/index.html
+# 單一大圖
+python3 examples/chart_today.py
 ```
 
 ### 外網開啟
