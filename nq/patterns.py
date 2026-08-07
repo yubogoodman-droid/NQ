@@ -56,7 +56,7 @@ def detect_w_bottoms(
     df: pd.DataFrame,
     *,
     swing_lookback: int = 3,
-    low_tolerance_pct: float = 0.003,
+    low_tolerance_pct: float = 0.001,
     min_bars_between_lows: int = 5,
     max_bars_between_lows: int = 60,
     require_neckline_break: bool = True,
@@ -76,7 +76,7 @@ def detect_w_bottoms(
     swing_lookback : int
         左右各幾根 K 確認轉折。
     low_tolerance_pct : float
-        兩低點允許的最大價差比例（0.003 = 0.3%）。
+        兩低點允許的最大價差比例（0.001 = 0.1%）。
     min_bars_between_lows : int
         兩低點最少間隔 K 數。
     max_bars_between_lows : int

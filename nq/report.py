@@ -240,7 +240,7 @@ TP 量度漲幅 = {sig.target:.2f}
 exit {trade.exit_price:.2f}
 W底 L1 {p.first_low:.2f} / L2 {p.second_low:.2f}
 頸線 {p.neckline:.2f} / 深度 {depth:.2f}
-雙底價差 {gap_pct:.2f}% (≤0.30%)
+雙底價差 {gap_pct:.2f}% (≤0.10%)
 {ma_line}
 $ {trade.pnl_dollars:+,.2f} NQ×{contracts}</pre>
       <div class="tf-badge">🕐 5分 K</div>

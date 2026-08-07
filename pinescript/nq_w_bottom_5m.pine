@@ -3,7 +3,7 @@ strategy("NQ 五分K W底進場", overlay=true, default_qty_type=strategy.fixed,
 
 // === 參數 ===
 swingLen     = input.int(3, "轉折確認 K 數", minval=1)
-tolPct       = input.float(0.3, "兩低點價差容忍 (%)", minval=0.05, step=0.05) / 100
+tolPct       = input.float(0.1, "兩低點價差容忍 (%)", minval=0.05, step=0.05) / 100
 minBars      = input.int(5, "兩低點最少間隔", minval=2)
 maxBars      = input.int(60, "兩低點最多間隔", minval=10)
 useCloseBreak = input.bool(true, "收盤突破頸線進場")

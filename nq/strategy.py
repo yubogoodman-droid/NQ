@@ -46,7 +46,7 @@ class NQWBottomStrategy:
     """
 
     swing_lookback: int = 3
-    low_tolerance_pct: float = 0.003
+    low_tolerance_pct: float = 0.001
     min_bars_between_lows: int = 5
     max_bars_between_lows: int = 60
     tick_size: float = 0.25
