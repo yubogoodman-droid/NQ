@@ -11,7 +11,17 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from nq.backtest import TradeResult, run_backtest, summarize
-from nq.strategy import NQWBottomStrategy, Signal
+from nq.strategy import NQWBottomStrategy
+
+MA_PERIODS = (5, 10, 20, 60, 120, 200)
+MA_COLORS = {
+    5: "#ffa726",
+    10: "#ffeb3b",
+    20: "#66bb6a",
+    60: "#42a5f5",
+    120: "#26c6da",
+    200: "#ab47bc",
+}
 
 
 def _fmt_time(ts: pd.Timestamp) -> str:
@@ -27,17 +37,57 @@ def _exit_tag(reason: str, pnl: float) -> tuple[str, str]:
     return "TIME", "tag-time"
 
 
-def _build_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
+def _filter_today_results(df: pd.DataFrame, results: list[TradeResult]) -> list[TradeResult]:
+    if not len(df):
+        return results
+    today = df.index[-1]
+    if hasattr(today, "tz_convert"):
+        today = today.tz_convert("America/New_York")
+    day = today.date()
+    return [r for r in results if r.signal.timestamp.date() == day]
+
+
+def _add_mas(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    for period in MA_PERIODS:
+        out[f"ma{period}"] = out["close"].rolling(period, min_periods=period).mean()
+    return out
+
+
+def _ma_snapshot(row: pd.Series) -> str:
+    short = []
+    long_ = []
+    for period in MA_PERIODS:
+        val = row.get(f"ma{period}")
+        if pd.notna(val):
+            text = f"MA{period} {val:.2f}"
+            if period <= 20:
+                short.append(text)
+            else:
+                long_.append(text)
+    lines = []
+    if short:
+        lines.append(" / ".join(short))
+    if long_:
+        lines.append(" / ".join(long_))
+    return "\n".join(lines)
+
+
+def _chart_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     p = trade.signal.pattern
-    start = max(0, p.first_low_idx - 8)
-    end = min(len(df) - 1, trade.signal.bar_idx + 24)
+    start = max(0, p.first_low_idx - 18)
+    end = trade.signal.bar_idx + 28
     for i in range(trade.signal.bar_idx + 1, len(df)):
         if df.index[i] == trade.exit_time:
-            end = min(len(df) - 1, i + 6)
+            end = min(len(df) - 1, i + 10)
             break
-    else:
-        end = min(len(df) - 1, end)
+    end = min(len(df) - 1, end)
+    return start, end
 
+
+def _build_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
+    p = trade.signal.pattern
+    start, end = _chart_window(df, trade)
     window = df.iloc[start : end + 1].copy()
     times = [t.tz_localize(None) if t.tzinfo else t for t in window.index]
 
@@ -51,13 +101,31 @@ def _build_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> s
             close=window["close"],
             increasing_line_color="#26a69a",
             decreasing_line_color="#ef5350",
-            name="NQ",
+            name="K",
+            showlegend=False,
         )
     )
 
-    l1_t = window.index.get_loc(df.index[p.first_low_idx]) if df.index[p.first_low_idx] in window.index else None
-    l2_t = window.index.get_loc(df.index[p.second_low_idx]) if df.index[p.second_low_idx] in window.index else None
-    if l1_t is not None:
+    for period in MA_PERIODS:
+        col = f"ma{period}"
+        if col not in window.columns:
+            continue
+        ma_vals = window[col]
+        if ma_vals.notna().sum() == 0:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=times,
+                y=ma_vals,
+                mode="lines",
+                name=f"MA{period}",
+                line=dict(color=MA_COLORS[period], width=1.3 if period <= 20 else 1.1),
+                connectgaps=False,
+            )
+        )
+
+    if df.index[p.first_low_idx] in window.index:
+        l1_t = window.index.get_loc(df.index[p.first_low_idx])
         fig.add_trace(
             go.Scatter(
                 x=[times[l1_t]],
@@ -69,13 +137,14 @@ def _build_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> s
                 showlegend=False,
             )
         )
-    if l2_t is not None:
+    if df.index[p.second_low_idx] in window.index:
+        l2_t = window.index.get_loc(df.index[p.second_low_idx])
         fig.add_trace(
             go.Scatter(
                 x=[times[l2_t]],
                 y=[p.second_low],
                 mode="markers+text",
-                marker=dict(symbol="circle", size=8, color="#ab47bc"),
+                marker=dict(symbol="circle", size=8, color="#ec407a"),
                 text=["L2"],
                 textposition="bottom center",
                 showlegend=False,
@@ -83,10 +152,9 @@ def _build_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> s
         )
 
     entry_t = _fmt_time(trade.signal.timestamp)
-    fig.add_hline(y=p.neckline, line_dash="dash", line_color="#ffa726", opacity=0.8)
-    fig.add_hline(y=trade.signal.stop_loss, line_dash="dot", line_color="#ff5252", opacity=0.7)
-    fig.add_hline(y=trade.signal.target, line_dash="dot", line_color="#00c805", opacity=0.7)
-    fig.add_hline(y=trade.signal.entry, line_dash="solid", line_color="#00e676", opacity=0.5)
+    fig.add_hline(y=p.neckline, line_dash="dash", line_color="#ffa726", opacity=0.75)
+    fig.add_hline(y=trade.signal.stop_loss, line_dash="dot", line_color="#ff5252", opacity=0.65)
+    fig.add_hline(y=trade.signal.target, line_dash="dot", line_color="#00c805", opacity=0.65)
 
     entry_idx = window.index.get_indexer([trade.signal.timestamp], method="nearest")[0]
     fig.add_trace(
@@ -95,17 +163,40 @@ def _build_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> s
             y=[trade.signal.entry],
             mode="markers",
             marker=dict(symbol="triangle-up", size=12, color="#00e676"),
+            name="進場",
+            showlegend=False,
+        )
+    )
+
+    exit_idx = window.index.get_indexer([trade.exit_time], method="nearest")[0]
+    exit_color = "#00c805" if trade.pnl_points > 0 else "#ff5252"
+    fig.add_trace(
+        go.Scatter(
+            x=[times[exit_idx]],
+            y=[trade.exit_price],
+            mode="markers",
+            marker=dict(symbol="x", size=10, color=exit_color),
+            name="出場",
             showlegend=False,
         )
     )
 
     fig.update_layout(
         template="plotly_dark",
-        height=260,
-        margin=dict(l=40, r=12, t=36, b=24),
+        height=300,
+        margin=dict(l=42, r=10, t=54, b=24),
         title=dict(text=f"#{trade_no} W底 | {entry_t}", x=0.02, font=dict(size=12)),
         xaxis_rangeslider_visible=False,
-        showlegend=False,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            font=dict(size=9),
+            bgcolor="rgba(0,0,0,0)",
+        ),
         paper_bgcolor="#161b22",
         plot_bgcolor="#161b22",
     )
@@ -124,6 +215,8 @@ def _render_trade_card(df: pd.DataFrame, trade: TradeResult, trade_no: int, cont
     low_gap = abs(p.first_low - p.second_low)
     avg_low = (p.first_low + p.second_low) / 2
     gap_pct = low_gap / avg_low * 100 if avg_low else 0
+    entry_row = df.iloc[sig.bar_idx]
+    ma_line = _ma_snapshot(entry_row)
 
     chart_html = _build_trade_chart(df, trade, trade_no)
 
@@ -148,6 +241,7 @@ exit {trade.exit_price:.2f}
 W底 L1 {p.first_low:.2f} / L2 {p.second_low:.2f}
 頸線 {p.neckline:.2f} / 深度 {depth:.2f}
 雙底價差 {gap_pct:.2f}% (≤0.30%)
+{ma_line}
 $ {trade.pnl_dollars:+,.2f} NQ×{contracts}</pre>
       <div class="tf-badge">🕐 5分 K</div>
       <div class="mini-chart">{chart_html}</div>
@@ -162,6 +256,7 @@ def build_report_html(
     title: str,
     symbol: str = "NQ=F",
 ) -> str:
+    df = _add_mas(df)
     stats = summarize(results)
     cards = "".join(_render_trade_card(df, r, i + 1) for i, r in enumerate(results))
     empty = '<div class="empty">今日未偵測到 W 底突破訊號</div>' if not results else ""
@@ -327,9 +422,12 @@ def save_report_html(
     strategy: NQWBottomStrategy | None = None,
     title: str | None = None,
     symbol: str = "NQ=F",
+    today_only: bool = True,
 ) -> Path:
     strategy = strategy or NQWBottomStrategy()
     results = run_backtest(df, strategy)
+    if today_only:
+        results = _filter_today_results(df, results)
     if title is None:
         today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
         title = f"NQ W底回測 — {today}"

@@ -17,16 +17,23 @@ from nq.chart import save_html_chart
 from nq.report import save_report_html
 
 
-def fetch_nq_5m(symbol: str = "NQ=F") -> "pd.DataFrame":
+def fetch_nq_5m(symbol: str = "NQ=F", *, period: str = "1d") -> "pd.DataFrame":
     import pandas as pd
 
-    raw = yf.Ticker(symbol).history(period="1d", interval="5m")
+    raw = yf.Ticker(symbol).history(period=period, interval="5m")
     if raw.empty:
         raise RuntimeError(f"無法取得 {symbol} 五分 K 資料")
 
     df = raw.rename(columns=str.lower)[["open", "high", "low", "close", "volume"]].copy()
     df.index = df.index.tz_convert("America/New_York")
     return df
+
+
+def today_mask(df: "pd.DataFrame") -> "pd.Series":
+    import pandas as pd
+
+    today = pd.Timestamp.now(tz="America/New_York").date()
+    return df.index.date == today
 
 
 def main() -> None:
@@ -41,7 +48,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    df = fetch_nq_5m(args.symbol)
+    df = fetch_nq_5m(args.symbol, period="5d" if (args.report or args.pages) else "1d")
     today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
 
     if args.report or args.pages:
