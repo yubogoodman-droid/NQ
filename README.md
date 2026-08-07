@@ -37,6 +37,13 @@ CSV 需含欄位：`datetime, open, high, low, close`
 python examples/run_backtest.py --csv your_nq_5m.csv
 ```
 
+### 產生今日 HTML 圖表
+
+```bash
+python3 examples/chart_today.py
+# 輸出: output/nq_w_bottom_today.html
+```
+
 ## TradingView
 
 `pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
