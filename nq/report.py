@@ -395,7 +395,7 @@ def build_report_html(
   <div class="page">
     <section class="summary">
       <h1>{html.escape(title)}</h1>
-      <p>{html.escape(symbol)} · 五分 K W底做多 · {html.escape(_report_date(df))}</p>
+      <p>{html.escape(symbol)} · 五分 K W底做多 · {html.escape(_report_date_range(df))}</p>
       <div class="total">
         {stats.get("trades", 0)} 筆 · 勝率 {stats.get("win_rate", 0) * 100:.0f}% ·
         總計 {stats.get("total_pnl_points", 0):+.1f} 點 (${stats.get("total_pnl_dollars", 0):+,.0f})
@@ -408,11 +408,15 @@ def build_report_html(
 """
 
 
-def _report_date(df: pd.DataFrame) -> str:
+def _report_date_range(df: pd.DataFrame) -> str:
     start = df.index[0]
+    end = df.index[-1]
     if hasattr(start, "tz_convert"):
         start = start.tz_convert("America/New_York")
-    return start.strftime("%Y-%m-%d")
+        end = end.tz_convert("America/New_York")
+    if start.date() == end.date():
+        return start.strftime("%Y-%m-%d")
+    return f"{start.strftime('%Y-%m-%d')} ~ {end.strftime('%Y-%m-%d')}"
 
 
 def save_report_html(

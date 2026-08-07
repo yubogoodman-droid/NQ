@@ -43,6 +43,9 @@ python examples/run_backtest.py --csv your_nq_5m.csv
 # 交易卡片報告（每筆分開，手機版，推薦）
 python3 examples/chart_today.py --report --pages
 
+# 30 天回測報告
+python3 examples/chart_today.py --report --days 30 -o output/nq_report_30d.html
+
 # 單一大圖
 python3 examples/chart_today.py
 ```

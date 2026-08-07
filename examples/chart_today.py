@@ -17,9 +17,11 @@ from nq.chart import save_html_chart
 from nq.report import save_report_html
 
 
-def fetch_nq_5m(symbol: str = "NQ=F", *, period: str = "1d") -> "pd.DataFrame":
+def fetch_nq_5m(symbol: str = "NQ=F", *, period: str = "1d", days: int | None = None) -> "pd.DataFrame":
     import pandas as pd
 
+    if days is not None:
+        period = f"{days}d"
     raw = yf.Ticker(symbol).history(period=period, interval="5m")
     if raw.empty:
         raise RuntimeError(f"無法取得 {symbol} 五分 K 資料")
@@ -46,22 +48,38 @@ def main() -> None:
         action="store_true",
         help="交易卡片報告（每筆分開，手機版）",
     )
+    parser.add_argument("--days", type=int, help="回測天數（例如 30）")
     args = parser.parse_args()
 
-    df = fetch_nq_5m(args.symbol, period="5d" if (args.report or args.pages) else "1d")
+    days = args.days
+    if days:
+        period = f"{days}d"
+    else:
+        period = "5d" if (args.report or args.pages) else "1d"
+
+    df = fetch_nq_5m(args.symbol, period=period, days=days)
     today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
 
     if args.report or args.pages:
-        output = args.output or ("docs/index.html" if args.pages else "output/nq_report.html")
-        title = f"NQ W底回測 — {today}"
-        out = save_report_html(df, output, title=title, symbol=args.symbol)
+        output = args.output or (
+            "docs/index.html" if args.pages else (f"output/nq_report_{days}d.html" if days else "output/nq_report.html")
+        )
+        if days:
+            title = f"NQ W底回測 — 近 {days} 天"
+        else:
+            title = f"NQ W底回測 — {today}"
+        out = save_report_html(
+            df, output, title=title, symbol=args.symbol, today_only=days is None
+        )
     else:
         output = args.output or "output/nq_w_bottom_today.html"
         title = f"NQ 五分K W底進場 — {today} ({args.symbol})"
         out = save_html_chart(df, output, title=title)
 
     print(f"已產生: {out.resolve()}")
-    print(f"K 線: {len(df)} 根 | {df.index[0].strftime('%H:%M')} ~ {df.index[-1].strftime('%H:%M')} ET")
+    start = df.index[0].strftime("%Y-%m-%d %H:%M")
+    end = df.index[-1].strftime("%Y-%m-%d %H:%M")
+    print(f"K 線: {len(df)} 根 | {start} ~ {end} ET")
 
 
 if __name__ == "__main__":
