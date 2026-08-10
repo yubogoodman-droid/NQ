@@ -15,62 +15,62 @@
     "require_sma25_hard": false,
     "min_abs_dist_ma99": 0.02,
     "max_near_above_ma99": 0.08,
+    "min_abs_dist_ma200": 0.02,
+    "max_near_above_ma200": 0.08,
     "max_chg24": 3.0,
     "cooldown_min": 60
   },
   "baseline_n": 76,
   "summary": {
-    "n": 28,
-    "symbols": 16,
-    "reclaim_3_rate": 14.3,
+    "n": 20,
+    "symbols": 13,
+    "reclaim_3_rate": 20.0,
     "by_horizon": {
       "15m": {
-        "n": 28,
-        "win_rate": 50.0,
-        "avg": 0.356,
-        "median": -0.147
+        "n": 20,
+        "win_rate": 55.0,
+        "avg": 0.77,
+        "median": 0.294
       },
       "30m": {
-        "n": 28,
-        "win_rate": 35.7,
-        "avg": -1.446,
+        "n": 20,
+        "win_rate": 35.0,
+        "avg": -1.578,
         "median": -1.101
       },
       "1h": {
-        "n": 27,
-        "win_rate": 44.4,
-        "avg": -1.266,
-        "median": -0.821
+        "n": 19,
+        "win_rate": 52.6,
+        "avg": -1.585,
+        "median": 0.176
       },
       "2h": {
-        "n": 25,
-        "win_rate": 48.0,
-        "avg": 1.146,
-        "median": -0.084
+        "n": 17,
+        "win_rate": 58.8,
+        "avg": 1.084,
+        "median": 3.692
       },
       "4h": {
-        "n": 22,
-        "win_rate": 45.5,
-        "avg": -1.862,
-        "median": -0.884
-      },
-      "8h": {
-        "n": 18,
-        "win_rate": 50.0,
-        "avg": -1.608,
-        "median": -2.101
-      },
-      "12h": {
         "n": 14,
         "win_rate": 50.0,
-        "avg": -9.266,
-        "median": -0.087
+        "avg": -3.368,
+        "median": 0.014
+      },
+      "8h": {
+        "n": 11,
+        "win_rate": 54.5,
+        "avg": -1.485,
+        "median": 3.297
+      },
+      "12h": {
+        "n": 9,
+        "win_rate": 44.4,
+        "avg": -12.728,
+        "median": -4.965
       }
     },
     "symbols_list": [
-      "BEAT/USDT",
       "BICO/USDT",
-      "BLUAI/USDT",
       "BMT/USDT",
       "BTW/USDT",
       "COOKIE/USDT",
@@ -79,7 +79,6 @@
       "MMT/USDT",
       "MUBARAK/USDT",
       "ON/USDT",
-      "SAGA/USDT",
       "TST/USDT",
       "TUT/USDT",
       "XAN/USDT",

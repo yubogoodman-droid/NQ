@@ -1,6 +1,6 @@
 """
 One-day backtest for balanced/strict shadow-neckline tiers.
-Uses shared SMA99 proximity rules.
+Uses shared SMA99 / SMA200 proximity rules.
 """
 
 from __future__ import annotations
@@ -188,7 +188,7 @@ def main():
             print("MUBARAK:")
             print(
                 df[df.symbol.str.contains("MUBARAK")][
-                    ["time_utc", "dist_ma99_pct", "pnl_1h"]
+                    ["time_utc", "dist_ma99_pct", "dist_ma200_pct", "pnl_1h"]
                 ].to_string(index=False)
             )
 

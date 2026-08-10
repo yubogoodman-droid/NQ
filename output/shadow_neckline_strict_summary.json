@@ -15,66 +15,63 @@
     "require_sma25_hard": true,
     "min_abs_dist_ma99": 0.02,
     "max_near_above_ma99": 0.08,
+    "min_abs_dist_ma200": 0.02,
+    "max_near_above_ma200": 0.08,
     "max_chg24": 3.0,
     "cooldown_min": 150
   },
   "baseline_n": 76,
   "summary": {
-    "n": 7,
-    "symbols": 7,
+    "n": 2,
+    "symbols": 2,
     "reclaim_3_rate": 0.0,
     "by_horizon": {
       "15m": {
-        "n": 7,
-        "win_rate": 57.1,
-        "avg": 2.923,
-        "median": 0.413
+        "n": 2,
+        "win_rate": 100.0,
+        "avg": 3.309,
+        "median": 3.309
       },
       "30m": {
-        "n": 7,
-        "win_rate": 42.9,
-        "avg": 2.187,
-        "median": -0.807
+        "n": 2,
+        "win_rate": 50.0,
+        "avg": -0.378,
+        "median": -0.378
       },
       "1h": {
-        "n": 7,
-        "win_rate": 42.9,
-        "avg": 2.481,
-        "median": -0.821
+        "n": 2,
+        "win_rate": 50.0,
+        "avg": 1.087,
+        "median": 1.087
       },
       "2h": {
-        "n": 7,
-        "win_rate": 42.9,
-        "avg": 2.271,
-        "median": -0.767
+        "n": 2,
+        "win_rate": 100.0,
+        "avg": 5.185,
+        "median": 5.185
       },
       "4h": {
-        "n": 7,
-        "win_rate": 28.6,
-        "avg": -1.951,
-        "median": -4.464
+        "n": 2,
+        "win_rate": 0.0,
+        "avg": -4.206,
+        "median": -4.206
       },
       "8h": {
-        "n": 7,
-        "win_rate": 28.6,
-        "avg": -5.164,
-        "median": -15.236
+        "n": 2,
+        "win_rate": 0.0,
+        "avg": -18.88,
+        "median": -18.88
       },
       "12h": {
-        "n": 6,
-        "win_rate": 33.3,
-        "avg": -13.545,
-        "median": -22.719
+        "n": 2,
+        "win_rate": 0.0,
+        "avg": -26.825,
+        "median": -26.825
       }
     },
     "symbols_list": [
-      "BEAT/USDT",
-      "BICO/USDT",
       "BTW/USDT",
-      "COOKIE/USDT",
-      "MUBARAK/USDT",
-      "SAGA/USDT",
-      "XAN/USDT"
+      "MUBARAK/USDT"
     ]
   }
 }

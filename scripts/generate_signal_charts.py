@@ -67,10 +67,13 @@ def short_pnl_table(df: pd.DataFrame, signal_rows: pd.DataFrame) -> list[dict]:
             "pnl": pnl,
             "time": entry_ts // 1000,
             "dist_ma99_pct": None,
+            "dist_ma200_pct": None,
             "close_break_pct": None,
         }
         if "dist_ma99_pct" in s and pd.notna(s["dist_ma99_pct"]):
             row["dist_ma99_pct"] = float(s["dist_ma99_pct"])
+        if "dist_ma200_pct" in s and pd.notna(s["dist_ma200_pct"]):
+            row["dist_ma200_pct"] = float(s["dist_ma200_pct"])
         if "close_break_pct" in s and pd.notna(s["close_break_pct"]):
             row["close_break_pct"] = float(s["close_break_pct"])
         out.append(row)
@@ -129,14 +132,19 @@ def render_symbol_html(
         f'<div class="filter-note">{filter_note}</div>' if filter_note else ""
     )
     show_dist = any(s.get("dist_ma99_pct") is not None for s in data["signals"])
-    dist_th = "<th>距SMA99</th>" if show_dist else ""
-    dist_td_js = (
-        """
+    show_dist200 = any(s.get("dist_ma200_pct") is not None for s in data["signals"])
+    dist_th = ("<th>距SMA99</th>" if show_dist else "") + (
+        "<th>距SMA200</th>" if show_dist200 else ""
+    )
+    dist_td_js = ""
+    if show_dist:
+        dist_td_js += """
           <td class="mono">${s.dist_ma99_pct === null || s.dist_ma99_pct === undefined ? '—' : (s.dist_ma99_pct>=0?'+':'') + s.dist_ma99_pct.toFixed(2) + '%'}</td>
 """
-        if show_dist
-        else ""
-    )
+    if show_dist200:
+        dist_td_js += """
+          <td class="mono">${s.dist_ma200_pct === null || s.dist_ma200_pct === undefined ? '—' : (s.dist_ma200_pct>=0?'+':'') + s.dist_ma200_pct.toFixed(2) + '%'}</td>
+"""
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -411,22 +419,22 @@ def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
 <body>
   <div class="wrap">
     <h1>影線頸線圖表</h1>
-    <p class="sub">{DAY} UTC · Binance USDT-M 5m。Balanced / Strict 共用 SMA99 規則：|Δ|&lt;2% 不空，仍在上方且距離&lt;8% 也不空。</p>
+    <p class="sub">{DAY} UTC · Binance USDT-M 5m。Balanced / Strict 共用 SMA99+SMA200 規則：|Δ|&lt;2% 不空，仍在上方且距離&lt;8% 也不空。</p>
     <div class="grid">
       <a class="card recommend" href="./balanced/index.html">
         <div class="tag">RECOMMENDED</div>
         <div class="name">Balanced 中等降噪</div>
-        <div class="desc">收盤確認 + 收陰 + SMA25 軟條件 + SMA99 規則 + 60m 冷卻。</div>
+        <div class="desc">收盤確認 + 收陰 + SMA25 軟條件 + SMA99/SMA200 規則 + 60m 冷卻。</div>
         <div class="meta">{balanced_n} 筆訊號</div>
       </a>
       <a class="card" href="./strict/index.html">
         <div class="name">Strict 嚴格版</div>
-        <div class="desc">Balanced 同套 SMA99，再加前K確認、SMA14&lt;25、破位≥0.8%、150m 冷卻。</div>
+        <div class="desc">同套 SMA99/SMA200，再加前K確認、SMA14&lt;25、破位≥0.8%、150m 冷卻。</div>
         <div class="meta">{strict_n} 筆訊號</div>
       </a>
       <a class="card" href="./raw/index.html">
         <div class="name">原版訊號</div>
-        <div class="desc">影線（Low）刺破即報，無 SMA99 過濾，留作對照。</div>
+        <div class="desc">影線（Low）刺破即報，無 SMA99/SMA200 過濾，留作對照。</div>
         <div class="meta">{baseline_n} 筆訊號</div>
       </a>
     </div>
@@ -449,7 +457,7 @@ def generate_set(
     sig = pd.read_csv(sig_csv)
     # normalize columns for strict csv which already has pnl_* optional
     need_cols = ["symbol", "time_utc", "price", "bias", "line_val", "sma14"]
-    for opt in ("dist_ma99_pct", "close_break_pct"):
+    for opt in ("dist_ma99_pct", "dist_ma200_pct", "close_break_pct"):
         if opt in sig.columns:
             need_cols.append(opt)
     missing = set(need_cols) - set(sig.columns)
@@ -474,6 +482,8 @@ def generate_set(
                         s["pnl"][h] = round(float(src[col]), 2)
                 if "dist_ma99_pct" in src and pd.notna(src["dist_ma99_pct"]):
                     s["dist_ma99_pct"] = float(src["dist_ma99_pct"])
+                if "dist_ma200_pct" in src and pd.notna(src["dist_ma200_pct"]):
+                    s["dist_ma200_pct"] = float(src["dist_ma200_pct"])
         stem = file_stem(symbol)
         href = f"{stem}.html"
         html = render_symbol_html(
@@ -524,22 +534,22 @@ def main():
             Path("/workspace/output/shadow_neckline_balanced_1d.csv"),
             root / "balanced",
             title=f"Balanced 中等降噪 · {DAY}",
-            subtitle=f"{DAY} UTC · 收盤確認 + 收陰 + SMA25軟條件 + SMA99規則（|Δ|≥2%，上方需≥8%）+ 60m 冷卻。",
+            subtitle=f"{DAY} UTC · 收盤確認 + 收陰 + SMA25軟條件 + SMA99/SMA200規則（|Δ|≥2%，上方需≥8%）+ 60m 冷卻。",
             badge="BALANCED",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="過濾：收盤破頸線+SMA14、收陰、SMA25 軟條件；|ΔSMA99|&lt;2% 不空；仍在 SMA99 上方且距離&lt;8% 也不空。",
+            filter_note="過濾：收盤破頸線+SMA14、收陰、SMA25 軟條件；SMA99/SMA200：|Δ|&lt;2% 不空；仍在上方且距離&lt;8% 也不空。",
         )
     if args.mode in ("all", "strict"):
         strict_n, _ = generate_set(
             Path("/workspace/output/shadow_neckline_strict_1d.csv"),
             root / "strict",
             title=f"Strict 嚴格降噪 · {DAY}",
-            subtitle=f"{DAY} UTC · 前K確認 + SMA14&lt;25 + 破位≥0.8% + 同套 SMA99 規則 + 150m 冷卻。",
+            subtitle=f"{DAY} UTC · 前K確認 + SMA14&lt;25 + 破位≥0.8% + 同套 SMA99/SMA200 規則 + 150m 冷卻。",
             badge="STRICT",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="過濾：收盤破位、前K確認、SMA14&lt;SMA25；|ΔSMA99|&lt;2% 不空；仍在 SMA99 上方且距離&lt;8% 也不空。",
+            filter_note="過濾：收盤破位、前K確認、SMA14&lt;SMA25；SMA99/SMA200：|Δ|&lt;2% 不空；仍在上方且距離&lt;8% 也不空。",
         )
 
     if args.mode == "all":

@@ -3,9 +3,9 @@ Shared shadow-neckline detection helpers.
 
 Tiers:
 - raw: wick/low break (original)
-- balanced: close confirm + soft SMA25 + SMA99 proximity rules
+- balanced: close confirm + soft SMA25 + SMA99/SMA200 proximity rules
 - strict: balanced-style close confirm + prev-bar confirm + SMA14<SMA25 + stricter structure
-         + same SMA99 rules
+         + same SMA99/SMA200 rules
 """
 
 from __future__ import annotations
@@ -33,9 +33,11 @@ class DetectParams:
     # ma filters
     sma25_soft: bool = True  # close<sma25 OR break>=1%
     require_sma25_hard: bool = False  # close<sma25 and sma14<sma25
-    # sma99 rules (same across balanced/strict)
+    # sma99 / sma200 proximity (same across balanced/strict)
     min_abs_dist_ma99: float = 0.02  # |Δ| < 2% skip
     max_near_above_ma99: float = 0.08  # 0<=Δ<8% skip
+    min_abs_dist_ma200: float = 0.02  # |Δ| < 2% skip
+    max_near_above_ma200: float = 0.08  # 0<=Δ<8% skip
     # meta
     max_chg24: float = 3.0
     cooldown_min: int = 60
@@ -53,6 +55,8 @@ STRICT = DetectParams(
     require_sma25_hard=True,
     min_abs_dist_ma99=0.02,
     max_near_above_ma99=0.08,
+    min_abs_dist_ma200=0.02,
+    max_near_above_ma200=0.08,
     max_chg24=3.0,  # keep TUT-class names; structure/confirm already stricter
     cooldown_min=150,
 )
@@ -114,7 +118,15 @@ def detect_at_index(
     slope = (h3 - h1) / (p3 - p1) if p3 != p1 else 0.0
     neck = h1 + slope * (curr_idx - p1)
     s14, s25, s99 = sma14[curr_idx], sma25[curr_idx], sma99[curr_idx]
-    if np.isnan(s14) or np.isnan(s25) or np.isnan(s99) or s99 == 0:
+    s200_entry = sma200[curr_idx]
+    if (
+        np.isnan(s14)
+        or np.isnan(s25)
+        or np.isnan(s99)
+        or np.isnan(s200_entry)
+        or s99 == 0
+        or s200_entry == 0
+    ):
         return False, None
 
     if p.use_close_break:
@@ -145,11 +157,17 @@ def detect_at_index(
         if not (close[curr_idx - 1] < neck_prev):
             return False, None
 
-    # Shared SMA99 rules
+    # Shared SMA99 / SMA200 proximity rules
     dist99 = (close[curr_idx] - s99) / s99
     if abs(dist99) < p.min_abs_dist_ma99:
         return False, None
     if 0 <= dist99 < p.max_near_above_ma99:
+        return False, None
+
+    dist200 = (close[curr_idx] - s200_entry) / s200_entry
+    if abs(dist200) < p.min_abs_dist_ma200:
+        return False, None
+    if 0 <= dist200 < p.max_near_above_ma200:
         return False, None
 
     if high[curr_idx] >= h2:
@@ -162,7 +180,9 @@ def detect_at_index(
         "sma14": round(float(s14), 6),
         "sma25": round(float(s25), 6),
         "sma99": round(float(s99), 6),
+        "sma200": round(float(s200_entry), 6),
         "dist_ma99_pct": round(dist99 * 100, 2),
+        "dist_ma200_pct": round(dist200 * 100, 2),
         "close_break_pct": round(br * 100, 2),
         "span": int(span),
     }
