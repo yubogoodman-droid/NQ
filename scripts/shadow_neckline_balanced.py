@@ -6,7 +6,7 @@
 - 收盤跌破深度 >= 0.3%
 - 當根收陰
 - SMA25：收盤跌破 或 破位深度>=1%（軟條件）
-- 距 SMA99 太近（|close-sma99|/sma99 < 2%）不空，避免撞支撐
+- 距 SMA99 太近（|Δ| < 2%）不空；仍在 SMA99 上方且距離 < 8% 也不空（避免砸支撐）
 - 肩距 8~50、對稱 < 15%
 - 24h 漲幅上限 300%
 - 同幣冷卻 60 分鐘
@@ -33,7 +33,8 @@ SCAN_INTERVAL = 60
 REPORT_GAP_MINUTES = 60
 MAX_CHG24 = 300.0  # percent（放寬以保留 TUT 這類強勢泵幣破位）
 MIN_CLOSE_BREAK_PCT = 0.3  # percent
-MIN_ABS_DIST_MA99_PCT = 2.0  # 太靠近 SMA99 不空
+MIN_ABS_DIST_MA99_PCT = 2.0  # |ΔSMA99| 太近不空
+MAX_NEAR_ABOVE_MA99_PCT = 8.0  # 仍在 SMA99 上方且距離不足此值 → 不空
 # ===========================================
 
 
@@ -116,9 +117,13 @@ def detect_shadow_neckline_balanced(df: pd.DataFrame, chg24: float | None):
     # Soft SMA25
     if not (close[curr_idx] < s25 or close_break_pct >= 1.0):
         return False, None
-    # Too close to SMA99 → skip (support / chop zone)
+    # MA99 proximity:
+    # 1) |Δ| < 2% → chop, skip
+    # 2) still ABOVE MA99 but within 8% → about to hit support, skip short
     dist_ma99_pct = (close[curr_idx] - s99) / s99 * 100
     if abs(dist_ma99_pct) < MIN_ABS_DIST_MA99_PCT:
+        return False, None
+    if 0 <= dist_ma99_pct < MAX_NEAR_ABOVE_MA99_PCT:
         return False, None
     if high[curr_idx] >= h2:
         return False, None
@@ -141,7 +146,8 @@ def main():
     exchange = ccxt.binanceusdm({"enableRateLimit": True})
     print(
         f"📡 Balanced 影線頸線監控中... (冷卻 {REPORT_GAP_MINUTES}m / "
-        f"收盤確認 / SMA25軟條件 / |ΔSMA99|>={MIN_ABS_DIST_MA99_PCT}% / 24h<{MAX_CHG24}%)"
+        f"收盤確認 / SMA25軟條件 / |ΔSMA99|>={MIN_ABS_DIST_MA99_PCT}% / "
+        f"上方距SMA99>={MAX_NEAR_ABOVE_MA99_PCT}% / 24h<{MAX_CHG24}%)"
     )
     last_report_time = {}
 
@@ -183,7 +189,7 @@ def main():
                         f"📉 頸線: `{d['line_val']}`  破位: `{d['close_break_pct']}%`\n"
                         f"Ⓜ️ SMA14/25/99: `{d['sma14']}` / `{d['sma25']}` / `{d['sma99']}`\n"
                         f"📏 距SMA99: `{d['dist_ma99_pct']}%`\n"
-                        f"⚠️ *收盤跌破頸線+SMA14，且遠離SMA99*"
+                        f"⚠️ *收盤跌破頸線+SMA14；遠離SMA99（上方需≥{MAX_NEAR_ABOVE_MA99_PCT:.0f}%或已跌破）*"
                     )
                     send_tg_message(msg)
                     print(f"🎯 訊號: {symbol} break={d['close_break_pct']}% bias={d['bias']}%")

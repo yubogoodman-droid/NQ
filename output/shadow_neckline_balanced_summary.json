@@ -11,13 +11,14 @@
     "sma25_soft": true,
     "max_chg24": 3.0,
     "cooldown_min": 60,
-    "min_abs_dist_ma99": 0.02
+    "min_abs_dist_ma99": 0.02,
+    "max_near_above_ma99": 0.08
   },
   "summary": {
-    "n": 43,
-    "symbols": 20,
-    "reclaim_3_rate": 20.9,
-    "pnl_1h_win": 45.0,
-    "pnl_1h_avg": -1.979
+    "n": 28,
+    "symbols": 16,
+    "reclaim_3_rate": 14.3,
+    "pnl_1h_win": 44.4,
+    "pnl_1h_avg": -1.266
   }
 }
