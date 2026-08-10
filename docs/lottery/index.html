@@ -449,7 +449,7 @@
 
   <script>
     const MAX_DRAWS = 3;
-    const STORAGE_KEY = "lucky-draw-v3";
+    const STORAGE_KEY = "lucky-draw-v4";
 
     const PRIZES = [
       { id: "kr-hotel",  name: "韓國住宿",       emoji: "🇰🇷", weight: 1 },
@@ -459,7 +459,7 @@
       { id: "mycard-1k", name: "MyCard 1000",    emoji: "💳", weight: 1 },
       { id: "mycard-1k2",name: "MyCard 1000",    emoji: "💳", weight: 1 },
       { id: "mycard-3k", name: "MyCard 3000",    emoji: "💎", weight: 1 },
-      { id: "paladin",   name: "聖騎士的項鍊",   emoji: "📿", weight: 1, image: "prizes/IMG_4123.jpeg" },
+      { id: "dragon-chain", name: "龍鍊",        emoji: "🐉", weight: 1, image: "prizes/IMG_4123.jpeg" },
       { id: "gi-card",   name: "貪婪之島卡抽獎", emoji: "🃏", weight: 1, spellDraw: true },
     ];
 
@@ -546,9 +546,12 @@
       return MAX_DRAWS - state.used;
     }
 
-    function pickRandom(forceSpell = false) {
+    function pickRandom({ forceSpell = false, forceDragon = false } = {}) {
       if (forceSpell) {
         return PRIZES.find(p => p.spellDraw) || PRIZES[PRIZES.length - 1];
+      }
+      if (forceDragon) {
+        return PRIZES.find(p => p.id === "dragon-chain") || PRIZES[0];
       }
       // 前兩次排除貪婪之島，最後一次才會中
       const pool = PRIZES.filter(p => !p.spellDraw);
@@ -695,9 +698,10 @@
       spinning = true;
       renderChances();
 
-      // 最後一次（第 3 抽）必定中貪婪之島咒語卡
+      // 第 1 抽必定中龍鍊；第 3 抽必定中貪婪之島咒語卡
+      const isFirstDraw = state.used === 0;
       const isLastDraw = remaining() === 1;
-      const base = pickRandom(isLastDraw);
+      const base = pickRandom({ forceSpell: isLastDraw, forceDragon: isFirstDraw && !isLastDraw });
       const winner = resolvePrize(base);
       const reel = document.getElementById("reel");
 
