@@ -30,7 +30,7 @@ TG_CHAT_ID = ""
 MIN_VOLUME_USDT = 50_000_000
 SCAN_INTERVAL = 60
 REPORT_GAP_MINUTES = 60
-MAX_CHG24 = 120.0  # percent
+MAX_CHG24 = 300.0  # percent（放寬以保留 TUT 這類強勢泵幣破位）
 MIN_CLOSE_BREAK_PCT = 0.3  # percent
 # ===========================================
 
