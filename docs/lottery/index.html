@@ -546,12 +546,9 @@
       return MAX_DRAWS - state.used;
     }
 
-    function pickRandom({ forceSpell = false, forceDragon = false } = {}) {
+    function pickRandom(forceSpell = false) {
       if (forceSpell) {
         return PRIZES.find(p => p.spellDraw) || PRIZES[PRIZES.length - 1];
-      }
-      if (forceDragon) {
-        return PRIZES.find(p => p.id === "dragon-chain") || PRIZES[0];
       }
       // 前兩次排除貪婪之島，最後一次才會中
       const pool = PRIZES.filter(p => !p.spellDraw);
@@ -698,10 +695,9 @@
       spinning = true;
       renderChances();
 
-      // 第 1 抽必定中龍鍊；第 3 抽必定中貪婪之島咒語卡
-      const isFirstDraw = state.used === 0;
+      // 最後一次（第 3 抽）必定中貪婪之島咒語卡
       const isLastDraw = remaining() === 1;
-      const base = pickRandom({ forceSpell: isLastDraw, forceDragon: isFirstDraw && !isLastDraw });
+      const base = pickRandom(isLastDraw);
       const winner = resolvePrize(base);
       const reel = document.getElementById("reel");
 
