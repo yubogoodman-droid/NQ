@@ -12,9 +12,9 @@ from pathlib import Path
 import pandas as pd
 import pandas_ta as ta
 
+import argparse
+
 CACHE = Path("/tmp/binance_um_klines")
-SIG_CSV = Path("/workspace/output/shadow_neckline_backtest_1d.csv")
-OUT_DIR = Path("/workspace/docs/charts")
 DAY = "2026-08-09"
 HIST = "2026-08-08"
 HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
@@ -112,7 +112,8 @@ def chart_payload(symbol: str, signal_rows: pd.DataFrame) -> dict:
     }
 
 
-def render_symbol_html(data: dict) -> str:
+def render_symbol_html(data: dict, index_href: str = "./index.html", badge: str = "") -> str:
+    badge_html = f'<div class="badge">{badge}</div>' if badge else ""
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -142,6 +143,7 @@ def render_symbol_html(data: dict) -> str:
   .wrap {{ max-width:1180px; margin:0 auto; padding:28px 20px 48px; }}
   .nav a {{ color:var(--muted); text-decoration:none; font-size:.86rem; }}
   .nav a:hover {{ color:var(--ink); }}
+  .badge {{ display:inline-block; margin-top:10px; font-family:"JetBrains Mono",monospace; font-size:.72rem; color:var(--accent); border:1px solid rgba(201,162,39,.35); padding:4px 8px; }}
   header {{ display:grid; gap:8px; margin:14px 0 22px; }}
   .brand {{ font-family:"IBM Plex Serif",serif; font-size:clamp(1.8rem,4vw,2.6rem); font-weight:600; letter-spacing:-.02em; }}
   .brand span {{ color:var(--accent); }}
@@ -171,7 +173,8 @@ def render_symbol_html(data: dict) -> str:
 </head>
 <body>
   <div class="wrap">
-    <div class="nav"><a href="./index.html">← 全部訊號幣種</a></div>
+    <div class="nav"><a href="{index_href}">← 全部訊號幣種</a></div>
+    {badge_html}
     <header>
       <div class="brand">{data['symbol'].split('/')[0]}<span>/{data['symbol'].split('/')[-1]}</span></div>
       <div class="sub">影線頸線破位訊號與做空報酬（{data['day']} UTC，Binance USDT-M 5m）</div>
@@ -273,7 +276,7 @@ def render_symbol_html(data: dict) -> str:
 """
 
 
-def render_index(cards: list[dict]) -> str:
+def render_index(cards: list[dict], title: str, subtitle: str, extra_nav: str = "") -> str:
     cards_sorted = sorted(cards, key=lambda x: (-x["n"], x["symbol"]))
     items = []
     for c in cards_sorted:
@@ -295,7 +298,7 @@ def render_index(cards: list[dict]) -> str:
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>影線頸線訊號幣種 · {DAY}</title>
+<title>{title}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -335,8 +338,9 @@ def render_index(cards: list[dict]) -> str:
 </head>
 <body>
   <div class="wrap">
-    <h1>影線頸線訊號</h1>
-    <p class="sub">{DAY} UTC · Binance USDT-M 5m · 成交額≥50M 宇宙下觸發的幣種。點進去看 K 線、均線與做空報酬。</p>
+    {extra_nav}
+    <h1>{title}</h1>
+    <p class="sub">{subtitle}</p>
     <div class="stats">
       <span>幣種 <b>{len(cards_sorted)}</b></span>
       <span>訊號總數 <b>{sum(c['n'] for c in cards_sorted)}</b></span>
@@ -351,41 +355,131 @@ def render_index(cards: list[dict]) -> str:
 """
 
 
-def main():
-    sig = pd.read_csv(SIG_CSV)
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    cards = []
+def render_hub(baseline_n: int, strict_n: int) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>影線頸線回測圖表 · {DAY}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {{ --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193; --line:rgba(232,240,234,.12); --accent:#c9a227; --long:#3dba7a; }}
+  body {{ margin:0; font-family:"IBM Plex Sans",sans-serif; color:var(--ink);
+    background: radial-gradient(900px 500px at 10% -10%, rgba(201,162,39,.18), transparent 55%), linear-gradient(165deg,var(--bg0),var(--bg1)); min-height:100vh; }}
+  .wrap {{ max-width:860px; margin:0 auto; padding:48px 20px; }}
+  h1 {{ font-family:"IBM Plex Serif",serif; font-size:clamp(2rem,4vw,2.8rem); margin:0 0 10px; }}
+  .sub {{ color:var(--muted); line-height:1.55; margin-bottom:28px; }}
+  .grid {{ display:grid; gap:14px; }}
+  a.card {{ display:block; text-decoration:none; color:inherit; border:1px solid var(--line); padding:20px;
+    background:rgba(20,32,27,.65); transition:border-color .15s, transform .15s; }}
+  a.card:hover {{ border-color:rgba(201,162,39,.55); transform:translateY(-2px); }}
+  .name {{ font-family:"IBM Plex Serif",serif; font-size:1.35rem; margin-bottom:8px; }}
+  .desc {{ color:var(--muted); font-size:.92rem; line-height:1.45; }}
+  .meta {{ margin-top:12px; font-family:"JetBrains Mono",monospace; font-size:.78rem; color:var(--accent); }}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>影線頸線圖表</h1>
+    <p class="sub">{DAY} UTC · Binance USDT-M 5m。建議先看 Strict 降噪版。</p>
+    <div class="grid">
+      <a class="card" href="./strict/index.html">
+        <div class="name">Strict 降噪版</div>
+        <div class="desc">收盤確認破位 + 前K確認 + SMA25 空頭排列 + 冷卻 150m。雜訊較少。</div>
+        <div class="meta">{strict_n} 筆訊號</div>
+      </a>
+      <a class="card" href="./raw/index.html">
+        <div class="name">原版訊號</div>
+        <div class="desc">影線（Low）刺破即報，訊號多、雜訊也多，留作對照。</div>
+        <div class="meta">{baseline_n} 筆訊號</div>
+      </a>
+    </div>
+  </div>
+</body>
+</html>
+"""
 
+
+def generate_set(sig_csv: Path, out_dir: Path, title: str, subtitle: str, badge: str, index_href: str, extra_nav: str):
+    sig = pd.read_csv(sig_csv)
+    # normalize columns for strict csv which already has pnl_* optional
+    need_cols = {"symbol", "time_utc", "price", "bias", "line_val", "sma14"}
+    missing = need_cols - set(sig.columns)
+    if missing:
+        raise SystemExit(f"{sig_csv} missing {missing}")
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cards = []
     for symbol, g in sig.groupby("symbol"):
         g = g.sort_values("time_utc")
-        data = chart_payload(symbol, g)
+        data = chart_payload(symbol, g[list(need_cols)])
+        # If strict csv already has pnl columns, override table values
+        if "pnl_1h" in g.columns:
+            by_time = {r["time_utc"]: r for _, r in g.iterrows()}
+            for s in data["signals"]:
+                src = by_time.get(s["time_utc"])
+                if src is None:
+                    continue
+                for h in HORIZONS:
+                    col = f"pnl_{h}"
+                    if col in src and pd.notna(src[col]):
+                        s["pnl"][h] = round(float(src[col]), 2)
         stem = file_stem(symbol)
         href = f"{stem}.html"
-        html = render_symbol_html(data)
-        (OUT_DIR / href).write_text(html, encoding="utf-8")
-
+        html = render_symbol_html(data, index_href=index_href, badge=badge)
+        (out_dir / href).write_text(html, encoding="utf-8")
         pnls_1h = [s["pnl"].get("1h") for s in data["signals"] if s["pnl"].get("1h") is not None]
         avg_1h = round(sum(pnls_1h) / len(pnls_1h), 2) if pnls_1h else None
         times = " · ".join(t[11:] for t in g["time_utc"].tolist())
-        cards.append(
-            {
-                "symbol": symbol,
-                "href": href,
-                "n": len(data["signals"]),
-                "avg_1h": avg_1h,
-                "times": times,
-            }
-        )
-        print(f"wrote {href} signals={len(data['signals'])}")
+        cards.append({"symbol": symbol, "href": href, "n": len(data["signals"]), "avg_1h": avg_1h, "times": times})
+        print(f"[{out_dir.name}] {href} signals={len(data['signals'])}")
 
-    index = render_index(cards)
-    (OUT_DIR / "index.html").write_text(index, encoding="utf-8")
-    # convenience copies
-    Path("/workspace/docs/bico_shadow_neckline_chart.html").write_text(
-        (OUT_DIR / "BICOUSDT.html").read_text(encoding="utf-8"), encoding="utf-8"
-    )
-    print(f"index with {len(cards)} symbols -> {OUT_DIR/'index.html'}")
+    index = render_index(cards, title=title, subtitle=subtitle, extra_nav=extra_nav)
+    (out_dir / "index.html").write_text(index, encoding="utf-8")
+    return len(sig), len(cards)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=["all", "raw", "strict"], default="all")
+    args = parser.parse_args()
+
+    root = Path("/workspace/docs/charts")
+    root.mkdir(parents=True, exist_ok=True)
+
+    baseline_n = strict_n = 0
+    if args.mode in ("all", "raw"):
+        baseline_n, _ = generate_set(
+            Path("/workspace/output/shadow_neckline_backtest_1d.csv"),
+            root / "raw",
+            title=f"原版影線頸線訊號 · {DAY}",
+            subtitle=f"{DAY} UTC · Low 刺破即報（雜訊較多）。",
+            badge="RAW",
+            index_href="./index.html",
+            extra_nav='<div class="stats" style="margin-bottom:18px"><a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · <a href="../strict/index.html" style="color:#8aa193;text-decoration:none">Strict 版</a></div>',
+        )
+    if args.mode in ("all", "strict"):
+        strict_n, _ = generate_set(
+            Path("/workspace/output/shadow_neckline_strict_1d.csv"),
+            root / "strict",
+            title=f"Strict 降噪訊號 · {DAY}",
+            subtitle=f"{DAY} UTC · 收盤確認 + 前K確認 + SMA25 空頭排列 + 150m 冷卻。",
+            badge="STRICT",
+            index_href="./index.html",
+            extra_nav='<div class="stats" style="margin-bottom:18px"><a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · <a href="../raw/index.html" style="color:#8aa193;text-decoration:none">原版對照</a></div>',
+        )
+
+    if args.mode == "all":
+        # counts from files if one side skipped
+        if not baseline_n:
+            baseline_n = len(pd.read_csv("/workspace/output/shadow_neckline_backtest_1d.csv"))
+        if not strict_n:
+            strict_n = len(pd.read_csv("/workspace/output/shadow_neckline_strict_1d.csv"))
+        (root / "index.html").write_text(render_hub(baseline_n, strict_n), encoding="utf-8")
+        print("hub ->", root / "index.html")
 
 
 if __name__ == "__main__":
     main()
+
