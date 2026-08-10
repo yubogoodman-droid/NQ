@@ -16,19 +16,27 @@
   a.card { display:block; text-decoration:none; color:inherit; border:1px solid var(--line); padding:20px;
     background:rgba(20,32,27,.65); transition:border-color .15s, transform .15s; }
   a.card:hover { border-color:rgba(201,162,39,.55); transform:translateY(-2px); }
+  a.card.recommend { border-color: rgba(201,162,39,.45); }
   .name { font-family:"IBM Plex Serif",serif; font-size:1.35rem; margin-bottom:8px; }
   .desc { color:var(--muted); font-size:.92rem; line-height:1.45; }
   .meta { margin-top:12px; font-family:"JetBrains Mono",monospace; font-size:.78rem; color:var(--accent); }
+  .tag { display:inline-block; margin-bottom:8px; font-family:"JetBrains Mono",monospace; font-size:.68rem; color:var(--accent); border:1px solid rgba(201,162,39,.35); padding:2px 6px; }
 </style>
 </head>
 <body>
   <div class="wrap">
     <h1>影線頸線圖表</h1>
-    <p class="sub">2026-08-09 UTC · Binance USDT-M 5m。建議先看 Strict 降噪版。</p>
+    <p class="sub">2026-08-09 UTC · Binance USDT-M 5m。日常建議用 Balanced；想更少訊號再用 Strict。</p>
     <div class="grid">
+      <a class="card recommend" href="./balanced/index.html">
+        <div class="tag">RECOMMENDED</div>
+        <div class="name">Balanced 中等降噪</div>
+        <div class="desc">收盤確認破位 + 收陰 + SMA25 軟條件 + 冷卻 60m。比原版乾淨，又不會太少。</div>
+        <div class="meta">44 筆訊號</div>
+      </a>
       <a class="card" href="./strict/index.html">
-        <div class="name">Strict 降噪版</div>
-        <div class="desc">收盤確認破位 + 前K確認 + SMA25 空頭排列 + 冷卻 150m。雜訊較少。</div>
+        <div class="name">Strict 嚴格版</div>
+        <div class="desc">再加前K確認、SMA14&lt;SMA25、冷卻 150m。訊號很少、品質較挑。</div>
         <div class="meta">11 筆訊號</div>
       </a>
       <a class="card" href="./raw/index.html">

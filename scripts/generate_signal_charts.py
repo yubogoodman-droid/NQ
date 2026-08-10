@@ -355,7 +355,7 @@ def render_index(cards: list[dict], title: str, subtitle: str, extra_nav: str = 
 """
 
 
-def render_hub(baseline_n: int, strict_n: int) -> str:
+def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -374,19 +374,27 @@ def render_hub(baseline_n: int, strict_n: int) -> str:
   a.card {{ display:block; text-decoration:none; color:inherit; border:1px solid var(--line); padding:20px;
     background:rgba(20,32,27,.65); transition:border-color .15s, transform .15s; }}
   a.card:hover {{ border-color:rgba(201,162,39,.55); transform:translateY(-2px); }}
+  a.card.recommend {{ border-color: rgba(201,162,39,.45); }}
   .name {{ font-family:"IBM Plex Serif",serif; font-size:1.35rem; margin-bottom:8px; }}
   .desc {{ color:var(--muted); font-size:.92rem; line-height:1.45; }}
   .meta {{ margin-top:12px; font-family:"JetBrains Mono",monospace; font-size:.78rem; color:var(--accent); }}
+  .tag {{ display:inline-block; margin-bottom:8px; font-family:"JetBrains Mono",monospace; font-size:.68rem; color:var(--accent); border:1px solid rgba(201,162,39,.35); padding:2px 6px; }}
 </style>
 </head>
 <body>
   <div class="wrap">
     <h1>影線頸線圖表</h1>
-    <p class="sub">{DAY} UTC · Binance USDT-M 5m。建議先看 Strict 降噪版。</p>
+    <p class="sub">{DAY} UTC · Binance USDT-M 5m。日常建議用 Balanced；想更少訊號再用 Strict。</p>
     <div class="grid">
+      <a class="card recommend" href="./balanced/index.html">
+        <div class="tag">RECOMMENDED</div>
+        <div class="name">Balanced 中等降噪</div>
+        <div class="desc">收盤確認破位 + 收陰 + SMA25 軟條件 + 冷卻 60m。比原版乾淨，又不會太少。</div>
+        <div class="meta">{balanced_n} 筆訊號</div>
+      </a>
       <a class="card" href="./strict/index.html">
-        <div class="name">Strict 降噪版</div>
-        <div class="desc">收盤確認破位 + 前K確認 + SMA25 空頭排列 + 冷卻 150m。雜訊較少。</div>
+        <div class="name">Strict 嚴格版</div>
+        <div class="desc">再加前K確認、SMA14&lt;SMA25、冷卻 150m。訊號很少、品質較挑。</div>
         <div class="meta">{strict_n} 筆訊號</div>
       </a>
       <a class="card" href="./raw/index.html">
@@ -442,13 +450,22 @@ def generate_set(sig_csv: Path, out_dir: Path, title: str, subtitle: str, badge:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["all", "raw", "strict"], default="all")
+    parser.add_argument("--mode", choices=["all", "raw", "balanced", "strict"], default="all")
     args = parser.parse_args()
 
     root = Path("/workspace/docs/charts")
     root.mkdir(parents=True, exist_ok=True)
 
-    baseline_n = strict_n = 0
+    nav = (
+        '<div class="stats" style="margin-bottom:18px">'
+        '<a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · '
+        '<a href="../balanced/index.html" style="color:#8aa193;text-decoration:none">Balanced</a> · '
+        '<a href="../strict/index.html" style="color:#8aa193;text-decoration:none">Strict</a> · '
+        '<a href="../raw/index.html" style="color:#8aa193;text-decoration:none">Raw</a>'
+        "</div>"
+    )
+
+    baseline_n = balanced_n = strict_n = 0
     if args.mode in ("all", "raw"):
         baseline_n, _ = generate_set(
             Path("/workspace/output/shadow_neckline_backtest_1d.csv"),
@@ -457,29 +474,43 @@ def main():
             subtitle=f"{DAY} UTC · Low 刺破即報（雜訊較多）。",
             badge="RAW",
             index_href="./index.html",
-            extra_nav='<div class="stats" style="margin-bottom:18px"><a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · <a href="../strict/index.html" style="color:#8aa193;text-decoration:none">Strict 版</a></div>',
+            extra_nav=nav,
+        )
+    if args.mode in ("all", "balanced"):
+        balanced_n, _ = generate_set(
+            Path("/workspace/output/shadow_neckline_balanced_1d.csv"),
+            root / "balanced",
+            title=f"Balanced 中等降噪 · {DAY}",
+            subtitle=f"{DAY} UTC · 收盤確認 + 收陰 + SMA25 軟條件 + 60m 冷卻。",
+            badge="BALANCED",
+            index_href="./index.html",
+            extra_nav=nav,
         )
     if args.mode in ("all", "strict"):
         strict_n, _ = generate_set(
             Path("/workspace/output/shadow_neckline_strict_1d.csv"),
             root / "strict",
-            title=f"Strict 降噪訊號 · {DAY}",
-            subtitle=f"{DAY} UTC · 收盤確認 + 前K確認 + SMA25 空頭排列 + 150m 冷卻。",
+            title=f"Strict 嚴格降噪 · {DAY}",
+            subtitle=f"{DAY} UTC · 收盤確認 + 前K確認 + SMA14&lt;25 + 150m 冷卻。",
             badge="STRICT",
             index_href="./index.html",
-            extra_nav='<div class="stats" style="margin-bottom:18px"><a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · <a href="../raw/index.html" style="color:#8aa193;text-decoration:none">原版對照</a></div>',
+            extra_nav=nav,
         )
 
     if args.mode == "all":
-        # counts from files if one side skipped
         if not baseline_n:
             baseline_n = len(pd.read_csv("/workspace/output/shadow_neckline_backtest_1d.csv"))
+        if not balanced_n:
+            balanced_n = len(pd.read_csv("/workspace/output/shadow_neckline_balanced_1d.csv"))
         if not strict_n:
             strict_n = len(pd.read_csv("/workspace/output/shadow_neckline_strict_1d.csv"))
-        (root / "index.html").write_text(render_hub(baseline_n, strict_n), encoding="utf-8")
+        (root / "index.html").write_text(
+            render_hub(baseline_n, balanced_n, strict_n), encoding="utf-8"
+        )
         print("hub ->", root / "index.html")
 
 
 if __name__ == "__main__":
     main()
+
 

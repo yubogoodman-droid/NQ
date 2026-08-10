@@ -1,0 +1,24 @@
+{
+  "day": "2026-08-09",
+  "params": {
+    "min_span": 8,
+    "max_span": 50,
+    "shoulder_sym": 0.15,
+    "min_bias": 0.05,
+    "max_bias": 2.0,
+    "min_close_break_pct": 0.003,
+    "require_red": true,
+    "require_prev_close_below": false,
+    "sma25_soft": true,
+    "max_chg24": 1.2,
+    "cooldown_min": 60
+  },
+  "summary": {
+    "n": 44,
+    "symbols": 19,
+    "reclaim_3_rate": 20.5,
+    "pnl_1h_win": 39.0,
+    "pnl_1h_avg": -2.113,
+    "pnl_1h_median": -0.821
+  }
+}
