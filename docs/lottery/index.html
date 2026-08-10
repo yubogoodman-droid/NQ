@@ -463,17 +463,18 @@
 
   <script>
     const MAX_DRAWS = 3;
-    const STORAGE_KEY = "lucky-draw-v2";
+    const STORAGE_KEY = "lucky-draw-v3";
 
     const PRIZES = [
-      { id: "kr-hotel",  name: "韓國住宿",       emoji: "🇰🇷" },
-      { id: "jp-hotel",  name: "日本住宿",       emoji: "🇯🇵" },
-      { id: "kr-sim",    name: "韓國網卡",       emoji: "📶" },
-      { id: "jp-sim",    name: "日本網卡",       emoji: "📡" },
-      { id: "mycard-1k", name: "MyCard 1000",    emoji: "💳" },
-      { id: "mycard-1k2",name: "MyCard 1000",    emoji: "💳" },
-      { id: "mycard-3k", name: "MyCard 3000",    emoji: "💎" },
-      { id: "gi-card",   name: "貪婪之島卡抽獎", emoji: "🃏", spellDraw: true },
+      { id: "kr-hotel",  name: "韓國住宿",       emoji: "🇰🇷", weight: 1 },
+      { id: "jp-hotel",  name: "日本住宿",       emoji: "🇯🇵", weight: 1 },
+      { id: "kr-sim",    name: "韓國網卡",       emoji: "📶", weight: 1 },
+      { id: "jp-sim",    name: "日本網卡",       emoji: "📡", weight: 1 },
+      { id: "mycard-1k", name: "MyCard 1000",    emoji: "💳", weight: 1 },
+      { id: "mycard-1k2",name: "MyCard 1000",    emoji: "💳", weight: 1 },
+      { id: "mycard-3k", name: "MyCard 3000",    emoji: "💎", weight: 1 },
+      // 提高機率，約 1/3 會抽到並隨機揭曉一張咒語卡
+      { id: "gi-card",   name: "貪婪之島卡抽獎", emoji: "🃏", weight: 4, spellDraw: true },
     ];
 
     const SPELL_CARDS = [
@@ -560,7 +561,13 @@
     }
 
     function pickRandom() {
-      return PRIZES[Math.floor(Math.random() * PRIZES.length)];
+      const total = PRIZES.reduce((sum, p) => sum + (p.weight || 1), 0);
+      let roll = Math.random() * total;
+      for (const prize of PRIZES) {
+        roll -= (prize.weight || 1);
+        if (roll <= 0) return prize;
+      }
+      return PRIZES[PRIZES.length - 1];
     }
 
     const MYSTERY_LABELS = ["🎁 ???", "✨ ???", "🏆 ???", "💎 ???", "🎰 ???", "🌟 ???"];
@@ -651,8 +658,8 @@
       const subEl = document.getElementById("result-sub");
 
       if (prize.spellCard) {
-        emojiEl.classList.add("hidden");
-        emojiEl.textContent = "";
+        emojiEl.classList.remove("hidden");
+        emojiEl.textContent = "🃏";
         imgEl.src = spellImageSrc(prize.spellCard.id);
         imgEl.alt = prize.spellCard.name;
         imgEl.onerror = () => {
@@ -661,7 +668,7 @@
         };
         imgEl.classList.add("show");
         document.getElementById("result-prize").textContent = prize.displayName;
-        subEl.textContent = prize.sub;
+        subEl.textContent = `貪婪之島咒語卡隨機揭曉 · ${prize.sub}`;
         subEl.classList.add("show");
       } else {
         emojiEl.classList.remove("hidden");
