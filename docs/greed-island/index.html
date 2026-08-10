@@ -188,12 +188,14 @@
       background: var(--bg-card);
       border: 2px solid var(--border-spell);
       border-radius: var(--radius);
-      padding: 1rem 1.1rem 1.1rem;
+      padding: 0;
       cursor: pointer;
       transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
       position: relative;
       overflow: hidden;
       box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
     }
 
     .card::before {
@@ -210,11 +212,28 @@
       box-shadow: 0 12px 40px rgba(61, 139, 253, 0.2);
     }
 
+    .card-art {
+      width: 100%;
+      aspect-ratio: 280 / 389;
+      object-fit: cover;
+      display: block;
+      background: #0a1424;
+      border-bottom: 1px solid rgba(61, 139, 253, 0.2);
+    }
+
+    .card-body {
+      padding: 0.85rem 1rem 1rem;
+      position: relative;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 0.6rem;
+      margin-bottom: 0.5rem;
       position: relative;
     }
 
@@ -359,6 +378,22 @@
       font-size: 0.9rem;
     }
 
+    .modal-art-wrap {
+      padding: 0 1.5rem;
+      margin-top: -0.25rem;
+    }
+
+    .modal-art {
+      width: 100%;
+      max-height: 340px;
+      object-fit: contain;
+      border-radius: 12px;
+      border: 2px solid var(--border-spell);
+      background: #0a1424;
+      display: block;
+      margin: 0 auto;
+    }
+
     .modal-body { padding: 1.25rem 1.5rem 1.5rem; }
 
     .detail-row {
@@ -463,6 +498,9 @@
         <h2 class="modal-name" id="modal-name"></h2>
         <div class="modal-name-en" id="modal-name-en"></div>
       </div>
+      <div class="modal-art-wrap">
+        <img class="modal-art" id="modal-art" alt="" loading="lazy" />
+      </div>
       <div class="modal-body">
         <div class="detail-row"><span class="detail-label">入手難度</span><span class="detail-value" id="modal-rank"></span></div>
         <div class="detail-row"><span class="detail-label">卡片化限度枚數</span><span class="detail-value" id="modal-limit"></span></div>
@@ -475,7 +513,7 @@
   </div>
 
   <footer class="footer">
-    <p>資料來源：HUNTER×HUNTER 原作 · 僅供同人學習交流</p>
+    <p>資料來源：HUNTER×HUNTER 原作 · 卡片圖片來自 Hunterpedia · 僅供同人學習交流</p>
     <p style="margin-top:0.4rem">咒語卡可在瑪莎多拉（Masadora）的咒語商店購買 · 集齊 40 張可兌換「大天使的吐息」</p>
   </footer>
 
@@ -538,6 +576,14 @@
 
     let activeFilter = "all";
 
+    function cardThumb(id) {
+      return `images/thumb/${id}.webp`;
+    }
+
+    function cardModal(id) {
+      return `images/modal/${id}.webp`;
+    }
+
     function rankColor(rank) {
       return RANK_COLORS[rank] || "#94a3b8";
     }
@@ -593,14 +639,17 @@
 
       grid.innerHTML = filtered.map(card => `
         <article class="card" data-id="${card.id}" tabindex="0" role="button" aria-label="${card.name}">
-          <div class="card-header">
-            <span class="card-number">NO.${String(card.id).padStart(4, "0")}</span>
-            <span class="card-rank" style="color:${rankColor(card.rank)}">${card.rank}-${card.limit}</span>
+          <img class="card-art" src="${cardThumb(card.id)}" alt="NO.${card.id} ${card.name}" loading="lazy" />
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-number">NO.${String(card.id).padStart(4, "0")}</span>
+              <span class="card-rank" style="color:${rankColor(card.rank)}">${card.rank}-${card.limit}</span>
+            </div>
+            <h3 class="card-name">${card.name}</h3>
+            <div class="card-name-en">${card.nameEn}</div>
+            <div class="card-tags">${typeTags(card)}</div>
+            <p class="card-desc">${card.desc}</p>
           </div>
-          <h3 class="card-name">${card.name}</h3>
-          <div class="card-name-en">${card.nameEn}</div>
-          <div class="card-tags">${typeTags(card)}</div>
-          <p class="card-desc">${card.desc}</p>
         </article>
       `).join("");
 
@@ -619,6 +668,9 @@
       document.getElementById("modal-number").textContent = `NO.${String(card.id).padStart(4, "0")}`;
       document.getElementById("modal-name").textContent = card.name;
       document.getElementById("modal-name-en").textContent = `${card.nameEn}（${card.nameJp}）`;
+      const modalArt = document.getElementById("modal-art");
+      modalArt.src = cardModal(card.id);
+      modalArt.alt = `NO.${card.id} ${card.name}`;
       document.getElementById("modal-rank").innerHTML = `<span style="color:${rankColor(card.rank)};font-family:Orbitron,sans-serif;font-weight:700">${card.rank} 級</span>`;
       document.getElementById("modal-limit").textContent = `${card.limit} 枚`;
       document.getElementById("modal-range").textContent = card.range === "long" ? "遠距離（島上任意地點）" : "近距離（半徑 20 公尺內）";
