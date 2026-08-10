@@ -385,18 +385,6 @@
       margin-top: 0.5rem;
     }
 
-    .footer-link {
-      display: block;
-      text-align: center;
-      margin-top: 1.5rem;
-      color: var(--glow);
-      font-size: 0.85rem;
-      text-decoration: none;
-      font-weight: 600;
-    }
-
-    .footer-link:hover { text-decoration: underline; }
-
     .confetti {
       position: fixed;
       width: 10px;
@@ -446,15 +434,13 @@
       <h2>📋 我的抽獎紀錄</h2>
       <ul class="history-list" id="history"></ul>
     </section>
-
-    <a class="footer-link" href="../">→ 貪婪之島咒語卡圖鑑</a>
   </div>
 
   <div class="result-overlay" id="result-overlay">
     <div class="result-card">
       <div class="result-emoji" id="result-emoji"></div>
       <img class="result-card-img" id="result-card-img" alt="" />
-      <p class="result-label">恭喜獲得</p>
+      <p class="result-label" id="result-label">恭喜獲得</p>
       <p class="result-prize" id="result-prize"></p>
       <p class="result-sub" id="result-sub"></p>
       <button class="result-close" id="result-close">太棒了！</button>
@@ -656,25 +642,29 @@
       const emojiEl = document.getElementById("result-emoji");
       const imgEl = document.getElementById("result-card-img");
       const subEl = document.getElementById("result-sub");
+      const labelEl = document.getElementById("result-label");
 
       if (prize.spellCard) {
-        emojiEl.classList.remove("hidden");
-        emojiEl.textContent = "🃏";
+        emojiEl.classList.add("hidden");
+        emojiEl.textContent = "";
         imgEl.src = spellImageSrc(prize.spellCard.id);
-        imgEl.alt = prize.spellCard.name;
+        imgEl.alt = `NO.${prize.spellCard.id} ${prize.spellCard.name}`;
         imgEl.onerror = () => {
           imgEl.onerror = null;
           imgEl.src = `../greed-island/images/modal/${prize.spellCard.id}.webp`;
         };
         imgEl.classList.add("show");
+        labelEl.textContent = "恭喜抽中咒語卡";
         document.getElementById("result-prize").textContent = prize.displayName;
-        subEl.textContent = `貪婪之島咒語卡隨機揭曉 · ${prize.sub}`;
+        subEl.textContent = prize.sub;
         subEl.classList.add("show");
       } else {
         emojiEl.classList.remove("hidden");
         emojiEl.textContent = prize.emoji;
         imgEl.classList.remove("show");
         imgEl.removeAttribute("src");
+        imgEl.removeAttribute("alt");
+        labelEl.textContent = "恭喜獲得";
         subEl.classList.remove("show");
         subEl.textContent = "";
         document.getElementById("result-prize").textContent = prize.name;
