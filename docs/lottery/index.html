@@ -205,6 +205,28 @@
       box-shadow: none;
     }
 
+    .reset-btn {
+      display: block;
+      width: 100%;
+      margin-top: 0.65rem;
+      padding: 0.7rem;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--muted);
+      background: transparent;
+      border: 1px dashed rgba(61, 139, 253, 0.35);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+
+    .reset-btn:hover {
+      color: var(--glow);
+      border-color: var(--border);
+      background: rgba(61, 139, 253, 0.08);
+    }
+
     /* Result popup */
     .result-overlay {
       display: none;
@@ -373,6 +395,7 @@
         <div class="reel" id="reel"></div>
       </div>
       <button class="draw-btn" id="draw-btn">🎰 開始抽獎</button>
+      <button class="reset-btn" id="reset-btn" type="button">🔄 再來一次（重置 3 次機會）</button>
     </div>
 
     <section class="section">
@@ -559,7 +582,19 @@
       showResult(winner);
     }
 
+    function resetDraws() {
+      if (spinning) return;
+      if (state.used === 0 && state.history.length === 0) return;
+      if (!confirm("確定要重置嗎？會清空抽獎紀錄並恢復 3 次機會。")) return;
+      state = { used: 0, history: [] };
+      saveState();
+      document.getElementById("result-overlay").classList.remove("show");
+      renderChances();
+      renderHistory();
+    }
+
     document.getElementById("draw-btn").addEventListener("click", spin);
+    document.getElementById("reset-btn").addEventListener("click", resetDraws);
     document.getElementById("result-close").addEventListener("click", () => {
       document.getElementById("result-overlay").classList.remove("show");
     });
