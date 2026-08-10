@@ -619,40 +619,61 @@
     ];
 
     let wheelAngle = 0;
-    let mysteryCount = 0;
 
-    function shortPrizeLabel(prize) {
+    function segmentAngle() {
+      return 360 / PRIZES.length;
+    }
+
+    // 扇形中心相對「上方指針」的角度（順時針，0 = 正上）
+    function segmentCenterDeg(index) {
+      const seg = segmentAngle();
+      return index * seg + seg / 2;
+    }
+
+    function shortPrizeLabel(prize, mysteryNo) {
       if (prize.reveal) return prize.name;
-      mysteryCount += 1;
-      return `神秘${mysteryCount}`;
+      return `神秘${mysteryNo}`;
     }
 
     function buildWheel() {
       const wheel = document.getElementById("wheel");
       const n = PRIZES.length;
-      const seg = 360 / n;
-      mysteryCount = 0;
+      const seg = segmentAngle();
+      let mysteryNo = 0;
 
+      // conic-gradient: 0deg = 正上方，順時針
       const gradient = PRIZES.map((_, i) => {
         const color = SEGMENT_COLORS[i % SEGMENT_COLORS.length];
-        const start = i * seg;
-        const end = (i + 1) * seg;
-        return `${color} ${start}deg ${end}deg`;
+        return `${color} ${i * seg}deg ${(i + 1) * seg}deg`;
       }).join(", ");
+      wheel.style.background = `conic-gradient(from 0deg, ${gradient})`;
 
-      wheel.style.background = `conic-gradient(from -${seg / 2}deg, ${gradient})`;
+      // CSS rotate(0) 是朝右，所以文字角度要再 -90deg 才會對到正上
       wheel.innerHTML = PRIZES.map((p, i) => {
-        const rot = i * seg;
-        const label = shortPrizeLabel(p);
+        if (!p.reveal) mysteryNo += 1;
+        const visualDeg = segmentCenterDeg(i); // 0 = top
+        const cssRot = visualDeg - 90;        // convert to CSS axis
         const cls = p.reveal ? "wheel-segment-label" : "wheel-segment-label mystery";
-        const flip = rot > 90 && rot < 270;
+        const flip = visualDeg > 90 && visualDeg < 270;
+        const emoji = p.reveal ? p.emoji : "🎁";
+        const label = shortPrizeLabel(p, mysteryNo);
         const inner = flip
-          ? `<span style="transform:rotate(180deg);display:inline-flex;align-items:center;gap:0.2rem"><span>${label}</span><span class="emoji">${p.reveal ? p.emoji : "🎁"}</span></span>`
-          : `<span class="emoji">${p.reveal ? p.emoji : "🎁"}</span><span>${label}</span>`;
-        return `<div class="${cls}" style="transform: rotate(${rot}deg) translateY(-50%);">${inner}</div>`;
+          ? `<span style="transform:rotate(180deg);display:inline-flex;align-items:center;gap:0.2rem"><span>${label}</span><span class="emoji">${emoji}</span></span>`
+          : `<span class="emoji">${emoji}</span><span>${label}</span>`;
+        return `<div class="${cls}" style="transform: rotate(${cssRot}deg) translateY(-50%);">${inner}</div>`;
       }).join("");
 
       wheel.style.transform = `rotate(${wheelAngle}deg)`;
+    }
+
+    // 依目前轉盤角度，算出指針正下方是第幾個獎
+    function prizeIndexUnderPointer() {
+      const n = PRIZES.length;
+      const seg = segmentAngle();
+      const a = ((wheelAngle % 360) + 360) % 360;
+      // 轉盤順時針轉 a 度後，停在上方的內容原本在 (360 - a)
+      const atTop = (360 - a) % 360;
+      return Math.floor(atTop / seg) % n;
     }
 
     function easeOutCubic(t) {
@@ -662,20 +683,20 @@
     function spinWheelTo(prizeIndex) {
       const wheel = document.getElementById("wheel");
       const stage = document.getElementById("wheel-stage");
-      const n = PRIZES.length;
-      const seg = 360 / n;
-      // Pointer is at top; segment centers start at 0 with conic offset -seg/2
-      const targetCenter = prizeIndex * seg;
+      const targetCenter = segmentCenterDeg(prizeIndex);
       const extraSpins = 6 + Math.floor(Math.random() * 3);
-      const current = ((wheelAngle % 360) + 360) % 360;
-      // Want final angle such that targetCenter lands under pointer (0 deg at top)
+
+      // 讓 targetCenter 轉到正上方：最終角度 ≡ -targetCenter (mod 360)
       const desiredMod = (360 - targetCenter) % 360;
+      const current = ((wheelAngle % 360) + 360) % 360;
       let delta = desiredMod - current;
-      if (delta <= 0) delta += 360;
+      if (delta < 0) delta += 360;
+      // 避免剛好 0 度看起來沒轉
+      if (delta < 20) delta += 360;
       delta += extraSpins * 360;
 
       const startAngle = wheelAngle;
-      const endAngle = wheelAngle + delta;
+      const endAngle = startAngle + delta;
       const duration = 5200;
       const start = performance.now();
       stage.classList.add("spinning");
@@ -685,7 +706,7 @@
         function frame(now) {
           const t = Math.min(1, (now - start) / duration);
           const eased = easeOutCubic(t);
-          wheelAngle = startAngle + delta * eased;
+          wheelAngle = startAngle + (endAngle - startAngle) * eased;
           wheel.style.transform = `rotate(${wheelAngle}deg)`;
           if (t < 1) {
             requestAnimationFrame(frame);
@@ -694,7 +715,7 @@
             wheel.style.transform = `rotate(${wheelAngle}deg)`;
             stage.classList.remove("spinning");
             wheel.classList.remove("spinning");
-            resolve();
+            resolve(prizeIndexUnderPointer());
           }
         }
         requestAnimationFrame(frame);
@@ -817,11 +838,13 @@
 
       // 最後一次（第 3 抽）必定中貪婪之島咒語卡
       const isLastDraw = remaining() === 1;
-      const base = pickRandom(isLastDraw);
-      const winner = resolvePrize(base);
-      const prizeIndex = PRIZES.findIndex(p => p.id === winner.id);
+      const intended = pickRandom(isLastDraw);
+      const prizeIndex = Math.max(0, PRIZES.findIndex(p => p.id === intended.id));
 
-      await spinWheelTo(prizeIndex < 0 ? 0 : prizeIndex);
+      const landedIndex = await spinWheelTo(prizeIndex);
+      // 以指針實際停到的扇形為準，避免畫面與開獎不一致
+      const landed = PRIZES[landedIndex] || intended;
+      const winner = resolvePrize(landed);
       await new Promise(r => setTimeout(r, 350));
 
       state.used++;
