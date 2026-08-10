@@ -427,7 +427,7 @@
     <section class="section">
       <h2>🏆 獎品池</h2>
       <div class="prize-grid" id="prize-grid"></div>
-      <p class="note">獎品名稱保密 · 抽中才揭曉</p>
+      <p class="note">部分獎品保密 · 抽中才揭曉</p>
     </section>
 
     <section class="section">
@@ -452,12 +452,12 @@
     const STORAGE_KEY = "lucky-draw-v4";
 
     const PRIZES = [
-      { id: "kr-hotel",  name: "韓國住宿",       emoji: "🇰🇷", weight: 1 },
-      { id: "jp-hotel",  name: "日本住宿",       emoji: "🇯🇵", weight: 1 },
-      { id: "kr-sim",    name: "韓國網卡",       emoji: "📶", weight: 1 },
-      { id: "jp-sim",    name: "日本網卡",       emoji: "📡", weight: 1 },
-      { id: "mycard-1k", name: "MyCard 1000",    emoji: "💳", weight: 1 },
-      { id: "mycard-3k", name: "MyCard 3000",    emoji: "💎", weight: 1 },
+      { id: "kr-hotel",  name: "韓國住宿",       emoji: "🇰🇷", weight: 1, reveal: true },
+      { id: "jp-hotel",  name: "日本住宿",       emoji: "🇯🇵", weight: 1, reveal: true },
+      { id: "kr-sim",    name: "韓國網卡",       emoji: "📶", weight: 1, reveal: true },
+      { id: "jp-sim",    name: "日本網卡",       emoji: "📡", weight: 1, reveal: true },
+      { id: "mycard-1k", name: "MyCard 1000",    emoji: "💳", weight: 1, reveal: true },
+      { id: "mycard-3k", name: "MyCard 3000",    emoji: "💎", weight: 1, reveal: true },
       { id: "dragon-chain", name: "龍鍊",        emoji: "🐉", weight: 1, image: "prizes/IMG_4123.jpeg" },
       { id: "gi-card",   name: "貪婪之島卡抽獎", emoji: "🃏", weight: 1, spellDraw: true },
     ];
@@ -615,9 +615,14 @@
     }
 
     function renderPrizes() {
-      document.getElementById("prize-grid").innerHTML = PRIZES.map((_, i) =>
-        `<div class="prize-chip mystery"><span class="emoji">🎁</span><span>神秘獎品 #${i + 1}</span></div>`
-      ).join("");
+      let mysteryIdx = 0;
+      document.getElementById("prize-grid").innerHTML = PRIZES.map(p => {
+        if (p.reveal) {
+          return `<div class="prize-chip"><span class="emoji">${p.emoji}</span><span>${p.name}</span></div>`;
+        }
+        mysteryIdx += 1;
+        return `<div class="prize-chip mystery"><span class="emoji">🎁</span><span>神秘獎品 #${mysteryIdx}</span></div>`;
+      }).join("");
     }
 
     function renderHistory() {
