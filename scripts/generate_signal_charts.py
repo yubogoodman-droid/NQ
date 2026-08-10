@@ -411,22 +411,22 @@ def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
 <body>
   <div class="wrap">
     <h1>影線頸線圖表</h1>
-    <p class="sub">{DAY} UTC · Binance USDT-M 5m。日常建議用 Balanced；想更少訊號再用 Strict。</p>
+    <p class="sub">{DAY} UTC · Binance USDT-M 5m。Balanced / Strict 共用 SMA99 規則：|Δ|&lt;2% 不空，仍在上方且距離&lt;8% 也不空。</p>
     <div class="grid">
       <a class="card recommend" href="./balanced/index.html">
         <div class="tag">RECOMMENDED</div>
         <div class="name">Balanced 中等降噪</div>
-        <div class="desc">收盤確認破位 + 收陰 + SMA25 軟條件 + 冷卻 60m。比原版乾淨，又不會太少。</div>
+        <div class="desc">收盤確認 + 收陰 + SMA25 軟條件 + SMA99 規則 + 60m 冷卻。</div>
         <div class="meta">{balanced_n} 筆訊號</div>
       </a>
       <a class="card" href="./strict/index.html">
         <div class="name">Strict 嚴格版</div>
-        <div class="desc">再加前K確認、SMA14&lt;SMA25、冷卻 150m。訊號很少、品質較挑。</div>
+        <div class="desc">Balanced 同套 SMA99，再加前K確認、SMA14&lt;25、破位≥0.8%、150m 冷卻。</div>
         <div class="meta">{strict_n} 筆訊號</div>
       </a>
       <a class="card" href="./raw/index.html">
         <div class="name">原版訊號</div>
-        <div class="desc">影線（Low）刺破即報，訊號多、雜訊也多，留作對照。</div>
+        <div class="desc">影線（Low）刺破即報，無 SMA99 過濾，留作對照。</div>
         <div class="meta">{baseline_n} 筆訊號</div>
       </a>
     </div>
@@ -535,10 +535,11 @@ def main():
             Path("/workspace/output/shadow_neckline_strict_1d.csv"),
             root / "strict",
             title=f"Strict 嚴格降噪 · {DAY}",
-            subtitle=f"{DAY} UTC · 收盤確認 + 前K確認 + SMA14&lt;25 + 150m 冷卻。",
+            subtitle=f"{DAY} UTC · 前K確認 + SMA14&lt;25 + 破位≥0.8% + 同套 SMA99 規則 + 150m 冷卻。",
             badge="STRICT",
             index_href="./index.html",
             extra_nav=nav,
+            filter_note="過濾：收盤破位、前K確認、SMA14&lt;SMA25；|ΔSMA99|&lt;2% 不空；仍在 SMA99 上方且距離&lt;8% 也不空。",
         )
 
     if args.mode == "all":

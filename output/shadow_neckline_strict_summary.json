@@ -1,86 +1,80 @@
 {
   "day": "2026-08-09",
+  "tier": "strict",
   "params": {
     "min_span": 12,
     "max_span": 60,
     "shoulder_sym": 0.1,
     "min_bias": 0.05,
-    "max_bias": 1.5,
-    "min_close_break_pct": 0.008,
+    "max_bias": 2.0,
+    "use_close_break": true,
+    "min_break_pct": 0.008,
     "require_red": true,
     "require_prev_close_below": true,
-    "require_sma25_break": true,
-    "require_sma14_lt_sma25": true,
-    "max_chg24": 0.6,
+    "sma25_soft": false,
+    "require_sma25_hard": true,
+    "min_abs_dist_ma99": 0.02,
+    "max_near_above_ma99": 0.08,
+    "max_chg24": 3.0,
     "cooldown_min": 150
   },
-  "baseline": {
-    "n": 76,
-    "symbols": 22,
-    "reclaim_3_rate": null,
-    "pnl_1h_win": 47.9,
-    "pnl_1h_avg": -1.064,
-    "pnl_1h_median": -0.384
-  },
-  "strict": {
-    "n": 11,
-    "symbols": 10,
+  "baseline_n": 76,
+  "summary": {
+    "n": 7,
+    "symbols": 7,
     "reclaim_3_rate": 0.0,
     "by_horizon": {
       "15m": {
-        "n": 11,
-        "win_rate": 63.6,
-        "avg": 2.145,
-        "median": 0.447
+        "n": 7,
+        "win_rate": 57.1,
+        "avg": 2.923,
+        "median": 0.413
       },
       "30m": {
-        "n": 11,
-        "win_rate": 36.4,
-        "avg": 1.399,
-        "median": -0.423
+        "n": 7,
+        "win_rate": 42.9,
+        "avg": 2.187,
+        "median": -0.807
       },
       "1h": {
-        "n": 11,
-        "win_rate": 54.5,
-        "avg": 2.78,
-        "median": 0.941
+        "n": 7,
+        "win_rate": 42.9,
+        "avg": 2.481,
+        "median": -0.821
       },
       "2h": {
-        "n": 10,
-        "win_rate": 60.0,
-        "avg": 2.477,
-        "median": 1.385
+        "n": 7,
+        "win_rate": 42.9,
+        "avg": 2.271,
+        "median": -0.767
       },
       "4h": {
-        "n": 10,
-        "win_rate": 40.0,
-        "avg": 0.027,
-        "median": -2.982
-      },
-      "8h": {
-        "n": 10,
-        "win_rate": 30.0,
-        "avg": -5.087,
-        "median": -10.438
-      },
-      "12h": {
         "n": 7,
         "win_rate": 28.6,
-        "avg": -12.778,
-        "median": -22.214
+        "avg": -1.951,
+        "median": -4.464
+      },
+      "8h": {
+        "n": 7,
+        "win_rate": 28.6,
+        "avg": -5.164,
+        "median": -15.236
+      },
+      "12h": {
+        "n": 6,
+        "win_rate": 33.3,
+        "avg": -13.545,
+        "median": -22.719
       }
     },
     "symbols_list": [
-      "BANK/USDT",
       "BEAT/USDT",
       "BICO/USDT",
       "BTW/USDT",
       "COOKIE/USDT",
       "MUBARAK/USDT",
-      "PUMP/USDT",
       "SAGA/USDT",
-      "XAN/USDT",
-      "龙虾/USDT"
+      "XAN/USDT"
     ]
   }
 }
