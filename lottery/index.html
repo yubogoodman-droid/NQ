@@ -262,6 +262,8 @@
 
     .result-emoji { font-size: 4rem; margin-bottom: 0.5rem; animation: bounce 0.6s ease; }
 
+    .result-emoji.hidden { display: none; }
+
     @keyframes bounce {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.2); }
@@ -269,6 +271,27 @@
 
     .result-label { color: var(--muted); font-size: 0.9rem; }
     .result-prize { font-size: 1.6rem; font-weight: 900; margin: 0.4rem 0 1.25rem; color: var(--glow); }
+
+    .result-card-img {
+      display: none;
+      width: min(220px, 70vw);
+      margin: 0.4rem auto 0.85rem;
+      border-radius: 12px;
+      border: 2px solid rgba(61, 139, 253, 0.55);
+      box-shadow: 0 8px 24px rgba(43, 33, 24, 0.12);
+      background: #0a1424;
+    }
+
+    .result-card-img.show { display: block; animation: bounce 0.6s ease; }
+
+    .result-sub {
+      display: none;
+      margin: -0.75rem 0 1.1rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .result-sub.show { display: block; }
 
     .result-close {
       padding: 0.7rem 2rem;
@@ -430,8 +453,10 @@
   <div class="result-overlay" id="result-overlay">
     <div class="result-card">
       <div class="result-emoji" id="result-emoji"></div>
+      <img class="result-card-img" id="result-card-img" alt="" />
       <p class="result-label">恭喜獲得</p>
       <p class="result-prize" id="result-prize"></p>
+      <p class="result-sub" id="result-sub"></p>
       <button class="result-close" id="result-close">太棒了！</button>
     </div>
   </div>
@@ -448,11 +473,75 @@
       { id: "mycard-1k", name: "MyCard 1000",    emoji: "💳" },
       { id: "mycard-1k2",name: "MyCard 1000",    emoji: "💳" },
       { id: "mycard-3k", name: "MyCard 3000",    emoji: "💎" },
-      { id: "gi-card",   name: "貪婪之島卡抽獎", emoji: "🃏" },
+      { id: "gi-card",   name: "貪婪之島卡抽獎", emoji: "🃏", spellDraw: true },
+    ];
+
+    const SPELL_CARDS = [
+      { id: 1001, name: "盜視", rank: "G" },
+      { id: 1002, name: "透視", rank: "F" },
+      { id: 1003, name: "防壁", rank: "G" },
+      { id: 1004, name: "反射", rank: "E" },
+      { id: 1005, name: "磁力", rank: "C" },
+      { id: 1006, name: "掏摸", rank: "F" },
+      { id: 1007, name: "竊盜", rank: "C" },
+      { id: 1008, name: "交換", rank: "E" },
+      { id: 1009, name: "再來", rank: "G" },
+      { id: 1010, name: "擬態", rank: "A" },
+      { id: 1011, name: "複製", rank: "D" },
+      { id: 1012, name: "左遷", rank: "F" },
+      { id: 1013, name: "初心", rank: "D" },
+      { id: 1014, name: "離脫", rank: "B" },
+      { id: 1015, name: "念視", rank: "D" },
+      { id: 1016, name: "漂流", rank: "F" },
+      { id: 1017, name: "衝突", rank: "F" },
+      { id: 1018, name: "徵收", rank: "B" },
+      { id: 1019, name: "城門", rank: "F" },
+      { id: 1020, name: "贗作", rank: "C" },
+      { id: 1021, name: "強奪", rank: "B" },
+      { id: 1022, name: "墜落", rank: "C" },
+      { id: 1023, name: "妥協", rank: "B" },
+      { id: 1024, name: "看破", rank: "D" },
+      { id: 1025, name: "暗幕", rank: "F" },
+      { id: 1026, name: "聖水", rank: "A" },
+      { id: 1027, name: "追蹤", rank: "E" },
+      { id: 1028, name: "投石", rank: "E" },
+      { id: 1029, name: "凶彈", rank: "B" },
+      { id: 1030, name: "道標", rank: "E" },
+      { id: 1031, name: "解析", rank: "G" },
+      { id: 1032, name: "寶籤", rank: "G" },
+      { id: 1033, name: "密著", rank: "C" },
+      { id: 1034, name: "淨化", rank: "D" },
+      { id: 1035, name: "堅牢", rank: "S" },
+      { id: 1036, name: "神眼", rank: "S" },
+      { id: 1037, name: "再生", rank: "F" },
+      { id: 1038, name: "名簿", rank: "G" },
+      { id: 1039, name: "同行", rank: "F" },
+      { id: 1040, name: "交信", rank: "F" },
     ];
 
     let state = loadState();
     let spinning = false;
+
+    function pickSpellCard() {
+      return SPELL_CARDS[Math.floor(Math.random() * SPELL_CARDS.length)];
+    }
+
+    function spellImageSrc(id) {
+      // gh-pages: images at site root; docs preview: under greed-island/
+      return `../images/modal/${id}.webp`;
+    }
+
+    function resolvePrize(base) {
+      if (!base.spellDraw) return { ...base };
+      const card = pickSpellCard();
+      return {
+        ...base,
+        spellCard: card,
+        name: `貪婪之島卡 · ${card.name}`,
+        displayName: card.name,
+        sub: `NO.${card.id} · ${card.rank} 級咒語卡`,
+      };
+    }
 
     function loadState() {
       try {
@@ -536,7 +625,7 @@
         `<li class="history-item">
           <span class="history-round">#${i + 1}</span>
           <span class="emoji">${h.emoji}</span>
-          <span>${h.name}</span>
+          <span>${h.name}${h.sub ? `（${h.sub}）` : ""}</span>
         </li>`
       ).join("");
     }
@@ -557,8 +646,33 @@
     }
 
     function showResult(prize) {
-      document.getElementById("result-emoji").textContent = prize.emoji;
-      document.getElementById("result-prize").textContent = prize.name;
+      const emojiEl = document.getElementById("result-emoji");
+      const imgEl = document.getElementById("result-card-img");
+      const subEl = document.getElementById("result-sub");
+
+      if (prize.spellCard) {
+        emojiEl.classList.add("hidden");
+        emojiEl.textContent = "";
+        imgEl.src = spellImageSrc(prize.spellCard.id);
+        imgEl.alt = prize.spellCard.name;
+        imgEl.onerror = () => {
+          imgEl.onerror = null;
+          imgEl.src = `../greed-island/images/modal/${prize.spellCard.id}.webp`;
+        };
+        imgEl.classList.add("show");
+        document.getElementById("result-prize").textContent = prize.displayName;
+        subEl.textContent = prize.sub;
+        subEl.classList.add("show");
+      } else {
+        emojiEl.classList.remove("hidden");
+        emojiEl.textContent = prize.emoji;
+        imgEl.classList.remove("show");
+        imgEl.removeAttribute("src");
+        subEl.classList.remove("show");
+        subEl.textContent = "";
+        document.getElementById("result-prize").textContent = prize.name;
+      }
+
       document.getElementById("result-overlay").classList.add("show");
       confetti();
     }
@@ -568,7 +682,8 @@
       spinning = true;
       renderChances();
 
-      const winner = pickRandom();
+      const base = pickRandom();
+      const winner = resolvePrize(base);
       const reel = document.getElementById("reel");
 
       const baseIdx = Math.floor(reelItems.length / 2);
@@ -591,7 +706,13 @@
       await new Promise(r => setTimeout(r, 3400));
 
       state.used++;
-      state.history.push({ id: winner.id, name: winner.name, emoji: winner.emoji });
+      state.history.push({
+        id: winner.id,
+        name: winner.name,
+        emoji: winner.emoji,
+        sub: winner.sub || "",
+        spellId: winner.spellCard ? winner.spellCard.id : null,
+      });
       saveState();
 
       spinning = false;
