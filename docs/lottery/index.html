@@ -315,9 +315,21 @@
       border-radius: 10px;
       font-size: 0.82rem;
       border: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--muted);
     }
 
     .prize-chip .emoji { font-size: 1.1rem; }
+
+    .prize-chip.mystery {
+      justify-content: center;
+      letter-spacing: 0.08em;
+    }
+
+    .reel-item.mystery {
+      color: var(--gold);
+      letter-spacing: 0.15em;
+      font-size: 1.15rem;
+    }
 
     .history-list { list-style: none; }
 
@@ -399,9 +411,9 @@
     </div>
 
     <section class="section">
-      <h2>🏆 獎品一覽</h2>
+      <h2>🏆 獎品池</h2>
       <div class="prize-grid" id="prize-grid"></div>
-      <p class="note">🏆 獎品可能會再新增</p>
+      <p class="note">獎品名稱保密 · 抽中才揭曉 · 🏆 可能會再新增</p>
     </section>
 
     <section class="section">
@@ -459,15 +471,18 @@
       return PRIZES[Math.floor(Math.random() * PRIZES.length)];
     }
 
+    const MYSTERY_LABELS = ["🎁 ???", "✨ ???", "🏆 ???", "💎 ???", "🎰 ???", "🌟 ???"];
+
     function buildReel() {
       const reel = document.getElementById("reel");
       const items = [];
       for (let r = 0; r < 30; r++) {
         PRIZES.forEach(p => items.push(p));
       }
-      reel.innerHTML = items.map(p =>
-        `<div class="reel-item"><span class="emoji">${p.emoji}</span><span>${p.name}</span></div>`
-      ).join("");
+      reel.innerHTML = items.map((_, i) => {
+        const label = MYSTERY_LABELS[i % MYSTERY_LABELS.length];
+        return `<div class="reel-item mystery">${label}</div>`;
+      }).join("");
       return items;
     }
 
@@ -503,8 +518,8 @@
     }
 
     function renderPrizes() {
-      document.getElementById("prize-grid").innerHTML = PRIZES.map(p =>
-        `<div class="prize-chip"><span class="emoji">${p.emoji}</span><span>${p.name}</span></div>`
+      document.getElementById("prize-grid").innerHTML = PRIZES.map((_, i) =>
+        `<div class="prize-chip mystery"><span class="emoji">🎁</span><span>神秘獎品 #${i + 1}</span></div>`
       ).join("");
     }
 
