@@ -645,10 +645,11 @@
         const rot = i * seg;
         const label = shortPrizeLabel(p);
         const cls = p.reveal ? "wheel-segment-label" : "wheel-segment-label mystery";
-        return `<div class="${cls}" style="transform: rotate(${rot}deg) translateY(-50%);">
-          <span class="emoji">${p.reveal ? p.emoji : "🎁"}</span>
-          <span>${label}</span>
-        </div>`;
+        const flip = rot > 90 && rot < 270;
+        const inner = flip
+          ? `<span style="transform:rotate(180deg);display:inline-flex;align-items:center;gap:0.2rem"><span>${label}</span><span class="emoji">${p.reveal ? p.emoji : "🎁"}</span></span>`
+          : `<span class="emoji">${p.reveal ? p.emoji : "🎁"}</span><span>${label}</span>`;
+        return `<div class="${cls}" style="transform: rotate(${rot}deg) translateY(-50%);">${inner}</div>`;
       }).join("");
 
       wheel.style.transform = `rotate(${wheelAngle}deg)`;
