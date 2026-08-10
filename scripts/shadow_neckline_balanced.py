@@ -6,8 +6,9 @@
 - 收盤跌破深度 >= 0.3%
 - 當根收陰
 - SMA25：收盤跌破 或 破位深度>=1%（軟條件）
+- 距 SMA99 太近（|close-sma99|/sma99 < 2%）不空，避免撞支撐
 - 肩距 8~50、對稱 < 15%
-- 24h 漲幅上限 120%
+- 24h 漲幅上限 300%
 - 同幣冷卻 60 分鐘
 
 更嚴版本見 shadow_neckline_strict.py
@@ -32,6 +33,7 @@ SCAN_INTERVAL = 60
 REPORT_GAP_MINUTES = 60
 MAX_CHG24 = 300.0  # percent（放寬以保留 TUT 這類強勢泵幣破位）
 MIN_CLOSE_BREAK_PCT = 0.3  # percent
+MIN_ABS_DIST_MA99_PCT = 2.0  # 太靠近 SMA99 不空
 # ===========================================
 
 
@@ -59,6 +61,7 @@ def detect_shadow_neckline_balanced(df: pd.DataFrame, chg24: float | None):
     sma200 = ta.sma(df["close"], length=200).to_numpy(float)
     sma14 = ta.sma(df["close"], length=14).to_numpy(float)
     sma25 = ta.sma(df["close"], length=25).to_numpy(float)
+    sma99 = ta.sma(df["close"], length=99).to_numpy(float)
 
     window = 2
     peaks = []
@@ -98,7 +101,8 @@ def detect_shadow_neckline_balanced(df: pd.DataFrame, chg24: float | None):
     neck = h1 + slope * (curr_idx - p1)
     s14 = sma14[curr_idx]
     s25 = sma25[curr_idx]
-    if np.isnan(s14) or np.isnan(s25):
+    s99 = sma99[curr_idx]
+    if np.isnan(s14) or np.isnan(s25) or np.isnan(s99) or s99 == 0:
         return False, None
 
     # Close confirmation (main anti-noise vs original wick break)
@@ -112,6 +116,10 @@ def detect_shadow_neckline_balanced(df: pd.DataFrame, chg24: float | None):
     # Soft SMA25
     if not (close[curr_idx] < s25 or close_break_pct >= 1.0):
         return False, None
+    # Too close to SMA99 → skip (support / chop zone)
+    dist_ma99_pct = (close[curr_idx] - s99) / s99 * 100
+    if abs(dist_ma99_pct) < MIN_ABS_DIST_MA99_PCT:
+        return False, None
     if high[curr_idx] >= h2:
         return False, None
 
@@ -121,6 +129,8 @@ def detect_shadow_neckline_balanced(df: pd.DataFrame, chg24: float | None):
         "line_val": round(float(neck), 6),
         "sma14": round(float(s14), 6),
         "sma25": round(float(s25), 6),
+        "sma99": round(float(s99), 6),
+        "dist_ma99_pct": round(dist_ma99_pct, 2),
         "close_break_pct": round(close_break_pct, 2),
         "span": int(span),
         "chg24": None if chg24 is None else round(chg24, 2),
@@ -131,7 +141,7 @@ def main():
     exchange = ccxt.binanceusdm({"enableRateLimit": True})
     print(
         f"📡 Balanced 影線頸線監控中... (冷卻 {REPORT_GAP_MINUTES}m / "
-        f"收盤確認 / SMA25軟條件 / 24h<{MAX_CHG24}%)"
+        f"收盤確認 / SMA25軟條件 / |ΔSMA99|>={MIN_ABS_DIST_MA99_PCT}% / 24h<{MAX_CHG24}%)"
     )
     last_report_time = {}
 
@@ -171,8 +181,9 @@ def main():
                         f"💰 收盤價: `{d['price']}`\n"
                         f"📊 SMA200 乖離: `{d['bias']}%`\n"
                         f"📉 頸線: `{d['line_val']}`  破位: `{d['close_break_pct']}%`\n"
-                        f"Ⓜ️ SMA14/25: `{d['sma14']}` / `{d['sma25']}`\n"
-                        f"⚠️ *收盤跌破頸線+SMA14（中等過濾）*"
+                        f"Ⓜ️ SMA14/25/99: `{d['sma14']}` / `{d['sma25']}` / `{d['sma99']}`\n"
+                        f"📏 距SMA99: `{d['dist_ma99_pct']}%`\n"
+                        f"⚠️ *收盤跌破頸線+SMA14，且遠離SMA99*"
                     )
                     send_tg_message(msg)
                     print(f"🎯 訊號: {symbol} break={d['close_break_pct']}% bias={d['bias']}%")

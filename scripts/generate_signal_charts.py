@@ -481,7 +481,7 @@ def main():
             Path("/workspace/output/shadow_neckline_balanced_1d.csv"),
             root / "balanced",
             title=f"Balanced 中等降噪 · {DAY}",
-            subtitle=f"{DAY} UTC · 收盤確認 + 收陰 + SMA25 軟條件 + 60m 冷卻。",
+            subtitle=f"{DAY} UTC · 收盤確認 + 收陰 + SMA25 軟條件 + |ΔSMA99|≥2% + 60m 冷卻。",
             badge="BALANCED",
             index_href="./index.html",
             extra_nav=nav,
