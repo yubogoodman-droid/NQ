@@ -1,0 +1,391 @@
+"""
+Generate per-symbol HTML charts for all shadow-neckline signal coins,
+plus an index page. Publishes under docs/charts/ (and optionally gh-pages).
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pandas as pd
+import pandas_ta as ta
+
+CACHE = Path("/tmp/binance_um_klines")
+SIG_CSV = Path("/workspace/output/shadow_neckline_backtest_1d.csv")
+OUT_DIR = Path("/workspace/docs/charts")
+DAY = "2026-08-09"
+HIST = "2026-08-08"
+HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
+
+
+def file_stem(symbol: str) -> str:
+    # BICO/USDT -> BICOUSDT
+    return symbol.replace("/", "")
+
+
+def load_ohlcv(sym: str) -> pd.DataFrame:
+    df = pd.concat(
+        [
+            pd.read_csv(CACHE / f"{sym}-5m-{HIST}.csv"),
+            pd.read_csv(CACHE / f"{sym}-5m-{DAY}.csv"),
+        ],
+        ignore_index=True,
+    )
+    return (
+        df.drop_duplicates("timestamp")
+        .sort_values("timestamp")
+        .reset_index(drop=True)
+    )
+
+
+def short_pnl_table(df: pd.DataFrame, signal_rows: pd.DataFrame) -> list[dict]:
+    out = []
+    for _, s in signal_rows.iterrows():
+        entry_ts = int(pd.Timestamp(s["time_utc"], tz="UTC").timestamp() * 1000)
+        idxs = df.index[df["timestamp"] == entry_ts].tolist()
+        if not idxs or idxs[0] + 1 >= len(df):
+            continue
+        i = idxs[0]
+        entry = float(df.loc[i + 1, "open"])
+        pnl = {}
+        for name, n in HORIZONS.items():
+            j = i + n
+            if j >= len(df):
+                pnl[name] = None
+                continue
+            exit_px = float(df.loc[j, "close"])
+            pnl[name] = round((entry - exit_px) / entry * 100, 2)
+        out.append(
+            {
+                "time_utc": s["time_utc"],
+                "price": float(s["price"]),
+                "entry": entry,
+                "bias": float(s["bias"]),
+                "line_val": float(s["line_val"]),
+                "sma14": float(s["sma14"]),
+                "pnl": pnl,
+                "time": entry_ts // 1000,
+            }
+        )
+    return out
+
+
+def chart_payload(symbol: str, signal_rows: pd.DataFrame) -> dict:
+    sym = file_stem(symbol)
+    df = load_ohlcv(sym)
+    for n in (7, 14, 25, 99, 200):
+        df[f"sma{n}"] = ta.sma(df["close"], length=n)
+
+    start_ts = int(pd.Timestamp(f"{HIST} 18:00:00", tz="UTC").timestamp() * 1000)
+    plot = df[df["timestamp"] >= start_ts].copy()
+
+    def series(col: str):
+        return [
+            {"time": int(r["timestamp"] // 1000), "value": float(r[col])}
+            for _, r in plot.iterrows()
+            if pd.notna(r[col])
+        ]
+
+    candles = [
+        {
+            "time": int(r["timestamp"] // 1000),
+            "open": float(r["open"]),
+            "high": float(r["high"]),
+            "low": float(r["low"]),
+            "close": float(r["close"]),
+        }
+        for _, r in plot.iterrows()
+    ]
+    signals = short_pnl_table(df, signal_rows)
+    return {
+        "symbol": symbol,
+        "day": DAY,
+        "candles": candles,
+        "sma7": series("sma7"),
+        "sma14": series("sma14"),
+        "sma25": series("sma25"),
+        "sma99": series("sma99"),
+        "sma200": series("sma200"),
+        "signals": signals,
+    }
+
+
+def render_symbol_html(data: dict) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{data['symbol']} 影線頸線 · {data['day']}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root {{
+    --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193;
+    --line:rgba(232,240,234,0.12); --long:#3dba7a; --short:#e35d5d;
+    --accent:#c9a227; --panel:rgba(20,32,27,0.72);
+    --ma7:#f0c14a; --ma14:#7eb6ff; --ma25:#d28cff; --ma99:#5fd2c2; --ma200:#c9a227;
+  }}
+  * {{ box-sizing:border-box; }}
+  html,body {{ margin:0; min-height:100%; }}
+  body {{
+    font-family:"IBM Plex Sans",sans-serif; color:var(--ink);
+    background:
+      radial-gradient(1100px 600px at 12% -10%, rgba(201,162,39,.16), transparent 55%),
+      radial-gradient(900px 500px at 90% 10%, rgba(61,186,122,.10), transparent 50%),
+      linear-gradient(165deg, var(--bg0), var(--bg1) 45%, #0a0f0d);
+  }}
+  .wrap {{ max-width:1180px; margin:0 auto; padding:28px 20px 48px; }}
+  .nav a {{ color:var(--muted); text-decoration:none; font-size:.86rem; }}
+  .nav a:hover {{ color:var(--ink); }}
+  header {{ display:grid; gap:8px; margin:14px 0 22px; }}
+  .brand {{ font-family:"IBM Plex Serif",serif; font-size:clamp(1.8rem,4vw,2.6rem); font-weight:600; letter-spacing:-.02em; }}
+  .brand span {{ color:var(--accent); }}
+  .sub {{ color:var(--muted); line-height:1.5; }}
+  .meta {{ display:flex; flex-wrap:wrap; gap:10px 18px; font-family:"JetBrains Mono",monospace; font-size:.78rem; color:var(--muted); }}
+  .meta b {{ color:var(--ink); font-weight:500; }}
+  .chart-shell {{ position:relative; border:1px solid var(--line); background:linear-gradient(180deg,rgba(255,255,255,.03),transparent 40%), var(--panel); overflow:hidden; }}
+  #chart {{ width:100%; height:min(62vh,560px); }}
+  .legend {{ position:absolute; top:12px; left:14px; right:14px; z-index:2; display:flex; flex-wrap:wrap; gap:10px 14px; font-size:.75rem; color:var(--muted); pointer-events:none; }}
+  .legend i {{ display:inline-block; width:18px; height:2px; vertical-align:middle; margin-right:6px; }}
+  .ma7 i{{background:var(--ma7)}} .ma14 i{{background:var(--ma14)}} .ma25 i{{background:var(--ma25)}}
+  .ma99 i{{background:var(--ma99)}} .ma200 i{{background:var(--ma200)}}
+  .sig i{{width:8px;height:8px;border-radius:50%;background:var(--short)}}
+  section {{ margin-top:22px; }}
+  h2 {{ font-family:"IBM Plex Serif",serif; font-size:1.2rem; margin:0 0 6px; }}
+  section p {{ color:var(--muted); margin:0 0 14px; font-size:.92rem; }}
+  .table-wrap {{ overflow-x:auto; border:1px solid var(--line); }}
+  table {{ width:100%; border-collapse:collapse; font-size:.86rem; min-width:720px; }}
+  th,td {{ padding:11px 12px; text-align:right; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }}
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2) {{ text-align:left; }}
+  th {{ font-family:"JetBrains Mono",monospace; font-size:.72rem; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); background:rgba(0,0,0,.22); font-weight:500; }}
+  td.mono {{ font-family:"JetBrains Mono",monospace; font-size:.8rem; }}
+  .pos {{ color:var(--long); }} .neg {{ color:var(--short); }} .na {{ color:var(--muted); }}
+  .note {{ margin-top:14px; color:var(--muted); font-size:.8rem; }}
+  @media (max-width:640px) {{ #chart{{height:420px}} .wrap{{padding:18px 12px 36px}} }}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav"><a href="./index.html">← 全部訊號幣種</a></div>
+    <header>
+      <div class="brand">{data['symbol'].split('/')[0]}<span>/{data['symbol'].split('/')[-1]}</span></div>
+      <div class="sub">影線頸線破位訊號與做空報酬（{data['day']} UTC，Binance USDT-M 5m）</div>
+      <div class="meta">
+        <span>進場：<b>訊號下一根開盤</b></span>
+        <span>均線：<b>SMA 7 / 14 / 25 / 99 / 200</b></span>
+        <span>訊號數：<b>{len(data['signals'])}</b></span>
+      </div>
+    </header>
+    <div class="chart-shell">
+      <div class="legend">
+        <span class="ma7"><i></i>SMA7</span>
+        <span class="ma14"><i></i>SMA14</span>
+        <span class="ma25"><i></i>SMA25</span>
+        <span class="ma99"><i></i>SMA99</span>
+        <span class="ma200"><i></i>SMA200</span>
+        <span class="sig"><i></i>做空訊號</span>
+      </div>
+      <div id="chart"></div>
+    </div>
+    <section>
+      <h2>做空報酬（%）</h2>
+      <p>正值表示空單獲利。缺資料以 — 表示（接近日終、持有期超出可用 K 線）。</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>訊號時間</th><th>進場價</th><th>乖離</th>
+              <th>15m</th><th>30m</th><th>1h</th><th>2h</th><th>4h</th><th>8h</th><th>12h</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <p class="note">資料：Binance Vision USDT-M 日檔。前置 K 線自 {HIST} 18:00 UTC。</p>
+    </section>
+  </div>
+  <script>
+    const DATA = {json.dumps(data, ensure_ascii=False)};
+    function fmtPct(v) {{
+      if (v === null || v === undefined) return '<span class="na">—</span>';
+      const cls = v >= 0 ? 'pos' : 'neg';
+      return `<span class="${{cls}}">${{(v>=0?'+':'') + v.toFixed(2)}}%</span>`;
+    }}
+    const tbody = document.getElementById('tbody');
+    for (const s of DATA.signals) {{
+      const p = s.pnl;
+      tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td class="mono">${{s.time_utc}}</td>
+          <td class="mono">${{Number(s.entry).toPrecision(6)}}</td>
+          <td class="mono">${{s.bias.toFixed(2)}}%</td>
+          <td>${{fmtPct(p['15m'])}}</td><td>${{fmtPct(p['30m'])}}</td>
+          <td>${{fmtPct(p['1h'])}}</td><td>${{fmtPct(p['2h'])}}</td>
+          <td>${{fmtPct(p['4h'])}}</td><td>${{fmtPct(p['8h'])}}</td>
+          <td>${{fmtPct(p['12h'])}}</td>
+        </tr>`);
+    }}
+    const chart = LightweightCharts.createChart(document.getElementById('chart'), {{
+      autoSize: true,
+      layout: {{ background: {{ type:'solid', color:'transparent' }}, textColor:'#8aa193', fontFamily:'JetBrains Mono, monospace' }},
+      grid: {{ vertLines: {{ color:'rgba(232,240,234,0.06)' }}, horzLines: {{ color:'rgba(232,240,234,0.06)' }} }},
+      crosshair: {{
+        vertLine: {{ color:'rgba(201,162,39,0.45)', labelBackgroundColor:'#c9a227' }},
+        horzLine: {{ color:'rgba(201,162,39,0.45)', labelBackgroundColor:'#c9a227' }},
+      }},
+      rightPriceScale: {{ borderColor:'rgba(232,240,234,0.12)' }},
+      timeScale: {{ borderColor:'rgba(232,240,234,0.12)', timeVisible:true, secondsVisible:false }},
+    }});
+    const candleSeries = chart.addCandlestickSeries({{
+      upColor:'#3dba7a', downColor:'#e35d5d',
+      borderUpColor:'#3dba7a', borderDownColor:'#e35d5d',
+      wickUpColor:'#3dba7a', wickDownColor:'#e35d5d',
+    }});
+    candleSeries.setData(DATA.candles);
+    function addMa(key, color) {{
+      const s = chart.addLineSeries({{ color, lineWidth:2, priceLineVisible:false, lastValueVisible:false }});
+      s.setData(DATA[key]);
+    }}
+    addMa('sma7','#f0c14a'); addMa('sma14','#7eb6ff'); addMa('sma25','#d28cff');
+    addMa('sma99','#5fd2c2'); addMa('sma200','#c9a227');
+    candleSeries.setMarkers(DATA.signals.map((s, idx) => ({{
+      time: s.time, position:'aboveBar', color:'#e35d5d', shape:'arrowDown', text:`SHORT #${{idx+1}}`,
+    }})));
+    DATA.signals.forEach((s, idx) => {{
+      candleSeries.createPriceLine({{
+        price: s.line_val,
+        color: idx === 0 ? 'rgba(227,93,93,0.35)' : 'rgba(227,93,93,0.55)',
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: `頸線#${{idx+1}}`,
+      }});
+    }});
+    chart.timeScale().fitContent();
+  </script>
+</body>
+</html>
+"""
+
+
+def render_index(cards: list[dict]) -> str:
+    cards_sorted = sorted(cards, key=lambda x: (-x["n"], x["symbol"]))
+    items = []
+    for c in cards_sorted:
+        avg = c["avg_1h"]
+        avg_cls = "pos" if avg is not None and avg >= 0 else "neg"
+        avg_txt = "—" if avg is None else f"{avg:+.2f}%"
+        items.append(
+            f"""
+        <a class="card" href="./{c['href']}">
+          <div class="name">{c['symbol']}</div>
+          <div class="row"><span>訊號</span><b>{c['n']}</b></div>
+          <div class="row"><span>1h 空均報酬</span><b class="{avg_cls}">{avg_txt}</b></div>
+          <div class="times">{c['times']}</div>
+        </a>"""
+        )
+    body = "\n".join(items)
+    return f"""<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>影線頸線訊號幣種 · {DAY}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {{
+    --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193;
+    --line:rgba(232,240,234,0.12); --long:#3dba7a; --short:#e35d5d; --accent:#c9a227;
+  }}
+  * {{ box-sizing:border-box; }}
+  body {{
+    margin:0; font-family:"IBM Plex Sans",sans-serif; color:var(--ink);
+    background:
+      radial-gradient(1000px 520px at 8% -8%, rgba(201,162,39,.18), transparent 55%),
+      radial-gradient(800px 480px at 100% 0%, rgba(61,186,122,.10), transparent 50%),
+      linear-gradient(165deg, var(--bg0), var(--bg1) 50%, #0a0f0d);
+    min-height:100vh;
+  }}
+  .wrap {{ max-width:1100px; margin:0 auto; padding:36px 20px 56px; }}
+  h1 {{ font-family:"IBM Plex Serif",serif; font-size:clamp(2rem,4vw,2.8rem); margin:0 0 8px; letter-spacing:-.02em; }}
+  .sub {{ color:var(--muted); max-width:40rem; line-height:1.55; margin-bottom:28px; }}
+  .stats {{ display:flex; flex-wrap:wrap; gap:14px 22px; margin-bottom:26px; font-family:"JetBrains Mono",monospace; font-size:.8rem; color:var(--muted); }}
+  .stats b {{ color:var(--ink); }}
+  .grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }}
+  a.card {{
+    display:block; text-decoration:none; color:inherit;
+    border:1px solid var(--line); padding:16px 16px 14px;
+    background:linear-gradient(180deg, rgba(255,255,255,.04), transparent 55%), rgba(20,32,27,.65);
+    transition: border-color .15s ease, transform .15s ease;
+  }}
+  a.card:hover {{ border-color: rgba(201,162,39,.55); transform: translateY(-2px); }}
+  .name {{ font-family:"IBM Plex Serif",serif; font-size:1.25rem; margin-bottom:10px; }}
+  .row {{ display:flex; justify-content:space-between; gap:10px; font-size:.86rem; color:var(--muted); margin:4px 0; }}
+  .row b {{ color:var(--ink); font-family:"JetBrains Mono",monospace; font-weight:500; }}
+  .pos {{ color:var(--long)!important; }} .neg {{ color:var(--short)!important; }}
+  .times {{ margin-top:10px; color:var(--muted); font-size:.72rem; font-family:"JetBrains Mono",monospace; line-height:1.45; }}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>影線頸線訊號</h1>
+    <p class="sub">{DAY} UTC · Binance USDT-M 5m · 成交額≥50M 宇宙下觸發的幣種。點進去看 K 線、均線與做空報酬。</p>
+    <div class="stats">
+      <span>幣種 <b>{len(cards_sorted)}</b></span>
+      <span>訊號總數 <b>{sum(c['n'] for c in cards_sorted)}</b></span>
+      <span>均線 <b>7 / 14 / 25 / 99 / 200</b></span>
+    </div>
+    <div class="grid">
+      {body}
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+def main():
+    sig = pd.read_csv(SIG_CSV)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    cards = []
+
+    for symbol, g in sig.groupby("symbol"):
+        g = g.sort_values("time_utc")
+        data = chart_payload(symbol, g)
+        stem = file_stem(symbol)
+        href = f"{stem}.html"
+        html = render_symbol_html(data)
+        (OUT_DIR / href).write_text(html, encoding="utf-8")
+
+        pnls_1h = [s["pnl"].get("1h") for s in data["signals"] if s["pnl"].get("1h") is not None]
+        avg_1h = round(sum(pnls_1h) / len(pnls_1h), 2) if pnls_1h else None
+        times = " · ".join(t[11:] for t in g["time_utc"].tolist())
+        cards.append(
+            {
+                "symbol": symbol,
+                "href": href,
+                "n": len(data["signals"]),
+                "avg_1h": avg_1h,
+                "times": times,
+            }
+        )
+        print(f"wrote {href} signals={len(data['signals'])}")
+
+    index = render_index(cards)
+    (OUT_DIR / "index.html").write_text(index, encoding="utf-8")
+    # convenience copies
+    Path("/workspace/docs/bico_shadow_neckline_chart.html").write_text(
+        (OUT_DIR / "BICOUSDT.html").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    print(f"index with {len(cards)} symbols -> {OUT_DIR/'index.html'}")
+
+
+if __name__ == "__main__":
+    main()
