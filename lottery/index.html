@@ -86,12 +86,12 @@
 
     .chances-text strong { color: var(--gold); font-size: 1.3rem; }
 
-    /* Slot machine */
+    /* Lucky wheel */
     .machine {
       background: var(--bg-panel);
       border: 2px solid rgba(255, 159, 67, 0.45);
       border-radius: var(--radius);
-      padding: 1.25rem;
+      padding: 1.25rem 1.25rem 1.35rem;
       box-shadow: 0 10px 28px rgba(255, 122, 24, 0.12), 0 2px 8px rgba(43, 33, 24, 0.06);
       margin-bottom: 1.25rem;
     }
@@ -102,91 +102,124 @@
       font-size: 0.75rem;
       letter-spacing: 0.2em;
       color: var(--glow);
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.85rem;
     }
 
-    .reel-window {
+    .wheel-stage {
       position: relative;
-      height: 168px;
-      overflow: hidden;
-      border-radius: 14px;
-      background: linear-gradient(180deg, #fffdf8, #ffe8c2);
-      border: 2px solid rgba(232, 154, 12, 0.45);
-      box-shadow: inset 0 2px 10px rgba(232, 154, 12, 0.12);
+      width: min(320px, 78vw);
+      margin: 0 auto 0.35rem;
+      aspect-ratio: 1;
     }
 
-    .reel-window.spinning {
-      animation: reelShake 0.12s linear infinite;
+    .wheel-pointer {
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+      width: 0;
+      height: 0;
+      border-left: 14px solid transparent;
+      border-right: 14px solid transparent;
+      border-top: 28px solid #ff7a18;
+      filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.2));
     }
 
-    @keyframes reelShake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-1px); }
-      75% { transform: translateX(1px); }
-    }
-
-    .reel-window::before,
-    .reel-window::after {
+    .wheel-pointer::after {
       content: "";
       position: absolute;
-      left: 0;
-      right: 0;
-      height: 48px;
-      z-index: 2;
-      pointer-events: none;
+      top: -28px;
+      left: -7px;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border: 3px solid #ff7a18;
+      border-radius: 50%;
     }
 
-    .reel-window::before {
-      top: 0;
-      background: linear-gradient(to bottom, #fff8ef 10%, rgba(255, 248, 239, 0.75), transparent);
-    }
-
-    .reel-window::after {
-      bottom: 0;
-      background: linear-gradient(to top, #fff0d8 10%, rgba(255, 240, 216, 0.75), transparent);
-    }
-
-    .reel-highlight {
+    .wheel-ring {
       position: absolute;
-      top: 50%;
-      left: 6px;
-      right: 6px;
-      height: 56px;
-      transform: translateY(-50%);
-      border: 2px solid rgba(232, 154, 12, 0.65);
-      border-radius: 10px;
-      background: rgba(255, 176, 32, 0.14);
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5) inset, 0 0 18px rgba(255, 176, 32, 0.25);
-      z-index: 1;
-      pointer-events: none;
+      inset: 0;
+      border-radius: 50%;
+      padding: 10px;
+      background:
+        conic-gradient(from 0deg, #ffb020, #ff7a18, #ffcf4d, #ff9f43, #ffb020);
+      box-shadow:
+        0 10px 28px rgba(255, 122, 24, 0.28),
+        inset 0 0 0 3px rgba(255, 255, 255, 0.55);
     }
 
-    .reel {
+    .wheel {
       position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
+      inset: 10px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: #fff8ef;
+      transition: none;
       will-change: transform;
-      backface-visibility: hidden;
+      box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.8);
     }
 
-    .reel-item {
-      height: 56px;
+    .wheel.spinning {
+      filter: saturate(1.08);
+    }
+
+    .wheel-segment-label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 46%;
+      transform-origin: left center;
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #3a2a1a;
+      pointer-events: none;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
-      font-size: 1.05rem;
-      font-weight: 700;
-      padding: 0 0.75rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      gap: 0.2rem;
+      line-height: 1.15;
+      padding-left: 18%;
     }
 
-    .reel-item .emoji { font-size: 1.45rem; flex-shrink: 0; }
+    .wheel-segment-label .emoji { font-size: 0.95rem; }
+    .wheel-segment-label.mystery { color: #c45c26; }
 
-    .reel-item.mystery { color: var(--glow); letter-spacing: 0.12em; }
+    .wheel-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      z-index: 4;
+      width: 64px;
+      height: 64px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: linear-gradient(145deg, #fff, #ffe2a8);
+      border: 4px solid #ff9f43;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+      display: grid;
+      place-items: center;
+      font-size: 1.5rem;
+    }
+
+    .wheel-glow {
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle, rgba(255, 176, 32, 0.35), transparent 70%);
+      transition: opacity 0.3s;
+    }
+
+    .wheel-stage.spinning .wheel-glow { opacity: 1; animation: glowPulse 0.6s ease-in-out infinite; }
+
+    @keyframes glowPulse {
+      0%, 100% { transform: scale(1); opacity: 0.55; }
+      50% { transform: scale(1.04); opacity: 1; }
+    }
 
     .draw-btn {
       display: block;
@@ -424,9 +457,13 @@
 
     <div class="machine">
       <div class="machine-top">▶ SPIN TO WIN ◀</div>
-      <div class="reel-window">
-        <div class="reel-highlight"></div>
-        <div class="reel" id="reel"></div>
+      <div class="wheel-stage" id="wheel-stage">
+        <div class="wheel-glow"></div>
+        <div class="wheel-pointer" aria-hidden="true"></div>
+        <div class="wheel-ring">
+          <div class="wheel" id="wheel"></div>
+        </div>
+        <div class="wheel-center">🎰</div>
       </div>
       <button class="draw-btn" id="draw-btn">🎰 開始抽獎</button>
       <button class="reset-btn" id="reset-btn" type="button">🔄 再來一次（重置 3 次機會）</button>
@@ -576,68 +613,95 @@
       return pool[pool.length - 1];
     }
 
-    const MYSTERY_LABELS = ["🎁 ???", "✨ ???", "🏆 ???", "💎 ???", "🎰 ???", "🌟 ???"];
-    const ITEM_H = 56;
-    const WINDOW_H = 168;
-    const REEL_LOOPS = 40;
+    const SEGMENT_COLORS = [
+      "#FFE08A", "#FFB347", "#FFD6A5", "#FFCC80",
+      "#FFF3B0", "#FFAB76", "#FFE5B4", "#FFC4A3",
+    ];
 
-    function reelLabel(prize, i) {
-      if (prize.reveal) return `<span class="emoji">${prize.emoji}</span><span>${prize.name}</span>`;
-      const label = MYSTERY_LABELS[i % MYSTERY_LABELS.length];
-      return label;
+    let wheelAngle = 0;
+    let mysteryCount = 0;
+
+    function shortPrizeLabel(prize) {
+      if (prize.reveal) return prize.name;
+      mysteryCount += 1;
+      return `神秘${mysteryCount}`;
     }
 
-    function buildReel() {
-      const reel = document.getElementById("reel");
-      const items = [];
-      for (let r = 0; r < REEL_LOOPS; r++) {
-        PRIZES.forEach(p => items.push(p));
-      }
-      reel.innerHTML = items.map((p, i) => {
-        const cls = p.reveal ? "reel-item" : "reel-item mystery";
-        return `<div class="${cls}">${reelLabel(p, i)}</div>`;
+    function buildWheel() {
+      const wheel = document.getElementById("wheel");
+      const n = PRIZES.length;
+      const seg = 360 / n;
+      mysteryCount = 0;
+
+      const gradient = PRIZES.map((_, i) => {
+        const color = SEGMENT_COLORS[i % SEGMENT_COLORS.length];
+        const start = i * seg;
+        const end = (i + 1) * seg;
+        return `${color} ${start}deg ${end}deg`;
+      }).join(", ");
+
+      wheel.style.background = `conic-gradient(from -${seg / 2}deg, ${gradient})`;
+      wheel.innerHTML = PRIZES.map((p, i) => {
+        const rot = i * seg;
+        const label = shortPrizeLabel(p);
+        const cls = p.reveal ? "wheel-segment-label" : "wheel-segment-label mystery";
+        const flip = rot > 90 && rot < 270;
+        const inner = flip
+          ? `<span style="transform:rotate(180deg);display:inline-flex;align-items:center;gap:0.2rem"><span>${label}</span><span class="emoji">${p.reveal ? p.emoji : "🎁"}</span></span>`
+          : `<span class="emoji">${p.reveal ? p.emoji : "🎁"}</span><span>${label}</span>`;
+        return `<div class="${cls}" style="transform: rotate(${rot}deg) translateY(-50%);">${inner}</div>`;
       }).join("");
-      return items;
+
+      wheel.style.transform = `rotate(${wheelAngle}deg)`;
     }
 
-    const reelItems = buildReel();
-    let currentReelIndex = 1;
-
-    function reelOffset(index) {
-      return index * ITEM_H - (WINDOW_H - ITEM_H) / 2;
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
     }
 
-    function setReelPosition(index, animate = false, durationMs = 4200) {
-      const reel = document.getElementById("reel");
-      if (!animate) {
-        reel.style.transition = "none";
-        reel.style.transform = `translateY(-${reelOffset(index)}px)`;
-        currentReelIndex = index;
-        return Promise.resolve();
-      }
+    function spinWheelTo(prizeIndex) {
+      const wheel = document.getElementById("wheel");
+      const stage = document.getElementById("wheel-stage");
+      const n = PRIZES.length;
+      const seg = 360 / n;
+      // Pointer is at top; segment centers start at 0 with conic offset -seg/2
+      const targetCenter = prizeIndex * seg;
+      const extraSpins = 6 + Math.floor(Math.random() * 3);
+      const current = ((wheelAngle % 360) + 360) % 360;
+      // Want final angle such that targetCenter lands under pointer (0 deg at top)
+      const desiredMod = (360 - targetCenter) % 360;
+      let delta = desiredMod - current;
+      if (delta <= 0) delta += 360;
+      delta += extraSpins * 360;
+
+      const startAngle = wheelAngle;
+      const endAngle = wheelAngle + delta;
+      const duration = 5200;
+      const start = performance.now();
+      stage.classList.add("spinning");
+      wheel.classList.add("spinning");
+
       return new Promise(resolve => {
-        let done = false;
-        const finish = () => {
-          if (done) return;
-          done = true;
-          reel.removeEventListener("transitionend", onEnd);
-          currentReelIndex = index;
-          resolve();
-        };
-        const onEnd = (e) => {
-          if (e.propertyName !== "transform") return;
-          finish();
-        };
-        reel.addEventListener("transitionend", onEnd);
-        reel.style.transition = `transform ${durationMs}ms cubic-bezier(0.12, 0.75, 0.08, 1)`;
-        requestAnimationFrame(() => {
-          reel.style.transform = `translateY(-${reelOffset(index)}px)`;
-        });
-        setTimeout(finish, durationMs + 150);
+        function frame(now) {
+          const t = Math.min(1, (now - start) / duration);
+          const eased = easeOutCubic(t);
+          wheelAngle = startAngle + delta * eased;
+          wheel.style.transform = `rotate(${wheelAngle}deg)`;
+          if (t < 1) {
+            requestAnimationFrame(frame);
+          } else {
+            wheelAngle = endAngle;
+            wheel.style.transform = `rotate(${wheelAngle}deg)`;
+            stage.classList.remove("spinning");
+            wheel.classList.remove("spinning");
+            resolve();
+          }
+        }
+        requestAnimationFrame(frame);
       });
     }
 
-    setReelPosition(1);
+    buildWheel();
 
     function renderChances() {
       const bar = document.getElementById("chances-bar");
@@ -755,32 +819,10 @@
       const isLastDraw = remaining() === 1;
       const base = pickRandom(isLastDraw);
       const winner = resolvePrize(base);
-      const windowEl = document.querySelector(".reel-window");
-      const reel = document.getElementById("reel");
+      const prizeIndex = PRIZES.findIndex(p => p.id === winner.id);
 
-      // 每次從頂端附近重新起轉，避免第二次無法觸發 transition
-      setReelPosition(1, false);
-      void reel.offsetHeight;
-
-      const spins = 6 + Math.floor(Math.random() * 3); // 多轉幾圈
-      let targetIdx = spins * PRIZES.length;
-      // 對齊到中獎獎項，且確保在 reel 範圍內
-      while (targetIdx < reelItems.length && reelItems[targetIdx].id !== winner.id) {
-        targetIdx++;
-      }
-      if (targetIdx >= reelItems.length - 2) {
-        targetIdx = PRIZES.findIndex(p => p.id === winner.id);
-        if (targetIdx < 0) targetIdx = 2;
-        targetIdx += 5 * PRIZES.length;
-      }
-
-      windowEl.classList.add("spinning");
-      const durationMs = 4200;
-      await setReelPosition(targetIdx, true, durationMs);
-      windowEl.classList.remove("spinning");
-
-      // 停輪後短暫停頓再揭曉
-      await new Promise(r => setTimeout(r, 280));
+      await spinWheelTo(prizeIndex < 0 ? 0 : prizeIndex);
+      await new Promise(r => setTimeout(r, 350));
 
       state.used++;
       state.history.push({
