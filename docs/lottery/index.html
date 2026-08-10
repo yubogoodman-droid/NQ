@@ -107,12 +107,22 @@
 
     .reel-window {
       position: relative;
-      height: 88px;
+      height: 168px;
       overflow: hidden;
-      border-radius: 12px;
+      border-radius: 14px;
       background: linear-gradient(180deg, #fffdf8, #ffe8c2);
       border: 2px solid rgba(232, 154, 12, 0.45);
       box-shadow: inset 0 2px 10px rgba(232, 154, 12, 0.12);
+    }
+
+    .reel-window.spinning {
+      animation: reelShake 0.12s linear infinite;
+    }
+
+    @keyframes reelShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-1px); }
+      75% { transform: translateX(1px); }
     }
 
     .reel-window::before,
@@ -121,31 +131,32 @@
       position: absolute;
       left: 0;
       right: 0;
-      height: 28px;
+      height: 48px;
       z-index: 2;
       pointer-events: none;
     }
 
     .reel-window::before {
       top: 0;
-      background: linear-gradient(to bottom, #fff8ef, transparent);
+      background: linear-gradient(to bottom, #fff8ef 10%, rgba(255, 248, 239, 0.75), transparent);
     }
 
     .reel-window::after {
       bottom: 0;
-      background: linear-gradient(to top, #fff0d8, transparent);
+      background: linear-gradient(to top, #fff0d8 10%, rgba(255, 240, 216, 0.75), transparent);
     }
 
     .reel-highlight {
       position: absolute;
       top: 50%;
-      left: 0;
-      right: 0;
-      height: 44px;
+      left: 6px;
+      right: 6px;
+      height: 56px;
       transform: translateY(-50%);
-      border-top: 1px solid rgba(232, 154, 12, 0.45);
-      border-bottom: 1px solid rgba(232, 154, 12, 0.45);
-      background: rgba(255, 176, 32, 0.12);
+      border: 2px solid rgba(232, 154, 12, 0.65);
+      border-radius: 10px;
+      background: rgba(255, 176, 32, 0.14);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5) inset, 0 0 18px rgba(255, 176, 32, 0.25);
       z-index: 1;
       pointer-events: none;
     }
@@ -156,15 +167,16 @@
       right: 0;
       top: 0;
       will-change: transform;
+      backface-visibility: hidden;
     }
 
     .reel-item {
-      height: 44px;
+      height: 56px;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 0.5rem;
-      font-size: 1rem;
+      font-size: 1.05rem;
       font-weight: 700;
       padding: 0 0.75rem;
       white-space: nowrap;
@@ -172,7 +184,9 @@
       text-overflow: ellipsis;
     }
 
-    .reel-item .emoji { font-size: 1.3rem; flex-shrink: 0; }
+    .reel-item .emoji { font-size: 1.45rem; flex-shrink: 0; }
+
+    .reel-item.mystery { color: var(--glow); letter-spacing: 0.12em; }
 
     .draw-btn {
       display: block;
@@ -348,12 +362,6 @@
     .prize-chip.mystery {
       justify-content: center;
       letter-spacing: 0.08em;
-    }
-
-    .reel-item.mystery {
-      color: var(--glow);
-      letter-spacing: 0.15em;
-      font-size: 1.15rem;
     }
 
     .history-list { list-style: none; }
@@ -569,31 +577,67 @@
     }
 
     const MYSTERY_LABELS = ["🎁 ???", "✨ ???", "🏆 ???", "💎 ???", "🎰 ???", "🌟 ???"];
+    const ITEM_H = 56;
+    const WINDOW_H = 168;
+    const REEL_LOOPS = 40;
+
+    function reelLabel(prize, i) {
+      if (prize.reveal) return `<span class="emoji">${prize.emoji}</span><span>${prize.name}</span>`;
+      const label = MYSTERY_LABELS[i % MYSTERY_LABELS.length];
+      return label;
+    }
 
     function buildReel() {
       const reel = document.getElementById("reel");
       const items = [];
-      for (let r = 0; r < 30; r++) {
+      for (let r = 0; r < REEL_LOOPS; r++) {
         PRIZES.forEach(p => items.push(p));
       }
-      reel.innerHTML = items.map((_, i) => {
-        const label = MYSTERY_LABELS[i % MYSTERY_LABELS.length];
-        return `<div class="reel-item mystery">${label}</div>`;
+      reel.innerHTML = items.map((p, i) => {
+        const cls = p.reveal ? "reel-item" : "reel-item mystery";
+        return `<div class="${cls}">${reelLabel(p, i)}</div>`;
       }).join("");
       return items;
     }
 
     const reelItems = buildReel();
-    const ITEM_H = 44;
+    let currentReelIndex = 1;
 
-    function setReelPosition(index) {
-      const reel = document.getElementById("reel");
-      const offset = index * ITEM_H - (88 - ITEM_H) / 2;
-      reel.style.transition = "none";
-      reel.style.transform = `translateY(-${offset}px)`;
+    function reelOffset(index) {
+      return index * ITEM_H - (WINDOW_H - ITEM_H) / 2;
     }
 
-    setReelPosition(Math.floor(reelItems.length / 2));
+    function setReelPosition(index, animate = false, durationMs = 4200) {
+      const reel = document.getElementById("reel");
+      if (!animate) {
+        reel.style.transition = "none";
+        reel.style.transform = `translateY(-${reelOffset(index)}px)`;
+        currentReelIndex = index;
+        return Promise.resolve();
+      }
+      return new Promise(resolve => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          reel.removeEventListener("transitionend", onEnd);
+          currentReelIndex = index;
+          resolve();
+        };
+        const onEnd = (e) => {
+          if (e.propertyName !== "transform") return;
+          finish();
+        };
+        reel.addEventListener("transitionend", onEnd);
+        reel.style.transition = `transform ${durationMs}ms cubic-bezier(0.12, 0.75, 0.08, 1)`;
+        requestAnimationFrame(() => {
+          reel.style.transform = `translateY(-${reelOffset(index)}px)`;
+        });
+        setTimeout(finish, durationMs + 150);
+      });
+    }
+
+    setReelPosition(1);
 
     function renderChances() {
       const bar = document.getElementById("chances-bar");
@@ -711,26 +755,32 @@
       const isLastDraw = remaining() === 1;
       const base = pickRandom(isLastDraw);
       const winner = resolvePrize(base);
+      const windowEl = document.querySelector(".reel-window");
       const reel = document.getElementById("reel");
 
-      const baseIdx = Math.floor(reelItems.length / 2);
-      let targetIdx = baseIdx;
-      for (let i = baseIdx; i < reelItems.length; i++) {
-        if (reelItems[i].id === winner.id) { targetIdx = i; break; }
+      // 每次從頂端附近重新起轉，避免第二次無法觸發 transition
+      setReelPosition(1, false);
+      void reel.offsetHeight;
+
+      const spins = 6 + Math.floor(Math.random() * 3); // 多轉幾圈
+      let targetIdx = spins * PRIZES.length;
+      // 對齊到中獎獎項，且確保在 reel 範圍內
+      while (targetIdx < reelItems.length && reelItems[targetIdx].id !== winner.id) {
+        targetIdx++;
       }
-      const extraRounds = PRIZES.length * 4;
-      targetIdx += extraRounds * PRIZES.length;
-      if (targetIdx >= reelItems.length - 5) {
-        targetIdx = baseIdx + extraRounds * PRIZES.length;
-        while (targetIdx < reelItems.length && reelItems[targetIdx].id !== winner.id) targetIdx++;
+      if (targetIdx >= reelItems.length - 2) {
+        targetIdx = PRIZES.findIndex(p => p.id === winner.id);
+        if (targetIdx < 0) targetIdx = 2;
+        targetIdx += 5 * PRIZES.length;
       }
 
-      const offset = targetIdx * ITEM_H - (88 - ITEM_H) / 2;
+      windowEl.classList.add("spinning");
+      const durationMs = 4200;
+      await setReelPosition(targetIdx, true, durationMs);
+      windowEl.classList.remove("spinning");
 
-      reel.style.transition = "transform 3.2s cubic-bezier(0.15, 0.85, 0.2, 1)";
-      reel.style.transform = `translateY(-${offset}px)`;
-
-      await new Promise(r => setTimeout(r, 3400));
+      // 停輪後短暫停頓再揭曉
+      await new Promise(r => setTimeout(r, 280));
 
       state.used++;
       state.history.push({
