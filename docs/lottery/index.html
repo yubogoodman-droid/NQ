@@ -309,90 +309,145 @@
       padding: 1.35rem 1.15rem 1.5rem;
     }
 
-    /* Chinese spell card face */
-    .spell-face {
+    /* Chinese Greed Island card face */
+    .gi-face {
       display: none;
-      margin: 0.35rem auto 0.9rem;
+      margin: 0.35rem auto 0.75rem;
       width: min(280px, 82vw);
-      border-radius: 14px;
-      padding: 1px;
-      background: linear-gradient(145deg, #f0d78c, #c9a227 40%, #8a6a12 100%);
+      aspect-ratio: 280 / 400;
+      border-radius: 6px;
+      padding: 7px;
+      background: linear-gradient(160deg, #1a1a1a 0%, #0a0a0a 40%, #1c2433 100%);
       box-shadow: 0 10px 28px rgba(43, 33, 24, 0.18);
       animation: bounce 0.6s ease;
       text-align: left;
     }
 
-    .spell-face.show { display: block; }
+    .gi-face.show { display: block; }
 
-    .spell-face-inner {
-      border-radius: 13px;
-      background:
-        radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255, 220, 120, 0.18), transparent 55%),
-        linear-gradient(180deg, #1a2740 0%, #0d1524 55%, #0a101c 100%);
-      color: #f5efe2;
-      padding: 0.95rem 1rem 1.05rem;
-      border: 1px solid rgba(255, 220, 140, 0.25);
-    }
-
-    .spell-face-no {
-      font-family: Orbitron, sans-serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.08em;
-      color: #f0d78c;
-      margin-bottom: 0.35rem;
-    }
-
-    .spell-face-name {
-      font-size: 1.65rem;
-      font-weight: 900;
-      line-height: 1.2;
-      color: #fff8e7;
-      margin-bottom: 0.15rem;
-    }
-
-    .spell-face-jp {
-      font-size: 0.78rem;
-      color: rgba(245, 239, 226, 0.55);
-      margin-bottom: 0.7rem;
-    }
-
-    .spell-face-meta {
+    .gi-inner {
+      height: 100%;
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-      margin-bottom: 0.75rem;
+      flex-direction: column;
+      background: #0b1220;
+      border: 2px solid #2a3f63;
+      border-radius: 4px;
+      overflow: hidden;
     }
 
-    .spell-chip {
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 0.22rem 0.5rem;
-      border-radius: 6px;
-      background: rgba(240, 215, 140, 0.12);
-      border: 1px solid rgba(240, 215, 140, 0.35);
-      color: #f0d78c;
+    .gi-head {
+      display: grid;
+      grid-template-columns: 48px 1fr 54px;
+      align-items: center;
+      gap: 0.2rem;
+      padding: 0.4rem 0.45rem;
+      background: linear-gradient(180deg, #f7f4ea 0%, #ebe4d2 100%);
+      color: #1a1a1a;
+      border-bottom: 2px solid #2a3f63;
+      min-height: 2.9rem;
     }
 
-    .spell-face-desc {
-      font-size: 0.88rem;
-      line-height: 1.55;
-      color: rgba(245, 239, 226, 0.92);
+    .gi-no { font-family: Orbitron, sans-serif; font-size: 0.72rem; font-weight: 700; }
+    .gi-title { text-align: center; font-size: 1.2rem; font-weight: 900; line-height: 1.15; letter-spacing: 0.05em; }
+    .gi-title small { display: block; font-size: 0.58rem; font-weight: 500; color: #666; margin-bottom: 0.05rem; }
+    .gi-rank { text-align: right; font-family: Orbitron, sans-serif; font-size: 0.72rem; font-weight: 700; }
+
+    .gi-art {
+      position: relative;
+      flex: 1.05;
+      min-height: 0;
+      background: #000;
+      overflow: hidden;
+      border-bottom: 2px solid #2a3f63;
+    }
+
+    .gi-art img {
+      width: 100%;
+      height: 155%;
+      object-fit: cover;
+      object-position: center 40%;
+      display: block;
+      transform: translateY(-8%);
+    }
+
+    .gi-text {
+      flex: 0.95;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(120,180,255,0.18), transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(80,140,220,0.16), transparent 45%),
+        #dce8f7;
+      padding: 0.45rem;
+    }
+
+    .gi-desc-box {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #9bb4d4;
+      border-radius: 3px;
+      padding: 0.4rem 0.45rem;
+      overflow: auto;
+    }
+
+    .gi-desc {
+      color: #1c2433;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      font-weight: 500;
       white-space: pre-wrap;
     }
 
+    .gi-icons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.28rem;
+      margin-top: 0.3rem;
+    }
+
+    .gi-icon {
+      width: 1.45rem;
+      height: 1.45rem;
+      border-radius: 50%;
+      border: 1.5px solid #2a3f63;
+      background: #fff;
+      color: #1a2436;
+      font-size: 0.68rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gi-icon.range { background: #e8f4ff; }
+
     .spell-scan-note {
       display: none;
-      margin: 0.15rem 0 0.85rem;
-      font-size: 0.75rem;
+      margin: 0.15rem auto 0.85rem;
+      font-size: 0.78rem;
       color: var(--muted);
+      text-align: left;
+      max-width: min(280px, 82vw);
+      border: 1px solid rgba(255, 159, 67, 0.3);
+      border-radius: 10px;
+      padding: 0.45rem 0.65rem;
+      background: #fffaf2;
     }
 
     .spell-scan-note.show { display: block; }
 
-    .result-card-img.spell-scan {
-      width: min(140px, 42vw);
-      opacity: 0.92;
-      margin-bottom: 0.35rem;
+    .spell-scan-note summary {
+      cursor: pointer;
+      font-weight: 500;
+      list-style: none;
+    }
+
+    .spell-scan-note summary::-webkit-details-marker { display: none; }
+
+    .spell-scan-note .result-card-img {
+      width: 100%;
+      margin: 0.55rem auto 0.15rem;
     }
 
     @keyframes popIn {
@@ -579,17 +634,29 @@
     <div class="result-card" id="result-card">
       <p class="result-label" id="result-label">恭喜獲得</p>
       <div class="result-emoji" id="result-emoji"></div>
-      <div class="spell-face" id="spell-face">
-        <div class="spell-face-inner">
-          <div class="spell-face-no" id="spell-face-no"></div>
-          <div class="spell-face-name" id="spell-face-name"></div>
-          <div class="spell-face-jp" id="spell-face-jp"></div>
-          <div class="spell-face-meta" id="spell-face-meta"></div>
-          <p class="spell-face-desc" id="spell-face-desc"></p>
+      <div class="gi-face" id="spell-face">
+        <div class="gi-inner">
+          <div class="gi-head">
+            <div class="gi-no" id="spell-face-no"></div>
+            <div class="gi-title" id="spell-face-name"></div>
+            <div class="gi-rank" id="spell-face-rank"></div>
+          </div>
+          <div class="gi-art">
+            <img id="spell-face-art" alt="" />
+          </div>
+          <div class="gi-text">
+            <div class="gi-desc-box">
+              <p class="gi-desc" id="spell-face-desc"></p>
+            </div>
+            <div class="gi-icons" id="spell-face-icons"></div>
+          </div>
         </div>
       </div>
       <img class="result-card-img" id="result-card-img" alt="" />
-      <p class="spell-scan-note" id="spell-scan-note">原版掃描（日文）</p>
+      <details class="spell-scan-note" id="spell-scan-note">
+        <summary>查看原版日文掃描</summary>
+        <img class="result-card-img show" id="result-scan-img" alt="" />
+      </details>
       <p class="result-prize" id="result-prize"></p>
       <p class="result-sub" id="result-sub"></p>
       <button class="result-close" id="result-close">太棒了！</button>
@@ -900,11 +967,14 @@
       const labelEl = document.getElementById("result-label");
       const spellFace = document.getElementById("spell-face");
       const scanNote = document.getElementById("spell-scan-note");
+      const scanImg = document.getElementById("result-scan-img");
 
       cardEl.classList.remove("spell-mode");
       spellFace.classList.remove("show");
       scanNote.classList.remove("show");
-      imgEl.classList.remove("spell-scan");
+      scanNote.open = false;
+      imgEl.classList.remove("show");
+      imgEl.removeAttribute("src");
 
       if (prize.spellCard) {
         const c = prize.spellCard;
@@ -912,28 +982,35 @@
         emojiEl.textContent = "";
         cardEl.classList.add("spell-mode");
 
-        document.getElementById("spell-face-no").textContent = `NO.${c.id}`;
-        document.getElementById("spell-face-name").textContent = c.name;
-        document.getElementById("spell-face-jp").textContent = c.nameJp ? `原名：${c.nameJp}` : "";
-        document.getElementById("spell-face-meta").innerHTML = [
-          `<span class="spell-chip">${c.rank} 級</span>`,
-          `<span class="spell-chip">${rangeLabel(c.range)}</span>`,
-          c.limit ? `<span class="spell-chip">限度 ${c.limit} 枚</span>` : "",
-        ].filter(Boolean).join("");
+        document.getElementById("spell-face-no").textContent = c.id;
+        document.getElementById("spell-face-name").innerHTML = `<small>咒語卡</small>${c.name}`;
+        document.getElementById("spell-face-rank").textContent = `${c.rank}-${c.limit || "?"}`;
         document.getElementById("spell-face-desc").textContent = c.desc || "";
+        document.getElementById("spell-face-icons").innerHTML =
+          `<span class="gi-icon range">${c.range === "long" ? "遠" : "近"}</span>` +
+          `<span class="gi-icon">咒</span>`;
+
+        const artEl = document.getElementById("spell-face-art");
+        const artSrc = spellImageSrc(c.id);
+        artEl.src = artSrc;
+        artEl.alt = "";
+        artEl.onerror = () => {
+          artEl.onerror = null;
+          artEl.src = `../greed-island/images/modal/${c.id}.webp`;
+        };
+
         spellFace.classList.add("show");
 
-        // 原版掃描作小圖參考；中文卡面為主
-        imgEl.src = spellImageSrc(c.id);
-        imgEl.alt = `NO.${c.id} ${c.name} 原版掃描`;
-        imgEl.onerror = () => {
-          imgEl.onerror = null;
-          imgEl.src = `../greed-island/images/modal/${c.id}.webp`;
+        scanImg.src = artSrc;
+        scanImg.alt = `NO.${c.id} ${c.name} 原版掃描`;
+        scanImg.onerror = () => {
+          scanImg.onerror = null;
+          scanImg.src = `../greed-island/images/modal/${c.id}.webp`;
         };
-        imgEl.classList.add("show", "spell-scan");
         scanNote.classList.add("show");
+        scanNote.open = false;
 
-        labelEl.textContent = "恭喜抽中咒語卡";
+        labelEl.textContent = "恭喜抽中咒語卡（中文卡面）";
         document.getElementById("result-prize").textContent = "";
         document.getElementById("result-prize").style.display = "none";
         subEl.classList.remove("show");
@@ -953,9 +1030,6 @@
       } else {
         emojiEl.classList.remove("hidden");
         emojiEl.textContent = prize.emoji;
-        imgEl.classList.remove("show");
-        imgEl.removeAttribute("src");
-        imgEl.removeAttribute("alt");
         labelEl.textContent = "恭喜獲得";
         subEl.classList.remove("show");
         subEl.textContent = "";
