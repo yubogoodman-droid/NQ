@@ -57,18 +57,23 @@ def short_pnl_table(df: pd.DataFrame, signal_rows: pd.DataFrame) -> list[dict]:
                 continue
             exit_px = float(df.loc[j, "close"])
             pnl[name] = round((entry - exit_px) / entry * 100, 2)
-        out.append(
-            {
-                "time_utc": s["time_utc"],
-                "price": float(s["price"]),
-                "entry": entry,
-                "bias": float(s["bias"]),
-                "line_val": float(s["line_val"]),
-                "sma14": float(s["sma14"]),
-                "pnl": pnl,
-                "time": entry_ts // 1000,
-            }
-        )
+        row = {
+            "time_utc": s["time_utc"],
+            "price": float(s["price"]),
+            "entry": entry,
+            "bias": float(s["bias"]),
+            "line_val": float(s["line_val"]),
+            "sma14": float(s["sma14"]),
+            "pnl": pnl,
+            "time": entry_ts // 1000,
+            "dist_ma99_pct": None,
+            "close_break_pct": None,
+        }
+        if "dist_ma99_pct" in s and pd.notna(s["dist_ma99_pct"]):
+            row["dist_ma99_pct"] = float(s["dist_ma99_pct"])
+        if "close_break_pct" in s and pd.notna(s["close_break_pct"]):
+            row["close_break_pct"] = float(s["close_break_pct"])
+        out.append(row)
     return out
 
 
@@ -102,6 +107,7 @@ def chart_payload(symbol: str, signal_rows: pd.DataFrame) -> dict:
     return {
         "symbol": symbol,
         "day": DAY,
+        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "candles": candles,
         "sma7": series("sma7"),
         "sma14": series("sma14"),
@@ -112,8 +118,25 @@ def chart_payload(symbol: str, signal_rows: pd.DataFrame) -> dict:
     }
 
 
-def render_symbol_html(data: dict, index_href: str = "./index.html", badge: str = "") -> str:
+def render_symbol_html(
+    data: dict,
+    index_href: str = "./index.html",
+    badge: str = "",
+    filter_note: str = "",
+) -> str:
     badge_html = f'<div class="badge">{badge}</div>' if badge else ""
+    note_html = (
+        f'<div class="filter-note">{filter_note}</div>' if filter_note else ""
+    )
+    show_dist = any(s.get("dist_ma99_pct") is not None for s in data["signals"])
+    dist_th = "<th>距SMA99</th>" if show_dist else ""
+    dist_td_js = (
+        """
+          <td class="mono">${s.dist_ma99_pct === null || s.dist_ma99_pct === undefined ? '—' : (s.dist_ma99_pct>=0?'+':'') + s.dist_ma99_pct.toFixed(2) + '%'}</td>
+"""
+        if show_dist
+        else ""
+    )
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -144,6 +167,7 @@ def render_symbol_html(data: dict, index_href: str = "./index.html", badge: str 
   .nav a {{ color:var(--muted); text-decoration:none; font-size:.86rem; }}
   .nav a:hover {{ color:var(--ink); }}
   .badge {{ display:inline-block; margin-top:10px; font-family:"JetBrains Mono",monospace; font-size:.72rem; color:var(--accent); border:1px solid rgba(201,162,39,.35); padding:4px 8px; }}
+  .filter-note {{ margin-top:8px; color:var(--muted); font-size:.86rem; line-height:1.45; max-width:42rem; }}
   header {{ display:grid; gap:8px; margin:14px 0 22px; }}
   .brand {{ font-family:"IBM Plex Serif",serif; font-size:clamp(1.8rem,4vw,2.6rem); font-weight:600; letter-spacing:-.02em; }}
   .brand span {{ color:var(--accent); }}
@@ -175,6 +199,7 @@ def render_symbol_html(data: dict, index_href: str = "./index.html", badge: str 
   <div class="wrap">
     <div class="nav"><a href="{index_href}">← 全部訊號幣種</a></div>
     {badge_html}
+    {note_html}
     <header>
       <div class="brand">{data['symbol'].split('/')[0]}<span>/{data['symbol'].split('/')[-1]}</span></div>
       <div class="sub">影線頸線破位訊號與做空報酬（{data['day']} UTC，Binance USDT-M 5m）</div>
@@ -182,6 +207,7 @@ def render_symbol_html(data: dict, index_href: str = "./index.html", badge: str 
         <span>進場：<b>訊號下一根開盤</b></span>
         <span>均線：<b>SMA 7 / 14 / 25 / 99 / 200</b></span>
         <span>訊號數：<b>{len(data['signals'])}</b></span>
+        <span>更新：<b>{data.get('updated','')}</b></span>
       </div>
     </header>
     <div class="chart-shell">
@@ -202,7 +228,7 @@ def render_symbol_html(data: dict, index_href: str = "./index.html", badge: str 
         <table>
           <thead>
             <tr>
-              <th>訊號時間</th><th>進場價</th><th>乖離</th>
+              <th>訊號時間</th><th>進場價</th><th>乖離</th>{dist_th}
               <th>15m</th><th>30m</th><th>1h</th><th>2h</th><th>4h</th><th>8h</th><th>12h</th>
             </tr>
           </thead>
@@ -227,6 +253,7 @@ def render_symbol_html(data: dict, index_href: str = "./index.html", badge: str 
           <td class="mono">${{s.time_utc}}</td>
           <td class="mono">${{Number(s.entry).toPrecision(6)}}</td>
           <td class="mono">${{s.bias.toFixed(2)}}%</td>
+          {dist_td_js}
           <td>${{fmtPct(p['15m'])}}</td><td>${{fmtPct(p['30m'])}}</td>
           <td>${{fmtPct(p['1h'])}}</td><td>${{fmtPct(p['2h'])}}</td>
           <td>${{fmtPct(p['4h'])}}</td><td>${{fmtPct(p['8h'])}}</td>
@@ -409,11 +436,23 @@ def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
 """
 
 
-def generate_set(sig_csv: Path, out_dir: Path, title: str, subtitle: str, badge: str, index_href: str, extra_nav: str):
+def generate_set(
+    sig_csv: Path,
+    out_dir: Path,
+    title: str,
+    subtitle: str,
+    badge: str,
+    index_href: str,
+    extra_nav: str,
+    filter_note: str = "",
+):
     sig = pd.read_csv(sig_csv)
     # normalize columns for strict csv which already has pnl_* optional
-    need_cols = {"symbol", "time_utc", "price", "bias", "line_val", "sma14"}
-    missing = need_cols - set(sig.columns)
+    need_cols = ["symbol", "time_utc", "price", "bias", "line_val", "sma14"]
+    for opt in ("dist_ma99_pct", "close_break_pct"):
+        if opt in sig.columns:
+            need_cols.append(opt)
+    missing = set(need_cols) - set(sig.columns)
     if missing:
         raise SystemExit(f"{sig_csv} missing {missing}")
 
@@ -421,8 +460,8 @@ def generate_set(sig_csv: Path, out_dir: Path, title: str, subtitle: str, badge:
     cards = []
     for symbol, g in sig.groupby("symbol"):
         g = g.sort_values("time_utc")
-        data = chart_payload(symbol, g[list(need_cols)])
-        # If strict csv already has pnl columns, override table values
+        data = chart_payload(symbol, g[need_cols])
+        # If csv already has pnl columns, override table values
         if "pnl_1h" in g.columns:
             by_time = {r["time_utc"]: r for _, r in g.iterrows()}
             for s in data["signals"]:
@@ -433,9 +472,13 @@ def generate_set(sig_csv: Path, out_dir: Path, title: str, subtitle: str, badge:
                     col = f"pnl_{h}"
                     if col in src and pd.notna(src[col]):
                         s["pnl"][h] = round(float(src[col]), 2)
+                if "dist_ma99_pct" in src and pd.notna(src["dist_ma99_pct"]):
+                    s["dist_ma99_pct"] = float(src["dist_ma99_pct"])
         stem = file_stem(symbol)
         href = f"{stem}.html"
-        html = render_symbol_html(data, index_href=index_href, badge=badge)
+        html = render_symbol_html(
+            data, index_href=index_href, badge=badge, filter_note=filter_note
+        )
         (out_dir / href).write_text(html, encoding="utf-8")
         pnls_1h = [s["pnl"].get("1h") for s in data["signals"] if s["pnl"].get("1h") is not None]
         avg_1h = round(sum(pnls_1h) / len(pnls_1h), 2) if pnls_1h else None
@@ -485,6 +528,7 @@ def main():
             badge="BALANCED",
             index_href="./index.html",
             extra_nav=nav,
+            filter_note="過濾：收盤破頸線+SMA14、收陰、SMA25 軟條件；|收盤−SMA99| / SMA99 &lt; 2% 不空。",
         )
     if args.mode in ("all", "strict"):
         strict_n, _ = generate_set(
