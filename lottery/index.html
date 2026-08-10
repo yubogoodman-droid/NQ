@@ -545,12 +545,20 @@
       return MAX_DRAWS - state.used;
     }
 
+    function wonPrizeIds() {
+      return new Set(state.history.map(h => h.id));
+    }
+
     function pickRandom(forceSpell = false) {
       if (forceSpell) {
         return PRIZES.find(p => p.spellDraw) || PRIZES[PRIZES.length - 1];
       }
-      // 前兩次排除貪婪之島，最後一次才會中
-      const pool = PRIZES.filter(p => !p.spellDraw);
+      const won = wonPrizeIds();
+      // 前兩次排除貪婪之島，且每個獎項只能中一次
+      const pool = PRIZES.filter(p => !p.spellDraw && !won.has(p.id));
+      if (pool.length === 0) {
+        return PRIZES.find(p => !p.spellDraw) || PRIZES[0];
+      }
       const total = pool.reduce((sum, p) => sum + (p.weight || 1), 0);
       let roll = Math.random() * total;
       for (const prize of pool) {
