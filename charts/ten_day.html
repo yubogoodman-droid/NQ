@@ -17,31 +17,31 @@ th{font-family:"JetBrains Mono",monospace;font-size:.72rem;color:var(--muted);te
 </style></head><body><div class="wrap">
 <div class="sub"><a href="./index.html">← 回總覽</a></div>
 <h1>10 日回測</h1>
-<p class="sub"><a href="./ten_day/index.html">查看一訊一圖（52 張） →</a></p>
-<p class="sub">爆量：訊號前 2h 內峰值量能 &gt; 5×（對照窗口前 20 根均量）；插針嘎空那根也算。</p>
+<p class="sub"><a href="./ten_day/index.html">查看一訊一圖（9 張） →</a></p>
+<p class="sub">爆量：破位那根 ≥ 3× 近 20 根均量。</p>
 <pre># 10-day shadow-neckline (2026-08-01 → 2026-08-10 UTC, Binance Vision)
 
 | Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |
 |--|--|--|--|--|--|--|
 | raw | 720 | 95 | 44.3% | -0.162% | 45.5% | -1.138% |
-| volume | 52 | 37 | 36.5% | -0.535% | 28.8% | -2.651% |
-| volume2 | 52 | 37 | 36.5% | -0.535% | 28.8% | -2.651% |
+| volume | 9 | 9 | 77.8% | 2.144% | 44.4% | -1.4% |
+| volume2 | 5 | 5 | 80.0% | 1.082% | 40.0% | -0.47% |
 
-volume = original + nearby peak vol>5× (2h window vs prior 20-bar avg) + structure filters
-volume2 = same as volume (legacy alias)
+volume = original + break-bar vol≥3× prior-20 avg + structure filters
+volume2 = original + break-bar vol≥4× + same structure filters
 
 Deep-below 15m SMA200 (dist < −3%): skips late shorts after a higher-TF dump (e.g. GWEI).</pre>
 <table><thead><tr><th>日</th><th>raw n</th><th>volume n</th><th>vol 1h win%</th><th>vol 1h avg%</th></tr></thead>
 <tbody>
-<tr><td>2026-08-01</td><td>55</td><td>6</td><td>50.0</td><td>2.285</td></tr>
-<tr><td>2026-08-02</td><td>54</td><td>4</td><td>25.0</td><td>-1.929</td></tr>
-<tr><td>2026-08-03</td><td>54</td><td>7</td><td>14.3</td><td>-2.113</td></tr>
-<tr><td>2026-08-04</td><td>134</td><td>12</td><td>25.0</td><td>-1.238</td></tr>
-<tr><td>2026-08-05</td><td>72</td><td>2</td><td>50.0</td><td>-1.779</td></tr>
-<tr><td>2026-08-06</td><td>71</td><td>2</td><td>50.0</td><td>-6.467</td></tr>
-<tr><td>2026-08-07</td><td>103</td><td>2</td><td>0.0</td><td>-3.251</td></tr>
-<tr><td>2026-08-08</td><td>38</td><td>4</td><td>50.0</td><td>4.981</td></tr>
-<tr><td>2026-08-09</td><td>76</td><td>4</td><td>0.0</td><td>-5.404</td></tr>
-<tr><td>2026-08-10</td><td>63</td><td>9</td><td>77.8</td><td>2.278</td></tr>
+<tr><td>2026-08-01</td><td>55</td><td>2</td><td>100.0</td><td>8.017</td></tr>
+<tr><td>2026-08-02</td><td>54</td><td>1</td><td>100.0</td><td>1.936</td></tr>
+<tr><td>2026-08-03</td><td>54</td><td>0</td><td>—</td><td>—</td></tr>
+<tr><td>2026-08-04</td><td>134</td><td>5</td><td>80.0</td><td>1.082</td></tr>
+<tr><td>2026-08-05</td><td>72</td><td>0</td><td>—</td><td>—</td></tr>
+<tr><td>2026-08-06</td><td>71</td><td>0</td><td>—</td><td>—</td></tr>
+<tr><td>2026-08-07</td><td>103</td><td>0</td><td>—</td><td>—</td></tr>
+<tr><td>2026-08-08</td><td>38</td><td>0</td><td>—</td><td>—</td></tr>
+<tr><td>2026-08-09</td><td>76</td><td>1</td><td>0.0</td><td>-4.08</td></tr>
+<tr><td>2026-08-10</td><td>63</td><td>0</td><td>—</td><td>—</td></tr>
 </tbody></table>
 </div></body></html>
