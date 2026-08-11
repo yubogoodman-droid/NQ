@@ -4,7 +4,7 @@ with an optional volume-spike (爆量) filter.
 
 Tiers:
 - raw: original (Low breaks neckline + SMA14)
-- volume: original + 爆量 (>=3×) + structure filters
+- volume: original + 爆量 (>=2.5×) + structure filters
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ class DetectParams:
     min_abs_dist_ma200: float = 0.0
     max_near_above_ma200: float = 0.0
     # volume spike (爆量)：破位那根 vs 前 N 根均量
-    min_vol_ratio: float = 0.0  # 0 = off; 3.0 = 爆量 ≥3×
+    min_vol_ratio: float = 0.0  # 0 = off; 2.5 = 爆量 ≥2.5×
     vol_lookback: int = 20
     vol_spike_window: int = 1  # unused (compat); 爆量只看破位棒
     # structure quality: classic H&S short prefers flat/descending neck
@@ -46,7 +46,7 @@ class DetectParams:
     # avoid shorting into rising SMA200 support when price is glued to it
     reject_near_rising_sma200: bool = False
     sma200_slope_bars: int = 24  # 2h on 5m
-    near_sma200_pct: float = 1.5  # |close-SMA200|/SMA200 < 1.5%
+    near_sma200_pct: float = 1.5  # |close-SMA200|/SMA200 < 此值且上彎 → 拒（XAN 類放寬到 4）
     # 15m context: 15分K 戳破並收在 200均線下 → 不做空（如 1000RATS）
     reject_15m_pierce_sma200: bool = False
     # 進場貼近 15m SMA200
@@ -62,9 +62,10 @@ class DetectParams:
 
 RAW = DetectParams()
 VOLUME = DetectParams(
-    min_vol_ratio=3.0,  # 爆量：破位 K ≥ 3× 近 20 均量
+    min_vol_ratio=2.5,  # 爆量：破位 K ≥ 2.5× 近 20 均量
     reject_rising_neck=True,  # 上升頸線（右肩抬高）不空
-    reject_near_rising_sma200=True,  # 上彎 SMA200 附近不空（如 BEAT）
+    reject_near_rising_sma200=True,  # 上彎 SMA200 附近不空（BEAT / XAN）
+    near_sma200_pct=4.0,  # |距| < 4% 且 SMA200 上彎 → 拒（濾 XAN 低位貼均）
     reject_15m_pierce_sma200=True,  # 15分K戳破200均線且收下方不空
     reject_near_sma200_15m=True,  # 貼近 15m SMA200 不空
     reject_deep_below_sma200_15m=True,  # 已深跌破 15m SMA200 不空（如 GWEI）
@@ -75,9 +76,10 @@ VOLUME = DetectParams(
 # Back-compat aliases (recommended path is now original + 爆量)
 BALANCED = VOLUME
 STRICT = DetectParams(
-    min_vol_ratio=4.0,  # 強爆量
+    min_vol_ratio=3.5,  # 強爆量
     reject_rising_neck=True,
     reject_near_rising_sma200=True,
+    near_sma200_pct=4.0,
     reject_15m_pierce_sma200=True,
     reject_near_sma200_15m=True,
     reject_deep_below_sma200_15m=True,

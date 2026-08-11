@@ -3,10 +3,11 @@
 | Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |
 |--|--|--|--|--|--|--|
 | raw | 720 | 95 | 44.3% | -0.162% | 45.5% | -1.138% |
-| volume | 9 | 9 | 77.8% | 2.144% | 44.4% | -1.4% |
-| volume2 | 5 | 5 | 80.0% | 1.082% | 40.0% | -0.47% |
+| volume | 7 | 7 | 85.7% | 3.416% | 57.1% | 0.554% |
+| volume2 | 5 | 5 | 100.0% | 3.007% | 40.0% | -2.83% |
 
-volume = original + break-bar vol≥3× prior-20 avg + structure filters
-volume2 = original + break-bar vol≥4× + same structure filters
+volume = original + break-bar vol≥2.5× prior-20 avg + structure filters
+volume2 = original + break-bar vol≥3.5× + same structure filters
 
+Near rising SMA200 (|dist|<4%): skips lows into rising MA support (e.g. XAN).
 Deep-below 15m SMA200 (dist < −3%): skips late shorts after a higher-TF dump (e.g. GWEI).

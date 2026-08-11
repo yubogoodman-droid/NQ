@@ -643,13 +643,13 @@ def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
     <div class="grid">
       <a class="card recommend" href="./balanced/index.html">
         <div class="tag">RECOMMENDED</div>
-        <div class="name">原版 + 爆量（≥3×）</div>
-        <div class="desc">破位棒量能≥3×近20均量；拒絕上升頸線／貼近上彎SMA200；15分K／SMA99／深跌破15mSMA200過濾。</div>
+        <div class="name">原版 + 爆量（≥2.5×）</div>
+        <div class="desc">破位棒量能≥2.5×近20均量；拒絕上升頸線／貼近上彎SMA200（|距|&lt;4%）；15分K／SMA99／深跌破15mSMA200過濾。</div>
         <div class="meta">{balanced_n} 筆訊號</div>
       </a>
       <a class="card" href="./strict/index.html">
-        <div class="name">原版 + 強爆量（≥4×）</div>
-        <div class="desc">破位棒量能≥4×；同樣結構過濾。</div>
+        <div class="name">原版 + 強爆量（≥3.5×）</div>
+        <div class="desc">破位棒量能≥3.5×；同樣結構過濾。</div>
         <div class="meta">{strict_n} 筆訊號</div>
       </a>
       <a class="card" href="./raw/index.html">
