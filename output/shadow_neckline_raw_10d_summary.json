@@ -37,7 +37,7 @@
     "max_near_above_ma200": 0.0,
     "min_vol_ratio": 0.0,
     "vol_lookback": 20,
-    "vol_spike_window": 24,
+    "vol_spike_window": 1,
     "reject_rising_neck": false,
     "reject_near_rising_sma200": false,
     "sma200_slope_bars": 24,

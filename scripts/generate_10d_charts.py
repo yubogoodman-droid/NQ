@@ -143,7 +143,7 @@ def render_signal_index(cards: list[dict], extra_nav: str) -> str:
   <div class="wrap">
     {extra_nav}
     <h1>10日爆量訊號 · 一訊一圖</h1>
-    <p class="sub">2026-08-01 → 08-10 UTC · Binance Vision · 原版 + 附近峰值量能&gt;5×（往回2h）+ 頸線／SMA200／15分K／SMA99 過濾。每個訊號獨立一張圖（±{PAD_HOURS}h）。</p>
+    <p class="sub">2026-08-01 → 08-10 UTC · Binance Vision · 原版 + 破位棒量能≥3× + 頸線／SMA200／15分K／SMA99 過濾。每個訊號獨立一張圖（±{PAD_HOURS}h）。</p>
     <div class="stats">
       <span>訊號總數 <b>{len(cards)}</b></span>
       <span>幣種 <b>{len({c['symbol'] for c in cards})}</b></span>
@@ -211,7 +211,7 @@ def main():
         html = render_symbol_html(
             data,
             index_href="./index.html",
-            badge="一訊一圖 · VOL峰值>5×",
+            badge="一訊一圖 · VOL≥3×",
             filter_note=f"單一訊號：{row['time_utc']} UTC · 圖面 ±{PAD_HOURS}h · 紅箭=訊號 / 黃點=進場。",
         )
         (out / href).write_text(html, encoding="utf-8")

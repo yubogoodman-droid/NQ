@@ -6,7 +6,7 @@
 - Low 刺破頸線 + SMA14，且高點未破頭
 
 新增：
-- 訊號前 2h 內峰值量能 > 5 × 窗口前 20 根均量（附近爆量／插針嘎空也算）
+- 破位 K 量能 ≥ 3 × 近 20 根均量（爆量）
 - 拒絕上升頸線（右肩高於左肩）
 - 拒絕貼近上彎 SMA200（|距SMA200|<1.5%）
 - 拒絕 15分K 戳破 200均線且收在下方
@@ -54,7 +54,7 @@ def main():
     exchange = ccxt.binanceusdm({"enableRateLimit": True})
     print(
         f"📡 原版+爆量 監控中... cooldown={PARAMS.cooldown_min}m "
-        f"vol峰值>{PARAMS.min_vol_ratio:.0f}×(win{PARAMS.vol_spike_window}/base{PARAMS.vol_lookback}) "
+        f"vol≥{PARAMS.min_vol_ratio:.0f}×{PARAMS.vol_lookback} "
         f"reject_rising_neck={PARAMS.reject_rising_neck} "
         f"reject_near_rising_sma200={PARAMS.reject_near_rising_sma200}"
     )

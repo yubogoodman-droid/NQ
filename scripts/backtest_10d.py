@@ -38,8 +38,8 @@ MIN_VOLUME_USDT = 50_000_000
 HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
 TIERS = {
     "raw": RAW,
-    "volume": VOLUME,  # 附近峰值 >5× + structure filters
-    "volume2": STRICT,  # same as volume (legacy alias)
+    "volume": VOLUME,  # ≥3× break-bar + structure filters
+    "volume2": STRICT,  # ≥4× + same structure filters
 }
 
 
@@ -288,7 +288,7 @@ def main():
 
     print(f"📡 10d Vision backtest")
     print(f"   window: {days[0]} → {days[-1]} ({len(days)} days) warmup={warmup}")
-    print(f"   tiers: raw / volume(附近>5×+filters) / volume2(同 volume)")
+    print(f"   tiers: raw / volume(≥3×+filters) / volume2(≥4×+filters)")
 
     print("📋 Listing symbols...")
     all_syms = list_um_usdt_symbols()
@@ -369,10 +369,10 @@ def main():
         )
     lines.append("")
     lines.append(
-        "volume = original + nearby peak vol>5× (2h window vs prior 20-bar avg) + structure filters"
+        "volume = original + break-bar vol≥3× prior-20 avg + structure filters"
     )
     lines.append(
-        "volume2 = same as volume (legacy alias)"
+        "volume2 = original + break-bar vol≥4× + same structure filters"
     )
     lines.append("")
     lines.append(

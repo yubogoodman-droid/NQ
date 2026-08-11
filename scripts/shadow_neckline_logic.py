@@ -4,7 +4,7 @@ with an optional volume-spike (爆量) filter.
 
 Tiers:
 - raw: original (Low breaks neckline + SMA14)
-- volume: original + 附近爆量 (>5×) + structure filters
+- volume: original + 爆量 (>=3×) + structure filters
 """
 
 from __future__ import annotations
@@ -37,11 +37,10 @@ class DetectParams:
     max_near_above_ma99: float = 0.0
     min_abs_dist_ma200: float = 0.0
     max_near_above_ma200: float = 0.0
-    # volume spike (爆量)：不限破位那根，訊號前窗口內任一根峰值即可
-    # （對應「突然爆量插針嘎空 → 再下跌破頸線」）
-    min_vol_ratio: float = 0.0  # 0 = off; 5.0 = 需 >5×（嚴格大於）
-    vol_lookback: int = 20  # 基準均量：爆量窗口之前的 N 根
-    vol_spike_window: int = 24  # 含訊號棒往回看 24 根（2h）取量能峰值
+    # volume spike (爆量)：破位那根 vs 前 N 根均量
+    min_vol_ratio: float = 0.0  # 0 = off; 3.0 = 爆量 ≥3×
+    vol_lookback: int = 20
+    vol_spike_window: int = 1  # unused (compat); 爆量只看破位棒
     # structure quality: classic H&S short prefers flat/descending neck
     reject_rising_neck: bool = False
     # avoid shorting into rising SMA200 support when price is glued to it
@@ -63,8 +62,7 @@ class DetectParams:
 
 RAW = DetectParams()
 VOLUME = DetectParams(
-    min_vol_ratio=5.0,  # 爆量：附近窗口峰值 > 5× 基準均量
-    vol_spike_window=24,  # 往回 2h 內任一根爆量即可（插針嘎空）
+    min_vol_ratio=3.0,  # 爆量：破位 K ≥ 3× 近 20 均量
     reject_rising_neck=True,  # 上升頸線（右肩抬高）不空
     reject_near_rising_sma200=True,  # 上彎 SMA200 附近不空（如 BEAT）
     reject_15m_pierce_sma200=True,  # 15分K戳破200均線且收下方不空
@@ -77,8 +75,7 @@ VOLUME = DetectParams(
 # Back-compat aliases (recommended path is now original + 爆量)
 BALANCED = VOLUME
 STRICT = DetectParams(
-    min_vol_ratio=5.0,
-    vol_spike_window=24,
+    min_vol_ratio=4.0,  # 強爆量
     reject_rising_neck=True,
     reject_near_rising_sma200=True,
     reject_15m_pierce_sma200=True,
@@ -170,28 +167,17 @@ def detect_at_index(
     if p.require_red and not (close[curr_idx] < open_[curr_idx]):
         return False, None
 
-    # 爆量：訊號前窗口內峰值量能 vs 窗口前基準均量（不限破位那根）
-    # 例：插針嘎空爆量後再破頸線下跌 → 仍算通過
+    # 爆量：破位 K 量能相對近 N 均量
     vol_ratio = None
     if p.min_vol_ratio > 0:
-        win = max(1, int(p.vol_spike_window))
-        lb = max(1, int(p.vol_lookback))
-        spike_lo = curr_idx - win + 1
-        if spike_lo < 0:
+        lb = p.vol_lookback
+        if curr_idx < lb:
             return False, None
-        base_hi = spike_lo
-        base_lo = base_hi - lb
-        if base_lo < 0:
-            return False, None
-        v_avg = float(np.nanmean(volume[base_lo:base_hi]))
+        v_avg = float(np.nanmean(volume[curr_idx - lb : curr_idx]))
         if not (v_avg > 0) or np.isnan(v_avg):
             return False, None
-        v_peak = float(np.nanmax(volume[spike_lo : curr_idx + 1]))
-        if np.isnan(v_peak):
-            return False, None
-        vol_ratio = v_peak / v_avg
-        # 大於門檻（min=5 → 需 >5×）
-        if not (vol_ratio > p.min_vol_ratio):
+        vol_ratio = float(volume[curr_idx]) / v_avg
+        if vol_ratio < p.min_vol_ratio:
             return False, None
 
     s200_e = sma200[curr_idx]
