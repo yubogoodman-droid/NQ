@@ -1,0 +1,264 @@
+{
+  "window": {
+    "start": "2026-08-01",
+    "end": "2026-08-10",
+    "days": [
+      "2026-08-01",
+      "2026-08-02",
+      "2026-08-03",
+      "2026-08-04",
+      "2026-08-05",
+      "2026-08-06",
+      "2026-08-07",
+      "2026-08-08",
+      "2026-08-09",
+      "2026-08-10"
+    ],
+    "warmup": "2026-07-31"
+  },
+  "source": "binance_vision_um_5m",
+  "tier": "raw",
+  "params": {
+    "min_span": 1,
+    "max_span": 30,
+    "shoulder_sym": 0.15,
+    "min_bias": 0.05,
+    "max_bias": 99.0,
+    "use_close_break": false,
+    "min_break_pct": 0.0,
+    "require_red": false,
+    "require_prev_close_below": false,
+    "min_body_pct": 0.0,
+    "sma25_soft": false,
+    "require_sma25_hard": false,
+    "min_abs_dist_ma99": 0.0,
+    "max_near_above_ma99": 0.0,
+    "min_abs_dist_ma200": 0.0,
+    "max_near_above_ma200": 0.0,
+    "min_vol_ratio": 0.0,
+    "vol_lookback": 20,
+    "reject_rising_neck": false,
+    "max_chg24": 99.0,
+    "cooldown_min": 30
+  },
+  "liquid_by_day": {
+    "2026-08-01": 49,
+    "2026-08-02": 51,
+    "2026-08-03": 73,
+    "2026-08-04": 74,
+    "2026-08-05": 80,
+    "2026-08-06": 73,
+    "2026-08-07": 80,
+    "2026-08-08": 41,
+    "2026-08-09": 52,
+    "2026-08-10": 72
+  },
+  "summary": {
+    "n": 720,
+    "symbols": 95,
+    "reclaim_3_rate": 32.4,
+    "by_horizon": {
+      "15m": {
+        "n": 719,
+        "win_rate": 43.9,
+        "avg": 0.09,
+        "median": -0.192
+      },
+      "30m": {
+        "n": 719,
+        "win_rate": 45.6,
+        "avg": 0.159,
+        "median": -0.195
+      },
+      "1h": {
+        "n": 718,
+        "win_rate": 44.3,
+        "avg": -0.162,
+        "median": -0.317
+      },
+      "2h": {
+        "n": 716,
+        "win_rate": 45.3,
+        "avg": -0.325,
+        "median": -0.368
+      },
+      "4h": {
+        "n": 710,
+        "win_rate": 45.5,
+        "avg": -1.138,
+        "median": -0.619
+      },
+      "8h": {
+        "n": 700,
+        "win_rate": 43.9,
+        "avg": -2.036,
+        "median": -1.024
+      },
+      "12h": {
+        "n": 691,
+        "win_rate": 43.6,
+        "avg": -3.537,
+        "median": -1.304
+      }
+    },
+    "by_day": {
+      "2026-08-01": {
+        "n": 55,
+        "symbols": 20,
+        "win_1h": 54.5,
+        "avg_1h": 0.618
+      },
+      "2026-08-02": {
+        "n": 54,
+        "symbols": 20,
+        "win_1h": 50.0,
+        "avg_1h": 1.032
+      },
+      "2026-08-03": {
+        "n": 54,
+        "symbols": 22,
+        "win_1h": 44.4,
+        "avg_1h": -0.299
+      },
+      "2026-08-04": {
+        "n": 134,
+        "symbols": 35,
+        "win_1h": 39.6,
+        "avg_1h": 0.002
+      },
+      "2026-08-05": {
+        "n": 72,
+        "symbols": 25,
+        "win_1h": 37.5,
+        "avg_1h": -0.925
+      },
+      "2026-08-06": {
+        "n": 71,
+        "symbols": 30,
+        "win_1h": 38.0,
+        "avg_1h": -0.945
+      },
+      "2026-08-07": {
+        "n": 103,
+        "symbols": 33,
+        "win_1h": 44.7,
+        "avg_1h": -0.268
+      },
+      "2026-08-08": {
+        "n": 38,
+        "symbols": 15,
+        "win_1h": 50.0,
+        "avg_1h": 0.979
+      },
+      "2026-08-09": {
+        "n": 76,
+        "symbols": 22,
+        "win_1h": 48.7,
+        "avg_1h": -0.697
+      },
+      "2026-08-10": {
+        "n": 63,
+        "symbols": 21,
+        "win_1h": 45.9,
+        "avg_1h": -0.21
+      }
+    },
+    "symbols_list": [
+      "1000CAT/USDT",
+      "1000PEPE/USDT",
+      "1000RATS/USDT",
+      "1000SATS/USDT",
+      "1000SHIB/USDT",
+      "AAOI/USDT",
+      "ACE/USDT",
+      "ADA/USDT",
+      "AEVO/USDT",
+      "AKE/USDT",
+      "ALLO/USDT",
+      "AMD/USDT",
+      "ARC/USDT",
+      "AVAX/USDT",
+      "AXTI/USDT",
+      "BANK/USDT",
+      "BEAT/USDT",
+      "BICO/USDT",
+      "BLESS/USDT",
+      "BLUAI/USDT",
+      "BMT/USDT",
+      "BTW/USDT",
+      "C98/USDT",
+      "CAP/USDT",
+      "COOKIE/USDT",
+      "COTI/USDT",
+      "CRCL/USDT",
+      "CTSI/USDT",
+      "CYS/USDT",
+      "DEXE/USDT",
+      "DODOX/USDT",
+      "DRAM/USDT",
+      "ENA/USDT",
+      "EPIC/USDT",
+      "ESPORTS/USDT",
+      "EUL/USDT",
+      "GIGGLE/USDT",
+      "GRVT/USDT",
+      "GUA/USDT",
+      "GWEI/USDT",
+      "HEI/USDT",
+      "HFT/USDT",
+      "HOME/USDT",
+      "HYPER/USDT",
+      "IDOL/USDT",
+      "INTC/USDT",
+      "IOTX/USDT",
+      "KAITO/USDT",
+      "KGEN/USDT",
+      "KOMA/USDT",
+      "KORU/USDT",
+      "LITE/USDT",
+      "MANTRA/USDT",
+      "META/USDT",
+      "MINIMAX/USDT",
+      "MMT/USDT",
+      "MRVL/USDT",
+      "MSTR/USDT",
+      "MU/USDT",
+      "MUBARAK/USDT",
+      "MUU/USDT",
+      "MVLL/USDT",
+      "NBIS/USDT",
+      "NIL/USDT",
+      "ON/USDT",
+      "PLTR/USDT",
+      "PUMP/USDT",
+      "RE/USDT",
+      "RIVER/USDT",
+      "SAMSUNG/USDT",
+      "SKHY/USDT",
+      "SKHYNIX/USDT",
+      "SKR/USDT",
+      "SKYAI/USDT",
+      "SNDK/USDT",
+      "SNXX/USDT",
+      "SOXL/USDT",
+      "SOXS/USDT",
+      "SPCX/USDT",
+      "STG/USDT",
+      "SYN/USDT",
+      "TAKE/USDT",
+      "TST/USDT",
+      "TUT/USDT",
+      "UAI/USDT",
+      "UB/USDT",
+      "US/USDT",
+      "VIC/USDT",
+      "WDC/USDT",
+      "WLD/USDT",
+      "XAN/USDT",
+      "XMR/USDT",
+      "ZBT/USDT",
+      "ZHIPU/USDT",
+      "龙虾/USDT"
+    ]
+  }
+}

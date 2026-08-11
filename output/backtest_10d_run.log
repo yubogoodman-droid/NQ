@@ -1,0 +1,117 @@
+📡 10d Vision backtest
+   window: 2026-08-01 → 2026-08-10 (10 days) warmup=2026-07-31
+   tiers: raw / volume(≥1.5×+no rising neck) / volume2(≥2.0×)
+📋 Listing symbols...
+   835 UM USDT symbols
+💰 Scanning daily quote volume >= 50M ...
+   2026-08-01 progress 200/835
+   2026-08-01 progress 400/835
+   2026-08-01 progress 600/835
+   2026-08-01 progress 800/835
+   2026-08-01: liquid=49
+   2026-08-02 progress 200/835
+   2026-08-02 progress 400/835
+   2026-08-02 progress 600/835
+   2026-08-02 progress 800/835
+   2026-08-02: liquid=51
+   2026-08-03 progress 200/835
+   2026-08-03 progress 400/835
+   2026-08-03 progress 600/835
+   2026-08-03 progress 800/835
+   2026-08-03: liquid=73
+   2026-08-04 progress 200/835
+   2026-08-04 progress 400/835
+   2026-08-04 progress 600/835
+   2026-08-04 progress 800/835
+   2026-08-04: liquid=74
+   2026-08-05 progress 200/835
+   2026-08-05 progress 400/835
+   2026-08-05 progress 600/835
+   2026-08-05 progress 800/835
+   2026-08-05: liquid=80
+   2026-08-06 progress 200/835
+   2026-08-06 progress 400/835
+   2026-08-06 progress 600/835
+   2026-08-06 progress 800/835
+   2026-08-06: liquid=73
+   2026-08-07 progress 200/835
+   2026-08-07 progress 400/835
+   2026-08-07 progress 600/835
+   2026-08-07 progress 800/835
+   2026-08-07: liquid=80
+   2026-08-08 progress 200/835
+   2026-08-08 progress 400/835
+   2026-08-08 progress 600/835
+   2026-08-08 progress 800/835
+   2026-08-08: liquid=41
+   2026-08-09 progress 200/835
+   2026-08-09 progress 400/835
+   2026-08-09 progress 600/835
+   2026-08-09 progress 800/835
+   2026-08-09: liquid=52
+   2026-08-10 progress 200/835
+   2026-08-10 progress 400/835
+   2026-08-10 progress 600/835
+   2026-08-10 progress 800/835
+   2026-08-10: liquid=72
+⬇ Ensuring warmup 2026-07-31 for 136 symbols...
+📦 Building frames...
+   frames 25/136 loaded=25
+   frames 50/136 loaded=50
+   frames 75/136 loaded=75
+   frames 100/136 loaded=100
+   frames 125/136 loaded=125
+   frames 136/136 loaded=136
+
+=== raw n=720 symbols=95 ===
+horizons: {"15m": {"n": 719, "win_rate": 43.9, "avg": 0.09, "median": -0.192}, "30m": {"n": 719, "win_rate": 45.6, "avg": 0.159, "median": -0.195}, "1h": {"n": 718, "win_rate": 44.3, "avg": -0.162, "median": -0.317}, "2h": {"n": 716, "win_rate": 45.3, "avg": -0.325, "median": -0.368}, "4h": {"n": 710, "win_rate": 45.5, "avg": -1.138, "median": -0.619}, "8h": {"n": 700, "win_rate": 43.9, "avg": -2.036, "median": -1.024}, "12h": {"n": 691, "win_rate": 43.6, "avg": -3.537, "median": -1.304}}
+by_day:
+  2026-08-01: {'n': 55, 'symbols': 20, 'win_1h': 54.5, 'avg_1h': 0.618}
+  2026-08-02: {'n': 54, 'symbols': 20, 'win_1h': 50.0, 'avg_1h': 1.032}
+  2026-08-03: {'n': 54, 'symbols': 22, 'win_1h': 44.4, 'avg_1h': -0.299}
+  2026-08-04: {'n': 134, 'symbols': 35, 'win_1h': 39.6, 'avg_1h': 0.002}
+  2026-08-05: {'n': 72, 'symbols': 25, 'win_1h': 37.5, 'avg_1h': -0.925}
+  2026-08-06: {'n': 71, 'symbols': 30, 'win_1h': 38.0, 'avg_1h': -0.945}
+  2026-08-07: {'n': 103, 'symbols': 33, 'win_1h': 44.7, 'avg_1h': -0.268}
+  2026-08-08: {'n': 38, 'symbols': 15, 'win_1h': 50.0, 'avg_1h': 0.979}
+  2026-08-09: {'n': 76, 'symbols': 22, 'win_1h': 48.7, 'avg_1h': -0.697}
+  2026-08-10: {'n': 63, 'symbols': 21, 'win_1h': 45.9, 'avg_1h': -0.21}
+
+=== volume n=60 symbols=39 ===
+horizons: {"15m": {"n": 60, "win_rate": 50.0, "avg": 0.509, "median": -0.019}, "30m": {"n": 60, "win_rate": 51.7, "avg": 1.114, "median": 0.172}, "1h": {"n": 59, "win_rate": 57.6, "avg": 0.723, "median": 0.39}, "2h": {"n": 59, "win_rate": 40.7, "avg": -0.536, "median": -1.238}, "4h": {"n": 59, "win_rate": 42.4, "avg": -1.462, "median": -1.991}, "8h": {"n": 59, "win_rate": 33.9, "avg": -3.118, "median": -4.146}, "12h": {"n": 59, "win_rate": 37.3, "avg": -4.414, "median": -4.281}}
+by_day:
+  2026-08-01: {'n': 5, 'symbols': 4, 'win_1h': 60.0, 'avg_1h': 2.818}
+  2026-08-02: {'n': 6, 'symbols': 5, 'win_1h': 83.3, 'avg_1h': 1.033}
+  2026-08-03: {'n': 5, 'symbols': 5, 'win_1h': 60.0, 'avg_1h': 0.348}
+  2026-08-04: {'n': 18, 'symbols': 17, 'win_1h': 50.0, 'avg_1h': 0.108}
+  2026-08-05: {'n': 5, 'symbols': 5, 'win_1h': 60.0, 'avg_1h': -0.682}
+  2026-08-06: {'n': 2, 'symbols': 2, 'win_1h': 50.0, 'avg_1h': -0.849}
+  2026-08-07: {'n': 8, 'symbols': 5, 'win_1h': 62.5, 'avg_1h': -0.148}
+  2026-08-08: {'n': 3, 'symbols': 2, 'win_1h': 100.0, 'avg_1h': 12.727}
+  2026-08-09: {'n': 5, 'symbols': 3, 'win_1h': 40.0, 'avg_1h': -1.992}
+  2026-08-10: {'n': 3, 'symbols': 2, 'win_1h': 0.0, 'avg_1h': -1.615}
+
+=== volume2 n=35 symbols=28 ===
+horizons: {"15m": {"n": 35, "win_rate": 34.3, "avg": 0.273, "median": -0.361}, "30m": {"n": 35, "win_rate": 42.9, "avg": 0.945, "median": -0.377}, "1h": {"n": 34, "win_rate": 50.0, "avg": 0.172, "median": 0.021}, "2h": {"n": 34, "win_rate": 41.2, "avg": -1.245, "median": -1.223}, "4h": {"n": 34, "win_rate": 41.2, "avg": -1.712, "median": -2.021}, "8h": {"n": 34, "win_rate": 35.3, "avg": -4.25, "median": -3.921}, "12h": {"n": 34, "win_rate": 41.2, "avg": -4.883, "median": -2.723}}
+by_day:
+  2026-08-01: {'n': 3, 'symbols': 2, 'win_1h': 66.7, 'avg_1h': 2.987}
+  2026-08-02: {'n': 3, 'symbols': 3, 'win_1h': 66.7, 'avg_1h': 0.216}
+  2026-08-03: {'n': 3, 'symbols': 3, 'win_1h': 33.3, 'avg_1h': 0.389}
+  2026-08-04: {'n': 11, 'symbols': 11, 'win_1h': 54.5, 'avg_1h': 0.611}
+  2026-08-05: {'n': 3, 'symbols': 3, 'win_1h': 66.7, 'avg_1h': 1.262}
+  2026-08-06: None
+  2026-08-07: {'n': 5, 'symbols': 3, 'win_1h': 40.0, 'avg_1h': -2.923}
+  2026-08-08: {'n': 2, 'symbols': 2, 'win_1h': 100.0, 'avg_1h': 7.185}
+  2026-08-09: {'n': 3, 'symbols': 3, 'win_1h': 0.0, 'avg_1h': -4.046}
+  2026-08-10: {'n': 2, 'symbols': 2, 'win_1h': 0.0, 'avg_1h': -3.05}
+
+# 10-day shadow-neckline (2026-08-01 → 2026-08-10 UTC, Binance Vision)
+
+| Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |
+|--|--|--|--|--|--|--|
+| raw | 720 | 95 | 44.3% | -0.162% | 45.5% | -1.138% |
+| volume | 60 | 39 | 57.6% | 0.723% | 42.4% | -1.462% |
+| volume2 | 35 | 28 | 50.0% | 0.172% | 41.2% | -1.712% |
+
+volume = original + vol≥1.5× + reject rising neck
+volume2 = original + vol≥2.0× + reject rising neck
