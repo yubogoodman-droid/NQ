@@ -1,40 +1,61 @@
-[ten_day] 1000RATSUSDT.html signals=2
-[ten_day] AAOIUSDT.html signals=1
-[ten_day] AKEUSDT.html signals=1
-[ten_day] ALLOUSDT.html signals=3
-[ten_day] AXTIUSDT.html signals=2
-[ten_day] BANKUSDT.html signals=1
-[ten_day] BEATUSDT.html signals=2
-[ten_day] BICOUSDT.html signals=2
-[ten_day] BLESSUSDT.html signals=2
-[ten_day] BTWUSDT.html signals=5
-[ten_day] C98USDT.html signals=1
-[ten_day] COTIUSDT.html signals=1
-[ten_day] CRCLUSDT.html signals=1
-[ten_day] CYSUSDT.html signals=3
-[ten_day] DRAMUSDT.html signals=1
-[ten_day] EULUSDT.html signals=1
-[ten_day] GIGGLEUSDT.html signals=3
-[ten_day] GWEIUSDT.html signals=2
-[ten_day] HEIUSDT.html signals=1
-[ten_day] HOMEUSDT.html signals=1
-[ten_day] INTCUSDT.html signals=1
-[ten_day] KAITOUSDT.html signals=1
-[ten_day] KORUUSDT.html signals=1
-[ten_day] LITEUSDT.html signals=1
-[ten_day] MRVLUSDT.html signals=2
-[ten_day] MUUUSDT.html signals=2
-[ten_day] MVLLUSDT.html signals=1
-[ten_day] NBISUSDT.html signals=1
-[ten_day] ONUSDT.html signals=1
-[ten_day] PLTRUSDT.html signals=1
-[ten_day] PUMPUSDT.html signals=3
-[ten_day] SKHYNIXUSDT.html signals=1
-[ten_day] SKYAIUSDT.html signals=1
-[ten_day] SNDKUSDT.html signals=1
-[ten_day] SOXLUSDT.html signals=1
-[ten_day] UAIUSDT.html signals=1
-[ten_day] UBUSDT.html signals=1
-[ten_day] XANUSDT.html signals=2
-[ten_day] LONGXIAUSDT.html signals=1
-done -> /workspace/docs/charts/ten_day symbols 39 signals 60
+[ten_day] 1000RATSUSDT_20260801_0145.html
+[ten_day] GIGGLEUSDT_20260801_0200.html
+[ten_day] 1000RATSUSDT_20260801_0215.html
+[ten_day] BANKUSDT_20260801_0600.html
+[ten_day] UAIUSDT_20260801_1425.html
+[ten_day] KAITOUSDT_20260802_0230.html
+[ten_day] EULUSDT_20260802_0300.html
+[ten_day] BLESSUSDT_20260802_0355.html
+[ten_day] BEATUSDT_20260802_1035.html
+[ten_day] HOMEUSDT_20260802_1910.html
+[ten_day] BLESSUSDT_20260802_2005.html
+[ten_day] AKEUSDT_20260803_0105.html
+[ten_day] SKYAIUSDT_20260803_0630.html
+[ten_day] GIGGLEUSDT_20260803_1355.html
+[ten_day] BTWUSDT_20260803_1950.html
+[ten_day] PUMPUSDT_20260803_1955.html
+[ten_day] NBISUSDT_20260804_0030.html
+[ten_day] MUUUSDT_20260804_0055.html
+[ten_day] MRVLUSDT_20260804_0100.html
+[ten_day] MVLLUSDT_20260804_0100.html
+[ten_day] SNDKUSDT_20260804_0100.html
+[ten_day] SOXLUSDT_20260804_0100.html
+[ten_day] AXTIUSDT_20260804_0110.html
+[ten_day] BTWUSDT_20260804_0730.html
+[ten_day] PLTRUSDT_20260804_0750.html
+[ten_day] COTIUSDT_20260804_0900.html
+[ten_day] BICOUSDT_20260804_1005.html
+[ten_day] AAOIUSDT_20260804_1325.html
+[ten_day] LITEUSDT_20260804_1325.html
+[ten_day] UBUSDT_20260804_1605.html
+[ten_day] MRVLUSDT_20260804_1850.html
+[ten_day] DRAMUSDT_20260804_1855.html
+[ten_day] INTCUSDT_20260804_1950.html
+[ten_day] SKHYNIXUSDT_20260804_2100.html
+[ten_day] KORUUSDT_20260805_0125.html
+[ten_day] MUUUSDT_20260805_0715.html
+[ten_day] CRCLUSDT_20260805_1230.html
+[ten_day] GIGGLEUSDT_20260805_1910.html
+[ten_day] CYSUSDT_20260805_2035.html
+[ten_day] BTWUSDT_20260806_1610.html
+[ten_day] ONUSDT_20260806_1805.html
+[ten_day] AXTIUSDT_20260807_0055.html
+[ten_day] BTWUSDT_20260807_0135.html
+[ten_day] ALLOUSDT_20260807_0140.html
+[ten_day] BTWUSDT_20260807_0215.html
+[ten_day] BICOUSDT_20260807_1215.html
+[ten_day] ALLOUSDT_20260807_1930.html
+[ten_day] C98USDT_20260807_1955.html
+[ten_day] ALLOUSDT_20260807_2000.html
+[ten_day] HEIUSDT_20260808_0225.html
+[ten_day] CYSUSDT_20260808_1045.html
+[ten_day] CYSUSDT_20260808_1115.html
+[ten_day] BEATUSDT_20260809_0355.html
+[ten_day] XANUSDT_20260809_0555.html
+[ten_day] PUMPUSDT_20260809_0850.html
+[ten_day] PUMPUSDT_20260809_2100.html
+[ten_day] XANUSDT_20260809_2100.html
+[ten_day] GWEIUSDT_20260810_0500.html
+[ten_day] GWEIUSDT_20260810_0530.html
+[ten_day] LONGXIAUSDT_20260810_2325.html
+done 60 charts -> /workspace/docs/charts/ten_day

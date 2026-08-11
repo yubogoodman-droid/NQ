@@ -3,327 +3,459 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>10日爆量訊號圖表 · 2026-08-01→08-10</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<title>10日爆量訊號圖 · 一訊一圖</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
-  :root {
-    --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193;
-    --line:rgba(232,240,234,0.12); --long:#3dba7a; --short:#e35d5d; --accent:#c9a227;
-  }
-  * { box-sizing:border-box; }
-  body {
-    margin:0; font-family:"IBM Plex Sans",sans-serif; color:var(--ink);
-    background:
-      radial-gradient(1000px 520px at 8% -8%, rgba(201,162,39,.18), transparent 55%),
-      radial-gradient(800px 480px at 100% 0%, rgba(61,186,122,.10), transparent 50%),
-      linear-gradient(165deg, var(--bg0), var(--bg1) 50%, #0a0f0d);
-    min-height:100vh;
-  }
-  .wrap { max-width:1100px; margin:0 auto; padding:36px 20px 56px; }
-  h1 { font-family:"IBM Plex Serif",serif; font-size:clamp(2rem,4vw,2.8rem); margin:0 0 8px; letter-spacing:-.02em; }
-  .sub { color:var(--muted); max-width:40rem; line-height:1.55; margin-bottom:28px; }
-  .stats { display:flex; flex-wrap:wrap; gap:14px 22px; margin-bottom:26px; font-family:"JetBrains Mono",monospace; font-size:.8rem; color:var(--muted); }
-  .stats b { color:var(--ink); }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
-  a.card {
-    display:block; text-decoration:none; color:inherit;
-    border:1px solid var(--line); padding:16px 16px 14px;
+  :root { --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193; --line:rgba(232,240,234,0.12);
+    --long:#3dba7a; --short:#e35d5d; --accent:#c9a227; }
+  body { margin:0; font-family:"IBM Plex Sans",sans-serif; color:var(--ink);
+    background: radial-gradient(900px 500px at 10% -10%, rgba(201,162,39,.18), transparent 55%), linear-gradient(165deg,var(--bg0),var(--bg1)); min-height:100vh; }
+  .wrap { max-width:1100px; margin:0 auto; padding:40px 20px 64px; }
+  h1 { font-family:"IBM Plex Serif",serif; font-size:clamp(1.8rem,3.5vw,2.4rem); margin:0 0 8px; }
+  .sub { color:var(--muted); max-width:44rem; line-height:1.55; margin-bottom:22px; }
+  .stats { display:flex; flex-wrap:wrap; gap:14px 22px; margin-bottom:22px; color:var(--muted); font-size:.9rem; }
+  .stats b { color:var(--ink); font-family:"JetBrains Mono",monospace; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+  a.card { display:block; text-decoration:none; color:inherit; border:1px solid var(--line); padding:16px;
     background:linear-gradient(180deg, rgba(255,255,255,.04), transparent 55%), rgba(20,32,27,.65);
-    transition: border-color .15s ease, transform .15s ease;
-  }
-  a.card:hover { border-color: rgba(201,162,39,.55); transform: translateY(-2px); }
-  .name { font-family:"IBM Plex Serif",serif; font-size:1.25rem; margin-bottom:10px; }
-  .row { display:flex; justify-content:space-between; gap:10px; font-size:.86rem; color:var(--muted); margin:4px 0; }
-  .row b { color:var(--ink); font-family:"JetBrains Mono",monospace; font-weight:500; }
-  .pos { color:var(--long)!important; } .neg { color:var(--short)!important; }
-  .times { margin-top:10px; color:var(--muted); font-size:.72rem; font-family:"JetBrains Mono",monospace; line-height:1.45; }
+    transition: border-color .15s, transform .15s; }
+  a.card:hover { border-color:rgba(201,162,39,.55); transform:translateY(-2px); }
+  .name { font-family:"IBM Plex Serif",serif; font-size:1.15rem; margin-bottom:10px; }
+  .row { display:flex; justify-content:space-between; gap:10px; font-size:.86rem; color:var(--muted); margin-top:6px; }
+  .row b { color:var(--ink); font-family:"JetBrains Mono",monospace; font-size:.8rem; }
+  .pos { color:var(--long); } .neg { color:var(--short); }
+  .mono { font-family:"JetBrains Mono",monospace; }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="stats" style="margin-bottom:18px"><a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · <a href="../ten_day.html" style="color:#8aa193;text-decoration:none">10日摘要</a> · <a href="./index.html" style="color:#8aa193;text-decoration:none">10日圖表</a></div>
-    <h1>10日爆量訊號圖表 · 2026-08-01→08-10</h1>
-    <p class="sub">Binance Vision · 原版 + 量能≥1.5× + 拒絕上升頸線。點幣種看 K 線。</p>
+    <div class="stats" style="margin-bottom:18px"><a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · <a href="../ten_day.html" style="color:#8aa193;text-decoration:none">10日摘要</a> · <a href="./index.html" style="color:#8aa193;text-decoration:none">一訊一圖</a></div>
+    <h1>10日爆量訊號 · 一訊一圖</h1>
+    <p class="sub">2026-08-01 → 08-10 UTC · Binance Vision · 原版 + 量能≥1.5× + 拒絕上升頸線。每個訊號獨立一張圖（±18h）。</p>
     <div class="stats">
-      <span>幣種 <b>39</b></span>
       <span>訊號總數 <b>60</b></span>
-      <span>均線 <b>7 / 14 / 25 / 99 / 200</b></span>
+      <span>幣種 <b>39</b></span>
     </div>
     <div class="grid">
       
-        <a class="card" href="./BTWUSDT.html">
-          <div class="name">BTW/USDT</div>
-          <div class="row"><span>訊號</span><b>5</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+0.16%</b></div>
-          <div class="times">08-03 19:50 · 08-04 07:30 · 08-06 16:10 · 08-07 01:35 · 08-07 02:15</div>
-        </a>
-
-        <a class="card" href="./ALLOUSDT.html">
-          <div class="name">ALLO/USDT</div>
-          <div class="row"><span>訊號</span><b>3</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+2.36%</b></div>
-          <div class="times">08-07 01:40 · 08-07 19:30 · 08-07 20:00</div>
-        </a>
-
-        <a class="card" href="./CYSUSDT.html">
-          <div class="name">CYS/USDT</div>
-          <div class="row"><span>訊號</span><b>3</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+6.49%</b></div>
-          <div class="times">08-05 20:35 · 08-08 10:45 · 08-08 11:15</div>
-        </a>
-
-        <a class="card" href="./GIGGLEUSDT.html">
-          <div class="name">GIGGLE/USDT</div>
-          <div class="row"><span>訊號</span><b>3</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-0.14%</b></div>
-          <div class="times">08-01 02:00 · 08-03 13:55 · 08-05 19:10</div>
-        </a>
-
-        <a class="card" href="./PUMPUSDT.html">
-          <div class="name">PUMP/USDT</div>
-          <div class="row"><span>訊號</span><b>3</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+0.10%</b></div>
-          <div class="times">08-03 19:55 · 08-09 08:50 · 08-09 21:00</div>
-        </a>
-
-        <a class="card" href="./1000RATSUSDT.html">
+        <a class="card" href="./1000RATSUSDT_20260801_0145.html">
           <div class="name">1000RATS/USDT</div>
-          <div class="row"><span>訊號</span><b>2</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+0.73%</b></div>
-          <div class="times">08-01 01:45 · 08-01 02:15</div>
+          <div class="row"><span>時間</span><b class="mono">08-01 01:45</b></div>
+          <div class="row"><span>爆量</span><b>2.32×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+20.63%</b></div>
         </a>
 
-        <a class="card" href="./AXTIUSDT.html">
-          <div class="name">AXTI/USDT</div>
-          <div class="row"><span>訊號</span><b>2</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-1.18%</b></div>
-          <div class="times">08-04 01:10 · 08-07 00:55</div>
+        <a class="card" href="./GIGGLEUSDT_20260801_0200.html">
+          <div class="name">GIGGLE/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-01 02:00</b></div>
+          <div class="row"><span>爆量</span><b>1.83×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-1.44%</b></div>
         </a>
 
-        <a class="card" href="./BEATUSDT.html">
-          <div class="name">BEAT/USDT</div>
-          <div class="row"><span>訊號</span><b>2</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-2.21%</b></div>
-          <div class="times">08-02 10:35 · 08-09 03:55</div>
+        <a class="card" href="./1000RATSUSDT_20260801_0215.html">
+          <div class="name">1000RATS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-01 02:15</b></div>
+          <div class="row"><span>爆量</span><b>2.70×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-19.17%</b></div>
         </a>
 
-        <a class="card" href="./BICOUSDT.html">
-          <div class="name">BICO/USDT</div>
-          <div class="row"><span>訊號</span><b>2</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-2.77%</b></div>
-          <div class="times">08-04 10:05 · 08-07 12:15</div>
-        </a>
-
-        <a class="card" href="./BLESSUSDT.html">
-          <div class="name">BLESS/USDT</div>
-          <div class="row"><span>訊號</span><b>2</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-0.75%</b></div>
-          <div class="times">08-02 03:55 · 08-02 20:05</div>
-        </a>
-
-        <a class="card" href="./GWEIUSDT.html">
-          <div class="name">GWEI/USDT</div>
-          <div class="row"><span>訊號</span><b>2</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-1.61%</b></div>
-          <div class="times">08-10 05:00 · 08-10 05:30</div>
-        </a>
-
-        <a class="card" href="./MRVLUSDT.html">
-          <div class="name">MRVL/USDT</div>
-          <div class="row"><span>訊號</span><b>2</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-0.49%</b></div>
-          <div class="times">08-04 01:00 · 08-04 18:50</div>
-        </a>
-
-        <a class="card" href="./MUUUSDT.html">
-          <div class="name">MUU/USDT</div>
-          <div class="row"><span>訊號</span><b>2</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-0.44%</b></div>
-          <div class="times">08-04 00:55 · 08-05 07:15</div>
-        </a>
-
-        <a class="card" href="./XANUSDT.html">
-          <div class="name">XAN/USDT</div>
-          <div class="row"><span>訊號</span><b>2</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-1.51%</b></div>
-          <div class="times">08-09 05:55 · 08-09 21:00</div>
-        </a>
-
-        <a class="card" href="./AAOIUSDT.html">
-          <div class="name">AAOI/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-0.36%</b></div>
-          <div class="times">08-04 13:25</div>
-        </a>
-
-        <a class="card" href="./AKEUSDT.html">
-          <div class="name">AKE/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+0.31%</b></div>
-          <div class="times">08-03 01:05</div>
-        </a>
-
-        <a class="card" href="./BANKUSDT.html">
+        <a class="card" href="./BANKUSDT_20260801_0600.html">
           <div class="name">BANK/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+6.57%</b></div>
-          <div class="times">08-01 06:00</div>
+          <div class="row"><span>時間</span><b class="mono">08-01 06:00</b></div>
+          <div class="row"><span>爆量</span><b>1.87×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+6.57%</b></div>
         </a>
 
-        <a class="card" href="./C98USDT.html">
-          <div class="name">C98/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+4.84%</b></div>
-          <div class="times">08-07 19:55</div>
-        </a>
-
-        <a class="card" href="./COTIUSDT.html">
-          <div class="name">COTI/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+3.15%</b></div>
-          <div class="times">08-04 09:00</div>
-        </a>
-
-        <a class="card" href="./CRCLUSDT.html">
-          <div class="name">CRCL/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+2.19%</b></div>
-          <div class="times">08-05 12:30</div>
-        </a>
-
-        <a class="card" href="./DRAMUSDT.html">
-          <div class="name">DRAM/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+0.40%</b></div>
-          <div class="times">08-04 18:55</div>
-        </a>
-
-        <a class="card" href="./EULUSDT.html">
-          <div class="name">EUL/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+1.29%</b></div>
-          <div class="times">08-02 03:00</div>
-        </a>
-
-        <a class="card" href="./HEIUSDT.html">
-          <div class="name">HEI/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+8.54%</b></div>
-          <div class="times">08-08 02:25</div>
-        </a>
-
-        <a class="card" href="./HOMEUSDT.html">
-          <div class="name">HOME/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+4.05%</b></div>
-          <div class="times">08-02 19:10</div>
-        </a>
-
-        <a class="card" href="./INTCUSDT.html">
-          <div class="name">INTC/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+2.77%</b></div>
-          <div class="times">08-04 19:50</div>
-        </a>
-
-        <a class="card" href="./KAITOUSDT.html">
-          <div class="name">KAITO/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+0.42%</b></div>
-          <div class="times">08-02 02:30</div>
-        </a>
-
-        <a class="card" href="./KORUUSDT.html">
-          <div class="name">KORU/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-1.95%</b></div>
-          <div class="times">08-05 01:25</div>
-        </a>
-
-        <a class="card" href="./LITEUSDT.html">
-          <div class="name">LITE/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+3.10%</b></div>
-          <div class="times">08-04 13:25</div>
-        </a>
-
-        <a class="card" href="./MVLLUSDT.html">
-          <div class="name">MVLL/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-3.99%</b></div>
-          <div class="times">08-04 01:00</div>
-        </a>
-
-        <a class="card" href="./NBISUSDT.html">
-          <div class="name">NBIS/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-2.12%</b></div>
-          <div class="times">08-04 00:30</div>
-        </a>
-
-        <a class="card" href="./ONUSDT.html">
-          <div class="name">ON/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-2.70%</b></div>
-          <div class="times">08-06 18:05</div>
-        </a>
-
-        <a class="card" href="./PLTRUSDT.html">
-          <div class="name">PLTR/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-0.58%</b></div>
-          <div class="times">08-04 07:50</div>
-        </a>
-
-        <a class="card" href="./SKHYNIXUSDT.html">
-          <div class="name">SKHYNIX/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+0.25%</b></div>
-          <div class="times">08-04 21:00</div>
-        </a>
-
-        <a class="card" href="./SKYAIUSDT.html">
-          <div class="name">SKYAI/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-1.28%</b></div>
-          <div class="times">08-03 06:30</div>
-        </a>
-
-        <a class="card" href="./SNDKUSDT.html">
-          <div class="name">SNDK/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-2.05%</b></div>
-          <div class="times">08-04 01:00</div>
-        </a>
-
-        <a class="card" href="./SOXLUSDT.html">
-          <div class="name">SOXL/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">-4.96%</b></div>
-          <div class="times">08-04 01:00</div>
-        </a>
-
-        <a class="card" href="./UAIUSDT.html">
+        <a class="card" href="./UAIUSDT_20260801_1425.html">
           <div class="name">UAI/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+7.51%</b></div>
-          <div class="times">08-01 14:25</div>
+          <div class="row"><span>時間</span><b class="mono">08-01 14:25</b></div>
+          <div class="row"><span>爆量</span><b>3.87×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+7.51%</b></div>
         </a>
 
-        <a class="card" href="./UBUSDT.html">
+        <a class="card" href="./KAITOUSDT_20260802_0230.html">
+          <div class="name">KAITO/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-02 02:30</b></div>
+          <div class="row"><span>爆量</span><b>2.35×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.42%</b></div>
+        </a>
+
+        <a class="card" href="./EULUSDT_20260802_0300.html">
+          <div class="name">EUL/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-02 03:00</b></div>
+          <div class="row"><span>爆量</span><b>1.58×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+1.29%</b></div>
+        </a>
+
+        <a class="card" href="./BLESSUSDT_20260802_0355.html">
+          <div class="name">BLESS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-02 03:55</b></div>
+          <div class="row"><span>爆量</span><b>1.62×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.21%</b></div>
+        </a>
+
+        <a class="card" href="./BEATUSDT_20260802_1035.html">
+          <div class="name">BEAT/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-02 10:35</b></div>
+          <div class="row"><span>爆量</span><b>3.21×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+1.94%</b></div>
+        </a>
+
+        <a class="card" href="./HOMEUSDT_20260802_1910.html">
+          <div class="name">HOME/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-02 19:10</b></div>
+          <div class="row"><span>爆量</span><b>1.60×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+4.05%</b></div>
+        </a>
+
+        <a class="card" href="./BLESSUSDT_20260802_2005.html">
+          <div class="name">BLESS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-02 20:05</b></div>
+          <div class="row"><span>爆量</span><b>3.53×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-1.71%</b></div>
+        </a>
+
+        <a class="card" href="./AKEUSDT_20260803_0105.html">
+          <div class="name">AKE/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-03 01:05</b></div>
+          <div class="row"><span>爆量</span><b>1.64×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.31%</b></div>
+        </a>
+
+        <a class="card" href="./SKYAIUSDT_20260803_0630.html">
+          <div class="name">SKYAI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-03 06:30</b></div>
+          <div class="row"><span>爆量</span><b>1.54×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-1.28%</b></div>
+        </a>
+
+        <a class="card" href="./GIGGLEUSDT_20260803_1355.html">
+          <div class="name">GIGGLE/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-03 13:55</b></div>
+          <div class="row"><span>爆量</span><b>2.22×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-1.18%</b></div>
+        </a>
+
+        <a class="card" href="./BTWUSDT_20260803_1950.html">
+          <div class="name">BTW/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-03 19:50</b></div>
+          <div class="row"><span>爆量</span><b>3.15×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+3.03%</b></div>
+        </a>
+
+        <a class="card" href="./PUMPUSDT_20260803_1955.html">
+          <div class="name">PUMP/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-03 19:55</b></div>
+          <div class="row"><span>爆量</span><b>1.54×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.87%</b></div>
+        </a>
+
+        <a class="card" href="./NBISUSDT_20260804_0030.html">
+          <div class="name">NBIS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 00:30</b></div>
+          <div class="row"><span>爆量</span><b>6.23×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-2.12%</b></div>
+        </a>
+
+        <a class="card" href="./MUUUSDT_20260804_0055.html">
+          <div class="name">MUU/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 00:55</b></div>
+          <div class="row"><span>爆量</span><b>1.82×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-5.20%</b></div>
+        </a>
+
+        <a class="card" href="./MRVLUSDT_20260804_0100.html">
+          <div class="name">MRVL/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 01:00</b></div>
+          <div class="row"><span>爆量</span><b>1.91×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-1.92%</b></div>
+        </a>
+
+        <a class="card" href="./MVLLUSDT_20260804_0100.html">
+          <div class="name">MVLL/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 01:00</b></div>
+          <div class="row"><span>爆量</span><b>1.98×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-3.99%</b></div>
+        </a>
+
+        <a class="card" href="./SNDKUSDT_20260804_0100.html">
+          <div class="name">SNDK/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 01:00</b></div>
+          <div class="row"><span>爆量</span><b>2.53×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-2.05%</b></div>
+        </a>
+
+        <a class="card" href="./SOXLUSDT_20260804_0100.html">
+          <div class="name">SOXL/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 01:00</b></div>
+          <div class="row"><span>爆量</span><b>2.49×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-4.96%</b></div>
+        </a>
+
+        <a class="card" href="./AXTIUSDT_20260804_0110.html">
+          <div class="name">AXTI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 01:10</b></div>
+          <div class="row"><span>爆量</span><b>2.58×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-2.74%</b></div>
+        </a>
+
+        <a class="card" href="./BTWUSDT_20260804_0730.html">
+          <div class="name">BTW/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 07:30</b></div>
+          <div class="row"><span>爆量</span><b>1.76×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+3.52%</b></div>
+        </a>
+
+        <a class="card" href="./PLTRUSDT_20260804_0750.html">
+          <div class="name">PLTR/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 07:50</b></div>
+          <div class="row"><span>爆量</span><b>1.98×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-0.58%</b></div>
+        </a>
+
+        <a class="card" href="./COTIUSDT_20260804_0900.html">
+          <div class="name">COTI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 09:00</b></div>
+          <div class="row"><span>爆量</span><b>1.52×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+3.15%</b></div>
+        </a>
+
+        <a class="card" href="./BICOUSDT_20260804_1005.html">
+          <div class="name">BICO/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 10:05</b></div>
+          <div class="row"><span>爆量</span><b>2.44×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+1.19%</b></div>
+        </a>
+
+        <a class="card" href="./AAOIUSDT_20260804_1325.html">
+          <div class="name">AAOI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 13:25</b></div>
+          <div class="row"><span>爆量</span><b>2.75×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-0.36%</b></div>
+        </a>
+
+        <a class="card" href="./LITEUSDT_20260804_1325.html">
+          <div class="name">LITE/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 13:25</b></div>
+          <div class="row"><span>爆量</span><b>5.81×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+3.10%</b></div>
+        </a>
+
+        <a class="card" href="./UBUSDT_20260804_1605.html">
           <div class="name">UB/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="pos">+10.57%</b></div>
-          <div class="times">08-04 16:05</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 16:05</b></div>
+          <div class="row"><span>爆量</span><b>2.95×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+10.57%</b></div>
         </a>
 
-        <a class="card" href="./LONGXIAUSDT.html">
+        <a class="card" href="./MRVLUSDT_20260804_1850.html">
+          <div class="name">MRVL/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 18:50</b></div>
+          <div class="row"><span>爆量</span><b>2.06×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.93%</b></div>
+        </a>
+
+        <a class="card" href="./DRAMUSDT_20260804_1855.html">
+          <div class="name">DRAM/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 18:55</b></div>
+          <div class="row"><span>爆量</span><b>2.09×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.40%</b></div>
+        </a>
+
+        <a class="card" href="./INTCUSDT_20260804_1950.html">
+          <div class="name">INTC/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 19:50</b></div>
+          <div class="row"><span>爆量</span><b>2.59×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+2.77%</b></div>
+        </a>
+
+        <a class="card" href="./SKHYNIXUSDT_20260804_2100.html">
+          <div class="name">SKHYNIX/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 21:00</b></div>
+          <div class="row"><span>爆量</span><b>1.68×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.25%</b></div>
+        </a>
+
+        <a class="card" href="./KORUUSDT_20260805_0125.html">
+          <div class="name">KORU/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-05 01:25</b></div>
+          <div class="row"><span>爆量</span><b>1.63×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-1.95%</b></div>
+        </a>
+
+        <a class="card" href="./MUUUSDT_20260805_0715.html">
+          <div class="name">MUU/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-05 07:15</b></div>
+          <div class="row"><span>爆量</span><b>1.70×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+4.32%</b></div>
+        </a>
+
+        <a class="card" href="./CRCLUSDT_20260805_1230.html">
+          <div class="name">CRCL/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-05 12:30</b></div>
+          <div class="row"><span>爆量</span><b>1.96×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+2.19%</b></div>
+        </a>
+
+        <a class="card" href="./GIGGLEUSDT_20260805_1910.html">
+          <div class="name">GIGGLE/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-05 19:10</b></div>
+          <div class="row"><span>爆量</span><b>2.27×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+2.20%</b></div>
+        </a>
+
+        <a class="card" href="./CYSUSDT_20260805_2035.html">
+          <div class="name">CYS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-05 20:35</b></div>
+          <div class="row"><span>爆量</span><b>1.92×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-10.17%</b></div>
+        </a>
+
+        <a class="card" href="./BTWUSDT_20260806_1610.html">
+          <div class="name">BTW/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-06 16:10</b></div>
+          <div class="row"><span>爆量</span><b>1.62×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+1.01%</b></div>
+        </a>
+
+        <a class="card" href="./ONUSDT_20260806_1805.html">
+          <div class="name">ON/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-06 18:05</b></div>
+          <div class="row"><span>爆量</span><b>1.65×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-2.70%</b></div>
+        </a>
+
+        <a class="card" href="./AXTIUSDT_20260807_0055.html">
+          <div class="name">AXTI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-07 00:55</b></div>
+          <div class="row"><span>爆量</span><b>1.65×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.39%</b></div>
+        </a>
+
+        <a class="card" href="./BTWUSDT_20260807_0135.html">
+          <div class="name">BTW/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-07 01:35</b></div>
+          <div class="row"><span>爆量</span><b>2.75×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-7.95%</b></div>
+        </a>
+
+        <a class="card" href="./ALLOUSDT_20260807_0140.html">
+          <div class="name">ALLO/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-07 01:40</b></div>
+          <div class="row"><span>爆量</span><b>2.03×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-2.50%</b></div>
+        </a>
+
+        <a class="card" href="./BTWUSDT_20260807_0215.html">
+          <div class="name">BTW/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-07 02:15</b></div>
+          <div class="row"><span>爆量</span><b>2.45×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+1.19%</b></div>
+        </a>
+
+        <a class="card" href="./BICOUSDT_20260807_1215.html">
+          <div class="name">BICO/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-07 12:15</b></div>
+          <div class="row"><span>爆量</span><b>2.06×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-6.73%</b></div>
+        </a>
+
+        <a class="card" href="./ALLOUSDT_20260807_1930.html">
+          <div class="name">ALLO/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-07 19:30</b></div>
+          <div class="row"><span>爆量</span><b>1.96×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+7.18%</b></div>
+        </a>
+
+        <a class="card" href="./C98USDT_20260807_1955.html">
+          <div class="name">C98/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-07 19:55</b></div>
+          <div class="row"><span>爆量</span><b>1.86×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+4.84%</b></div>
+        </a>
+
+        <a class="card" href="./ALLOUSDT_20260807_2000.html">
+          <div class="name">ALLO/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-07 20:00</b></div>
+          <div class="row"><span>爆量</span><b>1.70×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+2.40%</b></div>
+        </a>
+
+        <a class="card" href="./HEIUSDT_20260808_0225.html">
+          <div class="name">HEI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-08 02:25</b></div>
+          <div class="row"><span>爆量</span><b>1.58×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+8.54%</b></div>
+        </a>
+
+        <a class="card" href="./CYSUSDT_20260808_1045.html">
+          <div class="name">CYS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-08 10:45</b></div>
+          <div class="row"><span>爆量</span><b>1.57×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+22.13%</b></div>
+        </a>
+
+        <a class="card" href="./CYSUSDT_20260808_1115.html">
+          <div class="name">CYS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-08 11:15</b></div>
+          <div class="row"><span>爆量</span><b>2.18×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+7.51%</b></div>
+        </a>
+
+        <a class="card" href="./BEATUSDT_20260809_0355.html">
+          <div class="name">BEAT/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-09 03:55</b></div>
+          <div class="row"><span>爆量</span><b>2.48×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-6.36%</b></div>
+        </a>
+
+        <a class="card" href="./XANUSDT_20260809_0555.html">
+          <div class="name">XAN/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-09 05:55</b></div>
+          <div class="row"><span>爆量</span><b>3.60×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-4.08%</b></div>
+        </a>
+
+        <a class="card" href="./PUMPUSDT_20260809_0850.html">
+          <div class="name">PUMP/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-09 08:50</b></div>
+          <div class="row"><span>爆量</span><b>1.97×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-0.76%</b></div>
+        </a>
+
+        <a class="card" href="./PUMPUSDT_20260809_2100.html">
+          <div class="name">PUMP/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-09 21:00</b></div>
+          <div class="row"><span>爆量</span><b>1.71×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.19%</b></div>
+        </a>
+
+        <a class="card" href="./XANUSDT_20260809_2100.html">
+          <div class="name">XAN/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-09 21:00</b></div>
+          <div class="row"><span>爆量</span><b>1.53×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+1.06%</b></div>
+        </a>
+
+        <a class="card" href="./GWEIUSDT_20260810_0500.html">
+          <div class="name">GWEI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-10 05:00</b></div>
+          <div class="row"><span>爆量</span><b>1.78×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-0.17%</b></div>
+        </a>
+
+        <a class="card" href="./GWEIUSDT_20260810_0530.html">
+          <div class="name">GWEI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-10 05:30</b></div>
+          <div class="row"><span>爆量</span><b>1.57×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-3.06%</b></div>
+        </a>
+
+        <a class="card" href="./LONGXIAUSDT_20260810_2325.html">
           <div class="name">龙虾/USDT</div>
-          <div class="row"><span>訊號</span><b>1</b></div>
-          <div class="row"><span>1h 空均報酬</span><b class="neg">—</b></div>
-          <div class="times">08-10 23:25</div>
+          <div class="row"><span>時間</span><b class="mono">08-10 23:25</b></div>
+          <div class="row"><span>爆量</span><b>3.33×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">—</b></div>
         </a>
     </div>
   </div>
