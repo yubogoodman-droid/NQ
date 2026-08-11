@@ -33,7 +33,7 @@ class DetectParams:
     # unused in original (kept for API compat / off)
     sma25_soft: bool = False
     require_sma25_hard: bool = False
-    min_abs_dist_ma99: float = 0.0
+    min_abs_dist_ma99: float = 0.0  # |close-SMA99|% 低於此則濾掉（貼近 MA99）
     max_near_above_ma99: float = 0.0
     min_abs_dist_ma200: float = 0.0
     max_near_above_ma200: float = 0.0
@@ -63,6 +63,7 @@ VOLUME = DetectParams(
     reject_near_rising_sma200=True,  # 上彎 SMA200 附近不空（如 BEAT）
     reject_15m_pierce_sma200=True,  # 15分K戳破200均線且收下方不空
     reject_near_sma200_15m=True,  # 貼近 15m SMA200 不空
+    min_abs_dist_ma99=1.5,  # 貼近 SMA99（如 CYS）不空
     cooldown_min=30,
 )
 
@@ -74,6 +75,7 @@ STRICT = DetectParams(
     reject_near_rising_sma200=True,
     reject_15m_pierce_sma200=True,
     reject_near_sma200_15m=True,
+    min_abs_dist_ma99=1.5,
     cooldown_min=30,
 )
 
@@ -208,6 +210,15 @@ def detect_at_index(
             if p.reject_near_sma200_15m and abs(dist200_15) * 100.0 < p.near_sma200_15m_pct:
                 return False, None
 
+    # 貼近 SMA99 → 不做空（如 CYS）
+    dist99 = None
+    if sma99 is not None and not np.isnan(sma99[curr_idx]) and sma99[curr_idx] != 0:
+        dist99 = (close[curr_idx] - sma99[curr_idx]) / sma99[curr_idx]
+        if p.min_abs_dist_ma99 > 0 and abs(dist99) * 100.0 < p.min_abs_dist_ma99:
+            return False, None
+    elif p.min_abs_dist_ma99 > 0:
+        return False, None
+
     neck_chg_pct = ((h3 - h1) / h1 * 100.0) if h1 else 0.0
     out = {
         "price": float(close[curr_idx]),
@@ -223,8 +234,7 @@ def detect_at_index(
     # optional extras when arrays present
     if sma25 is not None and not np.isnan(sma25[curr_idx]):
         out["sma25"] = round(float(sma25[curr_idx]), 6)
-    if sma99 is not None and not np.isnan(sma99[curr_idx]) and sma99[curr_idx] != 0:
-        dist99 = (close[curr_idx] - sma99[curr_idx]) / sma99[curr_idx]
+    if dist99 is not None:
         out["sma99"] = round(float(sma99[curr_idx]), 6)
         out["dist_ma99_pct"] = round(dist99 * 100, 2)
     if dist200 is not None:

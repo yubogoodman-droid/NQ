@@ -644,7 +644,7 @@ def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
       <a class="card recommend" href="./balanced/index.html">
         <div class="tag">RECOMMENDED</div>
         <div class="name">原版 + 爆量（≥1.5×）</div>
-        <div class="desc">量能≥1.5×；拒絕上升頸線／貼近上彎SMA200；15分K戳破200均線且收下方不空。</div>
+        <div class="desc">量能≥1.5×；拒絕上升頸線／貼近上彎SMA200；15分K戳破200均線且收下方不空；|距SMA99|≥1.5%。</div>
         <div class="meta">{balanced_n} 筆訊號</div>
       </a>
       <a class="card" href="./strict/index.html">
@@ -795,22 +795,22 @@ def main():
             Path("/workspace/output/shadow_neckline_balanced_1d.csv"),
             root / "balanced",
             title=f"原版 + 爆量（≥1.5×）· {DAY}",
-            subtitle=f"{DAY} UTC · 原版 + 量能≥1.5× + 結構過濾（頸線／SMA200／15分K）。",
+            subtitle=f"{DAY} UTC · 原版 + 量能≥1.5× + 結構過濾（頸線／SMA200／15分K／SMA99）。",
             badge="VOL≥1.5×",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="Low 破頸線+SMA14；量≥1.5×；上升頸線不空；上彎SMA200貼近不空；15分K戳破200均線且收下方不空。",
+            filter_note="Low 破頸線+SMA14；量≥1.5×；上升頸線不空；上彎SMA200貼近不空；15分K戳破200均線且收下方不空；|距SMA99|≥1.5%。",
         )
     if args.mode in ("all", "strict"):
         strict_n, _ = generate_set(
             Path("/workspace/output/shadow_neckline_strict_1d.csv"),
             root / "strict",
             title=f"原版 + 強爆量（≥2.0×）· {DAY}",
-            subtitle=f"{DAY} UTC · 原版 + 量能≥2.0× + 結構過濾（頸線／SMA200／15分K）。",
+            subtitle=f"{DAY} UTC · 原版 + 量能≥2.0× + 結構過濾（頸線／SMA200／15分K／SMA99）。",
             badge="VOL≥2.0×",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="Low 破頸線+SMA14；量≥2.0×；上升頸線不空；上彎SMA200貼近不空；15分K戳破200均線且收下方不空。",
+            filter_note="Low 破頸線+SMA14；量≥2.0×；上升頸線不空；上彎SMA200貼近不空；15分K戳破200均線且收下方不空；|距SMA99|≥1.5%。",
         )
 
     if args.mode == "all":

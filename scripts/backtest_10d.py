@@ -369,7 +369,7 @@ def main():
         )
     lines.append("")
     lines.append(
-        "volume = original + vol≥1.5× + reject rising neck + near rising SMA200 + 15m pierce/near SMA200"
+        "volume = original + vol≥1.5× + filters (neck/SMA200/15m pierce/near SMA99)"
     )
     lines.append(
         "volume2 = original + vol≥2.0× + same structure filters"

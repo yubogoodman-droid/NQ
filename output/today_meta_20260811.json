@@ -4,7 +4,7 @@
     "hist": "2026-08-10",
     "source": "bingx_usdm_swap",
     "note": "Binance Vision daily zip not published for this day yet; fapi.binance.com returns HTTP 451 in this environment. Used BingX USDT-M swap 5m klines for overlapping Binance liquid symbols.",
-    "asof_utc": "2026-08-11 14:13:13",
+    "asof_utc": "2026-08-11 14:20:58",
     "symbols_requested": 40,
     "symbols_loaded": 40
   },
@@ -53,8 +53,8 @@
         "12h": {
           "n": 6,
           "win_rate": 66.7,
-          "avg": 5.493,
-          "median": 7.068
+          "avg": 5.465,
+          "median": 6.985
         }
       },
       "symbols_list": [
