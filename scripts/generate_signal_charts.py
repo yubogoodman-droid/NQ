@@ -369,20 +369,38 @@ def render_symbol_html(
       }});
     }});
 
+    function clampRange(from, to) {{
+      if (!DATA.candles.length) return null;
+      const minT = DATA.candles[0].time;
+      const maxT = DATA.candles[DATA.candles.length - 1].time;
+      const f = Math.max(from, minT);
+      const t = Math.min(to, maxT);
+      if (!(t > f)) return null;
+      return {{ from: f, to: t }};
+    }}
     function focusSignal(s) {{
       const pad = 12 * 3600; // ±12h
-      chart.timeScale().setVisibleRange({{
-        from: s.time - pad,
-        to: s.time + pad,
-      }});
+      const range = clampRange(s.time - pad, s.time + pad);
+      if (range) {{
+        try {{ chart.timeScale().setVisibleRange(range); }}
+        catch (e) {{ chart.timeScale().fitContent(); }}
+      }} else {{
+        chart.timeScale().fitContent();
+      }}
     }}
-    // Default view: zoom around signals (not whole 10-day fit, or markers look tiny)
-    if (DATA.signals.length) {{
-      const times = DATA.signals.map(s => s.time);
-      const lo = Math.min(...times) - 24 * 3600;
-      const hi = Math.max(...times) + 24 * 3600;
-      chart.timeScale().setVisibleRange({{ from: lo, to: hi }});
-    }} else {{
+    // Default view: prefer fitContent (safe). Optional mild zoom if range is valid.
+    try {{
+      if (DATA.signals.length === 1) {{
+        chart.timeScale().fitContent();
+      }} else if (DATA.signals.length > 1) {{
+        const times = DATA.signals.map(s => s.time);
+        const range = clampRange(Math.min(...times) - 6 * 3600, Math.max(...times) + 6 * 3600);
+        if (range) chart.timeScale().setVisibleRange(range);
+        else chart.timeScale().fitContent();
+      }} else {{
+        chart.timeScale().fitContent();
+      }}
+    }} catch (e) {{
       chart.timeScale().fitContent();
     }}
 
