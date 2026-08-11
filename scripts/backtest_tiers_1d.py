@@ -1,6 +1,5 @@
 """
-One-day backtest for balanced/strict shadow-neckline tiers.
-Uses shared SMA99/SMA200 proximity + volume/body/max-bias quality rules.
+One-day backtest: original shadow-neckline vs original + 爆量.
 """
 
 from __future__ import annotations
@@ -10,12 +9,12 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from shadow_neckline_logic import (
-    BALANCED,
+    RAW,
     STRICT,
+    VOLUME,
     DetectParams,
     detect_at_index,
     params_dict,
@@ -29,6 +28,11 @@ HIST = "2026-08-08"
 MIN_VOLUME_USDT = 50_000_000
 HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
 OUT = {
+    "volume": (
+        Path("/workspace/output/shadow_neckline_volume_1d.csv"),
+        Path("/workspace/output/shadow_neckline_volume_summary.json"),
+    ),
+    # keep old filenames as aliases of volume (recommended)
     "balanced": (
         Path("/workspace/output/shadow_neckline_balanced_1d.csv"),
         Path("/workspace/output/shadow_neckline_balanced_summary.json"),
@@ -113,10 +117,11 @@ def run(params: DetectParams) -> pd.DataFrame:
             if not ok:
                 continue
 
-            j = np.searchsorted(ts, ts[i] - 86_400_000, side="right") - 1
-            chg24 = None
-            if j >= 0 and close[j] > 0:
-                chg24 = close[i] / close[j] - 1
+            # original script had no 24h change filter when scanning by volume list;
+            # keep optional cap for compatibility
+            if params.max_chg24 < 50:
+                day_open = float(df.loc[df["timestamp"] >= start_ms, "open"].iloc[0])
+                chg24 = (close[i] / day_open - 1.0) if day_open else 0.0
                 if chg24 > params.max_chg24:
                     continue
 
@@ -124,92 +129,98 @@ def run(params: DetectParams) -> pd.DataFrame:
             prev = last_report.get(sym)
             if prev and tdt < prev + timedelta(minutes=params.cooldown_min):
                 continue
-            last_report[sym] = tdt
 
-            pn = calc_pnl(df, int(ts[i]))
-            reclaim = (
-                bool(df.loc[i + 1 : i + 3, "high"].max() > d["line_val"])
-                if i + 3 < len(df)
-                else False
-            )
+            # reclaim: any of next 3 highs back above neck
+            reclaim = False
+            for j in range(1, 4):
+                if i + j < len(df) and high[i + j] > d["line_val"]:
+                    reclaim = True
+                    break
+
+            pnl = calc_pnl(df, int(ts[i]))
             row = {
-                "symbol": f"{sym[:-4]}/USDT" if sym.endswith("USDT") else sym,
+                "symbol": f"{sym[:-4]}/{sym[-4:]}" if sym.endswith("USDT") else sym,
                 "time_utc": tdt.strftime("%Y-%m-%d %H:%M"),
                 **d,
-                "chg24": None if chg24 is None else round(chg24 * 100, 2),
-                "entry": pn.get("entry"),
+                "entry": pnl.get("entry"),
                 "reclaim_3": reclaim,
             }
             for h in HORIZONS:
-                row[f"pnl_{h}"] = pn.get(h)
+                row[f"pnl_{h}"] = pnl.get(h)
             signals.append(row)
+            last_report[sym] = tdt
+
     return pd.DataFrame(signals)
 
 
 def summarize(df: pd.DataFrame) -> dict:
     if df.empty:
-        return {"n": 0}
-
-    def stats(col):
-        s = df[col].dropna()
-        if s.empty:
-            return None
-        return {
-            "n": int(len(s)),
-            "win_rate": round(float((s > 0).mean() * 100), 1),
-            "avg": round(float(s.mean()), 3),
-            "median": round(float(s.median()), 3),
+        return {"n": 0, "symbols": 0, "reclaim_3_rate": None, "by_horizon": {}}
+    by = {}
+    for h in HORIZONS:
+        col = f"pnl_{h}"
+        x = df[col].dropna()
+        by[h] = {
+            "n": int(len(x)),
+            "win_rate": round(float((x > 0).mean() * 100), 1) if len(x) else None,
+            "avg": round(float(x.mean()), 3) if len(x) else None,
+            "median": round(float(x.median()), 3) if len(x) else None,
         }
-
     return {
         "n": int(len(df)),
         "symbols": int(df["symbol"].nunique()),
         "reclaim_3_rate": round(float(df["reclaim_3"].mean() * 100), 1),
-        "by_horizon": {h: stats(f"pnl_{h}") for h in HORIZONS},
+        "by_horizon": by,
         "symbols_list": sorted(df["symbol"].unique().tolist()),
     }
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--tier", choices=["balanced", "strict", "all"], default="all")
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--tier",
+        choices=["all", "volume", "strict", "rawcheck"],
+        default="all",
+    )
+    args = parser.parse_args()
 
-    tiers = []
-    if args.tier in ("balanced", "all"):
-        tiers.append(("balanced", BALANCED))
-    if args.tier in ("strict", "all"):
-        tiers.append(("strict", STRICT))
+    tiers: list[tuple[str, DetectParams, str]] = []
+    # name, params, out_key (balanced folder = 1.5× 爆量 recommended)
+    if args.tier in ("all", "volume"):
+        tiers.append(("volume", VOLUME, "volume"))
+        tiers.append(("balanced", VOLUME, "balanced"))  # chart path alias
+    if args.tier in ("all", "strict"):
+        tiers.append(("strict", STRICT, "strict"))  # 2.0× 強爆量
 
-    base = pd.read_csv(BASE_SIG) if BASE_SIG.exists() else None
-    for name, params in tiers:
+    baseline_n = len(pd.read_csv(BASE_SIG)) if BASE_SIG.exists() else 0
+
+    for name, params, out_key in tiers:
         df = run(params)
-        out_csv, out_json = OUT[name]
-        df.to_csv(out_csv, index=False)
+        summary = summarize(df)
         payload = {
             "day": DAY,
             "tier": name,
             "params": params_dict(params),
-            "baseline_n": None if base is None else int(len(base)),
-            "summary": summarize(df),
+            "baseline_n": baseline_n,
+            "summary": summary,
         }
+        out_csv, out_json = OUT[out_key]
+        df.to_csv(out_csv, index=False)
         out_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"\n=== {name} ===")
-        print(json.dumps(payload["summary"], ensure_ascii=False, indent=2))
-        if not df.empty and "MUBARAK" in "".join(df.symbol.astype(str)):
-            print("MUBARAK:")
-            print(
-                df[df.symbol.str.contains("MUBARAK")][
-                    [
-                        "time_utc",
-                        "dist_ma99_pct",
-                        "dist_ma200_pct",
-                        "vol_ratio",
-                        "body_pct",
-                        "pnl_1h",
-                    ]
-                ].to_string(index=False)
-            )
+
+        print(f"\n=== {name} (vol≥{params.min_vol_ratio}×) ===")
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        cols = [
+            c
+            for c in ["time_utc", "symbol", "vol_ratio", "bias", "pnl_1h"]
+            if c in df.columns
+        ]
+        if not df.empty:
+            print(df[cols].sort_values("time_utc").to_string(index=False))
+
+    if args.tier in ("all", "rawcheck"):
+        raw_df = run(RAW)
+        print(f"\n=== rawcheck n={len(raw_df)} baseline={baseline_n} ===")
 
 
 if __name__ == "__main__":

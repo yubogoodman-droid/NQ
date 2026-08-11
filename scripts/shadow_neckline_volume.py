@@ -1,4 +1,13 @@
-"""Deprecated: stricter 爆量 (2.0×) live scanner."""
+"""
+影線頸線監控（原版 + 爆量）— 建議日常使用
+
+原版邏輯不變：
+- 三峰肩頭、頭相對 SMA200 乖離 ≥5%、肩距 ≤30、對稱 <15%
+- Low 刺破頸線 + SMA14，且高點未破頭
+
+新增：
+- 破位 K 量能 ≥ 1.5 × 近 20 根均量（爆量）
+"""
 
 from __future__ import annotations
 
@@ -9,13 +18,15 @@ import ccxt
 import pandas as pd
 import requests
 
-from shadow_neckline_logic import STRICT, detect_at_index, prepare_indicators
+from shadow_neckline_logic import VOLUME, detect_at_index, prepare_indicators
 
+# ================= 設定區域 =================
 TG_TOKEN = ""
 TG_CHAT_ID = ""
 MIN_VOLUME_USDT = 50_000_000
 SCAN_INTERVAL = 60
-PARAMS = STRICT
+PARAMS = VOLUME
+# ===========================================
 
 
 def send_tg_message(message: str) -> None:
@@ -35,8 +46,12 @@ def send_tg_message(message: str) -> None:
 
 def main():
     exchange = ccxt.binanceusdm({"enableRateLimit": True})
-    print(f"📡 原版+強爆量(≥{PARAMS.min_vol_ratio}×) 監控中...")
+    print(
+        f"📡 原版+爆量 監控中... cooldown={PARAMS.cooldown_min}m "
+        f"vol≥{PARAMS.min_vol_ratio:.1f}×{PARAMS.vol_lookback}"
+    )
     last_report_time = {}
+
     while True:
         try:
             tickers = exchange.fetch_tickers()
@@ -46,28 +61,37 @@ def main():
                 if s.endswith(":USDT") and (t.get("quoteVolume") or 0) >= MIN_VOLUME_USDT
             ]
             now = datetime.now()
+            print(f"⏰ {now.strftime('%H:%M:%S')} | 掃描 {len(symbols)} 幣...")
+
             for symbol in symbols:
                 try:
                     if symbol in last_report_time and now < last_report_time[
                         symbol
                     ] + timedelta(minutes=PARAMS.cooldown_min):
                         continue
+
                     ohlcv = exchange.fetch_ohlcv(symbol, timeframe="5m", limit=300)
                     df = pd.DataFrame(
                         ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"]
                     )
-                    ok, d = detect_at_index(*prepare_indicators(df), len(df) - 1, PARAMS)
+                    arrays = prepare_indicators(df)
+                    ok, d = detect_at_index(*arrays, len(df) - 1, PARAMS)
                     if not ok:
                         time.sleep(0.05)
                         continue
-                    chg24 = (tickers.get(symbol) or {}).get("percentage")
-                    send_tg_message(
-                        f"🚨 *【影線頸線｜強爆量】*\n\n"
-                        f"💎 `{symbol.split(':')[0]}`\n"
-                        f"📈 24h `{None if chg24 is None else round(float(chg24),2)}%`\n"
-                        f"💰 `{d['price']}`  爆量 `{d.get('vol_ratio')}×`"
+
+                    t = tickers.get(symbol) or {}
+                    chg24 = t.get("percentage")
+                    msg = (
+                        f"🚨 *【影線頸線｜原版+爆量】*\n\n"
+                        f"💎 `{symbol.split(':')[0]}` (5M)\n"
+                        f"📈 24h: `{None if chg24 is None else round(float(chg24),2)}%`\n"
+                        f"💰 `{d['price']}`  刺破 `{d['close_break_pct']}%`\n"
+                        f"📊 乖離 `{d['bias']}%`  爆量 `{d.get('vol_ratio')}×`\n"
+                        f"⚠️ Low 破頸線+SMA14，且量能≥{PARAMS.min_vol_ratio}×均量"
                     )
-                    print(f"🎯 {symbol} vol={d.get('vol_ratio')}×")
+                    send_tg_message(msg)
+                    print(f"🎯 {symbol} vol={d.get('vol_ratio')}× bias={d['bias']}%")
                     last_report_time[symbol] = now
                     time.sleep(0.05)
                 except Exception:
