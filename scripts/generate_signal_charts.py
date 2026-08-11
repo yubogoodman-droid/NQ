@@ -125,12 +125,24 @@ def chart_payload(symbol: str, signal_rows: pd.DataFrame) -> dict:
         }
         for _, r in plot.iterrows()
     ]
+    volume = [
+        {
+            "time": int(r["timestamp"] // 1000),
+            "value": float(r["volume"]),
+            "color": "rgba(61,186,122,0.45)"
+            if float(r["close"]) >= float(r["open"])
+            else "rgba(227,93,93,0.45)",
+        }
+        for _, r in plot.iterrows()
+        if pd.notna(r.get("volume"))
+    ]
     signals = short_pnl_table(df, signal_rows)
     return {
         "symbol": symbol,
         "day": DAY,
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "candles": candles,
+        "volume": volume,
         "sma7": series("sma7"),
         "sma14": series("sma14"),
         "sma25": series("sma25"),
@@ -207,12 +219,14 @@ def render_symbol_html(
   .meta {{ display:flex; flex-wrap:wrap; gap:10px 18px; font-family:"JetBrains Mono",monospace; font-size:.78rem; color:var(--muted); }}
   .meta b {{ color:var(--ink); font-weight:500; }}
   .chart-shell {{ position:relative; border:1px solid var(--line); background:linear-gradient(180deg,rgba(255,255,255,.03),transparent 40%), var(--panel); overflow:hidden; }}
-  #chart {{ width:100%; height:min(62vh,560px); }}
+  #chart {{ width:100%; height:min(72vh,640px); }}
   .legend {{ position:absolute; top:12px; left:14px; right:14px; z-index:2; display:flex; flex-wrap:wrap; gap:10px 14px; font-size:.75rem; color:var(--muted); pointer-events:none; }}
   .legend i {{ display:inline-block; width:18px; height:2px; vertical-align:middle; margin-right:6px; }}
   .ma7 i{{background:var(--ma7)}} .ma14 i{{background:var(--ma14)}} .ma25 i{{background:var(--ma25)}}
   .ma99 i{{background:var(--ma99)}} .ma200 i{{background:var(--ma200)}}
-  .sig i{{width:8px;height:8px;border-radius:50%;background:var(--short)}}
+  .sig-arrow i{{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid #ff4d4f;background:transparent}}
+  .sig-entry i{{width:8px;height:8px;border-radius:50%;background:#ffd666}}
+  .vol i{{width:10px;height:10px;background:rgba(201,162,39,.45)}}
   section {{ margin-top:22px; }}
   h2 {{ font-family:"IBM Plex Serif",serif; font-size:1.2rem; margin:0 0 6px; }}
   section p {{ color:var(--muted); margin:0 0 14px; font-size:.92rem; }}
@@ -224,7 +238,7 @@ def render_symbol_html(
   td.mono {{ font-family:"JetBrains Mono",monospace; font-size:.8rem; }}
   .pos {{ color:var(--long); }} .neg {{ color:var(--short); }} .na {{ color:var(--muted); }}
   .note {{ margin-top:14px; color:var(--muted); font-size:.8rem; }}
-  @media (max-width:640px) {{ #chart{{height:420px}} .wrap{{padding:18px 12px 36px}} }}
+  @media (max-width:640px) {{ #chart{{height:480px}} .wrap{{padding:18px 12px 36px}} }}
 </style>
 </head>
 <body>
@@ -236,7 +250,8 @@ def render_symbol_html(
       <div class="brand">{data['symbol'].split('/')[0]}<span>/{data['symbol'].split('/')[-1]}</span></div>
       <div class="sub">影線頸線破位訊號與做空報酬（{data['day']} UTC，Binance USDT-M 5m）</div>
       <div class="meta">
-        <span>進場：<b>訊號下一根開盤</b></span>
+        <span>紅箭：<b>訊號棒</b>（破位確認）</span>
+        <span>黃點：<b>進場棒</b>（下一根開盤做空）</span>
         <span>均線：<b>SMA 7 / 14 / 25 / 99 / 200</b></span>
         <span>訊號數：<b>{len(data['signals'])}</b></span>
         <span>更新：<b>{data.get('updated','')}</b></span>
@@ -249,7 +264,9 @@ def render_symbol_html(
         <span class="ma25"><i></i>SMA25</span>
         <span class="ma99"><i></i>SMA99</span>
         <span class="ma200"><i></i>SMA200</span>
-        <span class="sig"><i></i>做空訊號</span>
+        <span class="sig-arrow"><i></i>訊號棒</span>
+        <span class="sig-entry"><i></i>進場棒</span>
+        <span class="vol"><i></i>成交量</span>
       </div>
       <div id="chart"></div>
       <div id="jumps" class="jumps"></div>
@@ -268,7 +285,7 @@ def render_symbol_html(
           <tbody id="tbody"></tbody>
         </table>
       </div>
-      <p class="note">資料：Binance Vision USDT-M 日檔。紅色箭頭 = 進場 K；點下方按鈕可跳到該訊號。</p>
+      <p class="note">紅箭 = 訊號棒（當根 Low 破頸線）；黃點 = 進場棒（下一根 5m 開盤做空）。下方柱狀為成交量。點按鈕可跳到該訊號。</p>
     </section>
   </div>
   <style>
@@ -319,6 +336,9 @@ def render_symbol_html(
       wickUpColor:'#3dba7a', wickDownColor:'#e35d5d',
     }});
     candleSeries.setData(DATA.candles);
+    candleSeries.priceScale().applyOptions({{
+      scaleMargins: {{ top: 0.08, bottom: 0.28 }},
+    }});
     function addMa(key, color) {{
       const s = chart.addLineSeries({{ color, lineWidth:2, priceLineVisible:false, lastValueVisible:false }});
       s.setData(DATA[key]);
@@ -326,7 +346,22 @@ def render_symbol_html(
     addMa('sma7','#f0c14a'); addMa('sma14','#7eb6ff'); addMa('sma25','#d28cff');
     addMa('sma99','#5fd2c2'); addMa('sma200','#c9a227');
 
-    // Visible markers: arrow on signal bar, circle on next-bar entry
+    // Volume histogram under price
+    if (DATA.volume && DATA.volume.length) {{
+      const volumeSeries = chart.addHistogramSeries({{
+        priceFormat: {{ type: 'volume' }},
+        priceScaleId: 'volume',
+        lastValueVisible: false,
+        priceLineVisible: false,
+      }});
+      chart.priceScale('volume').applyOptions({{
+        scaleMargins: {{ top: 0.78, bottom: 0 }},
+        borderVisible: false,
+      }});
+      volumeSeries.setData(DATA.volume);
+    }}
+
+    // Visible markers: red arrow = signal bar; yellow circle = next-bar entry
     const candleTimes = new Set(DATA.candles.map(c => c.time));
     const markers = [];
     DATA.signals.forEach((s, idx) => {{

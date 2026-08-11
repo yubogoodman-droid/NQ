@@ -80,6 +80,17 @@ def chart_payload_one(symbol: str, row: pd.Series, df: pd.DataFrame) -> dict:
         }
         for _, r in plot.iterrows()
     ]
+    volume = [
+        {
+            "time": int(r["timestamp"] // 1000),
+            "value": float(r["volume"]),
+            "color": "rgba(61,186,122,0.45)"
+            if float(r["close"]) >= float(r["open"])
+            else "rgba(227,93,93,0.45)",
+        }
+        for _, r in plot.iterrows()
+        if pd.notna(r.get("volume"))
+    ]
 
     one = pd.DataFrame([row])
     signals = short_pnl_table(df, one)
@@ -99,6 +110,7 @@ def chart_payload_one(symbol: str, row: pd.Series, df: pd.DataFrame) -> dict:
         "day": day_label,
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "candles": candles,
+        "volume": volume,
         "sma7": series("sma7"),
         "sma14": series("sma14"),
         "sma25": series("sma25"),
