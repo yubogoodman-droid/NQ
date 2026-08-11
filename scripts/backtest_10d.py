@@ -38,8 +38,8 @@ MIN_VOLUME_USDT = 50_000_000
 HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
 TIERS = {
     "raw": RAW,
-    "volume": VOLUME,  # ≥1.5× + neck/SMA200/15m/SMA99 filters
-    "volume2": STRICT,  # ≥2.0× + same structure filters
+    "volume": VOLUME,  # 附近峰值 >5× + structure filters
+    "volume2": STRICT,  # same as volume (legacy alias)
 }
 
 
@@ -288,7 +288,7 @@ def main():
 
     print(f"📡 10d Vision backtest")
     print(f"   window: {days[0]} → {days[-1]} ({len(days)} days) warmup={warmup}")
-    print(f"   tiers: raw / volume(≥1.5×+filters) / volume2(≥2.0×+filters)")
+    print(f"   tiers: raw / volume(附近>5×+filters) / volume2(同 volume)")
 
     print("📋 Listing symbols...")
     all_syms = list_um_usdt_symbols()
@@ -369,10 +369,14 @@ def main():
         )
     lines.append("")
     lines.append(
-        "volume = original + vol≥1.5× + filters (neck/SMA200/15m pierce/near SMA99)"
+        "volume = original + nearby peak vol>5× (2h window vs prior 20-bar avg) + structure filters"
     )
     lines.append(
-        "volume2 = original + vol≥2.0× + same structure filters"
+        "volume2 = same as volume (legacy alias)"
+    )
+    lines.append("")
+    lines.append(
+        "Deep-below 15m SMA200 (dist < −3%): skips late shorts after a higher-TF dump (e.g. GWEI)."
     )
     report = "\n".join(lines)
     (OUT / "shadow_neckline_10d_report.md").write_text(report, encoding="utf-8")
