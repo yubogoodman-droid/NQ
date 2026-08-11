@@ -44,6 +44,8 @@
     "reject_15m_pierce_sma200": true,
     "reject_near_sma200_15m": true,
     "near_sma200_15m_pct": 1.5,
+    "reject_deep_below_sma200_15m": true,
+    "max_below_sma200_15m_pct": 3.0,
     "max_chg24": 99.0,
     "cooldown_min": 30
   },
@@ -60,51 +62,51 @@
     "2026-08-10": 72
   },
   "summary": {
-    "n": 31,
-    "symbols": 25,
-    "reclaim_3_rate": 29.0,
+    "n": 29,
+    "symbols": 24,
+    "reclaim_3_rate": 31.0,
     "by_horizon": {
       "15m": {
-        "n": 31,
-        "win_rate": 58.1,
-        "avg": 1.271,
-        "median": 0.266
+        "n": 29,
+        "win_rate": 58.6,
+        "avg": 1.386,
+        "median": 0.439
       },
       "30m": {
-        "n": 31,
-        "win_rate": 64.5,
-        "avg": 1.931,
-        "median": 0.682
+        "n": 29,
+        "win_rate": 65.5,
+        "avg": 2.068,
+        "median": 0.733
       },
       "1h": {
-        "n": 31,
-        "win_rate": 64.5,
-        "avg": 1.542,
-        "median": 0.934
+        "n": 29,
+        "win_rate": 69.0,
+        "avg": 1.76,
+        "median": 1.006
       },
       "2h": {
-        "n": 31,
-        "win_rate": 41.9,
-        "avg": -0.665,
-        "median": -1.039
+        "n": 29,
+        "win_rate": 44.8,
+        "avg": -0.217,
+        "median": -0.834
       },
       "4h": {
-        "n": 31,
-        "win_rate": 41.9,
-        "avg": -2.505,
-        "median": -2.961
+        "n": 29,
+        "win_rate": 44.8,
+        "avg": -2.176,
+        "median": -1.991
       },
       "8h": {
-        "n": 31,
-        "win_rate": 41.9,
-        "avg": -3.085,
-        "median": -2.612
+        "n": 29,
+        "win_rate": 44.8,
+        "avg": -2.742,
+        "median": -0.941
       },
       "12h": {
-        "n": 31,
-        "win_rate": 38.7,
-        "avg": -4.827,
-        "median": -2.948
+        "n": 29,
+        "win_rate": 41.4,
+        "avg": -3.72,
+        "median": -2.497
       }
     },
     "by_day": {
@@ -161,12 +163,6 @@
         "symbols": 1,
         "win_1h": 50.0,
         "avg_1h": -1.512
-      },
-      "2026-08-10": {
-        "n": 2,
-        "symbols": 1,
-        "win_1h": 0.0,
-        "avg_1h": -1.615
       }
     },
     "symbols_list": [
@@ -185,7 +181,6 @@
       "DRAM/USDT",
       "EUL/USDT",
       "GIGGLE/USDT",
-      "GWEI/USDT",
       "INTC/USDT",
       "LITE/USDT",
       "MRVL/USDT",

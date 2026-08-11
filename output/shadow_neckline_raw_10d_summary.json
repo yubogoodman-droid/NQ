@@ -44,6 +44,8 @@
     "reject_15m_pierce_sma200": false,
     "reject_near_sma200_15m": false,
     "near_sma200_15m_pct": 1.5,
+    "reject_deep_below_sma200_15m": false,
+    "max_below_sma200_15m_pct": 3.0,
     "max_chg24": 99.0,
     "cooldown_min": 30
   },

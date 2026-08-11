@@ -38,7 +38,7 @@ MIN_VOLUME_USDT = 50_000_000
 HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
 TIERS = {
     "raw": RAW,
-    "volume": VOLUME,  # ≥1.5× + reject rising neck + near rising SMA200
+    "volume": VOLUME,  # ≥1.5× + neck/SMA200/15m/SMA99 filters
     "volume2": STRICT,  # ≥2.0× + same structure filters
 }
 

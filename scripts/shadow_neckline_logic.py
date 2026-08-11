@@ -51,6 +51,9 @@ class DetectParams:
     # 進場貼近 15m SMA200
     reject_near_sma200_15m: bool = False
     near_sma200_15m_pct: float = 1.5
+    # 已大幅低於 15m SMA200 → 大跌後低位追空（如 GWEI）不做空
+    reject_deep_below_sma200_15m: bool = False
+    max_below_sma200_15m_pct: float = 3.0  # dist% < -3 → reject
     # meta
     max_chg24: float = 99.0
     cooldown_min: int = 30
@@ -63,6 +66,7 @@ VOLUME = DetectParams(
     reject_near_rising_sma200=True,  # 上彎 SMA200 附近不空（如 BEAT）
     reject_15m_pierce_sma200=True,  # 15分K戳破200均線且收下方不空
     reject_near_sma200_15m=True,  # 貼近 15m SMA200 不空
+    reject_deep_below_sma200_15m=True,  # 已深跌破 15m SMA200 不空（如 GWEI）
     min_abs_dist_ma99=1.5,  # 貼近 SMA99（如 CYS）不空
     cooldown_min=30,
 )
@@ -75,6 +79,7 @@ STRICT = DetectParams(
     reject_near_rising_sma200=True,
     reject_15m_pierce_sma200=True,
     reject_near_sma200_15m=True,
+    reject_deep_below_sma200_15m=True,
     min_abs_dist_ma99=1.5,
     cooldown_min=30,
 )
@@ -208,6 +213,12 @@ def detect_at_index(
         if not np.isnan(s200_15) and s200_15 != 0:
             dist200_15 = (close[curr_idx] - s200_15) / s200_15
             if p.reject_near_sma200_15m and abs(dist200_15) * 100.0 < p.near_sma200_15m_pct:
+                return False, None
+            # 已大幅低於 15m SMA200 → 高週期已破、低位追空（如 GWEI）
+            if (
+                p.reject_deep_below_sma200_15m
+                and dist200_15 * 100.0 < -p.max_below_sma200_15m_pct
+            ):
                 return False, None
 
     # 貼近 SMA99 → 不做空（如 CYS）
