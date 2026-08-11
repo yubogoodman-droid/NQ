@@ -81,6 +81,7 @@ def short_pnl_table(df: pd.DataFrame, signal_rows: pd.DataFrame) -> list[dict]:
             "sma14": float(s["sma14"]),
             "pnl": pnl,
             "time": entry_ts // 1000,
+            "entry_time": (entry_ts // 1000) + 300,  # next 5m bar = actual short entry
             "dist_ma99_pct": None,
             "dist_ma200_pct": None,
             "close_break_pct": None,
@@ -251,6 +252,7 @@ def render_symbol_html(
         <span class="sig"><i></i>做空訊號</span>
       </div>
       <div id="chart"></div>
+      <div id="jumps" class="jumps"></div>
     </div>
     <section>
       <h2>做空報酬（%）</h2>
@@ -266,9 +268,18 @@ def render_symbol_html(
           <tbody id="tbody"></tbody>
         </table>
       </div>
-      <p class="note">資料：Binance Vision USDT-M 日檔。前置 K 線自 {HIST} 18:00 UTC。</p>
+      <p class="note">資料：Binance Vision USDT-M 日檔。紅色箭頭 = 進場 K；點下方按鈕可跳到該訊號。</p>
     </section>
   </div>
+  <style>
+    .jumps {{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }}
+    .jumps button {{
+      font-family:"JetBrains Mono",monospace; font-size:.72rem;
+      color:#e8f0ea; background:rgba(227,93,93,.18); border:1px solid rgba(227,93,93,.45);
+      padding:6px 10px; cursor:pointer;
+    }}
+    .jumps button:hover {{ background:rgba(227,93,93,.32); }}
+  </style>
   <script>
     const DATA = {json.dumps(data, ensure_ascii=False)};
     function fmtPct(v) {{
@@ -314,20 +325,75 @@ def render_symbol_html(
     }}
     addMa('sma7','#f0c14a'); addMa('sma14','#7eb6ff'); addMa('sma25','#d28cff');
     addMa('sma99','#5fd2c2'); addMa('sma200','#c9a227');
-    candleSeries.setMarkers(DATA.signals.map((s, idx) => ({{
-      time: s.time, position:'aboveBar', color:'#e35d5d', shape:'arrowDown', text:`SHORT #${{idx+1}}`,
-    }})));
+
+    // Visible markers: arrow on signal bar, circle on next-bar entry
+    const candleTimes = new Set(DATA.candles.map(c => c.time));
+    const markers = [];
+    DATA.signals.forEach((s, idx) => {{
+      markers.push({{
+        time: s.time,
+        position: 'aboveBar',
+        color: '#ff4d4f',
+        shape: 'arrowDown',
+        text: `訊號#${{idx+1}}`,
+        size: 2,
+      }});
+      const et = (s.entry_time && candleTimes.has(s.entry_time)) ? s.entry_time : s.time;
+      markers.push({{
+        time: et,
+        position: 'belowBar',
+        color: '#ffd666',
+        shape: 'circle',
+        text: `進場 ${{Number(s.entry).toPrecision(5)}}`,
+        size: 3,
+      }});
+    }});
+    candleSeries.setMarkers(markers);
+
     DATA.signals.forEach((s, idx) => {{
       candleSeries.createPriceLine({{
+        price: s.entry,
+        color: 'rgba(255,77,79,0.85)',
+        lineWidth: 2,
+        lineStyle: LightweightCharts.LineStyle.Solid,
+        axisLabelVisible: true,
+        title: `進場#${{idx+1}}`,
+      }});
+      candleSeries.createPriceLine({{
         price: s.line_val,
-        color: idx === 0 ? 'rgba(227,93,93,0.35)' : 'rgba(227,93,93,0.55)',
+        color: 'rgba(227,93,93,0.35)',
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dashed,
-        axisLabelVisible: true,
+        axisLabelVisible: false,
         title: `頸線#${{idx+1}}`,
       }});
     }});
-    chart.timeScale().fitContent();
+
+    function focusSignal(s) {{
+      const pad = 12 * 3600; // ±12h
+      chart.timeScale().setVisibleRange({{
+        from: s.time - pad,
+        to: s.time + pad,
+      }});
+    }}
+    // Default view: zoom around signals (not whole 10-day fit, or markers look tiny)
+    if (DATA.signals.length) {{
+      const times = DATA.signals.map(s => s.time);
+      const lo = Math.min(...times) - 24 * 3600;
+      const hi = Math.max(...times) + 24 * 3600;
+      chart.timeScale().setVisibleRange({{ from: lo, to: hi }});
+    }} else {{
+      chart.timeScale().fitContent();
+    }}
+
+    const jumps = document.getElementById('jumps');
+    DATA.signals.forEach((s, idx) => {{
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = `跳到空#${{idx+1}} ${{s.time_utc.slice(5)}}`;
+      btn.onclick = () => focusSignal(s);
+      jumps.appendChild(btn);
+    }});
   </script>
 </body>
 </html>
