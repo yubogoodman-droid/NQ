@@ -99,14 +99,31 @@ def short_pnl_table(df: pd.DataFrame, signal_rows: pd.DataFrame) -> list[dict]:
     return out
 
 
-def chart_payload(symbol: str, signal_rows: pd.DataFrame) -> dict:
-    sym = file_stem(symbol)
-    df = load_ohlcv(sym)
-    for n in (7, 14, 25, 99, 200):
-        df[f"sma{n}"] = ta.sma(df["close"], length=n)
+def resample_ohlcv_15m(df: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate 5m OHLCV into 15m bars (UTC-aligned, timestamp in ms)."""
+    if df.empty:
+        return df.copy()
+    d = df.copy()
+    # floor to 15m bucket in ms to avoid datetime64 unit quirks
+    bucket_ms = 15 * 60 * 1000
+    d["bucket"] = (d["timestamp"].astype("int64") // bucket_ms) * bucket_ms
+    agg = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
+    if "quote_volume" in d.columns:
+        agg["quote_volume"] = "sum"
+    out = d.groupby("bucket", as_index=False).agg(agg).dropna(subset=["open", "close"])
+    out = out.rename(columns={"bucket": "timestamp"})
+    return out.sort_values("timestamp").reset_index(drop=True)
 
-    start_ts = int(pd.Timestamp(f"{HIST} 18:00:00", tz="UTC").timestamp() * 1000)
-    plot = df[df["timestamp"] >= start_ts].copy()
+
+def add_sma_cols(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    for n in (7, 14, 25, 99, 200):
+        out[f"sma{n}"] = ta.sma(out["close"], length=n)
+    return out
+
+
+def plot_bundle(plot: pd.DataFrame) -> dict:
+    """Candles + volume + SMA series for one timeframe plot window."""
 
     def series(col: str):
         return [
@@ -136,11 +153,7 @@ def chart_payload(symbol: str, signal_rows: pd.DataFrame) -> dict:
         for _, r in plot.iterrows()
         if pd.notna(r.get("volume"))
     ]
-    signals = short_pnl_table(df, signal_rows)
     return {
-        "symbol": symbol,
-        "day": DAY,
-        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "candles": candles,
         "volume": volume,
         "sma7": series("sma7"),
@@ -148,6 +161,37 @@ def chart_payload(symbol: str, signal_rows: pd.DataFrame) -> dict:
         "sma25": series("sma25"),
         "sma99": series("sma99"),
         "sma200": series("sma200"),
+    }
+
+
+def with_15m_bundle(df_5m: pd.DataFrame, lo_ms: int | None, hi_ms: int | None) -> dict:
+    """Build 15m bundle from full 5m frame, sliced to [lo_ms, hi_ms]."""
+    df15 = add_sma_cols(resample_ohlcv_15m(df_5m))
+    plot15 = df15
+    if lo_ms is not None:
+        plot15 = plot15[plot15["timestamp"] >= lo_ms]
+    if hi_ms is not None:
+        plot15 = plot15[plot15["timestamp"] <= hi_ms]
+    if plot15.empty:
+        plot15 = df15
+    return plot_bundle(plot15)
+
+
+def chart_payload(symbol: str, signal_rows: pd.DataFrame) -> dict:
+    sym = file_stem(symbol)
+    df = add_sma_cols(load_ohlcv(sym))
+
+    start_ts = int(pd.Timestamp(f"{HIST} 18:00:00", tz="UTC").timestamp() * 1000)
+    plot = df[df["timestamp"] >= start_ts].copy()
+    b5 = plot_bundle(plot)
+    b15 = with_15m_bundle(df, start_ts, None)
+    signals = short_pnl_table(df, signal_rows)
+    return {
+        "symbol": symbol,
+        "day": DAY,
+        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        **b5,
+        "tf15": b15,
         "signals": signals,
     }
 
@@ -218,9 +262,11 @@ def render_symbol_html(
   .sub {{ color:var(--muted); line-height:1.5; }}
   .meta {{ display:flex; flex-wrap:wrap; gap:10px 18px; font-family:"JetBrains Mono",monospace; font-size:.78rem; color:var(--muted); }}
   .meta b {{ color:var(--ink); font-weight:500; }}
-  .chart-shell {{ position:relative; border:1px solid var(--line); background:linear-gradient(180deg,rgba(255,255,255,.03),transparent 40%), var(--panel); overflow:hidden; }}
-  #chart {{ width:100%; height:min(72vh,640px); }}
-  .legend {{ position:absolute; top:12px; left:14px; right:14px; z-index:2; display:flex; flex-wrap:wrap; gap:10px 14px; font-size:.75rem; color:var(--muted); pointer-events:none; }}
+  .chart-shell {{ position:relative; border:1px solid var(--line); background:linear-gradient(180deg,rgba(255,255,255,.03),transparent 40%), var(--panel); overflow:hidden; margin-top:14px; }}
+  .chart-shell:first-of-type {{ margin-top:0; }}
+  .tf-label {{ position:absolute; top:12px; right:14px; z-index:2; font-family:"JetBrains Mono",monospace; font-size:.72rem; color:var(--accent); border:1px solid rgba(201,162,39,.35); padding:3px 8px; background:rgba(12,18,16,.55); }}
+  .chart-pane {{ width:100%; height:min(58vh,520px); }}
+  .legend {{ position:absolute; top:12px; left:14px; right:90px; z-index:2; display:flex; flex-wrap:wrap; gap:10px 14px; font-size:.75rem; color:var(--muted); pointer-events:none; }}
   .legend i {{ display:inline-block; width:18px; height:2px; vertical-align:middle; margin-right:6px; }}
   .ma7 i{{background:var(--ma7)}} .ma14 i{{background:var(--ma14)}} .ma25 i{{background:var(--ma25)}}
   .ma99 i{{background:var(--ma99)}} .ma200 i{{background:var(--ma200)}}
@@ -238,7 +284,7 @@ def render_symbol_html(
   td.mono {{ font-family:"JetBrains Mono",monospace; font-size:.8rem; }}
   .pos {{ color:var(--long); }} .neg {{ color:var(--short); }} .na {{ color:var(--muted); }}
   .note {{ margin-top:14px; color:var(--muted); font-size:.8rem; }}
-  @media (max-width:640px) {{ #chart{{height:480px}} .wrap{{padding:18px 12px 36px}} }}
+  @media (max-width:640px) {{ .chart-pane{{height:400px}} .wrap{{padding:18px 12px 36px}} }}
 </style>
 </head>
 <body>
@@ -248,16 +294,17 @@ def render_symbol_html(
     {note_html}
     <header>
       <div class="brand">{data['symbol'].split('/')[0]}<span>/{data['symbol'].split('/')[-1]}</span></div>
-      <div class="sub">影線頸線破位訊號與做空報酬（{data['day']} UTC，Binance USDT-M 5m）</div>
+      <div class="sub">影線頸線破位訊號與做空報酬（{data['day']} UTC · 5m 偵測 · 5m＋15m 圖）</div>
       <div class="meta">
         <span>紅箭：<b>訊號棒</b>（破位確認）</span>
-        <span>黃點：<b>進場棒</b>（下一根開盤做空）</span>
+        <span>黃點：<b>進場棒</b>（下一根 5m 開盤做空）</span>
         <span>均線：<b>SMA 7 / 14 / 25 / 99 / 200</b></span>
         <span>訊號數：<b>{len(data['signals'])}</b></span>
         <span>更新：<b>{data.get('updated','')}</b></span>
       </div>
     </header>
     <div class="chart-shell">
+      <div class="tf-label">5m</div>
       <div class="legend">
         <span class="ma7"><i></i>SMA7</span>
         <span class="ma14"><i></i>SMA14</span>
@@ -268,8 +315,22 @@ def render_symbol_html(
         <span class="sig-entry"><i></i>進場棒</span>
         <span class="vol"><i></i>成交量</span>
       </div>
-      <div id="chart"></div>
+      <div id="chart" class="chart-pane"></div>
       <div id="jumps" class="jumps"></div>
+    </div>
+    <div class="chart-shell">
+      <div class="tf-label">15m</div>
+      <div class="legend">
+        <span class="ma7"><i></i>SMA7</span>
+        <span class="ma14"><i></i>SMA14</span>
+        <span class="ma25"><i></i>SMA25</span>
+        <span class="ma99"><i></i>SMA99</span>
+        <span class="ma200"><i></i>SMA200</span>
+        <span class="sig-arrow"><i></i>訊號棒</span>
+        <span class="sig-entry"><i></i>進場棒</span>
+        <span class="vol"><i></i>成交量</span>
+      </div>
+      <div id="chart15" class="chart-pane"></div>
     </div>
     <section>
       <h2>做空報酬（%）</h2>
@@ -285,7 +346,7 @@ def render_symbol_html(
           <tbody id="tbody"></tbody>
         </table>
       </div>
-      <p class="note">紅箭 = 訊號棒（當根 Low 破頸線）；黃點 = 進場棒（下一根 5m 開盤做空）。下方柱狀為成交量。點按鈕可跳到該訊號。</p>
+      <p class="note">紅箭 = 訊號棒（5m Low 破頸線）；黃點 = 進場棒（下一根 5m 開盤）。上圖 5m、下圖 15m（由 5m 合成）。點按鈕可同步跳到該訊號。</p>
     </section>
   </div>
   <style>
@@ -319,132 +380,149 @@ def render_symbol_html(
           <td>${{fmtPct(p['12h'])}}</td>
         </tr>`);
     }}
-    const chart = LightweightCharts.createChart(document.getElementById('chart'), {{
-      autoSize: true,
-      layout: {{ background: {{ type:'solid', color:'transparent' }}, textColor:'#8aa193', fontFamily:'JetBrains Mono, monospace' }},
-      grid: {{ vertLines: {{ color:'rgba(232,240,234,0.06)' }}, horzLines: {{ color:'rgba(232,240,234,0.06)' }} }},
-      crosshair: {{
-        vertLine: {{ color:'rgba(201,162,39,0.45)', labelBackgroundColor:'#c9a227' }},
-        horzLine: {{ color:'rgba(201,162,39,0.45)', labelBackgroundColor:'#c9a227' }},
-      }},
-      rightPriceScale: {{ borderColor:'rgba(232,240,234,0.12)' }},
-      timeScale: {{ borderColor:'rgba(232,240,234,0.12)', timeVisible:true, secondsVisible:false }},
-    }});
-    const candleSeries = chart.addCandlestickSeries({{
-      upColor:'#3dba7a', downColor:'#e35d5d',
-      borderUpColor:'#3dba7a', borderDownColor:'#e35d5d',
-      wickUpColor:'#3dba7a', wickDownColor:'#e35d5d',
-    }});
-    candleSeries.setData(DATA.candles);
-    candleSeries.priceScale().applyOptions({{
-      scaleMargins: {{ top: 0.08, bottom: 0.28 }},
-    }});
-    function addMa(key, color) {{
-      const s = chart.addLineSeries({{ color, lineWidth:2, priceLineVisible:false, lastValueVisible:false }});
-      s.setData(DATA[key]);
-    }}
-    addMa('sma7','#f0c14a'); addMa('sma14','#7eb6ff'); addMa('sma25','#d28cff');
-    addMa('sma99','#5fd2c2'); addMa('sma200','#c9a227');
 
-    // Volume histogram under price
-    if (DATA.volume && DATA.volume.length) {{
-      const volumeSeries = chart.addHistogramSeries({{
-        priceFormat: {{ type: 'volume' }},
-        priceScaleId: 'volume',
-        lastValueVisible: false,
-        priceLineVisible: false,
-      }});
-      chart.priceScale('volume').applyOptions({{
-        scaleMargins: {{ top: 0.78, bottom: 0 }},
-        borderVisible: false,
-      }});
-      volumeSeries.setData(DATA.volume);
+    function floorTf(t, sec) {{ return Math.floor(t / sec) * sec; }}
+    function nearestTime(timesSet, t) {{
+      if (timesSet.has(t)) return t;
+      let best = null, bestD = Infinity;
+      for (const x of timesSet) {{
+        const d = Math.abs(x - t);
+        if (d < bestD) {{ bestD = d; best = x; }}
+      }}
+      return best;
     }}
 
-    // Visible markers: red arrow = signal bar; yellow circle = next-bar entry
-    const candleTimes = new Set(DATA.candles.map(c => c.time));
-    const markers = [];
-    DATA.signals.forEach((s, idx) => {{
-      markers.push({{
-        time: s.time,
-        position: 'aboveBar',
-        color: '#ff4d4f',
-        shape: 'arrowDown',
-        text: `訊號#${{idx+1}}`,
-        size: 2,
+    function mountChart(elId, bundle, opts) {{
+      const barSec = opts.barSec || 300;
+      const chart = LightweightCharts.createChart(document.getElementById(elId), {{
+        autoSize: true,
+        layout: {{ background: {{ type:'solid', color:'transparent' }}, textColor:'#8aa193', fontFamily:'JetBrains Mono, monospace' }},
+        grid: {{ vertLines: {{ color:'rgba(232,240,234,0.06)' }}, horzLines: {{ color:'rgba(232,240,234,0.06)' }} }},
+        crosshair: {{
+          vertLine: {{ color:'rgba(201,162,39,0.45)', labelBackgroundColor:'#c9a227' }},
+          horzLine: {{ color:'rgba(201,162,39,0.45)', labelBackgroundColor:'#c9a227' }},
+        }},
+        rightPriceScale: {{ borderColor:'rgba(232,240,234,0.12)' }},
+        timeScale: {{ borderColor:'rgba(232,240,234,0.12)', timeVisible:true, secondsVisible:false }},
       }});
-      const et = (s.entry_time && candleTimes.has(s.entry_time)) ? s.entry_time : s.time;
-      markers.push({{
-        time: et,
-        position: 'belowBar',
-        color: '#ffd666',
-        shape: 'circle',
-        text: `進場 ${{Number(s.entry).toPrecision(5)}}`,
-        size: 3,
+      const candleSeries = chart.addCandlestickSeries({{
+        upColor:'#3dba7a', downColor:'#e35d5d',
+        borderUpColor:'#3dba7a', borderDownColor:'#e35d5d',
+        wickUpColor:'#3dba7a', wickDownColor:'#e35d5d',
       }});
-    }});
-    candleSeries.setMarkers(markers);
+      candleSeries.setData(bundle.candles || []);
+      candleSeries.priceScale().applyOptions({{ scaleMargins: {{ top: 0.08, bottom: 0.28 }} }});
+      function addMa(key, color) {{
+        const s = chart.addLineSeries({{ color, lineWidth:2, priceLineVisible:false, lastValueVisible:false }});
+        s.setData(bundle[key] || []);
+      }}
+      addMa('sma7','#f0c14a'); addMa('sma14','#7eb6ff'); addMa('sma25','#d28cff');
+      addMa('sma99','#5fd2c2'); addMa('sma200','#c9a227');
 
-    DATA.signals.forEach((s, idx) => {{
-      candleSeries.createPriceLine({{
-        price: s.entry,
-        color: 'rgba(255,77,79,0.85)',
-        lineWidth: 2,
-        lineStyle: LightweightCharts.LineStyle.Solid,
-        axisLabelVisible: true,
-        title: `進場#${{idx+1}}`,
-      }});
-      candleSeries.createPriceLine({{
-        price: s.line_val,
-        color: 'rgba(227,93,93,0.35)',
-        lineWidth: 1,
-        lineStyle: LightweightCharts.LineStyle.Dashed,
-        axisLabelVisible: false,
-        title: `頸線#${{idx+1}}`,
-      }});
-    }});
+      if (bundle.volume && bundle.volume.length) {{
+        const volumeSeries = chart.addHistogramSeries({{
+          priceFormat: {{ type: 'volume' }},
+          priceScaleId: 'volume',
+          lastValueVisible: false,
+          priceLineVisible: false,
+        }});
+        chart.priceScale('volume').applyOptions({{
+          scaleMargins: {{ top: 0.78, bottom: 0 }},
+          borderVisible: false,
+        }});
+        volumeSeries.setData(bundle.volume);
+      }}
 
-    function clampRange(from, to) {{
-      if (!DATA.candles.length) return null;
-      const minT = DATA.candles[0].time;
-      const maxT = DATA.candles[DATA.candles.length - 1].time;
-      const f = Math.max(from, minT);
-      const t = Math.min(to, maxT);
-      if (!(t > f)) return null;
-      return {{ from: f, to: t }};
-    }}
-    function focusSignal(s) {{
-      const pad = 12 * 3600; // ±12h
-      const range = clampRange(s.time - pad, s.time + pad);
-      if (range) {{
-        try {{ chart.timeScale().setVisibleRange(range); }}
-        catch (e) {{ chart.timeScale().fitContent(); }}
-      }} else {{
+      const candleTimes = new Set((bundle.candles || []).map(c => c.time));
+      const markers = [];
+      DATA.signals.forEach((s, idx) => {{
+        const st = nearestTime(candleTimes, floorTf(s.time, barSec));
+        if (st != null) {{
+          markers.push({{
+            time: st, position: 'aboveBar', color: '#ff4d4f', shape: 'arrowDown',
+            text: `訊號#${{idx+1}}`, size: 2,
+          }});
+        }}
+        const rawEt = s.entry_time || (s.time + 300);
+        const et = nearestTime(candleTimes, floorTf(rawEt, barSec));
+        if (et != null) {{
+          markers.push({{
+            time: et, position: 'belowBar', color: '#ffd666', shape: 'circle',
+            text: `進場 ${{Number(s.entry).toPrecision(5)}}`, size: 3,
+          }});
+        }}
+      }});
+      markers.sort((a,b) => a.time - b.time || (a.shape === 'arrowDown' ? -1 : 1));
+      candleSeries.setMarkers(markers);
+
+      DATA.signals.forEach((s, idx) => {{
+        candleSeries.createPriceLine({{
+          price: s.entry, color: 'rgba(255,77,79,0.85)', lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Solid, axisLabelVisible: true,
+          title: `進場#${{idx+1}}`,
+        }});
+        candleSeries.createPriceLine({{
+          price: s.line_val, color: 'rgba(227,93,93,0.35)', lineWidth: 1,
+          lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: false,
+          title: `頸線#${{idx+1}}`,
+        }});
+      }});
+
+      function clampRange(from, to) {{
+        if (!bundle.candles || !bundle.candles.length) return null;
+        const minT = bundle.candles[0].time;
+        const maxT = bundle.candles[bundle.candles.length - 1].time;
+        const f = Math.max(from, minT);
+        const t = Math.min(to, maxT);
+        if (!(t > f)) return null;
+        return {{ from: f, to: t }};
+      }}
+      function focusSignal(s) {{
+        const pad = 12 * 3600;
+        const range = clampRange(s.time - pad, s.time + pad);
+        if (range) {{
+          try {{ chart.timeScale().setVisibleRange(range); }}
+          catch (e) {{ chart.timeScale().fitContent(); }}
+        }} else {{
+          chart.timeScale().fitContent();
+        }}
+      }}
+      try {{
+        if (DATA.signals.length === 1) {{
+          chart.timeScale().fitContent();
+        }} else if (DATA.signals.length > 1) {{
+          const times = DATA.signals.map(s => s.time);
+          const range = clampRange(Math.min(...times) - 6 * 3600, Math.max(...times) + 6 * 3600);
+          if (range) chart.timeScale().setVisibleRange(range);
+          else chart.timeScale().fitContent();
+        }} else {{
+          chart.timeScale().fitContent();
+        }}
+      }} catch (e) {{
         chart.timeScale().fitContent();
       }}
+      return {{ chart, focusSignal }};
     }}
-    // Default view: prefer fitContent (safe). Optional mild zoom if range is valid.
-    try {{
-      if (DATA.signals.length === 1) {{
-        chart.timeScale().fitContent();
-      }} else if (DATA.signals.length > 1) {{
-        const times = DATA.signals.map(s => s.time);
-        const range = clampRange(Math.min(...times) - 6 * 3600, Math.max(...times) + 6 * 3600);
-        if (range) chart.timeScale().setVisibleRange(range);
-        else chart.timeScale().fitContent();
-      }} else {{
-        chart.timeScale().fitContent();
-      }}
-    }} catch (e) {{
-      chart.timeScale().fitContent();
-    }}
+
+    const bundle5 = {{
+      candles: DATA.candles, volume: DATA.volume,
+      sma7: DATA.sma7, sma14: DATA.sma14, sma25: DATA.sma25,
+      sma99: DATA.sma99, sma200: DATA.sma200,
+    }};
+    const view5 = mountChart('chart', bundle5, {{ barSec: 300 }});
+    const view15 = (DATA.tf15 && DATA.tf15.candles && DATA.tf15.candles.length)
+      ? mountChart('chart15', DATA.tf15, {{ barSec: 900 }})
+      : null;
 
     const jumps = document.getElementById('jumps');
     DATA.signals.forEach((s, idx) => {{
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = `跳到空#${{idx+1}} ${{s.time_utc.slice(5)}}`;
-      btn.onclick = () => focusSignal(s);
+      btn.onclick = () => {{
+        view5.focusSignal(s);
+        if (view15) view15.focusSignal(s);
+      }};
       jumps.appendChild(btn);
     }});
   </script>

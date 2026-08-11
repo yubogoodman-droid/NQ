@@ -14,9 +14,12 @@ import pandas_ta as ta
 from generate_signal_charts import (
     HORIZONS,
     STEM_ALIAS,
+    add_sma_cols,
     file_stem,
+    plot_bundle,
     render_symbol_html,
     short_pnl_table,
+    with_15m_bundle,
 )
 
 CACHE = Path("/tmp/binance_um_klines")
@@ -63,34 +66,8 @@ def chart_payload_one(symbol: str, row: pd.Series, df: pd.DataFrame) -> dict:
     if plot.empty:
         plot = df.copy()
 
-    def series(col: str):
-        return [
-            {"time": int(r["timestamp"] // 1000), "value": float(r[col])}
-            for _, r in plot.iterrows()
-            if pd.notna(r[col])
-        ]
-
-    candles = [
-        {
-            "time": int(r["timestamp"] // 1000),
-            "open": float(r["open"]),
-            "high": float(r["high"]),
-            "low": float(r["low"]),
-            "close": float(r["close"]),
-        }
-        for _, r in plot.iterrows()
-    ]
-    volume = [
-        {
-            "time": int(r["timestamp"] // 1000),
-            "value": float(r["volume"]),
-            "color": "rgba(61,186,122,0.45)"
-            if float(r["close"]) >= float(r["open"])
-            else "rgba(227,93,93,0.45)",
-        }
-        for _, r in plot.iterrows()
-        if pd.notna(r.get("volume"))
-    ]
+    b5 = plot_bundle(plot)
+    b15 = with_15m_bundle(df, lo, hi)
 
     one = pd.DataFrame([row])
     signals = short_pnl_table(df, one)
@@ -109,13 +86,8 @@ def chart_payload_one(symbol: str, row: pd.Series, df: pd.DataFrame) -> dict:
         "symbol": f"{symbol} · {day_label}",
         "day": day_label,
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "candles": candles,
-        "volume": volume,
-        "sma7": series("sma7"),
-        "sma14": series("sma14"),
-        "sma25": series("sma25"),
-        "sma99": series("sma99"),
-        "sma200": series("sma200"),
+        **b5,
+        "tf15": b15,
         "signals": signals,
     }
 
