@@ -1,5 +1,11 @@
 {
-  "day": "2026-08-09",
+  "day": "2026-08-11",
+  "hist": "2026-08-10",
+  "source": "bingx_usdm_swap",
+  "note": "Binance Vision daily zip not published for this day yet; fapi.binance.com returns HTTP 451 in this environment. Used BingX USDT-M swap 5m klines for overlapping Binance liquid symbols.",
+  "asof_utc": "2026-08-11 09:25:58",
+  "symbols_requested": 42,
+  "symbols_loaded": 42,
   "tier": "volume",
   "params": {
     "min_span": 1,
@@ -23,67 +29,58 @@
     "max_chg24": 99.0,
     "cooldown_min": 30
   },
-  "baseline_n": 76,
   "summary": {
-    "n": 16,
-    "symbols": 11,
-    "reclaim_3_rate": 31.2,
+    "n": 4,
+    "symbols": 3,
+    "reclaim_3_rate": 0.0,
     "by_horizon": {
       "15m": {
-        "n": 16,
-        "win_rate": 50.0,
-        "avg": -0.872,
-        "median": 0.04
+        "n": 4,
+        "win_rate": 100.0,
+        "avg": 2.107,
+        "median": 2.108
       },
       "30m": {
-        "n": 16,
-        "win_rate": 50.0,
-        "avg": -1.24,
-        "median": 0.266
+        "n": 4,
+        "win_rate": 75.0,
+        "avg": 1.74,
+        "median": 1.519
       },
       "1h": {
-        "n": 15,
-        "win_rate": 46.7,
-        "avg": -2.5,
-        "median": -0.76
+        "n": 4,
+        "win_rate": 100.0,
+        "avg": 3.234,
+        "median": 3.848
       },
       "2h": {
-        "n": 15,
-        "win_rate": 33.3,
-        "avg": -2.28,
-        "median": -1.326
+        "n": 4,
+        "win_rate": 50.0,
+        "avg": -0.793,
+        "median": 2.095
       },
       "4h": {
-        "n": 13,
-        "win_rate": 38.5,
-        "avg": -3.464,
-        "median": -3.4
+        "n": 4,
+        "win_rate": 50.0,
+        "avg": 4.89,
+        "median": 2.897
       },
       "8h": {
-        "n": 13,
-        "win_rate": 53.8,
-        "avg": -3.066,
-        "median": 2.244
+        "n": 1,
+        "win_rate": 0.0,
+        "avg": -6.152,
+        "median": -6.152
       },
       "12h": {
-        "n": 12,
-        "win_rate": 50.0,
-        "avg": -1.787,
-        "median": -2.0
+        "n": 0,
+        "win_rate": null,
+        "avg": null,
+        "median": null
       }
     },
     "symbols_list": [
-      "BEAT/USDT",
+      "ACE/USDT",
       "BICO/USDT",
-      "BLESS/USDT",
-      "COOKIE/USDT",
-      "CYS/USDT",
-      "IOTX/USDT",
-      "MUBARAK/USDT",
-      "PUMP/USDT",
-      "SKYAI/USDT",
-      "US/USDT",
-      "XAN/USDT"
+      "CYS/USDT"
     ]
   }
 }

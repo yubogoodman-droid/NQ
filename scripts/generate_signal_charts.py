@@ -6,33 +6,48 @@ plus an index page. Publishes under docs/charts/ (and optionally gh-pages).
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import argparse
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
 import pandas_ta as ta
 
-import argparse
-
 CACHE = Path("/tmp/binance_um_klines")
 DAY = "2026-08-09"
 HIST = "2026-08-08"
 HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
+DATA_NOTE = ""
+
+
+STEM_ALIAS = {
+    "龙虾USDT": "LONGXIAUSDT",
+}
 
 
 def file_stem(symbol: str) -> str:
     # BICO/USDT -> BICOUSDT
-    return symbol.replace("/", "")
+    stem = symbol.replace("/", "")
+    return STEM_ALIAS.get(stem, stem)
 
 
 def load_ohlcv(sym: str) -> pd.DataFrame:
-    df = pd.concat(
-        [
-            pd.read_csv(CACHE / f"{sym}-5m-{HIST}.csv"),
-            pd.read_csv(CACHE / f"{sym}-5m-{DAY}.csv"),
-        ],
-        ignore_index=True,
-    )
+    # accept chart stem or alias target
+    candidates = [sym]
+    for src, dst in STEM_ALIAS.items():
+        if sym == src:
+            candidates.append(dst)
+        if sym == dst:
+            candidates.append(src)
+    paths = []
+    for stem in candidates:
+        for d in (HIST, DAY):
+            p = CACHE / f"{stem}-5m-{d}.csv"
+            if p.exists():
+                paths.append(p)
+    if not paths:
+        raise FileNotFoundError(f"No klines for {sym} in {CACHE} ({HIST}/{DAY})")
+    df = pd.concat([pd.read_csv(p) for p in paths], ignore_index=True)
     return (
         df.drop_duplicates("timestamp")
         .sort_values("timestamp")
@@ -427,7 +442,7 @@ def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
 <body>
   <div class="wrap">
     <h1>影線頸線圖表</h1>
-    <p class="sub">{DAY} UTC · Binance USDT-M 5m。已改回原版影線頸線（Low 刺破），只加爆量過濾：破位 K 量能 ≥ N× 近 20 均量。</p>
+    <p class="sub">{DAY} UTC · {DATA_NOTE or "Binance USDT-M 5m"}。原版影線頸線（Low 刺破）+ 爆量過濾：破位 K 量能 ≥ N× 近 20 均量。</p>
     <div class="grid">
       <a class="card recommend" href="./balanced/index.html">
         <div class="tag">RECOMMENDED</div>
@@ -514,7 +529,30 @@ def generate_set(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["all", "raw", "balanced", "strict"], default="all")
+    parser.add_argument("--day", default=None, help="UTC day YYYY-MM-DD")
+    parser.add_argument("--hist", default=None, help="UTC warmup day YYYY-MM-DD")
+    parser.add_argument(
+        "--cache",
+        default=None,
+        help="klines cache dir (default /tmp/binance_um_klines)",
+    )
+    parser.add_argument(
+        "--data-note",
+        default="",
+        help="Short data-source note shown on hub",
+    )
     args = parser.parse_args()
+
+    global DAY, HIST, CACHE, DATA_NOTE
+    if args.day:
+        DAY = args.day
+    if args.hist:
+        HIST = args.hist
+    elif args.day:
+        HIST = (datetime.fromisoformat(args.day).date() - timedelta(days=1)).isoformat()
+    if args.cache:
+        CACHE = Path(args.cache)
+    DATA_NOTE = args.data_note
 
     root = Path("/workspace/docs/charts")
     root.mkdir(parents=True, exist_ok=True)

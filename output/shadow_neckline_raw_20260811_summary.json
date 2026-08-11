@@ -6,7 +6,7 @@
   "asof_utc": "2026-08-11 09:25:58",
   "symbols_requested": 42,
   "symbols_loaded": 42,
-  "tier": "volume",
+  "tier": "raw",
   "params": {
     "min_span": 1,
     "max_span": 30,
@@ -24,51 +24,51 @@
     "max_near_above_ma99": 0.0,
     "min_abs_dist_ma200": 0.0,
     "max_near_above_ma200": 0.0,
-    "min_vol_ratio": 1.5,
+    "min_vol_ratio": 0.0,
     "vol_lookback": 20,
     "max_chg24": 99.0,
     "cooldown_min": 30
   },
   "summary": {
-    "n": 4,
-    "symbols": 3,
-    "reclaim_3_rate": 0.0,
+    "n": 13,
+    "symbols": 8,
+    "reclaim_3_rate": 23.1,
     "by_horizon": {
       "15m": {
-        "n": 4,
-        "win_rate": 100.0,
-        "avg": 2.107,
-        "median": 2.108
+        "n": 13,
+        "win_rate": 38.5,
+        "avg": 0.273,
+        "median": -0.06
       },
       "30m": {
-        "n": 4,
-        "win_rate": 75.0,
-        "avg": 1.74,
-        "median": 1.519
+        "n": 13,
+        "win_rate": 61.5,
+        "avg": 1.293,
+        "median": 0.888
       },
       "1h": {
-        "n": 4,
-        "win_rate": 100.0,
-        "avg": 3.234,
-        "median": 3.848
+        "n": 13,
+        "win_rate": 84.6,
+        "avg": 1.899,
+        "median": 1.219
       },
       "2h": {
-        "n": 4,
-        "win_rate": 50.0,
-        "avg": -0.793,
-        "median": 2.095
+        "n": 13,
+        "win_rate": 61.5,
+        "avg": 1.008,
+        "median": 1.119
       },
       "4h": {
-        "n": 4,
-        "win_rate": 50.0,
-        "avg": 4.89,
-        "median": 2.897
+        "n": 11,
+        "win_rate": 54.5,
+        "avg": 3.382,
+        "median": 2.682
       },
       "8h": {
-        "n": 1,
-        "win_rate": 0.0,
-        "avg": -6.152,
-        "median": -6.152
+        "n": 3,
+        "win_rate": 66.7,
+        "avg": 4.869,
+        "median": 8.272
       },
       "12h": {
         "n": 0,
@@ -80,7 +80,12 @@
     "symbols_list": [
       "ACE/USDT",
       "BICO/USDT",
-      "CYS/USDT"
+      "BLESS/USDT",
+      "COOKIE/USDT",
+      "CYS/USDT",
+      "HEI/USDT",
+      "PUMP/USDT",
+      "龙虾/USDT"
     ]
   }
 }
