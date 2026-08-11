@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-10-day Binance Vision USDT-M backtest for original / 爆量 / 強爆量 tiers.
+N-day Binance Vision USDT-M backtest for original / 爆量 / 強爆量 tiers.
 
-Default window: last 10 *complete* UTC days available on data.binance.vision
-(currently through 2026-08-10; 2026-08-11 Vision zip still missing).
+Universe: each UTC day scans only the Top-N symbols by **prior UTC-day**
+open→close return (proxy for 漲幅榜前 N, without same-day look-ahead).
+
+Default window: last N complete UTC days on data.binance.vision.
 """
 
 from __future__ import annotations
@@ -34,7 +36,7 @@ VISION_BASE = "https://data.binance.vision"
 S3_BASE = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
 CACHE = Path("/tmp/binance_um_klines")
 OUT = Path("/workspace/output")
-MIN_VOLUME_USDT = 50_000_000
+TOP_N = 10  # 每天漲幅榜前 N（回測：用「前一 UTC 日」漲幅排名，避免偷看當日）
 HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
 TIERS = {
     "raw": RAW,
@@ -145,11 +147,16 @@ def download_day_df(symbol: str, day: str) -> pd.DataFrame | None:
     return df
 
 
-def day_quote_volume(symbol: str, day: str) -> float:
+def day_return_pct(symbol: str, day: str) -> float | None:
+    """UTC 日開→收漲幅 %；資料不足則 None。"""
     df = download_day_df(symbol, day)
     if df is None or df.empty:
-        return 0.0
-    return float(df["quote_volume"].sum())
+        return None
+    o = float(df.iloc[0]["open"])
+    c = float(df.iloc[-1]["close"])
+    if o <= 0:
+        return None
+    return (c / o - 1.0) * 100.0
 
 
 def calc_pnl(df: pd.DataFrame, signal_ts: int) -> dict:
@@ -295,34 +302,54 @@ def main():
     tag = f"{args.days}d"
     print(f"📡 {tag} Vision backtest")
     print(f"   window: {days[0]} → {days[-1]} ({len(days)} days) warmups={warmups[0]}→{warmups[-1]}")
+    print(f"   universe: 每日漲幅榜前 {TOP_N}（以「前一 UTC 日」漲幅排名）")
     print(f"   tiers: raw / volume(≥2.5×+filters) / volume2(≥3.5×+filters)")
 
     print("📋 Listing symbols...")
     all_syms = list_um_usdt_symbols()
     print(f"   {len(all_syms)} UM USDT symbols")
 
-    # Per-day liquidity (download each day zip as side effect)
-    liquid_by_day: dict[str, set[str]] = {d: set() for d in days}
-    union: set[str] = set()
-    print("💰 Scanning daily quote volume >= 50M ...")
-    for day in days:
-        vols = {}
+    # 排名日 = 訊號日前一日；需多抓一天供第一個交易日排名
+    rank_day0 = (
+        datetime.strptime(days[0], "%Y-%m-%d").replace(tzinfo=timezone.utc) - timedelta(days=1)
+    ).strftime("%Y-%m-%d")
+    rank_days = [rank_day0, *days[:-1]]  # map: days[i] uses rank_days[i]
+
+    # 下載所有排名日的 K 線以算漲幅（順便 cache）
+    print(f"📈 Ranking Top{TOP_N} by prior-day return ...")
+    returns_by_day: dict[str, dict[str, float]] = {}
+    for rday in sorted(set(rank_days)):
+        rets: dict[str, float] = {}
         with ThreadPoolExecutor(max_workers=32) as pool:
-            futs = {pool.submit(day_quote_volume, s, day): s for s in all_syms}
+            futs = {pool.submit(day_return_pct, s, rday): s for s in all_syms}
             done = 0
             for fut in as_completed(futs):
                 s = futs[fut]
                 done += 1
                 try:
-                    vols[s] = fut.result()
+                    v = fut.result()
                 except Exception:
-                    vols[s] = 0.0
+                    v = None
+                if v is not None:
+                    rets[s] = v
                 if done % 200 == 0:
-                    print(f"   {day} progress {done}/{len(all_syms)}")
-        liq = {s for s, v in vols.items() if v >= MIN_VOLUME_USDT}
-        liquid_by_day[day] = liq
-        union |= liq
-        print(f"   {day}: liquid={len(liq)}")
+                    print(f"   {rday} progress {done}/{len(all_syms)}")
+        returns_by_day[rday] = rets
+        print(f"   {rday}: ranked_from={len(rets)}")
+
+    universe_by_day: dict[str, set[str]] = {}
+    top_detail: dict[str, list[tuple[str, float]]] = {}
+    union: set[str] = set()
+    for day, rday in zip(days, rank_days):
+        ranked = sorted(returns_by_day.get(rday, {}).items(), key=lambda x: x[1], reverse=True)[
+            :TOP_N
+        ]
+        top_detail[day] = ranked
+        uni = {s for s, _ in ranked}
+        universe_by_day[day] = uni
+        union |= uni
+        preview = ", ".join(f"{s} {p:+.1f}%" for s, p in ranked[:5])
+        print(f"   {day} ← {rday} Top{TOP_N}: {preview} ...")
 
     print(f"⬇ Ensuring warmups {warmups[0]}→{warmups[-1]} for {len(union)} symbols...")
     with ThreadPoolExecutor(max_workers=24) as pool:
@@ -340,7 +367,7 @@ def main():
 
     results = {}
     for name, params in TIERS.items():
-        df = run_tier(params, frames, days, liquid_by_day)
+        df = run_tier(params, frames, days, universe_by_day)
         summary = summarize(df)
         payload = {
             "window": {
@@ -350,9 +377,15 @@ def main():
                 "warmups": warmups,
             },
             "source": "binance_vision_um_5m",
+            "universe": f"top{TOP_N}_prior_day_return",
+            "top_n": TOP_N,
+            "top_by_day": {
+                d: [{"symbol": s, "prior_day_pct": round(p, 2)} for s, p in top_detail[d]]
+                for d in days
+            },
             "tier": name,
             "params": params_dict(params),
-            "liquid_by_day": {d: len(liquid_by_day[d]) for d in days},
+            "universe_by_day": {d: sorted(universe_by_day[d]) for d in days},
             "summary": summary,
         }
         csv_path = OUT / f"shadow_neckline_{name}_{tag}.csv"
@@ -369,6 +402,8 @@ def main():
     # compact markdown-friendly table
     lines = [
         f"# {args.days}-day shadow-neckline ({days[0]} → {days[-1]} UTC, Binance Vision)",
+        "",
+        f"Universe: **Top {TOP_N} by prior UTC-day return** (no same-day look-ahead).",
         "",
         "| Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |",
         "|--|--|--|--|--|--|--|",

@@ -1,10 +1,12 @@
 # 30-day shadow-neckline (2026-07-12 → 2026-08-10 UTC, Binance Vision)
 
+Universe: **Top 10 by prior UTC-day return** (no same-day look-ahead).
+
 | Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |
 |--|--|--|--|--|--|--|
-| raw | 1800 | 156 | 45.5% | -0.22% | 44.4% | -1.267% |
-| volume | 11 | 10 | 72.7% | 1.906% | 54.5% | -1.283% |
-| volume2 | 6 | 6 | 100.0% | 3.9% | 50.0% | -1.028% |
+| raw | 688 | 121 | 45.5% | 0.006% | 51.1% | 0.103% |
+| volume | 8 | 8 | 50.0% | 1.47% | 50.0% | -1.257% |
+| volume2 | 3 | 3 | 66.7% | 1.873% | 66.7% | 2.153% |
 
 volume = original + break-bar vol≥2.5× prior-20 avg + structure filters
 volume2 = original + break-bar vol≥3.5× + same structure filters
