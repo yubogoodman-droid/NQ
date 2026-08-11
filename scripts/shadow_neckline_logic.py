@@ -42,6 +42,10 @@ class DetectParams:
     vol_lookback: int = 20
     # structure quality: classic H&S short prefers flat/descending neck
     reject_rising_neck: bool = False
+    # avoid shorting into rising SMA200 support when price is glued to it
+    reject_near_rising_sma200: bool = False
+    sma200_slope_bars: int = 24  # 2h on 5m
+    near_sma200_pct: float = 1.5  # |close-SMA200|/SMA200 < 1.5%
     # meta
     max_chg24: float = 99.0
     cooldown_min: int = 30
@@ -51,6 +55,7 @@ RAW = DetectParams()
 VOLUME = DetectParams(
     min_vol_ratio=1.5,  # 爆量：破位 K 量能 ≥ 1.5× 近 20 均量
     reject_rising_neck=True,  # 上升頸線（右肩抬高）不空
+    reject_near_rising_sma200=True,  # 上彎 SMA200 附近不空（如 BEAT）
     cooldown_min=30,
 )
 
@@ -59,6 +64,7 @@ BALANCED = VOLUME
 STRICT = DetectParams(
     min_vol_ratio=2.0,
     reject_rising_neck=True,
+    reject_near_rising_sma200=True,
     cooldown_min=30,
 )
 
@@ -155,6 +161,23 @@ def detect_at_index(
         if vol_ratio < p.min_vol_ratio:
             return False, None
 
+    s200_e = sma200[curr_idx]
+    dist200 = None
+    sma200_slope_pct = None
+    if not np.isnan(s200_e) and s200_e != 0:
+        dist200 = (close[curr_idx] - s200_e) / s200_e
+        sb = p.sma200_slope_bars
+        if curr_idx >= sb:
+            s200_prev = sma200[curr_idx - sb]
+            if not np.isnan(s200_prev) and s200_prev != 0:
+                sma200_slope_pct = (s200_e - s200_prev) / s200_prev
+        # 上彎 SMA200 + 價格貼近 → 易當支撐，不做空
+        if p.reject_near_rising_sma200:
+            if sma200_slope_pct is None or dist200 is None:
+                return False, None
+            if sma200_slope_pct > 0 and abs(dist200) * 100.0 < p.near_sma200_pct:
+                return False, None
+
     neck_chg_pct = ((h3 - h1) / h1 * 100.0) if h1 else 0.0
     out = {
         "price": float(close[curr_idx]),
@@ -174,11 +197,11 @@ def detect_at_index(
         dist99 = (close[curr_idx] - sma99[curr_idx]) / sma99[curr_idx]
         out["sma99"] = round(float(sma99[curr_idx]), 6)
         out["dist_ma99_pct"] = round(dist99 * 100, 2)
-    s200_e = sma200[curr_idx]
-    if not np.isnan(s200_e) and s200_e != 0:
-        dist200 = (close[curr_idx] - s200_e) / s200_e
+    if dist200 is not None:
         out["sma200"] = round(float(s200_e), 6)
         out["dist_ma200_pct"] = round(dist200 * 100, 2)
+    if sma200_slope_pct is not None:
+        out["sma200_slope_pct"] = round(sma200_slope_pct * 100, 3)
     return True, out
 
 

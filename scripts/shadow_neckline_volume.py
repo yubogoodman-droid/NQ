@@ -8,6 +8,7 @@
 新增：
 - 破位 K 量能 ≥ 1.5 × 近 20 根均量（爆量）
 - 拒絕上升頸線（右肩高於左肩）
+- 拒絕貼近上彎 SMA200（|距SMA200|<1.5%）
 """
 
 from __future__ import annotations
@@ -50,7 +51,8 @@ def main():
     print(
         f"📡 原版+爆量 監控中... cooldown={PARAMS.cooldown_min}m "
         f"vol≥{PARAMS.min_vol_ratio:.1f}×{PARAMS.vol_lookback} "
-        f"reject_rising_neck={PARAMS.reject_rising_neck}"
+        f"reject_rising_neck={PARAMS.reject_rising_neck} "
+        f"reject_near_rising_sma200={PARAMS.reject_near_rising_sma200}"
     )
     last_report_time = {}
 

@@ -3,9 +3,9 @@
   "hist": "2026-08-10",
   "source": "bingx_usdm_swap",
   "note": "Binance Vision daily zip not published for this day yet; fapi.binance.com returns HTTP 451 in this environment. Used BingX USDT-M swap 5m klines for overlapping Binance liquid symbols.",
-  "asof_utc": "2026-08-11 10:36:41",
-  "symbols_requested": 42,
-  "symbols_loaded": 42,
+  "asof_utc": "2026-08-11 11:29:33",
+  "symbols_requested": 40,
+  "symbols_loaded": 40,
   "tier": "raw",
   "params": {
     "min_span": 1,
@@ -27,48 +27,51 @@
     "min_vol_ratio": 0.0,
     "vol_lookback": 20,
     "reject_rising_neck": false,
+    "reject_near_rising_sma200": false,
+    "sma200_slope_bars": 24,
+    "near_sma200_pct": 1.5,
     "max_chg24": 99.0,
     "cooldown_min": 30
   },
   "summary": {
-    "n": 17,
-    "symbols": 9,
-    "reclaim_3_rate": 17.6,
+    "n": 11,
+    "symbols": 7,
+    "reclaim_3_rate": 27.3,
     "by_horizon": {
       "15m": {
-        "n": 16,
-        "win_rate": 50.0,
-        "avg": 0.86,
-        "median": 0.015
+        "n": 11,
+        "win_rate": 36.4,
+        "avg": -0.215,
+        "median": -0.379
       },
       "30m": {
-        "n": 15,
-        "win_rate": 66.7,
-        "avg": 1.541,
-        "median": 1.559
+        "n": 11,
+        "win_rate": 36.4,
+        "avg": -0.368,
+        "median": -0.383
       },
       "1h": {
-        "n": 13,
-        "win_rate": 84.6,
-        "avg": 1.899,
-        "median": 1.219
+        "n": 11,
+        "win_rate": 72.7,
+        "avg": 0.735,
+        "median": 1.04
       },
       "2h": {
-        "n": 13,
-        "win_rate": 61.5,
-        "avg": 1.008,
-        "median": 1.119
+        "n": 11,
+        "win_rate": 36.4,
+        "avg": -1.299,
+        "median": -1.374
       },
       "4h": {
-        "n": 12,
-        "win_rate": 50.0,
-        "avg": 2.722,
-        "median": 0.47
+        "n": 11,
+        "win_rate": 45.5,
+        "avg": 1.857,
+        "median": -1.742
       },
       "8h": {
         "n": 7,
-        "win_rate": 71.4,
-        "avg": 5.587,
+        "win_rate": 57.1,
+        "avg": 1.011,
         "median": 8.272
       },
       "12h": {
@@ -79,14 +82,12 @@
       }
     },
     "symbols_list": [
-      "ACE/USDT",
       "BICO/USDT",
       "BLESS/USDT",
-      "COOKIE/USDT",
+      "CAP/USDT",
       "CYS/USDT",
-      "HEI/USDT",
+      "GUA/USDT",
       "PUMP/USDT",
-      "SKYAI/USDT",
       "龙虾/USDT"
     ]
   }

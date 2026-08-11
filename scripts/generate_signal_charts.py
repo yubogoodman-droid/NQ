@@ -561,23 +561,33 @@ def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
 <body>
   <div class="wrap">
     <h1>影線頸線圖表</h1>
-    <p class="sub">{DAY} UTC · {DATA_NOTE or "Binance USDT-M 5m"}。原版影線頸線（Low 刺破）+ 爆量 + 拒絕上升頸線。</p>
+    <p class="sub">{DAY} UTC · {DATA_NOTE or "Binance USDT-M 5m"}。原版影線頸線（Low 刺破）+ 爆量 + 拒絕上升頸線 + 拒絕貼近上彎 SMA200。</p>
     <div class="grid">
       <a class="card recommend" href="./balanced/index.html">
         <div class="tag">RECOMMENDED</div>
         <div class="name">原版 + 爆量（≥1.5×）</div>
-        <div class="desc">破位量能 ≥ 1.5×，並拒絕上升頸線（右肩抬高）。</div>
+        <div class="desc">量能≥1.5×；拒絕上升頸線；進場貼近上彎 SMA200（|&lt;1.5%|）不空。</div>
         <div class="meta">{balanced_n} 筆訊號</div>
       </a>
       <a class="card" href="./strict/index.html">
         <div class="name">原版 + 強爆量（≥2.0×）</div>
-        <div class="desc">量能 ≥ 2.0×，同樣拒絕上升頸線。</div>
+        <div class="desc">量能≥2.0×；同樣拒絕上升頸線與貼近上彎 SMA200。</div>
         <div class="meta">{strict_n} 筆訊號</div>
       </a>
       <a class="card" href="./raw/index.html">
         <div class="name">原版訊號</div>
         <div class="desc">Low 刺破頸線 + SMA14 即報，無爆量過濾。</div>
         <div class="meta">{baseline_n} 筆訊號</div>
+      </a>
+      <a class="card" href="./ten_day/index.html">
+        <div class="name">10 日爆量圖表</div>
+        <div class="desc">2026-08-01→08-10 · 一訊一圖（紅箭=訊號 / 黃點=進場 / 底量）。</div>
+        <div class="meta">一訊一圖</div>
+      </a>
+      <a class="card" href="./ten_day.html">
+        <div class="name">10 日回測摘要</div>
+        <div class="desc">逐日勝率與平均報酬表。</div>
+        <div class="meta">raw / volume / volume2</div>
       </a>
     </div>
   </div>
@@ -640,6 +650,12 @@ def generate_set(
         cards.append({"symbol": symbol, "href": href, "n": len(data["signals"]), "avg_1h": avg_1h, "times": times})
         print(f"[{out_dir.name}] {href} signals={len(data['signals'])}")
 
+    keep_hrefs = {c["href"] for c in cards}
+    for p in out_dir.glob("*.html"):
+        if p.name == "index.html":
+            continue
+        if p.name not in keep_hrefs:
+            p.unlink()
     index = render_index(cards, title=title, subtitle=subtitle, extra_nav=extra_nav)
     (out_dir / "index.html").write_text(index, encoding="utf-8")
     return len(sig), len(cards)
@@ -701,22 +717,22 @@ def main():
             Path("/workspace/output/shadow_neckline_balanced_1d.csv"),
             root / "balanced",
             title=f"原版 + 爆量（≥1.5×）· {DAY}",
-            subtitle=f"{DAY} UTC · 原版 + 量能≥1.5× + 拒絕上升頸線。",
+            subtitle=f"{DAY} UTC · 原版 + 量能≥1.5× + 拒絕上升頸線 + 拒絕貼近上彎SMA200。",
             badge="VOL≥1.5×",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="Low 破頸線+SMA14；volume ≥ 1.5×20均量；右肩高於左肩（上升頸線）不空。",
+            filter_note="Low 破頸線+SMA14；volume ≥ 1.5×20均量；上升頸線不空；上彎 SMA200 且 |距|&lt;1.5% 不空。",
         )
     if args.mode in ("all", "strict"):
         strict_n, _ = generate_set(
             Path("/workspace/output/shadow_neckline_strict_1d.csv"),
             root / "strict",
             title=f"原版 + 強爆量（≥2.0×）· {DAY}",
-            subtitle=f"{DAY} UTC · 原版 + 量能≥2.0× + 拒絕上升頸線。",
+            subtitle=f"{DAY} UTC · 原版 + 量能≥2.0× + 拒絕上升頸線 + 拒絕貼近上彎SMA200。",
             badge="VOL≥2.0×",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="Low 破頸線+SMA14；volume ≥ 2.0×20均量；上升頸線不空。",
+            filter_note="Low 破頸線+SMA14；volume ≥ 2.0×20均量；上升頸線不空；上彎 SMA200 且 |距|&lt;1.5% 不空。",
         )
 
     if args.mode == "all":

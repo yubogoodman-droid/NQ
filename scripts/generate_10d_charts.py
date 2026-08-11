@@ -171,7 +171,7 @@ def render_signal_index(cards: list[dict], extra_nav: str) -> str:
   <div class="wrap">
     {extra_nav}
     <h1>10日爆量訊號 · 一訊一圖</h1>
-    <p class="sub">2026-08-01 → 08-10 UTC · Binance Vision · 原版 + 量能≥1.5× + 拒絕上升頸線。每個訊號獨立一張圖（±{PAD_HOURS}h）。</p>
+    <p class="sub">2026-08-01 → 08-10 UTC · Binance Vision · 原版 + 量能≥1.5× + 拒絕上升頸線 + 拒絕貼近上彎SMA200。每個訊號獨立一張圖（±{PAD_HOURS}h）。</p>
     <div class="stats">
       <span>訊號總數 <b>{len(cards)}</b></span>
       <span>幣種 <b>{len({c['symbol'] for c in cards})}</b></span>
@@ -257,6 +257,12 @@ def main():
         )
         print(f"[ten_day] {href}")
 
+    keep = {c["href"] for c in cards}
+    for p in out.glob("*.html"):
+        if p.name == "index.html":
+            continue
+        if p.name not in keep:
+            p.unlink()
     (out / "index.html").write_text(render_signal_index(cards, nav), encoding="utf-8")
 
     # hub / summary copy

@@ -38,8 +38,8 @@ MIN_VOLUME_USDT = 50_000_000
 HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
 TIERS = {
     "raw": RAW,
-    "volume": VOLUME,  # ≥1.5× + reject rising neck
-    "volume2": STRICT,  # ≥2.0× + reject rising neck
+    "volume": VOLUME,  # ≥1.5× + reject rising neck + near rising SMA200
+    "volume2": STRICT,  # ≥2.0× + same structure filters
 }
 
 
@@ -286,7 +286,7 @@ def main():
 
     print(f"📡 10d Vision backtest")
     print(f"   window: {days[0]} → {days[-1]} ({len(days)} days) warmup={warmup}")
-    print(f"   tiers: raw / volume(≥1.5×+no rising neck) / volume2(≥2.0×)")
+    print(f"   tiers: raw / volume(≥1.5×+filters) / volume2(≥2.0×+filters)")
 
     print("📋 Listing symbols...")
     all_syms = list_um_usdt_symbols()
@@ -366,8 +366,12 @@ def main():
             f"{h1.get('avg')}% | {h4.get('win_rate')}% | {h4.get('avg')}% |"
         )
     lines.append("")
-    lines.append("volume = original + vol≥1.5× + reject rising neck")
-    lines.append("volume2 = original + vol≥2.0× + reject rising neck")
+    lines.append(
+        "volume = original + vol≥1.5× + reject rising neck + reject near rising SMA200 (|dist|<1.5%)"
+    )
+    lines.append(
+        "volume2 = original + vol≥2.0× + reject rising neck + reject near rising SMA200 (|dist|<1.5%)"
+    )
     report = "\n".join(lines)
     (OUT / "shadow_neckline_10d_report.md").write_text(report, encoding="utf-8")
     print("\n" + report)
