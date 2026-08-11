@@ -23,15 +23,11 @@ from generate_signal_charts import (
 )
 
 CACHE = Path("/tmp/binance_um_klines")
-SIG_CSV = Path("/workspace/output/shadow_neckline_volume_10d.csv")
-OUT_DIR = Path("/workspace/docs/charts/ten_day")
-START = "2026-07-31"
-END = "2026-08-10"
 # candles kept around each signal (± hours)
 PAD_HOURS = 18
 
 
-def load_range(stem: str) -> pd.DataFrame:
+def load_range(stem: str, start: str, end: str) -> pd.DataFrame:
     candidates = [stem]
     for src, dst in STEM_ALIAS.items():
         if stem == src:
@@ -44,7 +40,7 @@ def load_range(stem: str) -> pd.DataFrame:
     keep = []
     for p in paths:
         day = p.name.split("-5m-")[-1].replace(".csv", "")
-        if START <= day <= END:
+        if start <= day <= end:
             keep.append(p)
     if not keep:
         raise FileNotFoundError(stem)
@@ -159,13 +155,29 @@ def render_signal_index(cards: list[dict], extra_nav: str) -> str:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", default=str(SIG_CSV))
-    parser.add_argument("--out", default=str(OUT_DIR))
+    parser.add_argument(
+        "--csv",
+        default="/workspace/output/shadow_neckline_volume_10d.csv",
+    )
+    parser.add_argument("--out", default="/workspace/docs/charts/ten_day")
+    parser.add_argument("--start", default=None, help="kline day start YYYY-MM-DD")
+    parser.add_argument("--end", default=None, help="kline day end YYYY-MM-DD")
+    parser.add_argument("--label", default="10日", help="index title label")
     args = parser.parse_args()
 
     sig = pd.read_csv(args.csv).sort_values(["time_utc", "symbol"]).reset_index(drop=True)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+
+    if args.start and args.end:
+        start, end = args.start, args.end
+    else:
+        days = sorted(sig["day"].astype(str).unique()) if "day" in sig.columns else []
+        if days:
+            start = (pd.Timestamp(days[0]) - pd.Timedelta(days=3)).strftime("%Y-%m-%d")
+            end = days[-1]
+        else:
+            start, end = "2026-07-31", "2026-08-10"
 
     # clear old multi-signal pages (STEM.html without timestamp)
     for p in out.glob("*.html"):
@@ -173,7 +185,6 @@ def main():
             continue
         if re.match(r"^.+_\d{8}_\d{4}\.html$", p.name):
             continue
-        # remove legacy per-symbol aggregates
         p.unlink()
 
     need_cols = ["symbol", "time_utc", "price", "bias", "line_val", "sma14"]
@@ -189,6 +200,7 @@ def main():
         '<div class="stats" style="margin-bottom:18px">'
         '<a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · '
         '<a href="../ten_day.html" style="color:#8aa193;text-decoration:none">10日摘要</a> · '
+        '<a href="../thirty_day.html" style="color:#8aa193;text-decoration:none">30日摘要</a> · '
         '<a href="./index.html" style="color:#8aa193;text-decoration:none">一訊一圖</a>'
         "</div>"
     )
@@ -200,7 +212,7 @@ def main():
         symbol = row["symbol"]
         stem = file_stem(symbol)
         if stem not in df_cache:
-            df = load_range(stem)
+            df = load_range(stem, start, end)
             for n in (7, 14, 25, 99, 200):
                 df[f"sma{n}"] = ta.sma(df["close"], length=n)
             df_cache[stem] = df
@@ -227,7 +239,7 @@ def main():
                 "vol_ratio": vol,
             }
         )
-        print(f"[ten_day] {href}")
+        print(f"[{args.label}] {href}")
 
     keep = {c["href"] for c in cards}
     for p in out.glob("*.html"):
@@ -235,29 +247,12 @@ def main():
             continue
         if p.name not in keep:
             p.unlink()
-    (out / "index.html").write_text(render_signal_index(cards, nav), encoding="utf-8")
 
-    # hub / summary copy
-    summary = Path("/workspace/docs/charts/ten_day.html")
-    if summary.exists():
-        t = summary.read_text(encoding="utf-8")
-        t = t.replace("查看 39 幣 K 線圖表", "查看一訊一圖（60 張）")
-        t = t.replace("查看 39 幣 K 線圖表（含進場標記）", "查看一訊一圖（60 張）")
-        if "一訊一圖" not in t:
-            t = t.replace(
-                "<h1>10 日回測</h1>",
-                '<h1>10 日回測</h1>\n<p class="sub"><a href="./ten_day/index.html">一訊一圖（60 張）→</a></p>',
-            )
-        summary.write_text(t, encoding="utf-8")
-
-    hub = Path("/workspace/docs/charts/index.html")
-    if hub.exists():
-        t = hub.read_text(encoding="utf-8")
-        t = t.replace("60 筆 / 39 幣", "60 張一訊一圖")
-        t = t.replace("逐幣 K 線", "每個訊號獨立一張圖")
-        t = t.replace("含進場標記。", "一訊一圖。")
-        hub.write_text(t, encoding="utf-8")
-
+    index_html = render_signal_index(cards, nav)
+    index_html = index_html.replace("10日爆量訊號圖", f"{args.label}爆量訊號圖").replace(
+        "10日爆量訊號", f"{args.label}爆量訊號"
+    )
+    (out / "index.html").write_text(index_html, encoding="utf-8")
     print("done", len(cards), "charts ->", out)
 
 

@@ -198,9 +198,12 @@ def summarize(df: pd.DataFrame) -> dict:
     }
 
 
-def load_symbol_frame(sym: str, days: list[str], warmup: str) -> pd.DataFrame | None:
+def load_symbol_frame(
+    sym: str, days: list[str], warmup: str | list[str]
+) -> pd.DataFrame | None:
+    warmups = [warmup] if isinstance(warmup, str) else list(warmup)
     parts = []
-    for d in [warmup, *days]:
+    for d in [*warmups, *days]:
         df = download_day_df(sym, d)
         if df is not None and not df.empty:
             parts.append(df)
@@ -282,12 +285,16 @@ def main():
 
     end = args.end or latest_complete_vision_day()
     days = daterange_end_inclusive(end, args.days)
-    warmup = (
-        datetime.strptime(days[0], "%Y-%m-%d").replace(tzinfo=timezone.utc) - timedelta(days=1)
-    ).strftime("%Y-%m-%d")
+    # Need ~3 prior days so 15m SMA200 (200×15m) is ready at window start
+    warmup_n = max(3, 1)
+    warmup_start = datetime.strptime(days[0], "%Y-%m-%d").replace(tzinfo=timezone.utc) - timedelta(
+        days=warmup_n
+    )
+    warmups = [(warmup_start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(warmup_n)]
 
-    print(f"📡 10d Vision backtest")
-    print(f"   window: {days[0]} → {days[-1]} ({len(days)} days) warmup={warmup}")
+    tag = f"{args.days}d"
+    print(f"📡 {tag} Vision backtest")
+    print(f"   window: {days[0]} → {days[-1]} ({len(days)} days) warmups={warmups[0]}→{warmups[-1]}")
     print(f"   tiers: raw / volume(≥2.5×+filters) / volume2(≥3.5×+filters)")
 
     print("📋 Listing symbols...")
@@ -317,14 +324,15 @@ def main():
         union |= liq
         print(f"   {day}: liquid={len(liq)}")
 
-    print(f"⬇ Ensuring warmup {warmup} for {len(union)} symbols...")
+    print(f"⬇ Ensuring warmups {warmups[0]}→{warmups[-1]} for {len(union)} symbols...")
     with ThreadPoolExecutor(max_workers=24) as pool:
-        list(pool.map(lambda s: download_day_df(s, warmup), sorted(union)))
+        for wday in warmups:
+            list(pool.map(lambda s, d=wday: download_day_df(s, d), sorted(union)))
 
     print("📦 Building frames...")
     frames: dict[str, pd.DataFrame] = {}
     for i, sym in enumerate(sorted(union), 1):
-        df = load_symbol_frame(sym, days, warmup)
+        df = load_symbol_frame(sym, days, warmups)
         if df is not None and len(df) >= 250:
             frames[sym] = df
         if i % 25 == 0 or i == len(union):
@@ -335,15 +343,20 @@ def main():
         df = run_tier(params, frames, days, liquid_by_day)
         summary = summarize(df)
         payload = {
-            "window": {"start": days[0], "end": days[-1], "days": days, "warmup": warmup},
+            "window": {
+                "start": days[0],
+                "end": days[-1],
+                "days": days,
+                "warmups": warmups,
+            },
             "source": "binance_vision_um_5m",
             "tier": name,
             "params": params_dict(params),
             "liquid_by_day": {d: len(liquid_by_day[d]) for d in days},
             "summary": summary,
         }
-        csv_path = OUT / f"shadow_neckline_{name}_10d.csv"
-        json_path = OUT / f"shadow_neckline_{name}_10d_summary.json"
+        csv_path = OUT / f"shadow_neckline_{name}_{tag}.csv"
+        json_path = OUT / f"shadow_neckline_{name}_{tag}_summary.json"
         df.to_csv(csv_path, index=False)
         json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         results[name] = summary
@@ -355,7 +368,7 @@ def main():
 
     # compact markdown-friendly table
     lines = [
-        f"# 10-day shadow-neckline ({days[0]} → {days[-1]} UTC, Binance Vision)",
+        f"# {args.days}-day shadow-neckline ({days[0]} → {days[-1]} UTC, Binance Vision)",
         "",
         "| Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |",
         "|--|--|--|--|--|--|--|",
@@ -382,7 +395,7 @@ def main():
         "Deep-below 15m SMA200 (dist < −3%): skips late shorts after a higher-TF dump (e.g. GWEI)."
     )
     report = "\n".join(lines)
-    (OUT / "shadow_neckline_10d_report.md").write_text(report, encoding="utf-8")
+    (OUT / f"shadow_neckline_{tag}_report.md").write_text(report, encoding="utf-8")
     print("\n" + report)
 
 
