@@ -442,17 +442,17 @@ def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
 <body>
   <div class="wrap">
     <h1>影線頸線圖表</h1>
-    <p class="sub">{DAY} UTC · {DATA_NOTE or "Binance USDT-M 5m"}。原版影線頸線（Low 刺破）+ 爆量過濾：破位 K 量能 ≥ N× 近 20 均量。</p>
+    <p class="sub">{DAY} UTC · {DATA_NOTE or "Binance USDT-M 5m"}。原版影線頸線（Low 刺破）+ 爆量 + 拒絕上升頸線。</p>
     <div class="grid">
       <a class="card recommend" href="./balanced/index.html">
         <div class="tag">RECOMMENDED</div>
         <div class="name">原版 + 爆量（≥1.5×）</div>
-        <div class="desc">原版邏輯不變，破位當根量能 ≥ 1.5 × 近 20 根均量。</div>
+        <div class="desc">破位量能 ≥ 1.5×，並拒絕上升頸線（右肩抬高）。</div>
         <div class="meta">{balanced_n} 筆訊號</div>
       </a>
       <a class="card" href="./strict/index.html">
         <div class="name">原版 + 強爆量（≥2.0×）</div>
-        <div class="desc">同一原版邏輯，量能門檻提高到 2.0×。</div>
+        <div class="desc">量能 ≥ 2.0×，同樣拒絕上升頸線。</div>
         <div class="meta">{strict_n} 筆訊號</div>
       </a>
       <a class="card" href="./raw/index.html">
@@ -582,22 +582,22 @@ def main():
             Path("/workspace/output/shadow_neckline_balanced_1d.csv"),
             root / "balanced",
             title=f"原版 + 爆量（≥1.5×）· {DAY}",
-            subtitle=f"{DAY} UTC · 原版影線頸線 + 破位 K 量能 ≥ 1.5 × 近 20 均量。",
+            subtitle=f"{DAY} UTC · 原版 + 量能≥1.5× + 拒絕上升頸線。",
             badge="VOL≥1.5×",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="原版邏輯（Low 破頸線+SMA14）+ 爆量：volume ≥ 1.5 × SMA(volume,20)。",
+            filter_note="Low 破頸線+SMA14；volume ≥ 1.5×20均量；右肩高於左肩（上升頸線）不空。",
         )
     if args.mode in ("all", "strict"):
         strict_n, _ = generate_set(
             Path("/workspace/output/shadow_neckline_strict_1d.csv"),
             root / "strict",
             title=f"原版 + 強爆量（≥2.0×）· {DAY}",
-            subtitle=f"{DAY} UTC · 原版影線頸線 + 破位 K 量能 ≥ 2.0 × 近 20 均量。",
+            subtitle=f"{DAY} UTC · 原版 + 量能≥2.0× + 拒絕上升頸線。",
             badge="VOL≥2.0×",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="原版邏輯 + 強爆量：volume ≥ 2.0 × SMA(volume,20)。",
+            filter_note="Low 破頸線+SMA14；volume ≥ 2.0×20均量；上升頸線不空。",
         )
 
     if args.mode == "all":

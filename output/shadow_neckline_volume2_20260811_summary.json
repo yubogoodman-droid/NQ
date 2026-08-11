@@ -3,7 +3,7 @@
   "hist": "2026-08-10",
   "source": "bingx_usdm_swap",
   "note": "Binance Vision daily zip not published for this day yet; fapi.binance.com returns HTTP 451 in this environment. Used BingX USDT-M swap 5m klines for overlapping Binance liquid symbols.",
-  "asof_utc": "2026-08-11 09:25:58",
+  "asof_utc": "2026-08-11 10:36:41",
   "symbols_requested": 42,
   "symbols_loaded": 42,
   "tier": "volume2",
@@ -26,49 +26,50 @@
     "max_near_above_ma200": 0.0,
     "min_vol_ratio": 2.0,
     "vol_lookback": 20,
+    "reject_rising_neck": true,
     "max_chg24": 99.0,
     "cooldown_min": 30
   },
   "summary": {
-    "n": 3,
-    "symbols": 3,
+    "n": 2,
+    "symbols": 2,
     "reclaim_3_rate": 0.0,
     "by_horizon": {
       "15m": {
-        "n": 3,
+        "n": 2,
         "win_rate": 100.0,
-        "avg": 1.898,
-        "median": 1.482
+        "avg": 2.106,
+        "median": 2.106
       },
       "30m": {
-        "n": 3,
-        "win_rate": 66.7,
-        "avg": 1.464,
-        "median": 0.469
+        "n": 2,
+        "win_rate": 100.0,
+        "avg": 2.548,
+        "median": 2.548
       },
       "1h": {
-        "n": 3,
+        "n": 2,
         "win_rate": 100.0,
-        "avg": 3.268,
-        "median": 4.561
+        "avg": 4.89,
+        "median": 4.89
       },
       "2h": {
-        "n": 3,
-        "win_rate": 66.7,
-        "avg": 5.345,
-        "median": 5.865
+        "n": 2,
+        "win_rate": 100.0,
+        "avg": 8.855,
+        "median": 8.855
       },
       "4h": {
-        "n": 3,
-        "win_rate": 66.7,
-        "avg": 7.039,
-        "median": 7.35
+        "n": 2,
+        "win_rate": 100.0,
+        "avg": 12.037,
+        "median": 12.037
       },
       "8h": {
         "n": 1,
-        "win_rate": 0.0,
-        "avg": -6.152,
-        "median": -6.152
+        "win_rate": 100.0,
+        "avg": 12.058,
+        "median": 12.058
       },
       "12h": {
         "n": 0,
@@ -79,8 +80,7 @@
     },
     "symbols_list": [
       "ACE/USDT",
-      "BICO/USDT",
-      "CYS/USDT"
+      "BICO/USDT"
     ]
   }
 }

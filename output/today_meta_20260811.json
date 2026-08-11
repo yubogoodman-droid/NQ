@@ -4,27 +4,27 @@
     "hist": "2026-08-10",
     "source": "bingx_usdm_swap",
     "note": "Binance Vision daily zip not published for this day yet; fapi.binance.com returns HTTP 451 in this environment. Used BingX USDT-M swap 5m klines for overlapping Binance liquid symbols.",
-    "asof_utc": "2026-08-11 09:25:58",
+    "asof_utc": "2026-08-11 10:36:41",
     "symbols_requested": 42,
     "symbols_loaded": 42
   },
   "results": {
     "raw": {
-      "n": 13,
-      "symbols": 8,
-      "reclaim_3_rate": 23.1,
+      "n": 17,
+      "symbols": 9,
+      "reclaim_3_rate": 17.6,
       "by_horizon": {
         "15m": {
-          "n": 13,
-          "win_rate": 38.5,
-          "avg": 0.273,
-          "median": -0.06
+          "n": 16,
+          "win_rate": 50.0,
+          "avg": 0.86,
+          "median": 0.015
         },
         "30m": {
-          "n": 13,
-          "win_rate": 61.5,
-          "avg": 1.293,
-          "median": 0.888
+          "n": 15,
+          "win_rate": 66.7,
+          "avg": 1.541,
+          "median": 1.559
         },
         "1h": {
           "n": 13,
@@ -39,15 +39,15 @@
           "median": 1.119
         },
         "4h": {
-          "n": 11,
-          "win_rate": 54.5,
-          "avg": 3.382,
-          "median": 2.682
+          "n": 12,
+          "win_rate": 50.0,
+          "avg": 2.722,
+          "median": 0.47
         },
         "8h": {
-          "n": 3,
-          "win_rate": 66.7,
-          "avg": 4.869,
+          "n": 7,
+          "win_rate": 71.4,
+          "avg": 5.587,
           "median": 8.272
         },
         "12h": {
@@ -65,103 +65,50 @@
         "CYS/USDT",
         "HEI/USDT",
         "PUMP/USDT",
+        "SKYAI/USDT",
         "龙虾/USDT"
       ]
     },
     "volume": {
-      "n": 4,
-      "symbols": 3,
-      "reclaim_3_rate": 0.0,
-      "by_horizon": {
-        "15m": {
-          "n": 4,
-          "win_rate": 100.0,
-          "avg": 2.107,
-          "median": 2.108
-        },
-        "30m": {
-          "n": 4,
-          "win_rate": 75.0,
-          "avg": 1.74,
-          "median": 1.519
-        },
-        "1h": {
-          "n": 4,
-          "win_rate": 100.0,
-          "avg": 3.234,
-          "median": 3.848
-        },
-        "2h": {
-          "n": 4,
-          "win_rate": 50.0,
-          "avg": -0.793,
-          "median": 2.095
-        },
-        "4h": {
-          "n": 4,
-          "win_rate": 50.0,
-          "avg": 4.89,
-          "median": 2.897
-        },
-        "8h": {
-          "n": 1,
-          "win_rate": 0.0,
-          "avg": -6.152,
-          "median": -6.152
-        },
-        "12h": {
-          "n": 0,
-          "win_rate": null,
-          "avg": null,
-          "median": null
-        }
-      },
-      "symbols_list": [
-        "ACE/USDT",
-        "BICO/USDT",
-        "CYS/USDT"
-      ]
-    },
-    "volume2": {
       "n": 3,
-      "symbols": 3,
+      "symbols": 2,
       "reclaim_3_rate": 0.0,
       "by_horizon": {
         "15m": {
           "n": 3,
           "win_rate": 100.0,
-          "avg": 1.898,
-          "median": 1.482
+          "avg": 2.315,
+          "median": 2.734
         },
         "30m": {
           "n": 3,
-          "win_rate": 66.7,
-          "avg": 1.464,
-          "median": 0.469
+          "win_rate": 100.0,
+          "avg": 2.555,
+          "median": 2.569
         },
         "1h": {
           "n": 3,
           "win_rate": 100.0,
-          "avg": 3.268,
+          "avg": 4.305,
           "median": 4.561
         },
         "2h": {
           "n": 3,
           "win_rate": 66.7,
-          "avg": 5.345,
+          "avg": -0.499,
           "median": 5.865
         },
         "4h": {
           "n": 3,
           "win_rate": 66.7,
-          "avg": 7.039,
+          "avg": 7.506,
           "median": 7.35
         },
         "8h": {
-          "n": 1,
-          "win_rate": 0.0,
-          "avg": -6.152,
-          "median": -6.152
+          "n": 2,
+          "win_rate": 100.0,
+          "avg": 11.073,
+          "median": 11.073
         },
         "12h": {
           "n": 0,
@@ -172,8 +119,60 @@
       },
       "symbols_list": [
         "ACE/USDT",
-        "BICO/USDT",
-        "CYS/USDT"
+        "BICO/USDT"
+      ]
+    },
+    "volume2": {
+      "n": 2,
+      "symbols": 2,
+      "reclaim_3_rate": 0.0,
+      "by_horizon": {
+        "15m": {
+          "n": 2,
+          "win_rate": 100.0,
+          "avg": 2.106,
+          "median": 2.106
+        },
+        "30m": {
+          "n": 2,
+          "win_rate": 100.0,
+          "avg": 2.548,
+          "median": 2.548
+        },
+        "1h": {
+          "n": 2,
+          "win_rate": 100.0,
+          "avg": 4.89,
+          "median": 4.89
+        },
+        "2h": {
+          "n": 2,
+          "win_rate": 100.0,
+          "avg": 8.855,
+          "median": 8.855
+        },
+        "4h": {
+          "n": 2,
+          "win_rate": 100.0,
+          "avg": 12.037,
+          "median": 12.037
+        },
+        "8h": {
+          "n": 1,
+          "win_rate": 100.0,
+          "avg": 12.058,
+          "median": 12.058
+        },
+        "12h": {
+          "n": 0,
+          "win_rate": null,
+          "avg": null,
+          "median": null
+        }
+      },
+      "symbols_list": [
+        "ACE/USDT",
+        "BICO/USDT"
       ]
     }
   }

@@ -3,7 +3,7 @@
   "hist": "2026-08-10",
   "source": "bingx_usdm_swap",
   "note": "Binance Vision daily zip not published for this day yet; fapi.binance.com returns HTTP 451 in this environment. Used BingX USDT-M swap 5m klines for overlapping Binance liquid symbols.",
-  "asof_utc": "2026-08-11 09:25:58",
+  "asof_utc": "2026-08-11 10:36:41",
   "symbols_requested": 42,
   "symbols_loaded": 42,
   "tier": "raw",
@@ -26,25 +26,26 @@
     "max_near_above_ma200": 0.0,
     "min_vol_ratio": 0.0,
     "vol_lookback": 20,
+    "reject_rising_neck": false,
     "max_chg24": 99.0,
     "cooldown_min": 30
   },
   "summary": {
-    "n": 13,
-    "symbols": 8,
-    "reclaim_3_rate": 23.1,
+    "n": 17,
+    "symbols": 9,
+    "reclaim_3_rate": 17.6,
     "by_horizon": {
       "15m": {
-        "n": 13,
-        "win_rate": 38.5,
-        "avg": 0.273,
-        "median": -0.06
+        "n": 16,
+        "win_rate": 50.0,
+        "avg": 0.86,
+        "median": 0.015
       },
       "30m": {
-        "n": 13,
-        "win_rate": 61.5,
-        "avg": 1.293,
-        "median": 0.888
+        "n": 15,
+        "win_rate": 66.7,
+        "avg": 1.541,
+        "median": 1.559
       },
       "1h": {
         "n": 13,
@@ -59,15 +60,15 @@
         "median": 1.119
       },
       "4h": {
-        "n": 11,
-        "win_rate": 54.5,
-        "avg": 3.382,
-        "median": 2.682
+        "n": 12,
+        "win_rate": 50.0,
+        "avg": 2.722,
+        "median": 0.47
       },
       "8h": {
-        "n": 3,
-        "win_rate": 66.7,
-        "avg": 4.869,
+        "n": 7,
+        "win_rate": 71.4,
+        "avg": 5.587,
         "median": 8.272
       },
       "12h": {
@@ -85,6 +86,7 @@
       "CYS/USDT",
       "HEI/USDT",
       "PUMP/USDT",
+      "SKYAI/USDT",
       "龙虾/USDT"
     ]
   }

@@ -7,6 +7,7 @@
 
 新增：
 - 破位 K 量能 ≥ 1.5 × 近 20 根均量（爆量）
+- 拒絕上升頸線（右肩高於左肩）
 """
 
 from __future__ import annotations
@@ -48,7 +49,8 @@ def main():
     exchange = ccxt.binanceusdm({"enableRateLimit": True})
     print(
         f"📡 原版+爆量 監控中... cooldown={PARAMS.cooldown_min}m "
-        f"vol≥{PARAMS.min_vol_ratio:.1f}×{PARAMS.vol_lookback}"
+        f"vol≥{PARAMS.min_vol_ratio:.1f}×{PARAMS.vol_lookback} "
+        f"reject_rising_neck={PARAMS.reject_rising_neck}"
     )
     last_report_time = {}
 
@@ -87,8 +89,9 @@ def main():
                         f"💎 `{symbol.split(':')[0]}` (5M)\n"
                         f"📈 24h: `{None if chg24 is None else round(float(chg24),2)}%`\n"
                         f"💰 `{d['price']}`  刺破 `{d['close_break_pct']}%`\n"
-                        f"📊 乖離 `{d['bias']}%`  爆量 `{d.get('vol_ratio')}×`\n"
-                        f"⚠️ Low 破頸線+SMA14，且量能≥{PARAMS.min_vol_ratio}×均量"
+                        f"📊 乖離 `{d['bias']}%`  爆量 `{d.get('vol_ratio')}×`  "
+                        f"頸線 `{d.get('neck_chg_pct')}%`\n"
+                        f"⚠️ Low 破頸線+SMA14，爆量，且非上升頸線"
                     )
                     send_tg_message(msg)
                     print(f"🎯 {symbol} vol={d.get('vol_ratio')}× bias={d['bias']}%")

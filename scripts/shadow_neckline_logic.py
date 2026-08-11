@@ -4,7 +4,7 @@ with an optional volume-spike (爆量) filter.
 
 Tiers:
 - raw: original (Low breaks neckline + SMA14)
-- volume: original + break-bar volume >= 1.5× prior 20-bar average
+- volume: original + 爆量 (>=1.5×) + reject rising neckline
 """
 
 from __future__ import annotations
@@ -40,6 +40,8 @@ class DetectParams:
     # volume spike (爆量)
     min_vol_ratio: float = 0.0  # 0 = off; 1.5 = 爆量
     vol_lookback: int = 20
+    # structure quality: classic H&S short prefers flat/descending neck
+    reject_rising_neck: bool = False
     # meta
     max_chg24: float = 99.0
     cooldown_min: int = 30
@@ -48,12 +50,17 @@ class DetectParams:
 RAW = DetectParams()
 VOLUME = DetectParams(
     min_vol_ratio=1.5,  # 爆量：破位 K 量能 ≥ 1.5× 近 20 均量
+    reject_rising_neck=True,  # 上升頸線（右肩抬高）不空
     cooldown_min=30,
 )
 
 # Back-compat aliases (recommended path is now original + 爆量)
 BALANCED = VOLUME
-STRICT = DetectParams(min_vol_ratio=2.0, cooldown_min=30)
+STRICT = DetectParams(
+    min_vol_ratio=2.0,
+    reject_rising_neck=True,
+    cooldown_min=30,
+)
 
 
 def _find_peaks(close: np.ndarray, curr_idx: int) -> list[int]:
@@ -113,6 +120,10 @@ def detect_at_index(
         return False, None
 
     slope = (h3 - h1) / (p3 - p1) if p3 != p1 else 0.0
+    # Rising neckline (right shoulder higher than left) → skip
+    if p.reject_rising_neck and slope > 0:
+        return False, None
+
     neck = h1 + slope * (curr_idx - p1)
     s14 = sma14[curr_idx]
     if np.isnan(s14):
@@ -144,12 +155,14 @@ def detect_at_index(
         if vol_ratio < p.min_vol_ratio:
             return False, None
 
+    neck_chg_pct = ((h3 - h1) / h1 * 100.0) if h1 else 0.0
     out = {
         "price": float(close[curr_idx]),
         "bias": round(bias * 100, 2),
         "line_val": round(float(neck), 6),
         "sma14": round(float(s14), 6),
         "close_break_pct": round(br * 100, 2),
+        "neck_chg_pct": round(neck_chg_pct, 2),
         "span": int(span),
     }
     if vol_ratio is not None:

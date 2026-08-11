@@ -1,49 +1,49 @@
 📡 Today backtest day=2026-08-11 hist=2026-08-10 symbols=42 source=BingX (Binance fapi/Vision unavailable for 2026-08-11)
-  ok BANK-USDT bars=402
-  ok ADA-USDT bars=402
-  ok BMT-USDT bars=76
-  ok BTC-USDT bars=402
-  ok 1000PEPE-USDT bars=402
-  ok ACE-USDT bars=402
-  ok BICO-USDT bars=402
-  ok BEAT-USDT bars=402
-  ok BLESS-USDT bars=402
-  ok BNB-USDT bars=402
-  ok BLUAI-USDT bars=402
-  ok BTW-USDT bars=402
-  ok DOGE-USDT bars=402
-  ok ENA-USDT bars=402
-  ok ETH-USDT bars=402
-  ok GRVT-USDT bars=402
-  ok COOKIE-USDT bars=402
-  ok CYS-USDT bars=402
-  ok EPIC-USDT bars=402
-  ok HYPE-USDT bars=402
-  ok HEI-USDT bars=402
-  ok IOTX-USDT bars=306
-  ok KAITO-USDT bars=402
-  ok LINK-USDT bars=402
-  ok MMT-USDT bars=402
-  ok MUBARAK-USDT bars=402
-  ok ON-USDT bars=402
-  ok LONGXIA-USDT bars=402
-  ok PUMP-USDT bars=402
-  ok SAGA-USDT bars=402
-  ok SKYAI-USDT bars=402
-  ok SOL-USDT bars=402
-  ok SUI-USDT bars=402
-  ok TAO-USDT bars=402
-  ok TST-USDT bars=306
-  ok TUT-USDT bars=402
-  ok XRP-USDT bars=402
-  ok US-USDT bars=402
-  ok WLD-USDT bars=402
-  ok ZEC-USDT bars=402
-  ok XAN-USDT bars=402
-  ok XMR-USDT bars=402
+  ok BTW-USDT bars=416
+  ok BMT-USDT bars=90
+  ok BTC-USDT bars=416
+  ok ADA-USDT bars=416
+  ok BANK-USDT bars=416
+  ok BICO-USDT bars=416
+  ok BNB-USDT bars=416
+  ok 1000PEPE-USDT bars=416
+  ok ACE-USDT bars=416
+  ok BLUAI-USDT bars=416
+  ok COOKIE-USDT bars=416
+  ok DOGE-USDT bars=416
+  ok BLESS-USDT bars=416
+  ok BEAT-USDT bars=416
+  ok ETH-USDT bars=416
+  ok CYS-USDT bars=416
+  ok GRVT-USDT bars=416
+  ok HEI-USDT bars=416
+  ok IOTX-USDT bars=320
+  ok ENA-USDT bars=416
+  ok KAITO-USDT bars=416
+  ok EPIC-USDT bars=416
+  ok HYPE-USDT bars=416
+  ok LINK-USDT bars=416
+  ok LONGXIA-USDT bars=416
+  ok MMT-USDT bars=416
+  ok ON-USDT bars=416
+  ok MUBARAK-USDT bars=416
+  ok SOL-USDT bars=416
+  ok SKYAI-USDT bars=416
+  ok TAO-USDT bars=416
+  ok PUMP-USDT bars=416
+  ok SAGA-USDT bars=416
+  ok TST-USDT bars=320
+  ok TUT-USDT bars=416
+  ok US-USDT bars=416
+  ok SUI-USDT bars=416
+  ok WLD-USDT bars=416
+  ok XAN-USDT bars=416
+  ok XMR-USDT bars=416
+  ok ZEC-USDT bars=416
+  ok XRP-USDT bars=416
 loaded 42 / 42
 
-=== raw n=13 symbols=8 ===
+=== raw n=17 symbols=9 ===
         time_utc      symbol  bias   pnl_15m    pnl_1h
 2026-08-11 00:00     龙虾/USDT  5.98 -0.058842  3.575508
 2026-08-11 00:50  BLESS/USDT  7.97 -1.693560  1.053932
@@ -58,21 +58,23 @@ loaded 42 / 42
 2026-08-11 04:55   BICO/USDT 22.31  5.987780  6.945010
 2026-08-11 05:40    CYS/USDT  9.78 -0.555806 -0.848731
 2026-08-11 06:45   PUMP/USDT  5.54 -0.383008  1.218663
+2026-08-11 09:40    HEI/USDT 18.33  5.203684       NaN
+2026-08-11 10:00  SKYAI/USDT  9.47  0.980484       NaN
+2026-08-11 10:10    HEI/USDT 18.33  4.021591       NaN
+2026-08-11 10:30  SKYAI/USDT  9.47       NaN       NaN
 1h: {'n': 13, 'win_rate': 84.6, 'avg': 1.899, 'median': 1.219}
 
-=== volume n=4 symbols=3 ===
+=== volume n=3 symbols=2 ===
         time_utc    symbol  vol_ratio  bias  pnl_15m   pnl_1h
-2026-08-11 01:20  CYS/USDT       2.70 16.83 1.481939 0.023155
 2026-08-11 01:35  ACE/USDT       2.26  8.32 3.765073 4.560742
 2026-08-11 02:15 BICO/USDT       1.97  6.88 2.733915 3.134575
 2026-08-11 05:00 BICO/USDT       2.17 22.31 0.447380 5.219429
-1h: {'n': 4, 'win_rate': 100.0, 'avg': 3.234, 'median': 3.848}
+1h: {'n': 3, 'win_rate': 100.0, 'avg': 4.305, 'median': 4.561}
 
-=== volume2 n=3 symbols=3 ===
+=== volume2 n=2 symbols=2 ===
         time_utc    symbol  vol_ratio  bias  pnl_15m   pnl_1h
-2026-08-11 01:20  CYS/USDT       2.70 16.83 1.481939 0.023155
 2026-08-11 01:35  ACE/USDT       2.26  8.32 3.765073 4.560742
 2026-08-11 05:00 BICO/USDT       2.17 22.31 0.447380 5.219429
-1h: {'n': 3, 'win_rate': 100.0, 'avg': 3.268, 'median': 4.561}
+1h: {'n': 2, 'win_rate': 100.0, 'avg': 4.89, 'median': 4.89}
 
-Done. {"raw": {"n": 13, "symbols": 8, "reclaim_3_rate": 23.1, "by_horizon": {"15m": {"n": 13, "win_rate": 38.5, "avg": 0.273, "median": -0.06}, "30m": {"n": 13, "win_rate": 61.5, "avg": 1.293, "median": 0.888}, "1h": {"n": 13, "win_rate": 84.6, "avg": 1.899, "median": 1.219}, "2h": {"n": 13, "win_rate": 61.5, "avg": 1.008, "median": 1.119}, "4h": {"n": 11, "win_rate": 54.5, "avg": 3.382, "median": 2.682}, "8h": {"n": 3, "win_rate": 66.7, "avg": 4.869, "median": 8.272}, "12h": {"n": 0, "win_rate": null, "avg": null, "median": null}}, "symbols_list": ["ACE/USDT", "BICO/USDT", "BLESS/USDT", "COOKIE/USDT", "CYS/USDT", "HEI/USDT", "PUMP/USDT", "龙虾/USDT"]}, "volume": {"n": 4, "symbols": 3, "reclaim_3_rate": 0.0, "by_horizon": {"15m": {"n": 4, "win_rate": 100.0, "avg": 2.107, "median": 2.108}, "30m": {"n": 4, "win_rate": 75.0, "avg": 1.74, "median": 1.519}, "1h": {"n": 4, "win_rate": 100.0, "avg": 3.234, "median": 3.848}, "2h": {"n": 4, "win_rate": 50.0, "avg": -0.793, "median": 2.095}, "4h": {"n": 4, "win_rate": 50.0, "avg": 4.89, "median": 2.897}, "8h": {"n": 1, "win_rate": 0.0, "avg": -6.152, "median": -6.152}, "12h": {"n": 0, "win_rate": null, "avg": null, "median": null}}, "symbols_list": ["ACE/USDT", "BICO/USDT", "CYS/USDT"]}, "volume2": {"n": 3, "symbols": 3, "reclaim_3_rate": 0.0, "by_horizon": {"15m": {"n": 3, "win_rate": 100.0, "avg": 1.898, "median": 1.482}, "30m": {"n": 3, "win_rate": 66.7, "avg": 1.464, "median": 0.469}, "1h": {"n": 3, "win_rate": 100.0, "avg": 3.268, "median": 4.561}, "2h": {"n": 3, "win_rate": 66.7, "avg": 5.345, "median": 5.865}, "4h": {"n": 3, "win_rate": 66.7, "avg": 7.039, "median": 7.35}, "8h": {"n": 1, "win_rate": 0.0, "avg": -6.152, "median": -6.152}, "12h": {"n": 0, "win_rate": null, "avg": null, "median": null}}, "symbols_list": ["ACE/USDT", "BICO/USDT", "CYS/USDT"]}}
+Done. {"raw": {"n": 17, "symbols": 9, "reclaim_3_rate": 17.6, "by_horizon": {"15m": {"n": 16, "win_rate": 50.0, "avg": 0.86, "median": 0.015}, "30m": {"n": 15, "win_rate": 66.7, "avg": 1.541, "median": 1.559}, "1h": {"n": 13, "win_rate": 84.6, "avg": 1.899, "median": 1.219}, "2h": {"n": 13, "win_rate": 61.5, "avg": 1.008, "median": 1.119}, "4h": {"n": 12, "win_rate": 50.0, "avg": 2.722, "median": 0.47}, "8h": {"n": 7, "win_rate": 71.4, "avg": 5.587, "median": 8.272}, "12h": {"n": 0, "win_rate": null, "avg": null, "median": null}}, "symbols_list": ["ACE/USDT", "BICO/USDT", "BLESS/USDT", "COOKIE/USDT", "CYS/USDT", "HEI/USDT", "PUMP/USDT", "SKYAI/USDT", "龙虾/USDT"]}, "volume": {"n": 3, "symbols": 2, "reclaim_3_rate": 0.0, "by_horizon": {"15m": {"n": 3, "win_rate": 100.0, "avg": 2.315, "median": 2.734}, "30m": {"n": 3, "win_rate": 100.0, "avg": 2.555, "median": 2.569}, "1h": {"n": 3, "win_rate": 100.0, "avg": 4.305, "median": 4.561}, "2h": {"n": 3, "win_rate": 66.7, "avg": -0.499, "median": 5.865}, "4h": {"n": 3, "win_rate": 66.7, "avg": 7.506, "median": 7.35}, "8h": {"n": 2, "win_rate": 100.0, "avg": 11.073, "median": 11.073}, "12h": {"n": 0, "win_rate": null, "avg": null, "median": null}}, "symbols_list": ["ACE/USDT", "BICO/USDT"]}, "volume2": {"n": 2, "symbols": 2, "reclaim_3_rate": 0.0, "by_horizon": {"15m": {"n": 2, "win_rate": 100.0, "avg": 2.106, "median": 2.106}, "30m": {"n": 2, "win_rate": 100.0, "avg": 2.548, "median": 2.548}, "1h": {"n": 2, "win_rate": 100.0, "avg": 4.89, "median": 4.89}, "2h": {"n": 2, "win_rate": 100.0, "avg": 8.855, "median": 8.855}, "4h": {"n": 2, "win_rate": 100.0, "avg": 12.037, "median": 12.037}, "8h": {"n": 1, "win_rate": 100.0, "avg": 12.058, "median": 12.058}, "12h": {"n": 0, "win_rate": null, "avg": null, "median": null}}, "symbols_list": ["ACE/USDT", "BICO/USDT"]}}
