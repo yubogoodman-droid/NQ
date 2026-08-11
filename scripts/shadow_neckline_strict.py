@@ -1,7 +1,7 @@
 """
 影線頸線監控（Strict）
 
-在 Balanced 共用 SMA99/SMA200 規則上再加嚴：
+在 Balanced 共用品質/均線規則上再加嚴：
 - 破位深度 ≥ 0.8%
 - 前一根已收在頸線下
 - close < SMA25 且 SMA14 < SMA25
@@ -48,7 +48,7 @@ def main():
     exchange = ccxt.binanceusdm({"enableRateLimit": True})
     print(
         f"📡 Strict 監控中... cooldown={PARAMS.cooldown_min}m "
-        f"prevConfirm + SMA14<25 + SMA99/SMA200 rules"
+        f"prevConfirm + SMA14<25 + quality filters"
     )
     last_report_time = {}
 
@@ -88,15 +88,15 @@ def main():
                         f"🚨 *【影線頸線｜Strict】*\n\n"
                         f"💎 `{symbol.split(':')[0]}` (5M)\n"
                         f"📈 24h: `{None if chg24 is None else round(float(chg24),2)}%`\n"
-                        f"💰 `{d['price']}`  破位 `{d['close_break_pct']}%`\n"
-                        f"📊 乖離 `{d['bias']}%`  頸線 `{d['line_val']}`\n"
+                        f"💰 `{d['price']}`  破位 `{d['close_break_pct']}%`  實體 `{d['body_pct']}%`\n"
+                        f"📊 乖離 `{d['bias']}%`  量比 `{d.get('vol_ratio','—')}`\n"
                         f"📏 距SMA99 `{d['dist_ma99_pct']}%` · 距SMA200 `{d['dist_ma200_pct']}%`\n"
-                        f"⚠️ 前K確認 + SMA14&lt;25 + 遠離SMA99/SMA200"
+                        f"⚠️ 前K確認 + SMA14&lt;25 + 量能/實體確認"
                     )
                     send_tg_message(msg)
                     print(
                         f"🎯 {symbol} dist99={d['dist_ma99_pct']}% "
-                        f"dist200={d['dist_ma200_pct']}%"
+                        f"dist200={d['dist_ma200_pct']}% vol={d.get('vol_ratio')}"
                     )
                     last_report_time[symbol] = now
                     time.sleep(0.05)

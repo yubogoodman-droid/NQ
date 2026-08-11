@@ -419,22 +419,22 @@ def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
 <body>
   <div class="wrap">
     <h1>影線頸線圖表</h1>
-    <p class="sub">{DAY} UTC · Binance USDT-M 5m。Balanced / Strict 共用 SMA99+SMA200 規則：|Δ|&lt;2% 不空，仍在上方且距離&lt;8% 也不空。</p>
+    <p class="sub">{DAY} UTC · Binance USDT-M 5m。Balanced / Strict 共用：SMA99+SMA200 距離規則、頭乖離≤50%、破位量能≥0.75×、陰線實體≥0.3%。</p>
     <div class="grid">
       <a class="card recommend" href="./balanced/index.html">
         <div class="tag">RECOMMENDED</div>
         <div class="name">Balanced 中等降噪</div>
-        <div class="desc">收盤確認 + 收陰 + SMA25 軟條件 + SMA99/SMA200 規則 + 60m 冷卻。</div>
+        <div class="desc">收盤確認 + 品質濾網（量能/實體/乖離）+ SMA99/SMA200 規則 + 60m 冷卻。</div>
         <div class="meta">{balanced_n} 筆訊號</div>
       </a>
       <a class="card" href="./strict/index.html">
         <div class="name">Strict 嚴格版</div>
-        <div class="desc">同套 SMA99/SMA200，再加前K確認、SMA14&lt;25、破位≥0.8%、150m 冷卻。</div>
+        <div class="desc">同套品質濾網，再加前K確認、SMA14&lt;25、破位≥0.8%、150m 冷卻。</div>
         <div class="meta">{strict_n} 筆訊號</div>
       </a>
       <a class="card" href="./raw/index.html">
         <div class="name">原版訊號</div>
-        <div class="desc">影線（Low）刺破即報，無 SMA99/SMA200 過濾，留作對照。</div>
+        <div class="desc">影線（Low）刺破即報，無品質/均線距離過濾，留作對照。</div>
         <div class="meta">{baseline_n} 筆訊號</div>
       </a>
     </div>
@@ -534,22 +534,32 @@ def main():
             Path("/workspace/output/shadow_neckline_balanced_1d.csv"),
             root / "balanced",
             title=f"Balanced 中等降噪 · {DAY}",
-            subtitle=f"{DAY} UTC · 收盤確認 + 收陰 + SMA25軟條件 + SMA99/SMA200規則（|Δ|≥2%，上方需≥8%）+ 60m 冷卻。",
+            subtitle=(
+                f"{DAY} UTC · 收盤確認 + 實體≥0.3% + 量能≥0.75× + 乖離≤50% + "
+                f"SMA99/SMA200規則 + 60m 冷卻。"
+            ),
             badge="BALANCED",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="過濾：收盤破頸線+SMA14、收陰、SMA25 軟條件；SMA99/SMA200：|Δ|&lt;2% 不空；仍在上方且距離&lt;8% 也不空。",
+            filter_note=(
+                "過濾：收盤破位+收陰實體≥0.3%；破位量≥0.75×20均量；頭乖離≤50%；"
+                "SMA99/SMA200：|Δ|&lt;2% 或不在上方&lt;8%。"
+            ),
         )
     if args.mode in ("all", "strict"):
         strict_n, _ = generate_set(
             Path("/workspace/output/shadow_neckline_strict_1d.csv"),
             root / "strict",
             title=f"Strict 嚴格降噪 · {DAY}",
-            subtitle=f"{DAY} UTC · 前K確認 + SMA14&lt;25 + 破位≥0.8% + 同套 SMA99/SMA200 規則 + 150m 冷卻。",
+            subtitle=(
+                f"{DAY} UTC · 前K確認 + SMA14&lt;25 + 破位≥0.8% + 同套品質/均線規則 + 150m 冷卻。"
+            ),
             badge="STRICT",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="過濾：收盤破位、前K確認、SMA14&lt;SMA25；SMA99/SMA200：|Δ|&lt;2% 不空；仍在上方且距離&lt;8% 也不空。",
+            filter_note=(
+                "過濾：前K確認、SMA14&lt;SMA25、破位≥0.8%；同套量能/實體/乖離與 SMA99/SMA200 規則。"
+            ),
         )
 
     if args.mode == "all":

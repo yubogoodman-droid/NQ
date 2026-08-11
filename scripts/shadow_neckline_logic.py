@@ -3,9 +3,8 @@ Shared shadow-neckline detection helpers.
 
 Tiers:
 - raw: wick/low break (original)
-- balanced: close confirm + soft SMA25 + SMA99/SMA200 proximity rules
-- strict: balanced-style close confirm + prev-bar confirm + SMA14<SMA25 + stricter structure
-         + same SMA99/SMA200 rules
+- balanced: close confirm + soft SMA25 + SMA99/SMA200 proximity + quality filters
+- strict: prev-bar confirm + SMA14<SMA25 + stricter structure + same proximity/quality
 """
 
 from __future__ import annotations
@@ -24,12 +23,13 @@ class DetectParams:
     max_span: int = 50
     shoulder_sym: float = 0.15
     min_bias: float = 0.05
-    max_bias: float = 2.0
+    max_bias: float = 0.50  # head vs SMA200; skip extreme pumps
     # break
     use_close_break: bool = True
     min_break_pct: float = 0.003  # of neck, by close or low
     require_red: bool = True
     require_prev_close_below: bool = False
+    min_body_pct: float = 0.003  # red body >= 0.3% of open
     # ma filters
     sma25_soft: bool = True  # close<sma25 OR break>=1%
     require_sma25_hard: bool = False  # close<sma25 and sma14<sma25
@@ -38,6 +38,9 @@ class DetectParams:
     max_near_above_ma99: float = 0.08  # 0<=Δ<8% skip
     min_abs_dist_ma200: float = 0.02  # |Δ| < 2% skip
     max_near_above_ma200: float = 0.08  # 0<=Δ<8% skip
+    # volume quality
+    min_vol_ratio: float = 0.75  # break bar vs prior 20-bar avg
+    vol_lookback: int = 20
     # meta
     max_chg24: float = 3.0
     cooldown_min: int = 60
@@ -48,16 +51,19 @@ STRICT = DetectParams(
     min_span=12,
     max_span=60,
     shoulder_sym=0.10,
+    max_bias=0.50,
     min_break_pct=0.008,
     require_red=True,
     require_prev_close_below=True,
+    min_body_pct=0.003,
     sma25_soft=False,
     require_sma25_hard=True,
     min_abs_dist_ma99=0.02,
     max_near_above_ma99=0.08,
     min_abs_dist_ma200=0.02,
     max_near_above_ma200=0.08,
-    max_chg24=3.0,  # keep TUT-class names; structure/confirm already stricter
+    min_vol_ratio=0.75,
+    max_chg24=3.0,
     cooldown_min=150,
 )
 
@@ -82,6 +88,7 @@ def detect_at_index(
     sma14,
     sma25,
     sma99,
+    volume,
     curr_idx: int,
     p: DetectParams,
 ):
@@ -143,6 +150,13 @@ def detect_at_index(
     if p.require_red and not (close[curr_idx] < open_[curr_idx]):
         return False, None
 
+    # Meaningful red body (skip dojis / tiny candles)
+    if open_[curr_idx] == 0:
+        return False, None
+    body = (open_[curr_idx] - close[curr_idx]) / open_[curr_idx]
+    if body < p.min_body_pct:
+        return False, None
+
     if p.require_sma25_hard:
         if not (close[curr_idx] < s25 and s14 < s25):
             return False, None
@@ -170,10 +184,23 @@ def detect_at_index(
     if 0 <= dist200 < p.max_near_above_ma200:
         return False, None
 
+    # Volume confirmation on break bar
+    vol_ratio = None
+    if p.min_vol_ratio > 0:
+        lb = p.vol_lookback
+        if curr_idx < lb:
+            return False, None
+        v_avg = float(np.nanmean(volume[curr_idx - lb : curr_idx]))
+        if not (v_avg > 0) or np.isnan(v_avg):
+            return False, None
+        vol_ratio = float(volume[curr_idx]) / v_avg
+        if vol_ratio < p.min_vol_ratio:
+            return False, None
+
     if high[curr_idx] >= h2:
         return False, None
 
-    return True, {
+    out = {
         "price": float(close[curr_idx]),
         "bias": round(bias * 100, 2),
         "line_val": round(float(neck), 6),
@@ -184,8 +211,12 @@ def detect_at_index(
         "dist_ma99_pct": round(dist99 * 100, 2),
         "dist_ma200_pct": round(dist200 * 100, 2),
         "close_break_pct": round(br * 100, 2),
+        "body_pct": round(body * 100, 2),
         "span": int(span),
     }
+    if vol_ratio is not None:
+        out["vol_ratio"] = round(vol_ratio, 2)
+    return True, out
 
 
 def prepare_indicators(df: pd.DataFrame):
@@ -193,11 +224,12 @@ def prepare_indicators(df: pd.DataFrame):
     high = df["high"].to_numpy(dtype=float)
     low = df["low"].to_numpy(dtype=float)
     open_ = df["open"].to_numpy(dtype=float)
+    volume = df["volume"].to_numpy(dtype=float)
     sma200 = ta.sma(df["close"], length=200).to_numpy(dtype=float)
     sma14 = ta.sma(df["close"], length=14).to_numpy(dtype=float)
     sma25 = ta.sma(df["close"], length=25).to_numpy(dtype=float)
     sma99 = ta.sma(df["close"], length=99).to_numpy(dtype=float)
-    return close, high, low, open_, sma200, sma14, sma25, sma99
+    return close, high, low, open_, sma200, sma14, sma25, sma99, volume
 
 
 def params_dict(p: DetectParams) -> dict:

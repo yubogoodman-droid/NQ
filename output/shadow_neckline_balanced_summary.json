@@ -6,83 +6,79 @@
     "max_span": 50,
     "shoulder_sym": 0.15,
     "min_bias": 0.05,
-    "max_bias": 2.0,
+    "max_bias": 0.5,
     "use_close_break": true,
     "min_break_pct": 0.003,
     "require_red": true,
     "require_prev_close_below": false,
+    "min_body_pct": 0.003,
     "sma25_soft": true,
     "require_sma25_hard": false,
     "min_abs_dist_ma99": 0.02,
     "max_near_above_ma99": 0.08,
     "min_abs_dist_ma200": 0.02,
     "max_near_above_ma200": 0.08,
+    "min_vol_ratio": 0.75,
+    "vol_lookback": 20,
     "max_chg24": 3.0,
     "cooldown_min": 60
   },
   "baseline_n": 76,
   "summary": {
-    "n": 20,
-    "symbols": 13,
-    "reclaim_3_rate": 20.0,
+    "n": 6,
+    "symbols": 6,
+    "reclaim_3_rate": 16.7,
     "by_horizon": {
       "15m": {
-        "n": 20,
-        "win_rate": 55.0,
-        "avg": 0.77,
-        "median": 0.294
+        "n": 6,
+        "win_rate": 33.3,
+        "avg": -0.691,
+        "median": -0.996
       },
       "30m": {
-        "n": 20,
-        "win_rate": 35.0,
-        "avg": -1.578,
-        "median": -1.101
+        "n": 6,
+        "win_rate": 16.7,
+        "avg": -3.234,
+        "median": -3.375
       },
       "1h": {
-        "n": 19,
-        "win_rate": 52.6,
-        "avg": -1.585,
-        "median": 0.176
+        "n": 5,
+        "win_rate": 60.0,
+        "avg": -0.028,
+        "median": 0.891
       },
       "2h": {
-        "n": 17,
-        "win_rate": 58.8,
-        "avg": 1.084,
-        "median": 3.692
+        "n": 5,
+        "win_rate": 60.0,
+        "avg": 3.481,
+        "median": 3.802
       },
       "4h": {
-        "n": 14,
-        "win_rate": 50.0,
-        "avg": -3.368,
-        "median": 0.014
+        "n": 4,
+        "win_rate": 25.0,
+        "avg": -1.323,
+        "median": -4.206
       },
       "8h": {
-        "n": 11,
-        "win_rate": 54.5,
-        "avg": -1.485,
-        "median": 3.297
+        "n": 4,
+        "win_rate": 50.0,
+        "avg": -0.143,
+        "median": -4.046
       },
       "12h": {
-        "n": 9,
-        "win_rate": 44.4,
-        "avg": -12.728,
-        "median": -4.965
+        "n": 3,
+        "win_rate": 33.3,
+        "avg": -4.646,
+        "median": -23.223
       }
     },
     "symbols_list": [
       "BICO/USDT",
-      "BMT/USDT",
       "BTW/USDT",
-      "COOKIE/USDT",
       "CYS/USDT",
-      "IOTX/USDT",
-      "MMT/USDT",
       "MUBARAK/USDT",
       "ON/USDT",
-      "TST/USDT",
-      "TUT/USDT",
-      "XAN/USDT",
-      "龙虾/USDT"
+      "TST/USDT"
     ]
   }
 }

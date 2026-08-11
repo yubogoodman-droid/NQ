@@ -1,6 +1,6 @@
 """
 One-day backtest for balanced/strict shadow-neckline tiers.
-Uses shared SMA99 / SMA200 proximity rules.
+Uses shared SMA99/SMA200 proximity + volume/body/max-bias quality rules.
 """
 
 from __future__ import annotations
@@ -89,14 +89,26 @@ def run(params: DetectParams) -> pd.DataFrame:
         df = load_symbol(sym)
         if len(df) < 250:
             continue
-        close, high, low, open_, sma200, sma14, sma25, sma99 = prepare_indicators(df)
+        close, high, low, open_, sma200, sma14, sma25, sma99, volume = prepare_indicators(
+            df
+        )
         ts = df["timestamp"].to_numpy()
 
         for i in range(len(df)):
             if not (start_ms <= ts[i] < end_ms):
                 continue
             ok, d = detect_at_index(
-                close, high, low, open_, sma200, sma14, sma25, sma99, i, params
+                close,
+                high,
+                low,
+                open_,
+                sma200,
+                sma14,
+                sma25,
+                sma99,
+                volume,
+                i,
+                params,
             )
             if not ok:
                 continue
@@ -188,7 +200,14 @@ def main():
             print("MUBARAK:")
             print(
                 df[df.symbol.str.contains("MUBARAK")][
-                    ["time_utc", "dist_ma99_pct", "dist_ma200_pct", "pnl_1h"]
+                    [
+                        "time_utc",
+                        "dist_ma99_pct",
+                        "dist_ma200_pct",
+                        "vol_ratio",
+                        "body_pct",
+                        "pnl_1h",
+                    ]
                 ].to_string(index=False)
             )
 

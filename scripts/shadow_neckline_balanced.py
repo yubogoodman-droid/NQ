@@ -2,10 +2,10 @@
 影線頸線監控（Balanced）— 建議日常使用
 
 邏輯見 shadow_neckline_logic.BALANCED：
-- 收盤破頸線 + SMA14、收陰、破位≥0.3%
+- 收盤破頸線 + SMA14、收陰、破位≥0.3%、實體≥0.3%
 - SMA25 軟條件
-- |ΔSMA99|<2% 不空；仍在 SMA99 上方且距離<8% 不空
-- |ΔSMA200|<2% 不空；仍在 SMA200 上方且距離<8% 不空
+- |ΔSMA99|/|ΔSMA200|<2% 不空；仍在上方且距離<8% 不空
+- 頭乖離 ≤50%、破位量能 ≥0.75×20均量
 - 冷卻 60m，24h 漲幅上限 300%
 """
 
@@ -48,8 +48,8 @@ def main():
     exchange = ccxt.binanceusdm({"enableRateLimit": True})
     print(
         f"📡 Balanced 監控中... cooldown={PARAMS.cooldown_min}m "
-        f"|ΔSMA99|/|ΔSMA200|>={PARAMS.min_abs_dist_ma99*100:.0f}% "
-        f"上方≥{PARAMS.max_near_above_ma99*100:.0f}%"
+        f"bias≤{PARAMS.max_bias*100:.0f}% vol≥{PARAMS.min_vol_ratio:.2f} "
+        f"|ΔMA|≥{PARAMS.min_abs_dist_ma99*100:.0f}% 上方≥{PARAMS.max_near_above_ma99*100:.0f}%"
     )
     last_report_time = {}
 
@@ -89,15 +89,15 @@ def main():
                         f"🚨 *【影線頸線｜Balanced】*\n\n"
                         f"💎 `{symbol.split(':')[0]}` (5M)\n"
                         f"📈 24h: `{None if chg24 is None else round(float(chg24),2)}%`\n"
-                        f"💰 `{d['price']}`  破位 `{d['close_break_pct']}%`\n"
-                        f"📊 乖離 `{d['bias']}%`  頸線 `{d['line_val']}`\n"
+                        f"💰 `{d['price']}`  破位 `{d['close_break_pct']}%`  實體 `{d['body_pct']}%`\n"
+                        f"📊 乖離 `{d['bias']}%`  量比 `{d.get('vol_ratio','—')}`\n"
                         f"📏 距SMA99 `{d['dist_ma99_pct']}%` · 距SMA200 `{d['dist_ma200_pct']}%`\n"
-                        f"⚠️ 收盤破位且遠離 SMA99/SMA200"
+                        f"⚠️ 收盤破位 + 量能/實體確認 + 遠離均線"
                     )
                     send_tg_message(msg)
                     print(
                         f"🎯 {symbol} dist99={d['dist_ma99_pct']}% "
-                        f"dist200={d['dist_ma200_pct']}%"
+                        f"dist200={d['dist_ma200_pct']}% vol={d.get('vol_ratio')}"
                     )
                     last_report_time[symbol] = now
                     time.sleep(0.05)
