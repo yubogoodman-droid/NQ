@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>30日爆量訊號圖 · 一訊一圖</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193; --line:rgba(232,240,234,0.12);
+    --long:#3dba7a; --short:#e35d5d; --accent:#c9a227; }
+  body { margin:0; font-family:"IBM Plex Sans",sans-serif; color:var(--ink);
+    background: radial-gradient(900px 500px at 10% -10%, rgba(201,162,39,.18), transparent 55%), linear-gradient(165deg,var(--bg0),var(--bg1)); min-height:100vh; }
+  .wrap { max-width:1100px; margin:0 auto; padding:40px 20px 64px; }
+  h1 { font-family:"IBM Plex Serif",serif; font-size:clamp(1.8rem,3.5vw,2.4rem); margin:0 0 8px; }
+  .sub { color:var(--muted); max-width:44rem; line-height:1.55; margin-bottom:22px; }
+  .stats { display:flex; flex-wrap:wrap; gap:14px 22px; margin-bottom:22px; color:var(--muted); font-size:.9rem; }
+  .stats b { color:var(--ink); font-family:"JetBrains Mono",monospace; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+  a.card { display:block; text-decoration:none; color:inherit; border:1px solid var(--line); padding:16px;
+    background:linear-gradient(180deg, rgba(255,255,255,.04), transparent 55%), rgba(20,32,27,.65);
+    transition: border-color .15s, transform .15s; }
+  a.card:hover { border-color:rgba(201,162,39,.55); transform:translateY(-2px); }
+  .name { font-family:"IBM Plex Serif",serif; font-size:1.15rem; margin-bottom:10px; }
+  .row { display:flex; justify-content:space-between; gap:10px; font-size:.86rem; color:var(--muted); margin-top:6px; }
+  .row b { color:var(--ink); font-family:"JetBrains Mono",monospace; font-size:.8rem; }
+  .pos { color:var(--long); } .neg { color:var(--short); }
+  .mono { font-family:"JetBrains Mono",monospace; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="stats" style="margin-bottom:18px"><a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · <a href="../ten_day.html" style="color:#8aa193;text-decoration:none">10日摘要</a> · <a href="../thirty_day.html" style="color:#8aa193;text-decoration:none">30日摘要</a> · <a href="./index.html" style="color:#8aa193;text-decoration:none">一訊一圖</a></div>
+    <h1>30日爆量訊號 · 一訊一圖</h1>
+    <p class="sub">2026-08-01 → 08-10 UTC · Binance Vision · 原版 + 破位棒量能≥2.5× + 頸線／SMA200／15分K／SMA99 過濾。每個訊號獨立一張圖（±18h）。</p>
+    <div class="stats">
+      <span>訊號總數 <b>11</b></span>
+      <span>幣種 <b>10</b></span>
+    </div>
+    <div class="grid">
+      
+        <a class="card" href="./BSBUSDT_20260715_1635.html">
+          <div class="name">BSB/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">07-15 16:35</b></div>
+          <div class="row"><span>爆量</span><b>4.67×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+8.37%</b></div>
+        </a>
+
+        <a class="card" href="./COTIUSDT_20260728_0000.html">
+          <div class="name">COTI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">07-28 00:00</b></div>
+          <div class="row"><span>爆量</span><b>2.68×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-2.77%</b></div>
+        </a>
+
+        <a class="card" href="./KAITOUSDT_20260729_0345.html">
+          <div class="name">KAITO/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">07-29 03:45</b></div>
+          <div class="row"><span>爆量</span><b>2.82×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.55%</b></div>
+        </a>
+
+        <a class="card" href="./UAIUSDT_20260729_1610.html">
+          <div class="name">UAI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">07-29 16:10</b></div>
+          <div class="row"><span>爆量</span><b>2.85×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-9.10%</b></div>
+        </a>
+
+        <a class="card" href="./1000RATSUSDT_20260801_0150.html">
+          <div class="name">1000RATS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-01 01:50</b></div>
+          <div class="row"><span>爆量</span><b>3.35×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+8.53%</b></div>
+        </a>
+
+        <a class="card" href="./UAIUSDT_20260801_1425.html">
+          <div class="name">UAI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-01 14:25</b></div>
+          <div class="row"><span>爆量</span><b>3.87×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+7.51%</b></div>
+        </a>
+
+        <a class="card" href="./BEATUSDT_20260802_1035.html">
+          <div class="name">BEAT/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-02 10:35</b></div>
+          <div class="row"><span>爆量</span><b>3.21×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+1.94%</b></div>
+        </a>
+
+        <a class="card" href="./AAOIUSDT_20260804_1325.html">
+          <div class="name">AAOI/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 13:25</b></div>
+          <div class="row"><span>爆量</span><b>2.75×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="neg">-0.36%</b></div>
+        </a>
+
+        <a class="card" href="./LITEUSDT_20260804_1325.html">
+          <div class="name">LITE/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 13:25</b></div>
+          <div class="row"><span>爆量</span><b>5.81×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+3.10%</b></div>
+        </a>
+
+        <a class="card" href="./DRAMUSDT_20260804_1900.html">
+          <div class="name">DRAM/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 19:00</b></div>
+          <div class="row"><span>爆量</span><b>4.96×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+0.43%</b></div>
+        </a>
+
+        <a class="card" href="./INTCUSDT_20260804_1950.html">
+          <div class="name">INTC/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-04 19:50</b></div>
+          <div class="row"><span>爆量</span><b>2.59×</b></div>
+          <div class="row"><span>1h 空報酬</span><b class="pos">+2.77%</b></div>
+        </a>
+    </div>
+  </div>
+</body>
+</html>
