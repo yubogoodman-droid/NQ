@@ -41,6 +41,9 @@
     "reject_near_rising_sma200": true,
     "sma200_slope_bars": 24,
     "near_sma200_pct": 1.5,
+    "reject_15m_pierce_sma200": true,
+    "reject_near_sma200_15m": true,
+    "near_sma200_15m_pct": 1.5,
     "max_chg24": 99.0,
     "cooldown_min": 30
   },
@@ -57,59 +60,59 @@
     "2026-08-10": 72
   },
   "summary": {
-    "n": 53,
-    "symbols": 35,
-    "reclaim_3_rate": 26.4,
+    "n": 42,
+    "symbols": 30,
+    "reclaim_3_rate": 33.3,
     "by_horizon": {
       "15m": {
-        "n": 53,
-        "win_rate": 52.8,
-        "avg": 0.692,
-        "median": 0.1
+        "n": 42,
+        "win_rate": 59.5,
+        "avg": 1.013,
+        "median": 0.239
       },
       "30m": {
-        "n": 53,
-        "win_rate": 56.6,
-        "avg": 1.427,
-        "median": 0.466
+        "n": 42,
+        "win_rate": 61.9,
+        "avg": 1.399,
+        "median": 0.597
       },
       "1h": {
-        "n": 53,
-        "win_rate": 58.5,
-        "avg": 0.864,
-        "median": 0.39
+        "n": 42,
+        "win_rate": 64.3,
+        "avg": 1.452,
+        "median": 0.409
       },
       "2h": {
-        "n": 53,
-        "win_rate": 43.4,
-        "avg": -0.351,
-        "median": -0.834
+        "n": 42,
+        "win_rate": 40.5,
+        "avg": -0.641,
+        "median": -0.937
       },
       "4h": {
-        "n": 53,
-        "win_rate": 43.4,
-        "avg": -1.324,
-        "median": -1.991
+        "n": 42,
+        "win_rate": 45.2,
+        "avg": -1.972,
+        "median": -2.476
       },
       "8h": {
-        "n": 53,
-        "win_rate": 32.1,
-        "avg": -3.312,
-        "median": -4.146
+        "n": 42,
+        "win_rate": 33.3,
+        "avg": -3.55,
+        "median": -3.884
       },
       "12h": {
-        "n": 53,
-        "win_rate": 37.7,
-        "avg": -4.432,
-        "median": -4.185
+        "n": 42,
+        "win_rate": 35.7,
+        "avg": -4.573,
+        "median": -3.833
       }
     },
     "by_day": {
       "2026-08-01": {
-        "n": 5,
+        "n": 4,
         "symbols": 4,
-        "win_1h": 60.0,
-        "avg_1h": 2.818
+        "win_1h": 75.0,
+        "avg_1h": 8.316
       },
       "2026-08-02": {
         "n": 5,
@@ -118,22 +121,22 @@
         "avg_1h": 0.43
       },
       "2026-08-03": {
-        "n": 5,
-        "symbols": 5,
-        "win_1h": 60.0,
-        "avg_1h": 0.348
-      },
-      "2026-08-04": {
-        "n": 16,
-        "symbols": 16,
-        "win_1h": 56.2,
-        "avg_1h": 0.37
-      },
-      "2026-08-05": {
         "n": 4,
         "symbols": 4,
         "win_1h": 75.0,
-        "avg_1h": -0.366
+        "avg_1h": 0.73
+      },
+      "2026-08-04": {
+        "n": 12,
+        "symbols": 12,
+        "win_1h": 66.7,
+        "avg_1h": 0.792
+      },
+      "2026-08-05": {
+        "n": 3,
+        "symbols": 3,
+        "win_1h": 66.7,
+        "avg_1h": -1.218
       },
       "2026-08-06": {
         "n": 2,
@@ -142,16 +145,16 @@
         "avg_1h": -0.849
       },
       "2026-08-07": {
-        "n": 7,
-        "symbols": 5,
-        "win_1h": 42.9,
-        "avg_1h": -0.9
+        "n": 5,
+        "symbols": 4,
+        "win_1h": 60.0,
+        "avg_1h": 0.635
       },
       "2026-08-08": {
-        "n": 3,
-        "symbols": 2,
+        "n": 1,
+        "symbols": 1,
         "win_1h": 100.0,
-        "avg_1h": 12.727
+        "avg_1h": 22.129
       },
       "2026-08-09": {
         "n": 4,
@@ -179,28 +182,23 @@
       "BTW/USDT",
       "C98/USDT",
       "COTI/USDT",
-      "CRCL/USDT",
       "CYS/USDT",
       "DRAM/USDT",
       "EUL/USDT",
       "GIGGLE/USDT",
       "GWEI/USDT",
-      "HEI/USDT",
       "INTC/USDT",
       "KAITO/USDT",
       "LITE/USDT",
       "MRVL/USDT",
       "MUU/USDT",
-      "MVLL/USDT",
       "NBIS/USDT",
       "ON/USDT",
       "PLTR/USDT",
       "PUMP/USDT",
       "SKHYNIX/USDT",
       "SKYAI/USDT",
-      "SOXL/USDT",
       "UAI/USDT",
-      "UB/USDT",
       "XAN/USDT"
     ]
   }

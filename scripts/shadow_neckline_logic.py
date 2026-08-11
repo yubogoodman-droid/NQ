@@ -46,6 +46,11 @@ class DetectParams:
     reject_near_rising_sma200: bool = False
     sma200_slope_bars: int = 24  # 2h on 5m
     near_sma200_pct: float = 1.5  # |close-SMA200|/SMA200 < 1.5%
+    # 15m context: 15分K 戳破並收在 200均線下 → 不做空（如 1000RATS）
+    reject_15m_pierce_sma200: bool = False
+    # 進場貼近 15m SMA200
+    reject_near_sma200_15m: bool = False
+    near_sma200_15m_pct: float = 1.5
     # meta
     max_chg24: float = 99.0
     cooldown_min: int = 30
@@ -56,6 +61,8 @@ VOLUME = DetectParams(
     min_vol_ratio=1.5,  # 爆量：破位 K 量能 ≥ 1.5× 近 20 均量
     reject_rising_neck=True,  # 上升頸線（右肩抬高）不空
     reject_near_rising_sma200=True,  # 上彎 SMA200 附近不空（如 BEAT）
+    reject_15m_pierce_sma200=True,  # 15分K戳破200均線且收下方不空
+    reject_near_sma200_15m=True,  # 貼近 15m SMA200 不空
     cooldown_min=30,
 )
 
@@ -65,6 +72,8 @@ STRICT = DetectParams(
     min_vol_ratio=2.0,
     reject_rising_neck=True,
     reject_near_rising_sma200=True,
+    reject_15m_pierce_sma200=True,
+    reject_near_sma200_15m=True,
     cooldown_min=30,
 )
 
@@ -90,6 +99,8 @@ def detect_at_index(
     sma25,
     sma99,
     volume,
+    timestamp,
+    sma200_15,
     curr_idx: int,
     p: DetectParams,
 ):
@@ -177,6 +188,25 @@ def detect_at_index(
                 return False, None
             if sma200_slope_pct > 0 and abs(dist200) * 100.0 < p.near_sma200_pct:
                 return False, None
+        # 15分K 戳破 200均線且收在下方 → 不做空
+        if p.reject_15m_pierce_sma200 and timestamp is not None:
+            bucket_ms = 15 * 60 * 1000
+            bucket = int(timestamp[curr_idx] // bucket_ms * bucket_ms)
+            lo = curr_idx
+            while lo > 0 and int(timestamp[lo - 1] // bucket_ms * bucket_ms) == bucket:
+                lo -= 1
+            low15 = float(np.nanmin(low[lo : curr_idx + 1]))
+            if low15 < s200_e and close[curr_idx] < s200_e:
+                return False, None
+
+    dist200_15 = None
+    s200_15 = None
+    if sma200_15 is not None:
+        s200_15 = sma200_15[curr_idx]
+        if not np.isnan(s200_15) and s200_15 != 0:
+            dist200_15 = (close[curr_idx] - s200_15) / s200_15
+            if p.reject_near_sma200_15m and abs(dist200_15) * 100.0 < p.near_sma200_15m_pct:
+                return False, None
 
     neck_chg_pct = ((h3 - h1) / h1 * 100.0) if h1 else 0.0
     out = {
@@ -202,7 +232,34 @@ def detect_at_index(
         out["dist_ma200_pct"] = round(dist200 * 100, 2)
     if sma200_slope_pct is not None:
         out["sma200_slope_pct"] = round(sma200_slope_pct * 100, 3)
+    if dist200_15 is not None:
+        out["sma200_15"] = round(float(s200_15), 6)
+        out["dist_ma200_15m_pct"] = round(dist200_15 * 100, 2)
     return True, out
+
+
+def _sma200_15m_on_5m(df: pd.DataFrame) -> np.ndarray:
+    """Map 15m SMA200 onto each 5m bar (NaN until 15m SMA200 is ready)."""
+    if df.empty:
+        return np.full(0, np.nan)
+    bucket_ms = 15 * 60 * 1000
+    d = df[["timestamp", "open", "high", "low", "close", "volume"]].copy()
+    d["bucket"] = (d["timestamp"].astype("int64") // bucket_ms) * bucket_ms
+    g = (
+        d.groupby("bucket", as_index=False)
+        .agg(
+            open=("open", "first"),
+            high=("high", "max"),
+            low=("low", "min"),
+            close=("close", "last"),
+            volume=("volume", "sum"),
+        )
+        .sort_values("bucket")
+        .reset_index(drop=True)
+    )
+    g["sma200"] = ta.sma(g["close"], length=200)
+    mapped = d["bucket"].map(g.set_index("bucket")["sma200"])
+    return mapped.to_numpy(dtype=float)
 
 
 def prepare_indicators(df: pd.DataFrame):
@@ -211,11 +268,13 @@ def prepare_indicators(df: pd.DataFrame):
     low = df["low"].to_numpy(dtype=float)
     open_ = df["open"].to_numpy(dtype=float)
     volume = df["volume"].to_numpy(dtype=float)
+    timestamp = df["timestamp"].to_numpy(dtype=np.int64)
     sma200 = ta.sma(df["close"], length=200).to_numpy(dtype=float)
     sma14 = ta.sma(df["close"], length=14).to_numpy(dtype=float)
     sma25 = ta.sma(df["close"], length=25).to_numpy(dtype=float)
     sma99 = ta.sma(df["close"], length=99).to_numpy(dtype=float)
-    return close, high, low, open_, sma200, sma14, sma25, sma99, volume
+    sma200_15 = _sma200_15m_on_5m(df)
+    return close, high, low, open_, sma200, sma14, sma25, sma99, volume, timestamp, sma200_15
 
 
 def params_dict(p: DetectParams) -> dict:

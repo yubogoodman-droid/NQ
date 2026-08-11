@@ -639,17 +639,17 @@ def render_hub(baseline_n: int, balanced_n: int, strict_n: int) -> str:
 <body>
   <div class="wrap">
     <h1>影線頸線圖表</h1>
-    <p class="sub">{DAY} UTC · {DATA_NOTE or "Binance USDT-M 5m"}。原版影線頸線（Low 刺破）+ 爆量 + 拒絕上升頸線 + 拒絕貼近上彎 SMA200。</p>
+    <p class="sub">{DAY} UTC · {DATA_NOTE or "Binance USDT-M 5m"}。原版 + 爆量 + 拒絕上升頸線 + 拒絕貼近上彎SMA200 + 15分K戳破200均線不空。</p>
     <div class="grid">
       <a class="card recommend" href="./balanced/index.html">
         <div class="tag">RECOMMENDED</div>
         <div class="name">原版 + 爆量（≥1.5×）</div>
-        <div class="desc">量能≥1.5×；拒絕上升頸線；進場貼近上彎 SMA200（|&lt;1.5%|）不空。</div>
+        <div class="desc">量能≥1.5×；拒絕上升頸線／貼近上彎SMA200；15分K戳破200均線且收下方不空。</div>
         <div class="meta">{balanced_n} 筆訊號</div>
       </a>
       <a class="card" href="./strict/index.html">
         <div class="name">原版 + 強爆量（≥2.0×）</div>
-        <div class="desc">量能≥2.0×；同樣拒絕上升頸線與貼近上彎 SMA200。</div>
+        <div class="desc">量能≥2.0×；同樣結構過濾（含15分K vs 200均線）。</div>
         <div class="meta">{strict_n} 筆訊號</div>
       </a>
       <a class="card" href="./raw/index.html">
@@ -795,22 +795,22 @@ def main():
             Path("/workspace/output/shadow_neckline_balanced_1d.csv"),
             root / "balanced",
             title=f"原版 + 爆量（≥1.5×）· {DAY}",
-            subtitle=f"{DAY} UTC · 原版 + 量能≥1.5× + 拒絕上升頸線 + 拒絕貼近上彎SMA200。",
+            subtitle=f"{DAY} UTC · 原版 + 量能≥1.5× + 結構過濾（頸線／SMA200／15分K）。",
             badge="VOL≥1.5×",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="Low 破頸線+SMA14；volume ≥ 1.5×20均量；上升頸線不空；上彎 SMA200 且 |距|&lt;1.5% 不空。",
+            filter_note="Low 破頸線+SMA14；量≥1.5×；上升頸線不空；上彎SMA200貼近不空；15分K戳破200均線且收下方不空。",
         )
     if args.mode in ("all", "strict"):
         strict_n, _ = generate_set(
             Path("/workspace/output/shadow_neckline_strict_1d.csv"),
             root / "strict",
             title=f"原版 + 強爆量（≥2.0×）· {DAY}",
-            subtitle=f"{DAY} UTC · 原版 + 量能≥2.0× + 拒絕上升頸線 + 拒絕貼近上彎SMA200。",
+            subtitle=f"{DAY} UTC · 原版 + 量能≥2.0× + 結構過濾（頸線／SMA200／15分K）。",
             badge="VOL≥2.0×",
             index_href="./index.html",
             extra_nav=nav,
-            filter_note="Low 破頸線+SMA14；volume ≥ 2.0×20均量；上升頸線不空；上彎 SMA200 且 |距|&lt;1.5% 不空。",
+            filter_note="Low 破頸線+SMA14；量≥2.0×；上升頸線不空；上彎SMA200貼近不空；15分K戳破200均線且收下方不空。",
         )
 
     if args.mode == "all":

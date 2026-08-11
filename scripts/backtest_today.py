@@ -202,14 +202,28 @@ def run_day(day: str, params: DetectParams, frames: dict[str, pd.DataFrame]) -> 
     for sym, df in frames.items():
         if len(df) < 250:
             continue
-        close, high, low, open_, sma200, sma14, sma25, sma99, volume = prepare_indicators(df)
+        close, high, low, open_, sma200, sma14, sma25, sma99, volume, timestamp, sma200_15 = (
+            prepare_indicators(df)
+        )
         ts = df["timestamp"].to_numpy()
 
         for i in range(len(df)):
             if not (start_ms <= int(ts[i]) < end_ms):
                 continue
             ok, d = detect_at_index(
-                close, high, low, open_, sma200, sma14, sma25, sma99, volume, i, params
+                close,
+                high,
+                low,
+                open_,
+                sma200,
+                sma14,
+                sma25,
+                sma99,
+                volume,
+                timestamp,
+                sma200_15,
+                i,
+                params,
             )
             if not ok:
                 continue

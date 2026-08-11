@@ -143,7 +143,7 @@ def render_signal_index(cards: list[dict], extra_nav: str) -> str:
   <div class="wrap">
     {extra_nav}
     <h1>10日爆量訊號 · 一訊一圖</h1>
-    <p class="sub">2026-08-01 → 08-10 UTC · Binance Vision · 原版 + 量能≥1.5× + 拒絕上升頸線 + 拒絕貼近上彎SMA200。每個訊號獨立一張圖（±{PAD_HOURS}h）。</p>
+    <p class="sub">2026-08-01 → 08-10 UTC · Binance Vision · 原版 + 量能≥1.5× + 拒絕上升頸線 + SMA200／15分K 過濾。每個訊號獨立一張圖（±{PAD_HOURS}h）。</p>
     <div class="stats">
       <span>訊號總數 <b>{len(cards)}</b></span>
       <span>幣種 <b>{len({c['symbol'] for c in cards})}</b></span>

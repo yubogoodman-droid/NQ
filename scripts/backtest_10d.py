@@ -225,8 +225,8 @@ def run_tier(
             df = frames.get(sym)
             if df is None or len(df) < 250:
                 continue
-            close, high, low, open_, sma200, sma14, sma25, sma99, volume = prepare_indicators(
-                df
+            close, high, low, open_, sma200, sma14, sma25, sma99, volume, timestamp, sma200_15 = (
+                prepare_indicators(df)
             )
             ts = df["timestamp"].to_numpy()
             for i in range(len(df)):
@@ -242,6 +242,8 @@ def run_tier(
                     sma25,
                     sma99,
                     volume,
+                    timestamp,
+                    sma200_15,
                     i,
                     params,
                 )
@@ -367,10 +369,10 @@ def main():
         )
     lines.append("")
     lines.append(
-        "volume = original + vol≥1.5× + reject rising neck + reject near rising SMA200 (|dist|<1.5%)"
+        "volume = original + vol≥1.5× + reject rising neck + near rising SMA200 + 15m pierce/near SMA200"
     )
     lines.append(
-        "volume2 = original + vol≥2.0× + reject rising neck + reject near rising SMA200 (|dist|<1.5%)"
+        "volume2 = original + vol≥2.0× + same structure filters"
     )
     report = "\n".join(lines)
     (OUT / "shadow_neckline_10d_report.md").write_text(report, encoding="utf-8")

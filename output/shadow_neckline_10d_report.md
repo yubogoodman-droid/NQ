@@ -3,8 +3,8 @@
 | Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |
 |--|--|--|--|--|--|--|
 | raw | 720 | 95 | 44.3% | -0.162% | 45.5% | -1.138% |
-| volume | 53 | 35 | 58.5% | 0.864% | 43.4% | -1.324% |
-| volume2 | 29 | 25 | 48.3% | 0.331% | 41.4% | -1.536% |
+| volume | 42 | 30 | 64.3% | 1.452% | 45.2% | -1.972% |
+| volume2 | 21 | 20 | 52.4% | 0.878% | 38.1% | -3.129% |
 
-volume = original + vol≥1.5× + reject rising neck + reject near rising SMA200 (|dist|<1.5%)
-volume2 = original + vol≥2.0× + reject rising neck + reject near rising SMA200 (|dist|<1.5%)
+volume = original + vol≥1.5× + reject rising neck + near rising SMA200 + 15m pierce/near SMA200
+volume2 = original + vol≥2.0× + same structure filters
