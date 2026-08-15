@@ -139,7 +139,7 @@ def render_signal_index(cards: list[dict], extra_nav: str) -> str:
   <div class="wrap">
     {extra_nav}
     <h1>10日爆量訊號 · 一訊一圖</h1>
-    <p class="sub">2026-08-01 → 08-10 UTC · Binance Vision · 原版 + 破位棒量能≥2.5× + 頸線／SMA200／15分K／SMA99 過濾。每個訊號獨立一張圖（±{PAD_HOURS}h）。</p>
+    <p class="sub">滾動24h Top10 · 爆量≥2.5×（破位棒或4h峰值）+ 結構過濾 · 一訊一圖（±{PAD_HOURS}h）。</p>
     <div class="stats">
       <span>訊號總數 <b>{len(cards)}</b></span>
       <span>幣種 <b>{len({c['symbol'] for c in cards})}</b></span>
@@ -251,6 +251,13 @@ def main():
     index_html = render_signal_index(cards, nav)
     index_html = index_html.replace("10日爆量訊號圖", f"{args.label}爆量訊號圖").replace(
         "10日爆量訊號", f"{args.label}爆量訊號"
+    )
+    # inject actual window into subtitle
+    day0 = str(sig["day"].min()) if "day" in sig.columns and len(sig) else start
+    day1 = str(sig["day"].max()) if "day" in sig.columns and len(sig) else end
+    index_html = index_html.replace(
+        "滾動24h Top10 · 爆量≥2.5×（破位棒或4h峰值）+ 結構過濾 · 一訊一圖",
+        f"{day0} → {day1} UTC · 滾動24h Top10 · 爆量≥2.5×（破位棒或4h峰值）+ 結構過濾 · 一訊一圖",
     )
     (out / "index.html").write_text(index_html, encoding="utf-8")
     print("done", len(cards), "charts ->", out)

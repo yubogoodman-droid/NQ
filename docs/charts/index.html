@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>影線頸線回測圖表 · 2026-08-11</title>
+<title>影線頸線回測圖表 · 2026-08-14</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
-  :root { --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193; --line:rgba(232,240,234,.12); --accent:#c9a227; --long:#3dba7a; }
+  :root { --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193; --line:rgba(232,240,234,.12); --accent:#c9a227; }
   body { margin:0; font-family:"IBM Plex Sans",sans-serif; color:var(--ink);
     background: radial-gradient(900px 500px at 10% -10%, rgba(201,162,39,.18), transparent 55%), linear-gradient(165deg,var(--bg0),var(--bg1)); min-height:100vh; }
   .wrap { max-width:860px; margin:0 auto; padding:48px 20px; }
@@ -26,37 +26,27 @@
 <body>
   <div class="wrap">
     <h1>影線頸線圖表</h1>
-    <p class="sub">2026-08-11 UTC · BingX USDT-M 5m（Binance fapi 451 / Vision 尚未有今日）。原版 + 爆量 + 拒絕上升頸線 + 拒絕貼近上彎SMA200 + 15分K戳破200均線不空。</p>
+    <p class="sub">至 2026-08-14 UTC · Vision+BingX · 滾動 24h Top10 + 爆量≥2.5×（破位棒或 4h 峰值）+ 結構過濾。含 ACE 08-14 訊號。</p>
     <div class="grid">
-      <a class="card recommend" href="./balanced/index.html">
+      <a class="card recommend" href="./ten_day/index.html">
         <div class="tag">RECOMMENDED</div>
-        <div class="name">原版 + 爆量（≥1.5×）</div>
-        <div class="desc">量能≥1.5×；拒絕上升頸線／貼近上彎SMA200；15分K戳破200均線且收下方不空；|距SMA99|≥1.5%。</div>
-        <div class="meta">1 筆訊號</div>
-      </a>
-      <a class="card" href="./strict/index.html">
-        <div class="name">原版 + 強爆量（≥2.0×）</div>
-        <div class="desc">量能≥2.0×；同樣結構過濾（含15分K vs 200均線）。</div>
-        <div class="meta">1 筆訊號</div>
-      </a>
-      <a class="card" href="./raw/index.html">
-        <div class="name">原版訊號</div>
-        <div class="desc">Low 刺破頸線 + SMA14 即報，無爆量過濾。</div>
-        <div class="meta">12 筆訊號</div>
-      </a>
-      <a class="card" href="./ten_day/index.html">
-        <div class="name">10 日爆量圖表</div>
-        <div class="desc">2026-08-01→08-10 · 一訊一圖（紅箭=訊號 / 黃點=進場 / 底量）。</div>
-        <div class="meta">一訊一圖</div>
+        <div class="name">10 日爆量 · 一訊一圖</div>
+        <div class="desc">2026-08-05 → 08-14 · 滾動 24h Top10 · vol≥2.5× · 含 ACE。</div>
+        <div class="meta">52 筆訊號</div>
       </a>
       <a class="card" href="./thirty_day/index.html">
-        <div class="name">30 日 · Top10漲幅榜</div>
-        <div class="desc">2026-07-12 → 08-10 · Top10漲幅榜 + vol≥2.5× · 一訊一圖。</div>
+        <div class="name">30 日爆量 · 一訊一圖</div>
+        <div class="desc">2026-07-16 → 08-14 · 同一套邏輯 · 一訊一圖。</div>
+        <div class="meta">175 筆訊號</div>
       </a>
-
       <a class="card" href="./ten_day.html">
         <div class="name">10 日回測摘要</div>
         <div class="desc">逐日勝率與平均報酬表。</div>
+        <div class="meta">raw / volume / volume2</div>
+      </a>
+      <a class="card" href="./thirty_day.html">
+        <div class="name">30 日回測摘要</div>
+        <div class="desc">30 日勝率與逐日表。</div>
         <div class="meta">raw / volume / volume2</div>
       </a>
     </div>
