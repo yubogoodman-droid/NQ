@@ -17,34 +17,35 @@ th{font-family:"JetBrains Mono",monospace;font-size:.72rem;color:var(--muted);te
 </style></head><body><div class="wrap">
 <div class="sub"><a href="./index.html">← 回總覽</a> · <a href="./ten_day/index.html">一訊一圖</a></div>
 <h1>10日回測 · 影線頸線</h1>
-<p class="sub"><a href="./ten_day/index.html">查看一訊一圖（3 張） →</a></p>
-<p class="sub">選幣：前一日漲幅榜 Top10 · 爆量≥2.5×</p>
-<pre># 10-day shadow-neckline (2026-08-01 → 2026-08-10 UTC, Binance Vision)
+<p class="sub"><a href="./ten_day/index.html">查看一訊一圖（52 張） →</a></p>
+<p class="sub">選幣：滾動 24h Top10（候選=前一日 Top30）· 爆量≥2.5×（破位棒或 4h 峰值）</p>
+<pre># 10-day shadow-neckline (2026-08-05 → 2026-08-14 UTC, Vision+BingX)
 
-Universe: **Top 10 by prior UTC-day return** (no same-day look-ahead).
+Universe: prior-day Top 30 candidates → **rolling 24h Top 10** (hourly, live-aligned).
 
 | Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |
 |--|--|--|--|--|--|--|
-| raw | 262 | 55 | 42.7% | -0.154% | 50.2% | 0.124% |
-| volume | 3 | 3 | 66.7% | 3.369% | 66.7% | 5.099% |
-| volume2 | 1 | 1 | 100.0% | 1.45% | 0.0% | -3.269% |
+| raw | 349 | 86 | 42.1% | -0.382% | 46.0% | -0.397% |
+| volume | 52 | 30 | 45.1% | -0.326% | 52.9% | 1.587% |
+| volume2 | 45 | 29 | 45.5% | -0.089% | 50.0% | 1.836% |
 
-volume = original + break-bar vol≥2.5× prior-20 avg + structure filters
-volume2 = original + break-bar vol≥3.5× + same structure filters
+volume = original + 爆量≥2.5× (break-bar OR 4h-peak vs pre-window avg) + structure filters
+volume2 = original + 爆量≥3.5× (same peak window) + same structure filters
 
 Near rising SMA200 (|dist|<4%): skips lows into rising MA support (e.g. XAN).
-Deep-below 15m SMA200 (dist < −3%): skips late shorts after a higher-TF dump (e.g. GWEI).</pre>
+Deep-below 15m SMA200 (dist < −3%): skips late shorts after a higher-TF dump (e.g. GWEI).
+Rolling 24h Top10 catches same-day pumps that prior-day Top10 misses (e.g. ACE 08-14).</pre>
 <table><thead><tr><th>日</th><th>raw n</th><th>volume n</th><th>vol 1h win%</th><th>vol 1h avg%</th></tr></thead>
 <tbody>
-<tr><td>2026-08-01</td><td>26</td><td>1</td><td>100.0</td><td>8.529</td></tr>
-<tr><td>2026-08-02</td><td>30</td><td>1</td><td>100.0</td><td>1.936</td></tr>
-<tr><td>2026-08-03</td><td>21</td><td>0</td><td>—</td><td>—</td></tr>
-<tr><td>2026-08-04</td><td>46</td><td>1</td><td>0.0</td><td>-0.358</td></tr>
-<tr><td>2026-08-05</td><td>36</td><td>0</td><td>—</td><td>—</td></tr>
-<tr><td>2026-08-06</td><td>24</td><td>0</td><td>—</td><td>—</td></tr>
-<tr><td>2026-08-07</td><td>18</td><td>0</td><td>—</td><td>—</td></tr>
-<tr><td>2026-08-08</td><td>13</td><td>0</td><td>—</td><td>—</td></tr>
-<tr><td>2026-08-09</td><td>29</td><td>0</td><td>—</td><td>—</td></tr>
-<tr><td>2026-08-10</td><td>19</td><td>0</td><td>—</td><td>—</td></tr>
+<tr><td>2026-08-05</td><td>45</td><td>4</td><td>0.0</td><td>-5.005</td></tr>
+<tr><td>2026-08-06</td><td>37</td><td>5</td><td>60.0</td><td>-0.415</td></tr>
+<tr><td>2026-08-07</td><td>37</td><td>5</td><td>0.0</td><td>-5.769</td></tr>
+<tr><td>2026-08-08</td><td>34</td><td>7</td><td>71.4</td><td>3.732</td></tr>
+<tr><td>2026-08-09</td><td>43</td><td>7</td><td>42.9</td><td>-0.579</td></tr>
+<tr><td>2026-08-10</td><td>25</td><td>3</td><td>33.3</td><td>-1.324</td></tr>
+<tr><td>2026-08-11</td><td>23</td><td>4</td><td>100.0</td><td>7.282</td></tr>
+<tr><td>2026-08-12</td><td>39</td><td>8</td><td>37.5</td><td>-0.982</td></tr>
+<tr><td>2026-08-13</td><td>38</td><td>7</td><td>57.1</td><td>1.010</td></tr>
+<tr><td>2026-08-14</td><td>28</td><td>2</td><td>0.0</td><td>-12.134</td></tr>
 </tbody></table>
 </div></body></html>
