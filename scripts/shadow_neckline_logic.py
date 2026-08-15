@@ -75,6 +75,19 @@ VOLUME = DetectParams(
     cooldown_min=30,
 )
 
+# Live alert default: same structure filters as VOLUME, **no** 爆量 gate
+STRUCTURE = DetectParams(
+    min_vol_ratio=0.0,  # 量不計
+    reject_rising_neck=True,
+    reject_near_rising_sma200=True,
+    near_sma200_pct=4.0,
+    reject_15m_pierce_sma200=True,
+    reject_near_sma200_15m=True,
+    reject_deep_below_sma200_15m=True,
+    min_abs_dist_ma99=1.5,
+    cooldown_min=30,
+)
+
 # Back-compat aliases (recommended path is now original + 爆量)
 BALANCED = VOLUME
 STRICT = DetectParams(

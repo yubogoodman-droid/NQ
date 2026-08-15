@@ -1,20 +1,24 @@
 """
-影線頸線監控（原版 + 爆量）— 建議日常使用
+影線頸線監控 → 滿足條件即 Telegram 通知
 
 選幣：Binance USDT-M「24h 漲幅榜前 10」（ticker.percentage）
 
-結構 + 過濾見 shadow_neckline_logic.VOLUME：
-- 爆量 ≥ 2.5×：破位棒 / 近20均，或近4h峰值 / 窗口前20均（吃大拉抬後破位，如 ACE）
+偵測：shadow_neckline_logic.STRUCTURE（結構過濾，**不看爆量**）
+- Low 破頸線 + SMA14
 - 拒絕上升頸線（右肩高於左肩）
 - 拒絕貼近上彎 SMA200（|距SMA200|<4%）
 - 拒絕 15分K 戳破 200均線且收在下方
 - 拒絕貼近 15m SMA200（|距|<1.5%）
 - 拒絕已深跌破 15m SMA200（dist < −3%）
 - 拒絕貼近 SMA99（|距|<1.5%）
+
+TG：環境變數 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
+（也可設 TG_TOKEN / TG_CHAT_ID）
 """
 
 from __future__ import annotations
 
+import os
 import time
 from datetime import datetime, timedelta
 
@@ -22,29 +26,42 @@ import ccxt
 import pandas as pd
 import requests
 
-from shadow_neckline_logic import VOLUME, detect_at_index, prepare_indicators
+from shadow_neckline_logic import STRUCTURE, detect_at_index, prepare_indicators
 
 # ================= 設定區域 =================
-TG_TOKEN = ""
-TG_CHAT_ID = ""
+TG_TOKEN = (
+    os.environ.get("TELEGRAM_BOT_TOKEN")
+    or os.environ.get("TG_TOKEN")
+    or ""
+).strip()
+TG_CHAT_ID = (
+    os.environ.get("TELEGRAM_CHAT_ID")
+    or os.environ.get("TG_CHAT_ID")
+    or ""
+).strip()
 TOP_N = 10
 SCAN_INTERVAL = 60
-PARAMS = VOLUME
-# 15m SMA200 需要 ≥200 根 15m ≈ 600 根 5m；過短會讓 15m 過濾失效
+PARAMS = STRUCTURE
+# 15m SMA200 需要 ≥200 根 15m ≈ 600 根 5m
 OHLCV_LIMIT = 600
 # ===========================================
 
 
-def send_tg_message(message: str) -> None:
+def send_tg_message(message: str) -> bool:
     if not TG_TOKEN or not TG_CHAT_ID:
-        print(f"[TG skipped] {message}")
-        return
+        print(f"[TG skipped — set TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID]\n{message}")
+        return False
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
     payload = {"chat_id": TG_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     try:
-        requests.post(url, json=payload, timeout=10)
+        r = requests.post(url, json=payload, timeout=10)
+        if r.status_code != 200:
+            print(f"❌ TG HTTP {r.status_code}: {r.text[:200]}")
+            return False
+        return True
     except Exception as e:
         print(f"❌ TG 發送失敗: {e}")
+        return False
 
 
 def top_gainers(tickers: dict, n: int = 10) -> list[tuple[str, float]]:
@@ -68,16 +85,13 @@ def top_gainers(tickers: dict, n: int = 10) -> list[tuple[str, float]]:
 
 def main():
     exchange = ccxt.binanceusdm({"enableRateLimit": True})
+    tg_ok = bool(TG_TOKEN and TG_CHAT_ID)
     print(
-        f"📡 原版+爆量 監控中... Top{TOP_N}漲幅榜 "
-        f"cooldown={PARAMS.cooldown_min}m "
-        f"vol≥{PARAMS.min_vol_ratio:.1f}× "
-        f"(break|{PARAMS.vol_spike_window}peak) "
-        f"ohlcv={OHLCV_LIMIT} "
-        f"reject_rising_neck={PARAMS.reject_rising_neck} "
-        f"reject_near_rising_sma200={PARAMS.reject_near_rising_sma200}"
+        f"📡 影線頸線監控（結構、不看量） Top{TOP_N}漲幅榜 "
+        f"cooldown={PARAMS.cooldown_min}m ohlcv={OHLCV_LIMIT} "
+        f"TG={'ON' if tg_ok else 'OFF'}"
     )
-    last_report_time = {}
+    last_report_time: dict[str, datetime] = {}
 
     while True:
         try:
@@ -104,17 +118,20 @@ def main():
                         time.sleep(0.05)
                         continue
 
+                    sym = symbol.split(":")[0]
                     msg = (
-                        f"🚨 *【影線頸線｜漲幅榜Top{TOP_N}+爆量】*\n\n"
-                        f"💎 `{symbol.split(':')[0]}` (5M)\n"
+                        f"🚨 *【影線頸線｜Top{TOP_N}】*\n\n"
+                        f"💎 `{sym}` (5M)\n"
                         f"📈 24h: `{pct:.2f}%`\n"
                         f"💰 `{d['price']}`  刺破 `{d['close_break_pct']}%`\n"
-                        f"📊 乖離 `{d['bias']}%`  爆量 `{d.get('vol_ratio')}×`  "
-                        f"頸線 `{d.get('neck_chg_pct')}%`\n"
-                        f"⚠️ Low 破頸線+SMA14，Top{TOP_N}漲幅榜，爆量過濾"
+                        f"📊 乖離 `{d['bias']}%`  頸線變化 `{d.get('neck_chg_pct')}%`\n"
+                        f"⚠️ Low 破頸線+SMA14（不看爆量）"
                     )
-                    send_tg_message(msg)
-                    print(f"🎯 {symbol} 24h={pct:+.1f}% vol={d.get('vol_ratio')}× bias={d['bias']}%")
+                    sent = send_tg_message(msg)
+                    print(
+                        f"🎯 {sym} 24h={pct:+.1f}% bias={d['bias']}% "
+                        f"break={d['close_break_pct']}% TG={'sent' if sent else 'skip'}"
+                    )
                     last_report_time[symbol] = now
                     time.sleep(0.05)
                 except Exception:
