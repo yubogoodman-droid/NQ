@@ -1,15 +1,16 @@
-# 10-day shadow-neckline (2026-08-01 → 2026-08-10 UTC, Binance Vision)
+# 10-day shadow-neckline (2026-08-05 → 2026-08-14 UTC, Vision+BingX)
 
-Universe: **Top 10 by prior UTC-day return** (no same-day look-ahead).
+Universe: prior-day Top 30 candidates → **rolling 24h Top 10** (hourly, live-aligned).
 
 | Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |
 |--|--|--|--|--|--|--|
-| raw | 262 | 55 | 42.7% | -0.154% | 50.2% | 0.124% |
-| volume | 3 | 3 | 66.7% | 3.369% | 66.7% | 5.099% |
-| volume2 | 1 | 1 | 100.0% | 1.45% | 0.0% | -3.269% |
+| raw | 349 | 86 | 42.1% | -0.382% | 46.0% | -0.397% |
+| volume | 52 | 30 | 45.1% | -0.326% | 52.9% | 1.587% |
+| volume2 | 45 | 29 | 45.5% | -0.089% | 50.0% | 1.836% |
 
-volume = original + break-bar vol≥2.5× prior-20 avg + structure filters
-volume2 = original + break-bar vol≥3.5× + same structure filters
+volume = original + 爆量≥2.5× (break-bar OR 4h-peak vs pre-window avg) + structure filters
+volume2 = original + 爆量≥3.5× (same peak window) + same structure filters
 
 Near rising SMA200 (|dist|<4%): skips lows into rising MA support (e.g. XAN).
 Deep-below 15m SMA200 (dist < −3%): skips late shorts after a higher-TF dump (e.g. GWEI).
+Rolling 24h Top10 catches same-day pumps that prior-day Top10 misses (e.g. ACE 08-14).
