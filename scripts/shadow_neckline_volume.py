@@ -30,6 +30,8 @@ TG_CHAT_ID = ""
 TOP_N = 10
 SCAN_INTERVAL = 60
 PARAMS = VOLUME
+# 15m SMA200 需要 ≥200 根 15m ≈ 600 根 5m；過短會讓 15m 過濾失效
+OHLCV_LIMIT = 600
 # ===========================================
 
 
@@ -69,7 +71,9 @@ def main():
     print(
         f"📡 原版+爆量 監控中... Top{TOP_N}漲幅榜 "
         f"cooldown={PARAMS.cooldown_min}m "
-        f"vol≥{PARAMS.min_vol_ratio:.1f}×{PARAMS.vol_lookback} "
+        f"vol≥{PARAMS.min_vol_ratio:.1f}× "
+        f"(break|{PARAMS.vol_spike_window}peak) "
+        f"ohlcv={OHLCV_LIMIT} "
         f"reject_rising_neck={PARAMS.reject_rising_neck} "
         f"reject_near_rising_sma200={PARAMS.reject_near_rising_sma200}"
     )
@@ -90,7 +94,7 @@ def main():
                     ] + timedelta(minutes=PARAMS.cooldown_min):
                         continue
 
-                    ohlcv = exchange.fetch_ohlcv(symbol, timeframe="5m", limit=300)
+                    ohlcv = exchange.fetch_ohlcv(symbol, timeframe="5m", limit=OHLCV_LIMIT)
                     df = pd.DataFrame(
                         ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"]
                     )

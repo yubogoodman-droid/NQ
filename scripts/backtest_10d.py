@@ -2,10 +2,14 @@
 """
 N-day Binance Vision USDT-M backtest for original / 爆量 / 強爆量 tiers.
 
-Universe: each UTC day scans only the Top-N symbols by **prior UTC-day**
-open→close return (proxy for 漲幅榜前 N, without same-day look-ahead).
+Universe (aligned with live scanner):
+- Candidate pool: prior UTC-day open→close Top CANDIDATE_N (download set)
+- Scan set: trailing 24h return Top TOP_N, refreshed each UTC hour
+  (same idea as live ticker.percentage Top10 — catches same-day pumps like ACE)
 
-Default window: last N complete UTC days on data.binance.vision.
+Vision daily zips lag ~1–2d; missing days fall back to BingX USDT-M 5m klines.
+
+Default window: last N complete UTC days on data.binance.vision (or --end).
 """
 
 from __future__ import annotations
@@ -13,6 +17,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
@@ -34,13 +39,16 @@ from shadow_neckline_logic import (
 
 VISION_BASE = "https://data.binance.vision"
 S3_BASE = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
+BINGX_KLINES = "https://open-api.bingx.com/openApi/swap/v2/quote/klines"
 CACHE = Path("/tmp/binance_um_klines")
 OUT = Path("/workspace/output")
-TOP_N = 10  # 每天漲幅榜前 N（回測：用「前一 UTC 日」漲幅排名，避免偷看當日）
+TOP_N = 10  # 滾動 24h 漲幅榜前 N（對齊實盤）
+CANDIDATE_N = 30  # 前一日 Top N 作為下載／候選池（含 ACE 類前一日剛進前段）
+BARS_24H = 288  # 5m × 288 = 24h
 HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
 TIERS = {
     "raw": RAW,
-    "volume": VOLUME,  # ≥2.5× break-bar + structure filters
+    "volume": VOLUME,  # ≥2.5× break-bar/4h-peak + structure filters
     "volume2": STRICT,  # ≥3.5× + same structure filters
 }
 
@@ -98,6 +106,79 @@ def list_um_usdt_symbols() -> list[str]:
     return sorted(symbols)
 
 
+def _to_bingx_symbol(symbol: str) -> str:
+    s = symbol.replace("/", "").replace("-", "").upper()
+    if not s.endswith("USDT"):
+        s += "USDT"
+    return s[:-4] + "-USDT"
+
+
+def download_day_df_bingx(symbol: str, day: str) -> pd.DataFrame | None:
+    """Fallback when Vision zip is not published yet (or geo-blocked)."""
+    CACHE.mkdir(parents=True, exist_ok=True)
+    cache_path = CACHE / f"{symbol}-5m-{day}.csv"
+    if cache_path.exists():
+        return pd.read_csv(cache_path)
+
+    start_ms = int(pd.Timestamp(f"{day} 00:00", tz="UTC").timestamp() * 1000)
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    if start_ms >= now_ms:
+        return None
+    end_ms = min(start_ms + 86_400_000, now_ms)
+    bx = _to_bingx_symbol(symbol)
+    rows: list[dict] = []
+    cur = start_ms
+    while cur < end_ms:
+        params = {
+            "symbol": bx,
+            "interval": "5m",
+            "startTime": cur,
+            "endTime": end_ms,
+            "limit": 1000,
+        }
+        payload = None
+        for attempt in range(4):
+            try:
+                r = requests.get(BINGX_KLINES, params=params, timeout=45)
+                r.raise_for_status()
+                payload = r.json()
+                break
+            except Exception:
+                if attempt == 3:
+                    return None
+                time.sleep(0.4 * (attempt + 1))
+        if not payload:
+            return None
+        data = payload.get("data") or []
+        if not data:
+            break
+        data = sorted(data, key=lambda x: int(x["time"]))
+        rows.extend(data)
+        last = int(data[-1]["time"])
+        nxt = last + 300_000
+        if nxt <= cur:
+            break
+        cur = nxt
+        time.sleep(0.05)
+
+    if not rows:
+        return None
+    df = pd.DataFrame(rows)
+    df = df.rename(columns={"time": "timestamp"})
+    for c in ("open", "high", "low", "close", "volume"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    df["timestamp"] = pd.to_numeric(df["timestamp"], errors="coerce").astype("int64")
+    df["quote_volume"] = df["close"] * df["volume"]
+    df = df[["timestamp", "open", "high", "low", "close", "volume", "quote_volume"]]
+    df = df.dropna().drop_duplicates("timestamp").sort_values("timestamp").reset_index(drop=True)
+    # Only keep bars for this UTC day
+    df = df[(df["timestamp"] >= start_ms) & (df["timestamp"] < start_ms + 86_400_000)]
+    if df.empty:
+        return None
+    df.to_csv(cache_path, index=False)
+    return df
+
+
 def download_day_df(symbol: str, day: str) -> pd.DataFrame | None:
     CACHE.mkdir(parents=True, exist_ok=True)
     cache_path = CACHE / f"{symbol}-5m-{day}.csv"
@@ -107,44 +188,45 @@ def download_day_df(symbol: str, day: str) -> pd.DataFrame | None:
     try:
         r = requests.get(zip_url(symbol, day), timeout=40)
     except requests.RequestException:
-        return None
-    if r.status_code != 200:
-        return None
-    try:
-        with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
-            raw = zf.read(zf.namelist()[0])
-    except zipfile.BadZipFile:
-        return None
+        r = None
+    if r is not None and r.status_code == 200:
+        try:
+            with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
+                raw = zf.read(zf.namelist()[0])
+        except zipfile.BadZipFile:
+            raw = None
+        if raw is not None:
+            text = raw.decode("utf-8", errors="replace")
+            first = text.split("\n", 1)[0]
+            has_header = "open" in first.lower()
+            cols = [
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "close_time",
+                "quote_volume",
+                "trades",
+                "taker_buy_base",
+                "taker_buy_quote",
+                "ignore",
+            ]
+            if has_header:
+                df = pd.read_csv(io.StringIO(text))
+                df.columns = cols[: len(df.columns)]
+            else:
+                df = pd.read_csv(io.StringIO(text), header=None, names=cols)
+            keep = ["timestamp", "open", "high", "low", "close", "volume", "quote_volume"]
+            df = df[keep].copy()
+            for c in keep:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+            df = df.dropna().reset_index(drop=True)
+            df.to_csv(cache_path, index=False)
+            return df
 
-    text = raw.decode("utf-8", errors="replace")
-    first = text.split("\n", 1)[0]
-    has_header = "open" in first.lower()
-    cols = [
-        "timestamp",
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-        "close_time",
-        "quote_volume",
-        "trades",
-        "taker_buy_base",
-        "taker_buy_quote",
-        "ignore",
-    ]
-    if has_header:
-        df = pd.read_csv(io.StringIO(text))
-        df.columns = cols[: len(df.columns)]
-    else:
-        df = pd.read_csv(io.StringIO(text), header=None, names=cols)
-    keep = ["timestamp", "open", "high", "low", "close", "volume", "quote_volume"]
-    df = df[keep].copy()
-    for c in keep:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    df = df.dropna().reset_index(drop=True)
-    df.to_csv(cache_path, index=False)
-    return df
+    return download_day_df_bingx(symbol, day)
 
 
 def day_return_pct(symbol: str, day: str) -> float | None:
@@ -220,18 +302,65 @@ def load_symbol_frame(
     return out.drop_duplicates("timestamp").sort_values("timestamp").reset_index(drop=True)
 
 
+def hourly_rolling_top(
+    frames: dict[str, pd.DataFrame],
+    days: list[str],
+    candidates_by_day: dict[str, set[str]],
+    top_n: int = TOP_N,
+    lookback: int = BARS_24H,
+) -> dict[str, dict[int, set[str]]]:
+    """
+    For each UTC day+hour, Top-N by trailing 24h return among that day's candidates.
+    Rank uses the last bar at or before the hour start (no intra-hour look-ahead).
+    """
+    indexed: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    for sym, df in frames.items():
+        indexed[sym] = (
+            df["timestamp"].to_numpy(dtype=np.int64),
+            df["close"].to_numpy(dtype=float),
+        )
+
+    out: dict[str, dict[int, set[str]]] = {}
+    for day in days:
+        out[day] = {}
+        cands = candidates_by_day.get(day, set())
+        day_start = int(pd.Timestamp(f"{day} 00:00", tz="UTC").timestamp() * 1000)
+        for hour in range(24):
+            t_ref = day_start + hour * 3_600_000
+            rets: list[tuple[float, str]] = []
+            for sym in cands:
+                pair = indexed.get(sym)
+                if pair is None:
+                    continue
+                ts, close = pair
+                i = int(np.searchsorted(ts, t_ref, side="right") - 1)
+                if i < lookback:
+                    continue
+                c0 = float(close[i - lookback])
+                c1 = float(close[i])
+                if c0 <= 0 or np.isnan(c0) or np.isnan(c1):
+                    continue
+                rets.append(((c1 / c0 - 1.0) * 100.0, sym))
+            rets.sort(key=lambda x: x[0], reverse=True)
+            out[day][hour] = {s for _, s in rets[:top_n]}
+    return out
+
+
 def run_tier(
     params: DetectParams,
     frames: dict[str, pd.DataFrame],
     days: list[str],
-    liquid_by_day: dict[str, set[str]],
+    candidates_by_day: dict[str, set[str]],
+    scan_by_day_hour: dict[str, dict[int, set[str]]] | None = None,
 ) -> pd.DataFrame:
+    if scan_by_day_hour is None:
+        scan_by_day_hour = hourly_rolling_top(frames, days, candidates_by_day)
     signals = []
     for day in days:
         start_ms = int(pd.Timestamp(f"{day} 00:00", tz="UTC").timestamp() * 1000)
         end_ms = start_ms + 86_400_000
         last_report: dict[str, datetime] = {}
-        for sym in sorted(liquid_by_day.get(day, set())):
+        for sym in sorted(candidates_by_day.get(day, set())):
             df = frames.get(sym)
             if df is None or len(df) < 250:
                 continue
@@ -240,7 +369,11 @@ def run_tier(
             )
             ts = df["timestamp"].to_numpy()
             for i in range(len(df)):
-                if not (start_ms <= int(ts[i]) < end_ms):
+                tsi = int(ts[i])
+                if not (start_ms <= tsi < end_ms):
+                    continue
+                hour = int((tsi - start_ms) // 3_600_000)
+                if sym not in scan_by_day_hour.get(day, {}).get(hour, set()):
                     continue
                 ok, d = detect_at_index(
                     close,
@@ -259,7 +392,7 @@ def run_tier(
                 )
                 if not ok:
                     continue
-                tdt = datetime.fromtimestamp(int(ts[i]) / 1000, tz=timezone.utc)
+                tdt = datetime.fromtimestamp(tsi / 1000, tz=timezone.utc)
                 prev = last_report.get(sym)
                 if prev and tdt < prev + timedelta(minutes=params.cooldown_min):
                     continue
@@ -268,7 +401,7 @@ def run_tier(
                     if i + j < len(df) and high[i + j] > d["line_val"]:
                         reclaim = True
                         break
-                pnl = calc_pnl(df, int(ts[i]))
+                pnl = calc_pnl(df, tsi)
                 row = {
                     "day": day,
                     "symbol": f"{sym[:-4]}/{sym[-4:]}",
@@ -300,23 +433,24 @@ def main():
     warmups = [(warmup_start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(warmup_n)]
 
     tag = f"{args.days}d"
-    print(f"📡 {tag} Vision backtest")
+    print(f"📡 {tag} Vision/BingX backtest")
     print(f"   window: {days[0]} → {days[-1]} ({len(days)} days) warmups={warmups[0]}→{warmups[-1]}")
-    print(f"   universe: 每日漲幅榜前 {TOP_N}（以「前一 UTC 日」漲幅排名）")
+    print(
+        f"   universe: 候選=前一日Top{CANDIDATE_N}；掃描=滾動24h Top{TOP_N}（每UTC整點刷新，對齊實盤）"
+    )
     print(f"   tiers: raw / volume(≥2.5×+filters) / volume2(≥3.5×+filters)")
 
     print("📋 Listing symbols...")
     all_syms = list_um_usdt_symbols()
     print(f"   {len(all_syms)} UM USDT symbols")
 
-    # 排名日 = 訊號日前一日；需多抓一天供第一個交易日排名
+    # 候選池排名日 = 訊號日前一日
     rank_day0 = (
         datetime.strptime(days[0], "%Y-%m-%d").replace(tzinfo=timezone.utc) - timedelta(days=1)
     ).strftime("%Y-%m-%d")
     rank_days = [rank_day0, *days[:-1]]  # map: days[i] uses rank_days[i]
 
-    # 下載所有排名日的 K 線以算漲幅（順便 cache）
-    print(f"📈 Ranking Top{TOP_N} by prior-day return ...")
+    print(f"📈 Candidate pool = prior-day Top{CANDIDATE_N} ...")
     returns_by_day: dict[str, dict[str, float]] = {}
     for rday in sorted(set(rank_days)):
         rets: dict[str, float] = {}
@@ -337,24 +471,27 @@ def main():
         returns_by_day[rday] = rets
         print(f"   {rday}: ranked_from={len(rets)}")
 
-    universe_by_day: dict[str, set[str]] = {}
+    candidates_by_day: dict[str, set[str]] = {}
     top_detail: dict[str, list[tuple[str, float]]] = {}
     union: set[str] = set()
     for day, rday in zip(days, rank_days):
         ranked = sorted(returns_by_day.get(rday, {}).items(), key=lambda x: x[1], reverse=True)[
-            :TOP_N
+            :CANDIDATE_N
         ]
         top_detail[day] = ranked
         uni = {s for s, _ in ranked}
-        universe_by_day[day] = uni
+        candidates_by_day[day] = uni
         union |= uni
         preview = ", ".join(f"{s} {p:+.1f}%" for s, p in ranked[:5])
-        print(f"   {day} ← {rday} Top{TOP_N}: {preview} ...")
+        print(f"   {day} ← {rday} candTop{CANDIDATE_N}: {preview} ...")
 
     print(f"⬇ Ensuring warmups {warmups[0]}→{warmups[-1]} for {len(union)} symbols...")
     with ThreadPoolExecutor(max_workers=24) as pool:
         for wday in warmups:
             list(pool.map(lambda s, d=wday: download_day_df(s, d), sorted(union)))
+        # also ensure scan days (Vision or BingX)
+        for d in days:
+            list(pool.map(lambda s, day=d: download_day_df(s, day), sorted(union)))
 
     print("📦 Building frames...")
     frames: dict[str, pd.DataFrame] = {}
@@ -365,9 +502,17 @@ def main():
         if i % 25 == 0 or i == len(union):
             print(f"   frames {i}/{len(union)} loaded={len(frames)}")
 
+    print(f"🏆 Building hourly rolling-24h Top{TOP_N} scan sets...")
+    scan_by_day_hour = hourly_rolling_top(frames, days, candidates_by_day, TOP_N)
+    # preview a few hours that matter
+    for day in days[-2:]:
+        for hour in (0, 13, 23):
+            top = scan_by_day_hour.get(day, {}).get(hour, set())
+            print(f"   {day} {hour:02d}:00 Top{TOP_N} n={len(top)} sample={sorted(top)[:5]}")
+
     results = {}
     for name, params in TIERS.items():
-        df = run_tier(params, frames, days, universe_by_day)
+        df = run_tier(params, frames, days, candidates_by_day, scan_by_day_hour)
         summary = summarize(df)
         payload = {
             "window": {
@@ -376,16 +521,17 @@ def main():
                 "days": days,
                 "warmups": warmups,
             },
-            "source": "binance_vision_um_5m",
-            "universe": f"top{TOP_N}_prior_day_return",
+            "source": "binance_vision_um_5m_bingx_fallback",
+            "universe": f"prior_day_top{CANDIDATE_N}_candidates__rolling_24h_top{TOP_N}_hourly",
             "top_n": TOP_N,
-            "top_by_day": {
+            "candidate_n": CANDIDATE_N,
+            "candidate_by_day": {
                 d: [{"symbol": s, "prior_day_pct": round(p, 2)} for s, p in top_detail[d]]
                 for d in days
             },
             "tier": name,
             "params": params_dict(params),
-            "universe_by_day": {d: sorted(universe_by_day[d]) for d in days},
+            "candidates_by_day": {d: sorted(candidates_by_day[d]) for d in days},
             "summary": summary,
         }
         csv_path = OUT / f"shadow_neckline_{name}_{tag}.csv"
@@ -398,12 +544,16 @@ def main():
         print("by_day:")
         for d in days:
             print(f"  {d}: {summary['by_day'].get(d)}")
+        if name == "volume" and not df.empty:
+            ace = df[df["symbol"].str.startswith("ACE/")]
+            if not ace.empty:
+                print("ACE hits:")
+                print(ace[["time_utc", "price", "vol_ratio", "bias", "pnl_1h", "pnl_4h"]].to_string(index=False))
 
-    # compact markdown-friendly table
     lines = [
-        f"# {args.days}-day shadow-neckline ({days[0]} → {days[-1]} UTC, Binance Vision)",
+        f"# {args.days}-day shadow-neckline ({days[0]} → {days[-1]} UTC, Vision+BingX)",
         "",
-        f"Universe: **Top {TOP_N} by prior UTC-day return** (no same-day look-ahead).",
+        f"Universe: prior-day Top {CANDIDATE_N} candidates → **rolling 24h Top {TOP_N}** (hourly, live-aligned).",
         "",
         "| Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |",
         "|--|--|--|--|--|--|--|",
@@ -417,10 +567,10 @@ def main():
         )
     lines.append("")
     lines.append(
-        "volume = original + break-bar vol≥2.5× prior-20 avg + structure filters"
+        "volume = original + 爆量≥2.5× (break-bar OR 4h-peak vs pre-window avg) + structure filters"
     )
     lines.append(
-        "volume2 = original + break-bar vol≥3.5× + same structure filters"
+        "volume2 = original + 爆量≥3.5× (same peak window) + same structure filters"
     )
     lines.append("")
     lines.append(
@@ -428,6 +578,9 @@ def main():
     )
     lines.append(
         "Deep-below 15m SMA200 (dist < −3%): skips late shorts after a higher-TF dump (e.g. GWEI)."
+    )
+    lines.append(
+        "Rolling 24h Top10 catches same-day pumps that prior-day Top10 misses (e.g. ACE 08-14)."
     )
     report = "\n".join(lines)
     (OUT / f"shadow_neckline_{tag}_report.md").write_text(report, encoding="utf-8")
