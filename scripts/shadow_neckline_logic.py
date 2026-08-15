@@ -37,10 +37,11 @@ class DetectParams:
     max_near_above_ma99: float = 0.0
     min_abs_dist_ma200: float = 0.0
     max_near_above_ma200: float = 0.0
-    # volume spike (爆量)：破位那根 vs 前 N 根均量
+    # volume spike (爆量)：破位棒 或 近窗峰值，對照基準均量
+    # （大拉抬後近均量被抬高時，破位棒相對倍率會失真，如 ACE）
     min_vol_ratio: float = 0.0  # 0 = off; 2.5 = 爆量 ≥2.5×
-    vol_lookback: int = 20
-    vol_spike_window: int = 1  # unused (compat); 爆量只看破位棒
+    vol_lookback: int = 20  # 基準均量根數
+    vol_spike_window: int = 48  # 往回看峰值窗口（48×5m=4h）；1=只看破位棒
     # structure quality: classic H&S short prefers flat/descending neck
     reject_rising_neck: bool = False
     # avoid shorting into rising SMA200 support when price is glued to it
@@ -62,7 +63,8 @@ class DetectParams:
 
 RAW = DetectParams()
 VOLUME = DetectParams(
-    min_vol_ratio=2.5,  # 爆量：破位 K ≥ 2.5× 近 20 均量
+    min_vol_ratio=2.5,  # 爆量 ≥ 2.5×
+    vol_spike_window=48,  # 破位棒或近4h峰值 / 窗口前20均
     reject_rising_neck=True,  # 上升頸線（右肩抬高）不空
     reject_near_rising_sma200=True,  # 上彎 SMA200 附近不空（BEAT / XAN）
     near_sma200_pct=4.0,  # |距| < 4% 且 SMA200 上彎 → 拒（濾 XAN 低位貼均）
@@ -77,6 +79,7 @@ VOLUME = DetectParams(
 BALANCED = VOLUME
 STRICT = DetectParams(
     min_vol_ratio=3.5,  # 強爆量
+    vol_spike_window=48,
     reject_rising_neck=True,
     reject_near_rising_sma200=True,
     near_sma200_pct=4.0,
@@ -169,16 +172,29 @@ def detect_at_index(
     if p.require_red and not (close[curr_idx] < open_[curr_idx]):
         return False, None
 
-    # 爆量：破位 K 量能相對近 N 均量
+    # 爆量：破位棒 / 近均量，或「近窗峰值 / 窗口前均量」（吃到拉抬爆量，如 ACE）
     vol_ratio = None
     if p.min_vol_ratio > 0:
-        lb = p.vol_lookback
+        lb = max(1, int(p.vol_lookback))
+        win = max(1, int(p.vol_spike_window))
         if curr_idx < lb:
             return False, None
-        v_avg = float(np.nanmean(volume[curr_idx - lb : curr_idx]))
-        if not (v_avg > 0) or np.isnan(v_avg):
+        # A) classic: break bar vs prior lb mean
+        v_avg_break = float(np.nanmean(volume[curr_idx - lb : curr_idx]))
+        if not (v_avg_break > 0) or np.isnan(v_avg_break):
             return False, None
-        vol_ratio = float(volume[curr_idx]) / v_avg
+        ratio_break = float(volume[curr_idx]) / v_avg_break
+        ratio_peak = 0.0
+        if win > 1:
+            spike_lo = curr_idx - win + 1
+            base_lo = spike_lo - lb
+            if spike_lo >= 0 and base_lo >= 0:
+                v_avg_pre = float(np.nanmean(volume[base_lo:spike_lo]))
+                if v_avg_pre > 0 and not np.isnan(v_avg_pre):
+                    v_peak = float(np.nanmax(volume[spike_lo : curr_idx + 1]))
+                    if not np.isnan(v_peak):
+                        ratio_peak = v_peak / v_avg_pre
+        vol_ratio = max(ratio_break, ratio_peak)
         if vol_ratio < p.min_vol_ratio:
             return False, None
 
