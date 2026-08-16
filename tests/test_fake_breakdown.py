@@ -43,7 +43,7 @@ class FakeBreakdownTests(unittest.TestCase):
         self.assertLess(p.break_pct, 0.03)
         self.assertIsNotNone(p.breakout_idx)
         self.assertGreater(df["close"].iloc[p.breakout_idx], p.resistance)
-        self.assertGreater(p.volume_ratio, 1.15)
+        self.assertGreater(p.volume_ratio, 1.3)
 
         signals = FakeBreakdownStrategy().generate_signals(df)
         self.assertGreaterEqual(len(signals), 1)
@@ -69,22 +69,6 @@ class FakeBreakdownTests(unittest.TestCase):
         p = patterns[0]
         self.assertLessEqual(p.reclaim_idx + 12, p.breakout_idx)
         self.assertGreater(df["close"].iloc[p.breakout_idx], p.resistance)
-
-    def test_neckline_ignores_upper_wick(self) -> None:
-        """單根上影不該把頸線撐高；收盤過實體高即可進場。"""
-        rows = _flat(55, 420.0, noise=0.3)
-        rows[45] = (420.0, 425.0, 420.0, 421.0, 200)
-        rows.append((418.0, 418.5, 413.0, 414.0, 180))
-        rows.append((414.0, 420.5, 413.5, 420.2, 190))
-        rows.append((420.5, 424.5, 420.0, 424.0, 520))
-        df = _bars(rows)
-        patterns = detect_fake_breakdowns(df)
-        self.assertGreaterEqual(len(patterns), 1)
-        p = patterns[0]
-        self.assertLess(p.resistance, 425.0)
-        self.assertLess(p.resistance, p.box_high + 1e-9)
-        self.assertGreater(df["close"].iloc[p.breakout_idx], p.resistance)
-        self.assertAlmostEqual(float(df["close"].iloc[p.breakout_idx]), 424.0)
 
     def test_ignores_breakdown_without_reclaim(self) -> None:
         rows = _flat(50, 420.0)

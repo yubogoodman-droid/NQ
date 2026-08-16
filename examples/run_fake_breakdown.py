@@ -79,8 +79,7 @@ def _print_pattern(df: pd.DataFrame, pattern: FakeBreakdownPattern) -> None:
     print(
         f"盤整 {df.index[pattern.range_start_idx].strftime('%H:%M')}–"
         f"{df.index[pattern.range_end_idx].strftime('%H:%M')} | "
-        f"箱 {pattern.support:.2f}–{pattern.box_high:.2f} ({pattern.range_pct * 100:.2f}%) | "
-        f"頸線 {pattern.resistance:.2f}"
+        f"箱 {pattern.support:.2f}–{pattern.resistance:.2f} ({pattern.range_pct * 100:.2f}%)"
     )
     print(
         f"假跌破 {df.index[pattern.spring_idx].strftime('%H:%M')} @ {pattern.spring_low:.2f} "

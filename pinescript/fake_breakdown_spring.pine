@@ -10,9 +10,8 @@ maxBreakPct    = input.float(3.0, "最大跌破深度 (%)", minval=0.5, step=0.1
 maxSpringBars  = input.int(15, "假跌破最多持續 K", minval=3)
 maxReclaimBars = input.int(10, "站回最多等待 K", minval=2)
 maxBreakoutBars = input.int(24, "突破最多等待 K", minval=2)
-necklineFrac   = input.float(80.0, "頸線位置（箱振幅 %）", minval=40, step=5) / 100
 volLen         = input.int(20, "量能均線", minval=5)
-breakoutVolMult = input.float(1.2, "突破放量倍數", minval=1.0, step=0.1)
+breakoutVolMult = input.float(1.4, "突破放量倍數", minval=1.0, step=0.1)
 springVolMaxMult = input.float(1.35, "跌破段量能上限倍數", minval=0.8, step=0.05)
 rewardR        = input.float(2.0, "停利 R 倍數", minval=0.5, step=0.5)
 useVolume      = input.bool(true, "要求放量確認")
@@ -26,10 +25,8 @@ volSma = ta.sma(volume, volLen)
 
 prevHigh = ta.highest(high, rangeBars)[1]
 prevLow  = ta.lowest(low, rangeBars)[1]
-bodyHigh = ta.highest(close, rangeBars)[1]
 prevMid  = (prevHigh + prevLow) / 2
 boxPct   = prevMid > 0 ? (prevHigh - prevLow) / prevMid : 1.0
-neckline = math.min(bodyHigh, prevLow + necklineFrac * (prevHigh - prevLow))
 maMax    = math.max(ma5, math.max(ma10, ma20))
 maMin    = math.min(ma5, math.min(ma10, ma20))
 maSpread = close > 0 ? (maMax - maMin) / close : 1.0
@@ -59,7 +56,7 @@ reset() =>
 if st == 0 and tightBox and clustered and prevLow > 0 and low < prevLow * (1 - minBreakPct)
     st := 1
     boxSup := prevLow
-    boxRes := neckline
+    boxRes := prevHigh
     springLow := low
     springBar := bar_index
     springVolSum := volume
@@ -102,6 +99,6 @@ plot(ma5, "MA5", color=color.new(#ffa726, 0), linewidth=1)
 plot(ma10, "MA10", color=color.new(#ffeb3b, 0), linewidth=1)
 plot(ma20, "MA20", color=color.new(#66bb6a, 0), linewidth=1)
 plot(st > 0 ? boxSup : na, "支撐", color=color.aqua, style=plot.style_linebr)
-plot(st > 0 ? boxRes : na, "頸線", color=color.orange, style=plot.style_linebr)
+plot(st > 0 ? boxRes : na, "箱高", color=color.orange, style=plot.style_linebr)
 plot(st > 0 ? springLow : na, "假跌破低", color=color.red, style=plot.style_circles)
 plotshape(longSignal, title="進場", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)

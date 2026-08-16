@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from nq.strategy import FakeBreakdownStrategy, MaAlignStrategy, NQWBottomStrategy, Signal
+from nq.strategy import FakeBreakdownStrategy, NQWBottomStrategy, Signal
 
-Strategy = NQWBottomStrategy | FakeBreakdownStrategy | MaAlignStrategy
+Strategy = NQWBottomStrategy | FakeBreakdownStrategy
 
 
 @dataclass

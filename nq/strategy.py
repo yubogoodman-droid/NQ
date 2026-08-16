@@ -7,7 +7,6 @@ from enum import Enum
 
 import pandas as pd
 
-from nq.ma_align import MaAlignPattern, detect_ma_align_alerts
 from nq.patterns import WBottomPattern, detect_w_bottoms
 from nq.spring import FakeBreakdownPattern, detect_fake_breakdowns
 
@@ -25,7 +24,7 @@ class Signal:
     entry: float
     stop_loss: float
     target: float
-    pattern: WBottomPattern | FakeBreakdownPattern | MaAlignPattern
+    pattern: WBottomPattern | FakeBreakdownPattern
     bar_idx: int
 
     @property
@@ -99,7 +98,7 @@ class FakeBreakdownStrategy:
     """
     假跌破後上拉（Spring）做多策略。
 
-    進場：盤整箱體被假跌破、迅速站回後，收盤突破頸線（盤整收盤高）且放量
+    進場：盤整箱體被假跌破、迅速站回後，收盤突破箱體高且放量
     停損：假跌破最低點
     停利：進場價 + reward_r × 風險（預設 2R）
     """
@@ -112,8 +111,7 @@ class FakeBreakdownStrategy:
     max_spring_bars: int = 15
     max_reclaim_bars: int = 10
     max_breakout_bars: int = 24
-    neckline_frac: float = 0.8
-    breakout_vol_mult: float = 1.2
+    breakout_vol_mult: float = 1.4
     spring_vol_max_mult: float = 1.35
     require_volume: bool = True
     reward_r: float = 2.0
@@ -133,7 +131,6 @@ class FakeBreakdownStrategy:
             max_spring_bars=self.max_spring_bars,
             max_reclaim_bars=self.max_reclaim_bars,
             max_breakout_bars=self.max_breakout_bars,
-            neckline_frac=self.neckline_frac,
             breakout_vol_mult=self.breakout_vol_mult,
             spring_vol_max_mult=self.spring_vol_max_mult,
             require_volume=self.require_volume,
@@ -153,48 +150,6 @@ class FakeBreakdownStrategy:
                 continue
             target = self._round_tick(entry + self.reward_r * risk)
 
-            signals.append(
-                Signal(
-                    timestamp=df.index[idx],
-                    side=Side.LONG,
-                    entry=entry,
-                    stop_loss=stop,
-                    target=target,
-                    pattern=pattern,
-                    bar_idx=idx,
-                )
-            )
-        return signals
-
-    def _round_tick(self, price: float) -> float:
-        return round(price / self.tick_size) * self.tick_size
-
-
-@dataclass
-class MaAlignStrategy:
-    """
-    1 分 K 多頭排列通知策略。
-
-    進場：MA5 > MA10 > MA20，且收盤剛站上 MA200（前一根還沒站上）
-    停損：MA20
-    停利：進場價 + reward_r × 風險（預設 2R）
-    """
-
-    reward_r: float = 2.0
-    tick_size: float = 0.5
-    point_value: float = 1.0
-    skip_open_minutes: int = 5
-
-    def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
-        signals: list[Signal] = []
-        for pattern in detect_ma_align_alerts(df, skip_open_minutes=self.skip_open_minutes):
-            idx = pattern.bar_idx
-            entry = self._round_tick(float(df["close"].iloc[idx]))
-            stop = self._round_tick(pattern.stop_loss)
-            risk = entry - stop
-            if risk <= 0:
-                continue
-            target = self._round_tick(entry + self.reward_r * risk)
             signals.append(
                 Signal(
                     timestamp=df.index[idx],
