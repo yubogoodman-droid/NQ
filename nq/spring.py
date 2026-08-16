@@ -18,7 +18,8 @@ class FakeBreakdownPattern:
     reclaim_idx: int
     breakout_idx: int | None
     support: float
-    resistance: float
+    resistance: float  # 頸線（盤整收盤高，不吃上影）
+    box_high: float  # 箱體最高價（含上影，僅供參考）
     spring_low: float
     range_pct: float
     break_pct: float
@@ -49,6 +50,26 @@ def _rolling_mean(values: Sequence[float], period: int) -> list[float | None]:
     return out
 
 
+def _neckline(
+    closes: Sequence[float],
+    start: int,
+    end: int,
+    support: float,
+    box_high: float,
+    frac: float,
+) -> float:
+    """頸線：盤整收盤高，且不超過箱振幅的 frac（預設不吃上影、略低於箱頂）。"""
+    body_high = max(closes[start : end + 1])
+    box_h = box_high - support
+    if box_h <= 0:
+        return box_high
+    capped = support + frac * box_h
+    line = min(body_high, capped)
+    if line <= support:
+        line = capped
+    return min(box_high, max(support, line))
+
+
 def _is_tight_box(
     highs: Sequence[float],
     lows: Sequence[float],
@@ -56,21 +77,22 @@ def _is_tight_box(
     start: int,
     end: int,
     range_max_pct: float,
-) -> tuple[float, float, float] | None:
-    """回傳 (support, resistance, range_pct)；不夠橫盤則為 None。"""
+    neckline_frac: float,
+) -> tuple[float, float, float, float] | None:
+    """回傳 (support, box_high, neckline, range_pct)；不夠橫盤則為 None。"""
     if end <= start:
         return None
     support = min(lows[start : end + 1])
-    resistance = max(highs[start : end + 1])
-    mid = (support + resistance) / 2
+    box_high = max(highs[start : end + 1])
+    mid = (support + box_high) / 2
     if mid <= 0:
         return None
-    range_pct = (resistance - support) / mid
+    range_pct = (box_high - support) / mid
     if range_pct > range_max_pct or range_pct <= 0:
         return None
 
     # 避免單邊趨勢穿過箱體：首尾收盤距離不得大於箱高的 60%
-    box_h = resistance - support
+    box_h = box_high - support
     if abs(closes[end] - closes[start]) > 0.6 * box_h:
         return None
 
@@ -78,12 +100,15 @@ def _is_tight_box(
     inside = 0
     total = end - start + 1
     for i in range(start, end + 1):
-        if support <= closes[i] <= resistance:
+        if support <= closes[i] <= box_high:
             inside += 1
     if inside / total < 0.85:
         return None
 
-    return support, resistance, range_pct
+    neckline = _neckline(closes, start, end, support, box_high, neckline_frac)
+    if neckline <= support:
+        return None
+    return support, box_high, neckline, range_pct
 
 
 def _ma_cluster_ok(
@@ -114,13 +139,14 @@ def detect_fake_breakdowns(
     range_max_pct: float = 0.02,
     ma_periods: tuple[int, ...] = (5, 10, 20),
     ma_cluster_pct: float = 0.012,
-    min_break_pct: float = 0.005,
+    min_break_pct: float = 0.004,
     max_break_pct: float = 0.03,
     max_spring_bars: int = 15,
     max_reclaim_bars: int = 10,
     max_breakout_bars: int = 24,
+    neckline_frac: float = 0.8,
     vol_ma: int = 20,
-    breakout_vol_mult: float = 1.4,
+    breakout_vol_mult: float = 1.2,
     spring_vol_max_mult: float = 1.35,
     require_volume: bool = True,
     same_session: bool = True,
@@ -133,7 +159,7 @@ def detect_fake_breakdowns(
     1. 盤整：近期箱體夠窄，均線糾結，價格貼著均線走
     2. 假跌破：短暫跌破箱體低，深度在 min/max_break_pct 之間，量能不宜爆量恐慌
     3. 站回：很快收盤站回原支撐
-    4. 上拉：收盤突破箱體高，且量能放大
+    4. 上拉：收盤突破頸線（盤整收盤高，不吃上影），且量能放大
     5. 開盤濾波：箱體與突破同一交易日，並略過開盤後 skip_open_minutes 分鐘
 
     Parameters
@@ -164,10 +190,10 @@ def detect_fake_breakdowns(
 
     for range_end in range(min_end, n - 2):
         range_start = range_end - range_bars + 1
-        box = _is_tight_box(highs, lows, closes, range_start, range_end, range_max_pct)
+        box = _is_tight_box(highs, lows, closes, range_start, range_end, range_max_pct, neckline_frac)
         if box is None:
             continue
-        support, resistance, range_pct = box
+        support, box_high, neckline, range_pct = box
         if not _ma_cluster_ok(ma_series, range_end, closes[range_end], ma_cluster_pct):
             continue
 
@@ -226,7 +252,7 @@ def detect_fake_breakdowns(
                 else:
                     ratio = volumes[k] / base
                     vol_ok = ratio >= breakout_vol_mult
-            if closes[k] > resistance and vol_ok:
+            if closes[k] > neckline and vol_ok:
                 breakout_idx = k
                 volume_ratio = ratio
                 break
@@ -249,7 +275,8 @@ def detect_fake_breakdowns(
                 reclaim_idx=reclaim_idx,
                 breakout_idx=breakout_idx,
                 support=support,
-                resistance=resistance,
+                resistance=neckline,
+                box_high=box_high,
                 spring_low=spring_low,
                 range_pct=range_pct,
                 break_pct=break_pct,

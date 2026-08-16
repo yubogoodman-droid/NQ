@@ -100,8 +100,10 @@ def save_png(df: pd.DataFrame, signal, trade, path: Path, title: str) -> Path:
     if df.index[p.range_start_idx] in w.index and df.index[p.range_end_idx] in w.index:
         x0 = int(w.index.get_loc(df.index[p.range_start_idx]))
         x1 = int(w.index.get_loc(df.index[p.range_end_idx]))
-        ax.plot([x0, x1], [p.support, p.support], color="#42a5f5", ls="--", lw=1)
-        ax.plot([x0, x1], [p.resistance, p.resistance], color="#ffa726", ls="--", lw=1)
+        ax.plot([x0, x1], [p.support, p.support], color="#42a5f5", ls="--", lw=1, label="支撐")
+        ax.plot([x0, x1], [p.resistance, p.resistance], color="#ffa726", ls="--", lw=1.6, label="頸線")
+        if p.box_high > p.resistance + 1e-6:
+            ax.plot([x0, x1], [p.box_high, p.box_high], color="#ffa726", ls=":", lw=0.9, alpha=0.55, label="箱頂影線")
     ax.axhspan(p.support, p.resistance, color="#42a5f5", alpha=0.08)
     if df.index[p.spring_idx] in w.index:
         ax.scatter([int(w.index.get_loc(df.index[p.spring_idx]))], [p.spring_low], s=36, c="#ff5252", zorder=5, label="假跌破")
@@ -186,7 +188,7 @@ def main() -> None:
     html_text = render_report_html(
         cards,
         title="2026-08-14 成交額前50 · 假跌破 1分K",
-        summary="已濾開盤雜訊（箱體不可跨夜、略過開盤 5 分鐘）；站回後最多等 24 根才突破（對齊金居 8/14）。均線 MA5/10/20/60/120/200。",
+        summary="頸線改吃盤整收盤高（不吃上影）。已濾開盤雜訊。均線 MA5/10/20/60/120/200。",
     )
     out = save_report(args.html, html_text)
     print(f"HTML: {out.resolve()}  共 {len(cards)} 張")

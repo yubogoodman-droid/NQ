@@ -98,7 +98,7 @@ class FakeBreakdownStrategy:
     """
     假跌破後上拉（Spring）做多策略。
 
-    進場：盤整箱體被假跌破、迅速站回後，收盤突破箱體高且放量
+    進場：盤整箱體被假跌破、迅速站回後，收盤突破頸線（盤整收盤高）且放量
     停損：假跌破最低點
     停利：進場價 + reward_r × 風險（預設 2R）
     """
@@ -106,12 +106,13 @@ class FakeBreakdownStrategy:
     range_bars: int = 18
     range_max_pct: float = 0.02
     ma_cluster_pct: float = 0.012
-    min_break_pct: float = 0.005
+    min_break_pct: float = 0.004
     max_break_pct: float = 0.03
     max_spring_bars: int = 15
     max_reclaim_bars: int = 10
     max_breakout_bars: int = 24
-    breakout_vol_mult: float = 1.4
+    neckline_frac: float = 0.8
+    breakout_vol_mult: float = 1.2
     spring_vol_max_mult: float = 1.35
     require_volume: bool = True
     reward_r: float = 2.0
@@ -131,6 +132,7 @@ class FakeBreakdownStrategy:
             max_spring_bars=self.max_spring_bars,
             max_reclaim_bars=self.max_reclaim_bars,
             max_breakout_bars=self.max_breakout_bars,
+            neckline_frac=self.neckline_frac,
             breakout_vol_mult=self.breakout_vol_mult,
             spring_vol_max_mult=self.spring_vol_max_mult,
             require_volume=self.require_volume,

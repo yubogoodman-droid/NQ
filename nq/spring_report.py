@@ -117,6 +117,17 @@ def build_signal_figure(
     )
     fig.add_trace(
         go.Scatter(
+            x=[box_start, box_end],
+            y=[p.resistance, p.resistance],
+            mode="lines",
+            line=dict(color="#ffa726", width=2, dash="dash"),
+            name="頸線",
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
             x=[_naive(df.index[p.spring_idx])],
             y=[p.spring_low],
             mode="markers+text",
@@ -207,7 +218,7 @@ def render_report_html(
         detail = (
             f"進場 {_fmt(sig.timestamp)} @ {sig.entry:.2f}\n"
             f"停損 {sig.stop_loss:.2f} / 目標 {sig.target:.2f}\n"
-            f"箱 {p.support:.2f}–{p.resistance:.2f} / 假跌破 {p.spring_low:.2f} ({p.break_pct * 100:.2f}%)\n"
+            f"箱 {p.support:.2f}–{p.box_high:.2f} / 頸線 {p.resistance:.2f} / 假跌破 {p.spring_low:.2f} ({p.break_pct * 100:.2f}%)\n"
             f"放量 {p.volume_ratio:.2f}x"
         )
         sections.append(

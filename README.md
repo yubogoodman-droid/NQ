@@ -60,7 +60,7 @@ python3 examples/chart_today.py
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
 3. **上週五假跌破 1 分 K**  
-   https://yubogoodman-droid.github.io/NQ/spring/?v=jinju
+   https://yubogoodman-droid.github.io/NQ/spring/?v=neck
 
 ## 假跌破後上拉（1 分 K）
 
@@ -79,9 +79,9 @@ python3 examples/chart_today.py
 | 條件 | 說明 |
 |------|------|
 | 盤整 | 約 18 根 K 箱體振幅 ≤ 2%，MA5/10/20 糾結 |
-| 假跌破 | 跌破箱低 0.5%～3%，持續不久，量能不宜爆量恐慌 |
+| 假跌破 | 跌破箱低 0.4%～3%，持續不久，量能不宜爆量恐慌 |
 | 站回 | 很快收盤站回原支撐 |
-| 進場 | 站回後 24 根內收盤突破箱高，且量能 ≥ 20MA 的 1.4 倍 |
+| 進場 | 站回後 24 根內收盤突破頸線（盤整收盤高，不吃上影），且量能 ≥ 20MA 的 1.2 倍 |
 | 停損 | 假跌破最低點 |
 | 停利 | 預設 2R |
 
@@ -104,7 +104,7 @@ python examples/chart_spring_top50.py                                  # 出 1 �
 報告：`docs/spring_top50_20260814.html`
 
 外網直接開（手機可）：  
-https://yubogoodman-droid.github.io/NQ/spring/?v=jinju
+https://yubogoodman-droid.github.io/NQ/spring/?v=neck
 
 ## TradingView
 
@@ -122,7 +122,7 @@ https://yubogoodman-droid.github.io/NQ/spring/?v=jinju
 | `min_bars_between_lows` | 5 | 兩低點最少間隔 |
 | `max_bars_between_lows` | 60 | 兩低點最多間隔（約 5 小時） |
 
-`FakeBreakdownStrategy` 預設對 1 分 K：箱體 18 根、跌破 0.5%～3%、站回後最多等 24 根才突破（對應金居 8/14 約 18 根）、突破量能 1.4 倍、停利 2R；**箱體不可跨夜**，並略過開盤後 5 分鐘（濾掉跳空雜訊）。
+`FakeBreakdownStrategy` 預設對 1 分 K：箱體 18 根、跌破 0.4%～3%、頸線取盤整收盤高（約箱振幅 80%，不吃上影）、站回後最多等 24 根、突破量能 1.2 倍、停利 2R；**箱體不可跨夜**，並略過開盤後 5 分鐘（濾掉跳空雜訊）。
 
 ## 風險提示
 
