@@ -59,8 +59,8 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
-3. **上週五假跌破 1 分 K**  
-   https://yubogoodman-droid.github.io/NQ/spring/?v=jinju
+3. **上週五假跌破 1 分 K（底下附 5 分 K）**  
+   https://yubogoodman-droid.github.io/NQ/spring/?v=1m5m
 
 ## 假跌破後上拉（1 分 K）
 
@@ -93,18 +93,17 @@ python3 -m unittest tests.test_fake_breakdown -v
 
 台股 CSV 需含 `datetime,open,high,low,close,volume`。
 
-掃描上週五成交額前 50 檔（1 分 K）：
+掃描上週五成交額前 50 檔（1 分 K 訊號，圖底下附 5 分 K）：
 
 ```bash
 python examples/scan_tw_top50_spring.py --date 20260814 --limit 50
-python examples/scan_tw_top50_spring.py --date 20260814 --after 00:00   # 含開盤後立刻的訊號
-python examples/chart_spring_top50.py                                  # 出 1 分 K 報告
+python examples/chart_spring_top50.py                                  # 1 分 K 報告，每張底下有 5 分 K
 ```
 
 報告：`docs/spring_top50_20260814.html`
 
 外網直接開（手機可）：  
-https://yubogoodman-droid.github.io/NQ/spring/?v=jinju
+https://yubogoodman-droid.github.io/NQ/spring/?v=1m5m
 
 ## TradingView
 

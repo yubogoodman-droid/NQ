@@ -40,6 +40,28 @@ def _fmt(ts: pd.Timestamp) -> str:
     return _naive(ts).strftime("%m-%d %H:%M")
 
 
+def resample_to_5m(df: pd.DataFrame) -> pd.DataFrame:
+    """把 1 分 K 合成 5 分 K（左標、含開盤 09:00 那根）。"""
+    cols = [c for c in ("open", "high", "low", "close", "volume") if c in df.columns]
+    work = df[cols].copy()
+    idx = work.index
+    if getattr(idx, "tz", None) is None:
+        work.index = idx.tz_localize("Asia/Taipei")
+    else:
+        work.index = idx.tz_convert("Asia/Taipei")
+    agg = {"open": "first", "high": "max", "low": "min", "close": "last"}
+    if "volume" in work.columns:
+        agg["volume"] = "sum"
+    out = work.resample("5min", label="left", closed="left").agg(agg)
+    return out.dropna(subset=["open", "high", "low", "close"])
+
+
+def session_window(df: pd.DataFrame, ts: pd.Timestamp) -> pd.DataFrame:
+    day = _naive(ts).date()
+    mask = [_naive(t).date() == day for t in df.index]
+    return df.loc[mask]
+
+
 def chart_window(df: pd.DataFrame, pattern: FakeBreakdownPattern, extra: int = 35) -> pd.DataFrame:
     pivot = pattern.breakout_idx or pattern.reclaim_idx
     day = _naive(df.index[pivot]).date()
@@ -57,10 +79,11 @@ def build_signal_figure(
     *,
     title: str,
     height: int = 460,
+    window: pd.DataFrame | None = None,
 ) -> go.Figure:
     p = signal.pattern
     assert isinstance(p, FakeBreakdownPattern)
-    window = chart_window(df, p)
+    window = chart_window(df, p) if window is None else window
     times = [_naive(t) for t in window.index]
 
     fig = make_subplots(
@@ -195,6 +218,18 @@ def render_report_html(
         assert isinstance(p, FakeBreakdownPattern)
         fig = build_signal_figure(df, sig, trade, title=f"#{i} {label} · 1分K")
         chart = fig.to_html(full_html=False, include_plotlyjs=False, config={"displayModeBar": False})
+        df5 = add_mas(resample_to_5m(df))
+        win5 = session_window(df5, sig.timestamp)
+        chart5 = ""
+        if not win5.empty:
+            fig5 = build_signal_figure(
+                df,
+                sig,
+                trade,
+                title=f"#{i} {label} · 5分K",
+                window=win5,
+            )
+            chart5 = fig5.to_html(full_html=False, include_plotlyjs=False, config={"displayModeBar": False})
         pnl = ""
         tag = '<span class="tag tag-info">訊號</span>'
         if trade is not None:
@@ -222,7 +257,9 @@ def render_report_html(
       </header>
       <div class="tags">{tag}<span class="tag tag-info">1分K</span><span class="tag tag-info">假跌破</span></div>
       <pre class="trade-detail">{html.escape(detail)}</pre>
+      <div class="tf-label">1分K</div>
       <div class="mini-chart">{chart}</div>
+      {f'<div class="tf-label">5分K</div><div class="mini-chart">{chart5}</div>' if chart5 else ""}
     </article>"""
         )
 
@@ -254,7 +291,8 @@ def render_report_html(
     .tag-time {{ background:rgba(255,193,7,.12); color:#f0c14b; border-color:rgba(255,193,7,.3); }}
     .tag-info {{ background:rgba(88,166,255,.12); color:#79c0ff; border-color:rgba(88,166,255,.28); }}
     .trade-detail {{ margin:0 0 10px; padding:10px 12px; background:#0d1117; border-radius:10px; border:1px solid #21262d; font-family:ui-monospace,Menlo,monospace; font-size:12px; line-height:1.55; color:#c9d1d9; white-space:pre-wrap; }}
-    .mini-chart {{ margin:0 -6px -4px; border-radius:10px; overflow:hidden; }}
+    .mini-chart {{ margin:0 -6px 8px; border-radius:10px; overflow:hidden; }}
+    .tf-label {{ font-size:11px; font-weight:700; color:#79c0ff; margin:8px 0 4px; }}
     .empty {{ text-align:center; color:#8b949e; padding:40px 16px; }}
   </style>
 </head>

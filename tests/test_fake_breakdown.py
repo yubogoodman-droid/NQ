@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from examples.run_fake_breakdown import make_sample_fake_breakdown_bars
 from nq.spring import detect_fake_breakdowns
+from nq.spring_report import resample_to_5m
 from nq.strategy import FakeBreakdownStrategy
 
 
@@ -127,6 +128,15 @@ class FakeBreakdownTests(unittest.TestCase):
         for p in late:
             t = df.index[p.breakout_idx]
             self.assertGreaterEqual(t.hour * 60 + t.minute, 9 * 60 + 5)
+
+    def test_resample_1m_to_5m(self) -> None:
+        rows = _flat(10, 420.0, vol=100)
+        df = _bars(rows, start="2026-08-14 09:00")
+        out = resample_to_5m(df)
+        self.assertEqual(len(out), 2)
+        first = out.iloc[0]
+        self.assertEqual(float(first["volume"]), 500)
+        self.assertAlmostEqual(float(first["close"]), 420.0)
 
 
 if __name__ == "__main__":
