@@ -94,7 +94,7 @@ def build_signal_figure(
                     y=window[col],
                     mode="lines",
                     name=f"MA{period}",
-                    line=dict(color=MA_COLORS[period], width=1.4 if period <= 20 else 1.15),
+                    line=dict(color=MA_COLORS[period], width=3 if period <= 20 else 2.4),
                     showlegend=True,
                 ),
                 row=1,

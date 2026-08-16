@@ -80,18 +80,32 @@ def save_png(df: pd.DataFrame, signal, trade, path: Path, title: str) -> Path:
         axv.bar(i, row["volume"], width=0.7, color=color, alpha=0.85)
 
     xs = list(range(len(w)))
+    ma_lows = []
+    ma_highs = []
     for period in MA_PERIODS:
         col = f"ma{period}"
         if col not in w.columns or not w[col].notna().any():
             continue
+        series = w[col]
+        ma_lows.append(float(series.min()))
+        ma_highs.append(float(series.max()))
+        ax.plot(xs, series, color="#0b0e11", lw=5.0 if period <= 20 else 4.2, zorder=18, solid_capstyle="round")
         ax.plot(
             xs,
-            w[col],
+            series,
             color=MA_COLORS[period],
-            lw=1.6 if period <= 20 else 1.25,
+            lw=2.8 if period <= 20 else 2.4,
             label=f"MA{period}",
-            zorder=3,
+            zorder=19,
+            solid_capstyle="round",
         )
+    y0 = float(w["low"].min())
+    y1 = float(w["high"].max())
+    if ma_lows:
+        y0 = min(y0, min(ma_lows))
+        y1 = max(y1, max(ma_highs))
+    pad = (y1 - y0) * 0.04 or 1
+    ax.set_ylim(y0 - pad, y1 + pad)
 
     def loc(ts: pd.Timestamp) -> int:
         return int(w.index.get_indexer([ts], method="nearest")[0])
@@ -171,10 +185,12 @@ def main() -> None:
             label = f"{code} {name}"
             cards.append((label, df, sig, trade))
             hhmm = (sig.timestamp.tz_convert("Asia/Taipei") if sig.timestamp.tzinfo else sig.timestamp).strftime("%H%M")
-            png_name = f"{code}_{hhmm}.png"
+            png_name = f"{code}_{hhmm}_v2.png"
             png = save_png(df, sig, trade, png_dir / png_name, f"{code} {name}  {args.date} 1m")
-            art = artifact_dir / png_name
-            art.write_bytes(png.read_bytes())
+            try:
+                (artifact_dir / png_name).write_bytes(png.read_bytes())
+            except OSError:
+                pass
             print(f"圖: {png}")
 
     html_text = render_report_html(
