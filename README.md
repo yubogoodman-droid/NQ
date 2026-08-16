@@ -63,7 +63,7 @@ python3 examples/chart_today.py
    https://yubogoodman-droid.github.io/NQ/spring/?v=neck
 
 4. **1 分 K 5/10/20 多頭且站上 MA200**  
-   https://yubogoodman-droid.github.io/NQ/ma-align/?v=1m
+   https://yubogoodman-droid.github.io/NQ/ma-align/?v=cross
 
 ## 假跌破後上拉（1 分 K）
 
@@ -130,13 +130,13 @@ https://yubogoodman-droid.github.io/NQ/spring/?v=neck
 
 ## 1 分 K 5/10/20 多頭排列且站上 MA200
 
-當 **MA5 > MA10 > MA20**，且 **收盤 > MA200**（1 分 K 的 200 期均線），並且前一根尚未同時成立時，發出通知（只在剛轉多時跳，持續排列不會一直響）。略過開盤後 5 分鐘。
+當 **MA5 > MA10 > MA20**，且 **收盤剛站上 MA200**（1 分 K 的 200 期均線：前一根還沒站上，這一根收盤才站上）。已經站在 MA200 上方、只是均線重新排好，不通知。略過開盤後 5 分鐘。
 
 | 條件 | 說明 |
 |------|------|
 | 多頭排列 | 1 分 K MA5 > MA10 > MA20 |
 | 站上 MA200 | 收盤價 > MA200 |
-| 通知 | 兩個條件「這一根才同時成立」 |
+| 通知 | 前一根收盤還沒站上 MA200，這一根才站上 |
 | 停損 | MA20 |
 | 停利 | 預設 2R，最多持有 30 根 |
 
@@ -149,7 +149,7 @@ python3 -m unittest tests.test_ma_align -v
 報告：`docs/ma-align/index.html`
 
 外網直接開：  
-https://yubogoodman-droid.github.io/NQ/ma-align/?v=1m
+https://yubogoodman-droid.github.io/NQ/ma-align/?v=cross
 
 ## 風險提示
 

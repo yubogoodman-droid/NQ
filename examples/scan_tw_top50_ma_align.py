@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""回測台股指定日成交額前 N 檔：1 分 K MA5>MA10>MA20 且收盤站上 MA200。"""
+"""回測台股指定日成交額前 N 檔：1 分 K 收盤剛站上 MA200，且 MA5>MA10>MA20。"""
 
 from __future__ import annotations
 

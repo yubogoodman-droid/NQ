@@ -9,7 +9,7 @@ import pandas as pd
 
 @dataclass(frozen=True)
 class MaAlignPattern:
-    """剛成立的多頭排列 + 收盤站上 MA200。"""
+    """多頭排列下，收盤剛站上 MA200。"""
 
     bar_idx: int
     close: float
@@ -46,12 +46,20 @@ def _as_local(ts: pd.Timestamp) -> pd.Timestamp:
     return ts
 
 
-def is_aligned(row: pd.Series) -> bool:
-    if pd.isna(row.get("ma5")) or pd.isna(row.get("ma10")) or pd.isna(row.get("ma20")) or pd.isna(row.get("ma200")):
+def is_stacked(row: pd.Series) -> bool:
+    if pd.isna(row.get("ma5")) or pd.isna(row.get("ma10")) or pd.isna(row.get("ma20")):
         return False
-    return _bull_stack(float(row["ma5"]), float(row["ma10"]), float(row["ma20"])) and float(row["close"]) > float(
-        row["ma200"]
-    )
+    return _bull_stack(float(row["ma5"]), float(row["ma10"]), float(row["ma20"]))
+
+
+def is_above_ma200(row: pd.Series) -> bool:
+    if pd.isna(row.get("ma200")):
+        return False
+    return float(row["close"]) > float(row["ma200"])
+
+
+def is_aligned(row: pd.Series) -> bool:
+    return is_stacked(row) and is_above_ma200(row)
 
 
 def detect_ma_align_alerts(
@@ -60,22 +68,24 @@ def detect_ma_align_alerts(
     skip_open_minutes: int = 5,
 ) -> list[MaAlignPattern]:
     """
-    偵測「這一根才成立」的通知：MA5 > MA10 > MA20 且收盤 > MA200，
-    且前一根尚未同時滿足。
+    偵測收盤剛站上 1 分 K MA200 的通知：
+    前一根收盤尚未站上 MA200，這一根收盤才站上，且當時 MA5 > MA10 > MA20。
+    已經站在 MA200 上方、只是均線重新排好，不算。
     """
     if df.empty or "close" not in df.columns:
         return []
     work = add_mas(df)
     patterns: list[MaAlignPattern] = []
-    prev_ok = False
+    prev_above = False
     for i in range(len(work)):
         row = work.iloc[i]
-        ok = is_aligned(row)
+        above = is_above_ma200(row)
+        stacked = is_stacked(row)
         too_early = False
         if skip_open_minutes > 0:
             local = _as_local(df.index[i])
             too_early = local.hour == 9 and local.minute < skip_open_minutes
-        if ok and not prev_ok and not too_early:
+        if stacked and above and not prev_above and not too_early:
             patterns.append(
                 MaAlignPattern(
                     bar_idx=i,
@@ -86,5 +96,5 @@ def detect_ma_align_alerts(
                     ma200=float(row["ma200"]),
                 )
             )
-        prev_ok = ok
+        prev_above = above
     return patterns

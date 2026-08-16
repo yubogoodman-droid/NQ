@@ -11,11 +11,10 @@ ma200 = ta.sma(close, 200)
 
 stacked = ma5 > ma10 and ma10 > ma20
 above200 = close > ma200
-aligned = stacked and above200
 newDay = ta.change(time("D")) != 0
 barsToday = nz(ta.barssince(newDay), 0)
 openOk = barsToday >= skipOpen
-notify = aligned and not aligned[1] and openOk
+notify = stacked and above200 and not above200[1] and openOk
 
 if notify
     stopLevel = ma20
@@ -24,9 +23,9 @@ if notify
         strategy.entry("多頭排列", strategy.long)
         strategy.exit("多頭排列出場", "多頭排列", stop=stopLevel, limit=close + rewardR * risk)
 
-alertcondition(notify, title="1分K 5/10/20多頭且站上MA200", message="{{ticker}} 1分K MA5>MA10>MA20 且收盤站上 MA200")
+alertcondition(notify, title="1分K 收盤站上MA200（多頭排列）", message="{{ticker}} 1分K 收盤剛站上 MA200，且 MA5>MA10>MA20")
 if notify
-    alert("{{ticker}} 1分K MA5>MA10>MA20 且收盤站上 MA200", alert.freq_once_per_bar_close)
+    alert("{{ticker}} 1分K 收盤剛站上 MA200，且 MA5>MA10>MA20", alert.freq_once_per_bar_close)
 
 plot(ma5, "MA5", color=color.new(#ffa726, 0), linewidth=2)
 plot(ma10, "MA10", color=color.new(#ffeb3b, 0), linewidth=2)

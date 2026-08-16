@@ -35,7 +35,8 @@ class MaAlignTests(unittest.TestCase):
         row = add_mas(df).iloc[p.bar_idx]
         self.assertTrue(is_aligned(row))
         if p.bar_idx > 0:
-            self.assertFalse(is_aligned(add_mas(df).iloc[p.bar_idx - 1]))
+            prev = add_mas(df).iloc[p.bar_idx - 1]
+            self.assertFalse(float(prev["close"]) > float(prev["ma200"]))
 
         signals = MaAlignStrategy(tick_size=0.01, skip_open_minutes=0).generate_signals(df)
         self.assertGreaterEqual(len(signals), 1)
@@ -61,6 +62,37 @@ class MaAlignTests(unittest.TestCase):
         self.assertGreater(float(last["ma10"]), float(last["ma20"]))
         self.assertLess(float(last["close"]), float(last["ma200"]))
         self.assertEqual(detect_ma_align_alerts(df, skip_open_minutes=0), [])
+
+    def test_ignores_restack_while_already_above_ma200(self) -> None:
+        closes = [100.0] * 200 + [130.0] * 12 + [115.0] * 10 + [130.0 + i * 0.2 for i in range(20)]
+        df = _bars(closes, start="2026-08-14 10:00")
+        work = add_mas(df)
+        alerts = detect_ma_align_alerts(df, skip_open_minutes=0)
+        self.assertGreaterEqual(len(alerts), 1)
+        first = alerts[0]
+        self.assertGreater(float(work.iloc[first.bar_idx]["close"]), float(work.iloc[first.bar_idx]["ma200"]))
+        restack_start = 200 + 12 + 10
+        later = [p for p in alerts if p.bar_idx >= restack_start]
+        self.assertEqual(later, [])
+        last = work.iloc[-1]
+        self.assertGreater(float(last["close"]), float(last["ma200"]))
+        self.assertGreater(float(last["ma5"]), float(last["ma10"]))
+        self.assertGreater(float(last["ma10"]), float(last["ma20"]))
+
+    def test_fires_again_after_close_drops_below_ma200(self) -> None:
+        closes = [100.0] * 200 + [120.0] * 8 + [80.0] * 30 + [130.0] * 15
+        df = _bars(closes, start="2026-08-14 10:00")
+        work = add_mas(df)
+        alerts = detect_ma_align_alerts(df, skip_open_minutes=0)
+        self.assertGreaterEqual(len(alerts), 2)
+        for p in alerts:
+            if p.bar_idx > 0:
+                prev = work.iloc[p.bar_idx - 1]
+                self.assertFalse(float(prev["close"]) > float(prev["ma200"]))
+            row = work.iloc[p.bar_idx]
+            self.assertGreater(float(row["close"]), float(row["ma200"]))
+            self.assertGreater(float(row["ma5"]), float(row["ma10"]))
+            self.assertGreater(float(row["ma10"]), float(row["ma20"]))
 
     def test_skips_first_minutes(self) -> None:
         closes = [100.0] * 200 + [100.0 + i * 0.8 for i in range(1, 20)]

@@ -248,7 +248,7 @@ def main() -> None:
 
     miss = f" 無通知：{'、'.join(misses)}。" if misses else ""
     summary = (
-        f"條件：1 分 K MA5>MA10>MA20 且收盤站上 MA200（這一根才成立才跳通知，略過開盤 5 分鐘）。"
+        f"條件：1 分 K MA5>MA10>MA20，且收盤剛站上 MA200（前一根還沒站上才算；略過開盤 5 分鐘）。"
         f" 停損 MA20、停利 2R、最多持有 {args.max_bars_hold} 根。"
         f" 當日 {n_hits} 檔有通知，圖為各檔第一筆。"
         f"{miss}"
