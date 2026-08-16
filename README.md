@@ -60,7 +60,7 @@ python3 examples/chart_today.py
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
 3. **上週五假跌破 1 分 K**  
-   https://raw.githack.com/yubogoodman-droid/NQ/cursor/fake-breakdown-spring-b99b/docs/spring_top50_20260814.html
+   https://yubogoodman-droid.github.io/NQ/spring/
 
 ## 假跌破後上拉（1 分 K）
 
