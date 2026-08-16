@@ -95,7 +95,10 @@ python3 -m unittest tests.test_fake_breakdown -v
 ```bash
 python examples/scan_tw_top50_spring.py --date 20260814 --limit 50
 python examples/scan_tw_top50_spring.py --date 20260814 --after 00:00   # 含開盤後立刻的訊號
+python examples/chart_spring_top50.py                                  # 出 1 分 K 報告
 ```
+
+報告：`docs/spring_top50_20260814.html`
 
 ## TradingView
 
