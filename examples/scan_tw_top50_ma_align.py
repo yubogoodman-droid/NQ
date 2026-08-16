@@ -109,20 +109,22 @@ def main() -> None:
         times = ", ".join(result["alerts"])
         print(f"{tag} | 成交 {amt:7.2f} 億 | 通知 {n} 次 {times} | 1分K {result['day_bars']}")
         for sig in result["signals"]:
-            day_trades += 1
-            if sig["exit"] == "take_profit":
-                day_wins += 1
-            elif sig["exit"] == "stop_loss":
-                day_stops += 1
-            elif sig["exit"] == "time_stop":
-                day_timeouts += 1
             if sig["pnl"] is not None:
+                day_trades += 1
                 day_pnl += sig["pnl"]
+                if sig["exit"] == "take_profit":
+                    day_wins += 1
+                elif sig["exit"] == "stop_loss":
+                    day_stops += 1
+                elif sig["exit"] == "time_stop":
+                    day_timeouts += 1
+            exit_s = sig["exit"] or "未進場"
+            pnl_s = "-" if sig["pnl"] is None else f"{sig['pnl']:+.2f}"
             print(
                 f"     {sig['time']} 做多 {sig['entry']:.2f} 停 {sig['stop']:.2f} "
                 f"目標 {sig['target']:.2f} | MA5 {sig['ma5']:.2f} > MA10 {sig['ma10']:.2f} "
                 f"> MA20 {sig['ma20']:.2f} | 收 {sig['close']:.2f} > MA200 {sig['ma200']:.2f} | "
-                f"{sig['exit']} {sig['pnl']:+.2f}"
+                f"{exit_s} {pnl_s}"
             )
 
     print("\n=== 摘要 ===")
