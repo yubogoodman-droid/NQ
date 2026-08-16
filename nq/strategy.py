@@ -106,7 +106,7 @@ class FakeBreakdownStrategy:
     range_bars: int = 18
     range_max_pct: float = 0.02
     ma_cluster_pct: float = 0.012
-    min_break_pct: float = 0.004
+    min_break_pct: float = 0.005
     max_break_pct: float = 0.03
     max_spring_bars: int = 15
     max_reclaim_bars: int = 10

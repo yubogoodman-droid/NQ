@@ -5,7 +5,7 @@ strategy("假跌破後上拉", overlay=true, default_qty_type=strategy.fixed, de
 rangeBars      = input.int(18, "盤整箱體 K 數", minval=8)
 rangeMaxPct    = input.float(2.0, "箱體最大振幅 (%)", minval=0.3, step=0.1) / 100
 maClusterPct   = input.float(1.2, "均線糾結最大差距 (%)", minval=0.2, step=0.1) / 100
-minBreakPct    = input.float(0.4, "最小跌破深度 (%)", minval=0.1, step=0.1) / 100
+minBreakPct    = input.float(0.5, "最小跌破深度 (%)", minval=0.1, step=0.1) / 100
 maxBreakPct    = input.float(3.0, "最大跌破深度 (%)", minval=0.5, step=0.1) / 100
 maxSpringBars  = input.int(15, "假跌破最多持續 K", minval=3)
 maxReclaimBars = input.int(10, "站回最多等待 K", minval=2)
