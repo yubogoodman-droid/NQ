@@ -173,20 +173,21 @@ class FakeBreakdownStrategy:
 @dataclass
 class MaAlignStrategy:
     """
-    日線多頭排列通知策略。
+    1 分 K 多頭排列通知策略。
 
-    進場：MA5 > MA10 > MA20，且收盤站上 MA200（當日才成立才通知）
-    停損：MA20（至少離進場 1.5%）
+    進場：MA5 > MA10 > MA20，且收盤站上 MA200（這一根才成立才通知）
+    停損：MA20
     停利：進場價 + reward_r × 風險（預設 2R）
     """
 
     reward_r: float = 2.0
     tick_size: float = 0.5
     point_value: float = 1.0
+    skip_open_minutes: int = 5
 
     def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
         signals: list[Signal] = []
-        for pattern in detect_ma_align_alerts(df):
+        for pattern in detect_ma_align_alerts(df, skip_open_minutes=self.skip_open_minutes):
             idx = pattern.bar_idx
             entry = self._round_tick(float(df["close"].iloc[idx]))
             stop = self._round_tick(pattern.stop_loss)

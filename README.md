@@ -62,8 +62,8 @@ python3 examples/chart_today.py
 3. **上週五假跌破 1 分 K**  
    https://yubogoodman-droid.github.io/NQ/spring/?v=neck
 
-4. **日線 5/10/20 多頭且站上 200 日**  
-   https://yubogoodman-droid.github.io/NQ/ma-align/?v=1
+4. **1 分 K 5/10/20 多頭且站上 MA200**  
+   https://yubogoodman-droid.github.io/NQ/ma-align/?v=1m
 
 ## 假跌破後上拉（1 分 K）
 
@@ -113,6 +113,7 @@ https://yubogoodman-droid.github.io/NQ/spring/?v=neck
 
 - W 底：`pinescript/nq_w_bottom_5m.pine`，NQ1! / MNQ1! 五分圖
 - 假跌破：`pinescript/fake_breakdown_spring.pine`，1 分圖（台股或 NQ 皆可）
+- 多頭排列：`pinescript/ma5_10_20_above_200.pine`，1 分圖（MA5>MA10>MA20 且收盤站上 MA200）
 
 ## 參數調整
 
@@ -127,17 +128,17 @@ https://yubogoodman-droid.github.io/NQ/spring/?v=neck
 
 `FakeBreakdownStrategy` 預設對 1 分 K：箱體 18 根、跌破 0.5%～3%、頸線取盤整收盤高（約箱振幅 80%，不吃上影）、站回後最多等 24 根、突破量能 1.2 倍、停利 2R；**箱體不可跨夜**，並略過開盤後 5 分鐘（濾掉跳空雜訊）。
 
-## 日線 5/10/20 多頭排列且站上 200 日
+## 1 分 K 5/10/20 多頭排列且站上 MA200
 
-當 **MA5 > MA10 > MA20**，且 **收盤 > MA200**，並且前一日尚未同時成立時，發出通知（只在剛轉多時跳，已排列的不會天天響）。
+當 **MA5 > MA10 > MA20**，且 **收盤 > MA200**（1 分 K 的 200 期均線），並且前一根尚未同時成立時，發出通知（只在剛轉多時跳，持續排列不會一直響）。略過開盤後 5 分鐘。
 
 | 條件 | 說明 |
 |------|------|
-| 多頭排列 | 日線 MA5 > MA10 > MA20 |
-| 站上 200 日 | 收盤價 > MA200 |
-| 通知 | 兩個條件「今天才同時成立」 |
-| 停損 | MA20（至少離進場 1.5%） |
-| 停利 | 預設 2R |
+| 多頭排列 | 1 分 K MA5 > MA10 > MA20 |
+| 站上 MA200 | 收盤價 > MA200 |
+| 通知 | 兩個條件「這一根才同時成立」 |
+| 停損 | MA20 |
+| 停利 | 預設 2R，最多持有 30 根 |
 
 ```bash
 python3 examples/scan_tw_top50_ma_align.py --date 20260814 --limit 50
@@ -146,6 +147,9 @@ python3 -m unittest tests.test_ma_align -v
 ```
 
 報告：`docs/ma-align/index.html`
+
+外網直接開：  
+https://yubogoodman-droid.github.io/NQ/ma-align/?v=1m
 
 ## 風險提示
 

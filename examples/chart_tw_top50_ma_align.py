@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""把成交額前 50 的日線多頭排列通知畫成報告。"""
+"""把成交額前 50 的 1 分 K 多頭排列通知畫成報告。"""
 
 from __future__ import annotations
 
@@ -28,10 +28,9 @@ for _fp in (
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from examples.scan_tw_top50_ma_align import fetch_yahoo_daily, scan_stock
-from examples.scan_tw_top50_spring import fetch_top_turnover, tw_tick_size
+from examples.scan_tw_top50_spring import fetch_top_turnover, fetch_yahoo_1m, tw_tick_size
 from nq.backtest import run_backtest
-from nq.ma_align import MaAlignPattern, add_daily_mas
+from nq.ma_align import MaAlignPattern, add_mas
 from nq.strategy import MaAlignStrategy
 
 MA_COLORS = {5: "#ffa726", 10: "#ffeb3b", 20: "#66bb6a", 200: "#ab47bc"}
@@ -42,19 +41,35 @@ def _naive(ts):
     return pd.Timestamp(t).tz_localize(None) if getattr(t, "tzinfo", None) else pd.Timestamp(t)
 
 
+def chart_window(df: pd.DataFrame, bar_idx: int, before: int = 80, after: int = 35) -> pd.DataFrame:
+    day = _naive(df.index[bar_idx]).date()
+    session = [i for i, t in enumerate(df.index) if _naive(t).date() == day]
+    sess0, sess1 = session[0], session[-1]
+    start = max(sess0, bar_idx - before)
+    end = min(sess1, bar_idx + after)
+    return df.iloc[start : end + 1]
+
+
 def save_png(df: pd.DataFrame, signal, trade, path: Path, title: str) -> Path:
     p = signal.pattern
     assert isinstance(p, MaAlignPattern)
-    work = add_daily_mas(df)
-    start = max(0, signal.bar_idx - 80)
-    end = min(len(work) - 1, signal.bar_idx + 20)
-    w = work.iloc[start : end + 1]
-    fig, ax = plt.subplots(figsize=(11, 5.4), facecolor="#0b0e11")
-    ax.set_facecolor("#161b22")
-    ax.tick_params(colors="#c9d1d9")
-    for spine in ax.spines.values():
-        spine.set_color("#30363d")
-    ax.grid(True, color="#ffffff", alpha=0.06)
+    work = add_mas(df)
+    w = chart_window(work, signal.bar_idx)
+    fig, axes = plt.subplots(
+        2,
+        1,
+        figsize=(11, 6.4),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1], "hspace": 0.04},
+        facecolor="#0b0e11",
+    )
+    ax, axv = axes
+    for a in axes:
+        a.set_facecolor("#161b22")
+        a.tick_params(colors="#c9d1d9")
+        for spine in a.spines.values():
+            spine.set_color("#30363d")
+        a.grid(True, color="#ffffff", alpha=0.06)
 
     for i, (_, row) in enumerate(w.iterrows()):
         up = row["close"] >= row["open"]
@@ -63,22 +78,56 @@ def save_png(df: pd.DataFrame, signal, trade, path: Path, title: str) -> Path:
         bottom = min(row["open"], row["close"])
         height = max(abs(row["close"] - row["open"]), 0.01)
         ax.add_patch(plt.Rectangle((i - 0.35, bottom), 0.7, height, facecolor=color, edgecolor=color, linewidth=0))
+        axv.bar(i, row["volume"], width=0.7, color=color, alpha=0.85)
 
+    xs = list(range(len(w)))
+    ma_lows: list[float] = []
+    ma_highs: list[float] = []
     for period, color in MA_COLORS.items():
-        ax.plot(range(len(w)), w[f"ma{period}"], color=color, lw=2.2 if period <= 20 else 2.6, label=f"MA{period}")
+        series = w[f"ma{period}"]
+        if not series.notna().any():
+            continue
+        ma_lows.append(float(series.min()))
+        ma_highs.append(float(series.max()))
+        ax.plot(xs, series, color="#0b0e11", lw=5.0 if period <= 20 else 4.2, zorder=18, solid_capstyle="round")
+        ax.plot(
+            xs,
+            series,
+            color=color,
+            lw=2.8 if period <= 20 else 2.6,
+            label=f"MA{period}",
+            zorder=19,
+            solid_capstyle="round",
+        )
+
+    y0 = float(w["low"].min())
+    y1 = float(w["high"].max())
+    if ma_lows:
+        y0 = min(y0, min(ma_lows))
+        y1 = max(y1, max(ma_highs))
+    pad = (y1 - y0) * 0.04 or 1
+    ax.set_ylim(y0 - pad, y1 + pad)
 
     loc = int(w.index.get_indexer([df.index[signal.bar_idx]], method="nearest")[0])
     ax.scatter([loc], [signal.entry], marker="^", s=80, c="#00e676", zorder=6, label="通知進場")
-    ax.axhline(signal.stop_loss, color="#ff5252", ls=":", lw=1, alpha=0.7)
-    ax.axhline(signal.target, color="#00c805", ls=":", lw=1, alpha=0.7)
+    ax.axhline(signal.stop_loss, color="#ff5252", ls=":", lw=1, alpha=0.7, label="停損 MA20")
+    ax.axhline(signal.target, color="#00c805", ls=":", lw=1, alpha=0.7, label="目標 2R")
     if trade is not None:
         eloc = int(w.index.get_indexer([trade.exit_time], method="nearest")[0])
         ax.scatter([eloc], [trade.exit_price], marker="x", s=50, c="#69f0ae" if trade.pnl_points > 0 else "#ff5252")
     ax.set_title(title, color="#e6edf3", loc="left", fontsize=12)
-    ax.legend(facecolor="#161b22", edgecolor="#30363d", labelcolor="#c9d1d9", fontsize=8, ncol=5, loc="upper left")
+    ax.legend(
+        facecolor="#161b22",
+        edgecolor="#30363d",
+        labelcolor="#c9d1d9",
+        fontsize=8,
+        ncol=4,
+        loc="upper left",
+        framealpha=0.85,
+    )
     ticks = list(range(0, len(w), max(1, len(w) // 6)))
-    ax.set_xticks(ticks)
-    ax.set_xticklabels([_naive(w.index[i]).strftime("%m-%d") for i in ticks], color="#c9d1d9")
+    axv.set_xticks(ticks)
+    axv.set_xticklabels([_naive(w.index[i]).strftime("%H:%M") for i in ticks], color="#c9d1d9")
     fig.savefig(path, dpi=140, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
     return path
@@ -86,7 +135,7 @@ def save_png(df: pd.DataFrame, signal, trade, path: Path, title: str) -> Path:
 
 def render_html(cards: list, title: str, summary: str) -> str:
     sections = []
-    for i, (label, df, sig, trade, png_name) in enumerate(cards, 1):
+    for i, (label, _df, sig, trade, png_name) in enumerate(cards, 1):
         p = sig.pattern
         pnl = ""
         tag = '<span class="tag tag-info">通知</span>'
@@ -98,8 +147,8 @@ def render_html(cards: list, title: str, summary: str) -> str:
             )
             tag = f'<span class="tag {reason[1]}">{reason[0]}</span>'
         detail = (
-            f"進場 {_naive(sig.timestamp).strftime('%Y-%m-%d')} @ {sig.entry:.2f}\n"
-            f"停損 {sig.stop_loss:.2f} / 目標 {sig.target:.2f}\n"
+            f"進場 {_naive(sig.timestamp).strftime('%Y-%m-%d %H:%M')} @ {sig.entry:.2f}\n"
+            f"停損 {sig.stop_loss:.2f}（MA20） / 目標 {sig.target:.2f}\n"
             f"MA5 {p.ma5:.2f} > MA10 {p.ma10:.2f} > MA20 {p.ma20:.2f}\n"
             f"收盤 {p.close:.2f} > MA200 {p.ma200:.2f}"
         )
@@ -110,10 +159,10 @@ def render_html(cards: list, title: str, summary: str) -> str:
     <article class="card">
       <header class="card-header">
         <div><span class="trade-no">#{i} {html.escape(label)}</span>
-        <span class="trade-time">{_naive(sig.timestamp).strftime('%Y-%m-%d')}</span></div>
+        <span class="trade-time">{_naive(sig.timestamp).strftime('%H:%M')}</span></div>
         {pnl}
       </header>
-      <div class="tags">{tag}<span class="tag tag-info">日線</span><span class="tag tag-info">5/10/20+200</span></div>
+      <div class="tags">{tag}<span class="tag tag-info">1分K</span><span class="tag tag-info">5/10/20+200</span></div>
       <pre class="trade-detail">{html.escape(detail)}</pre>
       {img}
     </article>"""
@@ -145,42 +194,66 @@ body {{ margin:0; background:#0b0e11; color:#e6edf3; font-family:-apple-system,B
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="日線多頭排列通知圖")
+    parser = argparse.ArgumentParser(description="1 分 K 多頭排列通知圖")
     parser.add_argument("--date", default="2026-08-14")
     parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument("--max-bars-hold", type=int, default=30)
+    parser.add_argument("--max-charts-per-stock", type=int, default=2)
     parser.add_argument("--html", default="docs/ma-align/index.html")
     parser.add_argument("--png-dir", default="docs/ma-align")
     args = parser.parse_args()
 
     png_dir = Path(args.png_dir)
     png_dir.mkdir(parents=True, exist_ok=True)
+    artifact_dir = Path("/opt/cursor/artifacts/screenshots")
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+
     ymd = args.date.replace("-", "")
     universe = fetch_top_turnover(ymd, args.limit)
     cards = []
-    aligned_names = []
+    hit_names: list[str] = []
+    extra_times: list[str] = []
     for row in universe:
-        result = scan_stock(row, args.date)
-        time.sleep(0.15)
-        if result.get("aligned"):
-            aligned_names.append(f"{row['code']}{row['name']}")
-        if not result.get("alert"):
+        df = fetch_yahoo_1m(row["symbol"])
+        time.sleep(0.2)
+        if df.empty:
+            print(f"{row['code']} {row['name']}: 無 1 分 K")
             continue
-        df = fetch_yahoo_daily(row["symbol"])
         strategy = MaAlignStrategy(tick_size=tw_tick_size(float(df["close"].iloc[-1])))
-        signals = [s for s in strategy.generate_signals(df) if _naive(s.timestamp).strftime("%Y-%m-%d") == args.date]
-        trades = {t.signal.bar_idx: t for t in run_backtest(df, strategy, max_bars_hold=40)}
-        for sig in signals:
+        signals = [
+            s
+            for s in strategy.generate_signals(df)
+            if _naive(s.timestamp).strftime("%Y-%m-%d") == args.date
+        ]
+        if not signals:
+            print(f"{row['code']} {row['name']}: 無通知")
+            continue
+        times = [_naive(s.timestamp).strftime("%H:%M") for s in signals]
+        hit_names.append(f"{row['code']}{row['name']}({','.join(times)})")
+        trades = {t.signal.bar_idx: t for t in run_backtest(df, strategy, max_bars_hold=args.max_bars_hold)}
+        kept = signals[: args.max_charts_per_stock]
+        if len(signals) > len(kept):
+            extra_times.append(f"{row['code']} 另有 {', '.join(times[len(kept):])}")
+        for sig in kept:
             trade = trades.get(sig.bar_idx)
-            png_name = f"{row['code']}_{_naive(sig.timestamp).strftime('%Y%m%d')}.png"
-            png = save_png(df, sig, trade, png_dir / png_name, f"{row['code']} {row['name']}  日線")
+            hhmm = _naive(sig.timestamp).strftime("%H%M")
+            png_name = f"{row['code']}_{hhmm}.png"
+            png = save_png(df, sig, trade, png_dir / png_name, f"{row['code']} {row['name']}  {args.date} 1m")
+            try:
+                (artifact_dir / png_name).write_bytes(png.read_bytes())
+            except OSError:
+                pass
             cards.append((f"{row['code']} {row['name']}", df, sig, trade, png_name))
             print(f"圖: {png}")
 
+    extra = (" 未入圖：" + "；".join(extra_times) + "。") if extra_times else ""
     summary = (
-        f"條件：MA5>MA10>MA20 且收盤站上 MA200（當日才成立才跳通知）。"
-        f" 已排列站上200：{'、'.join(aligned_names) if aligned_names else '無'}。"
+        f"條件：1 分 K MA5>MA10>MA20 且收盤站上 MA200（這一根才成立才跳通知，略過開盤 5 分鐘）。"
+        f" 停損 MA20、停利 2R、最多持有 {args.max_bars_hold} 根。"
+        f" 當日新通知：{'、'.join(hit_names) if hit_names else '無'}。"
+        f"{extra}"
     )
-    text = render_html(cards, f"{args.date} 成交額前50 · 日線多頭排列通知", summary)
+    text = render_html(cards, f"{args.date} 成交額前50 · 1分K 多頭排列通知", summary)
     out = Path(args.html)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding="utf-8")

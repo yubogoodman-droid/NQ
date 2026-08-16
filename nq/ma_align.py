@@ -1,4 +1,4 @@
-"""日線：MA5/10/20 多頭排列，且收盤站上 MA200 時發出通知。"""
+"""1 分 K：MA5/10/20 多頭排列，且收盤站上 MA200 時發出通知。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pandas as pd
 
 @dataclass(frozen=True)
 class MaAlignPattern:
-    """剛成立的多頭排列 + 站上 200 日均。"""
+    """剛成立的多頭排列 + 收盤站上 MA200。"""
 
     bar_idx: int
     close: float
@@ -20,12 +20,11 @@ class MaAlignPattern:
 
     @property
     def stop_loss(self) -> float:
-        """停損放在 20 日均下方（至少離進場 1.5%）。"""
-        floor = self.close * 0.985
-        return min(self.ma20, floor)
+        """停損放在 MA20。"""
+        return self.ma20
 
 
-def add_daily_mas(df: pd.DataFrame) -> pd.DataFrame:
+def add_mas(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out["ma5"] = out["close"].rolling(5, min_periods=5).mean()
     out["ma10"] = out["close"].rolling(10, min_periods=10).mean()
@@ -34,8 +33,17 @@ def add_daily_mas(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+add_daily_mas = add_mas
+
+
 def _bull_stack(ma5: float, ma10: float, ma20: float) -> bool:
     return ma5 > ma10 > ma20
+
+
+def _as_local(ts: pd.Timestamp) -> pd.Timestamp:
+    if getattr(ts, "tzinfo", None) is not None:
+        return ts.tz_convert("Asia/Taipei")
+    return ts
 
 
 def is_aligned(row: pd.Series) -> bool:
@@ -46,20 +54,28 @@ def is_aligned(row: pd.Series) -> bool:
     )
 
 
-def detect_ma_align_alerts(df: pd.DataFrame) -> list[MaAlignPattern]:
+def detect_ma_align_alerts(
+    df: pd.DataFrame,
+    *,
+    skip_open_minutes: int = 5,
+) -> list[MaAlignPattern]:
     """
-    偵測「今天才成立」的通知：MA5 > MA10 > MA20 且收盤 > MA200，
-    且前一日尚未同時滿足。
+    偵測「這一根才成立」的通知：MA5 > MA10 > MA20 且收盤 > MA200，
+    且前一根尚未同時滿足。
     """
     if df.empty or "close" not in df.columns:
         return []
-    work = add_daily_mas(df)
+    work = add_mas(df)
     patterns: list[MaAlignPattern] = []
     prev_ok = False
     for i in range(len(work)):
         row = work.iloc[i]
         ok = is_aligned(row)
-        if ok and not prev_ok:
+        too_early = False
+        if skip_open_minutes > 0:
+            local = _as_local(df.index[i])
+            too_early = local.hour == 9 and local.minute < skip_open_minutes
+        if ok and not prev_ok and not too_early:
             patterns.append(
                 MaAlignPattern(
                     bar_idx=i,
