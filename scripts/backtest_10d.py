@@ -555,15 +555,17 @@ def main():
         "",
         f"Universe: prior-day Top {CANDIDATE_N} candidates → **rolling 24h Top {TOP_N}** (hourly, live-aligned).",
         "",
-        "| Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |",
-        "|--|--|--|--|--|--|--|",
+        "| Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg | 8h win | 8h avg |",
+        "|--|--|--|--|--|--|--|--|--|",
     ]
     for name, s in results.items():
         h1 = s["by_horizon"].get("1h") or {}
         h4 = s["by_horizon"].get("4h") or {}
+        h8 = s["by_horizon"].get("8h") or {}
         lines.append(
             f"| {name} | {s['n']} | {s['symbols']} | {h1.get('win_rate')}% | "
-            f"{h1.get('avg')}% | {h4.get('win_rate')}% | {h4.get('avg')}% |"
+            f"{h1.get('avg')}% | {h4.get('win_rate')}% | {h4.get('avg')}% | "
+            f"{h8.get('win_rate')}% | {h8.get('avg')}% |"
         )
     lines.append("")
     lines.append(

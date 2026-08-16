@@ -2,11 +2,11 @@
 
 Universe: prior-day Top 30 candidates → **rolling 24h Top 10** (hourly, live-aligned).
 
-| Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg |
-|--|--|--|--|--|--|--|
-| raw | 349 | 86 | 42.1% | -0.382% | 46.0% | -0.397% |
-| volume | 52 | 30 | 45.1% | -0.326% | 52.9% | 1.587% |
-| volume2 | 45 | 29 | 45.5% | -0.089% | 50.0% | 1.836% |
+| Tier | n | symbols | 1h win | 1h avg | 4h win | 4h avg | 8h win | 8h avg |
+|--|--|--|--|--|--|--|--|--|
+| raw | 349 | 86 | 42.1% | -0.382% | 46.0% | -0.397% | 50.6% | -0.273% |
+| volume | 52 | 30 | 45.1% | -0.326% | 52.9% | 1.587% | 43.8% | -1.155% |
+| volume2 | 45 | 29 | 45.5% | -0.089% | 50.0% | 1.836% | 46.3% | -0.968% |
 
 volume = original + 爆量≥2.5× (break-bar OR 4h-peak vs pre-window avg) + structure filters
 volume2 = original + 爆量≥3.5× (same peak window) + same structure filters
