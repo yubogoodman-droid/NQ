@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from examples.scan_tw_top50_spring import fetch_yahoo_1m, tw_tick_size, yahoo_symbol
 from nq.backtest import run_backtest
 from nq.spring import FakeBreakdownPattern
-from nq.spring_report import add_mas, chart_window, render_report_html, save_report
+from nq.spring_report import MA_COLORS, MA_PERIODS, add_mas, chart_window, render_report_html, save_report
 from nq.strategy import FakeBreakdownStrategy
 
 HITS = [
@@ -57,7 +57,7 @@ def save_png(df: pd.DataFrame, signal, trade, path: Path, title: str) -> Path:
     fig, axes = plt.subplots(
         2,
         1,
-        figsize=(11, 6.2),
+        figsize=(11, 6.6),
         sharex=True,
         gridspec_kw={"height_ratios": [3.2, 1], "hspace": 0.04},
         facecolor="#0b0e11",
@@ -78,6 +78,20 @@ def save_png(df: pd.DataFrame, signal, trade, path: Path, title: str) -> Path:
         height = max(abs(row["close"] - row["open"]), 0.01)
         ax.add_patch(plt.Rectangle((i - 0.35, bottom), 0.7, height, facecolor=color, edgecolor=color, linewidth=0))
         axv.bar(i, row["volume"], width=0.7, color=color, alpha=0.85)
+
+    xs = list(range(len(w)))
+    for period in MA_PERIODS:
+        col = f"ma{period}"
+        if col not in w.columns or not w[col].notna().any():
+            continue
+        ax.plot(
+            xs,
+            w[col],
+            color=MA_COLORS[period],
+            lw=1.6 if period <= 20 else 1.25,
+            label=f"MA{period}",
+            zorder=3,
+        )
 
     def loc(ts: pd.Timestamp) -> int:
         return int(w.index.get_indexer([ts], method="nearest")[0])
@@ -103,7 +117,15 @@ def save_png(df: pd.DataFrame, signal, trade, path: Path, title: str) -> Path:
     ax.axhline(signal.stop_loss, color="#ff5252", ls=":", lw=1, alpha=0.7)
     ax.axhline(signal.target, color="#00c805", ls=":", lw=1, alpha=0.7)
     ax.set_title(title, color="#e6edf3", loc="left", fontsize=12)
-    ax.legend(facecolor="#161b22", edgecolor="#30363d", labelcolor="#c9d1d9", fontsize=8)
+    ax.legend(
+        facecolor="#161b22",
+        edgecolor="#30363d",
+        labelcolor="#c9d1d9",
+        fontsize=7.5,
+        ncol=4,
+        loc="upper left",
+        framealpha=0.85,
+    )
     ticks = list(range(0, len(w), max(1, len(w) // 6)))
     axv.set_xticks(ticks)
     axv.set_xticklabels([_naive_ts(w.index[i]).strftime("%H:%M") for i in ticks], color="#c9d1d9")
@@ -158,7 +180,7 @@ def main() -> None:
     html_text = render_report_html(
         cards,
         title="2026-08-14 成交額前50 · 假跌破 1分K",
-        summary="紅漲綠跌。藍框是盤整箱，紅點假跌破，綠三角進場。持有最多 60 根 1 分 K。",
+        summary="紅漲綠跌。均線 MA5/10/20/60/120/200。藍框是盤整箱，紅點假跌破，綠三角進場。",
     )
     out = save_report(args.html, html_text)
     print(f"HTML: {out.resolve()}  共 {len(cards)} 張")

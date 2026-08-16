@@ -13,8 +13,15 @@ from nq.backtest import TradeResult
 from nq.spring import FakeBreakdownPattern
 from nq.strategy import Signal
 
-MA_PERIODS = (5, 10, 20)
-MA_COLORS = {5: "#ffa726", 10: "#ffeb3b", 20: "#66bb6a"}
+MA_PERIODS = (5, 10, 20, 60, 120, 200)
+MA_COLORS = {
+    5: "#ffa726",
+    10: "#ffeb3b",
+    20: "#66bb6a",
+    60: "#42a5f5",
+    120: "#26c6da",
+    200: "#ab47bc",
+}
 
 
 def add_mas(df: pd.DataFrame) -> pd.DataFrame:
@@ -49,7 +56,7 @@ def build_signal_figure(
     trade: TradeResult | None,
     *,
     title: str,
-    height: int = 420,
+    height: int = 460,
 ) -> go.Figure:
     p = signal.pattern
     assert isinstance(p, FakeBreakdownPattern)
@@ -87,7 +94,7 @@ def build_signal_figure(
                     y=window[col],
                     mode="lines",
                     name=f"MA{period}",
-                    line=dict(color=MA_COLORS[period], width=1.2),
+                    line=dict(color=MA_COLORS[period], width=1.4 if period <= 20 else 1.15),
                     showlegend=True,
                 ),
                 row=1,
