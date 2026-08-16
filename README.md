@@ -90,6 +90,13 @@ python3 -m unittest tests.test_fake_breakdown -v
 
 台股 CSV 需含 `datetime,open,high,low,close,volume`。
 
+掃描上週五成交額前 50 檔（1 分 K）：
+
+```bash
+python examples/scan_tw_top50_spring.py --date 20260814 --limit 50
+python examples/scan_tw_top50_spring.py --date 20260814 --after 00:00   # 含開盤後立刻的訊號
+```
+
 ## TradingView
 
 - W 底：`pinescript/nq_w_bottom_5m.pine`，NQ1! / MNQ1! 五分圖
