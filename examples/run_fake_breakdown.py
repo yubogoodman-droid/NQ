@@ -51,9 +51,20 @@ def make_sample_fake_breakdown_bars(seed: int = 7) -> pd.DataFrame:
             open_off=0.8 if i < 4 else -0.6,
         )
 
-    rally = [419.6, 421.4, 424.0, 428.5, 435.0, 444.0, 452.0, 459.0]
+    # 站回後先在箱內磨，約 18 根才放量站上箱頂（對齊 8358 金居 09:35→09:53）
+    add_bar(419.6, high_off=0.5, low_off=0.3, volume=int(rng.integers(200, 260)), open_off=-0.4)
+    for _ in range(16):
+        price = min(max(420.2 + float(rng.normal(0, 0.06)), 419.7), 420.55)
+        add_bar(
+            price,
+            high_off=0.2,
+            low_off=0.25,
+            volume=int(rng.integers(160, 220)),
+            open_off=float(rng.normal(0, 0.08)),
+        )
+    rally = [424.0, 428.5, 435.0, 444.0, 452.0, 459.0]
     for i, px in enumerate(rally):
-        vol = int(rng.integers(380, 620)) if i >= 1 else int(rng.integers(260, 320))
+        vol = int(rng.integers(380, 620))
         add_bar(px, high_off=1.2, low_off=0.4, volume=vol, open_off=-0.8)
 
     idx = pd.date_range("2026-08-14 09:00", periods=len(rows), freq="1min")

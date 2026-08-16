@@ -9,7 +9,7 @@ minBreakPct    = input.float(0.5, "最小跌破深度 (%)", minval=0.1, step=0.1
 maxBreakPct    = input.float(3.0, "最大跌破深度 (%)", minval=0.5, step=0.1) / 100
 maxSpringBars  = input.int(15, "假跌破最多持續 K", minval=3)
 maxReclaimBars = input.int(10, "站回最多等待 K", minval=2)
-maxBreakoutBars = input.int(12, "突破最多等待 K", minval=2)
+maxBreakoutBars = input.int(24, "突破最多等待 K", minval=2)
 volLen         = input.int(20, "量能均線", minval=5)
 breakoutVolMult = input.float(1.4, "突破放量倍數", minval=1.0, step=0.1)
 springVolMaxMult = input.float(1.35, "跌破段量能上限倍數", minval=0.8, step=0.05)

@@ -110,7 +110,7 @@ class FakeBreakdownStrategy:
     max_break_pct: float = 0.03
     max_spring_bars: int = 15
     max_reclaim_bars: int = 10
-    max_breakout_bars: int = 12
+    max_breakout_bars: int = 24
     breakout_vol_mult: float = 1.4
     spring_vol_max_mult: float = 1.35
     require_volume: bool = True

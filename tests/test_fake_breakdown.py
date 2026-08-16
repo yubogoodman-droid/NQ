@@ -51,6 +51,25 @@ class FakeBreakdownTests(unittest.TestCase):
         self.assertGreater(sig.entry, sig.stop_loss)
         self.assertGreater(sig.target, sig.entry)
 
+    def test_catches_delayed_breakout_like_jinju(self) -> None:
+        """8358 金居 2026-08-14：09:35 站回、09:53 才收盤站上箱頂（約 18 根）。"""
+        rows = _flat(50, 420.0)
+        rows.append((418.0, 418.5, 413.0, 414.0, 180))
+        rows.append((414.0, 420.5, 413.5, 420.2, 190))
+        for _ in range(17):
+            rows.append((420.1, 420.2, 419.6, 420.0, 200))
+        rows.append((420.2, 426.0, 420.0, 425.0, 520))
+        df = _bars(rows)
+
+        tight = detect_fake_breakdowns(df, max_breakout_bars=12)
+        self.assertEqual(tight, [])
+
+        patterns = detect_fake_breakdowns(df)
+        self.assertGreaterEqual(len(patterns), 1)
+        p = patterns[0]
+        self.assertLessEqual(p.reclaim_idx + 12, p.breakout_idx)
+        self.assertGreater(df["close"].iloc[p.breakout_idx], p.resistance)
+
     def test_ignores_breakdown_without_reclaim(self) -> None:
         rows = _flat(50, 420.0)
         px = 420.0

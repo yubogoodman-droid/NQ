@@ -26,24 +26,11 @@ for _fp in (
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from examples.scan_tw_top50_spring import fetch_yahoo_1m, tw_tick_size, yahoo_symbol
+from examples.scan_tw_top50_spring import fetch_top_turnover, fetch_yahoo_1m, tw_tick_size
 from nq.backtest import run_backtest
 from nq.spring import FakeBreakdownPattern
 from nq.spring_report import MA_COLORS, MA_PERIODS, add_mas, chart_window, render_report_html, save_report
 from nq.strategy import FakeBreakdownStrategy
-
-HITS = [
-    ("8046", "南電", "tse"),
-    ("4958", "臻鼎-KY", "tse"),
-    ("3481", "群創", "tse"),
-    ("3532", "台勝科", "tse"),
-    ("6770", "力積電", "tse"),
-    ("3231", "緯創", "tse"),
-    ("2382", "廣達", "tse"),
-    ("2376", "技嘉", "tse"),
-    ("6446", "藥華藥", "tse"),
-]
-
 
 def _naive_ts(ts):
     t = ts.tz_convert("Asia/Taipei") if getattr(ts, "tzinfo", None) else ts
@@ -151,6 +138,7 @@ def save_png(df: pd.DataFrame, signal, trade, path: Path, title: str) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description="假跌破訊號 1 分 K 圖")
     parser.add_argument("--date", default="2026-08-14")
+    parser.add_argument("--limit", type=int, default=50)
     parser.add_argument("--html", default="docs/spring_top50_20260814.html")
     parser.add_argument("--png-dir", default="output/spring_charts")
     args = parser.parse_args()
@@ -160,10 +148,12 @@ def main() -> None:
     artifact_dir = Path("/opt/cursor/artifacts/screenshots")
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
+    ymd = args.date.replace("-", "")
+    universe = fetch_top_turnover(ymd, args.limit)
     cards = []
-    for i, (code, name, mkt) in enumerate(HITS, 1):
-        symbol = yahoo_symbol(code, mkt)
-        df = add_mas(fetch_yahoo_1m(symbol))
+    for row in universe:
+        code, name = row["code"], row["name"]
+        df = add_mas(fetch_yahoo_1m(row["symbol"]))
         time.sleep(0.2)
         if df.empty:
             print(f"{code} {name}: 無 1 分 K")
@@ -196,7 +186,7 @@ def main() -> None:
     html_text = render_report_html(
         cards,
         title="2026-08-14 成交額前50 · 假跌破 1分K",
-        summary="已濾開盤雜訊（箱體不可跨夜、略過開盤 5 分鐘）。均線 MA5/10/20/60/120/200。",
+        summary="已濾開盤雜訊（箱體不可跨夜、略過開盤 5 分鐘）；站回後最多等 24 根才突破（對齊金居 8/14）。均線 MA5/10/20/60/120/200。",
     )
     out = save_report(args.html, html_text)
     print(f"HTML: {out.resolve()}  共 {len(cards)} 張")
