@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate one chart page per signal for the 10-day volume backtest."""
+"""Generate one chart page per signal (structure or volume backtest CSV)."""
 
 from __future__ import annotations
 
@@ -26,6 +26,11 @@ CACHE = Path("/tmp/binance_um_klines")
 # candles kept around each signal (± hours)
 PAD_HOURS = 18
 
+try:
+    from backtest_10d import download_day_df
+except ImportError:  # pragma: no cover
+    download_day_df = None
+
 
 def load_range(stem: str, start: str, end: str) -> pd.DataFrame:
     candidates = [stem]
@@ -34,6 +39,12 @@ def load_range(stem: str, start: str, end: str) -> pd.DataFrame:
             candidates.append(dst)
         if stem == dst:
             candidates.append(src)
+    if download_day_df is not None:
+        for day in pd.date_range(start, end, freq="D").strftime("%Y-%m-%d"):
+            if any((CACHE / f"{s}-5m-{day}.csv").exists() for s in candidates):
+                continue
+            for s in candidates:
+                download_day_df(s, day)
     paths = []
     for s in candidates:
         paths.extend(sorted(CACHE.glob(f"{s}-5m-*.csv")))
@@ -95,20 +106,21 @@ def _pct_cell(v) -> tuple[str, str]:
     return cls, f"{v:+.2f}%"
 
 
-def render_signal_index(cards: list[dict], extra_nav: str) -> str:
+def render_signal_index(cards: list[dict], extra_nav: str, *, title: str, subtitle: str) -> str:
     cards_sorted = sorted(cards, key=lambda x: x["time_utc"], reverse=True)
     items = []
     for c in cards_sorted:
         c1, t1 = _pct_cell(c.get("pnl_1h"))
         c4, t4 = _pct_cell(c.get("pnl_4h"))
         c8, t8 = _pct_cell(c.get("pnl_8h"))
-        vol = "—" if c.get("vol_ratio") is None else f"{c['vol_ratio']:.2f}×"
+        extra_label = c.get("extra_label") or "乖離"
+        extra_val = c.get("extra_val") or "—"
         items.append(
             f"""
         <a class="card" href="./{c['href']}">
           <div class="name">{c['symbol']}</div>
           <div class="row"><span>時間</span><b class="mono">{c['time_utc'][5:]}</b></div>
-          <div class="row"><span>爆量</span><b>{vol}</b></div>
+          <div class="row"><span>{extra_label}</span><b>{extra_val}</b></div>
           <div class="pills">
             <span>1h <b class="{c1}">{t1}</b></span>
             <span>4h <b class="{c4}">{t4}</b></span>
@@ -122,7 +134,7 @@ def render_signal_index(cards: list[dict], extra_nav: str) -> str:
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>10日爆量訊號圖 · 一訊一圖</title>
+<title>{title} · 一訊一圖</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root {{ --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193; --line:rgba(232,240,234,0.12);
@@ -151,8 +163,8 @@ def render_signal_index(cards: list[dict], extra_nav: str) -> str:
 <body>
   <div class="wrap">
     {extra_nav}
-    <h1>10日爆量訊號 · 一訊一圖</h1>
-    <p class="sub">滾動24h Top10 · 爆量≥2.5×（破位棒或4h峰值）+ 結構過濾 · 一訊一圖（±{PAD_HOURS}h）。</p>
+    <h1>{title} · 一訊一圖</h1>
+    <p class="sub">{subtitle}</p>
     <div class="stats">
       <span>訊號總數 <b>{len(cards)}</b></span>
       <span>幣種 <b>{len({c['symbol'] for c in cards})}</b></span>
@@ -170,12 +182,19 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--csv",
-        default="/workspace/output/shadow_neckline_volume_10d.csv",
+        default="/workspace/output/shadow_neckline_structure_10d.csv",
     )
     parser.add_argument("--out", default="/workspace/docs/charts/ten_day")
     parser.add_argument("--start", default=None, help="kline day start YYYY-MM-DD")
     parser.add_argument("--end", default=None, help="kline day end YYYY-MM-DD")
     parser.add_argument("--label", default="10日", help="index title label")
+    parser.add_argument(
+        "--theme",
+        choices=("structure", "volume"),
+        default="structure",
+        help="structure = live logic (no volume); volume = 爆量≥2.5×",
+    )
+    parser.add_argument("--badge", default=None, help="override chart badge text")
     parser.add_argument(
         "--index-only",
         action="store_true",
@@ -225,10 +244,18 @@ def main():
 
     cards = []
     df_cache: dict[str, pd.DataFrame] = {}
+    structure = args.theme == "structure"
+    badge = args.badge or (
+        "一訊一圖 · 結構、不看量" if structure else "一訊一圖 · VOL≥2.5×"
+    )
+    extra_label = "乖離" if structure else "爆量"
 
     for _, row in sig.iterrows():
         symbol = row["symbol"]
         href = signal_filename(symbol, row["time_utc"])
+        pnl_1h = float(row["pnl_1h"]) if "pnl_1h" in row and pd.notna(row["pnl_1h"]) else None
+        pnl_4h = float(row["pnl_4h"]) if "pnl_4h" in row and pd.notna(row["pnl_4h"]) else None
+        pnl_8h = float(row["pnl_8h"]) if "pnl_8h" in row and pd.notna(row["pnl_8h"]) else None
         if not args.index_only:
             stem = file_stem(symbol)
             if stem not in df_cache:
@@ -241,16 +268,27 @@ def main():
             html = render_symbol_html(
                 data,
                 index_href="./index.html",
-                badge="一訊一圖 · VOL≥2.5×",
+                badge=badge,
                 filter_note=f"單一訊號：{row['time_utc']} UTC · 圖面 ±{PAD_HOURS}h · 紅箭=訊號 / 黃點=進場。",
             )
             (out / href).write_text(html, encoding="utf-8")
             print(f"[{args.label}] {href}")
+            if data.get("signals"):
+                p = data["signals"][0].get("pnl") or {}
+                if pnl_1h is None and p.get("1h") is not None:
+                    pnl_1h = float(p["1h"])
+                if pnl_4h is None and p.get("4h") is not None:
+                    pnl_4h = float(p["4h"])
+                if pnl_8h is None and p.get("8h") is not None:
+                    pnl_8h = float(p["8h"])
 
-        pnl_1h = float(row["pnl_1h"]) if "pnl_1h" in row and pd.notna(row["pnl_1h"]) else None
-        pnl_4h = float(row["pnl_4h"]) if "pnl_4h" in row and pd.notna(row["pnl_4h"]) else None
-        pnl_8h = float(row["pnl_8h"]) if "pnl_8h" in row and pd.notna(row["pnl_8h"]) else None
         vol = float(row["vol_ratio"]) if "vol_ratio" in row and pd.notna(row["vol_ratio"]) else None
+        bias = float(row["bias"]) if "bias" in row and pd.notna(row["bias"]) else None
+        extra_val = (
+            (f"{bias:.1f}%" if bias is not None else "—")
+            if structure
+            else (f"{vol:.2f}×" if vol is not None else "—")
+        )
         cards.append(
             {
                 "symbol": symbol,
@@ -260,6 +298,8 @@ def main():
                 "pnl_4h": pnl_4h,
                 "pnl_8h": pnl_8h,
                 "vol_ratio": vol,
+                "extra_label": extra_label,
+                "extra_val": extra_val,
             }
         )
 
@@ -271,17 +311,21 @@ def main():
             if p.name not in keep:
                 p.unlink()
 
-    index_html = render_signal_index(cards, nav)
-    index_html = index_html.replace("10日爆量訊號圖", f"{args.label}爆量訊號圖").replace(
-        "10日爆量訊號", f"{args.label}爆量訊號"
-    )
-    # inject actual window into subtitle
     day0 = str(sig["day"].min()) if "day" in sig.columns and len(sig) else start
     day1 = str(sig["day"].max()) if "day" in sig.columns and len(sig) else end
-    index_html = index_html.replace(
-        "滾動24h Top10 · 爆量≥2.5×（破位棒或4h峰值）+ 結構過濾 · 一訊一圖",
-        f"{day0} → {day1} UTC · 滾動24h Top10 · 爆量≥2.5×（破位棒或4h峰值）+ 結構過濾 · 一訊一圖",
-    )
+    if structure:
+        title = f"{args.label}結構訊號"
+        subtitle = (
+            f"{day0} → {day1} UTC · 滾動24h Top10 · 結構（收盤確認、跨度≥9、乖離≤65%、"
+            f"距SMA200≤40%、不破 MA99）· 不看量 · 一訊一圖（±{PAD_HOURS}h）。"
+        )
+    else:
+        title = f"{args.label}爆量訊號"
+        subtitle = (
+            f"{day0} → {day1} UTC · 滾動24h Top10 · 爆量≥2.5×（破位棒或4h峰值）"
+            f"+ 結構過濾 · 一訊一圖（±{PAD_HOURS}h）。"
+        )
+    index_html = render_signal_index(cards, nav, title=title, subtitle=subtitle)
     (out / "index.html").write_text(index_html, encoding="utf-8")
     print("done", len(cards), "charts ->", out)
 
