@@ -104,10 +104,7 @@ python examples/chart_spring_top50.py                                  # 出 1 �
 報告：`docs/spring_top50_20260814.html`
 
 外網直接開（手機可）：  
-https://raw.githack.com/yubogoodman-droid/NQ/cursor/fake-breakdown-spring-b99b/docs/spring_top50_20260814.html
-
-備用：  
-https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/fake-breakdown-spring-b99b/docs/spring_top50_20260814.html
+https://yubogoodman-droid.github.io/NQ/spring/
 
 ## TradingView
 
