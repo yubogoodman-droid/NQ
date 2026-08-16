@@ -88,13 +88,20 @@ def chart_payload_one(symbol: str, row: pd.Series, df: pd.DataFrame) -> dict:
     }
 
 
+def _pct_cell(v) -> tuple[str, str]:
+    if v is None:
+        return "na", "—"
+    cls = "pos" if v >= 0 else "neg"
+    return cls, f"{v:+.2f}%"
+
+
 def render_signal_index(cards: list[dict], extra_nav: str) -> str:
-    cards_sorted = sorted(cards, key=lambda x: x["time_utc"])
+    cards_sorted = sorted(cards, key=lambda x: x["time_utc"], reverse=True)
     items = []
     for c in cards_sorted:
-        avg = c["pnl_1h"]
-        avg_cls = "pos" if avg is not None and avg >= 0 else "neg"
-        avg_txt = "—" if avg is None else f"{avg:+.2f}%"
+        c1, t1 = _pct_cell(c.get("pnl_1h"))
+        c4, t4 = _pct_cell(c.get("pnl_4h"))
+        c8, t8 = _pct_cell(c.get("pnl_8h"))
         vol = "—" if c.get("vol_ratio") is None else f"{c['vol_ratio']:.2f}×"
         items.append(
             f"""
@@ -102,7 +109,11 @@ def render_signal_index(cards: list[dict], extra_nav: str) -> str:
           <div class="name">{c['symbol']}</div>
           <div class="row"><span>時間</span><b class="mono">{c['time_utc'][5:]}</b></div>
           <div class="row"><span>爆量</span><b>{vol}</b></div>
-          <div class="row"><span>1h 空報酬</span><b class="{avg_cls}">{avg_txt}</b></div>
+          <div class="pills">
+            <span>1h <b class="{c1}">{t1}</b></span>
+            <span>4h <b class="{c4}">{t4}</b></span>
+            <span>8h <b class="{c8}">{t8}</b></span>
+          </div>
         </a>"""
         )
     body = "\n".join(items)
@@ -123,7 +134,7 @@ def render_signal_index(cards: list[dict], extra_nav: str) -> str:
   .sub {{ color:var(--muted); max-width:44rem; line-height:1.55; margin-bottom:22px; }}
   .stats {{ display:flex; flex-wrap:wrap; gap:14px 22px; margin-bottom:22px; color:var(--muted); font-size:.9rem; }}
   .stats b {{ color:var(--ink); font-family:"JetBrains Mono",monospace; }}
-  .grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }}
+  .grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }}
   a.card {{ display:block; text-decoration:none; color:inherit; border:1px solid var(--line); padding:16px;
     background:linear-gradient(180deg, rgba(255,255,255,.04), transparent 55%), rgba(20,32,27,.65);
     transition: border-color .15s, transform .15s; }}
@@ -131,7 +142,9 @@ def render_signal_index(cards: list[dict], extra_nav: str) -> str:
   .name {{ font-family:"IBM Plex Serif",serif; font-size:1.15rem; margin-bottom:10px; }}
   .row {{ display:flex; justify-content:space-between; gap:10px; font-size:.86rem; color:var(--muted); margin-top:6px; }}
   .row b {{ color:var(--ink); font-family:"JetBrains Mono",monospace; font-size:.8rem; }}
-  .pos {{ color:var(--long); }} .neg {{ color:var(--short); }}
+  .pills {{ display:flex; justify-content:space-between; gap:6px; margin-top:12px; font-size:.72rem; color:var(--muted); }}
+  .pills b {{ font-family:"JetBrains Mono",monospace; font-size:.78rem; }}
+  .pos {{ color:var(--long); }} .neg {{ color:var(--short); }} .na {{ color:var(--muted); }}
   .mono {{ font-family:"JetBrains Mono",monospace; }}
 </style>
 </head>
@@ -163,6 +176,11 @@ def main():
     parser.add_argument("--start", default=None, help="kline day start YYYY-MM-DD")
     parser.add_argument("--end", default=None, help="kline day end YYYY-MM-DD")
     parser.add_argument("--label", default="10日", help="index title label")
+    parser.add_argument(
+        "--index-only",
+        action="store_true",
+        help="rebuild index.html from CSV without rewriting chart pages",
+    )
     args = parser.parse_args()
 
     sig = pd.read_csv(args.csv).sort_values(["time_utc", "symbol"]).reset_index(drop=True)
@@ -210,25 +228,28 @@ def main():
 
     for _, row in sig.iterrows():
         symbol = row["symbol"]
-        stem = file_stem(symbol)
-        if stem not in df_cache:
-            df = load_range(stem, start, end)
-            for n in (7, 14, 25, 99, 200):
-                df[f"sma{n}"] = ta.sma(df["close"], length=n)
-            df_cache[stem] = df
-        df = df_cache[stem]
-
-        data = chart_payload_one(symbol, row[need_cols], df)
         href = signal_filename(symbol, row["time_utc"])
-        html = render_symbol_html(
-            data,
-            index_href="./index.html",
-            badge="一訊一圖 · VOL≥2.5×",
-            filter_note=f"單一訊號：{row['time_utc']} UTC · 圖面 ±{PAD_HOURS}h · 紅箭=訊號 / 黃點=進場。",
-        )
-        (out / href).write_text(html, encoding="utf-8")
+        if not args.index_only:
+            stem = file_stem(symbol)
+            if stem not in df_cache:
+                df = load_range(stem, start, end)
+                for n in (7, 14, 25, 99, 200):
+                    df[f"sma{n}"] = ta.sma(df["close"], length=n)
+                df_cache[stem] = df
+            df = df_cache[stem]
+            data = chart_payload_one(symbol, row[need_cols], df)
+            html = render_symbol_html(
+                data,
+                index_href="./index.html",
+                badge="一訊一圖 · VOL≥2.5×",
+                filter_note=f"單一訊號：{row['time_utc']} UTC · 圖面 ±{PAD_HOURS}h · 紅箭=訊號 / 黃點=進場。",
+            )
+            (out / href).write_text(html, encoding="utf-8")
+            print(f"[{args.label}] {href}")
 
         pnl_1h = float(row["pnl_1h"]) if "pnl_1h" in row and pd.notna(row["pnl_1h"]) else None
+        pnl_4h = float(row["pnl_4h"]) if "pnl_4h" in row and pd.notna(row["pnl_4h"]) else None
+        pnl_8h = float(row["pnl_8h"]) if "pnl_8h" in row and pd.notna(row["pnl_8h"]) else None
         vol = float(row["vol_ratio"]) if "vol_ratio" in row and pd.notna(row["vol_ratio"]) else None
         cards.append(
             {
@@ -236,17 +257,19 @@ def main():
                 "href": href,
                 "time_utc": row["time_utc"],
                 "pnl_1h": pnl_1h,
+                "pnl_4h": pnl_4h,
+                "pnl_8h": pnl_8h,
                 "vol_ratio": vol,
             }
         )
-        print(f"[{args.label}] {href}")
 
-    keep = {c["href"] for c in cards}
-    for p in out.glob("*.html"):
-        if p.name == "index.html":
-            continue
-        if p.name not in keep:
-            p.unlink()
+    if not args.index_only:
+        keep = {c["href"] for c in cards}
+        for p in out.glob("*.html"):
+            if p.name == "index.html":
+                continue
+            if p.name not in keep:
+                p.unlink()
 
     index_html = render_signal_index(cards, nav)
     index_html = index_html.replace("10日爆量訊號圖", f"{args.label}爆量訊號圖").replace(

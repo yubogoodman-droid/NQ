@@ -1,55 +1,70 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>影線頸線回測圖表 · 2026-08-14</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>影線頸線圖表</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
-  :root { --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193; --line:rgba(232,240,234,.12); --accent:#c9a227; }
-  body { margin:0; font-family:"IBM Plex Sans",sans-serif; color:var(--ink);
-    background: radial-gradient(900px 500px at 10% -10%, rgba(201,162,39,.18), transparent 55%), linear-gradient(165deg,var(--bg0),var(--bg1)); min-height:100vh; }
-  .wrap { max-width:860px; margin:0 auto; padding:48px 20px; }
-  h1 { font-family:"IBM Plex Serif",serif; font-size:clamp(2rem,4vw,2.8rem); margin:0 0 10px; }
-  .sub { color:var(--muted); line-height:1.55; margin-bottom:28px; }
-  .grid { display:grid; gap:14px; }
-  a.card { display:block; text-decoration:none; color:inherit; border:1px solid var(--line); padding:20px;
-    background:rgba(20,32,27,.65); transition:border-color .15s, transform .15s; }
-  a.card:hover { border-color:rgba(201,162,39,.55); transform:translateY(-2px); }
-  a.card.recommend { border-color: rgba(201,162,39,.45); }
-  .name { font-family:"IBM Plex Serif",serif; font-size:1.35rem; margin-bottom:8px; }
-  .desc { color:var(--muted); font-size:.92rem; line-height:1.45; }
-  .meta { margin-top:12px; font-family:"JetBrains Mono",monospace; font-size:.78rem; color:var(--accent); }
-  .tag { display:inline-block; margin-bottom:8px; font-family:"JetBrains Mono",monospace; font-size:.68rem; color:var(--accent); border:1px solid rgba(201,162,39,.35); padding:2px 6px; }
-</style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>影線頸線圖表</h1>
-    <p class="sub">至 2026-08-14 UTC · Vision+BingX · 滾動 24h Top10 + 爆量≥2.5×（破位棒或 4h 峰值）+ 結構過濾。含 ACE 08-14 訊號。</p>
-    <div class="grid">
-      <a class="card recommend" href="./ten_day/index.html">
-        <div class="tag">RECOMMENDED</div>
-        <div class="name">10 日爆量 · 一訊一圖</div>
-        <div class="desc">2026-08-05 → 08-14 · 滾動 24h Top10 · vol≥2.5× · 含 ACE。</div>
-        <div class="meta">52 筆訊號</div>
-      </a>
-      <a class="card" href="./thirty_day/index.html">
-        <div class="name">30 日爆量 · 一訊一圖</div>
-        <div class="desc">2026-07-16 → 08-14 · 同一套邏輯 · 一訊一圖。</div>
-        <div class="meta">175 筆訊號</div>
-      </a>
-      <a class="card" href="./ten_day.html">
-        <div class="name">10 日回測摘要</div>
-        <div class="desc">逐日勝率與平均報酬表。</div>
-        <div class="meta">raw / volume / volume2</div>
-      </a>
-      <a class="card" href="./thirty_day.html">
-        <div class="name">30 日回測摘要</div>
-        <div class="desc">30 日勝率與逐日表。</div>
-        <div class="meta">raw / volume / volume2</div>
-      </a>
-    </div>
-  </div>
-</body>
-</html>
+:root{--bg0:#0b100e;--bg1:#131c18;--ink:#e8f0ea;--muted:#8aa193;--line:rgba(232,240,234,.12);--accent:#c9a227;--long:#3dba7a;--short:#e35d5d;--card:rgba(20,32,27,.72)}
+*{box-sizing:border-box}
+body{margin:0;font-family:"IBM Plex Sans",sans-serif;color:var(--ink);
+  background:radial-gradient(900px 500px at 8% -12%,rgba(201,162,39,.16),transparent 55%),linear-gradient(165deg,var(--bg0),var(--bg1));min-height:100vh}
+.wrap{max-width:1080px;margin:0 auto;padding:40px 20px 72px}
+nav{display:flex;flex-wrap:wrap;gap:10px 16px;margin-bottom:22px;font-size:.9rem}
+nav a{color:var(--accent);text-decoration:none}
+nav a.dim{color:var(--muted)}
+h1{font-family:"IBM Plex Serif",serif;font-size:clamp(1.9rem,3.6vw,2.6rem);margin:0 0 8px;letter-spacing:-.02em}
+.sub{color:var(--muted);line-height:1.6;margin:0 0 24px;max-width:46rem}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:0 0 22px}
+.kpi{border:1px solid var(--line);background:var(--card);padding:14px 16px}
+.kpi .lab{font-size:.72rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.kpi .val{font-family:"JetBrains Mono",monospace;font-size:1.25rem;margin-top:6px}
+.pos{color:var(--long)}.neg{color:var(--short)}.na{color:var(--muted)}
+.grid{display:grid;gap:12px}
+@media(min-width:720px){.grid.cards{grid-template-columns:1fr 1fr}}
+a.card{display:block;text-decoration:none;color:inherit;border:1px solid var(--line);padding:18px 20px;background:var(--card);transition:border-color .15s,transform .15s}
+a.card:hover{border-color:rgba(201,162,39,.55);transform:translateY(-2px)}
+a.card.hi{border-color:rgba(201,162,39,.4)}
+.tag{display:inline-block;margin-bottom:8px;font-family:"JetBrains Mono",monospace;font-size:.68rem;color:var(--accent);border:1px solid rgba(201,162,39,.35);padding:2px 7px}
+.name{font-family:"IBM Plex Serif",serif;font-size:1.25rem;margin-bottom:6px}
+.desc{color:var(--muted);font-size:.92rem;line-height:1.45}
+.meta{margin-top:10px;font-family:"JetBrains Mono",monospace;font-size:.76rem;color:var(--accent)}
+.table-wrap{overflow:auto;border:1px solid var(--line);background:rgba(0,0,0,.16)}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+th{font-family:"JetBrains Mono",monospace;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+tr:hover td{background:rgba(255,255,255,.03)}
+.mono{font-family:"JetBrains Mono",monospace}
+a.sym{color:var(--ink);text-decoration:none;border-bottom:1px dashed rgba(201,162,39,.35)}
+a.sym:hover{color:var(--accent)}
+</style></head><body><div class="wrap">
+<nav><a href="./recent.html">近兩日</a><a class="dim" href="./ten_day/index.html">10日圖</a><a class="dim" href="./thirty_day/index.html">30日圖</a></nav>
+<h1>影線頸線</h1>
+<p class="sub">實盤：Top10 漲幅榜 + 結構條件滿足就發 TG（<b style="color:var(--ink)">不看量</b>）。回測圖仍保留 volume 層方便對照。</p>
+<div class="grid cards">
+  <a class="card hi" href="./recent.html">
+    <div class="tag">NEW</div>
+    <div class="name">近兩日訊號</div>
+    <div class="desc">08-14 → 08-15 · 結構、不看量 · 含 1h / 4h / 8h。</div>
+    <div class="meta">15 筆 · 8h 勝率 20.0%</div>
+  </a>
+  <a class="card" href="./ten_day/index.html">
+    <div class="name">10 日 · 一訊一圖</div>
+    <div class="desc">08-05 → 08-14 · volume≥2.5× · 卡片現在有 1h/4h/8h。</div>
+    <div class="meta">52 筆</div>
+  </a>
+  <a class="card" href="./thirty_day/index.html">
+    <div class="name">30 日 · 一訊一圖</div>
+    <div class="desc">07-16 → 08-14 · 同一套 volume 邏輯。</div>
+    <div class="meta">175 筆</div>
+  </a>
+  <a class="card" href="./ten_day.html">
+    <div class="name">10 日摘要</div>
+    <div class="desc">分層勝率 + 逐日 1h / 8h。</div>
+    <div class="meta">raw / volume / volume2</div>
+  </a>
+  <a class="card" href="./thirty_day.html">
+    <div class="name">30 日摘要</div>
+    <div class="desc">較長樣本，8h 優勢不明顯。</div>
+    <div class="meta">raw / volume / volume2</div>
+  </a>
+</div>
+</div></body></html>
