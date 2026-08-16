@@ -315,6 +315,7 @@ def main() -> None:
                 }
             )
 
+    gallery.sort(key=lambda item: (not item["feature"], item["time"]))
     html_text = render_report_html(
         cards,
         title="2026-08-14 成交額前50 · 假跌破 1分K",

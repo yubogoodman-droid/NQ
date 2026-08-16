@@ -4,3 +4,4 @@ __pycache__/
 venv/
 output/*.html
 output/spring_charts/
+docs/spring/*.png
