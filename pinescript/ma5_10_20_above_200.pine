@@ -1,0 +1,31 @@
+//@version=5
+strategy("5/10/20多頭且站上200日", overlay=true, process_orders_on_close=true, initial_capital=100000, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+rewardR = input.float(2.0, "停利 R 倍數", minval=0.5, step=0.5)
+
+ma5   = ta.sma(close, 5)
+ma10  = ta.sma(close, 10)
+ma20  = ta.sma(close, 20)
+ma200 = ta.sma(close, 200)
+
+stacked = ma5 > ma10 and ma10 > ma20
+above200 = close > ma200
+aligned = stacked and above200
+notify = aligned and not aligned[1]
+
+if notify
+    stopLevel = math.min(ma20, close * 0.985)
+    risk = close - stopLevel
+    if risk > 0
+        strategy.entry("多頭排列", strategy.long)
+        strategy.exit("多頭排列出場", "多頭排列", stop=stopLevel, limit=close + rewardR * risk)
+
+alertcondition(notify, title="5/10/20多頭且站上200日", message="{{ticker}} 日線 MA5>MA10>MA20 且收盤站上 MA200")
+if notify
+    alert("{{ticker}} 日線 MA5>MA10>MA20 且收盤站上 MA200", alert.freq_once_per_bar_close)
+
+plot(ma5, "MA5", color=color.new(#ffa726, 0), linewidth=2)
+plot(ma10, "MA10", color=color.new(#ffeb3b, 0), linewidth=2)
+plot(ma20, "MA20", color=color.new(#66bb6a, 0), linewidth=2)
+plot(ma200, "MA200", color=color.new(#ab47bc, 0), linewidth=3)
+plotshape(notify, title="通知", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)

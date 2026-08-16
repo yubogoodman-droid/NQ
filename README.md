@@ -62,6 +62,9 @@ python3 examples/chart_today.py
 3. **上週五假跌破 1 分 K**  
    https://yubogoodman-droid.github.io/NQ/spring/?v=neck
 
+4. **日線 5/10/20 多頭且站上 200 日**  
+   https://yubogoodman-droid.github.io/NQ/ma-align/?v=1
+
 ## 假跌破後上拉（1 分 K）
 
 對應「先盤整、假跌破支撐、迅速站回、再放量上拉」的短線結構（金居 8358 那種）。
@@ -123,6 +126,26 @@ https://yubogoodman-droid.github.io/NQ/spring/?v=neck
 | `max_bars_between_lows` | 60 | 兩低點最多間隔（約 5 小時） |
 
 `FakeBreakdownStrategy` 預設對 1 分 K：箱體 18 根、跌破 0.5%～3%、頸線取盤整收盤高（約箱振幅 80%，不吃上影）、站回後最多等 24 根、突破量能 1.2 倍、停利 2R；**箱體不可跨夜**，並略過開盤後 5 分鐘（濾掉跳空雜訊）。
+
+## 日線 5/10/20 多頭排列且站上 200 日
+
+當 **MA5 > MA10 > MA20**，且 **收盤 > MA200**，並且前一日尚未同時成立時，發出通知（只在剛轉多時跳，已排列的不會天天響）。
+
+| 條件 | 說明 |
+|------|------|
+| 多頭排列 | 日線 MA5 > MA10 > MA20 |
+| 站上 200 日 | 收盤價 > MA200 |
+| 通知 | 兩個條件「今天才同時成立」 |
+| 停損 | MA20（至少離進場 1.5%） |
+| 停利 | 預設 2R |
+
+```bash
+python3 examples/scan_tw_top50_ma_align.py --date 20260814 --limit 50
+python3 examples/chart_tw_top50_ma_align.py --date 2026-08-14
+python3 -m unittest tests.test_ma_align -v
+```
+
+報告：`docs/ma-align/index.html`
 
 ## 風險提示
 

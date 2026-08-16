@@ -7,6 +7,7 @@ from enum import Enum
 
 import pandas as pd
 
+from nq.ma_align import MaAlignPattern, detect_ma_align_alerts
 from nq.patterns import WBottomPattern, detect_w_bottoms
 from nq.spring import FakeBreakdownPattern, detect_fake_breakdowns
 
@@ -24,7 +25,7 @@ class Signal:
     entry: float
     stop_loss: float
     target: float
-    pattern: WBottomPattern | FakeBreakdownPattern
+    pattern: WBottomPattern | FakeBreakdownPattern | MaAlignPattern
     bar_idx: int
 
     @property
@@ -152,6 +153,47 @@ class FakeBreakdownStrategy:
                 continue
             target = self._round_tick(entry + self.reward_r * risk)
 
+            signals.append(
+                Signal(
+                    timestamp=df.index[idx],
+                    side=Side.LONG,
+                    entry=entry,
+                    stop_loss=stop,
+                    target=target,
+                    pattern=pattern,
+                    bar_idx=idx,
+                )
+            )
+        return signals
+
+    def _round_tick(self, price: float) -> float:
+        return round(price / self.tick_size) * self.tick_size
+
+
+@dataclass
+class MaAlignStrategy:
+    """
+    日線多頭排列通知策略。
+
+    進場：MA5 > MA10 > MA20，且收盤站上 MA200（當日才成立才通知）
+    停損：MA20（至少離進場 1.5%）
+    停利：進場價 + reward_r × 風險（預設 2R）
+    """
+
+    reward_r: float = 2.0
+    tick_size: float = 0.5
+    point_value: float = 1.0
+
+    def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
+        signals: list[Signal] = []
+        for pattern in detect_ma_align_alerts(df):
+            idx = pattern.bar_idx
+            entry = self._round_tick(float(df["close"].iloc[idx]))
+            stop = self._round_tick(pattern.stop_loss)
+            risk = entry - stop
+            if risk <= 0:
+                continue
+            target = self._round_tick(entry + self.reward_r * risk)
             signals.append(
                 Signal(
                     timestamp=df.index[idx],
