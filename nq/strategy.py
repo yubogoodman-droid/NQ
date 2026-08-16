@@ -8,6 +8,7 @@ from enum import Enum
 import pandas as pd
 
 from nq.patterns import WBottomPattern, detect_w_bottoms
+from nq.spring import FakeBreakdownPattern, detect_fake_breakdowns
 
 
 class Side(str, Enum):
@@ -23,7 +24,7 @@ class Signal:
     entry: float
     stop_loss: float
     target: float
-    pattern: WBottomPattern
+    pattern: WBottomPattern | FakeBreakdownPattern
     bar_idx: int
 
     @property
@@ -86,6 +87,76 @@ class NQWBottomStrategy:
                 )
             )
 
+        return signals
+
+    def _round_tick(self, price: float) -> float:
+        return round(price / self.tick_size) * self.tick_size
+
+
+@dataclass
+class FakeBreakdownStrategy:
+    """
+    假跌破後上拉（Spring）做多策略。
+
+    進場：盤整箱體被假跌破、迅速站回後，收盤突破箱體高且放量
+    停損：假跌破最低點
+    停利：進場價 + reward_r × 風險（預設 2R）
+    """
+
+    range_bars: int = 18
+    range_max_pct: float = 0.02
+    ma_cluster_pct: float = 0.012
+    min_break_pct: float = 0.005
+    max_break_pct: float = 0.03
+    max_spring_bars: int = 15
+    max_reclaim_bars: int = 10
+    max_breakout_bars: int = 12
+    breakout_vol_mult: float = 1.4
+    spring_vol_max_mult: float = 1.35
+    require_volume: bool = True
+    reward_r: float = 2.0
+    tick_size: float = 0.5
+    point_value: float = 1.0
+
+    def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
+        patterns = detect_fake_breakdowns(
+            df,
+            range_bars=self.range_bars,
+            range_max_pct=self.range_max_pct,
+            ma_cluster_pct=self.ma_cluster_pct,
+            min_break_pct=self.min_break_pct,
+            max_break_pct=self.max_break_pct,
+            max_spring_bars=self.max_spring_bars,
+            max_reclaim_bars=self.max_reclaim_bars,
+            max_breakout_bars=self.max_breakout_bars,
+            breakout_vol_mult=self.breakout_vol_mult,
+            spring_vol_max_mult=self.spring_vol_max_mult,
+            require_volume=self.require_volume,
+        )
+
+        signals: list[Signal] = []
+        for pattern in patterns:
+            if pattern.breakout_idx is None:
+                continue
+            idx = pattern.breakout_idx
+            entry = self._round_tick(float(df["close"].iloc[idx]))
+            stop = self._round_tick(pattern.stop_loss)
+            risk = entry - stop
+            if risk <= 0:
+                continue
+            target = self._round_tick(entry + self.reward_r * risk)
+
+            signals.append(
+                Signal(
+                    timestamp=df.index[idx],
+                    side=Side.LONG,
+                    entry=entry,
+                    stop_loss=stop,
+                    target=target,
+                    pattern=pattern,
+                    bar_idx=idx,
+                )
+            )
         return signals
 
     def _round_tick(self, price: float) -> float:

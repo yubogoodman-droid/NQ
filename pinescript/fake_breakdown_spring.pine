@@ -1,0 +1,98 @@
+//@version=5
+strategy("假跌破後上拉", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=100000, process_orders_on_close=true)
+
+// === 參數（預設對 1 分 K）===
+rangeBars      = input.int(18, "盤整箱體 K 數", minval=8)
+rangeMaxPct    = input.float(2.0, "箱體最大振幅 (%)", minval=0.3, step=0.1) / 100
+maClusterPct   = input.float(1.2, "均線糾結最大差距 (%)", minval=0.2, step=0.1) / 100
+minBreakPct    = input.float(0.5, "最小跌破深度 (%)", minval=0.1, step=0.1) / 100
+maxBreakPct    = input.float(3.0, "最大跌破深度 (%)", minval=0.5, step=0.1) / 100
+maxSpringBars  = input.int(15, "假跌破最多持續 K", minval=3)
+maxReclaimBars = input.int(10, "站回最多等待 K", minval=2)
+maxBreakoutBars = input.int(12, "突破最多等待 K", minval=2)
+volLen         = input.int(20, "量能均線", minval=5)
+breakoutVolMult = input.float(1.4, "突破放量倍數", minval=1.0, step=0.1)
+springVolMaxMult = input.float(1.35, "跌破段量能上限倍數", minval=0.8, step=0.05)
+rewardR        = input.float(2.0, "停利 R 倍數", minval=0.5, step=0.5)
+useVolume      = input.bool(true, "要求放量確認")
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, 20)
+volSma = ta.sma(volume, volLen)
+
+prevHigh = ta.highest(high, rangeBars)[1]
+prevLow  = ta.lowest(low, rangeBars)[1]
+prevMid  = (prevHigh + prevLow) / 2
+boxPct   = prevMid > 0 ? (prevHigh - prevLow) / prevMid : 1.0
+maMax    = math.max(ma5, math.max(ma10, ma20))
+maMin    = math.min(ma5, math.min(ma10, ma20))
+maSpread = close > 0 ? (maMax - maMin) / close : 1.0
+maMid    = (ma5 + ma10 + ma20) / 3
+clustered = maSpread <= maClusterPct and math.abs(close[1] - maMid[1]) / close[1] <= maClusterPct * 1.5
+tightBox = boxPct > 0 and boxPct <= rangeMaxPct and math.abs(close[1] - close[rangeBars]) <= (prevHigh - prevLow) * 0.6
+
+var int   st = 0
+var float boxSup = na
+var float boxRes = na
+var float springLow = na
+var int   springBar = na
+var int   reclaimBar = na
+var float springVolSum = na
+var int   springVolN = na
+
+reset() =>
+    st := 0
+    boxSup := na
+    boxRes := na
+    springLow := na
+    springBar := na
+    reclaimBar := na
+    springVolSum := na
+    springVolN := na
+
+if st == 0 and tightBox and clustered and prevLow > 0 and low < prevLow * (1 - minBreakPct)
+    st := 1
+    boxSup := prevLow
+    boxRes := prevHigh
+    springLow := low
+    springBar := bar_index
+    springVolSum := volume
+    springVolN := 1
+
+if st == 1
+    springLow := math.min(springLow, low)
+    springVolSum := springVolSum + volume
+    springVolN := springVolN + 1
+    depth = (boxSup - springLow) / boxSup
+    avgSpringVol = springVolSum / springVolN
+    panicVol = useVolume and not na(volSma[1]) and avgSpringVol > volSma[1] * springVolMaxMult
+    if depth > maxBreakPct or panicVol or bar_index - springBar > maxSpringBars
+        reset()
+    else if close > boxSup
+        st := 2
+        reclaimBar := bar_index
+
+if st == 2
+    if low < springLow or bar_index - reclaimBar > maxBreakoutBars
+        reset()
+
+volOk = not useVolume or (not na(volSma) and volume >= volSma * breakoutVolMult)
+longSignal = st == 2 and close > boxRes and volOk and bar_index >= reclaimBar
+
+if longSignal
+    stopLevel = springLow
+    risk = close - stopLevel
+    if risk > 0
+        targetLevel = close + rewardR * risk
+        strategy.entry("假跌破做多", strategy.long)
+        strategy.exit("假跌破出場", "假跌破做多", stop=stopLevel, limit=targetLevel)
+    reset()
+
+plot(ma5, "MA5", color=color.new(#ffa726, 0), linewidth=1)
+plot(ma10, "MA10", color=color.new(#ffeb3b, 0), linewidth=1)
+plot(ma20, "MA20", color=color.new(#66bb6a, 0), linewidth=1)
+plot(st > 0 ? boxSup : na, "支撐", color=color.aqua, style=plot.style_linebr)
+plot(st > 0 ? boxRes : na, "箱高", color=color.orange, style=plot.style_linebr)
+plot(st > 0 ? springLow : na, "假跌破低", color=color.red, style=plot.style_circles)
+plotshape(longSignal, title="進場", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)

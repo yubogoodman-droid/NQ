@@ -1,0 +1,89 @@
+"""假跌破後上拉單元測試。"""
+
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from examples.run_fake_breakdown import make_sample_fake_breakdown_bars
+from nq.spring import detect_fake_breakdowns
+from nq.strategy import FakeBreakdownStrategy
+
+
+def _bars(
+    rows: list[tuple[float, float, float, float, float]],
+    start: str = "2026-08-14 09:00",
+) -> pd.DataFrame:
+    idx = pd.date_range(start, periods=len(rows), freq="1min")
+    return pd.DataFrame(rows, index=idx, columns=["open", "high", "low", "close", "volume"])
+
+
+def _flat(n: int, px: float, vol: float = 200, noise: float = 0.25) -> list[tuple[float, float, float, float, float]]:
+    rows = []
+    for i in range(n):
+        o = px + (0.05 if i % 2 == 0 else -0.05)
+        rows.append((o, px + noise, px - noise, px, vol))
+    return rows
+
+
+class FakeBreakdownTests(unittest.TestCase):
+    def test_detects_jinju_like_spring(self) -> None:
+        df = make_sample_fake_breakdown_bars()
+        patterns = detect_fake_breakdowns(df)
+        self.assertGreaterEqual(len(patterns), 1)
+        p = patterns[0]
+        self.assertLess(p.spring_low, p.support)
+        self.assertGreater(p.resistance, p.support)
+        self.assertGreater(p.break_pct, 0.005)
+        self.assertLess(p.break_pct, 0.03)
+        self.assertIsNotNone(p.breakout_idx)
+        self.assertGreater(df["close"].iloc[p.breakout_idx], p.resistance)
+        self.assertGreater(p.volume_ratio, 1.3)
+
+        signals = FakeBreakdownStrategy().generate_signals(df)
+        self.assertGreaterEqual(len(signals), 1)
+        sig = signals[0]
+        self.assertGreater(sig.entry, sig.stop_loss)
+        self.assertGreater(sig.target, sig.entry)
+
+    def test_ignores_breakdown_without_reclaim(self) -> None:
+        rows = _flat(50, 420.0)
+        px = 420.0
+        for _ in range(12):
+            px -= 2.0
+            rows.append((px + 0.5, px + 0.8, px - 0.4, px, 180))
+        df = _bars(rows)
+        self.assertEqual(detect_fake_breakdowns(df), [])
+
+    def test_ignores_too_deep_breakdown(self) -> None:
+        rows = _flat(50, 420.0)
+        # 跌超過 3%（約 12.6 點）再拉回，視為真跌破
+        for px in (410.0, 405.0, 400.0, 406.0, 421.0, 425.0):
+            vol = 500 if px >= 421 else 180
+            rows.append((px + 1, px + 1.5, px - 0.5, px, vol))
+        df = _bars(rows)
+        self.assertEqual(detect_fake_breakdowns(df), [])
+
+    def test_ignores_breakout_without_volume(self) -> None:
+        df = make_sample_fake_breakdown_bars()
+        # 把上拉段量能壓到盤整水準
+        df.loc[df["close"] > 421, "volume"] = 180
+        self.assertEqual(detect_fake_breakdowns(df, require_volume=True), [])
+        self.assertGreaterEqual(len(detect_fake_breakdowns(df, require_volume=False)), 1)
+
+    def test_ignores_wide_chop(self) -> None:
+        rows = []
+        for i in range(80):
+            px = 420 + (12 if i % 2 == 0 else -12)
+            rows.append((px, px + 2, px - 2, px, 400))
+        df = _bars(rows)
+        self.assertEqual(detect_fake_breakdowns(df), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

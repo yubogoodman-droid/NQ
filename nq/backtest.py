@@ -6,7 +6,9 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from nq.strategy import NQWBottomStrategy, Signal
+from nq.strategy import FakeBreakdownStrategy, NQWBottomStrategy, Signal
+
+Strategy = NQWBottomStrategy | FakeBreakdownStrategy
 
 
 @dataclass
@@ -21,11 +23,11 @@ class TradeResult:
 
 def run_backtest(
     df: pd.DataFrame,
-    strategy: NQWBottomStrategy | None = None,
+    strategy: Strategy | None = None,
     max_bars_hold: int = 48,
 ) -> list[TradeResult]:
     """
-    對歷史五分 K 執行 W 底策略回測。
+    對歷史 K 線執行策略回測。
 
     出場規則（依序檢查）：
     1. 觸及停損
