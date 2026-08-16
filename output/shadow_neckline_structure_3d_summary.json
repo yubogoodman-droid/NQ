@@ -385,37 +385,37 @@
       }
     ]
   },
-  "tier": "raw",
+  "tier": "structure",
   "params": {
-    "min_span": 1,
+    "min_span": 9,
     "max_span": 30,
     "shoulder_sym": 0.15,
     "min_bias": 0.05,
-    "max_bias": 99.0,
-    "use_close_break": false,
+    "max_bias": 0.65,
+    "use_close_break": true,
     "min_break_pct": 0.0,
     "require_red": false,
     "require_prev_close_below": false,
     "min_body_pct": 0.0,
     "sma25_soft": false,
     "require_sma25_hard": false,
-    "min_abs_dist_ma99": 0.0,
+    "min_abs_dist_ma99": 1.5,
     "max_near_above_ma99": 0.0,
     "min_abs_dist_ma200": 0.0,
     "max_near_above_ma200": 0.0,
-    "max_ext_ma200_pct": 0.0,
-    "reject_below_ma99": false,
+    "max_ext_ma200_pct": 40.0,
+    "reject_below_ma99": true,
     "min_vol_ratio": 0.0,
     "vol_lookback": 20,
     "vol_spike_window": 48,
-    "reject_rising_neck": false,
-    "reject_near_rising_sma200": false,
+    "reject_rising_neck": true,
+    "reject_near_rising_sma200": true,
     "sma200_slope_bars": 24,
-    "near_sma200_pct": 1.5,
-    "reject_15m_pierce_sma200": false,
-    "reject_near_sma200_15m": false,
+    "near_sma200_pct": 4.0,
+    "reject_15m_pierce_sma200": true,
+    "reject_near_sma200_15m": true,
     "near_sma200_15m_pct": 1.5,
-    "reject_deep_below_sma200_15m": false,
+    "reject_deep_below_sma200_15m": true,
     "max_below_sma200_15m_pct": 3.0,
     "max_chg24": 99.0,
     "cooldown_min": 30
@@ -519,96 +519,73 @@
     ]
   },
   "summary": {
-    "n": 71,
-    "symbols": 22,
-    "reclaim_3_rate": 32.4,
+    "n": 5,
+    "symbols": 5,
+    "reclaim_3_rate": 0.0,
     "by_horizon": {
       "15m": {
-        "n": 71,
-        "win_rate": 35.2,
-        "avg": -0.164,
-        "median": -0.338
+        "n": 5,
+        "win_rate": 80.0,
+        "avg": 2.035,
+        "median": 1.822
       },
       "30m": {
-        "n": 71,
-        "win_rate": 38.0,
-        "avg": -0.048,
-        "median": -0.477
+        "n": 5,
+        "win_rate": 60.0,
+        "avg": 6.262,
+        "median": 0.866
       },
       "1h": {
-        "n": 71,
-        "win_rate": 36.6,
-        "avg": -0.127,
-        "median": -0.812
+        "n": 5,
+        "win_rate": 60.0,
+        "avg": 7.023,
+        "median": 2.56
       },
       "2h": {
-        "n": 70,
-        "win_rate": 44.3,
-        "avg": 0.701,
-        "median": -0.338
+        "n": 5,
+        "win_rate": 100.0,
+        "avg": 9.895,
+        "median": 3.03
       },
       "4h": {
-        "n": 68,
-        "win_rate": 44.1,
-        "avg": -0.571,
-        "median": -0.706
+        "n": 5,
+        "win_rate": 60.0,
+        "avg": 8.406,
+        "median": 1.342
       },
       "8h": {
-        "n": 67,
-        "win_rate": 52.2,
-        "avg": -0.462,
-        "median": 1.258
+        "n": 5,
+        "win_rate": 60.0,
+        "avg": 16.333,
+        "median": 1.775
       },
       "12h": {
-        "n": 62,
-        "win_rate": 53.2,
-        "avg": -2.463,
-        "median": 1.596
+        "n": 4,
+        "win_rate": 50.0,
+        "avg": 3.483,
+        "median": -0.773
       }
     },
     "by_day": {
       "2026-08-14": {
-        "n": 40,
-        "symbols": 14,
-        "win_1h": 30.0,
-        "avg_1h": -0.119
+        "n": 1,
+        "symbols": 1,
+        "win_1h": 100.0,
+        "avg_1h": 29.581
       },
       "2026-08-15": {
-        "n": 28,
-        "symbols": 11,
-        "win_1h": 46.4,
-        "avg_1h": -0.138
-      },
-      "2026-08-16": {
-        "n": 3,
-        "symbols": 3,
-        "win_1h": 33.3,
-        "avg_1h": -0.134
+        "n": 4,
+        "symbols": 4,
+        "win_1h": 50.0,
+        "avg_1h": 1.384
       }
     },
     "symbols_list": [
       "ACE/USDT",
-      "AIO/USDT",
       "AIOT/USDT",
       "AKE/USDT",
-      "ALICE/USDT",
-      "AVAAI/USDT",
-      "AVNT/USDT",
-      "BASED/USDT",
-      "BR/USDT",
-      "CAP/USDT",
-      "EDEN/USDT",
       "H/USDT",
-      "HEI/USDT",
-      "PRL/USDT",
-      "RDDT/USDT",
-      "ROBO/USDT",
-      "SCRT/USDT",
-      "SNDK/USDT",
-      "SNXX/USDT",
-      "STORJ/USDT",
-      "USELESS/USDT",
-      "VELVET/USDT"
+      "ROBO/USDT"
     ]
   }
 }

@@ -1248,12 +1248,12 @@
   },
   "tier": "volume2",
   "params": {
-    "min_span": 1,
+    "min_span": 9,
     "max_span": 30,
     "shoulder_sym": 0.15,
     "min_bias": 0.05,
-    "max_bias": 99.0,
-    "use_close_break": false,
+    "max_bias": 0.65,
+    "use_close_break": true,
     "min_break_pct": 0.0,
     "require_red": false,
     "require_prev_close_below": false,
@@ -1264,6 +1264,8 @@
     "max_near_above_ma99": 0.0,
     "min_abs_dist_ma200": 0.0,
     "max_near_above_ma200": 0.0,
+    "max_ext_ma200_pct": 40.0,
+    "reject_below_ma99": true,
     "min_vol_ratio": 3.5,
     "vol_lookback": 20,
     "vol_spike_window": 48,
@@ -1602,51 +1604,51 @@
     ]
   },
   "summary": {
-    "n": 45,
-    "symbols": 29,
-    "reclaim_3_rate": 48.9,
+    "n": 32,
+    "symbols": 21,
+    "reclaim_3_rate": 34.4,
     "by_horizon": {
       "15m": {
-        "n": 45,
-        "win_rate": 42.2,
-        "avg": 0.338,
-        "median": -0.103
+        "n": 32,
+        "win_rate": 56.2,
+        "avg": 1.263,
+        "median": 0.235
       },
       "30m": {
-        "n": 45,
-        "win_rate": 42.2,
-        "avg": 0.032,
-        "median": -0.349
+        "n": 32,
+        "win_rate": 46.9,
+        "avg": 0.92,
+        "median": -0.136
       },
       "1h": {
-        "n": 44,
-        "win_rate": 45.5,
-        "avg": -0.089,
-        "median": -0.426
+        "n": 31,
+        "win_rate": 45.2,
+        "avg": -0.483,
+        "median": -0.5
       },
       "2h": {
-        "n": 44,
-        "win_rate": 50.0,
-        "avg": 1.101,
-        "median": -0.188
+        "n": 31,
+        "win_rate": 58.1,
+        "avg": 0.255,
+        "median": 0.631
       },
       "4h": {
-        "n": 44,
-        "win_rate": 50.0,
-        "avg": 1.836,
-        "median": 0.312
+        "n": 31,
+        "win_rate": 58.1,
+        "avg": 2.029,
+        "median": 1.245
       },
       "8h": {
-        "n": 41,
-        "win_rate": 46.3,
-        "avg": -0.968,
-        "median": -0.262
+        "n": 31,
+        "win_rate": 51.6,
+        "avg": -1.657,
+        "median": 0.763
       },
       "12h": {
-        "n": 39,
-        "win_rate": 51.3,
-        "avg": -1.581,
-        "median": 0.247
+        "n": 31,
+        "win_rate": 54.8,
+        "avg": -3.353,
+        "median": 0.789
       }
     },
     "by_day": {
@@ -1657,81 +1659,74 @@
         "avg_1h": -4.436
       },
       "2026-08-06": {
-        "n": 3,
-        "symbols": 3,
-        "win_1h": 33.3,
-        "avg_1h": -3.057
+        "n": 2,
+        "symbols": 2,
+        "win_1h": 50.0,
+        "avg_1h": 2.439
       },
       "2026-08-07": {
-        "n": 4,
-        "symbols": 3,
-        "win_1h": 0.0,
-        "avg_1h": -6.837
-      },
-      "2026-08-08": {
-        "n": 7,
-        "symbols": 4,
-        "win_1h": 71.4,
-        "avg_1h": 3.732
-      },
-      "2026-08-09": {
-        "n": 7,
-        "symbols": 5,
-        "win_1h": 42.9,
-        "avg_1h": -0.175
-      },
-      "2026-08-10": {
         "n": 3,
         "symbols": 3,
+        "win_1h": 0.0,
+        "avg_1h": -6.226
+      },
+      "2026-08-08": {
+        "n": 5,
+        "symbols": 4,
+        "win_1h": 80.0,
+        "avg_1h": 5.201
+      },
+      "2026-08-09": {
+        "n": 6,
+        "symbols": 4,
         "win_1h": 33.3,
-        "avg_1h": -1.324
+        "avg_1h": -3.352
       },
-      "2026-08-11": {
-        "n": 4,
-        "symbols": 4,
-        "win_1h": 100.0,
-        "avg_1h": 7.282
-      },
-      "2026-08-12": {
-        "n": 7,
-        "symbols": 5,
-        "win_1h": 28.6,
-        "avg_1h": -1.134
-      },
-      "2026-08-13": {
-        "n": 7,
-        "symbols": 4,
-        "win_1h": 57.1,
-        "avg_1h": 1.01
-      },
-      "2026-08-14": {
-        "n": 2,
+      "2026-08-10": {
+        "n": 1,
         "symbols": 1,
         "win_1h": 0.0,
-        "avg_1h": -12.134
+        "avg_1h": -3.371
+      },
+      "2026-08-11": {
+        "n": 2,
+        "symbols": 2,
+        "win_1h": 100.0,
+        "avg_1h": 0.602
+      },
+      "2026-08-12": {
+        "n": 5,
+        "symbols": 3,
+        "win_1h": 20.0,
+        "avg_1h": -1.67
+      },
+      "2026-08-13": {
+        "n": 6,
+        "symbols": 3,
+        "win_1h": 66.7,
+        "avg_1h": 1.317
+      },
+      "2026-08-14": {
+        "n": 1,
+        "symbols": 1,
+        "win_1h": null,
+        "avg_1h": null
       }
     },
     "symbols_list": [
       "ACE/USDT",
       "APR/USDT",
-      "ARIA/USDT",
-      "BEAT/USDT",
       "BICO/USDT",
       "BROCCOLI714/USDT",
       "BTW/USDT",
       "CAP/USDT",
       "COOKIE/USDT",
-      "CRWV/USDT",
-      "CSOPSKHYNIX2L/USDT",
       "CYS/USDT",
-      "DODOX/USDT",
       "GWEI/USDT",
       "HOLO/USDT",
       "KOMA/USDT",
-      "KORU/USDT",
       "MUBARAK/USDT",
       "PRL/USDT",
-      "PROM/USDT",
       "RECALL/USDT",
       "RIVER/USDT",
       "SHAZ/USDT",
@@ -1739,7 +1734,6 @@
       "SMCI/USDT",
       "THE/USDT",
       "TST/USDT",
-      "XAN/USDT",
       "龙虾/USDT"
     ]
   }

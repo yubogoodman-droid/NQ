@@ -4,13 +4,15 @@
 選幣：Binance USDT-M「24h 漲幅榜前 10」（ticker.percentage）
 
 偵測：shadow_neckline_logic.STRUCTURE（結構過濾，**不看爆量**）
-- Low 破頸線 + SMA14
+- Low 破頸線 + SMA14，且收盤也在下方
+- 頭肩跨度 ≥9 根 5m；頭部乖離 ≤65%
+- 進場不高於 SMA200 40%
 - 拒絕上升頸線（右肩高於左肩）
 - 拒絕貼近上彎 SMA200（|距SMA200|<4%）
 - 拒絕 15分K 戳破 200均線且收在下方
 - 拒絕貼近 15m SMA200（|距|<1.5%）
 - 拒絕已深跌破 15m SMA200（dist < −3%）
-- 拒絕貼近 SMA99（|距|<1.5%）
+- 拒絕貼近或跌破 SMA99
 
 TG：環境變數 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
 （也可設 TG_TOKEN / TG_CHAT_ID）

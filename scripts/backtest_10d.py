@@ -30,6 +30,7 @@ import requests
 from shadow_neckline_logic import (
     RAW,
     STRICT,
+    STRUCTURE,
     VOLUME,
     DetectParams,
     detect_at_index,
@@ -48,8 +49,9 @@ BARS_24H = 288  # 5m × 288 = 24h
 HORIZONS = {"15m": 3, "30m": 6, "1h": 12, "2h": 24, "4h": 48, "8h": 96, "12h": 144}
 TIERS = {
     "raw": RAW,
-    "volume": VOLUME,  # ≥2.5× break-bar/4h-peak + structure filters
-    "volume2": STRICT,  # ≥3.5× + same structure filters
+    "structure": STRUCTURE,  # 結構、不看量（實盤）
+    "volume": VOLUME,  # ≥2.5× + 結構
+    "volume2": STRICT,  # ≥3.5× + 結構
 }
 
 
@@ -544,11 +546,12 @@ def main():
         print("by_day:")
         for d in days:
             print(f"  {d}: {summary['by_day'].get(d)}")
-        if name == "volume" and not df.empty:
+        if name in ("volume", "structure") and not df.empty:
             ace = df[df["symbol"].str.startswith("ACE/")]
             if not ace.empty:
-                print("ACE hits:")
-                print(ace[["time_utc", "price", "vol_ratio", "bias", "pnl_1h", "pnl_4h"]].to_string(index=False))
+                print(f"ACE hits ({name}):")
+                cols = [c for c in ["time_utc", "price", "vol_ratio", "bias", "pnl_1h", "pnl_4h", "pnl_8h"] if c in df.columns]
+                print(ace[cols].to_string(index=False))
 
     lines = [
         f"# {args.days}-day shadow-neckline ({days[0]} → {days[-1]} UTC, Vision+BingX)",
@@ -569,10 +572,13 @@ def main():
         )
     lines.append("")
     lines.append(
-        "volume = original + 爆量≥2.5× (break-bar OR 4h-peak vs pre-window avg) + structure filters"
+        "structure = live path: same quality filters, **no volume** (close-break, span≥9, bias≤65%, ext SMA200≤40%, not below MA99)."
     )
     lines.append(
-        "volume2 = original + 爆量≥3.5× (same peak window) + same structure filters"
+        "volume = structure + 爆量≥2.5× (break-bar OR 4h-peak vs pre-window avg)"
+    )
+    lines.append(
+        "volume2 = structure + 爆量≥3.5× (same peak window)"
     )
     lines.append("")
     lines.append(

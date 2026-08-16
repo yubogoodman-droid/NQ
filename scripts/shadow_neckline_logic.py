@@ -37,6 +37,9 @@ class DetectParams:
     max_near_above_ma99: float = 0.0
     min_abs_dist_ma200: float = 0.0
     max_near_above_ma200: float = 0.0
+    # 進場已過度伸展在 SMA200 上方（垂直噴、追空）
+    max_ext_ma200_pct: float = 0.0  # 0=off；close 高於 SMA200 超過此% → 拒
+    reject_below_ma99: bool = False  # 收在 SMA99 下方 → 追空，拒
     # volume spike (爆量)：破位棒 或 近窗峰值，對照基準均量
     # （大拉抬後近均量被抬高時，破位棒相對倍率會失真，如 ACE）
     min_vol_ratio: float = 0.0  # 0 = off; 2.5 = 爆量 ≥2.5×
@@ -64,20 +67,30 @@ class DetectParams:
 RAW = DetectParams()
 VOLUME = DetectParams(
     min_vol_ratio=2.5,  # 爆量 ≥ 2.5×
-    vol_spike_window=48,  # 破位棒或近4h峰值 / 窗口前20均
-    reject_rising_neck=True,  # 上升頸線（右肩抬高）不空
-    reject_near_rising_sma200=True,  # 上彎 SMA200 附近不空（BEAT / XAN）
-    near_sma200_pct=4.0,  # |距| < 4% 且 SMA200 上彎 → 拒（濾 XAN 低位貼均）
-    reject_15m_pierce_sma200=True,  # 15分K戳破200均線且收下方不空
-    reject_near_sma200_15m=True,  # 貼近 15m SMA200 不空
-    reject_deep_below_sma200_15m=True,  # 已深跌破 15m SMA200 不空（如 GWEI）
-    min_abs_dist_ma99=1.5,  # 貼近 SMA99（如 CYS）不空
+    vol_spike_window=48,
+    min_span=9,  # 過窄的微型頭肩勝率差
+    max_bias=0.65,  # 頭部過度伸展（垂直噴）不空
+    use_close_break=True,  # 收盤也要在頸線+SMA14 下（濾下影假刺）
+    max_ext_ma200_pct=40.0,  # 進場已高於 SMA200 40%+ 不空
+    reject_below_ma99=True,  # 已跌破 SMA99 追空不空
+    reject_rising_neck=True,
+    reject_near_rising_sma200=True,
+    near_sma200_pct=4.0,
+    reject_15m_pierce_sma200=True,
+    reject_near_sma200_15m=True,
+    reject_deep_below_sma200_15m=True,
+    min_abs_dist_ma99=1.5,
     cooldown_min=30,
 )
 
 # Live alert default: same structure filters as VOLUME, **no** 爆量 gate
 STRUCTURE = DetectParams(
     min_vol_ratio=0.0,  # 量不計
+    min_span=9,
+    max_bias=0.65,
+    use_close_break=True,
+    max_ext_ma200_pct=40.0,
+    reject_below_ma99=True,
     reject_rising_neck=True,
     reject_near_rising_sma200=True,
     near_sma200_pct=4.0,
@@ -93,6 +106,11 @@ BALANCED = VOLUME
 STRICT = DetectParams(
     min_vol_ratio=3.5,  # 強爆量
     vol_spike_window=48,
+    min_span=9,
+    max_bias=0.65,
+    use_close_break=True,
+    max_ext_ma200_pct=40.0,
+    reject_below_ma99=True,
     reject_rising_neck=True,
     reject_near_rising_sma200=True,
     near_sma200_pct=4.0,
@@ -184,6 +202,9 @@ def detect_at_index(
 
     if p.require_red and not (close[curr_idx] < open_[curr_idx]):
         return False, None
+    # 收盤確認：不只下影線刺破，收盤也要在頸線與 SMA14 下方
+    if p.use_close_break and not (close[curr_idx] < neck and close[curr_idx] < s14):
+        return False, None
 
     # 爆量：破位棒 / 近均量，或「近窗峰值 / 窗口前均量」（吃到拉抬爆量，如 ACE）
     vol_ratio = None
@@ -227,6 +248,10 @@ def detect_at_index(
                 return False, None
             if sma200_slope_pct > 0 and abs(dist200) * 100.0 < p.near_sma200_pct:
                 return False, None
+        # 已過度伸展在 SMA200 上（垂直噴、還沒轉弱）→ 不做空
+        if p.max_ext_ma200_pct > 0 and dist200 is not None:
+            if dist200 * 100.0 > p.max_ext_ma200_pct:
+                return False, None
         # 15分K 戳破 200均線且收在下方 → 不做空
         if p.reject_15m_pierce_sma200 and timestamp is not None:
             bucket_ms = 15 * 60 * 1000
@@ -258,6 +283,8 @@ def detect_at_index(
     if sma99 is not None and not np.isnan(sma99[curr_idx]) and sma99[curr_idx] != 0:
         dist99 = (close[curr_idx] - sma99[curr_idx]) / sma99[curr_idx]
         if p.min_abs_dist_ma99 > 0 and abs(dist99) * 100.0 < p.min_abs_dist_ma99:
+            return False, None
+        if p.reject_below_ma99 and dist99 < 0:
             return False, None
     elif p.min_abs_dist_ma99 > 0:
         return False, None
