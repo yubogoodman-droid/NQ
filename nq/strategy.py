@@ -117,6 +117,8 @@ class FakeBreakdownStrategy:
     reward_r: float = 2.0
     tick_size: float = 0.5
     point_value: float = 1.0
+    same_session: bool = True
+    skip_open_minutes: int = 5
 
     def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
         patterns = detect_fake_breakdowns(
@@ -132,6 +134,8 @@ class FakeBreakdownStrategy:
             breakout_vol_mult=self.breakout_vol_mult,
             spring_vol_max_mult=self.spring_vol_max_mult,
             require_volume=self.require_volume,
+            same_session=self.same_session,
+            skip_open_minutes=self.skip_open_minutes,
         )
 
         signals: list[Signal] = []

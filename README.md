@@ -122,7 +122,7 @@ https://yubogoodman-droid.github.io/NQ/spring/?v=ma
 | `min_bars_between_lows` | 5 | 兩低點最少間隔 |
 | `max_bars_between_lows` | 60 | 兩低點最多間隔（約 5 小時） |
 
-`FakeBreakdownStrategy` 預設對 1 分 K：箱體 18 根、跌破 0.5%～3%、突破量能 1.4 倍、停利 2R。
+`FakeBreakdownStrategy` 預設對 1 分 K：箱體 18 根、跌破 0.5%～3%、突破量能 1.4 倍、停利 2R；**箱體不可跨夜**，並略過開盤後 5 分鐘（濾掉跳空雜訊）。
 
 ## 風險提示
 

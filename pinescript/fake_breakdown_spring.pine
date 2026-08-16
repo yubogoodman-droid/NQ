@@ -15,6 +15,8 @@ breakoutVolMult = input.float(1.4, "突破放量倍數", minval=1.0, step=0.1)
 springVolMaxMult = input.float(1.35, "跌破段量能上限倍數", minval=0.8, step=0.05)
 rewardR        = input.float(2.0, "停利 R 倍數", minval=0.5, step=0.5)
 useVolume      = input.bool(true, "要求放量確認")
+skipOpenBars   = input.int(5, "略過開盤 K 數", minval=0)
+sameSessionBox = input.bool(true, "箱體不可跨夜")
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -78,7 +80,11 @@ if st == 2
         reset()
 
 volOk = not useVolume or (not na(volSma) and volume >= volSma * breakoutVolMult)
-longSignal = st == 2 and close > boxRes and volOk and bar_index >= reclaimBar
+newDay = ta.change(time("D")) != 0
+barsToday = nz(ta.barssince(newDay), 0)
+boxInSession = not sameSessionBox or (time[rangeBars] >= time("D"))
+openOk = barsToday >= skipOpenBars
+longSignal = st == 2 and close > boxRes and volOk and bar_index >= reclaimBar and boxInSession and openOk
 
 if longSignal
     stopLevel = springLow

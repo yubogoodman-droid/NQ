@@ -123,6 +123,8 @@ def detect_fake_breakdowns(
     breakout_vol_mult: float = 1.4,
     spring_vol_max_mult: float = 1.35,
     require_volume: bool = True,
+    same_session: bool = True,
+    skip_open_minutes: int = 5,
 ) -> list[FakeBreakdownPattern]:
     """
     在 OHLCV DataFrame 上偵測假跌破後上拉。
@@ -132,6 +134,7 @@ def detect_fake_breakdowns(
     2. 假跌破：短暫跌破箱體低，深度在 min/max_break_pct 之間，量能不宜爆量恐慌
     3. 站回：很快收盤站回原支撐
     4. 上拉：收盤突破箱體高，且量能放大
+    5. 開盤濾波：箱體與突破同一交易日，並略過開盤後 skip_open_minutes 分鐘
 
     Parameters
     ----------
@@ -229,6 +232,14 @@ def detect_fake_breakdowns(
                 break
         if breakout_idx is None:
             continue
+        if not _session_ok(
+            df,
+            range_start,
+            breakout_idx,
+            same_session=same_session,
+            skip_open_minutes=skip_open_minutes,
+        ):
+            continue
 
         patterns.append(
             FakeBreakdownPattern(
@@ -247,6 +258,39 @@ def detect_fake_breakdowns(
         )
 
     return _dedupe_patterns(patterns)
+
+
+def _as_local(ts: pd.Timestamp) -> pd.Timestamp:
+    if getattr(ts, "tzinfo", None) is not None:
+        return ts.tz_convert("Asia/Taipei")
+    return ts
+
+
+def _session_ok(
+    df: pd.DataFrame,
+    range_start: int,
+    breakout_idx: int,
+    *,
+    same_session: bool,
+    skip_open_minutes: int,
+) -> bool:
+    """擋掉跨夜箱體，以及開盤前幾分鐘的跳空雜訊。"""
+    start_ts = _as_local(df.index[range_start])
+    break_ts = _as_local(df.index[breakout_idx])
+    if same_session and start_ts.date() != break_ts.date():
+        return False
+    if skip_open_minutes <= 0:
+        return True
+    day = break_ts.date()
+    open_ts = None
+    for ts in df.index:
+        local = _as_local(ts)
+        if local.date() == day:
+            open_ts = local
+            break
+    if open_ts is None:
+        return True
+    return break_ts >= open_ts + pd.Timedelta(minutes=skip_open_minutes)
 
 
 def _score(p: FakeBreakdownPattern) -> tuple[float, float]:

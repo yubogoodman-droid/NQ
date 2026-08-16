@@ -33,15 +33,15 @@ from nq.spring_report import MA_COLORS, MA_PERIODS, add_mas, chart_window, rende
 from nq.strategy import FakeBreakdownStrategy
 
 HITS = [
-    ("3231", "緯創", "tse"),
-    ("2382", "廣達", "tse"),
-    ("2376", "技嘉", "tse"),
-    ("6446", "藥華藥", "tse"),
     ("8046", "南電", "tse"),
     ("4958", "臻鼎-KY", "tse"),
     ("3481", "群創", "tse"),
     ("3532", "台勝科", "tse"),
     ("6770", "力積電", "tse"),
+    ("3231", "緯創", "tse"),
+    ("2382", "廣達", "tse"),
+    ("2376", "技嘉", "tse"),
+    ("6446", "藥華藥", "tse"),
 ]
 
 
@@ -196,7 +196,7 @@ def main() -> None:
     html_text = render_report_html(
         cards,
         title="2026-08-14 成交額前50 · 假跌破 1分K",
-        summary="紅漲綠跌。均線 MA5/10/20/60/120/200。藍框是盤整箱，紅點假跌破，綠三角進場。",
+        summary="已濾開盤雜訊（箱體不可跨夜、略過開盤 5 分鐘）。均線 MA5/10/20/60/120/200。",
     )
     out = save_report(args.html, html_text)
     print(f"HTML: {out.resolve()}  共 {len(cards)} 張")
