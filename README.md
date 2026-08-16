@@ -59,6 +59,9 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
+3. **上週五假跌破 1 分 K**  
+   https://raw.githack.com/yubogoodman-droid/NQ/cursor/fake-breakdown-spring-b99b/docs/spring_top50_20260814.html
+
 ## 假跌破後上拉（1 分 K）
 
 對應「先盤整、假跌破支撐、迅速站回、再放量上拉」的短線結構（金居 8358 那種）。
@@ -99,6 +102,12 @@ python examples/chart_spring_top50.py                                  # 出 1 �
 ```
 
 報告：`docs/spring_top50_20260814.html`
+
+外網直接開（手機可）：  
+https://raw.githack.com/yubogoodman-droid/NQ/cursor/fake-breakdown-spring-b99b/docs/spring_top50_20260814.html
+
+備用：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/fake-breakdown-spring-b99b/docs/spring_top50_20260814.html
 
 ## TradingView
 

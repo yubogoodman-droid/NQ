@@ -256,6 +256,7 @@ def render_report_html(
     <section class="summary">
       <h1>{html.escape(title)}</h1>
       <p>{html.escape(summary)}</p>
+      <p style="margin-top:8px"><a href="https://raw.githack.com/yubogoodman-droid/NQ/cursor/fake-breakdown-spring-b99b/docs/spring_top50_20260814.html" style="color:#79c0ff">外網開啟</a></p>
     </section>
     {body}
   </div>
