@@ -211,8 +211,8 @@ def main() -> None:
     ymd = args.date.replace("-", "")
     universe = fetch_top_turnover(ymd, args.limit)
     cards = []
-    hit_names: list[str] = []
-    extra_times: list[str] = []
+    n_hits = 0
+    misses: list[str] = []
     for row in universe:
         df = fetch_yahoo_1m(row["symbol"])
         time.sleep(0.2)
@@ -226,14 +226,14 @@ def main() -> None:
             if _naive(s.timestamp).strftime("%Y-%m-%d") == args.date
         ]
         if not signals:
+            misses.append(f"{row['code']}{row['name']}")
             print(f"{row['code']} {row['name']}: 無通知")
             continue
+        n_hits += 1
         times = [_naive(s.timestamp).strftime("%H:%M") for s in signals]
-        hit_names.append(f"{row['code']}{row['name']}({','.join(times)})")
+        print(f"{row['code']} {row['name']}: 通知 {len(times)} 次 {', '.join(times)}")
         trades = {t.signal.bar_idx: t for t in run_backtest(df, strategy, max_bars_hold=args.max_bars_hold)}
         kept = signals[: args.max_charts_per_stock]
-        if len(signals) > len(kept):
-            extra_times.append(f"{row['code']} 另有 {', '.join(times[len(kept):])}")
         for sig in kept:
             trade = trades.get(sig.bar_idx)
             hhmm = _naive(sig.timestamp).strftime("%H%M")
@@ -246,12 +246,12 @@ def main() -> None:
             cards.append((f"{row['code']} {row['name']}", df, sig, trade, png_name))
             print(f"圖: {png}")
 
-    extra = (" 未入圖：" + "；".join(extra_times) + "。") if extra_times else ""
+    miss = f" 無通知：{'、'.join(misses)}。" if misses else ""
     summary = (
         f"條件：1 分 K MA5>MA10>MA20 且收盤站上 MA200（這一根才成立才跳通知，略過開盤 5 分鐘）。"
         f" 停損 MA20、停利 2R、最多持有 {args.max_bars_hold} 根。"
-        f" 當日新通知：{'、'.join(hit_names) if hit_names else '無'}。"
-        f"{extra}"
+        f" 當日 {n_hits} 檔有通知，圖為各檔第一筆。"
+        f"{miss}"
     )
     text = render_html(cards, f"{args.date} 成交額前50 · 1分K 多頭排列通知", summary)
     out = Path(args.html)
