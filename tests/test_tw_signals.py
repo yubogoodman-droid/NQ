@@ -60,6 +60,27 @@ class SignalTests(unittest.TestCase):
         self.assertEqual(snap.close, 110.0)
         self.assertIsNone(is_ma200_breakout_bullish(_bars([100.0] * 200)))
 
+    def test_until_keeps_friday_and_ignores_monday(self) -> None:
+        fri = list(pd.date_range("2026-08-14 09:00", periods=201, freq="1min", tz="Asia/Taipei"))
+        mon = list(pd.date_range("2026-08-17 09:00", periods=3, freq="1min", tz="Asia/Taipei"))
+        closes = [100.0] * 200 + [110.0] + [111.0, 112.0, 113.0]
+        df = pd.DataFrame(
+            {
+                "open": closes,
+                "high": [c + 0.5 for c in closes],
+                "low": [c - 0.5 for c in closes],
+                "close": closes,
+                "volume": [1000] * len(closes),
+            },
+            index=fri + mon,
+        )
+        until = pd.Timestamp("2026-08-14 23:59:59", tz="Asia/Taipei")
+        snap = latest_ma200_breakout_bullish(df, until=until)
+        self.assertIsNotNone(snap)
+        assert snap is not None
+        self.assertEqual(snap.timestamp.date().isoformat(), "2026-08-14")
+        self.assertEqual(snap.close, 110.0)
+
     def test_overnight_gap_is_not_intraday_cross(self) -> None:
         idx = list(pd.date_range("2026-08-14 13:00", periods=200, freq="1min", tz="Asia/Taipei"))
         idx.append(pd.Timestamp("2026-08-17 09:00", tz="Asia/Taipei"))

@@ -5,8 +5,14 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from datetime import date, timedelta
 
 import requests
+
+TWSE_MI_INDEX_URL = "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX"
+TPEX_QUOTES_URL = (
+    "https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php"
+)
 
 YAHOO_TURNOVER_URL = "https://tw.stock.yahoo.com/rank/turnover"
 DEFAULT_HEADERS = {
@@ -88,6 +94,181 @@ def parse_yahoo_ranking_html(html: str) -> tuple[list[RankedStock], str | None]:
         )
     stocks.sort(key=lambda s: s.rank)
     return stocks, rank_time
+
+
+def previous_friday(today: date | None = None) -> date:
+    """回傳「上週五」（若今天是週五則回上一個週五）。"""
+    current = today or date.today()
+    days = current.weekday() - 4
+    if days <= 0:
+        days += 7
+    return current - timedelta(days=days)
+
+
+def fetch_daily_turnover_ranking(
+    on_date: date,
+    top: int = 100,
+    session: requests.Session | None = None,
+    timeout: int = 20,
+) -> tuple[list[RankedStock], str | None]:
+    """上市＋上櫃當日成交金額排行（盤後）。"""
+    sess = session or requests.Session()
+    twse = _fetch_twse_daily(on_date, sess, timeout)
+    tpex = _fetch_tpex_daily(on_date, sess, timeout)
+    stocks = twse + tpex
+    stocks.sort(key=lambda s: s.turnover, reverse=True)
+    ranked = [
+        RankedStock(
+            rank=i,
+            symbol=s.symbol,
+            name=s.name,
+            price=s.price,
+            change=s.change,
+            change_percent=s.change_percent,
+            volume_lots=s.volume_lots,
+            turnover=s.turnover,
+            exchange=s.exchange,
+        )
+        for i, s in enumerate(stocks, 1)
+    ]
+    return ranked[:top], f"{on_date.isoformat()} 盤後成交額"
+
+
+def parse_twse_mi_index(payload: dict, exchange: str = "TAI") -> list[RankedStock]:
+    table = _table_with_fields(payload, need=("證券代號", "成交金額", "收盤價"))
+    fields = [str(f).strip() for f in table.get("fields") or []]
+    idx = {name: i for i, name in enumerate(fields)}
+    stocks: list[RankedStock] = []
+    for row in table.get("data") or []:
+        stock = _row_to_stock(
+            row,
+            code_i=idx["證券代號"],
+            name_i=idx["證券名稱"],
+            close_i=idx["收盤價"],
+            turnover_i=idx["成交金額"],
+            volume_i=idx.get("成交股數"),
+            change_i=idx.get("漲跌價差"),
+            sign_i=idx.get("漲跌(+/-)"),
+            suffix=".TW",
+            exchange=exchange,
+        )
+        if stock is not None:
+            stocks.append(stock)
+    return stocks
+
+
+def parse_tpex_quotes(payload: dict) -> list[RankedStock]:
+    table = _table_with_fields(payload, need=("代號", "成交金額"))
+    fields = [re.sub(r"<[^>]+>", "", str(f)).strip() for f in table.get("fields") or []]
+    idx = {name: i for i, name in enumerate(fields)}
+    close_key = next((k for k in idx if k.startswith("收盤")), None)
+    turn_key = next((k for k in idx if "成交金額" in k), None)
+    vol_key = next((k for k in idx if "成交股數" in k), None)
+    if close_key is None or turn_key is None:
+        raise ValueError("上櫃收盤行情欄位異常")
+    stocks: list[RankedStock] = []
+    for row in table.get("data") or []:
+        stock = _row_to_stock(
+            row,
+            code_i=idx["代號"],
+            name_i=idx["名稱"],
+            close_i=idx[close_key],
+            turnover_i=idx[turn_key],
+            volume_i=idx.get(vol_key) if vol_key else None,
+            change_i=idx.get("漲跌"),
+            sign_i=None,
+            suffix=".TWO",
+            exchange="TWO",
+        )
+        if stock is not None:
+            stocks.append(stock)
+    return stocks
+
+
+def _fetch_twse_daily(on_date: date, sess: requests.Session, timeout: int) -> list[RankedStock]:
+    resp = sess.get(
+        TWSE_MI_INDEX_URL,
+        params={"date": on_date.strftime("%Y%m%d"), "type": "ALLBUT0999", "response": "json"},
+        headers=DEFAULT_HEADERS,
+        timeout=timeout,
+    )
+    resp.raise_for_status()
+    payload = resp.json()
+    if str(payload.get("stat", "")).upper() != "OK":
+        raise ValueError(f"上市盤後資料不可用：{payload.get('stat')}")
+    return parse_twse_mi_index(payload)
+
+
+def _fetch_tpex_daily(on_date: date, sess: requests.Session, timeout: int) -> list[RankedStock]:
+    roc = f"{on_date.year - 1911}/{on_date.strftime('%m/%d')}"
+    resp = sess.get(
+        TPEX_QUOTES_URL,
+        params={"l": "zh-tw", "d": roc, "se": "EW"},
+        headers=DEFAULT_HEADERS,
+        timeout=timeout,
+    )
+    resp.raise_for_status()
+    payload = resp.json()
+    if str(payload.get("stat", "")).lower() not in {"ok", "success"}:
+        raise ValueError(f"上櫃盤後資料不可用：{payload.get('stat')}")
+    return parse_tpex_quotes(payload)
+
+
+def _table_with_fields(payload: dict, need: tuple[str, ...]) -> dict:
+    for table in payload.get("tables") or []:
+        fields = [re.sub(r"<[^>]+>", "", str(f)).strip() for f in (table.get("fields") or [])]
+        if all(any(req in field for field in fields) for req in need):
+            return table
+    raise ValueError(f"找不到欄位 {need} 的行情表")
+
+
+def _row_to_stock(
+    row: list,
+    *,
+    code_i: int,
+    name_i: int,
+    close_i: int,
+    turnover_i: int,
+    volume_i: int | None,
+    change_i: int | None,
+    sign_i: int | None,
+    suffix: str,
+    exchange: str,
+) -> RankedStock | None:
+    if not isinstance(row, (list, tuple)) or len(row) <= max(code_i, name_i, close_i, turnover_i):
+        return None
+    code = str(row[code_i]).strip()
+    if not code:
+        return None
+    price = _to_float(row[close_i])
+    turnover = _to_float(row[turnover_i])
+    if price is None or turnover is None:
+        return None
+    change = _to_float(row[change_i]) if change_i is not None and change_i < len(row) else None
+    if change is not None and sign_i is not None and sign_i < len(row):
+        sign_html = str(row[sign_i])
+        if "color:green" in sign_html or re.search(r">\s*-", sign_html):
+            change = -abs(change)
+        elif "color:red" in sign_html or "+" in sign_html:
+            change = abs(change)
+    change_percent = None
+    if change is not None:
+        prev = price - change
+        if prev:
+            change_percent = change / prev * 100.0
+    volume_shares = _to_float(row[volume_i]) if volume_i is not None and volume_i < len(row) else None
+    volume_lots = int(volume_shares / 1000) if volume_shares is not None else None
+    return RankedStock(
+        rank=0,
+        symbol=f"{code}{suffix}" if "." not in code else code,
+        name=str(row[name_i]).strip() or code,
+        price=price,
+        change=change,
+        change_percent=change_percent,
+        volume_lots=volume_lots,
+        turnover=turnover,
+        exchange=exchange,
+    )
 
 
 def filter_by_price(stocks: list[RankedStock], max_price: float) -> list[RankedStock]:

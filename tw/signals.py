@@ -52,11 +52,12 @@ def latest_ma200_breakout_bullish(
     df: pd.DataFrame,
     *,
     since: pd.Timestamp | None = None,
+    until: pd.Timestamp | None = None,
     latest_only: bool = False,
 ) -> AlertSnapshot | None:
     """
     回傳符合條件的最新一根。
-    latest_only=True 只看最後一根；否則可往回找（可限制 since 之後）。
+    latest_only=True 只看最後一根；否則可往回找（可限制 since～until）。
     """
     if df is None or len(df) < MA_LONG + 1:
         return None
@@ -70,6 +71,8 @@ def latest_ma200_breakout_bullish(
         if snap is None:
             return None
         if since is not None and snap.timestamp < since:
+            return None
+        if until is not None and snap.timestamp > until:
             return None
         if snap.bullish_aligned and snap.crossed_above_ma200:
             return snap
@@ -90,6 +93,8 @@ def latest_ma200_breakout_bullish(
     for i in range(start, len(work)):
         prev_ts = work.index[i - 1]
         ts = work.index[i]
+        if until is not None and ts > until:
+            break
         if getattr(ts, "date", None) and ts.date() != prev_ts.date():
             continue
         snap = _snapshot_at(work, i)

@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
 
 from tw.kline import fetch_1m_bars_many, fetch_bars_many
-from tw.ranking import RankedStock, fetch_turnover_ranking, filter_by_price, filter_etfs
+from tw.ranking import (
+    RankedStock,
+    fetch_daily_turnover_ranking,
+    fetch_turnover_ranking,
+    filter_by_price,
+    filter_etfs,
+)
 from tw.signals import AlertSnapshot, close_above_ma200, latest_ma200_breakout_bullish
 
 TAIPEI = ZoneInfo("Asia/Taipei")
@@ -26,6 +32,7 @@ class ScanConfig:
     timeout: int = 20
     latest_only: bool = False
     exclude_etf: bool = True
+    on_date: date | None = None
 
 
 @dataclass
@@ -49,6 +56,7 @@ class ScanResult:
     price_dropped: int = 0
     etf_dropped: int = 0
     below_5m_dropped: int = 0
+    as_of: date | None = None
 
 
 def run_scan(
@@ -57,9 +65,14 @@ def run_scan(
 ) -> ScanResult:
     cfg = config or ScanConfig()
     sess = session or requests.Session()
-    universe, rank_time = fetch_turnover_ranking(
-        top=cfg.top, session=sess, timeout=cfg.timeout
-    )
+    if cfg.on_date is not None:
+        universe, rank_time = fetch_daily_turnover_ranking(
+            cfg.on_date, top=cfg.top, session=sess, timeout=cfg.timeout
+        )
+    else:
+        universe, rank_time = fetch_turnover_ranking(
+            top=cfg.top, session=sess, timeout=cfg.timeout
+        )
     priced = filter_by_price(universe, cfg.max_price)
     price_dropped = len(universe) - len(priced)
     if cfg.exclude_etf:
@@ -91,6 +104,7 @@ def run_scan(
             errors=errors,
             price_dropped=price_dropped,
             etf_dropped=etf_dropped,
+            as_of=cfg.on_date,
         )
 
     for stock in candidates:
@@ -102,11 +116,15 @@ def run_scan(
             skipped.append((stock, f"一分 K 不足 201 根（{len(df)}）"))
             continue
         since = None
-        if not cfg.latest_only:
+        until = None
+        if cfg.on_date is not None:
+            since = pd.Timestamp(cfg.on_date, tz=TAIPEI)
+            until = since + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        elif not cfg.latest_only:
             now = datetime.now(TAIPEI)
             since = pd.Timestamp(now.date(), tz=TAIPEI)
         snapshot = latest_ma200_breakout_bullish(
-            df, since=since, latest_only=cfg.latest_only
+            df, since=since, until=until, latest_only=cfg.latest_only
         )
         if snapshot is None:
             continue
@@ -147,6 +165,7 @@ def run_scan(
         price_dropped=price_dropped,
         etf_dropped=etf_dropped,
         below_5m_dropped=below_5m_dropped,
+        as_of=cfg.on_date,
     )
 
 

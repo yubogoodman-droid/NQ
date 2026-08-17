@@ -53,12 +53,28 @@ def _render(result: ScanResult) -> str:
     hit_rows = "\n".join(_hit_card(i, h) for i, h in enumerate(result.hits, 1)) or (
         '<p class="empty">目前沒有符合條件的個股。</p>'
     )
+    if result.as_of is not None:
+        as_of = result.as_of.isoformat()
+        title = f"回測 {as_of} · 一分K剛站上 MA200"
+        heading = f"回測 {as_of} · 剛站上 MA200"
+        lead = (
+            f"用 {as_of} 當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
+            "一分K MA5&gt;MA10&gt;MA20，且當日這根收盤剛站上 MA200（前一根還沒）。"
+            "含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
+        )
+    else:
+        title = "台股一分K · 多頭排列站上 MA200"
+        heading = "台股一分K · 剛站上 MA200"
+        lead = (
+            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20，"
+            "且這根收盤剛站上 MA200（前一根還沒）。含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
+        )
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>台股一分K · 多頭排列站上 MA200</title>
+  <title>{title}</title>
   <style>
     :root {{
       color-scheme: dark;
@@ -120,8 +136,8 @@ def _render(result: ScanResult) -> str:
 </head>
 <body>
   <div class="page">
-    <h1>台股一分K · 剛站上 MA200</h1>
-    <p class="lead">成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20，且這根收盤剛站上 MA200（前一根還沒）。含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。</p>
+    <h1>{heading}</h1>
+    <p class="lead">{lead}</p>
     <div class="chips">
       <span class="chip">不含 ETF</span>
       <span class="chip">股價 &lt; 650</span>
@@ -202,6 +218,10 @@ def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
     if frame is None or frame.empty:
         return None
     work = add_moving_averages(frame)
+    mark = pd.Timestamp(hit.snapshot.timestamp)
+    if work.index.tz is not None:
+        mark = mark.tz_convert(work.index.tz) if mark.tzinfo else mark.tz_localize(work.index.tz)
+    work = work[work.index < mark.normalize() + pd.Timedelta(days=1)]
     before, after = (70, 12) if timeframe == "5m" else (90, 20)
     mark_ts = pd.Timestamp(hit.snapshot.timestamp)
     if timeframe == "5m":

@@ -3,7 +3,18 @@ from __future__ import annotations
 import json
 import unittest
 
-from tw.ranking import RankedStock, filter_by_price, filter_etfs, is_etf, parse_yahoo_ranking_html
+from datetime import date
+
+from tw.ranking import (
+    RankedStock,
+    filter_by_price,
+    filter_etfs,
+    is_etf,
+    parse_tpex_quotes,
+    parse_twse_mi_index,
+    parse_yahoo_ranking_html,
+    previous_friday,
+)
 
 
 def _html_with_table(rows: list[dict], rank_time: str = "2026-08-17T10:49:08+08:00") -> str:
@@ -101,6 +112,42 @@ class RankingTests(unittest.TestCase):
         self.assertFalse(is_etf(stocks[5]))
         kept = filter_etfs(stocks)
         self.assertEqual([s.symbol for s in kept], ["2327.TW", "4958.TW"])
+
+    def test_previous_friday_from_monday(self) -> None:
+        self.assertEqual(previous_friday(date(2026, 8, 17)), date(2026, 8, 14))
+        self.assertEqual(previous_friday(date(2026, 8, 14)), date(2026, 8, 7))
+
+    def test_parse_twse_and_tpex_daily(self) -> None:
+        twse = {
+            "tables": [
+                {
+                    "fields": ["證券代號", "證券名稱", "成交股數", "成交筆數", "成交金額", "開盤價", "最高價", "最低價", "收盤價", "漲跌(+/-)", "漲跌價差"],
+                    "data": [
+                        ["2330", "台積電", "10,000,000", "1", "12,000,000,000", "1200", "1210", "1190", "1200", "<p style='color:green'>-</p>", "10"],
+                        ["2408", "南亞科", "1,000,000", "1", "500,000,000", "500", "510", "490", "500", "<p style='color:red'>+</p>", "5"],
+                    ],
+                }
+            ]
+        }
+        tpex = {
+            "tables": [
+                {
+                    "fields": ["代號", "名稱", "收盤 ", "漲跌", "開盤 ", "最高 ", "最低", "成交股數  ", " 成交金額(元)"],
+                    "data": [
+                        ["6182", "合晶", "122.5", "+11", "110", "123", "110", "7,900,000", "900,000,000"],
+                    ],
+                }
+            ]
+        }
+        listed = parse_twse_mi_index(twse)
+        otc = parse_tpex_quotes(tpex)
+        self.assertEqual(listed[0].symbol, "2330.TW")
+        self.assertEqual(listed[0].change, -10.0)
+        self.assertEqual(listed[1].symbol, "2408.TW")
+        self.assertEqual(listed[1].change, 5.0)
+        self.assertEqual(otc[0].symbol, "6182.TWO")
+        self.assertEqual(otc[0].turnover, 900_000_000)
+        self.assertAlmostEqual(otc[0].change_percent or 0, 11 / 111.5 * 100, places=4)
 
 
 if __name__ == "__main__":
