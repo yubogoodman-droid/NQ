@@ -4,7 +4,7 @@ import unittest
 
 import pandas as pd
 
-from tw.signals import add_moving_averages, is_ma200_breakout_bullish
+from tw.signals import add_moving_averages, is_ma200_breakout_bullish, latest_ma200_breakout_bullish
 
 
 def _bars(closes: list[float]) -> pd.DataFrame:
@@ -44,8 +44,32 @@ class SignalTests(unittest.TestCase):
         snap = is_ma200_breakout_bullish(_bars(closes))
         self.assertIsNone(snap)
 
-    def test_need_201_bars(self) -> None:
+    def test_lookback_finds_earlier_cross_today(self) -> None:
+        closes = [100.0] * 200 + [110.0] + [111.0, 112.0]
+        df = _bars(closes)
+        self.assertIsNone(is_ma200_breakout_bullish(df))
+        snap = latest_ma200_breakout_bullish(df)
+        self.assertIsNotNone(snap)
+        assert snap is not None
+        self.assertEqual(snap.close, 110.0)
         self.assertIsNone(is_ma200_breakout_bullish(_bars([100.0] * 200)))
+
+    def test_overnight_gap_is_not_intraday_cross(self) -> None:
+        idx = list(pd.date_range("2026-08-14 13:00", periods=200, freq="1min", tz="Asia/Taipei"))
+        idx.append(pd.Timestamp("2026-08-17 09:00", tz="Asia/Taipei"))
+        closes = [100.0] * 200 + [110.0]
+        df = pd.DataFrame(
+            {
+                "open": closes,
+                "high": [c + 0.5 for c in closes],
+                "low": [c - 0.5 for c in closes],
+                "close": closes,
+                "volume": [1000] * len(closes),
+            },
+            index=idx,
+        )
+        self.assertIsNone(is_ma200_breakout_bullish(df))
+        self.assertIsNone(latest_ma200_breakout_bullish(df))
 
     def test_moving_averages_length(self) -> None:
         df = add_moving_averages(_bars([float(i) for i in range(1, 221)]))

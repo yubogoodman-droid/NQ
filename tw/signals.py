@@ -44,21 +44,70 @@ def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def is_ma200_breakout_bullish(df: pd.DataFrame) -> AlertSnapshot | None:
+    """最新一根：MA5 > MA10 > MA20，收盤站上 MA200，且前一根尚未站上。"""
+    return latest_ma200_breakout_bullish(df, latest_only=True)
+
+
+def latest_ma200_breakout_bullish(
+    df: pd.DataFrame,
+    *,
+    since: pd.Timestamp | None = None,
+    latest_only: bool = False,
+) -> AlertSnapshot | None:
     """
-    最新一根：MA5 > MA10 > MA20，收盤站上 MA200；
-    前一根收盤尚未站上（相對該根的 MA200）。
+    回傳符合條件的最新一根。
+    latest_only=True 只看最後一根；否則可往回找（可限制 since 之後）。
     """
     if df is None or len(df) < MA_LONG + 1:
         return None
     work = add_moving_averages(df)
-    last = work.iloc[-1]
-    prev = work.iloc[-2]
+    if latest_only:
+        prev_ts = work.index[-2]
+        ts = work.index[-1]
+        if ts.date() != prev_ts.date():
+            return None
+        snap = _snapshot_at(work, len(work) - 1)
+        if snap is None:
+            return None
+        if since is not None and snap.timestamp < since:
+            return None
+        if snap.bullish_aligned and snap.crossed_above_ma200:
+            return snap
+        return None
+
+    start = MA_LONG
+    if since is not None:
+        matched = False
+        for i, ts in enumerate(work.index):
+            if ts >= since:
+                start = max(MA_LONG, i)
+                matched = True
+                break
+        if not matched:
+            return None
+
+    found: AlertSnapshot | None = None
+    for i in range(start, len(work)):
+        prev_ts = work.index[i - 1]
+        ts = work.index[i]
+        if getattr(ts, "date", None) and ts.date() != prev_ts.date():
+            continue
+        snap = _snapshot_at(work, i)
+        if snap and snap.bullish_aligned and snap.crossed_above_ma200:
+            found = snap
+    return found
+
+
+def _snapshot_at(work: pd.DataFrame, idx: int) -> AlertSnapshot | None:
+    if idx < 1:
+        return None
+    last = work.iloc[idx]
+    prev = work.iloc[idx - 1]
     needed = ("ma5", "ma10", "ma20", "ma200")
     if any(pd.isna(last[col]) or pd.isna(prev[col]) for col in needed):
         return None
-
-    snapshot = AlertSnapshot(
-        timestamp=work.index[-1],
+    return AlertSnapshot(
+        timestamp=work.index[idx],
         close=float(last["close"]),
         prev_close=float(prev["close"]),
         ma5=float(last["ma5"]),
@@ -67,6 +116,3 @@ def is_ma200_breakout_bullish(df: pd.DataFrame) -> AlertSnapshot | None:
         ma200=float(last["ma200"]),
         prev_ma200=float(prev["ma200"]),
     )
-    if snapshot.bullish_aligned and snapshot.crossed_above_ma200:
-        return snapshot
-    return None

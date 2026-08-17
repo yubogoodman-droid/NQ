@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -10,9 +9,9 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
-from tw.kline import fetch_1m_bars
+from tw.kline import fetch_1m_bars_many
 from tw.ranking import RankedStock, fetch_turnover_ranking, filter_by_price
-from tw.signals import AlertSnapshot, is_ma200_breakout_bullish
+from tw.signals import AlertSnapshot, latest_ma200_breakout_bullish
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
@@ -25,6 +24,7 @@ class ScanConfig:
     closed_only: bool = False
     workers: int = 8
     timeout: int = 20
+    latest_only: bool = False
 
 
 @dataclass
@@ -60,43 +60,46 @@ def run_scan(
     skipped: list[tuple[RankedStock, str]] = []
     errors: list[tuple[RankedStock, str]] = []
 
-    def _one(stock: RankedStock) -> tuple[str, RankedStock, object]:
-        local = requests.Session()
-        try:
-            df = fetch_1m_bars(
-                stock.symbol,
-                range_=cfg.kline_range,
-                session=local,
-                timeout=cfg.timeout,
-                closed_only=cfg.closed_only,
-            )
-            if df is None or df.empty:
-                return "skip", stock, "無一分 K 資料"
-            if len(df) < 201:
-                return "skip", stock, f"一分 K 不足 201 根（{len(df)}）"
-            snapshot = is_ma200_breakout_bullish(df)
-            if snapshot is None:
-                return "miss", stock, len(df)
-            return "hit", stock, (snapshot, len(df))
-        except Exception as exc:  # noqa: BLE001 — 單檔失敗不中斷整批
-            return "error", stock, str(exc)
+    frames: dict[str, pd.DataFrame] = {}
+    try:
+        frames = fetch_1m_bars_many(
+            [s.symbol for s in candidates],
+            range_=cfg.kline_range,
+            closed_only=cfg.closed_only,
+        )
+    except Exception as exc:  # noqa: BLE001
+        errors.extend((stock, str(exc)) for stock in candidates)
+        return ScanResult(
+            scanned_at=datetime.now(TAIPEI),
+            rank_time=rank_time,
+            universe=universe,
+            candidates=candidates,
+            hits=[],
+            skipped=[],
+            errors=errors,
+        )
 
-    workers = max(1, min(cfg.workers, len(candidates) or 1))
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(_one, stock) for stock in candidates]
-        for fut in as_completed(futures):
-            kind, stock, payload = fut.result()
-            if kind == "hit":
-                snapshot, bars = payload  # type: ignore[misc]
-                hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=bars))
-            elif kind == "skip":
-                skipped.append((stock, str(payload)))
-            elif kind == "error":
-                errors.append((stock, str(payload)))
+    for stock in candidates:
+        df = frames.get(stock.symbol)
+        if df is None or df.empty:
+            skipped.append((stock, "無一分 K 資料"))
+            continue
+        if len(df) < 201:
+            skipped.append((stock, f"一分 K 不足 201 根（{len(df)}）"))
+            continue
+        since = None
+        if not cfg.latest_only:
+            now = datetime.now(TAIPEI)
+            since = pd.Timestamp(now.date(), tz=TAIPEI)
+        snapshot = latest_ma200_breakout_bullish(
+            df, since=since, latest_only=cfg.latest_only
+        )
+        if snapshot is None:
+            continue
+        hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=len(df)))
 
     hits.sort(key=lambda h: h.stock.rank)
     skipped.sort(key=lambda item: item[0].rank)
-    errors.sort(key=lambda item: item[0].rank)
     return ScanResult(
         scanned_at=datetime.now(TAIPEI),
         rank_time=rank_time,

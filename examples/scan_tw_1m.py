@@ -10,6 +10,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tw.notify import format_hit_message, send_notifications
+from tw.report import save_scan_html
 from tw.screener import ScanConfig, hit_key, run_scan
 
 
@@ -19,6 +21,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--watch", action="store_true", help="盤中每分鐘重掃，同一根 K 不重複通知")
     p.add_argument("--interval", type=int, default=60, help="watch 間隔秒數")
+    p.add_argument("--latest-only", action="store_true", help="只看最新一根（watch 模式自動開啟）")
     p.add_argument("--closed-only", action="store_true", help="只用已收盤的一分 K（不含當根未收）")
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("-o", "--output", default="output/tw_1m_ma200.html")
@@ -58,6 +61,7 @@ def scan_once(args: argparse.Namespace, seen: set) -> int:
             max_price=args.max_price,
             closed_only=args.closed_only,
             workers=args.workers,
+            latest_only=args.latest_only or args.watch,
         )
     )
     print_result(result, quiet_empty=args.quiet_empty)

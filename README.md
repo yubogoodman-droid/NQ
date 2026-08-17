@@ -31,16 +31,17 @@
 3. 一分 K 的 **MA5 > MA10 > MA20**（多頭排列）
 4. **這根收盤站上 1 分 MA200**，且**前一根還沒站上** → 跳通知
 
-`MA200` 是一分 K 的 200 期均線（約 200 分鐘），不是日線 200 日。
+`MA200` 是一分 K 的 200 期均線（約 200 分鐘），不是日線 200 日。開盤相對昨收的跳空不列入（前一根需為同一交易日）。
 
 ```bash
 pip install -r requirements.txt
 python examples/scan_tw_1m.py
 ```
 
-盤中每分鐘重掃（同一根 K 不重複通知）：
+預設會列出**今天盤中曾出現**的訊號；`--watch` 只對最新一根跳通知。
 
 ```bash
+python examples/scan_tw_1m.py --latest-only   # 只看當下這一根
 python examples/scan_tw_1m.py --watch
 ```
 

@@ -1,97 +1,99 @@
-"""Yahoo Finance 一分 K。"""
+"""Yahoo Finance 一分 K（yfinance 批次下載，避開 429）。"""
 
 from __future__ import annotations
 
-import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-import requests
-
-from tw.ranking import DEFAULT_HEADERS
+import yfinance as yf
 
 TAIPEI = ZoneInfo("Asia/Taipei")
-CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 
 
 def fetch_1m_bars(
     symbol: str,
     range_: str = "5d",
-    session: requests.Session | None = None,
-    timeout: int = 20,
     closed_only: bool = False,
+    **_: object,
 ) -> pd.DataFrame:
-    """下載一分 K，index 為 Asia/Taipei 時區。"""
-    sess = session or requests.Session()
-    payload = None
-    last_error: Exception | None = None
-    for attempt in range(3):
-        try:
-            resp = sess.get(
-                CHART_URL.format(symbol=symbol),
-                params={"interval": "1m", "range": range_, "includePrePost": "false"},
-                headers=DEFAULT_HEADERS,
-                timeout=timeout,
-            )
-            if resp.status_code in {429, 500, 502, 503}:
-                raise requests.HTTPError(f"HTTP {resp.status_code}", response=resp)
-            resp.raise_for_status()
-            payload = resp.json()
-            break
-        except (requests.RequestException, ValueError) as exc:
-            last_error = exc
-            time.sleep(0.6 * (attempt + 1))
-    if payload is None:
-        raise RuntimeError(f"{symbol} 一分 K 下載失敗：{last_error}") from last_error
-    error = (payload.get("chart") or {}).get("error")
-    if error:
-        raise RuntimeError(f"{symbol} 一分 K 錯誤：{error}")
-    results = (payload.get("chart") or {}).get("result") or []
-    if not results:
+    """下載單一標的一分 K。"""
+    frames = fetch_1m_bars_many([symbol], range_=range_, closed_only=closed_only)
+    return frames.get(symbol, _empty())
+
+
+def fetch_1m_bars_many(
+    symbols: list[str],
+    range_: str = "5d",
+    closed_only: bool = False,
+) -> dict[str, pd.DataFrame]:
+    """一次抓多檔一分 K，回傳 symbol -> OHLCV。"""
+    unique = list(dict.fromkeys(s for s in symbols if s))
+    if not unique:
+        return {}
+
+    raw = yf.download(
+        unique,
+        interval="1m",
+        period=range_,
+        group_by="ticker",
+        auto_adjust=True,
+        threads=True,
+        progress=False,
+    )
+    out: dict[str, pd.DataFrame] = {}
+    for symbol in unique:
+        frame = _slice_ticker(raw, symbol)
+        normalized = _normalize_ohlcv(frame, closed_only=closed_only)
+        if not normalized.empty:
+            out[symbol] = normalized
+    return out
+
+
+def _slice_ticker(raw: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    if raw is None or raw.empty:
         return _empty()
-
-    result = results[0]
-    timestamps = result.get("timestamp") or []
-    quote = ((result.get("indicators") or {}).get("quote") or [{}])[0]
-
-    rows = []
-    for i, ts in enumerate(timestamps):
-        close = _at(quote.get("close"), i)
-        if close is None:
-            continue
-        rows.append(
-            {
-                "datetime": datetime.fromtimestamp(int(ts), tz=TAIPEI),
-                "open": _at(quote.get("open"), i, close),
-                "high": _at(quote.get("high"), i, close),
-                "low": _at(quote.get("low"), i, close),
-                "close": float(close),
-                "volume": _at(quote.get("volume"), i, 0.0) or 0.0,
-            }
-        )
-
-    if not rows:
+    if isinstance(raw.columns, pd.MultiIndex):
+        level0 = set(map(str, raw.columns.get_level_values(0)))
+        if symbol in level0:
+            return raw[symbol].copy()
+        last = set(map(str, raw.columns.get_level_values(-1)))
+        if symbol in last:
+            return raw.xs(symbol, axis=1, level=-1).copy()
         return _empty()
+    # 單檔時 yfinance 可能不帶 ticker 層
+    return raw.copy()
 
-    df = pd.DataFrame(rows).set_index("datetime").sort_index()
-    df = df[~df.index.duplicated(keep="last")]
-    if closed_only and len(df) >= 2:
-        last = pd.Timestamp(df.index[-1])
+
+def _normalize_ohlcv(df: pd.DataFrame, closed_only: bool = False) -> pd.DataFrame:
+    if df is None or df.empty:
+        return _empty()
+    work = df.copy()
+    if isinstance(work.columns, pd.MultiIndex):
+        work.columns = [str(col[-1]) for col in work.columns]
+    work.columns = [str(col).split()[-1].lower() for col in work.columns]
+    needed = ["open", "high", "low", "close"]
+    if any(col not in work.columns for col in needed):
+        return _empty()
+    if "volume" not in work.columns:
+        work["volume"] = 0.0
+    work = work[needed + ["volume"]].dropna(subset=["close"])
+    if work.empty:
+        return _empty()
+    index = pd.DatetimeIndex(work.index)
+    if index.tz is None:
+        index = index.tz_localize(TAIPEI)
+    else:
+        index = index.tz_convert(TAIPEI)
+    work.index = index
+    work = work[~work.index.duplicated(keep="last")].sort_index()
+    if closed_only and len(work) >= 2:
+        last = pd.Timestamp(work.index[-1])
         now = pd.Timestamp(datetime.now(TAIPEI))
         if last.floor("min") >= now.floor("min"):
-            df = df.iloc[:-1]
-    return df
+            work = work.iloc[:-1]
+    return work.astype(float)
 
 
 def _empty() -> pd.DataFrame:
     return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
-
-
-def _at(values: list | None, index: int, default: float | None = None) -> float | None:
-    if not values or index >= len(values):
-        return default
-    value = values[index]
-    if value is None:
-        return default
-    return float(value)
