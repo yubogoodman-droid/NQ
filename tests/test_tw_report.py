@@ -123,7 +123,7 @@ class ReportChartTests(unittest.TestCase):
         self.assertIn("MA20/MA200 0.4%", text)
         self.assertIn("MA5", text)
         self.assertIn("MA200", text)
-        self.assertIn("SHIOAJI_API_KEY", text)
+        self.assertIn("scan_tw_1m.py --watch", text)
         self.assertIn("scan_tw_1m.py --watch", md)
 
     def test_week_index_lists_each_day(self) -> None:

@@ -2,13 +2,9 @@
 
 ## 本機即時守盤
 
-有永豐金鑰就走即時一分 K；Key 只放自己電腦，不要 commit。
+永豐 Key、Secret、Telegram 序號填在 `examples/scan_tw_1m.py` 最上面四個引號裡。
 
 ```bash
-cd NQ
-pip install -r requirements.txt
-export SHIOAJI_API_KEY='你的Key'
-export SHIOAJI_SECRET_KEY='你的Secret'
 python3 examples/scan_tw_1m.py --watch
 ```
 

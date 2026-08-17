@@ -4,11 +4,34 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+# ════ 在下面引號裡填序號（只放你自己電腦，不要貼聊天室、不要 commit）════
+SHIOAJI_API_KEY = ""        # 永豐 API Key
+SHIOAJI_SECRET_KEY = ""     # 永豐 Secret
+TELEGRAM_BOT_TOKEN = ""     # Telegram BotFather 給的 token
+TELEGRAM_CHAT_ID = ""       # 你的 Telegram chat id
+# ═══════════════════════════════════════════════════════════════
+
+
+def _apply_secrets() -> None:
+    for name, value in (
+        ("SHIOAJI_API_KEY", SHIOAJI_API_KEY),
+        ("SHIOAJI_SECRET_KEY", SHIOAJI_SECRET_KEY),
+        ("TELEGRAM_BOT_TOKEN", TELEGRAM_BOT_TOKEN),
+        ("TELEGRAM_CHAT_ID", TELEGRAM_CHAT_ID),
+    ):
+        text = str(value).strip()
+        if text:
+            os.environ[name] = text
+
+
+_apply_secrets()
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -29,8 +52,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--source",
         choices=("auto", "shioaji", "yahoo"),
-        default="auto",
-        help="K線來源：有 SHIOAJI_API_KEY 就走永豐，否則 Yahoo",
+        default="shioaji",
+        help="K線來源（預設永豐；要 Yahoo 才用 --source yahoo）",
     )
     p.add_argument("--interval", type=int, default=60, help="watch 間隔秒數")
     p.add_argument("--latest-only", action="store_true", help="只看最新一根（watch 模式自動開啟）")
@@ -123,8 +146,8 @@ def scan_once(args: argparse.Namespace, seen: set) -> tuple[int, object]:
         if channels:
             print(f"  已通知：{', '.join(channels)}")
         else:
-            print("  未設定 Telegram/Discord/桌面通知（仍已印在終端機）。")
-            print("  可設 TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID 或 DISCORD_WEBHOOK_URL")
+            print("  未設定 Telegram（仍已印在終端機）。")
+            print("  在本檔最上面填 TELEGRAM_BOT_TOKEN 與 TELEGRAM_CHAT_ID")
     if result.errors and not args.quiet_empty:
         print("  錯誤：")
         for stock, err in result.errors[:8]:
@@ -178,6 +201,13 @@ def scan_last_week(args: argparse.Namespace) -> int:
 
 def main() -> int:
     args = parse_args()
+    _apply_secrets()
+    if args.source == "shioaji" and not (
+        os.environ.get("SHIOAJI_API_KEY", "").strip()
+        and os.environ.get("SHIOAJI_SECRET_KEY", "").strip()
+    ):
+        print("請在 examples/scan_tw_1m.py 最上面填 SHIOAJI_API_KEY 與 SHIOAJI_SECRET_KEY")
+        return 1
     set_kline_source(args.source)
     if args.last_week:
         scan_last_week(args)
