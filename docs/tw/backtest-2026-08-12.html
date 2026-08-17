@@ -66,13 +66,13 @@
 <body>
   <div class="page">
     <h1>回測 2026-08-12（週三）· 剛站上 MA200</h1>
-    <p class="lead">用 2026-08-12（週三）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。一分K MA5&gt;MA10&gt;MA20，且當日這根收盤剛站上 MA200。兩種過關：短均拉開 ≥ 0.5% 且五分高於 MA200 ≥ 6%（金居、玉晶光）；或收盤彈離 MA5 ≥ 1% 且五分仍在 MA200 之上（頎邦、信昌電）。K 棒漲紅跌綠。</p>
+    <p class="lead">用 2026-08-12（週三）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.5%），且當日這根收盤剛站上 MA200（前一根還沒）。含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。</p>
     <div class="chips">
       <span class="chip">不含 ETF</span>
       <span class="chip">股價 &lt; 650</span>
-      <span class="chip">MA5 &gt; 10 &gt; 20</span>
+      <span class="chip">MA5 &gt; 10 &gt; 20 拉開</span>
       <span class="chip">金叉 MA200</span>
-      <span class="chip">五分 ≥ MA200 +6% 或彈離 MA5</span>
+      <span class="chip">五分收盤 &gt; MA200</span>
     </div>
     <div class="legend">
       <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
@@ -81,12 +81,45 @@
       <span><i class="swatch" style="background:#ce93d8"></i>MA200</span>
     </div>
     <div class="summary">
-      命中 <span class="ok">0</span> 檔<br/>
-      掃描時間 2026-08-17 15:28:01（台北）<br/>
+      命中 <span class="ok">2</span> 檔<br/>
+      掃描時間 2026-08-17 15:32:50（台北）<br/>
       排行時間 2026-08-12 盤後成交額<br/>
-      前 100 名 → 濾掉股價 39、ETF 5 → 掃描 56 檔 → 均線糾結 31 → 五分未明顯站上MA200 7
+      前 100 名 → 濾掉股價 39、ETF 5 → 掃描 56 檔 → 均線糾結 33 → 五分MA200底下 3
     </div>
-    <p class="empty">目前沒有符合條件的個股。</p>
+    
+    <article class="card">
+      <div class="top">
+        <div class="name">1. 南亞科<span class="sym"><a href="https://tw.stock.yahoo.com/quote/2408.TW" target="_blank" rel="noopener">2408.TW</a></span></div>
+        <div class="price">482.50 -1.33%</div>
+      </div>
+      <div class="row"><span>1分金叉時間</span><b>13:16</b></div>
+      <div class="row"><span>1分收盤 / MA200</span><b>486.00 &gt; 485.57</b></div>
+      <div class="row"><span>五分收盤 / MA200</span><b>485.00 &gt; 484.00（+0.2%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>485.50 &gt; 483.75 &gt; 482.90</b></div>
+      <div class="row"><span>成交額排名</span><b>#2 · 460.90 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="南亞科 2408.TW 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-12/2408.TW-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="南亞科 2408.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-12/2408.TW-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">2. 華邦電<span class="sym"><a href="https://tw.stock.yahoo.com/quote/2344.TW" target="_blank" rel="noopener">2344.TW</a></span></div>
+        <div class="price">177.00 -0.56%</div>
+      </div>
+      <div class="row"><span>1分金叉時間</span><b>13:14</b></div>
+      <div class="row"><span>1分收盤 / MA200</span><b>178.50 &gt; 177.91</b></div>
+      <div class="row"><span>五分收盤 / MA200</span><b>178.50 &gt; 175.07（+2.0%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>177.10 &gt; 176.05 &gt; 175.78</b></div>
+      <div class="row"><span>成交額排名</span><b>#3 · 376.54 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="華邦電 2344.TW 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-12/2344.TW-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="華邦電 2344.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-12/2344.TW-5m.png"/></div>
+    </article>
+
     <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
   </div>
 </body>
