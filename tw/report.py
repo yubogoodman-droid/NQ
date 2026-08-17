@@ -1,10 +1,12 @@
-"""掃描結果 HTML 報告（K 棒圖存成 PNG 檔，避免單頁太大打不開）。"""
+"""掃描結果報告：PNG 圖檔 + GitHub Markdown（瀏覽器預覽才打得開）。"""
 
 from __future__ import annotations
 
 import html
 import io
+import re
 import shutil
+import subprocess
 from pathlib import Path
 
 import matplotlib
@@ -48,7 +50,16 @@ def save_scan_html(result: ScanResult, path: str | Path) -> Path:
     if chart_dir.exists():
         shutil.rmtree(chart_dir)
     chart_dir.mkdir(parents=True, exist_ok=True)
-    out.write_text(_render(result, chart_rel=chart_rel, chart_dir=chart_dir), encoding="utf-8")
+    image_base = _github_raw_base(out.parent)
+    out.write_text(
+        _render(result, chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base),
+        encoding="utf-8",
+    )
+    _write_markdown(result, out.with_suffix(".md"), chart_rel=chart_rel)
+    if out.stem in {"index", "today"}:
+        today_md = out.parent / "today.md"
+        if today_md.resolve() != out.with_suffix(".md").resolve():
+            shutil.copyfile(out.with_suffix(".md"), today_md)
     return out
 
 
@@ -57,11 +68,12 @@ def _render(
     *,
     chart_rel: Path | None = None,
     chart_dir: Path | None = None,
+    image_base: str | None = None,
 ) -> str:
     scanned = result.scanned_at.strftime("%Y-%m-%d %H:%M:%S")
     rank_time = html.escape(result.rank_time or "—")
     hit_rows = "\n".join(
-        _hit_card(i, h, chart_rel=chart_rel, chart_dir=chart_dir)
+        _hit_card(i, h, chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base)
         for i, h in enumerate(result.hits, 1)
     ) or (
         '<p class="empty">目前沒有符合條件的個股。</p>'
@@ -184,6 +196,7 @@ def _hit_card(
     *,
     chart_rel: Path | None = None,
     chart_dir: Path | None = None,
+    image_base: str | None = None,
 ) -> str:
     s = hit.stock
     snap = hit.snapshot
@@ -192,8 +205,12 @@ def _hit_card(
         chg = f" {s.change_percent:+.2f}%"
     ts = snap.timestamp.strftime("%H:%M")
     url = f"https://tw.stock.yahoo.com/quote/{html.escape(s.symbol)}"
-    chart_1m = build_k_chart(hit, timeframe="1m", chart_rel=chart_rel, chart_dir=chart_dir)
-    chart_5m = build_k_chart(hit, timeframe="5m", chart_rel=chart_rel, chart_dir=chart_dir)
+    chart_1m = build_k_chart(
+        hit, timeframe="1m", chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base
+    )
+    chart_5m = build_k_chart(
+        hit, timeframe="5m", chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base
+    )
     return f"""
     <article class="card">
       <div class="top">
@@ -227,6 +244,7 @@ def build_k_chart(
     *,
     chart_rel: Path | None = None,
     chart_dir: Path | None = None,
+    image_base: str | None = None,
 ) -> str:
     """K 棒圖 + MA5/10/20/200。有 chart_dir 就存成檔，否則退回 data URI（測試用）。"""
     png = render_k_chart_png(hit, timeframe=timeframe)
@@ -237,7 +255,8 @@ def build_k_chart(
     if chart_dir is not None and chart_rel is not None:
         fname = f"{_safe_symbol(hit.stock.symbol)}-{timeframe}.png"
         (chart_dir / fname).write_bytes(png)
-        src = html.escape(f"{chart_rel.as_posix()}/{fname}")
+        rel = f"{chart_rel.as_posix()}/{fname}"
+        src = html.escape(f"{image_base}{rel}" if image_base else rel)
         return f'<img alt="{alt}" src="{src}"/>'
     import base64
 
@@ -247,6 +266,105 @@ def build_k_chart(
 
 def _safe_symbol(symbol: str) -> str:
     return "".join(ch if ch.isalnum() or ch in ".-_" else "_" for ch in symbol)
+
+
+def _github_raw_base(page_dir: Path) -> str | None:
+    """https://raw.githubusercontent.com/owner/repo/branch/docs/tw/"""
+    try:
+        root = Path(
+            subprocess.check_output(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=page_dir,
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        )
+        remote = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"],
+            cwd=root,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=root,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    parsed = _parse_github_owner_repo(remote)
+    if parsed is None or not branch or branch == "HEAD":
+        return None
+    owner, repo = parsed
+    rel = page_dir.resolve().relative_to(root).as_posix().strip("/")
+    prefix = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/"
+    return f"{prefix}{rel}/" if rel != "." else prefix
+
+
+def _parse_github_owner_repo(remote: str) -> tuple[str, str] | None:
+    text = re.sub(r"^git@", "https://", remote)
+    text = text.replace("github.com:", "github.com/")
+    match = re.search(r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?$", text)
+    if not match:
+        return None
+    return match.group("owner"), match.group("repo")
+
+
+def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
+    if result.as_of is not None:
+        as_of = result.as_of.isoformat()
+        title = f"回測 {as_of} · 一分K剛站上 MA200"
+        lead = (
+            f"用 {as_of} 當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
+            "一分K MA5>MA10>MA20，且當日這根收盤剛站上 MA200；"
+            "含該金叉的五分K收盤也必須高於五分 MA200。"
+        )
+    else:
+        title = "台股一分K · 剛站上 MA200"
+        lead = (
+            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5>MA10>MA20，"
+            "且這根收盤剛站上 MA200；含該金叉的五分K收盤也必須高於五分 MA200。"
+        )
+    lines = [
+        f"# {title}",
+        "",
+        lead,
+        "",
+        f"- 命中 **{len(result.hits)}** 檔",
+        f"- 掃描時間 {result.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}（台北）",
+        f"- 排行 {result.rank_time or '—'}",
+        f"- 前 100 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} → 五分MA200底下 {result.below_5m_dropped}",
+        "",
+    ]
+    for i, hit in enumerate(result.hits, 1):
+        s, snap = hit.stock, hit.snapshot
+        chg = f" {s.change_percent:+.2f}%" if s.change_percent is not None else ""
+        sym = _safe_symbol(s.symbol)
+        rel = chart_rel.as_posix()
+        five = _five_min_ma200_text(hit)
+        lines.extend(
+            [
+                f"## {i}. {s.name} [{s.symbol}](https://tw.stock.yahoo.com/quote/{s.symbol})",
+                "",
+                f"- 價格 {s.price:.2f}{chg}　成交額排名 #{s.rank}　{s.turnover/1e8:.2f} 億",
+                f"- 1分金叉 {snap.timestamp.strftime('%H:%M')}　收 {snap.close:.2f} > MA200 {snap.ma200:.2f}",
+                f"- 1分 MA5 {snap.ma5:.2f} > MA10 {snap.ma10:.2f} > MA20 {snap.ma20:.2f}",
+                f"- 五分收盤 / MA200　{five}",
+                "",
+                "**一分 K**",
+                "",
+                f"![{s.name} 一分K]({rel}/{sym}-1m.png)",
+                "",
+                "**五分 K（對照）**",
+                "",
+                f"![{s.name} 五分K]({rel}/{sym}-5m.png)",
+                "",
+            ]
+        )
+    if not result.hits:
+        lines.append("目前沒有符合條件的個股。")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
