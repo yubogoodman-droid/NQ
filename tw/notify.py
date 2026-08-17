@@ -76,7 +76,6 @@ def _telegram(title: str, body: str) -> bool:
                 "text": f"{title}\n{body}"[:4000],
                 "disable_web_page_preview": True,
             },
-            headers=DEFAULT_HEADERS,
             timeout=15,
         )
         return resp.ok

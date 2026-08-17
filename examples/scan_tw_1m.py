@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("-o", "--output", default="docs/tw/index.html")
-    p.add_argument("--date", help="回測指定日（YYYY-MM-DD），只找當天金叉")
+    p.add_argument("--date", help="回測指定日（YYYY-MM-DD），只找當天站穩")
     p.add_argument("--last-friday", action="store_true", help="回測上週五")
     p.add_argument("--last-week", action="store_true", help="回測上週一到五，每天分開一頁")
     p.add_argument("--quiet-empty", action="store_true", help="沒命中時不印詳細清單")

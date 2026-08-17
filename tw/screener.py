@@ -1,4 +1,4 @@
-"""掃描成交額前 N 名，找出一分 K 多頭排列且剛站上 MA200 的標的。"""
+"""掃描成交額前 N 名，找出一分 K 多頭排列且連續兩根站穩 MA200 的標的。"""
 
 from __future__ import annotations
 
@@ -205,7 +205,7 @@ def run_scan(
 def apply_5m_ma200_filter(
     hits: list[ScanHit],
 ) -> tuple[list[ScanHit], int, list[tuple[RankedStock, str]]]:
-    """一分金叉當下的五分K收盤必須高於五分 MA200。"""
+    """一分站穩當下的五分K收盤必須高於五分 MA200。"""
     kept: list[ScanHit] = []
     skipped: list[tuple[RankedStock, str]] = []
     for hit in hits:
