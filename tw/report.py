@@ -1,12 +1,19 @@
-"""掃描結果 HTML 報告（含一分 K 棒圖，可放到 GitHub Pages）。"""
+"""掃描結果 HTML 報告（K 棒圖以 PNG 內嵌，免靠 JavaScript）。"""
 
 from __future__ import annotations
 
+import base64
 import html
+import io
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.font_manager as fm
+import matplotlib.pyplot as plt
 import pandas as pd
-import plotly.graph_objects as go
+from matplotlib.patches import Rectangle
 
 from tw.screener import ScanHit, ScanResult
 from tw.signals import add_moving_averages
@@ -17,6 +24,20 @@ MA_COLORS = {
     20: "#66bb6a",
     200: "#ce93d8",
 }
+UP = "#ef5350"
+DOWN = "#26a69a"
+BG = "#161b22"
+FG = "#e6edf3"
+GRID = "#30363d"
+
+_FONT = None
+for _path in (
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+):
+    if Path(_path).exists():
+        _FONT = fm.FontProperties(fname=_path)
+        break
 
 
 def save_scan_html(result: ScanResult, path: str | Path) -> Path:
@@ -38,7 +59,6 @@ def _render(result: ScanResult) -> str:
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>台股一分K · 多頭排列站上 MA200</title>
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     :root {{
       color-scheme: dark;
@@ -59,7 +79,7 @@ def _render(result: ScanResult) -> str:
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
       -webkit-font-smoothing: antialiased;
     }}
-    .page {{ max-width: 720px; margin: 0 auto; padding: 16px 12px 40px; }}
+    .page {{ max-width: 760px; margin: 0 auto; padding: 16px 12px 40px; }}
     h1 {{ font-size: 1.2rem; margin: 0 0 6px; }}
     .lead {{ color: var(--muted); font-size: .9rem; line-height: 1.55; margin: 0 0 12px; }}
     .chips {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }}
@@ -67,6 +87,11 @@ def _render(result: ScanResult) -> str:
       background: var(--chip); border: 1px solid var(--line); border-radius: 999px;
       padding: 4px 10px; font-size: 12px; color: var(--muted);
     }}
+    .legend {{
+      display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted);
+      margin: 0 0 12px;
+    }}
+    .swatch {{ display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 4px; }}
     .summary {{
       background: var(--card); border: 1px solid var(--line); border-radius: 14px;
       padding: 12px 14px; margin-bottom: 14px; font-size: .9rem; line-height: 1.65;
@@ -75,7 +100,7 @@ def _render(result: ScanResult) -> str:
     .summary .ok {{ color: var(--ok); font-weight: 700; font-size: 1.05rem; }}
     .card {{
       background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-      padding: 14px 10px 8px; margin: 0 0 14px; color: inherit;
+      padding: 14px 10px 10px; margin: 0 0 14px; color: inherit;
     }}
     .top {{ display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 0 6px; }}
     .name {{ font-weight: 700; font-size: 1.05rem; }}
@@ -83,7 +108,8 @@ def _render(result: ScanResult) -> str:
     .price {{ color: var(--up); font-weight: 700; white-space: nowrap; }}
     .row {{ display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: .9rem; color: var(--muted); padding: 0 6px; }}
     .row b {{ color: var(--text); font-weight: 600; }}
-    .chart {{ margin-top: 8px; }}
+    .chart {{ margin-top: 10px; }}
+    .chart img {{ width: 100%; height: auto; display: block; border-radius: 8px; }}
     .empty {{ color: var(--muted); }}
     footer {{ color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }}
   </style>
@@ -91,12 +117,18 @@ def _render(result: ScanResult) -> str:
 <body>
   <div class="page">
     <h1>台股一分K · 剛站上 MA200</h1>
-    <p class="lead">成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20，且這根收盤剛站上 MA200（前一根還沒）。K 棒為台股慣例：漲紅跌綠。</p>
+    <p class="lead">成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20，且這根收盤剛站上 MA200（前一根還沒）。K 棒漲紅跌綠。</p>
     <div class="chips">
       <span class="chip">不含 ETF</span>
       <span class="chip">股價 &lt; 650</span>
       <span class="chip">MA5 &gt; 10 &gt; 20</span>
       <span class="chip">金叉 MA200</span>
+    </div>
+    <div class="legend">
+      <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
+      <span><i class="swatch" style="background:#ffeb3b"></i>MA10</span>
+      <span><i class="swatch" style="background:#66bb6a"></i>MA20</span>
+      <span><i class="swatch" style="background:#ce93d8"></i>MA200</span>
     </div>
     <div class="summary">
       命中 <span class="ok">{len(result.hits)}</span> 檔<br/>
@@ -120,7 +152,7 @@ def _hit_card(index: int, hit: ScanHit) -> str:
         chg = f" {s.change_percent:+.2f}%"
     ts = snap.timestamp.strftime("%H:%M")
     url = f"https://tw.stock.yahoo.com/quote/{html.escape(s.symbol)}"
-    chart = build_k_chart(hit, index)
+    chart = build_k_chart(hit)
     return f"""
     <article class="card">
       <div class="top">
@@ -137,103 +169,118 @@ def _hit_card(index: int, hit: ScanHit) -> str:
 
 
 def build_k_chart(hit: ScanHit, index: int = 1) -> str:
-    """一分 K 棒圖 + MA5/10/20/200，標記剛站上 MA200 的那根。"""
-    if hit.frame is None or hit.frame.empty:
+    """一分 K 棒圖 + MA5/10/20/200，輸出成 PNG 讓預覽頁也能直接看到。"""
+    png = render_k_chart_png(hit)
+    if not png:
         return '<p class="empty">無 K 線資料</p>'
-    work = add_moving_averages(hit.frame)
-    window = _window_around(work, hit.snapshot.timestamp)
-    if window.empty:
-        return '<p class="empty">無 K 線資料</p>'
+    b64 = base64.b64encode(png).decode("ascii")
+    alt = html.escape(f"{hit.stock.name} {hit.stock.symbol} 一分K")
+    return f'<img alt="{alt}" src="data:image/png;base64,{b64}"/>'
 
-    times = [_naive(t) for t in window.index]
-    fig = go.Figure()
-    fig.add_trace(
-        go.Candlestick(
-            x=times,
-            open=window["open"],
-            high=window["high"],
-            low=window["low"],
-            close=window["close"],
-            increasing_line_color="#ef5350",
-            increasing_fillcolor="#ef5350",
-            decreasing_line_color="#26a69a",
-            decreasing_fillcolor="#26a69a",
-            name="K",
-            showlegend=False,
+
+def render_k_chart_png(hit: ScanHit) -> bytes | None:
+    if hit.frame is None or hit.frame.empty:
+        return None
+    work = add_moving_averages(hit.frame)
+    window = _window_around(work, hit.snapshot.timestamp, before=90, after=20)
+    if window.empty:
+        return None
+
+    n = len(window)
+    xs = list(range(n))
+    fig, ax = plt.subplots(figsize=(8.4, 3.8), dpi=130)
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+
+    body_w = 0.7
+    for i, (_, row) in enumerate(window.iterrows()):
+        o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
+        color = UP if c >= o else DOWN
+        ax.vlines(i, l, h, color=color, linewidth=0.9, zorder=2)
+        body = abs(c - o)
+        if body < 1e-9:
+            body = max((h - l) * 0.04, 1e-6)
+        ax.add_patch(
+            Rectangle(
+                (i - body_w / 2, min(o, c)),
+                body_w,
+                body,
+                facecolor=color,
+                edgecolor=color,
+                linewidth=0.4,
+                zorder=3,
+            )
         )
-    )
+
     for period, color in MA_COLORS.items():
         col = f"ma{period}"
-        if col not in window.columns or window[col].notna().sum() == 0:
+        if col not in window.columns:
             continue
-        fig.add_trace(
-            go.Scatter(
-                x=times,
-                y=window[col],
-                mode="lines",
-                name=f"MA{period}",
-                line=dict(color=color, width=1.6 if period == 200 else 1.2),
-                connectgaps=False,
-            )
+        vals = window[col].astype(float)
+        if vals.notna().sum() == 0:
+            continue
+        ax.plot(
+            xs,
+            vals,
+            color=color,
+            linewidth=2.0 if period == 200 else 1.35,
+            label=f"MA{period}",
+            zorder=4,
+            solid_capstyle="round",
         )
 
-    loc = window.index.get_indexer([hit.snapshot.timestamp], method="nearest")[0]
-    if loc >= 0:
-        fig.add_trace(
-            go.Scatter(
-                x=[times[loc]],
-                y=[hit.snapshot.close],
-                mode="markers+text",
-                marker=dict(symbol="triangle-up", size=12, color="#7ee787"),
-                text=["金叉"],
-                textposition="top center",
-                textfont=dict(size=10, color="#7ee787"),
-                name="金叉",
-                showlegend=False,
-            )
+    loc = int(window.index.get_indexer([hit.snapshot.timestamp], method="nearest")[0])
+    if 0 <= loc < n:
+        ax.scatter(
+            [loc],
+            [float(window["close"].iloc[loc])],
+            marker="^",
+            s=70,
+            color="#7ee787",
+            zorder=5,
+            label="金叉",
         )
-        fig.add_hline(
-            y=hit.snapshot.ma200,
-            line_dash="dot",
-            line_color="#ce93d8",
-            opacity=0.7,
-        )
+        ax.axhline(hit.snapshot.ma200, color="#ce93d8", linestyle=":", linewidth=1.0, alpha=0.85, zorder=1)
 
-    fig.update_layout(
-        template="plotly_dark",
-        height=320,
-        margin=dict(l=44, r=8, t=28, b=28),
-        title=dict(text=f"一分K  {hit.stock.name} {hit.snapshot.timestamp.strftime('%H:%M')}", x=0.01, font=dict(size=12)),
-        xaxis_rangeslider_visible=False,
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0,
-            font=dict(size=10),
-            bgcolor="rgba(0,0,0,0)",
-        ),
-        paper_bgcolor="#161b22",
-        plot_bgcolor="#161b22",
+    ax.set_xlim(-1, n)
+    title = f"{hit.stock.name} {hit.stock.symbol}  一分K  {hit.snapshot.timestamp.strftime('%H:%M')} 金叉"
+    ax.set_title(title, color=FG, fontsize=11, pad=8, fontproperties=_FONT)
+    ax.tick_params(colors="#9aa4b2", labelsize=8)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_color(GRID)
+    ax.spines["left"].set_color(GRID)
+    ax.grid(True, color=GRID, linewidth=0.6, alpha=0.7)
+    ax.legend(
+        loc="upper left",
+        fontsize=8,
+        frameon=False,
+        labelcolor=FG,
+        ncol=5,
+        prop=_FONT,
     )
-    fig.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickformat="%H:%M")
-    fig.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)")
-    return fig.to_html(full_html=False, include_plotlyjs=False, config={"displayModeBar": False})
+
+    step = max(1, n // 6)
+    ticks = list(range(0, n, step))
+    if n - 1 not in ticks:
+        ticks.append(n - 1)
+    labels = [pd.Timestamp(window.index[i]).strftime("%H:%M") for i in ticks]
+    ax.set_xticks(ticks)
+    ax.set_xticklabels(labels)
+
+    fig.tight_layout(pad=0.35)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", facecolor=fig.get_facecolor(), bbox_inches="tight", pad_inches=0.12)
+    plt.close(fig)
+    return buf.getvalue()
 
 
-def _window_around(df: pd.DataFrame, ts: pd.Timestamp, before: int = 80, after: int = 25) -> pd.DataFrame:
+def _window_around(df: pd.DataFrame, ts: pd.Timestamp, before: int = 90, after: int = 20) -> pd.DataFrame:
     if df.empty:
         return df
     loc = df.index.get_indexer([ts], method="nearest")[0]
     if loc < 0:
-        return df.iloc[-90:]
+        return df.iloc[-110:]
     start = max(0, int(loc) - before)
     end = min(len(df), int(loc) + after + 1)
     return df.iloc[start:end]
-
-
-def _naive(ts: pd.Timestamp) -> pd.Timestamp:
-    t = pd.Timestamp(ts)
-    return t.tz_localize(None) if t.tzinfo else t

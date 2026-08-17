@@ -50,9 +50,9 @@ class ReportChartTests(unittest.TestCase):
             frame=df,
         )
         html = build_k_chart(hit)
-        self.assertIn('"type":"candlestick"', html)
-        self.assertIn("MA200", html)
-        self.assertIn("triangle-up", html)
+        self.assertIn("data:image/png;base64,", html)
+        png = html.split("base64,", 1)[1].split('"', 1)[0]
+        self.assertGreater(len(png), 200)
 
     def test_save_html_embeds_plotly(self) -> None:
         df = _bars()
@@ -85,9 +85,10 @@ class ReportChartTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = save_scan_html(result, Path(tmp) / "index.html")
             text = path.read_text(encoding="utf-8")
-        self.assertIn("plotly-2.35.2", text)
-        self.assertIn('"type":"candlestick"', text)
+        self.assertIn("data:image/png;base64,", text)
         self.assertIn("南亞", text)
+        self.assertIn("MA5", text)
+        self.assertIn("MA200", text)
 
 
 if __name__ == "__main__":
