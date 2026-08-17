@@ -44,12 +44,22 @@ pip install -r requirements.txt
 python examples/scan_tw_1m.py
 ```
 
-預設會列出**今天盤中曾出現**的訊號；`--watch` 只對最新一根跳通知。
+預設會列出**今天盤中曾出現**的訊號；`--watch` 只對最新一根跳通知。有永豐 API 金鑰時自動改抓即時一分 K。
 
 ```bash
 python examples/scan_tw_1m.py --latest-only   # 只看當下這一根
+python examples/scan_tw_1m.py --watch         # 盤中守著，符合就通知
+```
+
+永豐即時（金鑰不要進 git，也不要貼到聊天室，只放環境變數）：
+
+```bash
+export SHIOAJI_API_KEY='你的Key'
+export SHIOAJI_SECRET_KEY='你的Secret'
 python examples/scan_tw_1m.py --watch
 ```
+
+第一次掃描會按日抓近幾天 1K 當種子（永豐一分 K 單次約 270 根），之後用成交明細補當根，不要每分鐘重抓歷史 K。沒設金鑰時仍走 Yahoo（約延遲 15～20 分鐘）。強制 Yahoo：`--source yahoo`。
 
 通知通道（擇一或同時設環境變數）：
 

@@ -1,4 +1,4 @@
-"""Yahoo Finance 一分 K（yfinance 批次下載，避開 429）。"""
+"""K 線下載：有永豐金鑰就走 Shioaji，否則 Yahoo。"""
 
 from __future__ import annotations
 
@@ -11,6 +11,32 @@ import yfinance as yf
 TAIPEI = ZoneInfo("Asia/Taipei")
 # Yahoo 一分K 單次請求最多 8 個日曆天；更長區間要分段再合併。
 YAHOO_1M_MAX_DAYS = 8
+_source = "auto"
+
+
+def set_kline_source(source: str) -> None:
+    """auto / shioaji / yahoo。"""
+    global _source
+    allowed = {"auto", "shioaji", "yahoo"}
+    if source not in allowed:
+        raise ValueError(f"kline source must be one of {sorted(allowed)}")
+    _source = source
+
+
+def kline_source() -> str:
+    return _source
+
+
+def using_shioaji() -> bool:
+    if _source == "yahoo":
+        return False
+    from tw.shioaji_feed import configured
+
+    if _source == "shioaji":
+        if not configured():
+            raise RuntimeError("指定 --source shioaji，但未設定 SHIOAJI_API_KEY / SHIOAJI_SECRET_KEY")
+        return True
+    return configured()
 
 
 def fetch_1m_bars(
@@ -80,6 +106,23 @@ def fetch_bars_many(
     unique = list(dict.fromkeys(s for s in symbols if s))
     if not unique:
         return {}
+    if using_shioaji():
+        from tw import shioaji_feed
+
+        try:
+            return shioaji_feed.fetch_bars_many(
+                unique,
+                interval=interval,
+                range_=range_,
+                closed_only=closed_only,
+                start=start,
+                end=end,
+            )
+        except Exception:
+            if kline_source() == "shioaji":
+                raise
+            # auto 模式登入失敗就退回 Yahoo，不要讓掃描整段死掉
+            pass
 
     start_d = _as_date(start)
     end_d = _as_date(end)

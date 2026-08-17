@@ -6,15 +6,19 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tw.kline import set_kline_source, using_shioaji
 from tw.notify import format_hit_message, send_notifications
 from tw.ranking import previous_friday, previous_weekdays
 from tw.report import save_scan_html, save_week_index
 from tw.screener import ScanConfig, hit_key, run_scan
+
+TAIPEI = ZoneInfo("Asia/Taipei")
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,6 +26,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--watch", action="store_true", help="盤中每分鐘重掃，同一根 K 不重複通知")
+    p.add_argument(
+        "--source",
+        choices=("auto", "shioaji", "yahoo"),
+        default="auto",
+        help="K線來源：有 SHIOAJI_API_KEY 就走永豐，否則 Yahoo",
+    )
     p.add_argument("--interval", type=int, default=60, help="watch 間隔秒數")
     p.add_argument("--latest-only", action="store_true", help="只看最新一根（watch 模式自動開啟）")
     p.add_argument("--closed-only", action="store_true", help="只用已收盤的一分 K（不含當根未收）")
@@ -56,6 +66,10 @@ def print_result(result, *, quiet_empty: bool) -> None:
     )
     if result.as_of:
         print(f"  回測日期：{result.as_of.isoformat()}")
+    if using_shioaji():
+        print("  K線：永豐 Shioaji")
+    else:
+        print("  K線：Yahoo（延遲）")
     if result.rank_time:
         print(f"  排行資料時間：{result.rank_time}")
     if not result.hits:
@@ -75,7 +89,7 @@ def print_result(result, *, quiet_empty: bool) -> None:
         )
 
 
-def scan_once(args: argparse.Namespace, seen: set) -> int:
+def scan_once(args: argparse.Namespace, seen: set) -> tuple[int, object]:
     on_date = _on_date(args)
     output = args.output
     if on_date is not None and output == "docs/tw/index.html":
@@ -84,7 +98,7 @@ def scan_once(args: argparse.Namespace, seen: set) -> int:
         ScanConfig(
             top=args.top,
             max_price=args.max_price,
-            closed_only=args.closed_only or on_date is not None,
+            closed_only=args.closed_only or on_date is not None or (args.watch and using_shioaji()),
             workers=args.workers,
             latest_only=(args.latest_only or args.watch) and on_date is None,
             exclude_etf=not args.include_etf,
@@ -117,7 +131,7 @@ def scan_once(args: argparse.Namespace, seen: set) -> int:
             print(f"    {stock.symbol} {err}")
         if len(result.errors) > 8:
             print(f"    …另有 {len(result.errors) - 8} 筆")
-    return len(new_hits)
+    return len(new_hits), result
 
 
 def scan_weekdays(args: argparse.Namespace, days: list, index_path: str, label: str) -> list:
@@ -152,26 +166,51 @@ def scan_weekdays(args: argparse.Namespace, days: list, index_path: str, label: 
     return results
 
 
+def _sleep_to_next_minute(pad_sec: int = 3) -> None:
+    now = datetime.now(TAIPEI)
+    nxt = now.replace(second=0, microsecond=0) + timedelta(minutes=1, seconds=pad_sec)
+    time.sleep(max(1.0, (nxt - now).total_seconds()))
+
+
 def scan_last_week(args: argparse.Namespace) -> int:
     return len(scan_weekdays(args, previous_weekdays(), "docs/tw/week-last.md", "回測上週"))
 
 
 def main() -> int:
     args = parse_args()
+    set_kline_source(args.source)
     if args.last_week:
         scan_last_week(args)
         return 0
     seen: set = set()
-    scan_once(args, seen)
+    _, result = scan_once(args, seen)
     if not args.watch or _on_date(args) is not None:
         return 0
-    print(f"\nwatch 模式，每 {args.interval} 秒重掃（Ctrl+C 結束）")
+    live = using_shioaji()
+    if live:
+        from tw.shioaji_feed import subscribe_symbols
+
+        subscribed = subscribe_symbols([s.symbol for s in result.candidates])
+        print(f"\nwatch 永豐即時：已訂閱 {len(subscribed)} 檔，每分鐘收完 K 再判斷（Ctrl+C 結束）")
+    else:
+        print(f"\nwatch 模式（Yahoo 延遲），每 {args.interval} 秒重掃（Ctrl+C 結束）")
     try:
         while True:
-            time.sleep(max(15, args.interval))
-            scan_once(args, seen)
+            if live:
+                _sleep_to_next_minute()
+            else:
+                time.sleep(max(15, args.interval))
+            _, result = scan_once(args, seen)
+            if live:
+                from tw.shioaji_feed import subscribe_symbols
+
+                subscribe_symbols([s.symbol for s in result.candidates])
     except KeyboardInterrupt:
         print("\n已停止。")
+        if live:
+            from tw.shioaji_feed import logout
+
+            logout()
     return 0
 
 
