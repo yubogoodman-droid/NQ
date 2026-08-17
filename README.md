@@ -22,11 +22,30 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## 台股：5/10/20 空頭排列、跌破 MA200 做空
+
+標的為上市+上櫃普通股，**排除 ETF**，並只用**上一週成交額前 100**、**收盤價 ≤ 600** 的股票。
+
+| 條件 | 說明 |
+|------|------|
+| 空頭排列 | MA5 < MA10 < MA20 |
+| 進場 | 當日收盤跌破 MA200（前一日收盤仍在 MA200 之上）做空 |
+| 出場 | 停利 12% / 停損 8% / 收盤站回 MA200 / 持有滿 20 日 |
+| 費用 | 手續費 0.1425%×2 + 證交稅 0.3% |
+
+```bash
+python examples/run_tw_ma_short.py --pages
+```
+
+報告：`docs/tw-ma-short/index.html`  
+Pages：`https://yubogoodman-droid.github.io/NQ/tw-ma-short/`
+
 ## 快速開始
 
 ```bash
 pip install -r requirements.txt
 python examples/run_backtest.py --demo
+python examples/run_tw_ma_short.py --demo
 ```
 
 ### 使用自己的五分 K 資料
