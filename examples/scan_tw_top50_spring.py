@@ -40,6 +40,16 @@ def _num(value: object) -> int:
     return int(str(value).replace(",", "").replace('"', "").strip() or 0)
 
 
+def _price(value: object) -> float | None:
+    text = str(value).replace(",", "").replace('"', "").strip()
+    if not text or text in {"--", "-"}:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
 def tw_tick_size(price: float) -> float:
     if price < 10:
         return 0.01
@@ -65,12 +75,12 @@ def fetch_top_turnover(date: str, limit: int) -> list[dict]:
     )
     if twse.get("stat") != "OK":
         raise RuntimeError(f"TWSE stat={twse.get('stat')}")
-    items: list[tuple[int, str, str, str]] = []
+    items: list[tuple[int, str, str, str, float | None]] = []
     for rec in twse["tables"][8]["data"]:
         code, name = rec[0].strip(), rec[1].strip()
         amt = _num(rec[4])
         if amt > 0:
-            items.append((amt, code, name, "tse"))
+            items.append((amt, code, name, "tse", _price(rec[8])))
 
     roc = f"{int(date[:4]) - 1911}{date[4:]}"
     tpex = _get_json("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes")
@@ -81,18 +91,26 @@ def fetch_top_turnover(date: str, limit: int) -> list[dict]:
         name = str(rec["CompanyName"]).strip()
         amt = _num(rec.get("TransactionAmount") or 0)
         if amt > 0:
-            items.append((amt, code, name, "otc"))
+            items.append((amt, code, name, "otc", _price(rec.get("Close"))))
 
-    best: dict[str, tuple[int, str, str, str]] = {}
-    for amt, code, name, mkt in items:
+    best: dict[str, tuple[int, str, str, str, float | None]] = {}
+    for amt, code, name, mkt, close in items:
         prev = best.get(code)
         if prev is None or amt > prev[0]:
-            best[code] = (amt, code, name, mkt)
+            best[code] = (amt, code, name, mkt, close)
 
     ranked = sorted(best.values(), reverse=True)[:limit]
     return [
-        {"rank": i, "code": code, "name": name, "market": mkt, "amount": amt, "symbol": yahoo_symbol(code, mkt)}
-        for i, (amt, code, name, mkt) in enumerate(ranked, 1)
+        {
+            "rank": i,
+            "code": code,
+            "name": name,
+            "market": mkt,
+            "amount": amt,
+            "close": close,
+            "symbol": yahoo_symbol(code, mkt),
+        }
+        for i, (amt, code, name, mkt, close) in enumerate(ranked, 1)
     ]
 
 
@@ -165,19 +183,41 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="台股成交額前 N 檔假跌破回測")
     parser.add_argument("--date", default="20260814", help="YYYYMMDD，預設上週五")
     parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument("--max-price", type=float, default=None, help="收盤價超過此值則剔除，例如 700")
     parser.add_argument("--sleep", type=float, default=0.25)
     parser.add_argument(
         "--after",
         default="09:00",
         help="只計此時之後的進場（開盤雜訊已由 skip_open_minutes 處理）",
     )
+    parser.add_argument("--json-out", default="", help="把掃描結果寫成 JSON")
     args = parser.parse_args()
     day = f"{args.date[:4]}-{args.date[4:6]}-{args.date[6:]}"
 
     universe = fetch_top_turnover(args.date, args.limit)
-    print(f"{args.date} 成交額前 {len(universe)} 檔（上市+上櫃）")
+    skipped_price: list[dict] = []
+    if args.max_price is not None:
+        kept_rows: list[dict] = []
+        for row in universe:
+            close = row.get("close")
+            if close is not None and close > args.max_price:
+                skipped_price.append(row)
+                continue
+            kept_rows.append(row)
+        universe = kept_rows
+    print(
+        f"{args.date} 成交額前 {args.limit} 檔"
+        + (f"，剔除收盤 > {args.max_price:g} 共 {len(skipped_price)} 檔" if args.max_price is not None else "")
+        + f"，實際掃描 {len(universe)} 檔（上市+上櫃）"
+    )
+    if skipped_price:
+        print(
+            "剔除：",
+            "、".join(f"{r['code']}{r['name']} {r['close']:g}" for r in skipped_price),
+        )
     hits: list[dict] = []
     missing = 0
+    scanned = 0
     for row in universe:
         result = scan_stock(row, day, {})
         time.sleep(args.sleep)
@@ -186,26 +226,64 @@ def main() -> None:
             missing += 1
             print(f"{tag} | 無 1 分 K")
             continue
+        scanned += 1
         kept = [s for s in result["signals"] if s["time"] >= args.after]
         result["signals"] = kept
         n = len(kept)
         amt = row["amount"] / 1e8
+        close = row.get("close")
+        px = f"收 {close:g}" if close is not None else "收 --"
         if n == 0:
-            print(f"{tag} | 成交 {amt:7.2f} 億 | 無訊號 | 1分K {result['friday_bars']}")
+            print(f"{tag} | 成交 {amt:7.2f} 億 | {px} | 無訊號 | 1分K {result['friday_bars']}")
             continue
         hits.append(result)
         for sig in kept:
             print(
-                f"{tag} | 成交 {amt:7.2f} 億 | {sig['time']} 做多 {sig['entry']:.2f} "
+                f"{tag} | 成交 {amt:7.2f} 億 | {px} | {sig['time']} 做多 {sig['entry']:.2f} "
                 f"停 {sig['stop']:.2f} 目標 {sig['target']:.2f} | "
                 f"跌破 {sig['break_pct']}% 量 {sig['vol_ratio']}x | "
                 f"{sig['exit']} {sig['pnl']:+.2f}"
             )
 
+    trades = [s for h in hits for s in h["signals"]]
+    wins = [t for t in trades if t.get("exit") == "take_profit"]
+    losses = [t for t in trades if t.get("exit") == "stop_loss"]
+    times = [t for t in trades if t.get("exit") == "time_stop"]
+    pnls = [t["pnl"] for t in trades if t.get("pnl") is not None]
     print("\n=== 摘要 ===")
-    print(f"掃描 {len(universe)} 檔，缺資料 {missing}，有訊號 {len(hits)} 檔、{sum(len(h['signals']) for h in hits)} 筆")
+    print(
+        f"成交額前 {args.limit}，剔除高價 {len(skipped_price)}，"
+        f"掃描 {scanned} 檔，缺資料 {missing}，"
+        f"有訊號 {len(hits)} 檔、{len(trades)} 筆"
+    )
+    if pnls:
+        print(
+            f"TP {len(wins)} / SL {len(losses)} / TIME {len(times)}，"
+            f"合計 {sum(pnls):+.2f} 點，平均 {sum(pnls)/len(pnls):+.2f} 點"
+        )
     if hits:
         print("有訊號：", "、".join(f"{h['code']}{h['name']}" for h in hits))
+    if args.json_out:
+        out = {
+            "date": day,
+            "limit": args.limit,
+            "max_price": args.max_price,
+            "skipped_price": skipped_price,
+            "missing": missing,
+            "hits": hits,
+            "summary": {
+                "scanned": scanned,
+                "signals": len(trades),
+                "tp": len(wins),
+                "sl": len(losses),
+                "time": len(times),
+                "pnl_sum": round(sum(pnls), 2) if pnls else 0,
+            },
+        }
+        path = Path(args.json_out)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"JSON: {path.resolve()}")
 
 
 if __name__ == "__main__":
