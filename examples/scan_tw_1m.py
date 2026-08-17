@@ -34,6 +34,12 @@ def parse_args() -> argparse.Namespace:
         default=0.06,
         help="五分收盤相對五分 MA200 的最小距離（預設 0.06=6%，金居／玉晶光這類）",
     )
+    p.add_argument(
+        "--min-ma5-pop",
+        type=float,
+        default=0.01,
+        help="收盤相對 MA5 的最小彈離（預設 0.01=1%，頎邦／信昌電這類）",
+    )
     p.add_argument("--date", help="回測指定日（YYYY-MM-DD），只找當天金叉")
     p.add_argument("--last-friday", action="store_true", help="回測上週五")
     p.add_argument("--quiet-empty", action="store_true", help="沒命中時不印詳細清單")
@@ -94,6 +100,7 @@ def scan_once(args: argparse.Namespace, seen: set) -> int:
             on_date=on_date,
             kline_range="7d" if on_date is not None else "5d",
             min_5m_ma200_gap=args.min_5m_gap,
+            min_ma5_pop=args.min_ma5_pop,
         )
     )
     print_result(result, quiet_empty=args.quiet_empty)

@@ -84,15 +84,17 @@ def _render(
         heading = f"回測 {as_of} · 剛站上 MA200"
         lead = (
             f"用 {as_of} 當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
-            "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.5%），且當日這根收盤剛站上 MA200（前一根還沒）。"
-            "含該金叉的五分K必須明顯站上五分 MA200（至少高 6%，像金居、玉晶光）。K 棒漲紅跌綠。"
+            "一分K MA5&gt;MA10&gt;MA20，且當日這根收盤剛站上 MA200。"
+            "兩種過關：短均拉開 ≥ 0.5% 且五分高於 MA200 ≥ 6%（金居、玉晶光）；"
+            "或收盤彈離 MA5 ≥ 1% 且五分仍在 MA200 之上（頎邦、信昌電）。K 棒漲紅跌綠。"
         )
     else:
         title = "台股一分K · 多頭排列站上 MA200"
         heading = "台股一分K · 剛站上 MA200"
         lead = (
-            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.5%），"
-            "且這根收盤剛站上 MA200（前一根還沒）。含該金叉的五分K必須明顯站上五分 MA200（至少高 6%，像金居、玉晶光）。K 棒漲紅跌綠。"
+            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20，且這根收盤剛站上 MA200。"
+            "兩種過關：短均拉開 ≥ 0.5% 且五分高於 MA200 ≥ 6%（金居、玉晶光）；"
+            "或收盤彈離 MA5 ≥ 1% 且五分仍在 MA200 之上（頎邦、信昌電）。K 棒漲紅跌綠。"
         )
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -166,9 +168,9 @@ def _render(
     <div class="chips">
       <span class="chip">不含 ETF</span>
       <span class="chip">股價 &lt; 650</span>
-      <span class="chip">MA5 &gt; 10 &gt; 20 拉開</span>
+      <span class="chip">MA5 &gt; 10 &gt; 20</span>
       <span class="chip">金叉 MA200</span>
-      <span class="chip">五分明顯站上 MA200（≥ 6%）</span>
+      <span class="chip">五分 ≥ MA200 +6% 或彈離 MA5</span>
     </div>
     <div class="legend">
       <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
@@ -221,6 +223,7 @@ def _hit_card(
       <div class="row"><span>1分收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
       <div class="row"><span>五分收盤 / MA200</span><b>{html.escape(_five_min_ma200_text(hit))}</b></div>
       <div class="row"><span>1分 MA5 / 10 / 20</span><b>{snap.ma5:.2f} &gt; {snap.ma10:.2f} &gt; {snap.ma20:.2f}</b></div>
+      <div class="row"><span>彈離 MA5</span><b>{snap.ma5_pop_pct:.1%}</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
       <div class="chart-label">一分 K</div>
       <div class="chart">{chart_1m}</div>
@@ -318,14 +321,16 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         title = f"回測 {as_of} · 一分K剛站上 MA200"
         lead = (
             f"用 {as_of} 當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
-            "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.5%），且當日這根收盤剛站上 MA200；"
-            "含該金叉的五分K必須明顯站上五分 MA200（至少高 6%，像金居、玉晶光）。"
+            "一分K MA5>MA10>MA20，且當日這根收盤剛站上 MA200。"
+            "兩種過關：短均拉開 ≥ 0.5% 且五分高於 MA200 ≥ 6%（金居、玉晶光）；"
+            "或收盤彈離 MA5 ≥ 1% 且五分仍在 MA200 之上（頎邦、信昌電）。"
         )
     else:
         title = "台股一分K · 剛站上 MA200"
         lead = (
-            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.5%），"
-            "且這根收盤剛站上 MA200；含該金叉的五分K必須明顯站上五分 MA200（至少高 6%，像金居、玉晶光）。"
+            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5>MA10>MA20，且這根收盤剛站上 MA200。"
+            "兩種過關：短均拉開 ≥ 0.5% 且五分高於 MA200 ≥ 6%（金居、玉晶光）；"
+            "或收盤彈離 MA5 ≥ 1% 且五分仍在 MA200 之上（頎邦、信昌電）。"
         )
     lines = [
         f"# {title}",
@@ -350,7 +355,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
                 "",
                 f"- 價格 {s.price:.2f}{chg}　成交額排名 #{s.rank}　{s.turnover/1e8:.2f} 億",
                 f"- 1分金叉 {snap.timestamp.strftime('%H:%M')}　收 {snap.close:.2f} > MA200 {snap.ma200:.2f}",
-                f"- 1分 MA5 {snap.ma5:.2f} > MA10 {snap.ma10:.2f} > MA20 {snap.ma20:.2f}",
+                f"- 1分 MA5 {snap.ma5:.2f} > MA10 {snap.ma10:.2f} > MA20 {snap.ma20:.2f}　彈離 MA5 {snap.ma5_pop_pct:.1%}",
                 f"- 五分收盤 / MA200　{five}",
                 "",
                 "**一分 K**",
