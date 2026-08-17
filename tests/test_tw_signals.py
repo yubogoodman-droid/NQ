@@ -191,8 +191,23 @@ class SignalTests(unittest.TestCase):
             ma200=43.15,
             prev_ma200=43.16,
         )
-        self.assertLess(snap.ma_span_pct, 0.005)
+        self.assertLess(snap.ma_span_pct, 0.002)
         self.assertFalse(mas_are_open(snap))
+
+    def test_keeps_span_just_above_0_2_percent(self) -> None:
+        snap = AlertSnapshot(
+            timestamp=pd.Timestamp("2026-08-17 09:58", tz="Asia/Taipei"),
+            close=211.00,
+            prev_close=208.50,
+            ma5=208.20,
+            ma10=207.95,
+            ma20=207.65,
+            ma200=209.68,
+            prev_ma200=209.69,
+        )
+        self.assertGreater(snap.ma_span_pct, 0.002)
+        self.assertLess(snap.ma_span_pct, 0.005)
+        self.assertTrue(mas_are_open(snap))
 
 
 if __name__ == "__main__":

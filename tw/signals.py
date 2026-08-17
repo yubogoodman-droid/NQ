@@ -40,8 +40,8 @@ class AlertSnapshot:
         return (self.ma5 - self.ma20) / self.close
 
 
-def mas_are_open(snapshot: AlertSnapshot, min_span: float = 0.005) -> bool:
-    """多頭排列且 MA5–MA20 拉開到 min_span 以上（預設 0.5%）。"""
+def mas_are_open(snapshot: AlertSnapshot, min_span: float = 0.002) -> bool:
+    """多頭排列且 MA5–MA20 拉開到 min_span 以上（預設 0.2%）。"""
     return snapshot.bullish_aligned and snapshot.ma_span_pct >= min_span
 
 

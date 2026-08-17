@@ -83,7 +83,7 @@ def save_week_index(results: list[ScanResult], path: str | Path) -> Path:
         "",
         "同一套規則，**每天分開**掃成交額前 100。",
         "",
-        "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.5%），收盤剛站上 MA200；"
+        "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），收盤剛站上 MA200；"
         "含該金叉的五分K收盤必須高於五分 MA200。",
         "",
         "| 日期 | 命中 | 標的 |",
@@ -127,14 +127,14 @@ def _render(
         heading = f"回測 {as_of}（{wd}）· 剛站上 MA200"
         lead = (
             f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
-            "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.5%），且當日這根收盤剛站上 MA200（前一根還沒）。"
+            "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），且當日這根收盤剛站上 MA200（前一根還沒）。"
             "含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
         )
     else:
         title = "台股一分K · 多頭排列站上 MA200"
         heading = "台股一分K · 剛站上 MA200"
         lead = (
-            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.5%），"
+            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），"
             "且這根收盤剛站上 MA200（前一根還沒）。含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
         )
     return f"""<!DOCTYPE html>
@@ -362,13 +362,13 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         title = f"回測 {as_of}（{wd}）· 一分K剛站上 MA200"
         lead = (
             f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
-            "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.5%），且當日這根收盤剛站上 MA200；"
+            "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），且當日這根收盤剛站上 MA200；"
             "含該金叉的五分K收盤也必須高於五分 MA200。"
         )
     else:
         title = "台股一分K · 剛站上 MA200"
         lead = (
-            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.5%），"
+            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），"
             "且這根收盤剛站上 MA200；含該金叉的五分K收盤也必須高於五分 MA200。"
         )
     lines = [

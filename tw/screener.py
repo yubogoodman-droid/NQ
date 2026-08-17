@@ -33,7 +33,7 @@ class ScanConfig:
     latest_only: bool = False
     exclude_etf: bool = True
     on_date: date | None = None
-    min_ma_span: float = 0.005
+    min_ma_span: float = 0.002
 
 
 @dataclass
