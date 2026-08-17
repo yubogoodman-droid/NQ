@@ -8,6 +8,7 @@ from tw.signals import (
     AlertSnapshot,
     add_moving_averages,
     close_above_ma200,
+    is_intraday_entry_bar,
     is_ma200_breakout_bullish,
     latest_ma200_breakout_bullish,
     ma200_at,
@@ -101,6 +102,55 @@ class SignalTests(unittest.TestCase):
         )
         self.assertIsNone(is_ma200_breakout_bullish(df))
         self.assertIsNone(latest_ma200_breakout_bullish(df))
+
+    def test_open_gap_through_ma200_is_not_entry(self) -> None:
+        fri = list(pd.date_range("2026-08-14 09:46", periods=200, freq="1min", tz="Asia/Taipei"))
+        mon = list(pd.date_range("2026-08-17 09:00", periods=5, freq="1min", tz="Asia/Taipei"))
+        closes = [100.0] * 200 + [110.0, 111.0, 111.0, 111.0, 111.0]
+        df = pd.DataFrame(
+            {
+                "open": closes,
+                "high": [c + 0.5 for c in closes],
+                "low": [c - 0.5 for c in closes],
+                "close": closes,
+                "volume": [1000] * len(closes),
+            },
+            index=fri + mon,
+        )
+        since = pd.Timestamp("2026-08-17", tz="Asia/Taipei")
+        self.assertIsNone(latest_ma200_breakout_bullish(df, since=since))
+        self.assertFalse(
+            is_intraday_entry_bar(mon[0], mon[1]),
+        )
+
+    def test_cross_after_open_is_entry(self) -> None:
+        fri = list(pd.date_range("2026-08-14 09:46", periods=200, freq="1min", tz="Asia/Taipei"))
+        mon = list(pd.date_range("2026-08-17 09:00", periods=6, freq="1min", tz="Asia/Taipei"))
+        closes = [100.0] * 200 + [100.0, 100.0, 100.0, 100.0, 100.0, 110.0]
+        df = pd.DataFrame(
+            {
+                "open": closes,
+                "high": [c + 0.5 for c in closes],
+                "low": [c - 0.5 for c in closes],
+                "close": closes,
+                "volume": [1000] * len(closes),
+            },
+            index=fri + mon,
+        )
+        since = pd.Timestamp("2026-08-17", tz="Asia/Taipei")
+        snap = latest_ma200_breakout_bullish(df, since=since)
+        self.assertIsNotNone(snap)
+        assert snap is not None
+        self.assertEqual(snap.timestamp.strftime("%H:%M"), "09:05")
+        self.assertEqual(snap.close, 110.0)
+
+    def test_first_cross_is_entry_not_later_recross(self) -> None:
+        closes = [100.0] * 200 + [110.0, 111.0, 90.0, 90.0, 90.0, 120.0]
+        df = _bars(closes)
+        snap = latest_ma200_breakout_bullish(df)
+        self.assertIsNotNone(snap)
+        assert snap is not None
+        self.assertEqual(snap.close, 110.0)
 
     def test_moving_averages_length(self) -> None:
         df = add_moving_averages(_bars([float(i) for i in range(1, 221)]))

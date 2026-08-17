@@ -11,6 +11,10 @@ MA_FAST = 5
 MA_MID = 10
 MA_SLOW = 20
 MA_LONG = 200
+# 09:00–09:04 開盤跳空不算「當下那根站上 200」。
+ENTRY_AFTER_HOUR = 9
+ENTRY_AFTER_MINUTE = 5
+MAX_BAR_GAP = pd.Timedelta(minutes=2)
 
 
 @dataclass(frozen=True)
@@ -47,6 +51,25 @@ class AlertSnapshot:
         return abs(self.ma200 - self.ma20) / self.close
 
 
+def is_intraday_entry_bar(prev_ts: pd.Timestamp, ts: pd.Timestamp) -> bool:
+    """同一根進場：前一根必須是同一交易日、連續的一分K，且已過開盤跳空時段。"""
+    prev = pd.Timestamp(prev_ts)
+    cur = pd.Timestamp(ts)
+    if prev.tzinfo is not None and cur.tzinfo is None:
+        cur = cur.tz_localize(prev.tzinfo)
+    elif cur.tzinfo is not None and prev.tzinfo is None:
+        prev = prev.tz_localize(cur.tzinfo)
+    if cur.date() != prev.date():
+        return False
+    if cur.hour < ENTRY_AFTER_HOUR or (
+        cur.hour == ENTRY_AFTER_HOUR and cur.minute < ENTRY_AFTER_MINUTE
+    ):
+        return False
+    if cur - prev > MAX_BAR_GAP:
+        return False
+    return True
+
+
 def mas_are_open(snapshot: AlertSnapshot, min_span: float = 0.002) -> bool:
     """多頭排列且 MA5–MA20 拉開到 min_span 以上（預設 0.2%）。"""
     return snapshot.bullish_aligned and snapshot.ma_span_pct >= min_span
@@ -80,8 +103,9 @@ def latest_ma200_breakout_bullish(
     latest_only: bool = False,
 ) -> AlertSnapshot | None:
     """
-    回傳符合條件的最新一根。
-    latest_only=True 只看最後一根；否則可往回找（可限制 since～until）。
+    回傳符合條件的進場那一根：MA5>MA10>MA20，且這根收盤剛站上 MA200。
+    latest_only=True 只看最後一根（盤中 watch）；否則找 since～until 裡第一根。
+    隔夜跳空、開盤前 5 分鐘不算。
     """
     if df is None or len(df) < MA_LONG + 1:
         return None
@@ -89,7 +113,7 @@ def latest_ma200_breakout_bullish(
     if latest_only:
         prev_ts = work.index[-2]
         ts = work.index[-1]
-        if ts.date() != prev_ts.date():
+        if not is_intraday_entry_bar(prev_ts, ts):
             return None
         snap = _snapshot_at(work, len(work) - 1)
         if snap is None:
@@ -113,18 +137,17 @@ def latest_ma200_breakout_bullish(
         if not matched:
             return None
 
-    found: AlertSnapshot | None = None
     for i in range(start, len(work)):
         prev_ts = work.index[i - 1]
         ts = work.index[i]
         if until is not None and ts > until:
             break
-        if getattr(ts, "date", None) and ts.date() != prev_ts.date():
+        if not is_intraday_entry_bar(prev_ts, ts):
             continue
         snap = _snapshot_at(work, i)
         if snap and snap.bullish_aligned and snap.crossed_above_ma200:
-            found = snap
-    return found
+            return snap
+    return None
 
 
 def ma200_at(
