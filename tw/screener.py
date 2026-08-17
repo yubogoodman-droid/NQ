@@ -17,12 +17,7 @@ from tw.ranking import (
     filter_by_price,
     filter_etfs,
 )
-from tw.signals import (
-    AlertSnapshot,
-    latest_ma200_breakout_bullish,
-    ma200_at,
-    passes_1m_structure,
-)
+from tw.signals import AlertSnapshot, close_above_ma200, latest_ma200_breakout_bullish, mas_are_open
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
@@ -39,10 +34,6 @@ class ScanConfig:
     exclude_etf: bool = True
     on_date: date | None = None
     min_ma_span: float = 0.005
-    # 金居 / 玉晶光這類：五分圖已明顯站上 MA200，不是剛貼著均線。
-    min_5m_ma200_gap: float = 0.06
-    # 頎邦 / 信昌電這類：短均還沒拉開，但收盤已明顯彈離 MA5。
-    min_ma5_pop: float = 0.01
 
 
 @dataclass
@@ -140,10 +131,8 @@ def run_scan(
         )
         if snapshot is None:
             continue
-        if not passes_1m_structure(
-            snapshot, min_span=cfg.min_ma_span, min_pop=cfg.min_ma5_pop
-        ):
-            skipped.append((stock, "均線糾結且未彈離 MA5"))
+        if not mas_are_open(snapshot, cfg.min_ma_span):
+            skipped.append((stock, "均線糾結"))
             tangled_dropped += 1
             continue
         hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=len(df), frame=df))
@@ -166,11 +155,7 @@ def run_scan(
             below_5m_dropped = len(hits)
             hits = []
         else:
-            hits, dropped_5m, skip_5m = apply_5m_ma200_filter(
-                hits,
-                min_gap=cfg.min_5m_ma200_gap,
-                min_ma5_pop=cfg.min_ma5_pop,
-            )
+            hits, dropped_5m, skip_5m = apply_5m_ma200_filter(hits)
             skipped.extend(skip_5m)
             below_5m_dropped = dropped_5m
 
@@ -194,10 +179,8 @@ def run_scan(
 
 def apply_5m_ma200_filter(
     hits: list[ScanHit],
-    min_gap: float = 0.06,
-    min_ma5_pop: float = 0.01,
 ) -> tuple[list[ScanHit], int, list[tuple[RankedStock, str]]]:
-    """五分K必須在 MA200 之上。金居走「明顯高於 6%」；頎邦／信昌電走「彈離 MA5」。"""
+    """一分金叉當下的五分K收盤必須高於五分 MA200。"""
     kept: list[ScanHit] = []
     skipped: list[tuple[RankedStock, str]] = []
     for hit in hits:
@@ -205,19 +188,10 @@ def apply_5m_ma200_filter(
         if frame is None or frame.empty:
             skipped.append((hit.stock, "無五分 K 資料"))
             continue
-        pair = ma200_at(frame, hit.snapshot.timestamp, floor="5min")
-        if pair is None or pair[1] <= 0:
-            skipped.append((hit.stock, "五分 MA200 不足"))
-            continue
-        close, ma200 = pair
-        gap = (close - ma200) / ma200
-        if close <= ma200:
+        if not close_above_ma200(frame, hit.snapshot.timestamp, floor="5min"):
             skipped.append((hit.stock, "五分K收盤在 MA200 底下"))
             continue
-        if gap >= min_gap or hit.snapshot.ma5_pop_pct >= min_ma5_pop:
-            kept.append(hit)
-            continue
-        skipped.append((hit.stock, f"五分K離 MA200 太近（僅 {gap:.1%}）且未彈離 MA5"))
+        kept.append(hit)
     return kept, len(skipped), skipped
 
 

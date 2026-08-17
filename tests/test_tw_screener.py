@@ -70,42 +70,11 @@ class FiveMinuteFilterTests(unittest.TestCase):
         self.assertIn("MA200", reasons["2313.TW"])
         self.assertIn("無五分", reasons["2486.TW"])
 
-    def test_drops_hits_hugging_5m_ma200(self) -> None:
-        # 101 vs ~100，只高出約 1%，且收盤幾乎貼著 MA5（不像頎邦／信昌電）。
-        hug_df = _bars([100.0] * 219 + [101.0])
-        clear_df = _bars([100.0] * 219 + [110.0])
-        ts = hug_df.index[-1] + pd.Timedelta(minutes=3)
-        hug = _hit("3605.TW", hug_df, ts, close=101.0, ma5=100.8, ma10=100.6, ma20=100.4)
-        clear = _hit("8358.TWO", clear_df, ts, close=110.0, ma5=109.2, ma10=108.8, ma20=108.0)
-        kept, dropped, skipped = apply_5m_ma200_filter([hug, clear])
-        self.assertEqual([h.stock.symbol for h in kept], ["8358.TWO"])
-        self.assertEqual(dropped, 1)
-        self.assertIn("太近", skipped[0][1])
-
-    def test_keeps_ma5_pop_like_qunbang_even_if_5m_gap_small(self) -> None:
-        # 頎邦：五分只高約 0.7%，但收盤彈離 MA5 超過 1%。
-        hug_df = _bars([100.0] * 219 + [100.7])
-        ts = hug_df.index[-1] + pd.Timedelta(minutes=3)
-        pop = _hit(
-            "6147.TWO",
-            hug_df,
-            ts,
-            close=161.50,
-            ma5=159.70,
-            ma10=159.15,
-            ma20=159.03,
-        )
-        kept, dropped, skipped = apply_5m_ma200_filter([pop])
-        self.assertEqual([h.stock.symbol for h in kept], ["6147.TWO"])
-        self.assertEqual(dropped, 0)
-        self.assertEqual(skipped, [])
-        self.assertGreaterEqual(pop.snapshot.ma5_pop_pct, 0.01)
-
-    def test_zero_gap_still_keeps_barely_above(self) -> None:
+    def test_keeps_hits_just_above_5m_ma200(self) -> None:
         hug_df = _bars([100.0] * 219 + [101.0])
         ts = hug_df.index[-1] + pd.Timedelta(minutes=3)
         hug = _hit("3605.TW", hug_df, ts)
-        kept, dropped, skipped = apply_5m_ma200_filter([hug], min_gap=0.0)
+        kept, dropped, skipped = apply_5m_ma200_filter([hug])
         self.assertEqual([h.stock.symbol for h in kept], ["3605.TW"])
         self.assertEqual(dropped, 0)
         self.assertEqual(skipped, [])

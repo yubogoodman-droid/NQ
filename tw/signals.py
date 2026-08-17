@@ -39,32 +39,10 @@ class AlertSnapshot:
             return 0.0
         return (self.ma5 - self.ma20) / self.close
 
-    @property
-    def ma5_pop_pct(self) -> float:
-        """收盤相對 MA5 的彈離幅度。頎邦／信昌電這種剛往上彈。"""
-        if self.close <= 0:
-            return 0.0
-        return (self.close - self.ma5) / self.close
-
 
 def mas_are_open(snapshot: AlertSnapshot, min_span: float = 0.005) -> bool:
     """多頭排列且 MA5–MA20 拉開到 min_span 以上（預設 0.5%）。"""
     return snapshot.bullish_aligned and snapshot.ma_span_pct >= min_span
-
-
-def price_popped_off_ma5(snapshot: AlertSnapshot, min_pop: float = 0.01) -> bool:
-    """收盤明顯彈離 MA5（預設 1%），短均即使還沒完全拉開也可以。"""
-    return snapshot.bullish_aligned and snapshot.ma5_pop_pct >= min_pop
-
-
-def passes_1m_structure(
-    snapshot: AlertSnapshot,
-    *,
-    min_span: float = 0.005,
-    min_pop: float = 0.01,
-) -> bool:
-    """金居：短均拉開；或頎邦／信昌電：收盤彈離 MA5。"""
-    return mas_are_open(snapshot, min_span) or price_popped_off_ma5(snapshot, min_pop)
 
 
 def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:

@@ -13,8 +13,6 @@ from tw.signals import (
     ma200_at,
     ma200_gap_pct,
     mas_are_open,
-    passes_1m_structure,
-    price_popped_off_ma5,
 )
 
 
@@ -195,40 +193,6 @@ class SignalTests(unittest.TestCase):
         )
         self.assertLess(snap.ma_span_pct, 0.005)
         self.assertFalse(mas_are_open(snap))
-        self.assertFalse(passes_1m_structure(snap))
-
-    def test_keeps_qunbang_style_ma5_pop(self) -> None:
-        snap = AlertSnapshot(
-            timestamp=pd.Timestamp("2026-08-17 09:09", tz="Asia/Taipei"),
-            close=161.50,
-            prev_close=159.50,
-            ma5=159.70,
-            ma10=159.15,
-            ma20=159.03,
-            ma200=160.18,
-            prev_ma200=160.18,
-        )
-        self.assertLess(snap.ma_span_pct, 0.005)
-        self.assertFalse(mas_are_open(snap))
-        self.assertGreaterEqual(snap.ma5_pop_pct, 0.01)
-        self.assertTrue(price_popped_off_ma5(snap))
-        self.assertTrue(passes_1m_structure(snap))
-
-    def test_keeps_xinchang_style_ma5_pop(self) -> None:
-        snap = AlertSnapshot(
-            timestamp=pd.Timestamp("2026-08-17 09:58", tz="Asia/Taipei"),
-            close=211.00,
-            prev_close=208.50,
-            ma5=208.20,
-            ma10=207.95,
-            ma20=207.65,
-            ma200=209.68,
-            prev_ma200=209.69,
-        )
-        self.assertLess(snap.ma_span_pct, 0.005)
-        self.assertFalse(mas_are_open(snap))
-        self.assertGreaterEqual(snap.ma5_pop_pct, 0.01)
-        self.assertTrue(passes_1m_structure(snap))
 
 
 if __name__ == "__main__":
