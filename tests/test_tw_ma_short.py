@@ -102,3 +102,30 @@ def test_backtest_records_short_pnl():
     assert stats["trades"] >= 1
     assert results[0].hold_bars >= 1
     assert results[0].pnl_pct > 0
+
+
+def test_1m_chart_zooms_around_signal():
+    from tw.chart import CHART_BARS_1M
+
+    assert CHART_BARS_1M == (24, 10)
+
+
+def test_centered_ylim_keeps_small_ma_gap_small():
+    from tw.chart import centered_ylim
+
+    lo, hi = centered_ylim(267.38, 268.0, span_pct=0.03)
+    assert hi - lo >= 268.0 * 0.03
+    assert 0.46 / (hi - lo) < 0.08
+    assert abs((lo + hi) / 2 - 267.38) < 0.05
+
+
+def test_trade_chart_png_is_candlestick():
+    from tw.chart import render_trade_chart_png
+
+    df = _downtrend_bars()
+    signals = TwMaShortStrategy().generate_signals(df, ticker="9999.TW", name="示範")
+    results = run_symbol_backtest(df, signals, commission=0.0, tax=0.0)
+    png = render_trade_chart_png(df, results[0], timeframe="1m")
+    assert png and png[:8] == b"\x89PNG\r\n\x1a\n"
+    png5 = render_trade_chart_png(df, results[0], timeframe="5m")
+    assert png5 and png5[:8] == b"\x89PNG\r\n\x1a\n"

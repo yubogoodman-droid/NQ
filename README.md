@@ -39,7 +39,10 @@ python examples/run_tw_ma_short.py --pages
 ```
 
 報告：`docs/tw-ma-short/index.html`  
+Markdown（GitHub 可直接預覽圖）：`docs/tw-ma-short/index.md`  
 Pages：`https://yubogoodman-droid.github.io/NQ/tw-ma-short/`
+
+K 線圖跟掃描頁同一套：漲紅跌綠 PNG、一分 K 只切跌破附近，縱軸對準 MA20/MA200，並附五分 K 對照。
 
 ## 快速開始
 
