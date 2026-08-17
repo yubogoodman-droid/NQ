@@ -105,6 +105,14 @@ def previous_friday(today: date | None = None) -> date:
     return current - timedelta(days=days)
 
 
+def previous_weekdays(today: date | None = None) -> list[date]:
+    """上週一到週五（不含本週）。"""
+    current = today or date.today()
+    this_monday = current - timedelta(days=current.weekday())
+    last_monday = this_monday - timedelta(days=7)
+    return [last_monday + timedelta(days=i) for i in range(5)]
+
+
 def fetch_daily_turnover_ranking(
     on_date: date,
     top: int = 100,

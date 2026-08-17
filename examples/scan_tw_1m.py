@@ -12,8 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tw.notify import format_hit_message, send_notifications
-from tw.ranking import previous_friday
-from tw.report import save_scan_html
+from tw.ranking import previous_friday, previous_weekdays
+from tw.report import save_scan_html, save_week_index
 from tw.screener import ScanConfig, hit_key, run_scan
 
 
@@ -42,6 +42,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--date", help="回測指定日（YYYY-MM-DD），只找當天金叉")
     p.add_argument("--last-friday", action="store_true", help="回測上週五")
+    p.add_argument("--last-week", action="store_true", help="回測上週一到五，每天分開一頁")
     p.add_argument("--quiet-empty", action="store_true", help="沒命中時不印詳細清單")
     return p.parse_args()
 
@@ -130,8 +131,46 @@ def scan_once(args: argparse.Namespace, seen: set) -> int:
     return len(new_hits)
 
 
+def scan_last_week(args: argparse.Namespace) -> int:
+    days = previous_weekdays()
+    results = []
+    print(f"回測上週 {days[0].isoformat()}～{days[-1].isoformat()}，每天分開")
+    for day in days:
+        output = f"docs/tw/backtest-{day.isoformat()}.html"
+        result = run_scan(
+            ScanConfig(
+                top=args.top,
+                max_price=args.max_price,
+                closed_only=True,
+                workers=args.workers,
+                latest_only=False,
+                exclude_etf=not args.include_etf,
+                on_date=day,
+                kline_range="7d",
+                min_5m_ma200_gap=args.min_5m_gap,
+                min_ma5_pop=args.min_ma5_pop,
+            )
+        )
+        print_result(result, quiet_empty=args.quiet_empty)
+        path = save_scan_html(result, output)
+        print(f"  報告：{path}")
+        results.append(result)
+    index = save_week_index(results, "docs/tw/week-last.md")
+    print(f"  週目錄：{index}")
+    print()
+    print("上週分日命中：")
+    for result in results:
+        assert result.as_of is not None
+        names = "、".join(h.stock.name for h in result.hits) or "—"
+        print(f"  {result.as_of.isoformat()}  {len(result.hits)} 檔  {names}")
+    return sum(len(r.hits) for r in results)
+
+
 def main() -> int:
     args = parse_args()
+    if args.last_week:
+        scan_last_week(args)
+        return 0
     seen: set = set()
     scan_once(args, seen)
     if not args.watch or _on_date(args) is not None:

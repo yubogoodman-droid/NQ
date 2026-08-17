@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from tw.ranking import RankedStock
-from tw.report import build_k_chart, save_scan_html
+from tw.report import build_k_chart, save_scan_html, save_week_index
 from tw.screener import ScanHit, ScanResult
 from tw.signals import AlertSnapshot
 
@@ -97,6 +97,34 @@ class ReportChartTests(unittest.TestCase):
         self.assertIn("拉開", text)
         self.assertIn("MA5", text)
         self.assertIn("MA200", text)
+
+    def test_week_index_lists_each_day(self) -> None:
+        hit = _hit(frame=_bars(), frame_5m=_bars(n=80, freq="5min"))
+        results = [
+            ScanResult(
+                scanned_at=datetime(2026, 8, 17, 11, 0, tzinfo=TAIPEI),
+                rank_time="盤後",
+                universe=[],
+                candidates=[],
+                hits=[hit] if day == date(2026, 8, 10) else [],
+                as_of=day,
+            )
+            for day in (
+                date(2026, 8, 10),
+                date(2026, 8, 11),
+                date(2026, 8, 12),
+                date(2026, 8, 13),
+                date(2026, 8, 14),
+            )
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = save_week_index(results, Path(tmp) / "week-last.md")
+            text = path.read_text(encoding="utf-8")
+        self.assertIn("週一 2026-08-10", text)
+        self.assertIn("週五 2026-08-14", text)
+        self.assertIn("backtest-2026-08-10.md", text)
+        self.assertIn("南亞", text)
+        self.assertIn("| 1 |", text)
 
 
 if __name__ == "__main__":

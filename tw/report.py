@@ -20,6 +20,8 @@ from matplotlib.patches import Rectangle
 from tw.screener import ScanHit, ScanResult
 from tw.signals import add_moving_averages, ma200_at
 
+WEEKDAY_ZH = "一二三四五六日"
+
 MA_COLORS = {
     5: "#ffa726",
     10: "#ffeb3b",
@@ -63,6 +65,46 @@ def save_scan_html(result: ScanResult, path: str | Path) -> Path:
     return out
 
 
+def weekday_zh(d) -> str:
+    return f"週{WEEKDAY_ZH[d.weekday()]}"
+
+
+def save_week_index(results: list[ScanResult], path: str | Path) -> Path:
+    """上週一到五的目錄頁（每天一頁的連結＋命中摘要）。"""
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    days = [r.as_of for r in results if r.as_of is not None]
+    if not days:
+        raise ValueError("week index needs as_of on each result")
+    start, end = days[0], days[-1]
+    title = f"上週回測 {start.isoformat()}～{end.isoformat()}"
+    lines = [
+        f"# {title}",
+        "",
+        "同一套規則，**每天分開**掃成交額前 100。",
+        "",
+        "兩種過關：短均拉開 ≥ 0.5% 且五分高於 MA200 ≥ 6%（金居、玉晶光）；"
+        "或收盤彈離 MA5 ≥ 1% 且五分仍在 MA200 之上（頎邦、信昌電）。",
+        "",
+        "| 日期 | 命中 | 標的 |",
+        "|---|---:|---|",
+    ]
+    for result in results:
+        assert result.as_of is not None
+        day = result.as_of.isoformat()
+        label = f"{weekday_zh(result.as_of)} {day}"
+        names = "、".join(h.stock.name for h in result.hits) or "—"
+        href = f"backtest-{day}.md"
+        lines.append(f"| [{label}]({href}) | {len(result.hits)} | {names} |")
+    lines.extend(["", "分日頁面：", ""])
+    for result in results:
+        assert result.as_of is not None
+        day = result.as_of.isoformat()
+        lines.append(f"- [{weekday_zh(result.as_of)} {day}](backtest-{day}.md)")
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out
+
+
 def _render(
     result: ScanResult,
     *,
@@ -80,10 +122,11 @@ def _render(
     )
     if result.as_of is not None:
         as_of = result.as_of.isoformat()
-        title = f"回測 {as_of} · 一分K剛站上 MA200"
-        heading = f"回測 {as_of} · 剛站上 MA200"
+        wd = weekday_zh(result.as_of)
+        title = f"回測 {as_of}（{wd}）· 一分K剛站上 MA200"
+        heading = f"回測 {as_of}（{wd}）· 剛站上 MA200"
         lead = (
-            f"用 {as_of} 當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
+            f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
             "一分K MA5&gt;MA10&gt;MA20，且當日這根收盤剛站上 MA200。"
             "兩種過關：短均拉開 ≥ 0.5% 且五分高於 MA200 ≥ 6%（金居、玉晶光）；"
             "或收盤彈離 MA5 ≥ 1% 且五分仍在 MA200 之上（頎邦、信昌電）。K 棒漲紅跌綠。"
@@ -318,9 +361,10 @@ def _parse_github_owner_repo(remote: str) -> tuple[str, str] | None:
 def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
     if result.as_of is not None:
         as_of = result.as_of.isoformat()
-        title = f"回測 {as_of} · 一分K剛站上 MA200"
+        wd = weekday_zh(result.as_of)
+        title = f"回測 {as_of}（{wd}）· 一分K剛站上 MA200"
         lead = (
-            f"用 {as_of} 當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
+            f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
             "一分K MA5>MA10>MA20，且當日這根收盤剛站上 MA200。"
             "兩種過關：短均拉開 ≥ 0.5% 且五分高於 MA200 ≥ 6%（金居、玉晶光）；"
             "或收盤彈離 MA5 ≥ 1% 且五分仍在 MA200 之上（頎邦、信昌電）。"

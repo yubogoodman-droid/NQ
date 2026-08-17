@@ -14,6 +14,7 @@ from tw.ranking import (
     parse_twse_mi_index,
     parse_yahoo_ranking_html,
     previous_friday,
+    previous_weekdays,
 )
 
 
@@ -116,6 +117,19 @@ class RankingTests(unittest.TestCase):
     def test_previous_friday_from_monday(self) -> None:
         self.assertEqual(previous_friday(date(2026, 8, 17)), date(2026, 8, 14))
         self.assertEqual(previous_friday(date(2026, 8, 14)), date(2026, 8, 7))
+
+    def test_previous_weekdays_is_last_mon_to_fri(self) -> None:
+        self.assertEqual(
+            previous_weekdays(date(2026, 8, 17)),
+            [
+                date(2026, 8, 10),
+                date(2026, 8, 11),
+                date(2026, 8, 12),
+                date(2026, 8, 13),
+                date(2026, 8, 14),
+            ],
+        )
+        self.assertEqual(previous_weekdays(date(2026, 8, 12))[0], date(2026, 8, 3))
 
     def test_parse_twse_and_tpex_daily(self) -> None:
         twse = {
