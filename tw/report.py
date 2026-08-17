@@ -1,102 +1,231 @@
-"""台股一分 K 做空回測報告：PNG 圖檔 + HTML / Markdown（跟掃描頁同一套畫法）。"""
+"""掃描頁同一套模板：chips + 卡片列 + 一分/五分 PNG。"""
 
 from __future__ import annotations
 
 import html
+import re
 import shutil
+import subprocess
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from tw.backtest import TradeResult, summarize
-from tw.chart import BG, FG, FONT, GRID, MA_COLORS, save_trade_charts
+from tw.chart import add_moving_averages, resample_5m, save_trade_charts
 from tw.universe import TwStock
 
 CHART_TRADES = 20
 
-
-def _fmt_ts(ts: pd.Timestamp) -> str:
-    t = pd.Timestamp(ts)
-    if t.hour or t.minute or t.second:
-        return t.strftime("%m-%d %H:%M")
-    return t.strftime("%Y-%m-%d")
-
-
-def _exit_tag(reason: str) -> tuple[str, str]:
-    mapping = {
-        "take_profit": ("TP", "tag-tp"),
-        "stop_loss": ("SL", "tag-sl"),
-        "ma200_reclaim": ("站回200", "tag-time"),
-        "time_stop": ("到期", "tag-time"),
-        "session_close": ("收盤", "tag-time"),
+PAGE_CSS = """
+    :root {
+      color-scheme: dark;
+      --bg: #0b0e11;
+      --card: #161b22;
+      --line: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --up: #ff5c7a;
+      --ok: #7ee787;
+      --chip: #21262d;
     }
-    return mapping.get(reason, (reason, "tag-info"))
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page { max-width: 760px; margin: 0 auto; padding: 16px 12px 40px; }
+    h1 { font-size: 1.2rem; margin: 0 0 6px; }
+    .lead { color: var(--muted); font-size: .9rem; line-height: 1.55; margin: 0 0 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip {
+      background: var(--chip); border: 1px solid var(--line); border-radius: 999px;
+      padding: 4px 10px; font-size: 12px; color: var(--muted);
+    }
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted);
+      margin: 0 0 12px;
+    }
+    .swatch { display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 4px; }
+    .summary {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 12px 14px; margin-bottom: 14px; font-size: .9rem; line-height: 1.65;
+      color: var(--muted);
+    }
+    .summary .ok { color: var(--ok); font-weight: 700; font-size: 1.05rem; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 14px 10px 10px; margin: 0 0 14px; color: inherit;
+    }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 0 6px; }
+    .name { font-weight: 700; font-size: 1.05rem; }
+    .sym a { color: var(--muted); font-weight: 500; margin-left: 6px; font-size: .9rem; text-decoration: none; }
+    .price { color: var(--up); font-weight: 700; white-space: nowrap; }
+    .price.ok { color: var(--ok); }
+    .row { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: .9rem; color: var(--muted); padding: 0 6px; }
+    .row b { color: var(--text); font-weight: 600; }
+    .chart { margin-top: 10px; }
+    .chart img { width: 100%; height: auto; display: block; border-radius: 8px; }
+    .chart-label {
+      font-size: 12px; color: var(--ok); font-weight: 700;
+      padding: 8px 6px 4px;
+    }
+    .empty { color: var(--muted); }
+    footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }
+"""
 
 
-def _safe_stem(ticker: str, trade_no: int) -> str:
-    return f"{trade_no:03d}-{ticker.replace('.', '_')}"
+def _safe_symbol(symbol: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in ".-_" else "_" for ch in symbol)
 
 
-def _equity_png(results: list[TradeResult]) -> bytes | None:
-    if not results:
-        return None
-    ordered = sorted(results, key=lambda r: r.exit_time)
-    equity = pd.Series([r.pnl_twd for r in ordered]).cumsum()
-    fig, ax = plt.subplots(figsize=(8.4, 2.8), dpi=130)
-    fig.patch.set_facecolor(BG)
-    ax.set_facecolor(BG)
-    ax.plot(range(len(equity)), equity, color="#7ee787", linewidth=1.8)
-    ax.set_title("累計損益（每筆 10 萬名義本金）", color=FG, fontsize=11, pad=8, fontproperties=FONT)
-    ax.tick_params(colors="#9aa4b2", labelsize=8)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["bottom"].set_color(GRID)
-    ax.spines["left"].set_color(GRID)
-    ax.grid(True, color=GRID, linewidth=0.6, alpha=0.7)
-    ax.set_xticks([])
-    fig.tight_layout(pad=0.35)
-    import io
-
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", facecolor=fig.get_facecolor(), bbox_inches="tight", pad_inches=0.12)
-    plt.close(fig)
-    return buf.getvalue()
+def _exit_label(reason: str) -> str:
+    return {
+        "take_profit": "停利",
+        "stop_loss": "停損",
+        "ma200_reclaim": "站回200",
+        "time_stop": "到期",
+        "session_close": "收盤",
+    }.get(reason, reason)
 
 
-def _universe_table(top: pd.DataFrame) -> str:
-    if top is None or top.empty:
-        return ""
-    week = pd.Timestamp(top.attrs.get("week_end")).strftime("%Y-%m-%d") if top.attrs.get("week_end") is not None else ""
-    rows = []
-    for _, r in top.iterrows():
-        rows.append(
-            f"<tr><td>{int(r['rank'])}</td><td>{html.escape(str(r['ticker']))}</td>"
-            f"<td>{html.escape(str(r['name']))}</td>"
-            f"<td>{float(r['close']):.2f}</td>"
-            f"<td>{float(r['turnover']) / 1e8:.2f}</td></tr>"
+def _five_min_ma200_text(df: pd.DataFrame | None, ts: pd.Timestamp) -> str:
+    if df is None or df.empty:
+        return "—"
+    work = add_moving_averages(resample_5m(df))
+    if work.empty or "ma200" not in work.columns:
+        return "—"
+    mark = pd.Timestamp(ts).floor("5min")
+    loc = work.index.get_indexer([mark], method="nearest")[0]
+    if loc < 0:
+        return "—"
+    close = float(work["close"].iloc[loc])
+    ma200 = work["ma200"].iloc[loc]
+    if pd.isna(ma200):
+        return f"{close:.2f} / —"
+    ma200 = float(ma200)
+    gap = (close - ma200) / ma200 if ma200 else 0.0
+    cmp_ = ">" if close > ma200 else "<"
+    return f"{close:.2f} {cmp_} {ma200:.2f}（{gap:+.1%}）"
+
+
+def _rank_text(ticker: str, universe_top: pd.DataFrame | None) -> str:
+    if universe_top is None or universe_top.empty:
+        return "—"
+    rows = universe_top[universe_top["ticker"] == ticker]
+    if rows.empty:
+        return "—"
+    r = rows.iloc[0]
+    return f"#{int(r['rank'])} · {float(r['turnover']) / 1e8:.2f} 億"
+
+
+def _github_raw_base(page_dir: Path) -> str | None:
+    try:
+        root = Path(
+            subprocess.check_output(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=page_dir,
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
         )
-    return f"""
-    <section class="summary">
-      <h2>最近一週成交額前 100（已排除 ETF、收盤 &gt; 600）</h2>
-      <p>週截止 {html.escape(week)} · 成交額單位：億元</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>代號</th><th>名稱</th><th>收盤</th><th>成交額</th></tr></thead>
-          <tbody>{''.join(rows)}</tbody>
-        </table>
-      </div>
-    </section>
-    """
+        remote = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"],
+            cwd=root,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=root,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    text = re.sub(r"^git@", "https://", remote).replace("github.com:", "github.com/")
+    match = re.search(r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?$", text)
+    if match is None or not branch or branch == "HEAD":
+        return None
+    rel = page_dir.resolve().relative_to(root).as_posix().strip("/")
+    prefix = f"https://raw.githubusercontent.com/{match.group('owner')}/{match.group('repo')}/{branch}/"
+    return f"{prefix}{rel}/" if rel != "." else prefix
 
 
-def _chart_block(rel: str | None, label: str) -> str:
+def _img(rel: str | None, alt: str, image_base: str | None) -> str:
     if not rel:
-        return f'<p class="empty">無{html.escape(label)}資料</p>'
-    return f'<div class="chart-label">{html.escape(label)}</div><div class="chart"><img src="{html.escape(rel)}" alt="{html.escape(label)}"/></div>'
+        return '<p class="empty">無 K 線資料</p>'
+    src = html.escape(f"{image_base}{rel}" if image_base else rel)
+    return f'<img alt="{html.escape(alt)}" src="{src}"/>'
+
+
+def _trade_card(
+    index: int,
+    trade: TradeResult,
+    df: pd.DataFrame | None,
+    *,
+    chart_rel: Path,
+    chart_dir: Path,
+    image_base: str | None,
+    universe_top: pd.DataFrame | None,
+) -> tuple[str, str]:
+    sig = trade.signal
+    ts = pd.Timestamp(sig.timestamp).strftime("%H:%M")
+    exit_t = pd.Timestamp(trade.exit_time).strftime("%H:%M")
+    url = f"https://tw.stock.yahoo.com/quote/{html.escape(sig.ticker)}"
+    chg = f" {trade.pnl_pct * 100:+.2f}%"
+    price_cls = "price ok" if trade.pnl_pct > 0 else "price"
+    gap = (sig.ma20 - sig.ma200) / sig.ma200 if sig.ma200 else 0.0
+    five = _five_min_ma200_text(df, sig.timestamp)
+    stem = f"{_safe_symbol(sig.ticker)}-{ts.replace(':', '')}"
+    rels: dict[str, str] = {}
+    if df is not None:
+        saved = save_trade_charts(df, trade, chart_dir, stem)
+        rels = {tf: f"{chart_rel.as_posix()}/{path.name}" for tf, path in saved.items()}
+    chart_1m = _img(rels.get("1m"), f"{sig.name} {sig.ticker} 一分K", image_base)
+    chart_5m = _img(rels.get("5m"), f"{sig.name} {sig.ticker} 五分K", image_base)
+    card = f"""
+    <article class="card">
+      <div class="top">
+        <div class="name">{index}. {html.escape(sig.name)}<span class="sym"><a href="{url}" target="_blank" rel="noopener">{html.escape(sig.ticker)}</a></span></div>
+        <div class="{price_cls}">{sig.entry:.2f}{html.escape(chg)}</div>
+      </div>
+      <div class="row"><span>1分跌破時間</span><b>{ts}</b></div>
+      <div class="row"><span>1分收盤 / MA200</span><b>{sig.entry:.2f} &lt; {sig.ma200:.2f}</b></div>
+      <div class="row"><span>五分收盤 / MA200</span><b>{html.escape(five)}</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>{sig.ma5:.2f} &lt; {sig.ma10:.2f} &lt; {sig.ma20:.2f}</b></div>
+      <div class="row"><span>MA20 與 MA200</span><b>{sig.ma20:.2f} / {sig.ma200:.2f}（差 {gap:.1%}）</b></div>
+      <div class="row"><span>成交額排名</span><b>{html.escape(_rank_text(sig.ticker, universe_top))}</b></div>
+      <div class="row"><span>回補</span><b>{exit_t} {trade.exit_price:.2f} · {_exit_label(trade.exit_reason)} · {trade.hold_bars} 分</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart">{chart_1m}</div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart">{chart_5m}</div>
+    </article>
+"""
+    md = "\n".join(
+        [
+            f"## {index}. {sig.name} [{sig.ticker}](https://tw.stock.yahoo.com/quote/{sig.ticker})",
+            "",
+            f"- 價格 {sig.entry:.2f}{chg}　成交額排名 {_rank_text(sig.ticker, universe_top)}",
+            f"- 1分跌破 {ts}　收 {sig.entry:.2f} < MA200 {sig.ma200:.2f}",
+            f"- 1分 MA5 {sig.ma5:.2f} < MA10 {sig.ma10:.2f} < MA20 {sig.ma20:.2f}　MA20/MA200 差 {gap:.1%}",
+            f"- 五分收盤 / MA200　{five}",
+            f"- 回補 {exit_t} {trade.exit_price:.2f}（{_exit_label(trade.exit_reason)} · {trade.hold_bars} 分）",
+            "",
+            "**一分 K**",
+            "",
+            f"![{sig.name} 一分K]({chart_rel.as_posix()}/{stem}-1m.png)",
+            "",
+            "**五分 K（對照）**",
+            "",
+            f"![{sig.name} 五分K]({chart_rel.as_posix()}/{stem}-5m.png)",
+            "",
+        ]
+    )
+    return card, md
 
 
 def build_report_html(
@@ -108,227 +237,91 @@ def build_report_html(
     universe_top: pd.DataFrame | None = None,
     chart_rel: Path,
     chart_dir: Path,
+    image_base: str | None = None,
     chart_trades: int = CHART_TRADES,
-) -> str:
+) -> tuple[str, str]:
     stats = summarize(results)
     pf = stats["profit_factor"]
     pf_txt = "∞" if pf == float("inf") else f"{pf:.2f}"
-
-    equity_rel = ""
-    png = _equity_png(results)
-    if png:
-        equity_path = chart_dir / "equity.png"
-        equity_path.write_bytes(png)
-        equity_rel = f"{chart_rel.as_posix()}/equity.png"
-
     show = list(reversed(results[-chart_trades:])) if results else []
-    start_no = max(1, len(results) - len(show) + 1)
-    cards = []
-    for i, trade in enumerate(show):
-        trade_no = start_no + i
+    cards: list[str] = []
+    md_cards: list[str] = []
+    for i, trade in enumerate(show, 1):
         df = frames.get(trade.signal.ticker)
-        rels: dict[str, str] = {}
-        if df is not None:
-            stem = _safe_stem(trade.signal.ticker, trade_no)
-            saved = save_trade_charts(df, trade, chart_dir, stem)
-            rels = {tf: f"{chart_rel.as_posix()}/{path.name}" for tf, path in saved.items()}
-        cards.append(_render_trade_card(trade, trade_no, rels))
-
-    empty = '<p class="empty">期間內沒有符合條件的進場訊號</p>' if not results else ""
-    uni = _universe_table(universe_top) if universe_top is not None else ""
-    rows = []
-    for i, r in enumerate(results, start=1):
-        cls = "win" if r.pnl_pct > 0 else "loss"
-        rows.append(
-            f"<tr class='{cls}'><td>{i}</td><td>{html.escape(r.signal.ticker)}</td>"
-            f"<td>{html.escape(r.signal.name)}</td>"
-            f"<td>{_fmt_ts(r.signal.timestamp)}</td>"
-            f"<td>{_fmt_ts(r.exit_time)}</td>"
-            f"<td>{html.escape(_exit_tag(r.exit_reason)[0])}</td>"
-            f"<td>{r.pnl_pct * 100:+.2f}%</td>"
-            f"<td>{r.pnl_twd:+,.0f}</td></tr>"
+        card, md = _trade_card(
+            i,
+            trade,
+            df,
+            chart_rel=chart_rel,
+            chart_dir=chart_dir,
+            image_base=image_base,
+            universe_top=universe_top,
         )
-    legend = "".join(
-        f'<span><i class="swatch" style="background:{color}"></i>MA{p}</span>'
-        for p, color in MA_COLORS.items()
+        cards.append(card)
+        md_cards.append(md)
+    empty = '<p class="empty">目前沒有符合條件的個股。</p>' if not results else ""
+    heading = "台股一分K · 跌破 MA200"
+    lead = (
+        "成交額前 100、濾掉 ETF 與股價 600 以上。一分K MA5&lt;MA10&lt;MA20 空頭排列，"
+        "當根收盤跌破 MA200 做空；13:00 後不再進場。"
+        "出場：停利 1.2% / 停損 0.8% / 收盤站回 MA200 / 持有滿 30 分 / 當日收盤回補。"
+        "K 棒漲紅跌綠。"
     )
-    equity_html = (
-        f'<section class="summary"><img class="equity" src="{html.escape(equity_rel)}" alt="累計損益"/></section>'
-        if equity_rel
-        else ""
-    )
-
-    return f"""<!DOCTYPE html>
+    html_page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>{html.escape(title)}</title>
   <style>
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      background: #0b0e11;
-      color: #e6edf3;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
-    }}
-    .page {{ max-width: 760px; margin: 0 auto; padding: 12px 12px 28px; }}
-    .summary, .trade-card {{
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin-bottom: 14px;
-    }}
-    h1 {{ margin: 0 0 6px; font-size: 18px; }}
-    h2 {{ margin: 0 0 8px; font-size: 15px; }}
-    .summary p, .lead {{ margin: 0; color: #8b949e; font-size: 13px; line-height: 1.5; }}
-    .total {{ margin-top: 8px; font-size: 15px; font-weight: 600; color: #7ee787; }}
-    .rules {{ margin-top: 10px; color: #8b949e; font-size: 12px; line-height: 1.55; }}
-    .legend {{ display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: #8b949e; margin: 10px 0 0; }}
-    .swatch {{ display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 4px; }}
-    .card-header {{ display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }}
-    .trade-no {{ font-size: 15px; font-weight: 700; }}
-    .trade-time {{ font-size: 12px; color: #8b949e; }}
-    .card-pnl {{ font-size: 16px; font-weight: 700; white-space: nowrap; }}
-    .pnl-win {{ color: #7ee787; }}
-    .pnl-loss {{ color: #ff7b72; }}
-    .tags {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }}
-    .tag {{ font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; border: 1px solid transparent; }}
-    .tag-tp {{ background: rgba(0,200,5,0.15); color: #3ddc68; border-color: rgba(0,200,5,0.35); }}
-    .tag-sl {{ background: rgba(255,82,82,0.15); color: #ff7b72; border-color: rgba(255,82,82,0.35); }}
-    .tag-time {{ background: rgba(255,193,7,0.12); color: #f0c14b; border-color: rgba(255,193,7,0.3); }}
-    .tag-info {{ background: rgba(88,166,255,0.12); color: #79c0ff; border-color: rgba(88,166,255,0.28); }}
-    .trade-detail {{
-      margin: 0 0 10px; padding: 10px 12px; background: #0d1117; border-radius: 10px;
-      border: 1px solid #21262d; font-family: ui-monospace, Menlo, Consolas, monospace;
-      font-size: 12px; line-height: 1.55; color: #c9d1d9; white-space: pre-wrap;
-    }}
-    .chart-label {{ font-size: 12px; color: #7ee787; font-weight: 700; padding: 8px 0 4px; }}
-    .chart img, img.equity {{ width: 100%; height: auto; display: block; border-radius: 8px; }}
-    .empty {{ text-align: center; color: #8b949e; padding: 20px 16px; }}
-    .table-wrap {{ overflow-x: auto; margin-top: 10px; max-height: 420px; overflow-y: auto; }}
-    table {{ width: 100%; border-collapse: collapse; font-size: 12px; }}
-    th, td {{ padding: 6px 8px; text-align: left; border-bottom: 1px solid #21262d; white-space: nowrap; }}
-    th {{ color: #8b949e; position: sticky; top: 0; background: #161b22; }}
-    tr.win td:nth-last-child(-n+2) {{ color: #3ddc68; }}
-    tr.loss td:nth-last-child(-n+2) {{ color: #ff7b72; }}
+{PAGE_CSS}
   </style>
 </head>
 <body>
   <div class="page">
-    <section class="summary">
-      <h1>{html.escape(title)}</h1>
-      <p class="lead">{html.escape(subtitle)}</p>
-      <div class="total">
-        {stats.get("trades", 0)} 筆 · 勝率 {stats.get("win_rate", 0) * 100:.1f}% ·
-        平均 {stats.get("avg_pnl_pct", 0) * 100:+.2f}% · 獲利因子 {html.escape(pf_txt)} ·
-        總計 {stats.get("total_pnl_twd", 0):+,.0f} · MDD {stats.get("max_drawdown_twd", 0):,.0f}
-      </div>
-      <div class="rules">
-        進場：上一週成交額前 100（已排除 ETF、股價 &gt; 600），一分 K 的 MA5 &lt; MA10 &lt; MA20，當根收盤跌破 MA200 做空。13:00 後不再進場。<br/>
-        出場：停利 1.2% / 停損 0.8% / 收盤站回 MA200 / 持有滿 30 根一分 K / 當日收盤強制回補。費用採當沖：手續費 0.1425%×2 + 證交稅 0.15%。<br/>
-        圖：漲紅跌綠；一分 K 只切跌破附近，縱軸對準 MA20/MA200（不要被旁邊回檔撐開）。
-      </div>
-      <div class="legend">{legend}<span>K棒 漲紅跌綠</span></div>
-    </section>
-    {equity_html}
-    {uni}
+    <h1>{html.escape(heading)}</h1>
+    <p class="lead">{lead}</p>
+    <div class="chips">
+      <span class="chip">不含 ETF</span>
+      <span class="chip">股價 ≤ 600</span>
+      <span class="chip">週成交額前 100</span>
+      <span class="chip">MA5 &lt; 10 &lt; 20 空頭</span>
+      <span class="chip">當根跌破 MA200</span>
+      <span class="chip">13:00 後不進</span>
+      <span class="chip">當沖回補</span>
+    </div>
+    <div class="legend">
+      <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
+      <span><i class="swatch" style="background:#ffeb3b"></i>MA10</span>
+      <span><i class="swatch" style="background:#66bb6a"></i>MA20</span>
+      <span><i class="swatch" style="background:#ce93d8"></i>MA200</span>
+    </div>
+    <div class="summary">
+      回測 <span class="ok">{stats.get("trades", 0)}</span> 筆 · 下圖最近 {len(show)} 筆<br/>
+      勝率 {stats.get("win_rate", 0) * 100:.1f}% · 平均 {stats.get("avg_pnl_pct", 0) * 100:+.2f}% · 獲利因子 {html.escape(pf_txt)}<br/>
+      總計 {stats.get("total_pnl_twd", 0):+,.0f} · MDD {stats.get("max_drawdown_twd", 0):,.0f}（每筆 10 萬名義）<br/>
+      {html.escape(subtitle)}
+    </div>
     {''.join(cards)}{empty}
-    <section class="summary">
-      <h2>全部交易</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>代號</th><th>名稱</th><th>進場</th><th>出場</th><th>原因</th><th>報酬</th><th>損益</th></tr></thead>
-          <tbody>{''.join(rows)}</tbody>
-        </table>
-      </div>
-    </section>
+    <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
   </div>
 </body>
 </html>
 """
-
-
-def _render_trade_card(trade: TradeResult, trade_no: int, rels: dict[str, str]) -> str:
-    sig = trade.signal
-    pnl_class = "pnl-win" if trade.pnl_pct > 0 else "pnl-loss"
-    tag_text, tag_class = _exit_tag(trade.exit_reason)
-    return f"""
-    <article class="trade-card">
-      <header class="card-header">
-        <div class="card-title">
-          <span class="trade-no">#{trade_no} {html.escape(sig.ticker)} {html.escape(sig.name)}</span>
-          <span class="trade-time">{_fmt_ts(sig.timestamp)} → {_fmt_ts(trade.exit_time)} · 持有 {trade.hold_bars} 分</span>
-        </div>
-        <div class="card-pnl {pnl_class}">{trade.pnl_pct * 100:+.2f}%</div>
-      </header>
-      <div class="tags">
-        <span class="tag {tag_class}">{html.escape(tag_text)}</span>
-        <span class="tag tag-info">一分K</span>
-        <span class="tag tag-info">空頭排列</span>
-        <span class="tag tag-info">跌破MA200</span>
-      </div>
-      <pre class="trade-detail">進場(一分K收盤做空) {sig.entry:.2f}
-回補 {trade.exit_price:.2f}
-MA5 {sig.ma5:.2f} / MA10 {sig.ma10:.2f} / MA20 {sig.ma20:.2f}
-MA200 {sig.ma200:.2f}
-損益 {trade.pnl_twd:+,.0f}（10萬名義）</pre>
-      {_chart_block(rels.get("1m"), "一分 K")}
-      {_chart_block(rels.get("5m"), "五分 K（對照）")}
-    </article>
-    """
-
-
-def _write_markdown(
-    results: list[TradeResult],
-    frames: dict[str, pd.DataFrame],
-    path: Path,
-    *,
-    title: str,
-    subtitle: str,
-    chart_rel: Path,
-    chart_dir: Path,
-    chart_trades: int,
-) -> None:
-    stats = summarize(results)
-    lines = [
-        f"# {title}",
+    md_lines = [
+        f"# {heading}",
         "",
-        subtitle,
+        "成交額前 100、濾掉 ETF 與股價 600 以上。一分K MA5<MA10<MA20 空頭排列，當根收盤跌破 MA200 做空；13:00 後不再進場。K 棒漲紅跌綠。",
         "",
-        f"- {stats.get('trades', 0)} 筆 · 勝率 {stats.get('win_rate', 0) * 100:.1f}% · 平均 {stats.get('avg_pnl_pct', 0) * 100:+.2f}%",
-        "- 圖：漲紅跌綠；一分 K 只切跌破附近，縱軸對準 MA20/MA200。",
+        f"- 回測 **{stats.get('trades', 0)}** 筆 · 下圖最近 {len(show)} 筆",
+        f"- 勝率 {stats.get('win_rate', 0) * 100:.1f}% · 平均 {stats.get('avg_pnl_pct', 0) * 100:+.2f}%",
+        f"- {subtitle}",
         "",
+        *md_cards,
     ]
-    if (chart_dir / "equity.png").exists():
-        lines.extend([f"![累計損益]({chart_rel.as_posix()}/equity.png)", ""])
-    show = list(reversed(results[-chart_trades:])) if results else []
-    start_no = max(1, len(results) - len(show) + 1)
-    for i, trade in enumerate(show):
-        trade_no = start_no + i
-        sig = trade.signal
-        stem = _safe_stem(sig.ticker, trade_no)
-        rel = chart_rel.as_posix()
-        lines.extend(
-            [
-                f"## {trade_no}. {sig.name} [{sig.ticker}](https://tw.stock.yahoo.com/quote/{sig.ticker})",
-                "",
-                f"- {_fmt_ts(sig.timestamp)} → {_fmt_ts(trade.exit_time)} · 持有 {trade.hold_bars} 分 · {trade.pnl_pct * 100:+.2f}%",
-                f"- 進場 {sig.entry:.2f} / 回補 {trade.exit_price:.2f} / MA200 {sig.ma200:.2f}",
-                f"- MA5 {sig.ma5:.2f} < MA10 {sig.ma10:.2f} < MA20 {sig.ma20:.2f}",
-                "",
-                "**一分 K**",
-                "",
-                f"![{sig.name} 一分K]({rel}/{stem}-1m.png)",
-                "",
-                "**五分 K（對照）**",
-                "",
-                f"![{sig.name} 五分K]({rel}/{stem}-5m.png)",
-                "",
-            ]
-        )
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if not results:
+        md_lines.append("目前沒有符合條件的個股。")
+    return html_page, "\n".join(md_lines) + "\n"
 
 
 def save_report_html(
@@ -349,7 +342,8 @@ def save_report_html(
     if chart_dir.exists():
         shutil.rmtree(chart_dir)
     chart_dir.mkdir(parents=True, exist_ok=True)
-    content = build_report_html(
+    image_base = _github_raw_base(out.parent)
+    html_page, markdown = build_report_html(
         results,
         frames,
         title=title,
@@ -357,21 +351,14 @@ def save_report_html(
         universe_top=universe_top,
         chart_rel=chart_rel,
         chart_dir=chart_dir,
+        image_base=image_base,
         chart_trades=chart_trades,
     )
-    out.write_text(content, encoding="utf-8")
-    _write_markdown(
-        results,
-        frames,
-        out.with_suffix(".md"),
-        title=title,
-        subtitle=subtitle,
-        chart_rel=chart_rel,
-        chart_dir=chart_dir,
-        chart_trades=chart_trades,
-    )
+    out.write_text(html_page, encoding="utf-8")
+    md_path = out.with_suffix(".md")
+    md_path.write_text(markdown, encoding="utf-8")
     if out.stem in {"index", "today"}:
         today_md = out.parent / "today.md"
-        if today_md.resolve() != out.with_suffix(".md").resolve():
-            shutil.copyfile(out.with_suffix(".md"), today_md)
+        if today_md.resolve() != md_path.resolve():
+            shutil.copyfile(md_path, today_md)
     return out

@@ -129,3 +129,35 @@ def test_trade_chart_png_is_candlestick():
     assert png and png[:8] == b"\x89PNG\r\n\x1a\n"
     png5 = render_trade_chart_png(df, results[0], timeframe="5m")
     assert png5 and png5[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_report_uses_screener_template(tmp_path=None):
+    from pathlib import Path
+    import tempfile
+
+    from tw.report import save_report_html
+    from tw.universe import TwStock
+
+    df = _downtrend_bars()
+    signals = TwMaShortStrategy().generate_signals(df, ticker="9999.TW", name="示範股")
+    results = run_symbol_backtest(df, signals, commission=0.0, tax=0.0)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = save_report_html(
+            results,
+            {"9999.TW": df},
+            Path(tmp) / "index.html",
+            title="test",
+            subtitle="demo",
+            stocks=[TwStock("9999", "示範股", "TW")],
+        )
+        text = path.read_text(encoding="utf-8")
+        md = path.with_suffix(".md").read_text(encoding="utf-8")
+    assert 'class="card"' in text
+    assert 'class="chips"' in text
+    assert 'class="chip"' in text
+    assert "trade-card" not in text
+    assert "trade-detail" not in text
+    assert "1分跌破時間" in text
+    assert "五分 K（對照）" in text
+    assert "示範股" in md
+    assert "**一分 K**" in md
