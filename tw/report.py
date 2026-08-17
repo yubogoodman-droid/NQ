@@ -1,4 +1,4 @@
-"""台股 MA 做空回測 HTML 報告。"""
+"""台股一分 K MA 做空回測 HTML 報告。"""
 
 from __future__ import annotations
 
@@ -7,8 +7,9 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
+
 from tw.backtest import TradeResult, summarize
-from tw.universe import TwStock, latest_weekly_top
+from tw.universe import TwStock
 
 MA_COLORS = {
     5: "#ffa726",
@@ -18,8 +19,11 @@ MA_COLORS = {
 }
 
 
-def _fmt_day(ts: pd.Timestamp) -> str:
-    return pd.Timestamp(ts).strftime("%Y-%m-%d")
+def _fmt_ts(ts: pd.Timestamp) -> str:
+    t = pd.Timestamp(ts)
+    if t.hour or t.minute or t.second:
+        return t.strftime("%m-%d %H:%M")
+    return t.strftime("%Y-%m-%d")
 
 
 def _exit_tag(reason: str) -> tuple[str, str]:
@@ -28,6 +32,7 @@ def _exit_tag(reason: str) -> tuple[str, str]:
         "stop_loss": ("SL", "tag-sl"),
         "ma200_reclaim": ("站回200", "tag-time"),
         "time_stop": ("到期", "tag-time"),
+        "session_close": ("收盤", "tag-time"),
     }
     return mapping.get(reason, (reason, "tag-info"))
 
@@ -36,12 +41,12 @@ def _equity_chart(results: list[TradeResult]) -> str:
     if not results:
         return ""
     ordered = sorted(results, key=lambda r: r.exit_time)
-    dates = [_fmt_day(r.exit_time) for r in ordered]
+    xs = [_fmt_ts(r.exit_time) for r in ordered]
     equity = pd.Series([r.pnl_twd for r in ordered]).cumsum()
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=dates,
+            x=xs,
             y=equity,
             mode="lines",
             line=dict(color="#00c805", width=2),
@@ -58,19 +63,18 @@ def _equity_chart(results: list[TradeResult]) -> str:
         showlegend=False,
     )
     fig.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)")
-    fig.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix=" ")
+    fig.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)")
     return fig.to_html(full_html=False, include_plotlyjs=False, config={"displayModeBar": False})
 
 
 def _trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
     sig = trade.signal
     start = max(0, sig.bar_idx - 40)
-    end = min(len(df) - 1, sig.bar_idx + max(trade.hold_days, 5) + 8)
+    end = min(len(df) - 1, sig.bar_idx + max(trade.hold_bars, 5) + 8)
     window = df.iloc[start : end + 1].copy()
-    close = window["close"]
     for p in (5, 10, 20, 200):
         window[f"ma{p}"] = df["close"].rolling(p, min_periods=p).mean().iloc[start : end + 1]
-    times = [pd.Timestamp(t).strftime("%Y-%m-%d") for t in window.index]
+    times = [_fmt_ts(t) for t in window.index]
 
     fig = go.Figure()
     fig.add_trace(
@@ -100,8 +104,8 @@ def _trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
                 connectgaps=False,
             )
         )
-    entry_x = pd.Timestamp(sig.timestamp).strftime("%Y-%m-%d")
-    exit_x = pd.Timestamp(trade.exit_time).strftime("%Y-%m-%d")
+    entry_x = _fmt_ts(sig.timestamp)
+    exit_x = _fmt_ts(trade.exit_time)
     fig.add_trace(
         go.Scatter(
             x=[entry_x],
@@ -126,7 +130,7 @@ def _trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
             showlegend=False,
         )
     )
-    title = f"#{trade_no} {sig.ticker} {sig.name} 做空"
+    title = f"#{trade_no} {sig.ticker} {sig.name} 一分K做空"
     fig.update_layout(
         template="plotly_dark",
         height=300,
@@ -152,16 +156,17 @@ def _render_trade_card(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> s
       <header class="card-header">
         <div class="card-title">
           <span class="trade-no">#{trade_no} {html.escape(sig.ticker)} {html.escape(sig.name)}</span>
-          <span class="trade-time">{_fmt_day(sig.timestamp)} → {_fmt_day(trade.exit_time)} · 持有 {trade.hold_days} 日</span>
+          <span class="trade-time">{_fmt_ts(sig.timestamp)} → {_fmt_ts(trade.exit_time)} · 持有 {trade.hold_bars} 分</span>
         </div>
         <div class="card-pnl {pnl_class}">{trade.pnl_pct * 100:+.2f}%</div>
       </header>
       <div class="tags">
         <span class="tag {tag_class}">{html.escape(tag_text)}</span>
+        <span class="tag tag-info">一分K</span>
         <span class="tag tag-info">空頭排列</span>
         <span class="tag tag-info">跌破MA200</span>
       </div>
-      <pre class="trade-detail">進場(收盤做空) {sig.entry:.2f}
+      <pre class="trade-detail">進場(一分K收盤做空) {sig.entry:.2f}
 回補 {trade.exit_price:.2f}
 MA5 {sig.ma5:.2f} / MA10 {sig.ma10:.2f} / MA20 {sig.ma20:.2f}
 MA200 {sig.ma200:.2f}
@@ -225,8 +230,8 @@ def build_report_html(
         rows.append(
             f"<tr class='{cls}'><td>{i}</td><td>{html.escape(r.signal.ticker)}</td>"
             f"<td>{html.escape(r.signal.name)}</td>"
-            f"<td>{_fmt_day(r.signal.timestamp)}</td>"
-            f"<td>{_fmt_day(r.exit_time)}</td>"
+            f"<td>{_fmt_ts(r.signal.timestamp)}</td>"
+            f"<td>{_fmt_ts(r.exit_time)}</td>"
             f"<td>{html.escape(_exit_tag(r.exit_reason)[0])}</td>"
             f"<td>{r.pnl_pct * 100:+.2f}%</td>"
             f"<td>{r.pnl_twd:+,.0f}</td></tr>"
@@ -297,8 +302,8 @@ def build_report_html(
         總計 {stats.get("total_pnl_twd", 0):+,.0f} · MDD {stats.get("max_drawdown_twd", 0):,.0f}
       </div>
       <div class="rules">
-        進場：上一週成交額前 100（已排除 ETF、股價 &gt; 600），且 MA5 &lt; MA10 &lt; MA20，當日收盤跌破 MA200 做空。<br/>
-        出場：停利 12% / 停損 8% / 收盤站回 MA200 / 持有滿 20 個交易日。含手續費 0.1425%×2 + 證交稅 0.3%。
+        進場：上一週成交額前 100（已排除 ETF、股價 &gt; 600），一分 K 的 MA5 &lt; MA10 &lt; MA20，當根收盤跌破 MA200 做空。13:00 後不再進場。<br/>
+        出場：停利 1.2% / 停損 0.8% / 收盤站回 MA200 / 持有滿 30 根一分 K / 當日收盤強制回補。費用採當沖：手續費 0.1425%×2 + 證交稅 0.15%。
       </div>
     </section>
     <section class="summary">{equity_html}</section>
@@ -327,13 +332,8 @@ def save_report_html(
     title: str,
     subtitle: str,
     stocks: list[TwStock] | None = None,
+    universe_top: pd.DataFrame | None = None,
 ) -> Path:
-    universe_top = None
-    if stocks and frames:
-        from tw.data import to_panels
-
-        _o, _h, _l, closes, volumes = to_panels(frames)
-        universe_top = latest_weekly_top(closes, volumes, stocks)
     content = build_report_html(
         results,
         frames,

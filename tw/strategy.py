@@ -1,8 +1,9 @@
-"""5/10/20 空頭排列 + 收盤跌破 MA200 做空進場。"""
+"""一分 K：5/10/20 空頭排列 + 當根收盤跌破 MA200 做空。"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import time
 
 import pandas as pd
 
@@ -23,13 +24,15 @@ class TwSignal:
 @dataclass
 class TwMaShortStrategy:
     """
-    進場（做空）：
+    進場（一分 K 做空）：
     1. MA5 < MA10 < MA20（空頭排列）
-    2. 當日收盤跌破 MA200（前一日收盤 >= MA200，當日收盤 < MA200）
-    3. 當日收盤價 <= max_price
+    2. 當根收盤跌破 MA200（前一根收盤 >= MA200，當根收盤 < MA200）
+    3. 當根收盤價 <= max_price
+    4. 13:00 後不再進場，預留出場時間
     """
 
     max_price: float = 600.0
+    entry_cutoff: time = field(default_factory=lambda: time(13, 0))
 
     def generate_signals(
         self,
@@ -51,7 +54,11 @@ class TwMaShortStrategy:
         bearish = (ma5 < ma10) & (ma10 < ma20)
         breakdown = (close < ma200) & (close.shift(1) >= ma200.shift(1))
         cheap = close <= self.max_price
-        signal_mask = bearish & breakdown & cheap
+        before_cutoff = pd.Series(
+            [_bar_time(ts) < self.entry_cutoff for ts in df.index],
+            index=df.index,
+        )
+        signal_mask = bearish & breakdown & cheap & before_cutoff
         if eligible is not None:
             elig = eligible.reindex(df.index).fillna(False).astype(bool)
             signal_mask = signal_mask & elig
@@ -78,3 +85,8 @@ class TwMaShortStrategy:
                 )
             )
         return signals
+
+
+def _bar_time(ts: pd.Timestamp) -> time:
+    t = pd.Timestamp(ts)
+    return t.time()

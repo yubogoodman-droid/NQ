@@ -141,3 +141,11 @@ def latest_weekly_top(
     )
     out.attrs["week_end"] = last_week
     return out
+
+
+def tickers_ever_eligible(mask: pd.DataFrame) -> list[str]:
+    """回傳在 mask 期間至少有一天符合週成交額條件的 ticker。"""
+    if mask.empty:
+        return []
+    flags = mask.fillna(False).astype(bool)
+    return [str(c) for c in flags.columns if bool(flags[c].any())]
