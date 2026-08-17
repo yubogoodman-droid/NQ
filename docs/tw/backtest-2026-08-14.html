@@ -66,13 +66,13 @@
 <body>
   <div class="page">
     <h1>回測 2026-08-14 · 剛站上 MA200</h1>
-    <p class="lead">用 2026-08-14 當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.5%），且當日這根收盤剛站上 MA200（前一根還沒）。含該金叉的五分K必須明顯站上五分 MA200（至少高 6%，像金居、玉晶光）。K 棒漲紅跌綠。</p>
+    <p class="lead">用 2026-08-14 當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。一分K MA5&gt;MA10&gt;MA20，且當日這根收盤剛站上 MA200。兩種過關：短均拉開 ≥ 0.5% 且五分高於 MA200 ≥ 6%（金居、玉晶光）；或收盤彈離 MA5 ≥ 1% 且五分仍在 MA200 之上（頎邦、信昌電）。K 棒漲紅跌綠。</p>
     <div class="chips">
       <span class="chip">不含 ETF</span>
       <span class="chip">股價 &lt; 650</span>
-      <span class="chip">MA5 &gt; 10 &gt; 20 拉開</span>
+      <span class="chip">MA5 &gt; 10 &gt; 20</span>
       <span class="chip">金叉 MA200</span>
-      <span class="chip">五分明顯站上 MA200（≥ 6%）</span>
+      <span class="chip">五分 ≥ MA200 +6% 或彈離 MA5</span>
     </div>
     <div class="legend">
       <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
@@ -81,10 +81,10 @@
       <span><i class="swatch" style="background:#ce93d8"></i>MA200</span>
     </div>
     <div class="summary">
-      命中 <span class="ok">2</span> 檔<br/>
-      掃描時間 2026-08-17 14:06:09（台北）<br/>
+      命中 <span class="ok">3</span> 檔<br/>
+      掃描時間 2026-08-17 14:15:51（台北）<br/>
       排行時間 2026-08-14 盤後成交額<br/>
-      前 100 名 → 濾掉股價 37、ETF 8 → 掃描 55 檔 → 均線糾結 23 → 五分未明顯站上MA200 8
+      前 100 名 → 濾掉股價 37、ETF 8 → 掃描 55 檔 → 均線糾結 22 → 五分未明顯站上MA200 8
     </div>
     
     <article class="card">
@@ -96,6 +96,7 @@
       <div class="row"><span>1分收盤 / MA200</span><b>425.50 &gt; 424.41</b></div>
       <div class="row"><span>五分收盤 / MA200</span><b>429.50 &gt; 399.71（+7.5%）</b></div>
       <div class="row"><span>1分 MA5 / 10 / 20</span><b>422.90 &gt; 421.65 &gt; 419.65</b></div>
+      <div class="row"><span>彈離 MA5</span><b>0.6%</b></div>
       <div class="row"><span>成交額排名</span><b>#13 · 192.68 億</b></div>
       <div class="chart-label">一分 K</div>
       <div class="chart"><img alt="金居 8358.TWO 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-14/8358.TWO-1m.png"/></div>
@@ -106,13 +107,32 @@
 
     <article class="card">
       <div class="top">
-        <div class="name">2. 玉晶光<span class="sym"><a href="https://tw.stock.yahoo.com/quote/3406.TW" target="_blank" rel="noopener">3406.TW</a></span></div>
+        <div class="name">2. 所羅門<span class="sym"><a href="https://tw.stock.yahoo.com/quote/2359.TW" target="_blank" rel="noopener">2359.TW</a></span></div>
+        <div class="price">159.50 +1.59%</div>
+      </div>
+      <div class="row"><span>1分金叉時間</span><b>09:01</b></div>
+      <div class="row"><span>1分收盤 / MA200</span><b>159.00 &gt; 157.00</b></div>
+      <div class="row"><span>五分收盤 / MA200</span><b>163.00 &gt; 148.31（+9.9%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>157.30 &gt; 157.15 &gt; 157.07</b></div>
+      <div class="row"><span>彈離 MA5</span><b>1.1%</b></div>
+      <div class="row"><span>成交額排名</span><b>#58 · 42.34 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="所羅門 2359.TW 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-14/2359.TW-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="所羅門 2359.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-14/2359.TW-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">3. 玉晶光<span class="sym"><a href="https://tw.stock.yahoo.com/quote/3406.TW" target="_blank" rel="noopener">3406.TW</a></span></div>
         <div class="price">615.00 -2.23%</div>
       </div>
       <div class="row"><span>1分金叉時間</span><b>10:38</b></div>
       <div class="row"><span>1分收盤 / MA200</span><b>623.00 &gt; 620.94</b></div>
       <div class="row"><span>五分收盤 / MA200</span><b>624.00 &gt; 570.25（+9.4%）</b></div>
       <div class="row"><span>1分 MA5 / 10 / 20</span><b>619.20 &gt; 616.70 &gt; 613.00</b></div>
+      <div class="row"><span>彈離 MA5</span><b>0.6%</b></div>
       <div class="row"><span>成交額排名</span><b>#84 · 28.05 億</b></div>
       <div class="chart-label">一分 K</div>
       <div class="chart"><img alt="玉晶光 3406.TW 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-14/3406.TW-1m.png"/></div>
