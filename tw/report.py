@@ -88,8 +88,8 @@ def save_week_index(results: list[ScanResult], path: str | Path) -> Path:
         "同一套規則，**每天分開**掃成交額前 100。",
         "",
         "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
-        "當天第一根收盤剛站上 MA200（開盤跳空不算）；"
-        "含該金叉的五分K收盤必須高於五分 MA200。",
+        "當天第一根剛站上 MA200，連續兩根收盤站穩再通知（開盤跳空不算）；"
+        "含該根的五分K收盤必須高於五分 MA200。",
         "",
         "| 日期 | 命中 | 標的 |",
         "|---|---:|---|",
@@ -128,20 +128,20 @@ def _render(
     if result.as_of is not None:
         as_of = result.as_of.isoformat()
         wd = weekday_zh(result.as_of)
-        title = f"回測 {as_of}（{wd}）· 一分K剛站上 MA200"
-        heading = f"回測 {as_of}（{wd}）· 剛站上 MA200"
+        title = f"回測 {as_of}（{wd}）· 一分K站穩 MA200"
+        heading = f"回測 {as_of}（{wd}）· 站穩 MA200"
         lead = (
             f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
             "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
-            "且當天第一根收盤剛站上 MA200（前一根還沒、開盤跳空不算）。"
-            "含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
+            "且當天第一根剛站上 MA200、連續兩根收盤站穩再通知（開盤跳空不算）。"
+            "含該根的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
         )
     else:
         title = "台股一分K · 多頭排列站上 MA200"
-        heading = "台股一分K · 剛站上 MA200"
+        heading = "台股一分K · 站穩 MA200"
         lead = (
             "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
-            "且這根收盤剛站上 MA200（前一根還沒、開盤跳空不算）。含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
+            "且連續兩根收盤站穩 MA200（開盤跳空不算）。含該根的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
         )
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -266,7 +266,7 @@ def _hit_card(
         <div class="name">{index}. {html.escape(s.name)}<span class="sym"><a href="{url}" target="_blank" rel="noopener">{html.escape(s.symbol)}</a></span></div>
         <div class="price">{s.price:.2f}{html.escape(chg)}</div>
       </div>
-      <div class="row"><span>1分金叉時間</span><b>{ts}</b></div>
+      <div class="row"><span>1分站穩時間</span><b>{ts}</b></div>
       <div class="row"><span>1分收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
       <div class="row"><span>五分收盤 / MA200</span><b>{html.escape(_five_min_ma200_text(hit))}</b></div>
       <div class="row"><span>1分 MA5 / 10 / 20</span><b>{snap.ma5:.2f} &gt; {snap.ma10:.2f} &gt; {snap.ma20:.2f}</b></div>
@@ -366,18 +366,18 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
     if result.as_of is not None:
         as_of = result.as_of.isoformat()
         wd = weekday_zh(result.as_of)
-        title = f"回測 {as_of}（{wd}）· 一分K剛站上 MA200"
+        title = f"回測 {as_of}（{wd}）· 一分K站穩 MA200"
         lead = (
             f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
             "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
-            "且當天第一根收盤剛站上 MA200（開盤跳空不算）；"
-            "含該金叉的五分K收盤也必須高於五分 MA200。"
+            "且當天第一根剛站上 MA200、連續兩根收盤站穩再通知（開盤跳空不算）；"
+            "含該根的五分K收盤也必須高於五分 MA200。"
         )
     else:
-        title = "台股一分K · 剛站上 MA200"
+        title = "台股一分K · 站穩 MA200"
         lead = (
             "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
-            "且這根收盤剛站上 MA200（開盤跳空不算）；含該金叉的五分K收盤也必須高於五分 MA200。"
+            "且連續兩根收盤站穩 MA200（開盤跳空不算）；含該根的五分K收盤也必須高於五分 MA200。"
         )
     lines = [
         f"# {title}",
@@ -401,7 +401,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
                 f"## {i}. {s.name} [{s.symbol}](https://tw.stock.yahoo.com/quote/{s.symbol})",
                 "",
                 f"- 價格 {s.price:.2f}{chg}　成交額排名 #{s.rank}　{s.turnover/1e8:.2f} 億",
-                f"- 1分金叉 {snap.timestamp.strftime('%H:%M')}　收 {snap.close:.2f} > MA200 {snap.ma200:.2f}",
+                f"- 1分站穩 {snap.timestamp.strftime('%H:%M')}　收 {snap.close:.2f} > MA200 {snap.ma200:.2f}",
                 f"- 1分 MA5 {snap.ma5:.2f} > MA10 {snap.ma10:.2f} > MA20 {snap.ma20:.2f}　MA20/MA200 差 {snap.ma20_ma200_gap_pct:.1%}",
                 f"- 五分收盤 / MA200　{five}",
                 "",
@@ -482,7 +482,7 @@ def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
 
     loc = int(window.index.get_indexer([mark_ts], method="nearest")[0])
     tf_name = "五分K" if timeframe == "5m" else "一分K"
-    marker_label = "1分金叉" if timeframe == "5m" else "金叉"
+    marker_label = "1分站穩" if timeframe == "5m" else "站穩"
     if 0 <= loc < n:
         ax.scatter(
             [loc],

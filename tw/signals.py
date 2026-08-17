@@ -1,4 +1,4 @@
-"""一分 K：MA5/10/20 多頭排列，且收盤剛站上 MA200。"""
+"""一分 K：MA5/10/20 多頭排列，連續兩根收盤站上 MA200 再通知。"""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ MA_LONG = 200
 ENTRY_AFTER_HOUR = 9
 ENTRY_AFTER_MINUTE = 5
 MAX_BAR_GAP = pd.Timedelta(minutes=2)
+HOLD_BARS = 2
 
 
 @dataclass(frozen=True)
@@ -91,7 +92,7 @@ def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def is_ma200_breakout_bullish(df: pd.DataFrame) -> AlertSnapshot | None:
-    """最新一根：MA5 > MA10 > MA20，收盤站上 MA200，且前一根尚未站上。"""
+    """最新一根：前一根剛站上 MA200，這一根仍收在 MA200 上（站穩兩根）。"""
     return latest_ma200_breakout_bullish(df, latest_only=True)
 
 
@@ -103,51 +104,64 @@ def latest_ma200_breakout_bullish(
     latest_only: bool = False,
 ) -> AlertSnapshot | None:
     """
-    回傳符合條件的進場那一根：MA5>MA10>MA20，且這根收盤剛站上 MA200。
-    latest_only=True 只看最後一根（盤中 watch）；否則找 since～until 裡第一根。
+    進場／通知那一根：MA5>MA10>MA20，且連續兩根收盤站上 MA200。
+    第一根剛站上、第二根站穩才報。latest_only 只看最後一根（watch）。
     隔夜跳空、開盤前 5 分鐘不算。
     """
-    if df is None or len(df) < MA_LONG + 1:
+    if df is None or len(df) < MA_LONG + HOLD_BARS:
         return None
     work = add_moving_averages(df)
     if latest_only:
-        prev_ts = work.index[-2]
-        ts = work.index[-1]
-        if not is_intraday_entry_bar(prev_ts, ts):
-            return None
-        snap = _snapshot_at(work, len(work) - 1)
+        loc = len(work) - 1
+        snap = _hold_confirm_at(work, loc)
         if snap is None:
             return None
         if since is not None and snap.timestamp < since:
             return None
         if until is not None and snap.timestamp > until:
             return None
-        if snap.bullish_aligned and snap.crossed_above_ma200:
-            return snap
-        return None
+        return snap
 
-    start = MA_LONG
+    start = MA_LONG + HOLD_BARS - 1
     if since is not None:
         matched = False
         for i, ts in enumerate(work.index):
             if ts >= since:
-                start = max(MA_LONG, i)
+                start = max(start, i)
                 matched = True
                 break
         if not matched:
             return None
 
     for i in range(start, len(work)):
-        prev_ts = work.index[i - 1]
         ts = work.index[i]
         if until is not None and ts > until:
             break
-        if not is_intraday_entry_bar(prev_ts, ts):
-            continue
-        snap = _snapshot_at(work, i)
-        if snap and snap.bullish_aligned and snap.crossed_above_ma200:
+        snap = _hold_confirm_at(work, i)
+        if snap is not None:
             return snap
     return None
+
+
+def _hold_confirm_at(work: pd.DataFrame, idx: int) -> AlertSnapshot | None:
+    """idx 為站穩的第二根；前一根必須是剛站上 200 的進場K。"""
+    if idx < 2:
+        return None
+    if not is_intraday_entry_bar(work.index[idx - 1], work.index[idx]):
+        return None
+    if not is_intraday_entry_bar(work.index[idx - 2], work.index[idx - 1]):
+        return None
+    confirm = _snapshot_at(work, idx)
+    cross = _snapshot_at(work, idx - 1)
+    if confirm is None or cross is None:
+        return None
+    if not cross.crossed_above_ma200:
+        return None
+    if not (confirm.close > confirm.ma200):
+        return None
+    if not (confirm.bullish_aligned and cross.bullish_aligned):
+        return None
+    return confirm
 
 
 def ma200_at(

@@ -34,14 +34,20 @@ def _bars(closes: list[float]) -> pd.DataFrame:
 
 class SignalTests(unittest.TestCase):
     def test_breakout_with_bullish_ma_alignment(self) -> None:
-        closes = [100.0] * 200 + [110.0]
+        closes = [100.0] * 200 + [110.0, 111.0]
         snap = is_ma200_breakout_bullish(_bars(closes))
         self.assertIsNotNone(snap)
         assert snap is not None
         self.assertGreater(snap.ma5, snap.ma10)
         self.assertGreater(snap.ma10, snap.ma20)
         self.assertGreater(snap.close, snap.ma200)
-        self.assertLessEqual(snap.prev_close, snap.prev_ma200)
+        self.assertGreater(snap.prev_close, snap.prev_ma200)
+        self.assertEqual(snap.close, 111.0)
+
+    def test_one_bar_above_ma200_is_not_enough(self) -> None:
+        closes = [100.0] * 200 + [110.0]
+        self.assertIsNone(is_ma200_breakout_bullish(_bars(closes)))
+        self.assertIsNone(latest_ma200_breakout_bullish(_bars(closes)))
 
     def test_already_above_previous_bar_is_not_new_signal(self) -> None:
         closes = [100.0] * 198
@@ -62,13 +68,13 @@ class SignalTests(unittest.TestCase):
         snap = latest_ma200_breakout_bullish(df)
         self.assertIsNotNone(snap)
         assert snap is not None
-        self.assertEqual(snap.close, 110.0)
+        self.assertEqual(snap.close, 111.0)
         self.assertIsNone(is_ma200_breakout_bullish(_bars([100.0] * 200)))
 
     def test_until_keeps_friday_and_ignores_monday(self) -> None:
-        fri = list(pd.date_range("2026-08-14 09:00", periods=201, freq="1min", tz="Asia/Taipei"))
+        fri = list(pd.date_range("2026-08-14 09:00", periods=202, freq="1min", tz="Asia/Taipei"))
         mon = list(pd.date_range("2026-08-17 09:00", periods=3, freq="1min", tz="Asia/Taipei"))
-        closes = [100.0] * 200 + [110.0] + [111.0, 112.0, 113.0]
+        closes = [100.0] * 200 + [110.0, 111.0] + [112.0, 113.0, 114.0]
         df = pd.DataFrame(
             {
                 "open": closes,
@@ -84,7 +90,7 @@ class SignalTests(unittest.TestCase):
         self.assertIsNotNone(snap)
         assert snap is not None
         self.assertEqual(snap.timestamp.date().isoformat(), "2026-08-14")
-        self.assertEqual(snap.close, 110.0)
+        self.assertEqual(snap.close, 111.0)
 
     def test_overnight_gap_is_not_intraday_cross(self) -> None:
         idx = list(pd.date_range("2026-08-14 13:00", periods=200, freq="1min", tz="Asia/Taipei"))
@@ -125,8 +131,8 @@ class SignalTests(unittest.TestCase):
 
     def test_cross_after_open_is_entry(self) -> None:
         fri = list(pd.date_range("2026-08-14 09:46", periods=200, freq="1min", tz="Asia/Taipei"))
-        mon = list(pd.date_range("2026-08-17 09:00", periods=6, freq="1min", tz="Asia/Taipei"))
-        closes = [100.0] * 200 + [100.0, 100.0, 100.0, 100.0, 100.0, 110.0]
+        mon = list(pd.date_range("2026-08-17 09:00", periods=7, freq="1min", tz="Asia/Taipei"))
+        closes = [100.0] * 200 + [100.0, 100.0, 100.0, 100.0, 100.0, 110.0, 111.0]
         df = pd.DataFrame(
             {
                 "open": closes,
@@ -141,16 +147,16 @@ class SignalTests(unittest.TestCase):
         snap = latest_ma200_breakout_bullish(df, since=since)
         self.assertIsNotNone(snap)
         assert snap is not None
-        self.assertEqual(snap.timestamp.strftime("%H:%M"), "09:05")
-        self.assertEqual(snap.close, 110.0)
+        self.assertEqual(snap.timestamp.strftime("%H:%M"), "09:06")
+        self.assertEqual(snap.close, 111.0)
 
     def test_first_cross_is_entry_not_later_recross(self) -> None:
-        closes = [100.0] * 200 + [110.0, 111.0, 90.0, 90.0, 90.0, 120.0]
+        closes = [100.0] * 200 + [110.0, 111.0, 90.0, 90.0, 90.0, 120.0, 121.0]
         df = _bars(closes)
         snap = latest_ma200_breakout_bullish(df)
         self.assertIsNotNone(snap)
         assert snap is not None
-        self.assertEqual(snap.close, 110.0)
+        self.assertEqual(snap.close, 111.0)
 
     def test_moving_averages_length(self) -> None:
         df = add_moving_averages(_bars([float(i) for i in range(1, 221)]))
