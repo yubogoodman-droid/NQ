@@ -13,6 +13,7 @@ from tw.signals import (
     ma200_at,
     ma200_gap_pct,
     mas_are_open,
+    ma20_near_ma200,
 )
 
 
@@ -179,6 +180,8 @@ class SignalTests(unittest.TestCase):
         )
         self.assertGreater(snap.ma_span_pct, 0.005)
         self.assertTrue(mas_are_open(snap))
+        self.assertLess(snap.ma20_ma200_gap_pct, 0.015)
+        self.assertTrue(ma20_near_ma200(snap))
 
     def test_drops_tangled_ma_stack(self) -> None:
         snap = AlertSnapshot(
@@ -208,6 +211,20 @@ class SignalTests(unittest.TestCase):
         self.assertGreater(snap.ma_span_pct, 0.002)
         self.assertLess(snap.ma_span_pct, 0.005)
         self.assertTrue(mas_are_open(snap))
+
+    def test_drops_huaxinke_when_ma20_far_from_ma200(self) -> None:
+        snap = AlertSnapshot(
+            timestamp=pd.Timestamp("2026-08-14 11:25", tz="Asia/Taipei"),
+            close=313.50,
+            prev_close=313.00,
+            ma5=311.20,
+            ma10=309.30,
+            ma20=306.85,
+            ma200=313.18,
+            prev_ma200=313.20,
+        )
+        self.assertGreater(snap.ma20_ma200_gap_pct, 0.015)
+        self.assertFalse(ma20_near_ma200(snap))
 
 
 if __name__ == "__main__":

@@ -39,10 +39,22 @@ class AlertSnapshot:
             return 0.0
         return (self.ma5 - self.ma20) / self.close
 
+    @property
+    def ma20_ma200_gap_pct(self) -> float:
+        """MA20 與 MA200 的距離／收盤。太大代表兩條線差太遠（像華新科）。"""
+        if self.close <= 0:
+            return 0.0
+        return abs(self.ma200 - self.ma20) / self.close
+
 
 def mas_are_open(snapshot: AlertSnapshot, min_span: float = 0.002) -> bool:
     """多頭排列且 MA5–MA20 拉開到 min_span 以上（預設 0.2%）。"""
     return snapshot.bullish_aligned and snapshot.ma_span_pct >= min_span
+
+
+def ma20_near_ma200(snapshot: AlertSnapshot, max_gap: float = 0.015) -> bool:
+    """MA20 與 MA200 不能差太遠（預設 1.5%）。"""
+    return snapshot.ma20_ma200_gap_pct <= max_gap
 
 
 def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:

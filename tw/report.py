@@ -83,7 +83,7 @@ def save_week_index(results: list[ScanResult], path: str | Path) -> Path:
         "",
         "同一套規則，**每天分開**掃成交額前 100。",
         "",
-        "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），收盤剛站上 MA200；"
+        "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，收盤剛站上 MA200；"
         "含該金叉的五分K收盤必須高於五分 MA200。",
         "",
         "| 日期 | 命中 | 標的 |",
@@ -127,14 +127,14 @@ def _render(
         heading = f"回測 {as_of}（{wd}）· 剛站上 MA200"
         lead = (
             f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
-            "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），且當日這根收盤剛站上 MA200（前一根還沒）。"
+            "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，且當日這根收盤剛站上 MA200（前一根還沒）。"
             "含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
         )
     else:
         title = "台股一分K · 多頭排列站上 MA200"
         heading = "台股一分K · 剛站上 MA200"
         lead = (
-            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），"
+            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
             "且這根收盤剛站上 MA200（前一根還沒）。含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
         )
     return f"""<!DOCTYPE html>
@@ -210,7 +210,7 @@ def _render(
       <span class="chip">不含 ETF</span>
       <span class="chip">股價 &lt; 650</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 拉開</span>
-      <span class="chip">金叉 MA200</span>
+      <span class="chip">MA20 靠近 MA200（≤ 1.5%）</span>
       <span class="chip">五分收盤 &gt; MA200</span>
     </div>
     <div class="legend">
@@ -223,7 +223,7 @@ def _render(
       命中 <span class="ok">{len(result.hits)}</span> 檔<br/>
       掃描時間 {html.escape(scanned)}（台北）<br/>
       排行時間 {rank_time}<br/>
-      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} 檔 → 均線糾結 {result.tangled_dropped} → 五分MA200底下 {result.below_5m_dropped}
+      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} 檔 → 均線糾結 {result.tangled_dropped} → MA20離MA200太遠 {result.far_ma_dropped} → 五分MA200底下 {result.below_5m_dropped}
     </div>
     {hit_rows}
     <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
@@ -264,6 +264,7 @@ def _hit_card(
       <div class="row"><span>1分收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
       <div class="row"><span>五分收盤 / MA200</span><b>{html.escape(_five_min_ma200_text(hit))}</b></div>
       <div class="row"><span>1分 MA5 / 10 / 20</span><b>{snap.ma5:.2f} &gt; {snap.ma10:.2f} &gt; {snap.ma20:.2f}</b></div>
+      <div class="row"><span>MA20 與 MA200</span><b>{snap.ma20:.2f} / {snap.ma200:.2f}（差 {snap.ma20_ma200_gap_pct:.1%}）</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
       <div class="chart-label">一分 K</div>
       <div class="chart">{chart_1m}</div>
@@ -362,13 +363,13 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         title = f"回測 {as_of}（{wd}）· 一分K剛站上 MA200"
         lead = (
             f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
-            "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），且當日這根收盤剛站上 MA200；"
+            "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，且當日這根收盤剛站上 MA200；"
             "含該金叉的五分K收盤也必須高於五分 MA200。"
         )
     else:
         title = "台股一分K · 剛站上 MA200"
         lead = (
-            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），"
+            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
             "且這根收盤剛站上 MA200；含該金叉的五分K收盤也必須高於五分 MA200。"
         )
     lines = [
@@ -379,7 +380,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         f"- 命中 **{len(result.hits)}** 檔",
         f"- 掃描時間 {result.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}（台北）",
         f"- 排行 {result.rank_time or '—'}",
-        f"- 前 100 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} → 均線糾結 {result.tangled_dropped} → 五分MA200底下 {result.below_5m_dropped}",
+        f"- 前 100 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} → 均線糾結 {result.tangled_dropped} → MA20離MA200太遠 {result.far_ma_dropped} → 五分MA200底下 {result.below_5m_dropped}",
         "",
     ]
     for i, hit in enumerate(result.hits, 1):
@@ -394,7 +395,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
                 "",
                 f"- 價格 {s.price:.2f}{chg}　成交額排名 #{s.rank}　{s.turnover/1e8:.2f} 億",
                 f"- 1分金叉 {snap.timestamp.strftime('%H:%M')}　收 {snap.close:.2f} > MA200 {snap.ma200:.2f}",
-                f"- 1分 MA5 {snap.ma5:.2f} > MA10 {snap.ma10:.2f} > MA20 {snap.ma20:.2f}",
+                f"- 1分 MA5 {snap.ma5:.2f} > MA10 {snap.ma10:.2f} > MA20 {snap.ma20:.2f}　MA20/MA200 差 {snap.ma20_ma200_gap_pct:.1%}",
                 f"- 五分收盤 / MA200　{five}",
                 "",
                 "**一分 K**",
