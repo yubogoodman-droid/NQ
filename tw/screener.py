@@ -41,8 +41,9 @@ class ScanConfig:
     exclude_etf: bool = True
     exclude_financial: bool = True
     on_date: date | None = None
-    min_ma_span: float = 0.002
-    max_ma20_ma200_gap: float = 0.015
+    min_ma_span: float = 0.004
+    min_ma20_ma200_gap: float = 0.004
+    max_ma20_ma200_gap: float = 0.010
     kline_start: date | None = None
     kline_end: date | None = None
 
@@ -154,7 +155,13 @@ def run_scan(
             now = datetime.now(TAIPEI)
             since = pd.Timestamp(now.date(), tz=TAIPEI)
         snapshot = latest_ma200_breakout_bullish(
-            df, since=since, until=until, latest_only=cfg.latest_only
+            df,
+            since=since,
+            until=until,
+            latest_only=cfg.latest_only,
+            min_ma_span=cfg.min_ma_span,
+            min_ma20_ma200_gap=cfg.min_ma20_ma200_gap,
+            max_ma20_ma200_gap=cfg.max_ma20_ma200_gap,
         )
         if snapshot is None:
             continue
@@ -162,8 +169,12 @@ def run_scan(
             skipped.append((stock, "均線糾結"))
             tangled_dropped += 1
             continue
-        if not ma20_near_ma200(snapshot, cfg.max_ma20_ma200_gap):
-            skipped.append((stock, "MA20 離 MA200 太遠"))
+        if not ma20_near_ma200(
+            snapshot,
+            max_gap=cfg.max_ma20_ma200_gap,
+            min_gap=cfg.min_ma20_ma200_gap,
+        ):
+            skipped.append((stock, "MA20/MA200 距離不對"))
             far_ma_dropped += 1
             continue
         hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=len(df), frame=df))

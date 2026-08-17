@@ -120,7 +120,7 @@ class ReportChartTests(unittest.TestCase):
         self.assertIn("一分 K", text)
         self.assertIn("五分 K（對照）", text)
         self.assertIn("五分收盤 &gt; MA200", text)
-        self.assertIn("MA20 靠近 MA200", text)
+        self.assertIn("MA20/MA200 0.4%", text)
         self.assertIn("MA5", text)
         self.assertIn("MA200", text)
 

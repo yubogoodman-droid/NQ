@@ -50,7 +50,7 @@ def print_result(result, *, quiet_empty: bool) -> None:
         f"成交額前 {len(result.universe)}／股價濾掉 {result.price_dropped}／"
         f"ETF濾掉 {result.etf_dropped}／金融濾掉 {result.financial_dropped}／掃描 {len(result.candidates)}／"
         f"均線糾結濾掉 {result.tangled_dropped}／"
-        f"MA20離MA200太遠 {result.far_ma_dropped}／"
+        f"MA20/MA200不符 {result.far_ma_dropped}／"
         f"五分MA200濾掉 {result.below_5m_dropped}／"
         f"命中 {len(result.hits)}／略過 {len(result.skipped)}／錯誤 {len(result.errors)}"
     )
