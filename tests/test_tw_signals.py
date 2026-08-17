@@ -4,7 +4,13 @@ import unittest
 
 import pandas as pd
 
-from tw.signals import add_moving_averages, is_ma200_breakout_bullish, latest_ma200_breakout_bullish
+from tw.signals import (
+    add_moving_averages,
+    close_above_ma200,
+    is_ma200_breakout_bullish,
+    latest_ma200_breakout_bullish,
+    ma200_at,
+)
 
 
 def _bars(closes: list[float]) -> pd.DataFrame:
@@ -75,6 +81,45 @@ class SignalTests(unittest.TestCase):
         df = add_moving_averages(_bars([float(i) for i in range(1, 221)]))
         self.assertTrue(pd.isna(df["ma200"].iloc[198]))
         self.assertFalse(pd.isna(df["ma200"].iloc[199]))
+
+    def test_5m_close_above_ma200(self) -> None:
+        idx = pd.date_range("2026-08-17 09:00", periods=220, freq="5min", tz="Asia/Taipei")
+        closes = [100.0] * 219 + [110.0]
+        df = pd.DataFrame(
+            {
+                "open": closes,
+                "high": [c + 0.5 for c in closes],
+                "low": [c - 0.5 for c in closes],
+                "close": closes,
+                "volume": [1000] * 220,
+            },
+            index=idx,
+        )
+        ts_1m = idx[-1] + pd.Timedelta(minutes=3)
+        self.assertTrue(close_above_ma200(df, ts_1m, floor="5min"))
+        close, ma200 = ma200_at(df, ts_1m, floor="5min")
+        self.assertGreater(close, ma200)
+
+    def test_5m_close_below_ma200(self) -> None:
+        idx = pd.date_range("2026-08-17 09:00", periods=220, freq="5min", tz="Asia/Taipei")
+        closes = [100.0] * 219 + [90.0]
+        df = pd.DataFrame(
+            {
+                "open": closes,
+                "high": [c + 0.5 for c in closes],
+                "low": [c - 0.5 for c in closes],
+                "close": closes,
+                "volume": [1000] * 220,
+            },
+            index=idx,
+        )
+        ts_1m = idx[-1] + pd.Timedelta(minutes=3)
+        self.assertFalse(close_above_ma200(df, ts_1m, floor="5min"))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
 
 
 if __name__ == "__main__":

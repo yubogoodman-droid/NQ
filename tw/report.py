@@ -16,7 +16,7 @@ import pandas as pd
 from matplotlib.patches import Rectangle
 
 from tw.screener import ScanHit, ScanResult
-from tw.signals import add_moving_averages
+from tw.signals import add_moving_averages, ma200_at
 
 MA_COLORS = {
     5: "#ffa726",
@@ -121,12 +121,13 @@ def _render(result: ScanResult) -> str:
 <body>
   <div class="page">
     <h1>台股一分K · 剛站上 MA200</h1>
-    <p class="lead">成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20，且這根收盤剛站上 MA200（前一根還沒）。下方附五分K對照，綠三角標在含該金叉的那根五分K。K 棒漲紅跌綠。</p>
+    <p class="lead">成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20，且這根收盤剛站上 MA200（前一根還沒）。含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。</p>
     <div class="chips">
       <span class="chip">不含 ETF</span>
       <span class="chip">股價 &lt; 650</span>
       <span class="chip">MA5 &gt; 10 &gt; 20</span>
       <span class="chip">金叉 MA200</span>
+      <span class="chip">五分收盤 &gt; MA200</span>
     </div>
     <div class="legend">
       <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
@@ -138,7 +139,7 @@ def _render(result: ScanResult) -> str:
       命中 <span class="ok">{len(result.hits)}</span> 檔<br/>
       掃描時間 {html.escape(scanned)}（台北）<br/>
       排行時間 {rank_time}<br/>
-      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} 檔
+      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} 檔 → 五分MA200底下 {result.below_5m_dropped}
     </div>
     {hit_rows}
     <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
@@ -166,6 +167,7 @@ def _hit_card(index: int, hit: ScanHit) -> str:
       </div>
       <div class="row"><span>1分金叉時間</span><b>{ts}</b></div>
       <div class="row"><span>1分收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
+      <div class="row"><span>五分收盤 / MA200</span><b>{html.escape(_five_min_ma200_text(hit))}</b></div>
       <div class="row"><span>1分 MA5 / 10 / 20</span><b>{snap.ma5:.2f} &gt; {snap.ma10:.2f} &gt; {snap.ma20:.2f}</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
       <div class="chart-label">一分 K</div>
@@ -174,6 +176,14 @@ def _hit_card(index: int, hit: ScanHit) -> str:
       <div class="chart">{chart_5m}</div>
     </article>
 """
+
+
+def _five_min_ma200_text(hit: ScanHit) -> str:
+    pair = ma200_at(hit.frame_5m, hit.snapshot.timestamp, floor="5min")
+    if pair is None:
+        return "—"
+    close, ma200 = pair
+    return f"{close:.2f} > {ma200:.2f}"
 
 
 def build_k_chart(hit: ScanHit, timeframe: str = "1m") -> str:

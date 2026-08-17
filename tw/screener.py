@@ -11,7 +11,7 @@ import requests
 
 from tw.kline import fetch_1m_bars_many, fetch_bars_many
 from tw.ranking import RankedStock, fetch_turnover_ranking, filter_by_price, filter_etfs
-from tw.signals import AlertSnapshot, latest_ma200_breakout_bullish
+from tw.signals import AlertSnapshot, close_above_ma200, latest_ma200_breakout_bullish
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
@@ -48,6 +48,7 @@ class ScanResult:
     errors: list[tuple[RankedStock, str]] = field(default_factory=list)
     price_dropped: int = 0
     etf_dropped: int = 0
+    below_5m_dropped: int = 0
 
 
 def run_scan(
@@ -111,6 +112,7 @@ def run_scan(
             continue
         hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=len(df), frame=df))
 
+    below_5m_dropped = 0
     if hits:
         try:
             frames_5m = fetch_bars_many(
@@ -123,6 +125,14 @@ def run_scan(
                 hit.frame_5m = frames_5m.get(hit.stock.symbol)
         except Exception as exc:  # noqa: BLE001
             errors.append((hits[0].stock, f"五分K下載失敗：{exc}"))
+            for hit in hits:
+                skipped.append((hit.stock, "五分K下載失敗"))
+            below_5m_dropped = len(hits)
+            hits = []
+        else:
+            hits, dropped_5m, skip_5m = apply_5m_ma200_filter(hits)
+            skipped.extend(skip_5m)
+            below_5m_dropped = dropped_5m
 
     hits.sort(key=lambda h: h.stock.rank)
     skipped.sort(key=lambda item: item[0].rank)
@@ -136,7 +146,26 @@ def run_scan(
         errors=errors,
         price_dropped=price_dropped,
         etf_dropped=etf_dropped,
+        below_5m_dropped=below_5m_dropped,
     )
+
+
+def apply_5m_ma200_filter(
+    hits: list[ScanHit],
+) -> tuple[list[ScanHit], int, list[tuple[RankedStock, str]]]:
+    """一分金叉當下的五分K收盤必須高於五分 MA200。"""
+    kept: list[ScanHit] = []
+    skipped: list[tuple[RankedStock, str]] = []
+    for hit in hits:
+        frame = hit.frame_5m
+        if frame is None or frame.empty:
+            skipped.append((hit.stock, "無五分 K 資料"))
+            continue
+        if not close_above_ma200(frame, hit.snapshot.timestamp, floor="5min"):
+            skipped.append((hit.stock, "五分K收盤在 MA200 底下"))
+            continue
+        kept.append(hit)
+    return kept, len(skipped), skipped
 
 
 def hit_key(hit: ScanHit) -> tuple[str, pd.Timestamp]:

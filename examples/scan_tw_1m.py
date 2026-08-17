@@ -35,6 +35,7 @@ def print_result(result, *, quiet_empty: bool) -> None:
         f"[{result.scanned_at.strftime('%H:%M:%S')}] "
         f"成交額前 {len(result.universe)}／股價濾掉 {result.price_dropped}／"
         f"ETF濾掉 {result.etf_dropped}／掃描 {len(result.candidates)}／"
+        f"五分MA200濾掉 {result.below_5m_dropped}／"
         f"命中 {len(result.hits)}／略過 {len(result.skipped)}／錯誤 {len(result.errors)}"
     )
     if result.rank_time:

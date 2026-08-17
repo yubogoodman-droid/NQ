@@ -98,6 +98,41 @@ def latest_ma200_breakout_bullish(
     return found
 
 
+def ma200_at(
+    df: pd.DataFrame,
+    ts: pd.Timestamp | None = None,
+    *,
+    floor: str | None = None,
+) -> tuple[float, float] | None:
+    """回傳指定時間（或最新一根）的收盤與 MA200；資料不足則 None。"""
+    if df is None or df.empty:
+        return None
+    work = add_moving_averages(df)
+    if ts is None:
+        loc = len(work) - 1
+    else:
+        mark = pd.Timestamp(ts)
+        if floor:
+            mark = mark.floor(floor)
+        loc = int(work.index.get_indexer([mark], method="nearest")[0])
+        if loc < 0:
+            return None
+    row = work.iloc[loc]
+    if pd.isna(row.get("ma200")):
+        return None
+    return float(row["close"]), float(row["ma200"])
+
+
+def close_above_ma200(
+    df: pd.DataFrame,
+    ts: pd.Timestamp | None = None,
+    *,
+    floor: str | None = None,
+) -> bool:
+    pair = ma200_at(df, ts, floor=floor)
+    return pair is not None and pair[0] > pair[1]
+
+
 def _snapshot_at(work: pd.DataFrame, idx: int) -> AlertSnapshot | None:
     if idx < 1:
         return None
