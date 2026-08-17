@@ -60,7 +60,7 @@ python3 examples/chart_today.py
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
 3. **上週五假跌破 1 分 K（底下附 5 分 K）**  
-   https://yubogoodman-droid.github.io/NQ/spring/?v=1m5m
+   https://yubogoodman-droid.github.io/NQ/spring/?v=overnight
 
 ## 假跌破後上拉（1 分 K）
 
@@ -103,7 +103,7 @@ python examples/chart_spring_top50.py                                  # 1 分 K
 報告：`docs/spring_top50_20260814.html`
 
 外網直接開（手機可）：  
-https://yubogoodman-droid.github.io/NQ/spring/?v=1m5m
+https://yubogoodman-droid.github.io/NQ/spring/?v=overnight
 
 ## TradingView
 
