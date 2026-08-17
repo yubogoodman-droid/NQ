@@ -131,6 +131,23 @@ class RankingTests(unittest.TestCase):
         )
         self.assertEqual(previous_weekdays(date(2026, 8, 12))[0], date(2026, 8, 3))
 
+    def test_previous_weekdays_two_weeks(self) -> None:
+        self.assertEqual(
+            previous_weekdays(date(2026, 8, 17), weeks=2),
+            [
+                date(2026, 8, 3),
+                date(2026, 8, 4),
+                date(2026, 8, 5),
+                date(2026, 8, 6),
+                date(2026, 8, 7),
+                date(2026, 8, 10),
+                date(2026, 8, 11),
+                date(2026, 8, 12),
+                date(2026, 8, 13),
+                date(2026, 8, 14),
+            ],
+        )
+
     def test_parse_twse_and_tpex_daily(self) -> None:
         twse = {
             "tables": [

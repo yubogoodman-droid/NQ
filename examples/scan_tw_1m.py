@@ -31,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--date", help="回測指定日（YYYY-MM-DD），只找當天金叉")
     p.add_argument("--last-friday", action="store_true", help="回測上週五")
     p.add_argument("--last-week", action="store_true", help="回測上週一到五，每天分開一頁")
+    p.add_argument("--last-two-weeks", action="store_true", help="回測上上週一到上週五，每天分開一頁")
     p.add_argument("--quiet-empty", action="store_true", help="沒命中時不印詳細清單")
     return p.parse_args()
 
@@ -118,10 +119,9 @@ def scan_once(args: argparse.Namespace, seen: set) -> int:
     return len(new_hits)
 
 
-def scan_last_week(args: argparse.Namespace) -> int:
-    days = previous_weekdays()
+def scan_weekdays(args: argparse.Namespace, days: list, index_path: str, label: str) -> list:
     results = []
-    print(f"回測上週 {days[0].isoformat()}～{days[-1].isoformat()}，每天分開")
+    print(f"{label} {days[0].isoformat()}～{days[-1].isoformat()}，每天分開")
     for day in days:
         output = f"docs/tw/backtest-{day.isoformat()}.html"
         result = run_scan(
@@ -133,26 +133,44 @@ def scan_last_week(args: argparse.Namespace) -> int:
                 latest_only=False,
                 exclude_etf=not args.include_etf,
                 on_date=day,
-                kline_range="7d",
             )
         )
         print_result(result, quiet_empty=args.quiet_empty)
         path = save_scan_html(result, output)
         print(f"  報告：{path}")
         results.append(result)
-    index = save_week_index(results, "docs/tw/week-last.md")
-    print(f"  週目錄：{index}")
+    index = save_week_index(results, index_path)
+    print(f"  目錄：{index}")
     print()
-    print("上週分日命中：")
+    print(f"{label}分日命中：")
     for result in results:
         assert result.as_of is not None
         names = "、".join(h.stock.name for h in result.hits) or "—"
         print(f"  {result.as_of.isoformat()}  {len(result.hits)} 檔  {names}")
+    return results
+
+
+def scan_last_week(args: argparse.Namespace) -> int:
+    return len(scan_weekdays(args, previous_weekdays(), "docs/tw/week-last.md", "回測上週"))
+
+
+def scan_last_two_weeks(args: argparse.Namespace) -> int:
+    results = scan_weekdays(
+        args,
+        previous_weekdays(weeks=2),
+        "docs/tw/week-2.md",
+        "回測兩週",
+    )
+    last_week = save_week_index(results[-5:], "docs/tw/week-last.md")
+    print(f"  上週目錄：{last_week}")
     return sum(len(r.hits) for r in results)
 
 
 def main() -> int:
     args = parse_args()
+    if args.last_two_weeks:
+        scan_last_two_weeks(args)
+        return 0
     if args.last_week:
         scan_last_week(args)
         return 0

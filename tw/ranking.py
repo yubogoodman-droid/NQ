@@ -105,12 +105,17 @@ def previous_friday(today: date | None = None) -> date:
     return current - timedelta(days=days)
 
 
-def previous_weekdays(today: date | None = None) -> list[date]:
-    """上週一到週五（不含本週）。"""
+def previous_weekdays(today: date | None = None, weeks: int = 1) -> list[date]:
+    """過去 N 個完整週的週一到週五（不含本週）。weeks=1 為上週，weeks=2 為上上週＋上週。"""
+    if weeks < 1:
+        raise ValueError("weeks must be >= 1")
     current = today or date.today()
     this_monday = current - timedelta(days=current.weekday())
-    last_monday = this_monday - timedelta(days=7)
-    return [last_monday + timedelta(days=i) for i in range(5)]
+    days: list[date] = []
+    for week in range(weeks, 0, -1):
+        monday = this_monday - timedelta(days=7 * week)
+        days.extend(monday + timedelta(days=i) for i in range(5))
+    return days
 
 
 def fetch_daily_turnover_ranking(

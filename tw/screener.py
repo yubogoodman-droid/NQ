@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
-from tw.kline import fetch_1m_bars_many, fetch_bars_many
+from tw.kline import fetch_1m_bars_many, fetch_bars_many, kline_window_for_date
 from tw.ranking import (
     RankedStock,
     fetch_daily_turnover_ranking,
@@ -41,6 +41,8 @@ class ScanConfig:
     on_date: date | None = None
     min_ma_span: float = 0.002
     max_ma20_ma200_gap: float = 0.015
+    kline_start: date | None = None
+    kline_end: date | None = None
 
 
 @dataclass
@@ -97,12 +99,19 @@ def run_scan(
     tangled_dropped = 0
     far_ma_dropped = 0
 
+    kline_start = cfg.kline_start
+    kline_end = cfg.kline_end
+    if cfg.on_date is not None and kline_start is None:
+        kline_start, kline_end = kline_window_for_date(cfg.on_date)
+
     frames: dict[str, pd.DataFrame] = {}
     try:
         frames = fetch_1m_bars_many(
             [s.symbol for s in candidates],
             range_=cfg.kline_range,
             closed_only=cfg.closed_only,
+            start=kline_start,
+            end=kline_end,
         )
     except Exception as exc:  # noqa: BLE001
         errors.extend((stock, str(exc)) for stock in candidates)
@@ -158,6 +167,8 @@ def run_scan(
                 interval="5m",
                 range_=cfg.kline_range,
                 closed_only=cfg.closed_only,
+                start=kline_start,
+                end=kline_end,
             )
             for hit in hits:
                 hit.frame_5m = frames_5m.get(hit.stock.symbol)

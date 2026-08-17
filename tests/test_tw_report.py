@@ -151,6 +151,37 @@ class ReportChartTests(unittest.TestCase):
         self.assertIn("南亞", text)
         self.assertIn("| 1 |", text)
 
+    def test_two_week_index_title(self) -> None:
+        hit = _hit(frame=_bars(), frame_5m=_bars(n=80, freq="5min"))
+        days = [
+            date(2026, 8, 3),
+            date(2026, 8, 4),
+            date(2026, 8, 5),
+            date(2026, 8, 6),
+            date(2026, 8, 7),
+            date(2026, 8, 10),
+            date(2026, 8, 11),
+            date(2026, 8, 12),
+            date(2026, 8, 13),
+            date(2026, 8, 14),
+        ]
+        results = [
+            ScanResult(
+                scanned_at=datetime(2026, 8, 17, 11, 0, tzinfo=TAIPEI),
+                rank_time="盤後",
+                universe=[],
+                candidates=[],
+                hits=[hit] if day == date(2026, 8, 3) else [],
+                as_of=day,
+            )
+            for day in days
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            text = save_week_index(results, Path(tmp) / "week-2.md").read_text(encoding="utf-8")
+        self.assertIn("兩週回測 2026-08-03～2026-08-14", text)
+        self.assertIn("週一 2026-08-03", text)
+        self.assertIn("週五 2026-08-14", text)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -80,7 +80,8 @@ def save_week_index(results: list[ScanResult], path: str | Path) -> Path:
     if not days:
         raise ValueError("week index needs as_of on each result")
     start, end = days[0], days[-1]
-    title = f"上週回測 {start.isoformat()}～{end.isoformat()}"
+    span = (end - start).days
+    title = f"{'兩週回測' if span > 6 else '上週回測'} {start.isoformat()}～{end.isoformat()}"
     lines = [
         f"# {title}",
         "",
