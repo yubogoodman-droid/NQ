@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from tw.ranking import RankedStock
-from tw.report import _axis_ylim, build_k_chart, save_scan_html, save_week_index
+from tw.report import CHART_BARS_1M, _axis_ylim, _centered_ylim, build_k_chart, save_scan_html, save_week_index
 from tw.screener import ScanHit, ScanResult
 from tw.signals import AlertSnapshot
 
@@ -53,6 +53,15 @@ def _hit(*, frame: pd.DataFrame, frame_5m: pd.DataFrame | None = None) -> ScanHi
 
 
 class ReportChartTests(unittest.TestCase):
+    def test_1m_chart_zooms_around_signal(self) -> None:
+        self.assertEqual(CHART_BARS_1M, (24, 10))
+
+    def test_centered_ylim_keeps_small_ma_gap_small(self) -> None:
+        lo, hi = _centered_ylim(267.38, 268.0, span_pct=0.03)
+        self.assertGreaterEqual(hi - lo, 268.0 * 0.03)
+        self.assertLess(0.46 / (hi - lo), 0.08)
+        self.assertLess(abs((lo + hi) / 2 - 267.38), 0.05)
+
     def test_axis_ylim_pads_tight_1m_range(self) -> None:
         idx = pd.date_range("2026-08-17 11:00", periods=10, freq="1min", tz=TAIPEI)
         window = pd.DataFrame(

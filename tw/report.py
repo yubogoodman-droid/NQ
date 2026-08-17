@@ -28,6 +28,9 @@ MA_COLORS = {
     20: "#66bb6a",
     200: "#ce93d8",
 }
+# 一分K 只畫金叉附近：拉太長會把更早的回檔畫成「MA200 在天花板」。
+CHART_BARS_1M = (24, 10)
+CHART_BARS_5M = (70, 12)
 UP = "#ef5350"
 DOWN = "#26a69a"
 BG = "#161b22"
@@ -422,7 +425,7 @@ def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
     if work.index.tz is not None:
         mark = mark.tz_convert(work.index.tz) if mark.tzinfo else mark.tz_localize(work.index.tz)
     work = work[work.index < mark.normalize() + pd.Timedelta(days=1)]
-    before, after = (70, 12) if timeframe == "5m" else (90, 20)
+    before, after = CHART_BARS_5M if timeframe == "5m" else CHART_BARS_1M
     mark_ts = pd.Timestamp(hit.snapshot.timestamp)
     if timeframe == "5m":
         mark_ts = mark_ts.floor("5min")
@@ -487,10 +490,13 @@ def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
             label=marker_label,
         )
 
-    # 一分K 波動很小，自動縮放會把 0.2% 的 MA20/MA200 差畫成「整張圖的距離」。
-    # 至少留 3% 的縱軸，讓 1.5% 門檻在圖上看起來才合理。
+    # 一分K 縱軸對準金叉時的 MA20/MA200，至少留 3%，不要被旁邊的回檔撐開。
     ref = float(hit.snapshot.close) if hit.snapshot.close else float(window["close"].iloc[-1])
-    ax.set_ylim(*_axis_ylim(window, ref, min_span_pct=0.03))
+    if timeframe == "1m":
+        mid = (float(hit.snapshot.ma20) + float(hit.snapshot.ma200)) / 2.0
+        ax.set_ylim(*_centered_ylim(mid, ref, span_pct=0.03))
+    else:
+        ax.set_ylim(*_axis_ylim(window, ref, min_span_pct=0.03))
     ax.set_xlim(-1, n)
     bar_time = pd.Timestamp(window.index[loc]).strftime("%H:%M") if 0 <= loc < n else hit.snapshot.timestamp.strftime("%H:%M")
     gap = hit.snapshot.ma20_ma200_gap_pct
@@ -527,6 +533,15 @@ def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
     fig.savefig(buf, format="png", facecolor=fig.get_facecolor(), bbox_inches="tight", pad_inches=0.12)
     plt.close(fig)
     return buf.getvalue()
+
+
+def _centered_ylim(mid: float, ref_price: float, span_pct: float = 0.03) -> tuple[float, float]:
+    """縱軸以 mid 為中心，高度為價格的 span_pct。"""
+    half = abs(ref_price) * span_pct / 2.0 if ref_price else 1.0
+    if half <= 0:
+        half = 1.0
+    pad = half * 0.04
+    return mid - half - pad, mid + half + pad
 
 
 def _axis_ylim(
