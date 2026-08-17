@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""台股一分 K：MA5/10/20 多頭排列，且這根收盤剛站上 MA200。"""
+"""台股一分 K：MA5/10/20 多頭排列，連續兩根收盤站穩 MA200 再通知。"""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from tw.screener import ScanConfig, hit_key, run_scan
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="台股一分K多頭排列＋剛站上MA200掃描")
+    p = argparse.ArgumentParser(description="台股一分K多頭排列＋站穩MA200掃描")
     p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--watch", action="store_true", help="盤中每分鐘重掃，同一根 K 不重複通知")
