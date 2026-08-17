@@ -33,6 +33,7 @@ class ScanHit:
     stock: RankedStock
     snapshot: AlertSnapshot
     bars: int
+    frame: pd.DataFrame | None = None
 
 
 @dataclass
@@ -107,7 +108,7 @@ def run_scan(
         )
         if snapshot is None:
             continue
-        hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=len(df)))
+        hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=len(df), frame=df))
 
     hits.sort(key=lambda h: h.stock.rank)
     skipped.sort(key=lambda item: item[0].rank)
