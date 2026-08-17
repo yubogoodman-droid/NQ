@@ -89,7 +89,7 @@ def save_week_index(results: list[ScanResult], path: str | Path) -> Path:
         "",
         "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
         "當天第一根剛站上 MA200，連續兩根收盤站穩再通知（開盤跳空不算）；"
-        "含該根的五分K收盤必須高於五分 MA200。",
+        "含該根的五分K收盤必須高於五分 MA200。不含 ETF、金融股。",
         "",
         "| 日期 | 命中 | 標的 |",
         "|---|---:|---|",
@@ -131,7 +131,7 @@ def _render(
         title = f"回測 {as_of}（{wd}）· 一分K站穩 MA200"
         heading = f"回測 {as_of}（{wd}）· 站穩 MA200"
         lead = (
-            f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
+            f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF、金融股與收盤價 650 以上。"
             "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
             "且當天第一根剛站上 MA200、連續兩根收盤站穩再通知（開盤跳空不算）。"
             "含該根的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
@@ -140,7 +140,7 @@ def _render(
         title = "台股一分K · 多頭排列站上 MA200"
         heading = "台股一分K · 站穩 MA200"
         lead = (
-            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
+            "成交額前 100、濾掉 ETF、金融股與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
             "且連續兩根收盤站穩 MA200（開盤跳空不算）。含該根的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
         )
     return f"""<!DOCTYPE html>
@@ -214,6 +214,7 @@ def _render(
     <p class="lead">{lead}</p>
     <div class="chips">
       <span class="chip">不含 ETF</span>
+      <span class="chip">不含金融股</span>
       <span class="chip">股價 &lt; 650</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 拉開</span>
       <span class="chip">MA20 靠近 MA200（≤ 1.5%）</span>
@@ -229,7 +230,7 @@ def _render(
       命中 <span class="ok">{len(result.hits)}</span> 檔<br/>
       掃描時間 {html.escape(scanned)}（台北）<br/>
       排行時間 {rank_time}<br/>
-      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} 檔 → 均線糾結 {result.tangled_dropped} → MA20離MA200太遠 {result.far_ma_dropped} → 五分MA200底下 {result.below_5m_dropped}
+      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped}、金融 {result.financial_dropped} → 掃描 {len(result.candidates)} 檔 → 均線糾結 {result.tangled_dropped} → MA20離MA200太遠 {result.far_ma_dropped} → 五分MA200底下 {result.below_5m_dropped}
     </div>
     {hit_rows}
     <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
@@ -368,7 +369,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         wd = weekday_zh(result.as_of)
         title = f"回測 {as_of}（{wd}）· 一分K站穩 MA200"
         lead = (
-            f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
+            f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF、金融股與收盤價 650 以上。"
             "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
             "且當天第一根剛站上 MA200、連續兩根收盤站穩再通知（開盤跳空不算）；"
             "含該根的五分K收盤也必須高於五分 MA200。"
@@ -376,7 +377,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
     else:
         title = "台股一分K · 站穩 MA200"
         lead = (
-            "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
+            "成交額前 100、濾掉 ETF、金融股與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.2%），MA20 與 MA200 差距 ≤ 1.5%，"
             "且連續兩根收盤站穩 MA200（開盤跳空不算）；含該根的五分K收盤也必須高於五分 MA200。"
         )
     lines = [
@@ -387,7 +388,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         f"- 命中 **{len(result.hits)}** 檔",
         f"- 掃描時間 {result.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}（台北）",
         f"- 排行 {result.rank_time or '—'}",
-        f"- 前 100 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} → 均線糾結 {result.tangled_dropped} → MA20離MA200太遠 {result.far_ma_dropped} → 五分MA200底下 {result.below_5m_dropped}",
+        f"- 前 100 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped}、金融 {result.financial_dropped} → 掃描 {len(result.candidates)} → 均線糾結 {result.tangled_dropped} → MA20離MA200太遠 {result.far_ma_dropped} → 五分MA200底下 {result.below_5m_dropped}",
         "",
     ]
     for i, hit in enumerate(result.hits, 1):

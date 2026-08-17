@@ -16,6 +16,7 @@ from tw.ranking import (
     fetch_turnover_ranking,
     filter_by_price,
     filter_etfs,
+    filter_financials,
 )
 from tw.signals import (
     AlertSnapshot,
@@ -38,6 +39,7 @@ class ScanConfig:
     timeout: int = 20
     latest_only: bool = False
     exclude_etf: bool = True
+    exclude_financial: bool = True
     on_date: date | None = None
     min_ma_span: float = 0.002
     max_ma20_ma200_gap: float = 0.015
@@ -65,6 +67,7 @@ class ScanResult:
     errors: list[tuple[RankedStock, str]] = field(default_factory=list)
     price_dropped: int = 0
     etf_dropped: int = 0
+    financial_dropped: int = 0
     below_5m_dropped: int = 0
     tangled_dropped: int = 0
     far_ma_dropped: int = 0
@@ -88,10 +91,15 @@ def run_scan(
     priced = filter_by_price(universe, cfg.max_price)
     price_dropped = len(universe) - len(priced)
     if cfg.exclude_etf:
-        candidates = filter_etfs(priced)
+        after_etf = filter_etfs(priced)
     else:
-        candidates = priced
-    etf_dropped = len(priced) - len(candidates)
+        after_etf = priced
+    etf_dropped = len(priced) - len(after_etf)
+    if cfg.exclude_financial:
+        candidates = filter_financials(after_etf)
+    else:
+        candidates = after_etf
+    financial_dropped = len(after_etf) - len(candidates)
 
     hits: list[ScanHit] = []
     skipped: list[tuple[RankedStock, str]] = []
@@ -125,6 +133,7 @@ def run_scan(
             errors=errors,
             price_dropped=price_dropped,
             etf_dropped=etf_dropped,
+            financial_dropped=financial_dropped,
             as_of=cfg.on_date,
         )
 
@@ -195,6 +204,7 @@ def run_scan(
         errors=errors,
         price_dropped=price_dropped,
         etf_dropped=etf_dropped,
+        financial_dropped=financial_dropped,
         below_5m_dropped=below_5m_dropped,
         tangled_dropped=tangled_dropped,
         far_ma_dropped=far_ma_dropped,

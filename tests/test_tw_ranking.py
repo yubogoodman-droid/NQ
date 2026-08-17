@@ -9,7 +9,9 @@ from tw.ranking import (
     RankedStock,
     filter_by_price,
     filter_etfs,
+    filter_financials,
     is_etf,
+    is_financial,
     parse_tpex_quotes,
     parse_twse_mi_index,
     parse_yahoo_ranking_html,
@@ -113,6 +115,33 @@ class RankingTests(unittest.TestCase):
         self.assertFalse(is_etf(stocks[5]))
         kept = filter_etfs(stocks)
         self.assertEqual([s.symbol for s in kept], ["2327.TW", "4958.TW"])
+
+    def test_filter_excludes_financials(self) -> None:
+        stocks = [
+            RankedStock(1, "2884.TW", "玉山金", 30.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(2, "2887.TW", "台新新光金", 20.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(3, "2801.TW", "彰化銀行", 20.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(4, "5871.TW", "中租-KY", 150.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(5, "6005.TWO", "群益證", 18.0, None, None, 1, 1.0, "TWO"),
+            RankedStock(6, "3653.TW", "金居", 420.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(7, "2312.TW", "金寶", 40.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(8, "2327.TW", "國巨*", 611.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(9, "4958.TW", "臻鼎-KY", 504.0, None, None, 1, 1.0, "TAI"),
+        ]
+        self.assertTrue(is_financial(stocks[0]))
+        self.assertTrue(is_financial(stocks[1]))
+        self.assertTrue(is_financial(stocks[2]))
+        self.assertTrue(is_financial(stocks[3]))
+        self.assertTrue(is_financial(stocks[4]))
+        self.assertFalse(is_financial(stocks[5]))
+        self.assertFalse(is_financial(stocks[6]))
+        self.assertFalse(is_financial(stocks[7]))
+        self.assertFalse(is_financial(stocks[8]))
+        kept = filter_financials(stocks)
+        self.assertEqual(
+            [s.symbol for s in kept],
+            ["3653.TW", "2312.TW", "2327.TW", "4958.TW"],
+        )
 
     def test_previous_friday_from_monday(self) -> None:
         self.assertEqual(previous_friday(date(2026, 8, 17)), date(2026, 8, 14))

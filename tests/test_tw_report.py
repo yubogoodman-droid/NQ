@@ -113,6 +113,7 @@ class ReportChartTests(unittest.TestCase):
         self.assertIn("1303.TW-1m.png", text)
         self.assertIn("1303.TW-5m.png", text)
         self.assertNotIn("data:image/png;base64,", text)
+        self.assertIn("不含金融股", text)
         self.assertIn("南亞", md)
         self.assertIn("1303.TW-1m.png", md)
         self.assertIn("南亞", text)

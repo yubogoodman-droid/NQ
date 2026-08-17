@@ -305,6 +305,26 @@ def filter_etfs(stocks: list[RankedStock]) -> list[RankedStock]:
     return [s for s in stocks if not is_etf(s)]
 
 
+_FINANCIAL_CODE_PREFIXES = ("28", "58")
+_FINANCIAL_NAME_MARKERS = ("銀行", "金控", "保險", "產險", "壽險", "證券", "票券", "期貨")
+_FINANCIAL_NAME_SUFFIXES = ("金", "銀", "證", "保", "壽", "票", "期")
+
+
+def is_financial(stock: RankedStock) -> bool:
+    """金控、銀行、保險、證券、票券、期貨、租賃（中租）。不把金居、金寶當金融股。"""
+    code = stock.code
+    if len(code) >= 2 and code[:2] in _FINANCIAL_CODE_PREFIXES:
+        return True
+    name = re.sub(r"[-*].*$", "", stock.name).strip()
+    if any(mark in name for mark in _FINANCIAL_NAME_MARKERS):
+        return True
+    return any(name.endswith(suf) for suf in _FINANCIAL_NAME_SUFFIXES)
+
+
+def filter_financials(stocks: list[RankedStock]) -> list[RankedStock]:
+    return [s for s in stocks if not is_financial(s)]
+
+
 def _extract_app_main(html: str) -> dict:
     match = re.search(r"root\.App\.main = (\{.*?\});\s*(?:</script>|\n)", html, re.S)
     if not match:

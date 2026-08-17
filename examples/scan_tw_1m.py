@@ -26,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--latest-only", action="store_true", help="只看最新一根（watch 模式自動開啟）")
     p.add_argument("--closed-only", action="store_true", help="只用已收盤的一分 K（不含當根未收）")
     p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
+    p.add_argument("--include-financial", action="store_true", help="不過濾金融股")
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("-o", "--output", default="docs/tw/index.html")
     p.add_argument("--date", help="回測指定日（YYYY-MM-DD），只找當天站穩")
@@ -47,7 +48,7 @@ def print_result(result, *, quiet_empty: bool) -> None:
     print(
         f"[{result.scanned_at.strftime('%H:%M:%S')}] "
         f"成交額前 {len(result.universe)}／股價濾掉 {result.price_dropped}／"
-        f"ETF濾掉 {result.etf_dropped}／掃描 {len(result.candidates)}／"
+        f"ETF濾掉 {result.etf_dropped}／金融濾掉 {result.financial_dropped}／掃描 {len(result.candidates)}／"
         f"均線糾結濾掉 {result.tangled_dropped}／"
         f"MA20離MA200太遠 {result.far_ma_dropped}／"
         f"五分MA200濾掉 {result.below_5m_dropped}／"
@@ -87,6 +88,7 @@ def scan_once(args: argparse.Namespace, seen: set) -> int:
             workers=args.workers,
             latest_only=(args.latest_only or args.watch) and on_date is None,
             exclude_etf=not args.include_etf,
+            exclude_financial=not args.include_financial,
             on_date=on_date,
             kline_range="7d" if on_date is not None else "5d",
         )
@@ -131,6 +133,7 @@ def scan_weekdays(args: argparse.Namespace, days: list, index_path: str, label: 
                 workers=args.workers,
                 latest_only=False,
                 exclude_etf=not args.include_etf,
+                exclude_financial=not args.include_financial,
                 on_date=day,
             )
         )
