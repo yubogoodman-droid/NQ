@@ -121,6 +121,22 @@ class FakeBreakdownTests(unittest.TestCase):
             )
         )
 
+    def test_allows_overnight_box_by_default(self) -> None:
+        df = make_sample_fake_breakdown_bars()
+        idx = [t - pd.Timedelta(days=1) if i < 50 else t for i, t in enumerate(df.index)]
+        shifted = df.copy()
+        shifted.index = pd.DatetimeIndex(idx)
+        default = detect_fake_breakdowns(shifted, skip_open_minutes=0)
+        overnight = detect_fake_breakdowns(shifted, same_session=False, skip_open_minutes=0)
+        self.assertEqual(len(default), len(overnight))
+        self.assertGreaterEqual(len(default), 1)
+        self.assertTrue(
+            any(
+                shifted.index[p.range_start_idx].date() != shifted.index[p.breakout_idx].date()
+                for p in default
+            )
+        )
+
     def test_skips_first_minutes(self) -> None:
         df = make_sample_fake_breakdown_bars()
         late = detect_fake_breakdowns(df, skip_open_minutes=5)

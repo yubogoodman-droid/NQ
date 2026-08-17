@@ -123,7 +123,7 @@ def detect_fake_breakdowns(
     breakout_vol_mult: float = 1.4,
     spring_vol_max_mult: float = 1.35,
     require_volume: bool = True,
-    same_session: bool = True,
+    same_session: bool = False,
     skip_open_minutes: int = 5,
 ) -> list[FakeBreakdownPattern]:
     """
@@ -134,7 +134,7 @@ def detect_fake_breakdowns(
     2. 假跌破：短暫跌破箱體低，深度在 min/max_break_pct 之間，量能不宜爆量恐慌
     3. 站回：很快收盤站回原支撐
     4. 上拉：收盤突破箱體高，且量能放大
-    5. 開盤濾波：箱體與突破同一交易日，並略過開盤後 skip_open_minutes 分鐘
+    5. 開盤濾波：略過開盤後 skip_open_minutes 分鐘（跨夜箱體預設允許）
 
     Parameters
     ----------
@@ -274,7 +274,7 @@ def _session_ok(
     same_session: bool,
     skip_open_minutes: int,
 ) -> bool:
-    """擋掉跨夜箱體，以及開盤前幾分鐘的跳空雜訊。"""
+    """可選擋掉跨夜箱體；並略過開盤前幾分鐘的跳空雜訊。"""
     start_ts = _as_local(df.index[range_start])
     break_ts = _as_local(df.index[breakout_idx])
     if same_session and start_ts.date() != break_ts.date():

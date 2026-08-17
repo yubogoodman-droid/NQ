@@ -319,7 +319,7 @@ def main() -> None:
     html_text = render_report_html(
         cards,
         title="2026-08-14 成交額前50 · 假跌破 1分K",
-        summary="訊號用 1 分 K。每張底下附同一段 5 分 K。已濾開盤雜訊；站回後最多等 24 根才突破（對齊金居 8/14）。",
+        summary="訊號用 1 分 K。每張底下附同一段 5 分 K。允許跨夜箱體；已濾開盤 5 分鐘；站回後最多等 24 根才突破（對齊金居 8/14）。",
     )
     out = save_report(args.html, html_text)
     print(f"HTML: {out.resolve()}  共 {len(cards)} 張")
@@ -328,7 +328,7 @@ def main() -> None:
         render_pages_html(
             gallery,
             title="假跌破 · 1分K（底下 5分K）",
-            summary="2026-08-14 成交額前 50。上面 1 分 K 是進場訊號，下面 5 分 K 看同一段結構。站回後最多等 24 根才突破（金居 09:35 站回、09:53 放量站上箱頂）。",
+            summary="2026-08-14 成交額前 50。上面 1 分 K 是進場訊號，下面 5 分 K 看同一段結構。允許跨夜箱體；站回後最多等 24 根才突破（金居 09:35 站回、09:53 放量站上箱頂）。",
         ),
         encoding="utf-8",
     )

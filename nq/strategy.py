@@ -101,6 +101,7 @@ class FakeBreakdownStrategy:
     進場：盤整箱體被假跌破、迅速站回後，收盤突破箱體高且放量
     停損：假跌破最低點
     停利：進場價 + reward_r × 風險（預設 2R）
+    箱體預設允許跨夜（same_session=False）；略過開盤後 skip_open_minutes 分鐘
     """
 
     range_bars: int = 18
@@ -117,7 +118,7 @@ class FakeBreakdownStrategy:
     reward_r: float = 2.0
     tick_size: float = 0.5
     point_value: float = 1.0
-    same_session: bool = True
+    same_session: bool = False
     skip_open_minutes: int = 5
 
     def generate_signals(self, df: pd.DataFrame) -> list[Signal]:

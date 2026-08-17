@@ -16,7 +16,7 @@ springVolMaxMult = input.float(1.35, "跌破段量能上限倍數", minval=0.8, 
 rewardR        = input.float(2.0, "停利 R 倍數", minval=0.5, step=0.5)
 useVolume      = input.bool(true, "要求放量確認")
 skipOpenBars   = input.int(5, "略過開盤 K 數", minval=0)
-sameSessionBox = input.bool(true, "箱體不可跨夜")
+sameSessionBox = input.bool(false, "箱體不可跨夜（預設關閉，允許跨夜箱）")
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)

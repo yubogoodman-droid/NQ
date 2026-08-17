@@ -166,7 +166,11 @@ def main() -> None:
     parser.add_argument("--date", default="20260814", help="YYYYMMDD，預設上週五")
     parser.add_argument("--limit", type=int, default=50)
     parser.add_argument("--sleep", type=float, default=0.25)
-    parser.add_argument("--after", default="09:15", help="只計此時之後的進場（避開開盤雜訊）")
+    parser.add_argument(
+        "--after",
+        default="09:00",
+        help="只計此時之後的進場（開盤雜訊已由 skip_open_minutes 處理）",
+    )
     args = parser.parse_args()
     day = f"{args.date[:4]}-{args.date[4:6]}-{args.date[6:]}"
 
