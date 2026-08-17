@@ -11,6 +11,7 @@ from tw.signals import (
     is_ma200_breakout_bullish,
     latest_ma200_breakout_bullish,
     ma200_at,
+    ma200_gap_pct,
     mas_are_open,
 )
 
@@ -120,8 +121,34 @@ class SignalTests(unittest.TestCase):
         )
         ts_1m = idx[-1] + pd.Timedelta(minutes=3)
         self.assertTrue(close_above_ma200(df, ts_1m, floor="5min"))
+        self.assertTrue(close_above_ma200(df, ts_1m, floor="5min", min_gap=0.06))
         close, ma200 = ma200_at(df, ts_1m, floor="5min")
         self.assertGreater(close, ma200)
+        gap = ma200_gap_pct(df, ts_1m, floor="5min")
+        self.assertIsNotNone(gap)
+        assert gap is not None
+        self.assertGreater(gap, 0.06)
+
+    def test_5m_hugging_ma200_fails_min_gap(self) -> None:
+        idx = pd.date_range("2026-08-17 09:00", periods=220, freq="5min", tz="Asia/Taipei")
+        closes = [100.0] * 219 + [101.0]
+        df = pd.DataFrame(
+            {
+                "open": closes,
+                "high": [c + 0.5 for c in closes],
+                "low": [c - 0.5 for c in closes],
+                "close": closes,
+                "volume": [1000] * 220,
+            },
+            index=idx,
+        )
+        ts_1m = idx[-1] + pd.Timedelta(minutes=3)
+        self.assertTrue(close_above_ma200(df, ts_1m, floor="5min"))
+        self.assertFalse(close_above_ma200(df, ts_1m, floor="5min", min_gap=0.06))
+        gap = ma200_gap_pct(df, ts_1m, floor="5min")
+        self.assertIsNotNone(gap)
+        assert gap is not None
+        self.assertLess(gap, 0.06)
 
     def test_5m_close_below_ma200(self) -> None:
         idx = pd.date_range("2026-08-17 09:00", periods=220, freq="5min", tz="Asia/Taipei")
@@ -166,11 +193,6 @@ class SignalTests(unittest.TestCase):
         )
         self.assertLess(snap.ma_span_pct, 0.005)
         self.assertFalse(mas_are_open(snap))
-
-
-if __name__ == "__main__":
-    unittest.main()
-
 
 
 if __name__ == "__main__":

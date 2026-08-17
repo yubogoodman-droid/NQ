@@ -140,14 +140,28 @@ def ma200_at(
     return float(row["close"]), float(row["ma200"])
 
 
+def ma200_gap_pct(
+    df: pd.DataFrame,
+    ts: pd.Timestamp | None = None,
+    *,
+    floor: str | None = None,
+) -> float | None:
+    """(收盤 − MA200) / MA200。資料不足或 MA200 ≤ 0 則 None。"""
+    pair = ma200_at(df, ts, floor=floor)
+    if pair is None or pair[1] <= 0:
+        return None
+    return (pair[0] - pair[1]) / pair[1]
+
+
 def close_above_ma200(
     df: pd.DataFrame,
     ts: pd.Timestamp | None = None,
     *,
     floor: str | None = None,
+    min_gap: float = 0.0,
 ) -> bool:
-    pair = ma200_at(df, ts, floor=floor)
-    return pair is not None and pair[0] > pair[1]
+    gap = ma200_gap_pct(df, ts, floor=floor)
+    return gap is not None and gap >= min_gap and gap > 0
 
 
 def _snapshot_at(work: pd.DataFrame, idx: int) -> AlertSnapshot | None:

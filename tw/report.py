@@ -85,14 +85,14 @@ def _render(
         lead = (
             f"用 {as_of} 當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
             "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.5%），且當日這根收盤剛站上 MA200（前一根還沒）。"
-            "含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
+            "含該金叉的五分K必須明顯站上五分 MA200（至少高 6%，像金居、玉晶光）。K 棒漲紅跌綠。"
         )
     else:
         title = "台股一分K · 多頭排列站上 MA200"
         heading = "台股一分K · 剛站上 MA200"
         lead = (
             "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.5%），"
-            "且這根收盤剛站上 MA200（前一根還沒）。含該金叉的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
+            "且這根收盤剛站上 MA200（前一根還沒）。含該金叉的五分K必須明顯站上五分 MA200（至少高 6%，像金居、玉晶光）。K 棒漲紅跌綠。"
         )
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -168,7 +168,7 @@ def _render(
       <span class="chip">股價 &lt; 650</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 拉開</span>
       <span class="chip">金叉 MA200</span>
-      <span class="chip">五分收盤 &gt; MA200</span>
+      <span class="chip">五分明顯站上 MA200（≥ 6%）</span>
     </div>
     <div class="legend">
       <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
@@ -180,7 +180,7 @@ def _render(
       命中 <span class="ok">{len(result.hits)}</span> 檔<br/>
       掃描時間 {html.escape(scanned)}（台北）<br/>
       排行時間 {rank_time}<br/>
-      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} 檔 → 均線糾結 {result.tangled_dropped} → 五分MA200底下 {result.below_5m_dropped}
+      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} 檔 → 均線糾結 {result.tangled_dropped} → 五分未明顯站上MA200 {result.below_5m_dropped}
     </div>
     {hit_rows}
     <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
@@ -235,7 +235,8 @@ def _five_min_ma200_text(hit: ScanHit) -> str:
     if pair is None:
         return "—"
     close, ma200 = pair
-    return f"{close:.2f} > {ma200:.2f}"
+    gap = (close - ma200) / ma200 if ma200 else 0.0
+    return f"{close:.2f} > {ma200:.2f}（{gap:+.1%}）"
 
 
 def build_k_chart(
@@ -318,13 +319,13 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         lead = (
             f"用 {as_of} 當天上市＋上櫃成交額前 100（盤後），濾掉 ETF 與收盤價 650 以上。"
             "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.5%），且當日這根收盤剛站上 MA200；"
-            "含該金叉的五分K收盤也必須高於五分 MA200。"
+            "含該金叉的五分K必須明顯站上五分 MA200（至少高 6%，像金居、玉晶光）。"
         )
     else:
         title = "台股一分K · 剛站上 MA200"
         lead = (
             "成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.5%），"
-            "且這根收盤剛站上 MA200；含該金叉的五分K收盤也必須高於五分 MA200。"
+            "且這根收盤剛站上 MA200；含該金叉的五分K必須明顯站上五分 MA200（至少高 6%，像金居、玉晶光）。"
         )
     lines = [
         f"# {title}",
@@ -334,7 +335,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         f"- 命中 **{len(result.hits)}** 檔",
         f"- 掃描時間 {result.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}（台北）",
         f"- 排行 {result.rank_time or '—'}",
-        f"- 前 100 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} → 均線糾結 {result.tangled_dropped} → 五分MA200底下 {result.below_5m_dropped}",
+        f"- 前 100 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped} → 掃描 {len(result.candidates)} → 均線糾結 {result.tangled_dropped} → 五分未明顯站上MA200 {result.below_5m_dropped}",
         "",
     ]
     for i, hit in enumerate(result.hits, 1):

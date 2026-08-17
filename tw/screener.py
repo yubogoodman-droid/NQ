@@ -17,7 +17,7 @@ from tw.ranking import (
     filter_by_price,
     filter_etfs,
 )
-from tw.signals import AlertSnapshot, close_above_ma200, latest_ma200_breakout_bullish, mas_are_open
+from tw.signals import AlertSnapshot, latest_ma200_breakout_bullish, ma200_at, mas_are_open
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
@@ -34,6 +34,8 @@ class ScanConfig:
     exclude_etf: bool = True
     on_date: date | None = None
     min_ma_span: float = 0.005
+    # 金居 / 玉晶光這類：五分圖已明顯站上 MA200，不是剛貼著均線。
+    min_5m_ma200_gap: float = 0.06
 
 
 @dataclass
@@ -155,7 +157,9 @@ def run_scan(
             below_5m_dropped = len(hits)
             hits = []
         else:
-            hits, dropped_5m, skip_5m = apply_5m_ma200_filter(hits)
+            hits, dropped_5m, skip_5m = apply_5m_ma200_filter(
+                hits, min_gap=cfg.min_5m_ma200_gap
+            )
             skipped.extend(skip_5m)
             below_5m_dropped = dropped_5m
 
@@ -179,8 +183,9 @@ def run_scan(
 
 def apply_5m_ma200_filter(
     hits: list[ScanHit],
+    min_gap: float = 0.06,
 ) -> tuple[list[ScanHit], int, list[tuple[RankedStock, str]]]:
-    """一分金叉當下的五分K收盤必須高於五分 MA200。"""
+    """一分金叉當下的五分K收盤必須明顯高於五分 MA200（預設至少 6%）。"""
     kept: list[ScanHit] = []
     skipped: list[tuple[RankedStock, str]] = []
     for hit in hits:
@@ -188,8 +193,17 @@ def apply_5m_ma200_filter(
         if frame is None or frame.empty:
             skipped.append((hit.stock, "無五分 K 資料"))
             continue
-        if not close_above_ma200(frame, hit.snapshot.timestamp, floor="5min"):
+        pair = ma200_at(frame, hit.snapshot.timestamp, floor="5min")
+        if pair is None or pair[1] <= 0:
+            skipped.append((hit.stock, "五分 MA200 不足"))
+            continue
+        close, ma200 = pair
+        gap = (close - ma200) / ma200
+        if close <= ma200:
             skipped.append((hit.stock, "五分K收盤在 MA200 底下"))
+            continue
+        if gap < min_gap:
+            skipped.append((hit.stock, f"五分K離 MA200 太近（僅 {gap:.1%}）"))
             continue
         kept.append(hit)
     return kept, len(skipped), skipped

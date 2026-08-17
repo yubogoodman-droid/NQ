@@ -61,6 +61,27 @@ class FiveMinuteFilterTests(unittest.TestCase):
         self.assertIn("MA200", reasons["2313.TW"])
         self.assertIn("無五分", reasons["2486.TW"])
 
+    def test_drops_hits_hugging_5m_ma200(self) -> None:
+        # 101 vs ~100，只高出約 1%，不像金居／玉晶光。
+        hug_df = _bars([100.0] * 219 + [101.0])
+        clear_df = _bars([100.0] * 219 + [110.0])
+        ts = hug_df.index[-1] + pd.Timedelta(minutes=3)
+        hug = _hit("3605.TW", hug_df, ts)
+        clear = _hit("8358.TWO", clear_df, ts)
+        kept, dropped, skipped = apply_5m_ma200_filter([hug, clear])
+        self.assertEqual([h.stock.symbol for h in kept], ["8358.TWO"])
+        self.assertEqual(dropped, 1)
+        self.assertIn("太近", skipped[0][1])
+
+    def test_zero_gap_still_keeps_barely_above(self) -> None:
+        hug_df = _bars([100.0] * 219 + [101.0])
+        ts = hug_df.index[-1] + pd.Timedelta(minutes=3)
+        hug = _hit("3605.TW", hug_df, ts)
+        kept, dropped, skipped = apply_5m_ma200_filter([hug], min_gap=0.0)
+        self.assertEqual([h.stock.symbol for h in kept], ["3605.TW"])
+        self.assertEqual(dropped, 0)
+        self.assertEqual(skipped, [])
+
 
 if __name__ == "__main__":
     unittest.main()

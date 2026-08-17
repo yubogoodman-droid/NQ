@@ -28,6 +28,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("-o", "--output", default="docs/tw/index.html")
+    p.add_argument(
+        "--min-5m-gap",
+        type=float,
+        default=0.06,
+        help="五分收盤相對五分 MA200 的最小距離（預設 0.06=6%，金居／玉晶光這類）",
+    )
     p.add_argument("--date", help="回測指定日（YYYY-MM-DD），只找當天金叉")
     p.add_argument("--last-friday", action="store_true", help="回測上週五")
     p.add_argument("--quiet-empty", action="store_true", help="沒命中時不印詳細清單")
@@ -48,7 +54,7 @@ def print_result(result, *, quiet_empty: bool) -> None:
         f"成交額前 {len(result.universe)}／股價濾掉 {result.price_dropped}／"
         f"ETF濾掉 {result.etf_dropped}／掃描 {len(result.candidates)}／"
         f"均線糾結濾掉 {result.tangled_dropped}／"
-        f"五分MA200濾掉 {result.below_5m_dropped}／"
+        f"五分未明顯站上MA200濾掉 {result.below_5m_dropped}／"
         f"命中 {len(result.hits)}／略過 {len(result.skipped)}／錯誤 {len(result.errors)}"
     )
     if result.as_of:
@@ -87,6 +93,7 @@ def scan_once(args: argparse.Namespace, seen: set) -> int:
             exclude_etf=not args.include_etf,
             on_date=on_date,
             kline_range="7d" if on_date is not None else "5d",
+            min_5m_ma200_gap=args.min_5m_gap,
         )
     )
     print_result(result, quiet_empty=args.quiet_empty)
