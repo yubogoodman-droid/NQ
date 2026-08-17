@@ -5,11 +5,13 @@ import unittest
 import pandas as pd
 
 from tw.signals import (
+    AlertSnapshot,
     add_moving_averages,
     close_above_ma200,
     is_ma200_breakout_bullish,
     latest_ma200_breakout_bullish,
     ma200_at,
+    mas_are_open,
 )
 
 
@@ -136,6 +138,39 @@ class SignalTests(unittest.TestCase):
         )
         ts_1m = idx[-1] + pd.Timedelta(minutes=3)
         self.assertFalse(close_above_ma200(df, ts_1m, floor="5min"))
+
+    def test_keeps_open_ma_stack_like_jinju(self) -> None:
+        snap = AlertSnapshot(
+            timestamp=pd.Timestamp("2026-08-14 09:53", tz="Asia/Taipei"),
+            close=425.50,
+            prev_close=424.00,
+            ma5=422.90,
+            ma10=421.65,
+            ma20=419.65,
+            ma200=424.41,
+            prev_ma200=424.50,
+        )
+        self.assertGreater(snap.ma_span_pct, 0.005)
+        self.assertTrue(mas_are_open(snap))
+
+    def test_drops_tangled_ma_stack(self) -> None:
+        snap = AlertSnapshot(
+            timestamp=pd.Timestamp("2026-08-14 13:20", tz="Asia/Taipei"),
+            close=43.20,
+            prev_close=43.10,
+            ma5=43.09,
+            ma10=43.06,
+            ma20=43.02,
+            ma200=43.15,
+            prev_ma200=43.16,
+        )
+        self.assertLess(snap.ma_span_pct, 0.005)
+        self.assertFalse(mas_are_open(snap))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
 
 
 if __name__ == "__main__":

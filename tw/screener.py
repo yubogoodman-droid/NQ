@@ -17,7 +17,7 @@ from tw.ranking import (
     filter_by_price,
     filter_etfs,
 )
-from tw.signals import AlertSnapshot, close_above_ma200, latest_ma200_breakout_bullish
+from tw.signals import AlertSnapshot, close_above_ma200, latest_ma200_breakout_bullish, mas_are_open
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
@@ -33,6 +33,7 @@ class ScanConfig:
     latest_only: bool = False
     exclude_etf: bool = True
     on_date: date | None = None
+    min_ma_span: float = 0.005
 
 
 @dataclass
@@ -56,6 +57,7 @@ class ScanResult:
     price_dropped: int = 0
     etf_dropped: int = 0
     below_5m_dropped: int = 0
+    tangled_dropped: int = 0
     as_of: date | None = None
 
 
@@ -84,6 +86,7 @@ def run_scan(
     hits: list[ScanHit] = []
     skipped: list[tuple[RankedStock, str]] = []
     errors: list[tuple[RankedStock, str]] = []
+    tangled_dropped = 0
 
     frames: dict[str, pd.DataFrame] = {}
     try:
@@ -128,6 +131,10 @@ def run_scan(
         )
         if snapshot is None:
             continue
+        if not mas_are_open(snapshot, cfg.min_ma_span):
+            skipped.append((stock, "均線糾結"))
+            tangled_dropped += 1
+            continue
         hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=len(df), frame=df))
 
     below_5m_dropped = 0
@@ -165,6 +172,7 @@ def run_scan(
         price_dropped=price_dropped,
         etf_dropped=etf_dropped,
         below_5m_dropped=below_5m_dropped,
+        tangled_dropped=tangled_dropped,
         as_of=cfg.on_date,
     )
 

@@ -32,6 +32,18 @@ class AlertSnapshot:
     def crossed_above_ma200(self) -> bool:
         return self.close > self.ma200 and self.prev_close <= self.prev_ma200
 
+    @property
+    def ma_span_pct(self) -> float:
+        """MA5 與 MA20 的距離／收盤。太小代表均線糾結。"""
+        if self.close <= 0:
+            return 0.0
+        return (self.ma5 - self.ma20) / self.close
+
+
+def mas_are_open(snapshot: AlertSnapshot, min_span: float = 0.005) -> bool:
+    """多頭排列且 MA5–MA20 拉開到 min_span 以上（預設 0.5%）。"""
+    return snapshot.bullish_aligned and snapshot.ma_span_pct >= min_span
+
 
 def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
