@@ -18,7 +18,7 @@ def fetch_1m_bars(
     **_: object,
 ) -> pd.DataFrame:
     """下載單一標的一分 K。"""
-    frames = fetch_1m_bars_many([symbol], range_=range_, closed_only=closed_only)
+    frames = fetch_bars_many([symbol], interval="1m", range_=range_, closed_only=closed_only)
     return frames.get(symbol, _empty())
 
 
@@ -27,14 +27,23 @@ def fetch_1m_bars_many(
     range_: str = "5d",
     closed_only: bool = False,
 ) -> dict[str, pd.DataFrame]:
-    """一次抓多檔一分 K，回傳 symbol -> OHLCV。"""
+    return fetch_bars_many(symbols, interval="1m", range_=range_, closed_only=closed_only)
+
+
+def fetch_bars_many(
+    symbols: list[str],
+    interval: str = "1m",
+    range_: str = "5d",
+    closed_only: bool = False,
+) -> dict[str, pd.DataFrame]:
+    """一次抓多檔 K 線，回傳 symbol -> OHLCV。"""
     unique = list(dict.fromkeys(s for s in symbols if s))
     if not unique:
         return {}
 
     raw = yf.download(
         unique,
-        interval="1m",
+        interval=interval,
         period=range_,
         group_by="ticker",
         auto_adjust=True,
@@ -44,7 +53,7 @@ def fetch_1m_bars_many(
     out: dict[str, pd.DataFrame] = {}
     for symbol in unique:
         frame = _slice_ticker(raw, symbol)
-        normalized = _normalize_ohlcv(frame, closed_only=closed_only)
+        normalized = _normalize_ohlcv(frame, closed_only=closed_only, interval=interval)
         if not normalized.empty:
             out[symbol] = normalized
     return out
@@ -65,7 +74,11 @@ def _slice_ticker(raw: pd.DataFrame, symbol: str) -> pd.DataFrame:
     return raw.copy()
 
 
-def _normalize_ohlcv(df: pd.DataFrame, closed_only: bool = False) -> pd.DataFrame:
+def _normalize_ohlcv(
+    df: pd.DataFrame,
+    closed_only: bool = False,
+    interval: str = "1m",
+) -> pd.DataFrame:
     if df is None or df.empty:
         return _empty()
     work = df.copy()
@@ -90,7 +103,8 @@ def _normalize_ohlcv(df: pd.DataFrame, closed_only: bool = False) -> pd.DataFram
     if closed_only and len(work) >= 2:
         last = pd.Timestamp(work.index[-1])
         now = pd.Timestamp(datetime.now(TAIPEI))
-        if last.floor("min") >= now.floor("min"):
+        freq = "5min" if interval == "5m" else "min"
+        if last.floor(freq) >= now.floor(freq):
             work = work.iloc[:-1]
     return work.astype(float)
 

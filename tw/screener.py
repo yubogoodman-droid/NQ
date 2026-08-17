@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
-from tw.kline import fetch_1m_bars_many
+from tw.kline import fetch_1m_bars_many, fetch_bars_many
 from tw.ranking import RankedStock, fetch_turnover_ranking, filter_by_price, filter_etfs
 from tw.signals import AlertSnapshot, latest_ma200_breakout_bullish
 
@@ -34,6 +34,7 @@ class ScanHit:
     snapshot: AlertSnapshot
     bars: int
     frame: pd.DataFrame | None = None
+    frame_5m: pd.DataFrame | None = None
 
 
 @dataclass
@@ -109,6 +110,19 @@ def run_scan(
         if snapshot is None:
             continue
         hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=len(df), frame=df))
+
+    if hits:
+        try:
+            frames_5m = fetch_bars_many(
+                [h.stock.symbol for h in hits],
+                interval="5m",
+                range_=cfg.kline_range,
+                closed_only=cfg.closed_only,
+            )
+            for hit in hits:
+                hit.frame_5m = frames_5m.get(hit.stock.symbol)
+        except Exception as exc:  # noqa: BLE001
+            errors.append((hits[0].stock, f"五分K下載失敗：{exc}"))
 
     hits.sort(key=lambda h: h.stock.rank)
     skipped.sort(key=lambda item: item[0].rank)

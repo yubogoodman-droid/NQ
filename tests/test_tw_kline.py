@@ -25,6 +25,22 @@ class KlineNormalizeTests(unittest.TestCase):
         self.assertEqual(len(out), 3)
         self.assertEqual(out["close"].iloc[-1], 12.2)
 
+    def test_normalize_accepts_5m_interval(self) -> None:
+        idx = pd.date_range("2026-08-17 09:00", periods=4, freq="5min", tz="Asia/Taipei")
+        df = pd.DataFrame(
+            {
+                "Open": [10.0, 11.0, 12.0, 13.0],
+                "High": [10.5, 11.5, 12.5, 13.5],
+                "Low": [9.5, 10.5, 11.5, 12.5],
+                "Close": [10.2, 11.1, 12.2, 13.1],
+                "Volume": [1, 2, 3, 4],
+            },
+            index=idx,
+        )
+        out = _normalize_ohlcv(df, interval="5m")
+        self.assertEqual(len(out), 4)
+        self.assertEqual(out["close"].iloc[-1], 13.1)
+
     def test_slice_multiindex_ticker(self) -> None:
         idx = pd.date_range("2026-08-17 09:00", periods=2, freq="1min", tz="Asia/Taipei")
         cols = pd.MultiIndex.from_product([["2408.TW", "1303.TW"], ["Open", "Close"]])

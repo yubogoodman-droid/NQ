@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -15,8 +17,8 @@ from tw.signals import AlertSnapshot
 TAIPEI = ZoneInfo("Asia/Taipei")
 
 
-def _bars(n: int = 240) -> pd.DataFrame:
-    idx = pd.date_range("2026-08-17 09:00", periods=n, freq="1min", tz=TAIPEI)
+def _bars(n: int = 240, freq: str = "1min") -> pd.DataFrame:
+    idx = pd.date_range("2026-08-17 09:00", periods=n, freq=freq, tz=TAIPEI)
     close = pd.Series(100.0, index=idx)
     close.iloc[-1] = 110.0
     return pd.DataFrame(
@@ -30,48 +32,46 @@ def _bars(n: int = 240) -> pd.DataFrame:
     )
 
 
+def _hit(*, frame: pd.DataFrame, frame_5m: pd.DataFrame | None = None) -> ScanHit:
+    ts = frame.index[-1]
+    return ScanHit(
+        stock=RankedStock(6, "1303.TW", "南亞", 208.5, 1.0, 0.5, 1, 1e10, "TAI"),
+        snapshot=AlertSnapshot(
+            timestamp=ts,
+            close=209.0,
+            prev_close=207.5,
+            ma5=207.8,
+            ma10=207.6,
+            ma20=207.5,
+            ma200=207.5,
+            prev_ma200=207.5,
+        ),
+        bars=len(frame),
+        frame=frame,
+        frame_5m=frame_5m,
+    )
+
+
 class ReportChartTests(unittest.TestCase):
     def test_k_chart_contains_candlestick(self) -> None:
-        df = _bars()
-        ts = df.index[-1]
-        hit = ScanHit(
-            stock=RankedStock(1, "2408.TW", "南亞科", 110.0, 10.0, 10.0, 1, 1e9, "TAI"),
-            snapshot=AlertSnapshot(
-                timestamp=ts,
-                close=110.0,
-                prev_close=100.0,
-                ma5=102.0,
-                ma10=101.0,
-                ma20=100.5,
-                ma200=100.05,
-                prev_ma200=100.0,
-            ),
-            bars=len(df),
-            frame=df,
-        )
-        html = build_k_chart(hit)
+        html = build_k_chart(_hit(frame=_bars()))
         self.assertIn("data:image/png;base64,", html)
         png = html.split("base64,", 1)[1].split('"', 1)[0]
         self.assertGreater(len(png), 200)
 
-    def test_save_html_embeds_plotly(self) -> None:
-        df = _bars()
-        ts = df.index[-1]
-        hit = ScanHit(
-            stock=RankedStock(6, "1303.TW", "南亞", 208.5, 1.0, 0.5, 1, 1e10, "TAI"),
-            snapshot=AlertSnapshot(
-                timestamp=ts,
-                close=209.0,
-                prev_close=207.5,
-                ma5=207.8,
-                ma10=207.6,
-                ma20=207.5,
-                ma200=207.5,
-                prev_ma200=207.5,
-            ),
-            bars=len(df),
-            frame=df,
-        )
+    def test_5m_chart_uses_5m_frame(self) -> None:
+        hit = _hit(frame=_bars(), frame_5m=_bars(n=80, freq="5min"))
+        html = build_k_chart(hit, timeframe="5m")
+        self.assertIn("data:image/png;base64,", html)
+        self.assertIn("五分K", html)
+
+    def test_5m_chart_missing_frame_shows_placeholder(self) -> None:
+        html = build_k_chart(_hit(frame=_bars()), timeframe="5m")
+        self.assertNotIn("data:image/png;base64,", html)
+        self.assertIn("無五分 K 線資料", html)
+
+    def test_save_html_embeds_1m_and_5m_png(self) -> None:
+        hit = _hit(frame=_bars(), frame_5m=_bars(n=80, freq="5min"))
         result = ScanResult(
             scanned_at=datetime(2026, 8, 17, 11, 0, tzinfo=TAIPEI),
             rank_time="2026-08-17T11:00:00+08:00",
@@ -79,14 +79,13 @@ class ReportChartTests(unittest.TestCase):
             candidates=[],
             hits=[hit],
         )
-        import tempfile
-        from pathlib import Path
-
         with tempfile.TemporaryDirectory() as tmp:
             path = save_scan_html(result, Path(tmp) / "index.html")
             text = path.read_text(encoding="utf-8")
-        self.assertIn("data:image/png;base64,", text)
+        self.assertEqual(text.count("data:image/png;base64,"), 2)
         self.assertIn("南亞", text)
+        self.assertIn("一分 K", text)
+        self.assertIn("五分 K（對照）", text)
         self.assertIn("MA5", text)
         self.assertIn("MA200", text)
 

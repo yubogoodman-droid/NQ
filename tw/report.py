@@ -110,6 +110,10 @@ def _render(result: ScanResult) -> str:
     .row b {{ color: var(--text); font-weight: 600; }}
     .chart {{ margin-top: 10px; }}
     .chart img {{ width: 100%; height: auto; display: block; border-radius: 8px; }}
+    .chart-label {{
+      font-size: 12px; color: var(--ok); font-weight: 700;
+      padding: 8px 6px 4px;
+    }}
     .empty {{ color: var(--muted); }}
     footer {{ color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }}
   </style>
@@ -117,7 +121,7 @@ def _render(result: ScanResult) -> str:
 <body>
   <div class="page">
     <h1>台股一分K · 剛站上 MA200</h1>
-    <p class="lead">成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20，且這根收盤剛站上 MA200（前一根還沒）。K 棒漲紅跌綠。</p>
+    <p class="lead">成交額前 100、濾掉 ETF 與股價 650 以上。一分K MA5&gt;MA10&gt;MA20，且這根收盤剛站上 MA200（前一根還沒）。下方附五分K對照，綠三角標在含該金叉的那根五分K。K 棒漲紅跌綠。</p>
     <div class="chips">
       <span class="chip">不含 ETF</span>
       <span class="chip">股價 &lt; 650</span>
@@ -152,37 +156,47 @@ def _hit_card(index: int, hit: ScanHit) -> str:
         chg = f" {s.change_percent:+.2f}%"
     ts = snap.timestamp.strftime("%H:%M")
     url = f"https://tw.stock.yahoo.com/quote/{html.escape(s.symbol)}"
-    chart = build_k_chart(hit)
+    chart_1m = build_k_chart(hit, timeframe="1m")
+    chart_5m = build_k_chart(hit, timeframe="5m")
     return f"""
     <article class="card">
       <div class="top">
         <div class="name">{index}. {html.escape(s.name)}<span class="sym"><a href="{url}" target="_blank" rel="noopener">{html.escape(s.symbol)}</a></span></div>
         <div class="price">{s.price:.2f}{html.escape(chg)}</div>
       </div>
-      <div class="row"><span>金叉時間</span><b>{ts}</b></div>
-      <div class="row"><span>收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
-      <div class="row"><span>MA5 / 10 / 20</span><b>{snap.ma5:.2f} &gt; {snap.ma10:.2f} &gt; {snap.ma20:.2f}</b></div>
+      <div class="row"><span>1分金叉時間</span><b>{ts}</b></div>
+      <div class="row"><span>1分收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>{snap.ma5:.2f} &gt; {snap.ma10:.2f} &gt; {snap.ma20:.2f}</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
-      <div class="chart">{chart}</div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart">{chart_1m}</div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart">{chart_5m}</div>
     </article>
 """
 
 
-def build_k_chart(hit: ScanHit, index: int = 1) -> str:
-    """一分 K 棒圖 + MA5/10/20/200，輸出成 PNG 讓預覽頁也能直接看到。"""
-    png = render_k_chart_png(hit)
+def build_k_chart(hit: ScanHit, timeframe: str = "1m") -> str:
+    """K 棒圖 + MA5/10/20/200，輸出成 PNG。timeframe: 1m 或 5m。"""
+    png = render_k_chart_png(hit, timeframe=timeframe)
     if not png:
-        return '<p class="empty">無 K 線資料</p>'
+        label = "五分" if timeframe == "5m" else "一分"
+        return f'<p class="empty">無{label} K 線資料</p>'
     b64 = base64.b64encode(png).decode("ascii")
-    alt = html.escape(f"{hit.stock.name} {hit.stock.symbol} 一分K")
+    alt = html.escape(f"{hit.stock.name} {hit.stock.symbol} {'五分K' if timeframe == '5m' else '一分K'}")
     return f'<img alt="{alt}" src="data:image/png;base64,{b64}"/>'
 
 
-def render_k_chart_png(hit: ScanHit) -> bytes | None:
-    if hit.frame is None or hit.frame.empty:
+def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
+    frame = hit.frame_5m if timeframe == "5m" else hit.frame
+    if frame is None or frame.empty:
         return None
-    work = add_moving_averages(hit.frame)
-    window = _window_around(work, hit.snapshot.timestamp, before=90, after=20)
+    work = add_moving_averages(frame)
+    before, after = (70, 12) if timeframe == "5m" else (90, 20)
+    mark_ts = pd.Timestamp(hit.snapshot.timestamp)
+    if timeframe == "5m":
+        mark_ts = mark_ts.floor("5min")
+    window = _window_around(work, mark_ts, before=before, after=after)
     if window.empty:
         return None
 
@@ -229,7 +243,9 @@ def render_k_chart_png(hit: ScanHit) -> bytes | None:
             solid_capstyle="round",
         )
 
-    loc = int(window.index.get_indexer([hit.snapshot.timestamp], method="nearest")[0])
+    loc = int(window.index.get_indexer([mark_ts], method="nearest")[0])
+    tf_name = "五分K" if timeframe == "5m" else "一分K"
+    marker_label = "1分金叉" if timeframe == "5m" else "金叉"
     if 0 <= loc < n:
         ax.scatter(
             [loc],
@@ -238,12 +254,15 @@ def render_k_chart_png(hit: ScanHit) -> bytes | None:
             s=70,
             color="#7ee787",
             zorder=5,
-            label="金叉",
+            label=marker_label,
         )
-        ax.axhline(hit.snapshot.ma200, color="#ce93d8", linestyle=":", linewidth=1.0, alpha=0.85, zorder=1)
+        ma200_val = window["ma200"].iloc[loc] if "ma200" in window.columns else hit.snapshot.ma200
+        if pd.notna(ma200_val):
+            ax.axhline(float(ma200_val), color="#ce93d8", linestyle=":", linewidth=1.0, alpha=0.85, zorder=1)
 
     ax.set_xlim(-1, n)
-    title = f"{hit.stock.name} {hit.stock.symbol}  一分K  {hit.snapshot.timestamp.strftime('%H:%M')} 金叉"
+    bar_time = pd.Timestamp(window.index[loc]).strftime("%H:%M") if 0 <= loc < n else hit.snapshot.timestamp.strftime("%H:%M")
+    title = f"{hit.stock.name} {hit.stock.symbol}  {tf_name}  {bar_time}"
     ax.set_title(title, color=FG, fontsize=11, pad=8, fontproperties=_FONT)
     ax.tick_params(colors="#9aa4b2", labelsize=8)
     ax.spines["top"].set_visible(False)
