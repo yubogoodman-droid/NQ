@@ -38,8 +38,10 @@
 python examples/run_tw_ma_short.py --pages
 ```
 
-報告：`docs/tw-ma-short/index.html`  
-Markdown（GitHub 可直接預覽圖）：`docs/tw-ma-short/index.md`  
+請用 GitHub 打開（跟掃描頁同一種，圖會顯示）：  
+https://github.com/yubogoodman-droid/NQ/blob/cursor/tw-ma200-short-91bb/docs/tw/today.md
+
+報告檔：`docs/tw/today.md`（與掃描頁 `docs/tw/today.md` 同一路徑）  
 Pages：`https://yubogoodman-droid.github.io/NQ/tw-ma-short/`
 
 K 線圖跟掃描頁同一套：漲紅跌綠 PNG、一分 K 只切跌破附近，縱軸對準 MA20/MA200，並附五分 K 對照。

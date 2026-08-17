@@ -74,6 +74,11 @@ PAGE_CSS = """
     }
     .empty { color: var(--muted); }
     footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }
+    .note {
+      background: var(--chip); border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 12px; margin: 0 0 12px; font-size: 13px; color: var(--muted); line-height: 1.5;
+    }
+    .note a { color: #58a6ff; }
 """
 
 
@@ -121,12 +126,13 @@ def _rank_text(ticker: str, universe_top: pd.DataFrame | None) -> str:
     return f"#{int(r['rank'])} · {float(r['turnover']) / 1e8:.2f} 億"
 
 
-def _github_raw_base(page_dir: Path) -> str | None:
+def _github_blob_url(file_path: Path) -> str | None:
+    """GitHub markdown preview URL. Uses refs/heads so slash branch names work."""
     try:
         root = Path(
             subprocess.check_output(
                 ["git", "rev-parse", "--show-toplevel"],
-                cwd=page_dir,
+                cwd=file_path.parent,
                 text=True,
                 stderr=subprocess.DEVNULL,
             ).strip()
@@ -149,15 +155,19 @@ def _github_raw_base(page_dir: Path) -> str | None:
     match = re.search(r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?$", text)
     if match is None or not branch or branch == "HEAD":
         return None
-    rel = page_dir.resolve().relative_to(root).as_posix().strip("/")
-    prefix = f"https://raw.githubusercontent.com/{match.group('owner')}/{match.group('repo')}/{branch}/"
-    return f"{prefix}{rel}/" if rel != "." else prefix
+    rel = file_path.resolve().relative_to(root).as_posix()
+    return (
+        f"https://github.com/{match.group('owner')}/{match.group('repo')}"
+        f"/blob/refs/heads/{branch}/{rel}"
+    )
 
 
 def _img(rel: str | None, alt: str, image_base: str | None) -> str:
     if not rel:
         return '<p class="empty">無 K 線資料</p>'
-    src = html.escape(f"{image_base}{rel}" if image_base else rel)
+    # Relative paths work on GitHub Pages and github.com markdown preview.
+    # raw.githubusercontent.com is often blocked in TW.
+    src = html.escape(f"{image_base.rstrip('/')}/{rel}" if image_base else rel)
     return f'<img alt="{html.escape(alt)}" src="{src}"/>'
 
 
@@ -239,6 +249,7 @@ def build_report_html(
     chart_dir: Path,
     image_base: str | None = None,
     chart_trades: int = CHART_TRADES,
+    github_md_url: str | None = None,
 ) -> tuple[str, str]:
     stats = summarize(results)
     pf = stats["profit_factor"]
@@ -267,6 +278,13 @@ def build_report_html(
         "出場：停利 1.2% / 停損 0.8% / 收盤站回 MA200 / 持有滿 30 分 / 當日收盤回補。"
         "K 棒漲紅跌綠。"
     )
+    note = ""
+    if github_md_url:
+        note = (
+            '<div class="note">網頁打不開時，請改開 GitHub 上這份報告'
+            "（跟掃描頁同一種，K 線圖會顯示）："
+            f'<a href="{html.escape(github_md_url)}">docs/tw/today.md</a></div>'
+        )
     html_page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -279,6 +297,7 @@ def build_report_html(
 </head>
 <body>
   <div class="page">
+    {note}
     <h1>{html.escape(heading)}</h1>
     <p class="lead">{lead}</p>
     <div class="chips">
@@ -342,7 +361,13 @@ def save_report_html(
     if chart_dir.exists():
         shutil.rmtree(chart_dir)
     chart_dir.mkdir(parents=True, exist_ok=True)
-    image_base = _github_raw_base(out.parent)
+    today_md = out.parent / "today.md"
+    blob_target = (
+        out.parent.parent / "tw" / "today.md"
+        if out.parent.name == "tw-ma-short"
+        else today_md
+    )
+    github_md_url = _github_blob_url(blob_target)
     html_page, markdown = build_report_html(
         results,
         frames,
@@ -351,14 +376,34 @@ def save_report_html(
         universe_top=universe_top,
         chart_rel=chart_rel,
         chart_dir=chart_dir,
-        image_base=image_base,
+        image_base=None,
         chart_trades=chart_trades,
+        github_md_url=github_md_url,
     )
     out.write_text(html_page, encoding="utf-8")
     md_path = out.with_suffix(".md")
     md_path.write_text(markdown, encoding="utf-8")
     if out.stem in {"index", "today"}:
-        today_md = out.parent / "today.md"
         if today_md.resolve() != md_path.resolve():
             shutil.copyfile(md_path, today_md)
+    _mirror_screener_dir(out)
     return out
+
+
+def _mirror_screener_dir(out: Path) -> None:
+    """Copy the report to docs/tw/ so the GitHub URL matches the screener path."""
+    if out.parent.name != "tw-ma-short":
+        return
+    dest = out.parent.parent / "tw"
+    dest.mkdir(parents=True, exist_ok=True)
+    for name in ("index.html", "index.md", "today.md"):
+        src = out.parent / name
+        if src.exists():
+            shutil.copyfile(src, dest / name)
+    src_charts = out.parent / "charts"
+    dest_charts = dest / "charts"
+    if not src_charts.exists():
+        return
+    if dest_charts.exists():
+        shutil.rmtree(dest_charts)
+    shutil.copytree(src_charts, dest_charts)

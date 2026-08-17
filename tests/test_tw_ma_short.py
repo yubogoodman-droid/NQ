@@ -159,5 +159,7 @@ def test_report_uses_screener_template(tmp_path=None):
     assert "trade-detail" not in text
     assert "1分跌破時間" in text
     assert "五分 K（對照）" in text
+    assert "raw.githubusercontent.com" not in text
+    assert 'src="charts/index/' in text
     assert "示範股" in md
     assert "**一分 K**" in md
