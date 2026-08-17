@@ -43,6 +43,15 @@
       color: var(--muted);
     }
     .summary .ok { color: var(--ok); font-weight: 700; font-size: 1.05rem; }
+    .run {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 12px 14px; margin: 0 0 14px; font-size: .85rem; color: var(--muted);
+    }
+    .run b { color: var(--text); }
+    .run pre {
+      margin: 8px 0 0; overflow-x: auto; background: #0b0e11; border-radius: 8px;
+      padding: 10px 12px; color: var(--ok); white-space: pre-wrap; line-height: 1.55;
+    }
     .card {
       background: var(--card); border: 1px solid var(--line); border-radius: 14px;
       padding: 14px 10px 10px; margin: 0 0 14px; color: inherit;
@@ -66,6 +75,11 @@
 <body>
   <div class="page">
     <h1>台股一分K · 站穩 MA200</h1>
+    <div class="run"><b>本機即時守盤</b><pre>cd NQ
+pip install -r requirements.txt
+export SHIOAJI_API_KEY='你的Key'
+export SHIOAJI_SECRET_KEY='你的Secret'
+python3 examples/scan_tw_1m.py --watch</pre></div>
     <p class="lead">成交額前 100、濾掉 ETF、金融股與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA200 差距 0.4%～1.0%，從 200 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）。含該根的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。</p>
     <div class="chips">
       <span class="chip">不含 ETF</span>

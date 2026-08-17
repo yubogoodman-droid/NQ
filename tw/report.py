@@ -37,6 +37,12 @@ BG = "#161b22"
 FG = "#e6edf3"
 GRID = "#30363d"
 
+WATCH_SCRIPT = """cd NQ
+pip install -r requirements.txt
+export SHIOAJI_API_KEY='你的Key'
+export SHIOAJI_SECRET_KEY='你的Secret'
+python3 examples/scan_tw_1m.py --watch"""
+
 _FONT = None
 for _path in (
     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
@@ -188,6 +194,15 @@ def _render(
       color: var(--muted);
     }}
     .summary .ok {{ color: var(--ok); font-weight: 700; font-size: 1.05rem; }}
+    .run {{
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 12px 14px; margin: 0 0 14px; font-size: .85rem; color: var(--muted);
+    }}
+    .run b {{ color: var(--text); }}
+    .run pre {{
+      margin: 8px 0 0; overflow-x: auto; background: #0b0e11; border-radius: 8px;
+      padding: 10px 12px; color: var(--ok); white-space: pre-wrap; line-height: 1.55;
+    }}
     .card {{
       background: var(--card); border: 1px solid var(--line); border-radius: 14px;
       padding: 14px 10px 10px; margin: 0 0 14px; color: inherit;
@@ -211,6 +226,7 @@ def _render(
 <body>
   <div class="page">
     <h1>{heading}</h1>
+    {_watch_script_html(result)}
     <p class="lead">{lead}</p>
     <div class="chips">
       <span class="chip">不含 ETF</span>
@@ -364,6 +380,30 @@ def _parse_github_owner_repo(remote: str) -> tuple[str, str] | None:
     return match.group("owner"), match.group("repo")
 
 
+def _watch_script_md_lines(result: ScanResult) -> list[str]:
+    if result.as_of is not None:
+        return []
+    return [
+        "## 本機即時守盤",
+        "",
+        "有永豐金鑰就走即時一分 K；Key 只放自己電腦，不要 commit。",
+        "",
+        "```bash",
+        WATCH_SCRIPT,
+        "```",
+        "",
+    ]
+
+
+def _watch_script_html(result: ScanResult) -> str:
+    if result.as_of is not None:
+        return ""
+    return (
+        '<div class="run"><b>本機即時守盤</b>'
+        f"<pre>{html.escape(WATCH_SCRIPT)}</pre></div>"
+    )
+
+
 def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
     if result.as_of is not None:
         as_of = result.as_of.isoformat()
@@ -384,6 +424,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
     lines = [
         f"# {title}",
         "",
+        *_watch_script_md_lines(result),
         lead,
         "",
         f"- 命中 **{len(result.hits)}** 檔",
