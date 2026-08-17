@@ -10,7 +10,7 @@ import pandas as pd
 import requests
 
 from tw.kline import fetch_1m_bars_many
-from tw.ranking import RankedStock, fetch_turnover_ranking, filter_by_price
+from tw.ranking import RankedStock, fetch_turnover_ranking, filter_by_price, filter_etfs
 from tw.signals import AlertSnapshot, latest_ma200_breakout_bullish
 
 TAIPEI = ZoneInfo("Asia/Taipei")
@@ -25,6 +25,7 @@ class ScanConfig:
     workers: int = 8
     timeout: int = 20
     latest_only: bool = False
+    exclude_etf: bool = True
 
 
 @dataclass
@@ -43,6 +44,8 @@ class ScanResult:
     hits: list[ScanHit]
     skipped: list[tuple[RankedStock, str]] = field(default_factory=list)
     errors: list[tuple[RankedStock, str]] = field(default_factory=list)
+    price_dropped: int = 0
+    etf_dropped: int = 0
 
 
 def run_scan(
@@ -54,7 +57,13 @@ def run_scan(
     universe, rank_time = fetch_turnover_ranking(
         top=cfg.top, session=sess, timeout=cfg.timeout
     )
-    candidates = filter_by_price(universe, cfg.max_price)
+    priced = filter_by_price(universe, cfg.max_price)
+    price_dropped = len(universe) - len(priced)
+    if cfg.exclude_etf:
+        candidates = filter_etfs(priced)
+    else:
+        candidates = priced
+    etf_dropped = len(priced) - len(candidates)
 
     hits: list[ScanHit] = []
     skipped: list[tuple[RankedStock, str]] = []
@@ -77,6 +86,8 @@ def run_scan(
             hits=[],
             skipped=[],
             errors=errors,
+            price_dropped=price_dropped,
+            etf_dropped=etf_dropped,
         )
 
     for stock in candidates:
@@ -108,6 +119,8 @@ def run_scan(
         hits=hits,
         skipped=skipped,
         errors=errors,
+        price_dropped=price_dropped,
+        etf_dropped=etf_dropped,
     )
 
 

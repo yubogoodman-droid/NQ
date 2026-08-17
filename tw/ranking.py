@@ -95,6 +95,22 @@ def filter_by_price(stocks: list[RankedStock], max_price: float) -> list[RankedS
     return [s for s in stocks if s.price < max_price]
 
 
+def is_etf(stock: RankedStock) -> bool:
+    """台股 ETF / ETN：代號 00、02 開頭、含英文字，或名稱帶 ETF/槓桿反向。"""
+    code = stock.code.upper()
+    if code.startswith(("00", "02")):
+        return True
+    if any(ch.isalpha() for ch in code):
+        return True
+    name = stock.name.upper()
+    markers = ("ETF", "ETN", "正2", "反1", "主動")
+    return any(mark in stock.name or mark in name for mark in markers)
+
+
+def filter_etfs(stocks: list[RankedStock]) -> list[RankedStock]:
+    return [s for s in stocks if not is_etf(s)]
+
+
 def _extract_app_main(html: str) -> dict:
     match = re.search(r"root\.App\.main = (\{.*?\});\s*(?:</script>|\n)", html, re.S)
     if not match:

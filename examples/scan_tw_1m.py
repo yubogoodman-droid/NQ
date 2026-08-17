@@ -23,8 +23,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--interval", type=int, default=60, help="watch 間隔秒數")
     p.add_argument("--latest-only", action="store_true", help="只看最新一根（watch 模式自動開啟）")
     p.add_argument("--closed-only", action="store_true", help="只用已收盤的一分 K（不含當根未收）")
+    p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
     p.add_argument("--workers", type=int, default=8)
-    p.add_argument("-o", "--output", default="output/tw_1m_ma200.html")
+    p.add_argument("-o", "--output", default="docs/tw/index.html")
     p.add_argument("--quiet-empty", action="store_true", help="沒命中時不印詳細清單")
     return p.parse_args()
 
@@ -32,7 +33,8 @@ def parse_args() -> argparse.Namespace:
 def print_result(result, *, quiet_empty: bool) -> None:
     print(
         f"[{result.scanned_at.strftime('%H:%M:%S')}] "
-        f"成交額前 {len(result.universe)}／股價<上限 {len(result.candidates)}／"
+        f"成交額前 {len(result.universe)}／股價濾掉 {result.price_dropped}／"
+        f"ETF濾掉 {result.etf_dropped}／掃描 {len(result.candidates)}／"
         f"命中 {len(result.hits)}／略過 {len(result.skipped)}／錯誤 {len(result.errors)}"
     )
     if result.rank_time:
@@ -62,6 +64,7 @@ def scan_once(args: argparse.Namespace, seen: set) -> int:
             closed_only=args.closed_only,
             workers=args.workers,
             latest_only=args.latest_only or args.watch,
+            exclude_etf=not args.include_etf,
         )
     )
     print_result(result, quiet_empty=args.quiet_empty)

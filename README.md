@@ -27,11 +27,16 @@
 條件：
 
 1. Yahoo 股市**成交金額前 100 名**（上市＋上櫃）
-2. **濾掉股價 650 元以上**（含 650）
+2. **濾掉 ETF**（代號 00/02 開頭或含英文字）與**股價 650 元以上**
 3. 一分 K 的 **MA5 > MA10 > MA20**（多頭排列）
 4. **這根收盤站上 1 分 MA200**，且**前一根還沒站上** → 跳通知
 
 `MA200` 是一分 K 的 200 期均線（約 200 分鐘），不是日線 200 日。開盤相對昨收的跳空不列入（前一根需為同一交易日）。
+
+外網頁面（合併進 main 或 Pages 部署後）：
+
+- https://yubogoodman-droid.github.io/NQ/tw/
+- 免部署預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/index.html
 
 ```bash
 pip install -r requirements.txt
@@ -51,7 +56,7 @@ python examples/scan_tw_1m.py --watch
 - `DISCORD_WEBHOOK_URL`
 - Linux 桌面：有 `notify-send` 會一併跳出
 
-報告寫入 `output/tw_1m_ma200.html`。
+報告寫入 `docs/tw/index.html`（GitHub Pages）。
 
 ## 快速開始
 

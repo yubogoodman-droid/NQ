@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import unittest
 
-from tw.ranking import RankedStock, filter_by_price, parse_yahoo_ranking_html
+from tw.ranking import RankedStock, filter_by_price, filter_etfs, is_etf, parse_yahoo_ranking_html
 
 
 def _html_with_table(rows: list[dict], rank_time: str = "2026-08-17T10:49:08+08:00") -> str:
@@ -83,6 +83,24 @@ class RankingTests(unittest.TestCase):
         ]
         kept = filter_by_price(stocks, 650)
         self.assertEqual([s.symbol for s in kept], ["1111.TW"])
+
+    def test_filter_excludes_etfs(self) -> None:
+        stocks = [
+            RankedStock(1, "0050.TW", "元大台灣50", 106.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(2, "00631L.TW", "元大台灣50正2", 36.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(3, "00981A.TW", "主動統一台股增長", 30.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(4, "00878.TW", "國泰永續高股息", 33.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(5, "2327.TW", "國巨", 611.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(6, "4958.TW", "臻鼎-KY", 504.0, None, None, 1, 1.0, "TAI"),
+        ]
+        self.assertTrue(is_etf(stocks[0]))
+        self.assertTrue(is_etf(stocks[1]))
+        self.assertTrue(is_etf(stocks[2]))
+        self.assertTrue(is_etf(stocks[3]))
+        self.assertFalse(is_etf(stocks[4]))
+        self.assertFalse(is_etf(stocks[5]))
+        kept = filter_etfs(stocks)
+        self.assertEqual([s.symbol for s in kept], ["2327.TW", "4958.TW"])
 
 
 if __name__ == "__main__":
