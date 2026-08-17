@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from tw.ranking import RankedStock
-from tw.report import build_k_chart, save_scan_html, save_week_index
+from tw.report import _axis_ylim, build_k_chart, save_scan_html, save_week_index
 from tw.screener import ScanHit, ScanResult
 from tw.signals import AlertSnapshot
 
@@ -53,6 +53,22 @@ def _hit(*, frame: pd.DataFrame, frame_5m: pd.DataFrame | None = None) -> ScanHi
 
 
 class ReportChartTests(unittest.TestCase):
+    def test_axis_ylim_pads_tight_1m_range(self) -> None:
+        idx = pd.date_range("2026-08-17 11:00", periods=10, freq="1min", tz=TAIPEI)
+        window = pd.DataFrame(
+            {
+                "low": [265.0] * 10,
+                "high": [268.5] * 10,
+                "ma20": [267.15] * 10,
+                "ma200": [267.61] * 10,
+            },
+            index=idx,
+        )
+        lo, hi = _axis_ylim(window, 268.0, min_span_pct=0.03)
+        self.assertGreaterEqual(hi - lo, 268.0 * 0.03)
+        # 0.46 元的 MA20/MA200 差不該佔滿縱軸
+        self.assertLess(0.46 / (hi - lo), 0.12)
+
     def test_k_chart_contains_candlestick(self) -> None:
         html = build_k_chart(_hit(frame=_bars()))
         self.assertIn("data:image/png;base64,", html)

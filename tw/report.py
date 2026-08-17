@@ -486,13 +486,18 @@ def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
             zorder=5,
             label=marker_label,
         )
-        ma200_val = window["ma200"].iloc[loc] if "ma200" in window.columns else hit.snapshot.ma200
-        if pd.notna(ma200_val):
-            ax.axhline(float(ma200_val), color="#ce93d8", linestyle=":", linewidth=1.0, alpha=0.85, zorder=1)
 
+    # 一分K 波動很小，自動縮放會把 0.2% 的 MA20/MA200 差畫成「整張圖的距離」。
+    # 至少留 3% 的縱軸，讓 1.5% 門檻在圖上看起來才合理。
+    ref = float(hit.snapshot.close) if hit.snapshot.close else float(window["close"].iloc[-1])
+    ax.set_ylim(*_axis_ylim(window, ref, min_span_pct=0.03))
     ax.set_xlim(-1, n)
     bar_time = pd.Timestamp(window.index[loc]).strftime("%H:%M") if 0 <= loc < n else hit.snapshot.timestamp.strftime("%H:%M")
-    title = f"{hit.stock.name} {hit.stock.symbol}  {tf_name}  {bar_time}"
+    gap = hit.snapshot.ma20_ma200_gap_pct
+    if timeframe == "1m":
+        title = f"{hit.stock.name} {hit.stock.symbol}  {tf_name}  {bar_time}  MA20/MA200 差 {gap:.1%}"
+    else:
+        title = f"{hit.stock.name} {hit.stock.symbol}  {tf_name}  {bar_time}"
     ax.set_title(title, color=FG, fontsize=11, pad=8, fontproperties=_FONT)
     ax.tick_params(colors="#9aa4b2", labelsize=8)
     ax.spines["top"].set_visible(False)
@@ -522,6 +527,36 @@ def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
     fig.savefig(buf, format="png", facecolor=fig.get_facecolor(), bbox_inches="tight", pad_inches=0.12)
     plt.close(fig)
     return buf.getvalue()
+
+
+def _axis_ylim(
+    window: pd.DataFrame,
+    ref_price: float,
+    min_span_pct: float = 0.03,
+) -> tuple[float, float]:
+    """縱軸至少覆蓋 min_span_pct，避免一分K把均線差放大成整張圖。"""
+    lows: list[float] = [float(window["low"].min())]
+    highs: list[float] = [float(window["high"].max())]
+    for col in ("ma5", "ma10", "ma20", "ma200"):
+        if col not in window.columns:
+            continue
+        series = window[col].astype(float)
+        if series.notna().any():
+            lows.append(float(series.min()))
+            highs.append(float(series.max()))
+    lo, hi = min(lows), max(highs)
+    if not (lo < hi):
+        pad = abs(ref_price) * 0.01 or 1.0
+        return lo - pad, hi + pad
+    span = hi - lo
+    min_span = abs(ref_price) * min_span_pct if ref_price else 0.0
+    if span < min_span:
+        mid = (lo + hi) / 2.0
+        lo = mid - min_span / 2.0
+        hi = mid + min_span / 2.0
+        span = min_span
+    pad = span * 0.04
+    return lo - pad, hi + pad
 
 
 def _window_around(df: pd.DataFrame, ts: pd.Timestamp, before: int = 90, after: int = 20) -> pd.DataFrame:
