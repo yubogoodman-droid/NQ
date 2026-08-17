@@ -82,7 +82,10 @@ class ReportChartTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = save_scan_html(result, Path(tmp) / "index.html")
             text = path.read_text(encoding="utf-8")
-        self.assertEqual(text.count("data:image/png;base64,"), 2)
+            self.assertTrue((path.parent / "charts" / "index" / "1303.TW-1m.png").exists())
+            self.assertTrue((path.parent / "charts" / "index" / "1303.TW-5m.png").exists())
+        self.assertEqual(text.count('src="charts/'), 2)
+        self.assertNotIn("data:image/png;base64,", text)
         self.assertIn("南亞", text)
         self.assertIn("一分 K", text)
         self.assertIn("五分 K（對照）", text)

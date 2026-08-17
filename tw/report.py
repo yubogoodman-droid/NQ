@@ -1,10 +1,10 @@
-"""掃描結果 HTML 報告（K 棒圖以 PNG 內嵌，免靠 JavaScript）。"""
+"""掃描結果 HTML 報告（K 棒圖存成 PNG 檔，避免單頁太大打不開）。"""
 
 from __future__ import annotations
 
-import base64
 import html
 import io
+import shutil
 from pathlib import Path
 
 import matplotlib
@@ -43,14 +43,27 @@ for _path in (
 def save_scan_html(result: ScanResult, path: str | Path) -> Path:
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(_render(result), encoding="utf-8")
+    chart_rel = Path("charts") / out.stem
+    chart_dir = out.parent / chart_rel
+    if chart_dir.exists():
+        shutil.rmtree(chart_dir)
+    chart_dir.mkdir(parents=True, exist_ok=True)
+    out.write_text(_render(result, chart_rel=chart_rel, chart_dir=chart_dir), encoding="utf-8")
     return out
 
 
-def _render(result: ScanResult) -> str:
+def _render(
+    result: ScanResult,
+    *,
+    chart_rel: Path | None = None,
+    chart_dir: Path | None = None,
+) -> str:
     scanned = result.scanned_at.strftime("%Y-%m-%d %H:%M:%S")
     rank_time = html.escape(result.rank_time or "—")
-    hit_rows = "\n".join(_hit_card(i, h) for i, h in enumerate(result.hits, 1)) or (
+    hit_rows = "\n".join(
+        _hit_card(i, h, chart_rel=chart_rel, chart_dir=chart_dir)
+        for i, h in enumerate(result.hits, 1)
+    ) or (
         '<p class="empty">目前沒有符合條件的個股。</p>'
     )
     if result.as_of is not None:
@@ -165,7 +178,13 @@ def _render(result: ScanResult) -> str:
 """
 
 
-def _hit_card(index: int, hit: ScanHit) -> str:
+def _hit_card(
+    index: int,
+    hit: ScanHit,
+    *,
+    chart_rel: Path | None = None,
+    chart_dir: Path | None = None,
+) -> str:
     s = hit.stock
     snap = hit.snapshot
     chg = ""
@@ -173,8 +192,8 @@ def _hit_card(index: int, hit: ScanHit) -> str:
         chg = f" {s.change_percent:+.2f}%"
     ts = snap.timestamp.strftime("%H:%M")
     url = f"https://tw.stock.yahoo.com/quote/{html.escape(s.symbol)}"
-    chart_1m = build_k_chart(hit, timeframe="1m")
-    chart_5m = build_k_chart(hit, timeframe="5m")
+    chart_1m = build_k_chart(hit, timeframe="1m", chart_rel=chart_rel, chart_dir=chart_dir)
+    chart_5m = build_k_chart(hit, timeframe="5m", chart_rel=chart_rel, chart_dir=chart_dir)
     return f"""
     <article class="card">
       <div class="top">
@@ -202,15 +221,32 @@ def _five_min_ma200_text(hit: ScanHit) -> str:
     return f"{close:.2f} > {ma200:.2f}"
 
 
-def build_k_chart(hit: ScanHit, timeframe: str = "1m") -> str:
-    """K 棒圖 + MA5/10/20/200，輸出成 PNG。timeframe: 1m 或 5m。"""
+def build_k_chart(
+    hit: ScanHit,
+    timeframe: str = "1m",
+    *,
+    chart_rel: Path | None = None,
+    chart_dir: Path | None = None,
+) -> str:
+    """K 棒圖 + MA5/10/20/200。有 chart_dir 就存成檔，否則退回 data URI（測試用）。"""
     png = render_k_chart_png(hit, timeframe=timeframe)
     if not png:
         label = "五分" if timeframe == "5m" else "一分"
         return f'<p class="empty">無{label} K 線資料</p>'
-    b64 = base64.b64encode(png).decode("ascii")
     alt = html.escape(f"{hit.stock.name} {hit.stock.symbol} {'五分K' if timeframe == '5m' else '一分K'}")
+    if chart_dir is not None and chart_rel is not None:
+        fname = f"{_safe_symbol(hit.stock.symbol)}-{timeframe}.png"
+        (chart_dir / fname).write_bytes(png)
+        src = html.escape(f"{chart_rel.as_posix()}/{fname}")
+        return f'<img alt="{alt}" src="{src}"/>'
+    import base64
+
+    b64 = base64.b64encode(png).decode("ascii")
     return f'<img alt="{alt}" src="data:image/png;base64,{b64}"/>'
+
+
+def _safe_symbol(symbol: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in ".-_" else "_" for ch in symbol)
 
 
 def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:

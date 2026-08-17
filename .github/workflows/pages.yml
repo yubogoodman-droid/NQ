@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - cursor/tw-1m-ma-alert-120c
     paths:
       - "docs/**"
       - ".github/workflows/pages.yml"
