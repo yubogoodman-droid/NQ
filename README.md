@@ -22,6 +22,36 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## 台股一分 K 掃描（多頭排列 × 剛站上 MA200）
+
+條件：
+
+1. Yahoo 股市**成交金額前 100 名**（上市＋上櫃）
+2. **濾掉股價 650 元以上**（含 650）
+3. 一分 K 的 **MA5 > MA10 > MA20**（多頭排列）
+4. **這根收盤站上 1 分 MA200**，且**前一根還沒站上** → 跳通知
+
+`MA200` 是一分 K 的 200 期均線（約 200 分鐘），不是日線 200 日。
+
+```bash
+pip install -r requirements.txt
+python examples/scan_tw_1m.py
+```
+
+盤中每分鐘重掃（同一根 K 不重複通知）：
+
+```bash
+python examples/scan_tw_1m.py --watch
+```
+
+通知通道（擇一或同時設環境變數）：
+
+- `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`
+- `DISCORD_WEBHOOK_URL`
+- Linux 桌面：有 `notify-send` 會一併跳出
+
+報告寫入 `output/tw_1m_ma200.html`。
+
 ## 快速開始
 
 ```bash
