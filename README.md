@@ -22,6 +22,23 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## 幣安黏帶三幕 Telegram
+
+1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
+約 15–25 分鐘後若走出「長均更黏、短均被帶走」（NBIS 那種），會再推一則**強訊號**（帶圖）。
+
+在 `examples/watch_binance_ribbon.py` 最上面填：
+
+```
+TELEGRAM_BOT_TOKEN = "..."
+TELEGRAM_CHAT_ID = "..."
+```
+
+```bash
+python3 examples/watch_binance_ribbon.py --test   # 先測通不通
+python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
+```
+
 ## 快速開始
 
 ```bash
