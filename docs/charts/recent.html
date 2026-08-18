@@ -1,0 +1,57 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>近兩日訊號 · 影線頸線</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg0:#0b100e;--bg1:#131c18;--ink:#e8f0ea;--muted:#8aa193;--line:rgba(232,240,234,.12);--accent:#c9a227;--long:#3dba7a;--short:#e35d5d;--card:rgba(20,32,27,.72)}
+*{box-sizing:border-box}
+body{margin:0;font-family:"IBM Plex Sans",sans-serif;color:var(--ink);
+  background:radial-gradient(900px 500px at 8% -12%,rgba(201,162,39,.16),transparent 55%),linear-gradient(165deg,var(--bg0),var(--bg1));min-height:100vh}
+.wrap{max-width:1080px;margin:0 auto;padding:40px 20px 72px}
+nav{display:flex;flex-wrap:wrap;gap:10px 16px;margin-bottom:22px;font-size:.9rem}
+nav a{color:var(--accent);text-decoration:none}
+nav a.dim{color:var(--muted)}
+h1{font-family:"IBM Plex Serif",serif;font-size:clamp(1.9rem,3.6vw,2.6rem);margin:0 0 8px;letter-spacing:-.02em}
+.sub{color:var(--muted);line-height:1.6;margin:0 0 24px;max-width:46rem}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:0 0 22px}
+.kpi{border:1px solid var(--line);background:var(--card);padding:14px 16px}
+.kpi .lab{font-size:.72rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.kpi .val{font-family:"JetBrains Mono",monospace;font-size:1.25rem;margin-top:6px}
+.pos{color:var(--long)}.neg{color:var(--short)}.na{color:var(--muted)}
+.grid{display:grid;gap:12px}
+@media(min-width:720px){.grid.cards{grid-template-columns:1fr 1fr}}
+a.card{display:block;text-decoration:none;color:inherit;border:1px solid var(--line);padding:18px 20px;background:var(--card);transition:border-color .15s,transform .15s}
+a.card:hover{border-color:rgba(201,162,39,.55);transform:translateY(-2px)}
+a.card.hi{border-color:rgba(201,162,39,.4)}
+.tag{display:inline-block;margin-bottom:8px;font-family:"JetBrains Mono",monospace;font-size:.68rem;color:var(--accent);border:1px solid rgba(201,162,39,.35);padding:2px 7px}
+.name{font-family:"IBM Plex Serif",serif;font-size:1.25rem;margin-bottom:6px}
+.desc{color:var(--muted);font-size:.92rem;line-height:1.45}
+.meta{margin-top:10px;font-family:"JetBrains Mono",monospace;font-size:.76rem;color:var(--accent)}
+.table-wrap{overflow:auto;border:1px solid var(--line);background:rgba(0,0,0,.16)}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+th{font-family:"JetBrains Mono",monospace;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+tr:hover td{background:rgba(255,255,255,.03)}
+.mono{font-family:"JetBrains Mono",monospace}
+a.sym{color:var(--ink);text-decoration:none;border-bottom:1px dashed rgba(201,162,39,.35)}
+a.sym:hover{color:var(--accent)}
+</style></head><body><div class="wrap">
+<nav><a href="./index.html">← 總覽</a><a class="dim" href="./ten_day/index.html">10日圖</a><a class="dim" href="./thirty_day/index.html">30日圖</a></nav>
+<h1>近兩日訊號</h1>
+<p class="sub">2026-08-14 → 08-16 UTC · 實盤：滾動 24h Top10 + 結構（收盤確認、跨度≥9、乖離≤65%、距SMA200≤40%、不破 MA99）。<b style="color:var(--ink)">不看爆量</b>。正值 = 空單獲利。</p>
+<div class="kpis">
+<div class="kpi"><div class="lab">筆數</div><div class="val ">5</div></div>
+<div class="kpi"><div class="lab">1h 勝率</div><div class="val pos">60.0%</div></div>
+<div class="kpi"><div class="lab">1h 均</div><div class="val "><span class="pos">+7.02%</span></div></div>
+<div class="kpi"><div class="lab">4h 勝率</div><div class="val pos">60.0%</div></div>
+<div class="kpi"><div class="lab">4h 均</div><div class="val "><span class="pos">+8.41%</span></div></div>
+<div class="kpi"><div class="lab">8h 勝率</div><div class="val pos">60.0%</div></div>
+<div class="kpi"><div class="lab">8h 均</div><div class="val "><span class="pos">+16.33%</span></div></div>
+</div>
+<div class="table-wrap"><table>
+<thead><tr><th>時間 UTC</th><th>幣</th><th>價</th><th>乖離</th><th>1h</th><th>4h</th><th>8h</th></tr></thead>
+<tbody>
+<tr><td class='mono'>08-15 15:10</td><td><a class='sym' href='./thirty_day/HUSDT_20260815_1510.html'>H/USDT</a></td><td class='mono'>0.13979</td><td class='mono'>19.8%</td><td><span class="pos">+2.56%</span></td><td><span class="neg">-5.95%</span></td><td><span class="neg">-7.16%</span></td></tr><tr><td class='mono'>08-15 11:05</td><td><a class='sym' href='./thirty_day/AIOTUSDT_20260815_1105.html'>AIOT/USDT</a></td><td class='mono'>0.04621</td><td class='mono'>8.9%</td><td><span class="neg">-0.13%</span></td><td><span class="pos">+1.34%</span></td><td><span class="pos">+1.77%</span></td></tr><tr><td class='mono'>08-15 10:20</td><td><a class='sym' href='./thirty_day/AKEUSDT_20260815_1020.html'>AKE/USDT</a></td><td class='mono'>0.010209</td><td class='mono'>10.9%</td><td><span class="neg">-4.08%</span></td><td><span class="neg">-3.77%</span></td><td><span class="neg">-2.84%</span></td></tr><tr><td class='mono'>08-15 05:45</td><td><a class='sym' href='./thirty_day/ROBOUSDT_20260815_0545.html'>ROBO/USDT</a></td><td class='mono'>0.0198</td><td class='mono'>31.4%</td><td><span class="pos">+7.19%</span></td><td><span class="pos">+10.43%</span></td><td><span class="pos">+30.72%</span></td></tr><tr><td class='mono'>08-14 23:25</td><td><a class='sym' href='./ten_day/ACEUSDT_20260814_2325.html'>ACE/USDT</a></td><td class='mono'>0.32959</td><td class='mono'>52.0%</td><td><span class="pos">+29.58%</span></td><td><span class="pos">+39.98%</span></td><td><span class="pos">+59.17%</span></td></tr>
+</tbody></table></div>
+<p class="sub" style="margin-top:18px">已濾掉垂直噴中段（如 ACE 13:55）與下影假刺。ACE 23:25 仍保留。</p>
+</div></body></html>
