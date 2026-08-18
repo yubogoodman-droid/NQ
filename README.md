@@ -59,9 +59,57 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
+3. **上週五假跌破 1 分 K（底下附 5 分 K）**  
+   https://yubogoodman-droid.github.io/NQ/spring/?v=overnight
+
+## 假跌破後上拉（1 分 K）
+
+對應「先盤整、假跌破支撐、迅速站回、再放量上拉」的短線結構（金居 8358 那種）。
+
+```
+        放量上拉 ────────●
+                       /
+        箱體高 ──────●──
+                   /
+    支撐 ────────●──  站回
+              \ /
+               ● 假跌破（量不大）
+```
+
+| 條件 | 說明 |
+|------|------|
+| 盤整 | 約 18 根 K 箱體振幅 ≤ 2%，MA5/10/20 糾結 |
+| 假跌破 | 跌破箱低 0.5%～3%，持續不久，量能不宜爆量恐慌 |
+| 站回 | 很快收盤站回原支撐 |
+| 進場 | 站回後 24 根內收盤突破箱高，且量能 ≥ 20MA 的 1.4 倍 |
+| 停損 | 假跌破最低點 |
+| 停利 | 預設 2R |
+
+```bash
+python examples/run_fake_breakdown.py --demo
+python examples/run_fake_breakdown.py --demo --chart output/spring_demo.html
+python3 -m unittest tests.test_fake_breakdown -v
+```
+
+台股 CSV 需含 `datetime,open,high,low,close,volume`。
+
+掃描上週五成交額前 50 / 100 檔（1 分 K 訊號，圖底下附 5 分 K）：
+
+```bash
+python examples/scan_tw_top50_spring.py --date 20260814 --limit 50
+python examples/scan_tw_top50_spring.py --date 20260814 --limit 100 --max-price 700
+python examples/chart_spring_top50.py                                  # 1 分 K 報告，每張底下有 5 分 K
+```
+
+報告：`docs/spring_top50_20260814.html`
+
+外網直接開（手機可）：  
+https://yubogoodman-droid.github.io/NQ/spring/?v=overnight
+
 ## TradingView
 
-`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
+- W 底：`pinescript/nq_w_bottom_5m.pine`，NQ1! / MNQ1! 五分圖
+- 假跌破：`pinescript/fake_breakdown_spring.pine`，1 分圖（台股或 NQ 皆可）
 
 ## 參數調整
 
@@ -73,6 +121,8 @@ python3 examples/chart_today.py
 | `low_tolerance_pct` | 0.001 | 兩低點價差容忍（0.1%） |
 | `min_bars_between_lows` | 5 | 兩低點最少間隔 |
 | `max_bars_between_lows` | 60 | 兩低點最多間隔（約 5 小時） |
+
+`FakeBreakdownStrategy` 預設對 1 分 K：箱體 18 根、跌破 0.5%～3%、站回後最多等 24 根才突破（對應金居 8/14 約 18 根）、突破量能 1.4 倍、停利 2R；**允許跨夜箱體**，並略過開盤後 5 分鐘（濾掉跳空雜訊）。
 
 ## 風險提示
 
