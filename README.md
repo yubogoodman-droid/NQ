@@ -22,6 +22,52 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## 台股一分 K 掃描（多頭排列 × 站穩 MA200 兩根）
+
+條件：
+
+1. Yahoo 股市**成交金額前 100 名**（上市＋上櫃）
+2. **濾掉 ETF**（代號 00/02 開頭或含英文字）、**金融股**（金控／銀行／保險／證券）與**股價 650 元以上**
+3. 一分 K 的 **MA5 > MA10 > MA20**（多頭排列），MA5−MA20 ≥ 0.4%，MA20 與 MA200 差距 **0.4%～1.0%**
+4. **從 MA200 下面穿上**，金叉前至少三根收在 200 下；**連續兩根收盤站穩**才通知，站穩時間 **09:10 以後**
+5. 含該根的五分 K 收盤也必須高於五分 MA200
+
+`MA200` 是一分 K 的 200 期均線（約 200 分鐘），不是日線 200 日。隔夜跳空與開盤 09:00–09:09 不算站穩。
+
+外網頁面（合併進 main 或 Pages 部署後）：
+
+- https://yubogoodman-droid.github.io/NQ/tw/
+- 免部署預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/index.html
+
+```bash
+pip install -r requirements.txt
+python examples/scan_tw_1m.py
+```
+
+預設會列出**今天盤中曾出現**的訊號；`--watch` 只對最新一根跳通知。有永豐 API 金鑰時自動改抓即時一分 K。
+
+```bash
+python examples/scan_tw_1m.py --latest-only   # 只看當下這一根
+python examples/scan_tw_1m.py --watch         # 盤中守著，符合就通知
+```
+
+預設走永豐。**只要一個檔**：把 `scan_tw.py` 存進 PyCharm（檔名不要叫 `tw.py`），最上面四個引號填永豐 Key / Secret 和 Telegram 序號，然後：
+
+```bash
+pip install pandas numpy yfinance requests shioaji
+python scan_tw.py --watch
+```
+
+第一次掃描會按日抓近幾天 1K 當種子（永豐一分 K 單次約 270 根），之後用成交明細補當根。強制 Yahoo：`--source yahoo`。
+
+通知通道（擇一或同時設環境變數）：
+
+- `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`
+- `DISCORD_WEBHOOK_URL`
+- Linux 桌面：有 `notify-send` 會一併跳出
+
+報告寫入 `docs/tw/index.html`（GitHub Pages）。
+
 ## 快速開始
 
 ```bash
