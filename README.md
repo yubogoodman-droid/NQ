@@ -51,10 +51,11 @@ python examples/scan_tw_1m.py --latest-only   # 只看當下這一根
 python examples/scan_tw_1m.py --watch         # 盤中守著，符合就通知
 ```
 
-預設走永豐。在 `examples/scan_tw_1m.py` **最上面四個引號**填永豐 Key / Secret 和 Telegram 序號，然後：
+預設走永豐。**只要一個檔**：把 `scan_tw.py` 存進 PyCharm（檔名不要叫 `tw.py`），最上面四個引號填永豐 Key / Secret 和 Telegram 序號，然後：
 
 ```bash
-python examples/scan_tw_1m.py --watch
+pip install pandas numpy yfinance requests shioaji
+python scan_tw.py --watch
 ```
 
 第一次掃描會按日抓近幾天 1K 當種子（永豐一分 K 單次約 270 根），之後用成交明細補當根。強制 Yahoo：`--source yahoo`。
