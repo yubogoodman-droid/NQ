@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>完整三幕 · 近五天</title>
+<style>
+body{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 14px 56px}
+h1{font-size:22px;margin:0 0 8px}
+h2{font-size:16px;margin:0 0 10px}
+.sub{color:#8aa193;line-height:1.65;margin:0 0 16px}
+.card{background:#14201b;border:1px solid rgba(232,240,234,.12);border-radius:12px;padding:14px;margin-bottom:16px}
+img{width:100%;height:auto;display:block;border-radius:8px;background:#101814}
+.note{color:#8aa193;font-size:13px;margin:8px 0 0;line-height:1.5}
+.pos{color:#3dba7a}.neg{color:#e35d5d}.mark{color:#c9a227}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid rgba(232,240,234,.1)}
+th{color:#8aa193;font-weight:500}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 4px}
+.kpi{border:1px solid rgba(232,240,234,.12);border-radius:10px;padding:10px}
+.kpi .k{color:#8aa193;font-size:12px} .kpi .v{font-size:18px;margin-top:4px}
+@media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr)}}
+</style></head>
+<body>
+<div class="wrap">
+  <h1>近五天完整三幕：3 筆</h1>
+  <p class="sub">區間 2026-08-14 ~ 2026-08-18 22:16 GMT+8，掃描 229 個流動 U 本位永續。條件與今天 NBIS / UB 同一套：圓 U 吻上黏帶，隔幾根放量離開，半小時後長均更黏、價已帶走短均。</p>
+  <div class="kpis">
+    <div class="kpi"><div class="k">完成樣貌</div><div class="v">3</div></div>
+    <div class="kpi"><div class="k">離開後 60m 勝率</div><div class="v">100%</div></div>
+    <div class="kpi"><div class="k">離開後 60m 均</div><div class="v">+2.53%</div></div>
+    <div class="kpi"><div class="k">只在離開當下進</div><div class="v">36 筆</div></div>
+  </div>
+  <p class="note">完成樣貌用了吻後 29 分鐘的確認，所以這 3 筆勝率不能直接當成即時進場優勢。若吻完、離開當下就進、不等確認：36 筆，60m 勝率 42%，均 -0.04%。</p>
+  <div class="card">
+    <h2>GPS 08-15 05:45吻 → 05:55離開 · 離開後60m <span class="pos">+1.14%</span></h2>
+    <img src="./img/GPS_08150545.png" alt="GPS 08-15"/>
+    <p class="note">長均黏度 0.130% · 回彈 0.72% · 離開後15/30/60/120m：+1.01% / +0.80% / +1.14% / +0.63%</p>
+  </div>
+  <div class="card">
+    <h2>UB 08-18 18:04吻 → 18:16離開 · 離開後60m <span class="pos">+3.12%</span></h2>
+    <img src="./img/UB_08181804.png" alt="UB 08-18"/>
+    <p class="note">長均黏度 0.120% · 回彈 0.82% · 離開後15/30/60/120m：+1.15% / +1.98% / +3.12% / +7.44%</p>
+  </div>
+  <div class="card">
+    <h2>NBIS 08-18 18:47吻 → 18:56離開 · 離開後60m <span class="pos">+3.33%</span></h2>
+    <img src="./img/NBIS_08181847.png" alt="NBIS 08-18"/>
+    <p class="note">長均黏度 0.121% · 回彈 1.03% · 離開後15/30/60/120m：+1.77% / +1.70% / +3.33% / +1.48%</p>
+  </div>
+
+  <div class="card">
+    <h2>離開當下就進的 36 筆（含上面 3 筆）</h2>
+    <table>
+      <thead><tr><th>日期</th><th>幣</th><th>吻</th><th>離開</th><th>黏度</th><th>離開後60m</th><th>完成樣貌</th></tr></thead>
+      <tbody>
+        <tr><td>08-14</td><td>HEMI</td><td>02:49</td><td>03:03</td><td>0.115%</td><td class='neg'>-2.99%</td><td class='mark'></td></tr><tr><td>08-14</td><td>TAO</td><td>09:39</td><td>09:47</td><td>0.107%</td><td class='neg'>-0.04%</td><td class='mark'></td></tr><tr><td>08-14</td><td>RIVER</td><td>09:46</td><td>09:51</td><td>0.172%</td><td class='neg'>-0.38%</td><td class='mark'></td></tr><tr><td>08-14</td><td>SKYAI</td><td>11:02</td><td>11:15</td><td>0.150%</td><td class='neg'>-1.07%</td><td class='mark'></td></tr><tr><td>08-14</td><td>FARTCOIN</td><td>13:29</td><td>13:38</td><td>0.161%</td><td class='neg'>-1.41%</td><td class='mark'></td></tr><tr><td>08-14</td><td>INTW</td><td>13:44</td><td>13:55</td><td>0.173%</td><td class='neg'>-0.31%</td><td class='mark'></td></tr><tr><td>08-14</td><td>XAG</td><td>13:49</td><td>13:53</td><td>0.088%</td><td class='pos'>+0.14%</td><td class='mark'></td></tr><tr><td>08-14</td><td>BOME</td><td>14:41</td><td>14:55</td><td>0.042%</td><td class='neg'>-0.12%</td><td class='mark'></td></tr><tr><td>08-14</td><td>ONG</td><td>16:15</td><td>16:29</td><td>0.095%</td><td class='pos'>+0.96%</td><td class='mark'></td></tr><tr><td>08-14</td><td>SLX</td><td>23:06</td><td>23:11</td><td>0.177%</td><td class='neg'>-0.80%</td><td class='mark'></td></tr><tr><td>08-14</td><td>AAVE</td><td>23:29</td><td>23:38</td><td>0.090%</td><td class='pos'>+0.72%</td><td class='mark'></td></tr><tr><td>08-15</td><td>ARX</td><td>01:40</td><td>01:47</td><td>0.143%</td><td class='pos'>+0.09%</td><td class='mark'></td></tr><tr><td>08-15</td><td>WLD</td><td>03:37</td><td>03:47</td><td>0.092%</td><td class='neg'>-0.78%</td><td class='mark'></td></tr><tr><td>08-15</td><td>TLM</td><td>05:02</td><td>05:13</td><td>0.005%</td><td class='pos'>+1.16%</td><td class='mark'></td></tr><tr><td>08-15</td><td>LAB</td><td>05:19</td><td>05:28</td><td>0.090%</td><td class='neg'>-2.41%</td><td class='mark'></td></tr><tr><td>08-15</td><td>GPS</td><td>05:45</td><td>05:55</td><td>0.130%</td><td class='pos'>+1.14%</td><td class='mark'>是</td></tr><tr><td>08-15</td><td>MMT</td><td>13:53</td><td>14:02</td><td>0.158%</td><td class='pos'>+0.34%</td><td class='mark'></td></tr><tr><td>08-16</td><td>MUBARAK</td><td>01:09</td><td>01:14</td><td>0.122%</td><td class='neg'>-0.98%</td><td class='mark'></td></tr><tr><td>08-16</td><td>GRVT</td><td>08:10</td><td>08:19</td><td>0.176%</td><td class='neg'>-0.71%</td><td class='mark'></td></tr><tr><td>08-16</td><td>GIGGLE</td><td>09:13</td><td>09:25</td><td>0.154%</td><td class='neg'>-1.04%</td><td class='mark'></td></tr><tr><td>08-16</td><td>UB</td><td>15:47</td><td>15:58</td><td>0.117%</td><td class='neg'>-0.96%</td><td class='mark'></td></tr><tr><td>08-16</td><td>TLM</td><td>18:14</td><td>18:18</td><td>0.075%</td><td class='neg'>-0.19%</td><td class='mark'></td></tr><tr><td>08-17</td><td>INJ</td><td>01:28</td><td>01:39</td><td>0.049%</td><td class='neg'>-0.53%</td><td class='mark'></td></tr><tr><td>08-17</td><td>LA</td><td>08:04</td><td>08:14</td><td>0.044%</td><td class='pos'>+0.67%</td><td class='mark'></td></tr><tr><td>08-17</td><td>DEXE</td><td>15:31</td><td>15:42</td><td>0.165%</td><td class='pos'>+0.32%</td><td class='mark'></td></tr><tr><td>08-17</td><td>RIF</td><td>17:14</td><td>17:18</td><td>0.161%</td><td class='neg'>-0.14%</td><td class='mark'></td></tr><tr><td>08-18</td><td>1000PEPE</td><td>04:40</td><td>04:45</td><td>0.174%</td><td class='pos'>+0.43%</td><td class='mark'></td></tr><tr><td>08-18</td><td>1000RATS</td><td>08:12</td><td>08:27</td><td>0.160%</td><td class='neg'>-0.96%</td><td class='mark'></td></tr><tr><td>08-18</td><td>PEOPLE</td><td>10:20</td><td>10:27</td><td>0.069%</td><td class='pos'>+1.08%</td><td class='mark'></td></tr><tr><td>08-18</td><td>SLX</td><td>13:52</td><td>13:58</td><td>0.062%</td><td class='pos'>+1.08%</td><td class='mark'></td></tr><tr><td>08-18</td><td>APT</td><td>14:10</td><td>14:23</td><td>0.066%</td><td class='pos'>+0.00%</td><td class='mark'></td></tr><tr><td>08-18</td><td>ZBT</td><td>15:21</td><td>15:30</td><td>0.040%</td><td class='neg'>-0.28%</td><td class='mark'></td></tr><tr><td>08-18</td><td>PEOPLE</td><td>15:41</td><td>15:45</td><td>0.124%</td><td class='pos'>+1.14%</td><td class='mark'></td></tr><tr><td>08-18</td><td>UB</td><td>18:04</td><td>18:16</td><td>0.120%</td><td class='pos'>+3.12%</td><td class='mark'>是</td></tr><tr><td>08-18</td><td>XPL</td><td>18:34</td><td>18:41</td><td>0.047%</td><td class='neg'>-1.01%</td><td class='mark'></td></tr><tr><td>08-18</td><td>NBIS</td><td>18:47</td><td>18:56</td><td>0.121%</td><td class='pos'>+3.33%</td><td class='mark'>是</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</body></html>
