@@ -33,7 +33,28 @@ def _apply_secrets() -> None:
 
 _apply_secrets()
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+def _repo_root() -> Path:
+    here = Path(__file__).resolve()
+    if here.stem == "tw":
+        raise SystemExit(
+            "這個檔不能叫 tw.py。\n"
+            "請用整個專案來跑，不要只貼這一個檔：\n"
+            "  git clone https://github.com/yubogoodman-droid/NQ.git\n"
+            "PyCharm 打開 NQ 資料夾，執行 examples/scan_tw_1m.py"
+        )
+    for folder in (here.parent, here.parent.parent):
+        if (folder / "tw" / "kline.py").is_file():
+            return folder
+    raise SystemExit(
+        "找不到 tw 套件（tw/kline.py）。\n"
+        "掃描不是單檔，需要整個專案。請 clone：\n"
+        "  git clone https://github.com/yubogoodman-droid/NQ.git\n"
+        "然後在 NQ 資料夾裡跑 examples/scan_tw_1m.py"
+    )
+
+
+sys.path.insert(0, str(_repo_root()))
 
 from tw.kline import set_kline_source, using_shioaji
 from tw.notify import format_hit_message, send_notifications
