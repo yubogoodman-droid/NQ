@@ -22,11 +22,36 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## 台股：一分 K 5/10/20 空頭排列、跌破 MA200 做空
+
+標的為上市+上櫃普通股，**排除 ETF**，並只用**上一週成交額前 100**、**收盤價 ≤ 600** 的股票。訊號打在**一分 K**。
+
+| 條件 | 說明 |
+|------|------|
+| 週期 | 一分 K（Yahoo 約近 7 個交易日） |
+| 空頭排列 | MA5 < MA10 < MA20 |
+| 進場 | 當根收盤跌破 MA200 做空；13:00 後不再進場 |
+| 出場 | 停利 1.2% / 停損 0.8% / 收盤站回 MA200 / 持有滿 30 分 / 當日收盤回補 |
+| 費用 | 當沖：手續費 0.1425%×2 + 證交稅 0.15% |
+
+```bash
+python examples/run_tw_ma_short.py --pages
+```
+
+請用 GitHub 打開（跟掃描頁同一種，圖會顯示）：  
+https://github.com/yubogoodman-droid/NQ/blob/cursor/tw-ma200-short-91bb/docs/tw/today.md
+
+報告檔：`docs/tw/today.md`（與掃描頁 `docs/tw/today.md` 同一路徑）  
+Pages：`https://yubogoodman-droid.github.io/NQ/tw-ma-short/`
+
+K 線圖跟掃描頁同一套：漲紅跌綠 PNG、一分 K 只切跌破附近，縱軸對準 MA20/MA200，並附五分 K 對照。
+
 ## 快速開始
 
 ```bash
 pip install -r requirements.txt
 python examples/run_backtest.py --demo
+python examples/run_tw_ma_short.py --demo
 ```
 
 ### 使用自己的五分 K 資料
