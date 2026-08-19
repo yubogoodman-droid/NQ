@@ -148,14 +148,14 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
         if n == 200:
             continue
         ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.15, label=f"MA{n}")
-    ax.plot(xs, d["m200d"][sl], color="#ffffff", lw=1.35, label="200日")
+    ax.plot(xs, d["m200d"][sl], color="#ffffff", lw=1.35, label="200d")
     x = i - a0
     ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
     ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
     r4 = row.moves.get(16)
     rtxt = f"  4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
     title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
-    kind = "剛站上200日" if row.crossed_200d else "多頭排列"
+    kind = "reclaim 200d" if row.crossed_200d else "7>14>25"
     ax.set_title(f"{title_sym}  15m  {hm(row.time_ms)}  {kind}{rtxt}", color="#e8f0ea", fontsize=12)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
     fig.tight_layout(pad=0.5)
@@ -166,40 +166,49 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
 
 
 def pick_gallery(rows: list[SignalRow], limit: int = 18) -> list[SignalRow]:
-    if not rows:
+    pool = [r for r in rows if r.crossed_200d] or list(rows)
+    if not pool:
         return []
-    crossed = [r for r in rows if r.crossed_200d]
-    rest = [r for r in rows if not r.crossed_200d]
-    ranked = sorted(
-        crossed + rest,
-        key=lambda r: (
-            0 if r.crossed_200d else 1,
-            -(r.moves.get(16).ret_pct or -999) if r.moves.get(16) else 999,
-        ),
-    )
+
+    def score(r: SignalRow) -> float:
+        mv = r.moves.get(16)
+        return mv.ret_pct if mv and mv.ret_pct is not None else 0.0
+
+    ranked = sorted(pool, key=score, reverse=True)
+    winners = ranked[: max(1, limit * 2 // 3)]
+    losers = list(reversed(ranked[len(winners) :]))[: limit - len(winners)]
+    mixed = winners + losers
     seen: set[str] = set()
     out: list[SignalRow] = []
-    for r in ranked:
+    for r in mixed:
         if r.symbol in seen and len(out) >= 8:
             continue
         seen.add(r.symbol)
         out.append(r)
         if len(out) >= limit:
             break
+    if len(out) < min(limit, len(ranked)):
+        for r in ranked:
+            if r in out:
+                continue
+            out.append(r)
+            if len(out) >= limit:
+                break
     return out
 
 
 def kpi_block(stats: list[dict]) -> str:
     raw = stats[0]
-    h = raw["h16"]
+    cross = stats[1]
+    h = cross["h16"]
     return "".join(
         f'<div class="kpi"><div class="k">{k}</div><div class="v">{v}</div></div>'
         for k, v in (
-            ("原始訊號", raw["count"]),
+            ("通知／突破", cross["count"]),
             ("4h 勝率", f"{h['wr']:.1f}%"),
             ("4h 平均", f"{h['avg']:+.3f}%"),
-            ("15m 假突破", f"{raw['fail15_pct']:.1f}%"),
-            ("剛站上 200 日", stats[1]["count"]),
+            ("15m 假突破", f"{cross['fail15_pct']:.1f}%"),
+            ("全部組合剛成立", raw["count"]),
             ("才形成多頭", stats[2]["count"]),
         )
     )
@@ -225,8 +234,9 @@ def stats_table(stats: list[dict]) -> str:
 
 
 def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
+    focus = [r for r in rows if r.crossed_200d] or rows
     ranked = sorted(
-        rows,
+        focus,
         key=lambda r: -(r.moves.get(16).ret_pct or -999) if r.moves.get(16) and r.moves[16].ret_pct is not None else 999,
     )[:limit]
     body = []
@@ -318,7 +328,8 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <h1>15 分 K：7 / 14 / 25 多頭排列，收盤站上 200 日</h1>
   <p class="sub">
     規則：15 分 SMA7 &gt; SMA14 &gt; SMA25，且收盤高於<strong>日線 SMA200</strong>（用已收盤日 K，不偷看當天）。
-    只在兩個條件「剛同時成立」那一根通知／進場，避免多頭裡每根都叫。
+    Telegram 通知只用「本根剛站上 200 日」：前收還在 200 日下，這一根收盤站上，同時短均已多頭排列。
+    已在 200 日上、只是 7/14/25 又排一次的，會列入表內但不推播（近 7 天噪音太多）。
     進場用訊號下一根開盤。假突破 = 進場那根 15 分收盤又跌回 200 日下方。
     掃描幣安 U 本位流動永續近 {days} 天、{universe_n} 個合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
     {c15}
@@ -334,7 +345,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     <p class="note">距 200 日 =（收盤 / 日線 MA200 − 1）× 100%。量比 = 當根量 / 20 根均量。</p>
   </div>
   <div class="card">
-    <h2>訊號表（依 4h 報酬排序，最多 80 筆）</h2>
+    <h2>訊號表（剛站上 200 日，依 4h 報酬排序）</h2>
     <div class="table-wrap">{signal_table(rows)}</div>
   </div>
 </div>

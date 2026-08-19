@@ -125,7 +125,7 @@ def draw_chart(sym: str, d: dict, idx: int, path: str) -> str | None:
     axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
     for n, col in PAL.items():
         ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.15, label=f"MA{n}")
-    ax.plot(xs, d["m200d"][sl], color="#ffffff", lw=1.35, label="200日")
+    ax.plot(xs, d["m200d"][sl], color="#ffffff", lw=1.35, label="200d")
     x = idx - a0
     ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
     ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
@@ -152,6 +152,8 @@ def scan_symbol(sym: str) -> list[dict]:
             continue
         hits = [s for s in detect_combo(d, min_gap_bars=0) if s.idx == closed]
         for sig in hits:
+            if not sig.crossed_200d:
+                continue
             events.append({"symbol": sym, "sig": sig, "d": d})
     return events
 
@@ -217,7 +219,7 @@ def main() -> int:
     seen = load_seen()
     print("載入標的…", flush=True)
     symbols = universe()
-    print(f"監看 {len(symbols)} 個流動永續。15m 收盤且 7>14>25 站上 200 日會推 Telegram。", flush=True)
+    print(f"監看 {len(symbols)} 個流動永續。15m 收盤剛站上 200 日且 7>14>25 會推 Telegram。", flush=True)
     uni_ts = time.time()
 
     def round_once() -> None:
