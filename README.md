@@ -22,6 +22,22 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## 幣安 15 分 K：7/14/25 多頭 + 站上 200 日
+
+15 分圖 SMA7 > SMA14 > SMA25，且收盤高於**日線 SMA200**（已收盤日 K，不偷看當天）。兩個條件剛同時成立才進場／推播。
+
+```bash
+python3 examples/backtest_15m_bull.py --demo
+python3 examples/backtest_15m_bull.py --days 7 --pages   # 寫入 docs/binance/ma15-bull.html
+```
+
+Telegram 監看（每根 15 分收盤掃一次），在 `examples/watch_15m_bull.py` 最上面填 token / chat id：
+
+```bash
+python3 examples/watch_15m_bull.py --test
+python3 examples/watch_15m_bull.py
+```
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
