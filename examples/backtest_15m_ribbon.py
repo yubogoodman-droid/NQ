@@ -255,7 +255,7 @@ def draw_chart(
         d,
         row.break_.idx,
         path,
-        title=f"{sym_label(sym)}  {interval}  {hm(row.time_ms)}{rtxt}",
+        title=f"{sym}  {interval}  {hm(row.time_ms)}{rtxt}",
     )
 
 
@@ -862,7 +862,7 @@ def main() -> int:
                         d1,
                         hi,
                         out1h,
-                        title=f"{sym_label(row.symbol)}  1h  {hm(row.time_ms)}",
+                        title=f"{row.symbol}  1h  {hm(row.time_ms)}",
                         before=36,
                         after=12,
                     ):
