@@ -22,14 +22,18 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.ribbon15 import (
+    H1_FILTERS,
     HORIZONS,
     MA_PERIODS,
     SignalRow,
     add_mas,
     apply_filter,
+    apply_h1_filter,
     detect_long_breaks,
     fail_rate,
     forward_moves,
+    hourly_context,
+    last_closed_h1_index,
     sma,
     summarize_rows,
 )
@@ -258,16 +262,56 @@ def filter_stats(rows: list[SignalRow]) -> list[dict]:
     out = []
     for name, kw in FILTERS:
         subset = apply_filter(rows, **kw)
-        item = {
-            "name": name,
-            "count": len(subset),
-            "symbols": len({r.symbol for r in subset}),
-            "fail15_pct": round(fail_rate(subset), 1),
-        }
-        for h in HORIZONS:
-            item[f"h{h}"] = {k: (round(v, 3) if isinstance(v, float) else v) for k, v in summarize_rows(subset, h).items()}
+        out.append(_subset_stats(name, subset))
+    return out
+
+
+def h1_filter_stats(rows: list[SignalRow]) -> list[dict]:
+    out = [_subset_stats("原始（有 1h 狀態）", [r for r in rows if r.hourly is not None])]
+    out[0]["key"] = ""
+    for name, key in H1_FILTERS:
+        item = _subset_stats(name, apply_h1_filter(rows, key))
+        item["key"] = key
         out.append(item)
     return out
+
+
+def _subset_stats(name: str, subset: list[SignalRow]) -> dict:
+    item = {
+        "name": name,
+        "count": len(subset),
+        "symbols": len({r.symbol for r in subset}),
+        "fail15_pct": round(fail_rate(subset), 1),
+        "key": "",
+    }
+    for h in HORIZONS:
+        item[f"h{h}"] = {k: (round(v, 3) if isinstance(v, float) else v) for k, v in summarize_rows(subset, h).items()}
+    return item
+
+
+def pick_h1_rule(h1_stats: list[dict], *, min_n: int) -> dict | None:
+    """只從事先列的濾網裡挑：筆數夠、4h 勝率明顯高於原始。對照組不挑。"""
+    if not h1_stats:
+        return None
+    raw = h1_stats[0]
+    raw_wr = raw["h16"]["wr"]
+    raw_avg = raw["h16"]["avg"]
+    ranked = []
+    for s in h1_stats[1:]:
+        if s["name"].startswith("（對照）"):
+            continue
+        if s["count"] < min_n:
+            continue
+        wr, avg = s["h16"]["wr"], s["h16"]["avg"]
+        if wr < raw_wr + 3.0:
+            continue
+        if avg < raw_avg - 0.15:
+            continue
+        ranked.append(s)
+    if not ranked:
+        return None
+    ranked.sort(key=lambda s: (s["h16"]["wr"], s["count"], s["h16"]["avg"]), reverse=True)
+    return ranked[0]
 
 
 def pick_gallery(rows: list[SignalRow], limit: int = 24, *, summary_h: int = 16) -> list[SignalRow]:
@@ -297,7 +341,17 @@ def pick_gallery(rows: list[SignalRow], limit: int = 24, *, summary_h: int = 16)
     return out
 
 
-def kpi_block(stats: list[dict], *, summary_h: int = 16) -> str:
+def h1_caption(row: SignalRow) -> str:
+    h = row.hourly
+    if h is None:
+        return ""
+    loc = "帶下" if h.below_ribbon else ("帶上" if h.above_ribbon else "帶內")
+    hour = "綠小時" if h.forming_green else "紅小時"
+    ma = "MA200上" if h.px_above_ma200 else "MA200下"
+    return f"1h {loc} · {hour} · 15m收在1h {ma}（{h.dist_ma200_pct:+.2f}%）"
+
+
+def kpi_block(stats: list[dict], *, summary_h: int = 16, h1_best: dict | None = None) -> str:
     if not stats:
         return ""
     by = {s["name"]: s for s in stats}
@@ -313,6 +367,10 @@ def kpi_block(stats: list[dict], *, summary_h: int = 16) -> str:
         ("寬度≤1%", str(tight["count"])),
         ("寬度>1% 4h均", f"{wide[f'h{summary_h}']['avg']:+.2f}%"),
     ]
+    if h1_best:
+        bh = h1_best[f"h{summary_h}"]
+        cards.append(("1h濾網筆數", str(h1_best["count"])))
+        cards.append(("1h濾網 4h勝率", f"{bh['wr']:.1f}%"))
     html_cards = []
     for k, v in cards:
         cls = ""
@@ -321,8 +379,11 @@ def kpi_block(stats: list[dict], *, summary_h: int = 16) -> str:
                 cls = "pos" if float(v.strip("%").replace("+", "")) > 0 else "neg"
             except ValueError:
                 cls = ""
-        if k == "4h 勝率":
-            cls = "pos" if h["wr"] >= 50 else "neg"
+        if k in ("4h 勝率", "1h濾網 4h勝率"):
+            try:
+                cls = "pos" if float(v.strip("%")) >= 50 else "neg"
+            except ValueError:
+                cls = ""
         html_cards.append(f'<div class="kpi"><div class="k">{html.escape(k)}</div><div class="v {cls}">{html.escape(v)}</div></div>')
     return "\n".join(html_cards)
 
@@ -411,6 +472,9 @@ def gallery_html(
         )
         if row.body_through:
             note += " · 實體穿越"
+        cap = h1_caption(row)
+        if cap:
+            note += " · " + cap
         src15 = public_img_src(rel15)
         h1 = ""
         if rel1h:
@@ -444,11 +508,25 @@ def write_html(
     universe_n: int,
     rows: list[SignalRow],
     stats: list[dict],
+    h1_stats: list[dict],
+    h1_best: dict | None,
     gallery: list[tuple[SignalRow, str, str | None]],
 ) -> None:
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
+    if h1_best:
+        bh = h1_best["h16"]
+        h1_blurb = (
+            f"用 1 小時當濾網（{html.escape(h1_best['name'])}）後剩 {h1_best['count']} 筆，"
+            f"4h 勝率 {bh['wr']:.1f}%、均 {bh['avg']:+.2f}%。"
+            "濾網只用訊號當下已收完的 1 小時 K，不偷看還在走的那根小時收盤。"
+        )
+    else:
+        h1_blurb = (
+            "下面有一張 1 小時濾網表。這週沒有「筆數夠、勝率明顯變好、平均不掉」的濾網；"
+            "對照組（1h 還在帶下、價在 1h MA200 下）通常更差。"
+        )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -466,7 +544,7 @@ img{{width:100%;height:auto;display:block;border-radius:8px;background:#101814;m
 .note{{color:#8aa193;font-size:13px;margin:8px 0 0;line-height:1.5}}
 .cap{{color:#c9a227;font-size:12px;margin:10px 0 0}}
 .pos{{color:#3dba7a}}.neg{{color:#e35d5d}}.mark{{color:#c9a227}}
-.kpis{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 18px}}
+.kpis{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}}
 .kpi{{border:1px solid rgba(232,240,234,.12);border-radius:10px;padding:10px}}
 .kpi .k{{color:#8aa193;font-size:12px}} .kpi .v{{font-size:18px;margin-top:4px}}
 .table-wrap{{overflow:auto}}
@@ -485,13 +563,21 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     圖例每筆上面是 15 分，底下是同一時間的 1 小時圖。僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">
-    {kpi_block(stats, summary_h=16)}
+    {kpi_block(stats, summary_h=16, h1_best=h1_best)}
   </div>
+  <p class="sub">{h1_blurb}</p>
   <h1>圖例</h1>
-  <p class="sub">黃虛線：15 分圖是穿越六條均線的那根；1 小時圖是這根 15 分所在的小時 K。</p>
+  <p class="sub">黃虛線：15 分圖是穿越六條均線的那根；1 小時圖是這根 15 分所在的小時 K。圖例優先抽 1h 濾網後的樣本。</p>
   {gallery_html(gallery)}
   <div class="card">
-    <h2>過濾對照</h2>
+    <h2>用 1 小時當濾網</h2>
+    <p class="note" style="margin:0 0 10px">只看訊號當下已收完的 1 小時 K。當根小時「已翻綠」= 這根 15 分收盤已經高於該小時開盤，不需要等小時收盤。</p>
+    <div class="table-wrap">
+      {stats_table(h1_stats)}
+    </div>
+  </div>
+  <div class="card">
+    <h2>15 分自己的過濾對照</h2>
     <div class="table-wrap">
       {stats_table(stats)}
     </div>
@@ -547,6 +633,15 @@ def run_demo() -> int:
     if not hits:
         print("demo 失敗：應該至少有一根穿過黏帶")
         return 1
+    t = np.array([0, 3_600_000, 7_200_000], np.int64)
+    # 16:30 這根 15m 收在 16:45，最後收完的小時是 15:00。
+    if last_closed_h1_index(t, 5_400_000) != 0:
+        print("demo 失敗：last_closed_h1_index 16:30")
+        return 1
+    # 16:45 這根 15m 收在 17:00，16:00 那根小時剛好收完。
+    if last_closed_h1_index(t, 6_300_000) != 1:
+        print("demo 失敗：last_closed_h1_index 16:45")
+        return 1
     return 0
 
 
@@ -573,6 +668,51 @@ def scan_interval(symbols: list[str], days: int, interval: str, workers: int) ->
     return rows, data
 
 
+def fetch_h1_map(symbols: list[str], days: int, workers: int) -> dict[str, dict]:
+    data_1h: dict[str, dict] = {}
+    if not symbols:
+        return data_1h
+    print(f"補抓 {len(symbols)} 個 1h K…", flush=True)
+    with ThreadPoolExecutor(workers) as ex:
+        futs = {ex.submit(fetch_klines, s, days=days, interval="1h"): s for s in symbols}
+        done = 0
+        for fut in as_completed(futs):
+            done += 1
+            sym = futs[fut]
+            try:
+                raw = fut.result()
+            except Exception as e:
+                print("err 1h", sym, e, flush=True)
+                continue
+            if raw is not None:
+                data_1h[sym] = add_mas(raw)
+            if done % 40 == 0 or done == len(symbols):
+                print(f"  1h {done}/{len(symbols)}", flush=True)
+    return data_1h
+
+
+def attach_hourly(rows: list[SignalRow], data_1h: dict[str, dict]) -> int:
+    n = 0
+    for r in rows:
+        d1 = data_1h.get(r.symbol)
+        if d1 is None:
+            continue
+        r.hourly = hourly_context(d1, r.time_ms, r.break_.close)
+        if r.hourly is not None:
+            n += 1
+    return n
+
+
+def print_filter_table(title: str, stats: list[dict]) -> None:
+    print(f"\n=== {title} ===")
+    for s in stats:
+        h = s["h16"]
+        print(
+            f"{s['name']}: n={s['count']}  4h勝率 {h['wr']:.1f}%  4h均 {h['avg']:+.3f}%  "
+            f"中位 {h['med']:+.3f}%  假突破 {s['fail15_pct']:.1f}%"
+        )
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description="15 分 K 同時突破六條均線（圖例附 1 小時）")
     p.add_argument("--demo", action="store_true", help="只用合成資料驗證偵測")
@@ -581,6 +721,7 @@ def main() -> int:
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma-ribbon-15m.html")
     p.add_argument("-o", "--output", help="HTML 輸出路徑")
     p.add_argument("--limit-symbols", type=int, default=0, help="除錯用，只掃前 N 個幣")
+    p.add_argument("--skip-charts", action="store_true", help="只算統計、不畫圖")
     args = p.parse_args()
     if args.demo:
         return run_demo()
@@ -592,85 +733,99 @@ def main() -> int:
     print(f"掃描 {len(symbols)} 個 15m 合約，近 {args.days} 天", flush=True)
     rows, data = scan_interval(symbols, args.days, "15m", args.workers)
     stats = filter_stats(rows)
-    print("\n=== 15 分 過濾對照 ===")
-    for s in stats:
-        h = s["h16"]
+    print_filter_table("15 分 過濾對照", stats)
+
+    need_1h = sorted({r.symbol for r in rows})
+    data_1h = fetch_h1_map(need_1h, args.days, args.workers)
+    n_h1 = attach_hourly(rows, data_1h)
+    print(f"對上 1h 狀態 {n_h1}/{len(rows)} 筆", flush=True)
+    h1_stats = h1_filter_stats(rows)
+    print_filter_table("1 小時濾網", h1_stats)
+    min_n = 18 if len(rows) >= 80 else max(8, len(rows) // 6)
+    h1_best = pick_h1_rule(h1_stats, min_n=min_n)
+    if h1_best:
         print(
-            f"{s['name']}: n={s['count']}  4h勝率 {h['wr']:.1f}%  4h均 {h['avg']:+.3f}%  "
-            f"假突破 {s['fail15_pct']:.1f}%"
+            f"\n選用濾網：{h1_best['name']}  n={h1_best['count']}  "
+            f"4h勝率 {h1_best['h16']['wr']:.1f}%  均 {h1_best['h16']['avg']:+.3f}%"
         )
+        gallery_src = apply_h1_filter(rows, h1_best["key"]) or rows
+    else:
+        print("\n沒有通過門檻的 1h 濾網（要筆數夠、4h 勝率至少高 3 個百分點、平均不掉太多）")
+        gallery_src = rows
 
     img15 = Path("docs/binance/img/ribbon15")
     img1h = Path("docs/binance/img/ribbon1h")
-    img15.mkdir(parents=True, exist_ok=True)
-    img1h.mkdir(parents=True, exist_ok=True)
-    for old in list(img15.glob("*.png")) + list(img1h.glob("*.png")):
-        old.unlink()
-    gallery_rows = pick_gallery(rows, summary_h=16)
-    need_1h = sorted({r.symbol for r in gallery_rows})
-    data_1h: dict[str, dict] = {}
-    print(f"補抓 {len(need_1h)} 個 1h 圖用 K 線…", flush=True)
-    with ThreadPoolExecutor(args.workers) as ex:
-        futs = {ex.submit(fetch_klines, s, days=args.days, interval="1h"): s for s in need_1h}
-        for fut in as_completed(futs):
-            sym = futs[fut]
-            try:
-                raw = fut.result()
-            except Exception as e:
-                print("err 1h", sym, e, flush=True)
-                continue
-            if raw is not None:
-                data_1h[sym] = add_mas(raw)
-
     gallery: list[tuple[SignalRow, str, str | None]] = []
-    for row in gallery_rows:
-        d = data.get(row.symbol)
-        if d is None:
-            continue
-        stamp = datetime.fromtimestamp(row.time_ms / 1000, TZ).strftime("%m%d%H%M")
-        base = row.symbol.replace("USDT", "")
-        fname15 = f"{base}_{stamp}.png"
-        out15 = img15 / fname15
-        if not draw_chart(
-            row.symbol,
-            d,
-            row,
-            out15,
-            interval="15m",
-            summary_h=16,
-            summary_label="4h",
-        ):
-            continue
-        rel1h = None
-        d1 = data_1h.get(row.symbol)
-        if d1 is not None:
-            hi = h1_index(d1, row.time_ms)
-            if hi is not None:
-                fname1h = f"{base}_{stamp}_1h.png"
-                out1h = img1h / fname1h
-                if draw_marked_chart(
-                    row.symbol,
-                    d1,
-                    hi,
-                    out1h,
-                    title=f"{row.symbol}  1h  {hm(row.time_ms)}",
-                    before=36,
-                    after=12,
-                ):
-                    rel1h = f"./img/ribbon1h/{fname1h}"
-        gallery.append((row, f"./img/ribbon15/{fname15}", rel1h))
+    if not args.skip_charts:
+        img15.mkdir(parents=True, exist_ok=True)
+        img1h.mkdir(parents=True, exist_ok=True)
+        for old in list(img15.glob("*.png")) + list(img1h.glob("*.png")):
+            old.unlink()
+        gallery_rows = pick_gallery(gallery_src, summary_h=16)
+        extra = pick_gallery(rows, summary_h=16)
+        seen = {(r.symbol, r.time_ms) for r in gallery_rows}
+        for r in extra:
+            if (r.symbol, r.time_ms) in seen:
+                continue
+            gallery_rows.append(r)
+            seen.add((r.symbol, r.time_ms))
+            if len(gallery_rows) >= 24:
+                break
+        for row in gallery_rows:
+            d = data.get(row.symbol)
+            if d is None:
+                continue
+            stamp = datetime.fromtimestamp(row.time_ms / 1000, TZ).strftime("%m%d%H%M")
+            base = row.symbol.replace("USDT", "")
+            fname15 = f"{base}_{stamp}.png"
+            out15 = img15 / fname15
+            if not draw_chart(
+                row.symbol,
+                d,
+                row,
+                out15,
+                interval="15m",
+                summary_h=16,
+                summary_label="4h",
+            ):
+                continue
+            rel1h = None
+            d1 = data_1h.get(row.symbol)
+            if d1 is not None:
+                hi = h1_index(d1, row.time_ms)
+                if hi is not None:
+                    fname1h = f"{base}_{stamp}_1h.png"
+                    out1h = img1h / fname1h
+                    if draw_marked_chart(
+                        row.symbol,
+                        d1,
+                        hi,
+                        out1h,
+                        title=f"{row.symbol}  1h  {hm(row.time_ms)}",
+                        before=36,
+                        after=12,
+                    ):
+                        rel1h = f"./img/ribbon1h/{fname1h}"
+            gallery.append((row, f"./img/ribbon15/{fname15}", rel1h))
 
     out_html = Path(args.output) if args.output else Path("docs/binance/ma-ribbon-15m.html")
     if args.pages:
         out_html = Path("docs/binance/ma-ribbon-15m.html")
-    write_html(
-        path=out_html,
-        days=args.days,
-        universe_n=len(symbols),
-        rows=rows,
-        stats=stats,
-        gallery=gallery,
-    )
+    write_html_ok = args.pages or args.output or not args.skip_charts
+    if write_html_ok:
+        write_html(
+            path=out_html,
+            days=args.days,
+            universe_n=len(symbols),
+            rows=rows,
+            stats=stats,
+            h1_stats=h1_stats,
+            h1_best=h1_best,
+            gallery=gallery,
+        )
+        print(f"\n已寫入 {out_html}  圖 {len(gallery)} 組（15m + 1h）")
+    else:
+        out_html = Path("output/ribbon15_summary.json")
     Path("output").mkdir(exist_ok=True)
     Path("output/ribbon15_summary.json").write_text(
         json.dumps(
@@ -678,7 +833,10 @@ def main() -> int:
                 "days": args.days,
                 "universe": len(symbols),
                 "signals": len(rows),
+                "hourly_attached": n_h1,
                 "filters": stats,
+                "h1_filters": h1_stats,
+                "h1_best": h1_best,
                 "html": str(out_html),
                 "charts": len(gallery),
             },
@@ -686,7 +844,8 @@ def main() -> int:
             indent=2,
         )
     )
-    print(f"\n已寫入 {out_html}  圖 {len(gallery)} 組（15m + 1h）")
+    if not write_html_ok:
+        print(f"\n統計已寫入 output/ribbon15_summary.json")
     return 0
 
 
