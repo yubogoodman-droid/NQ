@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""回測：15 分 K MA7>14>25 多頭排列，且收盤站上日線 200 日均線。
+"""回測：15 分 K MA7>14>25 多頭排列，且收盤站上 15 分 MA200。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --pages
@@ -28,8 +28,6 @@ from nq.ma15_bull import (
     SignalRow,
     add_15m_mas,
     apply_filter,
-    attach_daily_ma200,
-    detect_15m_ma200_cross,
     detect_combo,
     fail_rate,
     forward_moves,
@@ -38,16 +36,16 @@ from nq.ma15_bull import (
 )
 
 TZ = timezone(timedelta(hours=8))
-DISPLAY = {"HK1810USDT": "小米"}
+DISPLAY = {"HK1810USDT": "小米", "CRCLUSDT": "CRCL"}
 PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 200: "#ffffff"}
 HORIZON_LABEL = {1: "15m", 2: "30m", 4: "1h", 8: "2h", 16: "4h", 32: "8h"}
 FILTERS = (
-    ("原始：7>14>25 且收盤站上 200 日（組合剛成立）", {"crossed": None, "formed": None, "min_vol": None, "max_ext": None}),
-    ("本根剛站上 200 日", {"crossed": True, "formed": None, "min_vol": None, "max_ext": None}),
-    ("已在 200 日上，本根才多頭排列", {"crossed": None, "formed": True, "min_vol": None, "max_ext": None}),
+    ("原始：7>14>25 且收盤站上 15m MA200（組合剛成立）", {"crossed": None, "formed": None, "min_vol": None, "max_ext": None}),
+    ("本根剛站上 15m MA200", {"crossed": True, "formed": None, "min_vol": None, "max_ext": None}),
+    ("已在 MA200 上，本根才多頭排列", {"crossed": None, "formed": True, "min_vol": None, "max_ext": None}),
     ("放量 ≥ 1.5×", {"crossed": None, "formed": None, "min_vol": 1.5, "max_ext": None}),
-    ("剛站上 200 日 + 放量 ≥ 1.5×", {"crossed": True, "formed": None, "min_vol": 1.5, "max_ext": None}),
-    ("距 200 日 ≤ 1.0%", {"crossed": None, "formed": None, "min_vol": None, "max_ext": 1.0}),
+    ("剛站上 MA200 + 放量 ≥ 1.5×", {"crossed": True, "formed": None, "min_vol": 1.5, "max_ext": None}),
+    ("距 MA200 ≤ 1.0%", {"crossed": None, "formed": None, "min_vol": None, "max_ext": 1.0}),
 )
 
 
@@ -64,7 +62,9 @@ def file_base(symbol: str) -> str:
 def sym_label(symbol: str) -> str:
     base = symbol.replace("USDT", "")
     name = DISPLAY.get(symbol)
-    return f"{name} {base}" if name else base
+    if name and name != base:
+        return f"{name} {base}"
+    return base
 
 
 def pct(v: float | None) -> str:
@@ -74,29 +74,22 @@ def pct(v: float | None) -> str:
     return f'<span class="{cls}">{v:+.2f}%</span>'
 
 
-def scan_symbol(sym: str, days: int) -> tuple[str, dict | None, list[SignalRow], list[SignalRow]]:
-    daily = fetch_klines(sym, interval="1d", limit=260, extra_bars=0)
-    if daily is None or len(daily["c"]) < 200:
-        return sym, None, [], []
-    raw = fetch_klines(sym, interval="15m", days=days, extra_bars=48)
-    if raw is None or len(raw["c"]) < 40:
-        return sym, None, [], []
-    d = attach_daily_ma200(add_15m_mas(raw), daily)
+def scan_symbol(sym: str, days: int) -> tuple[str, dict | None, list[SignalRow]]:
+    raw = fetch_klines(sym, interval="15m", days=days, extra_bars=220)
+    if raw is None or len(raw["c"]) < 220:
+        return sym, None, []
+    d = add_15m_mas(raw)
     cutoff = int(d["t"][-1]) - days * 24 * 60 * 60 * 1000
-
-    def pack(hits) -> list[SignalRow]:
-        rows = []
-        for sig in hits:
-            ts = int(d["t"][sig.idx])
-            if ts < cutoff:
-                continue
-            entry, moves = forward_moves(d, sig)
-            if np.isnan(entry):
-                continue
-            rows.append(SignalRow(symbol=sym, sig=sig, time_ms=ts, entry=entry, moves=moves))
-        return rows
-
-    return sym, d, pack(detect_combo(d)), pack(detect_15m_ma200_cross(d))
+    rows = []
+    for sig in detect_combo(d):
+        ts = int(d["t"][sig.idx])
+        if ts < cutoff:
+            continue
+        entry, moves = forward_moves(d, sig)
+        if np.isnan(entry):
+            continue
+        rows.append(SignalRow(symbol=sym, sig=sig, time_ms=ts, entry=entry, moves=moves))
+    return sym, d, rows
 
 
 def filter_stats(rows: list[SignalRow]) -> list[dict]:
@@ -146,17 +139,14 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
         colors_v.append("#3dba7a99" if up else "#e35d5d99")
     axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
     for n, col in PAL.items():
-        if n == 200:
-            continue
-        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.15, label=f"MA{n}")
-    ax.plot(xs, d["m200d"][sl], color="#ffffff", lw=1.35, label="200d")
+        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.35 if n == 200 else 1.15, label=f"MA{n}")
     x = i - a0
     ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
     ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
     r4 = row.moves.get(16)
     rtxt = f"  4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
     title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
-    kind = "reclaim 200d" if row.crossed_200d else "7>14>25"
+    kind = "reclaim MA200" if row.crossed_200d else "7>14>25"
     ax.set_title(f"{title_sym}  15m  {hm(row.time_ms)}  {kind}{rtxt}", color="#e8f0ea", fontsize=12)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
     fig.tight_layout(pad=0.5)
@@ -170,6 +160,7 @@ def pick_gallery(rows: list[SignalRow], limit: int = 18) -> list[SignalRow]:
     pool = [r for r in rows if r.crossed_200d] or list(rows)
     if not pool:
         return []
+    pinned = [r for r in pool if r.symbol == "CRCLUSDT"]
 
     def score(r: SignalRow) -> float:
         mv = r.moves.get(16)
@@ -178,7 +169,7 @@ def pick_gallery(rows: list[SignalRow], limit: int = 18) -> list[SignalRow]:
     ranked = sorted(pool, key=score, reverse=True)
     winners = ranked[: max(1, limit * 2 // 3)]
     losers = list(reversed(ranked[len(winners) :]))[: limit - len(winners)]
-    mixed = winners + losers
+    mixed = pinned + [r for r in (winners + losers) if r not in pinned]
     seen: set[str] = set()
     out: list[SignalRow] = []
     for r in mixed:
@@ -242,7 +233,7 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
     )[:limit]
     body = []
     for r in ranked:
-        kind = "站上200日" if r.crossed_200d else "多頭排列"
+        kind = "站上MA200" if r.crossed_200d else "多頭排列"
         cells = [
             f'<td class="mono">{hm(r.time_ms)}</td>',
             f"<td>{html.escape(sym_label(r.symbol))}</td>",
@@ -256,7 +247,7 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
             cells.append(f"<td>{pct(mv.ret_pct if mv else None)}</td>")
         body.append("<tr>" + "".join(cells) + "</tr>")
     return (
-        "<table><thead><tr><th>時間</th><th>標的</th><th>種類</th><th>進場</th><th>量比</th><th>距200日</th>"
+        "<table><thead><tr><th>時間</th><th>標的</th><th>種類</th><th>進場</th><th>量比</th><th>距MA200</th>"
         "<th>15m</th><th>1h</th><th>4h</th><th>8h</th></tr></thead><tbody>"
         + "".join(body)
         + "</tbody></table>"
@@ -289,7 +280,7 @@ def gallery_html(gallery: list[tuple[SignalRow, str]]) -> str:
         return '<p class="note">這段期間沒有圖例。</p>'
     cards = []
     for row, rel in gallery:
-        kind = "本根剛站上 200 日" if row.crossed_200d else "已在 200 日上，本根才 7>14>25"
+        kind = "本根剛站上 15m MA200" if row.crossed_200d else "已在 MA200 上，本根才 7>14>25"
         r4 = row.moves.get(16)
         rtxt = f"4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
         src = public_img_src(rel)
@@ -309,22 +300,16 @@ def write_html(
     rows: list[SignalRow],
     stats: list[dict],
     gallery: list[tuple[SignalRow, str]],
-    cross15_n: int,
-    cross15_stats: dict,
 ) -> None:
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
-    c15 = (
-        f"對照組（15m MA7&gt;14&gt;25 且剛站上 15m MA200，不是日線 200 日）"
-        f"：{cross15_n} 筆，4h 勝率 {cross15_stats['wr']:.1f}%，4h 均 {cross15_stats['avg']:+.3f}%。"
-    )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>15分K 7/14/25 多頭 · 站上 200 日</title>
+<title>15分K 7/14/25 多頭 · 站上 MA200</title>
 <style>
 body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
 .wrap{{max-width:1100px;margin:0 auto;padding:20px 14px 56px}}
@@ -348,28 +333,26 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
 </style></head>
 <body>
 <div class="wrap">
-  <h1>15 分 K：7 / 14 / 25 多頭排列，收盤站上 200 日</h1>
+  <h1>15 分 K：7 / 14 / 25 多頭排列，收盤站上 15 分 MA200</h1>
   <p class="sub">
-    規則：15 分 SMA7 &gt; SMA14 &gt; SMA25，且收盤高於<strong>日線 SMA200</strong>（用已收盤日 K，不偷看當天）。
-    Telegram 通知只用「本根剛站上 200 日」：前收還在 200 日下，這一根收盤站上，同時短均已多頭排列。
-    已在 200 日上、只是 7/14/25 又排一次的，會列入表內但不推播（近 7 天噪音太多）。
-    進場用訊號下一根開盤。假突破 = 進場那根 15 分收盤又跌回 200 日下方。
+    規則：15 分 SMA7 &gt; SMA14 &gt; SMA25，且收盤高於<strong>同一張 15 分圖的 SMA200</strong>（不是日線 200 日）。
+    Telegram 通知只用「本根剛站上 MA200」：前收還在 MA200 下，這一根收盤站上，同時短均已多頭排列。
+    進場用訊號下一根開盤。假突破 = 進場那根 15 分收盤又跌回 MA200 下方。
     掃描幣安 U 本位流動永續近 {days} 天、{universe_n} 個合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
-    {c15}
-    外網請開 <a href="{PUBLIC_PAGE}" style="color:#c9a227">這頁（htmlpreview）</a>；圖已內嵌，不用另開 GitHub Pages。
+    外網請開 <a href="{PUBLIC_PAGE}" style="color:#c9a227">這頁（htmlpreview）</a>；圖已內嵌。
     僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">{kpi_block(stats)}</div>
   <h1>圖例</h1>
-  <p class="sub">黃虛線是訊號 K。白線是日線 200 日均線對齊到 15 分圖。</p>
+  <p class="sub">黃虛線是訊號 K。白線是 15 分 MA200。CRCL 若有訊號會釘在最上面。</p>
   {gallery_html(gallery)}
   <div class="card">
     <h2>過濾對照</h2>
     <div class="table-wrap">{stats_table(stats)}</div>
-    <p class="note">距 200 日 =（收盤 / 日線 MA200 − 1）× 100%。量比 = 當根量 / 20 根均量。</p>
+    <p class="note">距 MA200 =（收盤 / 15m SMA200 − 1）× 100%。量比 = 當根量 / 20 根均量。</p>
   </div>
   <div class="card">
-    <h2>訊號表（剛站上 200 日，依 4h 報酬排序）</h2>
+    <h2>訊號表（剛站上 15m MA200，依 4h 報酬排序）</h2>
     <div class="table-wrap">{signal_table(rows)}</div>
   </div>
 </div>
@@ -379,59 +362,44 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     path.write_text(page, encoding="utf-8")
 
 
-def make_demo_bars() -> tuple[dict, dict]:
-    n_d = 220
-    daily_t = np.arange(n_d, dtype=np.int64) * 86_400_000
-    daily_c = np.full(n_d, 100.0)
-    daily = {
-        "t": daily_t,
-        "o": daily_c.copy(),
-        "h": daily_c + 0.2,
-        "l": daily_c - 0.2,
-        "c": daily_c,
-        "v": np.full(n_d, 1_000.0),
-    }
-    start = int(daily_t[210] + 86_400_000)
-    n = 90
-    t = start + np.arange(n, dtype=np.int64) * 15 * 60_000
-    px = np.full(n, 99.15)
-    for i in range(45, 78):
-        px[i] = 99.15 + (i - 45) * 0.04
-    px[78:] = 100.55
+def make_demo_bars() -> dict:
+    n = 240
+    px = np.full(n, 99.00)
+    px[220:] = 100.20
     o = np.roll(px, 1)
-    o[0] = 99.15
+    o[0] = 99.00
+    o[220] = 99.00
     return {
-        "t": t,
+        "t": np.arange(n, dtype=np.int64) * 15 * 60_000,
         "o": o,
         "h": np.maximum(o, px) + 0.05,
-        "l": np.minimum(o, px) - 0.05,
+        "l": np.minimum(o, px) - 0.02,
         "c": px,
         "v": np.full(n, 1200.0),
-    }, daily
+    }
 
 
 def run_demo() -> int:
-    raw, daily = make_demo_bars()
-    d = attach_daily_ma200(add_15m_mas(raw), daily)
+    d = add_15m_mas(make_demo_bars())
     hits = detect_combo(d)
-    print(f"demo 偵測到 {len(hits)} 筆（7>14>25 且站上 200 日）")
+    print(f"demo 偵測到 {len(hits)} 筆（7>14>25 且站上 15m MA200）")
     for sig in hits:
         print(
-            f"  idx={sig.idx} close={sig.close:.3f} ma200d={sig.ma200d:.3f} "
+            f"  idx={sig.idx} close={sig.close:.3f} ma200={sig.ma200:.3f} "
             f"7>14>25={sig.m7:.3f}>{sig.m14:.3f}>{sig.m25:.3f} "
-            f"crossed={sig.crossed_200d} formed={sig.formed_align}"
+            f"crossed={sig.crossed_200} formed={sig.formed_align}"
         )
     if not hits:
         print("demo 失敗：應該至少有一根組合成立")
         return 1
-    if not any(s.crossed_200d or s.formed_align for s in hits):
-        print("demo 失敗：訊號種類不對")
+    if not any(s.crossed_200 for s in hits):
+        print("demo 失敗：應該有剛站上 MA200")
         return 1
     return 0
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="15 分 K 7/14/25 多頭且收盤站上 200 日")
+    p = argparse.ArgumentParser(description="15 分 K 7/14/25 多頭且收盤站上 15m MA200")
     p.add_argument("--demo", action="store_true")
     p.add_argument("--days", type=int, default=7)
     p.add_argument("--workers", type=int, default=8)
@@ -446,10 +414,9 @@ def main() -> int:
     symbols = universe()
     if args.limit_symbols:
         symbols = symbols[: args.limit_symbols]
-    print(f"掃描 {len(symbols)} 個 15m，近 {args.days} 天（需有 200 根日 K）", flush=True)
+    print(f"掃描 {len(symbols)} 個 15m，近 {args.days} 天（15 分 MA200）", flush=True)
 
     rows: list[SignalRow] = []
-    rows15: list[SignalRow] = []
     data: dict[str, dict] = {}
     t0 = time.time()
     with ThreadPoolExecutor(args.workers) as ex:
@@ -458,30 +425,28 @@ def main() -> int:
         for fut in as_completed(futs):
             done += 1
             try:
-                sym, d, hits, hits15 = fut.result()
+                sym, d, hits = fut.result()
             except Exception as e:
                 print("err", futs[fut], e, flush=True)
                 continue
             if d is not None:
                 data[sym] = d
             rows.extend(hits)
-            rows15.extend(hits15)
             if done % 40 == 0 or done == len(symbols):
-                print(
-                    f"  {done}/{len(symbols)}  主規則 {len(rows)}  15mMA200對照 {len(rows15)}  {time.time()-t0:.1f}s",
-                    flush=True,
-                )
+                print(f"  {done}/{len(symbols)}  訊號 {len(rows)}  {time.time()-t0:.1f}s", flush=True)
     rows.sort(key=lambda r: r.time_ms)
     stats = filter_stats(rows)
-    print("\n=== 15 分 7/14/25 + 200 日 ===")
+    print("\n=== 15 分 7/14/25 + MA200 ===")
     for s in stats:
         h = s["h16"]
         print(
             f"{s['name']}: n={s['count']}  4h勝率 {h['wr']:.1f}%  4h均 {h['avg']:+.3f}%  "
             f"假突破 {s['fail15_pct']:.1f}%"
         )
-    c15 = summarize_rows(rows15, 16)
-    print(f"對照 15m MA200 剛站上: n={len(rows15)}  4h勝率 {c15['wr']:.1f}%  4h均 {c15['avg']:+.3f}%")
+    crcl = [r for r in rows if r.symbol == "CRCLUSDT" and r.crossed_200d]
+    print(f"CRCL 剛站上 MA200：{len(crcl)} 筆")
+    for r in crcl:
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  entry={r.entry:g}  4h={r.moves.get(16).ret_pct if r.moves.get(16) else None}")
 
     img_dir = Path("docs/binance/img/ma15-bull")
     img_dir.mkdir(parents=True, exist_ok=True)
@@ -508,8 +473,6 @@ def main() -> int:
         rows=rows,
         stats=stats,
         gallery=gallery,
-        cross15_n=len(rows15),
-        cross15_stats=c15,
     )
     Path("output").mkdir(exist_ok=True)
     Path("output/ma15_bull_summary.json").write_text(
@@ -518,7 +481,10 @@ def main() -> int:
                 "days": args.days,
                 "universe": len(symbols),
                 "signals": len(rows),
-                "cross15m_ma200": len(rows15),
+                "crcl": [
+                    {"time": hm(r.time_ms), "close": r.sig.close, "crossed": r.crossed_200d}
+                    for r in crcl
+                ],
                 "filters": stats,
                 "html": str(out_html),
                 "charts": len(gallery),

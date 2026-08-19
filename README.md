@@ -22,9 +22,9 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
-## 幣安 15 分 K：7/14/25 多頭 + 站上 200 日
+## 幣安 15 分 K：7/14/25 多頭 + 站上 MA200
 
-15 分圖 SMA7 > SMA14 > SMA25，且收盤高於**日線 SMA200**（已收盤日 K，不偷看當天）。Telegram 只推「這一根剛站上 200 日」；已在 200 日上只是短均又排一次的不推。
+15 分圖 SMA7 > SMA14 > SMA25，且收盤高於**同一張 15 分圖的 SMA200**。Telegram 只推「這一根剛站上 MA200」。
 
 ```bash
 python3 examples/backtest_15m_bull.py --demo
@@ -98,7 +98,7 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
-3. **15 分 K 7/14/25 站上 200 日（這次 PR）**  
+3. **15 分 K 7/14/25 站上 MA200（這次 PR）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html
 
 ## TradingView

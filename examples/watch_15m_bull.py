@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""幣安 15 分 K：7/14/25 多頭排列且收盤站上 200 日 → Telegram。
+"""幣安 15 分 K：7/14/25 多頭排列且收盤站上 15 分 MA200 → Telegram。
 
 在下面填 Telegram 後執行：
 
@@ -23,7 +23,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.binance import INTERVAL_MS, SESSION, fetch_klines, universe
-from nq.ma15_bull import add_15m_mas, attach_daily_ma200, detect_combo, sma
+from nq.ma15_bull import add_15m_mas, detect_combo, sma
 
 # —— 填這裡 ——
 TELEGRAM_BOT_TOKEN = ""
@@ -31,7 +31,7 @@ TELEGRAM_CHAT_ID = ""
 
 TZ = timezone(timedelta(hours=8))
 SEEN_PATH = Path(__file__).resolve().parents[1] / "output" / "ma15_bull_seen.json"
-PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff"}
+PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 200: "#ffffff"}
 
 
 def apply_keys() -> None:
@@ -124,8 +124,7 @@ def draw_chart(sym: str, d: dict, idx: int, path: str) -> str | None:
         colors_v.append("#3dba7a99" if up else "#e35d5d99")
     axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
     for n, col in PAL.items():
-        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.15, label=f"MA{n}")
-    ax.plot(xs, d["m200d"][sl], color="#ffffff", lw=1.35, label="200d")
+        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.35 if n == 200 else 1.15, label=f"MA{n}")
     x = idx - a0
     ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
     ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
@@ -138,21 +137,18 @@ def draw_chart(sym: str, d: dict, idx: int, path: str) -> str | None:
 
 
 def scan_symbol(sym: str) -> list[dict]:
-    daily = fetch_klines(sym, interval="1d", limit=260, extra_bars=0)
-    if daily is None or len(daily["c"]) < 200:
+    raw = fetch_klines(sym, interval="15m", limit=280, extra_bars=8)
+    if raw is None or len(raw["c"]) < 220:
         return []
-    raw = fetch_klines(sym, interval="15m", limit=80, extra_bars=8)
-    if raw is None or len(raw["c"]) < 40:
-        return []
-    d = attach_daily_ma200(add_15m_mas(raw), daily)
+    d = add_15m_mas(raw)
     n = len(d["c"])
     events = []
     for closed in (n - 1, n - 2):
-        if closed < 26:
+        if closed < 200:
             continue
         hits = [s for s in detect_combo(d, min_gap_bars=0) if s.idx == closed]
         for sig in hits:
-            if not sig.crossed_200d:
+            if not sig.crossed_200:
                 continue
             events.append({"symbol": sym, "sig": sig, "d": d})
     return events
@@ -161,13 +157,13 @@ def scan_symbol(sym: str) -> list[dict]:
 def format_ev(ev: dict) -> str:
     d, sig, sym = ev["d"], ev["sig"], ev["symbol"]
     ts = hm(int(d["t"][sig.idx]))
-    kind = "剛站上 200 日" if sig.crossed_200d else "多頭排列剛成立"
+    kind = "剛站上 MA200" if sig.crossed_200 else "多頭排列剛成立"
     return (
         f"<b>15m 多頭排列 · {kind}</b>\n"
         f"<b>{sym}</b>\n"
         f"{ts}  收 {sig.close:g}\n"
         f"MA7 {sig.m7:g} &gt; MA14 {sig.m14:g} &gt; MA25 {sig.m25:g}\n"
-        f"200日 {sig.ma200d:g}　距 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×"
+        f"MA200 {sig.ma200:g}　距 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×"
     )
 
 
@@ -200,7 +196,7 @@ def wait_next_close() -> None:
 
 def test_telegram() -> int:
     apply_keys()
-    ok = telegram_send("15m 7/14/25 多頭 × 200 日 監看測試\n如果你看到這則，Telegram 已通。")
+    ok = telegram_send("15m 7/14/25 多頭 × MA200 監看測試\n如果你看到這則，Telegram 已通。")
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
     return 0 if ok else 1
 
@@ -208,7 +204,7 @@ def test_telegram() -> int:
 def main() -> int:
     import argparse
 
-    p = argparse.ArgumentParser(description="15 分 K 7/14/25 多頭且站上 200 日 Telegram")
+    p = argparse.ArgumentParser(description="15 分 K 7/14/25 多頭且站上 15m MA200 Telegram")
     p.add_argument("--once", action="store_true")
     p.add_argument("--test", action="store_true")
     args = p.parse_args()
@@ -219,7 +215,7 @@ def main() -> int:
     seen = load_seen()
     print("載入標的…", flush=True)
     symbols = universe()
-    print(f"監看 {len(symbols)} 個流動永續。15m 收盤剛站上 200 日且 7>14>25 會推 Telegram。", flush=True)
+    print(f"監看 {len(symbols)} 個流動永續。15m 收盤剛站上 MA200 且 7>14>25 會推 Telegram。", flush=True)
     uni_ts = time.time()
 
     def round_once() -> None:
