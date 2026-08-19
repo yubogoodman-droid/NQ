@@ -3,6 +3,7 @@
 from nq.patterns import WBottomPattern, detect_w_bottoms
 from nq.report import save_report_html
 from nq.strategy import NQWBottomStrategy, Signal
+from nq.v_recovery import STRICT, VRecoverySignal, count_ladder
 
 __all__ = [
     "WBottomPattern",
@@ -10,4 +11,7 @@ __all__ = [
     "NQWBottomStrategy",
     "Signal",
     "save_report_html",
+    "STRICT",
+    "VRecoverySignal",
+    "count_ladder",
 ]

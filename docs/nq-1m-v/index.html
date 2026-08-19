@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>NQ 1m 急跌 V 反 · 近一週</title>
+<style>
+body{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 14px 56px}
+h1{font-size:22px;margin:0 0 8px}
+h2{font-size:16px;margin:0 0 10px}
+.sub{color:#8aa193;line-height:1.65;margin:0 0 16px}
+.card{background:#14201b;border:1px solid rgba(232,240,234,.12);border-radius:12px;padding:14px;margin-bottom:16px}
+img{width:100%;height:auto;display:block;border-radius:8px;background:#101814}
+.note{color:#8aa193;font-size:13px;margin:8px 0 0;line-height:1.5}
+.pos{color:#3dba7a}.neg{color:#e35d5d}.mark{color:#c9a227}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 18px}
+.kpi{border:1px solid rgba(232,240,234,.12);border-radius:10px;padding:10px}
+.kpi .k{color:#8aa193;font-size:12px} .kpi .v{font-size:18px;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid rgba(232,240,234,.08)}
+th{color:#8aa193;font-weight:600}
+@media(max-width:720px){.kpis{grid-template-columns:1fr 1fr}}
+</style></head>
+<body>
+<div class="wrap">
+  <h1>NQ 一分 K 急跌 V 反 · 近一週 1 筆訊號</h1>
+  <p class="sub">
+    NQ=F · 2026-08-11 ~ 2026-08-18（7 個交易日曆日） · 8097 根 1m
+    （2026-08-11 00:09 ~ 2026-08-18 22:45 ET）。<br/>
+    規則對齊截圖那根：爆量長陰打穿全部均線 → 90 分鐘內不破低、收回 70% → 收盤站回 MA5/10/20/30/60/100/120/200 且 MA5&gt;MA10&gt;MA20。
+    紅虛線是急跌，綠虛線是進場，金線是前收（16:00 ET）。
+  </p>
+  <div class="kpis">
+    <div class="kpi"><div class="k">嚴格急跌</div><div class="v">4</div></div>
+    <div class="kpi"><div class="k">未破低收回 70%</div><div class="v">1</div></div>
+    <div class="kpi"><div class="k">站回均線+短均開花</div><div class="v pos">1</div></div>
+  </div>
+  <div class="card">
+    <h2>條件梯子（同一週、同一份 1m）</h2>
+    <table>
+      <tr><th>急跌定義</th><th>急跌事件</th><th>V 收回 70%</th><th>站回全部均線</th><th>再加短均開花＝訊號</th><th>再過前收</th></tr>
+      <tr><td>嚴格（截圖：5×ATR 或 50 點、5×量、跌破全部均線）</td><td>4</td><td>1</td><td>1</td><td class="pos">1</td><td>1</td></tr>
+      <tr><td>中等（3×ATR 或 25 點、3×量、跌破全部均線）</td><td>17</td><td>2</td><td>2</td><td>2</td><td>2</td></tr>
+      <tr><td>寬鬆（2.5×ATR、2.5×量、僅跌破 MA20）</td><td>35</td><td>3</td><td>3</td><td>3</td><td>3</td></tr>
+    </table>
+    <p class="note">寬鬆那 2 筆多出來的，多半是 08:30 美股開盤的寬幅 K，不是截圖那種 Globex 夜盤掃蕩。</p>
+  </div>
+  
+  <div class="card">
+    <h2>訊號 08-18 20:30 · 急跌 08-18 20:01</h2>
+    <img src="./img/signal_0818_2001.png" alt="signal 08-18 20:01"/>
+    <p class="note">
+      急跌 81.0 點 · 量比 10.0× · ATR 7.5×<br/>
+      進場 29549.50 · 停損 29442.00 · 前收 29581.25 · 突破 08-18 21:05<br/>
+      進場後 15/30/60m：+23.2pt / -13.0pt / +18.2pt
+    </p>
+  </div>
+  <h1 style="margin-top:28px">嚴格急跌但沒走出 V</h1>
+  <p class="sub">同一套急跌門檻，90 分鐘內又破了低點，不當訊號。</p>
+  
+  <div class="card">
+    <h2>急跌未完成 V　08-11 09:30</h2>
+    <img src="./img/fail_0811_0930.png" alt="dump 08-11 09:30"/>
+    <p class="note">急跌 71.2 點 · 量比 9.6× · ATR 5.5× · 90 分鐘內破了急跌低點</p>
+  </div>
+  <div class="card">
+    <h2>急跌未完成 V　08-12 06:48</h2>
+    <img src="./img/fail_0812_0648.png" alt="dump 08-12 06:48"/>
+    <p class="note">急跌 41.8 點 · 量比 7.2× · ATR 7.4× · 90 分鐘內破了急跌低點</p>
+  </div>
+  <div class="card">
+    <h2>急跌未完成 V　08-17 08:26</h2>
+    <img src="./img/fail_0817_0826.png" alt="dump 08-17 08:26"/>
+    <p class="note">急跌 52.0 點 · 量比 8.3× · ATR 5.2× · 90 分鐘內破了急跌低點</p>
+  </div>
+</div>
+</body>
+</html>
