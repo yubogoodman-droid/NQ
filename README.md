@@ -50,6 +50,12 @@ python3 examples/backtest_15m_ribbon.py --pages    # 掃幣安永續，寫入 do
 
 報告：`docs/binance/ma-ribbon-15m.html`
 
+外網（免部署，圖會一起載）：  
+https://cdn.jsdelivr.net/gh/yubogoodman-droid/NQ@cursor/15m-ma-ribbon-breakout-731b/docs/binance/ma-ribbon-15m.html
+
+合併進 `main` 後 GitHub Pages：  
+https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html
+
 ## 快速開始
 
 ```bash
@@ -86,6 +92,9 @@ python3 examples/chart_today.py
 
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
+
+3. **15 分 K 六均線回測（這次 PR）**  
+   https://cdn.jsdelivr.net/gh/yubogoodman-droid/NQ@cursor/15m-ma-ribbon-breakout-731b/docs/binance/ma-ribbon-15m.html
 
 ## TradingView
 
