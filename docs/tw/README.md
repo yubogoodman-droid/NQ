@@ -2,6 +2,7 @@
 
 請直接開 GitHub 上的 Markdown（圖會顯示）：
 
+- [這兩天 8/18～8/19](recent.md)
 - [今日掃描](today.md)
 - [上週一到五（分日）](week-last.md)
 - [週一 2026-08-10](backtest-2026-08-10.md)

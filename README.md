@@ -39,26 +39,16 @@
 - https://yubogoodman-droid.github.io/NQ/tw/
 - 免部署預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/index.html
 
-```bash
-pip install -r requirements.txt
-python examples/scan_tw_1m.py
-```
+單檔（PyCharm 只要這一個，檔名不要叫 `tw.py`）：
 
-預設會列出**今天盤中曾出現**的訊號；`--watch` 只對最新一根跳通知。有永豐 API 金鑰時自動改抓即時一分 K。
-
-```bash
-python examples/scan_tw_1m.py --latest-only   # 只看當下這一根
-python examples/scan_tw_1m.py --watch         # 盤中守著，符合就通知
-```
-
-預設走永豐。**只要一個檔**：把 `scan_tw.py` 存進 PyCharm（檔名不要叫 `tw.py`），最上面四個引號填永豐 Key / Secret 和 Telegram 序號，然後：
+https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/scan_tw.py
 
 ```bash
 pip install pandas numpy yfinance requests shioaji
 python scan_tw.py --watch
 ```
 
-第一次掃描會按日抓近幾天 1K 當種子（永豐一分 K 單次約 270 根），之後用成交明細補當根。強制 Yahoo：`--source yahoo`。
+最上面四個引號填永豐 Key / Secret 和 Telegram。第一次會按日抓近幾天 1K 當種子，之後用成交明細補當根。強制 Yahoo：`--source yahoo`。
 
 通知通道（擇一或同時設環境變數）：
 
