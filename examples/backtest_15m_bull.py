@@ -161,6 +161,7 @@ def pick_gallery(rows: list[SignalRow], limit: int = 18) -> list[SignalRow]:
     if not pool:
         return []
     pinned = [r for r in pool if r.symbol == "CRCLUSDT"]
+    pinned = sorted(pinned, key=lambda r: r.time_ms, reverse=True)[:4]
 
     def score(r: SignalRow) -> float:
         mv = r.moves.get(16)
