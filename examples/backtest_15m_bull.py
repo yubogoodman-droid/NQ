@@ -111,30 +111,19 @@ def filter_stats(rows: list[SignalRow]) -> list[dict]:
     return out
 
 
-def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
-    try:
-        import matplotlib
+def _style_ax(ax) -> None:
+    ax.set_facecolor("#101814")
+    ax.tick_params(colors="#8aa193", labelsize=8)
+    for sp in ax.spines.values():
+        sp.set_color("#2a3a33")
 
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import Rectangle
-    except Exception:
-        return None
 
-    i = row.sig.idx
-    a0 = max(0, i - 48)
-    a1 = min(len(d["c"]), i + 20)
+def _paint_ohlcv(ax, axv, d: dict, a0: int, a1: int, mark_i: int | None) -> None:
+    from matplotlib.patches import Rectangle
+
     sl = slice(a0, a1)
     xs = np.arange(a1 - a0)
     o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
-    fig, (ax, axv) = plt.subplots(
-        2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
-    )
-    for a in (ax, axv):
-        a.set_facecolor("#101814")
-        a.tick_params(colors="#8aa193", labelsize=8)
-        for sp in a.spines.values():
-            sp.set_color("#2a3a33")
     colors_v = []
     for k in range(len(c)):
         up = c[k] >= o[k]
@@ -148,15 +137,72 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
     axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
     for n, col in PAL.items():
         ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.35 if n == 200 else 1.15, label=f"MA{n}")
-    x = i - a0
-    ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
-    ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
+    if mark_i is not None and a0 <= mark_i < a1:
+        x = mark_i - a0
+        ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
+        ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
+
+
+def hour_bar_idx(d1h: dict, time_ms: int) -> int | None:
+    t = d1h["t"]
+    hour_open = int(time_ms) - (int(time_ms) % 3_600_000)
+    w = np.where(t == hour_open)[0]
+    if len(w):
+        return int(w[0])
+    w = np.where(t <= time_ms)[0]
+    return int(w[-1]) if len(w) else None
+
+
+def draw_chart(sym: str, d: dict, row: SignalRow, path: Path, d1h: dict | None = None) -> Path | None:
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception:
+        return None
+
+    i = row.sig.idx
+    a0 = max(0, i - 48)
+    a1 = min(len(d["c"]), i + 20)
     r4 = row.moves.get(16)
     rtxt = f"  4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
     title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
-    kind = "reclaim MA200" if row.crossed_200d else "7>14>25"
+    kind = "reclaim MA200" if row.crossed_200d else "close>7/14/25/200"
+
+    hi = hour_bar_idx(d1h, row.time_ms) if d1h is not None and len(d1h.get("c", [])) else None
+    stacked = hi is not None
+    if stacked:
+        fig, axes = plt.subplots(
+            4,
+            1,
+            figsize=(10.6, 10.6),
+            sharex=False,
+            gridspec_kw={"height_ratios": [3.1, 0.9, 3.1, 0.9]},
+            facecolor="#0c1210",
+        )
+        ax, axv, axh, axhv = axes
+    else:
+        fig, (ax, axv) = plt.subplots(
+            2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
+        )
+        axh = axhv = None
+    for a in (ax, axv, axh, axhv):
+        if a is not None:
+            _style_ax(a)
+    _paint_ohlcv(ax, axv, d, a0, a1, i)
     ax.set_title(f"{title_sym}  15m  {hm(row.time_ms)}  {kind}{rtxt}", color="#e8f0ea", fontsize=12)
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
+    if stacked and axh is not None and axhv is not None and d1h is not None and hi is not None:
+        b0 = max(0, hi - 48)
+        b1 = min(len(d1h["c"]), hi + 16)
+        _paint_ohlcv(axh, axhv, d1h, b0, b1, hi)
+        h_close = float(d1h["c"][hi])
+        h_ma = float(d1h["m200"][hi]) if not np.isnan(d1h["m200"][hi]) else None
+        vs = ""
+        if h_ma:
+            vs = f"  close {h_close:g} vs 1h MA200 {h_ma:g} ({(h_close / h_ma - 1) * 100:+.2f}%)"
+        axh.set_title(f"{title_sym}  1h  {hm(int(d1h['t'][hi]))}{vs}", color="#e8f0ea", fontsize=12)
     fig.tight_layout(pad=0.5)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -386,7 +432,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <div class="kpis">{kpi_block(stats)}</div>
   {crcl_card(rows)}
   <h1>圖例</h1>
-  <p class="sub">黃虛線是訊號 K。白線是 15 分 MA200。CRCL 若有訊號會釘在最上面。</p>
+  <p class="sub">上面 15 分 K，下面同一檔小時 K。黃虛線是訊號時間（小時圖對到包含那根 15 分的那一根）。白線是各週期自己的 MA200。CRCL 若有訊號會釘在最上面。</p>
   {gallery_html(gallery)}
   <div class="card">
     <h2>過濾對照</h2>
@@ -500,15 +546,19 @@ def main() -> int:
     img_dir.mkdir(parents=True, exist_ok=True)
     for old in img_dir.glob("*.png"):
         old.unlink()
+    h1_cache: dict[str, dict | None] = {}
     gallery: list[tuple[SignalRow, str]] = []
     for row in pick_gallery(rows, limit=24):
         d = data.get(row.symbol)
         if d is None:
             continue
+        if row.symbol not in h1_cache:
+            raw_h = fetch_klines(row.symbol, interval="1h", days=max(args.days, 14), extra_bars=220)
+            h1_cache[row.symbol] = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
         stamp = datetime.fromtimestamp(row.time_ms / 1000, TZ).strftime("%m%d%H%M")
         fname = f"{file_base(row.symbol)}_{stamp}.png"
         out = img_dir / fname
-        if draw_chart(row.symbol, d, row, out):
+        if draw_chart(row.symbol, d, row, out, d1h=h1_cache[row.symbol]):
             gallery.append((row, f"./img/{img_name}/{fname}"))
 
     default_html = "docs/binance/ma15-bull-stocks.html" if args.stocks else "docs/binance/ma15-bull.html"
