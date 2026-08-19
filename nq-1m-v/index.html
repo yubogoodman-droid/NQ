@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>NQ 1m 急跌 V 反 · 近一週</title>
+<title>NQ 1m 均線多頭排列 · 近一週</title>
 <style>
 body{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}
 .wrap{max-width:1100px;margin:0 auto;padding:20px 14px 56px}
@@ -13,7 +13,7 @@ h2{font-size:16px;margin:0 0 10px}
 .card{background:#14201b;border:1px solid rgba(232,240,234,.12);border-radius:12px;padding:14px;margin-bottom:16px}
 img{width:100%;height:auto;display:block;border-radius:8px;background:#101814}
 .note{color:#8aa193;font-size:13px;margin:8px 0 0;line-height:1.5}
-.pos{color:#3dba7a}.neg{color:#e35d5d}.mark{color:#c9a227}
+.pos{color:#3dba7a}.neg{color:#e35d5d}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 18px}
 .kpi{border:1px solid rgba(232,240,234,.12);border-radius:10px;padding:10px}
 .kpi .k{color:#8aa193;font-size:12px} .kpi .v{font-size:18px;margin-top:4px}
@@ -24,55 +24,353 @@ th{color:#8aa193;font-weight:600}
 </style></head>
 <body>
 <div class="wrap">
-  <h1>NQ 一分 K 急跌 V 反 · 近一週 1 筆訊號</h1>
+  <h1>NQ 一分 K 均線多頭排列 · 近一週 40 筆</h1>
   <p class="sub">
-    NQ=F · 2026-08-11 ~ 2026-08-18（7 個交易日曆日） · 8097 根 1m
-    （2026-08-11 00:09 ~ 2026-08-18 22:45 ET）。<br/>
-    規則對齊截圖那根：爆量長陰打穿全部均線 → 90 分鐘內不破低、收回 70% → 收盤站回 MA5/10/20/30/60/100/120/200 且 MA5&gt;MA10&gt;MA20。
-    紅虛線是急跌，綠虛線是進場，金線是前收（16:00 ET）。
+    NQ=F · 2026-08-11 ~ 2026-08-18 · 8155 根 1m
+    （2026-08-11 00:09 ~ 2026-08-18 22:54 ET）。<br/>
+    關注的是均線打開，不是急跌那一根。訊號 = 八條均線首次排成
+    <b>MA5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</b>，且收盤站在全部均線之上。
+    同一段行情 30 分鐘只記一次。綠虛線是排列形成的那一分。
+    截圖 20:30 只是短均開始排；完整八條打開是 <b>08-18 21:30</b>。
   </p>
   <div class="kpis">
-    <div class="kpi"><div class="k">嚴格急跌</div><div class="v">4</div></div>
-    <div class="kpi"><div class="k">未破低收回 70%</div><div class="v">1</div></div>
-    <div class="kpi"><div class="k">站回均線+短均開花</div><div class="v pos">1</div></div>
+    <div class="kpi"><div class="k">短均 5&gt;10&gt;20</div><div class="v">114</div></div>
+    <div class="kpi"><div class="k">中段接到 MA60</div><div class="v">77</div></div>
+    <div class="kpi"><div class="k">完整八條排列</div><div class="v pos">40</div></div>
   </div>
   <div class="card">
-    <h2>條件梯子（同一週、同一份 1m）</h2>
+    <h2>排列梯子（都要求收盤站上全部均線，30 分鐘去重）</h2>
     <table>
-      <tr><th>急跌定義</th><th>急跌事件</th><th>V 收回 70%</th><th>站回全部均線</th><th>再加短均開花＝訊號</th><th>再過前收</th></tr>
-      <tr><td>嚴格（截圖：5×ATR 或 50 點、5×量、跌破全部均線）</td><td>4</td><td>1</td><td>1</td><td class="pos">1</td><td>1</td></tr>
-      <tr><td>中等（3×ATR 或 25 點、3×量、跌破全部均線）</td><td>17</td><td>2</td><td>2</td><td>2</td><td>2</td></tr>
-      <tr><td>寬鬆（2.5×ATR、2.5×量、僅跌破 MA20）</td><td>35</td><td>3</td><td>3</td><td>3</td><td>3</td></tr>
+      <tr><th>均線條件</th><th>近一週訊號</th></tr>
+      <tr><td>短均多頭 MA5&gt;MA10&gt;MA20</td><td>114</td></tr>
+      <tr><td>再加 MA20&gt;MA30&gt;MA60</td><td>77</td></tr>
+      <tr><td>完整 MA5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</td><td class="pos">40</td></tr>
     </table>
-    <p class="note">寬鬆那 2 筆多出來的，多半是 08:30 美股開盤的寬幅 K，不是截圖那種 Globex 夜盤掃蕩。</p>
-  </div>
-  
-  <div class="card">
-    <h2>訊號 08-18 20:30 · 急跌 08-18 20:01</h2>
-    <img src="./img/signal_0818_2001.png" alt="signal 08-18 20:01"/>
     <p class="note">
-      急跌 81.0 點 · 量比 10.0× · ATR 7.5×<br/>
-      進場 29549.50 · 停損 29442.00 · 前收 29581.25 · 突破 08-18 21:05<br/>
-      進場後 15/30/60m：+23.2pt / -13.0pt / +18.2pt
+      完整排列進場後 15/30/60m 平均 +3.6 / +1.2 / +0.2 點，
+      勝率 50% / 40% / 48%。
     </p>
   </div>
-  <h1 style="margin-top:28px">嚴格急跌但沒走出 V</h1>
-  <p class="sub">同一套急跌門檻，90 分鐘內又破了低點，不當訊號。</p>
   
   <div class="card">
-    <h2>急跌未完成 V　08-11 09:30</h2>
-    <img src="./img/fail_0811_0930.png" alt="dump 08-11 09:30"/>
-    <p class="note">急跌 71.2 點 · 量比 9.6× · ATR 5.5× · 90 分鐘內破了急跌低點</p>
+    <h2>08-11 06:26 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0811_0626.png" alt="stack 08-11 06:26"/>
+    <p class="note">
+      進場 29817.00 · 短均相對 MA200 +0.156%<br/>
+      進場後 15/30/60m：<span class="neg">-11.2pt</span> / <span class="neg">-1.2pt</span> / <span class="pos">+18.5pt</span>
+    </p>
   </div>
   <div class="card">
-    <h2>急跌未完成 V　08-12 06:48</h2>
-    <img src="./img/fail_0812_0648.png" alt="dump 08-12 06:48"/>
-    <p class="note">急跌 41.8 點 · 量比 7.2× · ATR 7.4× · 90 分鐘內破了急跌低點</p>
+    <h2>08-11 07:01 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0811_0701.png" alt="stack 08-11 07:01"/>
+    <p class="note">
+      進場 29873.00 · 短均相對 MA200 +0.208%<br/>
+      進場後 15/30/60m：<span class="neg">-3.0pt</span> / <span class="neg">-43.5pt</span> / <span class="neg">-51.2pt</span>
+    </p>
   </div>
   <div class="card">
-    <h2>急跌未完成 V　08-17 08:26</h2>
-    <img src="./img/fail_0817_0826.png" alt="dump 08-17 08:26"/>
-    <p class="note">急跌 52.0 點 · 量比 8.3× · ATR 5.2× · 90 分鐘內破了急跌低點</p>
+    <h2>08-11 16:27 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0811_1627.png" alt="stack 08-11 16:27"/>
+    <p class="note">
+      進場 29668.25 · 短均相對 MA200 +0.187%<br/>
+      進場後 15/30/60m：<span class="pos">+0.2pt</span> / <span class="neg">-18.0pt</span> / <span class="neg">-14.5pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-11 21:03 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0811_2103.png" alt="stack 08-11 21:03"/>
+    <p class="note">
+      進場 29672.00 · 短均相對 MA200 +0.055%<br/>
+      進場後 15/30/60m：<span class="neg">-18.5pt</span> / <span class="neg">-18.5pt</span> / <span class="neg">-8.5pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-11 22:32 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0811_2232.png" alt="stack 08-11 22:32"/>
+    <p class="note">
+      進場 29683.25 · 短均相對 MA200 +0.078%<br/>
+      進場後 15/30/60m：<span class="pos">+12.0pt</span> / <span class="pos">+23.5pt</span> / <span class="pos">+15.2pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-11 23:05 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0811_2305.png" alt="stack 08-11 23:05"/>
+    <p class="note">
+      進場 29706.25 · 短均相對 MA200 +0.133%<br/>
+      進場後 15/30/60m：<span class="neg">-4.0pt</span> / <span class="neg">-4.8pt</span> / <span class="neg">-10.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 02:51 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_0251.png" alt="stack 08-12 02:51"/>
+    <p class="note">
+      進場 29727.75 · 短均相對 MA200 +0.083%<br/>
+      進場後 15/30/60m：<span class="pos">+25.2pt</span> / <span class="pos">+10.2pt</span> / <span class="pos">+5.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 04:03 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_0403.png" alt="stack 08-12 04:03"/>
+    <p class="note">
+      進場 29776.75 · 短均相對 MA200 +0.148%<br/>
+      進場後 15/30/60m：<span class="pos">+1.0pt</span> / <span class="neg">-9.5pt</span> / <span class="pos">+21.8pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 04:54 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_0454.png" alt="stack 08-12 04:54"/>
+    <p class="note">
+      進場 29797.50 · 短均相對 MA200 +0.188%<br/>
+      進場後 15/30/60m：<span class="pos">+12.0pt</span> / <span class="pos">+48.8pt</span> / <span class="pos">+6.8pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 05:36 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_0536.png" alt="stack 08-12 05:36"/>
+    <p class="note">
+      進場 29836.75 · 短均相對 MA200 +0.248%<br/>
+      進場後 15/30/60m：<span class="neg">-23.8pt</span> / <span class="neg">-11.2pt</span> / <span class="pos">+0.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 06:24 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_0624.png" alt="stack 08-12 06:24"/>
+    <p class="note">
+      進場 29842.75 · 短均相對 MA200 +0.182%<br/>
+      進場後 15/30/60m：<span class="neg">-6.0pt</span> / <span class="neg">-25.8pt</span> / <span class="neg">-37.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 08:34 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_0834.png" alt="stack 08-12 08:34"/>
+    <p class="note">
+      進場 29898.00 · 短均相對 MA200 +0.153%<br/>
+      進場後 15/30/60m：<span class="pos">+10.5pt</span> / <span class="pos">+27.5pt</span> / <span class="neg">-19.8pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 09:04 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_0904.png" alt="stack 08-12 09:04"/>
+    <p class="note">
+      進場 29925.50 · 短均相對 MA200 +0.266%<br/>
+      進場後 15/30/60m：<span class="pos">+36.0pt</span> / <span class="neg">-47.2pt</span> / <span class="neg">-68.2pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 13:38 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_1338.png" alt="stack 08-12 13:38"/>
+    <p class="note">
+      進場 29913.75 · 短均相對 MA200 +0.108%<br/>
+      進場後 15/30/60m：<span class="pos">+0.0pt</span> / <span class="neg">-18.0pt</span> / <span class="neg">-2.2pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 22:25 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_2225.png" alt="stack 08-12 22:25"/>
+    <p class="note">
+      進場 29865.75 · 短均相對 MA200 +0.103%<br/>
+      進場後 15/30/60m：<span class="neg">-5.8pt</span> / <span class="pos">+7.2pt</span> / <span class="pos">+8.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 23:03 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_2303.png" alt="stack 08-12 23:03"/>
+    <p class="note">
+      進場 29871.25 · 短均相對 MA200 +0.087%<br/>
+      進場後 15/30/60m：<span class="pos">+6.5pt</span> / <span class="neg">-3.2pt</span> / <span class="pos">+6.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-12 23:50 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0812_2350.png" alt="stack 08-12 23:50"/>
+    <p class="note">
+      進場 29879.50 · 短均相對 MA200 +0.081%<br/>
+      進場後 15/30/60m：<span class="neg">-7.2pt</span> / <span class="neg">-0.5pt</span> / <span class="neg">-2.5pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-13 00:51 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0813_0051.png" alt="stack 08-13 00:51"/>
+    <p class="note">
+      進場 29893.50 · 短均相對 MA200 +0.086%<br/>
+      進場後 15/30/60m：<span class="pos">+1.8pt</span> / <span class="pos">+23.5pt</span> / <span class="pos">+13.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-13 01:27 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0813_0127.png" alt="stack 08-13 01:27"/>
+    <p class="note">
+      進場 29919.75 · 短均相對 MA200 +0.130%<br/>
+      進場後 15/30/60m：<span class="neg">-18.5pt</span> / <span class="neg">-22.2pt</span> / <span class="neg">-24.8pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-13 06:22 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0813_0622.png" alt="stack 08-13 06:22"/>
+    <p class="note">
+      進場 29883.50 · 短均相對 MA200 +0.069%<br/>
+      進場後 15/30/60m：<span class="neg">-10.2pt</span> / <span class="pos">+1.0pt</span> / <span class="neg">-22.2pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-13 06:56 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0813_0656.png" alt="stack 08-13 06:56"/>
+    <p class="note">
+      進場 29884.00 · 短均相對 MA200 +0.075%<br/>
+      進場後 15/30/60m：<span class="neg">-6.0pt</span> / <span class="neg">-24.5pt</span> / <span class="neg">-0.5pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-13 09:42 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0813_0942.png" alt="stack 08-13 09:42"/>
+    <p class="note">
+      進場 30031.25 · 短均相對 MA200 +0.510%<br/>
+      進場後 15/30/60m：<span class="pos">+121.5pt</span> / <span class="pos">+175.8pt</span> / <span class="pos">+212.8pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-13 10:16 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0813_1016.png" alt="stack 08-13 10:16"/>
+    <p class="note">
+      進場 30207.25 · 短均相對 MA200 +0.937%<br/>
+      進場後 15/30/60m：<span class="pos">+42.2pt</span> / <span class="pos">+28.8pt</span> / <span class="pos">+6.2pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-14 03:46 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0814_0346.png" alt="stack 08-14 03:46"/>
+    <p class="note">
+      進場 30197.00 · 短均相對 MA200 +0.113%<br/>
+      進場後 15/30/60m：<span class="pos">+7.5pt</span> / <span class="pos">+25.2pt</span> / <span class="pos">+35.5pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-14 04:38 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0814_0438.png" alt="stack 08-14 04:38"/>
+    <p class="note">
+      進場 30238.00 · 短均相對 MA200 +0.183%<br/>
+      進場後 15/30/60m：<span class="neg">-2.8pt</span> / <span class="neg">-18.0pt</span> / <span class="neg">-25.5pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-14 07:05 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0814_0705.png" alt="stack 08-14 07:05"/>
+    <p class="note">
+      進場 30259.00 · 短均相對 MA200 +0.093%<br/>
+      進場後 15/30/60m：<span class="neg">-13.2pt</span> / <span class="neg">-3.8pt</span> / <span class="pos">+5.5pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-14 07:46 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0814_0746.png" alt="stack 08-14 07:46"/>
+    <p class="note">
+      進場 30258.50 · 短均相對 MA200 +0.061%<br/>
+      進場後 15/30/60m：<span class="pos">+10.2pt</span> / <span class="neg">-28.5pt</span> / <span class="pos">+6.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-14 08:53 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0814_0853.png" alt="stack 08-14 08:53"/>
+    <p class="note">
+      進場 30271.00 · 短均相對 MA200 +0.080%<br/>
+      進場後 15/30/60m：<span class="pos">+5.5pt</span> / <span class="neg">-25.0pt</span> / <span class="neg">-27.8pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-14 15:26 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0814_1526.png" alt="stack 08-14 15:26"/>
+    <p class="note">
+      進場 30095.25 · 短均相對 MA200 +0.043%<br/>
+      進場後 15/30/60m：<span class="pos">+11.8pt</span> / <span class="pos">+22.0pt</span> / <span class="pos">+33.8pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-14 15:59 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0814_1559.png" alt="stack 08-14 15:59"/>
+    <p class="note">
+      進場 30145.00 · 短均相對 MA200 +0.146%<br/>
+      進場後 15/30/60m：<span class="neg">-12.2pt</span> / <span class="neg">-14.0pt</span> / <span class="neg">-3.2pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-14 16:43 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0814_1643.png" alt="stack 08-14 16:43"/>
+    <p class="note">
+      進場 30141.25 · 短均相對 MA200 +0.146%<br/>
+      進場後 15/30/60m：<span class="pos">+6.2pt</span> / <span class="pos">+52.5pt</span> / <span class="pos">+66.8pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-16 18:49 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0816_1849.png" alt="stack 08-16 18:49"/>
+    <p class="note">
+      進場 30203.75 · 短均相對 MA200 +0.238%<br/>
+      進場後 15/30/60m：<span class="neg">-1.0pt</span> / <span class="neg">-9.2pt</span> / <span class="pos">+14.8pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-16 19:50 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0816_1950.png" alt="stack 08-16 19:50"/>
+    <p class="note">
+      進場 30225.25 · 短均相對 MA200 +0.187%<br/>
+      進場後 15/30/60m：<span class="neg">-1.8pt</span> / <span class="neg">-27.0pt</span> / <span class="neg">-33.5pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-16 23:24 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0816_2324.png" alt="stack 08-16 23:24"/>
+    <p class="note">
+      進場 30233.00 · 短均相對 MA200 +0.073%<br/>
+      進場後 15/30/60m：<span class="pos">+6.5pt</span> / <span class="pos">+11.5pt</span> / <span class="pos">+12.5pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-16 23:54 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0816_2354.png" alt="stack 08-16 23:54"/>
+    <p class="note">
+      進場 30244.50 · 短均相對 MA200 +0.090%<br/>
+      進場後 15/30/60m：<span class="pos">+2.8pt</span> / <span class="pos">+1.0pt</span> / <span class="neg">-8.5pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-17 01:45 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0817_0145.png" alt="stack 08-17 01:45"/>
+    <p class="note">
+      進場 30263.25 · 短均相對 MA200 +0.080%<br/>
+      進場後 15/30/60m：<span class="pos">+7.8pt</span> / <span class="pos">+16.8pt</span> / <span class="pos">+51.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-17 02:36 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0817_0236.png" alt="stack 08-17 02:36"/>
+    <p class="note">
+      進場 30308.50 · 短均相對 MA200 +0.172%<br/>
+      進場後 15/30/60m：<span class="pos">+12.5pt</span> / <span class="neg">-7.0pt</span> / <span class="pos">+6.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-17 20:18 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0817_2018.png" alt="stack 08-17 20:18"/>
+    <p class="note">
+      進場 30102.50 · 短均相對 MA200 +0.059%<br/>
+      進場後 15/30/60m：<span class="neg">-3.0pt</span> / <span class="pos">+8.5pt</span> / <span class="neg">-7.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-17 20:50 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0817_2050.png" alt="stack 08-17 20:50"/>
+    <p class="note">
+      進場 30118.25 · 短均相對 MA200 +0.090%<br/>
+      進場後 15/30/60m：<span class="neg">-14.2pt</span> / <span class="neg">-27.5pt</span> / <span class="neg">-109.0pt</span>
+    </p>
+  </div>
+  <div class="card">
+    <h2>08-18 21:30 · 5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</h2>
+    <img src="./img/stack_0818_2130.png" alt="stack 08-18 21:30"/>
+    <p class="note">
+      進場 29600.00 · 短均相對 MA200 +0.180%<br/>
+      進場後 15/30/60m：<span class="neg">-34.2pt</span> / <span class="neg">-26.8pt</span> / <span class="neg">-60.2pt</span>
+    </p>
   </div>
 </div>
 </body>
