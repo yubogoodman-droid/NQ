@@ -49,6 +49,8 @@ python3 examples/run_v_recovery.py
 
 會印條件梯子，並寫 `docs/nq-1m-v/index.html`。
 
+外網：https://yubogoodman-droid.github.io/NQ/nq-1m-v/
+
 ## 快速開始
 
 ```bash
