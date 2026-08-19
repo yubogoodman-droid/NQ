@@ -41,11 +41,11 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 ## 15 分 K 同時突破六條均線
 
-一根 15 分鐘 K：前一根收盤完全在 MA7 / 14 / 25 / 99 / 120 / 200 下方，這一根收盤完全站上六條均線。進場用下一根開盤。圖例每筆底下附同一時間的 1 小時圖。1 小時只當濾網：上一根完整 1h 已站上整條帶且距 1h MA200 不超過 8%，或 15m 收已站上 1h MA200、1h 帶子不寬、同樣未延伸。超過 8% 當追價（BSB / IREN 那種）濾掉。
+一根 15 分鐘 K：前一根收盤完全在 MA7 / 14 / 25 / 99 / 120 / 200 下方，這一根收盤完全站上六條均線。進場用下一根開盤。圖例每筆底下附同一時間的 1 小時圖，只做對照，不當進出場濾網。
 
 ```bash
 python3 examples/backtest_15m_ribbon.py --demo
-python3 examples/backtest_15m_ribbon.py --days 30 --pages
+python3 examples/backtest_15m_ribbon.py --days 7 --pages
 ```
 
 報告：`docs/binance/ma-ribbon-15m.html`
