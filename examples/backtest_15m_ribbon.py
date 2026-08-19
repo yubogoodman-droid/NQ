@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.ribbon15 import (
     H1_FILTERS,
+    H1_RECOMMENDED,
     HORIZONS,
     MA_PERIODS,
     SignalRow,
@@ -290,7 +291,12 @@ def _subset_stats(name: str, subset: list[SignalRow]) -> dict:
 
 
 def pick_h1_rule(h1_stats: list[dict], *, min_n: int) -> dict | None:
-    """只從事先列的濾網裡挑：筆數夠、4h 勝率明顯高於原始。對照組不挑。"""
+    """預先指定的濾網；沒資料時才退回門檻挑選。"""
+    by_key = {s.get("key"): s for s in h1_stats if s.get("key")}
+    for _name, key in H1_RECOMMENDED:
+        s = by_key.get(key)
+        if s and s["count"] >= max(8, min_n // 2):
+            return s
     if not h1_stats:
         return None
     raw = h1_stats[0]
@@ -312,6 +318,16 @@ def pick_h1_rule(h1_stats: list[dict], *, min_n: int) -> dict | None:
         return None
     ranked.sort(key=lambda s: (s["h16"]["wr"], s["count"], s["h16"]["avg"]), reverse=True)
     return ranked[0]
+
+
+def h1_recs_from_stats(h1_stats: list[dict]) -> list[dict]:
+    by_key = {s.get("key"): s for s in h1_stats if s.get("key")}
+    out = []
+    for _name, key in H1_RECOMMENDED:
+        s = by_key.get(key)
+        if s:
+            out.append(s)
+    return out
 
 
 def pick_gallery(rows: list[SignalRow], limit: int = 24, *, summary_h: int = 16) -> list[SignalRow]:
@@ -351,7 +367,7 @@ def h1_caption(row: SignalRow) -> str:
     return f"1h {loc} · {hour} · 15m收在1h {ma}（{h.dist_ma200_pct:+.2f}%）"
 
 
-def kpi_block(stats: list[dict], *, summary_h: int = 16, h1_best: dict | None = None) -> str:
+def kpi_block(stats: list[dict], *, summary_h: int = 16, h1_recs: list[dict] | None = None) -> str:
     if not stats:
         return ""
     by = {s["name"]: s for s in stats}
@@ -367,10 +383,12 @@ def kpi_block(stats: list[dict], *, summary_h: int = 16, h1_best: dict | None = 
         ("寬度≤1%", str(tight["count"])),
         ("寬度>1% 4h均", f"{wide[f'h{summary_h}']['avg']:+.2f}%"),
     ]
-    if h1_best:
-        bh = h1_best[f"h{summary_h}"]
-        cards.append(("1h濾網筆數", str(h1_best["count"])))
-        cards.append(("1h濾網 4h勝率", f"{bh['wr']:.1f}%"))
+    if h1_recs:
+        for s in h1_recs[:2]:
+            bh = s[f"h{summary_h}"]
+            label = "嚴：1h已站上帶" if s.get("key") == "above_ribbon" else "寬：價上MA200且帶緊"
+            cards.append((label, f"{bh['wr']:.1f}%"))
+            cards.append((f"{label}筆數", str(s["count"])))
     html_cards = []
     for k, v in cards:
         cls = ""
@@ -379,7 +397,7 @@ def kpi_block(stats: list[dict], *, summary_h: int = 16, h1_best: dict | None = 
                 cls = "pos" if float(v.strip("%").replace("+", "")) > 0 else "neg"
             except ValueError:
                 cls = ""
-        if k in ("4h 勝率", "1h濾網 4h勝率"):
+        if "勝率" in k:
             try:
                 cls = "pos" if float(v.strip("%")) >= 50 else "neg"
             except ValueError:
@@ -509,9 +527,101 @@ def write_html(
     rows: list[SignalRow],
     stats: list[dict],
     h1_stats: list[dict],
-    h1_best: dict | None,
+    h1_recs: list[dict],
+    h1_week_stats: list[dict] | None,
     gallery: list[tuple[SignalRow, str, str | None]],
 ) -> None:
+    now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
+    first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
+    last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
+    rec_bits = []
+    for s in h1_recs:
+        rec_bits.append(
+            f"{html.escape(s['name'])}：{s['count']} 筆、4h 勝率 {s['h16']['wr']:.1f}%、均 {s['h16']['avg']:+.2f}%"
+        )
+    rec_txt = "；".join(rec_bits) if rec_bits else "沒有預先指定的 1h 濾網可顯示。"
+    week_block = ""
+    if h1_week_stats:
+        week_block = f"""
+  <div class="card">
+    <h2>最近 7 天同一組 1h 濾網（容易過擬合，只拿來對照）</h2>
+    <div class="table-wrap">
+      {stats_table(h1_week_stats)}
+    </div>
+    <p class="note">這週「1h 收在 MA99 上」看起來很好，拉長到 {days} 天後差距會收掉。不要只看一週就定規則。</p>
+  </div>"""
+    page = f"""<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>15分K 同時突破 7/14/25/99/120/200</title>
+<style>
+body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
+.wrap{{max-width:1100px;margin:0 auto;padding:20px 14px 56px}}
+h1{{font-size:22px;margin:0 0 8px}}
+h2{{font-size:16px;margin:0 0 10px}}
+.sub{{color:#8aa193;line-height:1.65;margin:0 0 16px}}
+.card{{background:#14201b;border:1px solid rgba(232,240,234,.12);border-radius:12px;padding:14px;margin-bottom:16px}}
+img{{width:100%;height:auto;display:block;border-radius:8px;background:#101814;margin:6px 0 10px}}
+.note{{color:#8aa193;font-size:13px;margin:8px 0 0;line-height:1.5}}
+.cap{{color:#c9a227;font-size:12px;margin:10px 0 0}}
+.pos{{color:#3dba7a}}.neg{{color:#e35d5d}}.mark{{color:#c9a227}}
+.kpis{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}}
+.kpi{{border:1px solid rgba(232,240,234,.12);border-radius:10px;padding:10px}}
+.kpi .k{{color:#8aa193;font-size:12px}} .kpi .v{{font-size:18px;margin-top:4px}}
+.table-wrap{{overflow:auto}}
+table{{width:100%;border-collapse:collapse;font-size:13px}}
+th,td{{padding:7px 8px;border-bottom:1px solid rgba(232,240,234,.12);white-space:nowrap;text-align:right}}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){{text-align:left}}
+th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
+@media(max-width:720px){{.kpis{{grid-template-columns:1fr 1fr}}}}
+</style></head>
+<body>
+<div class="wrap">
+  <h1>一根 15 分 K 同時突破 7 / 14 / 25 / 99 / 120 / 200</h1>
+  <p class="sub">
+    前一根收盤完全在六條均線下方，這一根收盤完全站上六條均線。進場用訊號下一根開盤。
+    掃描幣安 U 本位永續近 {days} 天、{universe_n} 個流動合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
+    圖例每筆上面是 15 分，底下是同一時間的 1 小時圖。僅供型態對照，不是進出場建議。
+  </p>
+  <div class="kpis">
+    {kpi_block(stats, summary_h=16, h1_recs=h1_recs)}
+  </div>
+  <p class="sub">
+    1 小時濾網只用訊號當下已收完的小時 K，不偷看還在走的那根收盤。
+    能把 4h 勝率拉開、而且 7 天與 {days} 天方向一致的：{rec_txt}。
+    代價是成交變少。1h 還在整條帶下的 15 分穿刺，短線勝率不一定差，平均常被少數大漲拉高，但不穩。
+  </p>
+  <h1>圖例</h1>
+  <p class="sub">黃虛線：15 分圖是穿越六條均線的那根；1 小時圖是這根 15 分所在的小時 K。圖例優先抽「1h 已站上帶」和「價上 1h MA200 且帶子不寬」。</p>
+  {gallery_html(gallery)}
+  <div class="card">
+    <h2>用 1 小時當濾網（{days} 天）</h2>
+    <p class="note" style="margin:0 0 10px">只看訊號當下已收完的 1 小時 K。當根小時「已翻綠」= 這根 15 分收盤已經高於該小時開盤，幾乎每筆都會過，所以沒有區分度。</p>
+    <div class="table-wrap">
+      {stats_table(h1_stats)}
+    </div>
+  </div>
+  {week_block}
+  <div class="card">
+    <h2>15 分自己的過濾對照</h2>
+    <div class="table-wrap">
+      {stats_table(stats)}
+    </div>
+    <p class="note">寬度 =（最高均線 / 最低均線 − 1）× 100%，用突破前一根的均線。假突破 = 進場那根 15 分收盤又跌回最高均線下方。</p>
+  </div>
+  <div class="card">
+    <h2>訊號表（依 4h 報酬排序，最多 80 筆）</h2>
+    <div class="table-wrap">
+      {signal_table(rows)}
+    </div>
+  </div>
+</div>
+</body></html>
+"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(page, encoding="utf-8")
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
@@ -741,16 +851,29 @@ def main() -> int:
     print(f"對上 1h 狀態 {n_h1}/{len(rows)} 筆", flush=True)
     h1_stats = h1_filter_stats(rows)
     print_filter_table("1 小時濾網", h1_stats)
-    min_n = 18 if len(rows) >= 80 else max(8, len(rows) // 6)
-    h1_best = pick_h1_rule(h1_stats, min_n=min_n)
-    if h1_best:
+    h1_recs = h1_recs_from_stats(h1_stats)
+    h1_week_stats = None
+    if args.days >= 14 and data:
+        end_ms = max(int(d["t"][-1]) for d in data.values())
+        week_cut = end_ms - 7 * 24 * 60 * 60 * 1000
+        week_rows = [r for r in rows if r.time_ms >= week_cut]
+        h1_week_stats = h1_filter_stats(week_rows)
+        print_filter_table("最近 7 天 1 小時濾網", h1_week_stats)
+    for s in h1_recs:
         print(
-            f"\n選用濾網：{h1_best['name']}  n={h1_best['count']}  "
-            f"4h勝率 {h1_best['h16']['wr']:.1f}%  均 {h1_best['h16']['avg']:+.3f}%"
+            f"預設濾網：{s['name']}  n={s['count']}  "
+            f"4h勝率 {s['h16']['wr']:.1f}%  均 {s['h16']['avg']:+.3f}%"
         )
-        gallery_src = apply_h1_filter(rows, h1_best["key"]) or rows
-    else:
-        print("\n沒有通過門檻的 1h 濾網（要筆數夠、4h 勝率至少高 3 個百分點、平均不掉太多）")
+    gallery_src: list[SignalRow] = []
+    seen_g = set()
+    for _name, key in H1_RECOMMENDED:
+        for r in apply_h1_filter(rows, key):
+            k = (r.symbol, r.time_ms)
+            if k in seen_g:
+                continue
+            seen_g.add(k)
+            gallery_src.append(r)
+    if not gallery_src:
         gallery_src = rows
 
     img15 = Path("docs/binance/img/ribbon15")
@@ -820,7 +943,8 @@ def main() -> int:
             rows=rows,
             stats=stats,
             h1_stats=h1_stats,
-            h1_best=h1_best,
+            h1_recs=h1_recs,
+            h1_week_stats=h1_week_stats,
             gallery=gallery,
         )
         print(f"\n已寫入 {out_html}  圖 {len(gallery)} 組（15m + 1h）")
@@ -836,7 +960,8 @@ def main() -> int:
                 "hourly_attached": n_h1,
                 "filters": stats,
                 "h1_filters": h1_stats,
-                "h1_best": h1_best,
+                "h1_recommended": h1_recs,
+                "h1_week": h1_week_stats,
                 "html": str(out_html),
                 "charts": len(gallery),
             },

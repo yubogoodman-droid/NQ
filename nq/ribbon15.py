@@ -281,6 +281,12 @@ H1_FILTERS = (
     ("組合：小時綠 + 價上 MA200 + 非帶下 + 實體", "best_bundle"),
 )
 
+# 7 天與 30 天都把 4h 勝率拉開的濾網（樣本較少的寫在前）。
+H1_RECOMMENDED = (
+    ("1h 已站上整條帶", "above_ribbon"),
+    ("價在 1h MA200 上 + 1h 帶寬≤2%", "px_ma200_tight"),
+)
+
 
 def apply_h1_filter(rows: list["SignalRow"], key: str) -> list["SignalRow"]:
     return [r for r in rows if row_h1_match(r, key)]
