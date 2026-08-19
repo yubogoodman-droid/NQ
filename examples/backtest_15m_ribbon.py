@@ -75,6 +75,24 @@ def get_json(path: str, params=None, retries: int = 6):
     raise last
 
 
+def report_paths(asset: str) -> dict[str, Path | str]:
+    if asset == "stocks":
+        return {
+            "html": Path("docs/binance/ma-ribbon-15m-stocks.html"),
+            "img15": Path("docs/binance/img/ribbon15-stocks"),
+            "img1h": Path("docs/binance/img/ribbon1h-stocks"),
+            "rel15": "./img/ribbon15-stocks",
+            "rel1h": "./img/ribbon1h-stocks",
+        }
+    return {
+        "html": Path("docs/binance/ma-ribbon-15m.html"),
+        "img15": Path("docs/binance/img/ribbon15"),
+        "img1h": Path("docs/binance/img/ribbon1h"),
+        "rel15": "./img/ribbon15",
+        "rel1h": "./img/ribbon1h",
+    }
+
+
 def universe(*, asset: str = "all") -> list[str]:
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
@@ -470,6 +488,7 @@ def write_html(
     days: int,
     universe_n: int,
     universe_label: str,
+    asset: str,
     rows: list[SignalRow],
     stats: list[dict],
     gallery: list[tuple[SignalRow, str, str | None]],
@@ -477,18 +496,28 @@ def write_html(
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
+    if asset == "stocks":
+        page_title = "15分K 股票 同時站上 7/14/25/99/120"
+        heading = "股票：一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120"
+        nav = '<b>只要股票</b> · <a href="./ma-ribbon-15m.html">全部流動盤</a>'
+    else:
+        page_title = "15分K 同時站上 7/14/25/99/120"
+        heading = "一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120"
+        nav = '<b>全部流動盤</b> · <a href="./ma-ribbon-15m-stocks.html">只要股票</a>'
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>15分K 同時站上 7/14/25/99/120</title>
+<title>{html.escape(page_title)}</title>
 <style>
 body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
 .wrap{{max-width:1100px;margin:0 auto;padding:20px 14px 56px}}
 h1{{font-size:22px;margin:0 0 8px}}
 h2{{font-size:16px;margin:0 0 10px}}
 .sub{{color:#8aa193;line-height:1.65;margin:0 0 16px}}
+.nav{{color:#8aa193;margin:0 0 14px}}
+.nav a{{color:#c9a227}}
 .card{{background:#14201b;border:1px solid rgba(232,240,234,.12);border-radius:12px;padding:14px;margin-bottom:16px}}
 img{{width:100%;height:auto;display:block;border-radius:8px;background:#101814;margin:6px 0 10px}}
 .note{{color:#8aa193;font-size:13px;margin:8px 0 0;line-height:1.5}}
@@ -506,7 +535,8 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
 </style></head>
 <body>
 <div class="wrap">
-  <h1>一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120</h1>
+  <p class="nav">{nav}</p>
+  <h1>{html.escape(heading)}</h1>
   <p class="sub">
     前一根收盤完全在這五條均線下方，這一根收盤同時站上。不必過 MA200。進場用訊號下一根開盤。
     掃描幣安 {universe_label}近 {days} 天、{universe_n} 個合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
@@ -607,7 +637,7 @@ def main() -> int:
     p.add_argument("--days", type=int, default=7, help="回測天數（訊號窗口；前面另留 MA200 熱身）")
     p.add_argument("--asset", choices=("all", "stocks"), default="all", help="all=加密+股票流動盤；stocks=只要股票永續")
     p.add_argument("--workers", type=int, default=8)
-    p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma-ribbon-15m.html")
+    p.add_argument("--pages", action="store_true", help="寫入 docs/binance 報告（全部或股票各一頁）")
     p.add_argument("-o", "--output", help="HTML 輸出路徑")
     p.add_argument("--limit-symbols", type=int, default=0, help="除錯用，只掃前 N 個幣")
     args = p.parse_args()
@@ -634,8 +664,11 @@ def main() -> int:
             f"假突破 {s['fail15_pct']:.1f}%"
         )
 
-    img15 = Path("docs/binance/img/ribbon15")
-    img1h = Path("docs/binance/img/ribbon1h")
+    paths = report_paths(args.asset)
+    img15 = Path(paths["img15"])
+    img1h = Path(paths["img1h"])
+    rel15 = str(paths["rel15"])
+    rel1h_dir = str(paths["rel1h"])
     img15.mkdir(parents=True, exist_ok=True)
     img1h.mkdir(parents=True, exist_ok=True)
     for old in list(img15.glob("*.png")) + list(img1h.glob("*.png")):
@@ -675,7 +708,7 @@ def main() -> int:
             summary_label="4h",
         ):
             continue
-        rel1h = None
+        chart_1h = None
         d1 = data_1h.get(row.symbol)
         if d1 is not None:
             hi = h1_index(d1, row.time_ms)
@@ -692,18 +725,19 @@ def main() -> int:
                     before=36,
                     after=12,
                 ):
-                    rel1h = f"./img/ribbon1h/{fname1h}"
-        gallery.append((row, f"./img/ribbon15/{fname15}", rel1h))
+                    chart_1h = f"{rel1h_dir}/{fname1h}"
+        gallery.append((row, f"{rel15}/{fname15}", chart_1h))
 
-    out_html = Path(args.output) if args.output else Path("docs/binance/ma-ribbon-15m.html")
+    out_html = Path(args.output) if args.output else Path(paths["html"])
     if args.pages:
-        out_html = Path("docs/binance/ma-ribbon-15m.html")
+        out_html = Path(paths["html"])
     write_html(
         path=out_html,
         days=args.days,
         universe_n=len(symbols),
-            universe_label=uni_label,
-            rows=rows,
+        universe_label=uni_label,
+        asset=args.asset,
+        rows=rows,
         stats=stats,
         gallery=gallery,
     )

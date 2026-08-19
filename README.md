@@ -49,10 +49,13 @@ python3 examples/backtest_15m_ribbon.py --days 7 --pages
 python3 examples/backtest_15m_ribbon.py --days 7 --asset stocks --pages   # 只要股票
 ```
 
-報告：`docs/binance/ma-ribbon-15m.html`
+報告：
+- 全部流動盤：`docs/binance/ma-ribbon-15m.html`
+- 只要股票：`docs/binance/ma-ribbon-15m-stocks.html`
 
 外網：  
-https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html
+https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html  
+https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m-stocks.html
 
 合併進 `main` 後 GitHub Pages：  
 https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html
@@ -95,7 +98,8 @@ python3 examples/chart_today.py
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
 3. **15 分 K 五均線回測**  
-   https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html
+   全部：https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html  
+   股票：https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m-stocks.html
 
 ## TradingView
 
