@@ -229,6 +229,10 @@ def row_h1_match(row: "SignalRow", key: str) -> bool:
         return not h.px_above_ma200
     if key == "near_ma200":
         return h.px_above_ma200 and 0.0 <= h.dist_ma200_pct <= 2.0
+    if key == "not_extended":
+        return h.dist_ma200_pct <= 8.0
+    if key == "extended":
+        return h.dist_ma200_pct > 8.0
     if key == "tight":
         return h.width_pct <= 1.5
     if key == "not_below":
@@ -241,8 +245,12 @@ def row_h1_match(row: "SignalRow", key: str) -> bool:
         return h.above_ma200 and row.body_through
     if key == "px_ma200_tight":
         return h.px_above_ma200 and h.width_pct <= 2.0
+    if key == "px_ma200_tight_near":
+        return h.px_above_ma200 and h.width_pct <= 2.0 and h.dist_ma200_pct <= 8.0
     if key == "h1_ma200_near":
         return h.above_ma200 and h.px_above_ma200 and 0.0 <= h.dist_ma200_pct <= 2.0
+    if key == "above_ribbon_near":
+        return h.above_ribbon and h.dist_ma200_pct <= 8.0
     if key == "trend_continue":
         return h.above_ma200 and h.forming_green and not h.below_ribbon
     if key == "best_bundle":
@@ -270,21 +278,25 @@ H1_FILTERS = (
     ("15m 收盤站上 1h MA200", "px_above_ma200"),
     ("15m 收盤站上 1h 帶頂", "px_above_ribbon"),
     ("離 1h MA200 0～2%", "near_ma200"),
+    ("（對照）距 1h MA200 > 8%（追價）", "extended"),
+    ("距 1h MA200 ≤ 8%", "not_extended"),
     ("1h 帶寬 ≤ 1.5%", "tight"),
     ("排除：1h 還在帶下", "not_below"),
     ("當根小時綠 + 價在 1h MA200 上", "form_green_px_ma200"),
     ("1h 收 MA200 上 + 小時已綠", "h1_ma200_form_green"),
     ("1h 收 MA200 上 + 15m 實體穿越", "h1_ma200_body"),
     ("價在 1h MA200 上 + 1h 帶寬≤2%", "px_ma200_tight"),
+    ("價上 MA200、帶緊、未延伸", "px_ma200_tight_near"),
     ("1h 收 MA200 上且未延伸", "h1_ma200_near"),
+    ("1h 已站上帶且距 MA200 ≤ 8%", "above_ribbon_near"),
     ("順勢：1h 在 MA200 上且小時已綠", "trend_continue"),
     ("組合：小時綠 + 價上 MA200 + 非帶下 + 實體", "best_bundle"),
 )
 
-# 7 天與 30 天都把 4h 勝率拉開的濾網（樣本較少的寫在前）。
+# 7 天與 30 天都把 4h 勝率拉開，並濾掉 BSB/IREN 那種 1h 已拉很遠的追價。
 H1_RECOMMENDED = (
-    ("1h 已站上整條帶", "above_ribbon"),
-    ("價在 1h MA200 上 + 1h 帶寬≤2%", "px_ma200_tight"),
+    ("1h 已站上帶且距 MA200 ≤ 8%", "above_ribbon_near"),
+    ("價上 MA200、帶緊、未延伸", "px_ma200_tight_near"),
 )
 
 

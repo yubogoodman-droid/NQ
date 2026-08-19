@@ -386,7 +386,7 @@ def kpi_block(stats: list[dict], *, summary_h: int = 16, h1_recs: list[dict] | N
     if h1_recs:
         for s in h1_recs[:2]:
             bh = s[f"h{summary_h}"]
-            label = "嚴：1h已站上帶4h勝率" if s.get("key") == "above_ribbon" else "寬：價上MA200帶緊4h勝率"
+            label = "嚴：站上帶且未延伸4h勝率" if s.get("key") == "above_ribbon_near" else "寬：帶緊且未延伸4h勝率"
             cards.append((label, f"{bh['wr']:.1f}%"))
             cards.append((f"{label}筆數".replace("4h勝率", ""), str(s["count"])))
     html_cards = []
@@ -591,10 +591,11 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <p class="sub">
     1 小時濾網只用訊號當下已收完的小時 K，不偷看還在走的那根收盤。
     能把 4h 勝率拉開、而且 7 天與 {days} 天方向一致的：{rec_txt}。
+    另外濾掉「15m 收盤比 1h MA200 高出超過 8%」的追價（BSB / IREN 那種 1h 已經拉很遠、短均還黏在現價上面）。
     代價是成交變少。1h 還在整條帶下的 15 分穿刺，短線勝率不一定差，平均常被少數大漲拉高，但不穩。
   </p>
   <h1>圖例</h1>
-  <p class="sub">黃虛線：15 分圖是穿越六條均線的那根；1 小時圖是這根 15 分所在的小時 K。圖例優先抽「1h 已站上帶」和「價上 1h MA200 且帶子不寬」。</p>
+  <p class="sub">黃虛線：15 分圖是穿越六條均線的那根；1 小時圖是這根 15 分所在的小時 K。圖例只抽濾網後的樣本，不再把追價虧單補進來。</p>
   {gallery_html(gallery)}
   <div class="card">
     <h2>用 1 小時當濾網（{days} 天）</h2>
@@ -803,15 +804,6 @@ def main() -> int:
         for old in list(img15.glob("*.png")) + list(img1h.glob("*.png")):
             old.unlink()
         gallery_rows = pick_gallery(gallery_src, summary_h=16)
-        extra = pick_gallery(rows, summary_h=16)
-        seen = {(r.symbol, r.time_ms) for r in gallery_rows}
-        for r in extra:
-            if (r.symbol, r.time_ms) in seen:
-                continue
-            gallery_rows.append(r)
-            seen.add((r.symbol, r.time_ms))
-            if len(gallery_rows) >= 24:
-                break
         for row in gallery_rows:
             d = data.get(row.symbol)
             if d is None:
