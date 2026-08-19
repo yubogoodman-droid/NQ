@@ -254,6 +254,20 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
     )
 
 
+def crcl_card(rows: list[SignalRow]) -> str:
+    mine = [r for r in rows if r.symbol == "CRCLUSDT"]
+    cross = [r for r in mine if r.crossed_200d]
+    if not mine:
+        return '<div class="card"><h2>CRCL</h2><p class="note">這段期間沒有訊號。</p></div>'
+    st = summarize_rows(cross, 16) if cross else summarize_rows(mine, 16)
+    return f"""<div class="card">
+    <h2>CRCL</h2>
+    <p class="note">組合剛成立 {len(mine)} 筆，其中剛站上 15m MA200 {len(cross)} 筆。
+    剛站上那組 4h 勝率 {st['wr']:.1f}%　4h 均 {st['avg']:+.3f}%　4h 中位 {st['med']:+.3f}%。</p>
+    <div class="table-wrap">{signal_table(cross or mine, limit=40)}</div>
+  </div>"""
+
+
 PUBLIC_PAGE = (
     "https://htmlpreview.github.io/?"
     "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
@@ -343,6 +357,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">{kpi_block(stats)}</div>
+  {crcl_card(rows)}
   <h1>圖例</h1>
   <p class="sub">黃虛線是訊號 K。白線是 15 分 MA200。CRCL 若有訊號會釘在最上面。</p>
   {gallery_html(gallery)}
@@ -453,7 +468,7 @@ def main() -> int:
     for old in img_dir.glob("*.png"):
         old.unlink()
     gallery: list[tuple[SignalRow, str]] = []
-    for row in pick_gallery(rows):
+    for row in pick_gallery(rows, limit=24):
         d = data.get(row.symbol)
         if d is None:
             continue

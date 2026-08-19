@@ -28,7 +28,7 @@
 
 ```bash
 python3 examples/backtest_15m_bull.py --demo
-python3 examples/backtest_15m_bull.py --days 7 --pages   # 寫入 docs/binance/ma15-bull.html
+python3 examples/backtest_15m_bull.py --days 90 --pages   # 近 90 天完整回測，寫入 docs/binance/ma15-bull.html
 ```
 
 外網看圖（請用這個，圖已內嵌）：  
