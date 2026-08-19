@@ -41,7 +41,9 @@ from nq.ribbon15 import (
 
 TZ = timezone(timedelta(hours=8))
 BASE = "https://www.binance.com"
-KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT"}
+KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT", "HK1810USDT"}
+PIN_GALLERY = {"HK1810USDT"}  # 小米：15 分條件過了就畫，不因 1h 濾網從圖例消失
+DISPLAY = {"HK1810USDT": "小米"}
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"})
 
@@ -163,6 +165,12 @@ def hm(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, TZ).strftime("%m-%d %H:%M")
 
 
+def sym_label(symbol: str) -> str:
+    base = symbol.replace("USDT", "")
+    name = DISPLAY.get(symbol)
+    return f"{name} {base}" if name else base
+
+
 def pct(v: float | None) -> str:
     if v is None:
         return "—"
@@ -247,7 +255,7 @@ def draw_chart(
         d,
         row.break_.idx,
         path,
-        title=f"{sym}  {interval}  {hm(row.time_ms)}{rtxt}",
+        title=f"{sym_label(sym)}  {interval}  {hm(row.time_ms)}{rtxt}",
     )
 
 
@@ -449,7 +457,7 @@ def signal_table(
         body_tag = "是" if r.body_through else ""
         tds = [
             hm(r.time_ms),
-            r.symbol.replace("USDT", ""),
+            html.escape(sym_label(r.symbol)),
             f"{r.entry:g}",
             f"{r.width_pct:.2f}%",
             f"{r.vol_ratio:.2f}×",
@@ -502,7 +510,7 @@ def gallery_html(
   <img src="{html.escape(src1h)}" alt="{html.escape(row.symbol)} 1h {hm(row.time_ms)}"/>"""
         cards.append(
             f"""<div class="card">
-  <h2>{html.escape(row.symbol.replace("USDT",""))} {hm(row.time_ms)} · 4h <span class="{cls}">{ret_s}</span></h2>
+  <h2>{html.escape(sym_label(row.symbol))} {hm(row.time_ms)} · 4h <span class="{cls}">{ret_s}</span></h2>
   <p class="cap">15 分圖 · 黃虛線是同時穿過六條均線的那根</p>
   <img src="{html.escape(src15)}" alt="{html.escape(row.symbol)} {hm(row.time_ms)}"/>
   {h1}
@@ -595,7 +603,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     代價是成交變少。1h 還在整條帶下的 15 分穿刺，短線勝率不一定差，平均常被少數大漲拉高，但不穩。
   </p>
   <h1>圖例</h1>
-  <p class="sub">黃虛線：15 分圖是穿越六條均線的那根；1 小時圖是這根 15 分所在的小時 K。圖例只抽濾網後的樣本，不再把追價虧單補進來。</p>
+  <p class="sub">黃虛線：15 分圖是穿越六條均線的那根；1 小時圖是這根 15 分所在的小時 K。圖例以 1h 濾網後的樣本為主；小米（HK1810）只要 15 分條件過就留在最上面，方便對照。</p>
   {gallery_html(gallery)}
   <div class="card">
     <h2>用 1 小時當濾網（{days} 天）</h2>
@@ -794,6 +802,18 @@ def main() -> int:
             gallery_src.append(r)
     if not gallery_src:
         gallery_src = rows
+    pinned = [r for r in rows if r.symbol in PIN_GALLERY]
+    pinned.sort(key=lambda r: r.time_ms, reverse=True)
+    pin_front: list[SignalRow] = []
+    seen_pin = set()
+    for r in pinned:
+        k = (r.symbol, r.time_ms)
+        if k in seen_pin:
+            continue
+        seen_pin.add(k)
+        pin_front.append(r)
+        if len(pin_front) >= 2:
+            break
 
     img15 = Path("docs/binance/img/ribbon15")
     img1h = Path("docs/binance/img/ribbon1h")
@@ -803,7 +823,15 @@ def main() -> int:
         img1h.mkdir(parents=True, exist_ok=True)
         for old in list(img15.glob("*.png")) + list(img1h.glob("*.png")):
             old.unlink()
-        gallery_rows = pick_gallery(gallery_src, summary_h=16)
+        chosen = pick_gallery(gallery_src, summary_h=16)
+        seen = {(r.symbol, r.time_ms) for r in pin_front}
+        gallery_rows = list(pin_front)
+        for r in chosen:
+            k = (r.symbol, r.time_ms)
+            if k in seen:
+                continue
+            seen.add(k)
+            gallery_rows.append(r)
         for row in gallery_rows:
             d = data.get(row.symbol)
             if d is None:
@@ -834,7 +862,7 @@ def main() -> int:
                         d1,
                         hi,
                         out1h,
-                        title=f"{row.symbol}  1h  {hm(row.time_ms)}",
+                        title=f"{sym_label(row.symbol)}  1h  {hm(row.time_ms)}",
                         before=36,
                         after=12,
                     ):
