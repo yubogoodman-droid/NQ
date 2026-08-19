@@ -36,7 +36,15 @@ from nq.ma15_bull import (
 )
 
 TZ = timezone(timedelta(hours=8))
-DISPLAY = {"HK1810USDT": "小米", "CRCLUSDT": "CRCL"}
+DISPLAY = {
+    "HK1810USDT": "小米",
+    "CRCLUSDT": "CRCL",
+    "HK0700USDT": "騰訊",
+    "TENCENTUSDT": "騰訊",
+    "MEITUANUSDT": "美團",
+    "KUAISHOUUSDT": "快手",
+    "POPMARTUSDT": "泡泡瑪特",
+}
 PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 200: "#ffffff"}
 HORIZON_LABEL = {1: "15m", 2: "30m", 4: "1h", 8: "2h", 16: "4h", 32: "8h"}
 FILTERS = (
@@ -274,6 +282,11 @@ PUBLIC_PAGE = (
     "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
     "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html"
 )
+PUBLIC_PAGE_STOCKS = (
+    "https://htmlpreview.github.io/?"
+    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+    "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html"
+)
 
 
 def public_img_src(rel: str) -> str:
@@ -315,16 +328,29 @@ def write_html(
     rows: list[SignalRow],
     stats: list[dict],
     gallery: list[tuple[SignalRow, str]],
+    stocks_only: bool = False,
 ) -> None:
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
+    public = PUBLIC_PAGE_STOCKS if stocks_only else PUBLIC_PAGE
+    title = "15分K 7/14/25 多頭 · 幣安股票 · 站上 MA200" if stocks_only else "15分K 7/14/25 多頭 · 站上 MA200"
+    heading = (
+        "15 分 K：7 / 14 / 25 多頭排列，收盤站上 15 分 MA200（只掃幣安股票）"
+        if stocks_only
+        else "15 分 K：7 / 14 / 25 多頭排列，收盤站上 15 分 MA200"
+    )
+    universe_txt = (
+        f"只掃幣安 TradFi 股票永續（美／港／韓／中股、股票 ETF、Pre-IPO；不含黃金原油等商品）近 {days} 天、{universe_n} 個合約。"
+        if stocks_only
+        else f"掃描幣安 U 本位流動永續近 {days} 天、{universe_n} 個合約。"
+    )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>15分K 7/14/25 多頭 · 站上 MA200</title>
+<title>{html.escape(title)}</title>
 <style>
 body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
 .wrap{{max-width:1100px;margin:0 auto;padding:20px 14px 56px}}
@@ -348,13 +374,13 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
 </style></head>
 <body>
 <div class="wrap">
-  <h1>15 分 K：7 / 14 / 25 多頭排列，收盤站上 15 分 MA200</h1>
+  <h1>{html.escape(heading)}</h1>
   <p class="sub">
     規則：15 分 SMA7 &gt; SMA14 &gt; SMA25，且收盤高於<strong>同一張 15 分圖的 SMA200</strong>（不是日線 200 日）。
     Telegram 通知只用「本根剛站上 MA200」：前收還在 MA200 下，這一根收盤站上，同時短均已多頭排列。
     進場用訊號下一根開盤。假突破 = 進場那根 15 分收盤又跌回 MA200 下方。
-    掃描幣安 U 本位流動永續近 {days} 天、{universe_n} 個合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
-    外網請開 <a href="{PUBLIC_PAGE}" style="color:#c9a227">這頁（htmlpreview）</a>；圖已內嵌。
+    {universe_txt}訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
+    外網請開 <a href="{public}" style="color:#c9a227">這頁（htmlpreview）</a>；圖已內嵌。
     僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">{kpi_block(stats)}</div>
@@ -419,18 +445,20 @@ def main() -> int:
     p.add_argument("--demo", action="store_true")
     p.add_argument("--days", type=int, default=7)
     p.add_argument("--workers", type=int, default=8)
-    p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma15-bull.html")
+    p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma15-bull.html（--stocks 則寫 ma15-bull-stocks.html）")
     p.add_argument("-o", "--output", help="HTML 輸出路徑")
     p.add_argument("--limit-symbols", type=int, default=0)
+    p.add_argument("--stocks", action="store_true", help="只掃幣安 TradFi 股票永續（不含商品）")
     args = p.parse_args()
     if args.demo:
         return run_demo()
 
     print("載入標的…", flush=True)
-    symbols = universe()
+    symbols = universe(stocks_only=args.stocks)
     if args.limit_symbols:
         symbols = symbols[: args.limit_symbols]
-    print(f"掃描 {len(symbols)} 個 15m，近 {args.days} 天（15 分 MA200）", flush=True)
+    scope = "幣安股票永續" if args.stocks else "流動永續"
+    print(f"掃描 {len(symbols)} 個 15m {scope}，近 {args.days} 天（15 分 MA200）", flush=True)
 
     rows: list[SignalRow] = []
     data: dict[str, dict] = {}
@@ -464,7 +492,8 @@ def main() -> int:
     for r in crcl:
         print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  entry={r.entry:g}  4h={r.moves.get(16).ret_pct if r.moves.get(16) else None}")
 
-    img_dir = Path("docs/binance/img/ma15-bull")
+    img_name = "ma15-bull-stocks" if args.stocks else "ma15-bull"
+    img_dir = Path("docs/binance/img") / img_name
     img_dir.mkdir(parents=True, exist_ok=True)
     for old in img_dir.glob("*.png"):
         old.unlink()
@@ -477,11 +506,12 @@ def main() -> int:
         fname = f"{file_base(row.symbol)}_{stamp}.png"
         out = img_dir / fname
         if draw_chart(row.symbol, d, row, out):
-            gallery.append((row, f"./img/ma15-bull/{fname}"))
+            gallery.append((row, f"./img/{img_name}/{fname}"))
 
-    out_html = Path(args.output) if args.output else Path("docs/binance/ma15-bull.html")
+    default_html = "docs/binance/ma15-bull-stocks.html" if args.stocks else "docs/binance/ma15-bull.html"
+    out_html = Path(args.output) if args.output else Path(default_html)
     if args.pages:
-        out_html = Path("docs/binance/ma15-bull.html")
+        out_html = Path(default_html)
     write_html(
         path=out_html,
         days=args.days,
@@ -489,12 +519,15 @@ def main() -> int:
         rows=rows,
         stats=stats,
         gallery=gallery,
+        stocks_only=args.stocks,
     )
     Path("output").mkdir(exist_ok=True)
-    Path("output/ma15_bull_summary.json").write_text(
+    summary_path = Path("output/ma15_bull_stocks_summary.json" if args.stocks else "output/ma15_bull_summary.json")
+    summary_path.write_text(
         json.dumps(
             {
                 "days": args.days,
+                "stocks_only": args.stocks,
                 "universe": len(symbols),
                 "signals": len(rows),
                 "crcl": [

@@ -5,6 +5,7 @@
 
     python3 examples/watch_15m_bull.py --test
     python3 examples/watch_15m_bull.py
+    python3 examples/watch_15m_bull.py --stocks   # 只掃幣安股票永續
 
 Ctrl+C 結束。同一根 K 不會重發。
 """
@@ -207,6 +208,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description="15 分 K 7/14/25 多頭且站上 15m MA200 Telegram")
     p.add_argument("--once", action="store_true")
     p.add_argument("--test", action="store_true")
+    p.add_argument("--stocks", action="store_true", help="只掃幣安 TradFi 股票永續（不含商品）")
     args = p.parse_args()
     apply_keys()
     if args.test:
@@ -214,14 +216,15 @@ def main() -> int:
 
     seen = load_seen()
     print("載入標的…", flush=True)
-    symbols = universe()
-    print(f"監看 {len(symbols)} 個流動永續。15m 收盤剛站上 MA200 且 7>14>25 會推 Telegram。", flush=True)
+    symbols = universe(stocks_only=args.stocks)
+    scope = "幣安股票永續" if args.stocks else "流動永續"
+    print(f"監看 {len(symbols)} 個{scope}。15m 收盤剛站上 MA200 且 7>14>25 會推 Telegram。", flush=True)
     uni_ts = time.time()
 
     def round_once() -> None:
         nonlocal symbols, uni_ts
         if time.time() - uni_ts > 1800:
-            symbols = universe()
+            symbols = universe(stocks_only=args.stocks)
             uni_ts = time.time()
             print(f"更新標的 {len(symbols)}", flush=True)
         t0 = time.time()

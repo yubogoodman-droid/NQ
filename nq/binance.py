@@ -9,6 +9,8 @@ import requests
 
 BASE = "https://www.binance.com"
 KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT", "HK1810USDT", "CRCLUSDT"}
+# 幣安 TradFi 股票／ETF／Pre-IPO，不含黃金原油等商品。
+STOCK_UNDERLYING = {"EQUITY", "HK_EQUITY", "KR_EQUITY", "CN_EQUITY", "PREMARKET"}
 SESSION = requests.Session()
 SESSION.headers.update(
     {"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"}
@@ -40,22 +42,35 @@ def get_json(path: str, params=None, retries: int = 6):
     raise last
 
 
-def universe(*, min_quote_volume: float = 5_000_000) -> list[str]:
+def is_stock_perp(s: dict) -> bool:
+    return (
+        s.get("contractType") == "TRADIFI_PERPETUAL"
+        and s.get("underlyingType") in STOCK_UNDERLYING
+    )
+
+
+def universe(*, min_quote_volume: float = 5_000_000, stocks_only: bool = False) -> list[str]:
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
+    if stocks_only:
+        min_quote_volume = 0.0
     out = []
     for s in info["symbols"]:
         if s.get("quoteAsset") != "USDT":
             continue
         if s.get("status") != "TRADING":
             continue
-        if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
-            continue
-        if s.get("underlyingType") == "INDEX":
-            continue
+        if stocks_only:
+            if not is_stock_perp(s):
+                continue
+        else:
+            if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
+                continue
+            if s.get("underlyingType") == "INDEX":
+                continue
         sym = s["symbol"]
         qv = float((tickers.get(sym) or {}).get("quoteVolume") or 0)
-        if qv < min_quote_volume and sym not in KEEP:
+        if not stocks_only and qv < min_quote_volume and sym not in KEEP:
             continue
         out.append(sym)
     return out

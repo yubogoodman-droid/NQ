@@ -28,11 +28,15 @@
 
 ```bash
 python3 examples/backtest_15m_bull.py --demo
-python3 examples/backtest_15m_bull.py --days 90 --pages   # 近 90 天完整回測，寫入 docs/binance/ma15-bull.html
+python3 examples/backtest_15m_bull.py --days 30 --pages            # 流動永續
+python3 examples/backtest_15m_bull.py --days 30 --stocks --pages   # 只掃幣安股票永續
 ```
 
 外網看圖（請用這個，圖已內嵌）：  
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html
+
+只掃股票：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html
 
 合併進 `main` 後 GitHub Pages：  
 https://yubogoodman-droid.github.io/NQ/binance/ma15-bull.html
@@ -42,6 +46,7 @@ Telegram 監看（每根 15 分收盤掃一次），在 `examples/watch_15m_bull
 ```bash
 python3 examples/watch_15m_bull.py --test
 python3 examples/watch_15m_bull.py
+python3 examples/watch_15m_bull.py --stocks   # 只掃美／港／韓／中股與股票 ETF
 ```
 
 ## 幣安黏帶三幕 Telegram
@@ -99,7 +104,9 @@ python3 examples/chart_today.py
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
 3. **15 分 K 7/14/25 站上 MA200（這次 PR）**  
-   https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html
+   https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html  
+   只掃幣安股票：  
+   https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html
 
 ## TradingView
 
