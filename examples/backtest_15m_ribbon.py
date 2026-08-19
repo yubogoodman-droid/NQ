@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""回測：一根 15 分 K 同時突破 MA7 / 14 / 25 / 99 / 120 / 200。
+"""回測：一根 K 同時突破 MA7 / 14 / 25 / 99 / 120 / 200（15 分 + 1 小時）。
 
-    python3 examples/backtest_15m_ribbon.py
-    python3 examples/backtest_15m_ribbon.py --days 45 --pages
+    python3 examples/backtest_15m_ribbon.py --demo
+    python3 examples/backtest_15m_ribbon.py --days 7 --pages
 """
 
 from __future__ import annotations
@@ -50,7 +50,28 @@ FILTERS = (
     ("放量 ≥ 1.5×", {"body": None, "max_width": None, "min_width": None, "min_vol": 1.5}),
     ("實體 + 寬度≤1% + 放量≥1.5×", {"body": True, "max_width": 1.0, "min_width": None, "min_vol": 1.5}),
 )
-HORIZON_LABEL = {1: "15m", 2: "30m", 4: "1h", 8: "2h", 16: "4h", 32: "8h"}
+HORIZON_LABEL_15M = {1: "15m", 2: "30m", 4: "1h", 8: "2h", 16: "4h", 32: "8h"}
+HORIZON_LABEL_1H = {1: "1h", 2: "2h", 4: "4h", 8: "8h", 16: "16h", 32: "32h"}
+BARS_PER_DAY = {"15m": 96, "5m": 288, "1m": 1440, "1h": 24}
+INTERVAL_MS = {"15m": 15 * 60_000, "5m": 5 * 60_000, "1m": 60_000, "1h": 60 * 60_000}
+TF = {
+    "15m": {
+        "label": "15 分",
+        "horizon_label": HORIZON_LABEL_15M,
+        "summary_h": 16,  # 4 小時
+        "table_hs": (1, 4, 16, 32),
+        "img_dir": Path("docs/binance/img/ribbon15"),
+        "img_rel": "./img/ribbon15",
+    },
+    "1h": {
+        "label": "1 小時",
+        "horizon_label": HORIZON_LABEL_1H,
+        "summary_h": 4,  # 4 小時
+        "table_hs": (1, 4, 8, 16),
+        "img_dir": Path("docs/binance/img/ribbon1h"),
+        "img_rel": "./img/ribbon1h",
+    },
+}
 
 
 def get_json(path: str, params=None, retries: int = 6):
@@ -91,7 +112,7 @@ def universe() -> list[str]:
 
 
 def fetch_klines(sym: str, *, days: int, interval: str = "15m") -> dict | None:
-    bars_per_day = {"15m": 96, "5m": 288, "1m": 1440}[interval]
+    bars_per_day = BARS_PER_DAY[interval]
     need = days * bars_per_day + max(MA_PERIODS) + 8
     chunks: list[list] = []
     end_time = None
@@ -118,7 +139,7 @@ def fetch_klines(sym: str, *, days: int, interval: str = "15m") -> dict | None:
     if len(rows) < max(MA_PERIODS) + 5:
         return None
     now_ms = int(time.time() * 1000)
-    interval_ms = {"15m": 15 * 60_000, "5m": 5 * 60_000, "1m": 60_000}[interval]
+    interval_ms = INTERVAL_MS[interval]
     if int(rows[-1][0]) + interval_ms > now_ms:
         rows = rows[:-1]
     rows = rows[-need:]
@@ -134,8 +155,8 @@ def fetch_klines(sym: str, *, days: int, interval: str = "15m") -> dict | None:
     }
 
 
-def scan_symbol(sym: str, days: int) -> tuple[str, dict | None, list[SignalRow]]:
-    raw = fetch_klines(sym, days=days)
+def scan_symbol(sym: str, days: int, interval: str = "15m") -> tuple[str, dict | None, list[SignalRow]]:
+    raw = fetch_klines(sym, days=days, interval=interval)
     if raw is None:
         return sym, None, []
     d = add_mas(raw)
@@ -163,7 +184,16 @@ def pct(v: float | None) -> str:
     return f'<span class="{cls}">{v:+.2f}%</span>'
 
 
-def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
+def draw_chart(
+    sym: str,
+    d: dict,
+    row: SignalRow,
+    path: Path,
+    *,
+    interval: str,
+    summary_h: int,
+    summary_label: str,
+) -> Path | None:
     try:
         import matplotlib
 
@@ -203,9 +233,9 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
     x = i - a0
     ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
     ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
-    r4 = row.moves.get(16)
-    rtxt = f"  4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
-    ax.set_title(f"{sym}  15m  {hm(row.time_ms)}{rtxt}", color="#e8f0ea", fontsize=12)
+    r4 = row.moves.get(summary_h)
+    rtxt = f"  {summary_label} {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
+    ax.set_title(f"{sym}  {interval}  {hm(row.time_ms)}{rtxt}", color="#e8f0ea", fontsize=12)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     fig.tight_layout(pad=0.5)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -230,15 +260,15 @@ def filter_stats(rows: list[SignalRow]) -> list[dict]:
     return out
 
 
-def pick_gallery(rows: list[SignalRow], limit: int = 24) -> list[SignalRow]:
+def pick_gallery(rows: list[SignalRow], limit: int = 24, *, summary_h: int = 16) -> list[SignalRow]:
     body = apply_filter(rows, body=True) or rows
 
-    def r4(r: SignalRow) -> float:
-        m = r.moves.get(16)
+    def rsum(r: SignalRow) -> float:
+        m = r.moves.get(summary_h)
         return m.ret_pct if m and m.ret_pct is not None else -1e9
 
-    ranked = sorted(body, key=r4, reverse=True)
-    tight = sorted(apply_filter(body, max_width=0.4), key=r4, reverse=True)
+    ranked = sorted(body, key=rsum, reverse=True)
+    tight = sorted(apply_filter(body, max_width=0.4), key=rsum, reverse=True)
     n_best = min(8, len(ranked))
     n_worst = min(8, max(0, len(ranked) - n_best))
     chosen = ranked[:n_best] + ranked[-n_worst:] if n_worst else ranked[:n_best]
@@ -257,19 +287,21 @@ def pick_gallery(rows: list[SignalRow], limit: int = 24) -> list[SignalRow]:
     return out
 
 
-def kpi_block(stats: list[dict]) -> str:
+def kpi_block(stats: list[dict], *, summary_h: int = 16) -> str:
+    if not stats:
+        return ""
     by = {s["name"]: s for s in stats}
     raw = stats[0]
     tight = by.get("帶子寬度 ≤ 1.0%", stats[min(2, len(stats) - 1)])
     wide = by.get("帶子寬度 > 1.0%", raw)
-    h = raw["h16"]
+    h = raw[f"h{summary_h}"]
     cards = [
         ("原始筆數", str(raw["count"])),
         ("4h 勝率", f"{h['wr']:.1f}%"),
         ("4h 平均", f"{h['avg']:+.2f}%"),
         ("4h 中位", f"{h['med']:+.2f}%"),
         ("寬度≤1%", str(tight["count"])),
-        ("寬度>1% 4h均", f"{wide['h16']['avg']:+.2f}%"),
+        ("寬度>1% 4h均", f"{wide[f'h{summary_h}']['avg']:+.2f}%"),
     ]
     html_cards = []
     for k, v in cards:
@@ -285,10 +317,11 @@ def kpi_block(stats: list[dict]) -> str:
     return "\n".join(html_cards)
 
 
-def stats_table(stats: list[dict]) -> str:
-    heads = ["條件", "筆數", "幣數", "15m假突破"]
+def stats_table(stats: list[dict], *, horizon_label: dict[int, str] | None = None) -> str:
+    labels = horizon_label or HORIZON_LABEL_15M
+    heads = ["條件", "筆數", "幣數", "下一根假突破"]
     for h in HORIZONS:
-        heads += [f"{HORIZON_LABEL[h]}勝率", f"{HORIZON_LABEL[h]}均"]
+        heads += [f"{labels[h]}勝率", f"{labels[h]}均"]
     thead = "".join(f"<th>{x}</th>" for x in heads)
     body = []
     for s in stats:
@@ -306,13 +339,21 @@ def stats_table(stats: list[dict]) -> str:
     return f"<table><thead><tr>{thead}</tr></thead><tbody>{''.join(body)}</tbody></table>"
 
 
-def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
+def signal_table(
+    rows: list[SignalRow],
+    limit: int = 80,
+    *,
+    summary_h: int = 16,
+    table_hs: tuple[int, ...] = (1, 4, 16, 32),
+    horizon_label: dict[int, str] | None = None,
+) -> str:
+    labels = horizon_label or HORIZON_LABEL_15M
     ranked = sorted(
         rows,
-        key=lambda r: (r.moves.get(16).ret_pct if r.moves.get(16) and r.moves[16].ret_pct is not None else -1e9),
+        key=lambda r: (r.moves.get(summary_h).ret_pct if r.moves.get(summary_h) and r.moves[summary_h].ret_pct is not None else -1e9),
         reverse=True,
     )[:limit]
-    heads = ["時間", "標的", "進場", "寬度", "量比", "實體", "15m", "1h", "4h", "8h"]
+    heads = ["時間", "標的", "進場", "寬度", "量比", "實體"] + [labels[h] for h in table_hs]
     thead = "".join(f"<th>{x}</th>" for x in heads)
     body = []
     for r in ranked:
@@ -324,11 +365,9 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
             f"{r.width_pct:.2f}%",
             f"{r.vol_ratio:.2f}×",
             body_tag,
-            pct(r.moves.get(1).ret_pct if r.moves.get(1) else None),
-            pct(r.moves.get(4).ret_pct if r.moves.get(4) else None),
-            pct(r.moves.get(16).ret_pct if r.moves.get(16) else None),
-            pct(r.moves.get(32).ret_pct if r.moves.get(32) else None),
         ]
+        for h in table_hs:
+            tds.append(pct(r.moves.get(h).ret_pct if r.moves.get(h) else None))
         body.append("<tr>" + "".join(f"<td>{x}</td>" for x in tds) + "</tr>")
     return f"<table><thead><tr>{thead}</tr></thead><tbody>{''.join(body)}</tbody></table>"
 
@@ -340,17 +379,25 @@ def public_img_src(rel: str) -> str:
     return rel
 
 
-def gallery_html(items: list[tuple[SignalRow, str]], html_path: Path) -> str:
+def gallery_html(
+    items: list[tuple[SignalRow, str]],
+    *,
+    summary_h: int = 16,
+    table_hs: tuple[int, ...] = (1, 4, 16, 32),
+    horizon_label: dict[int, str] | None = None,
+) -> str:
+    labels = horizon_label or HORIZON_LABEL_15M
+    note_keys = " / ".join(labels[h] for h in table_hs)
     cards = []
     for row, rel in items:
-        r4 = row.moves.get(16)
+        r4 = row.moves.get(summary_h)
         ret = r4.ret_pct if r4 else None
         cls = "pos" if ret and ret > 0 else "neg"
         ret_s = f"{ret:+.2f}%" if ret is not None else "—"
         note = (
             f"寬度 {row.width_pct:.3f}% · 量比 {row.vol_ratio:.2f}× · "
-            f"15/1h/4h/8h："
-            f"{_plain(row, 1)} / {_plain(row, 4)} / {_plain(row, 16)} / {_plain(row, 32)}"
+            f"{note_keys}："
+            + " / ".join(_plain(row, h) for h in table_hs)
         )
         if row.body_through:
             note += " · 實體穿越"
@@ -377,23 +424,51 @@ def write_html(
     path: Path,
     days: int,
     universe_n: int,
-    rows: list[SignalRow],
-    stats: list[dict],
-    gallery: list[tuple[SignalRow, str]],
+    frames: list[dict],
 ) -> None:
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
-    first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
-    last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
+    all_rows = [r for fr in frames for r in fr["rows"]]
+    first = datetime.fromtimestamp(min(r.time_ms for r in all_rows) / 1000, TZ).strftime("%m-%d") if all_rows else "—"
+    last = datetime.fromtimestamp(max(r.time_ms for r in all_rows) / 1000, TZ).strftime("%m-%d") if all_rows else "—"
+    sections = []
+    for fr in frames:
+        cfg = fr["cfg"]
+        labels = cfg["horizon_label"]
+        sh = cfg["summary_h"]
+        ths = cfg["table_hs"]
+        sections.append(
+            f"""
+  <h1 id="{html.escape(fr['interval'])}">{html.escape(cfg['label'])} K</h1>
+  <p class="sub">黃虛線是那根同時穿過六條均線的 {html.escape(cfg['label'])} K。KPI 的 4h 是牆上時鐘四小時（15 分圖 = 16 根，1 小時圖 = 4 根）。</p>
+  <div class="kpis">
+    {kpi_block(fr["stats"], summary_h=sh)}
+  </div>
+  <h2>圖例</h2>
+  {gallery_html(fr["gallery"], summary_h=sh, table_hs=ths, horizon_label=labels)}
+  <div class="card">
+    <h2>過濾對照</h2>
+    <div class="table-wrap">
+      {stats_table(fr["stats"], horizon_label=labels)}
+    </div>
+    <p class="note">寬度 =（最高均線 / 最低均線 − 1）× 100%，用突破前一根的均線。假突破 = 進場那根收盤又跌回最高均線下方。</p>
+  </div>
+  <div class="card">
+    <h2>訊號表（依 4h 報酬排序，最多 80 筆）</h2>
+    <div class="table-wrap">
+      {signal_table(fr["rows"], summary_h=sh, table_hs=ths, horizon_label=labels)}
+    </div>
+  </div>"""
+        )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>15分K 同時突破 7/14/25/99/120/200</title>
+<title>15分 / 1小時 K 同時突破 7/14/25/99/120/200</title>
 <style>
 body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
 .wrap{{max-width:1100px;margin:0 auto;padding:20px 14px 56px}}
-h1{{font-size:22px;margin:0 0 8px}}
+h1{{font-size:22px;margin:24px 0 8px}}
 h2{{font-size:16px;margin:0 0 10px}}
 .sub{{color:#8aa193;line-height:1.65;margin:0 0 16px}}
 .card{{background:#14201b;border:1px solid rgba(232,240,234,.12);border-radius:12px;padding:14px;margin-bottom:16px}}
@@ -408,39 +483,23 @@ table{{width:100%;border-collapse:collapse;font-size:13px}}
 th,td{{padding:7px 8px;border-bottom:1px solid rgba(232,240,234,.12);white-space:nowrap;text-align:right}}
 th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){{text-align:left}}
 th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
+.jump{{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}}
+.jump a{{color:#c9a227;border:1px solid rgba(201,162,39,.35);border-radius:999px;padding:6px 12px;text-decoration:none;font-size:13px}}
 @media(max-width:720px){{.kpis{{grid-template-columns:1fr 1fr}}}}
 </style></head>
 <body>
 <div class="wrap">
-  <h1>一根 15 分 K 同時突破 7 / 14 / 25 / 99 / 120 / 200</h1>
+  <h1 style="margin-top:0">一根 K 同時突破 7 / 14 / 25 / 99 / 120 / 200</h1>
   <p class="sub">
-    前一根收盤完全在六條均線下方，這一根收盤完全站上六條均線，所以高低價必然同時穿過整條帶子。
-    進場用訊號下一根開盤。掃描幣安 U 本位永續近 {days} 天、{universe_n} 個流動合約。
-    訊號區間 {first} → {last}（GMT+8）。產生於 {now}。僅供型態對照，不是進出場建議。
+    前一根收盤完全在六條均線下方，這一根收盤完全站上六條均線。進場用訊號下一根開盤。
+    掃描幣安 U 本位永續近 {days} 天、{universe_n} 個流動合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
+    僅供型態對照，不是進出場建議。
   </p>
-  <p class="sub">
-    這根 K 本身已經走完穿越，再買下一根開盤偏晚：15 分到 2 小時勝率約四成、平均為負。
-    4 小時平均若轉正，多半是少數大贏家把數字拉起來，中位數仍常是負的。帶子濾得很黏沒有優勢。
-  </p>
-  <div class="kpis">
-    {kpi_block(stats)}
+  <div class="jump">
+    <a href="#15m">15 分 K</a>
+    <a href="#1h">1 小時 K</a>
   </div>
-  <h1>圖例</h1>
-  <p class="sub">黃虛線是那根同時穿過六條均線的 15 分 K。圖在數字上面，4 小時最好 / 最差，再加上一些帶子較黏的例子。</p>
-  {gallery_html(gallery, path)}
-  <div class="card">
-    <h2>過濾對照</h2>
-    <div class="table-wrap">
-      {stats_table(stats)}
-    </div>
-    <p class="note">寬度 =（最高均線 / 最低均線 − 1）× 100%，用突破前一根的均線。假突破 = 進場那根 15 分收盤又跌回最高均線下方。</p>
-  </div>
-  <div class="card">
-    <h2>訊號表（依 4h 報酬排序，最多 80 筆）</h2>
-    <div class="table-wrap">
-      {signal_table(rows)}
-    </div>
-  </div>
+  {''.join(sections)}
 </div>
 </body></html>
 """
@@ -488,8 +547,31 @@ def run_demo() -> int:
     return 0
 
 
+def scan_interval(symbols: list[str], days: int, interval: str, workers: int) -> tuple[list[SignalRow], dict[str, dict]]:
+    rows: list[SignalRow] = []
+    data: dict[str, dict] = {}
+    t0 = time.time()
+    with ThreadPoolExecutor(workers) as ex:
+        futs = {ex.submit(scan_symbol, s, days, interval): s for s in symbols}
+        done = 0
+        for fut in as_completed(futs):
+            done += 1
+            try:
+                sym, d, hits = fut.result()
+            except Exception as e:
+                print("err", futs[fut], e, flush=True)
+                continue
+            if d is not None:
+                data[sym] = d
+            rows.extend(hits)
+            if done % 40 == 0 or done == len(symbols):
+                print(f"  {interval} {done}/{len(symbols)}  訊號 {len(rows)}  {time.time()-t0:.1f}s", flush=True)
+    rows.sort(key=lambda r: r.time_ms)
+    return rows, data
+
+
 def main() -> int:
-    p = argparse.ArgumentParser(description="一根 15 分 K 同時突破六條均線")
+    p = argparse.ArgumentParser(description="一根 K 同時突破六條均線（15 分 + 1 小時）")
     p.add_argument("--demo", action="store_true", help="只用合成資料驗證偵測")
     p.add_argument("--days", type=int, default=7, help="回測天數（訊號窗口；前面另留 MA200 熱身）")
     p.add_argument("--workers", type=int, default=8)
@@ -504,72 +586,63 @@ def main() -> int:
     symbols = universe()
     if args.limit_symbols:
         symbols = symbols[: args.limit_symbols]
-    print(f"掃描 {len(symbols)} 個 15m 合約，近 {args.days} 天", flush=True)
 
-    rows: list[SignalRow] = []
-    data: dict[str, dict] = {}
-    t0 = time.time()
-    with ThreadPoolExecutor(args.workers) as ex:
-        futs = {ex.submit(scan_symbol, s, args.days): s for s in symbols}
-        done = 0
-        for fut in as_completed(futs):
-            done += 1
-            try:
-                sym, d, hits = fut.result()
-            except Exception as e:
-                print("err", futs[fut], e, flush=True)
+    frames = []
+    summary_by_tf = {}
+    for interval in ("15m", "1h"):
+        cfg = TF[interval]
+        print(f"掃描 {len(symbols)} 個 {interval} 合約，近 {args.days} 天", flush=True)
+        rows, data = scan_interval(symbols, args.days, interval, args.workers)
+        stats = filter_stats(rows)
+        sh = cfg["summary_h"]
+        print(f"\n=== {cfg['label']} 過濾對照 ===")
+        for s in stats:
+            h = s[f"h{sh}"]
+            print(
+                f"{s['name']}: n={s['count']}  4h勝率 {h['wr']:.1f}%  4h均 {h['avg']:+.3f}%  "
+                f"假突破 {s['fail15_pct']:.1f}%"
+            )
+        img_dir = cfg["img_dir"]
+        img_dir.mkdir(parents=True, exist_ok=True)
+        gallery_rows = pick_gallery(rows, summary_h=sh)
+        gallery: list[tuple[SignalRow, str]] = []
+        for row in gallery_rows:
+            d = data.get(row.symbol)
+            if d is None:
                 continue
-            if d is not None:
-                data[sym] = d
-            rows.extend(hits)
-            if done % 40 == 0 or done == len(symbols):
-                print(f"  {done}/{len(symbols)}  訊號 {len(rows)}  {time.time()-t0:.1f}s", flush=True)
-
-    rows.sort(key=lambda r: r.time_ms)
-    stats = filter_stats(rows)
-    print("\n=== 過濾對照 ===")
-    for s in stats:
-        h = s["h16"]
-        print(
-            f"{s['name']}: n={s['count']}  4h勝率 {h['wr']:.1f}%  4h均 {h['avg']:+.3f}%  "
-            f"假突破 {s['fail15_pct']:.1f}%"
+            stamp = datetime.fromtimestamp(row.time_ms / 1000, TZ).strftime("%m%d%H%M")
+            fname = f"{row.symbol.replace('USDT','')}_{stamp}.png"
+            outp = img_dir / fname
+            if draw_chart(
+                row.symbol,
+                d,
+                row,
+                outp,
+                interval=interval,
+                summary_h=sh,
+                summary_label="4h",
+            ):
+                gallery.append((row, f"{cfg['img_rel']}/{fname}"))
+        frames.append(
+            {
+                "interval": interval,
+                "cfg": cfg,
+                "rows": rows,
+                "stats": stats,
+                "gallery": gallery,
+            }
         )
-
-    img_dir = Path("docs/binance/img/ribbon15")
-    gallery_rows = pick_gallery(rows)
-    gallery: list[tuple[SignalRow, str]] = []
-    for row in gallery_rows:
-        d = data.get(row.symbol)
-        if d is None:
-            continue
-        stamp = datetime.fromtimestamp(row.time_ms / 1000, TZ).strftime("%m%d%H%M")
-        fname = f"{row.symbol.replace('USDT','')}_{stamp}.png"
-        outp = img_dir / fname
-        if draw_chart(row.symbol, d, row, outp):
-            gallery.append((row, f"./img/ribbon15/{fname}"))
+        summary_by_tf[interval] = {"signals": len(rows), "filters": stats, "charts": len(gallery)}
 
     out_html = Path(args.output) if args.output else Path("docs/binance/ma-ribbon-15m.html")
     if args.pages:
         out_html = Path("docs/binance/ma-ribbon-15m.html")
-    write_html(
-        path=out_html,
-        days=args.days,
-        universe_n=len(symbols),
-        rows=rows,
-        stats=stats,
-        gallery=gallery,
-    )
-    summary = {
-        "days": args.days,
-        "universe": len(symbols),
-        "signals": len(rows),
-        "filters": stats,
-        "html": str(out_html),
-        "charts": len(gallery),
-    }
+    write_html(path=out_html, days=args.days, universe_n=len(symbols), frames=frames)
     Path("output").mkdir(exist_ok=True)
-    Path("output/ribbon15_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2))
-    print(f"\n已寫入 {out_html}  圖 {len(gallery)} 張")
+    Path("output/ribbon15_summary.json").write_text(
+        json.dumps({"days": args.days, "universe": len(symbols), "by_tf": summary_by_tf, "html": str(out_html)}, ensure_ascii=False, indent=2)
+    )
+    print(f"\n已寫入 {out_html}")
     return 0
 
 
