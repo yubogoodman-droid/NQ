@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,6 +40,7 @@ TZ = timezone(timedelta(hours=8))
 BASE = "https://www.binance.com"
 KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT", "HK1810USDT"}
 DISPLAY = {"HK1810USDT": "小米"}
+STOCK_UNDERLYING = {"EQUITY", "KR_EQUITY", "HK_EQUITY", "CN_EQUITY"}
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"})
 
@@ -73,7 +75,7 @@ def get_json(path: str, params=None, retries: int = 6):
     raise last
 
 
-def universe() -> list[str]:
+def universe(*, asset: str = "all") -> list[str]:
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
     out = []
@@ -81,6 +83,13 @@ def universe() -> list[str]:
         if s.get("quoteAsset") != "USDT":
             continue
         if s.get("status") != "TRADING":
+            continue
+        if asset == "stocks":
+            if s.get("contractType") != "TRADIFI_PERPETUAL":
+                continue
+            if s.get("underlyingType") not in STOCK_UNDERLYING:
+                continue
+            out.append(s["symbol"])
             continue
         if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
             continue
@@ -92,6 +101,15 @@ def universe() -> list[str]:
             continue
         out.append(sym)
     return out
+
+
+def file_base(symbol: str) -> str:
+    """圖檔名用 ASCII，避免中文合約代碼把路徑弄壞。"""
+    base = symbol.replace("USDT", "")
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("_")
+    if safe:
+        return safe
+    return f"s{abs(hash(symbol)) % 10_000_000_000}"
 
 
 def fetch_klines(sym: str, *, days: int, interval: str = "15m") -> dict | None:
@@ -245,12 +263,13 @@ def draw_chart(
 ) -> Path | None:
     r4 = row.moves.get(summary_h)
     rtxt = f"  {summary_label} {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
+    title_sym = file_base(sym) if any(ord(c) >= 128 for c in sym) else sym
     return draw_marked_chart(
         sym,
         d,
         row.break_.idx,
         path,
-        title=f"{sym}  {interval}  {hm(row.time_ms)}{rtxt}",
+        title=f"{title_sym}  {interval}  {hm(row.time_ms)}{rtxt}",
     )
 
 
@@ -450,6 +469,7 @@ def write_html(
     path: Path,
     days: int,
     universe_n: int,
+    universe_label: str,
     rows: list[SignalRow],
     stats: list[dict],
     gallery: list[tuple[SignalRow, str, str | None]],
@@ -489,7 +509,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <h1>一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120</h1>
   <p class="sub">
     前一根收盤完全在這五條均線下方，這一根收盤同時站上。不必過 MA200。進場用訊號下一根開盤。
-    掃描幣安 U 本位永續近 {days} 天、{universe_n} 個流動合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
+    掃描幣安 {universe_label}近 {days} 天、{universe_n} 個合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
     圖例每筆上面是 15 分，底下是同一時間的 1 小時圖。圖上的 MA200 只是對照。僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">
@@ -585,6 +605,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description="15 分 K 同時站上 7/14/25/99/120（圖例附 1 小時）")
     p.add_argument("--demo", action="store_true", help="只用合成資料驗證偵測")
     p.add_argument("--days", type=int, default=7, help="回測天數（訊號窗口；前面另留 MA200 熱身）")
+    p.add_argument("--asset", choices=("all", "stocks"), default="all", help="all=加密+股票流動盤；stocks=只要股票永續")
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma-ribbon-15m.html")
     p.add_argument("-o", "--output", help="HTML 輸出路徑")
@@ -594,10 +615,15 @@ def main() -> int:
         return run_demo()
 
     print("載入標的…", flush=True)
-    symbols = universe()
+    symbols = universe(asset=args.asset)
     if args.limit_symbols:
         symbols = symbols[: args.limit_symbols]
-    print(f"掃描 {len(symbols)} 個 15m 合約，近 {args.days} 天", flush=True)
+    uni_label = (
+        "股票永續（美/港/韓/中，不含加密與商品）"
+        if args.asset == "stocks"
+        else "U 本位流動永續（加密+股票）"
+    )
+    print(f"掃描 {len(symbols)} 個 15m {uni_label}，近 {args.days} 天", flush=True)
     rows, data = scan_interval(symbols, args.days, "15m", args.workers)
     stats = filter_stats(rows)
     print("\n=== 15 分 過濾對照 ===")
@@ -636,7 +662,7 @@ def main() -> int:
         if d is None:
             continue
         stamp = datetime.fromtimestamp(row.time_ms / 1000, TZ).strftime("%m%d%H%M")
-        base = row.symbol.replace("USDT", "")
+        base = file_base(row.symbol)
         fname15 = f"{base}_{stamp}.png"
         out15 = img15 / fname15
         if not draw_chart(
@@ -656,12 +682,13 @@ def main() -> int:
             if hi is not None:
                 fname1h = f"{base}_{stamp}_1h.png"
                 out1h = img1h / fname1h
+                title_sym = base if any(ord(c) >= 128 for c in row.symbol) else row.symbol
                 if draw_marked_chart(
                     row.symbol,
                     d1,
                     hi,
                     out1h,
-                    title=f"{row.symbol}  1h  {hm(row.time_ms)}",
+                    title=f"{title_sym}  1h  {hm(row.time_ms)}",
                     before=36,
                     after=12,
                 ):
@@ -675,7 +702,8 @@ def main() -> int:
         path=out_html,
         days=args.days,
         universe_n=len(symbols),
-        rows=rows,
+            universe_label=uni_label,
+            rows=rows,
         stats=stats,
         gallery=gallery,
     )
@@ -685,6 +713,7 @@ def main() -> int:
             {
                 "days": args.days,
                 "universe": len(symbols),
+                "asset": args.asset,
                 "signals": len(rows),
                 "filters": stats,
                 "html": str(out_html),

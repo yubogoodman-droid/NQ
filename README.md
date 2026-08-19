@@ -46,6 +46,7 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```bash
 python3 examples/backtest_15m_ribbon.py --demo
 python3 examples/backtest_15m_ribbon.py --days 7 --pages
+python3 examples/backtest_15m_ribbon.py --days 7 --asset stocks --pages   # 只要股票
 ```
 
 報告：`docs/binance/ma-ribbon-15m.html`
@@ -93,7 +94,7 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
-3. **15 分 K 六均線回測**  
+3. **15 分 K 五均線回測**  
    https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html
 
 ## TradingView
