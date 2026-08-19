@@ -262,6 +262,23 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
     )
 
 
+IMG_BASE = (
+    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+    "cursor/15m-bull-ma200-e2b2/docs/binance/"
+)
+PUBLIC_PAGE = (
+    "https://raw.githack.com/yubogoodman-droid/NQ/"
+    "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html"
+)
+
+
+def public_img_src(rel: str) -> str:
+    """外網預覽要用絕對網址；GitHub raw 的 HTML 是 text/plain，不能拿來開頁。"""
+    if rel.startswith(("data:", "http://", "https://")):
+        return rel
+    return IMG_BASE.rstrip("/") + "/" + rel.lstrip("./")
+
+
 def gallery_html(gallery: list[tuple[SignalRow, str]]) -> str:
     if not gallery:
         return '<p class="note">這段期間沒有圖例。</p>'
@@ -270,10 +287,11 @@ def gallery_html(gallery: list[tuple[SignalRow, str]]) -> str:
         kind = "本根剛站上 200 日" if row.crossed_200d else "已在 200 日上，本根才 7>14>25"
         r4 = row.moves.get(16)
         rtxt = f"4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
+        src = public_img_src(rel)
         cards.append(
             f'<div class="card"><div class="cap">{html.escape(sym_label(row.symbol))} · {hm(row.time_ms)} · '
             f"{html.escape(kind)} · 量比 {row.vol_ratio:.2f} · {html.escape(rtxt)}</div>"
-            f'<img src="{html.escape(rel)}" alt="{html.escape(row.symbol)}"/></div>'
+            f'<img src="{html.escape(src)}" alt="{html.escape(row.symbol)}"/></div>'
         )
     return "\n".join(cards)
 
@@ -333,6 +351,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     進場用訊號下一根開盤。假突破 = 進場那根 15 分收盤又跌回 200 日下方。
     掃描幣安 U 本位流動永續近 {days} 天、{universe_n} 個合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
     {c15}
+    外網請開 <a href="{PUBLIC_PAGE}" style="color:#c9a227">這頁（githack）</a>；GitHub raw / jsDelivr 會把 HTML 當純文字。
     僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">{kpi_block(stats)}</div>
