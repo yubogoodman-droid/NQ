@@ -39,15 +39,13 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
-## 一分 K 急跌 V 反（近一週訊號數）
+## 一分 K 均線多頭排列（近一週訊號數）
 
-截圖那種：爆量長陰打穿全部均線 → 不破低收回 → 站回 MA 且短均開花。
+關注八條均線打開：`MA5>10>20>30>60>100>120>200`，且收盤站上全部均線。
 
 ```bash
 python3 examples/run_v_recovery.py
 ```
-
-會印條件梯子，並寫 `docs/nq-1m-v/index.html`。
 
 外網：https://yubogoodman-droid.github.io/NQ/nq-1m-v/
 
