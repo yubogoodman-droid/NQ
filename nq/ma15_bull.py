@@ -1,4 +1,4 @@
-"""15 分 K：MA7>MA14>MA25 多頭排列，且收盤站上 15 分 MA200。"""
+"""15 分 K：收盤高於 MA7 / MA14 / MA25 / MA200，且 7>14>25。"""
 
 from __future__ import annotations
 
@@ -27,16 +27,17 @@ def add_15m_mas(d: dict) -> dict:
     return out
 
 
-def _aligned(m7, m14, m25, i: int) -> bool:
-    a, b, c = m7[i], m14[i], m25[i]
-    if np.isnan([a, b, c]).any():
+def _stack_ok(c, m7, m14, m25, m200, i: int) -> bool:
+    """收盤同時在 MA7 / MA14 / MA25 / MA200 之上，且 7>14>25。"""
+    px, ma7, ma14, ma25, ma200 = c[i], m7[i], m14[i], m25[i], m200[i]
+    if np.isnan([px, ma7, ma14, ma25, ma200]).any():
         return False
-    return bool(a > b > c)
+    return bool(px > ma7 > ma14 > ma25 and px > ma200)
 
 
 @dataclass(frozen=True)
 class BullSignal:
-    """15m 多頭排列且收盤在 15 分 MA200 上方。"""
+    """15m 收盤在 MA7/14/25/200 之上，且 7>14>25。"""
 
     idx: int
     open: float
@@ -69,11 +70,11 @@ class BullSignal:
 
 def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
     """
-    進場：這一根同時滿足 MA7>MA14>MA25 且收盤 > 15 分 MA200，
-    前一根兩個條件沒有同時成立。
+    進場：這一根收盤 > MA7 > MA14 > MA25，且收盤 > 15 分 MA200，
+    前一根還沒同時成立。
 
     crossed_200：前收還在 MA200 下，本根收盤站上（通知用這個）。
-    formed_align：已經在 MA200 上，本根才排成 7>14>25。
+    formed_align：已經在 MA200 上，本根才收上短均／排成 7>14>25。
     """
     c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
     m7, m14, m25, m200 = d["m7"], d["m14"], d["m25"], d["m200"]
@@ -83,8 +84,8 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
     for i in range(200, len(c)):
         if np.isnan([m200[i], m200[i - 1]]).any():
             continue
-        now_ok = _aligned(m7, m14, m25, i) and c[i] > m200[i]
-        prev_ok = _aligned(m7, m14, m25, i - 1) and c[i - 1] > m200[i - 1]
+        now_ok = _stack_ok(c, m7, m14, m25, m200, i)
+        prev_ok = _stack_ok(c, m7, m14, m25, m200, i - 1)
         if not now_ok or prev_ok:
             continue
         if i - last_i < min_gap_bars:
@@ -106,7 +107,7 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
                 vol_ratio=vr,
                 ext_pct=float(ext),
                 crossed_200=bool(c[i - 1] <= m200[i - 1] and c[i] > m200[i]),
-                formed_align=bool(c[i - 1] > m200[i - 1] and not _aligned(m7, m14, m25, i - 1)),
+                formed_align=bool(c[i - 1] > m200[i - 1] and not _stack_ok(c, m7, m14, m25, m200, i - 1)),
             )
         )
         last_i = i

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""回測：15 分 K MA7>14>25 多頭排列，且收盤站上 15 分 MA200。
+"""回測：15 分 K 收盤高於 MA7/14/25/200，且 7>14>25。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --pages
@@ -48,9 +48,9 @@ DISPLAY = {
 PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 200: "#ffffff"}
 HORIZON_LABEL = {1: "15m", 2: "30m", 4: "1h", 8: "2h", 16: "4h", 32: "8h"}
 FILTERS = (
-    ("原始：7>14>25 且收盤站上 15m MA200（組合剛成立）", {"crossed": None, "formed": None, "min_vol": None, "max_ext": None}),
+    ("原始：收盤 > MA7>14>25 且 > MA200（組合剛成立）", {"crossed": None, "formed": None, "min_vol": None, "max_ext": None}),
     ("本根剛站上 15m MA200", {"crossed": True, "formed": None, "min_vol": None, "max_ext": None}),
-    ("已在 MA200 上，本根才多頭排列", {"crossed": None, "formed": True, "min_vol": None, "max_ext": None}),
+    ("已在 MA200 上，本根才收上 7/14/25", {"crossed": None, "formed": True, "min_vol": None, "max_ext": None}),
     ("放量 ≥ 1.5×", {"crossed": None, "formed": None, "min_vol": 1.5, "max_ext": None}),
     ("剛站上 MA200 + 放量 ≥ 1.5×", {"crossed": True, "formed": None, "min_vol": 1.5, "max_ext": None}),
     ("距 MA200 ≤ 1.0%", {"crossed": None, "formed": None, "min_vol": None, "max_ext": 1.0}),
@@ -242,7 +242,7 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
     )[:limit]
     body = []
     for r in ranked:
-        kind = "站上MA200" if r.crossed_200d else "多頭排列"
+        kind = "站上MA200" if r.crossed_200d else "收上短均"
         cells = [
             f'<td class="mono">{hm(r.time_ms)}</td>',
             f"<td>{html.escape(sym_label(r.symbol))}</td>",
@@ -308,7 +308,7 @@ def gallery_html(gallery: list[tuple[SignalRow, str]]) -> str:
         return '<p class="note">這段期間沒有圖例。</p>'
     cards = []
     for row, rel in gallery:
-        kind = "本根剛站上 15m MA200" if row.crossed_200d else "已在 MA200 上，本根才 7>14>25"
+        kind = "本根剛站上 15m MA200" if row.crossed_200d else "已在 MA200 上，本根才收上短均"
         r4 = row.moves.get(16)
         rtxt = f"4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
         src = public_img_src(rel)
@@ -334,11 +334,11 @@ def write_html(
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     public = PUBLIC_PAGE_STOCKS if stocks_only else PUBLIC_PAGE
-    title = "15分K 7/14/25 多頭 · 幣安股票 · 站上 MA200" if stocks_only else "15分K 7/14/25 多頭 · 站上 MA200"
+    title = "15分K 收盤在 7/14/25/200 之上 · 幣安股票" if stocks_only else "15分K 收盤在 7/14/25/200 之上"
     heading = (
-        "15 分 K：7 / 14 / 25 多頭排列，收盤站上 15 分 MA200（只掃幣安股票）"
+        "15 分 K：收盤在 7 / 14 / 25 / 200 之上（只掃幣安股票）"
         if stocks_only
-        else "15 分 K：7 / 14 / 25 多頭排列，收盤站上 15 分 MA200"
+        else "15 分 K：收盤在 7 / 14 / 25 / 200 之上"
     )
     universe_txt = (
         f"只掃幣安 TradFi 股票永續（美／港／韓／中股、股票 ETF、Pre-IPO；不含黃金原油等商品）近 {days} 天、{universe_n} 個合約。"
@@ -376,8 +376,8 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
 <div class="wrap">
   <h1>{html.escape(heading)}</h1>
   <p class="sub">
-    規則：15 分 SMA7 &gt; SMA14 &gt; SMA25，且收盤高於<strong>同一張 15 分圖的 SMA200</strong>（不是日線 200 日）。
-    Telegram 通知只用「本根剛站上 MA200」：前收還在 MA200 下，這一根收盤站上，同時短均已多頭排列。
+    規則：收盤同時高於 <strong>MA7、MA14、MA25、MA200</strong>（同一張 15 分圖），且 SMA7 &gt; SMA14 &gt; SMA25。
+    Telegram 通知只用「本根剛站上 MA200」：前收還在 MA200 下，這一根收盤站上，同時收盤也在 7/14/25 之上。
     進場用訊號下一根開盤。假突破 = 進場那根 15 分收盤又跌回 MA200 下方。
     {universe_txt}訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
     外網請開 <a href="{public}" style="color:#c9a227">這頁（htmlpreview）</a>；圖已內嵌。
@@ -424,11 +424,11 @@ def make_demo_bars() -> dict:
 def run_demo() -> int:
     d = add_15m_mas(make_demo_bars())
     hits = detect_combo(d)
-    print(f"demo 偵測到 {len(hits)} 筆（7>14>25 且站上 15m MA200）")
+    print(f"demo 偵測到 {len(hits)} 筆（收盤 > 7>14>25 且 > MA200）")
     for sig in hits:
         print(
             f"  idx={sig.idx} close={sig.close:.3f} ma200={sig.ma200:.3f} "
-            f"7>14>25={sig.m7:.3f}>{sig.m14:.3f}>{sig.m25:.3f} "
+            f"close>7>14>25={sig.close:.3f}>{sig.m7:.3f}>{sig.m14:.3f}>{sig.m25:.3f} "
             f"crossed={sig.crossed_200} formed={sig.formed_align}"
         )
     if not hits:
@@ -437,11 +437,14 @@ def run_demo() -> int:
     if not any(s.crossed_200 for s in hits):
         print("demo 失敗：應該有剛站上 MA200")
         return 1
+    if any(s.close <= s.m7 or s.close <= s.m14 or s.close <= s.m25 or s.close <= s.ma200 for s in hits):
+        print("demo 失敗：收盤必須在 7/14/25/200 之上")
+        return 1
     return 0
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="15 分 K 7/14/25 多頭且收盤站上 15m MA200")
+    p = argparse.ArgumentParser(description="15 分 K 收盤在 7/14/25/200 之上")
     p.add_argument("--demo", action="store_true")
     p.add_argument("--days", type=int, default=7)
     p.add_argument("--workers", type=int, default=8)

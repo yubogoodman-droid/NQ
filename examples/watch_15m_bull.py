@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""幣安 15 分 K：7/14/25 多頭排列且收盤站上 15 分 MA200 → Telegram。
+"""幣安 15 分 K：收盤在 MA7/14/25/200 之上且剛站上 MA200 → Telegram。
 
 在下面填 Telegram 後執行：
 
@@ -160,11 +160,11 @@ def format_ev(ev: dict) -> str:
     ts = hm(int(d["t"][sig.idx]))
     kind = "剛站上 MA200" if sig.crossed_200 else "多頭排列剛成立"
     return (
-        f"<b>15m 多頭排列 · {kind}</b>\n"
+        f"<b>15m 收盤在 7/14/25/200 上 · {kind}</b>\n"
         f"<b>{sym}</b>\n"
         f"{ts}  收 {sig.close:g}\n"
-        f"MA7 {sig.m7:g} &gt; MA14 {sig.m14:g} &gt; MA25 {sig.m25:g}\n"
-        f"MA200 {sig.ma200:g}　距 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×"
+        f"收盤 &gt; MA7 {sig.m7:g} &gt; MA14 {sig.m14:g} &gt; MA25 {sig.m25:g}\n"
+        f"且 &gt; MA200 {sig.ma200:g}　距 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×"
     )
 
 
@@ -218,7 +218,7 @@ def main() -> int:
     print("載入標的…", flush=True)
     symbols = universe(stocks_only=args.stocks)
     scope = "幣安股票永續" if args.stocks else "流動永續"
-    print(f"監看 {len(symbols)} 個{scope}。15m 收盤剛站上 MA200 且 7>14>25 會推 Telegram。", flush=True)
+    print(f"監看 {len(symbols)} 個{scope}。15m 收盤剛站上 MA200 且收在 7/14/25/200 上會推 Telegram。", flush=True)
     uni_ts = time.time()
 
     def round_once() -> None:
