@@ -50,8 +50,8 @@ python3 examples/backtest_15m_ribbon.py --pages    # 掃幣安永續，寫入 do
 
 報告：`docs/binance/ma-ribbon-15m.html`
 
-外網（免部署，圖會一起載）：  
-https://cdn.jsdelivr.net/gh/yubogoodman-droid/NQ@cursor/15m-ma-ribbon-breakout-731b/docs/binance/ma-ribbon-15m.html
+外網（圖已嵌進網頁，開了就能看）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-ribbon-breakout-731b/docs/binance/ma-ribbon-15m.html
 
 合併進 `main` 後 GitHub Pages：  
 https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html

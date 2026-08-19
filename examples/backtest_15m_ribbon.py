@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import html
 import json
 import sys
@@ -328,7 +329,17 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
     return f"<table><thead><tr>{thead}</tr></thead><tbody>{''.join(body)}</tbody></table>"
 
 
-def gallery_html(items: list[tuple[SignalRow, str]]) -> str:
+def embed_img_src(rel: str, html_path: Path) -> str:
+    """外網預覽吃不到相對路徑，把 PNG 嵌進 HTML。"""
+    if rel.startswith(("data:", "http://", "https://")):
+        return rel
+    img = (html_path.parent / rel).resolve()
+    if not img.exists():
+        return rel
+    return "data:image/png;base64," + base64.b64encode(img.read_bytes()).decode("ascii")
+
+
+def gallery_html(items: list[tuple[SignalRow, str]], html_path: Path) -> str:
     cards = []
     for row, rel in items:
         r4 = row.moves.get(16)
@@ -342,10 +353,11 @@ def gallery_html(items: list[tuple[SignalRow, str]]) -> str:
         )
         if row.body_through:
             note += " · 實體穿越"
+        src = embed_img_src(rel, html_path)
         cards.append(
             f"""<div class="card">
   <h2>{html.escape(row.symbol.replace("USDT",""))} {hm(row.time_ms)} · 4h <span class="{cls}">{ret_s}</span></h2>
-  <img src="{html.escape(rel)}" alt="{html.escape(row.symbol)} {hm(row.time_ms)}"/>
+  <img src="{html.escape(src)}" alt="{html.escape(row.symbol)} {hm(row.time_ms)}"/>
   <p class="note">{html.escape(note)}</p>
 </div>"""
         )
@@ -412,6 +424,9 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <div class="kpis">
     {kpi_block(stats)}
   </div>
+  <h1>圖例</h1>
+  <p class="sub">黃虛線是那根同時穿過六條均線的 15 分 K。圖在數字上面，4 小時最好 / 最差，再加上一些帶子較黏的例子。</p>
+  {gallery_html(gallery, path)}
   <div class="card">
     <h2>過濾對照</h2>
     <div class="table-wrap">
@@ -425,9 +440,6 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
       {signal_table(rows)}
     </div>
   </div>
-  <h1 style="margin-top:8px">圖例</h1>
-  <p class="sub">黃虛線是那根同時穿過六條均線的 15 分 K。圖例是 4 小時最好 / 最差，再加上一些帶子較黏的例子。</p>
-  {gallery_html(gallery)}
 </div>
 </body></html>
 """
