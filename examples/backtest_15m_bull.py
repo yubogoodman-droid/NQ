@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import html
 import json
 import re
@@ -262,21 +263,25 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
     )
 
 
-IMG_BASE = (
-    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
-    "cursor/15m-bull-ma200-e2b2/docs/binance/"
-)
 PUBLIC_PAGE = (
-    "https://raw.githack.com/yubogoodman-droid/NQ/"
+    "https://htmlpreview.github.io/?"
+    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
     "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html"
 )
 
 
 def public_img_src(rel: str) -> str:
-    """外網預覽要用絕對網址；GitHub raw 的 HTML 是 text/plain，不能拿來開頁。"""
-    if rel.startswith(("data:", "http://", "https://")):
+    """內嵌 PNG，htmlpreview / GitHub raw 才看得到圖。"""
+    if rel.startswith("data:"):
         return rel
-    return IMG_BASE.rstrip("/") + "/" + rel.lstrip("./")
+    local = Path("docs/binance") / rel.lstrip("./")
+    if not local.exists() and ("/" in rel):
+        name = rel.rsplit("/", 1)[-1]
+        local = Path("docs/binance/img/ma15-bull") / name
+    if local.exists():
+        b64 = base64.b64encode(local.read_bytes()).decode("ascii")
+        return f"data:image/png;base64,{b64}"
+    return rel
 
 
 def gallery_html(gallery: list[tuple[SignalRow, str]]) -> str:
@@ -351,7 +356,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     進場用訊號下一根開盤。假突破 = 進場那根 15 分收盤又跌回 200 日下方。
     掃描幣安 U 本位流動永續近 {days} 天、{universe_n} 個合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
     {c15}
-    外網請開 <a href="{PUBLIC_PAGE}" style="color:#c9a227">這頁（githack）</a>；GitHub raw / jsDelivr 會把 HTML 當純文字。
+    外網請開 <a href="{PUBLIC_PAGE}" style="color:#c9a227">這頁（htmlpreview）</a>；圖已內嵌，不用另開 GitHub Pages。
     僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">{kpi_block(stats)}</div>

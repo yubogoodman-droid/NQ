@@ -31,8 +31,8 @@ python3 examples/backtest_15m_bull.py --demo
 python3 examples/backtest_15m_bull.py --days 7 --pages   # 寫入 docs/binance/ma15-bull.html
 ```
 
-外網看圖（請用這個，GitHub raw / jsDelivr 會把 HTML 當純文字）：  
-https://raw.githack.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html
+外網看圖（請用這個，圖已內嵌）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html
 
 合併進 `main` 後 GitHub Pages：  
 https://yubogoodman-droid.github.io/NQ/binance/ma15-bull.html
@@ -99,7 +99,7 @@ python3 examples/chart_today.py
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
 3. **15 分 K 7/14/25 站上 200 日（這次 PR）**  
-   https://raw.githack.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html
+   https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html
 
 ## TradingView
 
