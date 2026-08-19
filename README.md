@@ -44,8 +44,8 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 一根 15 分鐘 K：前一根收盤完全在 MA7 / 14 / 25 / 99 / 120 / 200 下方，這一根收盤完全站上六條均線。進場用下一根開盤。
 
 ```bash
-python3 examples/backtest_15m_ribbon.py --demo     # 合成資料驗證偵測
-python3 examples/backtest_15m_ribbon.py --pages    # 掃幣安永續，寫入 docs/binance/ma-ribbon-15m.html
+python3 examples/backtest_15m_ribbon.py --demo          # 合成資料驗證偵測
+python3 examples/backtest_15m_ribbon.py --days 7 --pages # 近一週，寫入 docs/binance/ma-ribbon-15m.html
 ```
 
 報告：`docs/binance/ma-ribbon-15m.html`
@@ -93,8 +93,8 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
-3. **15 分 K 六均線回測（這次 PR）**  
-   https://cdn.jsdelivr.net/gh/yubogoodman-droid/NQ@cursor/15m-ma-ribbon-breakout-731b/docs/binance/ma-ribbon-15m.html
+3. **15 分 K 六均線回測（這次 PR，圖已嵌進頁面）**  
+   https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-ribbon-breakout-731b/docs/binance/ma-ribbon-15m.html
 
 ## TradingView
 

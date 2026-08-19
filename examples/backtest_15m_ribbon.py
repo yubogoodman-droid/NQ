@@ -97,14 +97,14 @@ def fetch_klines(sym: str, *, days: int, interval: str = "15m") -> dict | None:
     chunks: list[list] = []
     end_time = None
     while sum(len(c) for c in chunks) < need:
-        params = {"symbol": sym, "interval": interval, "limit": 1500}
+        params = {"symbol": sym, "interval": interval, "limit": min(1500, need)}
         if end_time is not None:
             params["endTime"] = end_time
         raw = get_json("/fapi/v1/klines", params)
         if not raw:
             break
         chunks.append(raw)
-        if len(raw) < 1500:
+        if len(raw) < params["limit"]:
             break
         end_time = int(raw[0][0]) - 1
     rows = []
@@ -122,6 +122,7 @@ def fetch_klines(sym: str, *, days: int, interval: str = "15m") -> dict | None:
     interval_ms = {"15m": 15 * 60_000, "5m": 5 * 60_000, "1m": 60_000}[interval]
     if int(rows[-1][0]) + interval_ms > now_ms:
         rows = rows[:-1]
+    rows = rows[-need:]
     if len(rows) < max(MA_PERIODS) + 5:
         return None
     return {
@@ -139,12 +140,16 @@ def scan_symbol(sym: str, days: int) -> tuple[str, dict | None, list[SignalRow]]
     if raw is None:
         return sym, None, []
     d = add_mas(raw)
+    cutoff = int(d["t"][-1]) - days * 24 * 60 * 60 * 1000
     rows = []
     for br in detect_long_breaks(d):
+        ts = int(d["t"][br.idx])
+        if ts < cutoff:
+            continue
         entry, moves = forward_moves(d, br)
         if np.isnan(entry):
             continue
-        rows.append(SignalRow(symbol=sym, break_=br, time_ms=int(d["t"][br.idx]), entry=entry, moves=moves))
+        rows.append(SignalRow(symbol=sym, break_=br, time_ms=ts, entry=entry, moves=moves))
     return sym, d, rows
 
 
@@ -490,7 +495,7 @@ def run_demo() -> int:
 def main() -> int:
     p = argparse.ArgumentParser(description="一根 15 分 K 同時突破六條均線")
     p.add_argument("--demo", action="store_true", help="只用合成資料驗證偵測")
-    p.add_argument("--days", type=int, default=30, help="回測天數")
+    p.add_argument("--days", type=int, default=7, help="回測天數（訊號窗口；前面另留 MA200 熱身）")
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma-ribbon-15m.html")
     p.add_argument("-o", "--output", help="HTML 輸出路徑")
