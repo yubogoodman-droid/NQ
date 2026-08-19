@@ -1,4 +1,4 @@
-"""15 分 K 同時穿越 MA7 / 14 / 25 / 99 / 120 / 200。"""
+"""15 分 K 同時穿越均線。訊號預設 MA7 / 14 / 25 / 99 / 120（不含 200）。"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
+SIGNAL_MA_PERIODS = (7, 14, 25, 99, 120)
 HORIZONS = (1, 2, 4, 8, 16, 32)  # 15m 根數 → 15m / 30m / 1h / 2h / 4h / 8h
 
 
@@ -26,8 +27,8 @@ def add_mas(d: dict) -> dict:
     return out
 
 
-def _mas_at(d: dict, i: int) -> np.ndarray | None:
-    vals = np.array([d[f"m{n}"][i] for n in MA_PERIODS], dtype=float)
+def _mas_at(d: dict, i: int, periods: tuple[int, ...] = MA_PERIODS) -> np.ndarray | None:
+    vals = np.array([d[f"m{n}"][i] for n in periods], dtype=float)
     if np.isnan(vals).any():
         return None
     return vals
@@ -53,19 +54,19 @@ class RibbonBreak:
     range_pct: float
 
 
-def detect_long_breaks(d: dict) -> list[RibbonBreak]:
+def detect_long_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) -> list[RibbonBreak]:
     """
-    做多：前一根收盤完全在 6 條均線下方，這一根收盤完全站上 6 條均線。
+    做多：前一根收盤完全在指定均線下方，這一根收盤完全站上這些均線。
 
-    這樣一根 15 分 K 的高低區間必然同時穿過 MA7/14/25/99/120/200。
+    預設五條：MA7 / 14 / 25 / 99 / 120（不必過 MA200）。
     """
     c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
     v20 = d["v20"]
     out: list[RibbonBreak] = []
-    start = max(MA_PERIODS) + 1
+    start = max(periods) + 1
     for i in range(start, len(c)):
-        prev = _mas_at(d, i - 1)
-        curr = _mas_at(d, i)
+        prev = _mas_at(d, i - 1, periods)
+        curr = _mas_at(d, i, periods)
         if prev is None or curr is None:
             continue
         lo_p, hi_p = float(prev.min()), float(prev.max())

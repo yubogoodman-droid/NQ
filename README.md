@@ -39,9 +39,9 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
-## 15 分 K 同時突破六條均線
+## 15 分 K 同時站上 7 / 14 / 25 / 99 / 120
 
-一根 15 分鐘 K：前一根收盤完全在 MA7 / 14 / 25 / 99 / 120 / 200 下方，這一根收盤完全站上六條均線。進場用下一根開盤。圖例每筆底下附同一時間的 1 小時圖，只做對照，不當進出場濾網。
+一根 15 分鐘 K：前一根收盤完全在 MA7 / 14 / 25 / 99 / 120 下方，這一根收盤同時站上這五條。不必過 MA200。進場用下一根開盤。圖例每筆底下附同一時間的 1 小時圖，只做對照。圖上仍畫 MA200 方便看位置。
 
 ```bash
 python3 examples/backtest_15m_ribbon.py --demo

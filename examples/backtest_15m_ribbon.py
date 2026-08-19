@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""回測：15 分 K 同時突破 MA7 / 14 / 25 / 99 / 120 / 200，圖例底下附同一時間 1 小時圖。
+"""回測：15 分 K 同時站上 MA7 / 14 / 25 / 99 / 120，圖例底下附同一時間 1 小時圖。
 
     python3 examples/backtest_15m_ribbon.py --demo
     python3 examples/backtest_15m_ribbon.py --days 7 --pages
@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nq.ribbon15 import (
     HORIZONS,
     MA_PERIODS,
+    SIGNAL_MA_PERIODS,
     SignalRow,
     add_mas,
     apply_filter,
@@ -144,7 +145,7 @@ def scan_symbol(sym: str, days: int, interval: str = "15m") -> tuple[str, dict |
     d = add_mas(raw)
     cutoff = int(d["t"][-1]) - days * 24 * 60 * 60 * 1000
     rows = []
-    for br in detect_long_breaks(d):
+    for br in detect_long_breaks(d, periods=SIGNAL_MA_PERIODS):
         ts = int(d["t"][br.idx])
         if ts < cutoff:
             continue
@@ -428,7 +429,7 @@ def gallery_html(
         cards.append(
             f"""<div class="card">
   <h2>{html.escape(sym_label(row.symbol))} {hm(row.time_ms)} · 4h <span class="{cls}">{ret_s}</span></h2>
-  <p class="cap">15 分圖 · 黃虛線是同時穿過六條均線的那根</p>
+  <p class="cap">15 分圖 · 黃虛線是同時站上 7/14/25/99/120 的那根（圖上 MA200 只是對照）</p>
   <img src="{html.escape(src15)}" alt="{html.escape(row.symbol)} {hm(row.time_ms)}"/>
   {h1}
   <p class="note">{html.escape(note)}</p>
@@ -461,7 +462,7 @@ def write_html(
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>15分K 同時突破 7/14/25/99/120/200</title>
+<title>15分K 同時站上 7/14/25/99/120</title>
 <style>
 body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
 .wrap{{max-width:1100px;margin:0 auto;padding:20px 14px 56px}}
@@ -485,17 +486,17 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
 </style></head>
 <body>
 <div class="wrap">
-  <h1>一根 15 分 K 同時突破 7 / 14 / 25 / 99 / 120 / 200</h1>
+  <h1>一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120</h1>
   <p class="sub">
-    前一根收盤完全在六條均線下方，這一根收盤完全站上六條均線。進場用訊號下一根開盤。
+    前一根收盤完全在這五條均線下方，這一根收盤同時站上。不必過 MA200。進場用訊號下一根開盤。
     掃描幣安 U 本位永續近 {days} 天、{universe_n} 個流動合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
-    圖例每筆上面是 15 分，底下是同一時間的 1 小時圖。僅供型態對照，不是進出場建議。
+    圖例每筆上面是 15 分，底下是同一時間的 1 小時圖。圖上的 MA200 只是對照。僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">
     {kpi_block(stats, summary_h=16)}
   </div>
   <h1>圖例</h1>
-  <p class="sub">黃虛線：15 分圖是穿越六條均線的那根；1 小時圖是這根 15 分所在的小時 K。</p>
+  <p class="sub">黃虛線：15 分圖是同時站上 7/14/25/99/120 的那根；1 小時圖是這根 15 分所在的小時 K。</p>
   {gallery_html(gallery)}
   <div class="card">
     <h2>過濾對照</h2>
@@ -544,8 +545,8 @@ def make_demo_bars() -> dict:
 
 def run_demo() -> int:
     d = add_mas(make_demo_bars())
-    hits = detect_long_breaks(d)
-    print(f"demo 偵測到 {len(hits)} 筆")
+    hits = detect_long_breaks(d, periods=SIGNAL_MA_PERIODS)
+    print(f"demo 偵測到 {len(hits)} 筆（7/14/25/99/120）")
     for br in hits:
         print(
             f"  idx={br.idx} close={br.close:.3f} width={br.width_pct:.3f}% "
@@ -581,7 +582,7 @@ def scan_interval(symbols: list[str], days: int, interval: str, workers: int) ->
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="15 分 K 同時突破六條均線（圖例附 1 小時）")
+    p = argparse.ArgumentParser(description="15 分 K 同時站上 7/14/25/99/120（圖例附 1 小時）")
     p.add_argument("--demo", action="store_true", help="只用合成資料驗證偵測")
     p.add_argument("--days", type=int, default=7, help="回測天數（訊號窗口；前面另留 MA200 熱身）")
     p.add_argument("--workers", type=int, default=8)
