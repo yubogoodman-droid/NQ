@@ -50,8 +50,8 @@ python3 examples/backtest_15m_ribbon.py --days 7 --pages # 近一週，寫入 do
 
 報告：`docs/binance/ma-ribbon-15m.html`
 
-外網（請用這個，GitHub raw / jsDelivr 會把 HTML 當純文字）：  
-https://raw.githack.com/yubogoodman-droid/NQ/cursor/15m-ma-ribbon-breakout-731b/docs/binance/ma-ribbon-15m.html
+外網：  
+https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html
 
 合併進 `main` 後 GitHub Pages：  
 https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html
@@ -93,8 +93,8 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
-3. **15 分 K 六均線回測（這次 PR）**  
-   https://raw.githack.com/yubogoodman-droid/NQ/cursor/15m-ma-ribbon-breakout-731b/docs/binance/ma-ribbon-15m.html
+3. **15 分 K 六均線回測**  
+   https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html
 
 ## TradingView
 

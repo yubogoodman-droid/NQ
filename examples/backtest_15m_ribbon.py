@@ -333,17 +333,11 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
     return f"<table><thead><tr>{thead}</tr></thead><tbody>{''.join(body)}</tbody></table>"
 
 
-IMG_BASE = (
-    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
-    "cursor/15m-ma-ribbon-breakout-731b/docs/binance/"
-)
-
-
 def public_img_src(rel: str) -> str:
-    """外網預覽要用絕對網址；GitHub raw 的 HTML 是 text/plain，不能拿來開頁。"""
+    """GitHub Pages 用相對路徑；和 docs/binance/img/ 放一起。"""
     if rel.startswith(("data:", "http://", "https://")):
         return rel
-    return IMG_BASE.rstrip("/") + "/" + rel.lstrip("./")
+    return rel
 
 
 def gallery_html(items: list[tuple[SignalRow, str]], html_path: Path) -> str:
