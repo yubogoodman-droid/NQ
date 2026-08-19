@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import html
 import json
 import sys
@@ -334,14 +333,17 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
     return f"<table><thead><tr>{thead}</tr></thead><tbody>{''.join(body)}</tbody></table>"
 
 
-def embed_img_src(rel: str, html_path: Path) -> str:
-    """外網預覽吃不到相對路徑，把 PNG 嵌進 HTML。"""
+IMG_BASE = (
+    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+    "cursor/15m-ma-ribbon-breakout-731b/docs/binance/"
+)
+
+
+def public_img_src(rel: str) -> str:
+    """外網預覽要用絕對網址；GitHub raw 的 HTML 是 text/plain，不能拿來開頁。"""
     if rel.startswith(("data:", "http://", "https://")):
         return rel
-    img = (html_path.parent / rel).resolve()
-    if not img.exists():
-        return rel
-    return "data:image/png;base64," + base64.b64encode(img.read_bytes()).decode("ascii")
+    return IMG_BASE.rstrip("/") + "/" + rel.lstrip("./")
 
 
 def gallery_html(items: list[tuple[SignalRow, str]], html_path: Path) -> str:
@@ -358,7 +360,7 @@ def gallery_html(items: list[tuple[SignalRow, str]], html_path: Path) -> str:
         )
         if row.body_through:
             note += " · 實體穿越"
-        src = embed_img_src(rel, html_path)
+        src = public_img_src(rel)
         cards.append(
             f"""<div class="card">
   <h2>{html.escape(row.symbol.replace("USDT",""))} {hm(row.time_ms)} · 4h <span class="{cls}">{ret_s}</span></h2>
