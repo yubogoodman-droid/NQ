@@ -181,12 +181,21 @@ def fail_rate(rows: list[SignalRow]) -> float:
     return float(sum(1 for x in flags if x) / len(flags) * 100.0)
 
 
-def apply_filter(rows: list[SignalRow], *, body: bool | None = None, max_width: float | None = None, min_vol: float | None = None) -> list[SignalRow]:
+def apply_filter(
+    rows: list[SignalRow],
+    *,
+    body: bool | None = None,
+    max_width: float | None = None,
+    min_width: float | None = None,
+    min_vol: float | None = None,
+) -> list[SignalRow]:
     out = rows
     if body:
         out = [r for r in out if r.body_through]
     if max_width is not None:
         out = [r for r in out if r.width_pct <= max_width]
+    if min_width is not None:
+        out = [r for r in out if r.width_pct > min_width]
     if min_vol is not None:
         out = [r for r in out if r.vol_ratio >= min_vol]
     return out

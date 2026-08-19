@@ -48,6 +48,8 @@ python3 examples/backtest_15m_ribbon.py --demo     # 合成資料驗證偵測
 python3 examples/backtest_15m_ribbon.py --pages    # 掃幣安永續，寫入 docs/binance/ma-ribbon-15m.html
 ```
 
+報告：`docs/binance/ma-ribbon-15m.html`
+
 ## 快速開始
 
 ```bash

@@ -42,12 +42,13 @@ SESSION.headers.update({"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accep
 
 PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
 FILTERS = (
-    ("原始：一根K從帶下收到帶上", {"body": None, "max_width": None, "min_vol": None}),
-    ("實體穿越（開在帶下、收在帶上）", {"body": True, "max_width": None, "min_vol": None}),
-    ("帶子寬度 ≤ 1.0%", {"body": None, "max_width": 1.0, "min_vol": None}),
-    ("帶子寬度 ≤ 0.4%", {"body": None, "max_width": 0.4, "min_vol": None}),
-    ("放量 ≥ 1.5×", {"body": None, "max_width": None, "min_vol": 1.5}),
-    ("實體 + 寬度≤1% + 放量≥1.5×", {"body": True, "max_width": 1.0, "min_vol": 1.5}),
+    ("原始：一根K從帶下收到帶上", {"body": None, "max_width": None, "min_width": None, "min_vol": None}),
+    ("實體穿越（開在帶下、收在帶上）", {"body": True, "max_width": None, "min_width": None, "min_vol": None}),
+    ("帶子寬度 ≤ 1.0%", {"body": None, "max_width": 1.0, "min_width": None, "min_vol": None}),
+    ("帶子寬度 ≤ 0.4%", {"body": None, "max_width": 0.4, "min_width": None, "min_vol": None}),
+    ("帶子寬度 > 1.0%", {"body": None, "max_width": None, "min_width": 1.0, "min_vol": None}),
+    ("放量 ≥ 1.5×", {"body": None, "max_width": None, "min_width": None, "min_vol": 1.5}),
+    ("實體 + 寬度≤1% + 放量≥1.5×", {"body": True, "max_width": 1.0, "min_width": None, "min_vol": 1.5}),
 )
 HORIZON_LABEL = {1: "15m", 2: "30m", 4: "1h", 8: "2h", 16: "4h", 32: "8h"}
 
@@ -225,23 +226,19 @@ def filter_stats(rows: list[SignalRow]) -> list[dict]:
 
 
 def pick_gallery(rows: list[SignalRow], limit: int = 24) -> list[SignalRow]:
-    tight = apply_filter(rows, body=True, max_width=1.0)
-    if len(tight) < 8:
-        tight = apply_filter(rows, body=True, max_width=2.0)
-    if len(tight) < 8:
-        tight = apply_filter(rows, body=True)
-    if not tight:
-        tight = rows
+    body = apply_filter(rows, body=True) or rows
 
     def r4(r: SignalRow) -> float:
         m = r.moves.get(16)
         return m.ret_pct if m and m.ret_pct is not None else -1e9
 
-    ranked = sorted(tight, key=r4, reverse=True)
-    if len(ranked) <= limit:
-        return ranked
-    half = limit // 2
-    chosen = ranked[:half] + ranked[-half:]
+    ranked = sorted(body, key=r4, reverse=True)
+    tight = sorted(apply_filter(body, max_width=0.4), key=r4, reverse=True)
+    n_best = min(8, len(ranked))
+    n_worst = min(8, max(0, len(ranked) - n_best))
+    chosen = ranked[:n_best] + ranked[-n_worst:] if n_worst else ranked[:n_best]
+    for r in tight[:8]:
+        chosen.append(r)
     seen = set()
     out = []
     for r in chosen:
@@ -250,27 +247,33 @@ def pick_gallery(rows: list[SignalRow], limit: int = 24) -> list[SignalRow]:
             continue
         seen.add(key)
         out.append(r)
+        if len(out) >= limit:
+            break
     return out
 
 
 def kpi_block(stats: list[dict]) -> str:
+    by = {s["name"]: s for s in stats}
     raw = stats[0]
-    tight = stats[2]
-    combo = stats[-1]
+    tight = by.get("帶子寬度 ≤ 1.0%", stats[min(2, len(stats) - 1)])
+    wide = by.get("帶子寬度 > 1.0%", raw)
     h = raw["h16"]
     cards = [
         ("原始筆數", str(raw["count"])),
         ("4h 勝率", f"{h['wr']:.1f}%"),
         ("4h 平均", f"{h['avg']:+.2f}%"),
+        ("4h 中位", f"{h['med']:+.2f}%"),
         ("寬度≤1%", str(tight["count"])),
-        ("嚴格組合", str(combo["count"])),
-        ("15m 假突破", f"{raw['fail15_pct']:.1f}%"),
+        ("寬度>1% 4h均", f"{wide['h16']['avg']:+.2f}%"),
     ]
     html_cards = []
     for k, v in cards:
         cls = ""
-        if k == "4h 平均":
-            cls = "pos" if h["avg"] > 0 else "neg"
+        if k in ("4h 平均", "4h 中位", "寬度>1% 4h均"):
+            try:
+                cls = "pos" if float(v.strip("%").replace("+", "")) > 0 else "neg"
+            except ValueError:
+                cls = ""
         if k == "4h 勝率":
             cls = "pos" if h["wr"] >= 50 else "neg"
         html_cards.append(f'<div class="kpi"><div class="k">{html.escape(k)}</div><div class="v {cls}">{html.escape(v)}</div></div>')
@@ -402,6 +405,10 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     進場用訊號下一根開盤。掃描幣安 U 本位永續近 {days} 天、{universe_n} 個流動合約。
     訊號區間 {first} → {last}（GMT+8）。產生於 {now}。僅供型態對照，不是進出場建議。
   </p>
+  <p class="sub">
+    這根 K 本身已經走完穿越，再買下一根開盤偏晚：15 分到 2 小時勝率約四成、平均為負。
+    4 小時平均若轉正，多半是少數大贏家把數字拉起來，中位數仍常是負的。帶子濾得很黏沒有優勢。
+  </p>
   <div class="kpis">
     {kpi_block(stats)}
   </div>
@@ -419,7 +426,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     </div>
   </div>
   <h1 style="margin-top:8px">圖例</h1>
-  <p class="sub">黃虛線是那根同時穿過六條均線的 15 分 K。優先畫「實體穿越且帶子寬度 ≤ 1%」；不夠再放寬。</p>
+  <p class="sub">黃虛線是那根同時穿過六條均線的 15 分 K。圖例是 4 小時最好 / 最差，再加上一些帶子較黏的例子。</p>
   {gallery_html(gallery)}
 </div>
 </body></html>
