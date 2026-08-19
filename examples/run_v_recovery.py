@@ -17,7 +17,9 @@ from nq.ma_stack import (  # noqa: E402
     MID_DUMP,
     STRICT_DUMP,
     ComboSignal,
+    StackSignal,
     add_indicators,
+    count_stack_events,
     dump_align_ladder,
     ladder_counts,
 )
@@ -133,6 +135,62 @@ def draw_combo(df: pd.DataFrame, combo: ComboSignal, path: Path, *, title: str) 
     return path
 
 
+def draw_stack(df: pd.DataFrame, sig: StackSignal, path: Path) -> Path:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+
+    start = max(0, sig.idx - 50)
+    end = min(len(df) - 1, sig.idx + 25)
+    window = df.iloc[start : end + 1]
+    xs = range(len(window))
+    o, h, l, c, v = window["open"], window["high"], window["low"], window["close"], window["volume"]
+
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.5),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.15, 1]},
+        facecolor="#0c1210",
+    )
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+
+    colors_v = []
+    for k in range(len(window)):
+        up = c.iloc[k] >= o.iloc[k]
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], l.iloc[k], h.iloc[k], color=col, lw=0.65)
+        y0, y1 = min(o.iloc[k], c.iloc[k]), max(o.iloc[k], c.iloc[k])
+        if y1 == y0:
+            y1 = y0 + max(h.iloc[k] - l.iloc[k], 1e-12) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    axv.bar(list(xs), v, width=0.8, color=colors_v, linewidth=0)
+    for n, col in MA_COLORS.items():
+        ax.plot(list(xs), window[f"ma{n}"], color=col, lw=1.3 if n <= 20 else 1.05, label=f"MA{n}")
+    sx = sig.idx - start
+    ax.axvline(sx, color="#3dba7a", ls="--", lw=1.0)
+    ax.scatter([sx], [c.iloc[sx]], s=38, color="#3dba7a", zorder=5)
+    ax.set_title(
+        f"NQ 1m  {sig.order_text}   {_fmt(sig.timestamp)}   fan {sig.fan_pct:+.3f}%",
+        color="#e8f0ea",
+        fontsize=11,
+    )
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=8)
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=100, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
 def _pt(x: float | None) -> str:
     if x is None:
         return "n/a"
@@ -146,6 +204,7 @@ def write_report(
     strict: dict,
     mid: dict,
     loose: dict,
+    stacks: list[StackSignal],
     align_only: dict[str, int],
     out_dir: Path,
     symbol: str,
@@ -155,11 +214,17 @@ def write_report(
     for old in img_dir.glob("*.png"):
         old.unlink()
 
-    hits: list[ComboSignal] = strict["signals"]
-    failed = [c for c in strict["combos"] if not c.aligned]
+    strict_ids = {c.dump.idx for c in strict["signals"]}
+    mid_ids = {c.dump.idx for c in mid["signals"]}
     cards = []
-    for combo in hits:
+    for combo in loose["signals"]:
         dump = combo.dump
+        if dump.idx in strict_ids:
+            tag = "嚴格"
+        elif dump.idx in mid_ids:
+            tag = "中等"
+        else:
+            tag = "寬鬆"
         png = img_dir / f"hit_{_stem(dump.timestamp)}.png"
         short_t = _fmt(combo.short.timestamp) if combo.short else "—"
         full_t = _fmt(combo.full.timestamp) if combo.full else "未完成"
@@ -174,7 +239,7 @@ def write_report(
         cards.append(
             f"""
   <div class="card">
-    <h2>急跌 {_fmt(dump.timestamp)} → 短均排列 {html.escape(short_t)} → 完整打開 {html.escape(full_t)}</h2>
+    <h2>{html.escape(tag)}　急跌 {_fmt(dump.timestamp)} → 短均 {html.escape(short_t)} → 完整 {html.escape(full_t)}</h2>
     <img src="./img/{html.escape(png.name)}" alt="combo {_fmt(dump.timestamp)}"/>
     <p class="note">
       急跌 {dump.range_pts:.1f} 點 · 量比 {dump.vol_ratio:.1f}× · ATR {dump.range_atr:.1f}×<br/>
@@ -184,6 +249,7 @@ def write_report(
   </div>"""
         )
 
+    failed = [c for c in strict["combos"] if not c.aligned]
     fails = []
     for combo in failed:
         dump = combo.dump
@@ -195,6 +261,23 @@ def write_report(
     <h2>急跌未走出排列　{_fmt(dump.timestamp)}</h2>
     <img src="./img/{html.escape(png.name)}" alt="dump {_fmt(dump.timestamp)}"/>
     <p class="note">急跌 {dump.range_pts:.1f} 點 · 量比 {dump.vol_ratio:.1f}× · ATR {dump.range_atr:.1f}× · 90 分鐘內破低或均線沒排成多頭</p>
+  </div>"""
+        )
+
+    stack_cards = []
+    for sig in stacks:
+        png = img_dir / f"stack_{_stem(sig.timestamp)}.png"
+        draw_stack(df, sig, png)
+        pts = {m: _fwd(df, sig.idx, m) for m in (15, 30, 60)}
+        stack_cards.append(
+            f"""
+  <div class="card">
+    <h2>{_fmt(sig.timestamp)} · {html.escape(sig.order_text)}</h2>
+    <img src="./img/{html.escape(png.name)}" alt="stack {_fmt(sig.timestamp)}"/>
+    <p class="note">
+      進場 {sig.entry:.2f} · 短均相對 MA200 {sig.fan_pct:+.3f}%<br/>
+      進場後 15/30/60m：{_pt(pts[15])} / {_pt(pts[30])} / {_pt(pts[60])}
+    </p>
   </div>"""
         )
 
@@ -227,12 +310,16 @@ th{{color:#8aa193;font-weight:600}}
 </style></head>
 <body>
 <div class="wrap">
-  <h1>NQ 一分 K 急跌 + 均線排列 · 近一週 {len(hits)} 筆</h1>
+  <h1>NQ 一分 K 急跌 + 均線排列 · 全部圖</h1>
   <p class="sub">
     {html.escape(symbol)} · {days[0]} ~ {days[-1]} · {len(df)} 根 1m
     （{html.escape(start)} ~ {html.escape(end)} ET）。<br/>
-    兩件事都要：先有爆量長陰打穿均線，90 分鐘內不破低，再走出多頭排列。
-    紅虛線是急跌，綠虛線是短均 5&gt;10&gt;20 且價站上全部均線，金虛線是八條完整打開。
+    紅虛線急跌、綠虛線短均排列、金虛線完整八條打開。下面三區：急跌+排列全部命中、急跌失敗、以及只看均線的 40 張完整打開。
+  </p>
+  <p class="sub">
+    <a href="#hits" style="color:#c9a227">急跌+排列 {len(cards)}</a> ·
+    <a href="#fails" style="color:#c9a227">急跌失敗 {len(fails)}</a> ·
+    <a href="#stacks" style="color:#c9a227">完整排列 {len(stack_cards)}</a>
   </p>
   <div class="kpis">
     <div class="kpi"><div class="k">嚴格急跌</div><div class="v">{strict['dumps']}</div></div>
@@ -250,10 +337,15 @@ th{{color:#8aa193;font-weight:600}}
     </table>
     <p class="note">只看排列一週有 40 筆完整打開；加上急跌之後，嚴格條件只剩截圖那一筆。</p>
   </div>
+  <h1 id="hits" style="margin-top:8px">急跌 + 排列（全部命中）</h1>
+  <p class="sub">寬鬆門檻下的全部命中；標籤標嚴／中／寬。</p>
   {''.join(cards) if cards else '<div class="card"><p class="note">這一週沒有急跌後走出排列的訊號。</p></div>'}
-  <h1 style="margin-top:28px">嚴格急跌但沒走出排列</h1>
+  <h1 id="fails" style="margin-top:28px">嚴格急跌但沒走出排列</h1>
   <p class="sub">有砸、有量，但 90 分鐘內破低或均線沒排成多頭。</p>
   {''.join(fails)}
+  <h1 id="stacks" style="margin-top:28px">只看均線：完整八條打開（{len(stack_cards)} 張）</h1>
+  <p class="sub">不管有沒有急跌。綠虛線是 MA5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200 第一次排好、價站上。</p>
+  {''.join(stack_cards)}
 </div>
 </body>
 </html>
@@ -298,6 +390,7 @@ def main() -> int:
     mid = dump_align_ladder(df, MID_DUMP)
     loose = dump_align_ladder(df, LOOSE_DUMP)
     align_only = ladder_counts(df)
+    stacks = count_stack_events(df, level="full")
     _print("嚴格急跌 + 排列", strict)
     _print("中等急跌 + 排列", mid)
     _print("寬鬆急跌 + 排列", loose)
@@ -308,6 +401,7 @@ def main() -> int:
         strict=strict,
         mid=mid,
         loose=loose,
+        stacks=stacks,
         align_only=align_only,
         out_dir=Path(args.out),
         symbol=args.symbol,
