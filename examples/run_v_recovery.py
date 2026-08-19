@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NQ 一分 K 均線多頭排列：近一週有多少訊號。"""
+"""NQ 一分 K：急跌 + 均線多頭排列，近一週有多少訊號。"""
 
 from __future__ import annotations
 
@@ -13,10 +13,12 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.ma_stack import (  # noqa: E402
-    MA_PERIODS,
-    StackSignal,
+    LOOSE_DUMP,
+    MID_DUMP,
+    STRICT_DUMP,
+    ComboSignal,
     add_indicators,
-    count_stack_events,
+    dump_align_ladder,
     ladder_counts,
 )
 
@@ -60,15 +62,21 @@ def _fwd(df: pd.DataFrame, idx: int, minutes: int) -> float | None:
     return float(df["close"].iloc[j] - df["close"].iloc[idx])
 
 
-def draw_stack(df: pd.DataFrame, sig: StackSignal, path: Path) -> Path:
+def draw_combo(df: pd.DataFrame, combo: ComboSignal, path: Path, *, title: str) -> Path:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
-    start = max(0, sig.idx - 50)
-    end = min(len(df) - 1, sig.idx + 25)
+    dump = combo.dump
+    last = dump.idx
+    if combo.full:
+        last = combo.full.idx
+    elif combo.short:
+        last = combo.short.idx
+    start = max(0, dump.idx - 18)
+    end = min(len(df) - 1, last + 25)
     window = df.iloc[start : end + 1]
     xs = range(len(window))
     o, h, l, c, v = window["open"], window["high"], window["low"], window["close"], window["volume"]
@@ -76,7 +84,7 @@ def draw_stack(df: pd.DataFrame, sig: StackSignal, path: Path) -> Path:
     fig, (ax, axv) = plt.subplots(
         2,
         1,
-        figsize=(10.4, 5.5),
+        figsize=(10.4, 5.6),
         sharex=True,
         gridspec_kw={"height_ratios": [3.15, 1]},
         facecolor="#0c1210",
@@ -100,65 +108,95 @@ def draw_stack(df: pd.DataFrame, sig: StackSignal, path: Path) -> Path:
     axv.bar(list(xs), v, width=0.8, color=colors_v, linewidth=0)
 
     for n, col in MA_COLORS.items():
-        lw = 1.35 if n <= 20 else 1.05
-        ax.plot(list(xs), window[f"ma{n}"], color=col, lw=lw, label=f"MA{n}")
+        ax.plot(list(xs), window[f"ma{n}"], color=col, lw=1.3 if n <= 20 else 1.05, label=f"MA{n}")
 
-    sx = sig.idx - start
-    ax.axvline(sx, color="#3dba7a", ls="--", lw=1.0)
-    ax.scatter([sx], [c.iloc[sx]], s=38, color="#3dba7a", zorder=5)
-    ax.set_title(
-        f"NQ 1m  {sig.order_text}   {_fmt(sig.timestamp)}   fan {sig.fan_pct:+.3f}%",
-        color="#e8f0ea",
-        fontsize=11,
-    )
+    dx = dump.idx - start
+    ax.axvline(dx, color="#e35d5d", ls="--", lw=1.0)
+    ax.scatter([dx], [c.iloc[dx]], s=36, color="#e35d5d", zorder=5)
+    if combo.short:
+        sx = combo.short.idx - start
+        if 0 <= sx < len(window):
+            ax.axvline(sx, color="#3dba7a", ls="--", lw=1.0)
+            ax.scatter([sx], [c.iloc[sx]], s=36, color="#3dba7a", zorder=5)
+    if combo.full and combo.short and combo.full.idx != combo.short.idx:
+        fx = combo.full.idx - start
+        if 0 <= fx < len(window):
+            ax.axvline(fx, color="#c9a227", ls=":", lw=1.1)
+            ax.scatter([fx], [c.iloc[fx]], s=32, color="#c9a227", zorder=5)
+
+    ax.set_title(title, color="#e8f0ea", fontsize=11)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=8)
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=100, facecolor=fig.get_facecolor())
+    fig.savefig(path, dpi=105, facecolor=fig.get_facecolor())
     plt.close(fig)
     return path
 
 
-def write_report(df: pd.DataFrame, signals: list[StackSignal], counts: dict[str, int], out_dir: Path, symbol: str) -> Path:
+def _pt(x: float | None) -> str:
+    if x is None:
+        return "n/a"
+    cls = "pos" if x >= 0 else "neg"
+    return f'<span class="{cls}">{x:+.1f}pt</span>'
+
+
+def write_report(
+    df: pd.DataFrame,
+    *,
+    strict: dict,
+    mid: dict,
+    loose: dict,
+    align_only: dict[str, int],
+    out_dir: Path,
+    symbol: str,
+) -> Path:
     img_dir = out_dir / "img"
     img_dir.mkdir(parents=True, exist_ok=True)
-    # drop leftover dump charts from the previous report
     for old in img_dir.glob("*.png"):
         old.unlink()
 
+    hits: list[ComboSignal] = strict["signals"]
+    failed = [c for c in strict["combos"] if not c.aligned]
     cards = []
-    fwds = {15: [], 30: [], 60: []}
-    for sig in signals:
-        png = img_dir / f"stack_{_stem(sig.timestamp)}.png"
-        draw_stack(df, sig, png)
-        pts = {m: _fwd(df, sig.idx, m) for m in (15, 30, 60)}
-        for m, val in pts.items():
-            if val is not None:
-                fwds[m].append(val)
-
-        def _pt(x):
-            if x is None:
-                return "n/a"
-            cls = "pos" if x >= 0 else "neg"
-            return f'<span class="{cls}">{x:+.1f}pt</span>'
-
+    for combo in hits:
+        dump = combo.dump
+        png = img_dir / f"hit_{_stem(dump.timestamp)}.png"
+        short_t = _fmt(combo.short.timestamp) if combo.short else "—"
+        full_t = _fmt(combo.full.timestamp) if combo.full else "未完成"
+        draw_combo(
+            df,
+            combo,
+            png,
+            title=f"NQ 1m  dump {_fmt(dump.timestamp)}  ->  stack {short_t}  full {full_t}",
+        )
+        entry = combo.short
+        pts = {m: _fwd(df, entry.idx, m) for m in (15, 30, 60)} if entry else {15: None, 30: None, 60: None}
         cards.append(
             f"""
   <div class="card">
-    <h2>{_fmt(sig.timestamp)} · {html.escape(sig.order_text)}</h2>
-    <img src="./img/{html.escape(png.name)}" alt="stack {_fmt(sig.timestamp)}"/>
+    <h2>急跌 {_fmt(dump.timestamp)} → 短均排列 {html.escape(short_t)} → 完整打開 {html.escape(full_t)}</h2>
+    <img src="./img/{html.escape(png.name)}" alt="combo {_fmt(dump.timestamp)}"/>
     <p class="note">
-      進場 {sig.entry:.2f} · 短均相對 MA200 {sig.fan_pct:+.3f}%<br/>
+      急跌 {dump.range_pts:.1f} 點 · 量比 {dump.vol_ratio:.1f}× · ATR {dump.range_atr:.1f}×<br/>
+      短均進場 {(entry.entry if entry else 0):.2f} · {html.escape(entry.order_text if entry else '')}<br/>
       進場後 15/30/60m：{_pt(pts[15])} / {_pt(pts[30])} / {_pt(pts[60])}
     </p>
   </div>"""
         )
 
-    def _avg(xs):
-        return sum(xs) / len(xs) if xs else 0.0
-
-    def _win(xs):
-        return (sum(1 for x in xs if x > 0) / len(xs) * 100) if xs else 0.0
+    fails = []
+    for combo in failed:
+        dump = combo.dump
+        png = img_dir / f"fail_{_stem(dump.timestamp)}.png"
+        draw_combo(df, combo, png, title=f"NQ 1m  dump (no stack)  {_fmt(dump.timestamp)}")
+        fails.append(
+            f"""
+  <div class="card">
+    <h2>急跌未走出排列　{_fmt(dump.timestamp)}</h2>
+    <img src="./img/{html.escape(png.name)}" alt="dump {_fmt(dump.timestamp)}"/>
+    <p class="note">急跌 {dump.range_pts:.1f} 點 · 量比 {dump.vol_ratio:.1f}× · ATR {dump.range_atr:.1f}× · 90 分鐘內破低或均線沒排成多頭</p>
+  </div>"""
+        )
 
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
@@ -168,7 +206,7 @@ def write_report(df: pd.DataFrame, signals: list[StackSignal], counts: dict[str,
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>NQ 1m 均線多頭排列 · 近一週</title>
+<title>NQ 1m 急跌 + 均線排列 · 近一週</title>
 <style>
 body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
 .wrap{{max-width:1100px;margin:0 auto;padding:20px 14px 56px}}
@@ -189,34 +227,33 @@ th{{color:#8aa193;font-weight:600}}
 </style></head>
 <body>
 <div class="wrap">
-  <h1>NQ 一分 K 均線多頭排列 · 近一週 {len(signals)} 筆</h1>
+  <h1>NQ 一分 K 急跌 + 均線排列 · 近一週 {len(hits)} 筆</h1>
   <p class="sub">
     {html.escape(symbol)} · {days[0]} ~ {days[-1]} · {len(df)} 根 1m
     （{html.escape(start)} ~ {html.escape(end)} ET）。<br/>
-    關注的是均線打開，不是急跌那一根。訊號 = 八條均線首次排成
-    <b>MA5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</b>，且收盤站在全部均線之上。
-    同一段行情 30 分鐘只記一次。綠虛線是排列形成的那一分。
-    截圖 20:30 只是短均開始排；完整八條打開是 <b>08-18 21:30</b>。
+    兩件事都要：先有爆量長陰打穿均線，90 分鐘內不破低，再走出多頭排列。
+    紅虛線是急跌，綠虛線是短均 5&gt;10&gt;20 且價站上全部均線，金虛線是八條完整打開。
   </p>
   <div class="kpis">
-    <div class="kpi"><div class="k">短均 5&gt;10&gt;20</div><div class="v">{counts['short']}</div></div>
-    <div class="kpi"><div class="k">中段接到 MA60</div><div class="v">{counts['mid']}</div></div>
-    <div class="kpi"><div class="k">完整八條排列</div><div class="v pos">{counts['full']}</div></div>
+    <div class="kpi"><div class="k">嚴格急跌</div><div class="v">{strict['dumps']}</div></div>
+    <div class="kpi"><div class="k">未破低</div><div class="v">{strict['v']}</div></div>
+    <div class="kpi"><div class="k">急跌+短均排列</div><div class="v pos">{strict['short']}</div></div>
   </div>
   <div class="card">
-    <h2>排列梯子（都要求收盤站上全部均線，30 分鐘去重）</h2>
+    <h2>急跌 × 均線梯子</h2>
     <table>
-      <tr><th>均線條件</th><th>近一週訊號</th></tr>
-      <tr><td>短均多頭 MA5&gt;MA10&gt;MA20</td><td>{counts['short']}</td></tr>
-      <tr><td>再加 MA20&gt;MA30&gt;MA60</td><td>{counts['mid']}</td></tr>
-      <tr><td>完整 MA5&gt;10&gt;20&gt;30&gt;60&gt;100&gt;120&gt;200</td><td class="pos">{counts['full']}</td></tr>
+      <tr><th>條件</th><th>急跌</th><th>未破低</th><th>短均 5&gt;10&gt;20</th><th>接到 MA60</th><th>完整八條</th></tr>
+      <tr><td>嚴格急跌（5×ATR 或 50 點、5×量、跌破全部均線）</td><td>{strict['dumps']}</td><td>{strict['v']}</td><td class="pos">{strict['short']}</td><td>{strict['mid']}</td><td>{strict['full']}</td></tr>
+      <tr><td>中等急跌</td><td>{mid['dumps']}</td><td>{mid['v']}</td><td>{mid['short']}</td><td>{mid['mid']}</td><td>{mid['full']}</td></tr>
+      <tr><td>寬鬆急跌</td><td>{loose['dumps']}</td><td>{loose['v']}</td><td>{loose['short']}</td><td>{loose['mid']}</td><td>{loose['full']}</td></tr>
+      <tr><td>只看均線、不看急跌（30 分鐘去重）</td><td>—</td><td>—</td><td>{align_only['short']}</td><td>{align_only['mid']}</td><td>{align_only['full']}</td></tr>
     </table>
-    <p class="note">
-      完整排列進場後 15/30/60m 平均 {_avg(fwds[15]):+.1f} / {_avg(fwds[30]):+.1f} / {_avg(fwds[60]):+.1f} 點，
-      勝率 {_win(fwds[15]):.0f}% / {_win(fwds[30]):.0f}% / {_win(fwds[60]):.0f}%。
-    </p>
+    <p class="note">只看排列一週有 40 筆完整打開；加上急跌之後，嚴格條件只剩截圖那一筆。</p>
   </div>
-  {''.join(cards)}
+  {''.join(cards) if cards else '<div class="card"><p class="note">這一週沒有急跌後走出排列的訊號。</p></div>'}
+  <h1 style="margin-top:28px">嚴格急跌但沒走出排列</h1>
+  <p class="sub">有砸、有量，但 90 分鐘內破低或均線沒排成多頭。</p>
+  {''.join(fails)}
 </div>
 </body>
 </html>
@@ -226,8 +263,21 @@ th{{color:#8aa193;font-weight:600}}
     return out
 
 
+def _print(name: str, ladder: dict) -> None:
+    print(f"\n=== {name} ===")
+    print(
+        f"急跌 {ladder['dumps']} | 未破低 {ladder['v']} | "
+        f"短均 {ladder['short']} | 中段 {ladder['mid']} | 完整 {ladder['full']}"
+    )
+    for c in ladder["signals"]:
+        d = c.dump
+        st = _fmt(c.short.timestamp) if c.short else "—"
+        ft = _fmt(c.full.timestamp) if c.full else "—"
+        print(f"  急跌 {_fmt(d.timestamp)} {d.range_pts:.1f}pt → 短均 {st} → 完整 {ft}")
+
+
 def main() -> int:
-    p = argparse.ArgumentParser(description="NQ 1m 均線多頭排列近一週回測")
+    p = argparse.ArgumentParser(description="NQ 1m 急跌+均線排列近一週回測")
     p.add_argument("--symbol", default="NQ=F")
     p.add_argument("--period", default="7d")
     p.add_argument("--csv")
@@ -243,17 +293,27 @@ def main() -> int:
         df = fetch_nq_1m(args.symbol, args.period)
 
     df = add_indicators(df)
-    counts = ladder_counts(df)
-    signals = count_stack_events(df, level="full")
     print(f"K 線 {len(df)} 根 | {df.index[0]} ~ {df.index[-1]} ET")
-    print(f"短均 5>10>20：{counts['short']}")
-    print(f"中段接到 MA60：{counts['mid']}")
-    print(f"完整八條多頭排列：{counts['full']}")
-    for sig in signals:
-        print(f"  {_fmt(sig.timestamp)}  {sig.order_text}  @ {sig.entry:.2f}  fan {sig.fan_pct:+.3f}%")
+    strict = dump_align_ladder(df, STRICT_DUMP)
+    mid = dump_align_ladder(df, MID_DUMP)
+    loose = dump_align_ladder(df, LOOSE_DUMP)
+    align_only = ladder_counts(df)
+    _print("嚴格急跌 + 排列", strict)
+    _print("中等急跌 + 排列", mid)
+    _print("寬鬆急跌 + 排列", loose)
+    print(f"\n只看排列：短 {align_only['short']} / 中 {align_only['mid']} / 完整 {align_only['full']}")
 
-    out = write_report(df, signals, counts, Path(args.out), args.symbol)
+    out = write_report(
+        df,
+        strict=strict,
+        mid=mid,
+        loose=loose,
+        align_only=align_only,
+        out_dir=Path(args.out),
+        symbol=args.symbol,
+    )
     print(f"\n報告 {out.resolve()}")
+    print(f"嚴格急跌+短均排列：{strict['short']} 筆")
     return 0
 
 

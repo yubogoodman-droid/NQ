@@ -39,9 +39,9 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
-## 一分 K 均線多頭排列（近一週訊號數）
+## 一分 K 急跌 + 均線多頭排列
 
-關注八條均線打開：`MA5>10>20>30>60>100>120>200`，且收盤站上全部均線。
+先有爆量急跌，90 分鐘內不破低，再走出 `MA5>10>20`（完整打開再到 60/100/120/200）。
 
 ```bash
 python3 examples/run_v_recovery.py

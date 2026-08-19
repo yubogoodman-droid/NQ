@@ -1,6 +1,6 @@
 """NQ 五分 K W 底進場策略模組。"""
 
-from nq.ma_stack import StackSignal, count_stack_events, ladder_counts
+from nq.ma_stack import ComboSignal, StackSignal, count_stack_events, dump_align_ladder, ladder_counts
 from nq.patterns import WBottomPattern, detect_w_bottoms
 from nq.report import save_report_html
 from nq.strategy import NQWBottomStrategy, Signal
@@ -12,6 +12,8 @@ __all__ = [
     "Signal",
     "save_report_html",
     "StackSignal",
+    "ComboSignal",
     "count_stack_events",
+    "dump_align_ladder",
     "ladder_counts",
 ]
