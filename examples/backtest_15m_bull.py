@@ -27,10 +27,12 @@ from nq.ma15_bull import (
     HORIZONS,
     SignalRow,
     add_15m_mas,
+    above_1h_ma200,
     apply_filter,
     detect_combo,
     fail_rate,
     forward_moves,
+    h1_ma200_at,
     sma,
     summarize_rows,
 )
@@ -82,22 +84,42 @@ def pct(v: float | None) -> str:
     return f'<span class="{cls}">{v:+.2f}%</span>'
 
 
-def scan_symbol(sym: str, days: int) -> tuple[str, dict | None, list[SignalRow]]:
+def scan_symbol(sym: str, days: int) -> tuple[str, dict | None, list[SignalRow], int, int]:
     raw = fetch_klines(sym, interval="15m", days=days, extra_bars=220)
     if raw is None or len(raw["c"]) < 220:
-        return sym, None, []
+        return sym, None, [], 0, 0
     d = add_15m_mas(raw)
+    raw_h = fetch_klines(sym, interval="1h", days=max(days, 14), extra_bars=220)
+    d1h = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
     cutoff = int(d["t"][-1]) - days * 24 * 60 * 60 * 1000
     rows = []
+    n15 = 0
+    n_drop = 0
     for sig in detect_combo(d):
         ts = int(d["t"][sig.idx])
         if ts < cutoff:
             continue
+        n15 += 1
+        if not above_1h_ma200(d1h, ts, sig.close):
+            n_drop += 1
+            continue
         entry, moves = forward_moves(d, sig)
         if np.isnan(entry):
             continue
-        rows.append(SignalRow(symbol=sym, sig=sig, time_ms=ts, entry=entry, moves=moves))
-    return sym, d, rows
+        ma1 = h1_ma200_at(d1h, ts, sig.close) if d1h is not None else None
+        ext1 = (sig.close / ma1 - 1.0) * 100.0 if ma1 else None
+        rows.append(
+            SignalRow(
+                symbol=sym,
+                sig=sig,
+                time_ms=ts,
+                entry=entry,
+                moves=moves,
+                h1_ma200=ma1,
+                h1_ext_pct=ext1,
+            )
+        )
+    return sym, d, rows, n15, n_drop
 
 
 def filter_stats(rows: list[SignalRow]) -> list[dict]:
@@ -296,13 +318,15 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
             f'<td class="mono">{r.entry:g}</td>',
             f'<td class="mono">{r.vol_ratio:.2f}</td>',
             f'<td class="mono">{r.ext_pct:+.2f}%</td>',
+            f'<td class="mono">{r.h1_ext_pct:+.2f}%</td>' if r.h1_ext_pct is not None else "<td>—</td>",
         ]
         for h in (1, 4, 16, 32):
             mv = r.moves.get(h)
             cells.append(f"<td>{pct(mv.ret_pct if mv else None)}</td>")
         body.append("<tr>" + "".join(cells) + "</tr>")
     return (
-        "<table><thead><tr><th>時間</th><th>標的</th><th>種類</th><th>進場</th><th>量比</th><th>距MA200</th>"
+        "<table><thead><tr><th>時間</th><th>標的</th><th>種類</th><th>進場</th><th>量比</th>"
+        "<th>距15mMA200</th><th>距1hMA200</th>"
         "<th>15m</th><th>1h</th><th>4h</th><th>8h</th></tr></thead><tbody>"
         + "".join(body)
         + "</tbody></table>"
@@ -423,7 +447,8 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <h1>{html.escape(heading)}</h1>
   <p class="sub">
     規則：收盤同時高於 <strong>MA7、MA14、MA25、MA200</strong>（同一張 15 分圖），且 SMA7 &gt; SMA14 &gt; SMA25。
-    Telegram 通知只用「本根剛站上 MA200」：前收還在 MA200 下，這一根收盤站上，同時收盤也在 7/14/25 之上。
+    還要當下價格在<strong>小時圖 SMA200</strong>之上。
+    Telegram 通知只用「本根剛站上 15 分 MA200」：前收還在 15 分 MA200 下，這一根收盤站上，同時收盤也在 7/14/25 之上，<strong>且當下價格已在小時圖 MA200 上方</strong>（未收完的小時 K 用當下收盤，不看未來）。
     進場用訊號下一根開盤。假突破 = 進場那根 15 分收盤又跌回 MA200 下方。
     {universe_txt}訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
     外網請開 <a href="{public}" style="color:#c9a227">這頁（htmlpreview）</a>；圖已內嵌。
@@ -437,7 +462,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <div class="card">
     <h2>過濾對照</h2>
     <div class="table-wrap">{stats_table(stats)}</div>
-    <p class="note">距 MA200 =（收盤 / 15m SMA200 − 1）× 100%。量比 = 當根量 / 20 根均量。</p>
+    <p class="note">距15mMA200 =（收盤 / 15m SMA200 − 1）× 100%。距1hMA200 用訊號當下價 vs 當時小時 SMA200。量比 = 當根量 / 20 根均量。</p>
   </div>
   <div class="card">
     <h2>訊號表（剛站上 15m MA200，依 4h 報酬排序）</h2>
@@ -507,10 +532,11 @@ def main() -> int:
     if args.limit_symbols:
         symbols = symbols[: args.limit_symbols]
     scope = "幣安股票永續" if args.stocks else "流動永續"
-    print(f"掃描 {len(symbols)} 個 15m {scope}，近 {args.days} 天（15 分 MA200）", flush=True)
+    print(f"掃描 {len(symbols)} 個 15m {scope}，近 {args.days} 天（15 分 MA200 + 小時 MA200）", flush=True)
 
     rows: list[SignalRow] = []
     data: dict[str, dict] = {}
+    n15 = n_drop = 0
     t0 = time.time()
     with ThreadPoolExecutor(args.workers) as ex:
         futs = {ex.submit(scan_symbol, s, args.days): s for s in symbols}
@@ -518,10 +544,12 @@ def main() -> int:
         for fut in as_completed(futs):
             done += 1
             try:
-                sym, d, hits = fut.result()
+                sym, d, hits, a, b = fut.result()
             except Exception as e:
                 print("err", futs[fut], e, flush=True)
                 continue
+            n15 += a
+            n_drop += b
             if d is not None:
                 data[sym] = d
             rows.extend(hits)
@@ -529,7 +557,8 @@ def main() -> int:
                 print(f"  {done}/{len(symbols)}  訊號 {len(rows)}  {time.time()-t0:.1f}s", flush=True)
     rows.sort(key=lambda r: r.time_ms)
     stats = filter_stats(rows)
-    print("\n=== 15 分 7/14/25 + MA200 ===")
+    print("\n=== 15 分 7/14/25 + MA200，且當下在 1h MA200 上 ===")
+    print(f"15m 組合 {n15} 筆，未站上 1h MA200 去掉 {n_drop} 筆，留下 {n15 - n_drop}")
     for s in stats:
         h = s["h16"]
         print(

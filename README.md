@@ -24,7 +24,7 @@
 
 ## 幣安 15 分 K：7/14/25 多頭 + 站上 MA200
 
-15 分圖收盤同時高於 **MA7、MA14、MA25、MA200**，且 SMA7 > SMA14 > SMA25。Telegram 只推「這一根剛站上 MA200」。
+15 分圖收盤同時高於 **MA7、MA14、MA25、MA200**，且 SMA7 > SMA14 > SMA25，並且當下價格也在 **小時圖 SMA200** 之上。Telegram 只推「這一根剛站上 15 分 MA200」。
 
 ```bash
 python3 examples/backtest_15m_bull.py --demo

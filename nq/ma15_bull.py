@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+H1_MS = 3_600_000
 HORIZONS = (1, 2, 4, 8, 16, 32)  # 15m 根數 → 15m / 30m / 1h / 2h / 4h / 8h
 
 
@@ -114,6 +115,31 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
     return out
 
 
+def h1_ma200_at(d1h: dict, time_ms: int, last_price: float) -> float | None:
+    """訊號當下的 1h SMA200。未收完的那根小時 K 用 last_price，不偷用後面的收盤。"""
+    t = d1h["t"]
+    opened = t <= time_ms
+    if not opened.any():
+        return None
+    last_i = int(np.where(opened)[0][-1])
+    if last_i + 1 < 200:
+        return None
+    c = np.array(d1h["c"][: last_i + 1], dtype=float)
+    if int(t[last_i]) + H1_MS > time_ms:
+        c[-1] = float(last_price)
+    window = c[-200:]
+    if np.isnan(window).any():
+        return None
+    return float(window.mean())
+
+
+def above_1h_ma200(d1h: dict | None, time_ms: int, last_price: float) -> bool:
+    if d1h is None:
+        return False
+    ma = h1_ma200_at(d1h, time_ms, last_price)
+    return ma is not None and float(last_price) > ma
+
+
 @dataclass
 class ForwardMove:
     bars: int
@@ -130,6 +156,8 @@ class SignalRow:
     time_ms: int
     entry: float
     moves: dict[int, ForwardMove] = field(default_factory=dict)
+    h1_ma200: float | None = None
+    h1_ext_pct: float | None = None
 
     @property
     def vol_ratio(self) -> float:

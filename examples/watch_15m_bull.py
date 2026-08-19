@@ -24,7 +24,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.binance import INTERVAL_MS, SESSION, fetch_klines, universe
-from nq.ma15_bull import add_15m_mas, detect_combo, sma
+from nq.ma15_bull import add_15m_mas, above_1h_ma200, detect_combo, h1_ma200_at, sma
 
 # —— 填這裡 ——
 TELEGRAM_BOT_TOKEN = ""
@@ -142,6 +142,8 @@ def scan_symbol(sym: str) -> list[dict]:
     if raw is None or len(raw["c"]) < 220:
         return []
     d = add_15m_mas(raw)
+    raw_h = fetch_klines(sym, interval="1h", limit=250, extra_bars=8)
+    d1h = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
     n = len(d["c"])
     events = []
     for closed in (n - 1, n - 2):
@@ -151,7 +153,10 @@ def scan_symbol(sym: str) -> list[dict]:
         for sig in hits:
             if not sig.crossed_200:
                 continue
-            events.append({"symbol": sym, "sig": sig, "d": d})
+            ts = int(d["t"][sig.idx])
+            if not above_1h_ma200(d1h, ts, sig.close):
+                continue
+            events.append({"symbol": sym, "sig": sig, "d": d, "d1h": d1h})
     return events
 
 
@@ -159,12 +164,15 @@ def format_ev(ev: dict) -> str:
     d, sig, sym = ev["d"], ev["sig"], ev["symbol"]
     ts = hm(int(d["t"][sig.idx]))
     kind = "剛站上 MA200" if sig.crossed_200 else "多頭排列剛成立"
+    ma1 = h1_ma200_at(ev.get("d1h"), int(d["t"][sig.idx]), sig.close) if ev.get("d1h") is not None else None
+    h1txt = f"1h MA200 {ma1:g}　距 {(sig.close / ma1 - 1) * 100:+.2f}%" if ma1 else "1h MA200 —"
     return (
         f"<b>15m 收盤在 7/14/25/200 上 · {kind}</b>\n"
         f"<b>{sym}</b>\n"
         f"{ts}  收 {sig.close:g}\n"
         f"收盤 &gt; MA7 {sig.m7:g} &gt; MA14 {sig.m14:g} &gt; MA25 {sig.m25:g}\n"
-        f"且 &gt; MA200 {sig.ma200:g}　距 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×"
+        f"且 &gt; 15m MA200 {sig.ma200:g}　距 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×\n"
+        f"且 &gt; {h1txt}"
     )
 
 
@@ -218,7 +226,7 @@ def main() -> int:
     print("載入標的…", flush=True)
     symbols = universe(stocks_only=args.stocks)
     scope = "幣安股票永續" if args.stocks else "流動永續"
-    print(f"監看 {len(symbols)} 個{scope}。15m 收盤剛站上 MA200 且收在 7/14/25/200 上會推 Telegram。", flush=True)
+    print(f"監看 {len(symbols)} 個{scope}。15m 剛站上 MA200、收在 7/14/25/200 上、且當下在 1h MA200 上會推 Telegram。", flush=True)
     uni_ts = time.time()
 
     def round_once() -> None:
