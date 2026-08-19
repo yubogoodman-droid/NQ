@@ -386,9 +386,9 @@ def kpi_block(stats: list[dict], *, summary_h: int = 16, h1_recs: list[dict] | N
     if h1_recs:
         for s in h1_recs[:2]:
             bh = s[f"h{summary_h}"]
-            label = "嚴：1h已站上帶" if s.get("key") == "above_ribbon" else "寬：價上MA200且帶緊"
+            label = "嚴：1h已站上帶4h勝率" if s.get("key") == "above_ribbon" else "寬：價上MA200帶緊4h勝率"
             cards.append((label, f"{bh['wr']:.1f}%"))
-            cards.append((f"{label}筆數", str(s["count"])))
+            cards.append((f"{label}筆數".replace("4h勝率", ""), str(s["count"])))
     html_cards = []
     for k, v in cards:
         cls = ""
@@ -604,88 +604,6 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     </div>
   </div>
   {week_block}
-  <div class="card">
-    <h2>15 分自己的過濾對照</h2>
-    <div class="table-wrap">
-      {stats_table(stats)}
-    </div>
-    <p class="note">寬度 =（最高均線 / 最低均線 − 1）× 100%，用突破前一根的均線。假突破 = 進場那根 15 分收盤又跌回最高均線下方。</p>
-  </div>
-  <div class="card">
-    <h2>訊號表（依 4h 報酬排序，最多 80 筆）</h2>
-    <div class="table-wrap">
-      {signal_table(rows)}
-    </div>
-  </div>
-</div>
-</body></html>
-"""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(page, encoding="utf-8")
-    now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
-    first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
-    last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
-    if h1_best:
-        bh = h1_best["h16"]
-        h1_blurb = (
-            f"用 1 小時當濾網（{html.escape(h1_best['name'])}）後剩 {h1_best['count']} 筆，"
-            f"4h 勝率 {bh['wr']:.1f}%、均 {bh['avg']:+.2f}%。"
-            "濾網只用訊號當下已收完的 1 小時 K，不偷看還在走的那根小時收盤。"
-        )
-    else:
-        h1_blurb = (
-            "下面有一張 1 小時濾網表。這週沒有「筆數夠、勝率明顯變好、平均不掉」的濾網；"
-            "對照組（1h 還在帶下、價在 1h MA200 下）通常更差。"
-        )
-    page = f"""<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>15分K 同時突破 7/14/25/99/120/200</title>
-<style>
-body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
-.wrap{{max-width:1100px;margin:0 auto;padding:20px 14px 56px}}
-h1{{font-size:22px;margin:0 0 8px}}
-h2{{font-size:16px;margin:0 0 10px}}
-.sub{{color:#8aa193;line-height:1.65;margin:0 0 16px}}
-.card{{background:#14201b;border:1px solid rgba(232,240,234,.12);border-radius:12px;padding:14px;margin-bottom:16px}}
-img{{width:100%;height:auto;display:block;border-radius:8px;background:#101814;margin:6px 0 10px}}
-.note{{color:#8aa193;font-size:13px;margin:8px 0 0;line-height:1.5}}
-.cap{{color:#c9a227;font-size:12px;margin:10px 0 0}}
-.pos{{color:#3dba7a}}.neg{{color:#e35d5d}}.mark{{color:#c9a227}}
-.kpis{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}}
-.kpi{{border:1px solid rgba(232,240,234,.12);border-radius:10px;padding:10px}}
-.kpi .k{{color:#8aa193;font-size:12px}} .kpi .v{{font-size:18px;margin-top:4px}}
-.table-wrap{{overflow:auto}}
-table{{width:100%;border-collapse:collapse;font-size:13px}}
-th,td{{padding:7px 8px;border-bottom:1px solid rgba(232,240,234,.12);white-space:nowrap;text-align:right}}
-th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){{text-align:left}}
-th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
-@media(max-width:720px){{.kpis{{grid-template-columns:1fr 1fr}}}}
-</style></head>
-<body>
-<div class="wrap">
-  <h1>一根 15 分 K 同時突破 7 / 14 / 25 / 99 / 120 / 200</h1>
-  <p class="sub">
-    前一根收盤完全在六條均線下方，這一根收盤完全站上六條均線。進場用訊號下一根開盤。
-    掃描幣安 U 本位永續近 {days} 天、{universe_n} 個流動合約。訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
-    圖例每筆上面是 15 分，底下是同一時間的 1 小時圖。僅供型態對照，不是進出場建議。
-  </p>
-  <div class="kpis">
-    {kpi_block(stats, summary_h=16, h1_best=h1_best)}
-  </div>
-  <p class="sub">{h1_blurb}</p>
-  <h1>圖例</h1>
-  <p class="sub">黃虛線：15 分圖是穿越六條均線的那根；1 小時圖是這根 15 分所在的小時 K。圖例優先抽 1h 濾網後的樣本。</p>
-  {gallery_html(gallery)}
-  <div class="card">
-    <h2>用 1 小時當濾網</h2>
-    <p class="note" style="margin:0 0 10px">只看訊號當下已收完的 1 小時 K。當根小時「已翻綠」= 這根 15 分收盤已經高於該小時開盤，不需要等小時收盤。</p>
-    <div class="table-wrap">
-      {stats_table(h1_stats)}
-    </div>
-  </div>
   <div class="card">
     <h2>15 分自己的過濾對照</h2>
     <div class="table-wrap">
