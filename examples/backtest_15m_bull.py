@@ -533,7 +533,7 @@ def write_html(
     other_url = other.public_stocks if stocks_only else other.public
     other_name = "小時圖" if spec.signal == "15m" else "15 分圖"
     sister_link = (
-        f'另有{other_name}回測：<a href="{html.escape(other_url)}" style="color:#c9a227">{html.escape(other_name)}</a>。'
+        f'另有 {other_name} 回測：<a href="{html.escape(other_url)}" style="color:#c9a227">{html.escape(other_name)}</a>。'
     )
     tf = spec.signal
     htf = spec.htf
