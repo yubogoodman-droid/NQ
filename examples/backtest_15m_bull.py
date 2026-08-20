@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""回測：15 分 K 收盤高於 MA7/14/25/200，且 7>14>25。
+"""回測：收盤高於 MA7/14/25/200，且 7>14>25。預設 15 分；`--tf 1h` 改小時圖（大週期用 4h MA200）。
 
     python3 examples/backtest_15m_bull.py --demo
-    python3 examples/backtest_15m_bull.py --days 7 --pages
+    python3 examples/backtest_15m_bull.py --days 7 --stocks --pages
+    python3 examples/backtest_15m_bull.py --days 30 --tf 1h --stocks --pages
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -22,17 +24,17 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nq.binance import fetch_klines, universe
+from nq.binance import INTERVAL_MS, fetch_klines, universe
 from nq.ma15_bull import (
     HORIZONS,
     SignalRow,
     add_15m_mas,
-    above_1h_ma200,
+    above_htf_ma200,
     apply_filter,
     detect_combo,
     fail_rate,
     forward_moves,
-    h1_ma200_at,
+    htf_ma200_at,
     sma,
     summarize_rows,
 )
@@ -48,15 +50,85 @@ DISPLAY = {
     "POPMARTUSDT": "泡泡瑪特",
 }
 PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 200: "#ffffff"}
-HORIZON_LABEL = {1: "15m", 2: "30m", 4: "1h", 8: "2h", 16: "4h", 32: "8h"}
-FILTERS = (
-    ("原始：收盤 > MA7>14>25 且 > MA200（組合剛成立）", {"crossed": None, "formed": None, "min_vol": None, "max_ext": None}),
-    ("本根剛站上 15m MA200", {"crossed": True, "formed": None, "min_vol": None, "max_ext": None}),
-    ("已在 MA200 上，本根才收上 7/14/25", {"crossed": None, "formed": True, "min_vol": None, "max_ext": None}),
-    ("放量 ≥ 1.5×", {"crossed": None, "formed": None, "min_vol": 1.5, "max_ext": None}),
-    ("剛站上 MA200 + 放量 ≥ 1.5×", {"crossed": True, "formed": None, "min_vol": 1.5, "max_ext": None}),
-    ("距 MA200 ≤ 1.0%", {"crossed": None, "formed": None, "min_vol": None, "max_ext": 1.0}),
-)
+
+
+@dataclass(frozen=True)
+class TfSpec:
+    signal: str
+    htf: str
+    htf_min_days: int
+    hold4: int
+    table_horizons: tuple[int, ...]
+    labels: dict[int, str]
+    fail_label: str
+    img: str
+    html: str
+    html_stocks: str
+    public: str
+    public_stocks: str
+
+    @property
+    def htf_ms(self) -> int:
+        return INTERVAL_MS[self.htf]
+
+
+TF_SPECS = {
+    "15m": TfSpec(
+        signal="15m",
+        htf="1h",
+        htf_min_days=14,
+        hold4=16,
+        table_horizons=(1, 4, 16, 32),
+        labels={1: "15m", 2: "30m", 4: "1h", 8: "2h", 16: "4h", 32: "8h"},
+        fail_label="15m假突破",
+        img="ma15-bull",
+        html="docs/binance/ma15-bull.html",
+        html_stocks="docs/binance/ma15-bull-stocks.html",
+        public=(
+            "https://htmlpreview.github.io/?"
+            "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+            "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html"
+        ),
+        public_stocks=(
+            "https://htmlpreview.github.io/?"
+            "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+            "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html"
+        ),
+    ),
+    "1h": TfSpec(
+        signal="1h",
+        htf="4h",
+        htf_min_days=40,
+        hold4=4,
+        table_horizons=(1, 2, 4, 8),
+        labels={1: "1h", 2: "2h", 4: "4h", 8: "8h", 16: "16h", 32: "32h"},
+        fail_label="1h假突破",
+        img="ma1h-bull",
+        html="docs/binance/ma1h-bull.html",
+        html_stocks="docs/binance/ma1h-bull-stocks.html",
+        public=(
+            "https://htmlpreview.github.io/?"
+            "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+            "cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull.html"
+        ),
+        public_stocks=(
+            "https://htmlpreview.github.io/?"
+            "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+            "cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull-stocks.html"
+        ),
+    ),
+}
+
+
+def filter_defs(tf: str) -> tuple:
+    return (
+        (f"原始：收盤 > MA7>14>25 且 > {tf} MA200（組合剛成立）", {"crossed": None, "formed": None, "min_vol": None, "max_ext": None}),
+        (f"本根剛站上 {tf} MA200", {"crossed": True, "formed": None, "min_vol": None, "max_ext": None}),
+        ("已在 MA200 上，本根才收上 7/14/25", {"crossed": None, "formed": True, "min_vol": None, "max_ext": None}),
+        ("放量 ≥ 1.5×", {"crossed": None, "formed": None, "min_vol": 1.5, "max_ext": None}),
+        ("剛站上 MA200 + 放量 ≥ 1.5×", {"crossed": True, "formed": None, "min_vol": 1.5, "max_ext": None}),
+        ("距 MA200 ≤ 1.0%", {"crossed": None, "formed": None, "min_vol": None, "max_ext": 1.0}),
+    )
 
 
 def hm(ms: int) -> str:
@@ -84,30 +156,30 @@ def pct(v: float | None) -> str:
     return f'<span class="{cls}">{v:+.2f}%</span>'
 
 
-def scan_symbol(sym: str, days: int) -> tuple[str, dict | None, list[SignalRow], int, int]:
-    raw = fetch_klines(sym, interval="15m", days=days, extra_bars=220)
+def scan_symbol(sym: str, days: int, spec: TfSpec) -> tuple[str, dict | None, list[SignalRow], int, int]:
+    raw = fetch_klines(sym, interval=spec.signal, days=days, extra_bars=220)
     if raw is None or len(raw["c"]) < 220:
         return sym, None, [], 0, 0
     d = add_15m_mas(raw)
-    raw_h = fetch_klines(sym, interval="1h", days=max(days, 14), extra_bars=220)
-    d1h = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
+    raw_h = fetch_klines(sym, interval=spec.htf, days=max(days, spec.htf_min_days), extra_bars=220)
+    d_htf = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
     cutoff = int(d["t"][-1]) - days * 24 * 60 * 60 * 1000
     rows = []
-    n15 = 0
+    n_raw = 0
     n_drop = 0
     for sig in detect_combo(d):
         ts = int(d["t"][sig.idx])
         if ts < cutoff:
             continue
-        n15 += 1
-        if not above_1h_ma200(d1h, ts, sig.close):
+        n_raw += 1
+        if not above_htf_ma200(d_htf, ts, sig.close, spec.htf_ms):
             n_drop += 1
             continue
         entry, moves = forward_moves(d, sig)
         if np.isnan(entry):
             continue
-        ma1 = h1_ma200_at(d1h, ts, sig.close) if d1h is not None else None
-        ext1 = (sig.close / ma1 - 1.0) * 100.0 if ma1 else None
+        ma_h = htf_ma200_at(d_htf, ts, sig.close, spec.htf_ms) if d_htf is not None else None
+        ext_h = (sig.close / ma_h - 1.0) * 100.0 if ma_h else None
         rows.append(
             SignalRow(
                 symbol=sym,
@@ -115,16 +187,16 @@ def scan_symbol(sym: str, days: int) -> tuple[str, dict | None, list[SignalRow],
                 time_ms=ts,
                 entry=entry,
                 moves=moves,
-                h1_ma200=ma1,
-                h1_ext_pct=ext1,
+                h1_ma200=ma_h,
+                h1_ext_pct=ext_h,
             )
         )
-    return sym, d, rows, n15, n_drop
+    return sym, d, rows, n_raw, n_drop
 
 
-def filter_stats(rows: list[SignalRow]) -> list[dict]:
+def filter_stats(rows: list[SignalRow], spec: TfSpec) -> list[dict]:
     out = []
-    for name, kw in FILTERS:
+    for name, kw in filter_defs(spec.signal):
         subset = apply_filter(rows, **kw)
         item = {"name": name, "count": len(subset), "fail15_pct": fail_rate(subset)}
         for h in HORIZONS:
@@ -166,17 +238,24 @@ def _paint_ohlcv(ax, axv, d: dict, a0: int, a1: int, mark_i: int | None) -> None
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
 
 
-def hour_bar_idx(d1h: dict, time_ms: int) -> int | None:
-    t = d1h["t"]
-    hour_open = int(time_ms) - (int(time_ms) % 3_600_000)
-    w = np.where(t == hour_open)[0]
+def tf_bar_idx(d: dict, time_ms: int, bar_ms: int) -> int | None:
+    t = d["t"]
+    open_ms = int(time_ms) - (int(time_ms) % bar_ms)
+    w = np.where(t == open_ms)[0]
     if len(w):
         return int(w[0])
     w = np.where(t <= time_ms)[0]
     return int(w[-1]) if len(w) else None
 
 
-def draw_chart(sym: str, d: dict, row: SignalRow, path: Path, d1h: dict | None = None) -> Path | None:
+def draw_chart(
+    sym: str,
+    d: dict,
+    row: SignalRow,
+    path: Path,
+    spec: TfSpec,
+    d_htf: dict | None = None,
+) -> Path | None:
     try:
         import matplotlib
 
@@ -188,12 +267,12 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path, d1h: dict | None =
     i = row.sig.idx
     a0 = max(0, i - 48)
     a1 = min(len(d["c"]), i + 20)
-    r4 = row.moves.get(16)
+    r4 = row.moves.get(spec.hold4)
     rtxt = f"  4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
     title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
     kind = "reclaim MA200" if row.crossed_200d else "close>7/14/25/200"
 
-    hi = hour_bar_idx(d1h, row.time_ms) if d1h is not None and len(d1h.get("c", [])) else None
+    hi = tf_bar_idx(d_htf, row.time_ms, spec.htf_ms) if d_htf is not None and len(d_htf.get("c", [])) else None
     stacked = hi is not None
     if stacked:
         fig, axes = plt.subplots(
@@ -214,17 +293,17 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path, d1h: dict | None =
         if a is not None:
             _style_ax(a)
     _paint_ohlcv(ax, axv, d, a0, a1, i)
-    ax.set_title(f"{title_sym}  15m  {hm(row.time_ms)}  {kind}{rtxt}", color="#e8f0ea", fontsize=12)
-    if stacked and axh is not None and axhv is not None and d1h is not None and hi is not None:
+    ax.set_title(f"{title_sym}  {spec.signal}  {hm(row.time_ms)}  {kind}{rtxt}", color="#e8f0ea", fontsize=12)
+    if stacked and axh is not None and axhv is not None and d_htf is not None and hi is not None:
         b0 = max(0, hi - 48)
-        b1 = min(len(d1h["c"]), hi + 16)
-        _paint_ohlcv(axh, axhv, d1h, b0, b1, hi)
-        h_close = float(d1h["c"][hi])
-        h_ma = float(d1h["m200"][hi]) if not np.isnan(d1h["m200"][hi]) else None
+        b1 = min(len(d_htf["c"]), hi + 16)
+        _paint_ohlcv(axh, axhv, d_htf, b0, b1, hi)
+        h_close = float(d_htf["c"][hi])
+        h_ma = float(d_htf["m200"][hi]) if not np.isnan(d_htf["m200"][hi]) else None
         vs = ""
         if h_ma:
-            vs = f"  close {h_close:g} vs 1h MA200 {h_ma:g} ({(h_close / h_ma - 1) * 100:+.2f}%)"
-        axh.set_title(f"{title_sym}  1h  {hm(int(d1h['t'][hi]))}{vs}", color="#e8f0ea", fontsize=12)
+            vs = f"  close {h_close:g} vs {spec.htf} MA200 {h_ma:g} ({(h_close / h_ma - 1) * 100:+.2f}%)"
+        axh.set_title(f"{title_sym}  {spec.htf}  {hm(int(d_htf['t'][hi]))}{vs}", color="#e8f0ea", fontsize=12)
     fig.tight_layout(pad=0.5)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -232,7 +311,7 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path, d1h: dict | None =
     return path
 
 
-def pick_gallery(rows: list[SignalRow], limit: int = 18) -> list[SignalRow]:
+def pick_gallery(rows: list[SignalRow], spec: TfSpec, limit: int = 18) -> list[SignalRow]:
     pool = [r for r in rows if r.crossed_200d] or list(rows)
     if not pool:
         return []
@@ -240,7 +319,7 @@ def pick_gallery(rows: list[SignalRow], limit: int = 18) -> list[SignalRow]:
     pinned = sorted(pinned, key=lambda r: r.time_ms, reverse=True)[:4]
 
     def score(r: SignalRow) -> float:
-        mv = r.moves.get(16)
+        mv = r.moves.get(spec.hold4)
         return mv.ret_pct if mv and mv.ret_pct is not None else 0.0
 
     ranked = sorted(pool, key=score, reverse=True)
@@ -266,35 +345,36 @@ def pick_gallery(rows: list[SignalRow], limit: int = 18) -> list[SignalRow]:
     return out
 
 
-def kpi_block(stats: list[dict]) -> str:
+def kpi_block(stats: list[dict], spec: TfSpec) -> str:
     raw = stats[0]
     cross = stats[1]
-    h = cross["h16"]
+    h = cross[f"h{spec.hold4}"]
     return "".join(
         f'<div class="kpi"><div class="k">{k}</div><div class="v">{v}</div></div>'
         for k, v in (
             ("通知／突破", cross["count"]),
             ("4h 勝率", f"{h['wr']:.1f}%"),
             ("4h 平均", f"{h['avg']:+.3f}%"),
-            ("15m 假突破", f"{cross['fail15_pct']:.1f}%"),
+            (spec.fail_label, f"{cross['fail15_pct']:.1f}%"),
             ("全部組合剛成立", raw["count"]),
             ("才形成多頭", stats[2]["count"]),
         )
     )
 
 
-def stats_table(stats: list[dict]) -> str:
-    heads = "".join(f"<th>{HORIZON_LABEL[h]}勝率</th><th>{HORIZON_LABEL[h]}均</th>" for h in (1, 4, 16, 32))
+def stats_table(stats: list[dict], spec: TfSpec) -> str:
+    hs = spec.table_horizons
+    heads = "".join(f"<th>{spec.labels[h]}勝率</th><th>{spec.labels[h]}均</th>" for h in hs)
     rows = []
     for s in stats:
         cells = [f"<td>{html.escape(s['name'])}</td>", f'<td class="mono">{s["count"]}</td>', f'<td class="mono">{s["fail15_pct"]:.1f}%</td>']
-        for h in (1, 4, 16, 32):
+        for h in hs:
             st = s[f"h{h}"]
             cells.append(f'<td class="mono">{st["wr"]:.1f}%</td>')
             cells.append(f"<td>{pct(st['avg'])}</td>")
         rows.append("<tr>" + "".join(cells) + "</tr>")
     return (
-        "<table><thead><tr><th>條件</th><th>筆數</th><th>15m假突破</th>"
+        f"<table><thead><tr><th>條件</th><th>筆數</th><th>{html.escape(spec.fail_label)}</th>"
         + heads
         + "</tr></thead><tbody>"
         + "".join(rows)
@@ -302,11 +382,14 @@ def stats_table(stats: list[dict]) -> str:
     )
 
 
-def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
+def signal_table(rows: list[SignalRow], spec: TfSpec, limit: int = 80) -> str:
+    hs = spec.table_horizons
     focus = [r for r in rows if r.crossed_200d] or rows
     ranked = sorted(
         focus,
-        key=lambda r: -(r.moves.get(16).ret_pct or -999) if r.moves.get(16) and r.moves[16].ret_pct is not None else 999,
+        key=lambda r: -(r.moves.get(spec.hold4).ret_pct or -999)
+        if r.moves.get(spec.hold4) and r.moves[spec.hold4].ret_pct is not None
+        else 999,
     )[:limit]
     body = []
     for r in ranked:
@@ -320,43 +403,32 @@ def signal_table(rows: list[SignalRow], limit: int = 80) -> str:
             f'<td class="mono">{r.ext_pct:+.2f}%</td>',
             f'<td class="mono">{r.h1_ext_pct:+.2f}%</td>' if r.h1_ext_pct is not None else "<td>—</td>",
         ]
-        for h in (1, 4, 16, 32):
+        for h in hs:
             mv = r.moves.get(h)
             cells.append(f"<td>{pct(mv.ret_pct if mv else None)}</td>")
         body.append("<tr>" + "".join(cells) + "</tr>")
+    ret_heads = "".join(f"<th>{spec.labels[h]}</th>" for h in hs)
     return (
         "<table><thead><tr><th>時間</th><th>標的</th><th>種類</th><th>進場</th><th>量比</th>"
-        "<th>距15mMA200</th><th>距1hMA200</th>"
-        "<th>15m</th><th>1h</th><th>4h</th><th>8h</th></tr></thead><tbody>"
+        f"<th>距{spec.signal}MA200</th><th>距{spec.htf}MA200</th>"
+        f"{ret_heads}</tr></thead><tbody>"
         + "".join(body)
         + "</tbody></table>"
     )
 
 
-def crcl_card(rows: list[SignalRow]) -> str:
+def crcl_card(rows: list[SignalRow], spec: TfSpec) -> str:
     mine = [r for r in rows if r.symbol == "CRCLUSDT"]
     cross = [r for r in mine if r.crossed_200d]
     if not mine:
         return '<div class="card"><h2>CRCL</h2><p class="note">這段期間沒有訊號。</p></div>'
-    st = summarize_rows(cross, 16) if cross else summarize_rows(mine, 16)
+    st = summarize_rows(cross, spec.hold4) if cross else summarize_rows(mine, spec.hold4)
     return f"""<div class="card">
     <h2>CRCL</h2>
-    <p class="note">組合剛成立 {len(mine)} 筆，其中剛站上 15m MA200 {len(cross)} 筆。
+    <p class="note">組合剛成立 {len(mine)} 筆，其中剛站上 {spec.signal} MA200 {len(cross)} 筆。
     剛站上那組 4h 勝率 {st['wr']:.1f}%　4h 均 {st['avg']:+.3f}%　4h 中位 {st['med']:+.3f}%。</p>
-    <div class="table-wrap">{signal_table(cross or mine, limit=40)}</div>
+    <div class="table-wrap">{signal_table(cross or mine, spec, limit=40)}</div>
   </div>"""
-
-
-PUBLIC_PAGE = (
-    "https://htmlpreview.github.io/?"
-    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
-    "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html"
-)
-PUBLIC_PAGE_STOCKS = (
-    "https://htmlpreview.github.io/?"
-    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
-    "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html"
-)
 
 
 def public_img_src(rel: str) -> str:
@@ -366,20 +438,24 @@ def public_img_src(rel: str) -> str:
     local = Path("docs/binance") / rel.lstrip("./")
     if not local.exists() and ("/" in rel):
         name = rel.rsplit("/", 1)[-1]
-        local = Path("docs/binance/img/ma15-bull") / name
+        for folder in ("ma15-bull", "ma15-bull-stocks", "ma1h-bull", "ma1h-bull-stocks"):
+            cand = Path("docs/binance/img") / folder / name
+            if cand.exists():
+                local = cand
+                break
     if local.exists():
         b64 = base64.b64encode(local.read_bytes()).decode("ascii")
         return f"data:image/png;base64,{b64}"
     return rel
 
 
-def gallery_html(gallery: list[tuple[SignalRow, str]]) -> str:
+def gallery_html(gallery: list[tuple[SignalRow, str]], spec: TfSpec) -> str:
     if not gallery:
         return '<p class="note">這段期間沒有圖例。</p>'
     cards = []
     for row, rel in gallery:
-        kind = "本根剛站上 15m MA200" if row.crossed_200d else "已在 MA200 上，本根才收上短均"
-        r4 = row.moves.get(16)
+        kind = f"本根剛站上 {spec.signal} MA200" if row.crossed_200d else "已在 MA200 上，本根才收上短均"
+        r4 = row.moves.get(spec.hold4)
         rtxt = f"4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
         src = public_img_src(rel)
         cards.append(
@@ -399,17 +475,16 @@ def write_html(
     stats: list[dict],
     gallery: list[tuple[SignalRow, str]],
     stocks_only: bool = False,
+    spec: TfSpec,
 ) -> None:
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
-    public = PUBLIC_PAGE_STOCKS if stocks_only else PUBLIC_PAGE
-    title = "15分K 收盤在 7/14/25/200 之上 · 幣安股票" if stocks_only else "15分K 收盤在 7/14/25/200 之上"
-    heading = (
-        "15 分 K：收盤在 7 / 14 / 25 / 200 之上（只掃幣安股票）"
-        if stocks_only
-        else "15 分 K：收盤在 7 / 14 / 25 / 200 之上"
-    )
+    public = spec.public_stocks if stocks_only else spec.public
+    tf = spec.signal
+    htf = spec.htf
+    title = f"{tf} 收盤在 7/14/25/200 之上" + (" · 幣安股票" if stocks_only else "")
+    heading = f"{tf} K：收盤在 7 / 14 / 25 / 200 之上" + ("（只掃幣安股票）" if stocks_only else "")
     universe_txt = (
         f"只掃幣安 TradFi 股票永續（美／港／韓／中股、股票 ETF、Pre-IPO；不含黃金原油等商品）近 {days} 天、{universe_n} 個合約。"
         if stocks_only
@@ -446,27 +521,27 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
 <div class="wrap">
   <h1>{html.escape(heading)}</h1>
   <p class="sub">
-    規則：收盤同時高於 <strong>MA7、MA14、MA25、MA200</strong>（同一張 15 分圖），且 SMA7 &gt; SMA14 &gt; SMA25。
-    還要當下價格在<strong>小時圖 SMA200</strong>之上。
-    Telegram 通知只用「本根剛站上 15 分 MA200」：前收還在 15 分 MA200 下，這一根收盤站上，同時收盤也在 7/14/25 之上，<strong>且當下價格已在小時圖 MA200 上方</strong>（未收完的小時 K 用當下收盤，不看未來）。
-    進場用訊號下一根開盤。假突破 = 進場那根 15 分收盤又跌回 MA200 下方。
+    規則：收盤同時高於 <strong>MA7、MA14、MA25、MA200</strong>（同一張 {html.escape(tf)} 圖），且 SMA7 &gt; SMA14 &gt; SMA25。
+    還要當下價格在<strong>{html.escape(htf)} 圖 SMA200</strong>之上。
+    Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，這一根收盤站上，同時收盤也在 7/14/25 之上，<strong>且當下價格已在 {html.escape(htf)} MA200 上方</strong>（未收完的大週期 K 用當下收盤，不看未來）。
+    進場用訊號下一根開盤。假突破 = 進場那根 {html.escape(tf)} 收盤又跌回 MA200 下方。
     {universe_txt}訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
     外網請開 <a href="{public}" style="color:#c9a227">這頁（htmlpreview）</a>；圖已內嵌。
     僅供型態對照，不是進出場建議。
   </p>
-  <div class="kpis">{kpi_block(stats)}</div>
-  {crcl_card(rows)}
+  <div class="kpis">{kpi_block(stats, spec)}</div>
+  {crcl_card(rows, spec)}
   <h1>圖例</h1>
-  <p class="sub">上面 15 分 K，下面同一檔小時 K。黃虛線是訊號時間（小時圖對到包含那根 15 分的那一根）。白線是各週期自己的 MA200。CRCL 若有訊號會釘在最上面。</p>
-  {gallery_html(gallery)}
+  <p class="sub">上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K。黃虛線是訊號時間。白線是各週期自己的 MA200。CRCL 若有訊號會釘在最上面。</p>
+  {gallery_html(gallery, spec)}
   <div class="card">
     <h2>過濾對照</h2>
-    <div class="table-wrap">{stats_table(stats)}</div>
-    <p class="note">距15mMA200 =（收盤 / 15m SMA200 − 1）× 100%。距1hMA200 用訊號當下價 vs 當時小時 SMA200。量比 = 當根量 / 20 根均量。</p>
+    <div class="table-wrap">{stats_table(stats, spec)}</div>
+    <p class="note">距{html.escape(tf)}MA200 =（收盤 / {html.escape(tf)} SMA200 − 1）× 100%。距{html.escape(htf)}MA200 用訊號當下價 vs 當時 {html.escape(htf)} SMA200。量比 = 當根量 / 20 根均量。</p>
   </div>
   <div class="card">
-    <h2>訊號表（剛站上 15m MA200，依 4h 報酬排序）</h2>
-    <div class="table-wrap">{signal_table(rows)}</div>
+    <h2>訊號表（剛站上 {html.escape(tf)} MA200，依 4h 報酬排序）</h2>
+    <div class="table-wrap">{signal_table(rows, spec)}</div>
   </div>
 </div>
 </body></html>
@@ -515,31 +590,37 @@ def run_demo() -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="15 分 K 收盤在 7/14/25/200 之上")
+    p = argparse.ArgumentParser(description="收盤在 7/14/25/200 之上（15m 或 1h）")
     p.add_argument("--demo", action="store_true")
     p.add_argument("--days", type=int, default=7)
     p.add_argument("--workers", type=int, default=8)
-    p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma15-bull.html（--stocks 則寫 ma15-bull-stocks.html）")
+    p.add_argument("--tf", choices=("15m", "1h"), default="15m", help="訊號週期；1h 時大週期改用 4h MA200")
+    p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma15-bull.html 或 ma1h-bull.html")
     p.add_argument("-o", "--output", help="HTML 輸出路徑")
     p.add_argument("--limit-symbols", type=int, default=0)
     p.add_argument("--stocks", action="store_true", help="只掃幣安 TradFi 股票永續（不含商品）")
     args = p.parse_args()
     if args.demo:
         return run_demo()
+    spec = TF_SPECS[args.tf]
 
     print("載入標的…", flush=True)
     symbols = universe(stocks_only=args.stocks)
     if args.limit_symbols:
         symbols = symbols[: args.limit_symbols]
     scope = "幣安股票永續" if args.stocks else "流動永續"
-    print(f"掃描 {len(symbols)} 個 15m {scope}，近 {args.days} 天（15 分 MA200 + 小時 MA200）", flush=True)
+    print(
+        f"掃描 {len(symbols)} 個 {spec.signal} {scope}，近 {args.days} 天"
+        f"（{spec.signal} MA200 + {spec.htf} MA200）",
+        flush=True,
+    )
 
     rows: list[SignalRow] = []
     data: dict[str, dict] = {}
-    n15 = n_drop = 0
+    n_raw = n_drop = 0
     t0 = time.time()
     with ThreadPoolExecutor(args.workers) as ex:
-        futs = {ex.submit(scan_symbol, s, args.days): s for s in symbols}
+        futs = {ex.submit(scan_symbol, s, args.days, spec): s for s in symbols}
         done = 0
         for fut in as_completed(futs):
             done += 1
@@ -548,7 +629,7 @@ def main() -> int:
             except Exception as e:
                 print("err", futs[fut], e, flush=True)
                 continue
-            n15 += a
+            n_raw += a
             n_drop += b
             if d is not None:
                 data[sym] = d
@@ -556,11 +637,11 @@ def main() -> int:
             if done % 40 == 0 or done == len(symbols):
                 print(f"  {done}/{len(symbols)}  訊號 {len(rows)}  {time.time()-t0:.1f}s", flush=True)
     rows.sort(key=lambda r: r.time_ms)
-    stats = filter_stats(rows)
-    print("\n=== 15 分 7/14/25 + MA200，且當下在 1h MA200 上 ===")
-    print(f"15m 組合 {n15} 筆，未站上 1h MA200 去掉 {n_drop} 筆，留下 {n15 - n_drop}")
+    stats = filter_stats(rows, spec)
+    print(f"\n=== {spec.signal} 7/14/25 + MA200，且當下在 {spec.htf} MA200 上 ===")
+    print(f"{spec.signal} 組合 {n_raw} 筆，未站上 {spec.htf} MA200 去掉 {n_drop} 筆，留下 {n_raw - n_drop}")
     for s in stats:
-        h = s["h16"]
+        h = s[f"h{spec.hold4}"]
         print(
             f"{s['name']}: n={s['count']}  4h勝率 {h['wr']:.1f}%  4h均 {h['avg']:+.3f}%  "
             f"假突破 {s['fail15_pct']:.1f}%"
@@ -568,29 +649,30 @@ def main() -> int:
     crcl = [r for r in rows if r.symbol == "CRCLUSDT" and r.crossed_200d]
     print(f"CRCL 剛站上 MA200：{len(crcl)} 筆")
     for r in crcl:
-        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  entry={r.entry:g}  4h={r.moves.get(16).ret_pct if r.moves.get(16) else None}")
+        mv = r.moves.get(spec.hold4)
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  entry={r.entry:g}  4h={mv.ret_pct if mv else None}")
 
-    img_name = "ma15-bull-stocks" if args.stocks else "ma15-bull"
+    img_name = spec.img + ("-stocks" if args.stocks else "")
     img_dir = Path("docs/binance/img") / img_name
     img_dir.mkdir(parents=True, exist_ok=True)
     for old in img_dir.glob("*.png"):
         old.unlink()
-    h1_cache: dict[str, dict | None] = {}
+    htf_cache: dict[str, dict | None] = {}
     gallery: list[tuple[SignalRow, str]] = []
-    for row in pick_gallery(rows, limit=24):
+    for row in pick_gallery(rows, spec, limit=24):
         d = data.get(row.symbol)
         if d is None:
             continue
-        if row.symbol not in h1_cache:
-            raw_h = fetch_klines(row.symbol, interval="1h", days=max(args.days, 14), extra_bars=220)
-            h1_cache[row.symbol] = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
+        if row.symbol not in htf_cache:
+            raw_h = fetch_klines(row.symbol, interval=spec.htf, days=max(args.days, spec.htf_min_days), extra_bars=220)
+            htf_cache[row.symbol] = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
         stamp = datetime.fromtimestamp(row.time_ms / 1000, TZ).strftime("%m%d%H%M")
         fname = f"{file_base(row.symbol)}_{stamp}.png"
         out = img_dir / fname
-        if draw_chart(row.symbol, d, row, out, d1h=h1_cache[row.symbol]):
+        if draw_chart(row.symbol, d, row, out, spec, d_htf=htf_cache[row.symbol]):
             gallery.append((row, f"./img/{img_name}/{fname}"))
 
-    default_html = "docs/binance/ma15-bull-stocks.html" if args.stocks else "docs/binance/ma15-bull.html"
+    default_html = spec.html_stocks if args.stocks else spec.html
     out_html = Path(args.output) if args.output else Path(default_html)
     if args.pages:
         out_html = Path(default_html)
@@ -602,13 +684,19 @@ def main() -> int:
         stats=stats,
         gallery=gallery,
         stocks_only=args.stocks,
+        spec=spec,
     )
     Path("output").mkdir(exist_ok=True)
-    summary_path = Path("output/ma15_bull_stocks_summary.json" if args.stocks else "output/ma15_bull_summary.json")
+    if args.tf == "15m":
+        summary_path = Path("output/ma15_bull_stocks_summary.json" if args.stocks else "output/ma15_bull_summary.json")
+    else:
+        summary_path = Path("output/ma1h_bull_stocks_summary.json" if args.stocks else "output/ma1h_bull_summary.json")
     summary_path.write_text(
         json.dumps(
             {
                 "days": args.days,
+                "tf": args.tf,
+                "htf": spec.htf,
                 "stocks_only": args.stocks,
                 "universe": len(symbols),
                 "signals": len(rows),

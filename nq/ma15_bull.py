@@ -115,17 +115,17 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
     return out
 
 
-def h1_ma200_at(d1h: dict, time_ms: int, last_price: float) -> float | None:
-    """訊號當下的 1h SMA200。未收完的那根小時 K 用 last_price，不偷用後面的收盤。"""
-    t = d1h["t"]
+def htf_ma200_at(d_htf: dict, time_ms: int, last_price: float, bar_ms: int) -> float | None:
+    """訊號當下的大週期 SMA200。未收完的那根 K 用 last_price，不偷用後面的收盤。"""
+    t = d_htf["t"]
     opened = t <= time_ms
     if not opened.any():
         return None
     last_i = int(np.where(opened)[0][-1])
     if last_i + 1 < 200:
         return None
-    c = np.array(d1h["c"][: last_i + 1], dtype=float)
-    if int(t[last_i]) + H1_MS > time_ms:
+    c = np.array(d_htf["c"][: last_i + 1], dtype=float)
+    if int(t[last_i]) + bar_ms > time_ms:
         c[-1] = float(last_price)
     window = c[-200:]
     if np.isnan(window).any():
@@ -133,11 +133,19 @@ def h1_ma200_at(d1h: dict, time_ms: int, last_price: float) -> float | None:
     return float(window.mean())
 
 
-def above_1h_ma200(d1h: dict | None, time_ms: int, last_price: float) -> bool:
-    if d1h is None:
+def h1_ma200_at(d1h: dict, time_ms: int, last_price: float) -> float | None:
+    return htf_ma200_at(d1h, time_ms, last_price, H1_MS)
+
+
+def above_htf_ma200(d_htf: dict | None, time_ms: int, last_price: float, bar_ms: int) -> bool:
+    if d_htf is None:
         return False
-    ma = h1_ma200_at(d1h, time_ms, last_price)
+    ma = htf_ma200_at(d_htf, time_ms, last_price, bar_ms)
     return ma is not None and float(last_price) > ma
+
+
+def above_1h_ma200(d1h: dict | None, time_ms: int, last_price: float) -> bool:
+    return above_htf_ma200(d1h, time_ms, last_price, H1_MS)
 
 
 @dataclass

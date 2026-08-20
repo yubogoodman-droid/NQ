@@ -16,12 +16,13 @@ SESSION.headers.update(
     {"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"}
 )
 
-BARS_PER_DAY = {"15m": 96, "5m": 288, "1m": 1440, "1h": 24, "1d": 1}
+BARS_PER_DAY = {"15m": 96, "5m": 288, "1m": 1440, "1h": 24, "4h": 6, "1d": 1}
 INTERVAL_MS = {
     "15m": 15 * 60_000,
     "5m": 5 * 60_000,
     "1m": 60_000,
     "1h": 60 * 60_000,
+    "4h": 4 * 60 * 60_000,
     "1d": 24 * 60 * 60_000,
 }
 

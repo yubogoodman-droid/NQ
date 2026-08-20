@@ -24,7 +24,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.binance import INTERVAL_MS, SESSION, fetch_klines, universe
-from nq.ma15_bull import add_15m_mas, above_1h_ma200, detect_combo, h1_ma200_at, sma
+from nq.ma15_bull import add_15m_mas, above_htf_ma200, detect_combo, htf_ma200_at, sma
 
 # —— 填這裡 ——
 TELEGRAM_BOT_TOKEN = ""
@@ -137,13 +137,16 @@ def draw_chart(sym: str, d: dict, idx: int, path: str) -> str | None:
     return path
 
 
+WATCH = {"signal": "15m", "htf": "1h", "htf_ms": INTERVAL_MS["1h"], "sig_limit": 280, "htf_limit": 250}
+
+
 def scan_symbol(sym: str) -> list[dict]:
-    raw = fetch_klines(sym, interval="15m", limit=280, extra_bars=8)
+    raw = fetch_klines(sym, interval=WATCH["signal"], limit=WATCH["sig_limit"], extra_bars=8)
     if raw is None or len(raw["c"]) < 220:
         return []
     d = add_15m_mas(raw)
-    raw_h = fetch_klines(sym, interval="1h", limit=250, extra_bars=8)
-    d1h = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
+    raw_h = fetch_klines(sym, interval=WATCH["htf"], limit=WATCH["htf_limit"], extra_bars=8)
+    d_htf = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
     n = len(d["c"])
     events = []
     for closed in (n - 1, n - 2):
@@ -154,9 +157,9 @@ def scan_symbol(sym: str) -> list[dict]:
             if not sig.crossed_200:
                 continue
             ts = int(d["t"][sig.idx])
-            if not above_1h_ma200(d1h, ts, sig.close):
+            if not above_htf_ma200(d_htf, ts, sig.close, WATCH["htf_ms"]):
                 continue
-            events.append({"symbol": sym, "sig": sig, "d": d, "d1h": d1h})
+            events.append({"symbol": sym, "sig": sig, "d": d, "d_htf": d_htf})
     return events
 
 
@@ -164,15 +167,16 @@ def format_ev(ev: dict) -> str:
     d, sig, sym = ev["d"], ev["sig"], ev["symbol"]
     ts = hm(int(d["t"][sig.idx]))
     kind = "剛站上 MA200" if sig.crossed_200 else "多頭排列剛成立"
-    ma1 = h1_ma200_at(ev.get("d1h"), int(d["t"][sig.idx]), sig.close) if ev.get("d1h") is not None else None
-    h1txt = f"1h MA200 {ma1:g}　距 {(sig.close / ma1 - 1) * 100:+.2f}%" if ma1 else "1h MA200 —"
+    tf, htf = WATCH["signal"], WATCH["htf"]
+    ma_h = htf_ma200_at(ev.get("d_htf"), int(d["t"][sig.idx]), sig.close, WATCH["htf_ms"]) if ev.get("d_htf") is not None else None
+    htxt = f"{htf} MA200 {ma_h:g}　距 {(sig.close / ma_h - 1) * 100:+.2f}%" if ma_h else f"{htf} MA200 —"
     return (
-        f"<b>15m 收盤在 7/14/25/200 上 · {kind}</b>\n"
+        f"<b>{tf} 收盤在 7/14/25/200 上 · {kind}</b>\n"
         f"<b>{sym}</b>\n"
         f"{ts}  收 {sig.close:g}\n"
         f"收盤 &gt; MA7 {sig.m7:g} &gt; MA14 {sig.m14:g} &gt; MA25 {sig.m25:g}\n"
-        f"且 &gt; 15m MA200 {sig.ma200:g}　距 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×\n"
-        f"且 &gt; {h1txt}"
+        f"且 &gt; {tf} MA200 {sig.ma200:g}　距 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×\n"
+        f"且 &gt; {htxt}"
     )
 
 
@@ -198,7 +202,7 @@ def notify(ev: dict) -> None:
 
 def wait_next_close() -> None:
     now = time.time()
-    step = INTERVAL_MS["15m"] / 1000
+    step = INTERVAL_MS[WATCH["signal"]] / 1000
     nxt = (int(now) // int(step) + 1) * step + 3
     time.sleep(max(1, nxt - now))
 
@@ -217,16 +221,24 @@ def main() -> int:
     p.add_argument("--once", action="store_true")
     p.add_argument("--test", action="store_true")
     p.add_argument("--stocks", action="store_true", help="只掃幣安 TradFi 股票永續（不含商品）")
+    p.add_argument("--tf", choices=("15m", "1h"), default="15m", help="訊號週期；1h 時大週期改用 4h MA200")
     args = p.parse_args()
     apply_keys()
     if args.test:
         return test_telegram()
 
+    if args.tf == "1h":
+        WATCH.update({"signal": "1h", "htf": "4h", "htf_ms": INTERVAL_MS["4h"], "sig_limit": 250, "htf_limit": 250})
+
     seen = load_seen()
     print("載入標的…", flush=True)
     symbols = universe(stocks_only=args.stocks)
     scope = "幣安股票永續" if args.stocks else "流動永續"
-    print(f"監看 {len(symbols)} 個{scope}。15m 剛站上 MA200、收在 7/14/25/200 上、且當下在 1h MA200 上會推 Telegram。", flush=True)
+    print(
+        f"監看 {len(symbols)} 個{scope}。{WATCH['signal']} 剛站上 MA200、收在 7/14/25/200 上、"
+        f"且當下在 {WATCH['htf']} MA200 上會推 Telegram。",
+        flush=True,
+    )
     uni_ts = time.time()
 
     def round_once() -> None:
@@ -259,7 +271,7 @@ def main() -> int:
     round_once()
     if args.once:
         return 0
-    print("watch 中，每根 15m 收盤掃一次（Ctrl+C 停）", flush=True)
+    print(f"watch 中，每根 {WATCH['signal']} 收盤掃一次（Ctrl+C 停）", flush=True)
     try:
         while True:
             wait_next_close()

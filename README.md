@@ -28,15 +28,18 @@
 
 ```bash
 python3 examples/backtest_15m_bull.py --demo
-python3 examples/backtest_15m_bull.py --days 30 --pages            # 流動永續
-python3 examples/backtest_15m_bull.py --days 30 --stocks --pages   # 只掃幣安股票永續
+python3 examples/backtest_15m_bull.py --days 7 --stocks --pages            # 15 分
+python3 examples/backtest_15m_bull.py --days 30 --tf 1h --stocks --pages   # 小時圖，大週期用 4h MA200
 ```
 
 外網看圖（請用這個，圖已內嵌）：  
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html
 
-只掃股票：  
+只掃股票（15 分）：  
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html
+
+只掃股票（小時）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull-stocks.html
 
 合併進 `main` 後 GitHub Pages：  
 https://yubogoodman-droid.github.io/NQ/binance/ma15-bull.html
