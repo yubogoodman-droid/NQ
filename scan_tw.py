@@ -1777,6 +1777,14 @@ def _sleep_to_next_minute(pad_sec: int = 3) -> None:
     time.sleep(max(1.0, (nxt - now).total_seconds()))
 
 
+def _shioaji_installed() -> bool:
+    try:
+        import shioaji  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 def main() -> int:
     args = parse_args()
     _apply_secrets()
@@ -1787,6 +1795,11 @@ def main() -> int:
         print("請在本檔最上面填 SHIOAJI_API_KEY 與 SHIOAJI_SECRET_KEY")
         return 1
     set_kline_source(args.source)
+    if using_shioaji() and not _shioaji_installed():
+        print("沒有 shioaji 套件，永豐登入不了。")
+        print("請用「現在跑腳本的同一個 Python」安裝：")
+        print(f"  {sys.executable} -m pip install shioaji")
+        return 1
     if args.last_week:
         scan_weekdays(args, previous_weekdays(), "回測上週")
         return 0
