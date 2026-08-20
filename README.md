@@ -30,9 +30,10 @@
 
 ```bash
 python3 examples/backtest_15m_bull.py --demo
-python3 examples/backtest_15m_bull.py --days 7 --stocks --pages            # 15 分
-python3 examples/backtest_15m_bull.py --days 30 --tf 1h --pages            # 小時圖通知條件
-python3 examples/backtest_15m_bull.py --days 30 --tf 1h --stocks --pages   # 小時圖股票
+python3 examples/backtest_15m_bull.py --days 30 --pages                   # 15 分全市場
+python3 examples/backtest_15m_bull.py --days 30 --tf 1h --pages           # 小時圖全市場
+python3 examples/backtest_15m_bull.py --days 7 --stocks --pages           # 15 分股票
+python3 examples/backtest_15m_bull.py --days 30 --tf 1h --stocks --pages  # 小時圖股票
 ```
 
 外網看圖（請用這個，圖已內嵌）：  

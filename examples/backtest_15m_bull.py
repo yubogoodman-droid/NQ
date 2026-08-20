@@ -529,6 +529,12 @@ def write_html(
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     public = spec.public_stocks if stocks_only else spec.public
+    other = TF_SPECS["1h" if spec.signal == "15m" else "15m"]
+    other_url = other.public_stocks if stocks_only else other.public
+    other_name = "小時圖" if spec.signal == "15m" else "15 分圖"
+    sister_link = (
+        f'另有{other_name}回測：<a href="{html.escape(other_url)}" style="color:#c9a227">{html.escape(other_name)}</a>。'
+    )
     tf = spec.signal
     htf = spec.htf
     title = f"{tf} 收盤在 7/14/25/200 之上" + (" · 幣安股票" if stocks_only else "")
@@ -598,6 +604,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     進場用訊號下一根開盤。假突破 = 進場那根 {html.escape(tf)} 收盤又跌回 MA200 下方。
     {universe_txt}訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
     外網請開 <a href="{public}" style="color:#c9a227">這頁（htmlpreview）</a>；圖已內嵌。
+    {sister_link}
     僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">{kpi_block(stats, spec)}</div>
