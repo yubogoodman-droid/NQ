@@ -828,22 +828,41 @@ def _sj_login(api) -> None:
     secret = os.environ["SHIOAJI_SECRET_KEY"].strip()
     try:
         api.login(api_key=key, secret_key=secret, fetch_contract=True)
-        return
     except TypeError:
-        pass
-    api.login(api_key=key, secret_key=secret)
-    for name in ("fetch_contracts", "fetch_contract"):
-        fn = getattr(api, name, None)
-        if not callable(fn):
+        api.login(api_key=key, secret_key=secret)
+    _wait_stock_contracts(api)
+
+
+def _wait_stock_contracts(api, timeout_sec: float = 90) -> None:
+    """login 自己會抓合約，不要再呼叫 fetch_contracts（會 exclusive access lost）。"""
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        if _contract_count(api) > 100:
+            return
+        time.sleep(1)
+    print("商品合約還沒齊，先繼續…", flush=True)
+
+
+def _contract_count(api) -> int:
+    stocks = getattr(getattr(api, "Contracts", None), "Stocks", None)
+    if stocks is None:
+        return 0
+    total = 0
+    for exch in ("TSE", "OTC"):
+        try:
+            bucket = stocks[exch]
+        except Exception:  # noqa: BLE001
+            bucket = getattr(stocks, exch, None)
+        if bucket is None:
             continue
         try:
-            fn()
-        except TypeError:
-            try:
-                fn(contract_download=True)
-            except Exception:  # noqa: BLE001
-                pass
-        break
+            if hasattr(bucket, "values"):
+                total += len(list(bucket.values()))
+            else:
+                total += len(list(bucket))
+        except Exception:  # noqa: BLE001
+            continue
+    return total
 
 
 def login():
@@ -855,7 +874,7 @@ def login():
             return _api
         import shioaji as sj
 
-        print("永豐登入中（第一次下載商品合約會等 1～2 分鐘）…", flush=True)
+        print("永豐登入中（第一次下載商品合約會等 1～2 分鐘，不要再按一次 Run）…", flush=True)
         api = sj.Shioaji()
         _sj_login(api)
         print("永豐登入完成。", flush=True)
