@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 import re
@@ -27,6 +28,8 @@ SHIOAJI_SECRET_KEY = ""     # 永豐 Secret
 TELEGRAM_BOT_TOKEN = ""     # Telegram BotFather 給的 token
 TELEGRAM_CHAT_ID = ""       # 你的 Telegram chat id
 # ═══════════════════════════════════════════════════════════════
+
+SCRIPT_VERSION = "2026-08-20-d"
 
 
 def _apply_secrets() -> None:
@@ -826,10 +829,13 @@ def sj_fetch_bars_many(
 def _sj_login(api) -> None:
     key = os.environ["SHIOAJI_API_KEY"].strip()
     secret = os.environ["SHIOAJI_SECRET_KEY"].strip()
+    kwargs = {"api_key": key, "secret_key": secret}
     try:
-        api.login(api_key=key, secret_key=secret, fetch_contract=True)
-    except TypeError:
-        api.login(api_key=key, secret_key=secret)
+        if "fetch_contract" in inspect.signature(api.login).parameters:
+            kwargs["fetch_contract"] = True
+    except (TypeError, ValueError):
+        pass
+    api.login(**kwargs)
     _wait_stock_contracts(api)
 
 
@@ -1753,6 +1759,7 @@ def _ensure_shioaji() -> None:
 
 
 def main() -> int:
+    print(f"scan_tw {SCRIPT_VERSION}（不該再出現 fetch_contracts / fn()）", flush=True)
     args = parse_args()
     _apply_secrets()
     if not args.once and _on_date(args) is None and not args.last_week:
