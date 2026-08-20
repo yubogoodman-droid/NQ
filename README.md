@@ -44,7 +44,7 @@
 https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/scan_tw.py
 
 ```bash
-pip install pandas numpy yfinance requests shioaji
+pip install pandas numpy requests shioaji
 python scan_tw.py --watch
 ```
 

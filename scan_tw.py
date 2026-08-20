@@ -20,7 +20,6 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
-import yfinance as yf
 
 # ════ 在下面引號裡填序號（只放你自己電腦，不要貼聊天室）════
 SHIOAJI_API_KEY = ""        # 永豐 API Key
@@ -1274,6 +1273,10 @@ def _download_normalized(
         kwargs["end"] = end.isoformat()
     else:
         kwargs["period"] = period or "5d"
+    try:
+        import yfinance as yf
+    except ImportError as exc:
+        raise RuntimeError("指定 Yahoo K 線時才需要 yfinance：pip install yfinance") from exc
     raw = yf.download(symbols, **kwargs)
     out: dict[str, pd.DataFrame] = {}
     for symbol in symbols:
@@ -1662,7 +1665,8 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="台股一分K多頭排列＋站穩MA200掃描（單檔）")
     p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
-    p.add_argument("--watch", action="store_true", help="盤中每分鐘重掃，同一根 K 不重複通知")
+    p.add_argument("--watch", action="store_true", help="盤中持續監控（PyCharm 直接 Run 預設就是這個）")
+    p.add_argument("--once", action="store_true", help="只掃一次，不持續監控")
     p.add_argument(
         "--source",
         choices=("auto", "shioaji", "yahoo"),
@@ -1822,6 +1826,8 @@ def _ensure_shioaji() -> None:
 def main() -> int:
     args = parse_args()
     _apply_secrets()
+    if not args.once and _on_date(args) is None and not args.last_week:
+        args.watch = True
     if args.source == "shioaji" and not (
         os.environ.get("SHIOAJI_API_KEY", "").strip()
         and os.environ.get("SHIOAJI_SECRET_KEY", "").strip()

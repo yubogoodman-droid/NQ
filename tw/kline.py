@@ -6,7 +6,6 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-import yfinance as yf
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 # Yahoo 一分K 單次請求最多 8 個日曆天；更長區間要分段再合併。
@@ -174,6 +173,10 @@ def _download_normalized(
         kwargs["end"] = end.isoformat()
     else:
         kwargs["period"] = period or "5d"
+    try:
+        import yfinance as yf
+    except ImportError as exc:
+        raise RuntimeError("指定 Yahoo K 線時才需要 yfinance：pip install yfinance") from exc
     raw = yf.download(symbols, **kwargs)
     out: dict[str, pd.DataFrame] = {}
     for symbol in symbols:
