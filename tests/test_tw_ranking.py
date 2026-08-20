@@ -4,14 +4,18 @@ import json
 import unittest
 
 from datetime import date
+from unittest.mock import patch
 
 from tw.ranking import (
     RankedStock,
+    fetch_daily_turnover_ranking,
+    fetch_turnover_ranking,
     filter_by_price,
     filter_etfs,
     filter_financials,
     is_etf,
     is_financial,
+    iter_recent_sessions,
     parse_tpex_quotes,
     parse_twse_mi_index,
     parse_yahoo_ranking_html,
@@ -208,6 +212,41 @@ class RankingTests(unittest.TestCase):
         self.assertEqual(otc[0].symbol, "6182.TWO")
         self.assertEqual(otc[0].turnover, 900_000_000)
         self.assertAlmostEqual(otc[0].change_percent or 0, 11 / 111.5 * 100, places=4)
+
+    def test_iter_recent_sessions_skips_weekend(self) -> None:
+        days = list(iter_recent_sessions(date(2026, 8, 16), limit=3))
+        self.assertEqual(days, [date(2026, 8, 14), date(2026, 8, 13), date(2026, 8, 12)])
+
+    def test_live_ranking_falls_back_to_previous_session(self) -> None:
+        today = date(2026, 8, 20)
+        rows = [
+            RankedStock(i, f"{1000 + i}.TW", "測", 10.0, None, None, 1, 1e9 - i, "TAI")
+            for i in range(60)
+        ]
+
+        def fake_daily(on_date, top=100, session=None, timeout=20):
+            if on_date == today:
+                raise ValueError("not published")
+            return rows[:top], f"{on_date.isoformat()} 盤後成交額"
+
+        with patch("tw.ranking.fetch_daily_turnover_ranking", side_effect=fake_daily):
+            ranked, label = fetch_turnover_ranking(as_of=today)
+        self.assertEqual(len(ranked), 60)
+        self.assertIn("2026-08-19", label)
+        self.assertIn("尚未公布", label)
+
+    def test_daily_ranking_keeps_one_market_if_other_fails(self) -> None:
+        rows = [
+            RankedStock(i, f"{2000 + i}.TW", "測", 20.0, None, None, 1, 8e8 - i, "TAI")
+            for i in range(40)
+        ]
+        with (
+            patch("tw.ranking._fetch_twse_daily", return_value=rows),
+            patch("tw.ranking._fetch_tpex_daily", side_effect=ValueError("down")),
+        ):
+            ranked, label = fetch_daily_turnover_ranking(date(2026, 8, 19), top=100)
+        self.assertEqual(len(ranked), 40)
+        self.assertIn("2026-08-19", label)
 
 
 if __name__ == "__main__":

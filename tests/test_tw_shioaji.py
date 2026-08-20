@@ -13,6 +13,7 @@ from tw.shioaji_feed import (
     resample_ohlcv,
     yahoo_symbol_to_code,
     _ranked_from_snap,
+    _sj_busy,
 )
 from tw.kline import set_kline_source, using_shioaji
 
@@ -138,6 +139,11 @@ class ShioajiFeedTests(unittest.TestCase):
         self.assertEqual(stock.symbol, "6147.TWO")
         self.assertEqual(stock.exchange, "TWO")
         self.assertEqual(stock.turnover, 5.4e9)
+
+    def test_sj_busy_detects_exclusive_access(self) -> None:
+        self.assertTrue(_sj_busy(RuntimeError("fetch_contracts: exclusive access lost")))
+        self.assertTrue(_sj_busy(TimeoutError("kbars timeout")))
+        self.assertFalse(_sj_busy(ValueError("bad contract")))
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ SUBSCRIBE_LIMIT = 200
 
 _api = None
 _api_lock = threading.Lock()
+_rest_lock = threading.Lock()
 _frames: dict[str, pd.DataFrame] = {}
 _frames_lock = threading.Lock()
 _frame_ranges: dict[str, tuple[date, date]] = {}
@@ -336,21 +337,49 @@ def _snap_float(value) -> float | None:
 def _sj_login(api) -> None:
     key = os.environ["SHIOAJI_API_KEY"].strip()
     secret = os.environ["SHIOAJI_SECRET_KEY"].strip()
+    kwargs = {"api_key": key, "secret_key": secret}
     try:
-        api.login(api_key=key, secret_key=secret, fetch_contract=True)
-    except TypeError:
-        api.login(api_key=key, secret_key=secret)
+        if "fetch_contract" in inspect.signature(api.login).parameters:
+            kwargs["fetch_contract"] = True
+    except (TypeError, ValueError):
+        pass
+    api.login(**kwargs)
     _wait_stock_contracts(api)
 
 
-def _wait_stock_contracts(api, timeout_sec: float = 90) -> None:
-    """login 自己會抓合約，不要再呼叫 fetch_contracts（會 exclusive access lost）。"""
+def _sj_busy(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    name = type(exc).__name__.lower()
+    return "exclusive" in msg or "timeout" in name or "timeout" in msg
+
+
+def _wait_stock_contracts(api, timeout_sec: float = 180.0) -> int:
+    """login 自己會抓合約，不要再呼叫 fetch_contracts（會 exclusive access lost）。
+
+    等到數量穩定幾秒，避免 TSE 先到 100 檔就去拉 K 線、跟還在下載的 OTC 搶線。
+    """
     deadline = time.time() + timeout_sec
+    last_n = -1
+    stable = 0
     while time.time() < deadline:
-        if _contract_count(api) > 100:
-            return
-        time.sleep(1)
-    print("商品合約還沒齊，先繼續…", flush=True)
+        n = _contract_count(api)
+        if n != last_n:
+            stable = 0
+            if n > 0:
+                print(f"永豐商品合約下載中… 目前 {n} 檔", flush=True)
+        elif n > 200:
+            stable += 1
+            if stable >= 3:
+                print(f"永豐合約就緒：{n} 檔", flush=True)
+                return n
+        last_n = n
+        time.sleep(2)
+    n = _contract_count(api)
+    if n > 100:
+        print(f"永豐合約未完全穩定（目前 {n} 檔），先繼續…", flush=True)
+    else:
+        print("商品合約還沒齊，先繼續…", flush=True)
+    return n
 
 
 def _contract_count(api) -> int:
@@ -376,7 +405,7 @@ def _contract_count(api) -> int:
 
 
 def subscribe_symbols(symbols: list[str]) -> list[str]:
-    """盤中訂閱成交；回傳成功的 Yahoo 代號。超過 200 檔會截斷。"""
+    """盤中訂閱成交；回傳成功的代號。超過 200 檔會截斷。"""
     api = login()
     ok: list[str] = []
     for symbol in symbols[:SUBSCRIBE_LIMIT]:
@@ -388,9 +417,15 @@ def subscribe_symbols(symbols: list[str]) -> list[str]:
         if contract is None:
             continue
         try:
-            api.quote.subscribe(contract, quote_type="tick", version="v1")
-        except TypeError:
-            api.quote.subscribe(contract, quote_type="tick")
+            with _rest_lock:
+                try:
+                    api.quote.subscribe(contract, quote_type="tick", version="v1")
+                except TypeError:
+                    api.quote.subscribe(contract, quote_type="tick")
+        except Exception as exc:  # noqa: BLE001
+            if _sj_busy(exc):
+                print(f"訂閱 {symbol} 時永豐忙碌，略過", flush=True)
+            continue
         _subscribed.add(symbol)
         ok.append(symbol)
     return ok
@@ -425,6 +460,29 @@ def _peek_1m(symbol: str, start_d: date, end_d: date) -> pd.DataFrame | None:
     return None
 
 
+def _kbars_day(api, contract, day: date) -> pd.DataFrame:
+    last: Exception | None = None
+    for attempt in range(4):
+        try:
+            with _rest_lock:
+                kbars = api.kbars(
+                    contract=contract,
+                    start=day.isoformat(),
+                    end=day.isoformat(),
+                )
+            return kbars_to_frame(kbars)
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            if _sj_busy(exc) and attempt < 3:
+                wait = 2 * (attempt + 1)
+                print(f"永豐忙碌（{day.isoformat()}），{wait} 秒後再試…", flush=True)
+                time.sleep(wait)
+                continue
+            raise
+    assert last is not None
+    raise last
+
+
 def _one_minute(api, symbol: str, start_d: date, end_d: date) -> pd.DataFrame:
     """1K 每次最多約 270 根（一個台股交易日），按日抓再串起來。"""
     cached = _peek_1m(symbol, start_d, end_d)
@@ -432,6 +490,9 @@ def _one_minute(api, symbol: str, start_d: date, end_d: date) -> pd.DataFrame:
         return cached
     code = yahoo_symbol_to_code(symbol)
     contract = _contract(api, code)
+    if contract is None:
+        time.sleep(2)
+        contract = _contract(api, code)
     if contract is None:
         return _empty()
     today = datetime.now(TAIPEI).date()
@@ -444,16 +505,12 @@ def _one_minute(api, symbol: str, start_d: date, end_d: date) -> pd.DataFrame:
                 time.sleep(KBARS_GAP_SEC)
             first_call = False
             try:
-                kbars = api.kbars(
-                    contract=contract,
-                    start=day.isoformat(),
-                    end=day.isoformat(),
-                )
-                part = kbars_to_frame(kbars)
+                part = _kbars_day(api, contract, day)
                 if not part.empty:
                     parts.append(part)
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001
+                if _sj_busy(exc):
+                    print(f"  {symbol} {day.isoformat()} 失敗：{exc}", flush=True)
         day += timedelta(days=1)
     frame = concat_daily_frames(parts)
     with _frames_lock:

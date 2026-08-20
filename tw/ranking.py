@@ -1,4 +1,4 @@
-"""成交額排行：Yahoo 股市即時排行（上市＋上櫃合併）。"""
+"""成交額排行：證交所／櫃買已公布的盤後成交金額（上市＋上櫃合併）。"""
 
 from __future__ import annotations
 
@@ -45,13 +45,43 @@ def fetch_turnover_ranking(
     top: int = 100,
     session: requests.Session | None = None,
     timeout: int = 20,
+    as_of: date | None = None,
 ) -> tuple[list[RankedStock], str | None]:
-    """抓取成交金額前 N 名。回傳 (清單, 排行資料時間)。"""
+    """抓最近一個「已公布」交易日的成交金額前 N 名。
+
+    盤中官方當日排行尚未出爐，會改用前一個交易日，避免永豐 snapshots 掃全市場。
+    """
     sess = session or requests.Session()
-    resp = sess.get(YAHOO_TURNOVER_URL, headers=DEFAULT_HEADERS, timeout=timeout)
-    resp.raise_for_status()
-    stocks, rank_time = parse_yahoo_ranking_html(resp.text)
-    return stocks[:top], rank_time
+    start = as_of or date.today()
+    last_error: Exception | None = None
+    for session_day in iter_recent_sessions(start, limit=10):
+        try:
+            stocks, label = fetch_daily_turnover_ranking(
+                session_day, top=top, session=sess, timeout=timeout
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            continue
+        if len(stocks) < 50:
+            last_error = ValueError(f"{session_day.isoformat()} 成交額名單只有 {len(stocks)} 檔")
+            continue
+        if session_day != start:
+            label = f"{session_day.isoformat()} 證交所/櫃買成交額（{start.isoformat()} 尚未公布）"
+        print(f"成交額名單：{label} {len(stocks)} 檔", flush=True)
+        return stocks, label
+    detail = f"（{last_error}）" if last_error else ""
+    raise RuntimeError(f"成交額排行抓不到（證交所/櫃買）{detail}")
+
+
+def iter_recent_sessions(start: date, limit: int = 10):
+    """由 start 往回列出最近的平日（含 start，若本身是平日）。"""
+    current = start
+    found = 0
+    while found < limit:
+        if current.weekday() < 5:
+            yield current
+            found += 1
+        current -= timedelta(days=1)
 
 
 def parse_yahoo_ranking_html(html: str) -> tuple[list[RankedStock], str | None]:
@@ -124,11 +154,21 @@ def fetch_daily_turnover_ranking(
     session: requests.Session | None = None,
     timeout: int = 20,
 ) -> tuple[list[RankedStock], str | None]:
-    """上市＋上櫃當日成交金額排行（盤後）。"""
+    """上市＋上櫃當日成交金額排行（盤後）。一邊失敗仍用另一邊。"""
     sess = session or requests.Session()
-    twse = _fetch_twse_daily(on_date, sess, timeout)
-    tpex = _fetch_tpex_daily(on_date, sess, timeout)
-    stocks = twse + tpex
+    stocks: list[RankedStock] = []
+    errors: list[str] = []
+    try:
+        stocks.extend(_fetch_twse_daily(on_date, sess, timeout))
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"上市 {exc}")
+    try:
+        stocks.extend(_fetch_tpex_daily(on_date, sess, timeout))
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"上櫃 {exc}")
+    if len(stocks) < 30:
+        detail = "；".join(errors) or "資料不足"
+        raise ValueError(f"{on_date.isoformat()} 盤後成交額不可用：{detail}")
     stocks.sort(key=lambda s: s.turnover, reverse=True)
     ranked = [
         RankedStock(

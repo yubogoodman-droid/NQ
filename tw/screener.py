@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
-from tw.kline import fetch_1m_bars_many, fetch_bars_many, kline_window_for_date, using_shioaji
+from tw.kline import fetch_1m_bars_many, fetch_bars_many, kline_window_for_date
 from tw.ranking import (
     RankedStock,
     fetch_daily_turnover_ranking,
@@ -46,6 +46,8 @@ class ScanConfig:
     max_ma20_ma200_gap: float = 0.010
     kline_start: date | None = None
     kline_end: date | None = None
+    reuse_universe: list[RankedStock] | None = None
+    reuse_rank_time: str | None = None
 
 
 @dataclass
@@ -85,14 +87,14 @@ def run_scan(
         universe, rank_time = fetch_daily_turnover_ranking(
             cfg.on_date, top=cfg.top, session=sess, timeout=cfg.timeout
         )
-    elif using_shioaji():
-        from tw.shioaji_feed import fetch_snapshot_ranking
-
-        universe, rank_time = fetch_snapshot_ranking(top=cfg.top)
+    elif cfg.reuse_universe:
+        universe, rank_time = list(cfg.reuse_universe), cfg.reuse_rank_time
     else:
         universe, rank_time = fetch_turnover_ranking(
             top=cfg.top, session=sess, timeout=cfg.timeout
         )
+    if len(universe) < 20:
+        raise RuntimeError(f"成交額名單只有 {len(universe)} 檔，抓不到證交所/櫃買排行。")
     priced = filter_by_price(universe, cfg.max_price)
     price_dropped = len(universe) - len(priced)
     if cfg.exclude_etf:

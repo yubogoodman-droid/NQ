@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 import time
 from datetime import date, datetime, timedelta
@@ -116,6 +117,9 @@ def print_result(result, *, quiet_empty: bool) -> None:
         print("  K線：Yahoo（延遲）")
     if result.rank_time:
         print(f"  排行資料時間：{result.rank_time}")
+    no_k = sum(1 for _, reason in result.skipped if "無一分" in reason or "不足" in reason)
+    if no_k >= max(5, len(result.candidates) // 2) and not result.hits:
+        print("  多數沒有一分K：合約可能還沒下完，或永豐還在忙碌。不要連按 Run。")
     if not result.hits:
         if not quiet_empty:
             print("  目前沒有符合條件的標的。")
@@ -133,22 +137,33 @@ def print_result(result, *, quiet_empty: bool) -> None:
         )
 
 
-def scan_once(args: argparse.Namespace, seen: set) -> tuple[int, object]:
+def scan_once(
+    args: argparse.Namespace,
+    seen: set,
+    *,
+    ranking: tuple | None = None,
+    first: bool = False,
+) -> tuple[int, object]:
     on_date = _on_date(args)
     output = args.output
     if on_date is not None and output == "docs/tw/index.html":
         output = f"docs/tw/backtest-{on_date.isoformat()}.html"
+    latest_only = (args.latest_only or args.watch) and on_date is None
+    if first and args.watch and on_date is None:
+        latest_only = False
     result = run_scan(
         ScanConfig(
             top=args.top,
             max_price=args.max_price,
             closed_only=args.closed_only or on_date is not None or (args.watch and using_shioaji()),
             workers=args.workers,
-            latest_only=(args.latest_only or args.watch) and on_date is None,
+            latest_only=latest_only,
             exclude_etf=not args.include_etf,
             exclude_financial=not args.include_financial,
             on_date=on_date,
             kline_range="7d" if on_date is not None else "5d",
+            reuse_universe=None if ranking is None else list(ranking[0]),
+            reuse_rank_time=None if ranking is None else ranking[1],
         )
     )
     print_result(result, quiet_empty=args.quiet_empty)
@@ -220,12 +235,28 @@ def scan_last_week(args: argparse.Namespace) -> int:
     return len(scan_weekdays(args, previous_weekdays(), "docs/tw/week-last.md", "回測上週"))
 
 
-def _shioaji_installed() -> bool:
+def _ensure_shioaji() -> None:
     try:
         import shioaji  # noqa: F401
-        return True
+        return
     except ImportError:
-        return False
+        pass
+    print("沒有 shioaji，正在裝到目前這個 Python：")
+    print(f"  {sys.executable} -m pip install shioaji")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "shioaji"])
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(
+            "安裝失敗。請在 PyCharm Terminal 執行：\n"
+            f"  {sys.executable} -m pip install shioaji"
+        ) from exc
+    try:
+        import shioaji  # noqa: F401
+    except ImportError as exc:
+        raise SystemExit(
+            "裝完仍 import 不到。PyCharm 右下角 interpreter 要選這個：\n"
+            f"  {sys.executable}"
+        ) from exc
 
 
 def main() -> int:
@@ -238,16 +269,14 @@ def main() -> int:
         print("請在 examples/scan_tw_1m.py 最上面填 SHIOAJI_API_KEY 與 SHIOAJI_SECRET_KEY")
         return 1
     set_kline_source(args.source)
-    if using_shioaji() and not _shioaji_installed():
-        print("沒有 shioaji 套件，永豐登入不了。")
-        print("請用「現在跑腳本的同一個 Python」安裝：")
-        print(f"  {sys.executable} -m pip install shioaji")
-        return 1
+    if using_shioaji():
+        _ensure_shioaji()
     if args.last_week:
         scan_last_week(args)
         return 0
     seen: set = set()
-    _, result = scan_once(args, seen)
+    _, result = scan_once(args, seen, first=True)
+    ranking = (result.universe, result.rank_time)
     if not args.watch or _on_date(args) is not None:
         return 0
     live = using_shioaji()
@@ -264,7 +293,7 @@ def main() -> int:
                 _sleep_to_next_minute()
             else:
                 time.sleep(max(15, args.interval))
-            _, result = scan_once(args, seen)
+            _, result = scan_once(args, seen, ranking=ranking)
             if live:
                 from tw.shioaji_feed import subscribe_symbols
 

@@ -29,7 +29,7 @@ TELEGRAM_BOT_TOKEN = ""     # Telegram BotFather 給的 token
 TELEGRAM_CHAT_ID = ""       # 你的 Telegram chat id
 # ═══════════════════════════════════════════════════════════════
 
-SCRIPT_VERSION = "2026-08-20-d"
+SCRIPT_VERSION = "2026-08-20-e"
 
 
 def _apply_secrets() -> None:
@@ -384,9 +384,39 @@ def fetch_turnover_ranking(
     top: int = 100,
     session: requests.Session | None = None,
     timeout: int = 20,
+    as_of: date | None = None,
 ) -> tuple[list[RankedStock], str | None]:
-    """永豐快照成交金額前 N 名。"""
-    return fetch_snapshot_ranking(top)
+    """抓最近一個已公布交易日的成交金額前 N 名（證交所／櫃買，不走永豐快照）。"""
+    sess = session or requests.Session()
+    start = as_of or date.today()
+    last_error: Exception | None = None
+    for session_day in iter_recent_sessions(start, limit=10):
+        try:
+            stocks, label = fetch_daily_turnover_ranking(
+                session_day, top=top, session=sess, timeout=timeout
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            continue
+        if len(stocks) < 50:
+            last_error = ValueError(f"{session_day.isoformat()} 成交額名單只有 {len(stocks)} 檔")
+            continue
+        if session_day != start:
+            label = f"{session_day.isoformat()} 證交所/櫃買成交額（{start.isoformat()} 尚未公布）"
+        print(f"成交額名單：{label} {len(stocks)} 檔", flush=True)
+        return stocks, label
+    detail = f"（{last_error}）" if last_error else ""
+    raise RuntimeError(f"成交額排行抓不到（證交所/櫃買）{detail}")
+
+
+def iter_recent_sessions(start: date, limit: int = 10):
+    current = start
+    found = 0
+    while found < limit:
+        if current.weekday() < 5:
+            yield current
+            found += 1
+        current -= timedelta(days=1)
 
 
 def previous_friday(today: date | None = None) -> date:
@@ -417,11 +447,21 @@ def fetch_daily_turnover_ranking(
     session: requests.Session | None = None,
     timeout: int = 20,
 ) -> tuple[list[RankedStock], str | None]:
-    """上市＋上櫃當日成交金額排行（盤後）。"""
+    """上市＋上櫃當日成交金額排行（盤後）。一邊失敗仍用另一邊。"""
     sess = session or requests.Session()
-    twse = _fetch_twse_daily(on_date, sess, timeout)
-    tpex = _fetch_tpex_daily(on_date, sess, timeout)
-    stocks = twse + tpex
+    stocks: list[RankedStock] = []
+    errors: list[str] = []
+    try:
+        stocks.extend(_fetch_twse_daily(on_date, sess, timeout))
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"上市 {exc}")
+    try:
+        stocks.extend(_fetch_tpex_daily(on_date, sess, timeout))
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"上櫃 {exc}")
+    if len(stocks) < 30:
+        detail = "；".join(errors) or "資料不足"
+        raise ValueError(f"{on_date.isoformat()} 盤後成交額不可用：{detail}")
     stocks.sort(key=lambda s: s.turnover, reverse=True)
     ranked = [
         RankedStock(
@@ -654,6 +694,7 @@ SUBSCRIBE_LIMIT = 200
 
 _api = None
 _api_lock = threading.Lock()
+_rest_lock = threading.Lock()
 _frames: dict[str, pd.DataFrame] = {}
 _frames_lock = threading.Lock()
 _frame_ranges: dict[str, tuple[date, date]] = {}
@@ -839,14 +880,39 @@ def _sj_login(api) -> None:
     _wait_stock_contracts(api)
 
 
-def _wait_stock_contracts(api, timeout_sec: float = 90) -> None:
-    """login 自己會抓合約，不要再呼叫 fetch_contracts（會 exclusive access lost）。"""
+def _sj_busy(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    name = type(exc).__name__.lower()
+    return "exclusive" in msg or "timeout" in name or "timeout" in msg
+
+
+def _wait_stock_contracts(api, timeout_sec: float = 180.0) -> int:
+    """login 自己會抓合約，不要再呼叫 fetch_contracts（會 exclusive access lost）。
+
+    等到數量穩定幾秒，避免 TSE 先到 100 檔就去拉 K 線、跟還在下載的 OTC 搶線。
+    """
     deadline = time.time() + timeout_sec
+    last_n = -1
+    stable = 0
     while time.time() < deadline:
-        if _contract_count(api) > 100:
-            return
-        time.sleep(1)
-    print("商品合約還沒齊，先繼續…", flush=True)
+        n = _contract_count(api)
+        if n != last_n:
+            stable = 0
+            if n > 0:
+                print(f"永豐商品合約下載中… 目前 {n} 檔", flush=True)
+        elif n > 200:
+            stable += 1
+            if stable >= 3:
+                print(f"永豐合約就緒：{n} 檔", flush=True)
+                return n
+        last_n = n
+        time.sleep(2)
+    n = _contract_count(api)
+    if n > 100:
+        print(f"永豐合約未完全穩定（目前 {n} 檔），先繼續…", flush=True)
+    else:
+        print("商品合約還沒齊，先繼續…", flush=True)
+    return n
 
 
 def _contract_count(api) -> int:
@@ -1026,9 +1092,15 @@ def subscribe_symbols(symbols: list[str]) -> list[str]:
         if contract is None:
             continue
         try:
-            api.quote.subscribe(contract, quote_type="tick", version="v1")
-        except TypeError:
-            api.quote.subscribe(contract, quote_type="tick")
+            with _rest_lock:
+                try:
+                    api.quote.subscribe(contract, quote_type="tick", version="v1")
+                except TypeError:
+                    api.quote.subscribe(contract, quote_type="tick")
+        except Exception as exc:  # noqa: BLE001
+            if _sj_busy(exc):
+                print(f"訂閱 {symbol} 時永豐忙碌，略過", flush=True)
+            continue
         _subscribed.add(symbol)
         ok.append(symbol)
     return ok
@@ -1063,6 +1135,29 @@ def _peek_1m(symbol: str, start_d: date, end_d: date) -> pd.DataFrame | None:
     return None
 
 
+def _kbars_day(api, contract, day: date) -> pd.DataFrame:
+    last: Exception | None = None
+    for attempt in range(4):
+        try:
+            with _rest_lock:
+                kbars = api.kbars(
+                    contract=contract,
+                    start=day.isoformat(),
+                    end=day.isoformat(),
+                )
+            return kbars_to_frame(kbars)
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            if _sj_busy(exc) and attempt < 3:
+                wait = 2 * (attempt + 1)
+                print(f"永豐忙碌（{day.isoformat()}），{wait} 秒後再試…", flush=True)
+                time.sleep(wait)
+                continue
+            raise
+    assert last is not None
+    raise last
+
+
 def _one_minute(api, symbol: str, start_d: date, end_d: date) -> pd.DataFrame:
     """1K 每次最多約 270 根（一個台股交易日），按日抓再串起來。"""
     cached = _peek_1m(symbol, start_d, end_d)
@@ -1070,6 +1165,9 @@ def _one_minute(api, symbol: str, start_d: date, end_d: date) -> pd.DataFrame:
         return cached
     code = stock_code(symbol)
     contract = _contract(api, code)
+    if contract is None:
+        time.sleep(2)
+        contract = _contract(api, code)
     if contract is None:
         return _sj_empty()
     today = datetime.now(TAIPEI).date()
@@ -1082,16 +1180,12 @@ def _one_minute(api, symbol: str, start_d: date, end_d: date) -> pd.DataFrame:
                 time.sleep(KBARS_GAP_SEC)
             first_call = False
             try:
-                kbars = api.kbars(
-                    contract=contract,
-                    start=day.isoformat(),
-                    end=day.isoformat(),
-                )
-                part = kbars_to_frame(kbars)
+                part = _kbars_day(api, contract, day)
                 if not part.empty:
                     parts.append(part)
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001
+                if _sj_busy(exc):
+                    print(f"  {symbol} {day.isoformat()} 失敗：{exc}", flush=True)
         day += timedelta(days=1)
     frame = concat_daily_frames(parts)
     with _frames_lock:
@@ -1311,6 +1405,8 @@ class ScanConfig:
     max_ma20_ma200_gap: float = 0.010
     kline_start: date | None = None
     kline_end: date | None = None
+    reuse_universe: list[RankedStock] | None = None
+    reuse_rank_time: str | None = None
 
 
 @dataclass
@@ -1350,10 +1446,14 @@ def run_scan(
         universe, rank_time = fetch_daily_turnover_ranking(
             cfg.on_date, top=cfg.top, session=sess, timeout=cfg.timeout
         )
+    elif cfg.reuse_universe:
+        universe, rank_time = list(cfg.reuse_universe), cfg.reuse_rank_time
     else:
         universe, rank_time = fetch_turnover_ranking(
             top=cfg.top, session=sess, timeout=cfg.timeout
         )
+    if len(universe) < 20:
+        raise RuntimeError(f"成交額名單只有 {len(universe)} 檔，抓不到證交所/櫃買排行。")
     priced = filter_by_price(universe, cfg.max_price)
     price_dropped = len(universe) - len(priced)
     if cfg.exclude_etf:
@@ -1638,6 +1738,9 @@ def print_result(result, *, quiet_empty: bool) -> None:
     print("  K線：永豐 Shioaji")
     if result.rank_time:
         print(f"  排行資料時間：{result.rank_time}")
+    no_k = sum(1 for _, reason in result.skipped if "無一分" in reason or "不足" in reason)
+    if no_k >= max(5, len(result.candidates) // 2) and not result.hits:
+        print("  多數沒有一分K：合約可能還沒下完，或永豐還在忙碌。不要連按 Run。")
     if not result.hits:
         if not quiet_empty:
             print("  目前沒有符合條件的標的。")
@@ -1655,18 +1758,29 @@ def print_result(result, *, quiet_empty: bool) -> None:
         )
 
 
-def scan_once(args: argparse.Namespace, seen: set) -> tuple[int, object]:
+def scan_once(
+    args: argparse.Namespace,
+    seen: set,
+    *,
+    ranking: tuple | None = None,
+    first: bool = False,
+) -> tuple[int, object]:
     on_date = _on_date(args)
+    latest_only = (args.latest_only or args.watch) and on_date is None
+    if first and args.watch and on_date is None:
+        latest_only = False
     result = run_scan(
         ScanConfig(
             top=args.top,
             max_price=args.max_price,
             closed_only=args.closed_only or on_date is not None or (args.watch and using_shioaji()),
-            latest_only=(args.latest_only or args.watch) and on_date is None,
+            latest_only=latest_only,
             exclude_etf=not args.include_etf,
             exclude_financial=not args.include_financial,
             on_date=on_date,
             kline_range="7d" if on_date is not None else "5d",
+            reuse_universe=None if ranking is None else list(ranking[0]),
+            reuse_rank_time=None if ranking is None else ranking[1],
         )
     )
     print_result(result, quiet_empty=args.quiet_empty)
@@ -1776,7 +1890,8 @@ def main() -> int:
         scan_weekdays(args, previous_weekdays(), "回測上週")
         return 0
     seen: set = set()
-    _, result = scan_once(args, seen)
+    _, result = scan_once(args, seen, first=True)
+    ranking = (result.universe, result.rank_time)
     if not args.watch or _on_date(args) is not None:
         return 0
     if not _tw_session_open() and "--watch" not in sys.argv:
@@ -1794,7 +1909,7 @@ def main() -> int:
                 _sleep_to_next_minute()
             else:
                 time.sleep(max(15, args.interval))
-            _, result = scan_once(args, seen)
+            _, result = scan_once(args, seen, ranking=ranking)
             if live:
                 subscribe_symbols([s.symbol for s in result.candidates])
     except KeyboardInterrupt:
