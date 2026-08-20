@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """台股一分K掃描（單檔）。PyCharm 只要這一個檔，檔名不要叫 tw.py。
 
-先 pip install pandas numpy yfinance requests shioaji
-最上面四個引號填序號，然後 Run，或：
-    python scan_tw.py --watch
+最上面四個引號填序號，按 Run 就是盤中隨時監控。只掃一次加 --once。
 """
 from __future__ import annotations
 
@@ -887,6 +885,29 @@ def sj_fetch_bars_many(
     return out
 
 
+def _sj_login(api) -> None:
+    key = os.environ["SHIOAJI_API_KEY"].strip()
+    secret = os.environ["SHIOAJI_SECRET_KEY"].strip()
+    try:
+        api.login(api_key=key, secret_key=secret, fetch_contract=True)
+        return
+    except TypeError:
+        pass
+    api.login(api_key=key, secret_key=secret)
+    for name in ("fetch_contracts", "fetch_contract"):
+        fn = getattr(api, name, None)
+        if not callable(fn):
+            continue
+        try:
+            fn()
+        except TypeError:
+            try:
+                fn(contract_download=True)
+            except Exception:  # noqa: BLE001
+                pass
+        break
+
+
 def login():
     global _api, _callback_bound
     if not configured():
@@ -897,11 +918,7 @@ def login():
         import shioaji as sj
 
         api = sj.Shioaji()
-        api.login(
-            api_key=os.environ["SHIOAJI_API_KEY"].strip(),
-            secret_key=os.environ["SHIOAJI_SECRET_KEY"].strip(),
-            fetch_contract=True,
-        )
+        _sj_login(api)
         if not _callback_bound:
             _bind_tick_callback(api)
             _callback_bound = True
@@ -1432,7 +1449,7 @@ def run_scan(
             end=kline_end,
         )
     except Exception as exc:  # noqa: BLE001
-        errors.extend((stock, str(exc)) for stock in candidates)
+        errors.append((candidates[0] if candidates else RankedStock(0, "—", "—", 0.0, None, None, None, 0.0, ""), str(exc)))
         return ScanResult(
             scanned_at=datetime.now(TAIPEI),
             rank_time=rank_time,
@@ -1777,12 +1794,29 @@ def _sleep_to_next_minute(pad_sec: int = 3) -> None:
     time.sleep(max(1.0, (nxt - now).total_seconds()))
 
 
-def _shioaji_installed() -> bool:
+def _ensure_shioaji() -> None:
+    """沒裝 shioaji 就用目前這個 Python 自動 pip install。"""
     try:
         import shioaji  # noqa: F401
-        return True
+        return
     except ImportError:
-        return False
+        pass
+    print("沒有 shioaji，正在裝到目前這個 Python：")
+    print(f"  {sys.executable} -m pip install shioaji")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "shioaji"])
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(
+            "安裝失敗。請在 PyCharm Terminal 執行：\n"
+            f"  {sys.executable} -m pip install shioaji"
+        ) from exc
+    try:
+        import shioaji  # noqa: F401
+    except ImportError as exc:
+        raise SystemExit(
+            "裝完仍 import 不到。PyCharm 右下角 interpreter 要選這個：\n"
+            f"  {sys.executable}"
+        ) from exc
 
 
 def main() -> int:
@@ -1795,11 +1829,8 @@ def main() -> int:
         print("請在本檔最上面填 SHIOAJI_API_KEY 與 SHIOAJI_SECRET_KEY")
         return 1
     set_kline_source(args.source)
-    if using_shioaji() and not _shioaji_installed():
-        print("沒有 shioaji 套件，永豐登入不了。")
-        print("請用「現在跑腳本的同一個 Python」安裝：")
-        print(f"  {sys.executable} -m pip install shioaji")
-        return 1
+    if using_shioaji():
+        _ensure_shioaji()
     if args.last_week:
         scan_weekdays(args, previous_weekdays(), "回測上週")
         return 0

@@ -194,16 +194,35 @@ def login():
         import shioaji as sj
 
         api = sj.Shioaji()
-        api.login(
-            api_key=os.environ["SHIOAJI_API_KEY"].strip(),
-            secret_key=os.environ["SHIOAJI_SECRET_KEY"].strip(),
-            fetch_contract=True,
-        )
+        _sj_login(api)
         if not _callback_bound:
             _bind_tick_callback(api)
             _callback_bound = True
         _api = api
         return api
+
+
+def _sj_login(api) -> None:
+    key = os.environ["SHIOAJI_API_KEY"].strip()
+    secret = os.environ["SHIOAJI_SECRET_KEY"].strip()
+    try:
+        api.login(api_key=key, secret_key=secret, fetch_contract=True)
+        return
+    except TypeError:
+        pass
+    api.login(api_key=key, secret_key=secret)
+    for name in ("fetch_contracts", "fetch_contract"):
+        fn = getattr(api, name, None)
+        if not callable(fn):
+            continue
+        try:
+            fn()
+        except TypeError:
+            try:
+                fn(contract_download=True)
+            except Exception:  # noqa: BLE001
+                pass
+        break
 
 
 def subscribe_symbols(symbols: list[str]) -> list[str]:
