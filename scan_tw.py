@@ -868,9 +868,13 @@ def sj_fetch_bars_many(
     api = login()
     start_d, end_d = _window(range_, start, end)
     unique = list(dict.fromkeys(s for s in symbols if s))
+    if interval == "1m":
+        print(f"下載一分K：{len(unique)} 檔（第一次較久，不是當機）…", flush=True)
     out: dict[str, pd.DataFrame] = {}
     for i, symbol in enumerate(unique):
         cached = _peek_1m(symbol, start_d, end_d)
+        if cached is None and interval == "1m":
+            print(f"  {i + 1}/{len(unique)} {symbol}", flush=True)
         frame_1m = cached if cached is not None else _one_minute(api, symbol, start_d, end_d)
         if frame_1m.empty:
             continue
@@ -916,8 +920,10 @@ def login():
             return _api
         import shioaji as sj
 
+        print("永豐登入中（第一次下載商品合約會等 1～2 分鐘）…", flush=True)
         api = sj.Shioaji()
         _sj_login(api)
+        print("永豐登入完成。", flush=True)
         if not _callback_bound:
             _bind_tick_callback(api)
             _callback_bound = True
@@ -1798,6 +1804,14 @@ def _sleep_to_next_minute(pad_sec: int = 3) -> None:
     time.sleep(max(1.0, (nxt - now).total_seconds()))
 
 
+def _tw_session_open(now: datetime | None = None) -> bool:
+    now = now or datetime.now(TAIPEI)
+    if now.weekday() >= 5:
+        return False
+    minutes = now.hour * 60 + now.minute
+    return 9 * 60 <= minutes <= 13 * 60 + 35
+
+
 def _ensure_shioaji() -> None:
     """沒裝 shioaji 就用目前這個 Python 自動 pip install。"""
     try:
@@ -1843,6 +1857,12 @@ def main() -> int:
     seen: set = set()
     _, result = scan_once(args, seen)
     if not args.watch or _on_date(args) is not None:
+        return 0
+    if not _tw_session_open() and "--watch" not in sys.argv:
+        print("現在不是台股開盤（平日 09:00–13:30）。收盤後沒有即時成交，掃完就結束。")
+        print("明天盤中再按 Run，才會持續監控。")
+        if using_shioaji():
+            logout()
         return 0
     live = using_shioaji()
     if live:

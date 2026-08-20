@@ -168,9 +168,13 @@ def fetch_bars_many(
     api = login()
     start_d, end_d = _window(range_, start, end)
     unique = list(dict.fromkeys(s for s in symbols if s))
+    if interval == "1m":
+        print(f"下載一分K：{len(unique)} 檔（第一次較久，不是當機）…", flush=True)
     out: dict[str, pd.DataFrame] = {}
     for i, symbol in enumerate(unique):
         cached = _peek_1m(symbol, start_d, end_d)
+        if cached is None and interval == "1m":
+            print(f"  {i + 1}/{len(unique)} {symbol}", flush=True)
         frame_1m = cached if cached is not None else _one_minute(api, symbol, start_d, end_d)
         if frame_1m.empty:
             continue
@@ -193,8 +197,10 @@ def login():
             return _api
         import shioaji as sj
 
+        print("永豐登入中（第一次下載商品合約會等 1～2 分鐘）…", flush=True)
         api = sj.Shioaji()
         _sj_login(api)
+        print("永豐登入完成。", flush=True)
         if not _callback_bound:
             _bind_tick_callback(api)
             _callback_bound = True
