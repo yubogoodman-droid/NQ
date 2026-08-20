@@ -137,7 +137,14 @@ def draw_chart(sym: str, d: dict, idx: int, path: str) -> str | None:
     return path
 
 
-WATCH = {"signal": "15m", "htf": "1h", "htf_ms": INTERVAL_MS["1h"], "sig_limit": 280, "htf_limit": 250}
+WATCH = {
+    "signal": "15m",
+    "htf": "1h",
+    "htf_ms": INTERVAL_MS["1h"],
+    "sig_limit": 280,
+    "htf_limit": 250,
+    "require_htf": True,
+}
 
 
 def scan_symbol(sym: str) -> list[dict]:
@@ -157,7 +164,7 @@ def scan_symbol(sym: str) -> list[dict]:
             if not sig.crossed_200:
                 continue
             ts = int(d["t"][sig.idx])
-            if not above_htf_ma200(d_htf, ts, sig.close, WATCH["htf_ms"]):
+            if WATCH["require_htf"] and not above_htf_ma200(d_htf, ts, sig.close, WATCH["htf_ms"]):
                 continue
             events.append({"symbol": sym, "sig": sig, "d": d, "d_htf": d_htf})
     return events
@@ -170,13 +177,14 @@ def format_ev(ev: dict) -> str:
     tf, htf = WATCH["signal"], WATCH["htf"]
     ma_h = htf_ma200_at(ev.get("d_htf"), int(d["t"][sig.idx]), sig.close, WATCH["htf_ms"]) if ev.get("d_htf") is not None else None
     htxt = f"{htf} MA200 {ma_h:g}　距 {(sig.close / ma_h - 1) * 100:+.2f}%" if ma_h else f"{htf} MA200 —"
+    hline = f"且 &gt; {htxt}" if WATCH["require_htf"] else f"{htxt}（參考，不擋單）"
     return (
         f"<b>{tf} 收盤在 7/14/25/200 上 · {kind}</b>\n"
         f"<b>{sym}</b>\n"
         f"{ts}  收 {sig.close:g}\n"
         f"收盤 &gt; MA7 {sig.m7:g} &gt; MA14 {sig.m14:g} &gt; MA25 {sig.m25:g}\n"
         f"且 &gt; {tf} MA200 {sig.ma200:g}　距 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×\n"
-        f"且 &gt; {htxt}"
+        f"{hline}"
     )
 
 
@@ -221,22 +229,35 @@ def main() -> int:
     p.add_argument("--once", action="store_true")
     p.add_argument("--test", action="store_true")
     p.add_argument("--stocks", action="store_true", help="只掃幣安 TradFi 股票永續（不含商品）")
-    p.add_argument("--tf", choices=("15m", "1h"), default="15m", help="訊號週期；1h 時大週期改用 4h MA200")
+    p.add_argument("--tf", choices=("15m", "1h"), default="15m", help="訊號週期；1h 時 4h 只參考、不擋單")
     args = p.parse_args()
     apply_keys()
     if args.test:
         return test_telegram()
 
     if args.tf == "1h":
-        WATCH.update({"signal": "1h", "htf": "4h", "htf_ms": INTERVAL_MS["4h"], "sig_limit": 250, "htf_limit": 250})
+        WATCH.update(
+            {
+                "signal": "1h",
+                "htf": "4h",
+                "htf_ms": INTERVAL_MS["4h"],
+                "sig_limit": 250,
+                "htf_limit": 250,
+                "require_htf": False,
+            }
+        )
 
     seen = load_seen()
     print("載入標的…", flush=True)
     symbols = universe(stocks_only=args.stocks)
     scope = "幣安股票永續" if args.stocks else "流動永續"
+    htf_note = (
+        f"、且當下在 {WATCH['htf']} MA200 上"
+        if WATCH["require_htf"]
+        else f"（{WATCH['htf']} MA200 只參考、不擋單）"
+    )
     print(
-        f"監看 {len(symbols)} 個{scope}。{WATCH['signal']} 剛站上 MA200、收在 7/14/25/200 上、"
-        f"且當下在 {WATCH['htf']} MA200 上會推 Telegram。",
+        f"監看 {len(symbols)} 個{scope}。{WATCH['signal']} 剛站上 MA200、收在 7/14/25/200 上{htf_note}會推 Telegram。",
         flush=True,
     )
     uni_ts = time.time()

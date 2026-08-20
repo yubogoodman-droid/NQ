@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""回測：收盤高於 MA7/14/25/200，且 7>14>25。預設 15 分；`--tf 1h` 改小時圖（大週期用 4h MA200）。
+"""回測：收盤高於 MA7/14/25/200，且 7>14>25。預設 15 分（還要在 1h MA200 上）；`--tf 1h` 改小時圖（4h 只畫圖、不擋單）。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --stocks --pages
-    python3 examples/backtest_15m_bull.py --days 30 --tf 1h --stocks --pages
+    python3 examples/backtest_15m_bull.py --days 30 --tf 1h --pages
 """
 
 from __future__ import annotations
@@ -66,6 +66,7 @@ class TfSpec:
     html_stocks: str
     public: str
     public_stocks: str
+    require_htf: bool = True
 
     @property
     def htf_ms(self) -> int:
@@ -94,6 +95,7 @@ TF_SPECS = {
             "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
             "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html"
         ),
+        require_htf=True,
     ),
     "1h": TfSpec(
         signal="1h",
@@ -116,6 +118,7 @@ TF_SPECS = {
             "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
             "cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull-stocks.html"
         ),
+        require_htf=False,
     ),
 }
 
@@ -172,7 +175,7 @@ def scan_symbol(sym: str, days: int, spec: TfSpec) -> tuple[str, dict | None, li
         if ts < cutoff:
             continue
         n_raw += 1
-        if not above_htf_ma200(d_htf, ts, sig.close, spec.htf_ms):
+        if spec.require_htf and not above_htf_ma200(d_htf, ts, sig.close, spec.htf_ms):
             n_drop += 1
             continue
         entry, moves = forward_moves(d, sig)
@@ -315,8 +318,9 @@ def pick_gallery(rows: list[SignalRow], spec: TfSpec, limit: int = 18) -> list[S
     pool = [r for r in rows if r.crossed_200d] or list(rows)
     if not pool:
         return []
-    pinned = [r for r in pool if r.symbol == "CRCLUSDT"]
-    pinned = sorted(pinned, key=lambda r: r.time_ms, reverse=True)[:4]
+    pinned = []
+    for sym in ("TRUMPUSDT", "CRCLUSDT"):
+        pinned.extend(sorted([r for r in pool if r.symbol == sym], key=lambda r: r.time_ms, reverse=True)[:4])
 
     def score(r: SignalRow) -> float:
         mv = r.moves.get(spec.hold4)
@@ -490,6 +494,20 @@ def write_html(
         if stocks_only
         else f"掃描幣安 U 本位流動永續近 {days} 天、{universe_n} 個合約。"
     )
+    if spec.require_htf:
+        htf_rule = f"還要當下價格在<strong>{html.escape(htf)} 圖 SMA200</strong>之上。"
+        notify_rule = (
+            f"Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
+            f"這一根收盤站上，同時收盤也在 7/14/25 之上，"
+            f"<strong>且當下價格已在 {html.escape(htf)} MA200 上方</strong>"
+            f"（未收完的大週期 K 用當下收盤，不看未來）。"
+        )
+    else:
+        htf_rule = f"{html.escape(htf)} 圖只放在底下對照，<strong>不當作過濾</strong>。"
+        notify_rule = (
+            f"Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
+            f"這一根收盤站上，同時收盤也在 7/14/25 之上。"
+        )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -522,8 +540,8 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <h1>{html.escape(heading)}</h1>
   <p class="sub">
     規則：收盤同時高於 <strong>MA7、MA14、MA25、MA200</strong>（同一張 {html.escape(tf)} 圖），且 SMA7 &gt; SMA14 &gt; SMA25。
-    還要當下價格在<strong>{html.escape(htf)} 圖 SMA200</strong>之上。
-    Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，這一根收盤站上，同時收盤也在 7/14/25 之上，<strong>且當下價格已在 {html.escape(htf)} MA200 上方</strong>（未收完的大週期 K 用當下收盤，不看未來）。
+    {htf_rule}
+    {notify_rule}
     進場用訊號下一根開盤。假突破 = 進場那根 {html.escape(tf)} 收盤又跌回 MA200 下方。
     {universe_txt}訊號區間 {first} → {last}（GMT+8）。產生於 {now}。
     外網請開 <a href="{public}" style="color:#c9a227">這頁（htmlpreview）</a>；圖已內嵌。
@@ -532,7 +550,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <div class="kpis">{kpi_block(stats, spec)}</div>
   {crcl_card(rows, spec)}
   <h1>圖例</h1>
-  <p class="sub">上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K。黃虛線是訊號時間。白線是各週期自己的 MA200。CRCL 若有訊號會釘在最上面。</p>
+  <p class="sub">上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K。黃虛線是訊號時間。白線是各週期自己的 MA200。TRUMP、CRCL 若有訊號會釘在最上面。</p>
   {gallery_html(gallery, spec)}
   <div class="card">
     <h2>過濾對照</h2>
@@ -594,7 +612,7 @@ def main() -> int:
     p.add_argument("--demo", action="store_true")
     p.add_argument("--days", type=int, default=7)
     p.add_argument("--workers", type=int, default=8)
-    p.add_argument("--tf", choices=("15m", "1h"), default="15m", help="訊號週期；1h 時大週期改用 4h MA200")
+    p.add_argument("--tf", choices=("15m", "1h"), default="15m", help="訊號週期；1h 時 4h 只畫圖、不擋單")
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma15-bull.html 或 ma1h-bull.html")
     p.add_argument("-o", "--output", help="HTML 輸出路徑")
     p.add_argument("--limit-symbols", type=int, default=0)
@@ -609,11 +627,12 @@ def main() -> int:
     if args.limit_symbols:
         symbols = symbols[: args.limit_symbols]
     scope = "幣安股票永續" if args.stocks else "流動永續"
-    print(
-        f"掃描 {len(symbols)} 個 {spec.signal} {scope}，近 {args.days} 天"
-        f"（{spec.signal} MA200 + {spec.htf} MA200）",
-        flush=True,
+    htf_scan = (
+        f"{spec.signal} MA200 + {spec.htf} MA200"
+        if spec.require_htf
+        else f"{spec.signal} MA200（{spec.htf} 只畫圖、不擋單）"
     )
+    print(f"掃描 {len(symbols)} 個 {spec.signal} {scope}，近 {args.days} 天（{htf_scan}）", flush=True)
 
     rows: list[SignalRow] = []
     data: dict[str, dict] = {}
@@ -638,8 +657,12 @@ def main() -> int:
                 print(f"  {done}/{len(symbols)}  訊號 {len(rows)}  {time.time()-t0:.1f}s", flush=True)
     rows.sort(key=lambda r: r.time_ms)
     stats = filter_stats(rows, spec)
-    print(f"\n=== {spec.signal} 7/14/25 + MA200，且當下在 {spec.htf} MA200 上 ===")
-    print(f"{spec.signal} 組合 {n_raw} 筆，未站上 {spec.htf} MA200 去掉 {n_drop} 筆，留下 {n_raw - n_drop}")
+    if spec.require_htf:
+        print(f"\n=== {spec.signal} 7/14/25 + MA200，且當下在 {spec.htf} MA200 上 ===")
+        print(f"{spec.signal} 組合 {n_raw} 筆，未站上 {spec.htf} MA200 去掉 {n_drop} 筆，留下 {n_raw - n_drop}")
+    else:
+        print(f"\n=== {spec.signal} 7/14/25 + MA200（不擋 {spec.htf} MA200）===")
+        print(f"{spec.signal} 組合 {n_raw} 筆，留下 {n_raw - n_drop}")
     for s in stats:
         h = s[f"h{spec.hold4}"]
         print(
@@ -649,6 +672,11 @@ def main() -> int:
     crcl = [r for r in rows if r.symbol == "CRCLUSDT" and r.crossed_200d]
     print(f"CRCL 剛站上 MA200：{len(crcl)} 筆")
     for r in crcl:
+        mv = r.moves.get(spec.hold4)
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  entry={r.entry:g}  4h={mv.ret_pct if mv else None}")
+    trump = [r for r in rows if r.symbol == "TRUMPUSDT" and r.crossed_200d]
+    print(f"TRUMP 剛站上 MA200：{len(trump)} 筆")
+    for r in trump:
         mv = r.moves.get(spec.hold4)
         print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  entry={r.entry:g}  4h={mv.ret_pct if mv else None}")
 
@@ -697,12 +725,19 @@ def main() -> int:
                 "days": args.days,
                 "tf": args.tf,
                 "htf": spec.htf,
+                "require_htf": spec.require_htf,
                 "stocks_only": args.stocks,
                 "universe": len(symbols),
                 "signals": len(rows),
+                "combo": n_raw,
+                "htf_dropped": n_drop,
                 "crcl": [
                     {"time": hm(r.time_ms), "close": r.sig.close, "crossed": r.crossed_200d}
                     for r in crcl
+                ],
+                "trump": [
+                    {"time": hm(r.time_ms), "close": r.sig.close, "crossed": r.crossed_200d}
+                    for r in trump
                 ],
                 "filters": stats,
                 "html": str(out_html),
