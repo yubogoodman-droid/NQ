@@ -26,12 +26,12 @@
 
 15 分圖收盤同時高於 **MA7、MA14、MA25、MA200**，且 SMA7 > SMA14 > SMA25，並且當下價格也在 **小時圖 SMA200** 之上。Telegram 只推「這一根剛站上 15 分 MA200」。
 
-小時圖同一套短均＋剛站上 1h MA200；底下仍畫 4h，但 **不再要求站上 4h MA200**。
+小時圖同一套短均＋剛站上 1h MA200；4h 只畫圖不擋單。通知再加三道篩：站上前連續 **至少 36 根** 收盤在 MA200 下、**量比 ≥ 1.5×**、收盤距 MA200 **≤ 2%**（TRUMP 08-19 那種趴很久再放量站回去）。
 
 ```bash
 python3 examples/backtest_15m_bull.py --demo
 python3 examples/backtest_15m_bull.py --days 7 --stocks --pages            # 15 分
-python3 examples/backtest_15m_bull.py --days 30 --tf 1h --pages            # 小時圖，不擋 4h MA200
+python3 examples/backtest_15m_bull.py --days 30 --tf 1h --pages            # 小時圖通知條件
 python3 examples/backtest_15m_bull.py --days 30 --tf 1h --stocks --pages   # 小時圖股票
 ```
 
@@ -56,7 +56,7 @@ Telegram 監看（每根 15 分收盤掃一次），在 `examples/watch_15m_bull
 python3 examples/watch_15m_bull.py --test
 python3 examples/watch_15m_bull.py
 python3 examples/watch_15m_bull.py --stocks   # 只掃美／港／韓／中股與股票 ETF
-python3 examples/watch_15m_bull.py --tf 1h    # 小時圖，不擋 4h MA200
+python3 examples/watch_15m_bull.py --tf 1h    # 小時圖：底下趴夠久 + 放量 + 剛貼上 MA200
 ```
 
 ## 幣安黏帶三幕 Telegram

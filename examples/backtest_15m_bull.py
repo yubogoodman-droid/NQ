@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""回測：收盤高於 MA7/14/25/200，且 7>14>25。預設 15 分（還要在 1h MA200 上）；`--tf 1h` 改小時圖（4h 只畫圖、不擋單）。
+"""回測：收盤高於 MA7/14/25/200，且 7>14>25。預設 15 分（還要在 1h MA200 上）；`--tf 1h` 改小時圖（4h 只畫圖；通知要底下趴夠久＋放量＋剛貼上）。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --stocks --pages
@@ -67,6 +67,10 @@ class TfSpec:
     public: str
     public_stocks: str
     require_htf: bool = True
+    min_below: int | None = None
+    min_vol: float | None = None
+    max_ext: float | None = None
+    lookback: int = 48
 
     @property
     def htf_ms(self) -> int:
@@ -119,19 +123,53 @@ TF_SPECS = {
             "cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull-stocks.html"
         ),
         require_htf=False,
+        min_below=36,
+        min_vol=1.5,
+        max_ext=2.0,
+        lookback=80,
     ),
 }
 
 
-def filter_defs(tf: str) -> tuple:
-    return (
+def notify_kwargs(spec: TfSpec) -> dict:
+    kw: dict = {"crossed": True}
+    if spec.min_below is not None:
+        kw["min_below"] = spec.min_below
+    if spec.min_vol is not None:
+        kw["min_vol"] = spec.min_vol
+    if spec.max_ext is not None:
+        kw["max_ext"] = spec.max_ext
+    return kw
+
+
+def filter_defs(spec: TfSpec) -> tuple:
+    tf = spec.signal
+    rows = [
         (f"原始：收盤 > MA7>14>25 且 > {tf} MA200（組合剛成立）", {"crossed": None, "formed": None, "min_vol": None, "max_ext": None}),
         (f"本根剛站上 {tf} MA200", {"crossed": True, "formed": None, "min_vol": None, "max_ext": None}),
         ("已在 MA200 上，本根才收上 7/14/25", {"crossed": None, "formed": True, "min_vol": None, "max_ext": None}),
         ("放量 ≥ 1.5×", {"crossed": None, "formed": None, "min_vol": 1.5, "max_ext": None}),
         ("剛站上 MA200 + 放量 ≥ 1.5×", {"crossed": True, "formed": None, "min_vol": 1.5, "max_ext": None}),
         ("距 MA200 ≤ 1.0%", {"crossed": None, "formed": None, "min_vol": None, "max_ext": 1.0}),
-    )
+    ]
+    if spec.min_below is not None:
+        rows.extend(
+            [
+                (
+                    f"剛站上且底下 ≥ {spec.min_below} 根",
+                    {"crossed": True, "min_below": spec.min_below},
+                ),
+                (
+                    f"通知：剛站上 + 底下≥{spec.min_below}根 + 量≥{spec.min_vol}× + 距MA≤{spec.max_ext:g}%",
+                    notify_kwargs(spec),
+                ),
+                (
+                    "通知且近24根高低差 ≤ 4%",
+                    {**notify_kwargs(spec), "max_rng24": 4.0},
+                ),
+            ]
+        )
+    return tuple(rows)
 
 
 def hm(ms: int) -> str:
@@ -199,7 +237,7 @@ def scan_symbol(sym: str, days: int, spec: TfSpec) -> tuple[str, dict | None, li
 
 def filter_stats(rows: list[SignalRow], spec: TfSpec) -> list[dict]:
     out = []
-    for name, kw in filter_defs(spec.signal):
+    for name, kw in filter_defs(spec):
         subset = apply_filter(rows, **kw)
         item = {"name": name, "count": len(subset), "fail15_pct": fail_rate(subset)}
         for h in HORIZONS:
@@ -268,12 +306,13 @@ def draw_chart(
         return None
 
     i = row.sig.idx
-    a0 = max(0, i - 48)
+    a0 = max(0, i - spec.lookback)
     a1 = min(len(d["c"]), i + 20)
     r4 = row.moves.get(spec.hold4)
     rtxt = f"  4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
     title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
     kind = "reclaim MA200" if row.crossed_200d else "close>7/14/25/200"
+    extra = f"  below={row.bars_below}  vol={row.vol_ratio:.2f}x  ext={row.ext_pct:+.2f}%"
 
     hi = tf_bar_idx(d_htf, row.time_ms, spec.htf_ms) if d_htf is not None and len(d_htf.get("c", [])) else None
     stacked = hi is not None
@@ -296,7 +335,7 @@ def draw_chart(
         if a is not None:
             _style_ax(a)
     _paint_ohlcv(ax, axv, d, a0, a1, i)
-    ax.set_title(f"{title_sym}  {spec.signal}  {hm(row.time_ms)}  {kind}{rtxt}", color="#e8f0ea", fontsize=12)
+    ax.set_title(f"{title_sym}  {spec.signal}  {hm(row.time_ms)}  {kind}{extra}{rtxt}", color="#e8f0ea", fontsize=11)
     if stacked and axh is not None and axhv is not None and d_htf is not None and hi is not None:
         b0 = max(0, hi - 48)
         b1 = min(len(d_htf["c"]), hi + 16)
@@ -315,7 +354,7 @@ def draw_chart(
 
 
 def pick_gallery(rows: list[SignalRow], spec: TfSpec, limit: int = 18) -> list[SignalRow]:
-    pool = [r for r in rows if r.crossed_200d] or list(rows)
+    pool = apply_filter(rows, **notify_kwargs(spec)) or [r for r in rows if r.crossed_200d] or list(rows)
     if not pool:
         return []
     pinned = []
@@ -352,16 +391,17 @@ def pick_gallery(rows: list[SignalRow], spec: TfSpec, limit: int = 18) -> list[S
 def kpi_block(stats: list[dict], spec: TfSpec) -> str:
     raw = stats[0]
     cross = stats[1]
-    h = cross[f"h{spec.hold4}"]
+    notify = next((s for s in stats if s["name"].startswith("通知：")), cross)
+    h = notify[f"h{spec.hold4}"]
     return "".join(
         f'<div class="kpi"><div class="k">{k}</div><div class="v">{v}</div></div>'
         for k, v in (
-            ("通知／突破", cross["count"]),
+            ("通知", notify["count"]),
             ("4h 勝率", f"{h['wr']:.1f}%"),
             ("4h 平均", f"{h['avg']:+.3f}%"),
-            (spec.fail_label, f"{cross['fail15_pct']:.1f}%"),
+            (spec.fail_label, f"{notify['fail15_pct']:.1f}%"),
+            ("全部剛站上", cross["count"]),
             ("全部組合剛成立", raw["count"]),
-            ("才形成多頭", stats[2]["count"]),
         )
     )
 
@@ -403,6 +443,7 @@ def signal_table(rows: list[SignalRow], spec: TfSpec, limit: int = 80) -> str:
             f"<td>{html.escape(sym_label(r.symbol))}</td>",
             f"<td>{html.escape(kind)}</td>",
             f'<td class="mono">{r.entry:g}</td>',
+            f'<td class="mono">{r.bars_below}</td>',
             f'<td class="mono">{r.vol_ratio:.2f}</td>',
             f'<td class="mono">{r.ext_pct:+.2f}%</td>',
             f'<td class="mono">{r.h1_ext_pct:+.2f}%</td>' if r.h1_ext_pct is not None else "<td>—</td>",
@@ -413,7 +454,7 @@ def signal_table(rows: list[SignalRow], spec: TfSpec, limit: int = 80) -> str:
         body.append("<tr>" + "".join(cells) + "</tr>")
     ret_heads = "".join(f"<th>{spec.labels[h]}</th>" for h in hs)
     return (
-        "<table><thead><tr><th>時間</th><th>標的</th><th>種類</th><th>進場</th><th>量比</th>"
+        "<table><thead><tr><th>時間</th><th>標的</th><th>種類</th><th>進場</th><th>底下</th><th>量比</th>"
         f"<th>距{spec.signal}MA200</th><th>距{spec.htf}MA200</th>"
         f"{ret_heads}</tr></thead><tbody>"
         + "".join(body)
@@ -421,17 +462,18 @@ def signal_table(rows: list[SignalRow], spec: TfSpec, limit: int = 80) -> str:
     )
 
 
-def crcl_card(rows: list[SignalRow], spec: TfSpec) -> str:
-    mine = [r for r in rows if r.symbol == "CRCLUSDT"]
-    cross = [r for r in mine if r.crossed_200d]
+def pin_card(rows: list[SignalRow], spec: TfSpec, symbol: str, title: str) -> str:
+    mine = [r for r in rows if r.symbol == symbol]
     if not mine:
-        return '<div class="card"><h2>CRCL</h2><p class="note">這段期間沒有訊號。</p></div>'
-    st = summarize_rows(cross, spec.hold4) if cross else summarize_rows(mine, spec.hold4)
+        return (
+            f'<div class="card"><h2>{html.escape(title)}</h2>'
+            f'<p class="note">這段期間沒有符合通知條件的訊號。</p></div>'
+        )
+    st = summarize_rows(mine, spec.hold4)
     return f"""<div class="card">
-    <h2>CRCL</h2>
-    <p class="note">組合剛成立 {len(mine)} 筆，其中剛站上 {spec.signal} MA200 {len(cross)} 筆。
-    剛站上那組 4h 勝率 {st['wr']:.1f}%　4h 均 {st['avg']:+.3f}%　4h 中位 {st['med']:+.3f}%。</p>
-    <div class="table-wrap">{signal_table(cross or mine, spec, limit=40)}</div>
+    <h2>{html.escape(title)}</h2>
+    <p class="note">符合通知 {len(mine)} 筆。4h 勝率 {st['wr']:.1f}%　4h 均 {st['avg']:+.3f}%　4h 中位 {st['med']:+.3f}%。</p>
+    <div class="table-wrap">{signal_table(mine, spec, limit=40)}</div>
   </div>"""
 
 
@@ -464,7 +506,7 @@ def gallery_html(gallery: list[tuple[SignalRow, str]], spec: TfSpec) -> str:
         src = public_img_src(rel)
         cards.append(
             f'<div class="card"><div class="cap">{html.escape(sym_label(row.symbol))} · {hm(row.time_ms)} · '
-            f"{html.escape(kind)} · 量比 {row.vol_ratio:.2f} · {html.escape(rtxt)}</div>"
+            f"{html.escape(kind)} · 底下 {row.bars_below} 根 · 量比 {row.vol_ratio:.2f} · {html.escape(rtxt)}</div>"
             f'<img src="{html.escape(src)}" alt="{html.escape(row.symbol)}"/></div>'
         )
     return "\n".join(cards)
@@ -480,7 +522,9 @@ def write_html(
     gallery: list[tuple[SignalRow, str]],
     stocks_only: bool = False,
     spec: TfSpec,
+    notify_rows: list[SignalRow] | None = None,
 ) -> None:
+    notify_rows = notify_rows if notify_rows is not None else apply_filter(rows, **notify_kwargs(spec))
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
@@ -489,6 +533,8 @@ def write_html(
     htf = spec.htf
     title = f"{tf} 收盤在 7/14/25/200 之上" + (" · 幣安股票" if stocks_only else "")
     heading = f"{tf} K：收盤在 7 / 14 / 25 / 200 之上" + ("（只掃幣安股票）" if stocks_only else "")
+    if spec.min_below is not None:
+        heading += " · 底下趴夠久再放量站上"
     universe_txt = (
         f"只掃幣安 TradFi 股票永續（美／港／韓／中股、股票 ETF、Pre-IPO；不含黃金原油等商品）近 {days} 天、{universe_n} 個合約。"
         if stocks_only
@@ -504,10 +550,17 @@ def write_html(
         )
     else:
         htf_rule = f"{html.escape(htf)} 圖只放在底下對照，<strong>不當作過濾</strong>。"
-        notify_rule = (
-            f"Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
-            f"這一根收盤站上，同時收盤也在 7/14/25 之上。"
-        )
+        if spec.min_below is not None:
+            notify_rule = (
+                f"Telegram 通知只推這種：<strong>剛站上 {html.escape(tf)} MA200</strong>，"
+                f"且站上前連續至少 <strong>{spec.min_below} 根</strong>收盤在 MA200 下、"
+                f"量比 ≥ <strong>{spec.min_vol:g}×</strong>、收盤距 MA200 ≤ <strong>{spec.max_ext:g}%</strong>。"
+            )
+        else:
+            notify_rule = (
+                f"Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
+                f"這一根收盤站上，同時收盤也在 7/14/25 之上。"
+            )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -548,18 +601,19 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">{kpi_block(stats, spec)}</div>
-  {crcl_card(rows, spec)}
+  {pin_card(notify_rows, spec, "TRUMPUSDT", "TRUMP")}
+  {pin_card(notify_rows, spec, "CRCLUSDT", "CRCL")}
   <h1>圖例</h1>
-  <p class="sub">上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K。黃虛線是訊號時間。白線是各週期自己的 MA200。TRUMP、CRCL 若有訊號會釘在最上面。</p>
+  <p class="sub">上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K。黃虛線是訊號時間。白線是各週期自己的 MA200。圖例只畫符合通知條件的（TRUMP、CRCL 若有會釘在最上面）。</p>
   {gallery_html(gallery, spec)}
   <div class="card">
     <h2>過濾對照</h2>
     <div class="table-wrap">{stats_table(stats, spec)}</div>
-    <p class="note">距{html.escape(tf)}MA200 =（收盤 / {html.escape(tf)} SMA200 − 1）× 100%。距{html.escape(htf)}MA200 用訊號當下價 vs 當時 {html.escape(htf)} SMA200。量比 = 當根量 / 20 根均量。</p>
+    <p class="note">底下 = 站上前連續幾根收盤在 MA200 下。距{html.escape(tf)}MA200 =（收盤 / {html.escape(tf)} SMA200 − 1）× 100%。距{html.escape(htf)}MA200 用訊號當下價 vs 當時 {html.escape(htf)} SMA200。量比 = 當根量 / 20 根均量。</p>
   </div>
   <div class="card">
-    <h2>訊號表（剛站上 {html.escape(tf)} MA200，依 4h 報酬排序）</h2>
-    <div class="table-wrap">{signal_table(rows, spec)}</div>
+    <h2>訊號表（通知條件，依 4h 報酬排序）</h2>
+    <div class="table-wrap">{signal_table(notify_rows, spec)}</div>
   </div>
 </div>
 </body></html>
@@ -593,7 +647,7 @@ def run_demo() -> int:
         print(
             f"  idx={sig.idx} close={sig.close:.3f} ma200={sig.ma200:.3f} "
             f"close>7>14>25={sig.close:.3f}>{sig.m7:.3f}>{sig.m14:.3f}>{sig.m25:.3f} "
-            f"crossed={sig.crossed_200} formed={sig.formed_align}"
+            f"crossed={sig.crossed_200} formed={sig.formed_align} below={sig.bars_below}"
         )
     if not hits:
         print("demo 失敗：應該至少有一根組合成立")
@@ -657,28 +711,33 @@ def main() -> int:
                 print(f"  {done}/{len(symbols)}  訊號 {len(rows)}  {time.time()-t0:.1f}s", flush=True)
     rows.sort(key=lambda r: r.time_ms)
     stats = filter_stats(rows, spec)
+    notify_rows = apply_filter(rows, **notify_kwargs(spec))
     if spec.require_htf:
         print(f"\n=== {spec.signal} 7/14/25 + MA200，且當下在 {spec.htf} MA200 上 ===")
         print(f"{spec.signal} 組合 {n_raw} 筆，未站上 {spec.htf} MA200 去掉 {n_drop} 筆，留下 {n_raw - n_drop}")
     else:
         print(f"\n=== {spec.signal} 7/14/25 + MA200（不擋 {spec.htf} MA200）===")
         print(f"{spec.signal} 組合 {n_raw} 筆，留下 {n_raw - n_drop}")
+        if spec.min_below is not None:
+            print(
+                f"通知：剛站上 + 底下≥{spec.min_below}根 + 量≥{spec.min_vol}× + 距MA≤{spec.max_ext:g}% → {len(notify_rows)} 筆"
+            )
     for s in stats:
         h = s[f"h{spec.hold4}"]
         print(
             f"{s['name']}: n={s['count']}  4h勝率 {h['wr']:.1f}%  4h均 {h['avg']:+.3f}%  "
             f"假突破 {s['fail15_pct']:.1f}%"
         )
-    crcl = [r for r in rows if r.symbol == "CRCLUSDT" and r.crossed_200d]
-    print(f"CRCL 剛站上 MA200：{len(crcl)} 筆")
+    crcl = [r for r in notify_rows if r.symbol == "CRCLUSDT"]
+    print(f"CRCL 通知：{len(crcl)} 筆")
     for r in crcl:
         mv = r.moves.get(spec.hold4)
-        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  entry={r.entry:g}  4h={mv.ret_pct if mv else None}")
-    trump = [r for r in rows if r.symbol == "TRUMPUSDT" and r.crossed_200d]
-    print(f"TRUMP 剛站上 MA200：{len(trump)} 筆")
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
+    trump = [r for r in notify_rows if r.symbol == "TRUMPUSDT"]
+    print(f"TRUMP 通知：{len(trump)} 筆")
     for r in trump:
         mv = r.moves.get(spec.hold4)
-        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  entry={r.entry:g}  4h={mv.ret_pct if mv else None}")
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
 
     img_name = spec.img + ("-stocks" if args.stocks else "")
     img_dir = Path("docs/binance/img") / img_name
@@ -713,6 +772,7 @@ def main() -> int:
         gallery=gallery,
         stocks_only=args.stocks,
         spec=spec,
+        notify_rows=notify_rows,
     )
     Path("output").mkdir(exist_ok=True)
     if args.tf == "15m":
@@ -730,13 +790,22 @@ def main() -> int:
                 "universe": len(symbols),
                 "signals": len(rows),
                 "combo": n_raw,
-                "htf_dropped": n_drop,
+                "min_below": spec.min_below,
+                "min_vol": spec.min_vol,
+                "max_ext": spec.max_ext,
+                "notify": len(notify_rows),
                 "crcl": [
                     {"time": hm(r.time_ms), "close": r.sig.close, "crossed": r.crossed_200d}
                     for r in crcl
                 ],
                 "trump": [
-                    {"time": hm(r.time_ms), "close": r.sig.close, "crossed": r.crossed_200d}
+                    {
+                        "time": hm(r.time_ms),
+                        "close": r.sig.close,
+                        "below": r.bars_below,
+                        "vol": r.vol_ratio,
+                        "ext": r.ext_pct,
+                    }
                     for r in trump
                 ],
                 "filters": stats,

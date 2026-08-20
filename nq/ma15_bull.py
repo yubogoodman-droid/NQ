@@ -36,6 +36,24 @@ def _stack_ok(c, m7, m14, m25, m200, i: int) -> bool:
     return bool(px > ma7 > ma14 > ma25 and px > ma200)
 
 
+def bars_below_ma200(c, m200, i: int) -> int:
+    """站上前連續幾根收盤仍在 MA200 下（不含本根）。"""
+    n = 0
+    j = i - 1
+    while j >= 0 and not np.isnan(m200[j]) and c[j] <= m200[j]:
+        n += 1
+        j -= 1
+    return n
+
+
+def rng24_pct(h, l, m200, i: int) -> float:
+    """站上前 24 根的高低差，相對當時 MA200。"""
+    a0 = max(0, i - 24)
+    if i <= a0 or np.isnan(m200[i]) or not m200[i]:
+        return 0.0
+    return float((h[a0:i].max() - l[a0:i].min()) / m200[i] * 100.0)
+
+
 @dataclass(frozen=True)
 class BullSignal:
     """15m 收盤在 MA7/14/25/200 之上，且 7>14>25。"""
@@ -54,6 +72,8 @@ class BullSignal:
     ext_pct: float
     crossed_200: bool
     formed_align: bool
+    bars_below: int = 0
+    rng24: float = 0.0
 
     # 舊欄位別名，給既有回測腳本用
     @property
@@ -109,6 +129,8 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
                 ext_pct=float(ext),
                 crossed_200=bool(c[i - 1] <= m200[i - 1] and c[i] > m200[i]),
                 formed_align=bool(c[i - 1] > m200[i - 1] and not _stack_ok(c, m7, m14, m25, m200, i - 1)),
+                bars_below=bars_below_ma200(c, m200, i),
+                rng24=rng24_pct(h, l, m200, i),
             )
         )
         last_i = i
@@ -182,6 +204,14 @@ class SignalRow:
     @property
     def ext_pct(self) -> float:
         return self.sig.ext_pct
+
+    @property
+    def bars_below(self) -> int:
+        return self.sig.bars_below
+
+    @property
+    def rng24(self) -> float:
+        return self.sig.rng24
 
 
 def forward_moves(
@@ -258,6 +288,8 @@ def apply_filter(
     formed: bool | None = None,
     min_vol: float | None = None,
     max_ext: float | None = None,
+    min_below: int | None = None,
+    max_rng24: float | None = None,
 ) -> list[SignalRow]:
     out = rows
     if crossed:
@@ -268,4 +300,27 @@ def apply_filter(
         out = [r for r in out if r.vol_ratio >= min_vol]
     if max_ext is not None:
         out = [r for r in out if r.ext_pct <= max_ext]
+    if min_below is not None:
+        out = [r for r in out if r.bars_below >= min_below]
+    if max_rng24 is not None:
+        out = [r for r in out if r.rng24 <= max_rng24]
     return out
+
+
+def quality_reclaim(
+    sig: BullSignal,
+    *,
+    min_below: int | None = None,
+    min_vol: float | None = None,
+    max_ext: float | None = None,
+) -> bool:
+    """TRUMP 那種：剛站上、底下趴夠久、放量、收盤還貼著 MA200。"""
+    if not sig.crossed_200:
+        return False
+    if min_below is not None and sig.bars_below < min_below:
+        return False
+    if min_vol is not None and sig.vol_ratio < min_vol:
+        return False
+    if max_ext is not None and sig.ext_pct > max_ext:
+        return False
+    return True
