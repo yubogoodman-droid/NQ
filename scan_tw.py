@@ -15,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+import warnings
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -29,7 +30,7 @@ TELEGRAM_BOT_TOKEN = ""     # Telegram BotFather 給的 token
 TELEGRAM_CHAT_ID = ""       # 你的 Telegram chat id
 # ═══════════════════════════════════════════════════════════════
 
-SCRIPT_VERSION = "2026-08-20-f"
+SCRIPT_VERSION = "2026-08-20-g"
 
 
 def _apply_secrets() -> None:
@@ -47,6 +48,11 @@ def _apply_secrets() -> None:
 _apply_secrets()
 
 TAIPEI = ZoneInfo("Asia/Taipei")
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    message=r".*api\.Contracts is deprecated.*",
+)
 
 
 MA_FAST = 5
@@ -889,28 +895,57 @@ def _sj_busy(exc: BaseException) -> bool:
     return "exclusive" in msg or "timeout" in name or "timeout" in msg
 
 
-def _wait_stock_contracts(api, timeout_sec: float = 180.0) -> int:
-    """login 自己會抓合約，不要再呼叫 fetch_contracts（會 exclusive access lost）。
+def _v2_contracts(api):
+    """Shioaji 1.7 起用 api.contracts；不要碰已廢棄的 api.Contracts。"""
+    contracts = getattr(api, "contracts", None)
+    if contracts is not None and callable(getattr(contracts, "get", None)):
+        return contracts
+    return None
 
-    等到數量穩定幾秒，避免 TSE 先到 100 檔就去拉 K 線、跟還在下載的 OTC 搶線。
+
+def _legacy_stock_bucket(api):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        return getattr(getattr(api, "Contracts", None), "Stocks", None)
+
+
+def _wait_stock_contracts(api, timeout_sec: float = 180.0) -> int:
+    """login 自己會抓合約，不要再呼叫 fetch_contracts。
+
+    新版用 api.contracts.get('2330') 探測；舊版才數 api.Contracts 檔數。
     """
+    print("永豐載入股票合約中（第一次較久，不要再按一次 Run）…", flush=True)
     deadline = time.time() + timeout_sec
+    last_print = 0.0
     last_n = -1
     stable = 0
+    v2 = _v2_contracts(api) is not None
     while time.time() < deadline:
-        n = _contract_count(api)
-        if n != last_n:
-            stable = 0
-            if n > 0:
-                print(f"永豐商品合約下載中… 目前 {n} 檔", flush=True)
-        elif n > 200:
-            stable += 1
-            if stable >= 3:
-                print(f"永豐合約就緒：{n} 檔", flush=True)
-                return n
-        last_n = n
+        if v2:
+            if _contract(api, "2330") is not None:
+                print("永豐合約就緒。", flush=True)
+                return 1
+            now = time.time()
+            if now - last_print >= 10:
+                print("永豐商品合約下載中…", flush=True)
+                last_print = now
+        else:
+            n = _contract_count(api)
+            if n != last_n:
+                stable = 0
+                if n > 0:
+                    print(f"永豐商品合約下載中… 目前 {n} 檔", flush=True)
+            elif n > 200:
+                stable += 1
+                if stable >= 3:
+                    print(f"永豐合約就緒：{n} 檔", flush=True)
+                    return n
+            last_n = n
         time.sleep(2)
     n = _contract_count(api)
+    if _contract(api, "2330") is not None:
+        print("永豐合約就緒。", flush=True)
+        return n or 1
     if n > 100:
         print(f"永豐合約未完全穩定（目前 {n} 檔），先繼續…", flush=True)
     else:
@@ -919,7 +954,10 @@ def _wait_stock_contracts(api, timeout_sec: float = 180.0) -> int:
 
 
 def _contract_count(api) -> int:
-    stocks = getattr(getattr(api, "Contracts", None), "Stocks", None)
+    v2 = _v2_contracts(api)
+    if v2 is not None and callable(getattr(v2, "list", None)):
+        return 0
+    stocks = _legacy_stock_bucket(api)
     if stocks is None:
         return 0
     total = 0
@@ -1002,7 +1040,7 @@ def fetch_snapshot_ranking(top: int = 100) -> tuple[list, str | None]:
 
 
 def _stock_contracts(api) -> list:
-    stocks = getattr(getattr(api, "Contracts", None), "Stocks", None)
+    stocks = _legacy_stock_bucket(api)
     if stocks is None:
         return []
     out = []
@@ -1208,12 +1246,13 @@ def _one_minute(api, symbol: str, start_d: date, end_d: date) -> pd.DataFrame:
 
 
 def _contract(api, code: str):
-    getter = getattr(api, "contracts", None)
-    if getter is not None and hasattr(getter, "get"):
-        found = getter.get(code)
-        if found is not None:
-            return found
-    stocks = getattr(getattr(api, "Contracts", None), "Stocks", None)
+    v2 = _v2_contracts(api)
+    if v2 is not None:
+        try:
+            return v2.get(code)
+        except Exception:  # noqa: BLE001
+            return None
+    stocks = _legacy_stock_bucket(api)
     if stocks is None:
         return None
     try:

@@ -5,6 +5,8 @@ from types import SimpleNamespace
 
 import pandas as pd
 
+from unittest.mock import patch
+
 from tw.shioaji_feed import (
     EMPTY_RETRY_SEC,
     apply_tick,
@@ -13,6 +15,7 @@ from tw.shioaji_feed import (
     minute_of_tick,
     resample_ohlcv,
     yahoo_symbol_to_code,
+    _contract,
     _empty,
     _empty_at,
     _frame_ranges,
@@ -20,6 +23,7 @@ from tw.shioaji_feed import (
     _peek_1m,
     _ranked_from_snap,
     _sj_busy,
+    _wait_stock_contracts,
 )
 from tw.kline import set_kline_source, using_shioaji
 
@@ -171,6 +175,29 @@ class ShioajiFeedTests(unittest.TestCase):
 
         _empty_at[symbol] = _time.time() - EMPTY_RETRY_SEC - 1
         self.assertIsNone(_peek_1m(symbol, *window))
+
+    def test_contract_uses_v2_get_not_legacy_contracts(self) -> None:
+        class Boom:
+            def __getattribute__(self, name):  # noqa: ARG002
+                raise AssertionError("must not touch api.Contracts")
+
+        api = SimpleNamespace(
+            contracts=SimpleNamespace(
+                get=lambda code: SimpleNamespace(code=code) if code == "2330" else None
+            ),
+            Contracts=Boom(),
+        )
+        found = _contract(api, "2330")
+        self.assertEqual(found.code, "2330")
+        self.assertIsNone(_contract(api, "9999"))
+
+    def test_wait_ready_when_v2_get_works(self) -> None:
+        api = SimpleNamespace(
+            contracts=SimpleNamespace(get=lambda code: SimpleNamespace(code=code)),
+        )
+        with patch("tw.shioaji_feed.time.sleep"):
+            n = _wait_stock_contracts(api, timeout_sec=4)
+        self.assertGreaterEqual(n, 1)
 
 
 if __name__ == "__main__":
