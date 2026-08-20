@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="description" content="獵人 HUNTER×HUNTER 貪婪之島（Greed Island）全 40 張咒語卡圖鑑，含效果、等級、距離分類與搜尋篩選。" />
-  <title>貪婪之島 · 咒語卡圖鑑 | Greed Island Spell Cards</title>
+  <meta name="description" content="獵人 HUNTER×HUNTER 貪婪之島（Greed Island）全 40 張咒語卡圖鑑，中文卡面、效果、等級、距離分類與搜尋篩選。" />
+  <title>貪婪之島 · 咒語卡圖鑑（中文版）</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Orbitron:wght@500;700&display=swap" rel="stylesheet" />
@@ -18,15 +18,6 @@
       --text: #e8f0ff;
       --text-muted: #8ba3c7;
       --accent: #ffd54f;
-      --accent-green: #4ade80;
-      --rank-s: #ff6b6b;
-      --rank-a: #c084fc;
-      --rank-b: #60a5fa;
-      --rank-c: #4ade80;
-      --rank-d: #fbbf24;
-      --rank-e: #fb923c;
-      --rank-f: #a78bfa;
-      --rank-g: #94a3b8;
       --radius: 14px;
       --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
     }
@@ -77,6 +68,18 @@
       margin-top: 0.5rem;
       color: var(--text-muted);
       font-size: 0.95rem;
+    }
+
+    .lang-badge {
+      display: inline-block;
+      margin-top: 0.75rem;
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 213, 79, 0.45);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: rgba(255, 213, 79, 0.08);
     }
 
     .stats-bar {
@@ -185,123 +188,181 @@
     }
 
     .card {
-      background: var(--bg-card);
-      border: 2px solid var(--border-spell);
-      border-radius: var(--radius);
+      background: transparent;
+      border: none;
+      border-radius: 0;
       padding: 0;
       cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      transition: transform 0.2s, filter 0.2s;
       position: relative;
-      overflow: hidden;
-      box-shadow: var(--shadow);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .card::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(61, 139, 253, 0.08) 0%, transparent 60%);
-      pointer-events: none;
-    }
-
-    .card:hover {
-      transform: translateY(-4px);
-      border-color: var(--border-glow);
-      box-shadow: 0 12px 40px rgba(61, 139, 253, 0.2);
-    }
-
-    .card-art {
-      width: 100%;
-      aspect-ratio: 280 / 389;
-      object-fit: cover;
+      overflow: visible;
+      box-shadow: none;
       display: block;
-      background: #0a1424;
-      border-bottom: 1px solid rgba(61, 139, 253, 0.2);
     }
 
-    .card-body {
-      padding: 0.85rem 1rem 1rem;
-      position: relative;
-      flex: 1;
+    .card:hover { transform: translateY(-4px); }
+    .card:focus-visible { outline: 2px solid var(--border-glow); outline-offset: 4px; border-radius: 8px; }
+
+    /* ===== Chinese Greed Island card face ===== */
+    .gi-face {
+      width: 100%;
+      aspect-ratio: 280 / 400;
+      border-radius: 6px;
+      padding: 7px;
+      background: linear-gradient(160deg, #1a1a1a 0%, #0a0a0a 40%, #1c2433 100%);
+      box-shadow: var(--shadow), inset 0 0 0 1px rgba(255,255,255,0.06);
+    }
+
+    .gi-face.large {
+      max-width: 360px;
+      margin: 0 auto;
+      aspect-ratio: 280 / 420;
+    }
+
+    .gi-inner {
+      height: 100%;
       display: flex;
       flex-direction: column;
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 0.5rem;
-      position: relative;
-    }
-
-    .card-number {
-      font-family: Orbitron, sans-serif;
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      letter-spacing: 0.05em;
-    }
-
-    .card-rank {
-      font-family: Orbitron, sans-serif;
-      font-size: 0.82rem;
-      font-weight: 700;
-      padding: 0.15rem 0.5rem;
-      border-radius: 6px;
-      background: rgba(0, 0, 0, 0.3);
-    }
-
-    .card-name {
-      font-size: 1.35rem;
-      font-weight: 700;
-      margin-bottom: 0.15rem;
-      position: relative;
-    }
-
-    .card-name-en {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      font-weight: 400;
-      letter-spacing: 0.03em;
-      margin-bottom: 0.65rem;
-      position: relative;
-    }
-
-    .card-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-      margin-bottom: 0.65rem;
-      position: relative;
-    }
-
-    .tag {
-      font-size: 0.72rem;
-      padding: 0.15rem 0.5rem;
+      background: #0b1220;
+      border: 2px solid #2a3f63;
       border-radius: 4px;
-      background: rgba(0, 0, 0, 0.35);
-      color: var(--text-muted);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      overflow: hidden;
     }
 
-    .tag.range-long { color: #7dd3fc; border-color: rgba(125, 211, 252, 0.3); }
-    .tag.range-short { color: #86efac; border-color: rgba(134, 239, 172, 0.3); }
-    .tag.type-attack { color: #fca5a5; border-color: rgba(252, 165, 165, 0.3); }
-    .tag.type-defense { color: #93c5fd; border-color: rgba(147, 197, 253, 0.3); }
-    .tag.type-continuous { color: #c4b5fd; border-color: rgba(196, 181, 253, 0.3); }
+    .gi-head {
+      display: grid;
+      grid-template-columns: 52px 1fr 58px;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.45rem 0.5rem;
+      background: linear-gradient(180deg, #f7f4ea 0%, #ebe4d2 100%);
+      color: #1a1a1a;
+      border-bottom: 2px solid #2a3f63;
+      min-height: 3.1rem;
+    }
 
-    .card-desc {
-      font-size: 0.88rem;
-      color: #c5d5eb;
-      line-height: 1.55;
+    .gi-no {
+      font-family: Orbitron, sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #333;
+    }
+
+    .gi-title {
+      text-align: center;
+      font-size: 1.25rem;
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: 0.06em;
+    }
+
+    .gi-title small {
+      display: block;
+      font-size: 0.62rem;
+      font-weight: 500;
+      color: #666;
+      letter-spacing: 0.02em;
+      margin-bottom: 0.05rem;
+    }
+
+    .gi-rank {
+      text-align: right;
+      font-family: Orbitron, sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #222;
+    }
+
+    .gi-art {
       position: relative;
+      flex: 1.05;
+      min-height: 0;
+      background: #000;
+      overflow: hidden;
+      border-bottom: 2px solid #2a3f63;
+    }
+
+    .gi-art img {
+      width: 100%;
+      height: 155%;
+      object-fit: cover;
+      object-position: center 40%;
+      display: block;
+      transform: translateY(-8%);
+    }
+
+    .gi-text {
+      flex: 0.95;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(120,180,255,0.18), transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(80,140,220,0.16), transparent 45%),
+        #dce8f7;
+      padding: 0.55rem 0.55rem 0.45rem;
+      position: relative;
+    }
+
+    .gi-desc-box {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #9bb4d4;
+      border-radius: 3px;
+      padding: 0.45rem 0.5rem;
+      overflow: hidden;
+    }
+
+    .gi-desc {
+      color: #1c2433;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      font-weight: 500;
       display: -webkit-box;
-      -webkit-line-clamp: 3;
+      -webkit-line-clamp: 5;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
+
+    .gi-face.large .gi-desc {
+      font-size: 0.9rem;
+      line-height: 1.55;
+      -webkit-line-clamp: 8;
+      display: block;
+      overflow: auto;
+      max-height: 100%;
+    }
+
+    .gi-face.large .gi-title { font-size: 1.55rem; }
+    .gi-face.large .gi-head { min-height: 3.6rem; padding: 0.55rem 0.65rem; }
+
+    .gi-icons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.3rem;
+      margin-top: 0.35rem;
+    }
+
+    .gi-icon {
+      width: 1.55rem;
+      height: 1.55rem;
+      border-radius: 50%;
+      border: 1.5px solid #2a3f63;
+      background: #fff;
+      color: #1a2436;
+      font-size: 0.72rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .gi-icon.range { background: #e8f4ff; }
+    .gi-icon.attack { background: #ffe8e8; }
+    .gi-icon.defense { background: #e8f0ff; }
+    .gi-icon.continuous { background: #f0e8ff; }
+    .gi-icon.versus { background: #fff4e0; }
 
     /* Modal */
     .modal-overlay {
@@ -336,7 +397,7 @@
     }
 
     .modal-top {
-      padding: 1.5rem 1.5rem 1rem;
+      padding: 1.25rem 1.5rem 0.85rem;
       border-bottom: 1px solid rgba(61, 139, 253, 0.2);
       position: relative;
     }
@@ -361,57 +422,76 @@
 
     .modal-close:hover { background: rgba(255, 255, 255, 0.15); color: var(--text); }
 
-    .modal-number {
-      font-family: Orbitron, sans-serif;
-      font-size: 0.85rem;
-      color: var(--text-muted);
+    .modal-kicker {
+      font-size: 0.82rem;
+      color: var(--accent);
+      font-weight: 600;
+      margin-bottom: 0.2rem;
     }
 
     .modal-name {
-      font-size: 2rem;
+      font-size: 1.8rem;
       font-weight: 900;
-      margin: 0.25rem 0;
+      margin: 0.1rem 0;
+      padding-right: 2rem;
     }
 
     .modal-name-en {
       color: var(--text-muted);
-      font-size: 0.9rem;
+      font-size: 0.88rem;
     }
 
-    .modal-art-wrap {
-      padding: 0 1.5rem;
-      margin-top: -0.25rem;
+    .modal-face-wrap {
+      padding: 1rem 1.5rem 0.25rem;
     }
+
+    .scan-toggle {
+      margin: 0.85rem 1.5rem 0;
+      border: 1px solid rgba(61, 139, 253, 0.25);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.18);
+      padding: 0.55rem 0.75rem;
+    }
+
+    .scan-toggle summary {
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      list-style: none;
+    }
+
+    .scan-toggle summary::-webkit-details-marker { display: none; }
+    .scan-toggle summary::before { content: "▸ "; color: var(--border-glow); }
+    .scan-toggle[open] summary::before { content: "▾ "; }
 
     .modal-art {
       width: 100%;
-      max-height: 340px;
+      max-height: 320px;
       object-fit: contain;
-      border-radius: 12px;
-      border: 2px solid var(--border-spell);
+      border-radius: 10px;
+      border: 1px solid rgba(61, 139, 253, 0.35);
       background: #0a1424;
       display: block;
-      margin: 0 auto;
+      margin: 0.65rem auto 0.2rem;
     }
 
-    .modal-body { padding: 1.25rem 1.5rem 1.5rem; }
+    .modal-body { padding: 1rem 1.5rem 1.5rem; }
 
     .detail-row {
       display: flex;
       justify-content: space-between;
-      padding: 0.6rem 0;
+      padding: 0.55rem 0;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       font-size: 0.9rem;
     }
 
     .detail-row:last-child { border-bottom: none; }
-
     .detail-label { color: var(--text-muted); }
-
     .detail-value { font-weight: 500; text-align: right; max-width: 65%; }
 
     .modal-desc {
-      margin-top: 1rem;
+      margin-top: 0.85rem;
       padding: 1rem;
       background: rgba(0, 0, 0, 0.25);
       border-radius: 10px;
@@ -440,9 +520,6 @@
       border-top: 1px solid rgba(61, 139, 253, 0.15);
     }
 
-    .footer a { color: var(--border-glow); text-decoration: none; }
-    .footer a:hover { text-decoration: underline; }
-
     .empty-state {
       grid-column: 1 / -1;
       text-align: center;
@@ -453,39 +530,42 @@
     .empty-state p { font-size: 1.1rem; margin-bottom: 0.5rem; }
 
     @media (max-width: 480px) {
-      .grid { grid-template-columns: 1fr; }
-      .modal-name { font-size: 1.6rem; }
+      .grid { grid-template-columns: 1fr; max-width: 340px; }
+      .modal-name { font-size: 1.45rem; }
+      .gi-title { font-size: 1.1rem; }
+      .gi-desc { font-size: 0.74rem; }
     }
   </style>
 </head>
 <body>
   <header class="header">
     <h1 class="logo">GREED ISLAND</h1>
-    <p class="subtitle">貪婪之島 · 咒語卡圖鑑（全 40 張）</p>
+    <p class="subtitle">貪婪之島 · 咒語卡圖鑑（No.1001–1040）</p>
+    <div class="lang-badge">中文卡面 · 名稱與效果全文翻譯</div>
     <div class="stats-bar">
-      <div class="stat">咒語卡 <strong>40</strong> 張</div>
+      <div class="stat">共 <strong>40</strong> 張</div>
       <div class="stat">遠距離 <strong id="stat-long">—</strong></div>
       <div class="stat">近距離 <strong id="stat-short">—</strong></div>
-      <div class="stat">收集獎勵 <strong>大天使的吐息</strong></div>
     </div>
   </header>
 
   <div class="controls">
     <div class="search-row">
-      <input type="search" class="search-input" id="search" placeholder="搜尋卡名、編號、效果…" autocomplete="off" />
+      <input class="search-input" id="search" type="search" placeholder="搜尋卡名、效果、編號…" autocomplete="off" />
     </div>
     <div class="filter-row" id="filters">
       <button class="filter-btn active" data-filter="all">全部</button>
       <button class="filter-btn" data-filter="long">遠距離</button>
       <button class="filter-btn" data-filter="short">近距離</button>
-      <button class="filter-btn" data-filter="attack">攻擊咒文</button>
-      <button class="filter-btn" data-filter="defense">防禦咒文</button>
-      <button class="filter-btn" data-filter="regular">通常咒文</button>
-      <button class="filter-btn" data-filter="continuous">持續咒文</button>
+      <button class="filter-btn" data-filter="attack">攻擊</button>
+      <button class="filter-btn" data-filter="defense">防禦</button>
+      <button class="filter-btn" data-filter="regular">通常</button>
+      <button class="filter-btn" data-filter="continuous">持續</button>
+      <button class="filter-btn" data-filter="versus">對抗</button>
       <button class="filter-btn" data-filter="rank-s">S 級</button>
       <button class="filter-btn" data-filter="rank-a">A 級</button>
     </div>
-    <p class="result-count" id="result-count"></p>
+    <div class="result-count" id="result-count"></div>
   </div>
 
   <main class="grid" id="grid"></main>
@@ -494,13 +574,15 @@
     <div class="modal" id="modal">
       <div class="modal-top">
         <button class="modal-close" id="modal-close" aria-label="關閉">×</button>
-        <div class="modal-number" id="modal-number"></div>
+        <div class="modal-kicker">中文咒語卡</div>
         <h2 class="modal-name" id="modal-name"></h2>
         <div class="modal-name-en" id="modal-name-en"></div>
       </div>
-      <div class="modal-art-wrap">
+      <div class="modal-face-wrap" id="modal-face-wrap"></div>
+      <details class="scan-toggle">
+        <summary>查看原版日文掃描（參考用）</summary>
         <img class="modal-art" id="modal-art" alt="" loading="lazy" />
-      </div>
+      </details>
       <div class="modal-body">
         <div class="detail-row"><span class="detail-label">入手難度</span><span class="detail-value" id="modal-rank"></span></div>
         <div class="detail-row"><span class="detail-label">卡片化限度枚數</span><span class="detail-value" id="modal-limit"></span></div>
@@ -513,7 +595,7 @@
   </div>
 
   <footer class="footer">
-    <p>資料來源：HUNTER×HUNTER 原作 · 卡片圖片來自 Hunterpedia · 僅供同人學習交流</p>
+    <p>卡面文字為繁體中文翻譯 · 插圖取自原版掃描裁切 · 僅供同人學習交流</p>
     <p style="margin-top:0.4rem">咒語卡可在瑪莎多拉（Masadora）的咒語商店購買 · 集齊 40 張可兌換「大天使的吐息」</p>
   </footer>
 
@@ -529,6 +611,14 @@
       regular: "通常咒文",
       continuous: "持續咒文",
       versus: "對抗咒文"
+    };
+
+    const TYPE_ICON = {
+      attack: ["攻", "attack"],
+      defense: ["防", "defense"],
+      regular: ["通", "regular"],
+      continuous: ["持", "continuous"],
+      versus: ["抗", "versus"]
     };
 
     const CARDS = [
@@ -576,30 +666,46 @@
 
     let activeFilter = "all";
 
-    function cardThumb(id) {
-      return `images/thumb/${id}.webp`;
-    }
-
-    function cardModal(id) {
-      return `images/modal/${id}.webp`;
-    }
-
-    function rankColor(rank) {
-      return RANK_COLORS[rank] || "#94a3b8";
-    }
-
-    function typeTags(card) {
-      const tags = [];
-      tags.push(`<span class="tag range-${card.range}">${card.range === "long" ? "遠距離" : "近距離"}</span>`);
-      card.types.forEach(t => {
-        const cls = t === "attack" ? "type-attack" : t === "defense" ? "type-defense" : t === "continuous" ? "type-continuous" : "";
-        tags.push(`<span class="tag ${cls}">${TYPE_LABELS[t] || t}</span>`);
-      });
-      return tags.join("");
-    }
+    function cardThumb(id) { return `images/thumb/${id}.webp`; }
+    function cardModal(id) { return `images/modal/${id}.webp`; }
+    function rankColor(rank) { return RANK_COLORS[rank] || "#94a3b8"; }
 
     function typeLabels(card) {
       return card.types.map(t => TYPE_LABELS[t] || t).join(" · ");
+    }
+
+    function iconHtml(card) {
+      const icons = [];
+      icons.push(`<span class="gi-icon range" title="${card.range === "long" ? "遠距離" : "近距離"}">${card.range === "long" ? "遠" : "近"}</span>`);
+      card.types.forEach(t => {
+        const [ch, cls] = TYPE_ICON[t] || ["通", "regular"];
+        icons.push(`<span class="gi-icon ${cls}" title="${TYPE_LABELS[t] || t}">${ch}</span>`);
+      });
+      return icons.join("");
+    }
+
+    function spellFaceHtml(card, { large = false, artSrc = null } = {}) {
+      const src = artSrc || cardThumb(card.id);
+      const cls = large ? "gi-face large" : "gi-face";
+      return `
+        <div class="${cls}" aria-label="NO.${card.id} ${card.name}">
+          <div class="gi-inner">
+            <div class="gi-head">
+              <div class="gi-no">${card.id}</div>
+              <div class="gi-title"><small>咒語卡</small>${card.name}</div>
+              <div class="gi-rank">${card.rank}-${card.limit}</div>
+            </div>
+            <div class="gi-art">
+              <img src="${src}" alt="" loading="lazy" />
+            </div>
+            <div class="gi-text">
+              <div class="gi-desc-box">
+                <p class="gi-desc">${card.desc}</p>
+              </div>
+              <div class="gi-icons">${iconHtml(card)}</div>
+            </div>
+          </div>
+        </div>`;
     }
 
     function matchesFilter(card) {
@@ -629,7 +735,7 @@
 
       document.getElementById("result-count").textContent =
         filtered.length === CARDS.length
-          ? `顯示全部 ${CARDS.length} 張咒語卡`
+          ? `顯示全部 ${CARDS.length} 張中文咒語卡`
           : `找到 ${filtered.length} / ${CARDS.length} 張`;
 
       if (filtered.length === 0) {
@@ -639,17 +745,7 @@
 
       grid.innerHTML = filtered.map(card => `
         <article class="card" data-id="${card.id}" tabindex="0" role="button" aria-label="${card.name}">
-          <img class="card-art" src="${cardThumb(card.id)}" alt="NO.${card.id} ${card.name}" loading="lazy" />
-          <div class="card-body">
-            <div class="card-header">
-              <span class="card-number">NO.${String(card.id).padStart(4, "0")}</span>
-              <span class="card-rank" style="color:${rankColor(card.rank)}">${card.rank}-${card.limit}</span>
-            </div>
-            <h3 class="card-name">${card.name}</h3>
-            <div class="card-name-en">${card.nameEn}</div>
-            <div class="card-tags">${typeTags(card)}</div>
-            <p class="card-desc">${card.desc}</p>
-          </div>
+          ${spellFaceHtml(card)}
         </article>
       `).join("");
 
@@ -665,12 +761,19 @@
       const card = CARDS.find(c => c.id === id);
       if (!card) return;
 
-      document.getElementById("modal-number").textContent = `NO.${String(card.id).padStart(4, "0")}`;
       document.getElementById("modal-name").textContent = card.name;
-      document.getElementById("modal-name-en").textContent = `${card.nameEn}（${card.nameJp}）`;
+      document.getElementById("modal-name-en").textContent = `原名：${card.nameJp} · ${card.nameEn}`;
+      document.getElementById("modal-face-wrap").innerHTML = spellFaceHtml(card, {
+        large: true,
+        artSrc: cardModal(card.id)
+      });
+
       const modalArt = document.getElementById("modal-art");
       modalArt.src = cardModal(card.id);
-      modalArt.alt = `NO.${card.id} ${card.name}`;
+      modalArt.alt = `NO.${card.id} ${card.name} 原版日文掃描`;
+      const details = document.querySelector(".scan-toggle");
+      if (details) details.open = false;
+
       document.getElementById("modal-rank").innerHTML = `<span style="color:${rankColor(card.rank)};font-family:Orbitron,sans-serif;font-weight:700">${card.rank} 級</span>`;
       document.getElementById("modal-limit").textContent = `${card.limit} 枚`;
       document.getElementById("modal-range").textContent = card.range === "long" ? "遠距離（島上任意地點）" : "近距離（半徑 20 公尺內）";
@@ -689,7 +792,6 @@
     }
 
     document.getElementById("search").addEventListener("input", renderCards);
-
     document.getElementById("filters").addEventListener("click", e => {
       const btn = e.target.closest(".filter-btn");
       if (!btn) return;
@@ -698,7 +800,6 @@
       activeFilter = btn.dataset.filter;
       renderCards();
     });
-
     document.getElementById("modal-close").addEventListener("click", closeModal);
     document.getElementById("modal-overlay").addEventListener("click", e => {
       if (e.target === e.currentTarget) closeModal();
@@ -707,7 +808,6 @@
 
     document.getElementById("stat-long").textContent = CARDS.filter(c => c.range === "long").length;
     document.getElementById("stat-short").textContent = CARDS.filter(c => c.range === "short").length;
-
     renderCards();
   </script>
 </body>
