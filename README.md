@@ -45,10 +45,18 @@ https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120
 
 ```bash
 pip install pandas numpy requests shioaji
-python scan_tw.py --watch
+python scan_tw.py
 ```
 
-最上面四個引號填永豐 Key / Secret 和 Telegram。第一次會按日抓近幾天 1K 當種子，之後用成交明細補當根。
+最上面四個引號填永豐 Key / Secret 和 Telegram。直接 Run 就是盤中持續監控：
+
+1. 登入永豐，等商品合約下載穩定
+2. 抓證交所／櫃買最近已公布的成交額前 100 名，按日補近幾天一分 K 當種子
+3. 開盤前跑的話，等到 09:00 才開始；訂閱成交明細，每分鐘 K 收完就判斷
+4. 出現新的站穩訊號立刻發 Telegram，同一根 K 不重複通知
+5. 13:30 收盤自動停，印出今天通知幾檔
+
+只掃一次不監控加 `--once`；收盤後想硬跑監控加 `--watch`。
 
 通知通道（擇一或同時設環境變數）：
 

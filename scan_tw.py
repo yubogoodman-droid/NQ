@@ -29,7 +29,7 @@ TELEGRAM_BOT_TOKEN = ""     # Telegram BotFather 給的 token
 TELEGRAM_CHAT_ID = ""       # 你的 Telegram chat id
 # ═══════════════════════════════════════════════════════════════
 
-SCRIPT_VERSION = "2026-08-20-e"
+SCRIPT_VERSION = "2026-08-20-f"
 
 
 def _apply_secrets() -> None:
@@ -692,9 +692,12 @@ def _parse_percent(value: object) -> float | None:
 KBARS_GAP_SEC = 0.25  # 低於官方 50 次／10 秒
 SUBSCRIBE_LIMIT = 200
 
+EMPTY_RETRY_SEC = 600.0
+
 _api = None
 _api_lock = threading.Lock()
 _rest_lock = threading.Lock()
+_empty_at: dict[str, float] = {}
 _frames: dict[str, pd.DataFrame] = {}
 _frames_lock = threading.Lock()
 _frame_ranges: dict[str, tuple[date, date]] = {}
@@ -1120,6 +1123,7 @@ def logout() -> None:
     with _frames_lock:
         _frames.clear()
         _frame_ranges.clear()
+        _empty_at.clear()
         _open_bars.clear()
         _subscribed.clear()
 
@@ -1128,11 +1132,16 @@ def _peek_1m(symbol: str, start_d: date, end_d: date) -> pd.DataFrame | None:
     with _frames_lock:
         cached = _frames.get(symbol)
         rng = _frame_ranges.get(symbol)
-        if cached is None or cached.empty or rng is None:
+        if cached is None or rng is None:
             return None
-        if rng[0] <= start_d and rng[1] >= end_d:
-            return cached.copy()
-    return None
+        if rng[0] > start_d or rng[1] < end_d:
+            return None
+        if cached.empty:
+            # 沒資料的標的別每分鐘重打一次 kbars，隔一段時間才重試
+            recorded = _empty_at.get(symbol)
+            if recorded is None or time.time() - recorded > EMPTY_RETRY_SEC:
+                return None
+        return cached.copy()
 
 
 def _kbars_day(api, contract, day: date) -> pd.DataFrame:
@@ -1191,6 +1200,10 @@ def _one_minute(api, symbol: str, start_d: date, end_d: date) -> pd.DataFrame:
     with _frames_lock:
         _frames[symbol] = frame.copy()
         _frame_ranges[symbol] = (start_d, end_d)
+        if frame.empty:
+            _empty_at[symbol] = time.time()
+        else:
+            _empty_at.pop(symbol, None)
     return frame
 
 
@@ -1847,6 +1860,17 @@ def _tw_session_open(now: datetime | None = None) -> bool:
     return 9 * 60 <= minutes <= 13 * 60 + 35
 
 
+def _seconds_until_open(now: datetime | None = None) -> float | None:
+    """平日開盤前回傳還要等幾秒；已開盤、收盤後或週末回傳 None。"""
+    now = now or datetime.now(TAIPEI)
+    if now.weekday() >= 5:
+        return None
+    open_at = now.replace(hour=9, minute=0, second=0, microsecond=0)
+    if now >= open_at:
+        return None
+    return (open_at - now).total_seconds()
+
+
 def _ensure_shioaji() -> None:
     """沒裝 shioaji 就用目前這個 Python 自動 pip install。"""
     try:
@@ -1894,28 +1918,35 @@ def main() -> int:
     ranking = (result.universe, result.rank_time)
     if not args.watch or _on_date(args) is not None:
         return 0
-    if not _tw_session_open() and "--watch" not in sys.argv:
+
+    forced = "--watch" in sys.argv
+    wait_sec = _seconds_until_open()
+    if wait_sec is not None and not forced:
+        print(f"\n離 09:00 開盤還有 {wait_sec / 60:.0f} 分鐘。K 線已先抓好，等開盤自動開始監控。")
+        print("這段時間不要關視窗，也不要重按 Run。")
+        time.sleep(wait_sec + 5)
+    elif not _tw_session_open() and not forced:
         print("現在不是台股開盤（平日 09:00–13:30）。收盤後沒有即時成交，掃完就結束。")
         print("明天盤中再按 Run，才會持續監控。")
-        if using_shioaji():
-            logout()
+        logout()
         return 0
-    live = True
+
     subscribed = subscribe_symbols([s.symbol for s in result.candidates])
     print(f"\nwatch 永豐即時：已訂閱 {len(subscribed)} 檔，每分鐘收完 K 再判斷（Ctrl+C 結束）")
+    alerted = 0
     try:
         while True:
-            if live:
-                _sleep_to_next_minute()
-            else:
-                time.sleep(max(15, args.interval))
-            _, result = scan_once(args, seen, ranking=ranking)
-            if live:
-                subscribe_symbols([s.symbol for s in result.candidates])
+            _sleep_to_next_minute()
+            if not _tw_session_open() and not forced:
+                print("\n13:30 收盤，停止監控。")
+                break
+            new_hits, result = scan_once(args, seen, ranking=ranking)
+            alerted += new_hits
+            subscribe_symbols([s.symbol for s in result.candidates])
     except KeyboardInterrupt:
         print("\n已停止。")
-        if live:
-            logout()
+    print(f"今天共通知 {alerted} 檔。")
+    logout()
     return 0
 
 

@@ -231,6 +231,25 @@ def _sleep_to_next_minute(pad_sec: int = 3) -> None:
     time.sleep(max(1.0, (nxt - now).total_seconds()))
 
 
+def _tw_session_open(now: datetime | None = None) -> bool:
+    now = now or datetime.now(TAIPEI)
+    if now.weekday() >= 5:
+        return False
+    minutes = now.hour * 60 + now.minute
+    return 9 * 60 <= minutes <= 13 * 60 + 35
+
+
+def _seconds_until_open(now: datetime | None = None) -> float | None:
+    """平日開盤前回傳還要等幾秒；已開盤、收盤後或週末回傳 None。"""
+    now = now or datetime.now(TAIPEI)
+    if now.weekday() >= 5:
+        return None
+    open_at = now.replace(hour=9, minute=0, second=0, microsecond=0)
+    if now >= open_at:
+        return None
+    return (open_at - now).total_seconds()
+
+
 def scan_last_week(args: argparse.Namespace) -> int:
     return len(scan_weekdays(args, previous_weekdays(), "docs/tw/week-last.md", "回測上週"))
 
@@ -280,6 +299,10 @@ def main() -> int:
     if not args.watch or _on_date(args) is not None:
         return 0
     live = using_shioaji()
+    wait_sec = _seconds_until_open()
+    if live and wait_sec is not None:
+        print(f"\n離 09:00 開盤還有 {wait_sec / 60:.0f} 分鐘。K 線已先抓好，等開盤自動開始監控。")
+        time.sleep(wait_sec + 5)
     if live:
         from tw.shioaji_feed import subscribe_symbols
 
@@ -287,23 +310,29 @@ def main() -> int:
         print(f"\nwatch 永豐即時：已訂閱 {len(subscribed)} 檔，每分鐘收完 K 再判斷（Ctrl+C 結束）")
     else:
         print(f"\nwatch 模式（Yahoo 延遲），每 {args.interval} 秒重掃（Ctrl+C 結束）")
+    alerted = 0
     try:
         while True:
             if live:
                 _sleep_to_next_minute()
+                if not _tw_session_open():
+                    print("\n13:30 收盤，停止監控。")
+                    break
             else:
                 time.sleep(max(15, args.interval))
-            _, result = scan_once(args, seen, ranking=ranking)
+            new_hits, result = scan_once(args, seen, ranking=ranking)
+            alerted += new_hits
             if live:
                 from tw.shioaji_feed import subscribe_symbols
 
                 subscribe_symbols([s.symbol for s in result.candidates])
     except KeyboardInterrupt:
         print("\n已停止。")
-        if live:
-            from tw.shioaji_feed import logout
+    print(f"今天共通知 {alerted} 檔。")
+    if live:
+        from tw.shioaji_feed import logout
 
-            logout()
+        logout()
     return 0
 
 

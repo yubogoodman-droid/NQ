@@ -15,9 +15,12 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 KBARS_GAP_SEC = 0.25  # 低於官方 50 次／10 秒
 SUBSCRIBE_LIMIT = 200
 
+EMPTY_RETRY_SEC = 600.0
+
 _api = None
 _api_lock = threading.Lock()
 _rest_lock = threading.Lock()
+_empty_at: dict[str, float] = {}
 _frames: dict[str, pd.DataFrame] = {}
 _frames_lock = threading.Lock()
 _frame_ranges: dict[str, tuple[date, date]] = {}
@@ -445,6 +448,7 @@ def logout() -> None:
     with _frames_lock:
         _frames.clear()
         _frame_ranges.clear()
+        _empty_at.clear()
         _open_bars.clear()
         _subscribed.clear()
 
@@ -453,11 +457,16 @@ def _peek_1m(symbol: str, start_d: date, end_d: date) -> pd.DataFrame | None:
     with _frames_lock:
         cached = _frames.get(symbol)
         rng = _frame_ranges.get(symbol)
-        if cached is None or cached.empty or rng is None:
+        if cached is None or rng is None:
             return None
-        if rng[0] <= start_d and rng[1] >= end_d:
-            return cached.copy()
-    return None
+        if rng[0] > start_d or rng[1] < end_d:
+            return None
+        if cached.empty:
+            # 沒資料的標的別每分鐘重打一次 kbars，隔一段時間才重試
+            recorded = _empty_at.get(symbol)
+            if recorded is None or time.time() - recorded > EMPTY_RETRY_SEC:
+                return None
+        return cached.copy()
 
 
 def _kbars_day(api, contract, day: date) -> pd.DataFrame:
@@ -516,6 +525,10 @@ def _one_minute(api, symbol: str, start_d: date, end_d: date) -> pd.DataFrame:
     with _frames_lock:
         _frames[symbol] = frame.copy()
         _frame_ranges[symbol] = (start_d, end_d)
+        if frame.empty:
+            _empty_at[symbol] = time.time()
+        else:
+            _empty_at.pop(symbol, None)
     return frame
 
 

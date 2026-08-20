@@ -6,12 +6,18 @@ from types import SimpleNamespace
 import pandas as pd
 
 from tw.shioaji_feed import (
+    EMPTY_RETRY_SEC,
     apply_tick,
     concat_daily_frames,
     kbars_to_frame,
     minute_of_tick,
     resample_ohlcv,
     yahoo_symbol_to_code,
+    _empty,
+    _empty_at,
+    _frame_ranges,
+    _frames,
+    _peek_1m,
     _ranked_from_snap,
     _sj_busy,
 )
@@ -144,6 +150,27 @@ class ShioajiFeedTests(unittest.TestCase):
         self.assertTrue(_sj_busy(RuntimeError("fetch_contracts: exclusive access lost")))
         self.assertTrue(_sj_busy(TimeoutError("kbars timeout")))
         self.assertFalse(_sj_busy(ValueError("bad contract")))
+
+    def test_empty_symbol_is_not_refetched_every_minute(self) -> None:
+        import time as _time
+        from datetime import date as _date
+
+        symbol = "9999.TW"
+        window = (_date(2026, 8, 15), _date(2026, 8, 21))
+        self.addCleanup(_frames.pop, symbol, None)
+        self.addCleanup(_frame_ranges.pop, symbol, None)
+        self.addCleanup(_empty_at.pop, symbol, None)
+
+        _frames[symbol] = _empty()
+        _frame_ranges[symbol] = window
+        _empty_at[symbol] = _time.time()
+        cached = _peek_1m(symbol, *window)
+        self.assertIsNotNone(cached)
+        assert cached is not None
+        self.assertTrue(cached.empty)
+
+        _empty_at[symbol] = _time.time() - EMPTY_RETRY_SEC - 1
+        self.assertIsNone(_peek_1m(symbol, *window))
 
 
 if __name__ == "__main__":
