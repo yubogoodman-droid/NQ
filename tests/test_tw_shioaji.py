@@ -12,6 +12,7 @@ from tw.shioaji_feed import (
     minute_of_tick,
     resample_ohlcv,
     yahoo_symbol_to_code,
+    _ranked_from_snap,
 )
 from tw.kline import set_kline_source, using_shioaji
 
@@ -117,6 +118,26 @@ class ShioajiFeedTests(unittest.TestCase):
         self.assertFalse(using_shioaji())
         set_kline_source("auto")
         self.assertFalse(using_shioaji())
+
+    def test_snapshot_rank_maps_otc(self) -> None:
+        from tw.ranking import RankedStock
+
+        snap = SimpleNamespace(
+            code="6147",
+            close=168.5,
+            total_amount=5.4e9,
+            total_volume=32000,
+            exchange="OTC",
+            name="頎邦",
+            change_price=1.0,
+            change_rate=0.6,
+        )
+        stock = _ranked_from_snap(snap, RankedStock)
+        self.assertIsNotNone(stock)
+        assert stock is not None
+        self.assertEqual(stock.symbol, "6147.TWO")
+        self.assertEqual(stock.exchange, "TWO")
+        self.assertEqual(stock.turnover, 5.4e9)
 
 
 if __name__ == "__main__":

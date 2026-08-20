@@ -351,7 +351,6 @@ TPEX_QUOTES_URL = (
     "https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php"
 )
 
-YAHOO_TURNOVER_URL = "https://tw.stock.yahoo.com/rank/turnover"
 DEFAULT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -383,54 +382,8 @@ def fetch_turnover_ranking(
     session: requests.Session | None = None,
     timeout: int = 20,
 ) -> tuple[list[RankedStock], str | None]:
-    """抓取成交金額前 N 名。回傳 (清單, 排行資料時間)。"""
-    sess = session or requests.Session()
-    resp = sess.get(YAHOO_TURNOVER_URL, headers=DEFAULT_HEADERS, timeout=timeout)
-    resp.raise_for_status()
-    stocks, rank_time = parse_yahoo_ranking_html(resp.text)
-    return stocks[:top], rank_time
-
-
-def parse_yahoo_ranking_html(html: str) -> tuple[list[RankedStock], str | None]:
-    payload = _extract_app_main(html)
-    table = (
-        payload.get("context", {})
-        .get("dispatcher", {})
-        .get("stores", {})
-        .get("TableStore", {})
-        .get("main-0-StockRanking")
-    )
-    if not isinstance(table, dict) or not table.get("list"):
-        raise ValueError("Yahoo 成交額排行資料格式異常")
-
-    rank_time = None
-    meta = table.get("listMeta") or {}
-    if isinstance(meta, dict):
-        rank_time = meta.get("rankTime")
-
-    stocks: list[RankedStock] = []
-    for row in table["list"]:
-        symbol = str(row.get("symbol") or "").strip()
-        if not symbol:
-            continue
-        price = _to_float(row.get("price"))
-        if price is None:
-            continue
-        stocks.append(
-            RankedStock(
-                rank=int(row.get("rank") or len(stocks) + 1),
-                symbol=symbol,
-                name=str(row.get("name") or row.get("symbolName") or symbol),
-                price=price,
-                change=_to_float(row.get("change")),
-                change_percent=_parse_percent(row.get("changePercent")),
-                volume_lots=_to_int(row.get("volK")),
-                turnover=_turnover_from_row(row),
-                exchange=_exchange_of(symbol),
-            )
-        )
-    stocks.sort(key=lambda s: s.rank)
-    return stocks, rank_time
+    """永豐快照成交金額前 N 名。"""
+    return fetch_snapshot_ranking(top)
 
 
 def previous_friday(today: date | None = None) -> date:
@@ -662,24 +615,6 @@ def filter_financials(stocks: list[RankedStock]) -> list[RankedStock]:
     return [s for s in stocks if not is_financial(s)]
 
 
-def _extract_app_main(html: str) -> dict:
-    match = re.search(r"root\.App\.main = (\{.*?\});\s*(?:</script>|\n)", html, re.S)
-    if not match:
-        raise ValueError("找不到 Yahoo App.main 排行資料")
-    raw = match.group(1)
-    raw = re.sub(r"(?<![A-Za-z\"])undefined(?![A-Za-z])", "null", raw)
-    raw = re.sub(r"(?<![A-Za-z\"])NaN(?![A-Za-z])", "null", raw)
-    return json.loads(raw)
-
-
-def _turnover_from_row(row: dict) -> float:
-    # turnoverK 單位為千元
-    turnover_k = _to_float(row.get("turnoverK"))
-    if turnover_k is not None:
-        return turnover_k * 1000.0
-    return 0.0
-
-
 def _exchange_of(symbol: str) -> str:
     if symbol.endswith(".TWO"):
         return "TWO"
@@ -731,12 +666,12 @@ def configured() -> bool:
     )
 
 
-def yahoo_symbol_to_code(symbol: str) -> str:
+def stock_code(symbol: str) -> str:
     return str(symbol).split(".", 1)[0].strip()
 
 
 def kbars_to_frame(kbars: object) -> pd.DataFrame:
-    """把 Shioaji Kbars 轉成與 Yahoo 相同的 OHLCV DataFrame。"""
+    """把永豐 Kbars 轉成 OHLCV DataFrame。"""
     if kbars is None:
         return _sj_empty()
     if isinstance(kbars, pd.DataFrame):
@@ -931,12 +866,134 @@ def login():
         return api
 
 
+SNAPSHOT_BATCH = 80
+
+
+def fetch_snapshot_ranking(top: int = 100) -> tuple[list, str | None]:
+    """用永豐快照排上市＋上櫃成交金額。"""
+    api = login()
+    contracts = _stock_contracts(api)
+    print(f"永豐快照排行：{len(contracts)} 檔…", flush=True)
+    rows: list = []
+    for i in range(0, len(contracts), SNAPSHOT_BATCH):
+        batch = contracts[i : i + SNAPSHOT_BATCH]
+        try:
+            snaps = api.snapshots(batch)
+        except Exception:  # noqa: BLE001
+            continue
+        if not snaps:
+            continue
+        for snap in snaps:
+            stock = _ranked_from_snap(snap, RankedStock)
+            if stock is not None:
+                rows.append(stock)
+        time.sleep(0.1)
+    rows.sort(key=lambda s: s.turnover, reverse=True)
+    ranked = [
+        RankedStock(
+            rank=i,
+            symbol=s.symbol,
+            name=s.name,
+            price=s.price,
+            change=s.change,
+            change_percent=s.change_percent,
+            volume_lots=s.volume_lots,
+            turnover=s.turnover,
+            exchange=s.exchange,
+        )
+        for i, s in enumerate(rows[:top], 1)
+    ]
+    stamp = datetime.now(TAIPEI).strftime("%Y-%m-%dT%H:%M:%S+08:00")
+    return ranked, f"{stamp} 永豐快照"
+
+
+def _stock_contracts(api) -> list:
+    stocks = getattr(getattr(api, "Contracts", None), "Stocks", None)
+    if stocks is None:
+        return []
+    out = []
+    seen: set[str] = set()
+    for exch in ("TSE", "OTC"):
+        bucket = None
+        try:
+            bucket = stocks[exch]
+        except Exception:  # noqa: BLE001
+            bucket = getattr(stocks, exch, None)
+        if bucket is None:
+            continue
+        items = []
+        if hasattr(bucket, "values"):
+            try:
+                items = list(bucket.values())
+            except Exception:  # noqa: BLE001
+                items = []
+        if not items:
+            try:
+                items = list(bucket)
+            except Exception:  # noqa: BLE001
+                items = []
+        for contract in items:
+            code = str(getattr(contract, "code", "") or "")
+            if len(code) != 4 or not code.isdigit() or code in seen:
+                continue
+            seen.add(code)
+            out.append(contract)
+    return out
+
+
+def _ranked_from_snap(snap, ranked_cls):
+    code = str(getattr(snap, "code", "") or "")
+    if len(code) != 4 or not code.isdigit():
+        return None
+    close = _snap_float(getattr(snap, "close", None))
+    if not close:
+        return None
+    turnover = _snap_float(getattr(snap, "total_amount", None)) or 0.0
+    if turnover <= 0:
+        vol = _snap_float(getattr(snap, "total_volume", None)) or 0.0
+        turnover = close * vol * 1000.0
+    if turnover <= 0:
+        return None
+    exch_raw = str(getattr(snap, "exchange", "") or "").upper()
+    if "OTC" in exch_raw or exch_raw in {"TWO", "OTC"}:
+        suffix, exchange = ".TWO", "TWO"
+    else:
+        suffix, exchange = ".TW", "TAI"
+    name = str(getattr(snap, "name", "") or code)
+    change = _snap_float(getattr(snap, "change_price", None))
+    chg_pct = _snap_float(getattr(snap, "change_rate", None))
+    vol = _snap_float(getattr(snap, "total_volume", None))
+    return ranked_cls(
+        rank=0,
+        symbol=f"{code}{suffix}",
+        name=name,
+        price=close,
+        change=change,
+        change_percent=chg_pct,
+        volume_lots=int(vol) if vol is not None else None,
+        turnover=turnover,
+        exchange=exchange,
+    )
+
+
+def _snap_float(value) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number:
+        return None
+    return number
+
+
 def subscribe_symbols(symbols: list[str]) -> list[str]:
-    """盤中訂閱成交；回傳成功的 Yahoo 代號。超過 200 檔會截斷。"""
+    """盤中訂閱成交；回傳成功的代號。超過 200 檔會截斷。"""
     api = login()
     ok: list[str] = []
     for symbol in symbols[:SUBSCRIBE_LIMIT]:
-        code = yahoo_symbol_to_code(symbol)
+        code = stock_code(symbol)
         if symbol in _subscribed:
             ok.append(symbol)
             continue
@@ -986,7 +1043,7 @@ def _one_minute(api, symbol: str, start_d: date, end_d: date) -> pd.DataFrame:
     cached = _peek_1m(symbol, start_d, end_d)
     if cached is not None:
         return cached
-    code = yahoo_symbol_to_code(symbol)
+    code = stock_code(symbol)
     contract = _contract(api, code)
     if contract is None:
         return _sj_empty()
@@ -1088,7 +1145,7 @@ def _bind_tick_callback(api) -> None:
 
 def _symbol_for_code(code: str) -> str:
     for symbol in list(_subscribed) + list(_frames):
-        if yahoo_symbol_to_code(symbol) == code:
+        if stock_code(symbol) == code:
             return symbol
     return f"{code}.TW"
 
@@ -1116,18 +1173,12 @@ def _sj_empty() -> pd.DataFrame:
     return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
 
 
-# Yahoo 一分K 單次請求最多 8 個日曆天；更長區間要分段再合併。
-YAHOO_1M_MAX_DAYS = 8
-_source = "auto"
+_source = "shioaji"
 
 
 def set_kline_source(source: str) -> None:
-    """auto / shioaji / yahoo。"""
     global _source
-    allowed = {"auto", "shioaji", "yahoo"}
-    if source not in allowed:
-        raise ValueError(f"kline source must be one of {sorted(allowed)}")
-    _source = source
+    _source = "shioaji"
 
 
 def kline_source() -> str:
@@ -1135,14 +1186,9 @@ def kline_source() -> str:
 
 
 def using_shioaji() -> bool:
-    if _source == "yahoo":
-        return False
-
-    if _source == "shioaji":
-        if not configured():
-            raise RuntimeError("指定 --source shioaji，但未設定 SHIOAJI_API_KEY / SHIOAJI_SECRET_KEY")
-        return True
-    return configured()
+    if not configured():
+        raise RuntimeError("未設定 SHIOAJI_API_KEY / SHIOAJI_SECRET_KEY")
+    return True
 
 
 def fetch_1m_bars(
@@ -1187,19 +1233,6 @@ def kline_window_for_date(on_date: date, lookback_days: int = 7) -> tuple[date, 
     return on_date - timedelta(days=lookback_days), on_date + timedelta(days=1)
 
 
-def date_windows(start: date, end: date, max_days: int = YAHOO_1M_MAX_DAYS) -> list[tuple[date, date]]:
-    """把 [start, end) 切成 Yahoo 一分K 能一次抓完的視窗。"""
-    if end <= start:
-        return []
-    windows: list[tuple[date, date]] = []
-    cur = start
-    while cur < end:
-        nxt = min(cur + timedelta(days=max_days), end)
-        windows.append((cur, nxt))
-        cur = nxt
-    return windows
-
-
 def fetch_bars_many(
     symbols: list[str],
     interval: str = "1m",
@@ -1212,39 +1245,13 @@ def fetch_bars_many(
     unique = list(dict.fromkeys(s for s in symbols if s))
     if not unique:
         return {}
-    if using_shioaji():
-
-        try:
-            return sj_fetch_bars_many(
-                unique,
-                interval=interval,
-                range_=range_,
-                closed_only=closed_only,
-                start=start,
-                end=end,
-            )
-        except Exception:
-            if kline_source() == "shioaji":
-                raise
-            # auto 模式登入失敗就退回 Yahoo，不要讓掃描整段死掉
-            pass
-
-    start_d = _as_date(start)
-    end_d = _as_date(end)
-    if start_d is not None and end_d is not None and interval == "1m":
-        chunks = [
-            _download_normalized(unique, interval, closed_only=closed_only, start=a, end=b)
-            for a, b in date_windows(start_d, end_d)
-        ]
-        return _concat_symbol_frames(chunks)
-
-    return _download_normalized(
+    return sj_fetch_bars_many(
         unique,
-        interval,
+        interval=interval,
+        range_=range_,
         closed_only=closed_only,
-        period=None if start_d is not None else range_,
-        start=start_d,
-        end=end_d,
+        start=start,
+        end=end,
     )
 
 
@@ -1256,108 +1263,6 @@ def _as_date(value: date | str | None) -> date | None:
     if isinstance(value, date):
         return value
     return date.fromisoformat(str(value)[:10])
-
-
-def _download_normalized(
-    symbols: list[str],
-    interval: str,
-    *,
-    closed_only: bool,
-    period: str | None = None,
-    start: date | None = None,
-    end: date | None = None,
-) -> dict[str, pd.DataFrame]:
-    kwargs: dict = {
-        "interval": interval,
-        "group_by": "ticker",
-        "auto_adjust": True,
-        "threads": True,
-        "progress": False,
-    }
-    if start is not None and end is not None:
-        kwargs["start"] = start.isoformat()
-        kwargs["end"] = end.isoformat()
-    else:
-        kwargs["period"] = period or "5d"
-    try:
-        import yfinance as yf
-    except ImportError as exc:
-        raise RuntimeError("指定 Yahoo K 線時才需要 yfinance：pip install yfinance") from exc
-    raw = yf.download(symbols, **kwargs)
-    out: dict[str, pd.DataFrame] = {}
-    for symbol in symbols:
-        frame = _slice_ticker(raw, symbol)
-        normalized = _normalize_ohlcv(frame, closed_only=closed_only, interval=interval)
-        if not normalized.empty:
-            out[symbol] = normalized
-    return out
-
-
-def _concat_symbol_frames(chunks: list[dict[str, pd.DataFrame]]) -> dict[str, pd.DataFrame]:
-    keys: list[str] = []
-    for chunk in chunks:
-        for symbol in chunk:
-            if symbol not in keys:
-                keys.append(symbol)
-    out: dict[str, pd.DataFrame] = {}
-    for symbol in keys:
-        parts = [chunk[symbol] for chunk in chunks if symbol in chunk and not chunk[symbol].empty]
-        if not parts:
-            continue
-        merged = pd.concat(parts).sort_index()
-        merged = merged[~merged.index.duplicated(keep="last")]
-        out[symbol] = merged
-    return out
-
-
-def _slice_ticker(raw: pd.DataFrame, symbol: str) -> pd.DataFrame:
-    if raw is None or raw.empty:
-        return _empty()
-    if isinstance(raw.columns, pd.MultiIndex):
-        level0 = set(map(str, raw.columns.get_level_values(0)))
-        if symbol in level0:
-            return raw[symbol].copy()
-        last = set(map(str, raw.columns.get_level_values(-1)))
-        if symbol in last:
-            return raw.xs(symbol, axis=1, level=-1).copy()
-        return _empty()
-    # 單檔時 yfinance 可能不帶 ticker 層
-    return raw.copy()
-
-
-def _normalize_ohlcv(
-    df: pd.DataFrame,
-    closed_only: bool = False,
-    interval: str = "1m",
-) -> pd.DataFrame:
-    if df is None or df.empty:
-        return _empty()
-    work = df.copy()
-    if isinstance(work.columns, pd.MultiIndex):
-        work.columns = [str(col[-1]) for col in work.columns]
-    work.columns = [str(col).split()[-1].lower() for col in work.columns]
-    needed = ["open", "high", "low", "close"]
-    if any(col not in work.columns for col in needed):
-        return _empty()
-    if "volume" not in work.columns:
-        work["volume"] = 0.0
-    work = work[needed + ["volume"]].dropna(subset=["close"])
-    if work.empty:
-        return _empty()
-    index = pd.DatetimeIndex(work.index)
-    if index.tz is None:
-        index = index.tz_localize(TAIPEI)
-    else:
-        index = index.tz_convert(TAIPEI)
-    work.index = index
-    work = work[~work.index.duplicated(keep="last")].sort_index()
-    if closed_only and len(work) >= 2:
-        last = pd.Timestamp(work.index[-1])
-        now = pd.Timestamp(datetime.now(TAIPEI))
-        freq = "5min" if interval == "5m" else "min"
-        if last.floor(freq) >= now.floor(freq):
-            work = work.iloc[:-1]
-    return work.astype(float)
 
 
 def _empty() -> pd.DataFrame:
@@ -1673,12 +1578,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--watch", action="store_true", help="盤中持續監控（PyCharm 直接 Run 預設就是這個）")
     p.add_argument("--once", action="store_true", help="只掃一次，不持續監控")
-    p.add_argument(
-        "--source",
-        choices=("auto", "shioaji", "yahoo"),
-        default="shioaji",
-        help="K線來源（預設永豐）",
-    )
     p.add_argument("--interval", type=int, default=60, help="watch 間隔秒數")
     p.add_argument("--latest-only", action="store_true", help="只看最新一根（watch 模式自動開啟）")
     p.add_argument("--closed-only", action="store_true", help="只用已收盤的一分 K")
@@ -1711,10 +1610,7 @@ def print_result(result, *, quiet_empty: bool) -> None:
     )
     if result.as_of:
         print(f"  回測日期：{result.as_of.isoformat()}")
-    if using_shioaji():
-        print("  K線：永豐 Shioaji")
-    else:
-        print("  K線：Yahoo（延遲）")
+    print("  K線：永豐 Shioaji")
     if result.rank_time:
         print(f"  排行資料時間：{result.rank_time}")
     if not result.hits:
@@ -1842,15 +1738,14 @@ def main() -> int:
     _apply_secrets()
     if not args.once and _on_date(args) is None and not args.last_week:
         args.watch = True
-    if args.source == "shioaji" and not (
+    if not (
         os.environ.get("SHIOAJI_API_KEY", "").strip()
         and os.environ.get("SHIOAJI_SECRET_KEY", "").strip()
     ):
         print("請在本檔最上面填 SHIOAJI_API_KEY 與 SHIOAJI_SECRET_KEY")
         return 1
-    set_kline_source(args.source)
-    if using_shioaji():
-        _ensure_shioaji()
+    set_kline_source("shioaji")
+    _ensure_shioaji()
     if args.last_week:
         scan_weekdays(args, previous_weekdays(), "回測上週")
         return 0
@@ -1864,12 +1759,9 @@ def main() -> int:
         if using_shioaji():
             logout()
         return 0
-    live = using_shioaji()
-    if live:
-        subscribed = subscribe_symbols([s.symbol for s in result.candidates])
-        print(f"\nwatch 永豐即時：已訂閱 {len(subscribed)} 檔，每分鐘收完 K 再判斷（Ctrl+C 結束）")
-    else:
-        print(f"\nwatch 模式（Yahoo 延遲），每 {args.interval} 秒重掃（Ctrl+C 結束）")
+    live = True
+    subscribed = subscribe_symbols([s.symbol for s in result.candidates])
+    print(f"\nwatch 永豐即時：已訂閱 {len(subscribed)} 檔，每分鐘收完 K 再判斷（Ctrl+C 結束）")
     try:
         while True:
             if live:

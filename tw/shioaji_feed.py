@@ -208,6 +208,130 @@ def login():
         return api
 
 
+SNAPSHOT_BATCH = 80
+
+
+def fetch_snapshot_ranking(top: int = 100) -> tuple[list, str | None]:
+    """用永豐快照排上市＋上櫃成交金額，不經過 Yahoo。"""
+    from tw.ranking import RankedStock
+
+    api = login()
+    contracts = _stock_contracts(api)
+    print(f"永豐快照排行：{len(contracts)} 檔…", flush=True)
+    rows: list = []
+    for i in range(0, len(contracts), SNAPSHOT_BATCH):
+        batch = contracts[i : i + SNAPSHOT_BATCH]
+        try:
+            snaps = api.snapshots(batch)
+        except Exception:  # noqa: BLE001
+            continue
+        if not snaps:
+            continue
+        for snap in snaps:
+            stock = _ranked_from_snap(snap, RankedStock)
+            if stock is not None:
+                rows.append(stock)
+        time.sleep(0.1)
+    rows.sort(key=lambda s: s.turnover, reverse=True)
+    ranked = [
+        RankedStock(
+            rank=i,
+            symbol=s.symbol,
+            name=s.name,
+            price=s.price,
+            change=s.change,
+            change_percent=s.change_percent,
+            volume_lots=s.volume_lots,
+            turnover=s.turnover,
+            exchange=s.exchange,
+        )
+        for i, s in enumerate(rows[:top], 1)
+    ]
+    stamp = datetime.now(TAIPEI).strftime("%Y-%m-%dT%H:%M:%S+08:00")
+    return ranked, f"{stamp} 永豐快照"
+
+
+def _stock_contracts(api) -> list:
+    stocks = getattr(getattr(api, "Contracts", None), "Stocks", None)
+    if stocks is None:
+        return []
+    out = []
+    seen: set[str] = set()
+    for exch in ("TSE", "OTC"):
+        bucket = None
+        try:
+            bucket = stocks[exch]
+        except Exception:  # noqa: BLE001
+            bucket = getattr(stocks, exch, None)
+        if bucket is None:
+            continue
+        items = []
+        if hasattr(bucket, "values"):
+            try:
+                items = list(bucket.values())
+            except Exception:  # noqa: BLE001
+                items = []
+        if not items:
+            try:
+                items = list(bucket)
+            except Exception:  # noqa: BLE001
+                items = []
+        for contract in items:
+            code = str(getattr(contract, "code", "") or "")
+            if len(code) != 4 or not code.isdigit() or code in seen:
+                continue
+            seen.add(code)
+            out.append(contract)
+    return out
+
+
+def _ranked_from_snap(snap, ranked_cls):
+    code = str(getattr(snap, "code", "") or "")
+    if len(code) != 4 or not code.isdigit():
+        return None
+    close = _snap_float(getattr(snap, "close", None))
+    if not close:
+        return None
+    turnover = _snap_float(getattr(snap, "total_amount", None)) or 0.0
+    if turnover <= 0:
+        vol = _snap_float(getattr(snap, "total_volume", None)) or 0.0
+        turnover = close * vol * 1000.0
+    if turnover <= 0:
+        return None
+    exch_raw = str(getattr(snap, "exchange", "") or "").upper()
+    if "OTC" in exch_raw or exch_raw in {"TWO", "OTC"}:
+        suffix, exchange = ".TWO", "TWO"
+    else:
+        suffix, exchange = ".TW", "TAI"
+    name = str(getattr(snap, "name", "") or code)
+    change = _snap_float(getattr(snap, "change_price", None))
+    chg_pct = _snap_float(getattr(snap, "change_rate", None))
+    vol = _snap_float(getattr(snap, "total_volume", None))
+    return ranked_cls(
+        rank=0,
+        symbol=f"{code}{suffix}",
+        name=name,
+        price=close,
+        change=change,
+        change_percent=chg_pct,
+        volume_lots=int(vol) if vol is not None else None,
+        turnover=turnover,
+        exchange=exchange,
+    )
+
+
+def _snap_float(value) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number:  # NaN
+        return None
+    return number
+
+
 def _sj_login(api) -> None:
     key = os.environ["SHIOAJI_API_KEY"].strip()
     secret = os.environ["SHIOAJI_SECRET_KEY"].strip()

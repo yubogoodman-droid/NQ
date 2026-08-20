@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
-from tw.kline import fetch_1m_bars_many, fetch_bars_many, kline_window_for_date
+from tw.kline import fetch_1m_bars_many, fetch_bars_many, kline_window_for_date, using_shioaji
 from tw.ranking import (
     RankedStock,
     fetch_daily_turnover_ranking,
@@ -85,6 +85,10 @@ def run_scan(
         universe, rank_time = fetch_daily_turnover_ranking(
             cfg.on_date, top=cfg.top, session=sess, timeout=cfg.timeout
         )
+    elif using_shioaji():
+        from tw.shioaji_feed import fetch_snapshot_ranking
+
+        universe, rank_time = fetch_snapshot_ranking(top=cfg.top)
     else:
         universe, rank_time = fetch_turnover_ranking(
             top=cfg.top, session=sess, timeout=cfg.timeout
@@ -123,7 +127,7 @@ def run_scan(
             end=kline_end,
         )
     except Exception as exc:  # noqa: BLE001
-        errors.extend((stock, str(exc)) for stock in candidates)
+        errors.append((candidates[0] if candidates else RankedStock(0, "—", "—", 0.0, None, None, None, 0.0, ""), str(exc)))
         return ScanResult(
             scanned_at=datetime.now(TAIPEI),
             rank_time=rank_time,
