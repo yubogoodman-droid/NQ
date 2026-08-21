@@ -367,7 +367,7 @@ def pick_gallery(rows: list[SignalRow], spec: TfSpec, limit: int = 18) -> list[S
     if not pool:
         return []
     pinned = []
-    for sym in ("TRUMPUSDT", "CRCLUSDT"):
+    for sym in ("BTCUSDT", "TRUMPUSDT", "CRCLUSDT"):
         pinned.extend(sorted([r for r in pool if r.symbol == sym], key=lambda r: r.time_ms, reverse=True)[:4])
 
     def score(r: SignalRow) -> float:
@@ -758,6 +758,11 @@ def main() -> int:
     for r in trump:
         mv = r.moves.get(spec.hold4)
         print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
+    btc = [r for r in notify_rows if r.symbol == "BTCUSDT"]
+    print(f"BTC 通知：{len(btc)} 筆")
+    for r in btc:
+        mv = r.moves.get(spec.hold4)
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
 
     img_name = spec.img + ("-stocks" if args.stocks else "")
     img_dir = Path("docs/binance/img") / img_name
@@ -827,6 +832,16 @@ def main() -> int:
                         "ext": r.ext_pct,
                     }
                     for r in trump
+                ],
+                "btc": [
+                    {
+                        "time": hm(r.time_ms),
+                        "close": r.sig.close,
+                        "below": r.bars_below,
+                        "vol": r.vol_ratio,
+                        "ext": r.ext_pct,
+                    }
+                    for r in btc
                 ],
                 "filters": stats,
                 "html": str(out_html),
