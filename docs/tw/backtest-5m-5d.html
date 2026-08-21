@@ -54,8 +54,12 @@
     .price { color: var(--up); font-weight: 700; white-space: nowrap; }
     .row { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: .9rem; color: var(--muted); padding: 0 6px; }
     .row b { color: var(--text); font-weight: 600; }
-    .chart { margin-top: 10px; }
+    .chart { margin-top: 6px; }
     .chart img { width: 100%; height: auto; display: block; border-radius: 8px; }
+    .chart-label {
+      font-size: 12px; color: var(--ok); font-weight: 700;
+      padding: 10px 6px 2px;
+    }
     .empty { color: var(--muted); }
     footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }
   </style>
@@ -66,7 +70,8 @@
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股與收盤價 650 以上。
       五分K MA5 &gt; MA10 &gt; MA20 多頭排列，<strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200（收在所有均線上面）。開盤第一根因隔夜跳空不算。K 棒漲紅跌綠。
+      且這根收盤必須高於 MA5／10／20／200（收在所有均線上面）。開盤第一根因隔夜跳空不算。
+      每則下面附<strong>十五分K對照</strong>（由五分K合成）。K 棒漲紅跌綠。
     </p>
     <div class="chips">
       <span class="chip">五分K</span>
@@ -76,6 +81,7 @@
       <span class="chip">MA5 &gt; 10 &gt; 20</span>
       <span class="chip">當根收盤站上 MA200</span>
       <span class="chip">收盤 &gt; 所有均線</span>
+      <span class="chip">十五分K對照</span>
       <span class="chip">週一 2026-08-17 · 15 則</span><span class="chip">週二 2026-08-18 · 4 則</span><span class="chip">週三 2026-08-19 · 9 則</span><span class="chip">週四 2026-08-20 · 12 則</span><span class="chip">週五 2026-08-21 · 17 則</span>
     </div>
     <div class="legend">
@@ -86,7 +92,7 @@
     </div>
     <div class="summary">
       五天共通知 <span class="ok">57</span> 則<br/>
-      掃描時間 2026-08-21 17:22:43（台北）<br/>
+      掃描時間 2026-08-21 18:09:11（台北）<br/>
       資料：證交所／櫃買盤後成交額 ＋ Yahoo 五分K
     </div>
     
@@ -104,7 +110,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>124.00 &gt; MA5 122.20 / 10 121.75 / 20 121.40</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>123.00 ≤ 123.17</b></div>
       <div class="row"><span>成交額排名</span><b>#35 · 82.52 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="聯電 2303.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2303.TW-0905.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="聯電 2303.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2303.TW-0905-15m.png"/></div>
     </article>
 
 
@@ -118,7 +127,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>109.00 &gt; MA5 108.20 / 10 107.85 / 20 107.70</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>108.50 ≤ 108.56</b></div>
       <div class="row"><span>成交額排名</span><b>#100 · 20.52 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="台灣大 3045.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3045.TW-0905.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="台灣大 3045.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3045.TW-0905-15m.png"/></div>
     </article>
 
 
@@ -132,7 +144,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>26.55 &gt; MA5 26.11 / 10 26.03 / 20 25.95</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>26.00 ≤ 26.15</b></div>
       <div class="row"><span>成交額排名</span><b>#37 · 79.30 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="友達 2409.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2409.TW-0915.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="友達 2409.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2409.TW-0915-15m.png"/></div>
     </article>
 
 
@@ -146,7 +161,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>235.50 &gt; MA5 231.70 / 10 229.30 / 20 228.90</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>231.00 ≤ 231.85</b></div>
       <div class="row"><span>成交額排名</span><b>#94 · 21.88 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="一詮 2486.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2486.TW-0915.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="一詮 2486.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2486.TW-0915-15m.png"/></div>
     </article>
 
 
@@ -160,7 +178,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>109.00 &gt; MA5 108.60 / 10 108.10 / 20 107.83</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>108.50 ≤ 108.56</b></div>
       <div class="row"><span>成交額排名</span><b>#100 · 20.52 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="台灣大 3045.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3045.TW-0915.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="台灣大 3045.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3045.TW-0915-15m.png"/></div>
     </article>
 
 
@@ -174,7 +195,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>109.00 &gt; MA5 108.80 / 10 108.35 / 20 107.95</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>108.50 ≤ 108.55</b></div>
       <div class="row"><span>成交額排名</span><b>#100 · 20.52 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="台灣大 3045.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3045.TW-0925.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="台灣大 3045.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3045.TW-0925-15m.png"/></div>
     </article>
 
 
@@ -188,7 +212,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>252.50 &gt; MA5 251.90 / 10 250.95 / 20 248.82</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>251.50 ≤ 251.96</b></div>
       <div class="row"><span>成交額排名</span><b>#73 · 34.49 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="京元電子 2449.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2449.TW-0935.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="京元電子 2449.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2449.TW-0935-15m.png"/></div>
     </article>
 
 
@@ -202,7 +229,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>253.00 &gt; MA5 251.40 / 10 251.25 / 20 251.10</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>251.50 ≤ 252.26</b></div>
       <div class="row"><span>成交額排名</span><b>#73 · 34.49 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="京元電子 2449.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2449.TW-1025.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="京元電子 2449.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2449.TW-1025-15m.png"/></div>
     </article>
 
 
@@ -216,7 +246,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>214.00 &gt; MA5 213.90 / 10 212.90 / 20 212.18</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>213.50 ≤ 213.56</b></div>
       <div class="row"><span>成交額排名</span><b>#79 · 29.54 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="華通 2313.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2313.TW-1035.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="華通 2313.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2313.TW-1035-15m.png"/></div>
     </article>
 
 
@@ -230,7 +263,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>141.50 &gt; MA5 139.30 / 10 138.45 / 20 137.03</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>139.50 ≤ 140.84</b></div>
       <div class="row"><span>成交額排名</span><b>#76 · 33.16 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="強茂 2481.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2481.TW-1040.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="強茂 2481.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2481.TW-1040-15m.png"/></div>
     </article>
 
 
@@ -244,7 +280,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>141.00 &gt; MA5 140.70 / 10 139.40 / 20 137.70</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>140.50 ≤ 140.82</b></div>
       <div class="row"><span>成交額排名</span><b>#76 · 33.16 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="強茂 2481.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2481.TW-1055.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="強茂 2481.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-2481.TW-1055-15m.png"/></div>
     </article>
 
 
@@ -258,7 +297,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>50.70 &gt; MA5 50.34 / 10 50.26 / 20 50.05</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>50.20 ≤ 50.37</b></div>
       <div class="row"><span>成交額排名</span><b>#17 · 125.01 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="群創 3481.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3481.TW-1105.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="群創 3481.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3481.TW-1105-15m.png"/></div>
     </article>
 
 
@@ -272,7 +314,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>50.50 &gt; MA5 50.44 / 10 50.39 / 20 50.22</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>50.30 ≤ 50.38</b></div>
       <div class="row"><span>成交額排名</span><b>#17 · 125.01 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="群創 3481.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3481.TW-1130.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="群創 3481.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3481.TW-1130-15m.png"/></div>
     </article>
 
 
@@ -286,7 +331,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>612.00 &gt; MA5 602.40 / 10 598.30 / 20 595.65</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>608.00 ≤ 608.05</b></div>
       <div class="row"><span>成交額排名</span><b>#92 · 22.78 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="上詮 3363.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3363.TWO-1230.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="上詮 3363.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3363.TWO-1230-15m.png"/></div>
     </article>
 
 
@@ -300,7 +348,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>613.00 &gt; MA5 607.60 / 10 606.30 / 20 600.00</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>605.00 ≤ 607.24</b></div>
       <div class="row"><span>成交額排名</span><b>#92 · 22.78 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="上詮 3363.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3363.TWO-1300.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="上詮 3363.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-17-3363.TWO-1300-15m.png"/></div>
     </article>
 
     </section>
@@ -318,7 +369,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>438.50 &gt; MA5 426.80 / 10 423.70 / 20 422.90</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>425.50 ≤ 426.01</b></div>
       <div class="row"><span>成交額排名</span><b>#19 · 141.34 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="金居 8358.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-18-8358.TWO-0910.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="金居 8358.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-18-8358.TWO-0910-15m.png"/></div>
     </article>
 
 
@@ -332,7 +386,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>123.50 &gt; MA5 123.10 / 10 122.45 / 20 122.38</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>123.00 ≤ 123.15</b></div>
       <div class="row"><span>成交額排名</span><b>#32 · 109.83 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="聯電 2303.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-18-2303.TW-0920.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="聯電 2303.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-18-2303.TW-0920-15m.png"/></div>
     </article>
 
 
@@ -346,7 +403,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>50.40 &gt; MA5 50.08 / 10 49.79 / 20 49.67</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>50.10 ≤ 50.20</b></div>
       <div class="row"><span>成交額排名</span><b>#35 · 104.83 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="群創 3481.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-18-3481.TW-1140.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="群創 3481.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-18-3481.TW-1140-15m.png"/></div>
     </article>
 
 
@@ -360,7 +420,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>26.45 &gt; MA5 26.40 / 10 26.38 / 20 26.37</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>26.35 ≤ 26.36</b></div>
       <div class="row"><span>成交額排名</span><b>#72 · 40.59 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="友達 2409.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-18-2409.TW-1155.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="友達 2409.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-18-2409.TW-1155-15m.png"/></div>
     </article>
 
     </section>
@@ -378,7 +441,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>170.00 &gt; MA5 165.00 / 10 163.45 / 20 163.05</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>168.50 ≤ 169.76</b></div>
       <div class="row"><span>成交額排名</span><b>#62 · 37.06 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="日電貿 3090.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-3090.TW-0910.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="日電貿 3090.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-3090.TW-0910-15m.png"/></div>
     </article>
 
 
@@ -392,7 +458,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>301.00 &gt; MA5 297.80 / 10 293.15 / 20 288.93</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>299.50 ≤ 299.96</b></div>
       <div class="row"><span>成交額排名</span><b>#15 · 138.66 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="華新科 2492.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-2492.TW-0940.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="華新科 2492.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-2492.TW-0940-15m.png"/></div>
     </article>
 
 
@@ -406,7 +475,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>518.00 &gt; MA5 512.60 / 10 510.90 / 20 508.80</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>513.00 ≤ 513.73</b></div>
       <div class="row"><span>成交額排名</span><b>#93 · 24.86 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="聯詠 3034.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-3034.TW-1000.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="聯詠 3034.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-3034.TW-1000-15m.png"/></div>
     </article>
 
 
@@ -420,7 +492,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>329.00 &gt; MA5 327.70 / 10 326.55 / 20 325.10</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>328.00 ≤ 328.49</b></div>
       <div class="row"><span>成交額排名</span><b>#50 · 54.12 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="廣達 2382.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-2382.TW-1100.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="廣達 2382.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-2382.TW-1100-15m.png"/></div>
     </article>
 
 
@@ -434,7 +509,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>329.00 &gt; MA5 328.40 / 10 327.45 / 20 325.68</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>328.50 ≤ 328.56</b></div>
       <div class="row"><span>成交額排名</span><b>#50 · 54.12 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="廣達 2382.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-2382.TW-1110.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="廣達 2382.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-2382.TW-1110-15m.png"/></div>
     </article>
 
 
@@ -448,7 +526,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>188.50 &gt; MA5 184.40 / 10 183.60 / 20 182.50</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>184.00 ≤ 184.12</b></div>
       <div class="row"><span>成交額排名</span><b>#61 · 37.65 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="晶技 3042.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-3042.TW-1120.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="晶技 3042.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-3042.TW-1120-15m.png"/></div>
     </article>
 
 
@@ -462,7 +543,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>26.40 &gt; MA5 26.31 / 10 26.25 / 20 26.18</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>26.35 ≤ 26.37</b></div>
       <div class="row"><span>成交額排名</span><b>#66 · 35.12 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="友達 2409.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-2409.TW-1130.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="友達 2409.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-2409.TW-1130-15m.png"/></div>
     </article>
 
 
@@ -476,7 +560,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>26.55 &gt; MA5 26.39 / 10 26.32 / 20 26.22</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>26.35 ≤ 26.38</b></div>
       <div class="row"><span>成交額排名</span><b>#66 · 35.12 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="友達 2409.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-2409.TW-1145.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="友達 2409.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-2409.TW-1145-15m.png"/></div>
     </article>
 
 
@@ -490,7 +577,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>164.00 &gt; MA5 163.20 / 10 162.05 / 20 160.90</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>163.00 ≤ 163.84</b></div>
       <div class="row"><span>成交額排名</span><b>#83 · 27.40 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="頎邦 6147.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-6147.TWO-1205.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="頎邦 6147.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-19-6147.TWO-1205-15m.png"/></div>
     </article>
 
     </section>
@@ -508,7 +598,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>423.00 &gt; MA5 415.90 / 10 411.00 / 20 408.75</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>419.00 ≤ 422.43</b></div>
       <div class="row"><span>成交額排名</span><b>#34 · 76.04 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="金居 8358.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-8358.TWO-0910.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="金居 8358.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-8358.TWO-0910-15m.png"/></div>
     </article>
 
 
@@ -522,7 +615,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>73.60 &gt; MA5 70.62 / 10 69.83 / 20 69.61</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>70.20 ≤ 70.57</b></div>
       <div class="row"><span>成交額排名</span><b>#49 · 58.57 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="漢翔 2634.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2634.TW-0915.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="漢翔 2634.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2634.TW-0915-15m.png"/></div>
     </article>
 
 
@@ -536,7 +632,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>188.00 &gt; MA5 184.60 / 10 182.45 / 20 181.28</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>185.50 ≤ 186.11</b></div>
       <div class="row"><span>成交額排名</span><b>#96 · 22.75 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="盟立 2464.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2464.TW-0915.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="盟立 2464.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2464.TW-0915-15m.png"/></div>
     </article>
 
 
@@ -550,7 +649,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>179.00 &gt; MA5 178.40 / 10 172.95 / 20 170.05</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>178.00 ≤ 178.42</b></div>
       <div class="row"><span>成交額排名</span><b>#4 · 264.26 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="華邦電 2344.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2344.TW-0920.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="華邦電 2344.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2344.TW-0920-15m.png"/></div>
     </article>
 
 
@@ -564,7 +666,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>435.00 &gt; MA5 426.10 / 10 424.65 / 20 420.68</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>427.50 ≤ 432.26</b></div>
       <div class="row"><span>成交額排名</span><b>#81 · 27.42 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="訊芯-KY 6451.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-6451.TW-0950.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="訊芯-KY 6451.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-6451.TW-0950-15m.png"/></div>
     </article>
 
 
@@ -578,7 +683,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>409.50 &gt; MA5 405.10 / 10 404.35 / 20 401.95</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>404.00 ≤ 408.08</b></div>
       <div class="row"><span>成交額排名</span><b>#41 · 66.86 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="全新 2455.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2455.TW-1030.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="全新 2455.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2455.TW-1030-15m.png"/></div>
     </article>
 
 
@@ -592,7 +700,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>184.50 &gt; MA5 182.90 / 10 182.65 / 20 182.30</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>183.00 ≤ 184.44</b></div>
       <div class="row"><span>成交額排名</span><b>#43 · 64.77 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="晶技 3042.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-3042.TW-1205.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="晶技 3042.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-3042.TW-1205-15m.png"/></div>
     </article>
 
 
@@ -606,7 +717,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>236.50 &gt; MA5 232.20 / 10 231.45 / 20 230.35</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>233.00 ≤ 236.31</b></div>
       <div class="row"><span>成交額排名</span><b>#60 · 40.29 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="一詮 2486.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2486.TW-1210.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="一詮 2486.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2486.TW-1210-15m.png"/></div>
     </article>
 
 
@@ -620,7 +734,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>304.00 &gt; MA5 300.30 / 10 299.50 / 20 298.40</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>302.50 ≤ 303.13</b></div>
       <div class="row"><span>成交額排名</span><b>#27 · 87.15 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="精材 3374.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-3374.TWO-1305.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="精材 3374.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-3374.TWO-1305-15m.png"/></div>
     </article>
 
 
@@ -634,7 +751,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>184.50 &gt; MA5 182.00 / 10 180.70 / 20 179.72</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>183.50 ≤ 183.53</b></div>
       <div class="row"><span>成交額排名</span><b>#71 · 30.90 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="中美晶 5483.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-5483.TWO-1310.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="中美晶 5483.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-5483.TWO-1310-15m.png"/></div>
     </article>
 
 
@@ -648,7 +768,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>303.50 &gt; MA5 302.10 / 10 300.35 / 20 299.02</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>302.00 ≤ 303.24</b></div>
       <div class="row"><span>成交額排名</span><b>#27 · 87.15 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="精材 3374.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-3374.TWO-1315.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="精材 3374.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-3374.TWO-1315-15m.png"/></div>
     </article>
 
 
@@ -662,7 +785,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>176.50 &gt; MA5 175.60 / 10 175.55 / 20 174.95</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>175.50 ≤ 176.40</b></div>
       <div class="row"><span>成交額排名</span><b>#4 · 264.26 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="華邦電 2344.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2344.TW-1320.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="華邦電 2344.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-20-2344.TW-1320-15m.png"/></div>
     </article>
 
     </section>
@@ -679,8 +805,11 @@
       <div class="row"><span>收盤 / MA200</span><b>377.50 &gt; 376.39</b></div>
       <div class="row"><span>收盤 vs 均線</span><b>377.50 &gt; MA5 374.20 / 10 371.00 / 20 369.12</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>375.00 ≤ 376.47</b></div>
-      <div class="row"><span>成交額排名</span><b>#26 · 81.87 億</b></div>
+      <div class="row"><span>成交額排名</span><b>#27 · 81.87 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="穩懋 3105.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3105.TWO-0905.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="穩懋 3105.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3105.TWO-0905-15m.png"/></div>
     </article>
 
 
@@ -694,7 +823,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>253.00 &gt; MA5 249.70 / 10 248.35 / 20 248.18</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>249.50 ≤ 252.90</b></div>
       <div class="row"><span>成交額排名</span><b>#80 · 23.80 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="晶豪科 3006.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3006.TW-0915.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="晶豪科 3006.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3006.TW-0915-15m.png"/></div>
     </article>
 
 
@@ -708,7 +840,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>426.00 &gt; MA5 415.00 / 10 413.20 / 20 412.55</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>415.00 ≤ 416.60</b></div>
       <div class="row"><span>成交額排名</span><b>#15 · 129.81 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="金居 8358.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-8358.TWO-0925.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="金居 8358.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-8358.TWO-0925-15m.png"/></div>
     </article>
 
 
@@ -721,8 +856,11 @@
       <div class="row"><span>收盤 / MA200</span><b>378.50 &gt; 376.08</b></div>
       <div class="row"><span>收盤 vs 均線</span><b>378.50 &gt; MA5 378.20 / 10 375.35 / 20 371.73</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>373.00 ≤ 376.17</b></div>
-      <div class="row"><span>成交額排名</span><b>#26 · 81.87 億</b></div>
+      <div class="row"><span>成交額排名</span><b>#27 · 81.87 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="穩懋 3105.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3105.TWO-0925.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="穩懋 3105.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3105.TWO-0925-15m.png"/></div>
     </article>
 
 
@@ -736,7 +874,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>305.50 &gt; MA5 303.10 / 10 303.05 / 20 301.27</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>303.50 ≤ 303.65</b></div>
       <div class="row"><span>成交額排名</span><b>#62 · 42.40 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="精材 3374.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3374.TWO-0930.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="精材 3374.TWO 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3374.TWO-0930-15m.png"/></div>
     </article>
 
 
@@ -750,7 +891,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>256.50 &gt; MA5 252.90 / 10 250.75 / 20 249.12</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>251.50 ≤ 252.53</b></div>
       <div class="row"><span>成交額排名</span><b>#80 · 23.80 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="晶豪科 3006.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3006.TW-0935.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="晶豪科 3006.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3006.TW-0935-15m.png"/></div>
     </article>
 
 
@@ -763,8 +907,11 @@
       <div class="row"><span>收盤 / MA200</span><b>565.00 &gt; 563.94</b></div>
       <div class="row"><span>收盤 vs 均線</span><b>565.00 &gt; MA5 559.80 / 10 555.50 / 20 552.90</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>559.00 ≤ 563.76</b></div>
-      <div class="row"><span>成交額排名</span><b>#30 · 78.04 億</b></div>
+      <div class="row"><span>成交額排名</span><b>#31 · 78.04 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="聯鈞 3450.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3450.TW-1015.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="聯鈞 3450.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3450.TW-1015-15m.png"/></div>
     </article>
 
 
@@ -777,8 +924,11 @@
       <div class="row"><span>收盤 / MA200</span><b>568.00 &gt; 564.27</b></div>
       <div class="row"><span>收盤 vs 均線</span><b>568.00 &gt; MA5 563.00 / 10 559.10 / 20 554.00</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>564.00 ≤ 564.11</b></div>
-      <div class="row"><span>成交額排名</span><b>#30 · 78.04 億</b></div>
+      <div class="row"><span>成交額排名</span><b>#31 · 78.04 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="聯鈞 3450.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3450.TW-1025.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="聯鈞 3450.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-3450.TW-1025-15m.png"/></div>
     </article>
 
 
@@ -792,7 +942,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>117.00 &gt; MA5 115.60 / 10 115.25 / 20 115.03</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>115.50 ≤ 116.92</b></div>
       <div class="row"><span>成交額排名</span><b>#38 · 67.90 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="聯電 2303.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2303.TW-1025.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="聯電 2303.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2303.TW-1025-15m.png"/></div>
     </article>
 
 
@@ -806,7 +959,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>117.00 &gt; MA5 116.70 / 10 115.95 / 20 115.40</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>116.00 ≤ 116.81</b></div>
       <div class="row"><span>成交額排名</span><b>#38 · 67.90 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="聯電 2303.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2303.TW-1045.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="聯電 2303.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2303.TW-1045-15m.png"/></div>
     </article>
 
 
@@ -820,7 +976,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>411.00 &gt; MA5 405.10 / 10 402.80 / 20 402.52</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>404.50 ≤ 408.50</b></div>
       <div class="row"><span>成交額排名</span><b>#45 · 57.14 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="全新 2455.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2455.TW-1045.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="全新 2455.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2455.TW-1045-15m.png"/></div>
     </article>
 
 
@@ -834,7 +993,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>122.00 &gt; MA5 120.90 / 10 120.65 / 20 120.53</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>121.00 ≤ 121.69</b></div>
       <div class="row"><span>成交額排名</span><b>#69 · 36.59 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="旺宏 2337.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2337.TW-1055.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="旺宏 2337.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2337.TW-1055-15m.png"/></div>
     </article>
 
 
@@ -848,7 +1010,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>121.50 &gt; MA5 121.20 / 10 121.05 / 20 120.65</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>121.00 ≤ 121.48</b></div>
       <div class="row"><span>成交額排名</span><b>#69 · 36.59 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="旺宏 2337.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2337.TW-1120.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="旺宏 2337.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2337.TW-1120-15m.png"/></div>
     </article>
 
 
@@ -862,7 +1027,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>121.50 &gt; MA5 121.30 / 10 121.25 / 20 120.95</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>121.00 ≤ 121.29</b></div>
       <div class="row"><span>成交額排名</span><b>#69 · 36.59 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="旺宏 2337.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2337.TW-1145.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="旺宏 2337.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2337.TW-1145-15m.png"/></div>
     </article>
 
 
@@ -876,7 +1044,10 @@
       <div class="row"><span>收盤 vs 均線</span><b>116.50 &gt; MA5 116.40 / 10 116.30 / 20 116.17</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>116.00 ≤ 116.22</b></div>
       <div class="row"><span>成交額排名</span><b>#38 · 67.90 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="聯電 2303.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2303.TW-1225.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="聯電 2303.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-2303.TW-1225-15m.png"/></div>
     </article>
 
 
@@ -889,8 +1060,11 @@
       <div class="row"><span>收盤 / MA200</span><b>68.40 &gt; 68.21</b></div>
       <div class="row"><span>收盤 vs 均線</span><b>68.40 &gt; MA5 68.04 / 10 67.78 / 20 67.64</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>67.90 ≤ 68.23</b></div>
-      <div class="row"><span>成交額排名</span><b>#29 · 78.53 億</b></div>
+      <div class="row"><span>成交額排名</span><b>#30 · 78.53 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="力積電 6770.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-6770.TW-1245.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="力積電 6770.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-6770.TW-1245-15m.png"/></div>
     </article>
 
 
@@ -903,8 +1077,11 @@
       <div class="row"><span>收盤 / MA200</span><b>68.30 &gt; 68.09</b></div>
       <div class="row"><span>收盤 vs 均線</span><b>68.30 &gt; MA5 68.08 / 10 68.06 / 20 67.79</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>68.10 ≤ 68.11</b></div>
-      <div class="row"><span>成交額排名</span><b>#29 · 78.53 億</b></div>
+      <div class="row"><span>成交額排名</span><b>#30 · 78.53 億</b></div>
+      <div class="chart-label">五分 K</div>
       <div class="chart"><img alt="力積電 6770.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-6770.TW-1310.png"/></div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart"><img alt="力積電 6770.TW 十五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-5m-5d/2026-08-21-6770.TW-1310-15m.png"/></div>
     </article>
 
     </section>
