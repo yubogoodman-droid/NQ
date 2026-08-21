@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""幣安 1m 黏帶三幕：離開推 Telegram；完全符合再推強訊號（帶圖）。
+"""幣安 Telegram：15 分同時站上 MA7/14/25/99/120；可順便跑 1m 黏帶三幕。
 
 在下面填 Telegram 後執行：
 
-    python3 examples/watch_binance_ribbon.py
+    python3 examples/watch_binance_ribbon.py              # 股票 15 分條件
+    python3 examples/watch_binance_ribbon.py --asset all  # 加密+股票流動盤
 
 Ctrl+C 結束。同一根 K 不會重發。
 """
@@ -11,6 +12,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
@@ -18,6 +21,10 @@ from pathlib import Path
 
 import numpy as np
 import requests
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from nq.ribbon15 import SIGNAL_MA_PERIODS, add_mas, detect_long_breaks
 
 # —— 填這裡 ——
 TELEGRAM_BOT_TOKEN = ""  # BotFather 給的 token，例如 123456:ABC...
@@ -28,7 +35,11 @@ BASE = "https://www.binance.com"
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"})
 SEEN_PATH = Path(__file__).resolve().parents[1] / "output" / "binance_ribbon_seen.json"
-KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT"}
+KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT", "HK1810USDT"}
+DISPLAY = {"HK1810USDT": "小米"}
+STOCK_UNDERLYING = {"EQUITY", "KR_EQUITY", "HK_EQUITY", "CN_EQUITY"}
+INTERVAL_MS = {"1m": 60_000, "15m": 15 * 60_000}
+PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
 
 
 def apply_keys() -> None:
@@ -61,7 +72,7 @@ def get_json(path: str, params=None, retries: int = 5):
     raise last
 
 
-def universe() -> list[str]:
+def universe(*, asset: str = "all") -> list[str]:
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
     out = []
@@ -69,6 +80,13 @@ def universe() -> list[str]:
         if s.get("quoteAsset") != "USDT":
             continue
         if s.get("status") != "TRADING":
+            continue
+        if asset == "stocks":
+            if s.get("contractType") != "TRADIFI_PERPETUAL":
+                continue
+            if s.get("underlyingType") not in STOCK_UNDERLYING:
+                continue
+            out.append(s["symbol"])
             continue
         if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
             continue
@@ -82,14 +100,16 @@ def universe() -> list[str]:
     return out
 
 
-def fetch_klines(sym: str, limit: int = 400) -> dict | None:
-    raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": "1m", "limit": limit})
-    if not raw or len(raw) < 230:
+def fetch_klines(sym: str, *, interval: str = "1m", limit: int = 400) -> dict | None:
+    raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": interval, "limit": limit})
+    min_bars = 230 if interval == "1m" else 140
+    if not raw or len(raw) < min_bars:
         return None
     now_ms = int(time.time() * 1000)
-    # 丟掉還沒收盤的當根
-    if int(raw[-1][0]) + 60_000 > now_ms:
+    if int(raw[-1][0]) + INTERVAL_MS[interval] > now_ms:
         raw = raw[:-1]
+    if len(raw) < min_bars:
+        return None
     return {
         "t": np.array([int(x[0]) for x in raw], np.int64),
         "o": np.array([float(x[1]) for x in raw]),
@@ -174,6 +194,27 @@ def look_at(d: dict, kiss_i: int) -> dict | None:
 
 def hm(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, TZ).strftime("%m-%d %H:%M")
+
+
+def sym_label(symbol: str) -> str:
+    base = symbol.replace("USDT", "")
+    name = DISPLAY.get(symbol)
+    return f"{name} {base}" if name else base
+
+
+def html_label(symbol: str) -> str:
+    return (
+        sym_label(symbol)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def file_base(symbol: str) -> str:
+    base = symbol.replace("USDT", "")
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("_")
+    return safe or f"s{abs(hash(symbol)) % 10_000_000_000}"
 
 
 def load_seen() -> set[str]:
@@ -276,6 +317,55 @@ def draw_chart(sym: str, d: dict, kiss_i: int, lift_i: int, path: str) -> str | 
     return path
 
 
+def draw_15m_chart(sym: str, d: dict, mark_idx: int, path: str) -> str | None:
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
+    except Exception:
+        return None
+    if mark_idx < 0 or mark_idx >= len(d["c"]):
+        return None
+    a0 = max(0, mark_idx - 48)
+    a1 = min(len(d["c"]), mark_idx + 8)
+    sl = slice(a0, a1)
+    xs = np.arange(a1 - a0)
+    o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
+    fig, (ax, axv) = plt.subplots(
+        2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
+    )
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+    colors_v = []
+    for k in range(len(c)):
+        up = c[k] >= o[k]
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.7)
+        y0, y1 = min(o[k], c[k]), max(o[k], c[k])
+        if y1 == y0:
+            y1 = y0 + max(h[k] - l[k], 1e-12) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
+        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
+    for n, col in PAL.items():
+        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.05, label=f"MA{n}")
+    x = mark_idx - a0
+    ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
+    ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
+    title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
+    ax.set_title(f"{title_sym}  15m  {hm(int(d['t'][mark_idx]))}", color="#e8f0ea", fontsize=12)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    fig.tight_layout(pad=0.5)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
 def scan_symbol(sym: str) -> list[dict]:
     raw = fetch_klines(sym)
     if raw is None:
@@ -335,13 +425,28 @@ def scan_symbol(sym: str) -> list[dict]:
     return events
 
 
+def scan_symbol_15m(sym: str) -> list[dict]:
+    raw = fetch_klines(sym, interval="15m", limit=250)
+    if raw is None:
+        return []
+    d = add_mas(raw)
+    hits = detect_long_breaks(d, periods=SIGNAL_MA_PERIODS)
+    n = len(d["c"])
+    events = []
+    for br in hits:
+        if br.idx not in (n - 1, n - 2):
+            continue
+        events.append({"kind": "m15", "symbol": sym, "break": br, "d": d})
+    return events
+
+
 def format_lift(ev: dict) -> str:
     d, kiss, sym = ev["d"], ev["kiss"], ev["symbol"]
     ks = hm(int(d["t"][ev["kiss_i"]]))
     ls = hm(int(d["t"][ev["lift_i"]]))
     px = d["c"][ev["lift_i"]]
     return (
-        f"<b>離開</b>  {sym}\n"
+        f"<b>離開</b>  {html_label(sym)}\n"
         f"吻 {ks} → 離開 {ls}\n"
         f"現價 {px:g}\n"
         f"長均黏度 {kiss['cl']:.3f}%　回彈 {kiss['bounce']:.2f}%\n"
@@ -357,7 +462,7 @@ def format_look(ev: dict) -> str:
     px = d["c"][ev["kiss_i"] + 29]
     return (
         f"🔥🔥🔥 <b>完全符合（強）</b>\n"
-        f"<b>{sym}</b>  1m\n"
+        f"<b>{html_label(sym)}</b>  1m\n"
         f"吻 {ks} → 離開 {ls}\n"
         f"現價 {px:g}\n"
         f"長均黏度 {kiss['cl']:.3f}% → {look['cl29']:.3f}%\n"
@@ -366,35 +471,74 @@ def format_look(ev: dict) -> str:
     )
 
 
+def format_m15(ev: dict) -> str:
+    d, br, sym = ev["d"], ev["break"], ev["symbol"]
+    ts = hm(int(d["t"][br.idx]))
+    body = "是" if br.body_through else "否"
+    return (
+        f"<b>15分 同時站上 7/14/25/99/120</b>\n"
+        f"<b>{html_label(sym)}</b>\n"
+        f"時間 {ts}（GMT+8）\n"
+        f"收 {br.close:g}　開 {br.open:g}　低 {br.low:g}\n"
+        f"帶子寬度 {br.width_pct:.2f}%　量比 {br.vol_ratio:.2f}×　實體穿越 {body}\n"
+        f"<i>前一根收在五條均線下方，這一根收盤同時站上。不必過 MA200。</i>"
+    )
+
+
 def key_of(ev: dict) -> str:
+    if ev["kind"] == "m15":
+        return f"15m:{ev['symbol']}:{int(ev['d']['t'][ev['break'].idx])}"
     return f"{ev['symbol']}:{int(ev['d']['t'][ev['kiss_i']])}:{ev['kind']}"
 
 
-def scan_all(symbols: list[str]) -> list[dict]:
+def scan_all(symbols: list[str], fn) -> list[dict]:
     events = []
+    if not symbols:
+        return events
     with ThreadPoolExecutor(8) as ex:
-        futs = {ex.submit(scan_symbol, s): s for s in symbols}
+        futs = {ex.submit(fn, s): s for s in symbols}
         for fut in as_completed(futs):
             try:
                 events.extend(fut.result())
             except Exception as e:
                 print("err", futs[fut], e, flush=True)
-    # look 優先
-    events.sort(key=lambda e: (0 if e["kind"] == "look" else 1, e["symbol"]))
     return events
 
 
+def should_scan_15m() -> bool:
+    return datetime.now(TZ).minute % 15 <= 1
+
+
+def strip_html(text: str) -> str:
+    return (
+        text.replace("<b>", "")
+        .replace("</b>", "")
+        .replace("<i>", "")
+        .replace("</i>", "")
+        .replace("&gt;", ">")
+        .replace("&lt;", "<")
+        .replace("&amp;", "&")
+    )
+
+
 def notify(ev: dict) -> None:
-    strong = ev["kind"] == "look"
-    text = format_look(ev) if strong else format_lift(ev)
-    print("\n" + text.replace("<b>", "").replace("</b>", "").replace("<i>", "").replace("</i>", "").replace("&gt;", ">"))
-    photo = None
-    if strong:
-        tmp = Path("/tmp") / f"ribbon_{ev['symbol']}_{ev['kiss_i']}.png"
-        photo = draw_chart(ev["symbol"], ev["d"], ev["kiss_i"], ev["lift_i"], str(tmp))
-        # 強訊號連發文字 + 圖，比較不容易被滑過
-        telegram_send("🔥🔥🔥 完全符合（強） " + ev["symbol"], strong=True)
-    ok = telegram_send(text, strong=strong, photo=photo)
+    if ev["kind"] == "m15":
+        text = format_m15(ev)
+        print("\n" + strip_html(text))
+        tmp = Path("/tmp") / f"ribbon15_{file_base(ev['symbol'])}_{ev['break'].idx}.png"
+        photo = draw_15m_chart(ev["symbol"], ev["d"], ev["break"].idx, str(tmp))
+        telegram_send("15分 同時站上 " + sym_label(ev["symbol"]), strong=True)
+        ok = telegram_send(text, strong=True, photo=photo)
+    else:
+        strong = ev["kind"] == "look"
+        text = format_look(ev) if strong else format_lift(ev)
+        print("\n" + strip_html(text))
+        photo = None
+        if strong:
+            tmp = Path("/tmp") / f"ribbon_{ev['symbol']}_{ev['kiss_i']}.png"
+            photo = draw_chart(ev["symbol"], ev["d"], ev["kiss_i"], ev["lift_i"], str(tmp))
+            telegram_send("🔥🔥🔥 完全符合（強） " + ev["symbol"], strong=True)
+        ok = telegram_send(text, strong=strong, photo=photo)
     if ok:
         print("  → Telegram 已送")
     else:
@@ -414,40 +558,90 @@ def wait_next_close() -> None:
 
 def test_telegram() -> int:
     apply_keys()
-    ok = telegram_send("黏帶監看測試\n如果你看到這則，Telegram 已通。")
+    ok = telegram_send("15分同時站上監看測試\n如果你看到這則，Telegram 已通。")
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
     return 0 if ok else 1
+
+
+def make_demo_15m_bars() -> dict:
+    n = 180
+    px = np.full(n, 100.0)
+    o = np.full(n, 100.0)
+    h = np.full(n, 100.05)
+    l = np.full(n, 99.95)
+    v = np.full(n, 1000.0)
+    o[140], l[140], h[140], px[140] = 100.0, 98.90, 100.02, 99.00
+    v[140] = 1800
+    o[141], l[141], h[141], px[141] = 99.05, 98.95, 101.60, 101.40
+    v[141] = 3200
+    return {"t": np.arange(n, dtype=np.int64) * 15 * 60_000, "o": o, "h": h, "l": l, "c": px, "v": v}
+
+
+def run_demo() -> int:
+    d = add_mas(make_demo_15m_bars())
+    hits = detect_long_breaks(d, periods=SIGNAL_MA_PERIODS)
+    print(f"demo 15m 偵測到 {len(hits)} 筆")
+    for br in hits:
+        print(f"  idx={br.idx} close={br.close:.3f} width={br.width_pct:.3f}% body={br.body_through}")
+    if not hits:
+        print("demo 失敗：應偵測到同時站上 7/14/25/99/120")
+        return 1
+    return 0
 
 
 def main() -> int:
     import argparse
 
-    p = argparse.ArgumentParser(description="幣安黏帶三幕 Telegram 監看")
-    p.add_argument("--once", action="store_true", help="只掃剛收盤的那一分，然後結束")
+    p = argparse.ArgumentParser(description="15 分同時站上 7/14/25/99/120 Telegram 監看")
+    p.add_argument("--once", action="store_true", help="掃一輪就結束（15 分看剛收的兩根）")
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
+    p.add_argument("--demo", action="store_true", help="只用合成 15 分 K 驗證偵測")
+    p.add_argument("--asset", choices=("stocks", "all"), default="stocks", help="15 分掃描範圍，預設只要股票")
+    p.add_argument("--also-1m", action="store_true", help="順便跑原本的 1m 黏帶離開/強訊號")
     args = p.parse_args()
     apply_keys()
     if args.test:
         return test_telegram()
+    if args.demo:
+        return run_demo()
 
     seen = load_seen()
     print("載入標的…", flush=True)
-    symbols = universe()
-    print(f"監看 {len(symbols)} 個流動永續。離開會推；完全符合再推強訊號。", flush=True)
+    symbols_15m = universe(asset=args.asset)
+    symbols_1m = universe(asset="all") if args.also_1m else []
+    label = "股票永續" if args.asset == "stocks" else "流動永續（加密+股票）"
+    print(
+        f"15 分同時站上 7/14/25/99/120：監看 {len(symbols_15m)} 個{label}。",
+        flush=True,
+    )
+    if args.also_1m:
+        print(f"另外監看 {len(symbols_1m)} 個 1m 黏帶。", flush=True)
     uni_ts = time.time()
 
-    def round_once() -> None:
-        nonlocal symbols, uni_ts
+    def round_once(*, force_15m: bool = False) -> None:
+        nonlocal symbols_15m, symbols_1m, uni_ts
         if time.time() - uni_ts > 1800:
-            symbols = universe()
+            symbols_15m = universe(asset=args.asset)
+            if args.also_1m:
+                symbols_1m = universe(asset="all")
             uni_ts = time.time()
-            print(f"更新標的 {len(symbols)}", flush=True)
+            print(f"更新標的 15m {len(symbols_15m)}" + (f"  1m {len(symbols_1m)}" if args.also_1m else ""), flush=True)
         t0 = time.time()
-        events = scan_all(symbols)
+        events: list[dict] = []
+        scanned = []
+        if args.also_1m:
+            one = scan_all(symbols_1m, scan_symbol)
+            one.sort(key=lambda e: (0 if e["kind"] == "look" else 1, e["symbol"]))
+            events.extend(one)
+            scanned.append("1m")
+        if force_15m or should_scan_15m():
+            events.extend(scan_all(symbols_15m, scan_symbol_15m))
+            scanned.append("15m")
         new = [e for e in events if key_of(e) not in seen]
+        tag = "+".join(scanned) if scanned else "idle"
         print(
             f"[{datetime.now(TZ).strftime('%H:%M:%S')}] "
-            f"掃完 {len(symbols)} 用 {time.time()-t0:.1f}s　新訊號 {len(new)}",
+            f"{tag} 用 {time.time()-t0:.1f}s　新訊號 {len(new)}",
             flush=True,
         )
         for ev in new:
@@ -456,10 +650,10 @@ def main() -> int:
         if new:
             save_seen(seen)
 
-    round_once()
+    round_once(force_15m=True)
     if args.once:
         return 0
-    print("watch 中，每根 1m 收盤掃一次（Ctrl+C 停）", flush=True)
+    print("watch 中：每根 15 分收盤掃一次條件（Ctrl+C 停）", flush=True)
     try:
         while True:
             wait_next_close()

@@ -22,10 +22,9 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
-## 幣安黏帶三幕 Telegram
+## 幣安 Telegram（15 分同時站上）
 
-1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
-約 15–25 分鐘後若走出「長均更黏、短均被帶走」（NBIS 那種），會再推一則**強訊號**（帶圖）。
+15 分鐘 K：前一根收盤完全在 MA7 / 14 / 25 / 99 / 120 下方，這一根收盤同時站上這五條，就推 Telegram（帶圖）。預設只掃股票永續。不必過 MA200。
 
 在 `examples/watch_binance_ribbon.py` 最上面填：
 
@@ -35,8 +34,12 @@ TELEGRAM_CHAT_ID = "..."
 ```
 
 ```bash
-python3 examples/watch_binance_ribbon.py --test   # 先測通不通
-python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
+python3 examples/watch_binance_ribbon.py --demo          # 驗證偵測
+python3 examples/watch_binance_ribbon.py --test          # 先測 Telegram 通不通
+python3 examples/watch_binance_ribbon.py --once          # 掃剛收的 15 分，推完就結束
+python3 examples/watch_binance_ribbon.py                 # 每根 15 分收盤掃股票
+python3 examples/watch_binance_ribbon.py --asset all     # 加密+股票流動盤
+python3 examples/watch_binance_ribbon.py --also-1m       # 順便跑原本 1m 黏帶
 ```
 
 ## 15 分 K 同時站上 7 / 14 / 25 / 99 / 120
