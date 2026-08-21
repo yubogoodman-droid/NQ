@@ -57,6 +57,9 @@ class FiveMinSignalTests(unittest.TestCase):
         self.assertTrue(hit.ribbon_fanned)
         self.assertTrue(hit.crossed_above_ma200)
         self.assertTrue(hit.close_above_all_mas)
+        self.assertTrue(hit.hourly_close_above_ma20)
+        self.assertIsNotNone(hit.h1_close)
+        self.assertGreater(hit.h1_close, hit.h1_ma20)
         self.assertGreaterEqual(hit.ribbon_fan_pct, 0.50)
         self.assertGreater(hit.close, hit.ma5)
         self.assertGreater(hit.close, hit.ma200)
@@ -101,6 +104,15 @@ class FiveMinSignalTests(unittest.TestCase):
     def test_rejects_tangled_ribbon(self) -> None:
         df = _history_then_live([100.0, 100.4, 100.8, 101.2])
         hits = iter_5m_ma200_alerts(df)
+        self.assertEqual(hits, [])
+
+    def test_rejects_when_hourly_close_below_ma20(self) -> None:
+        hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
+        idx = _session_index(hist_days)
+        closes = [200.0] * 24 + [100.0] * (len(idx) - 24)
+        hist = _ohlcv(closes, idx)
+        live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
+        hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
         self.assertEqual(hits, [])
 
 
@@ -175,6 +187,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("十五分K", text)
         self.assertIn("上＝五分K", text)
         self.assertIn("均線發散", text)
+        self.assertIn("小時K", text)
         self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
 
@@ -200,6 +213,24 @@ class ResampleTests(unittest.TestCase):
         self.assertEqual(float(row["low"]), 99.0)
         self.assertEqual(float(row["close"]), 103.0)
         self.assertEqual(float(row["volume"]), 6.0)
+
+    def test_twelve_5m_bars_make_one_hour(self) -> None:
+        idx = pd.date_range("2026-08-21 09:00", periods=12, freq="5min", tz=TAIPEI)
+        df = pd.DataFrame(
+            {
+                "open": [100.0] * 12,
+                "high": [101.0] * 12,
+                "low": [99.0] * 12,
+                "close": list(range(100, 112)),
+                "volume": [1.0] * 12,
+            },
+            index=idx,
+        )
+        out = resample_ohlcv(df, "1h")
+        self.assertEqual(len(out), 1)
+        self.assertEqual(float(out.iloc[0]["open"]), 100.0)
+        self.assertEqual(float(out.iloc[0]["close"]), 111.0)
+        self.assertEqual(float(out.iloc[0]["volume"]), 12.0)
 
 
 if __name__ == "__main__":
