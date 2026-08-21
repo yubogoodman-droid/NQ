@@ -1,4 +1,4 @@
-"""五分 K：MA5/10/20 多頭排列，當根收盤站上所有均線（含 MA200）時報通知。"""
+"""五分 K：MA5/10/20 多頭發散，當根收盤站上所有均線（含 MA200）時報通知。"""
 
 from __future__ import annotations
 
@@ -11,6 +11,10 @@ MA_FAST = 5
 MA_MID = 10
 MA_SLOW = 20
 MA_LONG = 200
+# MA5 相對 MA20 至少拉開這麼多（％），否則算糾結。
+MIN_RIBBON_FAN_PCT = 0.50
+# MA5–MA10、MA10–MA20 各自相對收盤至少這麼多（％），避免其中兩條黏在一起。
+MIN_RIBBON_GAP_PCT = 0.15
 
 
 @dataclass(frozen=True)
@@ -22,11 +26,47 @@ class AlertSnapshot:
     ma10: float
     ma20: float
     ma200: float
+    prev_ma5: float
+    prev_ma10: float
+    prev_ma20: float
     prev_ma200: float
 
     @property
     def bullish_aligned(self) -> bool:
         return self.ma5 > self.ma10 > self.ma20
+
+    @property
+    def mas_rising(self) -> bool:
+        return self.ma5 > self.prev_ma5 and self.ma10 > self.prev_ma10 and self.ma20 > self.prev_ma20
+
+    @property
+    def ribbon_fan_pct(self) -> float:
+        if self.ma20 == 0:
+            return 0.0
+        return (self.ma5 / self.ma20 - 1.0) * 100.0
+
+    @property
+    def gap_5_10_pct(self) -> float:
+        if not self.close:
+            return 0.0
+        return (self.ma5 - self.ma10) / self.close * 100.0
+
+    @property
+    def gap_10_20_pct(self) -> float:
+        if not self.close:
+            return 0.0
+        return (self.ma10 - self.ma20) / self.close * 100.0
+
+    @property
+    def ribbon_fanned(self) -> bool:
+        """多頭排列且均線發散：三條往上打開，不是黏在一起。"""
+        return (
+            self.bullish_aligned
+            and self.mas_rising
+            and self.ribbon_fan_pct >= MIN_RIBBON_FAN_PCT
+            and self.gap_5_10_pct >= MIN_RIBBON_GAP_PCT
+            and self.gap_10_20_pct >= MIN_RIBBON_GAP_PCT
+        )
 
     @property
     def crossed_above_ma200(self) -> bool:
@@ -58,7 +98,7 @@ def iter_5m_ma200_alerts(
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
 ) -> list[AlertSnapshot]:
-    """同一交易日連續五分 K：MA5>MA10>MA20，當根收盤剛站上 MA200，且收在所有均線之上。"""
+    """同一交易日連續五分 K：MA5/10/20 發散，當根收盤剛站上 MA200，且收在所有均線之上。"""
     if df is None or len(df) < MA_LONG + 1:
         return []
     work = add_moving_averages(df)
@@ -83,11 +123,7 @@ def iter_5m_ma200_alerts(
         prev_ts = work.index[i - 1]
         if pd.Timestamp(ts).date() != pd.Timestamp(prev_ts).date():
             continue
-        if (
-            snap.bullish_aligned
-            and snap.crossed_above_ma200
-            and snap.close_above_all_mas
-        ):
+        if snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas:
             hits.append(snap)
     return hits
 
@@ -108,5 +144,8 @@ def _snapshot_at(work: pd.DataFrame, idx: int) -> AlertSnapshot | None:
         ma10=float(last["ma10"]),
         ma20=float(last["ma20"]),
         ma200=float(last["ma200"]),
+        prev_ma5=float(prev["ma5"]),
+        prev_ma10=float(prev["ma10"]),
+        prev_ma20=float(prev["ma20"]),
         prev_ma200=float(prev["ma200"]),
     )

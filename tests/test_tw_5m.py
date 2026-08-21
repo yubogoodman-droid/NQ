@@ -48,21 +48,23 @@ def _history_then_live(live_closes: list[float], live_day: date = date(2026, 8, 
 
 
 class FiveMinSignalTests(unittest.TestCase):
-    def test_alerts_on_cross_while_ribbon_is_bullish(self) -> None:
-        df = _history_then_live([100.0, 100.4, 100.8, 101.2])
+    def test_alerts_on_cross_while_ribbon_is_fanned(self) -> None:
+        df = _history_then_live([99.0, 105.0])
         hits = iter_5m_ma200_alerts(df)
         self.assertEqual(len(hits), 1)
         hit = hits[0]
         self.assertTrue(hit.bullish_aligned)
+        self.assertTrue(hit.ribbon_fanned)
         self.assertTrue(hit.crossed_above_ma200)
         self.assertTrue(hit.close_above_all_mas)
+        self.assertGreaterEqual(hit.ribbon_fan_pct, 0.50)
         self.assertGreater(hit.close, hit.ma5)
         self.assertGreater(hit.close, hit.ma200)
         self.assertLessEqual(hit.prev_close, hit.prev_ma200)
         self.assertEqual(hit.timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 5, tzinfo=TAIPEI)))
 
     def test_does_not_repeat_while_staying_above(self) -> None:
-        df = _history_then_live([100.0] + [101.0] * 8)
+        df = _history_then_live([99.0] + [105.0] * 8)
         hits = iter_5m_ma200_alerts(df)
         self.assertEqual(len(hits), 1)
 
@@ -72,7 +74,7 @@ class FiveMinSignalTests(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_since_until_keeps_only_that_session(self) -> None:
-        df = _history_then_live([100.0, 101.5])
+        df = _history_then_live([99.0, 105.0])
         since = pd.Timestamp(date(2026, 8, 20), tz=TAIPEI)
         until = since + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
         self.assertEqual(iter_5m_ma200_alerts(df, since=since, until=until), [])
@@ -96,11 +98,16 @@ class FiveMinSignalTests(unittest.TestCase):
         hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
         self.assertEqual(hits, [])
 
+    def test_rejects_tangled_ribbon(self) -> None:
+        df = _history_then_live([100.0, 100.4, 100.8, 101.2])
+        hits = iter_5m_ma200_alerts(df)
+        self.assertEqual(hits, [])
+
 
 class FiveMinBacktestTests(unittest.TestCase):
     def test_run_scan_uses_daily_universe_and_5m_alerts(self) -> None:
-        df = _history_then_live([100.0, 101.0])
-        stock = RankedStock(1, "2408.TW", "南亞科", 101.0, 1.0, 1.0, 100, 1e9, "TAI")
+        df = _history_then_live([99.0, 105.0])
+        stock = RankedStock(1, "2408.TW", "南亞科", 105.0, 1.0, 1.0, 100, 1e9, "TAI")
         universe = DayUniverse(
             day=date(2026, 8, 21),
             rank_time="test",
@@ -127,9 +134,9 @@ class FiveMinBacktestTests(unittest.TestCase):
 
 class ReportTests(unittest.TestCase):
     def test_html_contains_hit(self) -> None:
-        df = _history_then_live([100.0, 101.0])
+        df = _history_then_live([99.0, 105.0])
         hits = iter_5m_ma200_alerts(df)
-        stock = RankedStock(1, "2408.TW", "南亞科", 101.0, 1.0, 1.0, 100, 1e9, "TAI")
+        stock = RankedStock(1, "2408.TW", "南亞科", 105.0, 1.0, 1.0, 100, 1e9, "TAI")
         result = BacktestResult(
             scanned_at=datetime(2026, 8, 21, 17, 0, tzinfo=TAIPEI),
             days=[date(2026, 8, 21)],
@@ -167,6 +174,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("南亞科", text)
         self.assertIn("十五分K", text)
         self.assertIn("上＝五分K", text)
+        self.assertIn("均線發散", text)
         self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
 

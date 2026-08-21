@@ -185,8 +185,9 @@ def _render(
     <div class="banner">每檔一張圖：上面是五分K，下面是十五分K（由五分K合成，不是另一個來源）</div>
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 650 以上。
-      五分K MA5 &gt; MA10 &gt; MA20 多頭排列，<strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200（收在所有均線上面）。開盤第一根因隔夜跳空不算。
+      五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段也不黏在一起），
+      <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
+      且這根收盤必須高於 MA5／10／20／200。開盤第一根因隔夜跳空不算。
       K 棒漲紅跌綠。
     </p>
     <div class="chips">
@@ -195,7 +196,7 @@ def _render(
       <span class="chip">不含金融股</span>
       <span class="chip">不含電信股</span>
       <span class="chip">股價 &lt; 650</span>
-      <span class="chip">MA5 &gt; 10 &gt; 20</span>
+      <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
       <span class="chip">當根收盤站上 MA200</span>
       <span class="chip">收盤 &gt; 所有均線</span>
       <span class="chip">十五分K對照</span>
@@ -245,6 +246,7 @@ def _hit_card(
       <div class="row"><span>五分站上時間</span><b>{ts}</b></div>
       <div class="row"><span>收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
       <div class="row"><span>收盤 vs 均線</span><b>{snap.close:.2f} &gt; MA5 {snap.ma5:.2f} / 10 {snap.ma10:.2f} / 20 {snap.ma20:.2f}</b></div>
+      <div class="row"><span>均線發散</span><b>MA5/MA20 +{snap.ribbon_fan_pct:.2f}%　5–10 {snap.gap_5_10_pct:.2f}%　10–20 {snap.gap_10_20_pct:.2f}%</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>{snap.prev_close:.2f} ≤ {snap.prev_ma200:.2f}</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
       <div class="chart-label">▼ 同一張圖：上＝五分K　下＝十五分K</div>
