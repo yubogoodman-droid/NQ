@@ -156,12 +156,16 @@ class ReportTests(unittest.TestCase):
             path = save_backtest_html(result, Path(tmp) / "out.html")
             text = path.read_text(encoding="utf-8")
             pngs = list(Path(tmp).joinpath("charts/out").glob("*.png"))
-            self.assertEqual(len(pngs), 2)
-            self.assertTrue(any(p.name.endswith("-15m.png") for p in pngs))
+            self.assertEqual(len(pngs), 1)
+            self.assertTrue(pngs[0].name.endswith("-5m15m.png"))
+            from PIL import Image
+
+            with Image.open(pngs[0]) as im:
+                self.assertGreater(im.height, 700)
         self.assertIn("南亞科", text)
-        self.assertIn("五分K", text)
-        self.assertIn("十五分 K", text)
-        self.assertEqual(text.count("<img "), 2)
+        self.assertIn("十五分K", text)
+        self.assertIn("上＝五分K", text)
+        self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
 
 
