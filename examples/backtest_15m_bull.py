@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""回測：收盤高於 MA7/14/25/200，且 7>14>25。預設 15 分（還要在 1h MA200 上）；`--tf 1h` 改小時圖（4h 只畫圖；通知要底下趴夠久＋放量＋剛貼上）。
+"""回測：收盤高於 MA7/14/25/200，且 7>14>25。預設 15 分（還要在 1h MA200 上）；`--tf 1h` 改小時圖（4h 只畫圖；通知要底下趴夠久＋剛貼上）。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --stocks --pages
@@ -124,7 +124,7 @@ TF_SPECS = {
         ),
         require_htf=False,
         min_below=36,
-        min_vol=1.5,
+        min_vol=None,
         max_ext=2.0,
         lookback=80,
     ),
@@ -140,6 +140,15 @@ def notify_kwargs(spec: TfSpec) -> dict:
     if spec.max_ext is not None:
         kw["max_ext"] = spec.max_ext
     return kw
+
+
+def notify_label(spec: TfSpec) -> str:
+    bits = [f"剛站上 + 底下≥{spec.min_below}根"]
+    if spec.min_vol is not None:
+        bits.append(f"量≥{spec.min_vol}×")
+    if spec.max_ext is not None:
+        bits.append(f"距MA≤{spec.max_ext:g}%")
+    return "通知：" + " + ".join(bits)
 
 
 def filter_defs(spec: TfSpec) -> tuple:
@@ -160,7 +169,7 @@ def filter_defs(spec: TfSpec) -> tuple:
                     {"crossed": True, "min_below": spec.min_below},
                 ),
                 (
-                    f"通知：剛站上 + 底下≥{spec.min_below}根 + 量≥{spec.min_vol}× + 距MA≤{spec.max_ext:g}%",
+                    notify_label(spec),
                     notify_kwargs(spec),
                 ),
                 (
@@ -540,7 +549,7 @@ def write_html(
     title = f"{tf} 收盤在 7/14/25/200 之上" + (" · 幣安股票" if stocks_only else "")
     heading = f"{tf} K：收盤在 7 / 14 / 25 / 200 之上" + ("（只掃幣安股票）" if stocks_only else "")
     if spec.min_below is not None:
-        heading += " · 底下趴夠久再放量站上"
+        heading += " · 底下趴夠久再貼上"
     universe_txt = (
         f"只掃幣安 TradFi 股票永續（美／港／韓／中股、股票 ETF、Pre-IPO；不含黃金原油等商品）近 {days} 天、{universe_n} 個合約。"
         if stocks_only
@@ -557,10 +566,14 @@ def write_html(
     else:
         htf_rule = f"{html.escape(htf)} 圖只放在底下對照，<strong>不當作過濾</strong>。"
         if spec.min_below is not None:
+            extra = ""
+            if spec.min_vol is not None:
+                extra += f"量比 ≥ <strong>{spec.min_vol:g}×</strong>、"
+            extra += f"收盤距 MA200 ≤ <strong>{spec.max_ext:g}%</strong>。"
             notify_rule = (
                 f"Telegram 通知只推這種：<strong>剛站上 {html.escape(tf)} MA200</strong>，"
                 f"且站上前連續至少 <strong>{spec.min_below} 根</strong>收盤在 MA200 下、"
-                f"量比 ≥ <strong>{spec.min_vol:g}×</strong>、收盤距 MA200 ≤ <strong>{spec.max_ext:g}%</strong>。"
+                f"{extra}"
             )
         else:
             notify_rule = (
@@ -727,7 +740,7 @@ def main() -> int:
         print(f"{spec.signal} 組合 {n_raw} 筆，留下 {n_raw - n_drop}")
         if spec.min_below is not None:
             print(
-                f"通知：剛站上 + 底下≥{spec.min_below}根 + 量≥{spec.min_vol}× + 距MA≤{spec.max_ext:g}% → {len(notify_rows)} 筆"
+                f"{notify_label(spec)} → {len(notify_rows)} 筆"
             )
     for s in stats:
         h = s[f"h{spec.hold4}"]

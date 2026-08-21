@@ -2,7 +2,7 @@
 """依回測同一套規則推 Telegram。
 
 15 分：收盤 > MA7>14>25 且剛站上 15m MA200，還要現價在 1h MA200 上。
-1 小時：剛站上 1h MA200，底下至少 36 根、量比 ≥ 1.5×、距 MA200 ≤ 2%（4h 不擋單）。
+1 小時：剛站上 1h MA200，底下至少 36 根、距 MA200 ≤ 2%（4h 不擋單，不看量比）。
 
 在下面填 Telegram 後執行：
 
@@ -71,10 +71,10 @@ TF_WATCH = {
         "htf_limit": 250,
         "require_htf": False,
         "min_below": 36,
-        "min_vol": 1.5,
+        "min_vol": None,
         "max_ext": 2.0,
         "lookback": 80,
-        "title": "1h 剛站上 MA200（底下趴夠久 + 放量）",
+        "title": "1h 剛站上 MA200（底下趴夠久再貼上）",
     },
 }
 
@@ -357,7 +357,7 @@ def test_telegram() -> int:
     ok = telegram_send(
         "MA200 監看測試\n"
         "15m：剛站上 15m MA200 且在 1h MA200 上\n"
-        "1h：剛站上 1h MA200，底下≥36根、量≥1.5×、距MA≤2%\n"
+        "1h：剛站上 1h MA200，底下≥36根、距MA≤2%\n"
         "如果你看到這則，Telegram 已通。"
     )
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
@@ -369,8 +369,8 @@ def spec_note(spec: dict) -> str:
         extra = f"且現價在 {spec['htf']} MA200 上"
     else:
         extra = (
-            f"底下≥{spec['min_below']}根、量≥{spec['min_vol']}×、距MA≤{spec['max_ext']}% "
-            f"（{spec['htf']} 不擋單）"
+            f"底下≥{spec['min_below']}根、距MA≤{spec['max_ext']}% "
+            f"（{spec['htf']} 不擋單、不看量比）"
         )
     return f"{spec['signal']} 剛站上 MA200、{extra}"
 

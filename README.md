@@ -26,7 +26,7 @@
 
 15 分圖收盤同時高於 **MA7、MA14、MA25、MA200**，且 SMA7 > SMA14 > SMA25，並且當下價格也在 **小時圖 SMA200** 之上。Telegram 只推「這一根剛站上 15 分 MA200」。
 
-小時圖同一套短均＋剛站上 1h MA200；4h 只畫圖不擋單。通知再加三道篩：站上前連續 **至少 36 根** 收盤在 MA200 下、**量比 ≥ 1.5×**、收盤距 MA200 **≤ 2%**（TRUMP 08-19 那種趴很久再放量站回去）。
+小時圖同一套短均＋剛站上 1h MA200；4h 只畫圖不擋單。通知再加兩道篩：站上前連續 **至少 36 根** 收盤在 MA200 下、收盤距 MA200 **≤ 2%**（不看量比；TRUMP 08-19、BTC 08-17 那種趴很久再貼回去）。
 
 ```bash
 python3 examples/backtest_15m_bull.py --demo
@@ -57,7 +57,7 @@ Telegram 監看（與回測同一套規則）。在 `examples/watch_15m_bull.py`
 python3 examples/watch_15m_bull.py --test
 python3 examples/watch_15m_bull.py            # 預設 15 分 + 1 小時都推
 python3 examples/watch_15m_bull.py --tf 15m   # 只推 15 分（要在 1h MA200 上）
-python3 examples/watch_15m_bull.py --tf 1h    # 只推小時圖（底下趴夠久 + 放量）
+python3 examples/watch_15m_bull.py --tf 1h    # 只推小時圖（底下趴夠久再貼上）
 python3 examples/watch_15m_bull.py --stocks
 python3 examples/watch_15m_bull.py --once     # 掃一輪就結束
 ```

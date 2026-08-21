@@ -314,7 +314,7 @@ def quality_reclaim(
     min_vol: float | None = None,
     max_ext: float | None = None,
 ) -> bool:
-    """TRUMP 那種：剛站上、底下趴夠久、放量、收盤還貼著 MA200。"""
+    """TRUMP 那種：剛站上、底下趴夠久、收盤還貼著 MA200（量比可選）。"""
     if not sig.crossed_200:
         return False
     if min_below is not None and sig.bars_below < min_below:
