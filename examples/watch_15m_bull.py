@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""幣安 15 分 K：收盤在 MA7/14/25/200 之上且剛站上 MA200 → Telegram。
+"""依回測同一套規則推 Telegram。
+
+15 分：收盤 > MA7>14>25 且剛站上 15m MA200，還要現價在 1h MA200 上。
+1 小時：剛站上 1h MA200，底下至少 36 根、量比 ≥ 1.5×、距 MA200 ≤ 2%（4h 不擋單）。
 
 在下面填 Telegram 後執行：
 
     python3 examples/watch_15m_bull.py --test
-    python3 examples/watch_15m_bull.py
-    python3 examples/watch_15m_bull.py --stocks   # 只掃幣安股票永續
+    python3 examples/watch_15m_bull.py              # 預設 15 分 + 1 小時都監看
+    python3 examples/watch_15m_bull.py --tf 15m
+    python3 examples/watch_15m_bull.py --tf 1h
+    python3 examples/watch_15m_bull.py --stocks
 
 Ctrl+C 結束。同一根 K 不會重發。
 """
@@ -13,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -31,8 +37,46 @@ TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
 
 TZ = timezone(timedelta(hours=8))
-SEEN_PATH = Path(__file__).resolve().parents[1] / "output" / "ma15_bull_seen.json"
+SEEN_PATH = Path(__file__).resolve().parents[1] / "output" / "ma_bull_tg_seen.json"
 PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 200: "#ffffff"}
+DISPLAY = {
+    "HK1810USDT": "小米",
+    "CRCLUSDT": "CRCL",
+    "HK0700USDT": "騰訊",
+    "TENCENTUSDT": "騰訊",
+    "MEITUANUSDT": "美團",
+    "KUAISHOUUSDT": "快手",
+    "POPMARTUSDT": "泡泡瑪特",
+}
+
+TF_WATCH = {
+    "15m": {
+        "signal": "15m",
+        "htf": "1h",
+        "htf_ms": INTERVAL_MS["1h"],
+        "sig_limit": 280,
+        "htf_limit": 250,
+        "require_htf": True,
+        "min_below": None,
+        "min_vol": None,
+        "max_ext": None,
+        "lookback": 48,
+        "title": "15m 剛站上 MA200（且在 1h MA200 上）",
+    },
+    "1h": {
+        "signal": "1h",
+        "htf": "4h",
+        "htf_ms": INTERVAL_MS["4h"],
+        "sig_limit": 420,
+        "htf_limit": 250,
+        "require_htf": False,
+        "min_below": 36,
+        "min_vol": 1.5,
+        "max_ext": 2.0,
+        "lookback": 80,
+        "title": "1h 剛站上 MA200（底下趴夠久 + 放量）",
+    },
+}
 
 
 def apply_keys() -> None:
@@ -44,6 +88,20 @@ def apply_keys() -> None:
 
 def hm(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, TZ).strftime("%m-%d %H:%M")
+
+
+def file_base(symbol: str) -> str:
+    base = symbol.replace("USDT", "")
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("_")
+    return safe or f"s{abs(hash(symbol)) % 10_000_000_000}"
+
+
+def sym_label(symbol: str) -> str:
+    base = symbol.replace("USDT", "")
+    name = DISPLAY.get(symbol)
+    if name and name != base:
+        return f"{name} {base}"
+    return base
 
 
 def load_seen() -> set[str]:
@@ -91,28 +149,19 @@ def telegram_send(text: str, photo: str | None = None) -> bool:
         return False
 
 
-def draw_chart(sym: str, d: dict, idx: int, path: str) -> str | None:
-    try:
-        import matplotlib
+def _style_ax(ax) -> None:
+    ax.set_facecolor("#101814")
+    ax.tick_params(colors="#8aa193", labelsize=8)
+    for sp in ax.spines.values():
+        sp.set_color("#2a3a33")
 
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import Rectangle
-    except Exception:
-        return None
-    a0 = max(0, idx - 48)
-    a1 = min(len(d["c"]), idx + 4)
+
+def _paint_ohlcv(ax, axv, d: dict, a0: int, a1: int, mark_i: int | None) -> None:
+    from matplotlib.patches import Rectangle
+
     sl = slice(a0, a1)
     xs = np.arange(a1 - a0)
     o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
-    fig, (ax, axv) = plt.subplots(
-        2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
-    )
-    for a in (ax, axv):
-        a.set_facecolor("#101814")
-        a.tick_params(colors="#8aa193", labelsize=8)
-        for sp in a.spines.values():
-            sp.set_color("#2a3a33")
     colors_v = []
     for k in range(len(c)):
         up = c[k] >= o[k]
@@ -126,36 +175,95 @@ def draw_chart(sym: str, d: dict, idx: int, path: str) -> str | None:
     axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
     for n, col in PAL.items():
         ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.35 if n == 200 else 1.15, label=f"MA{n}")
-    x = idx - a0
-    ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
-    ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
-    ax.set_title(f"{sym}  15m", color="#e8f0ea", fontsize=12)
+    if mark_i is not None and a0 <= mark_i < a1:
+        x = mark_i - a0
+        ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
+        ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
+
+
+def tf_bar_idx(d: dict, time_ms: int, bar_ms: int) -> int | None:
+    t = d["t"]
+    open_ms = int(time_ms) - (int(time_ms) % bar_ms)
+    w = np.where(t == open_ms)[0]
+    if len(w):
+        return int(w[0])
+    w = np.where(t <= time_ms)[0]
+    return int(w[-1]) if len(w) else None
+
+
+def draw_chart(sym: str, d: dict, sig, spec: dict, path: str, d_htf: dict | None) -> str | None:
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception:
+        return None
+
+    i = sig.idx
+    ts = int(d["t"][i])
+    a0 = max(0, i - spec["lookback"])
+    a1 = min(len(d["c"]), i + 4)
+    title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
+    extra = f"  below={sig.bars_below}  vol={sig.vol_ratio:.2f}x  ext={sig.ext_pct:+.2f}%"
+    hi = tf_bar_idx(d_htf, ts, spec["htf_ms"]) if d_htf is not None and len(d_htf.get("c", [])) else None
+    stacked = hi is not None
+    if stacked:
+        fig, axes = plt.subplots(
+            4,
+            1,
+            figsize=(10.6, 10.6),
+            sharex=False,
+            gridspec_kw={"height_ratios": [3.1, 0.9, 3.1, 0.9]},
+            facecolor="#0c1210",
+        )
+        ax, axv, axh, axhv = axes
+    else:
+        fig, (ax, axv) = plt.subplots(
+            2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
+        )
+        axh = axhv = None
+    for a in (ax, axv, axh, axhv):
+        if a is not None:
+            _style_ax(a)
+    _paint_ohlcv(ax, axv, d, a0, a1, i)
+    ax.set_title(f"{title_sym}  {spec['signal']}  {hm(ts)}  reclaim MA200{extra}", color="#e8f0ea", fontsize=11)
+    if stacked and axh is not None and axhv is not None and d_htf is not None and hi is not None:
+        b0 = max(0, hi - 48)
+        b1 = min(len(d_htf["c"]), hi + 2)
+        _paint_ohlcv(axh, axhv, d_htf, b0, b1, hi)
+        h_close = float(d_htf["c"][hi])
+        h_ma = float(d_htf["m200"][hi]) if not np.isnan(d_htf["m200"][hi]) else None
+        vs = ""
+        if h_ma:
+            vs = f"  close {h_close:g} vs {spec['htf']} MA200 {h_ma:g} ({(h_close / h_ma - 1) * 100:+.2f}%)"
+        axh.set_title(f"{title_sym}  {spec['htf']}  {hm(int(d_htf['t'][hi]))}{vs}", color="#e8f0ea", fontsize=12)
     fig.tight_layout(pad=0.5)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
     plt.close(fig)
     return path
 
 
-WATCH = {
-    "signal": "15m",
-    "htf": "1h",
-    "htf_ms": INTERVAL_MS["1h"],
-    "sig_limit": 280,
-    "htf_limit": 250,
-    "require_htf": True,
-    "min_below": None,
-    "min_vol": None,
-    "max_ext": None,
-}
+def passes_notify(sig, spec: dict, d_htf, ts: int) -> bool:
+    if not sig.crossed_200:
+        return False
+    if spec["require_htf"] and not above_htf_ma200(d_htf, ts, sig.close, spec["htf_ms"]):
+        return False
+    return quality_reclaim(
+        sig,
+        min_below=spec["min_below"],
+        min_vol=spec["min_vol"],
+        max_ext=spec["max_ext"],
+    )
 
 
-def scan_symbol(sym: str) -> list[dict]:
-    raw = fetch_klines(sym, interval=WATCH["signal"], limit=WATCH["sig_limit"], extra_bars=8)
+def scan_symbol(sym: str, spec: dict) -> list[dict]:
+    raw = fetch_klines(sym, interval=spec["signal"], limit=spec["sig_limit"], extra_bars=8)
     if raw is None or len(raw["c"]) < 220:
         return []
     d = add_15m_mas(raw)
-    raw_h = fetch_klines(sym, interval=WATCH["htf"], limit=WATCH["htf_limit"], extra_bars=8)
+    raw_h = fetch_klines(sym, interval=spec["htf"], limit=spec["htf_limit"], extra_bars=8)
     d_htf = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
     n = len(d["c"])
     events = []
@@ -164,50 +272,56 @@ def scan_symbol(sym: str) -> list[dict]:
             continue
         hits = [s for s in detect_combo(d, min_gap_bars=0) if s.idx == closed]
         for sig in hits:
-            if not sig.crossed_200:
-                continue
             ts = int(d["t"][sig.idx])
-            if WATCH["require_htf"] and not above_htf_ma200(d_htf, ts, sig.close, WATCH["htf_ms"]):
+            if not passes_notify(sig, spec, d_htf, ts):
                 continue
-            if not quality_reclaim(
-                sig,
-                min_below=WATCH.get("min_below"),
-                min_vol=WATCH.get("min_vol"),
-                max_ext=WATCH.get("max_ext"),
-            ):
-                continue
-            events.append({"symbol": sym, "sig": sig, "d": d, "d_htf": d_htf})
+            events.append({"symbol": sym, "sig": sig, "d": d, "d_htf": d_htf, "spec": spec})
     return events
 
 
 def format_ev(ev: dict) -> str:
-    d, sig, sym = ev["d"], ev["sig"], ev["symbol"]
+    d, sig, spec = ev["d"], ev["sig"], ev["spec"]
+    sym = ev["symbol"]
     ts = hm(int(d["t"][sig.idx]))
-    kind = "剛站上 MA200" if sig.crossed_200 else "多頭排列剛成立"
-    tf, htf = WATCH["signal"], WATCH["htf"]
-    ma_h = htf_ma200_at(ev.get("d_htf"), int(d["t"][sig.idx]), sig.close, WATCH["htf_ms"]) if ev.get("d_htf") is not None else None
+    tf, htf = spec["signal"], spec["htf"]
+    ma_h = (
+        htf_ma200_at(ev.get("d_htf"), int(d["t"][sig.idx]), sig.close, spec["htf_ms"])
+        if ev.get("d_htf") is not None
+        else None
+    )
     htxt = f"{htf} MA200 {ma_h:g}　距 {(sig.close / ma_h - 1) * 100:+.2f}%" if ma_h else f"{htf} MA200 —"
-    hline = f"且 &gt; {htxt}" if WATCH["require_htf"] else f"{htxt}（參考，不擋單）"
-    below = f"底下已跌 {sig.bars_below} 根　" if sig.crossed_200 else ""
+    if spec["require_htf"]:
+        hline = f"且現價 &gt; {htxt}"
+    else:
+        hline = f"{htxt}（參考，不擋單）"
+    extra = ""
+    if spec["min_below"] is not None:
+        extra = (
+            f"底下已跌 {sig.bars_below} 根　量比 {sig.vol_ratio:.2f}×　距 {tf} MA200 {sig.ext_pct:+.2f}%\n"
+        )
+    else:
+        extra = f"距 {tf} MA200 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×\n"
     return (
-        f"<b>{tf} 收盤在 7/14/25/200 上 · {kind}</b>\n"
-        f"<b>{sym}</b>\n"
+        f"<b>{spec['title']}</b>\n"
+        f"<b>{sym_label(sym)}</b>  {sym}\n"
         f"{ts}  收 {sig.close:g}\n"
         f"收盤 &gt; MA7 {sig.m7:g} &gt; MA14 {sig.m14:g} &gt; MA25 {sig.m25:g}\n"
-        f"且 &gt; {tf} MA200 {sig.ma200:g}　距 {sig.ext_pct:+.2f}%　{below}量比 {sig.vol_ratio:.2f}×\n"
+        f"且 &gt; {tf} MA200 {sig.ma200:g}\n"
+        f"{extra}"
         f"{hline}"
     )
 
 
 def key_of(ev: dict) -> str:
-    return f"{ev['symbol']}:{int(ev['d']['t'][ev['sig'].idx])}"
+    return f"{ev['spec']['signal']}:{ev['symbol']}:{int(ev['d']['t'][ev['sig'].idx])}"
 
 
 def notify(ev: dict) -> None:
     text = format_ev(ev)
     print("\n" + text.replace("<b>", "").replace("</b>", "").replace("&gt;", ">"))
-    tmp = Path("/tmp") / f"ma15_{ev['symbol']}_{ev['sig'].idx}.png"
-    photo = draw_chart(ev["symbol"], ev["d"], ev["sig"].idx, str(tmp))
+    spec = ev["spec"]
+    tmp = Path("/tmp") / f"ma_{spec['signal']}_{ev['symbol']}_{ev['sig'].idx}.png"
+    photo = draw_chart(ev["symbol"], ev["d"], ev["sig"], spec, str(tmp), ev.get("d_htf"))
     ok = telegram_send(text, photo=photo)
     if ok:
         print("  → Telegram 已送")
@@ -219,88 +333,109 @@ def notify(ev: dict) -> None:
             print("  → Telegram 送出失敗，檢查 token 與 chat id")
 
 
-def wait_next_close() -> None:
+def next_close_unix(interval_ms: int) -> float:
     now = time.time()
-    step = INTERVAL_MS[WATCH["signal"]] / 1000
-    nxt = (int(now) // int(step) + 1) * step + 3
-    time.sleep(max(1, nxt - now))
+    step = interval_ms / 1000
+    return (int(now) // int(step) + 1) * step + 3
+
+
+def wait_next(specs: list[dict]) -> None:
+    nxt = min(next_close_unix(INTERVAL_MS[s["signal"]]) for s in specs)
+    time.sleep(max(1, nxt - time.time()))
+
+
+def due_to_scan(spec: dict, *, force: bool) -> bool:
+    if force or spec["signal"] == "15m":
+        return True
+    now = time.time()
+    hour_close = (int(now) // 3600) * 3600
+    return (now - hour_close) < 14 * 60
 
 
 def test_telegram() -> int:
     apply_keys()
-    ok = telegram_send("15m 7/14/25 多頭 × MA200 監看測試\n如果你看到這則，Telegram 已通。")
+    ok = telegram_send(
+        "MA200 監看測試\n"
+        "15m：剛站上 15m MA200 且在 1h MA200 上\n"
+        "1h：剛站上 1h MA200，底下≥36根、量≥1.5×、距MA≤2%\n"
+        "如果你看到這則，Telegram 已通。"
+    )
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
     return 0 if ok else 1
+
+
+def spec_note(spec: dict) -> str:
+    if spec["require_htf"]:
+        extra = f"且現價在 {spec['htf']} MA200 上"
+    else:
+        extra = (
+            f"底下≥{spec['min_below']}根、量≥{spec['min_vol']}×、距MA≤{spec['max_ext']}% "
+            f"（{spec['htf']} 不擋單）"
+        )
+    return f"{spec['signal']} 剛站上 MA200、{extra}"
 
 
 def main() -> int:
     import argparse
 
-    p = argparse.ArgumentParser(description="15 分 K 7/14/25 多頭且站上 15m MA200 Telegram")
+    p = argparse.ArgumentParser(description="15 分 / 1 小時 MA200 剛站上 → Telegram（與回測同一套規則）")
     p.add_argument("--once", action="store_true")
     p.add_argument("--test", action="store_true")
     p.add_argument("--stocks", action="store_true", help="只掃幣安 TradFi 股票永續（不含商品）")
-    p.add_argument("--tf", choices=("15m", "1h"), default="15m", help="訊號週期；1h 時 4h 只參考、不擋單")
+    p.add_argument("--tf", choices=("15m", "1h", "both"), default="both", help="預設 15 分與 1 小時都監看")
+    p.add_argument("--limit-symbols", type=int, default=0)
     args = p.parse_args()
     apply_keys()
     if args.test:
         return test_telegram()
 
-    if args.tf == "1h":
-        WATCH.update(
-            {
-                "signal": "1h",
-                "htf": "4h",
-                "htf_ms": INTERVAL_MS["4h"],
-                "sig_limit": 250,
-                "htf_limit": 250,
-                "require_htf": False,
-                "min_below": 36,
-                "min_vol": 1.5,
-                "max_ext": 2.0,
-                "sig_limit": 420,
-            }
-        )
+    names = ("15m", "1h") if args.tf == "both" else (args.tf,)
+    specs = [TF_WATCH[n] for n in names]
 
     seen = load_seen()
     print("載入標的…", flush=True)
     symbols = universe(stocks_only=args.stocks)
+    if args.limit_symbols:
+        symbols = symbols[: args.limit_symbols]
     scope = "幣安股票永續" if args.stocks else "流動永續"
-    htf_note = (
-        f"、且當下在 {WATCH['htf']} MA200 上"
-        if WATCH["require_htf"]
-        else f"（{WATCH['htf']} MA200 只參考、不擋單）"
-    )
-    quality_note = ""
-    if WATCH.get("min_below"):
-        quality_note = (
-            f"、底下至少 {WATCH['min_below']} 根、量比 ≥ {WATCH['min_vol']}×、距 MA200 ≤ {WATCH['max_ext']}%"
-        )
-    print(
-        f"監看 {len(symbols)} 個{scope}。{WATCH['signal']} 剛站上 MA200、收在 7/14/25/200 上{htf_note}{quality_note}會推 Telegram。",
-        flush=True,
-    )
+    print(f"監看 {len(symbols)} 個{scope}。", flush=True)
+    for spec in specs:
+        print("  · " + spec_note(spec), flush=True)
     uni_ts = time.time()
+    first = True
 
     def round_once() -> None:
-        nonlocal symbols, uni_ts
+        nonlocal symbols, uni_ts, first
         if time.time() - uni_ts > 1800:
             symbols = universe(stocks_only=args.stocks)
+            if args.limit_symbols:
+                symbols = symbols[: args.limit_symbols]
             uni_ts = time.time()
             print(f"更新標的 {len(symbols)}", flush=True)
+        force = first or args.once
+        first = False
         t0 = time.time()
         events = []
+        jobs = [(s, spec) for spec in specs if due_to_scan(spec, force=force) for s in symbols]
+        if not jobs:
+            print(
+                f"[{datetime.now(TZ).strftime('%H:%M:%S')}] 這輪沒有要掃的週期",
+                flush=True,
+            )
+            return
         with ThreadPoolExecutor(8) as ex:
-            futs = {ex.submit(scan_symbol, s): s for s in symbols}
+            futs = {ex.submit(scan_symbol, sym, spec): (sym, spec) for sym, spec in jobs}
             for fut in as_completed(futs):
                 try:
                     events.extend(fut.result())
                 except Exception as e:
-                    print("err", futs[fut], e, flush=True)
+                    sym, spec = futs[fut]
+                    print("err", spec["signal"], sym, e, flush=True)
         new = [e for e in events if key_of(e) not in seen]
+        scanned = sorted({spec["signal"] for _, spec in jobs})
         print(
             f"[{datetime.now(TZ).strftime('%H:%M:%S')}] "
-            f"掃完 {len(symbols)} 用 {time.time()-t0:.1f}s　新訊號 {len(new)}",
+            f"掃完 {len(symbols)} × {'+'.join(scanned)} 用 {time.time()-t0:.1f}s　新訊號 {len(new)}",
             flush=True,
         )
         for ev in new:
@@ -312,10 +447,10 @@ def main() -> int:
     round_once()
     if args.once:
         return 0
-    print(f"watch 中，每根 {WATCH['signal']} 收盤掃一次（Ctrl+C 停）", flush=True)
+    print(f"watch 中（{' + '.join(s['signal'] for s in specs)}），收盤掃一次（Ctrl+C 停）", flush=True)
     try:
         while True:
-            wait_next_close()
+            wait_next(specs)
             round_once()
     except KeyboardInterrupt:
         print("\n已停止。")
