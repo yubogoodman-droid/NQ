@@ -41,7 +41,7 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 ## 台股五分 K 回測
 
-成交額前 100、濾掉 ETF／金融股／股價 650 以上。五分 K **MA5 > MA10 > MA20**，當根收盤剛站上五分 **MA200**，且收盤高於所有均線，記一則通知。
+成交額前 100、濾掉 ETF／金融股／電信股／股價 650 以上。五分 K **MA5 > MA10 > MA20**，當根收盤剛站上五分 **MA200**，且收盤高於所有均線，記一則通知。
 
 ```bash
 python3 examples/backtest_tw_5m.py --days 5

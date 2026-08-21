@@ -21,6 +21,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
     p.add_argument("--include-financial", action="store_true", help="不過濾金融股")
+    p.add_argument("--include-telecom", action="store_true", help="不過濾電信股")
     p.add_argument("--today", help="回測截止日 YYYY-MM-DD（預設台北今天）")
     p.add_argument("-o", "--output", default="docs/tw/backtest-5m-15m.html")
     return p.parse_args()
@@ -36,6 +37,7 @@ def main() -> int:
             max_price=args.max_price,
             exclude_etf=not args.include_etf,
             exclude_financial=not args.include_financial,
+            exclude_telecom=not args.include_telecom,
             today=today,
         )
     )

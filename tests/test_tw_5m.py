@@ -109,6 +109,7 @@ class FiveMinBacktestTests(unittest.TestCase):
             price_dropped=0,
             etf_dropped=0,
             financial_dropped=0,
+            telecom_dropped=0,
         )
 
         def fake_universes(cfg, as_of, sess):
@@ -141,6 +142,7 @@ class ReportTests(unittest.TestCase):
                     price_dropped=2,
                     etf_dropped=1,
                     financial_dropped=0,
+                    telecom_dropped=0,
                 )
             },
             hits=[

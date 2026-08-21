@@ -16,6 +16,7 @@ from tw.ranking import (
     filter_by_price,
     filter_etfs,
     filter_financials,
+    filter_telecoms,
 )
 from tw.signals import AlertSnapshot, iter_5m_ma200_alerts
 
@@ -29,6 +30,7 @@ class BacktestConfig:
     max_price: float = 650.0
     exclude_etf: bool = True
     exclude_financial: bool = True
+    exclude_telecom: bool = True
     kline_range: str = "1mo"
     today: date | None = None
     timeout: int = 20
@@ -43,6 +45,7 @@ class DayUniverse:
     price_dropped: int
     etf_dropped: int
     financial_dropped: int
+    telecom_dropped: int
 
 
 @dataclass
@@ -141,8 +144,11 @@ def _load_session_universes(
                 continue
             priced = filter_by_price(universe, cfg.max_price)
             after_etf = filter_etfs(priced) if cfg.exclude_etf else priced
-            candidates = (
+            after_fin = (
                 filter_financials(after_etf) if cfg.exclude_financial else after_etf
+            )
+            candidates = (
+                filter_telecoms(after_fin) if cfg.exclude_telecom else after_fin
             )
             found.append(
                 DayUniverse(
@@ -152,13 +158,15 @@ def _load_session_universes(
                     candidates=candidates,
                     price_dropped=len(universe) - len(priced),
                     etf_dropped=len(priced) - len(after_etf),
-                    financial_dropped=len(after_etf) - len(candidates),
+                    financial_dropped=len(after_etf) - len(after_fin),
+                    telecom_dropped=len(after_fin) - len(candidates),
                 )
             )
             print(
                 f"{current.isoformat()} 成交額前 {len(universe)} → "
                 f"價{found[-1].price_dropped}/ETF{found[-1].etf_dropped}/"
-                f"金融{found[-1].financial_dropped} → 掃描 {len(candidates)}",
+                f"金融{found[-1].financial_dropped}/電信{found[-1].telecom_dropped} "
+                f"→ 掃描 {len(candidates)}",
                 flush=True,
             )
         current -= timedelta(days=1)

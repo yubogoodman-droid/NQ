@@ -379,6 +379,22 @@ def filter_financials(stocks: list[RankedStock]) -> list[RankedStock]:
     return [s for s in stocks if not is_financial(s)]
 
 
+_TELECOM_CODES = {"2412", "3045", "4904", "3682"}
+_TELECOM_NAME_MARKERS = ("電信", "中華電", "台灣大", "遠傳", "亞太電", "台灣之星")
+
+
+def is_telecom(stock: RankedStock) -> bool:
+    """電信營運商（中華電、台灣大、遠傳、亞太電）。智邦、啟碁等通信設備不算。"""
+    if stock.code in _TELECOM_CODES:
+        return True
+    name = re.sub(r"[-*].*$", "", stock.name).strip()
+    return any(mark in name for mark in _TELECOM_NAME_MARKERS)
+
+
+def filter_telecoms(stocks: list[RankedStock]) -> list[RankedStock]:
+    return [s for s in stocks if not is_telecom(s)]
+
+
 def _extract_app_main(html: str) -> dict:
     match = re.search(r"root\.App\.main = (\{.*?\});\s*(?:</script>|\n)", html, re.S)
     if not match:

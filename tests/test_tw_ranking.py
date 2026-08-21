@@ -13,8 +13,10 @@ from tw.ranking import (
     filter_by_price,
     filter_etfs,
     filter_financials,
+    filter_telecoms,
     is_etf,
     is_financial,
+    is_telecom,
     iter_recent_sessions,
     parse_tpex_quotes,
     parse_twse_mi_index,
@@ -146,6 +148,29 @@ class RankingTests(unittest.TestCase):
         self.assertEqual(
             [s.symbol for s in kept],
             ["3653.TW", "2312.TW", "2327.TW", "4958.TW"],
+        )
+
+    def test_filter_excludes_telecoms(self) -> None:
+        stocks = [
+            RankedStock(1, "2412.TW", "中華電", 130.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(2, "3045.TW", "台灣大", 110.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(3, "4904.TW", "遠傳", 90.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(4, "3682.TW", "亞太電", 10.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(5, "2345.TW", "智邦", 700.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(6, "2303.TW", "聯電", 50.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(7, "2327.TW", "國巨*", 611.0, None, None, 1, 1.0, "TAI"),
+        ]
+        self.assertTrue(is_telecom(stocks[0]))
+        self.assertTrue(is_telecom(stocks[1]))
+        self.assertTrue(is_telecom(stocks[2]))
+        self.assertTrue(is_telecom(stocks[3]))
+        self.assertFalse(is_telecom(stocks[4]))
+        self.assertFalse(is_telecom(stocks[5]))
+        self.assertFalse(is_telecom(stocks[6]))
+        kept = filter_telecoms(stocks)
+        self.assertEqual(
+            [s.symbol for s in kept],
+            ["2345.TW", "2303.TW", "2327.TW"],
         )
 
     def test_previous_friday_from_monday(self) -> None:

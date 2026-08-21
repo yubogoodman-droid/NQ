@@ -104,7 +104,7 @@ def _render(
             f"""
     <section class="day">
       <h2>{weekday_zh(day)} {day.isoformat()}</h2>
-      <p class="lead">成交額前 {len(uni.universe)} → 股價濾掉 {uni.price_dropped}、ETF {uni.etf_dropped}、金融 {uni.financial_dropped} → 掃描 {len(uni.candidates)} → 通知 {len(day_hits)} 則</p>
+      <p class="lead">成交額前 {len(uni.universe)} → 股價濾掉 {uni.price_dropped}、ETF {uni.etf_dropped}、金融 {uni.financial_dropped}、電信 {uni.telecom_dropped} → 掃描 {len(uni.candidates)} → 通知 {len(day_hits)} 則</p>
       {body}
     </section>"""
         )
@@ -184,7 +184,7 @@ def _render(
     <h1>{html.escape(title)}</h1>
     <div class="banner">每檔一張圖：上面是五分K，下面是十五分K（由五分K合成，不是另一個來源）</div>
     <p class="lead">
-      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股與收盤價 650 以上。
+      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 650 以上。
       五分K MA5 &gt; MA10 &gt; MA20 多頭排列，<strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／200（收在所有均線上面）。開盤第一根因隔夜跳空不算。
       K 棒漲紅跌綠。
@@ -193,6 +193,7 @@ def _render(
       <span class="chip">五分K</span>
       <span class="chip">不含 ETF</span>
       <span class="chip">不含金融股</span>
+      <span class="chip">不含電信股</span>
       <span class="chip">股價 &lt; 650</span>
       <span class="chip">MA5 &gt; 10 &gt; 20</span>
       <span class="chip">當根收盤站上 MA200</span>
