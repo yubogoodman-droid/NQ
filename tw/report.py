@@ -18,6 +18,7 @@ import pandas as pd
 from matplotlib.patches import Rectangle
 
 from tw.backtest_5m import BacktestHit, BacktestResult
+from tw.kline import resample_ohlcv
 from tw.signals import add_moving_averages
 
 WEEKDAY_ZH = "一二三四五六日"
@@ -27,7 +28,10 @@ MA_COLORS = {
     20: "#66bb6a",
     200: "#ce93d8",
 }
-CHART_BARS = (36, 8)
+CHART_BARS = {
+    "5m": (36, 8),
+    "15m": (28, 4),
+}
 UP = "#ef5350"
 DOWN = "#26a69a"
 BG = "#161b22"
@@ -160,8 +164,12 @@ def _render(
     .price {{ color: var(--up); font-weight: 700; white-space: nowrap; }}
     .row {{ display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: .9rem; color: var(--muted); padding: 0 6px; }}
     .row b {{ color: var(--text); font-weight: 600; }}
-    .chart {{ margin-top: 10px; }}
+    .chart {{ margin-top: 6px; }}
     .chart img {{ width: 100%; height: auto; display: block; border-radius: 8px; }}
+    .chart-label {{
+      font-size: 12px; color: var(--ok); font-weight: 700;
+      padding: 10px 6px 2px;
+    }}
     .empty {{ color: var(--muted); }}
     footer {{ color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }}
   </style>
@@ -172,7 +180,8 @@ def _render(
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股與收盤價 650 以上。
       五分K MA5 &gt; MA10 &gt; MA20 多頭排列，<strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200（收在所有均線上面）。開盤第一根因隔夜跳空不算。K 棒漲紅跌綠。
+      且這根收盤必須高於 MA5／10／20／200（收在所有均線上面）。開盤第一根因隔夜跳空不算。
+      每則下面附<strong>十五分K對照</strong>（由五分K合成）。K 棒漲紅跌綠。
     </p>
     <div class="chips">
       <span class="chip">五分K</span>
@@ -182,6 +191,7 @@ def _render(
       <span class="chip">MA5 &gt; 10 &gt; 20</span>
       <span class="chip">當根收盤站上 MA200</span>
       <span class="chip">收盤 &gt; 所有均線</span>
+      <span class="chip">十五分K對照</span>
       {day_chips}
     </div>
     <div class="legend">
@@ -218,7 +228,12 @@ def _hit_card(
         chg = f" {s.change_percent:+.2f}%"
     ts = snap.timestamp.strftime("%H:%M")
     url = f"https://tw.stock.yahoo.com/quote/{html.escape(s.symbol)}"
-    chart = _chart_img(hit, chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base)
+    chart_5m = _chart_img(
+        hit, timeframe="5m", chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base
+    )
+    chart_15m = _chart_img(
+        hit, timeframe="15m", chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base
+    )
     return f"""
     <article class="card">
       <div class="top">
@@ -230,7 +245,10 @@ def _hit_card(
       <div class="row"><span>收盤 vs 均線</span><b>{snap.close:.2f} &gt; MA5 {snap.ma5:.2f} / 10 {snap.ma10:.2f} / 20 {snap.ma20:.2f}</b></div>
       <div class="row"><span>前收 / 前MA200</span><b>{snap.prev_close:.2f} ≤ {snap.prev_ma200:.2f}</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
-      <div class="chart">{chart}</div>
+      <div class="chart-label">五分 K</div>
+      <div class="chart">{chart_5m}</div>
+      <div class="chart-label">十五分 K（對照）</div>
+      <div class="chart">{chart_15m}</div>
     </article>
 """
 
@@ -238,27 +256,40 @@ def _hit_card(
 def _chart_img(
     hit: BacktestHit,
     *,
+    timeframe: str = "5m",
     chart_rel: Path,
     chart_dir: Path,
     image_base: str | None,
 ) -> str:
-    png = render_k_chart_png(hit)
+    png = render_k_chart_png(hit, timeframe=timeframe)
+    label = "十五分" if timeframe == "15m" else "五分"
     if not png:
-        return '<p class="empty">無五分 K 線資料</p>'
+        return f'<p class="empty">無{label} K 線資料</p>'
     stamp = hit.snapshot.timestamp.strftime("%H%M")
-    fname = f"{hit.day.isoformat()}-{_safe_symbol(hit.stock.symbol)}-{stamp}.png"
+    suffix = "-15m" if timeframe == "15m" else ""
+    fname = f"{hit.day.isoformat()}-{_safe_symbol(hit.stock.symbol)}-{stamp}{suffix}.png"
     (chart_dir / fname).write_bytes(png)
     rel = f"{chart_rel.as_posix()}/{fname}"
     src = html.escape(f"{image_base}{rel}" if image_base else rel)
-    alt = html.escape(f"{hit.stock.name} {hit.stock.symbol} 五分K")
+    alt = html.escape(f"{hit.stock.name} {hit.stock.symbol} {label}K")
     return f'<img alt="{alt}" src="{src}"/>'
 
 
-def render_k_chart_png(hit: BacktestHit) -> bytes | None:
+def _chart_frame(hit: BacktestHit, timeframe: str) -> pd.DataFrame | None:
     if hit.frame is None or hit.frame.empty:
         return None
-    work = add_moving_averages(hit.frame)
-    mark_ts = pd.Timestamp(hit.snapshot.timestamp).floor("5min")
+    if timeframe == "15m":
+        return resample_ohlcv(hit.frame, "15min")
+    return hit.frame
+
+
+def render_k_chart_png(hit: BacktestHit, timeframe: str = "5m") -> bytes | None:
+    frame = _chart_frame(hit, timeframe)
+    if frame is None or frame.empty:
+        return None
+    work = add_moving_averages(frame)
+    freq = "15min" if timeframe == "15m" else "5min"
+    mark_ts = pd.Timestamp(hit.snapshot.timestamp).floor(freq)
     if work.index.tz is not None:
         mark_ts = (
             mark_ts.tz_convert(work.index.tz)
@@ -266,7 +297,8 @@ def render_k_chart_png(hit: BacktestHit) -> bytes | None:
             else mark_ts.tz_localize(work.index.tz)
         )
     work = work[work.index < mark_ts.normalize() + pd.Timedelta(days=1)]
-    window = _window_around(work, mark_ts, before=CHART_BARS[0], after=CHART_BARS[1])
+    before, after = CHART_BARS.get(timeframe, CHART_BARS["5m"])
+    window = _window_around(work, mark_ts, before=before, after=after)
     if window.empty:
         return None
 
@@ -314,6 +346,7 @@ def render_k_chart_png(hit: BacktestHit) -> bytes | None:
         )
 
     loc = int(window.index.get_indexer([mark_ts], method="nearest")[0])
+    marker_label = "五分訊號" if timeframe == "15m" else "站上MA200"
     if 0 <= loc < n:
         ax.scatter(
             [loc],
@@ -322,7 +355,7 @@ def render_k_chart_png(hit: BacktestHit) -> bytes | None:
             s=70,
             color="#7ee787",
             zorder=5,
-            label="站上MA200",
+            label=marker_label,
         )
 
     ref = float(hit.snapshot.close) if hit.snapshot.close else float(window["close"].iloc[-1])
@@ -333,7 +366,8 @@ def render_k_chart_png(hit: BacktestHit) -> bytes | None:
         if 0 <= loc < n
         else hit.snapshot.timestamp.strftime("%H:%M")
     )
-    title = f"{hit.stock.name} {hit.stock.symbol}  五分K  {bar_time}"
+    tf_name = "十五分K" if timeframe == "15m" else "五分K"
+    title = f"{hit.stock.name} {hit.stock.symbol}  {tf_name}  {bar_time}"
     ax.set_title(title, color=FG, fontsize=11, pad=8, fontproperties=_FONT)
     ax.tick_params(colors="#9aa4b2", labelsize=8)
     ax.spines["top"].set_visible(False)

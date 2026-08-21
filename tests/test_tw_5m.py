@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from tw.backtest_5m import BacktestConfig, BacktestHit, BacktestResult, DayUniverse, run_5m_backtest
+from tw.kline import resample_ohlcv
 from tw.ranking import RankedStock
 from tw.report import save_backtest_html, weekday_zh
 from tw.signals import iter_5m_ma200_alerts
@@ -154,9 +155,37 @@ class ReportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = save_backtest_html(result, Path(tmp) / "out.html")
             text = path.read_text(encoding="utf-8")
+            pngs = list(Path(tmp).joinpath("charts/out").glob("*.png"))
+            self.assertEqual(len(pngs), 2)
+            self.assertTrue(any(p.name.endswith("-15m.png") for p in pngs))
         self.assertIn("南亞科", text)
         self.assertIn("五分K", text)
+        self.assertIn("十五分 K", text)
+        self.assertEqual(text.count("<img "), 2)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
+
+
+class ResampleTests(unittest.TestCase):
+    def test_three_5m_bars_make_one_15m(self) -> None:
+        idx = pd.date_range("2026-08-21 09:00", periods=3, freq="5min", tz=TAIPEI)
+        df = pd.DataFrame(
+            {
+                "open": [100.0, 101.0, 102.0],
+                "high": [101.0, 103.0, 104.0],
+                "low": [99.0, 100.0, 101.0],
+                "close": [101.0, 102.0, 103.0],
+                "volume": [1.0, 2.0, 3.0],
+            },
+            index=idx,
+        )
+        out = resample_ohlcv(df)
+        self.assertEqual(len(out), 1)
+        row = out.iloc[0]
+        self.assertEqual(float(row["open"]), 100.0)
+        self.assertEqual(float(row["high"]), 104.0)
+        self.assertEqual(float(row["low"]), 99.0)
+        self.assertEqual(float(row["close"]), 103.0)
+        self.assertEqual(float(row["volume"]), 6.0)
 
 
 if __name__ == "__main__":

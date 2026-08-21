@@ -11,6 +11,25 @@ import pandas as pd
 TAIPEI = ZoneInfo("Asia/Taipei")
 
 
+def resample_ohlcv(df: pd.DataFrame, rule: str = "15min") -> pd.DataFrame:
+    """把較短週期 OHLCV 合成較長週期（預設五分 → 十五分）。"""
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+    work = df.copy()
+    if not isinstance(work.index, pd.DatetimeIndex):
+        work.index = pd.DatetimeIndex(work.index)
+    agg = {
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "volume": "sum",
+    }
+    cols = {name: how for name, how in agg.items() if name in work.columns}
+    out = work.resample(rule, label="left", closed="left").agg(cols)
+    return out.dropna(subset=["close"]) if "close" in out.columns else out
+
+
 def fetch_bars_many(
     symbols: list[str],
     interval: str = "5m",
