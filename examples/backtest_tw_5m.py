@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""台股五分 K 回測：MA5/10/20 多頭排列，當根收盤站上 MA200。"""
+"""台股五分 K 回測：MA5/10/20 多頭排列，當根收盤站上所有均線。"""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from tw.report import save_backtest_html, weekday_zh
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="台股五分K多頭排列＋站上MA200，回測近 N 個交易日")
+    p = argparse.ArgumentParser(description="台股五分K多頭排列＋收盤站上所有均線，回測近 N 個交易日")
     p.add_argument("--days", type=int, default=5, help="回測交易日數（預設 5）")
     p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")

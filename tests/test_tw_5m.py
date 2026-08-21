@@ -54,6 +54,8 @@ class FiveMinSignalTests(unittest.TestCase):
         hit = hits[0]
         self.assertTrue(hit.bullish_aligned)
         self.assertTrue(hit.crossed_above_ma200)
+        self.assertTrue(hit.close_above_all_mas)
+        self.assertGreater(hit.close, hit.ma5)
         self.assertGreater(hit.close, hit.ma200)
         self.assertLessEqual(hit.prev_close, hit.prev_ma200)
         self.assertEqual(hit.timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 5, tzinfo=TAIPEI)))
@@ -77,6 +79,11 @@ class FiveMinSignalTests(unittest.TestCase):
         until2 = since2 + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
         hits = iter_5m_ma200_alerts(df, since=since2, until=until2)
         self.assertEqual(len(hits), 1)
+
+    def test_rejects_close_below_ma5(self) -> None:
+        df = _history_then_live([110.0] * 5 + [99.0, 100.5])
+        hits = iter_5m_ma200_alerts(df)
+        self.assertEqual(hits, [])
 
     def test_requires_bullish_ribbon(self) -> None:
         hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]

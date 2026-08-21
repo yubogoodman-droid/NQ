@@ -1,4 +1,4 @@
-"""五分 K：MA5/10/20 多頭排列，當根收盤站上 MA200 時報通知。"""
+"""五分 K：MA5/10/20 多頭排列，當根收盤站上所有均線（含 MA200）時報通知。"""
 
 from __future__ import annotations
 
@@ -32,6 +32,15 @@ class AlertSnapshot:
     def crossed_above_ma200(self) -> bool:
         return self.close > self.ma200 and self.prev_close <= self.prev_ma200
 
+    @property
+    def close_above_all_mas(self) -> bool:
+        return (
+            self.close > self.ma5
+            and self.close > self.ma10
+            and self.close > self.ma20
+            and self.close > self.ma200
+        )
+
 
 def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
@@ -49,7 +58,7 @@ def iter_5m_ma200_alerts(
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
 ) -> list[AlertSnapshot]:
-    """同一交易日連續五分 K：MA5>MA10>MA20，且當根收盤剛站上 MA200。"""
+    """同一交易日連續五分 K：MA5>MA10>MA20，當根收盤剛站上 MA200，且收在所有均線之上。"""
     if df is None or len(df) < MA_LONG + 1:
         return []
     work = add_moving_averages(df)
@@ -74,7 +83,11 @@ def iter_5m_ma200_alerts(
         prev_ts = work.index[i - 1]
         if pd.Timestamp(ts).date() != pd.Timestamp(prev_ts).date():
             continue
-        if snap.bullish_aligned and snap.crossed_above_ma200:
+        if (
+            snap.bullish_aligned
+            and snap.crossed_above_ma200
+            and snap.close_above_all_mas
+        ):
             hits.append(snap)
     return hits
 
