@@ -4,3 +4,5 @@ __pycache__/
 venv/
 output/*.html
 output/*.json
+telegram_local.py
+**/telegram_local.py

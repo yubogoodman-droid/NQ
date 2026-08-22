@@ -22,6 +22,53 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## 幣安 15 分 K：7/14/25 多頭 + 站上 MA200
+
+15 分圖收盤同時高於 **MA7、MA14、MA25、MA200**，且 SMA7 > SMA14 > SMA25。Telegram 推「這一根剛站上 15m MA200」，**或站上後 4 根（1 小時）內才收出 7>14>25**（避免 TUT 那種先站上、兩根後才排好均線卻漏推）。小時圖仍只推本根剛站上 1h MA200。大週期圖只對照，不擋單；不再看量比、底下根數、高低差、BTC。
+
+```bash
+python3 examples/backtest_15m_bull.py --demo
+python3 examples/backtest_15m_bull.py --days 7 --pages                   # 15 分全市場
+python3 examples/backtest_15m_bull.py --days 7 --tf 1h --pages           # 小時圖全市場
+python3 examples/backtest_15m_bull.py --days 7 --stocks --pages          # 15 分股票
+python3 examples/backtest_15m_bull.py --days 7 --tf 1h --stocks --pages  # 小時圖股票
+```
+
+外網看圖（請用這個，圖已內嵌）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html
+
+只掃股票（15 分）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html
+
+小時圖（全市場）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull.html
+
+只掃股票（小時）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull-stocks.html
+
+合併進 `main` 後 GitHub Pages：  
+https://yubogoodman-droid.github.io/NQ/binance/ma15-bull.html
+
+Telegram 監看（與回測同一套規則）。**不要只拷一個 py**，`nq` 資料夾要在旁邊。
+
+PyCharm：用「Open」打開整個 NQ 專案，或把 `15M多排.py` 和 `nq` 放同一層，在 `15M多排.py` 最上面填 token / chat id：
+
+```
+PythonProject2\
+  15M多排.py
+  nq\
+```
+
+```bash
+pip install numpy requests matplotlib
+python 15M多排.py --test
+python 15M多排.py                 # 預設 15 分 + 1 小時都推
+python 15M多排.py --tf 1h         # 只推小時圖（剛站上 1h MA200）
+python 15M多排.py --once
+```
+
+也可以 `pip install -e .` 後跑 `examples/watch_15m_bull.py`。
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
@@ -75,6 +122,11 @@ python3 examples/chart_today.py
 
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
+
+3. **15 分 K 7/14/25 站上 MA200（這次 PR）**  
+   https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html  
+   只掃幣安股票：  
+   https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html
 
 ## TradingView
 
