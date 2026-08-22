@@ -204,7 +204,7 @@ def _render(
     <h1>{html.escape(title)}</h1>
     <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K（十五分與小時都由五分K合成）</div>
     <p class="lead">
-      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股與電信股。
+      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 600 以上。
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段也不黏在一起），
       <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
@@ -217,6 +217,7 @@ def _render(
       <span class="chip">不含金融股</span>
       <span class="chip">不含電信股</span>
       <span class="chip">成交額前 100</span>
+      <span class="chip">股價 &lt; 600</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
       <span class="chip">當根收盤站上 MA200</span>
       <span class="chip">收盤 &gt; 十五分 MA5／10／20</span>
