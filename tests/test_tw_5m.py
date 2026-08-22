@@ -258,6 +258,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("股價 &lt; 500", text)
         self.assertIn("一小時後", text)
         self.assertIn("進場後一小時勝率", text)
+        self.assertIn("個交易日共通知", text)
         self.assertNotIn("小時 MA20 不下彎", text)
         self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")

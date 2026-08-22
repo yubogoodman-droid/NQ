@@ -276,7 +276,7 @@ def _render(
       <span><i class="swatch" style="background:#ce93d8"></i>MA200</span>
     </div>
     <div class="summary">
-      五天共通知 <span class="ok">{len(result.hits)}</span> 則<br/>
+      {len(result.days)} 個交易日共通知 <span class="ok">{len(result.hits)}</span> 則<br/>
       {_hour_later_summary_html(result)}
       掃描時間 {html.escape(scanned)}（台北）<br/>
       資料：證交所／櫃買盤後成交額 ＋ Yahoo 五分K
