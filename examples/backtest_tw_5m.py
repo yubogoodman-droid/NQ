@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--days", type=int, default=5, help="回測交易日數（預設 5）")
     p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
     p.add_argument("--max-price", type=float, default=500.0, help="濾掉此價格以上（預設 500）")
-    p.add_argument("--kline-range", default="1mo", help="Yahoo 五分K區間（預設 1mo；兩週回測用 2mo）")
+    p.add_argument("--kline-range", default="1mo", help="Yahoo 五分K區間（預設 1mo；五分K最長約 60 天，勿用 2mo／3mo）")
     p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
     p.add_argument("--include-financial", action="store_true", help="不過濾金融股")
     p.add_argument("--include-telecom", action="store_true", help="不過濾電信股")

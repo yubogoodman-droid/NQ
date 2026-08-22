@@ -44,10 +44,10 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 成交額前 100、濾掉 ETF／金融股／電信股／股價 500 以上。五分 K **MA5 > MA10 > MA20 且均線發散**（不要糾結），當根收盤剛站上五分 **MA200**，收盤高於所有均線，也在十五分 **MA5／10／20** 之上，**十五分K已在 MA200 上至少半小時**，**小時K收在 MA20 之上**，記一則通知。
 
 ```bash
-python3 examples/backtest_tw_5m.py --days 5
+python3 examples/backtest_tw_5m.py --days 10
 ```
 
-報告：`docs/tw/backtest-5m-15m-1h.html`（每檔一張圖：上五分K、中十五分K、下小時K、最下日K）
+報告：`docs/tw/backtest-5m-15m-1h.html`（近兩週；每檔一張圖：上五分K、中十五分K、下小時K、最下日K）
 
 ## 快速開始
 
