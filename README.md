@@ -39,6 +39,23 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## 一分 K 棒型態回測
+
+學習單根／雙根／三根 K（錘子、吞噬、晨星、三白兵…），再加上南亞科那種**盤整後放量長紅突破**。型態收盤確認，下一根開盤進場；停損在型態極值，停利 1.5R，最多抱 20 分鐘。當日已漲超過 6% 不追。
+
+```bash
+# 模擬南亞科式盤整突破
+python examples/run_1m_backtest.py --demo
+
+# 近 7 日真實一分 K（Yahoo：南亞科／華邦電／聯電／台積電／NQ）
+python examples/run_1m_backtest.py
+
+# 單元測試
+python -m unittest tests.test_candles
+```
+
+報告寫到 `docs/1m-candles/index.html`。Yahoo 一分 K 最多約 7 個交易日，結果只供學習。
+
 ## 快速開始
 
 ```bash
