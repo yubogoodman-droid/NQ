@@ -77,7 +77,7 @@ def draw_trade(df: pd.DataFrame, trade: Align200Trade, path: Path, trade_no: int
     axv.set_xticks(ticks)
     axv.set_xticklabels([_naive(window.index[i]).strftime("%m-%d %H:%M") for i in ticks])
     ax.set_title(
-        f"#{trade_no} {trade.signal.symbol} {trade.signal.name}  1m  {_fmt(trade.signal.timestamp)}",
+        f"#{trade_no} {trade.signal.symbol}  1m  {_fmt(trade.signal.timestamp)}",
         color="#e6edf3",
         fontsize=11,
         loc="left",
@@ -88,6 +88,35 @@ def draw_trade(df: pd.DataFrame, trade: Align200Trade, path: Path, trade_no: int
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor(), bbox_inches="tight")
     plt.close(fig)
     return path
+
+
+def _pick_gallery(trades: list[Align200Trade], limit: int = 24) -> list[Align200Trade]:
+    """每天先抽幾筆，再補最大賺／最大虧，避免圖全擠在第一天。"""
+    chosen: list[Align200Trade] = []
+    seen: set[tuple] = set()
+
+    def add(trade: Align200Trade) -> None:
+        key = (trade.signal.symbol, trade.signal.timestamp)
+        if key in seen:
+            return
+        seen.add(key)
+        chosen.append(trade)
+
+    by_day: dict = {}
+    for trade in trades:
+        by_day.setdefault(trade.signal.day, []).append(trade)
+    for day_trades in by_day.values():
+        for trade in day_trades[:3]:
+            add(trade)
+    ranked = sorted(trades, key=lambda t: t.pnl_pct_net, reverse=True)
+    for trade in ranked[:5] + ranked[-5:]:
+        add(trade)
+    for trade in trades:
+        if len(chosen) >= limit:
+            break
+        add(trade)
+    chosen.sort(key=lambda t: (t.signal.day, t.signal.timestamp, t.signal.symbol))
+    return chosen[:limit]
 
 
 def write_report(
@@ -101,19 +130,39 @@ def write_report(
     output_dir.mkdir(parents=True, exist_ok=True)
     img_dir = output_dir / "img"
     img_dir.mkdir(exist_ok=True)
+    for old in img_dir.glob("*.png"):
+        old.unlink()
     stats = summarize_align(trades)
     lines = [
         f"# {title}",
         "",
         "請直接開這個 Markdown，GitHub 會顯示圖。",
         "",
-        f"- 成交 **{stats['trades']}**　勝率 **{stats['win_rate']*100:.0f}%**　淨損益 **{_pct(stats['total_pnl_pct_net'])}**　期望 **{_pct(stats['expectancy_net'])}**",
+        f"- 成交 **{stats['trades']}**　勝 **{stats['wins']}**　勝率 **{stats['win_rate']*100:.0f}%**　單筆期望 **{_pct(stats['expectancy_net'])}**",
+        f"- 把每筆淨報酬加總 **{_pct(stats['total_pnl_pct_net'])}**（不是資金曲線；每天最多同時一百檔）",
         "",
         "規則：一分K **MA5>MA10>MA20>MA60** 且收盤**站上 MA200**，條件剛成立才通知／進場。",
         "",
+        "### 每日訊號",
+        "",
+        "| 日期 | 筆數 |",
+        "| --- | ---: |",
     ]
+    for day in sorted(stats["by_day"]):
+        lines.append(f"| {day.isoformat()} | {stats['by_day'][day]} |")
+    lines += [
+        "",
+        "### 出場",
+        "",
+        "| 原因 | 筆數 |",
+        "| --- | ---: |",
+    ]
+    for reason, n in sorted(stats["by_exit"].items(), key=lambda kv: -kv[1]):
+        lines.append(f"| `{reason}` | {n} |")
+    lines += ["", "## 抽樣圖", ""]
     cards = []
-    for i, trade in enumerate(trades[:80], start=1):
+    gallery = _pick_gallery(trades)
+    for i, trade in enumerate(gallery, start=1):
         df = frames.get(trade.signal.symbol)
         png = img_dir / f"{i:02d}_{trade.signal.symbol.replace('.', '-')}.png"
         if df is not None and len(df):
@@ -122,7 +171,7 @@ def write_report(
         else:
             img_rel = ""
         lines += [
-            f"## #{i} {trade.signal.symbol} {trade.signal.name}　{_fmt(trade.signal.timestamp)}　{_pct(trade.pnl_pct_net)}",
+            f"### #{i} {trade.signal.symbol} {trade.signal.name}　{_fmt(trade.signal.timestamp)}　{_pct(trade.pnl_pct_net)}",
             "",
             f"進場 `{trade.signal.entry:.2f}`　出場 `{trade.exit_price:.2f}`　{trade.exit_reason}",
             "",
@@ -138,6 +187,18 @@ def write_report(
             + (f'<img src="{img_rel}" alt="{i}"/>' if img_rel else "")
             + "</article>"
         )
+    lines += [
+        "## 全部成交",
+        "",
+        "| # | 日期 | 代號 | 名稱 | 進場 | 出場 | 淨% | 原因 |",
+        "| ---: | --- | --- | --- | ---: | ---: | ---: | --- |",
+    ]
+    for i, trade in enumerate(trades, start=1):
+        lines.append(
+            f"| {i} | {trade.signal.day.isoformat()} | {trade.signal.symbol} | {trade.signal.name} | "
+            f"{trade.signal.entry:.2f} | {trade.exit_price:.2f} | {_pct(trade.pnl_pct_net)} | {trade.exit_reason} |"
+        )
+    lines.append("")
     md = output_dir / "README.md"
     md.write_text("\n".join(lines + ["## 規則"] + [f"- {n}" for n in notes] + [""]), encoding="utf-8")
     html_page = f"""<!DOCTYPE html>

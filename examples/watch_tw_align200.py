@@ -66,7 +66,7 @@ def telegram(text: str) -> bool:
 
 
 def scan_once(top: int = 100) -> int:
-    stocks, label = fetch_turnover_ranking(top=top)
+    stocks, label = fetch_turnover_ranking(top=max(top * 2, 150))
     stocks = filter_etfs(stocks)[:top]
     print(f"{label} 掃描 {len(stocks)} 檔", flush=True)
     seen = load_seen()

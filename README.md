@@ -78,7 +78,7 @@ python examples/watch_tw_align200.py --test
 python examples/watch_tw_align200.py          # 盤中每分鐘掃
 ```
 
-報告：`docs/align200/README.md`
+圖表請開 GitHub Markdown：[`docs/align200/README.md`](docs/align200/README.md)
 
 ## 快速開始
 

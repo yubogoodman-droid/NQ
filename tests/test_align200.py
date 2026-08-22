@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from nq.align200 import detect_align200, run_align200_backtest
+from nq.align200 import detect_align200, run_align200_backtest, summarize_align
 
 
 def _frame(closes: list[float]) -> pd.DataFrame:
@@ -68,6 +68,10 @@ class Align200Tests(unittest.TestCase):
         trades = run_align200_backtest(df, sigs, cost_bps=0)
         self.assertTrue(trades)
         self.assertIn(trades[0].exit_reason, {"lost_align", "session_flat", "time_stop"})
+        stats = summarize_align(trades)
+        self.assertGreaterEqual(stats["trades"], 1)
+        self.assertIn(trades[0].signal.day, stats["by_day"])
+        self.assertTrue(stats["by_exit"])
 
 
 if __name__ == "__main__":

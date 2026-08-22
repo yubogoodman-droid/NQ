@@ -181,15 +181,24 @@ def summarize_align(trades: list[Align200Trade]) -> dict:
             "win_rate": 0.0,
             "total_pnl_pct_net": 0.0,
             "expectancy_net": 0.0,
+            "by_day": {},
+            "by_exit": {},
         }
     wins = sum(1 for t in trades if t.pnl_pct_net > 0)
     total = sum(t.pnl_pct_net for t in trades)
+    by_day: dict[date, int] = {}
+    by_exit: dict[str, int] = {}
+    for t in trades:
+        by_day[t.signal.day] = by_day.get(t.signal.day, 0) + 1
+        by_exit[t.exit_reason] = by_exit.get(t.exit_reason, 0) + 1
     return {
         "trades": len(trades),
         "wins": wins,
         "win_rate": wins / len(trades),
         "total_pnl_pct_net": total,
         "expectancy_net": total / len(trades),
+        "by_day": by_day,
+        "by_exit": by_exit,
     }
 
 
