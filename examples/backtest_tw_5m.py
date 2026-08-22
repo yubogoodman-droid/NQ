@@ -18,7 +18,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="台股五分K多頭發散＋收盤站上所有均線＋小時K在MA20上，回測近 N 個交易日")
     p.add_argument("--days", type=int, default=5, help="回測交易日數（預設 5）")
     p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
-    p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
+    p.add_argument("--max-price", type=float, default=600.0, help="濾掉此價格以上（預設 600）")
     p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
     p.add_argument("--include-financial", action="store_true", help="不過濾金融股")
     p.add_argument("--include-telecom", action="store_true", help="不過濾電信股")

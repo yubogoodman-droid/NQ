@@ -93,16 +93,16 @@ class RankingTests(unittest.TestCase):
         self.assertEqual(stocks[0].turnover, 10412850 * 1000)
         self.assertEqual(stocks[2].exchange, "TWO")
 
-        kept = filter_by_price(stocks, 650)
+        kept = filter_by_price(stocks, 600)
         self.assertEqual([s.symbol for s in kept], ["2408.TW", "6182.TWO"])
-        self.assertTrue(all(s.price < 650 for s in kept))
+        self.assertTrue(all(s.price < 600 for s in kept))
 
     def test_filter_excludes_price_equal_to_limit(self) -> None:
         stocks = [
-            RankedStock(1, "9999.TW", "測", 650.0, None, None, 1, 1.0, "TAI"),
-            RankedStock(2, "1111.TW", "測2", 649.9, None, None, 1, 1.0, "TAI"),
+            RankedStock(1, "9999.TW", "測", 600.0, None, None, 1, 1.0, "TAI"),
+            RankedStock(2, "1111.TW", "測2", 599.9, None, None, 1, 1.0, "TAI"),
         ]
-        kept = filter_by_price(stocks, 650)
+        kept = filter_by_price(stocks, 600)
         self.assertEqual([s.symbol for s in kept], ["1111.TW"])
 
     def test_filter_excludes_etfs(self) -> None:
