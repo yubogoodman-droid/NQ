@@ -10,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from nq.candles import (
+    CORE_PATTERNS,
     CandlePattern,
     add_candle_features,
     detect_candle_patterns,
@@ -262,6 +263,8 @@ def build_one_min_report_html(
 ) -> str:
     overall = summarize_trades(trades)
     by_pat = summarize_by_pattern(trades)
+    core_trades = [t for t in trades if t.signal.pattern.name in CORE_PATTERNS]
+    core = summarize_trades(core_trades)
 
     def pct(x: float) -> str:
         return f"{x * 100:+.2f}%"
@@ -312,6 +315,7 @@ def build_one_min_report_html(
     h2 {{ font-size: 16px; margin: 22px 0 10px; }}
     p, li {{ color: #8b949e; line-height: 1.6; font-size: 14px; }}
     .cards {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }}
+    .cards .card:nth-child(n+5) {{ border-color: #3d4a5c; }}
     .card {{ background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 12px; }}
     .k {{ color: #8b949e; font-size: 12px; }}
     .v {{ font-size: 20px; font-weight: 700; margin-top: 4px; }}
@@ -329,11 +333,16 @@ def build_one_min_report_html(
     <h1>{html.escape(title)}</h1>
     <p>型態收盤確認、下一根開盤進場；停損在型態極值，停利 1.5R，最多抱 20 根一分 K。已扣單邊成本。</p>
     <div class="cards">
-      <div class="card"><div class="k">成交</div><div class="v">{overall['trades']}</div></div>
-      <div class="card"><div class="k">勝率（淨）</div><div class="v">{wr(overall['win_rate'])}</div></div>
-      <div class="card"><div class="k">累計淨損益</div><div class="v {'pos' if overall['total_pnl_pct_net']>=0 else 'neg'}">{pct(overall['total_pnl_pct_net'])}</div></div>
-      <div class="card"><div class="k">單筆期望值</div><div class="v {'pos' if overall['expectancy_net']>=0 else 'neg'}">{pct(overall['expectancy_net'])}</div></div>
+      <div class="card"><div class="k">全部成交</div><div class="v">{overall['trades']}</div></div>
+      <div class="card"><div class="k">全部勝率</div><div class="v">{wr(overall['win_rate'])}</div></div>
+      <div class="card"><div class="k">全部淨損益</div><div class="v {'pos' if overall['total_pnl_pct_net']>=0 else 'neg'}">{pct(overall['total_pnl_pct_net'])}</div></div>
+      <div class="card"><div class="k">全部期望值</div><div class="v {'pos' if overall['expectancy_net']>=0 else 'neg'}">{pct(overall['expectancy_net'])}</div></div>
+      <div class="card"><div class="k">核心型態成交</div><div class="v">{core['trades']}</div></div>
+      <div class="card"><div class="k">核心勝率</div><div class="v">{wr(core['win_rate'])}</div></div>
+      <div class="card"><div class="k">核心淨損益</div><div class="v {'pos' if core['total_pnl_pct_net']>=0 else 'neg'}">{pct(core['total_pnl_pct_net'])}</div></div>
+      <div class="card"><div class="k">核心期望值</div><div class="v {'pos' if core['expectancy_net']>=0 else 'neg'}">{pct(core['expectancy_net'])}</div></div>
     </div>
+    <p>核心型態：盤整放量突破、三白兵／三烏鴉、晨星／夜星、吞噬、刺透／烏雲。鑷子、錘子、光頭光腳單獨列，一分 K 雜訊通常較大。</p>
     <h2>各型態（依淨期望值排序）</h2>
     <table>
       <thead><tr><th>型態</th><th>代碼</th><th>筆數</th><th>勝率</th><th>淨損益</th><th>期望值</th></tr></thead>

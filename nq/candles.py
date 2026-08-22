@@ -422,6 +422,18 @@ def _range_breakout_at(
     )
 
 
+CORE_PATTERNS = {
+    "range_breakout",
+    "three_white_soldiers",
+    "three_black_crows",
+    "morning_star",
+    "evening_star",
+    "bull_engulfing",
+    "bear_engulfing",
+    "piercing",
+    "dark_cloud",
+}
+
 PRIORITY = {
     "range_breakout": 0,
     "three_white_soldiers": 1,

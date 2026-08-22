@@ -12,6 +12,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from nq.candles import CORE_PATTERNS
 from nq.one_min import (
     OneMinCandleStrategy,
     run_one_min_backtest,
@@ -144,6 +145,7 @@ def main() -> None:
         "盤整放量突破：約 30–60 根區間寬度 ≤4%，當根放量長紅收在區間上。",
         "台股 13:20 以後強制平倉；成本預設單邊 8bps（往返 16bps）。",
         "Yahoo 一分 K 最多約 7 個交易日，樣本有限，結果只供學習。",
+        "鑷子／錘子／光頭光腳在一分 K 出現太頻繁，核心統計不含這三類。",
     ]
 
     if args.csv:
@@ -186,11 +188,25 @@ def main() -> None:
             _print_stats(symbol, trades, len(df))
 
     overall = summarize_trades(all_trades)
+    core_trades = [t for t in all_trades if t.signal.pattern.name in CORE_PATTERNS]
+    core = summarize_trades(core_trades)
     print("\n=== 全部合計 ===")
     print(
         f"成交 {overall['trades']}  勝率 {overall['win_rate']*100:.0f}%  "
         f"淨利 {overall['total_pnl_pct_net']*100:+.2f}%  期望 {overall['expectancy_net']*100:+.3f}%"
     )
+    print("\n=== 核心型態（突破／吞噬／星線／三兵） ===")
+    print(
+        f"成交 {core['trades']}  勝率 {core['win_rate']*100:.0f}%  "
+        f"淨利 {core['total_pnl_pct_net']*100:+.2f}%  期望 {core['expectancy_net']*100:+.3f}%"
+    )
+    for row in summarize_by_pattern(core_trades):
+        print(
+            f"  {row['name_zh']:8s} {row['name']:22s}  "
+            f"n={row['trades']:3d}  WR {row['win_rate']*100:5.1f}%  "
+            f"淨 {row['total_pnl_pct_net']*100:+6.2f}%  "
+            f"E {row['expectancy_net']*100:+6.3f}%"
+        )
 
     out = save_one_min_report(
         args.output,
