@@ -17,7 +17,7 @@ H1_MA = 20
 # MA5 相對 MA20 至少拉開這麼多（％），否則算糾結。
 MIN_RIBBON_FAN_PCT = 0.50
 # MA5–MA10、MA10–MA20 各自相對收盤至少這麼多（％），避免其中兩條黏在一起。
-MIN_RIBBON_GAP_PCT = 0.15
+MIN_RIBBON_GAP_PCT = 0.10
 
 
 @dataclass(frozen=True)
