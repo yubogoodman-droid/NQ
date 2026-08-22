@@ -33,12 +33,16 @@ def format_hit_message(hits: list[tuple[RankedStock, AlertSnapshot]]) -> tuple[s
         chg = ""
         if stock.change_percent is not None:
             chg = f" {stock.change_percent:+.2f}%"
+        extra = ""
+        if snap.h1_close is not None and snap.h1_ma20 is not None:
+            extra = f"   小時K {snap.h1_close:.2f} < MA20 {snap.h1_ma20:.2f}\n"
         lines.append(
             f"{stock.rank}. {stock.name} {stock.symbol} "
             f"{stock.price:.2f}{chg}\n"
             f"   收 {snap.close:.2f} < MA200 {snap.ma200:.2f} "
             f"（前收 {snap.prev_close:.2f} / 前MA200 {snap.prev_ma200:.2f}）\n"
             f"   MA5 {snap.ma5:.2f} < MA10 {snap.ma10:.2f} < MA20 {snap.ma20:.2f}\n"
+            f"{extra}"
             f"   {snap.timestamp.strftime('%H:%M')}  成交額 {stock.turnover / 1e8:.2f} 億"
         )
     return title, "\n".join(lines)

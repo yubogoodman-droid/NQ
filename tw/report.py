@@ -184,11 +184,12 @@ def _render(
 <body>
   <div class="page">
     <h1>{html.escape(title)}</h1>
-    <div class="banner">空頭通知：五分K MA5 &lt; MA10 &lt; MA20，當根收盤跌破 MA200。上面五分K，下面十五分K。</div>
+    <div class="banner">空頭通知：五分K MA5 &lt; MA10 &lt; MA20，當根收盤跌破 MA200，且小時K在 MA20 之下。上面五分K，下面十五分K。</div>
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 650 以上。
       五分K <strong>MA5 &lt; MA10 &lt; MA20 空頭排列</strong>，
-      <strong>當根收盤剛跌破五分 MA200</strong>（前一根尚未跌破）。開盤第一根因隔夜跳空不算。
+      <strong>當根收盤剛跌破五分 MA200</strong>（前一根尚未跌破），
+      且<strong>小時K收盤在小時 MA20 之下</strong>。開盤第一根因隔夜跳空不算。
       後續報酬以做空計算（價格續跌為正）。K 棒漲紅跌綠。
     </p>
     <div class="chips">
@@ -199,6 +200,7 @@ def _render(
       <span class="chip">股價 &lt; 650</span>
       <span class="chip">MA5 &lt; 10 &lt; 20</span>
       <span class="chip">當根收盤跌破 MA200</span>
+      <span class="chip">小時K &lt; MA20</span>
       <span class="chip">近一週</span>
       {day_chips}
     </div>
@@ -252,6 +254,12 @@ def _hit_card(
     url = f"https://tw.stock.yahoo.com/quote/{html.escape(s.symbol)}"
     chart = _chart_img(hit, chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base)
     fwd_row = _fwd_row(hit)
+    h1_row = ""
+    if snap.h1_close is not None and snap.h1_ma20 is not None:
+        h1_row = (
+            f'<div class="row"><span>小時K / MA20</span>'
+            f"<b>{snap.h1_close:.2f} &lt; {snap.h1_ma20:.2f}</b></div>"
+        )
     return f"""
     <article class="card">
       <div class="top">
@@ -261,6 +269,7 @@ def _hit_card(
       <div class="row"><span>五分跌破時間</span><b>{ts}</b></div>
       <div class="row"><span>收盤 / MA200</span><b>{snap.close:.2f} &lt; {snap.ma200:.2f}</b></div>
       <div class="row"><span>空頭排列</span><b>MA5 {snap.ma5:.2f} &lt; 10 {snap.ma10:.2f} &lt; 20 {snap.ma20:.2f}</b></div>
+      {h1_row}
       <div class="row"><span>前收 / 前MA200</span><b>{snap.prev_close:.2f} ≥ {snap.prev_ma200:.2f}</b></div>
       {fwd_row}
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>

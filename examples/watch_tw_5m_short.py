@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""台股五分 K 空頭：MA5 < MA10 < MA20 且收盤跌破 MA200 就推通知。
+"""台股五分 K 空頭：MA5 < MA10 < MA20、收盤跌破 MA200、且小時K在 MA20 之下就推通知。
 
 在下面填 Telegram 後執行：
 
@@ -37,7 +37,7 @@ from tw.watch import WatchConfig, hit_key, market_open, run_scan
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="台股五分K空頭排列跌破MA200即時通知")
+    p = argparse.ArgumentParser(description="台股五分K空頭排列跌破MA200且小時K在MA20下即時通知")
     p.add_argument("--test", action="store_true", help="立刻掃一次並試送通知")
     p.add_argument("--interval", type=int, default=60, help="盤中重掃間隔秒數（預設 60）")
     p.add_argument("--top", type=int, default=100)
@@ -108,7 +108,7 @@ def main() -> int:
         print(f"測試通知 → {', '.join(sent) or '未設定通道（填 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID）'}")
         return 0
 
-    print("五分K空頭監視：MA5 < MA10 < MA20 且收盤跌破 MA200。Ctrl+C 結束。", flush=True)
+    print("五分K空頭監視：MA5 < MA10 < MA20、跌破 MA200、小時K < MA20。Ctrl+C 結束。", flush=True)
     while True:
         if not market_open():
             print("盤外等待…", flush=True)
