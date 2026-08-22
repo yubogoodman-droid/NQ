@@ -24,6 +24,16 @@ DEFAULT_HEADERS = {
 }
 
 
+DEFAULT_TURNOVER_TOP = 300
+
+
+def turnover_pool_label(top: int | None) -> str:
+    """掃描池成交額範圍的中文標籤。"""
+    if top is None or top <= 0:
+        return "不限成交額"
+    return f"成交額前{int(top)}"
+
+
 @dataclass(frozen=True)
 class RankedStock:
     rank: int

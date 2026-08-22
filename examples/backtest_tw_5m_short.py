@@ -11,13 +11,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tw.backtest_5m import BacktestConfig, run_5m_short_backtest, summarize_forwards
+from tw.ranking import DEFAULT_TURNOVER_TOP
 from tw.report import save_backtest_html, weekday_zh
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="台股五分K空頭排列＋跌破MA200＋15分／小時K在MA20下，回測近一週")
     p.add_argument("--days", type=int, default=5, help="回測交易日數（預設 5＝一週）")
-    p.add_argument("--top", type=int, default=0, help="成交額前 N 名（0＝不限，預設不限）")
+    p.add_argument(
+        "--top",
+        type=int,
+        default=DEFAULT_TURNOVER_TOP,
+        help=f"成交額前 N 名（0＝不限，預設 {DEFAULT_TURNOVER_TOP}）",
+    )
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
     p.add_argument("--include-financial", action="store_true", help="不過濾金融股")

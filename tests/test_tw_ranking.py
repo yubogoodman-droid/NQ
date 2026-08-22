@@ -302,6 +302,14 @@ class RankingTests(unittest.TestCase):
         self.assertEqual(_take_top(rows, -1), rows)
         self.assertEqual([s.symbol for s in _take_top(rows, 2)], ["0.TW", "1.TW"])
 
+    def test_turnover_pool_label(self) -> None:
+        from tw.ranking import DEFAULT_TURNOVER_TOP, turnover_pool_label
+
+        self.assertEqual(DEFAULT_TURNOVER_TOP, 300)
+        self.assertEqual(turnover_pool_label(300), "成交額前300")
+        self.assertEqual(turnover_pool_label(0), "不限成交額")
+        self.assertEqual(turnover_pool_label(-1), "不限成交額")
+
 
 if __name__ == "__main__":
     unittest.main()

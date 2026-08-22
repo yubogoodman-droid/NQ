@@ -1,4 +1,4 @@
-"""台股五分 K 空頭回測：不限成交額、5/10/20 空頭排列、跌破 MA200，且 15 分／小時 K 都在 MA20 之下。"""
+"""台股五分 K 空頭回測：成交額前 300、5/10/20 空頭排列、跌破 MA200，且 15 分／小時 K 都在 MA20 之下。"""
 
 from __future__ import annotations
 
@@ -11,12 +11,14 @@ import requests
 
 from tw.kline import fetch_bars_many
 from tw.ranking import (
+    DEFAULT_TURNOVER_TOP,
     RankedStock,
     fetch_daily_turnover_ranking,
     filter_by_price,
     filter_etfs,
     filter_financials,
     filter_telecoms,
+    turnover_pool_label,
 )
 from tw.signals import AlertSnapshot, iter_5m_ma200_short_alerts
 
@@ -27,7 +29,7 @@ FORWARD_BARS = (3, 6, 12)
 @dataclass(frozen=True)
 class BacktestConfig:
     days: int = 5
-    top: int = 0
+    top: int = DEFAULT_TURNOVER_TOP
     max_price: float = 650.0
     exclude_etf: bool = True
     exclude_financial: bool = True
@@ -74,6 +76,7 @@ class BacktestResult:
     hits: list[BacktestHit]
     skipped: list[tuple[date, RankedStock, str]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    top: int = DEFAULT_TURNOVER_TOP
 
     def hits_on(self, day: date) -> list[BacktestHit]:
         return [h for h in self.hits if h.day == day]
@@ -132,6 +135,7 @@ def run_5m_short_backtest(
         universes=by_day,
         hits=hits,
         skipped=skipped,
+        top=cfg.top,
     )
 
 
@@ -231,7 +235,8 @@ def _load_session_universes(
                 )
             )
             print(
-                f"{current.isoformat()} 上市＋上櫃 {len(universe)} → "
+                f"{current.isoformat()} 上市＋上櫃 {len(universe)}"
+                f"（{turnover_pool_label(cfg.top)}） → "
                 f"價{found[-1].price_dropped}/ETF{found[-1].etf_dropped}/"
                 f"金融{found[-1].financial_dropped}/電信{found[-1].telecom_dropped} "
                 f"→ 掃描 {len(candidates)}",

@@ -33,6 +33,7 @@ apply_keys()
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tw.notify import format_hit_message, send_notifications
+from tw.ranking import DEFAULT_TURNOVER_TOP
 from tw.watch import WatchConfig, hit_key, market_open, run_scan
 
 
@@ -40,7 +41,12 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="台股五分K空頭排列跌破MA200且15分／小時K在MA20下即時通知")
     p.add_argument("--test", action="store_true", help="立刻掃一次並試送通知")
     p.add_argument("--interval", type=int, default=60, help="盤中重掃間隔秒數（預設 60）")
-    p.add_argument("--top", type=int, default=0, help="成交額前 N 名（0＝不限）")
+    p.add_argument(
+        "--top",
+        type=int,
+        default=DEFAULT_TURNOVER_TOP,
+        help=f"成交額前 N 名（0＝不限，預設 {DEFAULT_TURNOVER_TOP}）",
+    )
     p.add_argument("--max-price", type=float, default=650.0)
     p.add_argument("--include-etf", action="store_true")
     p.add_argument("--include-financial", action="store_true")

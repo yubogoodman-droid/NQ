@@ -11,6 +11,7 @@ import requests
 
 from tw.kline import fetch_bars_many
 from tw.ranking import (
+    DEFAULT_TURNOVER_TOP,
     RankedStock,
     fetch_turnover_ranking,
     filter_by_price,
@@ -27,7 +28,7 @@ MARKET_CLOSE = time(13, 30)
 
 @dataclass(frozen=True)
 class WatchConfig:
-    top: int = 0
+    top: int = DEFAULT_TURNOVER_TOP
     max_price: float = 650.0
     exclude_etf: bool = True
     exclude_financial: bool = True

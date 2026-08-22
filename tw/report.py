@@ -19,6 +19,7 @@ from matplotlib.patches import Rectangle
 
 from tw.backtest_5m import BacktestHit, BacktestResult, summarize_forwards
 from tw.kline import resample_ohlcv
+from tw.ranking import turnover_pool_label
 from tw.signals import add_moving_averages
 
 WEEKDAY_ZH = "一二三四五六日"
@@ -84,6 +85,7 @@ def _render(
     scanned = result.scanned_at.strftime("%Y-%m-%d %H:%M:%S")
     start, end = result.days[0], result.days[-1]
     title = f"台股五分K空頭 {start.isoformat()}～{end.isoformat()}"
+    pool = turnover_pool_label(result.top)
     day_chips = "".join(
         f'<span class="chip">{weekday_zh(day)} {day.isoformat()} · {len(result.hits_on(day))} 則</span>'
         for day in result.days
@@ -112,7 +114,7 @@ def _render(
             f"""
     <section class="day">
       <h2>{weekday_zh(day)} {day.isoformat()}</h2>
-      <p class="lead">上市＋上櫃 {len(uni.universe)}（不限成交額） → 股價濾掉 {uni.price_dropped}、ETF {uni.etf_dropped}、金融 {uni.financial_dropped}、電信 {uni.telecom_dropped} → 掃描 {len(uni.candidates)} → 通知 {len(day_hits)} 則</p>
+      <p class="lead">上市＋上櫃 {len(uni.universe)}（{html.escape(pool)}） → 股價濾掉 {uni.price_dropped}、ETF {uni.etf_dropped}、金融 {uni.financial_dropped}、電信 {uni.telecom_dropped} → 掃描 {len(uni.candidates)} → 通知 {len(day_hits)} 則</p>
       {body}
     </section>"""
         )
@@ -192,7 +194,7 @@ def _render(
     <h1>{html.escape(title)}</h1>
     <div class="banner">空頭通知：五分K MA5 &lt; MA10 &lt; MA20，當根收盤跌破 MA200，且 15 分／小時 K 都在各自 MA20 之下。上五分、中十五分、下一小時。</div>
     <p class="lead">
-      同一套台股掃描池：每天上市＋上櫃全部（不限成交額），濾掉 ETF、金融股、電信股與收盤價 650 以上。
+      同一套台股掃描池：每天上市＋上櫃{html.escape(pool)}，濾掉 ETF、金融股、電信股與收盤價 650 以上。
       五分K <strong>MA5 &lt; MA10 &lt; MA20 空頭排列</strong>，
       <strong>當根收盤剛跌破五分 MA200</strong>（前一根尚未跌破），
       且<strong>十五分K、小時K收盤都在各自 MA20 之下</strong>。開盤第一根因隔夜跳空不算。
@@ -200,7 +202,7 @@ def _render(
     </p>
     <div class="chips">
       <span class="chip">五分K</span>
-      <span class="chip">不限成交額</span>
+      <span class="chip">{html.escape(pool)}</span>
       <span class="chip">不含 ETF</span>
       <span class="chip">不含金融股</span>
       <span class="chip">不含電信股</span>
