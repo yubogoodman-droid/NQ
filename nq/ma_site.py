@@ -1,13 +1,19 @@
-"""南亞科均線回測 HTML 站：每筆一分 K + 六條均線。"""
+"""南亞科均線回測 HTML 站：每筆一分 K + 六條均線（靜態圖，預覽也看得到）。"""
 
 from __future__ import annotations
 
+import base64
 import html
+import io
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+from matplotlib.patches import Rectangle
 
 from nq.nanya_ma import (
     MA_PERIODS,
@@ -46,7 +52,24 @@ def _pct(x: float) -> str:
     return f"{x * 100:+.2f}%"
 
 
-def _chart_html(df: pd.DataFrame, trade: NanyaMaTrade, trade_no: int) -> str:
+def _png_tag(fig, *, alt: str) -> str:
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=120, facecolor=fig.get_facecolor(), bbox_inches="tight")
+    plt.close(fig)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    return f'<img alt="{html.escape(alt)}" src="data:image/png;base64,{b64}" />'
+
+
+def _style_axes(*axes) -> None:
+    for ax in axes:
+        ax.set_facecolor("#10141a")
+        ax.tick_params(colors="#8b949e", labelsize=8)
+        for sp in ax.spines.values():
+            sp.set_color("#30363d")
+        ax.grid(True, color="#ffffff10", lw=0.6)
+
+
+def _window(df: pd.DataFrame, trade: NanyaMaTrade) -> pd.DataFrame:
     work = add_nanya_features(df)
     start = max(0, trade.signal.bar_idx - 55)
     end = min(len(work) - 1, trade.signal.bar_idx + 35)
@@ -54,130 +77,90 @@ def _chart_html(df: pd.DataFrame, trade: NanyaMaTrade, trade_no: int) -> str:
         if work.index[i] == trade.exit_time:
             end = min(len(work) - 1, i + 12)
             break
-    window = work.iloc[start : end + 1]
-    times = [_naive(t) for t in window.index]
+    return work.iloc[start : end + 1]
 
-    fig = make_subplots(
-        rows=2,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.04,
-        row_heights=[0.78, 0.22],
+
+def _chart_html(df: pd.DataFrame, trade: NanyaMaTrade, trade_no: int) -> str:
+    window = _window(df, trade)
+    xs = np.arange(len(window))
+    o = window["open"].to_numpy()
+    h = window["high"].to_numpy()
+    l = window["low"].to_numpy()
+    c = window["close"].to_numpy()
+    v = window["volume"].to_numpy()
+
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.6),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.15, 1]},
+        facecolor="#161b22",
     )
-    fig.add_trace(
-        go.Candlestick(
-            x=times,
-            open=window["open"],
-            high=window["high"],
-            low=window["low"],
-            close=window["close"],
-            increasing_line_color="#ef5350",
-            increasing_fillcolor="#ef5350",
-            decreasing_line_color="#26a69a",
-            decreasing_fillcolor="#26a69a",
-            name="K",
-            showlegend=False,
-        ),
-        row=1,
-        col=1,
-    )
+    _style_axes(ax, axv)
+    vol_colors = []
+    for i in range(len(c)):
+        up = c[i] >= o[i]
+        col = "#ef5350" if up else "#26a69a"
+        ax.vlines(xs[i], l[i], h[i], color=col, lw=0.8)
+        y0, y1 = min(o[i], c[i]), max(o[i], c[i])
+        if y1 == y0:
+            y1 = y0 + max(h[i] - l[i], 1e-9) * 0.04
+        ax.add_patch(Rectangle((xs[i] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
+        vol_colors.append("#ef535099" if up else "#26a69a99")
+    axv.bar(xs, v, width=0.8, color=vol_colors, linewidth=0)
+
     for period in MA_PERIODS:
         col = f"ma{period}"
         if col not in window.columns:
             continue
-        fig.add_trace(
-            go.Scatter(
-                x=times,
-                y=window[col],
-                mode="lines",
-                name=f"MA{period}",
-                line=dict(color=MA_COLORS[period], width=1.6 if period <= 20 else 1.2),
-                connectgaps=False,
-            ),
-            row=1,
-            col=1,
+        ax.plot(xs, window[col], color=MA_COLORS[period], lw=1.35 if period <= 20 else 1.1, label=f"MA{period}")
+
+    ax.axhline(trade.signal.range_high, color="#8b949e", ls="--", lw=0.8, alpha=0.7)
+    ax.axhline(trade.signal.stop_loss, color="#ff5252", ls=":", lw=0.9)
+    ax.axhline(trade.signal.target, color="#69f0ae", ls=":", lw=0.9)
+
+    entry_mask = window.index == trade.signal.timestamp
+    exit_mask = window.index == trade.exit_time
+    entry_x = int(entry_mask.argmax()) if bool(entry_mask.any()) else None
+    exit_x = int(exit_mask.argmax()) if bool(exit_mask.any()) else None
+    if entry_x is not None:
+        ax.scatter([entry_x], [trade.signal.entry], marker="^", s=46, color="#00e676", zorder=5, label="IN")
+    if exit_x is not None:
+        ax.scatter(
+            [exit_x],
+            [trade.exit_price],
+            marker="x",
+            s=42,
+            color="#69f0ae" if trade.pnl_pct_net > 0 else "#ff5252",
+            zorder=5,
+            label="OUT",
         )
 
-    fig.add_hline(y=trade.signal.range_high, line_dash="dash", line_color="#8b949e", opacity=0.45, row=1, col=1)
-    fig.add_hline(y=trade.signal.stop_loss, line_dash="dot", line_color="#ff5252", opacity=0.7, row=1, col=1)
-    fig.add_hline(y=trade.signal.target, line_dash="dot", line_color="#69f0ae", opacity=0.7, row=1, col=1)
-
-    fig.add_trace(
-        go.Scatter(
-            x=[_naive(trade.signal.timestamp)],
-            y=[trade.signal.entry],
-            mode="markers",
-            marker=dict(symbol="triangle-up", size=13, color="#00e676", line=dict(width=1, color="white")),
-            name="進場",
-            showlegend=False,
-        ),
-        row=1,
-        col=1,
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[_naive(trade.exit_time)],
-            y=[trade.exit_price],
-            mode="markers",
-            marker=dict(
-                symbol="x",
-                size=11,
-                color="#69f0ae" if trade.pnl_pct_net > 0 else "#ff5252",
-                line=dict(width=2, color="white"),
-            ),
-            name="出場",
-            showlegend=False,
-        ),
-        row=1,
-        col=1,
-    )
-    colors = ["#ef5350" if c >= o else "#26a69a" for o, c in zip(window["open"], window["close"])]
-    fig.add_trace(
-        go.Bar(x=times, y=window["volume"], marker_color=colors, opacity=0.55, showlegend=False, name="量"),
-        row=2,
-        col=1,
-    )
-
-    fig.update_layout(
-        template="plotly_dark",
-        height=420,
-        margin=dict(l=48, r=12, t=36, b=28),
-        title=dict(text=f"#{trade_no} {trade.symbol} · {_fmt(trade.signal.timestamp)}", x=0.01, font=dict(size=13)),
-        xaxis_rangeslider_visible=False,
-        paper_bgcolor="#161b22",
-        plot_bgcolor="#161b22",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(size=10), bgcolor="rgba(0,0,0,0)"),
-        hovermode="x unified",
-    )
-    fig.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickformat="%m-%d %H:%M")
-    fig.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)", row=1, col=1)
-    return fig.to_html(full_html=False, include_plotlyjs=False, config={"displayModeBar": False})
+    ticks = list(range(0, len(window), max(1, len(window) // 6)))
+    axv.set_xticks(ticks)
+    axv.set_xticklabels([_naive(window.index[i]).strftime("%m-%d %H:%M") for i in ticks], rotation=0)
+    ax.set_title(f"#{trade_no} {trade.symbol}  1m  {_fmt(trade.signal.timestamp)}", color="#e6edf3", fontsize=11, loc="left")
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c9d1d9", ncol=5)
+    fig.tight_layout(pad=0.45)
+    return _png_tag(fig, alt=f"{trade.symbol} {_fmt(trade.signal.timestamp)}")
 
 
 def _equity_html(trades: list[NanyaMaTrade]) -> str:
     if not trades:
         return ""
-    xs = [_naive(t.exit_time) for t in trades]
     ys = []
     acc = 0.0
     for t in trades:
         acc += t.pnl_pct_net * 100
         ys.append(acc)
-    fig = go.Figure(
-        go.Scatter(x=xs, y=ys, mode="lines+markers", line=dict(color="#79c0ff", width=2), marker=dict(size=6))
-    )
-    fig.update_layout(
-        template="plotly_dark",
-        height=240,
-        margin=dict(l=48, r=12, t=28, b=28),
-        title=dict(text="累計淨損益（%）", x=0.01, font=dict(size=13)),
-        paper_bgcolor="#161b22",
-        plot_bgcolor="#161b22",
-        showlegend=False,
-    )
-    fig.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)")
-    fig.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)", zeroline=True, zerolinecolor="rgba(255,255,255,0.2)")
-    return fig.to_html(full_html=False, include_plotlyjs=False, config={"displayModeBar": False})
+    fig, ax = plt.subplots(figsize=(10.4, 2.6), facecolor="#161b22")
+    _style_axes(ax)
+    ax.plot(range(1, len(ys) + 1), ys, color="#79c0ff", lw=2, marker="o", ms=4)
+    ax.axhline(0, color="#ffffff33", lw=0.8)
+    ax.set_title("Net PnL %", color="#e6edf3", fontsize=11, loc="left")
+    fig.tight_layout(pad=0.45)
+    return _png_tag(fig, alt="累計淨損益")
 
 
 def build_backtest_site(
@@ -248,7 +231,6 @@ MA60 {trade.signal.ma60:.2f}　MA120 {trade.signal.ma120:.2f}　MA200 {trade.sig
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{html.escape(title)}</title>
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     :root {{
       --bg:#0b0e11; --panel:#161b22; --ink:#e6edf3; --muted:#8b949e;
@@ -298,6 +280,7 @@ MA60 {trade.signal.ma60:.2f}　MA120 {trade.signal.ma120:.2f}　MA200 {trade.sig
       white-space:pre-wrap;
     }}
     .chart {{ margin:0 -6px; }}
+    .chart img, .eq img {{ width:100%; height:auto; display:block; border-radius:8px; background:#10141a; }}
     .empty {{ text-align:center; color:var(--muted); padding:40px 12px; border:1px solid var(--line); border-radius:14px; }}
     .eq {{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:8px; margin-bottom:16px; }}
     @media (max-width:720px) {{ .stats {{ grid-template-columns:repeat(2,1fr); }} }}

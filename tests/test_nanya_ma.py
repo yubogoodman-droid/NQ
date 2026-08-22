@@ -93,7 +93,8 @@ class NanyaMaTests(unittest.TestCase):
             symbol_stats=[("DEMO.2408", summarize_ma_trades(trades), len(df))],
         )
         text = out.read_text(encoding="utf-8")
-        self.assertIn("plotly", text.lower())
+        self.assertIn("data:image/png;base64,", text)
+        self.assertIn("<img", text)
         self.assertIn("DEMO.2408", text)
         self.assertIn("MA5", text)
 
