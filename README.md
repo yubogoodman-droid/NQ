@@ -47,7 +47,7 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 python3 examples/backtest_tw_5m.py --days 5
 ```
 
-報告：`docs/tw/backtest-5m-15m-1h.html`（每檔一張圖：上五分K、中十五分K、下小時K）
+報告：`docs/tw/backtest-5m-15m-1h.html`（每檔一張圖：上五分K、中十五分K、下小時K、最下日K）
 
 ## 快速開始
 

@@ -33,11 +33,13 @@ CHART_BARS = {
     "5m": (36, 8),
     "15m": (28, 4),
     "1h": (20, 2),
+    "1d": (80, 8),
 }
 _PANEL_FREQ = {
     "5m": "5min",
     "15m": "15min",
     "1h": "1h",
+    "1d": "D",
 }
 UP = "#ef5350"
 DOWN = "#26a69a"
@@ -235,7 +237,7 @@ def _render(
 <body>
   <div class="page">
     <h1>{html.escape(title)}</h1>
-    <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K（十五分與小時都由五分K合成）</div>
+    <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 250，濾掉 ETF、金融股、電信股與收盤價 500 以上。
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
@@ -243,6 +245,7 @@ def _render(
       且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
       且小時K收盤也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
+      最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／200）方便對照。
       K 棒漲紅跌綠。
     </p>
     <div class="chips">
@@ -259,6 +262,7 @@ def _render(
       <span class="chip">收盤 &gt; 所有均線</span>
       <span class="chip">十五分K對照</span>
       <span class="chip">小時K對照</span>
+      <span class="chip">日K對照</span>
       {day_chips}
     </div>
     <div class="legend">
@@ -314,6 +318,7 @@ def _hit_card(
             f"<b>{snap.h1_close:.2f} &gt; {snap.h1_ma20:.2f}</b></div>"
         )
     extra_rows += _hour_later_row(hour_later_for_hit(hit))
+    extra_rows += _daily_ma_row(hit)
     return f"""
     <article class="card">
       <div class="top">
@@ -327,7 +332,7 @@ def _hit_card(
       {extra_rows}
       <div class="row"><span>前收 / 前MA200</span><b>{snap.prev_close:.2f} ≤ {snap.prev_ma200:.2f}</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
-      <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K</div>
+      <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K　最下＝日K</div>
       <div class="chart">{chart}</div>
     </article>
 """
@@ -344,11 +349,11 @@ def _chart_img(
     if not png:
         return '<p class="empty">無 K 線資料</p>'
     stamp = hit.snapshot.timestamp.strftime("%H%M")
-    fname = f"{hit.day.isoformat()}-{_safe_symbol(hit.stock.symbol)}-{stamp}-5m1h.png"
+    fname = f"{hit.day.isoformat()}-{_safe_symbol(hit.stock.symbol)}-{stamp}-5m1hd.png"
     (chart_dir / fname).write_bytes(png)
     rel = f"{chart_rel.as_posix()}/{fname}"
     src = html.escape(f"{image_base}{rel}" if image_base else rel)
-    alt = html.escape(f"{hit.stock.name} {hit.stock.symbol} 五分K＋十五分K＋小時K")
+    alt = html.escape(f"{hit.stock.name} {hit.stock.symbol} 五分K＋十五分K＋小時K＋日K")
     return f'<img alt="{alt}" src="{src}"/>'
 
 
@@ -359,15 +364,19 @@ def _chart_frame(hit: BacktestHit, timeframe: str) -> pd.DataFrame | None:
         return resample_ohlcv(hit.frame, "15min")
     if timeframe == "1h":
         return resample_ohlcv(hit.frame, "1h")
+    if timeframe == "1d":
+        if hit.daily is None or hit.daily.empty:
+            return None
+        return hit.daily
     return hit.frame
 
 
 def render_stacked_png(hit: BacktestHit) -> bytes | None:
-    """一張圖：上五分K、中十五分K、下小時K。"""
-    fig, axes = plt.subplots(3, 1, figsize=(8.4, 11.4), dpi=130)
+    """一張圖：上五分K、中十五分K、下小時K、最下日K。"""
+    fig, axes = plt.subplots(4, 1, figsize=(8.4, 14.8), dpi=130)
     fig.patch.set_facecolor(BG)
     fig.suptitle(
-        "上：五分K　　中：十五分K　　下：小時K",
+        "上：五分K　　中：十五分K　　下：小時K　　最下：日K",
         color="#7ee787",
         fontsize=13,
         fontproperties=_FONT,
@@ -378,6 +387,7 @@ def render_stacked_png(hit: BacktestHit) -> bytes | None:
         return None
     _draw_or_empty(axes[1], hit, "15m", "無十五分 K 線資料")
     _draw_or_empty(axes[2], hit, "1h", "無小時 K 線資料")
+    _draw_or_empty(axes[3], hit, "1d", "無日 K 線資料")
     fig.tight_layout(pad=0.45, h_pad=1.0, rect=(0, 0, 1, 0.97))
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=fig.get_facecolor(), bbox_inches="tight", pad_inches=0.12)
@@ -414,15 +424,9 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
     if frame is None or frame.empty:
         return False
     work = add_moving_averages(frame)
-    freq = _PANEL_FREQ.get(timeframe, "5min")
-    mark_ts = pd.Timestamp(hit.snapshot.timestamp).floor(freq)
-    if work.index.tz is not None:
-        mark_ts = (
-            mark_ts.tz_convert(work.index.tz)
-            if mark_ts.tzinfo
-            else mark_ts.tz_localize(work.index.tz)
-        )
-    work = work[work.index < mark_ts.normalize() + pd.Timedelta(days=1)]
+    mark_ts = _panel_mark(hit, timeframe, work)
+    if timeframe != "1d":
+        work = work[work.index < mark_ts.normalize() + pd.Timedelta(days=1)]
     before, after = CHART_BARS.get(timeframe, CHART_BARS["5m"])
     window = _window_around(work, mark_ts, before=before, after=after)
     if window.empty:
@@ -432,9 +436,10 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
     xs = list(range(n))
     ax.set_facecolor(BG)
     body_w = 0.7
-    for i in range(1, n):
-        if pd.Timestamp(window.index[i]).date() != pd.Timestamp(window.index[i - 1]).date():
-            ax.axvline(i - 0.5, color="#8b949e", linewidth=0.9, linestyle="--", alpha=0.55, zorder=1)
+    if timeframe != "1d":
+        for i in range(1, n):
+            if pd.Timestamp(window.index[i]).date() != pd.Timestamp(window.index[i - 1]).date():
+                ax.axvline(i - 0.5, color="#8b949e", linewidth=0.9, linestyle="--", alpha=0.55, zorder=1)
     for i, (_, row) in enumerate(window.iterrows()):
         o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
         color = UP if c >= o else DOWN
@@ -473,7 +478,12 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
         )
 
     loc = int(window.index.get_indexer([mark_ts], method="nearest")[0])
-    marker_label = "站上MA200" if timeframe == "5m" else "五分訊號"
+    if timeframe == "5m":
+        marker_label = "站上MA200"
+    elif timeframe == "1d":
+        marker_label = "訊號日"
+    else:
+        marker_label = "五分訊號"
     if 0 <= loc < n:
         ax.scatter(
             [loc],
@@ -489,9 +499,9 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
     ax.set_ylim(*_axis_ylim(window, ref, min_span_pct=0.03))
     ax.set_xlim(-1, n)
     bar_time = (
-        pd.Timestamp(window.index[loc]).strftime("%H:%M")
+        pd.Timestamp(window.index[loc]).strftime("%m/%d" if timeframe == "1d" else "%H:%M")
         if 0 <= loc < n
-        else hit.snapshot.timestamp.strftime("%H:%M")
+        else hit.snapshot.timestamp.strftime("%m/%d" if timeframe == "1d" else "%H:%M")
     )
     if timeframe == "1h":
         title = f"▼ 小時K（由五分合成）  {hit.stock.name} {hit.stock.symbol}  {bar_time}"
@@ -500,6 +510,10 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
     elif timeframe == "15m":
         title = f"▼ 十五分K（由五分合成）  {hit.stock.name} {hit.stock.symbol}  {bar_time}"
         title_color = "#fbbf24"
+        title_size = 12
+    elif timeframe == "1d":
+        title = f"▼ 日K  {hit.stock.name} {hit.stock.symbol}  {bar_time}"
+        title_color = "#e879f9"
         title_size = 12
     else:
         title = f"▲ 五分K  {hit.stock.name} {hit.stock.symbol}  {bar_time}"
@@ -520,10 +534,57 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
         ncol=5,
         prop=_FONT,
     )
-    ticks, labels = _session_tick_labels(window.index)
+    ticks, labels = (
+        _daily_tick_labels(window.index) if timeframe == "1d" else _session_tick_labels(window.index)
+    )
     ax.set_xticks(ticks)
     ax.set_xticklabels(labels)
     return True
+
+
+def _panel_mark(hit: BacktestHit, timeframe: str, work: pd.DataFrame) -> pd.Timestamp:
+    ts = pd.Timestamp(hit.snapshot.timestamp)
+    idx = work.index
+    if isinstance(idx, pd.DatetimeIndex) and idx.tz is not None:
+        ts = ts.tz_convert(idx.tz) if ts.tzinfo else ts.tz_localize(idx.tz)
+    elif ts.tzinfo is not None:
+        ts = ts.tz_localize(None)
+    if timeframe == "1d":
+        day = ts.date()
+        matched = [stamp for stamp in idx if pd.Timestamp(stamp).date() == day]
+        return pd.Timestamp(matched[0]) if matched else ts.normalize()
+    freq = _PANEL_FREQ.get(timeframe, "5min")
+    return ts.floor(freq)
+
+
+def _daily_ma_row(hit: BacktestHit) -> str:
+    if hit.daily is None or hit.daily.empty:
+        return ""
+    work = add_moving_averages(hit.daily)
+    mark = _panel_mark(hit, "1d", work)
+    loc = int(work.index.get_indexer([mark], method="nearest")[0])
+    if loc < 0:
+        return ""
+    row = work.iloc[loc]
+    parts = [f"{float(row['close']):.2f}"]
+    for name in ("ma5", "ma10", "ma20", "ma200"):
+        val = row.get(name)
+        parts.append("—" if val is None or pd.isna(val) else f"{float(val):.2f}")
+    return (
+        f'<div class="row"><span>日K / MA5 10 20 200</span>'
+        f"<b>{parts[0]}　MA {parts[1]} / {parts[2]} / {parts[3]} / {parts[4]}</b></div>"
+    )
+
+
+def _daily_tick_labels(index: pd.DatetimeIndex) -> tuple[list[int], list[str]]:
+    n = len(index)
+    if n == 0:
+        return [], []
+    ticks = {0, n - 1}
+    step = max(1, n // 6)
+    ticks.update(range(0, n, step))
+    ordered = sorted(ticks)
+    return ordered, [pd.Timestamp(index[i]).strftime("%m/%d") for i in ordered]
 
 
 def _session_tick_labels(index: pd.DatetimeIndex) -> tuple[list[int], list[str]]:

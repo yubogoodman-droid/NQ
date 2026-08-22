@@ -32,6 +32,7 @@ class BacktestConfig:
     exclude_financial: bool = True
     exclude_telecom: bool = True
     kline_range: str = "1mo"
+    daily_range: str = "2y"
     today: date | None = None
     timeout: int = 20
 
@@ -54,6 +55,7 @@ class BacktestHit:
     stock: RankedStock
     snapshot: AlertSnapshot
     frame: pd.DataFrame
+    daily: pd.DataFrame | None = None
 
 
 @dataclass
@@ -108,6 +110,7 @@ def run_5m_backtest(
                 )
 
     hits.sort(key=lambda h: (h.day, h.snapshot.timestamp, h.stock.rank))
+    _attach_daily_frames(hits, cfg.daily_range)
     return BacktestResult(
         scanned_at=datetime.now(TAIPEI),
         days=days,
@@ -179,3 +182,14 @@ def _load_session_universes(
         detail = f"（{last_error}）" if last_error else ""
         raise RuntimeError(f"湊不滿 {cfg.days} 個已公布交易日{detail}")
     return found
+
+
+def _attach_daily_frames(hits: list[BacktestHit], range_: str) -> None:
+    symbols = list(dict.fromkeys(hit.stock.symbol for hit in hits))
+    if not symbols:
+        return
+    print(f"日K下載 {len(symbols)} 檔（Yahoo {range_}）", flush=True)
+    dailies = fetch_bars_many(symbols, interval="1d", range_=range_, closed_only=False)
+    for hit in hits:
+        frame = dailies.get(hit.stock.symbol)
+        hit.daily = None if frame is None or frame.empty else frame

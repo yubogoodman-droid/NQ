@@ -187,6 +187,8 @@ def _normalize_ohlcv(
             freq = "5min"
         elif interval == "1h":
             freq = "h"
+        elif interval in ("1d", "1wk"):
+            freq = "D"
         else:
             freq = "min"
         if last.floor(freq) >= now.floor(freq):

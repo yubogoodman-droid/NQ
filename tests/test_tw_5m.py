@@ -40,6 +40,21 @@ def _ohlcv(closes: list[float], index: pd.DatetimeIndex) -> pd.DataFrame:
     )
 
 
+def _daily_ohlcv(end: date, days: int = 220, last_close: float = 105.0) -> pd.DataFrame:
+    idx = pd.bdate_range(end=end, periods=days, tz=TAIPEI)
+    close = pd.Series([100.0 + 0.02 * i for i in range(days)], index=idx, dtype=float)
+    close.iloc[-1] = last_close
+    return pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 0.5,
+            "low": close - 0.5,
+            "close": close,
+            "volume": 1000.0,
+        }
+    )
+
+
 def _history_then_live(live_closes: list[float], live_day: date = date(2026, 8, 21)) -> pd.DataFrame:
     hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
     hist = _ohlcv([100.0] * (54 * 4), _session_index(hist_days))
@@ -187,6 +202,7 @@ class ReportTests(unittest.TestCase):
                     stock=stock,
                     snapshot=hits[0],
                     frame=df,
+                    daily=_daily_ohlcv(date(2026, 8, 21)),
                 )
             ],
         )
@@ -195,15 +211,18 @@ class ReportTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             pngs = list(Path(tmp).joinpath("charts/out").glob("*.png"))
             self.assertEqual(len(pngs), 1)
-            self.assertTrue(pngs[0].name.endswith("-5m1h.png"))
+            self.assertTrue(pngs[0].name.endswith("-5m1hd.png"))
             from PIL import Image
 
             with Image.open(pngs[0]) as im:
-                self.assertGreater(im.height, 1000)
+                self.assertGreater(im.height, 1400)
         self.assertIn("南亞科", text)
         self.assertIn("十五分K", text)
         self.assertIn("十五分K / MA5 10 20", text)
         self.assertIn("小時K", text)
+        self.assertIn("日K", text)
+        self.assertIn("日K / MA5 10 20 200", text)
+        self.assertIn("最下＝日K", text)
         self.assertIn("上＝五分K", text)
         self.assertIn("均線發散", text)
         self.assertIn("成交額前 250", text)
