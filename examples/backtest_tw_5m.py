@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""台股五分 K 回測：MA5/10/20 多頭發散，當根收盤站上所有均線，且小時K在 MA20 之上。"""
+"""台股五分 K 回測：MA5/10/20 多頭發散，當根收盤站上所有均線，且當下與前1小時K都在小時 MA200 之上。"""
 
 from __future__ import annotations
 

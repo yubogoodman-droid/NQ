@@ -1,4 +1,4 @@
-"""五分 K：MA5/10/20 多頭發散，當根收盤站上所有均線（含 MA200），且小時K在 MA20 之上。"""
+"""五分 K：MA5/10/20 多頭發散，當根收盤站上所有均線，且當下與前一根小時K都在小時 MA200 之上。"""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ MA_MID = 10
 MA_SLOW = 20
 MA_LONG = 200
 H1_MA = 20
+H1_MA_LONG = 200
 # MA5 相對 MA20 至少拉開這麼多（％），否則算糾結。
 MIN_RIBBON_FAN_PCT = 0.50
 # MA5–MA10、MA10–MA20 各自相對收盤至少這麼多（％），避免其中兩條黏在一起。
@@ -35,6 +36,9 @@ class AlertSnapshot:
     prev_ma200: float
     h1_close: float | None = None
     h1_ma20: float | None = None
+    h1_ma200: float | None = None
+    h1_prev_close: float | None = None
+    h1_prev_ma200: float | None = None
 
     @property
     def bullish_aligned(self) -> bool:
@@ -94,6 +98,26 @@ class AlertSnapshot:
             and self.h1_close > self.h1_ma20
         )
 
+    @property
+    def hourly_two_bars_above_ma200(self) -> bool:
+        return (
+            self.h1_close is not None
+            and self.h1_ma200 is not None
+            and self.h1_prev_close is not None
+            and self.h1_prev_ma200 is not None
+            and self.h1_close > self.h1_ma200
+            and self.h1_prev_close > self.h1_prev_ma200
+        )
+
+
+@dataclass(frozen=True)
+class HourlyContext:
+    close: float
+    ma20: float
+    ma200: float
+    prev_close: float
+    prev_ma200: float
+
 
 def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
@@ -105,15 +129,32 @@ def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def hourly_close_and_ma20(five_min: pd.DataFrame) -> tuple[float, float] | None:
-    """用截至目前的五分K合成小時K，回傳（小時收盤, 小時MA20）。"""
+def hourly_context(five_min: pd.DataFrame) -> HourlyContext | None:
+    """用截至目前的五分K合成小時K：當下與前一根的收盤、MA20、MA200。"""
     hourly = resample_ohlcv(five_min, "1h")
-    if len(hourly) < H1_MA or "close" not in hourly.columns:
+    if len(hourly) < H1_MA_LONG + 1 or "close" not in hourly.columns:
         return None
-    ma20 = hourly["close"].rolling(H1_MA, min_periods=H1_MA).mean()
-    if pd.isna(ma20.iloc[-1]) or pd.isna(hourly["close"].iloc[-1]):
+    close = hourly["close"]
+    ma20 = close.rolling(H1_MA, min_periods=H1_MA).mean()
+    ma200 = close.rolling(H1_MA_LONG, min_periods=H1_MA_LONG).mean()
+    last = hourly.iloc[-1]
+    prev = hourly.iloc[-2]
+    if any(pd.isna(v) for v in (last["close"], prev["close"], ma20.iloc[-1], ma200.iloc[-1], ma200.iloc[-2])):
         return None
-    return float(hourly["close"].iloc[-1]), float(ma20.iloc[-1])
+    return HourlyContext(
+        close=float(last["close"]),
+        ma20=float(ma20.iloc[-1]),
+        ma200=float(ma200.iloc[-1]),
+        prev_close=float(prev["close"]),
+        prev_ma200=float(ma200.iloc[-2]),
+    )
+
+
+def hourly_close_and_ma20(five_min: pd.DataFrame) -> tuple[float, float] | None:
+    ctx = hourly_context(five_min)
+    if ctx is None:
+        return None
+    return ctx.close, ctx.ma20
 
 
 def iter_5m_ma200_alerts(
@@ -122,7 +163,7 @@ def iter_5m_ma200_alerts(
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
 ) -> list[AlertSnapshot]:
-    """同一交易日連續五分 K：MA5/10/20 發散，當根收盤剛站上 MA200，且小時K收在 MA20 之上。"""
+    """同一交易日連續五分 K：短均發散、剛站上五分 MA200，且當下與前一根小時K都在小時 MA200 之上。"""
     if df is None or len(df) < MA_LONG + 1:
         return []
     work = add_moving_averages(df)
@@ -149,13 +190,23 @@ def iter_5m_ma200_alerts(
             continue
         if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
             continue
-        hourly = hourly_close_and_ma20(work.iloc[: i + 1])
+        hourly = hourly_context(work.iloc[: i + 1])
         if hourly is None:
             continue
-        h1_close, h1_ma20 = hourly
-        if h1_close <= h1_ma20:
+        if hourly.close <= hourly.ma20:
             continue
-        hits.append(replace(snap, h1_close=h1_close, h1_ma20=h1_ma20))
+        if hourly.close <= hourly.ma200 or hourly.prev_close <= hourly.prev_ma200:
+            continue
+        hits.append(
+            replace(
+                snap,
+                h1_close=hourly.close,
+                h1_ma20=hourly.ma20,
+                h1_ma200=hourly.ma200,
+                h1_prev_close=hourly.prev_close,
+                h1_prev_ma200=hourly.prev_ma200,
+            )
+        )
     return hits
 
 

@@ -31,7 +31,7 @@ class BacktestConfig:
     exclude_etf: bool = True
     exclude_financial: bool = True
     exclude_telecom: bool = True
-    kline_range: str = "1mo"
+    kline_range: str = "3mo"
     today: date | None = None
     timeout: int = 20
 

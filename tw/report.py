@@ -193,7 +193,8 @@ def _render(
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 600 以上。
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段也不黏在一起），
       <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200，<strong>小時K收盤也要在小時 MA20 之上</strong>。開盤第一根因隔夜跳空不算。
+      且這根收盤必須高於 MA5／10／20／200，<strong>觸發當下與前一根小時K都要收在小時 MA200 之上</strong>，
+      且當下小時K也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
       K 棒漲紅跌綠。
     </p>
     <div class="chips">
@@ -205,6 +206,7 @@ def _render(
       <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
       <span class="chip">當根收盤站上 MA200</span>
       <span class="chip">小時K &gt; MA20</span>
+      <span class="chip">當下＋前1h &gt; 小時MA200</span>
       <span class="chip">收盤 &gt; 所有均線</span>
       <span class="chip">十五分K對照</span>
       <span class="chip">小時K對照</span>
@@ -250,6 +252,17 @@ def _hit_card(
         h1_row = (
             f'<div class="row"><span>小時K / MA20</span>'
             f"<b>{snap.h1_close:.2f} &gt; {snap.h1_ma20:.2f}</b></div>"
+        )
+    if (
+        snap.h1_close is not None
+        and snap.h1_ma200 is not None
+        and snap.h1_prev_close is not None
+        and snap.h1_prev_ma200 is not None
+    ):
+        h1_row += (
+            f'<div class="row"><span>小時K / MA200</span>'
+            f"<b>當下 {snap.h1_close:.2f} &gt; {snap.h1_ma200:.2f}　"
+            f"前1h {snap.h1_prev_close:.2f} &gt; {snap.h1_prev_ma200:.2f}</b></div>"
         )
     return f"""
     <article class="card">
@@ -395,7 +408,7 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
         vals = window[col].astype(float)
         if vals.notna().sum() == 0:
             continue
-        thick = period == 20 if timeframe == "1h" else period == 200
+        thick = period in (20, 200) if timeframe == "1h" else period == 200
         ax.plot(
             xs,
             vals,
