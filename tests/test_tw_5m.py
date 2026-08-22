@@ -58,11 +58,9 @@ class FiveMinSignalTests(unittest.TestCase):
         self.assertTrue(hit.crossed_above_ma200)
         self.assertTrue(hit.close_above_all_mas)
         self.assertTrue(hit.hourly_close_above_ma20)
-        self.assertTrue(hit.hourly_ma20_not_falling)
         self.assertTrue(hit.close_above_15m_mas)
         self.assertIsNotNone(hit.h1_close)
         self.assertGreater(hit.h1_close, hit.h1_ma20)
-        self.assertGreaterEqual(hit.h1_ma20, hit.h1_prev_ma20)
         self.assertGreater(hit.m15_close, hit.m15_ma5)
         self.assertGreater(hit.m15_close, hit.m15_ma10)
         self.assertGreater(hit.m15_close, hit.m15_ma20)
@@ -116,18 +114,6 @@ class FiveMinSignalTests(unittest.TestCase):
         hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
         idx = _session_index(hist_days)
         closes = [200.0] * 24 + [100.0] * (len(idx) - 24)
-        hist = _ohlcv(closes, idx)
-        live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
-        hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
-        self.assertEqual(hits, [])
-
-    def test_rejects_when_hourly_ma20_is_falling(self) -> None:
-        hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
-        idx = _session_index(hist_days)
-        closes = [100.0] * len(idx)
-        # 視窗最左邊那根小時K抬高，當下小時 MA20 會比前一根低。
-        for i in range(12):
-            closes[i] = 200.0
         hist = _ohlcv(closes, idx)
         live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
         hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
@@ -217,11 +203,11 @@ class ReportTests(unittest.TestCase):
         self.assertIn("十五分K", text)
         self.assertIn("十五分K / MA5 10 20", text)
         self.assertIn("小時K", text)
-        self.assertIn("小時 MA20 不下彎", text)
         self.assertIn("上＝五分K", text)
         self.assertIn("均線發散", text)
         self.assertIn("成交額前 250", text)
-        self.assertIn("股價 &lt; 600", text)
+        self.assertIn("股價 &lt; 500", text)
+        self.assertNotIn("小時 MA20 不下彎", text)
         self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
 

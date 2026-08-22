@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""台股五分 K 回測：MA5/10/20 多頭發散，當根收盤站上所有均線與十五分短均，小時K在 MA20 之上且 MA20 不能下彎。"""
+"""台股五分 K 回測：MA5/10/20 多頭發散，當根收盤站上所有均線與十五分短均，小時K在 MA20 之上。"""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--days", type=int, default=5, help="回測交易日數（預設 5）")
     p.add_argument("--top", type=int, default=250, help="成交額前 N 名（預設 250）")
-    p.add_argument("--max-price", type=float, default=600.0, help="濾掉此價格以上（預設 600）")
+    p.add_argument("--max-price", type=float, default=500.0, help="濾掉此價格以上（預設 500）")
     p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
     p.add_argument("--include-financial", action="store_true", help="不過濾金融股")
     p.add_argument("--include-telecom", action="store_true", help="不過濾電信股")

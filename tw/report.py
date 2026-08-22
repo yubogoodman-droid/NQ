@@ -204,11 +204,11 @@ def _render(
     <h1>{html.escape(title)}</h1>
     <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K（十五分與小時都由五分K合成）</div>
     <p class="lead">
-      同一套台股掃描池：每天上市＋上櫃成交額前 250，濾掉 ETF、金融股、電信股與收盤價 600 以上。
+      同一套台股掃描池：每天上市＋上櫃成交額前 250，濾掉 ETF、金融股、電信股與收盤價 500 以上。
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
       <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
-      且小時K收盤也要在小時 MA20 之上，<strong>小時 MA20 不能下彎</strong>。開盤第一根因隔夜跳空不算。
+      且小時K收盤也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
       K 棒漲紅跌綠。
     </p>
     <div class="chips">
@@ -217,12 +217,11 @@ def _render(
       <span class="chip">不含金融股</span>
       <span class="chip">不含電信股</span>
       <span class="chip">成交額前 250</span>
-      <span class="chip">股價 &lt; 600</span>
+      <span class="chip">股價 &lt; 500</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
       <span class="chip">當根收盤站上 MA200</span>
       <span class="chip">收盤 &gt; 十五分 MA5／10／20</span>
       <span class="chip">小時K &gt; MA20</span>
-      <span class="chip">小時 MA20 不下彎</span>
       <span class="chip">收盤 &gt; 所有均線</span>
       <span class="chip">十五分K對照</span>
       <span class="chip">小時K對照</span>
@@ -275,12 +274,9 @@ def _hit_card(
             f"<b>{snap.m15_close:.2f} &gt; {snap.m15_ma5:.2f} / {snap.m15_ma10:.2f} / {snap.m15_ma20:.2f}</b></div>"
         )
     if snap.h1_close is not None and snap.h1_ma20 is not None:
-        slope = ""
-        if snap.h1_prev_ma20 is not None:
-            slope = f"　MA20 {snap.h1_ma20:.2f} ≥ 前 {snap.h1_prev_ma20:.2f}"
         extra_rows += (
             f'<div class="row"><span>小時K / MA20</span>'
-            f"<b>{snap.h1_close:.2f} &gt; {snap.h1_ma20:.2f}{slope}</b></div>"
+            f"<b>{snap.h1_close:.2f} &gt; {snap.h1_ma20:.2f}</b></div>"
         )
     return f"""
     <article class="card">

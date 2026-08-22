@@ -1,4 +1,4 @@
-"""台股五分 K 回測：成交額前 N、多頭發散、當根收盤站上 MA200 與十五分短均，小時K在 MA20 之上且 MA20 不能下彎。"""
+"""台股五分 K 回測：成交額前 N、多頭發散、當根收盤站上 MA200 與十五分短均，小時K在 MA20 之上。"""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 class BacktestConfig:
     days: int = 5
     top: int = 250
-    max_price: float | None = 600.0
+    max_price: float | None = 500.0
     exclude_etf: bool = True
     exclude_financial: bool = True
     exclude_telecom: bool = True
