@@ -24,9 +24,7 @@
 
 ## 幣安 15 分 K：7/14/25 多頭 + 站上 MA200
 
-15 分圖收盤同時高於 **MA7、MA14、MA25、MA200**，且 SMA7 > SMA14 > SMA25，並且當下價格也在 **小時圖 SMA200** 之上。Telegram 只推「這一根剛站上 15 分 MA200」。
-
-小時圖同一套短均＋剛站上 1h MA200；4h 只畫圖不擋單。通知再加：站上前連續 **至少 96 根** 收盤在 MA200 下、收盤距 MA200 **≤ 2%**、近 24 根高低差 **≤ 4%**，且當時 **BTC 已在 1h MA200 上**（不看量比）。
+15 分圖收盤同時高於 **MA7、MA14、MA25、MA200**，且 SMA7 > SMA14 > SMA25。Telegram 只推「這一根剛站上該週期 MA200」。小時圖同一套。大週期圖只對照，不擋單；不再看量比、底下根數、高低差、BTC。
 
 ```bash
 python3 examples/backtest_15m_bull.py --demo
@@ -65,7 +63,7 @@ PythonProject2\
 pip install numpy requests matplotlib
 python 15M多排.py --test
 python 15M多排.py                 # 預設 15 分 + 1 小時都推
-python 15M多排.py --tf 1h         # 只推小時圖
+python 15M多排.py --tf 1h         # 只推小時圖（剛站上 1h MA200）
 python 15M多排.py --once
 ```
 

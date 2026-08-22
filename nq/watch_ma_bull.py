@@ -45,14 +45,14 @@ TF_WATCH = {
         "htf_ms": INTERVAL_MS["1h"],
         "sig_limit": 280,
         "htf_limit": 250,
-        "require_htf": True,
+        "require_htf": False,
         "min_below": None,
         "min_vol": None,
         "max_ext": None,
         "max_rng24": None,
         "require_btc_1h": False,
         "lookback": 48,
-        "title": "15m 剛站上 MA200（且在 1h MA200 上）",
+        "title": "15m 剛站上 MA200",
     },
     "1h": {
         "signal": "1h",
@@ -61,13 +61,13 @@ TF_WATCH = {
         "sig_limit": 420,
         "htf_limit": 250,
         "require_htf": False,
-        "min_below": 96,
+        "min_below": None,
         "min_vol": None,
-        "max_ext": 2.0,
-        "max_rng24": 4.0,
-        "require_btc_1h": True,
+        "max_ext": None,
+        "max_rng24": None,
+        "require_btc_1h": False,
         "lookback": 80,
-        "title": "1h 剛站上 MA200（底下夠久 + 波動小 + BTC 先站上）",
+        "title": "1h 剛站上 MA200",
     },
 }
 
@@ -375,8 +375,8 @@ def test_telegram() -> int:
     apply_keys()
     ok = telegram_send(
         "MA200 監看測試\n"
-        "15m：剛站上 15m MA200 且在 1h MA200 上\n"
-        "1h：剛站上 1h MA200，底下≥96根、距MA≤2%、高低差≤4%、BTC在1h MA200上\n"
+        "15m：剛站上 15m MA200（收盤 > 7>14>25）\n"
+        "1h：剛站上 1h MA200（收盤 > 7>14>25）\n"
         "如果你看到這則，Telegram 已通。"
     )
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
@@ -384,16 +384,7 @@ def test_telegram() -> int:
 
 
 def spec_note(spec: dict) -> str:
-    if spec["require_htf"]:
-        extra = f"且現價在 {spec['htf']} MA200 上"
-    else:
-        extra = (
-            f"底下≥{spec['min_below']}根、距MA≤{spec['max_ext']}%、"
-            f"高低差≤{spec.get('max_rng24')}% "
-            f"（{spec['htf']} 不擋單、不看量比"
-            f"{'、要 BTC 在 1h MA200 上' if spec.get('require_btc_1h') else ''}）"
-        )
-    return f"{spec['signal']} 剛站上 MA200、{extra}"
+    return f"{spec['signal']} 剛站上 MA200、收盤 > 7>14>25（{spec['htf']} 只畫圖、不擋單）"
 
 
 def main() -> int:

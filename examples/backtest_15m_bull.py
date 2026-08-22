@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""回測：收盤高於 MA7/14/25/200，且 7>14>25。預設 15 分（還要在 1h MA200 上）；`--tf 1h` 改小時圖（4h 只畫圖；通知要底下夠久、波動不大、BTC 先站上）。
+"""回測：收盤高於 MA7/14/25/200，且 7>14>25。通知只推本根剛站上該週期 MA200。大週期圖只對照、不擋單。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --stocks --pages
@@ -102,7 +102,7 @@ TF_SPECS = {
             "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
             "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html"
         ),
-        require_htf=True,
+        require_htf=False,
     ),
     "1h": TfSpec(
         signal="1h",
@@ -126,11 +126,11 @@ TF_SPECS = {
             "cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull-stocks.html"
         ),
         require_htf=False,
-        min_below=96,
+        min_below=None,
         min_vol=None,
-        max_ext=2.0,
-        max_rng24=4.0,
-        require_btc_1h=True,
+        max_ext=None,
+        max_rng24=None,
+        require_btc_1h=False,
         lookback=80,
     ),
 }
@@ -152,16 +152,7 @@ def notify_kwargs(spec: TfSpec) -> dict:
 
 
 def notify_label(spec: TfSpec) -> str:
-    bits = [f"剛站上 + 底下≥{spec.min_below}根"]
-    if spec.min_vol is not None:
-        bits.append(f"量≥{spec.min_vol}×")
-    if spec.max_ext is not None:
-        bits.append(f"距MA≤{spec.max_ext:g}%")
-    if spec.max_rng24 is not None:
-        bits.append(f"高低差≤{spec.max_rng24:g}%")
-    if spec.require_btc_1h:
-        bits.append("BTC在1hMA200上")
-    return "通知：" + " + ".join(bits)
+    return f"通知：本根剛站上 {spec.signal} MA200"
 
 
 def filter_defs(spec: TfSpec) -> tuple:
@@ -173,6 +164,7 @@ def filter_defs(spec: TfSpec) -> tuple:
         ("放量 ≥ 1.5×", {"crossed": None, "formed": None, "min_vol": 1.5, "max_ext": None}),
         ("剛站上 MA200 + 放量 ≥ 1.5×", {"crossed": True, "formed": None, "min_vol": 1.5, "max_ext": None}),
         ("距 MA200 ≤ 1.0%", {"crossed": None, "formed": None, "min_vol": None, "max_ext": 1.0}),
+        (notify_label(spec), notify_kwargs(spec)),
     ]
     if spec.min_below is not None:
         rows.extend(
@@ -380,7 +372,7 @@ def pick_gallery(rows: list[SignalRow], spec: TfSpec, limit: int = 18) -> list[S
     if not pool:
         return []
     pinned = []
-    for sym in ("BTCUSDT", "TRUMPUSDT", "CRCLUSDT"):
+    for sym in ("TUTUSDT", "BTCUSDT", "TRUMPUSDT", "CRCLUSDT"):
         pinned.extend(sorted([r for r in pool if r.symbol == sym], key=lambda r: r.time_ms, reverse=True)[:4])
 
     def score(r: SignalRow) -> float:
@@ -642,7 +634,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   {pin_card(notify_rows, spec, "TRUMPUSDT", "TRUMP")}
   {pin_card(notify_rows, spec, "CRCLUSDT", "CRCL")}
   <h1>圖例</h1>
-  <p class="sub">上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K。黃虛線是訊號時間。白線是各週期自己的 MA200。圖例只畫符合通知條件的（TRUMP、CRCL 若有會釘在最上面）。</p>
+  <p class="sub">上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K（只對照，不擋單）。黃虛線是訊號時間。白線是各週期自己的 MA200。圖例只畫剛站上 MA200 的通知（TUT、TRUMP、CRCL 若有會釘在最上面）。</p>
   {gallery_html(gallery, spec)}
   <div class="card">
     <h2>過濾對照</h2>
@@ -704,7 +696,7 @@ def main() -> int:
     p.add_argument("--demo", action="store_true")
     p.add_argument("--days", type=int, default=7)
     p.add_argument("--workers", type=int, default=8)
-    p.add_argument("--tf", choices=("15m", "1h"), default="15m", help="訊號週期；1h 時 4h 只畫圖、不擋單")
+    p.add_argument("--tf", choices=("15m", "1h"), default="15m", help="訊號週期；大週期圖只對照、不擋單")
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma15-bull.html 或 ma1h-bull.html")
     p.add_argument("-o", "--output", help="HTML 輸出路徑")
     p.add_argument("--limit-symbols", type=int, default=0)
@@ -763,10 +755,7 @@ def main() -> int:
     else:
         print(f"\n=== {spec.signal} 7/14/25 + MA200（不擋 {spec.htf} MA200）===")
         print(f"{spec.signal} 組合 {n_raw} 筆，留下 {n_raw - n_drop}")
-        if spec.min_below is not None:
-            print(
-                f"{notify_label(spec)} → {len(notify_rows)} 筆"
-            )
+        print(f"{notify_label(spec)} → {len(notify_rows)} 筆")
     for s in stats:
         h = s[f"h{spec.hold4}"]
         print(
@@ -781,6 +770,11 @@ def main() -> int:
     trump = [r for r in notify_rows if r.symbol == "TRUMPUSDT"]
     print(f"TRUMP 通知：{len(trump)} 筆")
     for r in trump:
+        mv = r.moves.get(spec.hold4)
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
+    tut = [r for r in notify_rows if r.symbol == "TUTUSDT"]
+    print(f"TUT 通知：{len(tut)} 筆")
+    for r in tut:
         mv = r.moves.get(spec.hold4)
         print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
     btc = [r for r in notify_rows if r.symbol == "BTCUSDT"]
@@ -869,6 +863,16 @@ def main() -> int:
                         "ext": r.ext_pct,
                     }
                     for r in btc
+                ],
+                "tut": [
+                    {
+                        "time": hm(r.time_ms),
+                        "close": r.sig.close,
+                        "below": r.bars_below,
+                        "vol": r.vol_ratio,
+                        "ext": r.ext_pct,
+                    }
+                    for r in tut
                 ],
                 "filters": stats,
                 "html": str(out_html),
