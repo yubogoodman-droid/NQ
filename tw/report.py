@@ -221,7 +221,7 @@ def _render(
     <div class="summary">
       五天共通知 <span class="ok">{len(result.hits)}</span> 則<br/>
       掃描時間 {html.escape(scanned)}（台北）<br/>
-      資料：證交所／櫃買盤後成交額 ＋ Yahoo 五分K
+      資料：證交所／櫃買盤後成交額 ＋ Yahoo 五分K／小時K
     </div>
     {''.join(sections)}
     <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>

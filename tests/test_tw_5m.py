@@ -140,6 +140,27 @@ class FiveMinSignalTests(unittest.TestCase):
         hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
         self.assertEqual(hits, [])
 
+    def test_official_hourly_can_reject_even_if_5m_resample_passes(self) -> None:
+        df = _history_then_live([99.0, 105.0])
+        self.assertEqual(len(iter_5m_ma200_alerts(df)), 1)
+        hours = pd.date_range("2026-01-05 09:00", periods=220, freq="h", tz=TAIPEI)
+        hourly = _ohlcv([200.0] * 200 + [50.0] * 20, hours)
+        self.assertEqual(iter_5m_ma200_alerts(df, hourly_full=hourly), [])
+
+    def test_official_hourly_supplies_ma200_when_5m_history_is_short(self) -> None:
+        live_day = date(2026, 8, 21)
+        hist_days = _weekdays_ending(live_day - timedelta(days=1), 5)
+        hist = _ohlcv([99.0] * (54 * len(hist_days)), _session_index(hist_days))
+        live = _ohlcv([99.0, 105.0], _session_index([live_day])[:2])
+        df = pd.concat([hist, live])
+        self.assertEqual(iter_5m_ma200_alerts(df), [])
+        hours = pd.date_range("2026-01-05 09:00", periods=220, freq="h", tz=TAIPEI)
+        hourly = _ohlcv([100.0] * 219 + [110.0], hours)
+        hits = iter_5m_ma200_alerts(df, hourly_full=hourly)
+        self.assertEqual(len(hits), 1)
+        self.assertGreater(hits[0].h1_close, hits[0].h1_ma200)
+        self.assertGreater(hits[0].h1_prev_close, hits[0].h1_prev_ma200)
+
 
 class FiveMinBacktestTests(unittest.TestCase):
     def test_run_scan_uses_daily_universe_and_5m_alerts(self) -> None:
@@ -159,9 +180,14 @@ class FiveMinBacktestTests(unittest.TestCase):
         def fake_universes(cfg, as_of, sess):
             return [universe]
 
+        def fake_fetch(symbols, interval="5m", **kwargs):
+            if interval == "5m":
+                return {"2408.TW": df}
+            return {}
+
         with (
             patch("tw.backtest_5m._load_session_universes", side_effect=fake_universes),
-            patch("tw.backtest_5m.fetch_bars_many", return_value={"2408.TW": df}),
+            patch("tw.backtest_5m.fetch_bars_many", side_effect=fake_fetch),
         ):
             result = run_5m_backtest(BacktestConfig(days=1, today=date(2026, 8, 21)))
         self.assertEqual(len(result.hits), 1)

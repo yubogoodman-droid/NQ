@@ -129,10 +129,41 @@ def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def hourly_context(five_min: pd.DataFrame) -> HourlyContext | None:
-    """用截至目前的五分K合成小時K：當下與前一根的收盤、MA20、MA200。"""
-    hourly = resample_ohlcv(five_min, "1h")
-    if len(hourly) < H1_MA_LONG + 1 or "close" not in hourly.columns:
+def _hourly_upto(
+    five_min: pd.DataFrame,
+    hourly_full: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """已收盤的小時K用獨立資料，當下這根小時K只看到訊號當下的五分K，避免偷看未來。"""
+    if five_min is None or five_min.empty:
+        return resample_ohlcv(five_min, "1h")
+    if hourly_full is None or hourly_full.empty:
+        return resample_ohlcv(five_min, "1h")
+    end = pd.Timestamp(five_min.index[-1])
+    hour_start = end.floor("h")
+    completed = hourly_full.copy()
+    idx = pd.DatetimeIndex(completed.index)
+    if idx.tz is None:
+        idx = idx.tz_localize(end.tz if end.tz is not None else "Asia/Taipei")
+    elif end.tz is not None:
+        idx = idx.tz_convert(end.tz)
+    completed.index = idx
+    completed = completed[completed.index < hour_start]
+    forming = resample_ohlcv(five_min[five_min.index >= hour_start], "1h")
+    if forming.empty:
+        return completed
+    if completed.empty:
+        return forming
+    out = pd.concat([completed, forming])
+    return out[~out.index.duplicated(keep="last")].sort_index()
+
+
+def hourly_context(
+    five_min: pd.DataFrame,
+    hourly_full: pd.DataFrame | None = None,
+) -> HourlyContext | None:
+    """當下與前一根小時K的收盤、MA20、MA200。優先用獨立小時K，不足再由五分合成。"""
+    hourly = _hourly_upto(five_min, hourly_full)
+    if hourly is None or len(hourly) < H1_MA_LONG + 1 or "close" not in hourly.columns:
         return None
     close = hourly["close"]
     ma20 = close.rolling(H1_MA, min_periods=H1_MA).mean()
@@ -162,6 +193,7 @@ def iter_5m_ma200_alerts(
     *,
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
+    hourly_full: pd.DataFrame | None = None,
 ) -> list[AlertSnapshot]:
     """同一交易日連續五分 K：短均發散、剛站上五分 MA200，且當下與前一根小時K都在小時 MA200 之上。"""
     if df is None or len(df) < MA_LONG + 1:
@@ -190,7 +222,7 @@ def iter_5m_ma200_alerts(
             continue
         if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
             continue
-        hourly = hourly_context(work.iloc[: i + 1])
+        hourly = hourly_context(work.iloc[: i + 1], hourly_full=hourly_full)
         if hourly is None:
             continue
         if hourly.close <= hourly.ma20:

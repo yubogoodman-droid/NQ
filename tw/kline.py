@@ -183,7 +183,12 @@ def _normalize_ohlcv(
     if closed_only and len(work) >= 2:
         last = pd.Timestamp(work.index[-1])
         now = pd.Timestamp(datetime.now(TAIPEI))
-        freq = "5min" if interval == "5m" else "min"
+        if interval == "5m":
+            freq = "5min"
+        elif interval == "1h":
+            freq = "h"
+        else:
+            freq = "min"
         if last.floor(freq) >= now.floor(freq):
             work = work.iloc[:-1]
     return work.astype(float)
