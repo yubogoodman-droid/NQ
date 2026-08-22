@@ -56,6 +56,18 @@ python -m unittest tests.test_candles
 
 報告寫到 `docs/1m-candles/index.html`。Yahoo 一分 K 最多約 7 個交易日，結果只供學習。
 
+## 南亞科一分均線回測
+
+對應截圖 MA5/10/20/60/120/200：盤整時短均要黏；進場是短均**剛**排成 5>10>20、價剛離開 MA200。已經排成 436 那種末端多頭不追。停損看 MA20，收盤跌破 MA20 離場。
+
+```bash
+python examples/run_nanya_ma.py --demo
+python examples/run_nanya_ma.py
+python -m unittest tests.test_nanya_ma
+```
+
+報告：`docs/nanya-ma/index.html`。
+
 ## 快速開始
 
 ```bash
