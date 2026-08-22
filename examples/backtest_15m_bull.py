@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""回測：收盤高於 MA7/14/25/200，且 7>14>25。通知只推本根剛站上該週期 MA200。大週期圖只對照、不擋單。
+"""回測：收盤高於 MA7/14/25/200，且 7>14>25。
+
+15m 通知：剛站上 MA200，或站上後 4 根內才收出 7>14>25。
+1h 通知：只推本根剛站上 1h MA200。大週期圖只對照、不擋單。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --stocks --pages
@@ -72,6 +75,7 @@ class TfSpec:
     min_vol: float | None = None
     max_ext: float | None = None
     max_rng24: float | None = None
+    max_bars_above: int | None = None
     require_btc_1h: bool = False
     lookback: int = 48
 
@@ -103,6 +107,7 @@ TF_SPECS = {
             "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html"
         ),
         require_htf=False,
+        max_bars_above=4,
     ),
     "1h": TfSpec(
         signal="1h",
@@ -137,7 +142,11 @@ TF_SPECS = {
 
 
 def notify_kwargs(spec: TfSpec) -> dict:
-    kw: dict = {"crossed": True}
+    kw: dict = {}
+    if spec.max_bars_above is not None:
+        kw["max_bars_above"] = spec.max_bars_above
+    else:
+        kw["crossed"] = True
     if spec.min_below is not None:
         kw["min_below"] = spec.min_below
     if spec.min_vol is not None:
@@ -152,6 +161,10 @@ def notify_kwargs(spec: TfSpec) -> dict:
 
 
 def notify_label(spec: TfSpec) -> str:
+    if spec.max_bars_above is not None:
+        return (
+            f"通知：剛站上 {spec.signal} MA200，或站上後 {spec.max_bars_above} 根內收出 7>14>25"
+        )
     return f"通知：本根剛站上 {spec.signal} MA200"
 
 
@@ -166,6 +179,14 @@ def filter_defs(spec: TfSpec) -> tuple:
         ("距 MA200 ≤ 1.0%", {"crossed": None, "formed": None, "min_vol": None, "max_ext": 1.0}),
         (notify_label(spec), notify_kwargs(spec)),
     ]
+    if spec.max_bars_above is not None:
+        rows.insert(
+            -1,
+            (
+                f"已在 MA200 上，且站上後 ≤ {spec.max_bars_above} 根才排好",
+                {"formed": True, "max_bars_above": spec.max_bars_above},
+            ),
+        )
     if spec.min_below is not None:
         rows.extend(
             [
@@ -325,8 +346,8 @@ def draw_chart(
     r4 = row.moves.get(spec.hold4)
     rtxt = f"  4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
     title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
-    kind = "reclaim MA200" if row.crossed_200d else "close>7/14/25/200"
-    extra = f"  below={row.bars_below}  vol={row.vol_ratio:.2f}x  ext={row.ext_pct:+.2f}%"
+    kind = "reclaim MA200" if row.crossed_200d else f"stack within {row.bars_above} bars of MA200"
+    extra = f"  below={row.bars_below}  above={row.bars_above}  vol={row.vol_ratio:.2f}x  ext={row.ext_pct:+.2f}%"
 
     hi = tf_bar_idx(d_htf, row.time_ms, spec.htf_ms) if d_htf is not None and len(d_htf.get("c", [])) else None
     stacked = hi is not None
@@ -442,7 +463,7 @@ def stats_table(stats: list[dict], spec: TfSpec) -> str:
 
 def signal_table(rows: list[SignalRow], spec: TfSpec, limit: int = 80) -> str:
     hs = spec.table_horizons
-    focus = [r for r in rows if r.crossed_200d] or rows
+    focus = list(rows)
     ranked = sorted(
         focus,
         key=lambda r: -(r.moves.get(spec.hold4).ret_pct or -999)
@@ -451,7 +472,7 @@ def signal_table(rows: list[SignalRow], spec: TfSpec, limit: int = 80) -> str:
     )[:limit]
     body = []
     for r in ranked:
-        kind = "站上MA200" if r.crossed_200d else "收上短均"
+        kind = "站上MA200" if r.crossed_200d else f"站上後{r.bars_above}根內"
         cells = [
             f'<td class="mono">{hm(r.time_ms)}</td>',
             f"<td>{html.escape(sym_label(r.symbol))}</td>",
@@ -514,7 +535,11 @@ def gallery_html(gallery: list[tuple[SignalRow, str]], spec: TfSpec) -> str:
         return '<p class="note">這段期間沒有圖例。</p>'
     cards = []
     for row, rel in gallery:
-        kind = f"本根剛站上 {spec.signal} MA200" if row.crossed_200d else "已在 MA200 上，本根才收上短均"
+        kind = (
+            f"本根剛站上 {spec.signal} MA200"
+            if row.crossed_200d
+            else f"站上後 {row.bars_above} 根內才收出 7>14>25"
+        )
         r4 = row.moves.get(spec.hold4)
         rtxt = f"4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
         src = public_img_src(rel)
@@ -586,10 +611,19 @@ def write_html(
                 f"{extra}"
             )
         else:
-            notify_rule = (
-                f"Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
-                f"這一根收盤站上，同時收盤也在 7/14/25 之上。"
-            )
+            if spec.max_bars_above is not None:
+                notify_rule = (
+                    f"Telegram 通知：<strong>剛站上 {html.escape(tf)} MA200</strong>"
+                    f"（前收還在 MA200 下、本根收盤站上且 7&gt;14&gt;25），"
+                    f"或<strong>站上後 {spec.max_bars_above} 根內</strong>才收出 7&gt;14&gt;25"
+                    f"（避免像 TUT 先站上 MA200、兩根後才排好均線卻漏推）。"
+                    f"不會把已經在 MA200 上很久才排好的訊號都打進去。"
+                )
+            else:
+                notify_rule = (
+                    f"Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
+                    f"這一根收盤站上，同時收盤也在 7/14/25 之上。"
+                )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -631,10 +665,11 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     僅供型態對照，不是進出場建議。
   </p>
   <div class="kpis">{kpi_block(stats, spec)}</div>
+  {pin_card(notify_rows, spec, "TUTUSDT", "TUT")}
   {pin_card(notify_rows, spec, "TRUMPUSDT", "TRUMP")}
   {pin_card(notify_rows, spec, "CRCLUSDT", "CRCL")}
   <h1>圖例</h1>
-  <p class="sub">上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K（只對照，不擋單）。黃虛線是訊號時間。白線是各週期自己的 MA200。圖例只畫剛站上 MA200 的通知（TUT、TRUMP、CRCL 若有會釘在最上面）。</p>
+  <p class="sub">上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K（只對照，不擋單）。黃虛線是訊號時間。白線是各週期自己的 MA200。圖例只畫通知條件（TUT、TRUMP、CRCL 若有會釘在最上面）。</p>
   {gallery_html(gallery, spec)}
   <div class="card">
     <h2>過濾對照</h2>
@@ -766,17 +801,17 @@ def main() -> int:
     print(f"CRCL 通知：{len(crcl)} 筆")
     for r in crcl:
         mv = r.moves.get(spec.hold4)
-        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  above={r.bars_above}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
     trump = [r for r in notify_rows if r.symbol == "TRUMPUSDT"]
     print(f"TRUMP 通知：{len(trump)} 筆")
     for r in trump:
         mv = r.moves.get(spec.hold4)
-        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  above={r.bars_above}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
     tut = [r for r in notify_rows if r.symbol == "TUTUSDT"]
     print(f"TUT 通知：{len(tut)} 筆")
     for r in tut:
         mv = r.moves.get(spec.hold4)
-        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  below={r.bars_below}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  crossed={r.crossed_200d}  above={r.bars_above}  vol={r.vol_ratio:.2f}  4h={mv.ret_pct if mv else None}")
     btc = [r for r in notify_rows if r.symbol == "BTCUSDT"]
     print(f"BTC 通知：{len(btc)} 筆")
     for r in btc:

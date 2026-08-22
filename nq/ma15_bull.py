@@ -46,6 +46,16 @@ def bars_below_ma200(c, m200, i: int) -> int:
     return n
 
 
+def bars_above_ma200(c, m200, i: int) -> int:
+    """本根之前連續幾根收盤已在 MA200 上（不含本根）。剛站上那根為 0。"""
+    n = 0
+    j = i - 1
+    while j >= 0 and not np.isnan(m200[j]) and c[j] > m200[j]:
+        n += 1
+        j -= 1
+    return n
+
+
 def rng24_pct(h, l, m200, i: int) -> float:
     """站上前 24 根的高低差，相對當時 MA200。"""
     a0 = max(0, i - 24)
@@ -74,6 +84,7 @@ class BullSignal:
     formed_align: bool
     bars_below: int = 0
     rng24: float = 0.0
+    bars_above: int = 0
 
     # 舊欄位別名，給既有回測腳本用
     @property
@@ -94,8 +105,9 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
     進場：這一根收盤 > MA7 > MA14 > MA25，且收盤 > 15 分 MA200，
     前一根還沒同時成立。
 
-    crossed_200：前收還在 MA200 下，本根收盤站上（通知用這個）。
+    crossed_200：前收還在 MA200 下，本根收盤站上。
     formed_align：已經在 MA200 上，本根才收上短均／排成 7>14>25。
+    15m 通知：crossed_200，或 formed_align 且 bars_above ≤ 4（站上後 1 小時內才排好）。
     """
     c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
     m7, m14, m25, m200 = d["m7"], d["m14"], d["m25"], d["m200"]
@@ -131,6 +143,7 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
                 formed_align=bool(c[i - 1] > m200[i - 1] and not _stack_ok(c, m7, m14, m25, m200, i - 1)),
                 bars_below=bars_below_ma200(c, m200, i),
                 rng24=rng24_pct(h, l, m200, i),
+                bars_above=bars_above_ma200(c, m200, i),
             )
         )
         last_i = i
@@ -225,6 +238,10 @@ class SignalRow:
     def rng24(self) -> float:
         return self.sig.rng24
 
+    @property
+    def bars_above(self) -> int:
+        return self.sig.bars_above
+
 
 def forward_moves(
     d: dict,
@@ -302,6 +319,7 @@ def apply_filter(
     max_ext: float | None = None,
     min_below: int | None = None,
     max_rng24: float | None = None,
+    max_bars_above: int | None = None,
     require_btc_1h: bool | None = None,
 ) -> list[SignalRow]:
     out = rows
@@ -317,6 +335,12 @@ def apply_filter(
         out = [r for r in out if r.bars_below >= min_below]
     if max_rng24 is not None:
         out = [r for r in out if r.rng24 <= max_rng24]
+    if max_bars_above is not None:
+        out = [
+            r
+            for r in out
+            if r.crossed_200d or (r.formed_align and r.bars_above <= max_bars_above)
+        ]
     if require_btc_1h:
         out = [r for r in out if r.btc_1h_ok]
     return out
@@ -329,9 +353,14 @@ def quality_reclaim(
     min_vol: float | None = None,
     max_ext: float | None = None,
     max_rng24: float | None = None,
+    max_bars_above: int | None = None,
 ) -> bool:
-    """剛站上、底下趴夠久、收盤還貼著 MA200；可再限波動。"""
-    if not sig.crossed_200:
+    """剛站上；15m 可放寬：站上後 max_bars_above 根內才收出 7>14>25。"""
+    if sig.crossed_200:
+        pass
+    elif max_bars_above is not None and sig.formed_align and sig.bars_above <= max_bars_above:
+        pass
+    else:
         return False
     if min_below is not None and sig.bars_below < min_below:
         return False

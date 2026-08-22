@@ -1,4 +1,8 @@
-"""15 分 / 1 小時 MA200 剛站上 → Telegram（與回測同一套規則）。"""
+"""15 分 / 1 小時 MA200 剛站上 → Telegram（與回測同一套規則）。
+
+15m：剛站上，或站上後 4 根內才收出 7>14>25。
+1h：只推本根剛站上 1h MA200。
+"""
 
 from __future__ import annotations
 
@@ -50,9 +54,10 @@ TF_WATCH = {
         "min_vol": None,
         "max_ext": None,
         "max_rng24": None,
+        "max_bars_above": 4,
         "require_btc_1h": False,
         "lookback": 48,
-        "title": "15m 剛站上 MA200",
+        "title": "15m 剛站上 MA200（4根內寬限）",
     },
     "1h": {
         "signal": "1h",
@@ -65,6 +70,7 @@ TF_WATCH = {
         "min_vol": None,
         "max_ext": None,
         "max_rng24": None,
+        "max_bars_above": None,
         "require_btc_1h": False,
         "lookback": 80,
         "title": "1h 剛站上 MA200",
@@ -212,7 +218,10 @@ def draw_chart(sym: str, d: dict, sig, spec: dict, path: str, d_htf: dict | None
     a0 = max(0, i - spec["lookback"])
     a1 = min(len(d["c"]), i + 4)
     title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
-    extra = f"  below={sig.bars_below}  vol={sig.vol_ratio:.2f}x  ext={sig.ext_pct:+.2f}%"
+    extra = (
+        f"  below={sig.bars_below}  above={sig.bars_above}  "
+        f"vol={sig.vol_ratio:.2f}x  ext={sig.ext_pct:+.2f}%"
+    )
     hi = tf_bar_idx(d_htf, ts, spec["htf_ms"]) if d_htf is not None and len(d_htf.get("c", [])) else None
     stacked = hi is not None
     if stacked:
@@ -259,8 +268,6 @@ def load_btc_1h() -> dict | None:
 
 
 def passes_notify(sig, spec: dict, d_htf, ts: int, btc_1h: dict | None) -> bool:
-    if not sig.crossed_200:
-        return False
     if spec["require_htf"] and not above_htf_ma200(d_htf, ts, sig.close, spec["htf_ms"]):
         return False
     if spec.get("require_btc_1h") and not bar_above_ma200(btc_1h, ts, INTERVAL_MS["1h"]):
@@ -271,6 +278,7 @@ def passes_notify(sig, spec: dict, d_htf, ts: int, btc_1h: dict | None) -> bool:
         min_vol=spec["min_vol"],
         max_ext=spec["max_ext"],
         max_rng24=spec.get("max_rng24"),
+        max_bars_above=spec.get("max_bars_above"),
     )
 
 
@@ -311,13 +319,15 @@ def format_ev(ev: dict) -> str:
     else:
         hline = f"{htxt}（參考，不擋單）"
     extra = ""
+    if not sig.crossed_200:
+        extra += f"站上後第 {sig.bars_above} 根才收出 7&gt;14&gt;25\n"
     if spec["min_below"] is not None:
-        extra = (
+        extra += (
             f"底下已跌 {sig.bars_below} 根　高低差 {sig.rng24:.2f}%　"
             f"量比 {sig.vol_ratio:.2f}×　距 {tf} MA200 {sig.ext_pct:+.2f}%\n"
         )
     else:
-        extra = f"距 {tf} MA200 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×\n"
+        extra += f"距 {tf} MA200 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×\n"
     if spec.get("require_btc_1h"):
         extra += "BTC 當時在 1h MA200 上\n"
     return (
@@ -375,7 +385,7 @@ def test_telegram() -> int:
     apply_keys()
     ok = telegram_send(
         "MA200 監看測試\n"
-        "15m：剛站上 15m MA200（收盤 > 7>14>25）\n"
+        "15m：剛站上，或站上後 4 根內才收出 7>14>25\n"
         "1h：剛站上 1h MA200（收盤 > 7>14>25）\n"
         "如果你看到這則，Telegram 已通。"
     )
@@ -384,6 +394,12 @@ def test_telegram() -> int:
 
 
 def spec_note(spec: dict) -> str:
+    n = spec.get("max_bars_above")
+    if n is not None:
+        return (
+            f"{spec['signal']} 剛站上 MA200，或站上後 {n} 根內收出 7>14>25"
+            f"（{spec['htf']} 只畫圖、不擋單）"
+        )
     return f"{spec['signal']} 剛站上 MA200、收盤 > 7>14>25（{spec['htf']} 只畫圖、不擋單）"
 
 
