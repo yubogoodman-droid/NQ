@@ -244,6 +244,7 @@ def _render(
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
       <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
+      且<strong>十五分K已在 MA200 上至少半小時</strong>，
       且小時K收盤也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
@@ -259,6 +260,7 @@ def _render(
       <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
       <span class="chip">當根收盤站上 MA200</span>
       <span class="chip">收盤 &gt; 十五分 MA5／10／20</span>
+      <span class="chip">十五分K在 MA200 上 ≥ 半小時</span>
       <span class="chip">小時K &gt; MA20</span>
       <span class="chip">收盤 &gt; 所有均線</span>
       <span class="chip">十五分K對照</span>
@@ -314,6 +316,11 @@ def _hit_card(
             f'<div class="row"><span>十五分K / MA5 10 20</span>'
             f"<b>{snap.m15_close:.2f} &gt; {snap.m15_ma5:.2f} / {snap.m15_ma10:.2f} / {snap.m15_ma20:.2f}</b></div>"
         )
+        if snap.m15_ma200 is not None and snap.m15_above_ma200_minutes is not None:
+            extra_rows += (
+                f'<div class="row"><span>十五分K / MA200</span>'
+                f"<b>{snap.m15_close:.2f} &gt; {snap.m15_ma200:.2f}　已在上 {snap.m15_above_ma200_minutes} 分</b></div>"
+            )
     if snap.h1_close is not None and snap.h1_ma20 is not None:
         extra_rows += (
             f'<div class="row"><span>小時K / MA20</span>'

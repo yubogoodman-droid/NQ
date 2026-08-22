@@ -55,9 +55,20 @@ def _daily_ohlcv(end: date, days: int = 220, last_close: float = 105.0) -> pd.Da
     )
 
 
+def _weekdays_before(end: date, n: int) -> list[date]:
+    days: list[date] = []
+    current = end
+    while len(days) < n:
+        if current.weekday() < 5:
+            days.append(current)
+        current -= timedelta(days=1)
+    days.reverse()
+    return days
+
+
 def _history_then_live(live_closes: list[float], live_day: date = date(2026, 8, 21)) -> pd.DataFrame:
-    hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
-    hist = _ohlcv([100.0] * (54 * 4), _session_index(hist_days))
+    hist_days = _weekdays_before(live_day - timedelta(days=1), 14)
+    hist = _ohlcv([100.0] * (54 * len(hist_days)), _session_index(hist_days))
     live_index = _session_index([live_day])[: len(live_closes)]
     live = _ohlcv(live_closes, live_index)
     return pd.concat([hist, live])
@@ -80,6 +91,9 @@ class FiveMinSignalTests(unittest.TestCase):
         self.assertGreater(hit.m15_close, hit.m15_ma5)
         self.assertGreater(hit.m15_close, hit.m15_ma10)
         self.assertGreater(hit.m15_close, hit.m15_ma20)
+        self.assertGreater(hit.m15_close, hit.m15_ma200)
+        self.assertGreaterEqual(hit.m15_above_ma200_minutes, 30)
+        self.assertTrue(hit.fifteen_above_ma200_half_hour)
         self.assertGreaterEqual(hit.ribbon_fan_pct, 0.50)
         self.assertGreater(hit.close, hit.ma5)
         self.assertGreater(hit.close, hit.ma200)
@@ -130,6 +144,18 @@ class FiveMinSignalTests(unittest.TestCase):
         hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
         idx = _session_index(hist_days)
         closes = [200.0] * 24 + [100.0] * (len(idx) - 24)
+        hist = _ohlcv(closes, idx)
+        live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
+        hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
+        self.assertEqual(hits, [])
+
+    def test_rejects_when_15m_just_crossed_ma200(self) -> None:
+        hist_days = _weekdays_before(date(2026, 8, 20), 14)
+        idx = _session_index(hist_days)
+        closes = [100.0] * len(idx)
+        # 最近兩根十五分K壓回 MA200 下，當根才剛站上，未滿半小時。
+        for i in range(len(closes) - 6, len(closes)):
+            closes[i] = 90.0
         hist = _ohlcv(closes, idx)
         live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
         hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
@@ -219,6 +245,9 @@ class ReportTests(unittest.TestCase):
         self.assertIn("南亞科", text)
         self.assertIn("十五分K", text)
         self.assertIn("十五分K / MA5 10 20", text)
+        self.assertIn("十五分K / MA200", text)
+        self.assertIn("已在上", text)
+        self.assertIn("半小時", text)
         self.assertIn("小時K", text)
         self.assertIn("日K", text)
         self.assertIn("日K / MA5 10 20 60 200", text)
