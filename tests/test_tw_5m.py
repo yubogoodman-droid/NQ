@@ -12,6 +12,7 @@ import pandas as pd
 from tw.backtest_5m import BacktestConfig, BacktestHit, BacktestResult, DayUniverse, run_5m_backtest
 from tw.kline import resample_ohlcv
 from tw.ranking import RankedStock
+from tw.forward import hour_later, summarize_hour_later
 from tw.report import _session_tick_labels, save_backtest_html, weekday_zh
 from tw.signals import iter_5m_ma200_alerts
 
@@ -207,6 +208,8 @@ class ReportTests(unittest.TestCase):
         self.assertIn("均線發散", text)
         self.assertIn("成交額前 250", text)
         self.assertIn("股價 &lt; 500", text)
+        self.assertIn("一小時後", text)
+        self.assertIn("進場後一小時勝率", text)
         self.assertNotIn("小時 MA20 不下彎", text)
         self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
@@ -220,6 +223,43 @@ class ReportTests(unittest.TestCase):
         self.assertTrue(any("08/14" in lab for lab in labels))
         self.assertTrue(any("08/17" in lab for lab in labels))
         self.assertFalse(any("08/15" in lab or "08/16" in lab for lab in labels))
+
+
+class HourLaterTests(unittest.TestCase):
+    def test_reads_the_same_session_bar_one_hour_later(self) -> None:
+        idx = _session_index([date(2026, 8, 21)])
+        closes = [100.0] * len(idx)
+        closes[12] = 103.0
+        df = _ohlcv(closes, idx)
+        move = hour_later(df, idx[0], 100.0)
+        self.assertIsNotNone(move)
+        self.assertEqual(move.later, 103.0)
+        self.assertTrue(move.win)
+        self.assertAlmostEqual(move.ret_pct, 3.0)
+
+    def test_skips_when_the_session_has_no_full_hour(self) -> None:
+        idx = _session_index([date(2026, 8, 21)])
+        df = _ohlcv([100.0] * len(idx), idx)
+        move = hour_later(df, idx[-5], 100.0)
+        self.assertIsNone(move)
+
+    def test_summary_counts_wins_and_short_sessions(self) -> None:
+        df = _history_then_live([99.0, 105.0] + [106.0] * 20)
+        hits = iter_5m_ma200_alerts(df)
+        self.assertEqual(len(hits), 1)
+        stock = RankedStock(1, "2408.TW", "南亞科", 105.0, 1.0, 1.0, 100, 1e9, "TAI")
+        scored = BacktestHit(day=date(2026, 8, 21), stock=stock, snapshot=hits[0], frame=df)
+        short = BacktestHit(
+            day=date(2026, 8, 21),
+            stock=stock,
+            snapshot=hits[0],
+            frame=_history_then_live([99.0, 105.0]),
+        )
+        stats = summarize_hour_later([scored, short])
+        self.assertEqual(stats.n_scored, 1)
+        self.assertEqual(stats.n_short, 1)
+        self.assertEqual(stats.wins, 1)
+        self.assertAlmostEqual(stats.win_rate, 100.0)
 
 
 class ResampleTests(unittest.TestCase):

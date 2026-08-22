@@ -18,6 +18,7 @@ import pandas as pd
 from matplotlib.patches import Rectangle
 
 from tw.backtest_5m import BacktestHit, BacktestResult, DayUniverse
+from tw.forward import HourLater, hour_later_for_hit, summarize_hour_later
 from tw.kline import resample_ohlcv
 from tw.signals import add_moving_averages
 
@@ -56,6 +57,36 @@ for _path in (
 
 def weekday_zh(d) -> str:
     return f"週{WEEKDAY_ZH[d.weekday()]}"
+
+
+def _hour_later_summary_html(result: BacktestResult) -> str:
+    stats = summarize_hour_later(result.hits)
+    if stats.n_scored <= 0 or stats.win_rate is None:
+        return "進場後一小時勝率 —（沒有滿一小時的樣本）<br/>"
+    avg = f"{stats.avg_pct:+.2f}%" if stats.avg_pct is not None else "—"
+    med = f"{stats.med_pct:+.2f}%" if stats.med_pct is not None else "—"
+    short = (
+        f"，另 {stats.n_short} 則尾盤不足一小時不列入"
+        if stats.n_short
+        else ""
+    )
+    return (
+        f"進場後一小時勝率 <span class=\"ok\">{stats.win_rate:.0f}%</span>"
+        f"（滿一小時 {stats.n_scored}/{stats.n_hits} 則，"
+        f"{stats.wins} 贏 {stats.flats} 平 {stats.losses} 輸，"
+        f"平均 {avg}、中位 {med}{short}）<br/>"
+    )
+
+
+def _hour_later_row(move: HourLater | None) -> str:
+    if move is None:
+        return '<div class="row"><span>一小時後</span><b>尾盤不足一小時</b></div>'
+    cls = "win" if move.win else ("lose" if not move.flat else "")
+    clock = pd.Timestamp(move.later_ts).strftime("%H:%M")
+    return (
+        f'<div class="row"><span>一小時後（{clock}）</span>'
+        f'<b class="{cls}">{move.entry:.2f} → {move.later:.2f}　{move.ret_pct:+.2f}%</b></div>'
+    )
 
 
 def _universe_line(uni: DayUniverse, hit_count: int) -> str:
@@ -174,6 +205,8 @@ def _render(
       color: var(--muted);
     }}
     .summary .ok {{ color: var(--ok); font-weight: 700; font-size: 1.05rem; }}
+    .row .win {{ color: var(--ok); }}
+    .row .lose {{ color: var(--up); }}
     .card {{
       background: var(--card); border: 1px solid var(--line); border-radius: 14px;
       padding: 14px 10px 10px; margin: 0 0 14px; color: inherit;
@@ -236,6 +269,7 @@ def _render(
     </div>
     <div class="summary">
       五天共通知 <span class="ok">{len(result.hits)}</span> 則<br/>
+      {_hour_later_summary_html(result)}
       掃描時間 {html.escape(scanned)}（台北）<br/>
       資料：證交所／櫃買盤後成交額 ＋ Yahoo 五分K
     </div>
@@ -279,6 +313,7 @@ def _hit_card(
             f'<div class="row"><span>小時K / MA20</span>'
             f"<b>{snap.h1_close:.2f} &gt; {snap.h1_ma20:.2f}</b></div>"
         )
+    extra_rows += _hour_later_row(hour_later_for_hit(hit))
     return f"""
     <article class="card">
       <div class="top">

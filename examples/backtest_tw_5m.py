@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tw.backtest_5m import BacktestConfig, run_5m_backtest
+from tw.forward import summarize_hour_later
 from tw.report import save_backtest_html, weekday_zh
 
 
@@ -51,6 +52,16 @@ def main() -> int:
             f"{h.stock.name} {h.snapshot.timestamp.strftime('%H:%M')}" for h in hits
         ) or "—"
         print(f"  {weekday_zh(day)} {day.isoformat()}  {len(hits)} 則  {names}")
+    stats = summarize_hour_later(result.hits)
+    if stats.win_rate is None:
+        print("進場後一小時勝率 —（沒有滿一小時的樣本）")
+    else:
+        avg = f"{stats.avg_pct:+.2f}%" if stats.avg_pct is not None else "—"
+        print(
+            f"進場後一小時勝率 {stats.win_rate:.0f}%  "
+            f"（{stats.wins} 贏 / {stats.n_scored} 則滿一小時，"
+            f"{stats.flats} 平 {stats.losses} 輸 {stats.n_short} 則不足，平均 {avg}）"
+        )
     path = save_backtest_html(result, args.output)
     print(f"報告：{path}")
     return 0
