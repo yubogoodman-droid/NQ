@@ -92,7 +92,7 @@ def main() -> None:
     ]
     out = write_report(
         Path(args.output),
-        title="一分K 5>10>20>60 站上MA200 · 近一週前100",
+        title="一分K 5>10>20>60 站上MA200 · 近一週前100（股價<600）",
         trades=all_trades,
         frames=frames,
         notes=notes,
