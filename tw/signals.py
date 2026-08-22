@@ -1,4 +1,4 @@
-"""五分 K：MA5/10/20 多頭發散，當根收盤站上所有均線（含 MA200），且小時K在 MA20 之上。"""
+"""五分 K：MA5/10/20 多頭發散，當根收盤站上所有均線（含 MA200），也在十五分 MA5/10/20 之上，且小時K在 MA20 之上。"""
 
 from __future__ import annotations
 
@@ -35,6 +35,10 @@ class AlertSnapshot:
     prev_ma200: float
     h1_close: float | None = None
     h1_ma20: float | None = None
+    m15_close: float | None = None
+    m15_ma5: float | None = None
+    m15_ma10: float | None = None
+    m15_ma20: float | None = None
 
     @property
     def bullish_aligned(self) -> bool:
@@ -94,6 +98,18 @@ class AlertSnapshot:
             and self.h1_close > self.h1_ma20
         )
 
+    @property
+    def close_above_15m_mas(self) -> bool:
+        return (
+            self.m15_close is not None
+            and self.m15_ma5 is not None
+            and self.m15_ma10 is not None
+            and self.m15_ma20 is not None
+            and self.m15_close > self.m15_ma5
+            and self.m15_close > self.m15_ma10
+            and self.m15_close > self.m15_ma20
+        )
+
 
 def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
@@ -116,13 +132,30 @@ def hourly_close_and_ma20(five_min: pd.DataFrame) -> tuple[float, float] | None:
     return float(hourly["close"].iloc[-1]), float(ma20.iloc[-1])
 
 
+def fifteen_close_and_mas(
+    five_min: pd.DataFrame,
+) -> tuple[float, float, float, float] | None:
+    """用截至目前的五分K合成十五分K，回傳（收盤, MA5, MA10, MA20）。"""
+    m15 = resample_ohlcv(five_min, "15min")
+    if len(m15) < MA_SLOW or "close" not in m15.columns:
+        return None
+    close = m15["close"]
+    ma5 = close.rolling(MA_FAST, min_periods=MA_FAST).mean()
+    ma10 = close.rolling(MA_MID, min_periods=MA_MID).mean()
+    ma20 = close.rolling(MA_SLOW, min_periods=MA_SLOW).mean()
+    last = close.iloc[-1]
+    if any(pd.isna(v) for v in (last, ma5.iloc[-1], ma10.iloc[-1], ma20.iloc[-1])):
+        return None
+    return float(last), float(ma5.iloc[-1]), float(ma10.iloc[-1]), float(ma20.iloc[-1])
+
+
 def iter_5m_ma200_alerts(
     df: pd.DataFrame,
     *,
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
 ) -> list[AlertSnapshot]:
-    """同一交易日連續五分 K：MA5/10/20 發散，當根收盤剛站上 MA200，且小時K收在 MA20 之上。"""
+    """同一交易日連續五分 K：短均發散、剛站上五分 MA200，當根也在十五分 MA5/10/20 上，且小時K收在 MA20 之上。"""
     if df is None or len(df) < MA_LONG + 1:
         return []
     work = add_moving_averages(df)
@@ -149,13 +182,30 @@ def iter_5m_ma200_alerts(
             continue
         if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
             continue
-        hourly = hourly_close_and_ma20(work.iloc[: i + 1])
+        window = work.iloc[: i + 1]
+        m15 = fifteen_close_and_mas(window)
+        if m15 is None:
+            continue
+        m15_close, m15_ma5, m15_ma10, m15_ma20 = m15
+        if m15_close <= m15_ma5 or m15_close <= m15_ma10 or m15_close <= m15_ma20:
+            continue
+        hourly = hourly_close_and_ma20(window)
         if hourly is None:
             continue
         h1_close, h1_ma20 = hourly
         if h1_close <= h1_ma20:
             continue
-        hits.append(replace(snap, h1_close=h1_close, h1_ma20=h1_ma20))
+        hits.append(
+            replace(
+                snap,
+                h1_close=h1_close,
+                h1_ma20=h1_ma20,
+                m15_close=m15_close,
+                m15_ma5=m15_ma5,
+                m15_ma10=m15_ma10,
+                m15_ma20=m15_ma20,
+            )
+        )
     return hits
 
 

@@ -58,8 +58,12 @@ class FiveMinSignalTests(unittest.TestCase):
         self.assertTrue(hit.crossed_above_ma200)
         self.assertTrue(hit.close_above_all_mas)
         self.assertTrue(hit.hourly_close_above_ma20)
+        self.assertTrue(hit.close_above_15m_mas)
         self.assertIsNotNone(hit.h1_close)
         self.assertGreater(hit.h1_close, hit.h1_ma20)
+        self.assertGreater(hit.m15_close, hit.m15_ma5)
+        self.assertGreater(hit.m15_close, hit.m15_ma10)
+        self.assertGreater(hit.m15_close, hit.m15_ma20)
         self.assertGreaterEqual(hit.ribbon_fan_pct, 0.50)
         self.assertGreater(hit.close, hit.ma5)
         self.assertGreater(hit.close, hit.ma200)
@@ -110,6 +114,18 @@ class FiveMinSignalTests(unittest.TestCase):
         hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
         idx = _session_index(hist_days)
         closes = [200.0] * 24 + [100.0] * (len(idx) - 24)
+        hist = _ohlcv(closes, idx)
+        live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
+        hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
+        self.assertEqual(hits, [])
+
+    def test_rejects_when_close_below_15m_mas(self) -> None:
+        hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
+        idx = _session_index(hist_days)
+        closes = [100.0] * len(idx)
+        # 一根還在最近 20 根十五分K裡的高K，把十五分 MA20 抬高，但不破壞五分剛站上。
+        for i in range(159, 162):
+            closes[i] = 400.0
         hist = _ohlcv(closes, idx)
         live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
         hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
@@ -185,6 +201,7 @@ class ReportTests(unittest.TestCase):
                 self.assertGreater(im.height, 1000)
         self.assertIn("南亞科", text)
         self.assertIn("十五分K", text)
+        self.assertIn("十五分K / MA5 10 20", text)
         self.assertIn("小時K", text)
         self.assertIn("上＝五分K", text)
         self.assertIn("均線發散", text)

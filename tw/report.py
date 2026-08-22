@@ -193,7 +193,8 @@ def _render(
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 600 以上。
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段也不黏在一起），
       <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200，<strong>小時K收盤也要在小時 MA20 之上</strong>。開盤第一根因隔夜跳空不算。
+      且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
+      且小時K收盤也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
       K 棒漲紅跌綠。
     </p>
     <div class="chips">
@@ -204,6 +205,7 @@ def _render(
       <span class="chip">股價 &lt; 600</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
       <span class="chip">當根收盤站上 MA200</span>
+      <span class="chip">收盤 &gt; 十五分 MA5／10／20</span>
       <span class="chip">小時K &gt; MA20</span>
       <span class="chip">收盤 &gt; 所有均線</span>
       <span class="chip">十五分K對照</span>
@@ -245,9 +247,19 @@ def _hit_card(
     ts = snap.timestamp.strftime("%H:%M")
     url = f"https://tw.stock.yahoo.com/quote/{html.escape(s.symbol)}"
     chart = _chart_img(hit, chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base)
-    h1_row = ""
+    extra_rows = ""
+    if (
+        snap.m15_close is not None
+        and snap.m15_ma5 is not None
+        and snap.m15_ma10 is not None
+        and snap.m15_ma20 is not None
+    ):
+        extra_rows += (
+            f'<div class="row"><span>十五分K / MA5 10 20</span>'
+            f"<b>{snap.m15_close:.2f} &gt; {snap.m15_ma5:.2f} / {snap.m15_ma10:.2f} / {snap.m15_ma20:.2f}</b></div>"
+        )
     if snap.h1_close is not None and snap.h1_ma20 is not None:
-        h1_row = (
+        extra_rows += (
             f'<div class="row"><span>小時K / MA20</span>'
             f"<b>{snap.h1_close:.2f} &gt; {snap.h1_ma20:.2f}</b></div>"
         )
@@ -261,7 +273,7 @@ def _hit_card(
       <div class="row"><span>收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
       <div class="row"><span>收盤 vs 均線</span><b>{snap.close:.2f} &gt; MA5 {snap.ma5:.2f} / 10 {snap.ma10:.2f} / 20 {snap.ma20:.2f}</b></div>
       <div class="row"><span>均線發散</span><b>MA5/MA20 +{snap.ribbon_fan_pct:.2f}%　5–10 {snap.gap_5_10_pct:.2f}%　10–20 {snap.gap_10_20_pct:.2f}%</b></div>
-      {h1_row}
+      {extra_rows}
       <div class="row"><span>前收 / 前MA200</span><b>{snap.prev_close:.2f} ≤ {snap.prev_ma200:.2f}</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
       <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K</div>
