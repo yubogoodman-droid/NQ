@@ -2,7 +2,8 @@
 """依回測同一套規則推 Telegram。
 
 15 分：收盤 > MA7>14>25 且剛站上 15m MA200，還要現價在 1h MA200 上。
-1 小時：剛站上 1h MA200，底下至少 36 根、距 MA200 ≤ 2%（4h 不擋單，不看量比）。
+1 小時：剛站上 1h MA200，底下至少 96 根、距 MA200 ≤ 2%、近 24 根高低差 ≤ 4%，
+且當時 BTC 已在 1h MA200 上（4h 不擋單，不看量比）。
 
 在下面填 Telegram 後執行：
 
@@ -30,7 +31,15 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.binance import INTERVAL_MS, SESSION, fetch_klines, universe
-from nq.ma15_bull import add_15m_mas, above_htf_ma200, detect_combo, htf_ma200_at, quality_reclaim, sma
+from nq.ma15_bull import (
+    add_15m_mas,
+    above_htf_ma200,
+    bar_above_ma200,
+    detect_combo,
+    htf_ma200_at,
+    quality_reclaim,
+    sma,
+)
 
 # —— 填這裡 ——
 TELEGRAM_BOT_TOKEN = ""
@@ -60,6 +69,8 @@ TF_WATCH = {
         "min_below": None,
         "min_vol": None,
         "max_ext": None,
+        "max_rng24": None,
+        "require_btc_1h": False,
         "lookback": 48,
         "title": "15m 剛站上 MA200（且在 1h MA200 上）",
     },
@@ -70,11 +81,13 @@ TF_WATCH = {
         "sig_limit": 420,
         "htf_limit": 250,
         "require_htf": False,
-        "min_below": 36,
+        "min_below": 96,
         "min_vol": None,
         "max_ext": 2.0,
+        "max_rng24": 4.0,
+        "require_btc_1h": True,
         "lookback": 80,
-        "title": "1h 剛站上 MA200（底下趴夠久再貼上）",
+        "title": "1h 剛站上 MA200（底下夠久 + 波動小 + BTC 先站上）",
     },
 }
 
@@ -245,20 +258,30 @@ def draw_chart(sym: str, d: dict, sig, spec: dict, path: str, d_htf: dict | None
     return path
 
 
-def passes_notify(sig, spec: dict, d_htf, ts: int) -> bool:
+def load_btc_1h() -> dict | None:
+    raw = fetch_klines("BTCUSDT", interval="1h", limit=250, extra_bars=8)
+    if raw is None or len(raw["c"]) < 200:
+        return None
+    return add_15m_mas(raw)
+
+
+def passes_notify(sig, spec: dict, d_htf, ts: int, btc_1h: dict | None) -> bool:
     if not sig.crossed_200:
         return False
     if spec["require_htf"] and not above_htf_ma200(d_htf, ts, sig.close, spec["htf_ms"]):
+        return False
+    if spec.get("require_btc_1h") and not bar_above_ma200(btc_1h, ts, INTERVAL_MS["1h"]):
         return False
     return quality_reclaim(
         sig,
         min_below=spec["min_below"],
         min_vol=spec["min_vol"],
         max_ext=spec["max_ext"],
+        max_rng24=spec.get("max_rng24"),
     )
 
 
-def scan_symbol(sym: str, spec: dict) -> list[dict]:
+def scan_symbol(sym: str, spec: dict, btc_1h: dict | None = None) -> list[dict]:
     raw = fetch_klines(sym, interval=spec["signal"], limit=spec["sig_limit"], extra_bars=8)
     if raw is None or len(raw["c"]) < 220:
         return []
@@ -273,7 +296,7 @@ def scan_symbol(sym: str, spec: dict) -> list[dict]:
         hits = [s for s in detect_combo(d, min_gap_bars=0) if s.idx == closed]
         for sig in hits:
             ts = int(d["t"][sig.idx])
-            if not passes_notify(sig, spec, d_htf, ts):
+            if not passes_notify(sig, spec, d_htf, ts, btc_1h):
                 continue
             events.append({"symbol": sym, "sig": sig, "d": d, "d_htf": d_htf, "spec": spec})
     return events
@@ -297,10 +320,13 @@ def format_ev(ev: dict) -> str:
     extra = ""
     if spec["min_below"] is not None:
         extra = (
-            f"底下已跌 {sig.bars_below} 根　量比 {sig.vol_ratio:.2f}×　距 {tf} MA200 {sig.ext_pct:+.2f}%\n"
+            f"底下已跌 {sig.bars_below} 根　高低差 {sig.rng24:.2f}%　"
+            f"量比 {sig.vol_ratio:.2f}×　距 {tf} MA200 {sig.ext_pct:+.2f}%\n"
         )
     else:
         extra = f"距 {tf} MA200 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×\n"
+    if spec.get("require_btc_1h"):
+        extra += "BTC 當時在 1h MA200 上\n"
     return (
         f"<b>{spec['title']}</b>\n"
         f"<b>{sym_label(sym)}</b>  {sym}\n"
@@ -357,7 +383,7 @@ def test_telegram() -> int:
     ok = telegram_send(
         "MA200 監看測試\n"
         "15m：剛站上 15m MA200 且在 1h MA200 上\n"
-        "1h：剛站上 1h MA200，底下≥36根、距MA≤2%\n"
+        "1h：剛站上 1h MA200，底下≥96根、距MA≤2%、高低差≤4%、BTC在1h MA200上\n"
         "如果你看到這則，Telegram 已通。"
     )
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
@@ -369,8 +395,10 @@ def spec_note(spec: dict) -> str:
         extra = f"且現價在 {spec['htf']} MA200 上"
     else:
         extra = (
-            f"底下≥{spec['min_below']}根、距MA≤{spec['max_ext']}% "
-            f"（{spec['htf']} 不擋單、不看量比）"
+            f"底下≥{spec['min_below']}根、距MA≤{spec['max_ext']}%、"
+            f"高低差≤{spec.get('max_rng24')}% "
+            f"（{spec['htf']} 不擋單、不看量比"
+            f"{'、要 BTC 在 1h MA200 上' if spec.get('require_btc_1h') else ''}）"
         )
     return f"{spec['signal']} 剛站上 MA200、{extra}"
 
@@ -423,8 +451,13 @@ def main() -> int:
                 flush=True,
             )
             return
+        btc_1h = None
+        if any(spec.get("require_btc_1h") for _, spec in jobs):
+            btc_1h = load_btc_1h()
+            if btc_1h is None:
+                print("警告：抓不到 BTC 1h，這輪 1h 大盤過濾全不過", flush=True)
         with ThreadPoolExecutor(8) as ex:
-            futs = {ex.submit(scan_symbol, sym, spec): (sym, spec) for sym, spec in jobs}
+            futs = {ex.submit(scan_symbol, sym, spec, btc_1h): (sym, spec) for sym, spec in jobs}
             for fut in as_completed(futs):
                 try:
                     events.extend(fut.result())

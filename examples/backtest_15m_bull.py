@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""回測：收盤高於 MA7/14/25/200，且 7>14>25。預設 15 分（還要在 1h MA200 上）；`--tf 1h` 改小時圖（4h 只畫圖；通知要底下趴夠久＋剛貼上）。
+"""回測：收盤高於 MA7/14/25/200，且 7>14>25。預設 15 分（還要在 1h MA200 上）；`--tf 1h` 改小時圖（4h 只畫圖；通知要底下夠久、波動不大、BTC 先站上）。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --stocks --pages
@@ -31,6 +31,7 @@ from nq.ma15_bull import (
     add_15m_mas,
     above_htf_ma200,
     apply_filter,
+    bar_above_ma200,
     detect_combo,
     fail_rate,
     forward_moves,
@@ -70,6 +71,8 @@ class TfSpec:
     min_below: int | None = None
     min_vol: float | None = None
     max_ext: float | None = None
+    max_rng24: float | None = None
+    require_btc_1h: bool = False
     lookback: int = 48
 
     @property
@@ -123,9 +126,11 @@ TF_SPECS = {
             "cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull-stocks.html"
         ),
         require_htf=False,
-        min_below=36,
+        min_below=96,
         min_vol=None,
         max_ext=2.0,
+        max_rng24=4.0,
+        require_btc_1h=True,
         lookback=80,
     ),
 }
@@ -139,6 +144,10 @@ def notify_kwargs(spec: TfSpec) -> dict:
         kw["min_vol"] = spec.min_vol
     if spec.max_ext is not None:
         kw["max_ext"] = spec.max_ext
+    if spec.max_rng24 is not None:
+        kw["max_rng24"] = spec.max_rng24
+    if spec.require_btc_1h:
+        kw["require_btc_1h"] = True
     return kw
 
 
@@ -148,6 +157,10 @@ def notify_label(spec: TfSpec) -> str:
         bits.append(f"量≥{spec.min_vol}×")
     if spec.max_ext is not None:
         bits.append(f"距MA≤{spec.max_ext:g}%")
+    if spec.max_rng24 is not None:
+        bits.append(f"高低差≤{spec.max_rng24:g}%")
+    if spec.require_btc_1h:
+        bits.append("BTC在1hMA200上")
     return "通知：" + " + ".join(bits)
 
 
@@ -173,8 +186,8 @@ def filter_defs(spec: TfSpec) -> tuple:
                     notify_kwargs(spec),
                 ),
                 (
-                    "通知且近24根高低差 ≤ 4%",
-                    {**notify_kwargs(spec), "max_rng24": 4.0},
+                    "同上但不看 BTC",
+                    {k: v for k, v in notify_kwargs(spec).items() if k != "require_btc_1h"},
                 ),
             ]
         )
@@ -549,7 +562,7 @@ def write_html(
     title = f"{tf} 收盤在 7/14/25/200 之上" + (" · 幣安股票" if stocks_only else "")
     heading = f"{tf} K：收盤在 7 / 14 / 25 / 200 之上" + ("（只掃幣安股票）" if stocks_only else "")
     if spec.min_below is not None:
-        heading += " · 底下趴夠久再貼上"
+        heading += " · 底下夠久、波動不大、BTC 先站上"
     universe_txt = (
         f"只掃幣安 TradFi 股票永續（美／港／韓／中股、股票 ETF、Pre-IPO；不含黃金原油等商品）近 {days} 天、{universe_n} 個合約。"
         if stocks_only
@@ -569,7 +582,12 @@ def write_html(
             extra = ""
             if spec.min_vol is not None:
                 extra += f"量比 ≥ <strong>{spec.min_vol:g}×</strong>、"
-            extra += f"收盤距 MA200 ≤ <strong>{spec.max_ext:g}%</strong>。"
+            extra += f"收盤距 MA200 ≤ <strong>{spec.max_ext:g}%</strong>"
+            if spec.max_rng24 is not None:
+                extra += f"、近 24 根高低差 ≤ <strong>{spec.max_rng24:g}%</strong>"
+            if spec.require_btc_1h:
+                extra += "，且當時 <strong>BTC 已在 1h MA200 上</strong>"
+            extra += "。"
             notify_rule = (
                 f"Telegram 通知只推這種：<strong>剛站上 {html.escape(tf)} MA200</strong>，"
                 f"且站上前連續至少 <strong>{spec.min_below} 根</strong>收盤在 MA200 下、"
@@ -730,6 +748,13 @@ def main() -> int:
             if done % 40 == 0 or done == len(symbols):
                 print(f"  {done}/{len(symbols)}  訊號 {len(rows)}  {time.time()-t0:.1f}s", flush=True)
     rows.sort(key=lambda r: r.time_ms)
+    if spec.require_btc_1h:
+        raw_btc = fetch_klines("BTCUSDT", interval="1h", days=max(args.days, 14), extra_bars=220)
+        btc_d = add_15m_mas(raw_btc) if raw_btc is not None and len(raw_btc["c"]) >= 200 else None
+        if btc_d is None:
+            print("警告：抓不到 BTC 1h，BTC 大盤過濾全判不過", flush=True)
+        for r in rows:
+            r.btc_1h_ok = bar_above_ma200(btc_d, r.time_ms, INTERVAL_MS["1h"])
     stats = filter_stats(rows, spec)
     notify_rows = apply_filter(rows, **notify_kwargs(spec))
     if spec.require_htf:
@@ -818,6 +843,8 @@ def main() -> int:
                 "min_below": spec.min_below,
                 "min_vol": spec.min_vol,
                 "max_ext": spec.max_ext,
+                "max_rng24": spec.max_rng24,
+                "require_btc_1h": spec.require_btc_1h,
                 "notify": len(notify_rows),
                 "crcl": [
                     {"time": hm(r.time_ms), "close": r.sig.close, "crossed": r.crossed_200d}

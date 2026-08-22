@@ -170,6 +170,17 @@ def above_1h_ma200(d1h: dict | None, time_ms: int, last_price: float) -> bool:
     return above_htf_ma200(d1h, time_ms, last_price, H1_MS)
 
 
+def bar_above_ma200(d: dict | None, time_ms: int, bar_ms: int) -> bool:
+    """該週期自己的收盤是否在自己的 SMA200 上（未收完用當根已走出的收盤）。"""
+    if d is None or len(d.get("c", [])) < 200:
+        return False
+    opened = d["t"] <= time_ms
+    if not opened.any():
+        return False
+    last_i = int(np.where(opened)[0][-1])
+    return above_htf_ma200(d, time_ms, float(d["c"][last_i]), bar_ms)
+
+
 @dataclass
 class ForwardMove:
     bars: int
@@ -188,6 +199,7 @@ class SignalRow:
     moves: dict[int, ForwardMove] = field(default_factory=dict)
     h1_ma200: float | None = None
     h1_ext_pct: float | None = None
+    btc_1h_ok: bool | None = None
 
     @property
     def vol_ratio(self) -> float:
@@ -290,6 +302,7 @@ def apply_filter(
     max_ext: float | None = None,
     min_below: int | None = None,
     max_rng24: float | None = None,
+    require_btc_1h: bool | None = None,
 ) -> list[SignalRow]:
     out = rows
     if crossed:
@@ -304,6 +317,8 @@ def apply_filter(
         out = [r for r in out if r.bars_below >= min_below]
     if max_rng24 is not None:
         out = [r for r in out if r.rng24 <= max_rng24]
+    if require_btc_1h:
+        out = [r for r in out if r.btc_1h_ok]
     return out
 
 
@@ -313,8 +328,9 @@ def quality_reclaim(
     min_below: int | None = None,
     min_vol: float | None = None,
     max_ext: float | None = None,
+    max_rng24: float | None = None,
 ) -> bool:
-    """TRUMP 那種：剛站上、底下趴夠久、收盤還貼著 MA200（量比可選）。"""
+    """剛站上、底下趴夠久、收盤還貼著 MA200；可再限波動。"""
     if not sig.crossed_200:
         return False
     if min_below is not None and sig.bars_below < min_below:
@@ -322,5 +338,7 @@ def quality_reclaim(
     if min_vol is not None and sig.vol_ratio < min_vol:
         return False
     if max_ext is not None and sig.ext_pct > max_ext:
+        return False
+    if max_rng24 is not None and sig.rng24 > max_rng24:
         return False
     return True
