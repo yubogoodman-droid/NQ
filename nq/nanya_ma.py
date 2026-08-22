@@ -278,13 +278,16 @@ def run_nanya_ma_backtest(
                 exit_reason = "take_profit"
                 exit_idx = i
                 break
-            # 收盤跌破 MA20：截圖上第一道回檔線沒了
-            if i > sig.bar_idx and close < ma20:
-                exit_price = close
-                exit_time = ts
-                exit_reason = "lost_ma20"
-                exit_idx = i
-                break
+            # 連續兩根收盤跌破 MA20 才離場，一分雜訊單根刺破不算壞
+            if i > sig.bar_idx + 1 and close < ma20:
+                prev_close = float(work["close"].iloc[i - 1])
+                prev_ma20 = float(work["ma20"].iloc[i - 1])
+                if prev_close < prev_ma20:
+                    exit_price = close
+                    exit_time = ts
+                    exit_reason = "lost_ma20"
+                    exit_idx = i
+                    break
 
         busy_until = exit_idx
         pnl_points = exit_price - sig.entry
@@ -397,7 +400,7 @@ def build_nanya_ma_report_html(
 <body>
   <div class="page">
     <h1>{html.escape(title)}</h1>
-    <p>對應南亞科一分圖 MA5/10/20/60/120/200：盤整短均要黏，進場要短均剛扇開、價剛離開 MA200。已排成末端多頭（436 那種）不追。</p>
+    <p>對應南亞科一分圖 MA5/10/20/60/120/200：盤整短均要黏，進場要短均剛扇開、價剛離開 MA200。已排成末端多頭（436 那種）不追。跌破 MA20 需連續兩根收盤。</p>
     <div class="cards">
       <div class="card"><div class="k">成交</div><div class="v">{overall['trades']}</div></div>
       <div class="card"><div class="k">勝率（淨）</div><div class="v">{wr(overall['win_rate'])}</div></div>

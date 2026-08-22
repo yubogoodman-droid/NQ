@@ -65,7 +65,7 @@ class NanyaMaTests(unittest.TestCase):
         signals = strategy.generate_signals(df)
         self.assertTrue(signals)
         entry = signals[0].bar_idx
-        for i in range(entry + 2, min(entry + 8, len(df))):
+        for i in range(entry + 2, min(entry + 10, len(df))):
             df.iloc[i, df.columns.get_loc("close")] = 396.0
             df.iloc[i, df.columns.get_loc("low")] = 395.5
             df.iloc[i, df.columns.get_loc("high")] = 397.0
