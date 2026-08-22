@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""幣安 Telegram：15 分同時站上 MA7/14/25/99/120；可順便跑 1m 黏帶三幕。
+"""幣安 Telegram：15 分同時站上 MA7/14/25/99/120。可單獨複製這一支執行。
 
 在下面填 Telegram 後執行：
 
-    python3 examples/watch_binance_ribbon.py                 # 流動盤全掃
-    python3 examples/watch_binance_ribbon.py --asset stocks  # 只要股票
+    python 小米15分K.py                 # 流動盤全掃（加密+股票）
+    python 小米15分K.py --asset stocks  # 只要股票
 
 Ctrl+C 結束。同一根 K 不會重發。
 """
@@ -13,18 +13,14 @@ from __future__ import annotations
 import json
 import os
 import re
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import requests
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from nq.ribbon15 import SIGNAL_MA_PERIODS, add_mas, detect_long_breaks
 
 # —— 填這裡 ——
 TELEGRAM_BOT_TOKEN = ""  # BotFather 給的 token，例如 123456:ABC...
@@ -34,7 +30,13 @@ TZ = timezone(timedelta(hours=8))
 BASE = "https://www.binance.com"
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"})
-SEEN_PATH = Path(__file__).resolve().parents[1] / "output" / "binance_ribbon_seen.json"
+HERE = Path(__file__).resolve().parent
+SEEN_PATH = (
+    HERE.parent / "output" / "binance_ribbon_seen.json"
+    if (HERE.parent / "nq").is_dir()
+    else HERE / "binance_ribbon_seen.json"
+)
+SIGNAL_MA_PERIODS = (7, 14, 25, 99, 120)
 KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT", "HK1810USDT"}
 DISPLAY = {"HK1810USDT": "小米"}
 STOCK_UNDERLYING = {"EQUITY", "KR_EQUITY", "HK_EQUITY", "CN_EQUITY"}
@@ -127,6 +129,40 @@ def indicators(d: dict) -> dict:
     d["m99"], d["m120"], d["m200"] = sma(c, 99), sma(c, 120), sma(c, 200)
     d["v20"] = sma(v, 20)
     return d
+
+
+def detect_long_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) -> list:
+    """前一根收在指定均線下方，這一根收盤同時站上。預設 7/14/25/99/120。"""
+    c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
+    v20 = d["v20"]
+    out = []
+    start = max(periods) + 1
+    for i in range(start, len(c)):
+        prev = np.array([d[f"m{n}"][i - 1] for n in periods], dtype=float)
+        curr = np.array([d[f"m{n}"][i] for n in periods], dtype=float)
+        if np.isnan(prev).any() or np.isnan(curr).any():
+            continue
+        lo_p, hi_p = float(prev.min()), float(prev.max())
+        lo_c, hi_c = float(curr.min()), float(curr.max())
+        if not (c[i - 1] < lo_p and c[i] > hi_c):
+            continue
+        if l[i] > lo_p:
+            continue
+        width = (hi_p / lo_p - 1.0) * 100.0 if lo_p > 0 else float("inf")
+        vr = float(v[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
+        out.append(
+            SimpleNamespace(
+                idx=i,
+                open=float(o[i]),
+                high=float(h[i]),
+                low=float(l[i]),
+                close=float(c[i]),
+                width_pct=width,
+                vol_ratio=vr,
+                body_through=bool(o[i] < lo_p and c[i] > hi_c),
+            )
+        )
+    return out
 
 
 def kiss_at(d: dict, i: int) -> dict | None:
@@ -429,8 +465,8 @@ def scan_symbol_15m(sym: str) -> list[dict]:
     raw = fetch_klines(sym, interval="15m", limit=250)
     if raw is None:
         return []
-    d = add_mas(raw)
-    hits = detect_long_breaks(d, periods=SIGNAL_MA_PERIODS)
+    d = indicators(raw)
+    hits = detect_long_breaks(d)
     n = len(d["c"])
     events = []
     for br in hits:
@@ -578,8 +614,8 @@ def make_demo_15m_bars() -> dict:
 
 
 def run_demo() -> int:
-    d = add_mas(make_demo_15m_bars())
-    hits = detect_long_breaks(d, periods=SIGNAL_MA_PERIODS)
+    d = indicators(make_demo_15m_bars())
+    hits = detect_long_breaks(d)
     print(f"demo 15m 偵測到 {len(hits)} 筆")
     for br in hits:
         print(f"  idx={br.idx} close={br.close:.3f} width={br.width_pct:.3f}% body={br.body_through}")
