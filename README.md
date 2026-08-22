@@ -66,8 +66,7 @@ python examples/run_nanya_ma.py
 python -m unittest tests.test_nanya_ma
 ```
 
-回測網（每筆一分K＋六條均線）：`docs/backtest/index.html`  
-表格版：`docs/nanya-ma/index.html`
+回測圖請直接開 GitHub 上的 Markdown（圖會顯示）：[`docs/backtest/README.md`](docs/backtest/README.md)
 
 ## 快速開始
 

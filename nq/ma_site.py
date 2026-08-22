@@ -1,10 +1,8 @@
-"""南亞科均線回測 HTML 站：每筆一分 K + 六條均線（靜態圖，預覽也看得到）。"""
+"""南亞科均線回測 HTML 站：每筆一分 K + 六條均線（靜態 PNG）。"""
 
 from __future__ import annotations
 
-import base64
 import html
-import io
 from pathlib import Path
 
 import matplotlib
@@ -52,12 +50,11 @@ def _pct(x: float) -> str:
     return f"{x * 100:+.2f}%"
 
 
-def _png_tag(fig, *, alt: str) -> str:
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=120, facecolor=fig.get_facecolor(), bbox_inches="tight")
+def _save_png(fig, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, format="png", dpi=120, facecolor=fig.get_facecolor(), bbox_inches="tight")
     plt.close(fig)
-    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-    return f'<img alt="{html.escape(alt)}" src="data:image/png;base64,{b64}" />'
+    return path
 
 
 def _style_axes(*axes) -> None:
@@ -80,7 +77,7 @@ def _window(df: pd.DataFrame, trade: NanyaMaTrade) -> pd.DataFrame:
     return work.iloc[start : end + 1]
 
 
-def _chart_html(df: pd.DataFrame, trade: NanyaMaTrade, trade_no: int) -> str:
+def _draw_trade_chart(df: pd.DataFrame, trade: NanyaMaTrade, trade_no: int, path: Path) -> Path:
     window = _window(df, trade)
     xs = np.arange(len(window))
     o = window["open"].to_numpy()
@@ -143,12 +140,12 @@ def _chart_html(df: pd.DataFrame, trade: NanyaMaTrade, trade_no: int) -> str:
     ax.set_title(f"#{trade_no} {trade.symbol}  1m  {_fmt(trade.signal.timestamp)}", color="#e6edf3", fontsize=11, loc="left")
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c9d1d9", ncol=5)
     fig.tight_layout(pad=0.45)
-    return _png_tag(fig, alt=f"{trade.symbol} {_fmt(trade.signal.timestamp)}")
+    return _save_png(fig, path)
 
 
-def _equity_html(trades: list[NanyaMaTrade]) -> str:
+def _draw_equity(trades: list[NanyaMaTrade], path: Path) -> Path | None:
     if not trades:
-        return ""
+        return None
     ys = []
     acc = 0.0
     for t in trades:
@@ -160,7 +157,11 @@ def _equity_html(trades: list[NanyaMaTrade]) -> str:
     ax.axhline(0, color="#ffffff33", lw=0.8)
     ax.set_title("Net PnL %", color="#e6edf3", fontsize=11, loc="left")
     fig.tight_layout(pad=0.45)
-    return _png_tag(fig, alt="累計淨損益")
+    return _save_png(fig, path)
+
+
+def _img_tag(rel: str, alt: str) -> str:
+    return f'<img alt="{html.escape(alt)}" src="{html.escape(rel)}" />'
 
 
 def build_backtest_site(
@@ -170,8 +171,10 @@ def build_backtest_site(
     frames: dict[str, pd.DataFrame],
     notes: list[str],
     symbol_stats: list[tuple[str, dict, int]],
-) -> str:
+    img_dir: Path,
+) -> tuple[str, str]:
     overall = summarize_ma_trades(trades)
+    img_dir.mkdir(parents=True, exist_ok=True)
 
     def wr(x: float) -> str:
         return f"{x * 100:.0f}%"
@@ -192,9 +195,40 @@ def build_backtest_site(
     )
 
     cards = []
+    md_parts = [
+        f"# {title}",
+        "",
+        "請直接開這個 Markdown（GitHub 會顯示圖）。htmlpreview 常常把圖擋掉。",
+        "",
+        f"- 成交 **{overall['trades']}**　勝率 **{overall['win_rate']*100:.0f}%**　淨損益 **{_pct(overall['total_pnl_pct_net'])}**　期望 **{_pct(overall['expectancy_net'])}**",
+        "",
+        "南亞科一分圖同款均線 MA5/10/20/60/120/200。進場是短均剛扇開，不是 436 末端。",
+        "",
+    ]
+    eq_path = _draw_equity(trades, img_dir / "equity.png")
+    eq_html = _img_tag("img/equity.png", "累計淨損益") if eq_path else ""
+    if eq_path:
+        md_parts += ["## 累計淨損益", "", "![equity](img/equity.png)", ""]
+
     for i, trade in enumerate(trades, start=1):
         df = frames.get(trade.symbol)
-        chart = _chart_html(df, trade, i) if df is not None and len(df) else "<p class='muted'>沒有K線</p>"
+        slug = trade.symbol.replace("=", "").replace(".", "-")
+        png_name = f"{i:02d}_{slug}.png"
+        if df is not None and len(df):
+            _draw_trade_chart(df, trade, i, img_dir / png_name)
+            chart = _img_tag(f"img/{png_name}", f"{trade.symbol} {_fmt(trade.signal.timestamp)}")
+            md_parts += [
+                f"## #{i} {trade.symbol}　{_fmt(trade.signal.timestamp)}　{_pct(trade.pnl_pct_net)}",
+                "",
+                f"進場 `{trade.signal.entry:.2f}`　出場 `{trade.exit_price:.2f}`　{EXIT_ZH.get(trade.exit_reason, trade.exit_reason)}",
+                "",
+                f"MA5/10/20 `{trade.signal.ma5:.2f}` / `{trade.signal.ma10:.2f}` / `{trade.signal.ma20:.2f}`　離200 `{trade.signal.ext_200_pct*100:.2f}%`",
+                "",
+                f"![trade {i}](img/{png_name})",
+                "",
+            ]
+        else:
+            chart = "<p class='muted'>沒有K線</p>"
         pnl_cls = "pos" if trade.pnl_pct_net >= 0 else "neg"
         tag = EXIT_ZH.get(trade.exit_reason, trade.exit_reason)
         cards.append(
@@ -225,7 +259,7 @@ MA60 {trade.signal.ma60:.2f}　MA120 {trade.signal.ma120:.2f}　MA200 {trade.sig
     note_html = "".join(f"<li>{html.escape(n)}</li>" for n in notes)
     empty = "" if trades else '<div class="empty">沒有成交</div>'
 
-    return f"""<!DOCTYPE html>
+    html_page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
@@ -306,7 +340,7 @@ MA60 {trade.signal.ma60:.2f}　MA120 {trade.signal.ma120:.2f}　MA200 {trade.sig
       <div class="stat"><div class="k">單筆期望</div><div class="v {'pos' if overall['expectancy_net']>=0 else 'neg'}">{_pct(overall['expectancy_net'])}</div></div>
     </div>
     <div class="chips">{''.join(chips)}</div>
-    <div class="eq">{_equity_html(trades)}</div>
+    <div class="eq">{eq_html}</div>
     <h2>標的</h2>
     <table>
       <thead><tr><th>代號</th><th>K 數</th><th>筆數</th><th>勝率</th><th>淨損益</th></tr></thead>
@@ -332,6 +366,7 @@ MA60 {trade.signal.ma60:.2f}　MA120 {trade.signal.ma120:.2f}　MA200 {trade.sig
 </body>
 </html>
 """
+    return html_page, "\n".join(md_parts)
 
 
 def save_backtest_site(
@@ -345,8 +380,14 @@ def save_backtest_site(
 ) -> Path:
     out = Path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
-        build_backtest_site(title=title, trades=trades, frames=frames, notes=notes, symbol_stats=symbol_stats),
-        encoding="utf-8",
+    html_page, markdown = build_backtest_site(
+        title=title,
+        trades=trades,
+        frames=frames,
+        notes=notes,
+        symbol_stats=symbol_stats,
+        img_dir=out.parent / "img",
     )
+    out.write_text(html_page, encoding="utf-8")
+    (out.parent / "README.md").write_text(markdown, encoding="utf-8")
     return out

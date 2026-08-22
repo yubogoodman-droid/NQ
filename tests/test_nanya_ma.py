@@ -93,10 +93,14 @@ class NanyaMaTests(unittest.TestCase):
             symbol_stats=[("DEMO.2408", summarize_ma_trades(trades), len(df))],
         )
         text = out.read_text(encoding="utf-8")
-        self.assertIn("data:image/png;base64,", text)
+        md = (out.parent / "README.md").read_text(encoding="utf-8")
+        imgs = list((out.parent / "img").glob("*.png"))
+        self.assertTrue(imgs)
+        self.assertIn('src="img/', text)
         self.assertIn("<img", text)
         self.assertIn("DEMO.2408", text)
         self.assertIn("MA5", text)
+        self.assertIn("img/", md)
 
 
 if __name__ == "__main__":
