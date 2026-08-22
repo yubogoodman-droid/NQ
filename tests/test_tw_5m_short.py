@@ -65,8 +65,11 @@ class FiveMinShortSignalTests(unittest.TestCase):
         self.assertTrue(hit.bearish_aligned)
         self.assertTrue(hit.crossed_below_ma200)
         self.assertTrue(hit.hourly_close_below_ma20)
+        self.assertTrue(hit.m15_close_below_ma20)
         self.assertIsNotNone(hit.h1_close)
+        self.assertIsNotNone(hit.m15_close)
         self.assertLess(hit.h1_close, hit.h1_ma20)
+        self.assertLess(hit.m15_close, hit.m15_ma20)
         self.assertLess(hit.close, hit.ma200)
         self.assertGreaterEqual(hit.prev_close, hit.prev_ma200)
         self.assertLess(hit.ma5, hit.ma10)
@@ -97,6 +100,15 @@ class FiveMinShortSignalTests(unittest.TestCase):
         hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
         idx = _session_index(hist_days)
         closes = [80.0] * 24 + [100.0] * (len(idx) - 24)
+        hist = _ohlcv(closes, idx)
+        live = _ohlcv([100.0, 99.2], _session_index([date(2026, 8, 21)])[:2])
+        hits = iter_5m_ma200_short_alerts(pd.concat([hist, live]))
+        self.assertEqual(hits, [])
+
+    def test_rejects_when_15m_close_above_ma20(self) -> None:
+        hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
+        idx = _session_index(hist_days)
+        closes = [100.0] * 159 + [98.5] * 45 + [100.0] * 12
         hist = _ohlcv(closes, idx)
         live = _ohlcv([100.0, 99.2], _session_index([date(2026, 8, 21)])[:2])
         hits = iter_5m_ma200_short_alerts(pd.concat([hist, live]))
@@ -199,6 +211,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("空頭排列", text)
         self.assertIn("跌破", text)
         self.assertIn("小時K", text)
+        self.assertIn("15分K", text)
         self.assertIn("十五分K", text)
         self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
@@ -215,6 +228,7 @@ class NotifyTests(unittest.TestCase):
         self.assertIn("< MA200", body)
         self.assertIn("MA5", body)
         self.assertIn("小時K", body)
+        self.assertIn("15分K", body)
 
 
 class MarketHoursTests(unittest.TestCase):

@@ -34,8 +34,10 @@ def format_hit_message(hits: list[tuple[RankedStock, AlertSnapshot]]) -> tuple[s
         if stock.change_percent is not None:
             chg = f" {stock.change_percent:+.2f}%"
         extra = ""
+        if snap.m15_close is not None and snap.m15_ma20 is not None:
+            extra += f"   15分K {snap.m15_close:.2f} < MA20 {snap.m15_ma20:.2f}\n"
         if snap.h1_close is not None and snap.h1_ma20 is not None:
-            extra = f"   小時K {snap.h1_close:.2f} < MA20 {snap.h1_ma20:.2f}\n"
+            extra += f"   小時K {snap.h1_close:.2f} < MA20 {snap.h1_ma20:.2f}\n"
         lines.append(
             f"{stock.rank}. {stock.name} {stock.symbol} "
             f"{stock.price:.2f}{chg}\n"
