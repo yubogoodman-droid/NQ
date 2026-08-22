@@ -27,7 +27,7 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 class BacktestConfig:
     days: int = 5
     top: int = 100
-    max_price: float = 600.0
+    max_price: float | None = None
     exclude_etf: bool = True
     exclude_financial: bool = True
     exclude_telecom: bool = True
@@ -142,7 +142,11 @@ def _load_session_universes(
                 last_error = ValueError(f"只有 {len(universe)} 檔")
                 current -= timedelta(days=1)
                 continue
-            priced = filter_by_price(universe, cfg.max_price)
+            priced = (
+                filter_by_price(universe, cfg.max_price)
+                if cfg.max_price is not None
+                else list(universe)
+            )
             after_etf = filter_etfs(priced) if cfg.exclude_etf else priced
             after_fin = (
                 filter_financials(after_etf) if cfg.exclude_financial else after_etf

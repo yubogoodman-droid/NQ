@@ -20,7 +20,12 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--days", type=int, default=5, help="回測交易日數（預設 5）")
     p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
-    p.add_argument("--max-price", type=float, default=600.0, help="濾掉此價格以上（預設 600）")
+    p.add_argument(
+        "--max-price",
+        type=float,
+        default=None,
+        help="濾掉此價格以上（預設不過濾，掃描成交額前 N 名）",
+    )
     p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
     p.add_argument("--include-financial", action="store_true", help="不過濾金融股")
     p.add_argument("--include-telecom", action="store_true", help="不過濾電信股")

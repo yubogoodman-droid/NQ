@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.patches import Rectangle
 
-from tw.backtest_5m import BacktestHit, BacktestResult
+from tw.backtest_5m import BacktestHit, BacktestResult, DayUniverse
 from tw.kline import resample_ohlcv
 from tw.signals import add_moving_averages
 
@@ -56,6 +56,20 @@ for _path in (
 
 def weekday_zh(d) -> str:
     return f"週{WEEKDAY_ZH[d.weekday()]}"
+
+
+def _universe_line(uni: DayUniverse, hit_count: int) -> str:
+    drops = []
+    if uni.price_dropped:
+        drops.append(f"股價濾掉 {uni.price_dropped}")
+    drops.append(f"ETF {uni.etf_dropped}")
+    drops.append(f"金融 {uni.financial_dropped}")
+    drops.append(f"電信 {uni.telecom_dropped}")
+    return (
+        f"成交額前 {len(uni.universe)} → "
+        + "、".join(drops)
+        + f" → 掃描 {len(uni.candidates)} → 通知 {hit_count} 則"
+    )
 
 
 def save_backtest_html(result: BacktestResult, path: str | Path) -> Path:
@@ -110,7 +124,7 @@ def _render(
             f"""
     <section class="day">
       <h2>{weekday_zh(day)} {day.isoformat()}</h2>
-      <p class="lead">成交額前 {len(uni.universe)} → 股價濾掉 {uni.price_dropped}、ETF {uni.etf_dropped}、金融 {uni.financial_dropped}、電信 {uni.telecom_dropped} → 掃描 {len(uni.candidates)} → 通知 {len(day_hits)} 則</p>
+      <p class="lead">{_universe_line(uni, len(day_hits))}</p>
       {body}
     </section>"""
         )
@@ -190,7 +204,7 @@ def _render(
     <h1>{html.escape(title)}</h1>
     <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K（十五分與小時都由五分K合成）</div>
     <p class="lead">
-      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 600 以上。
+      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股與電信股。
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段也不黏在一起），
       <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
@@ -202,7 +216,7 @@ def _render(
       <span class="chip">不含 ETF</span>
       <span class="chip">不含金融股</span>
       <span class="chip">不含電信股</span>
-      <span class="chip">股價 &lt; 600</span>
+      <span class="chip">成交額前 100</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
       <span class="chip">當根收盤站上 MA200</span>
       <span class="chip">收盤 &gt; 十五分 MA5／10／20</span>
