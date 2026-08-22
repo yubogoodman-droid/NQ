@@ -68,6 +68,18 @@ python -m unittest tests.test_nanya_ma
 
 回測圖請直接開 GitHub 上的 Markdown（圖會顯示）：[`docs/backtest/README.md`](docs/backtest/README.md)
 
+## 一分K 5>10>20>60 站上 MA200
+
+條件剛成立才通知。回測近一週每日成交額前 100。
+
+```bash
+python examples/run_tw_align200.py
+python examples/watch_tw_align200.py --test
+python examples/watch_tw_align200.py          # 盤中每分鐘掃
+```
+
+報告：`docs/align200/README.md`
+
 ## 快速開始
 
 ```bash
