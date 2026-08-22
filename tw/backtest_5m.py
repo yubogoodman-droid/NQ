@@ -26,7 +26,7 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 @dataclass(frozen=True)
 class BacktestConfig:
     days: int = 5
-    top: int = 250
+    top: int = 100
     max_price: float | None = 500.0
     exclude_etf: bool = True
     exclude_financial: bool = True
