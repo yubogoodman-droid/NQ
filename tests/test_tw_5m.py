@@ -221,7 +221,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("十五分K / MA5 10 20", text)
         self.assertIn("小時K", text)
         self.assertIn("日K", text)
-        self.assertIn("日K / MA5 10 20 200", text)
+        self.assertIn("日K / MA5 10 20 60 200", text)
         self.assertIn("最下＝日K", text)
         self.assertIn("上＝五分K", text)
         self.assertIn("均線發散", text)

@@ -27,6 +27,7 @@ MA_COLORS = {
     5: "#ffa726",
     10: "#ffeb3b",
     20: "#66bb6a",
+    60: "#4fc3f7",
     200: "#ce93d8",
 }
 CHART_BARS = {
@@ -245,7 +246,7 @@ def _render(
       且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
       且小時K收盤也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
-      最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／200）方便對照。
+      最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
       K 棒漲紅跌綠。
     </p>
     <div class="chips">
@@ -269,6 +270,7 @@ def _render(
       <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
       <span><i class="swatch" style="background:#ffeb3b"></i>MA10</span>
       <span><i class="swatch" style="background:#66bb6a"></i>MA20</span>
+      <span><i class="swatch" style="background:#4fc3f7"></i>MA60</span>
       <span><i class="swatch" style="background:#ce93d8"></i>MA200</span>
     </div>
     <div class="summary">
@@ -531,7 +533,7 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
         fontsize=8,
         frameon=False,
         labelcolor=FG,
-        ncol=5,
+        ncol=6,
         prop=_FONT,
     )
     ticks, labels = (
@@ -567,12 +569,12 @@ def _daily_ma_row(hit: BacktestHit) -> str:
         return ""
     row = work.iloc[loc]
     parts = [f"{float(row['close']):.2f}"]
-    for name in ("ma5", "ma10", "ma20", "ma200"):
+    for name in ("ma5", "ma10", "ma20", "ma60", "ma200"):
         val = row.get(name)
         parts.append("—" if val is None or pd.isna(val) else f"{float(val):.2f}")
     return (
-        f'<div class="row"><span>日K / MA5 10 20 200</span>'
-        f"<b>{parts[0]}　MA {parts[1]} / {parts[2]} / {parts[3]} / {parts[4]}</b></div>"
+        f'<div class="row"><span>日K / MA5 10 20 60 200</span>'
+        f"<b>{parts[0]}　MA {parts[1]} / {parts[2]} / {parts[3]} / {parts[4]} / {parts[5]}</b></div>"
     )
 
 
@@ -622,7 +624,7 @@ def _axis_ylim(
 ) -> tuple[float, float]:
     lows: list[float] = [float(window["low"].min())]
     highs: list[float] = [float(window["high"].max())]
-    for col in ("ma5", "ma10", "ma20", "ma200"):
+    for col in ("ma5", "ma10", "ma20", "ma60", "ma200"):
         if col not in window.columns:
             continue
         series = window[col].astype(float)

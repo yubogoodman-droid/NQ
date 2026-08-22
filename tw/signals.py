@@ -12,6 +12,7 @@ from tw.kline import resample_ohlcv
 MA_FAST = 5
 MA_MID = 10
 MA_SLOW = 20
+MA_MED = 60
 MA_LONG = 200
 H1_MA = 20
 # MA5 相對 MA20 至少拉開這麼多（％），否則算糾結。
@@ -117,6 +118,7 @@ def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
     out["ma5"] = close.rolling(MA_FAST, min_periods=MA_FAST).mean()
     out["ma10"] = close.rolling(MA_MID, min_periods=MA_MID).mean()
     out["ma20"] = close.rolling(MA_SLOW, min_periods=MA_SLOW).mean()
+    out["ma60"] = close.rolling(MA_MED, min_periods=MA_MED).mean()
     out["ma200"] = close.rolling(MA_LONG, min_periods=MA_LONG).mean()
     return out
 
