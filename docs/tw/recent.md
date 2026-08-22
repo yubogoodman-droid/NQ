@@ -2,34 +2,48 @@
 
 同一套規則：從 MA200 下面穿上、連續兩根站穩、09:10 以後。
 
-## 週二 2026-08-18（2 檔）
+週五盤中用週四成交額名單，所以先進光會出現在週五（盤後正式前 100 它是第 110）。
 
-完整頁： [backtest-2026-08-18.md](backtest-2026-08-18.md)
+## 週四 2026-08-20（5 檔）
 
-### 強茂 2481.TW　10:01
+完整頁： [backtest-2026-08-20.md](backtest-2026-08-20.md)
 
-![強茂 一分K](charts/backtest-2026-08-18/2481.TW-1m.png)
+### 聯鈞 3450.TW　09:52
 
-![強茂 五分K](charts/backtest-2026-08-18/2481.TW-5m.png)
+![聯鈞 一分K](charts/backtest-2026-08-20/3450.TW-1m.png)
 
-### 頎邦 6147.TWO　10:39
+### IET-KY 4971.TWO　10:07
 
-![頎邦 一分K](charts/backtest-2026-08-18/6147.TWO-1m.png)
+![IET-KY 一分K](charts/backtest-2026-08-20/4971.TWO-1m.png)
 
-![頎邦 五分K](charts/backtest-2026-08-18/6147.TWO-5m.png)
+### 大毅 2478.TW　12:23
 
-## 週三 2026-08-19（盤中 2 檔）
+![大毅 一分K](charts/backtest-2026-08-20/2478.TW-1m.png)
 
-盤後排行還沒出，用盤中成交額前 100。完整頁： [backtest-2026-08-19.md](backtest-2026-08-19.md)
+### 精材 3374.TWO　13:05
 
-### 萬海 2615.TW　10:17
+![精材 一分K](charts/backtest-2026-08-20/3374.TWO-1m.png)
 
-![萬海 一分K](charts/backtest-2026-08-19/2615.TW-1m.png)
+### 先進光 3362.TWO　13:15
 
-![萬海 五分K](charts/backtest-2026-08-19/2615.TW-5m.png)
+![先進光 一分K](charts/backtest-2026-08-20/3362.TWO-1m.png)
 
-### 騰輝電子-KY 6672.TW　11:03
+## 週五 2026-08-21（4 檔）
 
-![騰輝電子-KY 一分K](charts/backtest-2026-08-19/6672.TW-1m.png)
+完整頁： [backtest-2026-08-21.md](backtest-2026-08-21.md)
 
-![騰輝電子-KY 五分K](charts/backtest-2026-08-19/6672.TW-5m.png)
+### 環宇-KY 4991.TWO　10:16
+
+![環宇-KY 一分K](charts/backtest-2026-08-21/4991.TWO-1m.png)
+
+### 台虹 8039.TW　10:17
+
+![台虹 一分K](charts/backtest-2026-08-21/8039.TW-1m.png)
+
+### 先進光 3362.TWO　10:48
+
+![先進光 一分K](charts/backtest-2026-08-21/3362.TWO-1m.png)
+
+### 聯一光 3441.TWO　12:35
+
+![聯一光 一分K](charts/backtest-2026-08-21/3441.TWO-1m.png)

@@ -83,12 +83,12 @@ def run_scan(
 ) -> ScanResult:
     cfg = config or ScanConfig()
     sess = session or requests.Session()
-    if cfg.on_date is not None:
+    if cfg.reuse_universe:
+        universe, rank_time = list(cfg.reuse_universe), cfg.reuse_rank_time
+    elif cfg.on_date is not None:
         universe, rank_time = fetch_daily_turnover_ranking(
             cfg.on_date, top=cfg.top, session=sess, timeout=cfg.timeout
         )
-    elif cfg.reuse_universe:
-        universe, rank_time = list(cfg.reuse_universe), cfg.reuse_rank_time
     else:
         universe, rank_time = fetch_turnover_ranking(
             top=cfg.top, session=sess, timeout=cfg.timeout
