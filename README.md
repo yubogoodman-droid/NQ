@@ -51,16 +51,25 @@ https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-dro
 合併進 `main` 後 GitHub Pages：  
 https://yubogoodman-droid.github.io/NQ/binance/ma15-bull.html
 
-Telegram 監看（與回測同一套規則）。在 `examples/watch_15m_bull.py` 最上面填 token / chat id：
+Telegram 監看（與回測同一套規則）。**不要只拷一個 py**，`nq` 資料夾要在旁邊。
+
+PyCharm：用「Open」打開整個 NQ 專案，或把 `15M多排.py` 和 `nq` 放同一層，在 `15M多排.py` 最上面填 token / chat id：
+
+```
+PythonProject2\
+  15M多排.py
+  nq\
+```
 
 ```bash
-python3 examples/watch_15m_bull.py --test
-python3 examples/watch_15m_bull.py            # 預設 15 分 + 1 小時都推
-python3 examples/watch_15m_bull.py --tf 15m   # 只推 15 分（要在 1h MA200 上）
-python3 examples/watch_15m_bull.py --tf 1h    # 只推小時圖（底下夠久 + 波動小 + BTC 先站上）
-python3 examples/watch_15m_bull.py --stocks
-python3 examples/watch_15m_bull.py --once     # 掃一輪就結束
+pip install numpy requests matplotlib
+python 15M多排.py --test
+python 15M多排.py                 # 預設 15 分 + 1 小時都推
+python 15M多排.py --tf 1h         # 只推小時圖
+python 15M多排.py --once
 ```
+
+也可以 `pip install -e .` 後跑 `examples/watch_15m_bull.py`。
 
 ## 幣安黏帶三幕 Telegram
 
