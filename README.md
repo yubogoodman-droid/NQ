@@ -22,6 +22,21 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## 台股五分 K 空頭通知
+
+五分鐘圖：`MA5 < MA10 < MA20` 空頭排列，且當根收盤剛跌破 MA200，會推桌面／Telegram／Discord。
+
+```bash
+# 近一週回測（預設 5 個交易日）
+python3 examples/backtest_tw_5m_short.py --today 2026-08-21
+
+# 盤中監視（在 examples/watch_tw_5m_short.py 最上面填 Telegram）
+python3 examples/watch_tw_5m_short.py --test
+python3 examples/watch_tw_5m_short.py
+```
+
+報告：`docs/tw/backtest-5m-short-7d.html`
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
