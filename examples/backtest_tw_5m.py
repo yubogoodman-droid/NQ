@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--include-financial", action="store_true", help="不過濾金融股")
     p.add_argument("--include-telecom", action="store_true", help="不過濾電信股")
     p.add_argument("--today", help="回測截止日 YYYY-MM-DD（預設台北今天）")
-    p.add_argument("-o", "--output", default="docs/tw/backtest-5m-15m.html")
+    p.add_argument("-o", "--output", default="docs/tw/backtest-5m-15m-1h.html")
     return p.parse_args()
 
 

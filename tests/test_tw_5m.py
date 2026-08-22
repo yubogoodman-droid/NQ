@@ -178,16 +178,16 @@ class ReportTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             pngs = list(Path(tmp).joinpath("charts/out").glob("*.png"))
             self.assertEqual(len(pngs), 1)
-            self.assertTrue(pngs[0].name.endswith("-5m15m.png"))
+            self.assertTrue(pngs[0].name.endswith("-5m1h.png"))
             from PIL import Image
 
             with Image.open(pngs[0]) as im:
-                self.assertGreater(im.height, 700)
+                self.assertGreater(im.height, 1000)
         self.assertIn("南亞科", text)
         self.assertIn("十五分K", text)
+        self.assertIn("小時K", text)
         self.assertIn("上＝五分K", text)
         self.assertIn("均線發散", text)
-        self.assertIn("小時K", text)
         self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
 
