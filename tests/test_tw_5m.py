@@ -12,7 +12,7 @@ import pandas as pd
 from tw.backtest_5m import BacktestConfig, BacktestHit, BacktestResult, DayUniverse, run_5m_backtest
 from tw.kline import resample_ohlcv
 from tw.ranking import RankedStock
-from tw.report import save_backtest_html, weekday_zh
+from tw.report import _session_tick_labels, save_backtest_html, weekday_zh
 from tw.signals import iter_5m_ma200_alerts
 
 TAIPEI = ZoneInfo("Asia/Taipei")
@@ -210,6 +210,16 @@ class ReportTests(unittest.TestCase):
         self.assertNotIn("小時 MA20 不下彎", text)
         self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
+
+    def test_axis_labels_mark_the_next_session_after_friday(self) -> None:
+        friday = pd.date_range("2026-08-14 12:00", periods=3, freq="h", tz=TAIPEI)
+        monday = pd.date_range("2026-08-17 09:00", periods=3, freq="h", tz=TAIPEI)
+        idx = friday.append(monday)
+        ticks, labels = _session_tick_labels(idx)
+        self.assertIn(3, ticks)
+        self.assertTrue(any("08/14" in lab for lab in labels))
+        self.assertTrue(any("08/17" in lab for lab in labels))
+        self.assertFalse(any("08/15" in lab or "08/16" in lab for lab in labels))
 
 
 class ResampleTests(unittest.TestCase):

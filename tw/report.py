@@ -209,6 +209,7 @@ def _render(
       <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
       且小時K收盤也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
+      <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       K 棒漲紅跌綠。
     </p>
     <div class="chips">
@@ -396,6 +397,9 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
     xs = list(range(n))
     ax.set_facecolor(BG)
     body_w = 0.7
+    for i in range(1, n):
+        if pd.Timestamp(window.index[i]).date() != pd.Timestamp(window.index[i - 1]).date():
+            ax.axvline(i - 0.5, color="#8b949e", linewidth=0.9, linestyle="--", alpha=0.55, zorder=1)
     for i, (_, row) in enumerate(window.iterrows()):
         o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
         color = UP if c >= o else DOWN
@@ -481,14 +485,37 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
         ncol=5,
         prop=_FONT,
     )
-    step = max(1, n // 6)
-    ticks = list(range(0, n, step))
-    if n - 1 not in ticks:
-        ticks.append(n - 1)
-    labels = [pd.Timestamp(window.index[i]).strftime("%H:%M") for i in ticks]
+    ticks, labels = _session_tick_labels(window.index)
     ax.set_xticks(ticks)
     ax.set_xticklabels(labels)
     return True
+
+
+def _session_tick_labels(index: pd.DatetimeIndex) -> tuple[list[int], list[str]]:
+    """換日的刻度帶日期，避免週五 13:00 旁邊的週一只寫 09:00、看起來像沒扣假日。"""
+    n = len(index)
+    if n == 0:
+        return [], []
+    dates = [pd.Timestamp(ts).date() for ts in index]
+    ticks = {0, n - 1}
+    for i in range(1, n):
+        if dates[i] != dates[i - 1]:
+            ticks.add(i)
+    step = max(1, n // 6)
+    ticks.update(range(0, n, step))
+    ordered = sorted(ticks)
+    labels: list[str] = []
+    prev_date = None
+    for i in ordered:
+        ts = pd.Timestamp(index[i])
+        day = ts.date()
+        clock = ts.strftime("%H:%M")
+        if prev_date is None or day != prev_date:
+            labels.append(f"{ts.strftime('%m/%d')}\n{clock}")
+        else:
+            labels.append(clock)
+        prev_date = day
+    return ordered, labels
 
 
 
