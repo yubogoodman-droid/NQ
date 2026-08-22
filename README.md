@@ -24,7 +24,7 @@
 
 ## 幣安 Telegram（15 分同時站上）
 
-15 分鐘 K：前一根收盤完全在 MA7 / 14 / 25 / 99 / 120 下方，這一根收盤同時站上這五條，就推 Telegram（帶圖）。預設只掃股票永續。不必過 MA200。
+15 分鐘 K：前一根收盤完全在 MA7 / 14 / 25 / 99 / 120 下方，這一根收盤同時站上這五條，就推 Telegram（帶圖）。預設全掃流動永續（加密+股票）。不必過 MA200。
 
 在 `examples/watch_binance_ribbon.py` 最上面填：
 
@@ -37,8 +37,8 @@ TELEGRAM_CHAT_ID = "..."
 python3 examples/watch_binance_ribbon.py --demo          # 驗證偵測
 python3 examples/watch_binance_ribbon.py --test          # 先測 Telegram 通不通
 python3 examples/watch_binance_ribbon.py --once          # 掃剛收的 15 分，推完就結束
-python3 examples/watch_binance_ribbon.py                 # 每根 15 分收盤掃股票
-python3 examples/watch_binance_ribbon.py --asset all     # 加密+股票流動盤
+python3 examples/watch_binance_ribbon.py                 # 每根 15 分收盤全掃流動盤
+python3 examples/watch_binance_ribbon.py --asset stocks  # 只要股票
 python3 examples/watch_binance_ribbon.py --also-1m       # 順便跑原本 1m 黏帶
 ```
 

@@ -3,8 +3,8 @@
 
 在下面填 Telegram 後執行：
 
-    python3 examples/watch_binance_ribbon.py              # 股票 15 分條件
-    python3 examples/watch_binance_ribbon.py --asset all  # 加密+股票流動盤
+    python3 examples/watch_binance_ribbon.py                 # 流動盤全掃
+    python3 examples/watch_binance_ribbon.py --asset stocks  # 只要股票
 
 Ctrl+C 結束。同一根 K 不會重發。
 """
@@ -596,7 +596,7 @@ def main() -> int:
     p.add_argument("--once", action="store_true", help="掃一輪就結束（15 分看剛收的兩根）")
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
     p.add_argument("--demo", action="store_true", help="只用合成 15 分 K 驗證偵測")
-    p.add_argument("--asset", choices=("stocks", "all"), default="stocks", help="15 分掃描範圍，預設只要股票")
+    p.add_argument("--asset", choices=("stocks", "all"), default="all", help="15 分掃描範圍，預設全掃流動盤")
     p.add_argument("--also-1m", action="store_true", help="順便跑原本的 1m 黏帶離開/強訊號")
     args = p.parse_args()
     apply_keys()
