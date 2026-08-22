@@ -39,26 +39,12 @@ def _ohlcv(closes: list[float], index: pd.DatetimeIndex) -> pd.DataFrame:
     )
 
 
-def _weekdays_ending(end: date, n: int) -> list[date]:
-    days: list[date] = []
-    current = end
-    while len(days) < n:
-        if current.weekday() < 5:
-            days.append(current)
-        current -= timedelta(days=1)
-    days.reverse()
-    return days
-
-
 def _history_then_live(live_closes: list[float], live_day: date = date(2026, 8, 21)) -> pd.DataFrame:
-    """約 42 個交易日，讓小時 MA200 算得出來；最後一天略高，前一根小時K會在 MA200 上。"""
-    hist_days = _weekdays_ending(live_day - timedelta(days=1), 42)
-    older, last = hist_days[:-1], hist_days[-1]
-    hist = _ohlcv([99.0] * (54 * len(older)), _session_index(older))
-    last_day = _ohlcv([100.0] * 54, _session_index([last]))
+    hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
+    hist = _ohlcv([100.0] * (54 * 4), _session_index(hist_days))
     live_index = _session_index([live_day])[: len(live_closes)]
     live = _ohlcv(live_closes, live_index)
-    return pd.concat([hist, last_day, live])
+    return pd.concat([hist, live])
 
 
 class FiveMinSignalTests(unittest.TestCase):
@@ -72,11 +58,8 @@ class FiveMinSignalTests(unittest.TestCase):
         self.assertTrue(hit.crossed_above_ma200)
         self.assertTrue(hit.close_above_all_mas)
         self.assertTrue(hit.hourly_close_above_ma20)
-        self.assertTrue(hit.hourly_two_bars_above_ma200)
         self.assertIsNotNone(hit.h1_close)
         self.assertGreater(hit.h1_close, hit.h1_ma20)
-        self.assertGreater(hit.h1_close, hit.h1_ma200)
-        self.assertGreater(hit.h1_prev_close, hit.h1_prev_ma200)
         self.assertGreaterEqual(hit.ribbon_fan_pct, 0.50)
         self.assertGreater(hit.close, hit.ma5)
         self.assertGreater(hit.close, hit.ma200)
@@ -132,35 +115,6 @@ class FiveMinSignalTests(unittest.TestCase):
         hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
         self.assertEqual(hits, [])
 
-    def test_rejects_when_prev_hour_below_h1_ma200(self) -> None:
-        live_day = date(2026, 8, 21)
-        hist_days = _weekdays_ending(live_day - timedelta(days=1), 42)
-        hist = _ohlcv([100.0] * (54 * len(hist_days)), _session_index(hist_days))
-        live = _ohlcv([99.0, 105.0], _session_index([live_day])[:2])
-        hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
-        self.assertEqual(hits, [])
-
-    def test_official_hourly_can_reject_even_if_5m_resample_passes(self) -> None:
-        df = _history_then_live([99.0, 105.0])
-        self.assertEqual(len(iter_5m_ma200_alerts(df)), 1)
-        hours = pd.date_range("2026-01-05 09:00", periods=220, freq="h", tz=TAIPEI)
-        hourly = _ohlcv([200.0] * 200 + [50.0] * 20, hours)
-        self.assertEqual(iter_5m_ma200_alerts(df, hourly_full=hourly), [])
-
-    def test_official_hourly_supplies_ma200_when_5m_history_is_short(self) -> None:
-        live_day = date(2026, 8, 21)
-        hist_days = _weekdays_ending(live_day - timedelta(days=1), 5)
-        hist = _ohlcv([99.0] * (54 * len(hist_days)), _session_index(hist_days))
-        live = _ohlcv([99.0, 105.0], _session_index([live_day])[:2])
-        df = pd.concat([hist, live])
-        self.assertEqual(iter_5m_ma200_alerts(df), [])
-        hours = pd.date_range("2026-01-05 09:00", periods=220, freq="h", tz=TAIPEI)
-        hourly = _ohlcv([100.0] * 219 + [110.0], hours)
-        hits = iter_5m_ma200_alerts(df, hourly_full=hourly)
-        self.assertEqual(len(hits), 1)
-        self.assertGreater(hits[0].h1_close, hits[0].h1_ma200)
-        self.assertGreater(hits[0].h1_prev_close, hits[0].h1_prev_ma200)
-
 
 class FiveMinBacktestTests(unittest.TestCase):
     def test_run_scan_uses_daily_universe_and_5m_alerts(self) -> None:
@@ -180,14 +134,9 @@ class FiveMinBacktestTests(unittest.TestCase):
         def fake_universes(cfg, as_of, sess):
             return [universe]
 
-        def fake_fetch(symbols, interval="5m", **kwargs):
-            if interval == "5m":
-                return {"2408.TW": df}
-            return {}
-
         with (
             patch("tw.backtest_5m._load_session_universes", side_effect=fake_universes),
-            patch("tw.backtest_5m.fetch_bars_many", side_effect=fake_fetch),
+            patch("tw.backtest_5m.fetch_bars_many", return_value={"2408.TW": df}),
         ):
             result = run_5m_backtest(BacktestConfig(days=1, today=date(2026, 8, 21)))
         self.assertEqual(len(result.hits), 1)

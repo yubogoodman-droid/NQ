@@ -1,4 +1,4 @@
-"""台股五分 K 回測：成交額前 N、多頭發散、當根收盤站上 MA200，且當下與前1小時都在小時 MA200 之上。"""
+"""台股五分 K 回測：成交額前 N、多頭發散、當根收盤站上 MA200，且小時K在 MA20 之上。"""
 
 from __future__ import annotations
 
@@ -32,7 +32,6 @@ class BacktestConfig:
     exclude_financial: bool = True
     exclude_telecom: bool = True
     kline_range: str = "1mo"
-    hourly_range: str = "6mo"
     today: date | None = None
     timeout: int = 20
 
@@ -86,10 +85,6 @@ def run_5m_backtest(
     )
     print(f"五分K下載 {len(symbols)} 檔（Yahoo {cfg.kline_range}）", flush=True)
     frames = fetch_bars_many(symbols, interval="5m", range_=cfg.kline_range, closed_only=True)
-    print(f"小時K下載 {len(symbols)} 檔（Yahoo {cfg.hourly_range}，給小時 MA200）", flush=True)
-    hourly_frames = fetch_bars_many(
-        symbols, interval="1h", range_=cfg.hourly_range, closed_only=True
-    )
 
     hits: list[BacktestHit] = []
     skipped: list[tuple[date, RankedStock, str]] = []
@@ -104,12 +99,7 @@ def run_5m_backtest(
             if len(df) < 201:
                 skipped.append((item.day, stock, f"五分 K 不足 201 根（{len(df)}）"))
                 continue
-            alerts = iter_5m_ma200_alerts(
-                df,
-                since=since,
-                until=until,
-                hourly_full=hourly_frames.get(stock.symbol),
-            )
+            alerts = iter_5m_ma200_alerts(df, since=since, until=until)
             if not alerts:
                 continue
             for snap in alerts:
