@@ -27,7 +27,7 @@ MARKET_CLOSE = time(13, 30)
 
 @dataclass(frozen=True)
 class WatchConfig:
-    top: int = 100
+    top: int = 0
     max_price: float = 650.0
     exclude_etf: bool = True
     exclude_financial: bool = True

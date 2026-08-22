@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="台股五分K空頭排列跌破MA200且15分／小時K在MA20下即時通知")
     p.add_argument("--test", action="store_true", help="立刻掃一次並試送通知")
     p.add_argument("--interval", type=int, default=60, help="盤中重掃間隔秒數（預設 60）")
-    p.add_argument("--top", type=int, default=100)
+    p.add_argument("--top", type=int, default=0, help="成交額前 N 名（0＝不限）")
     p.add_argument("--max-price", type=float, default=650.0)
     p.add_argument("--include-etf", action="store_true")
     p.add_argument("--include-financial", action="store_true")
@@ -62,7 +62,7 @@ def _config(args: argparse.Namespace) -> WatchConfig:
 def print_result(result) -> None:
     print(
         f"[{result.scanned_at.strftime('%H:%M:%S')}] "
-        f"成交額前 {len(result.universe)}／價{result.price_dropped}／"
+        f"名單 {len(result.universe)}／價{result.price_dropped}／"
         f"ETF{result.etf_dropped}／金融{result.financial_dropped}／"
         f"電信{result.telecom_dropped}／掃描 {len(result.candidates)}／"
         f"命中 {len(result.hits)}"

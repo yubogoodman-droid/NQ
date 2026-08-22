@@ -1,4 +1,4 @@
-"""台股五分 K 空頭回測：成交額前 N、5/10/20 空頭排列、跌破 MA200，且 15 分／小時 K 都在 MA20 之下。"""
+"""台股五分 K 空頭回測：不限成交額、5/10/20 空頭排列、跌破 MA200，且 15 分／小時 K 都在 MA20 之下。"""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ FORWARD_BARS = (3, 6, 12)
 @dataclass(frozen=True)
 class BacktestConfig:
     days: int = 5
-    top: int = 100
+    top: int = 0
     max_price: float = 650.0
     exclude_etf: bool = True
     exclude_financial: bool = True
@@ -231,7 +231,7 @@ def _load_session_universes(
                 )
             )
             print(
-                f"{current.isoformat()} 成交額前 {len(universe)} → "
+                f"{current.isoformat()} 上市＋上櫃 {len(universe)} → "
                 f"價{found[-1].price_dropped}/ETF{found[-1].etf_dropped}/"
                 f"金融{found[-1].financial_dropped}/電信{found[-1].telecom_dropped} "
                 f"→ 掃描 {len(candidates)}",

@@ -42,12 +42,12 @@ class RankedStock:
 
 
 def fetch_turnover_ranking(
-    top: int = 100,
+    top: int = 0,
     session: requests.Session | None = None,
     timeout: int = 20,
     as_of: date | None = None,
 ) -> tuple[list[RankedStock], str | None]:
-    """抓最近一個「已公布」交易日的成交金額前 N 名。
+    """抓最近一個「已公布」交易日的上市＋上櫃名單（top<=0 不限成交額）。
 
     盤中官方當日排行尚未出爐，會改用前一個交易日，避免永豐 snapshots 掃全市場。
     """
@@ -164,11 +164,11 @@ def last_n_weekdays(n: int = 5, today: date | None = None) -> list[date]:
 
 def fetch_daily_turnover_ranking(
     on_date: date,
-    top: int = 100,
+    top: int = 0,
     session: requests.Session | None = None,
     timeout: int = 20,
 ) -> tuple[list[RankedStock], str | None]:
-    """上市＋上櫃當日成交金額排行（盤後）。一邊失敗仍用另一邊。"""
+    """上市＋上櫃當日名單（盤後，top<=0 不限成交額）。一邊失敗仍用另一邊。"""
     sess = session or requests.Session()
     stocks: list[RankedStock] = []
     errors: list[str] = []
@@ -198,7 +198,14 @@ def fetch_daily_turnover_ranking(
         )
         for i, s in enumerate(stocks, 1)
     ]
-    return ranked[:top], f"{on_date.isoformat()} 盤後成交額"
+    return _take_top(ranked, top), f"{on_date.isoformat()} 盤後成交額"
+
+
+def _take_top(ranked: list[RankedStock], top: int) -> list[RankedStock]:
+    """top <= 0 表示不限成交額名次，回傳全部。"""
+    if top is None or top <= 0:
+        return ranked
+    return ranked[:top]
 
 
 def parse_twse_mi_index(payload: dict, exchange: str = "TAI") -> list[RankedStock]:

@@ -214,6 +214,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("15分K", text)
         self.assertIn("十五分K", text)
         self.assertIn("一小時K", text)
+        self.assertIn("不限成交額", text)
         self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
 
