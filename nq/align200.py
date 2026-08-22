@@ -37,6 +37,7 @@ class Align200Trade:
 
 
 def add_align_features(df: pd.DataFrame) -> pd.DataFrame:
+    """一分K均線：MA200 = 近 200 根 1m 收盤平均，不是日線 200。"""
     out = df.copy()
     close = out["close"]
     for period in MA_PERIODS:

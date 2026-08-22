@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from nq.align200 import detect_align200, run_align200_backtest, summarize_align
+from tw.ranking import RankedStock, filter_by_price
 
 
 def _frame(closes: list[float]) -> pd.DataFrame:
@@ -72,6 +73,13 @@ class Align200Tests(unittest.TestCase):
         self.assertGreaterEqual(stats["trades"], 1)
         self.assertIn(trades[0].signal.day, stats["by_day"])
         self.assertTrue(stats["by_exit"])
+
+    def test_drops_price_600_and_above(self) -> None:
+        cheap = RankedStock(1, "2408.TW", "南亞科", 436.0, None, None, 100, 1e9, "TAI")
+        edge = RankedStock(2, "2330.TW", "台積電", 600.0, None, None, 100, 1e9, "TAI")
+        dear = RankedStock(3, "3081.TWO", "聯亞", 2635.0, None, None, 10, 1e9, "TWO")
+        kept = filter_by_price([cheap, edge, dear], 600.0)
+        self.assertEqual([s.symbol for s in kept], ["2408.TW"])
 
 
 if __name__ == "__main__":

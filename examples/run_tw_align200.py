@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nq.align200 import detect_align200, run_align200_backtest, summarize_align
 from nq.align200_site import write_report
 from nq.yahoo_1m import fetch_1m_many
-from tw.ranking import RankedStock, fetch_daily_turnover_ranking, filter_etfs, iter_recent_sessions
+from tw.ranking import RankedStock, fetch_daily_turnover_ranking, filter_by_price, filter_etfs, iter_recent_sessions
 
 
 def last_weekdays(end: date | None = None, n: int = 5) -> list[date]:
@@ -28,6 +28,7 @@ def main() -> None:
     parser.add_argument("--days", type=int, default=5)
     parser.add_argument("--end", default="", help="結束日 YYYY-MM-DD，預設最近交易日")
     parser.add_argument("--keep-etf", action="store_true")
+    parser.add_argument("--max-price", type=float, default=600.0, help="股價達此以上不掃，0=不限")
     parser.add_argument("--output", default="docs/align200")
     parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args()
@@ -40,17 +41,19 @@ def main() -> None:
     names: dict[str, str] = {}
     for day in days:
         try:
-            stocks, label = fetch_daily_turnover_ranking(day, top=max(args.top * 2, 150))
+            stocks, label = fetch_daily_turnover_ranking(day, top=max(args.top * 3, 250))
         except Exception as exc:
             print(f"{day} 排行失敗：{exc}", flush=True)
             continue
         if not args.keep_etf:
             stocks = filter_etfs(stocks)
+        if args.max_price > 0:
+            stocks = filter_by_price(stocks, args.max_price)
         stocks = stocks[: args.top]
         day_universe[day] = stocks
         for s in stocks:
             names[s.symbol] = s.name
-        print(f"{label} → 掃描 {len(stocks)} 檔", flush=True)
+        print(f"{label} → 掃描 {len(stocks)} 檔（股價<{args.max_price:g}）", flush=True)
 
     symbols = sorted({s.symbol for stocks in day_universe.values() for s in stocks})
     print(f"下載一分K {len(symbols)} 檔…", flush=True)
@@ -82,7 +85,8 @@ def main() -> None:
     notes = [
         "一分K：MA5>MA10>MA20>MA60 多頭排列，且收盤站上 MA200。",
         "只在條件剛成立那一根通知／進場（前一根尚未同時滿足）。",
-        "每日成交額前 100（上市+上櫃），預設去掉 ETF。09:10 前不進，13:20 平倉。",
+        "每日成交額前 100（上市+上櫃），去掉 ETF 與股價 600 以上。09:10 前不進，13:20 平倉。",
+        "MA5/10/20/60/200 全部是一分K均線（MA200＝近 200 根 1m，約 3 小時 20 分，不是日線200）。",
         "出場：收盤跌破 MA200，或 MA5 跌破 MA10。下一根開盤進場，單邊 8bps。",
         "Yahoo 一分K 約 7 日。學習用，不是下單建議。",
     ]

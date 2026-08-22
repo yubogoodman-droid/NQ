@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.align200 import detect_align200, format_alert
 from nq.yahoo_1m import fetch_1m
-from tw.ranking import fetch_turnover_ranking, filter_etfs
+from tw.ranking import fetch_turnover_ranking, filter_by_price, filter_etfs
 
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
@@ -65,9 +65,12 @@ def telegram(text: str) -> bool:
     return r.ok
 
 
-def scan_once(top: int = 100) -> int:
-    stocks, label = fetch_turnover_ranking(top=max(top * 2, 150))
-    stocks = filter_etfs(stocks)[:top]
+def scan_once(top: int = 100, max_price: float = 600.0) -> int:
+    stocks, label = fetch_turnover_ranking(top=max(top * 3, 250))
+    stocks = filter_etfs(stocks)
+    if max_price > 0:
+        stocks = filter_by_price(stocks, max_price)
+    stocks = stocks[:top]
     print(f"{label} 掃描 {len(stocks)} 檔", flush=True)
     seen = load_seen()
     sent = 0
@@ -101,6 +104,7 @@ def main() -> None:
     p.add_argument("--once", action="store_true")
     p.add_argument("--interval", type=int, default=60)
     p.add_argument("--top", type=int, default=100)
+    p.add_argument("--max-price", type=float, default=600.0, help="股價達此以上不掃，0=不限")
     p.add_argument("--test", action="store_true")
     args = p.parse_args()
     if args.test:
@@ -108,12 +112,12 @@ def main() -> None:
         print("Telegram", "OK" if ok else "未設定或失敗")
         return
     if args.once:
-        print(f"送出 {scan_once(args.top)} 則")
+        print(f"送出 {scan_once(args.top, args.max_price)} 則")
         return
     print("watch 中，每根 1m 收盤掃一次（Ctrl+C 停）", flush=True)
     while True:
         try:
-            scan_once(args.top)
+            scan_once(args.top, args.max_price)
         except Exception as exc:
             print(f"掃描失敗：{exc}", flush=True)
         time.sleep(args.interval)

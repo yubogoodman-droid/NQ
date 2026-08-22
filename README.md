@@ -70,7 +70,7 @@ python -m unittest tests.test_nanya_ma
 
 ## 一分K 5>10>20>60 站上 MA200
 
-條件剛成立才通知。回測近一週每日成交額前 100。
+條件剛成立才通知。回測近一週每日成交額前 100，股價 600 以上不掃。MA200 是一分K近 200 根，不是日線。
 
 ```bash
 python examples/run_tw_align200.py
