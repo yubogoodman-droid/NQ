@@ -66,7 +66,8 @@ python examples/run_nanya_ma.py
 python -m unittest tests.test_nanya_ma
 ```
 
-報告：`docs/nanya-ma/index.html`。
+回測網（每筆一分K＋六條均線）：`docs/backtest/index.html`  
+表格版：`docs/nanya-ma/index.html`
 
 ## 快速開始
 

@@ -12,6 +12,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from nq.ma_site import save_backtest_site
 from nq.nanya_ma import NanyaMaStrategy, run_nanya_ma_backtest, save_nanya_ma_report, summarize_ma_trades
 
 DEFAULT_SYMBOLS = ("2408.TW", "2344.TW", "2303.TW", "2330.TW", "NQ=F")
@@ -105,7 +106,8 @@ def main() -> None:
     parser.add_argument("--demo", action="store_true")
     parser.add_argument("--symbols", nargs="*", default=list(DEFAULT_SYMBOLS))
     parser.add_argument("--period", default="7d")
-    parser.add_argument("--output", "-o", default="docs/nanya-ma/index.html")
+    parser.add_argument("--output", "-o", default="docs/backtest/index.html")
+    parser.add_argument("--table", default="docs/nanya-ma/index.html")
     parser.add_argument("--cost-bps", type=float, default=8.0)
     args = parser.parse_args()
 
@@ -120,6 +122,7 @@ def main() -> None:
     ]
 
     all_trades = []
+    frames: dict[str, pd.DataFrame] = {}
     symbol_stats: list[tuple[str, dict, int]] = []
 
     if args.demo:
@@ -127,6 +130,7 @@ def main() -> None:
         strategy = NanyaMaStrategy(tick_size=0.05)
         trades = run_nanya_ma_backtest(df, symbol="DEMO.2408", strategy=strategy, cost_bps=args.cost_bps)
         all_trades.extend(trades)
+        frames["DEMO.2408"] = df
         symbol_stats.append(("DEMO.2408", summarize_ma_trades(trades), len(df)))
         _print_stats("模擬南亞科黏均後啟動", trades, len(df))
     else:
@@ -151,6 +155,7 @@ def main() -> None:
                 df, symbol=symbol, strategy=strategy, cost_bps=cost, flatten_minutes=flatten
             )
             all_trades.extend(trades)
+            frames[symbol] = df
             symbol_stats.append((symbol, summarize_ma_trades(trades), len(df)))
             _print_stats(symbol, trades, len(df))
 
@@ -160,14 +165,23 @@ def main() -> None:
         f"成交 {overall['trades']}  勝率 {overall['win_rate']*100:.0f}%  "
         f"淨利 {overall['total_pnl_pct_net']*100:+.2f}%  期望 {overall['expectancy_net']*100:+.3f}%"
     )
-    out = save_nanya_ma_report(
+    site = save_backtest_site(
         args.output,
+        title="南亞科一分均線回測",
+        trades=all_trades,
+        frames=frames,
+        notes=notes,
+        symbol_stats=symbol_stats,
+    )
+    table = save_nanya_ma_report(
+        args.table,
         title="南亞科一分均線回測",
         trades=all_trades,
         notes=notes,
         symbol_stats=symbol_stats,
     )
-    print(f"\n報告：{out.resolve()}")
+    print(f"\n回測網：{site.resolve()}")
+    print(f"表格版：{table.resolve()}")
 
 
 if __name__ == "__main__":

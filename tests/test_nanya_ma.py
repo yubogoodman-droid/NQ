@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from nq.nanya_ma import NanyaMaStrategy, add_nanya_features, run_nanya_ma_backtest
+from nq.ma_site import save_backtest_site
+from nq.nanya_ma import NanyaMaStrategy, add_nanya_features, run_nanya_ma_backtest, summarize_ma_trades
 
 
 def _series(closes: list[float], *, vol: float = 400) -> pd.DataFrame:
@@ -75,6 +77,25 @@ class NanyaMaTests(unittest.TestCase):
         )
         self.assertTrue(trades)
         self.assertIn(trades[0].exit_reason, {"lost_ma20", "stop_loss"})
+
+    def test_backtest_site_contains_charts(self) -> None:
+        df = _coil_then_lift()
+        strategy = NanyaMaStrategy(tick_size=0.05)
+        trades = run_nanya_ma_backtest(df, symbol="DEMO.2408", strategy=strategy, cost_bps=0, flatten_minutes=None)
+        self.assertTrue(trades)
+        out = Path("/tmp/nanya_ma_site_test.html")
+        save_backtest_site(
+            out,
+            title="測試",
+            trades=trades,
+            frames={"DEMO.2408": df},
+            notes=["測試"],
+            symbol_stats=[("DEMO.2408", summarize_ma_trades(trades), len(df))],
+        )
+        text = out.read_text(encoding="utf-8")
+        self.assertIn("plotly", text.lower())
+        self.assertIn("DEMO.2408", text)
+        self.assertIn("MA5", text)
 
 
 if __name__ == "__main__":
