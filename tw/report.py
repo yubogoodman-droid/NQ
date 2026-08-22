@@ -27,7 +27,7 @@ MA_COLORS = {
     5: "#ffa726",
     10: "#ffeb3b",
     20: "#66bb6a",
-    60: "#4fc3f7",
+    60: "#00e5ff",
     200: "#ce93d8",
 }
 CHART_BARS = {
@@ -270,7 +270,7 @@ def _render(
       <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
       <span><i class="swatch" style="background:#ffeb3b"></i>MA10</span>
       <span><i class="swatch" style="background:#66bb6a"></i>MA20</span>
-      <span><i class="swatch" style="background:#4fc3f7"></i>MA60</span>
+      <span><i class="swatch" style="background:#00e5ff"></i>MA60</span>
       <span><i class="swatch" style="background:#ce93d8"></i>MA200</span>
     </div>
     <div class="summary">
@@ -351,7 +351,7 @@ def _chart_img(
     if not png:
         return '<p class="empty">無 K 線資料</p>'
     stamp = hit.snapshot.timestamp.strftime("%H%M")
-    fname = f"{hit.day.isoformat()}-{_safe_symbol(hit.stock.symbol)}-{stamp}-5m1hd.png"
+    fname = f"{hit.day.isoformat()}-{_safe_symbol(hit.stock.symbol)}-{stamp}-stack.png"
     (chart_dir / fname).write_bytes(png)
     rel = f"{chart_rel.as_posix()}/{fname}"
     src = html.escape(f"{image_base}{rel}" if image_base else rel)
@@ -468,12 +468,17 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
         vals = window[col].astype(float)
         if vals.notna().sum() == 0:
             continue
-        thick = period == 20 if timeframe == "1h" else period == 200
+        if period == 60:
+            width = 2.6
+        elif period == 200 or (period == 20 and timeframe == "1h"):
+            width = 2.4
+        else:
+            width = 1.35
         ax.plot(
             xs,
             vals,
             color=color,
-            linewidth=2.4 if thick else 1.35,
+            linewidth=width,
             label=f"MA{period}",
             zorder=4,
             solid_capstyle="round",

@@ -211,7 +211,7 @@ class ReportTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             pngs = list(Path(tmp).joinpath("charts/out").glob("*.png"))
             self.assertEqual(len(pngs), 1)
-            self.assertTrue(pngs[0].name.endswith("-5m1hd.png"))
+            self.assertTrue(pngs[0].name.endswith("-stack.png"))
             from PIL import Image
 
             with Image.open(pngs[0]) as im:
