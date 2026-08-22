@@ -193,7 +193,7 @@ def _render(
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 600 以上。
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段也不黏在一起），
       <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
+      且這根收盤必須高於 MA5／10／20／200，<strong>十五分K也要 MA5 &gt; MA10 &gt; MA20 &gt; MA200 多排</strong>，
       且小時K收盤也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
       K 棒漲紅跌綠。
     </p>
@@ -205,7 +205,7 @@ def _render(
       <span class="chip">股價 &lt; 600</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
       <span class="chip">當根收盤站上 MA200</span>
-      <span class="chip">收盤 &gt; 十五分 MA5／10／20</span>
+      <span class="chip">十五分 5 &gt; 10 &gt; 20 &gt; 200</span>
       <span class="chip">小時K &gt; MA20</span>
       <span class="chip">收盤 &gt; 所有均線</span>
       <span class="chip">十五分K對照</span>
@@ -253,10 +253,13 @@ def _hit_card(
         and snap.m15_ma5 is not None
         and snap.m15_ma10 is not None
         and snap.m15_ma20 is not None
+        and snap.m15_ma200 is not None
     ):
         extra_rows += (
-            f'<div class="row"><span>十五分K / MA5 10 20</span>'
-            f"<b>{snap.m15_close:.2f} &gt; {snap.m15_ma5:.2f} / {snap.m15_ma10:.2f} / {snap.m15_ma20:.2f}</b></div>"
+            f'<div class="row"><span>十五分K 多排</span>'
+            f"<b>MA5 {snap.m15_ma5:.2f} &gt; 10 {snap.m15_ma10:.2f} &gt; "
+            f"20 {snap.m15_ma20:.2f} &gt; 200 {snap.m15_ma200:.2f}　"
+            f"收 {snap.m15_close:.2f}</b></div>"
         )
     if snap.h1_close is not None and snap.h1_ma20 is not None:
         extra_rows += (

@@ -39,9 +39,21 @@ def _ohlcv(closes: list[float], index: pd.DatetimeIndex) -> pd.DataFrame:
     )
 
 
+def _weekdays_ending(end: date, n: int) -> list[date]:
+    days: list[date] = []
+    current = end
+    while len(days) < n:
+        if current.weekday() < 5:
+            days.append(current)
+        current -= timedelta(days=1)
+    days.reverse()
+    return days
+
+
 def _history_then_live(live_closes: list[float], live_day: date = date(2026, 8, 21)) -> pd.DataFrame:
-    hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
-    hist = _ohlcv([100.0] * (54 * 4), _session_index(hist_days))
+    """約 14 個交易日，讓十五分 MA200 算得出來。"""
+    hist_days = _weekdays_ending(live_day - timedelta(days=1), 14)
+    hist = _ohlcv([100.0] * (54 * len(hist_days)), _session_index(hist_days))
     live_index = _session_index([live_day])[: len(live_closes)]
     live = _ohlcv(live_closes, live_index)
     return pd.concat([hist, live])
@@ -59,11 +71,13 @@ class FiveMinSignalTests(unittest.TestCase):
         self.assertTrue(hit.close_above_all_mas)
         self.assertTrue(hit.hourly_close_above_ma20)
         self.assertTrue(hit.close_above_15m_mas)
+        self.assertTrue(hit.m15_bullish_aligned)
         self.assertIsNotNone(hit.h1_close)
         self.assertGreater(hit.h1_close, hit.h1_ma20)
+        self.assertGreater(hit.m15_ma5, hit.m15_ma10)
+        self.assertGreater(hit.m15_ma10, hit.m15_ma20)
+        self.assertGreater(hit.m15_ma20, hit.m15_ma200)
         self.assertGreater(hit.m15_close, hit.m15_ma5)
-        self.assertGreater(hit.m15_close, hit.m15_ma10)
-        self.assertGreater(hit.m15_close, hit.m15_ma20)
         self.assertGreaterEqual(hit.ribbon_fan_pct, 0.50)
         self.assertGreater(hit.close, hit.ma5)
         self.assertGreater(hit.close, hit.ma200)
@@ -111,24 +125,27 @@ class FiveMinSignalTests(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_rejects_when_hourly_close_below_ma20(self) -> None:
-        hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
+        live_day = date(2026, 8, 21)
+        hist_days = _weekdays_ending(live_day - timedelta(days=1), 14)
         idx = _session_index(hist_days)
-        closes = [200.0] * 24 + [100.0] * (len(idx) - 24)
+        closes = [100.0] * len(idx)
+        # 最近四天開頭兩小時抬高，讓小時 MA20 高過當下收盤，但不讓五分 MA200 太高。
+        start = 54 * (len(hist_days) - 4)
+        for i in range(start, start + 24):
+            closes[i] = 200.0
         hist = _ohlcv(closes, idx)
-        live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
+        live = _ohlcv([99.0, 105.0], _session_index([live_day])[:2])
         hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
         self.assertEqual(hits, [])
 
-    def test_rejects_when_close_below_15m_mas(self) -> None:
-        hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
-        idx = _session_index(hist_days)
-        closes = [100.0] * len(idx)
-        # 一根還在最近 20 根十五分K裡的高K，把十五分 MA20 抬高，但不破壞五分剛站上。
-        for i in range(159, 162):
-            closes[i] = 400.0
-        hist = _ohlcv(closes, idx)
-        live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
-        hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
+    def test_rejects_when_15m_not_bullish_stacked(self) -> None:
+        live_day = date(2026, 8, 21)
+        hist_days = _weekdays_ending(live_day - timedelta(days=1), 14)
+        older, recent = hist_days[:-4], hist_days[-4:]
+        older_df = _ohlcv([130.0] * (54 * len(older)), _session_index(older))
+        recent_df = _ohlcv([100.0] * (54 * len(recent)), _session_index(recent))
+        live = _ohlcv([99.0, 105.0], _session_index([live_day])[:2])
+        hits = iter_5m_ma200_alerts(pd.concat([older_df, recent_df, live]))
         self.assertEqual(hits, [])
 
 
@@ -201,7 +218,7 @@ class ReportTests(unittest.TestCase):
                 self.assertGreater(im.height, 1000)
         self.assertIn("南亞科", text)
         self.assertIn("十五分K", text)
-        self.assertIn("十五分K / MA5 10 20", text)
+        self.assertIn("十五分K 多排", text)
         self.assertIn("小時K", text)
         self.assertIn("上＝五分K", text)
         self.assertIn("均線發散", text)
