@@ -22,6 +22,26 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 一分 K 破底翻 MA Reclaim
+
+1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
+停損在破底低點下方；目標 2R（MA20 上彎時 3R）。品質看 1m MA5 / 1m MA60 / 5m MA60 斜率。
+
+```bash
+# 近 8 天回測 + 手機版 HTML（每筆一張圖）
+python3 examples/nq_ma_reclaim.py backtest --period 8d --html output/nq_ma_reclaim.html
+
+# 寫到 GitHub Pages
+python3 examples/nq_ma_reclaim.py backtest --period 8d --pages
+
+# Telegram 輪詢（憑證放 tg_config.env，勿提交）
+python3 examples/nq_ma_reclaim.py alert --test
+python3 examples/nq_ma_reclaim.py alert --dry-run --once
+python3 examples/nq_ma_reclaim.py alert
+```
+
+外網：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
