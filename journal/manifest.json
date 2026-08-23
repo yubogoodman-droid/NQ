@@ -1,0 +1,18 @@
+{
+  "name": "股市進出簿",
+  "short_name": "進出簿",
+  "description": "紀錄台股與美股買賣、持倉與損益",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b0e11",
+  "theme_color": "#0b0e11",
+  "lang": "zh-Hant",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
