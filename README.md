@@ -125,8 +125,8 @@ python3 examples/chart_today.py
 
 ## NQ 一分 K 站上季線
 
-1 分鐘圖：收盤從 **SMA60（季線）** 下方站上、陽線確認，預設再要 MACD 多頭（DIF>DEA）與放量。  
-停損在進場 K 低點／季線下方；目標 2R。對應「整理後穿過季線帶、MACD 翻多」那種進場。
+1 分鐘圖：收盤從 **SMA60（季線）** 下方站上、陽線確認；預設還要穿過黏在一起的 MA60/100/120 季線帶、MACD 多頭（DIF>DEA）與放量。  
+停損在進場 K 低點／季線下方；目標 2R。對應「整理後踩穩並穿過季線帶」那種進場。
 
 ```bash
 python3 examples/nq_ma60_stand.py backtest --period 8d --html output/nq_ma60_stand.html
@@ -135,6 +135,10 @@ python3 examples/nq_ma60_stand.py alert --dry-run --once
 ```
 
 TradingView：`pinescript/nq_1m_ma60_stand.pine` 貼到 Pine Editor，套用至 NQ1! / MNQ1! **一分圖**。
+
+近 8 天 Yahoo 1m（2026-08-14 → 08-21）：穿過季線帶後仍有不少假站上，約 20 筆、勝率偏低。一分圖季線交叉本身很密，腳本用黏帶／MACD／放量把「整理後踩穩穿過」留下來；實盤請再自己看圖。
+
+報告：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma60-stand-fbcb/docs/nq-ma60-stand/view.html
 
 ## TradingView
 

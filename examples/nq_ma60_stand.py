@@ -64,6 +64,7 @@ class Signal:
     ma20: float
     below_bars: int
     dist_above: float
+    cluster_width: float
     slope60: float
     dif: float
     dea: float
@@ -96,13 +97,21 @@ def macd(close: np.ndarray, fast: int = 12, slow: int = 26, signal: int = 9) -> 
     return dif.to_numpy(float), dea.to_numpy(float), hist.to_numpy(float)
 
 
-def quality_from_stand(slope60: float, vol_ratio: float, dif: float, dea: float, dist_above: float) -> Tuple[int, str]:
+def quality_from_stand(
+    slope60: float,
+    vol_ratio: float,
+    dif: float,
+    dea: float,
+    dist_above: float,
+    cluster_width: float,
+    hist: float,
+) -> Tuple[int, str]:
     score = 0
-    if dif > dea:
+    if dif > dea and hist > 0:
         score += 1
-    if vol_ratio >= 1.2:
+    if vol_ratio >= 1.5:
         score += 1
-    if slope60 >= -2.0 and dist_above <= 20.0:
+    if slope60 >= -2.0 and dist_above <= 20.0 and cluster_width <= 20.0:
         score += 1
     if score >= 2:
         grade = "A"
@@ -117,12 +126,15 @@ def detect_signals(
     df: pd.DataFrame,
     ma60_len: int = 60,
     min_below_bars: int = 8,
-    max_stand_pts: float = 35.0,
+    max_stand_pts: float = 28.0,
     min_stand_pts: float = 1.0,
+    cluster_pts: float = 28.0,
+    stand_touch_pts: float = 22.0,
+    use_cluster: bool = True,
     use_macd: bool = True,
     use_vol: bool = True,
     vol_len: int = 20,
-    vol_mult: float = 1.2,
+    vol_mult: float = 1.4,
     use_slope: bool = True,
     slope_bars: int = 5,
     min_slope: float = -6.0,
@@ -144,7 +156,9 @@ def detect_signals(
     ma10 = sma(close, 10)
     ma20 = sma(close, 20)
     ma60 = sma(close, ma60_len)
-    dif, dea, _hist = macd(close)
+    ma100 = sma(close, 100)
+    ma120 = sma(close, 120)
+    dif, dea, hist = macd(close)
     vol_ma = sma(volume, vol_len)
 
     n = len(close)
@@ -183,6 +197,22 @@ def detect_signals(
         if dist < min_stand_pts or dist > max_stand_pts:
             bump("skip_dist")
             continue
+        if stand_touch_pts > 0 and float(low[i]) > float(ma60[i]) + stand_touch_pts:
+            bump("skip_touch")
+            continue
+        cluster_width = 0.0
+        if not (np.isnan(ma100[i]) or np.isnan(ma120[i])):
+            band = (float(ma60[i]), float(ma100[i]), float(ma120[i]))
+            cluster_width = max(band) - min(band)
+            if use_cluster and cluster_width > cluster_pts:
+                bump("skip_cluster")
+                continue
+            if use_cluster and close[i] <= max(band):
+                bump("skip_cluster")
+                continue
+        elif use_cluster:
+            bump("skip_cluster")
+            continue
         below_prev = int(below[i - 1])
         if below_prev < min_below_bars:
             bump("skip_below")
@@ -219,7 +249,8 @@ def detect_signals(
             bump("skip_risk")
             continue
 
-        q_score, q_grade = quality_from_stand(slope60, v_ratio, d_i, e_i, dist)
+        h_i = float(hist[i]) if not np.isnan(hist[i]) else 0.0
+        q_score, q_grade = quality_from_stand(slope60, v_ratio, d_i, e_i, dist, cluster_width, h_i)
         bump("taken")
         signals.append(
             Signal(
@@ -233,6 +264,7 @@ def detect_signals(
                 ma20=float(ma20[i]) if not np.isnan(ma20[i]) else 0.0,
                 below_bars=below_prev,
                 dist_above=dist,
+                cluster_width=cluster_width,
                 slope60=slope60,
                 dif=d_i,
                 dea=e_i,
@@ -484,7 +516,7 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: 
             f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts)\n"
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
-            f"季線 MA60 {t.signal.ma60:.1f}  站上 +{t.signal.dist_above:.1f}  下方 {t.signal.below_bars} 根\n"
+            f"季線 MA60 {t.signal.ma60:.1f}  站上 +{t.signal.dist_above:.1f}  帶寬 {t.signal.cluster_width:.1f}  下方 {t.signal.below_bars} 根\n"
             f"MACD DIF {t.signal.dif:.3f} / DEA {t.signal.dea:.3f}  量比 {t.signal.vol_ratio:.2f}x\n"
             f"MA5 {t.signal.ma5:.1f} / MA10 {t.signal.ma10:.1f} / MA20 {t.signal.ma20:.1f}"
             "</pre>"
@@ -515,6 +547,7 @@ def write_html_report(
             f"<p class='muted'>漏斗：穿越 {funnel.get('cross', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
             f"（陰線 {funnel.get('skip_bear', 0)} · 距離 {funnel.get('skip_dist', 0)} · "
+            f"沒踩到線 {funnel.get('skip_touch', 0)} · 季線帶 {funnel.get('skip_cluster', 0)} · "
             f"下方不夠 {funnel.get('skip_below', 0)} · 斜率 {funnel.get('skip_slope', 0)} · "
             f"MACD {funnel.get('skip_macd', 0)} · 量能 {funnel.get('skip_vol', 0)} · "
             f"冷卻 {funnel.get('skip_cooldown', 0)}）</p>"
@@ -558,7 +591,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 一分K 站上季線</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">收盤從 SMA60（季線）下方站上、陽線、MACD 多頭、放量。停損在低點／季線下方，目標 2R。</p>
+<p class="muted">收盤從 SMA60（季線）下方站上、陽線、穿過 MA60/100/120 黏帶、MACD 多頭、放量。停損在低點／季線下方，目標 2R。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -758,6 +791,7 @@ def cmd_backtest(args) -> int:
             "funnel "
             f"cross={funnel.get('cross', 0)} taken={funnel.get('taken', 0)} "
             f"bear={funnel.get('skip_bear', 0)} dist={funnel.get('skip_dist', 0)} "
+            f"touch={funnel.get('skip_touch', 0)} cluster={funnel.get('skip_cluster', 0)} "
             f"below={funnel.get('skip_below', 0)} slope={funnel.get('skip_slope', 0)} "
             f"macd={funnel.get('skip_macd', 0)} vol={funnel.get('skip_vol', 0)} "
             f"cool={funnel.get('skip_cooldown', 0)}"

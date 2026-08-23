@@ -7,15 +7,18 @@ strategy("NQ 一分K 站上季線", overlay=true, default_qty_type=strategy.fixe
 // === 參數 ===
 ma60Len        = input.int(60, "季線週期", minval=10)
 minBelowBars   = input.int(8, "站上前至少在季線下方幾根", minval=1)
-maxStandPts    = input.float(35.0, "站上距離上限（點）", minval=1.0, step=1.0, tooltip="收盤超過季線太多視為追價，不進")
+maxStandPts    = input.float(28.0, "站上距離上限（點）", minval=1.0, step=1.0, tooltip="收盤超過季線太多視為追價，不進")
 minStandPts    = input.float(1.0, "最少站上距離（點）", minval=0.0, step=0.25)
+useCluster     = input.bool(true, "季線帶確認（MA60/100/120 黏在一起且收盤穿過帶）")
+clusterPts     = input.float(28.0, "季線帶最大寬度（點）", minval=5.0, step=1.0)
+touchPts       = input.float(22.0, "低點須靠近季線（點）", minval=0.0, step=1.0)
 useMacd        = input.bool(true, "MACD 多頭確認（DIF>DEA）")
 macdFast       = input.int(12, "MACD 快線", minval=2)
 macdSlow       = input.int(26, "MACD 慢線", minval=5)
 macdSig        = input.int(9, "MACD 訊號", minval=2)
 useVol         = input.bool(true, "放量確認")
 volLen         = input.int(20, "成交量均線", minval=5)
-volMult        = input.float(1.2, "量能倍數", minval=0.5, step=0.1)
+volMult        = input.float(1.4, "量能倍數", minval=0.5, step=0.1)
 useSlope       = input.bool(true, "季線不可明顯下彎")
 slopeBars      = input.int(5, "季線斜率回看", minval=2)
 minSlope       = input.float(-6.0, "季線 5 根最少斜率（點）")
@@ -49,6 +52,10 @@ stoodUp   = close[1] <= ma60[1] and close > ma60
 bullBar   = close > open
 distAbove = close - ma60
 nearStand = distAbove >= minStandPts and distAbove <= maxStandPts
+touchOk   = touchPts <= 0 or low <= ma60 + touchPts
+bandHi    = math.max(ma60, math.max(ma100, ma120))
+bandLo    = math.min(ma60, math.min(ma100, ma120))
+clusterOk = not useCluster or (not na(ma100) and not na(ma120) and (bandHi - bandLo) <= clusterPts and close > bandHi)
 enoughBelow = belowPrev >= minBelowBars
 macdOk    = not useMacd or (not na(dif) and not na(dea) and dif > dea)
 volOk     = not useVol or (not na(volMa) and volMa > 0 and volume >= volMa * volMult)
@@ -58,7 +65,7 @@ if strategy.closedtrades > 0
     lastExitBar := strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1)
 cooled = strategy.position_size == 0 and (na(lastExitBar) or bar_index - lastExitBar >= cooldown)
 
-longSignal = stoodUp and bullBar and nearStand and enoughBelow and macdOk and volOk and slopeOk and cooled and strategy.position_size == 0
+longSignal = stoodUp and bullBar and nearStand and touchOk and clusterOk and enoughBelow and macdOk and volOk and slopeOk and cooled and strategy.position_size == 0
 
 stopLevel = math.min(low, ma60) - stopBuffer
 risk      = close - stopLevel
