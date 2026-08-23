@@ -22,10 +22,10 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
-## 幣安黏帶三幕 Telegram
+## 幣安 Telegram（15 分同時站上）
 
-1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
-約 15–25 分鐘後若走出「長均更黏、短均被帶走」（NBIS 那種），會再推一則**強訊號**（帶圖）。
+15 分鐘 K：前一根收盤完全在 MA7 / 14 / 25 / 99 / 120 下方，這一根收盤同時站上這五條，就推 Telegram（帶圖）。預設全掃流動永續（加密+股票）。不必過 MA200。  
+這支腳本是獨立的，複製到別的資料夾當 `小米15分K.py` 也能跑，不必帶 `nq` 套件。
 
 在 `examples/watch_binance_ribbon.py` 最上面填：
 
@@ -35,9 +35,34 @@ TELEGRAM_CHAT_ID = "..."
 ```
 
 ```bash
-python3 examples/watch_binance_ribbon.py --test   # 先測通不通
-python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
+python3 examples/watch_binance_ribbon.py --demo          # 驗證偵測
+python3 examples/watch_binance_ribbon.py --test          # 先測 Telegram 通不通
+python3 examples/watch_binance_ribbon.py --once          # 掃剛收的 15 分，推完就結束
+python3 examples/watch_binance_ribbon.py                 # 每根 15 分收盤全掃流動盤
+python3 examples/watch_binance_ribbon.py --asset stocks  # 只要股票
+python3 examples/watch_binance_ribbon.py --also-1m       # 順便跑原本 1m 黏帶
 ```
+
+## 15 分 K 同時站上 7 / 14 / 25 / 99 / 120
+
+一根 15 分鐘 K：前一根收盤完全在 MA7 / 14 / 25 / 99 / 120 下方，這一根收盤同時站上這五條。不必過 MA200。進場用下一根開盤。圖例每筆底下附同一時間的 1 小時圖，只做對照。圖上仍畫 MA200 方便看位置。
+
+```bash
+python3 examples/backtest_15m_ribbon.py --demo
+python3 examples/backtest_15m_ribbon.py --days 7 --pages
+python3 examples/backtest_15m_ribbon.py --days 7 --asset stocks --pages   # 只要股票
+```
+
+報告：
+- 全部流動盤：`docs/binance/ma-ribbon-15m.html`
+- 只要股票：`docs/binance/ma-ribbon-15m-stocks.html`
+
+外網：  
+https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html  
+https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m-stocks.html
+
+合併進 `main` 後 GitHub Pages：  
+https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html
 
 ## 快速開始
 
@@ -84,6 +109,10 @@ python3 examples/chart_today.py
 
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
+
+3. **15 分 K 五均線回測**  
+   全部：https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html  
+   股票：https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m-stocks.html
 
 ## TradingView
 
