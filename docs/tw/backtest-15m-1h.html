@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>台股十五分K回測 2026-08-10～2026-08-21</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0e11;
+      --card: #161b22;
+      --line: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --up: #ff5c7a;
+      --ok: #7ee787;
+      --chip: #21262d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page { max-width: 760px; margin: 0 auto; padding: 16px 12px 40px; }
+    h1 { font-size: 1.2rem; margin: 0 0 6px; }
+    h2 { font-size: 1.05rem; margin: 22px 0 8px; }
+    .lead { color: var(--muted); font-size: .9rem; line-height: 1.55; margin: 0 0 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip {
+      background: var(--chip); border: 1px solid var(--line); border-radius: 999px;
+      padding: 4px 10px; font-size: 12px; color: var(--muted);
+    }
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted);
+      margin: 0 0 12px;
+    }
+    .swatch { display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 4px; }
+    .summary {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 12px 14px; margin-bottom: 14px; font-size: .9rem; line-height: 1.65;
+      color: var(--muted);
+    }
+    .summary .ok { color: var(--ok); font-weight: 700; font-size: 1.05rem; }
+    .row .win { color: var(--ok); }
+    .row .lose { color: var(--up); }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 14px 10px 10px; margin: 0 0 14px; color: inherit;
+    }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 0 6px; }
+    .name { font-weight: 700; font-size: 1.05rem; }
+    .sym a { color: var(--muted); font-weight: 500; margin-left: 6px; font-size: .9rem; text-decoration: none; }
+    .price { color: var(--up); font-weight: 700; white-space: nowrap; }
+    .row { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: .9rem; color: var(--muted); padding: 0 6px; }
+    .row b { color: var(--text); font-weight: 600; }
+    .chart { margin-top: 6px; }
+    .chart img { width: 100%; height: auto; display: block; border-radius: 8px; }
+    .banner {
+      background: #3d2a00; border: 1px solid #fbbf24; color: #fde68a;
+      border-radius: 12px; padding: 10px 12px; margin: 0 0 14px;
+      font-size: .95rem; line-height: 1.5; font-weight: 700;
+    }
+    .chart-label {
+      font-size: 13px; color: #fbbf24; font-weight: 700;
+      padding: 10px 6px 2px;
+    }
+    .empty { color: var(--muted); }
+    footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>台股十五分K回測 2026-08-10～2026-08-21</h1>
+    
+    <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
+    <p class="lead">
+      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
+      十五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
+      <strong>當根收盤剛站上十五分 MA200</strong>（前一根尚未站上），
+      且這根收盤必須高於 MA5／10／20／200，<strong>小時K也要在 MA5／10／20 之上</strong>。
+      開盤第一根十五分因隔夜跳空不算。
+      <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
+      最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
+      K 棒漲紅跌綠。
+    </p>
+    <div class="chips">
+      
+      <span class="chip">十五分K</span>
+      <span class="chip">不含 ETF</span>
+      <span class="chip">不含金融股</span>
+      <span class="chip">不含電信股</span>
+      <span class="chip">成交額前 100</span>
+      <span class="chip">股價 &lt; 500</span>
+      <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
+      <span class="chip">當根收盤站上 MA200</span>
+      <span class="chip">收盤 &gt; 所有均線</span>
+      <span class="chip">小時K &gt; MA5／10／20</span>
+      <span class="chip">五分K對照</span>
+      <span class="chip">小時K對照</span>
+      <span class="chip">日K對照</span>
+      <span class="chip">週一 2026-08-10 · 0 則</span><span class="chip">週二 2026-08-11 · 1 則</span><span class="chip">週三 2026-08-12 · 0 則</span><span class="chip">週四 2026-08-13 · 0 則</span><span class="chip">週五 2026-08-14 · 0 則</span><span class="chip">週一 2026-08-17 · 0 則</span><span class="chip">週二 2026-08-18 · 0 則</span><span class="chip">週三 2026-08-19 · 0 則</span><span class="chip">週四 2026-08-20 · 3 則</span><span class="chip">週五 2026-08-21 · 3 則</span>
+    </div>
+    <div class="legend">
+      <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
+      <span><i class="swatch" style="background:#ffeb3b"></i>MA10</span>
+      <span><i class="swatch" style="background:#66bb6a"></i>MA20</span>
+      <span><i class="swatch" style="background:#00e5ff"></i>MA60</span>
+      <span><i class="swatch" style="background:#ce93d8"></i>MA200</span>
+    </div>
+    <div class="summary">
+      10 個交易日共通知 <span class="ok">7</span> 則<br/>
+      進場後一小時勝率 <span class="ok">40%</span>（滿一小時 5/7 則，2 贏 0 平 3 輸，平均 +0.53%、中位 -0.12%，另 2 則尾盤不足一小時不列入）<br/>
+      掃描時間 2026-08-23 14:39:39（台北）<br/>
+      資料：證交所／櫃買盤後成交額 ＋ Yahoo 五分K
+    </div>
+    
+    <section class="day">
+      <h2>週一 2026-08-10</h2>
+      <p class="lead">成交額前 100 → 股價濾掉 48、ETF 5、金融 1、電信 0 → 掃描 46 → 通知 0 則</p>
+      <p class="empty">這天沒有符合條件的通知。</p>
+    </section>
+    <section class="day">
+      <h2>週二 2026-08-11</h2>
+      <p class="lead">成交額前 100 → 股價濾掉 44、ETF 5、金融 2、電信 0 → 掃描 49 → 通知 1 則</p>
+      
+    <article class="card">
+      <div class="top">
+        <div class="name">1. 華容<span class="sym"><a href="https://tw.stock.yahoo.com/quote/5328.TWO" target="_blank" rel="noopener">5328.TWO</a></span></div>
+        <div class="price">66.00 +5.60%</div>
+      </div>
+      <div class="row"><span>十五分站上時間</span><b>10:40</b></div>
+      <div class="row"><span>收盤 / MA200</span><b>65.60 &gt; 64.11</b></div>
+      <div class="row"><span>收盤 vs 均線</span><b>65.60 &gt; MA5 63.98 / 10 63.83 / 20 63.24</b></div>
+      <div class="row"><span>均線發散</span><b>MA5/MA20 +1.17%　5–10 0.23%　10–20 0.90%</b></div>
+      <div class="row"><span>小時K / MA5 10 20</span><b>65.60 &gt; 63.28 / 62.51 / 63.18</b></div><div class="row"><span>一小時後（11:40）</span><b class="win">65.60 → 66.30　+1.07%</b></div><div class="row"><span>日K / MA5 10 20 60 200</span><b>66.00　MA 63.62 / 63.85 / 63.50 / 56.25 / 33.58</b></div>
+      <div class="row"><span>前收 / 前MA200</span><b>63.90 ≤ 64.12</b></div>
+      <div class="row"><span>成交額排名</span><b>#100 · 19.71 億</b></div>
+      <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K　最下＝日K</div>
+      <div class="chart"><img alt="華容 5328.TWO 五分K＋十五分K＋小時K＋日K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-15m-1h/2026-08-11-5328.TWO-1040-stack.png"/></div>
+    </article>
+
+    </section>
+    <section class="day">
+      <h2>週三 2026-08-12</h2>
+      <p class="lead">成交額前 100 → 股價濾掉 43、ETF 5、金融 1、電信 0 → 掃描 51 → 通知 0 則</p>
+      <p class="empty">這天沒有符合條件的通知。</p>
+    </section>
+    <section class="day">
+      <h2>週四 2026-08-13</h2>
+      <p class="lead">成交額前 100 → 股價濾掉 47、ETF 6、金融 3、電信 0 → 掃描 44 → 通知 0 則</p>
+      <p class="empty">這天沒有符合條件的通知。</p>
+    </section>
+    <section class="day">
+      <h2>週五 2026-08-14</h2>
+      <p class="lead">成交額前 100 → 股價濾掉 41、ETF 8、金融 2、電信 0 → 掃描 49 → 通知 0 則</p>
+      <p class="empty">這天沒有符合條件的通知。</p>
+    </section>
+    <section class="day">
+      <h2>週一 2026-08-17</h2>
+      <p class="lead">成交額前 100 → 股價濾掉 42、ETF 7、金融 6、電信 1 → 掃描 44 → 通知 0 則</p>
+      <p class="empty">這天沒有符合條件的通知。</p>
+    </section>
+    <section class="day">
+      <h2>週二 2026-08-18</h2>
+      <p class="lead">成交額前 100 → 股價濾掉 44、ETF 8、金融 2、電信 0 → 掃描 46 → 通知 0 則</p>
+      <p class="empty">這天沒有符合條件的通知。</p>
+    </section>
+    <section class="day">
+      <h2>週三 2026-08-19</h2>
+      <p class="lead">成交額前 100 → 股價濾掉 43、ETF 6、金融 4、電信 1 → 掃描 46 → 通知 0 則</p>
+      <p class="empty">這天沒有符合條件的通知。</p>
+    </section>
+    <section class="day">
+      <h2>週四 2026-08-20</h2>
+      <p class="lead">成交額前 100 → 股價濾掉 44、ETF 5、金融 3、電信 0 → 掃描 48 → 通知 3 則</p>
+      
+    <article class="card">
+      <div class="top">
+        <div class="name">2. 訊芯-KY<span class="sym"><a href="https://tw.stock.yahoo.com/quote/6451.TW" target="_blank" rel="noopener">6451.TW</a></span></div>
+        <div class="price">437.00 +5.56%</div>
+      </div>
+      <div class="row"><span>十五分站上時間</span><b>10:40</b></div>
+      <div class="row"><span>收盤 / MA200</span><b>437.50 &gt; 436.50</b></div>
+      <div class="row"><span>收盤 vs 均線</span><b>437.50 &gt; MA5 429.20 / 10 423.85 / 20 421.93</b></div>
+      <div class="row"><span>均線發散</span><b>MA5/MA20 +1.72%　5–10 1.22%　10–20 0.44%</b></div>
+      <div class="row"><span>小時K / MA5 10 20</span><b>437.50 &gt; 424.30 / 426.45 / 431.93</b></div><div class="row"><span>一小時後（11:40）</span><b class="lose">437.50 → 424.50　-2.97%</b></div><div class="row"><span>日K / MA5 10 20 60 200</span><b>437.00　MA 431.20 / 435.30 / 412.31 / 501.47 / 329.75</b></div>
+      <div class="row"><span>前收 / 前MA200</span><b>426.50 ≤ 436.46</b></div>
+      <div class="row"><span>成交額排名</span><b>#81 · 27.42 億</b></div>
+      <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K　最下＝日K</div>
+      <div class="chart"><img alt="訊芯-KY 6451.TW 五分K＋十五分K＋小時K＋日K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-15m-1h/2026-08-20-6451.TW-1040-stack.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">3. 華邦電<span class="sym"><a href="https://tw.stock.yahoo.com/quote/2344.TW" target="_blank" rel="noopener">2344.TW</a></span></div>
+        <div class="price">176.50 +5.06%</div>
+      </div>
+      <div class="row"><span>十五分站上時間</span><b>13:20</b></div>
+      <div class="row"><span>收盤 / MA200</span><b>176.50 &gt; 176.11</b></div>
+      <div class="row"><span>收盤 vs 均線</span><b>176.50 &gt; MA5 175.90 / 10 174.90 / 20 174.62</b></div>
+      <div class="row"><span>均線發散</span><b>MA5/MA20 +0.73%　5–10 0.57%　10–20 0.16%</b></div>
+      <div class="row"><span>小時K / MA5 10 20</span><b>176.50 &gt; 174.60 / 171.05 / 176.28</b></div><div class="row"><span>一小時後</span><b>尾盤不足一小時</b></div><div class="row"><span>日K / MA5 10 20 60 200</span><b>176.50　MA 177.20 / 176.10 / 161.90 / 173.20 / 116.52</b></div>
+      <div class="row"><span>前收 / 前MA200</span><b>175.50 ≤ 176.08</b></div>
+      <div class="row"><span>成交額排名</span><b>#4 · 264.26 億</b></div>
+      <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K　最下＝日K</div>
+      <div class="chart"><img alt="華邦電 2344.TW 五分K＋十五分K＋小時K＋日K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-15m-1h/2026-08-20-2344.TW-1320-stack.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">4. 訊芯-KY<span class="sym"><a href="https://tw.stock.yahoo.com/quote/6451.TW" target="_blank" rel="noopener">6451.TW</a></span></div>
+        <div class="price">437.00 +5.56%</div>
+      </div>
+      <div class="row"><span>十五分站上時間</span><b>13:20</b></div>
+      <div class="row"><span>收盤 / MA200</span><b>437.00 &gt; 436.56</b></div>
+      <div class="row"><span>收盤 vs 均線</span><b>437.00 &gt; MA5 434.00 / 10 430.90 / 20 428.18</b></div>
+      <div class="row"><span>均線發散</span><b>MA5/MA20 +1.36%　5–10 0.71%　10–20 0.62%</b></div>
+      <div class="row"><span>小時K / MA5 10 20</span><b>437.00 &gt; 431.50 / 426.95 / 432.68</b></div><div class="row"><span>一小時後</span><b>尾盤不足一小時</b></div><div class="row"><span>日K / MA5 10 20 60 200</span><b>437.00　MA 431.20 / 435.30 / 412.31 / 501.47 / 329.75</b></div>
+      <div class="row"><span>前收 / 前MA200</span><b>434.50 ≤ 436.53</b></div>
+      <div class="row"><span>成交額排名</span><b>#81 · 27.42 億</b></div>
+      <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K　最下＝日K</div>
+      <div class="chart"><img alt="訊芯-KY 6451.TW 五分K＋十五分K＋小時K＋日K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-15m-1h/2026-08-20-6451.TW-1320-stack.png"/></div>
+    </article>
+
+    </section>
+    <section class="day">
+      <h2>週五 2026-08-21</h2>
+      <p class="lead">成交額前 100 → 股價濾掉 45、ETF 5、金融 5、電信 0 → 掃描 45 → 通知 3 則</p>
+      
+    <article class="card">
+      <div class="top">
+        <div class="name">5. 創見<span class="sym"><a href="https://tw.stock.yahoo.com/quote/2451.TW" target="_blank" rel="noopener">2451.TW</a></span></div>
+        <div class="price">312.50 +9.84%</div>
+      </div>
+      <div class="row"><span>十五分站上時間</span><b>09:25</b></div>
+      <div class="row"><span>收盤 / MA200</span><b>296.50 &gt; 290.18</b></div>
+      <div class="row"><span>收盤 vs 均線</span><b>296.50 &gt; MA5 286.70 / 10 284.00 / 20 283.07</b></div>
+      <div class="row"><span>均線發散</span><b>MA5/MA20 +1.28%　5–10 0.91%　10–20 0.31%</b></div>
+      <div class="row"><span>小時K / MA5 10 20</span><b>296.50 &gt; 285.00 / 282.45 / 283.27</b></div><div class="row"><span>一小時後（10:25）</span><b class="win">296.50 → 312.50　+5.40%</b></div><div class="row"><span>日K / MA5 10 20 60 200</span><b>312.50　MA 289.60 / 291.85 / 285.90 / 280.24 / 238.10</b></div>
+      <div class="row"><span>前收 / 前MA200</span><b>288.50 ≤ 290.10</b></div>
+      <div class="row"><span>成交額排名</span><b>#46 · 56.35 億</b></div>
+      <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K　最下＝日K</div>
+      <div class="chart"><img alt="創見 2451.TW 五分K＋十五分K＋小時K＋日K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-15m-1h/2026-08-21-2451.TW-0925-stack.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">6. 威剛<span class="sym"><a href="https://tw.stock.yahoo.com/quote/3260.TWO" target="_blank" rel="noopener">3260.TWO</a></span></div>
+        <div class="price">422.50 +5.36%</div>
+      </div>
+      <div class="row"><span>十五分站上時間</span><b>09:40</b></div>
+      <div class="row"><span>收盤 / MA200</span><b>419.50 &gt; 406.06</b></div>
+      <div class="row"><span>收盤 vs 均線</span><b>419.50 &gt; MA5 404.90 / 10 400.95 / 20 398.07</b></div>
+      <div class="row"><span>均線發散</span><b>MA5/MA20 +1.71%　5–10 0.94%　10–20 0.69%</b></div>
+      <div class="row"><span>小時K / MA5 10 20</span><b>419.50 &gt; 401.70 / 396.20 / 394.85</b></div><div class="row"><span>一小時後（10:40）</span><b class="lose">419.50 → 419.00　-0.12%</b></div><div class="row"><span>日K / MA5 10 20 60 200</span><b>422.50　MA 401.10 / 404.25 / 400.38 / 405.43 / 333.38</b></div>
+      <div class="row"><span>前收 / 前MA200</span><b>405.00 ≤ 405.94</b></div>
+      <div class="row"><span>成交額排名</span><b>#25 · 85.97 億</b></div>
+      <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K　最下＝日K</div>
+      <div class="chart"><img alt="威剛 3260.TWO 五分K＋十五分K＋小時K＋日K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-15m-1h/2026-08-21-3260.TWO-0940-stack.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">7. 十銓<span class="sym"><a href="https://tw.stock.yahoo.com/quote/4967.TW" target="_blank" rel="noopener">4967.TW</a></span></div>
+        <div class="price">276.00 +3.76%</div>
+      </div>
+      <div class="row"><span>十五分站上時間</span><b>09:40</b></div>
+      <div class="row"><span>收盤 / MA200</span><b>276.50 &gt; 271.99</b></div>
+      <div class="row"><span>收盤 vs 均線</span><b>276.50 &gt; MA5 268.60 / 10 266.55 / 20 265.27</b></div>
+      <div class="row"><span>均線發散</span><b>MA5/MA20 +1.25%　5–10 0.74%　10–20 0.46%</b></div>
+      <div class="row"><span>小時K / MA5 10 20</span><b>276.50 &gt; 266.80 / 263.10 / 261.20</b></div><div class="row"><span>一小時後（10:40）</span><b class="lose">276.50 → 274.50　-0.72%</b></div><div class="row"><span>日K / MA5 10 20 60 200</span><b>276.00　MA 263.50 / 266.39 / 250.40 / 249.94 / 212.01</b></div>
+      <div class="row"><span>前收 / 前MA200</span><b>271.00 ≤ 271.93</b></div>
+      <div class="row"><span>成交額排名</span><b>#91 · 20.94 億</b></div>
+      <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K　最下＝日K</div>
+      <div class="chart"><img alt="十銓 4967.TW 五分K＋十五分K＋小時K＋日K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/charts/backtest-15m-1h/2026-08-21-4967.TW-0940-stack.png"/></div>
+    </article>
+
+    </section>
+    <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
+  </div>
+</body>
+</html>
