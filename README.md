@@ -67,7 +67,16 @@ python3 examples/chart_today.py --report --days 30 -o output/nq_report_30d.html
 python3 examples/chart_today.py
 ```
 
-### 外網開啟
+### 股市進出簿
+
+手機也能用的買賣帳本，資料存在瀏覽器本機，可匯出 JSON / CSV。
+
+- 本機：開 `docs/journal/index.html`
+- GitHub Pages：`https://yubogoodman-droid.github.io/NQ/journal/`
+
+可記台股／美股買進賣出、自動帶入台股手續費與證交稅、用先進先出算持倉與已實現損益，並在持倉裡手動設現價看未實現。
+
+## 外網開啟
 
 1. **GitHub Pages（永久）**  
    到 [Repo Settings → Pages](https://github.com/yubogoodman-droid/NQ/settings/pages)，Source 選 **GitHub Actions**，儲存後重新執行 workflow。  
