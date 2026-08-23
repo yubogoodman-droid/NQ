@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """回測：收盤高於 MA7/25/200，且 7>25。MA14 只畫圖、不擋單。
 
-通知只推本根剛站上該週期 MA200，且 1h MA25 未下彎；15m 還要 1h 7>25。大週期 SMA200 只對照、不擋單。
+通知只推本根剛站上該週期 MA200，且 1h MA25 未下彎；15m 還要 1h 7>25。
+15m 圖例疊 15m / 1h / 4h（4h 只對照、不擋單）。大週期 SMA200 只對照、不擋單。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --stocks --pages
@@ -354,14 +355,16 @@ def tf_bar_idx(d: dict, time_ms: int, bar_ms: int) -> int | None:
     return int(w[-1]) if len(w) else None
 
 
-def draw_chart(
-    sym: str,
-    d: dict,
-    row: SignalRow,
-    path: Path,
-    spec: TfSpec,
-    d_htf: dict | None = None,
-) -> Path | None:
+def _panel_title(sym: str, tf: str, d: dict, mark_i: int, extra: str = "", note: str = "") -> str:
+    h_close = float(d["c"][mark_i])
+    h_ma = float(d["m200"][mark_i]) if not np.isnan(d["m200"][mark_i]) else None
+    vs = ""
+    if h_ma:
+        vs = f"  close {h_close:g} vs {tf} MA200 {h_ma:g} ({(h_close / h_ma - 1) * 100:+.2f}%)"
+    return f"{sym}  {tf}  {hm(int(d['t'][mark_i]))}{vs}{extra}{note}"
+
+
+def _save_stacked_chart(path: Path, panels: list[tuple[dict, str, int, int, int, str]]) -> Path | None:
     try:
         import matplotlib
 
@@ -369,7 +372,51 @@ def draw_chart(
         import matplotlib.pyplot as plt
     except Exception:
         return None
+    n = len(panels)
+    if n < 1:
+        return None
+    ratios = []
+    for i in range(n):
+        ratios.extend([3.1, 0.9] if i == 0 else [2.4, 0.75])
+    fig, axes = plt.subplots(
+        n * 2,
+        1,
+        figsize=(10.6, 5.4 + 4.6 * (n - 1)),
+        sharex=False,
+        gridspec_kw={"height_ratios": ratios},
+        facecolor="#0c1210",
+    )
+    if n == 1:
+        axes = [axes[0], axes[1]]
+    for a in axes:
+        _style_ax(a)
+    for i, (frame, _tf, a0, a1, mark_i, title) in enumerate(panels):
+        ax_p, ax_v = axes[2 * i], axes[2 * i + 1]
+        _paint_ohlcv(ax_p, ax_v, frame, a0, a1, mark_i)
+        ax_p.set_title(title, color="#e8f0ea", fontsize=11 if i == 0 else 12)
+    fig.tight_layout(pad=0.5)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
 
+
+def load_htf_frame(sym: str, interval: str, days: int, min_days: int) -> dict | None:
+    raw = fetch_klines(sym, interval=interval, days=max(days, min_days), extra_bars=220)
+    if raw is None or len(raw["c"]) < 200:
+        return None
+    return add_15m_mas(raw)
+
+
+def draw_chart(
+    sym: str,
+    d: dict,
+    row: SignalRow,
+    path: Path,
+    spec: TfSpec,
+    d_htf: dict | None = None,
+    d_4h: dict | None = None,
+) -> Path | None:
     i = row.sig.idx
     a0 = max(0, i - spec.lookback)
     a1 = min(len(d["c"]), i + 20)
@@ -383,43 +430,41 @@ def draw_chart(
     if row.h1_stack_ok is not None:
         extra += "  1h7>25 " + ("ok" if row.h1_stack_ok else "no")
 
+    panels: list[tuple[dict, str, int, int, int, str]] = [
+        (
+            d,
+            spec.signal,
+            a0,
+            a1,
+            i,
+            f"{title_sym}  {spec.signal}  {hm(row.time_ms)}  {kind}{extra}{rtxt}",
+        )
+    ]
     hi = tf_bar_idx(d_htf, row.time_ms, spec.htf_ms) if d_htf is not None and len(d_htf.get("c", [])) else None
-    stacked = hi is not None
-    if stacked:
-        fig, axes = plt.subplots(
-            4,
-            1,
-            figsize=(10.6, 10.6),
-            sharex=False,
-            gridspec_kw={"height_ratios": [3.1, 0.9, 3.1, 0.9]},
-            facecolor="#0c1210",
-        )
-        ax, axv, axh, axhv = axes
-    else:
-        fig, (ax, axv) = plt.subplots(
-            2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
-        )
-        axh = axhv = None
-    for a in (ax, axv, axh, axhv):
-        if a is not None:
-            _style_ax(a)
-    _paint_ohlcv(ax, axv, d, a0, a1, i)
-    ax.set_title(f"{title_sym}  {spec.signal}  {hm(row.time_ms)}  {kind}{extra}{rtxt}", color="#e8f0ea", fontsize=11)
-    if stacked and axh is not None and axhv is not None and d_htf is not None and hi is not None:
+    if d_htf is not None and hi is not None:
         b0 = max(0, hi - 48)
         b1 = min(len(d_htf["c"]), hi + 16)
-        _paint_ohlcv(axh, axhv, d_htf, b0, b1, hi)
-        h_close = float(d_htf["c"][hi])
-        h_ma = float(d_htf["m200"][hi]) if not np.isnan(d_htf["m200"][hi]) else None
-        vs = ""
-        if h_ma:
-            vs = f"  close {h_close:g} vs {spec.htf} MA200 {h_ma:g} ({(h_close / h_ma - 1) * 100:+.2f}%)"
-        axh.set_title(f"{title_sym}  {spec.htf}  {hm(int(d_htf['t'][hi]))}{vs}", color="#e8f0ea", fontsize=12)
-    fig.tight_layout(pad=0.5)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
-    plt.close(fig)
-    return path
+        note = "（只對照，不擋單）" if spec.htf == "4h" else ""
+        panels.append(
+            (d_htf, spec.htf, b0, b1, hi, _panel_title(title_sym, spec.htf, d_htf, hi, note=note))
+        )
+    # 15m 已有 1h 擋單圖，再附 4h 對照；1h 的 htf 已是 4h，不再疊一次。
+    if spec.signal == "15m" and d_4h is not None and len(d_4h.get("c", [])):
+        i4 = tf_bar_idx(d_4h, row.time_ms, INTERVAL_MS["4h"])
+        if i4 is not None:
+            c0 = max(0, i4 - 48)
+            c1 = min(len(d_4h["c"]), i4 + 8)
+            panels.append(
+                (
+                    d_4h,
+                    "4h",
+                    c0,
+                    c1,
+                    i4,
+                    _panel_title(title_sym, "4h", d_4h, i4, note="（只對照，不擋單）"),
+                )
+            )
+    return _save_stacked_chart(path, panels)
 
 
 def pick_gallery(rows: list[SignalRow], spec: TfSpec, limit: int = 18) -> list[SignalRow]:
@@ -634,7 +679,9 @@ def write_html(
             f"（未收完的大週期 K 用當下收盤，不看未來）。"
         )
     else:
-        htf_rule = f"{html.escape(htf)} 圖 SMA200 只放在底下對照，<strong>不當作過濾</strong>。"
+        htf_rule = f"{html.escape(htf)} 圖 SMA200 只放在圖上對照，<strong>不當作過濾</strong>。"
+        if spec.signal == "15m":
+            htf_rule += "圖例再附 <strong>4h K</strong> 對照，同樣<strong>不擋單</strong>。"
         if spec.require_h1_ma25_up:
             htf_rule += (
                 "另要求當時 <strong>1h SMA25 未下彎</strong>"
@@ -718,7 +765,11 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   {pin_card(notify_rows, spec, "TRUMPUSDT", "TRUMP")}
   {pin_card(notify_rows, spec, "CRCLUSDT", "CRCL")}
   <h1>圖例</h1>
-  <p class="sub">上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K（只對照，不擋單）。黃虛線是訊號時間。白線是各週期自己的 MA200。圖例只畫通知條件（TUT、TRUMP、CRCL 若有會釘在最上面）。</p>
+  <p class="sub">{
+    "上面 15m K，中間 1h K（用來擋單：MA25 未下彎、7&gt;25），下面 4h K（只對照，不擋單）。"
+    if spec.signal == "15m"
+    else f"上面 {html.escape(tf)} K，下面同一檔 {html.escape(htf)} K（只對照，不擋單）。"
+  }黃虛線是訊號時間。白線是各週期自己的 MA200。圖例只畫通知條件（TUT、TRUMP、CRCL 若有會釘在最上面）。</p>
   {gallery_html(gallery, spec)}
   <div class="card">
     <h2>過濾對照</h2>
@@ -873,18 +924,23 @@ def main() -> int:
     for old in img_dir.glob("*.png"):
         old.unlink()
     htf_cache: dict[str, dict | None] = {}
+    h4_cache: dict[str, dict | None] = {}
     gallery: list[tuple[SignalRow, str]] = []
     for row in pick_gallery(rows, spec, limit=24):
         d = data.get(row.symbol)
         if d is None:
             continue
         if row.symbol not in htf_cache:
-            raw_h = fetch_klines(row.symbol, interval=spec.htf, days=max(args.days, spec.htf_min_days), extra_bars=220)
-            htf_cache[row.symbol] = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
+            htf_cache[row.symbol] = load_htf_frame(row.symbol, spec.htf, args.days, spec.htf_min_days)
+        d_4h = None
+        if spec.signal == "15m":
+            if row.symbol not in h4_cache:
+                h4_cache[row.symbol] = load_htf_frame(row.symbol, "4h", args.days, 40)
+            d_4h = h4_cache[row.symbol]
         stamp = datetime.fromtimestamp(row.time_ms / 1000, TZ).strftime("%m%d%H%M")
         fname = f"{file_base(row.symbol)}_{stamp}.png"
         out = img_dir / fname
-        if draw_chart(row.symbol, d, row, out, spec, d_htf=htf_cache[row.symbol]):
+        if draw_chart(row.symbol, d, row, out, spec, d_htf=htf_cache[row.symbol], d_4h=d_4h):
             gallery.append((row, f"./img/{img_name}/{fname}"))
 
     default_html = spec.html_stocks if args.stocks else spec.html

@@ -1,6 +1,7 @@
 """15 分 / 1 小時 MA200 剛站上 → Telegram（與回測同一套規則）。
 
 15m / 1h：收盤 > MA7>25 且本根剛站上該週期 MA200。
+15m Telegram 圖由上到下是 15m / 1h / 4h（4h 只對照、不擋單）。
 """
 
 from __future__ import annotations
@@ -211,7 +212,16 @@ def tf_bar_idx(d: dict, time_ms: int, bar_ms: int) -> int | None:
     return int(w[-1]) if len(w) else None
 
 
-def draw_chart(sym: str, d: dict, sig, spec: dict, path: str, d_htf: dict | None) -> str | None:
+def _panel_title(sym: str, tf: str, d: dict, mark_i: int, extra: str = "", note: str = "") -> str:
+    h_close = float(d["c"][mark_i])
+    h_ma = float(d["m200"][mark_i]) if not np.isnan(d["m200"][mark_i]) else None
+    vs = ""
+    if h_ma:
+        vs = f"  close {h_close:g} vs {tf} MA200 {h_ma:g} ({(h_close / h_ma - 1) * 100:+.2f}%)"
+    return f"{sym}  {tf}  {hm(int(d['t'][mark_i]))}{vs}{extra}{note}"
+
+
+def _save_stacked_chart(path: str, panels: list[tuple[dict, str, int, int, int, str]]) -> str | None:
     try:
         import matplotlib
 
@@ -219,7 +229,50 @@ def draw_chart(sym: str, d: dict, sig, spec: dict, path: str, d_htf: dict | None
         import matplotlib.pyplot as plt
     except Exception:
         return None
+    n = len(panels)
+    if n < 1:
+        return None
+    ratios = []
+    for i in range(n):
+        ratios.extend([3.1, 0.9] if i == 0 else [2.4, 0.75])
+    fig, axes = plt.subplots(
+        n * 2,
+        1,
+        figsize=(10.6, 5.4 + 4.6 * (n - 1)),
+        sharex=False,
+        gridspec_kw={"height_ratios": ratios},
+        facecolor="#0c1210",
+    )
+    if n == 1:
+        axes = [axes[0], axes[1]]
+    for a in axes:
+        _style_ax(a)
+    for i, (frame, _tf, a0, a1, mark_i, title) in enumerate(panels):
+        ax_p, ax_v = axes[2 * i], axes[2 * i + 1]
+        _paint_ohlcv(ax_p, ax_v, frame, a0, a1, mark_i)
+        ax_p.set_title(title, color="#e8f0ea", fontsize=11 if i == 0 else 12)
+    fig.tight_layout(pad=0.5)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
 
+
+def load_4h_frame(sym: str) -> dict | None:
+    raw = fetch_klines(sym, interval="4h", days=40, extra_bars=220)
+    if raw is None or len(raw["c"]) < 200:
+        return None
+    return add_15m_mas(raw)
+
+
+def draw_chart(
+    sym: str,
+    d: dict,
+    sig,
+    spec: dict,
+    path: str,
+    d_htf: dict | None,
+    d_4h: dict | None = None,
+) -> str | None:
     i = sig.idx
     ts = int(d["t"][i])
     a0 = max(0, i - spec["lookback"])
@@ -229,42 +282,24 @@ def draw_chart(sym: str, d: dict, sig, spec: dict, path: str, d_htf: dict | None
         f"  below={sig.bars_below}  above={sig.bars_above}  "
         f"vol={sig.vol_ratio:.2f}x  ext={sig.ext_pct:+.2f}%"
     )
+    panels: list[tuple[dict, str, int, int, int, str]] = [
+        (d, spec["signal"], a0, a1, i, f"{title_sym}  {spec['signal']}  {hm(ts)}  reclaim MA200{extra}")
+    ]
     hi = tf_bar_idx(d_htf, ts, spec["htf_ms"]) if d_htf is not None and len(d_htf.get("c", [])) else None
-    stacked = hi is not None
-    if stacked:
-        fig, axes = plt.subplots(
-            4,
-            1,
-            figsize=(10.6, 10.6),
-            sharex=False,
-            gridspec_kw={"height_ratios": [3.1, 0.9, 3.1, 0.9]},
-            facecolor="#0c1210",
-        )
-        ax, axv, axh, axhv = axes
-    else:
-        fig, (ax, axv) = plt.subplots(
-            2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
-        )
-        axh = axhv = None
-    for a in (ax, axv, axh, axhv):
-        if a is not None:
-            _style_ax(a)
-    _paint_ohlcv(ax, axv, d, a0, a1, i)
-    ax.set_title(f"{title_sym}  {spec['signal']}  {hm(ts)}  reclaim MA200{extra}", color="#e8f0ea", fontsize=11)
-    if stacked and axh is not None and axhv is not None and d_htf is not None and hi is not None:
+    if d_htf is not None and hi is not None:
         b0 = max(0, hi - 48)
         b1 = min(len(d_htf["c"]), hi + 2)
-        _paint_ohlcv(axh, axhv, d_htf, b0, b1, hi)
-        h_close = float(d_htf["c"][hi])
-        h_ma = float(d_htf["m200"][hi]) if not np.isnan(d_htf["m200"][hi]) else None
-        vs = ""
-        if h_ma:
-            vs = f"  close {h_close:g} vs {spec['htf']} MA200 {h_ma:g} ({(h_close / h_ma - 1) * 100:+.2f}%)"
-        axh.set_title(f"{title_sym}  {spec['htf']}  {hm(int(d_htf['t'][hi]))}{vs}", color="#e8f0ea", fontsize=12)
-    fig.tight_layout(pad=0.5)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
-    plt.close(fig)
-    return path
+        note = "（只對照，不擋單）" if spec["htf"] == "4h" else ""
+        panels.append((d_htf, spec["htf"], b0, b1, hi, _panel_title(title_sym, spec["htf"], d_htf, hi, note=note)))
+    if spec["signal"] == "15m" and d_4h is not None and len(d_4h.get("c", [])):
+        i4 = tf_bar_idx(d_4h, ts, INTERVAL_MS["4h"])
+        if i4 is not None:
+            c0 = max(0, i4 - 48)
+            c1 = min(len(d_4h["c"]), i4 + 2)
+            panels.append(
+                (d_4h, "4h", c0, c1, i4, _panel_title(title_sym, "4h", d_4h, i4, note="（只對照，不擋單）"))
+            )
+    return _save_stacked_chart(path, panels)
 
 
 def load_btc_1h() -> dict | None:
@@ -355,6 +390,8 @@ def format_ev(ev: dict) -> str:
         m7, m25 = htf_ma7_25_at(src, int(d["t"][sig.idx]), sig.close, INTERVAL_MS["1h"])
         if m7 is not None and m25 is not None:
             extra += f"1h MA7 {m7:g} &gt; MA25 {m25:g}（多頭排列）\n"
+    if spec["signal"] == "15m":
+        extra += "圖附 4h 對照（不擋單）\n"
     return (
         f"<b>{spec['title']}</b>\n"
         f"<b>{sym_label(sym)}</b>  {sym}\n"
@@ -375,7 +412,8 @@ def notify(ev: dict) -> None:
     print("\n" + text.replace("<b>", "").replace("</b>", "").replace("&gt;", ">"))
     spec = ev["spec"]
     tmp = Path(tempfile.gettempdir()) / f"ma_{spec['signal']}_{ev['symbol']}_{ev['sig'].idx}.png"
-    photo = draw_chart(ev["symbol"], ev["d"], ev["sig"], spec, str(tmp), ev.get("d_htf"))
+    d_4h = load_4h_frame(ev["symbol"]) if spec["signal"] == "15m" else None
+    photo = draw_chart(ev["symbol"], ev["d"], ev["sig"], spec, str(tmp), ev.get("d_htf"), d_4h=d_4h)
     ok = telegram_send(text, photo=photo)
     if ok:
         print("  → Telegram 已送")
