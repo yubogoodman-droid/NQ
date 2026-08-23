@@ -910,6 +910,9 @@ def _render_trade_cards(
             f"<img src='img/{escape(img_name)}' alt='#{i} Q{escape(t.quality)}' "
             "style='width:100%;display:block;border-radius:10px'/>"
         )
+        extra_tag = ""
+        if 9 <= et.hour < 10:
+            extra_tag = "<span class='tag tag-tp'>09–10 才放進來</span>"
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -921,6 +924,7 @@ def _render_trade_cards(
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
             f"<span class='tag tag-info'>1m</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
+            f"{extra_tag}"
             "</div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}\n"
@@ -936,6 +940,15 @@ def _render_trade_cards(
     return "".join(cards)
 
 
+def write_view_html(src: Path, branch: str = "cursor/nq-30d-ablation-2484") -> Path:
+    rel = src.parent.relative_to(REPO_ROOT).as_posix()
+    base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
+    text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    out = src.with_name("view.html")
+    out.write_text(text, encoding="utf-8")
+    return out
+
+
 def write_html_report(
     path: str | Path,
     df: pd.DataFrame,
@@ -945,6 +958,7 @@ def write_html_report(
     funnel: Optional[Dict[str, int]] = None,
     extra_trades: Optional[List[TradeResult]] = None,
     extra_title: str = "",
+    note: str = "",
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -1019,6 +1033,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底翻 MA Reclaim</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
+{f'<p class="muted">{escape(note)}</p>' if note else ''}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1243,9 +1258,13 @@ CORE_DETECT = dict(hug_ma20_pts=0.0, use_ma60_skip=False, max_risk_non_qa=0.0)
 
 
 def detect_kwargs(args) -> dict:
+    kw: Dict[str, Any] = {}
     if getattr(args, "loose", False):
-        return dict(CORE_DETECT)
-    return {}
+        kw.update(CORE_DETECT)
+    if getattr(args, "allow_open_hour", False):
+        kw["skip_hour_start"] = None
+        kw["skip_hour_end"] = None
+    return kw
 
 
 def cmd_backtest(args) -> int:
@@ -1279,7 +1298,8 @@ def cmd_backtest(args) -> int:
 
     extra_trades: List[TradeResult] = []
     extra_funnel: Dict[str, int] = {}
-    if getattr(args, "pages", False) and not getattr(args, "loose", False):
+    allow_open = bool(getattr(args, "allow_open_hour", False))
+    if getattr(args, "pages", False) and not getattr(args, "loose", False) and not allow_open:
         core_sigs = detect_signals(df, funnel=extra_funnel, **CORE_DETECT)
         extra_trades = simulate(df, core_sigs)
         extra_stats = summarize_trades(extra_trades)
@@ -1297,19 +1317,34 @@ def cmd_backtest(args) -> int:
 
     html_path = args.html
     if getattr(args, "pages", False):
-        html_path = html_path or str(PAGES_HTML)
+        if allow_open:
+            html_path = html_path or str(REPO_ROOT / "docs" / "nq-ma-reclaim-0910" / "index.html")
+        else:
+            html_path = html_path or str(PAGES_HTML)
+    period_label = args.period
+    note = ""
+    if allow_open:
+        period_label = f"{args.period} · 允許美東 09–10 進場"
+        note = (
+            "預設美東 09:00–10:00 不進。這頁只關掉那一道，hug / MA60 / 風險上限仍在。"
+            "多出來、標了「09–10 才放進來」的就是被這道檔掉的單。"
+        )
     if html_path:
         out = write_html_report(
             html_path,
             df,
             trades,
             args.symbol,
-            args.period,
+            period_label,
             funnel=funnel,
             extra_trades=extra_trades,
             extra_title="核心（關掉 hug / MA60 特例 / 寬停損 QA 門檻）",
+            note=note,
         )
         print(f"html={out}")
+        if allow_open:
+            view = write_view_html(out)
+            print(f"view={view}")
     return 0
 
 
@@ -1364,6 +1399,11 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--html", default="")
     b.add_argument("--pages", action="store_true", help="寫到 docs/nq-ma-reclaim/index.html")
     b.add_argument("--loose", action="store_true", help="關掉 hug / MA60 特例 / 寬停損 QA，只留核心破底翻")
+    b.add_argument(
+        "--allow-open-hour",
+        action="store_true",
+        help="關掉美東 09–10 不進場（其餘嚴格規則不變）",
+    )
     b.set_defaults(func=cmd_backtest)
 
     a = sub.add_parser("alert", help="Telegram 輪詢")
@@ -1383,6 +1423,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true", help="寫到 docs/nq-ma-reclaim/index.html")
     p.add_argument("--loose", action="store_true", help="關掉 hug / MA60 特例 / 寬停損 QA，只留核心破底翻")
+    p.add_argument(
+        "--allow-open-hour",
+        action="store_true",
+        help="關掉美東 09–10 不進場（其餘嚴格規則不變）",
+    )
     return p
 
 

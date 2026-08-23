@@ -11,9 +11,12 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from types import SimpleNamespace
+
 from nq_ma_reclaim import (  # noqa: E402
     ET,
     TradeResult,
+    detect_kwargs,
     detect_signals,
     parse_period_days,
     quality_from_slopes,
@@ -22,6 +25,13 @@ from nq_ma_reclaim import (  # noqa: E402
     summarize_trades,
     write_html_report,
 )
+
+
+def test_detect_kwargs_allow_open_hour() -> None:
+    assert detect_kwargs(SimpleNamespace(loose=False)) == {}
+    kw = detect_kwargs(SimpleNamespace(loose=False, allow_open_hour=True))
+    assert kw["skip_hour_start"] is None
+    assert kw["skip_hour_end"] is None
 
 
 def test_parse_period_days() -> None:
@@ -130,6 +140,7 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
 
 
 def main() -> int:
+    test_detect_kwargs_allow_open_hour()
     test_parse_period_days()
     test_quality_from_slopes()
     test_sma()
