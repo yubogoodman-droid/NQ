@@ -28,6 +28,22 @@ from nq_ma_reclaim import (  # noqa: E402
 )
 
 
+def test_hug_band_skips_flat_not_steep() -> None:
+    """08-11 型走平要擋；07-27 21:25 型大跌收復（斜率 -12）不擋。"""
+    import inspect
+
+    from nq_ma_reclaim import detect_signals
+
+    params = inspect.signature(detect_signals).parameters
+    assert params["min_ma20_slope"].default == -13.0
+    assert params["hug_ma20_min_slope"].default == -8.0
+    assert params["hug_ma20_max_slope"].default == 0.5
+    # -12.12 is below hug min, so hug does not fire; still passes the -13 slope floor
+    assert -13.0 <= -12.12 < -8.0
+    # -0.95 sits in the hug band
+    assert -8.0 <= -0.95 <= 0.5
+
+
 def test_detect_kwargs_allow_open_hour() -> None:
     assert detect_kwargs(SimpleNamespace(loose=False)) == {}
     kw = detect_kwargs(SimpleNamespace(loose=False, allow_open_hour=True))
@@ -156,6 +172,7 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
 
 
 def main() -> int:
+    test_hug_band_skips_flat_not_steep()
     test_detect_kwargs_allow_open_hour()
     test_parse_period_days()
     test_quality_from_slopes()

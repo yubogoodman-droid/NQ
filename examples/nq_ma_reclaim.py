@@ -286,9 +286,11 @@ def detect_signals(
     require_w: bool = False,
     min_break_depth: float = 10.0,
     max_entry_vol: float = 2.5,
-    min_ma20_slope: float = -5.0,
-    # ⑯ 貼著仍下彎/走平的 1m MA20 不進（擋 08-11 12:39）
+    min_ma20_slope: float = -13.0,
+    # ⑯ 貼著走平／小跌的 1m MA20 不進（擋 08-11 12:39）
+    # 大跌後剛收復（斜率比 min 更負，如 07-27 21:25）不擋
     hug_ma20_pts: float = 16.0,
+    hug_ma20_min_slope: float = -8.0,
     hug_ma20_max_slope: float = 0.5,
     max_risk: float = 100.0,
     # ⑮：風險偏大時只准 QA（擋 08-05 型寬停損弱品質全損）
@@ -318,6 +320,7 @@ def detect_signals(
     min_break_depth *= s
     min_ma20_slope *= s
     hug_ma20_pts *= s
+    hug_ma20_min_slope *= s
     hug_ma20_max_slope *= s
     max_risk *= s
     max_risk_non_qa *= s
@@ -413,7 +416,11 @@ def detect_signals(
                 continue
             # ⑯ 收盤貼著 1m MA20，且 MA20 仍下彎/走平 → 放棄這波破底
             ma20_s5 = float(ma20[j] - ma20[j - ma20_slope_bars]) if j >= ma20_slope_bars else 0.0
-            if hug_ma20_pts > 0 and (close[j] - ma20[j]) < hug_ma20_pts and ma20_s5 <= hug_ma20_max_slope:
+            if (
+                hug_ma20_pts > 0
+                and (close[j] - ma20[j]) < hug_ma20_pts
+                and hug_ma20_min_slope <= ma20_s5 <= hug_ma20_max_slope
+            ):
                 bump("skip_hug_ma20")
                 mark(j, "skip_hug_ma20")
                 abandon_break = True
