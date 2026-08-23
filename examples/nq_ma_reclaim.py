@@ -775,7 +775,13 @@ def _trade_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     return start, end
 
 
-def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
+def draw_trade_png(
+    df: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+    title_extra: str = "",
+) -> Path:
     """Static 1m candle + MA card. MAs are computed on the full series (no window lookahead)."""
     import matplotlib
 
@@ -853,8 +859,9 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     et = df.index[trade.entry_idx]
     xt = df.index[trade.exit_idx]
     sign = "+" if trade.pnl_points >= 0 else ""
+    extra = f"{title_extra}  " if title_extra else ""
     ax.set_title(
-        f"#{trade_no}  Q{trade.quality}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"#{trade_no}  {extra}Q{trade.quality}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
         color="#e8f0ea",
         fontsize=11,
