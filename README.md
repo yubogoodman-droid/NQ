@@ -49,7 +49,7 @@ https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-dro
 合併進 `main` 後 GitHub Pages：  
 https://yubogoodman-droid.github.io/NQ/binance/ma15-bull.html
 
-Telegram 監看（與回測同一套規則）。**不要只拷一個 py**，`nq` 資料夾要在旁邊。
+Telegram 監看用**同一個腳本**同時盯 15 分與 1 小時（與回測同一套規則）。視窗開著就會一直掃，符合才推 TG。**不要只拷一個 py**，`nq` 資料夾要在旁邊。
 
 PyCharm：用「Open」打開整個 NQ 專案，或把 `15M多排.py` 和 `nq` 放同一層，在 `15M多排.py` 最上面填 token / chat id：
 
@@ -61,10 +61,10 @@ PythonProject2\
 
 ```bash
 pip install numpy requests matplotlib
-python 15M多排.py --test
-python 15M多排.py                 # 預設 15 分 + 1 小時都推
-python 15M多排.py --tf 1h         # 只推小時圖（剛站上 1h MA200）
-python 15M多排.py --once
+python 15M多排.py --test          # 先測 TG 通不通
+python 15M多排.py                 # 15 分 + 1 小時一直監看（預設）
+python 15M多排.py --tf 1h         # 只看小時圖
+python 15M多排.py --once          # 只掃一輪
 ```
 
 也可以 `pip install -e .` 後跑 `examples/watch_15m_bull.py`。

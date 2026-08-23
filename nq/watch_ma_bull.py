@@ -1,8 +1,9 @@
 """15 分 / 1 小時 MA200 剛站上 → Telegram（與回測同一套規則）。
 
-15m / 1h：收盤 > MA7>25 且本根剛站上該週期 MA200。
-15m 還要剛站上後連續 3 根收盤都在 MA200 上才推（訊號是第 3 根）。
-15m Telegram 圖由上到下是 15m / 1h / 4h（4h 只對照、不擋單）。
+同一個行程同時監看 15m 與 1h。
+15m：剛站上後連 3 根都在 MA200 上，且 1h MA25 未下彎、1h 7>25。
+1h：本根剛站上 1h MA200，且 1h MA25 未下彎。
+15m 圖：15m / 1h / 4h（4h 只對照）。1h 圖：1h / 4h。
 """
 
 from __future__ import annotations
@@ -515,6 +516,14 @@ def main() -> int:
 
     names = ("15m", "1h") if args.tf == "both" else (args.tf,)
     specs = [TF_WATCH[n] for n in names]
+    if not os.environ.get("TELEGRAM_BOT_TOKEN", "").strip() or not os.environ.get(
+        "TELEGRAM_CHAT_ID", ""
+    ).strip():
+        print(
+            "還沒填 Telegram：在 15M多排.py 最上面填 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID，\n"
+            "或在同資料夾放 telegram_local.py。沒填也能掃，只是不會推到 TG。",
+            flush=True,
+        )
 
     seen = load_seen()
     print("載入標的…", flush=True)
@@ -522,9 +531,16 @@ def main() -> int:
     if args.limit_symbols:
         symbols = symbols[: args.limit_symbols]
     scope = "幣安股票永續" if args.stocks else "成交額前100永續"
-    print(f"監看 {len(symbols)} 個{scope}。", flush=True)
+    print(f"同一個腳本監看 {len(symbols)} 個{scope}：{' + '.join(names)}", flush=True)
     for spec in specs:
         print("  · " + spec_note(spec), flush=True)
+    if not args.once and not args.test:
+        telegram_send(
+            "<b>監看已啟動</b>\n"
+            "同一個腳本盯 15m 與 1h，收盤掃一次，符合才推圖。\n"
+            "15m：剛站上年線後連 3 根，且 1h MA25 未下彎、1h 7&gt;25\n"
+            "1h：本根剛站上 1h MA200，且 1h MA25 未下彎"
+        )
     uni_ts = time.time()
     first = True
 
