@@ -15,12 +15,21 @@ from nq_ma_reclaim import (  # noqa: E402
     ET,
     TradeResult,
     detect_signals,
+    parse_period_days,
     quality_from_slopes,
     simulate,
     sma,
     summarize_trades,
     write_html_report,
 )
+
+
+def test_parse_period_days() -> None:
+    assert parse_period_days("8d") == 8
+    assert parse_period_days("30d") == 30
+    assert parse_period_days("1mo") == 30
+    assert parse_period_days("4w") == 28
+    assert parse_period_days("5d") == 5
 
 
 def test_quality_from_slopes() -> None:
@@ -117,6 +126,7 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
 
 
 def main() -> int:
+    test_parse_period_days()
     test_quality_from_slopes()
     test_sma()
     test_summarize_trades()

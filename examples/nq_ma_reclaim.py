@@ -4,7 +4,7 @@
 用法:
   python3 examples/nq_ma_reclaim.py
   python3 examples/nq_ma_reclaim.py backtest --period 8d --html report.html
-  python3 examples/nq_ma_reclaim.py backtest --period 8d --pages
+  python3 examples/nq_ma_reclaim.py backtest --period 30d --pages
   python3 examples/nq_ma_reclaim.py alert
   python3 examples/nq_ma_reclaim.py alert --test
   python3 examples/nq_ma_reclaim.py alert --dry-run --once
@@ -53,6 +53,17 @@ PAGES_HTML = REPO_ROOT / "docs" / "nq-ma-reclaim" / "index.html"
 # ---------------------------------------------------------------------------
 
 
+def parse_period_days(period: str) -> Optional[int]:
+    p = (period or "").strip().lower()
+    if p.endswith("mo") and p[:-2].isdigit():
+        return int(p[:-2]) * 30
+    if p.endswith("d") and p[:-1].isdigit():
+        return int(p[:-1])
+    if p.endswith("w") and p[:-1].isdigit():
+        return int(p[:-1]) * 7
+    return None
+
+
 def load_yfinance(symbol: str = "NQ=F", interval: str = "1m", period: str = "5d") -> pd.DataFrame:
     df = yf.download(symbol, interval=interval, period=period, progress=False, auto_adjust=True)
     if isinstance(df.columns, pd.MultiIndex):
@@ -90,12 +101,29 @@ def load_yahoo_intraday(
                 part.columns = part.columns.get_level_values(0)
             part = part.rename(columns=str.title)
             chunks.append(part)
+            print(f"[data] {cur.date()} → {nxt.date()} bars={len(part)}", file=sys.stderr)
+        else:
+            print(f"[data] {cur.date()} → {nxt.date()} empty", file=sys.stderr)
         cur = nxt
+        time.sleep(0.4)
     if not chunks:
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
     df = pd.concat(chunks).sort_index()
     df = df[~df.index.duplicated(keep="last")]
     return df.dropna()
+
+
+def load_bars(symbol: str, interval: str, period: str) -> pd.DataFrame:
+    """Yahoo 1m period= 最多約 7–8 天；超過改用 7 日切片（約可回看 30 天）。"""
+    days = parse_period_days(period)
+    if days is not None and days > 8:
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=days)
+        df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=7)
+        if not df.empty:
+            return df
+        print(f"[data] chunked {period} empty, fallback period download", file=sys.stderr)
+    return load_yfinance(symbol, interval, period)
 
 
 def to_et(df: pd.DataFrame) -> pd.DataFrame:
@@ -1147,7 +1175,7 @@ def scan_once(
 
 
 def cmd_backtest(args) -> int:
-    df = to_et(load_yfinance(args.symbol, "1m", args.period))
+    df = to_et(load_bars(args.symbol, "1m", args.period))
     if df.empty:
         print("no data", file=sys.stderr)
         return 1
