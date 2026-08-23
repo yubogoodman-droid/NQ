@@ -307,6 +307,8 @@ def detect_signals(
     pt_scale: float = 1.0,
     use_ma20_up_target: bool = True,
     ma20_up_target_r: float = 3.0,
+    use_ma60_skip: bool = True,
+    funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     s = float(pt_scale) if pt_scale and pt_scale > 0 else 1.0
     stop_buffer *= s
@@ -340,6 +342,10 @@ def detect_signals(
     n = len(close)
     warmup = max(p200, two_hour_bars, 200)
     i = warmup
+    fun = funnel if funnel is not None else {}
+
+    def bump(key: str) -> None:
+        fun[key] = fun.get(key, 0) + 1
 
     while i < n - 1:
         if np.isnan(two_hr_low[i]) or np.isnan(ma30[i]):
@@ -351,12 +357,15 @@ def detect_signals(
             i += 1
             continue
 
+        bump("break")
         break_low = float(low[i])
         break_idx = i
         break_depth = support - break_low
         if break_depth < min_break_depth:
+            bump("shallow")
             i += 1
             continue
+        bump("deep_break")
 
         w_info = find_w_bottom_at(low, high, break_idx, break_low)
         if require_w and w_info is None:
@@ -374,38 +383,47 @@ def detect_signals(
             bull_stack = ma5[j] > ma10[j] > ma20[j]
             if not (reclaimed and bull_stack):
                 continue
+            bump("reclaim_stack")
             vol_avg = np.mean(volume[max(0, j - vol_lookback) : j]) or 1.0
             if volume[j] / vol_avg > max_entry_vol:
+                bump("skip_vol")
                 continue
             if j >= ma20_slope_bars and (ma20[j] - ma20[j - ma20_slope_bars]) < min_ma20_slope:
+                bump("skip_ma20_slope")
                 continue
             # ⑯ 收盤貼著 1m MA20，且 MA20 仍下彎/走平 → 放棄這波破底
             ma20_s5 = float(ma20[j] - ma20[j - ma20_slope_bars]) if j >= ma20_slope_bars else 0.0
             if hug_ma20_pts > 0 and (close[j] - ma20[j]) < hug_ma20_pts and ma20_s5 <= hug_ma20_max_slope:
+                bump("skip_hug_ma20")
                 abandon_break = True
                 last_entry = j
                 break
             if skip_hour_start is not None and skip_hour_end is not None:
                 h = df.index[j].hour
                 if skip_hour_start <= h < skip_hour_end:
+                    bump("skip_open_hour")
                     continue
             if j - last_entry < min_entry_gap:
+                bump("skip_entry_gap")
                 break
             entry = float(close[j])
             stop = break_low - stop_buffer
             risk = entry - stop
             if risk <= 0:
+                bump("skip_bad_risk")
                 break
             if max_risk > 0 and risk > max_risk:
+                bump("skip_max_risk")
                 continue
             if not np.isnan(ma200[j]):
                 dist_ma200 = entry - float(ma200[j])
                 if dist_ma200 <= 0 and dist_ma200 > -ma200_buffer:
+                    bump("skip_ma200_hug")
                     continue
             slope5 = 0.0
             if j >= ma60_slope_bars and not np.isnan(ma60[j]) and not np.isnan(ma60[j - ma60_slope_bars]):
                 slope5 = float(ma60[j]) - float(ma60[j - ma60_slope_bars])
-            if not np.isnan(ma60[j]):
+            if use_ma60_skip and not np.isnan(ma60[j]):
                 dist_ma60 = entry - float(ma60[j])
                 dist_ma200 = entry - float(ma200[j]) if not np.isnan(ma200[j]) else 999.0
                 p = s
@@ -491,6 +509,7 @@ def detect_signals(
                     skip_ma60 = True
                     hard_skip_break = True
                 if skip_ma60:
+                    bump("skip_ma60")
                     if hard_skip_break:
                         abandon_break = True
                         break
@@ -507,7 +526,9 @@ def detect_signals(
             q_score, q_grade = quality_from_slopes(m1_ma5_s5, slope5, m5_s5)
             # ⑮ 寬停損只做 QA
             if max_risk_non_qa > 0 and risk > max_risk_non_qa and q_score < 2:
+                bump("skip_wide_risk")
                 continue
+            bump("taken")
             signals.append(
                 Signal(
                     break_idx,
@@ -850,26 +871,19 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     return path
 
 
-def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
+def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int, prefix: str = "t") -> str:
     et = df.index[trade.entry_idx]
-    return f"t{trade_no:02d}_{et.strftime('%m%d_%H%M')}_q{trade.quality.lower()}.png"
+    return f"{prefix}{trade_no:02d}_{et.strftime('%m%d_%H%M')}_q{trade.quality.lower()}.png"
 
 
-def write_html_report(
-    path: str | Path,
+def _render_trade_cards(
     df: pd.DataFrame,
     trades: List[TradeResult],
-    symbol: str,
-    period: str,
-) -> Path:
-    stats = summarize_trades(trades)
-    pnls = [t.pnl_points for t in trades]
-    q_bits = []
-    for q, info in stats.get("by_quality", {}).items():
-        q_bits.append(f"Q{q} {info['n']}筆 {info['pnl']:+.1f}")
-    q_line = " · ".join(q_bits) if q_bits else "無品質分組"
-
-    cards = []
+    html_path: Path,
+    *,
+    prefix: str = "t",
+) -> str:
+    cards: List[str] = []
     for i, t in enumerate(trades, 1):
         et = df.index[t.entry_idx]
         xt = df.index[t.exit_idx]
@@ -883,9 +897,8 @@ def write_html_report(
             "stop": "tag-sl",
             "ma60_stop": "tag-sl",
         }.get(t.exit_reason, "tag-time")
-        img_name = _trade_img_name(df, t, i)
-        img_path = Path(path).parent / "img" / img_name
-        draw_trade_png(df, t, img_path, i)
+        img_name = _trade_img_name(df, t, i, prefix=prefix)
+        draw_trade_png(df, t, html_path.parent / "img" / img_name, i)
         chart = (
             f"<img src='img/{escape(img_name)}' alt='#{i} Q{escape(t.quality)}' "
             "style='width:100%;display:block;border-radius:10px'/>"
@@ -912,6 +925,52 @@ def write_html_report(
             "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
             "</article>"
+        )
+    return "".join(cards)
+
+
+def write_html_report(
+    path: str | Path,
+    df: pd.DataFrame,
+    trades: List[TradeResult],
+    symbol: str,
+    period: str,
+    funnel: Optional[Dict[str, int]] = None,
+    extra_trades: Optional[List[TradeResult]] = None,
+    extra_title: str = "",
+) -> Path:
+    stats = summarize_trades(trades)
+    pnls = [t.pnl_points for t in trades]
+    q_bits = []
+    for q, info in stats.get("by_quality", {}).items():
+        q_bits.append(f"Q{q} {info['n']}筆 {info['pnl']:+.1f}")
+    q_line = " · ".join(q_bits) if q_bits else "無品質分組"
+    out = Path(path)
+    cards = _render_trade_cards(df, trades, out, prefix="t")
+    extra_html = ""
+    if extra_trades:
+        extra_stats = summarize_trades(extra_trades)
+        extra_cls = "pnl-win" if extra_stats["total_points"] >= 0 else "pnl-loss"
+        extra_html = (
+            f"<section class='summary'><h1>{escape(extra_title or '核心對照')}</h1>"
+            f"<p class='muted'>關掉 hug MA20、MA60 特例、寬停損只做 QA。仍要破 2h 低、15 根內收復 MA20/30、5/10/20 多頭。</p>"
+            f"<div class='cards'><div class='card'>筆數<b>{extra_stats['count']}</b></div>"
+            f"<div class='card'>勝率<b>{extra_stats['win_rate']:.1f}%</b></div>"
+            f"<div class='card'>總點數<b class='{extra_cls}'>{extra_stats['total_points']:+.1f}</b></div>"
+            f"<div class='card'>勝/負<b>{extra_stats['wins']}/{extra_stats['count']-extra_stats['wins']}</b></div></div>"
+            f"<div class='equity'>{_equity_svg([t.pnl_points for t in extra_trades])}</div></section>"
+            + (_render_trade_cards(df, extra_trades, out, prefix="c") or "<div class='empty'>無交易</div>")
+        )
+    funnel_line = ""
+    if funnel:
+        funnel_line = (
+            f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → "
+            f"深度夠 {funnel.get('deep_break', 0)} → "
+            f"收復+排列 {funnel.get('reclaim_stack', 0)} → "
+            f"進場 {funnel.get('taken', 0)}"
+            f"（hug {funnel.get('skip_hug_ma20', 0)} · MA60 {funnel.get('skip_ma60', 0)} · "
+            f"9點檔 {funnel.get('skip_open_hour', 0)} · 量能 {funnel.get('skip_vol', 0)} · "
+            f"風險 {funnel.get('skip_max_risk', 0)} · 寬停損 {funnel.get('skip_wide_risk', 0)}）</p>"
         )
 
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -960,13 +1019,14 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">勝/負<b>{stats['wins']}/{stats['count']-stats['wins']}</b></div>
 </div>
 <p class="muted">{escape(q_line)}</p>
+{funnel_line}
 <div class="equity">{_equity_svg(pnls)}</div>
 </section>
-{''.join(cards) or "<div class='empty'>無交易</div>"}
+{cards or "<div class='empty'>無交易</div>"}
+{extra_html}
 </div>
 </body></html>
 """
-    out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
     return out
@@ -1172,16 +1232,35 @@ def scan_once(
 # ---------------------------------------------------------------------------
 
 
+CORE_DETECT = dict(hug_ma20_pts=0.0, use_ma60_skip=False, max_risk_non_qa=0.0)
+
+
+def detect_kwargs(args) -> dict:
+    if getattr(args, "loose", False):
+        return dict(CORE_DETECT)
+    return {}
+
+
 def cmd_backtest(args) -> int:
     df = to_et(load_bars(args.symbol, "1m", args.period))
     if df.empty:
         print("no data", file=sys.stderr)
         return 1
-    sigs = detect_signals(df)
+    funnel: Dict[str, int] = {}
+    sigs = detect_signals(df, funnel=funnel, **detect_kwargs(args))
     trades = simulate(df, sigs)
     stats = summarize_trades(trades)
     print(f"{args.symbol} {args.period} bars={len(df)} {df.index[0]} -> {df.index[-1]}")
     print(f"trades={stats['count']} WR={stats['win_rate']:.1f}% pnl={stats['total_points']:+.1f}")
+    if funnel:
+        print(
+            "funnel "
+            f"break={funnel.get('break', 0)} deep={funnel.get('deep_break', 0)} "
+            f"reclaim={funnel.get('reclaim_stack', 0)} taken={funnel.get('taken', 0)} "
+            f"hug={funnel.get('skip_hug_ma20', 0)} ma60={funnel.get('skip_ma60', 0)} "
+            f"hour={funnel.get('skip_open_hour', 0)} vol={funnel.get('skip_vol', 0)} "
+            f"risk={funnel.get('skip_max_risk', 0)} wide={funnel.get('skip_wide_risk', 0)}"
+        )
     for q, info in stats.get("by_quality", {}).items():
         print(f"  Q{q}: n={info['n']} wins={info['wins']} pnl={info['pnl']:+.1f}")
     for i, t in enumerate(trades, 1):
@@ -1190,11 +1269,39 @@ def cmd_backtest(args) -> int:
             f"-> {df.index[t.exit_idx].strftime('%m-%d %H:%M')} "
             f"{t.exit_reason} {t.pnl_points:+.1f}"
         )
+
+    extra_trades: List[TradeResult] = []
+    extra_funnel: Dict[str, int] = {}
+    if getattr(args, "pages", False) and not getattr(args, "loose", False):
+        core_sigs = detect_signals(df, funnel=extra_funnel, **CORE_DETECT)
+        extra_trades = simulate(df, core_sigs)
+        extra_stats = summarize_trades(extra_trades)
+        print(
+            f"core  trades={extra_stats['count']} WR={extra_stats['win_rate']:.1f}% "
+            f"pnl={extra_stats['total_points']:+.1f}  "
+            f"(no hug / no MA60 specials / no wide-risk QA gate)"
+        )
+        for i, t in enumerate(extra_trades, 1):
+            print(
+                f"  [core {i}] Q{t.quality} {df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
+                f"-> {df.index[t.exit_idx].strftime('%m-%d %H:%M')} "
+                f"{t.exit_reason} {t.pnl_points:+.1f}"
+            )
+
     html_path = args.html
     if getattr(args, "pages", False):
         html_path = html_path or str(PAGES_HTML)
     if html_path:
-        out = write_html_report(html_path, df, trades, args.symbol, args.period)
+        out = write_html_report(
+            html_path,
+            df,
+            trades,
+            args.symbol,
+            args.period,
+            funnel=funnel,
+            extra_trades=extra_trades,
+            extra_title="核心（關掉 hug / MA60 特例 / 寬停損 QA 門檻）",
+        )
         print(f"html={out}")
     return 0
 
@@ -1249,6 +1356,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--period", default="8d")
     b.add_argument("--html", default="")
     b.add_argument("--pages", action="store_true", help="寫到 docs/nq-ma-reclaim/index.html")
+    b.add_argument("--loose", action="store_true", help="關掉 hug / MA60 特例 / 寬停損 QA，只留核心破底翻")
     b.set_defaults(func=cmd_backtest)
 
     a = sub.add_parser("alert", help="Telegram 輪詢")
@@ -1267,6 +1375,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--period", default="8d")
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true", help="寫到 docs/nq-ma-reclaim/index.html")
+    p.add_argument("--loose", action="store_true", help="關掉 hug / MA60 特例 / 寬停損 QA，只留核心破底翻")
     return p
 
 
