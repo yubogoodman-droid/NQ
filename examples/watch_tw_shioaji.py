@@ -54,17 +54,33 @@ from tw.ranking import (
 )
 from tw.signals import iter_15m_ma200_alerts, iter_5m_ma200_alerts
 
-# —— 填這裡（也可只設環境變數，不要把真的金鑰 commit 上去）——
+# —— 本機金鑰放 examples/local_secrets.py（已 gitignore，不要填進這個檔再 commit）——
 SHIOAJI_API_KEY = ""
 SHIOAJI_SECRET_KEY = ""
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
 
 SEEN_PATH = Path(__file__).resolve().parents[1] / "output" / "tw_shioaji_seen.json"
+LOCAL_SECRETS = Path(__file__).resolve().parent / "local_secrets.py"
 TG_SESSION = requests.Session()
 
 
 def apply_keys() -> None:
+    if LOCAL_SECRETS.exists():
+        ns: dict = {}
+        exec(LOCAL_SECRETS.read_text(encoding="utf-8"), ns)
+        mapping = {
+            "SHIOAJI_API_KEY": ("SHIOAJI_API_KEY", "API_KEY"),
+            "SHIOAJI_SECRET_KEY": ("SHIOAJI_SECRET_KEY", "SECRET_KEY"),
+            "TELEGRAM_BOT_TOKEN": ("TELEGRAM_BOT_TOKEN", "TG_TOKEN"),
+            "TELEGRAM_CHAT_ID": ("TELEGRAM_CHAT_ID", "TG_CHAT_ID"),
+        }
+        for env_name, aliases in mapping.items():
+            for alias in aliases:
+                val = str(ns.get(alias, "")).strip()
+                if val:
+                    os.environ.setdefault(env_name, val)
+                    break
     if SHIOAJI_API_KEY.strip():
         os.environ.setdefault("SHIOAJI_API_KEY", SHIOAJI_API_KEY.strip())
     if SHIOAJI_SECRET_KEY.strip():
