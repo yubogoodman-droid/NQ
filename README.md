@@ -45,6 +45,15 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## 台股成交額前 100 · 同一套破底翻（一週）
+
+```bash
+python3 examples/scan_tw_ma_reclaim.py --limit 100 --range 7d --pages
+```
+
+2026-08-21 成交額前 100（第 100 名約 17 億）：**有訊號，7 筆**，勝率 0%（多為停損打平），南亞科 −1.9。  
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
