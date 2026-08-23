@@ -39,6 +39,40 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## 台股五分 K 回測
+
+成交額前 100、濾掉 ETF／金融股／電信股／股價 500 以上。五分 K **MA5 > MA10 > MA20 且均線發散**（不要糾結），當根收盤剛站上五分 **MA200**，收盤高於所有均線，也在十五分 **MA5／10／20** 之上，**十五分K已在 MA200 上至少半小時**，**小時K收在 MA20 之上**，記一則通知。
+
+```bash
+python3 examples/backtest_tw_5m.py --days 10
+python3 examples/backtest_tw_15m.py --days 10
+```
+
+報告：`docs/tw/backtest-5m-15m-1h.html`（五分K）、`docs/tw/backtest-15m-1h.html`（十五分K；同一套發散＋剛站上 MA200，小時K要在 MA5／10／20 之上）
+
+## 永豐盤中監控 → Telegram
+
+同一套掃描池與進場條件。啟動時用永豐抓一次歷史 1 分K 當均線底，盤中改訂閱 tick 合成五分／十五分（不要盤中重覆打 kbars）。符合就推 Telegram，同一根 K 不重發。
+
+本機金鑰請放 `examples/local_secrets.py`（已 gitignore，不要 commit），或設環境變數。腳本上方的空字串不要填真的金鑰。
+
+```
+SHIOAJI_API_KEY=...
+SHIOAJI_SECRET_KEY=...
+TELEGRAM_BOT_TOKEN=...   # 也可用 TG_TOKEN
+TELEGRAM_CHAT_ID=...     # 也可用 TG_CHAT_ID
+```
+
+```bash
+pip install shioaji
+python3 examples/watch_tw_shioaji.py --test     # 先測 Telegram
+python3 examples/watch_tw_shioaji.py --once     # 盤後用歷史K掃今天
+python3 examples/watch_tw_shioaji.py            # 盤中一直盯（五分＋十五分）
+python3 examples/watch_tw_shioaji.py --tf 5m
+```
+
+建議每個交易日開盤前重開。金鑰不要 commit。
+
 ## 快速開始
 
 ```bash
