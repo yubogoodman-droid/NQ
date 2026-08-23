@@ -30,17 +30,11 @@ from nq_ma_reclaim import (  # noqa: E402
 
 def test_hug_band_skips_flat_not_steep() -> None:
     """08-11 型走平要擋；07-27 21:25 型大跌收復（斜率 -12）不擋。"""
-    import inspect
-
-    from nq_ma_reclaim import detect_signals
-
-    params = inspect.signature(detect_signals).parameters
-    assert params["min_ma20_slope"].default == -13.0
-    assert params["hug_ma20_min_slope"].default == -8.0
-    assert params["hug_ma20_max_slope"].default == 0.5
-    # -12.12 is below hug min, so hug does not fire; still passes the -13 slope floor
+    kw = detect_kwargs(SimpleNamespace(reclaim_ma20_only=True))
+    assert kw["require_ma30"] is False
+    assert kw["min_ma20_slope"] == -13.0
+    assert kw["hug_ma20_min_slope"] == -8.0
     assert -13.0 <= -12.12 < -8.0
-    # -0.95 sits in the hug band
     assert -8.0 <= -0.95 <= 0.5
 
 

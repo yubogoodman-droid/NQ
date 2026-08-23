@@ -286,11 +286,10 @@ def detect_signals(
     require_w: bool = False,
     min_break_depth: float = 10.0,
     max_entry_vol: float = 2.5,
-    min_ma20_slope: float = -13.0,
-    # ⑯ 貼著走平／小跌的 1m MA20 不進（擋 08-11 12:39）
-    # 大跌後剛收復（斜率比 min 更負，如 07-27 21:25）不擋
+    min_ma20_slope: float = -5.0,
+    # ⑯ 貼著走平／下彎的 1m MA20 不進（擋 08-11 12:39）
     hug_ma20_pts: float = 16.0,
-    hug_ma20_min_slope: float = -8.0,
+    hug_ma20_min_slope: Optional[float] = None,
     hug_ma20_max_slope: float = 0.5,
     max_risk: float = 100.0,
     # ⑮：風險偏大時只准 QA（擋 08-05 型寬停損弱品質全損）
@@ -320,8 +319,10 @@ def detect_signals(
     min_break_depth *= s
     min_ma20_slope *= s
     hug_ma20_pts *= s
-    hug_ma20_min_slope *= s
+    if hug_ma20_min_slope is not None:
+        hug_ma20_min_slope = float(hug_ma20_min_slope) * s
     hug_ma20_max_slope *= s
+    hug_lo = float("-inf") if hug_ma20_min_slope is None else float(hug_ma20_min_slope)
     max_risk *= s
     max_risk_non_qa *= s
     ma200_buffer *= s
@@ -419,7 +420,7 @@ def detect_signals(
             if (
                 hug_ma20_pts > 0
                 and (close[j] - ma20[j]) < hug_ma20_pts
-                and hug_ma20_min_slope <= ma20_s5 <= hug_ma20_max_slope
+                and hug_lo <= ma20_s5 <= hug_ma20_max_slope
             ):
                 bump("skip_hug_ma20")
                 mark(j, "skip_hug_ma20")
@@ -1375,7 +1376,10 @@ def detect_kwargs(args) -> dict:
         kw["skip_hour_start"] = None
         kw["skip_hour_end"] = None
     if getattr(args, "reclaim_ma20_only", False):
+        # 07-27 21:25：斜率 −12 仍可收復；hug 只擋走平／小跌（08-11 12:39）
         kw["require_ma30"] = False
+        kw["min_ma20_slope"] = -13.0
+        kw["hug_ma20_min_slope"] = -8.0
     return kw
 
 
@@ -1452,9 +1456,8 @@ def cmd_backtest(args) -> int:
     elif ma20_only:
         period_label = f"{args.period} · 只要收復 MA20"
         note = (
-            "收復條件改成收盤站上 MA20 即可，不再要求同時站上 MA30。"
-            "MA5>MA10>MA20、hug、09–10、風險上限都還在。"
-            "這個月通過的單與嚴格模式相同（8 筆 +614）。"
+            "收復只要站上 MA20。MA20 斜率門檻改 −13（放行 07-27 21:25 那種 −12）；"
+            "hug 只擋走平／小跌（仍擋 08-11 12:39），大跌後收復不擋。"
         )
     if html_path:
         out = write_html_report(
