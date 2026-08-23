@@ -156,12 +156,26 @@ def fetch_top_turnover(date: str, limit: int) -> list[dict]:
     ]
 
 
-def fetch_yahoo_1m(symbol: str, range_: str = "7d") -> pd.DataFrame:
-    url = (
-        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-        f"?interval=1m&range={range_}&includePrePost=false"
-    )
-    payload = _get_json(url)
+def filter_by_max_price(rows: list[dict], max_price: float | None, limit: int) -> tuple[list[dict], list[dict]]:
+    if max_price is None:
+        kept = rows[:limit]
+        return kept, []
+    kept: list[dict] = []
+    dropped: list[dict] = []
+    for row in rows:
+        px = row.get("close")
+        if px is None or float(px) > max_price:
+            dropped.append(row)
+            continue
+        kept.append(row)
+        if len(kept) >= limit:
+            break
+    for i, row in enumerate(kept, 1):
+        row["rank"] = i
+    return kept, dropped
+
+
+def _chart_payload_to_df(payload: dict) -> pd.DataFrame:
     result = (payload.get("chart") or {}).get("result")
     if not result:
         return pd.DataFrame()
@@ -180,7 +194,49 @@ def fetch_yahoo_1m(symbol: str, range_: str = "7d") -> pd.DataFrame:
     df = df.dropna(subset=["Open", "High", "Low", "Close"])
     df["Volume"] = df["Volume"].fillna(0)
     df = df[~df.index.duplicated(keep="last")].sort_index()
+    if df.empty:
+        return df
     return df.loc[session_mask(df.index)].copy()
+
+
+def fetch_yahoo_1m(symbol: str, range_: str = "7d", days: int | None = None) -> pd.DataFrame:
+    if days is not None and days > 8:
+        return fetch_yahoo_1m_days(symbol, days)
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        f"?interval=1m&range={range_}&includePrePost=false"
+    )
+    return _chart_payload_to_df(_get_json(url))
+
+
+def fetch_yahoo_1m_days(symbol: str, days: int = 30, chunk_days: int = 7) -> pd.DataFrame:
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=days)
+    chunks: list[pd.DataFrame] = []
+    cur = start
+    while cur < end:
+        nxt = min(cur + timedelta(days=chunk_days), end)
+        url = (
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+            f"?interval=1m&period1={int(cur.timestamp())}&period2={int(nxt.timestamp())}"
+            f"&includePrePost=false"
+        )
+        try:
+            part = _chart_payload_to_df(_get_json(url))
+            if len(part):
+                # drop stray bars outside the requested window
+                lo, hi = cur.astimezone(TPE), nxt.astimezone(TPE)
+                part = part.loc[(part.index >= lo) & (part.index < hi)]
+                if len(part):
+                    chunks.append(part)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[data] {symbol} {cur.date()}→{nxt.date()} {exc}", file=sys.stderr)
+        cur = nxt
+        time.sleep(0.12)
+    if not chunks:
+        return pd.DataFrame()
+    df = pd.concat(chunks).sort_index()
+    return df[~df.index.duplicated(keep="last")]
 
 
 def simulate_scaled(df: pd.DataFrame, sigs, scale: float):
@@ -200,10 +256,10 @@ def simulate_scaled(df: pd.DataFrame, sigs, scale: float):
     )
 
 
-def scan_symbol(row: dict, range_: str) -> tuple[list[TwHit], dict]:
+def scan_symbol(row: dict, range_: str, days: int | None = None) -> tuple[list[TwHit], dict]:
     meta = {**row, "bars": 0, "error": "", "n_sig": 0, "n_trade": 0}
     try:
-        df = fetch_yahoo_1m(row["symbol"], range_)
+        df = fetch_yahoo_1m(row["symbol"], range_, days=days)
     except Exception as exc:  # noqa: BLE001
         meta["error"] = str(exc)[:80]
         return [], meta
@@ -255,6 +311,8 @@ def write_tw_html(path: Path, hits: list[TwHit], universe: list[dict], period: s
             "</article>"
         )
     cutoff = universe[-1]["amount"] / 1e8 if universe else 0
+    prices = [r.get("close") for r in universe if r.get("close") is not None]
+    px_note = f" · 股價 {min(prices):.0f}–{max(prices):.0f}" if prices else ""
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -280,7 +338,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <div class="page">
 <section class="summary">
 <h1>台股 1m 破底翻 · 成交額前 {len(universe)}</h1>
-<p class="muted">{escape(period)} · 基準日 {escape(date)} · 第100名成交額約 {cutoff:.1f} 億
+<p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億{escape(px_note)}
 <br/>規則同 NQ：破 2h 低、15 根收復 MA20/30、5/10/20 多頭、09–10 不進。點數 × 股價/20000。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -289,7 +347,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <div class="card">標的<b>{len({h.row['code'] for h in hits})}</b></div>
 </div>
 </section>
-{''.join(cards) or "<div class='empty'>這一週沒有通過嚴格過濾的破底翻訊號</div>"}
+{''.join(cards) or "<div class='empty'>這段期間沒有通過嚴格過濾的破底翻訊號</div>"}
 </div></body></html>
 """
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -298,9 +356,10 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 
 
 def write_view_html(src: Path) -> Path:
+    rel = src.parent.relative_to(REPO).as_posix()
     base = (
         "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
-        "cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim/"
+        f"cursor/nq-1m-ma-reclaim-2484/{rel}/"
     )
     text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
     out = src.with_name("view.html")
@@ -312,29 +371,43 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="台股成交額前100 破底翻一週回測")
     p.add_argument("--date", default="", help="YYYYMMDD，預設上一個交易日")
     p.add_argument("--limit", type=int, default=100)
+    p.add_argument("--pool", type=int, default=200, help="先取成交額前 N 再套股價過濾")
+    p.add_argument("--max-price", type=float, default=None, help="收盤價超過此值剔除，例如 600")
+    p.add_argument("--days", type=int, default=None, help="1m 回看天數；>8 用 7 日切片")
     p.add_argument("--range", dest="range_", default="7d")
-    p.add_argument("--sleep", type=float, default=0.35)
+    p.add_argument("--sleep", type=float, default=0.25)
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
     args = p.parse_args(argv)
 
     date = args.date or last_tw_session_yyyymmdd()
-    print(f"universe date={date} limit={args.limit} range={args.range_}")
-    universe = fetch_top_turnover(date, args.limit)
+    pool = max(args.limit, args.pool if args.max_price else args.limit)
+    print(
+        f"universe date={date} limit={args.limit} pool={pool} "
+        f"max_price={args.max_price} days={args.days or args.range_}"
+    )
+    raw = fetch_top_turnover(date, pool)
+    universe, dropped = filter_by_max_price(raw, args.max_price, args.limit)
+    if dropped:
+        print(
+            f"drop price>{args.max_price}: "
+            + ", ".join(f"{r['code']} {r['close']}" for r in dropped[:12])
+            + (" …" if len(dropped) > 12 else "")
+        )
     if not universe:
         print("no universe", file=sys.stderr)
         return 1
     print(
-        f"top1 {universe[0]['code']} {universe[0]['name']} "
-        f"{universe[0]['amount']/1e8:.1f}億 · "
-        f"#{len(universe)} {universe[-1]['code']} {universe[-1]['amount']/1e8:.1f}億"
+        f"keep {len(universe)}  {universe[0]['code']} {universe[0]['name']} "
+        f"{universe[0]['amount']/1e8:.1f}億 / {universe[0]['close']} · "
+        f"末 {universe[-1]['code']} {universe[-1]['amount']/1e8:.1f}億 / {universe[-1]['close']}"
     )
 
     hits: list[TwHit] = []
     errors = 0
     scanned = 0
     for i, row in enumerate(universe, 1):
-        stock_hits, meta = scan_symbol(row, args.range_)
+        stock_hits, meta = scan_symbol(row, args.range_, days=args.days)
         scanned += 1
         if meta["error"]:
             errors += 1
@@ -358,9 +431,17 @@ def main(argv=None) -> int:
             f"{ts.strftime('%m-%d %H:%M')} {t.exit_reason} {t.pnl_points:+.2f}"
         )
 
-    html_path = Path(args.html) if args.html else (PAGES if args.pages else None)
+    html_path = Path(args.html) if args.html else None
+    if html_path is None and args.pages:
+        if args.days and args.days > 8:
+            html_path = REPO / "docs" / "tw-ma-reclaim-30d" / "index.html"
+        else:
+            html_path = PAGES
     if html_path:
-        out = write_tw_html(html_path, hits, universe, args.range_, date)
+        period_label = f"{args.days}d" if args.days else args.range_
+        if args.max_price is not None:
+            period_label += f" · 股價≤{args.max_price:g}"
+        out = write_tw_html(html_path, hits, universe, period_label, date)
         write_view_html(out)
         print(f"html={out}")
     return 0

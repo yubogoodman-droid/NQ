@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from scan_tw_ma_reclaim import (  # noqa: E402
     TPE,
     _is_stock_code,
+    filter_by_max_price,
     last_tw_session_yyyymmdd,
     session_mask,
     tw_pt_scale,
@@ -54,6 +55,19 @@ def test_session_mask() -> None:
     assert list(m) == [False, True, True, False]
 
 
+def test_filter_by_max_price() -> None:
+    rows = [
+        {"code": "2330", "close": 1400.0},
+        {"code": "2408", "close": 500.0},
+        {"code": "2303", "close": 55.0},
+        {"code": "3008", "close": 2500.0},
+    ]
+    kept, dropped = filter_by_max_price(rows, 600.0, 100)
+    assert [r["code"] for r in kept] == ["2408", "2303"]
+    assert {r["code"] for r in dropped} == {"2330", "3008"}
+    assert kept[0]["rank"] == 1
+
+
 def test_last_session_skips_weekend() -> None:
     sunday = datetime(2026, 8, 23, 12, 0, tzinfo=TPE)
     assert last_tw_session_yyyymmdd(sunday) == "20260821"
@@ -64,6 +78,7 @@ def main() -> int:
     test_yahoo_symbol()
     test_tw_pt_scale()
     test_session_mask()
+    test_filter_by_max_price()
     test_last_session_skips_weekend()
     print("ok")
     return 0
