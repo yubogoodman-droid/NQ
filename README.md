@@ -22,6 +22,53 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## 幣安 15 分 K：7>25 多頭 + 站上 MA200
+
+15 分圖收盤同時高於 **MA7、MA25、MA200**，且 SMA7 > SMA25（MA14 只畫圖、不擋單）。Telegram 只推「這一根剛站上該週期 MA200」，且當時 **1h SMA25 未下彎**、**1h 收盤 > MA7 > MA25**，15m 還要剛站上後 **連續 3 根收盤都在 MA200 上**（訊號時間是第 3 根）。全市場只掃 **24h 成交額前 100** 的 USDT 永續。小時圖同一套（1h 本身已是 7>25，不要求連 3 根）。15m 圖例由上到下是 **15m / 1h / 4h**（1h 用來擋單，4h 只對照）；1h 圖例是 **1h / 4h**。大週期 SMA200 不擋單；不再看量比、底下根數、高低差、BTC。
+
+```bash
+python3 examples/backtest_15m_bull.py --demo
+python3 examples/backtest_15m_bull.py --days 7 --pages                   # 15 分全市場
+python3 examples/backtest_15m_bull.py --days 7 --tf 1h --pages           # 小時圖全市場
+python3 examples/backtest_15m_bull.py --days 7 --stocks --pages          # 15 分股票
+python3 examples/backtest_15m_bull.py --days 7 --tf 1h --stocks --pages  # 小時圖股票
+```
+
+外網看圖（請用這個，圖已內嵌）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html
+
+只掃股票（15 分）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html
+
+小時圖（全市場）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull.html
+
+只掃股票（小時）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull-stocks.html
+
+合併進 `main` 後 GitHub Pages：  
+https://yubogoodman-droid.github.io/NQ/binance/ma15-bull.html
+
+Telegram 監看用**同一個腳本**同時盯 15 分與 1 小時（與回測同一套規則）。視窗開著就會一直掃，符合才推 TG。**不要只拷一個 py**，`nq` 資料夾要在旁邊。
+
+PyCharm：用「Open」打開整個 NQ 專案，或把 `15M多排.py` 和 `nq` 放同一層，在 `15M多排.py` 最上面填 token / chat id：
+
+```
+PythonProject2\
+  15M多排.py
+  nq\
+```
+
+```bash
+pip install numpy requests matplotlib
+python 15M多排.py --test          # 先測 TG 通不通
+python 15M多排.py                 # 15 分 + 1 小時一直監看（預設）
+python 15M多排.py --tf 1h         # 只看小時圖
+python 15M多排.py --once          # 只掃一輪
+```
+
+也可以 `pip install -e .` 後跑 `examples/watch_15m_bull.py`。
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
@@ -75,6 +122,11 @@ python3 examples/chart_today.py
 
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
+
+3. **15 分 K 7>25 站上 MA200（這次 PR）**  
+   https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html  
+   只掃幣安股票：  
+   https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html
 
 ## TradingView
 
