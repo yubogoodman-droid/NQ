@@ -150,22 +150,52 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
     return out
 
 
-def htf_ma200_at(d_htf: dict, time_ms: int, last_price: float, bar_ms: int) -> float | None:
-    """訊號當下的大週期 SMA200。未收完的那根 K 用 last_price，不偷用後面的收盤。"""
+def htf_sma_at(d_htf: dict, time_ms: int, last_price: float, bar_ms: int, n: int) -> float | None:
+    """訊號當下的大週期 SMAn。未收完的那根 K 用 last_price，不偷用後面的收盤。"""
     t = d_htf["t"]
     opened = t <= time_ms
     if not opened.any():
         return None
     last_i = int(np.where(opened)[0][-1])
-    if last_i + 1 < 200:
+    if last_i + 1 < n:
         return None
     c = np.array(d_htf["c"][: last_i + 1], dtype=float)
     if int(t[last_i]) + bar_ms > time_ms:
         c[-1] = float(last_price)
-    window = c[-200:]
+    window = c[-n:]
     if np.isnan(window).any():
         return None
     return float(window.mean())
+
+
+def htf_ma200_at(d_htf: dict, time_ms: int, last_price: float, bar_ms: int) -> float | None:
+    return htf_sma_at(d_htf, time_ms, last_price, bar_ms, 200)
+
+
+def htf_ma25_now_prev(
+    d_htf: dict | None, time_ms: int, last_price: float, bar_ms: int
+) -> tuple[float | None, float | None]:
+    """當下 SMA25（未收完用 last_price）與前一根已收完 SMA25。"""
+    if d_htf is None or len(d_htf.get("c", [])) < 26:
+        return None, None
+    now = htf_sma_at(d_htf, time_ms, last_price, bar_ms, 25)
+    t = d_htf["t"]
+    opened = t <= time_ms
+    if not opened.any():
+        return now, None
+    last_i = int(np.where(opened)[0][-1])
+    if last_i < 25:
+        return now, None
+    prev_win = np.array(d_htf["c"][last_i - 25 : last_i], dtype=float)
+    if len(prev_win) < 25 or np.isnan(prev_win).any():
+        return now, None
+    return now, float(prev_win.mean())
+
+
+def htf_ma25_not_down(d_htf: dict | None, time_ms: int, last_price: float, bar_ms: int) -> bool:
+    """1h MA25 未下彎：當下 ≥ 前一根已收完。"""
+    now, prev = htf_ma25_now_prev(d_htf, time_ms, last_price, bar_ms)
+    return now is not None and prev is not None and now >= prev
 
 
 def h1_ma200_at(d1h: dict, time_ms: int, last_price: float) -> float | None:
@@ -213,6 +243,9 @@ class SignalRow:
     h1_ma200: float | None = None
     h1_ext_pct: float | None = None
     btc_1h_ok: bool | None = None
+    h1_ma25: float | None = None
+    h1_ma25_prev: float | None = None
+    h1_ma25_up: bool | None = None
 
     @property
     def vol_ratio(self) -> float:
@@ -321,6 +354,7 @@ def apply_filter(
     max_rng24: float | None = None,
     max_bars_above: int | None = None,
     require_btc_1h: bool | None = None,
+    require_h1_ma25_up: bool | None = None,
 ) -> list[SignalRow]:
     out = rows
     if crossed:
@@ -343,6 +377,8 @@ def apply_filter(
         ]
     if require_btc_1h:
         out = [r for r in out if r.btc_1h_ok]
+    if require_h1_ma25_up:
+        out = [r for r in out if r.h1_ma25_up]
     return out
 
 

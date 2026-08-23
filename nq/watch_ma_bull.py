@@ -23,6 +23,8 @@ from nq.ma15_bull import (
     bar_above_ma200,
     detect_combo,
     htf_ma200_at,
+    htf_ma25_not_down,
+    htf_ma25_now_prev,
     quality_reclaim,
     sma,
 )
@@ -55,6 +57,7 @@ TF_WATCH = {
         "max_rng24": None,
         "max_bars_above": None,
         "require_btc_1h": False,
+        "require_h1_ma25_up": True,
         "lookback": 48,
         "title": "15m 剛站上 MA200",
     },
@@ -71,6 +74,7 @@ TF_WATCH = {
         "max_rng24": None,
         "max_bars_above": None,
         "require_btc_1h": False,
+        "require_h1_ma25_up": True,
         "lookback": 80,
         "title": "1h 剛站上 MA200",
     },
@@ -266,11 +270,15 @@ def load_btc_1h() -> dict | None:
     return add_15m_mas(raw)
 
 
-def passes_notify(sig, spec: dict, d_htf, ts: int, btc_1h: dict | None) -> bool:
+def passes_notify(sig, spec: dict, d, d_htf, ts: int, btc_1h: dict | None) -> bool:
     if spec["require_htf"] and not above_htf_ma200(d_htf, ts, sig.close, spec["htf_ms"]):
         return False
     if spec.get("require_btc_1h") and not bar_above_ma200(btc_1h, ts, INTERVAL_MS["1h"]):
         return False
+    if spec.get("require_h1_ma25_up"):
+        src = d if spec["signal"] == "1h" else d_htf
+        if not htf_ma25_not_down(src, ts, sig.close, INTERVAL_MS["1h"]):
+            return False
     return quality_reclaim(
         sig,
         min_below=spec["min_below"],
@@ -296,7 +304,7 @@ def scan_symbol(sym: str, spec: dict, btc_1h: dict | None = None) -> list[dict]:
         hits = [s for s in detect_combo(d, min_gap_bars=0) if s.idx == closed]
         for sig in hits:
             ts = int(d["t"][sig.idx])
-            if not passes_notify(sig, spec, d_htf, ts, btc_1h):
+            if not passes_notify(sig, spec, d, d_htf, ts, btc_1h):
                 continue
             events.append({"symbol": sym, "sig": sig, "d": d, "d_htf": d_htf, "spec": spec})
     return events
@@ -329,6 +337,11 @@ def format_ev(ev: dict) -> str:
         extra += f"距 {tf} MA200 {sig.ext_pct:+.2f}%　量比 {sig.vol_ratio:.2f}×\n"
     if spec.get("require_btc_1h"):
         extra += "BTC 當時在 1h MA200 上\n"
+    if spec.get("require_h1_ma25_up"):
+        src = d if spec["signal"] == "1h" else ev.get("d_htf")
+        now, prev = htf_ma25_now_prev(src, int(d["t"][sig.idx]), sig.close, INTERVAL_MS["1h"])
+        if now is not None and prev is not None:
+            extra += f"1h MA25 {now:g} ≥ 前一根 {prev:g}（未下彎）\n"
     return (
         f"<b>{spec['title']}</b>\n"
         f"<b>{sym_label(sym)}</b>  {sym}\n"
@@ -384,8 +397,8 @@ def test_telegram() -> int:
     apply_keys()
     ok = telegram_send(
         "MA200 監看測試\n"
-        "15m：剛站上 15m MA200（收盤 > 7>25）\n"
-        "1h：剛站上 1h MA200（收盤 > 7>25）\n"
+        "15m：剛站上 15m MA200（收盤 > 7>25），且 1h MA25 未下彎\n"
+        "1h：剛站上 1h MA200（收盤 > 7>25），且 1h MA25 未下彎\n"
         "如果你看到這則，Telegram 已通。"
     )
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
@@ -399,7 +412,11 @@ def spec_note(spec: dict) -> str:
             f"{spec['signal']} 剛站上 MA200，或站上後 {n} 根內收出 7>25"
             f"（{spec['htf']} 只畫圖、不擋單）"
         )
-    return f"{spec['signal']} 剛站上 MA200、收盤 > 7>25（{spec['htf']} 只畫圖、不擋單）"
+    return (
+        f"{spec['signal']} 剛站上 MA200、收盤 > 7>25"
+        + ("，且 1h MA25 未下彎" if spec.get("require_h1_ma25_up") else "")
+        + f"（{spec['htf']} SMA200 只畫圖、不擋單）"
+    )
 
 
 def main() -> int:
