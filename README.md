@@ -51,8 +51,14 @@ python3 examples/nq_ma_reclaim.py alert
 python3 examples/scan_tw_ma_reclaim.py --limit 100 --range 7d --pages
 ```
 
-2026-08-21 成交額前 100（第 100 名約 17 億）：**有訊號，7 筆**，勝率 0%（多為停損打平），南亞科 −1.9。  
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim/view.html
+2026-08-21 成交額前 100（第 100 名約 17 億）：一週 **7 筆**。  
+近一個月、**股價 ≤ 600**：100 檔（台積電／聯發科／大立光等已濾掉）**32 筆、勝率 21.9%、−6.55**。
+
+```bash
+python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --pages
+```
+
+月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
 ## 幣安黏帶三幕 Telegram
 
