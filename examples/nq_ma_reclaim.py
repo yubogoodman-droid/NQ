@@ -355,6 +355,7 @@ def detect_signals(
             return
         row = {
             "idx": int(j),
+            "break_idx": int(break_idx),
             "reason": reason,
             "close": float(close[j]),
             "ma20": float(ma20[j]),
@@ -899,6 +900,80 @@ def draw_trade_png(
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
     axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
+def draw_event_png(
+    df: pd.DataFrame,
+    event_idx: int,
+    path: Path,
+    title: str,
+    break_idx: int | None = None,
+) -> Path:
+    """Mark one 1m bar (filtered reclaim) on a short candle window."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+    from matplotlib.patches import Rectangle
+
+    for fp in (
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ):
+        if Path(fp).exists():
+            font_manager.fontManager.addfont(fp)
+            plt.rcParams["font.sans-serif"] = [font_manager.FontProperties(fname=fp).get_name(), "DejaVu Sans"]
+            plt.rcParams["axes.unicode_minus"] = False
+            break
+
+    left = break_idx if break_idx is not None else event_idx
+    start = max(0, int(left) - 25)
+    end = min(len(df) - 1, int(event_idx) + 20)
+    window = df.iloc[start : end + 1]
+    xs = range(len(window))
+    o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
+    close_full = df["Close"].astype(float)
+
+    fig, ax = plt.subplots(figsize=(10.4, 4.6), facecolor="#0c1210")
+    ax.set_facecolor("#101814")
+    ax.tick_params(colors="#8aa193", labelsize=8)
+    for sp in ax.spines.values():
+        sp.set_color("#2a3a33")
+
+    for k in range(len(window)):
+        up = float(c.iloc[k]) >= float(o.iloc[k])
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.65)
+        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
+        if y1 == y0:
+            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+
+    for n, col in MA_COLORS.items():
+        ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
+        ax.plot(list(xs), ma, color=col, lw=1.35 if n <= 20 else 1.05, label=f"MA{n}")
+
+    ex = int(event_idx) - start
+    if 0 <= ex < len(window):
+        ax.axvline(ex, color="#f0c14b", ls="--", lw=0.95)
+        ax.scatter([ex], [float(df["Close"].iloc[event_idx])], s=46, color="#f0c14b", marker="o", zorder=6)
+    if break_idx is not None:
+        bx = int(break_idx) - start
+        if 0 <= bx < len(window):
+            ax.scatter([bx], [float(df["Low"].iloc[break_idx])], s=34, color="#f472b6", zorder=5)
+
+    ax.set_title(title, color="#e8f0ea", fontsize=11)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    step = max(1, len(window) // 6)
+    ticks = list(range(0, len(window), step))
+    ax.set_xticks(ticks)
+    ax.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())

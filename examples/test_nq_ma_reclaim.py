@@ -18,6 +18,7 @@ from nq_ma_reclaim import (  # noqa: E402
     TradeResult,
     detect_kwargs,
     detect_signals,
+    draw_event_png,
     parse_period_days,
     quality_from_slopes,
     simulate,
@@ -133,6 +134,12 @@ def test_trace_records_taken() -> None:
     assert any(row["reason"] == "taken" for row in trace)
 
 
+def test_draw_event_png() -> None:
+    df = _make_reclaim_bars()
+    path = draw_event_png(df, 222, Path("/tmp/nq_event_test.png"), "demo", break_idx=220)
+    assert path.exists() and path.stat().st_size > 1000
+
+
 def test_write_html_report(tmp_path: Path | None = None) -> None:
     df = _make_reclaim_bars()
     sigs = detect_signals(df)
@@ -156,6 +163,7 @@ def main() -> int:
     test_summarize_trades()
     test_detect_and_simulate_reclaim()
     test_trace_records_taken()
+    test_draw_event_png()
     test_write_html_report()
     print("ok")
     return 0
