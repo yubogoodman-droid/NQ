@@ -25,7 +25,7 @@
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
-停損在破底低點下方；目標 2R（MA20 上彎時 3R）。品質看 1m MA5 / 1m MA60 / 5m MA60 斜率。
+停損在破底低點下方 15 點，用進場之後才收完的 5 分收盤觸發（0.7R 後保本）；目標 2R（MA20 上彎時 3R）。品質看 1m MA5 / 1m MA60 / 5m MA60 斜率。
 
 ```bash
 # 近 8 天 / 近一個月回測 + 手機版 HTML（每筆一張圖）
@@ -52,7 +52,9 @@ python3 examples/nq_ma_reclaim.py backtest --period 30d --allow-open-hour --page
 
 拆解頁：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim/research-view.html  
 允許 09–10 的 9 筆圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim-0910/view.html  
-只要收復 MA20：斜率改看近 3 根（門檻 −8）。07-27 21:25 會進（打平）；08-11 12:39 近 3 根已翻正，仍被 hug 擋。  
+只要收復 MA20：斜率改看近 3 根（門檻 −8）。07-27 21:25 會進。  
+5 分停損只用進場之後才收完的 K（不再用進場當根立刻打保本）。21:25 改成 21:55 移動停損 **+25.6**。08-11 12:39 仍被 hug 擋。  
+整組 **9 筆、勝率 77.8%、+719**。  
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim-ma20/view.html
 
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
