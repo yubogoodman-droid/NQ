@@ -123,6 +123,19 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
+## NQ 一分 K 站上季線
+
+1 分鐘圖：收盤從 **SMA60（季線）** 下方站上、陽線確認，預設再要 MACD 多頭（DIF>DEA）與放量。  
+停損在進場 K 低點／季線下方；目標 2R。對應「整理後穿過季線帶、MACD 翻多」那種進場。
+
+```bash
+python3 examples/nq_ma60_stand.py backtest --period 8d --html output/nq_ma60_stand.html
+python3 examples/nq_ma60_stand.py backtest --period 30d --pages
+python3 examples/nq_ma60_stand.py alert --dry-run --once
+```
+
+TradingView：`pinescript/nq_1m_ma60_stand.pine` 貼到 Pine Editor，套用至 NQ1! / MNQ1! **一分圖**。
+
 ## TradingView
 
 `pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
