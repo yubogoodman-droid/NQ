@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """回測：收盤高於 MA7/25/200，且 7>25。MA14 只畫圖、不擋單。
 
-15m 通知：剛站上 MA200，或站上後 4 根內才收出 7>25。
-1h 通知：只推本根剛站上 1h MA200。大週期圖只對照、不擋單。
+通知只推本根剛站上該週期 MA200。大週期圖只對照、不擋單。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --stocks --pages
@@ -107,7 +106,6 @@ TF_SPECS = {
             "cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html"
         ),
         require_htf=False,
-        max_bars_above=4,
     ),
     "1h": TfSpec(
         signal="1h",

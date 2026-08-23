@@ -1,7 +1,6 @@
 """15 分 / 1 小時 MA200 剛站上 → Telegram（與回測同一套規則）。
 
-15m：收盤 > MA7>25 且剛站上 MA200，或站上後 4 根內才收出 7>25。
-1h：只推本根剛站上 1h MA200（同樣 7>25）。
+15m / 1h：收盤 > MA7>25 且本根剛站上該週期 MA200。
 """
 
 from __future__ import annotations
@@ -54,10 +53,10 @@ TF_WATCH = {
         "min_vol": None,
         "max_ext": None,
         "max_rng24": None,
-        "max_bars_above": 4,
+        "max_bars_above": None,
         "require_btc_1h": False,
         "lookback": 48,
-        "title": "15m 剛站上 MA200（4根內寬限）",
+        "title": "15m 剛站上 MA200",
     },
     "1h": {
         "signal": "1h",
@@ -385,7 +384,7 @@ def test_telegram() -> int:
     apply_keys()
     ok = telegram_send(
         "MA200 監看測試\n"
-        "15m：剛站上，或站上後 4 根內才收出 7>25\n"
+        "15m：剛站上 15m MA200（收盤 > 7>25）\n"
         "1h：剛站上 1h MA200（收盤 > 7>25）\n"
         "如果你看到這則，Telegram 已通。"
     )

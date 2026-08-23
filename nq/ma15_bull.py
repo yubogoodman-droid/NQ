@@ -107,7 +107,7 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
 
     crossed_200：前收還在 MA200 下，本根收盤站上。
     formed_align：已經在 MA200 上，本根才收上短均／排成 7>25。
-    15m 通知：crossed_200，或 formed_align 且 bars_above ≤ 4（站上後 1 小時內才排好）。
+    15m 通知：crossed_200（本根剛站上 MA200 且 7>25）。
     """
     c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
     m7, m14, m25, m200 = d["m7"], d["m14"], d["m25"], d["m200"]
@@ -355,7 +355,7 @@ def quality_reclaim(
     max_rng24: float | None = None,
     max_bars_above: int | None = None,
 ) -> bool:
-    """剛站上；15m 可放寬：站上後 max_bars_above 根內才收出 7>25。"""
+    """剛站上 MA200 且 7>25；可再限底下根數、量比、偏離、波動。"""
     if sig.crossed_200:
         pass
     elif max_bars_above is not None and sig.formed_align and sig.bars_above <= max_bars_above:
