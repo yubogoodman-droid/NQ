@@ -7,3 +7,4 @@ output/*.json
 examples/local_secrets.py
 telegram_local.py
 *.local.py
+shioaji.log
