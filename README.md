@@ -38,8 +38,9 @@ python3 examples/nq_ma_reclaim.py alert --dry-run --once
 python3 examples/nq_ma_reclaim.py alert
 ```
 
-近一個月 Yahoo 1m（2026-07-24 → 08-21，Yahoo 一分 K 最遠約 30 天）：**8 筆、勝率 62.5%、+614.8 點**
-（QA 07-28 +296 / QB 07-31 +111 / 其餘見報告）
+近一個月 Yahoo 1m（2026-07-24 → 08-21）：**嚴格 8 筆、勝率 62.5%、約 +614 點**。  
+漏斗：破底 1197 → 深度≥10點 293 → 收復+排列後還被 hug/MA60/9–10點/風險擋掉，只剩 8。  
+關掉 hug／MA60 特例後（核心）變成 **25 筆、+815 點**，但會多出幾筆 −50 停損（含原本要擋的 08-11 12:39）。
 
 外網：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/
 
