@@ -107,8 +107,15 @@ def telegram_send(text: str) -> bool:
             },
             timeout=20,
         )
+        if not r.ok:
+            try:
+                desc = r.json().get("description", r.text[:200])
+            except ValueError:
+                desc = r.text[:200]
+            print(f"  Telegram HTTP {r.status_code}：{desc}", flush=True)
         return bool(r.ok)
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        print(f"  Telegram 連線失敗：{exc}", flush=True)
         return False
 
 

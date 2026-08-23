@@ -54,13 +54,13 @@ python3 examples/backtest_tw_15m.py --days 10
 
 同一套掃描池與進場條件。啟動時用永豐抓一次歷史 1 分K 當均線底，盤中改訂閱 tick 合成五分／十五分（不要盤中重覆打 kbars）。符合就推 Telegram，同一根 K 不重發。
 
-在 `examples/watch_tw_shioaji.py` 最上面填永豐 API 與 Telegram，或設環境變數：
+本機金鑰請放 `examples/local_secrets.py`（已 gitignore，不要 commit），或設環境變數。腳本上方的空字串不要填真的金鑰。
 
 ```
 SHIOAJI_API_KEY=...
 SHIOAJI_SECRET_KEY=...
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
+TELEGRAM_BOT_TOKEN=...   # 也可用 TG_TOKEN
+TELEGRAM_CHAT_ID=...     # 也可用 TG_CHAT_ID
 ```
 
 ```bash
