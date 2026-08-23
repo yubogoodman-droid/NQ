@@ -748,118 +748,111 @@ def _equity_svg(pnls: List[float], width: int = 720, height: int = 180) -> str:
     )
 
 
-def _trade_chart_html(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
-    try:
-        import plotly.graph_objects as go
-    except ImportError:
-        return ""
+def _trade_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
+    start = max(0, trade.signal.break_idx - 25)
+    end = min(len(df) - 1, trade.exit_idx + 18)
+    return start, end
+
+
+def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
+    """Static 1m candle + MA card. MAs are computed on the full series (no window lookahead)."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+    from matplotlib.patches import Rectangle
+
+    for fp in (
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ):
+        if Path(fp).exists():
+            font_manager.fontManager.addfont(fp)
+            plt.rcParams["font.sans-serif"] = [font_manager.FontProperties(fname=fp).get_name(), "DejaVu Sans"]
+            plt.rcParams["axes.unicode_minus"] = False
+            break
 
     sig = trade.signal
-    start = max(0, sig.break_idx - 25)
-    end = min(len(df) - 1, trade.exit_idx + 18)
+    start, end = _trade_window(df, trade)
     window = df.iloc[start : end + 1]
-    if window.empty:
-        return ""
-    times = [t.tz_localize(None) if getattr(t, "tzinfo", None) else t for t in window.index]
-    close = window["Close"].astype(float)
-    fig = go.Figure()
-    fig.add_trace(
-        go.Candlestick(
-            x=times,
-            open=window["Open"],
-            high=window["High"],
-            low=window["Low"],
-            close=window["Close"],
-            increasing_line_color="#26a69a",
-            decreasing_line_color="#ef5350",
-            name="K",
-            showlegend=False,
-        )
-    )
-    for period, color in MA_COLORS.items():
-        ma = close.rolling(period, min_periods=period).mean()
-        if ma.notna().sum() == 0:
-            continue
-        fig.add_trace(
-            go.Scatter(
-                x=times,
-                y=ma,
-                mode="lines",
-                name=f"MA{period}",
-                line=dict(color=color, width=1.4 if period <= 20 else 1.1),
-                connectgaps=False,
-            )
-        )
-    fig.add_hline(y=trade.stop_price, line_dash="dot", line_color="#ff5252", opacity=0.7)
-    fig.add_hline(y=trade.target_price, line_dash="dot", line_color="#00c805", opacity=0.65)
-    fig.add_hline(y=sig.two_hr_low, line_dash="dash", line_color="#94a3b8", opacity=0.45)
+    xs = range(len(window))
+    o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
+    vol = window["Volume"] if "Volume" in window.columns else None
+    close_full = df["Close"].astype(float)
 
-    def _x_at(idx: int):
-        loc = window.index.get_indexer([df.index[idx]], method="nearest")[0]
-        return times[loc]
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.6),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
 
-    fig.add_trace(
-        go.Scatter(
-            x=[_x_at(sig.break_idx)],
-            y=[sig.break_low],
-            mode="markers+text",
-            marker=dict(symbol="circle", size=9, color="#f472b6"),
-            text=["破底"],
-            textposition="bottom center",
-            showlegend=False,
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[_x_at(trade.entry_idx)],
-            y=[trade.entry_price],
-            mode="markers",
-            marker=dict(symbol="triangle-up", size=13, color="#00e676"),
-            name="進場",
-            showlegend=False,
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[_x_at(trade.exit_idx)],
-            y=[trade.exit_price],
-            mode="markers",
-            marker=dict(
-                symbol="x",
-                size=11,
-                color="#00c805" if trade.pnl_points > 0 else "#ff5252",
-            ),
-            name="出場",
-            showlegend=False,
-        )
-    )
+    colors_v = []
+    for k in range(len(window)):
+        up = float(c.iloc[k]) >= float(o.iloc[k])
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.65)
+        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
+        if y1 == y0:
+            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    if vol is not None:
+        axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
+
+    for n, col in MA_COLORS.items():
+        ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
+        ax.plot(list(xs), ma, color=col, lw=1.35 if n <= 20 else 1.05, label=f"MA{n}")
+
+    ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
+    ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
+    ax.axhline(sig.two_hr_low, color="#8aa193", ls="--", lw=0.85, alpha=0.55)
+
+    bx, ex, xx = sig.break_idx - start, trade.entry_idx - start, trade.exit_idx - start
+    if 0 <= bx < len(window):
+        ax.scatter([bx], [sig.break_low], s=38, color="#f472b6", zorder=5)
+        ax.annotate("破底", (bx, sig.break_low), textcoords="offset points", xytext=(0, -12),
+                    ha="center", color="#f9a8d4", fontsize=8)
+    if 0 <= ex < len(window):
+        ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
+        ax.scatter([ex], [trade.entry_price], s=42, color="#00e676", marker="^", zorder=6)
+    if 0 <= xx < len(window):
+        ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
+        ax.scatter([xx], [trade.exit_price], s=40, color="#00c805" if trade.pnl_points > 0 else "#ff5252",
+                   marker="x", zorder=6)
+
     et = df.index[trade.entry_idx]
-    fig.update_layout(
-        template="plotly_dark",
-        height=320,
-        margin=dict(l=42, r=10, t=48, b=24),
-        title=dict(
-            text=f"#{trade_no} Q{trade.quality} · {et.strftime('%m-%d %H:%M')}",
-            x=0.02,
-            font=dict(size=12),
-        ),
-        xaxis_rangeslider_visible=False,
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0,
-            font=dict(size=9),
-            bgcolor="rgba(0,0,0,0)",
-        ),
-        paper_bgcolor="#161b22",
-        plot_bgcolor="#161b22",
+    xt = df.index[trade.exit_idx]
+    sign = "+" if trade.pnl_points >= 0 else ""
+    ax.set_title(
+        f"#{trade_no}  Q{trade.quality}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
+        color="#e8f0ea",
+        fontsize=11,
     )
-    fig.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickformat="%H:%M")
-    fig.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)")
-    return fig.to_html(full_html=False, include_plotlyjs=False, config={"displayModeBar": False})
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    step = max(1, len(window) // 6)
+    ticks = list(range(0, len(window), step))
+    axv.set_xticks(ticks)
+    axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
+def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
+    et = df.index[trade.entry_idx]
+    return f"t{trade_no:02d}_{et.strftime('%m%d_%H%M')}_q{trade.quality.lower()}.png"
 
 
 def write_html_report(
@@ -890,7 +883,13 @@ def write_html_report(
             "stop": "tag-sl",
             "ma60_stop": "tag-sl",
         }.get(t.exit_reason, "tag-time")
-        chart = _trade_chart_html(df, t, i)
+        img_name = _trade_img_name(df, t, i)
+        img_path = Path(path).parent / "img" / img_name
+        draw_trade_png(df, t, img_path, i)
+        chart = (
+            f"<img src='img/{escape(img_name)}' alt='#{i} Q{escape(t.quality)}' "
+            "style='width:100%;display:block;border-radius:10px'/>"
+        )
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -923,7 +922,6 @@ def write_html_report(
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <title>{escape(symbol)} 破底翻 MA Reclaim</title>
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}

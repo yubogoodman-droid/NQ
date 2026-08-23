@@ -123,6 +123,10 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
     text = path.read_text(encoding="utf-8")
     assert "破底翻 MA Reclaim" in text
     assert ("entry" in text) or ("無交易" in text)
+    if trades:
+        assert "<img src='img/" in text
+        img_dir = path.parent / "img"
+        assert any(img_dir.glob("t01_*.png")), "expected a static trade PNG"
 
 
 def main() -> int:
