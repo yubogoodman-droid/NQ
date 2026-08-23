@@ -14,7 +14,7 @@ from tw.kline import resample_ohlcv
 from tw.ranking import RankedStock
 from tw.forward import hour_later, summarize_hour_later
 from tw.report import _session_tick_labels, save_backtest_html, weekday_zh
-from tw.signals import iter_5m_ma200_alerts
+from tw.signals import iter_15m_ma200_alerts, iter_5m_ma200_alerts
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
@@ -309,6 +309,79 @@ class HourLaterTests(unittest.TestCase):
         self.assertEqual(stats.n_short, 1)
         self.assertEqual(stats.wins, 1)
         self.assertAlmostEqual(stats.win_rate, 100.0)
+
+
+class FifteenMinSignalTests(unittest.TestCase):
+    def test_alerts_on_15m_cross_while_ribbon_is_fanned(self) -> None:
+        df = _history_then_live([99.0, 99.0, 99.0, 105.0, 105.0, 105.0])
+        hits = iter_15m_ma200_alerts(df)
+        self.assertEqual(len(hits), 1)
+        hit = hits[0]
+        self.assertTrue(hit.ribbon_fanned)
+        self.assertTrue(hit.crossed_above_ma200)
+        self.assertTrue(hit.close_above_all_mas)
+        self.assertTrue(hit.hourly_close_above_short_mas)
+        self.assertGreater(hit.close, hit.ma200)
+        self.assertLessEqual(hit.prev_close, hit.prev_ma200)
+        self.assertEqual(hit.timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 25, tzinfo=TAIPEI)))
+
+    def test_does_not_repeat_while_staying_above(self) -> None:
+        df = _history_then_live([99.0, 99.0, 99.0] + [105.0] * 9)
+        hits = iter_15m_ma200_alerts(df)
+        self.assertEqual(len(hits), 1)
+
+    def test_skips_first_15m_of_the_day(self) -> None:
+        df = _history_then_live([99.0, 110.0, 110.0])
+        hits = iter_15m_ma200_alerts(df)
+        self.assertEqual(hits, [])
+
+    def test_rejects_when_hourly_close_below_short_mas(self) -> None:
+        df = _history_then_live([99.0, 99.0, 99.0, 105.0, 105.0, 105.0])
+        with patch("tw.signals.hourly_close_and_mas", return_value=(100.0, 101.0, 101.0, 101.0)):
+            hits = iter_15m_ma200_alerts(df)
+        self.assertEqual(hits, [])
+
+
+class FifteenMinReportTests(unittest.TestCase):
+    def test_html_uses_15m_copy(self) -> None:
+        df = _history_then_live([99.0, 99.0, 99.0, 105.0, 105.0, 105.0])
+        hits = iter_15m_ma200_alerts(df)
+        stock = RankedStock(1, "2408.TW", "南亞科", 105.0, 1.0, 1.0, 100, 1e9, "TAI")
+        result = BacktestResult(
+            scanned_at=datetime(2026, 8, 21, 17, 0, tzinfo=TAIPEI),
+            days=[date(2026, 8, 21)],
+            universes={
+                date(2026, 8, 21): DayUniverse(
+                    day=date(2026, 8, 21),
+                    rank_time="t",
+                    universe=[stock],
+                    candidates=[stock],
+                    price_dropped=0,
+                    etf_dropped=0,
+                    financial_dropped=0,
+                    telecom_dropped=0,
+                )
+            },
+            hits=[
+                BacktestHit(
+                    day=date(2026, 8, 21),
+                    stock=stock,
+                    snapshot=hits[0],
+                    frame=df,
+                    daily=_daily_ohlcv(date(2026, 8, 21)),
+                    signal_tf="15m",
+                )
+            ],
+            signal_tf="15m",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = save_backtest_html(result, Path(tmp) / "out.html")
+            text = path.read_text(encoding="utf-8")
+        self.assertIn("台股十五分K回測", text)
+        self.assertIn("十五分站上時間", text)
+        self.assertIn("小時K / MA5 10 20", text)
+        self.assertIn("當根收盤剛站上十五分 MA200", text)
+        self.assertNotIn("十五分K已在 MA200 上至少半小時", text)
 
 
 class ResampleTests(unittest.TestCase):

@@ -45,9 +45,10 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 ```bash
 python3 examples/backtest_tw_5m.py --days 10
+python3 examples/backtest_tw_15m.py --days 10
 ```
 
-報告：`docs/tw/backtest-5m-15m-1h.html`（近兩週；每檔一張圖：上五分K、中十五分K、下小時K、最下日K）
+報告：`docs/tw/backtest-5m-15m-1h.html`（五分K）、`docs/tw/backtest-15m-1h.html`（十五分K；同一套發散＋剛站上 MA200，小時K要在 MA5／10／20 之上）
 
 ## 快速開始
 

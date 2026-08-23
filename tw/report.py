@@ -106,6 +106,62 @@ def _universe_line(uni: DayUniverse, hit_count: int) -> str:
     )
 
 
+def _lead_block(result: BacktestResult) -> str:
+    if result.signal_tf == "15m":
+        return """
+    <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
+    <p class="lead">
+      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
+      十五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
+      <strong>當根收盤剛站上十五分 MA200</strong>（前一根尚未站上），
+      且這根收盤必須高於 MA5／10／20／200，<strong>小時K也要在 MA5／10／20 之上</strong>。
+      開盤第一根十五分因隔夜跳空不算。
+      <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
+      最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
+      K 棒漲紅跌綠。
+    </p>"""
+    return """
+    <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
+    <p class="lead">
+      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
+      五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
+      <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
+      且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
+      且<strong>十五分K已在 MA200 上至少半小時</strong>，
+      且小時K收盤也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
+      <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
+      最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
+      K 棒漲紅跌綠。
+    </p>"""
+
+
+def _chips_html(result: BacktestResult) -> str:
+    common = """
+      <span class="chip">不含 ETF</span>
+      <span class="chip">不含金融股</span>
+      <span class="chip">不含電信股</span>
+      <span class="chip">成交額前 100</span>
+      <span class="chip">股價 &lt; 500</span>
+      <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
+      <span class="chip">當根收盤站上 MA200</span>
+      <span class="chip">收盤 &gt; 所有均線</span>"""
+    if result.signal_tf == "15m":
+        return f"""
+      <span class="chip">十五分K</span>{common}
+      <span class="chip">小時K &gt; MA5／10／20</span>
+      <span class="chip">五分K對照</span>
+      <span class="chip">小時K對照</span>
+      <span class="chip">日K對照</span>"""
+    return f"""
+      <span class="chip">五分K</span>{common}
+      <span class="chip">收盤 &gt; 十五分 MA5／10／20</span>
+      <span class="chip">十五分K在 MA200 上 ≥ 半小時</span>
+      <span class="chip">小時K &gt; MA20</span>
+      <span class="chip">十五分K對照</span>
+      <span class="chip">小時K對照</span>
+      <span class="chip">日K對照</span>"""
+
+
 def save_backtest_html(result: BacktestResult, path: str | Path) -> Path:
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -131,7 +187,10 @@ def _render(
 ) -> str:
     scanned = result.scanned_at.strftime("%Y-%m-%d %H:%M:%S")
     start, end = result.days[0], result.days[-1]
-    title = f"台股五分K回測 {start.isoformat()}～{end.isoformat()}"
+    if result.signal_tf == "15m":
+        title = f"台股十五分K回測 {start.isoformat()}～{end.isoformat()}"
+    else:
+        title = f"台股五分K回測 {start.isoformat()}～{end.isoformat()}"
     day_chips = "".join(
         f'<span class="chip">{weekday_zh(day)} {day.isoformat()} · {len(result.hits_on(day))} 則</span>'
         for day in result.days
@@ -151,6 +210,7 @@ def _render(
                     chart_rel=chart_rel,
                     chart_dir=chart_dir,
                     image_base=image_base,
+                    signal_tf=result.signal_tf,
                 )
             )
         body = "\n".join(cards) or '<p class="empty">這天沒有符合條件的通知。</p>'
@@ -238,34 +298,9 @@ def _render(
 <body>
   <div class="page">
     <h1>{html.escape(title)}</h1>
-    <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
-    <p class="lead">
-      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
-      五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
-      <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
-      且<strong>十五分K已在 MA200 上至少半小時</strong>，
-      且小時K收盤也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
-      <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
-      最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
-      K 棒漲紅跌綠。
-    </p>
+    {_lead_block(result)}
     <div class="chips">
-      <span class="chip">五分K</span>
-      <span class="chip">不含 ETF</span>
-      <span class="chip">不含金融股</span>
-      <span class="chip">不含電信股</span>
-      <span class="chip">成交額前 100</span>
-      <span class="chip">股價 &lt; 500</span>
-      <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
-      <span class="chip">當根收盤站上 MA200</span>
-      <span class="chip">收盤 &gt; 十五分 MA5／10／20</span>
-      <span class="chip">十五分K在 MA200 上 ≥ 半小時</span>
-      <span class="chip">小時K &gt; MA20</span>
-      <span class="chip">收盤 &gt; 所有均線</span>
-      <span class="chip">十五分K對照</span>
-      <span class="chip">小時K對照</span>
-      <span class="chip">日K對照</span>
+      {_chips_html(result)}
       {day_chips}
     </div>
     <div class="legend">
@@ -296,6 +331,7 @@ def _hit_card(
     chart_rel: Path,
     chart_dir: Path,
     image_base: str | None,
+    signal_tf: str = "5m",
 ) -> str:
     s = hit.stock
     snap = hit.snapshot
@@ -306,7 +342,7 @@ def _hit_card(
     url = f"https://tw.stock.yahoo.com/quote/{html.escape(s.symbol)}"
     chart = _chart_img(hit, chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base)
     extra_rows = ""
-    if (
+    if signal_tf != "15m" and (
         snap.m15_close is not None
         and snap.m15_ma5 is not None
         and snap.m15_ma10 is not None
@@ -321,20 +357,26 @@ def _hit_card(
                 f'<div class="row"><span>十五分K / MA200</span>'
                 f"<b>{snap.m15_close:.2f} &gt; {snap.m15_ma200:.2f}　已在上 {snap.m15_above_ma200_minutes} 分</b></div>"
             )
-    if snap.h1_close is not None and snap.h1_ma20 is not None:
+    if signal_tf == "15m" and snap.hourly_close_above_short_mas:
+        extra_rows += (
+            f'<div class="row"><span>小時K / MA5 10 20</span>'
+            f"<b>{snap.h1_close:.2f} &gt; {snap.h1_ma5:.2f} / {snap.h1_ma10:.2f} / {snap.h1_ma20:.2f}</b></div>"
+        )
+    elif snap.h1_close is not None and snap.h1_ma20 is not None:
         extra_rows += (
             f'<div class="row"><span>小時K / MA20</span>'
             f"<b>{snap.h1_close:.2f} &gt; {snap.h1_ma20:.2f}</b></div>"
         )
     extra_rows += _hour_later_row(hour_later_for_hit(hit))
     extra_rows += _daily_ma_row(hit)
+    stand_label = "十五分站上時間" if signal_tf == "15m" else "五分站上時間"
     return f"""
     <article class="card">
       <div class="top">
         <div class="name">{index}. {html.escape(s.name)}<span class="sym"><a href="{url}" target="_blank" rel="noopener">{html.escape(s.symbol)}</a></span></div>
         <div class="price">{s.price:.2f}{html.escape(chg)}</div>
       </div>
-      <div class="row"><span>五分站上時間</span><b>{ts}</b></div>
+      <div class="row"><span>{stand_label}</span><b>{ts}</b></div>
       <div class="row"><span>收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
       <div class="row"><span>收盤 vs 均線</span><b>{snap.close:.2f} &gt; MA5 {snap.ma5:.2f} / 10 {snap.ma10:.2f} / 20 {snap.ma20:.2f}</b></div>
       <div class="row"><span>均線發散</span><b>MA5/MA20 +{snap.ribbon_fan_pct:.2f}%　5–10 {snap.gap_5_10_pct:.2f}%　10–20 {snap.gap_10_20_pct:.2f}%</b></div>
@@ -492,7 +534,14 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
         )
 
     loc = int(window.index.get_indexer([mark_ts], method="nearest")[0])
-    if timeframe == "5m":
+    if hit.signal_tf == "15m":
+        if timeframe == "15m":
+            marker_label = "站上MA200"
+        elif timeframe == "1d":
+            marker_label = "訊號日"
+        else:
+            marker_label = "十五分訊號"
+    elif timeframe == "5m":
         marker_label = "站上MA200"
     elif timeframe == "1d":
         marker_label = "訊號日"

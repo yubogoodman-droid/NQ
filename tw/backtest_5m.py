@@ -18,7 +18,7 @@ from tw.ranking import (
     filter_financials,
     filter_telecoms,
 )
-from tw.signals import AlertSnapshot, iter_5m_ma200_alerts
+from tw.signals import AlertSnapshot, iter_15m_ma200_alerts, iter_5m_ma200_alerts
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
@@ -56,6 +56,7 @@ class BacktestHit:
     snapshot: AlertSnapshot
     frame: pd.DataFrame
     daily: pd.DataFrame | None = None
+    signal_tf: str = "5m"
 
 
 @dataclass
@@ -66,6 +67,7 @@ class BacktestResult:
     hits: list[BacktestHit]
     skipped: list[tuple[date, RankedStock, str]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    signal_tf: str = "5m"
 
     def hits_on(self, day: date) -> list[BacktestHit]:
         return [h for h in self.hits if h.day == day]
@@ -117,6 +119,63 @@ def run_5m_backtest(
         universes=by_day,
         hits=hits,
         skipped=skipped,
+        signal_tf="5m",
+    )
+
+
+def run_15m_backtest(
+    config: BacktestConfig | None = None,
+    session: requests.Session | None = None,
+) -> BacktestResult:
+    cfg = config or BacktestConfig()
+    sess = session or requests.Session()
+    as_of = cfg.today or datetime.now(TAIPEI).date()
+    universes = _load_session_universes(cfg, as_of, sess)
+    days = [item.day for item in universes]
+    by_day = {item.day: item for item in universes}
+
+    symbols = list(
+        dict.fromkeys(stock.symbol for item in universes for stock in item.candidates)
+    )
+    print(f"五分K下載 {len(symbols)} 檔（Yahoo {cfg.kline_range}，合成十五分）", flush=True)
+    frames = fetch_bars_many(symbols, interval="5m", range_=cfg.kline_range, closed_only=True)
+
+    hits: list[BacktestHit] = []
+    skipped: list[tuple[date, RankedStock, str]] = []
+    for item in universes:
+        since = pd.Timestamp(item.day, tz=TAIPEI)
+        until = since + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        for stock in item.candidates:
+            df = frames.get(stock.symbol)
+            if df is None or df.empty:
+                skipped.append((item.day, stock, "無五分 K 資料"))
+                continue
+            if len(df) < 600:
+                skipped.append((item.day, stock, f"五分 K 不足 600 根（{len(df)}）"))
+                continue
+            alerts = iter_15m_ma200_alerts(df, since=since, until=until)
+            if not alerts:
+                continue
+            for snap in alerts:
+                hits.append(
+                    BacktestHit(
+                        day=item.day,
+                        stock=stock,
+                        snapshot=snap,
+                        frame=df,
+                        signal_tf="15m",
+                    )
+                )
+
+    hits.sort(key=lambda h: (h.day, h.snapshot.timestamp, h.stock.rank))
+    _attach_daily_frames(hits, cfg.daily_range)
+    return BacktestResult(
+        scanned_at=datetime.now(TAIPEI),
+        days=days,
+        universes=by_day,
+        hits=hits,
+        skipped=skipped,
+        signal_tf="15m",
     )
 
 

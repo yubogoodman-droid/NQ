@@ -38,6 +38,8 @@ class AlertSnapshot:
     prev_ma20: float
     prev_ma200: float
     h1_close: float | None = None
+    h1_ma5: float | None = None
+    h1_ma10: float | None = None
     h1_ma20: float | None = None
     m15_close: float | None = None
     m15_ma5: float | None = None
@@ -105,6 +107,18 @@ class AlertSnapshot:
         )
 
     @property
+    def hourly_close_above_short_mas(self) -> bool:
+        return (
+            self.h1_close is not None
+            and self.h1_ma5 is not None
+            and self.h1_ma10 is not None
+            and self.h1_ma20 is not None
+            and self.h1_close > self.h1_ma5
+            and self.h1_close > self.h1_ma10
+            and self.h1_close > self.h1_ma20
+        )
+
+    @property
     def close_above_15m_mas(self) -> bool:
         return (
             self.m15_close is not None
@@ -138,15 +152,27 @@ def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def hourly_close_and_ma20(five_min: pd.DataFrame) -> tuple[float, float] | None:
-    """用截至目前的五分K合成小時K，回傳（小時收盤, 小時MA20）。"""
+def hourly_close_and_mas(five_min: pd.DataFrame) -> tuple[float, float, float, float] | None:
+    """用截至目前的五分K合成小時K，回傳（收盤, MA5, MA10, MA20）。"""
     hourly = resample_ohlcv(five_min, "1h")
     if len(hourly) < H1_MA or "close" not in hourly.columns:
         return None
-    ma20 = hourly["close"].rolling(H1_MA, min_periods=H1_MA).mean()
-    if any(pd.isna(v) for v in (hourly["close"].iloc[-1], ma20.iloc[-1])):
+    close = hourly["close"]
+    ma5 = close.rolling(MA_FAST, min_periods=MA_FAST).mean()
+    ma10 = close.rolling(MA_MID, min_periods=MA_MID).mean()
+    ma20 = close.rolling(H1_MA, min_periods=H1_MA).mean()
+    last = (close.iloc[-1], ma5.iloc[-1], ma10.iloc[-1], ma20.iloc[-1])
+    if any(pd.isna(v) for v in last):
         return None
-    return float(hourly["close"].iloc[-1]), float(ma20.iloc[-1])
+    return float(last[0]), float(last[1]), float(last[2]), float(last[3])
+
+
+def hourly_close_and_ma20(five_min: pd.DataFrame) -> tuple[float, float] | None:
+    """用截至目前的五分K合成小時K，回傳（小時收盤, 小時MA20）。"""
+    hourly = hourly_close_and_mas(five_min)
+    if hourly is None:
+        return None
+    return hourly[0], hourly[3]
 
 
 @dataclass(frozen=True)
@@ -260,6 +286,66 @@ def iter_5m_ma200_alerts(
                 m15_ma20=m15.ma20,
                 m15_ma200=m15.ma200,
                 m15_above_ma200_minutes=m15.above_ma200_minutes,
+            )
+        )
+    return hits
+
+
+def iter_15m_ma200_alerts(
+    df: pd.DataFrame,
+    *,
+    since: pd.Timestamp | None = None,
+    until: pd.Timestamp | None = None,
+) -> list[AlertSnapshot]:
+    """同一交易日連續十五分 K：短均發散、剛站上十五分 MA200，且小時K收在 MA5／10／20 之上。"""
+    if df is None or df.empty or "close" not in df.columns:
+        return []
+    m15 = resample_ohlcv(df, "15min")
+    if len(m15) < MA_LONG + 1:
+        return []
+    work = add_moving_averages(m15)
+    hits: list[AlertSnapshot] = []
+    start = MA_LONG
+    if since is not None:
+        matched = False
+        for i, ts in enumerate(work.index):
+            if ts >= since:
+                start = max(start, i)
+                matched = True
+                break
+        if not matched:
+            return []
+    for i in range(start, len(work)):
+        ts = work.index[i]
+        if until is not None and ts > until:
+            break
+        snap = _snapshot_at(work, i)
+        if snap is None:
+            continue
+        prev_ts = work.index[i - 1]
+        if pd.Timestamp(ts).date() != pd.Timestamp(prev_ts).date():
+            continue
+        if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
+            continue
+        bar_end = pd.Timestamp(ts) + pd.Timedelta(minutes=15)
+        five_window = df[df.index < bar_end]
+        if five_window.empty:
+            continue
+        hourly = hourly_close_and_mas(five_window)
+        if hourly is None:
+            continue
+        h1_close, h1_ma5, h1_ma10, h1_ma20 = hourly
+        if h1_close <= h1_ma5 or h1_close <= h1_ma10 or h1_close <= h1_ma20:
+            continue
+        signal_ts = pd.Timestamp(five_window.index[-1])
+        hits.append(
+            replace(
+                snap,
+                timestamp=signal_ts,
+                h1_close=h1_close,
+                h1_ma5=h1_ma5,
+                h1_ma10=h1_ma10,
+                h1_ma20=h1_ma20,
             )
         )
     return hits
