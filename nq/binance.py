@@ -50,12 +50,16 @@ def is_stock_perp(s: dict) -> bool:
     )
 
 
-def universe(*, min_quote_volume: float = 5_000_000, stocks_only: bool = False) -> list[str]:
+def universe(
+    *,
+    min_quote_volume: float = 5_000_000,
+    stocks_only: bool = False,
+    top_n: int | None = 100,
+) -> list[str]:
+    """USDT 永續清單。全市場預設取 24h 成交額前 `top_n`；股票模式不過濾成交額。"""
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
-    if stocks_only:
-        min_quote_volume = 0.0
-    out = []
+    ranked: list[tuple[float, str]] = []
     for s in info["symbols"]:
         if s.get("quoteAsset") != "USDT":
             continue
@@ -71,10 +75,13 @@ def universe(*, min_quote_volume: float = 5_000_000, stocks_only: bool = False) 
                 continue
         sym = s["symbol"]
         qv = float((tickers.get(sym) or {}).get("quoteVolume") or 0)
-        if not stocks_only and qv < min_quote_volume and sym not in KEEP:
-            continue
-        out.append(sym)
-    return out
+        ranked.append((qv, sym))
+    ranked.sort(reverse=True)
+    if stocks_only:
+        return [sym for _, sym in ranked]
+    if top_n is not None:
+        return [sym for _, sym in ranked[:top_n]]
+    return [sym for qv, sym in ranked if qv >= min_quote_volume or sym in KEEP]
 
 
 def _to_ohlcv(rows: list) -> dict:

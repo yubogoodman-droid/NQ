@@ -441,7 +441,7 @@ def main() -> int:
     symbols = universe(stocks_only=args.stocks)
     if args.limit_symbols:
         symbols = symbols[: args.limit_symbols]
-    scope = "幣安股票永續" if args.stocks else "流動永續"
+    scope = "幣安股票永續" if args.stocks else "成交額前100永續"
     print(f"監看 {len(symbols)} 個{scope}。", flush=True)
     for spec in specs:
         print("  · " + spec_note(spec), flush=True)

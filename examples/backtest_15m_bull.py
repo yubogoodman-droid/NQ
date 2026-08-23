@@ -605,7 +605,7 @@ def write_html(
     universe_txt = (
         f"只掃幣安 TradFi 股票永續（美／港／韓／中股、股票 ETF、Pre-IPO；不含黃金原油等商品）近 {days} 天、{universe_n} 個合約。"
         if stocks_only
-        else f"掃描幣安 U 本位流動永續近 {days} 天、{universe_n} 個合約。"
+        else f"掃描幣安 U 本位成交額前 {universe_n} 永續近 {days} 天。"
     )
     if spec.require_htf:
         htf_rule = f"還要當下價格在<strong>{html.escape(htf)} 圖 SMA200</strong>之上。"
@@ -701,7 +701,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <div class="card">
     <h2>過濾對照</h2>
     <div class="table-wrap">{stats_table(stats, spec)}</div>
-    <p class="note">底下 = 站上前連續幾根收盤在 MA200 下。距{html.escape(tf)}MA200 =（收盤 / {html.escape(tf)} SMA200 − 1）× 100%。距{html.escape(htf)}MA200 用訊號當下價 vs 當時 {html.escape(htf)} SMA200。量比 = 當根量 / 20 根均量。</p>
+    <p class="note">底下 = 站上前連續幾根收盤在 MA200 下。距{html.escape(tf)}MA200 =（收盤 / {html.escape(tf)} SMA200 − 1）× 100%。距{html.escape(htf)}MA200 用訊號當下價 vs 當時 {html.escape(htf)} SMA200。量比 = 當根量 / 20 根均量。1h MA25 未下彎 = 當下 1h SMA25 ≥ 前一根已收完（未收完的 1h 用當下收盤）。</p>
   </div>
   <div class="card">
     <h2>訊號表（通知條件，依 4h 報酬排序）</h2>
@@ -772,7 +772,7 @@ def main() -> int:
     symbols = universe(stocks_only=args.stocks)
     if args.limit_symbols:
         symbols = symbols[: args.limit_symbols]
-    scope = "幣安股票永續" if args.stocks else "流動永續"
+    scope = "幣安股票永續" if args.stocks else "成交額前100永續"
     htf_scan = (
         f"{spec.signal} MA200 + {spec.htf} MA200"
         if spec.require_htf
