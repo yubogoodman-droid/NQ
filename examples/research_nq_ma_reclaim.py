@@ -81,6 +81,24 @@ def run_research(df) -> dict:
     core = cached["核心（關 hug / MA60 / 寬停損QA）"]
     extras = extra_vs_base(strict, core)
     qa_only = simulate(df, [s for s in strict_sigs if s.quality == "A"])
+    def trade_row(t) -> dict:
+        ts = df.index[t.entry_idx]
+        return {
+            "when": ts.strftime("%m-%d %H:%M"),
+            "session": session_bucket(int(ts.hour)),
+            "q": t.quality,
+            "reason": t.exit_reason,
+            "pnl": float(t.pnl_points),
+            "risk": float(t.entry_price - t.stop_price),
+        }
+
+    variant_extras = {}
+    variant_dropped = {}
+    for name, trades in cached.items():
+        if name == "嚴格（預設）":
+            continue
+        variant_extras[name] = [trade_row(t) for t in extra_vs_base(strict, trades)]
+        variant_dropped[name] = [trade_row(t) for t in extra_vs_base(trades, strict)]
 
     sessions = []
     for label in ("亞盤 18–03", "倫敦 03–09", "美開 09–10", "美股 10–16", "尾盤 16–18"):
@@ -114,6 +132,8 @@ def run_research(df) -> dict:
         "qa_only": _stat_line(qa_only),
         "extras": extra_rows,
         "extras_stat": _stat_line(extras),
+        "variant_extras": variant_extras,
+        "variant_dropped": variant_dropped,
         "strict": _stat_line(strict),
         "core": _stat_line(core),
     }
@@ -150,6 +170,51 @@ def write_research_html(path: Path, report: dict) -> Path:
         "</tr>"
         for r in report["extras"]
     ) or "<tr><td colspan='5'>沒有多出來的核心單</td></tr>"
+
+    def extras_table(title: str, key: str) -> str:
+        rows = report.get("variant_extras", {}).get(key) or []
+        dropped = report.get("variant_dropped", {}).get(key) or []
+        if not rows and not dropped:
+            return ""
+
+        def body(items):
+            return "".join(
+                "<tr>"
+                f"<td>{escape(r['when'])}</td><td>{escape(r['session'])}</td>"
+                f"<td>Q{escape(r['q'])}</td><td>{escape(r['reason'])}</td>"
+                f"<td>{r.get('risk', 0):.1f}</td><td>{_fmt_pnl(r['pnl'])}</td>"
+                "</tr>"
+                for r in items
+            ) or "<tr><td colspan='6'>無</td></tr>"
+
+        dropped_html = ""
+        if dropped:
+            dropped_html = (
+                "<p class='muted'>同時少掉原本嚴格的單（常是被更早進場擠掉）：</p>"
+                "<table><thead><tr><th>進場</th><th>時段</th><th>Q</th><th>出場</th>"
+                "<th>風險</th><th>點數</th></tr></thead>"
+                f"<tbody>{body(dropped)}</tbody></table>"
+            )
+        return (
+            f"<div class='box'><h2>{escape(title)}</h2>"
+            "<table><thead><tr><th>進場</th><th>時段</th><th>Q</th><th>出場</th>"
+            "<th>風險</th><th>點數</th></tr></thead>"
+            f"<tbody>{body(rows)}</tbody></table>{dropped_html}</div>"
+        )
+
+    hour_box = extras_table("只關 09–10：多出來的單", "只關 09–10 檔")
+    risk_box = extras_table("只關 100 點風險上限：多出來的單", "只關 100 點風險上限")
+    ma60_box = extras_table("只關 MA60 特例：多出來的單", "只關 MA60 特例")
+    best = max(report["variants"], key=lambda r: r["pnl"])
+    findings = (
+        f"<div class='box'><h2>這輪看到什麼</h2><p class='muted'>"
+        f"單項最好是「{escape(best['name'])}」：{best['n']} 筆、"
+        f"{_fmt_pnl(best['pnl'])}。"
+        f"嚴格美股 10–16 三筆全贏；09–10 被檔的那一筆若放進來是 QA 打到 target。"
+        f"關 100 點風險上限會多出大停損，也可能把原本更好的單擠掉。"
+        f"hug 關掉點數變少，這道還是有用。寬停損 QA 這月沒擋到任何單。"
+        f"</p></div>"
+    )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -182,6 +247,7 @@ th{{color:#8b949e;font-weight:600}}
 多出來的核心單 {_fmt_pnl(ex['pnl'])} / {ex['n']} 筆 ·
 嚴格只做 QA {_fmt_pnl(qa['pnl'])} / {qa['n']} 筆（勝率 {qa['wr']:.1f}%）</p>
 </div>
+{findings}
 <div class="box">
 <h2>一次只關一個過濾器</h2>
 <table><thead><tr><th>設定</th><th>筆</th><th>勝率</th><th>點數</th></tr></thead>
@@ -192,6 +258,9 @@ th{{color:#8b949e;font-weight:600}}
 <table><thead><tr><th>時段</th><th>模式</th><th>筆</th><th>勝率</th><th>點數</th></tr></thead>
 <tbody>{s_rows}</tbody></table>
 </div>
+{hour_box}
+{risk_box}
+{ma60_box}
 <div class="box">
 <h2>核心比嚴格多出來的單</h2>
 <table><thead><tr><th>進場</th><th>時段</th><th>Q</th><th>出場</th><th>點數</th></tr></thead>
