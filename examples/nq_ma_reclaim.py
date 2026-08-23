@@ -308,6 +308,7 @@ def detect_signals(
     use_ma20_up_target: bool = True,
     ma20_up_target_r: float = 3.0,
     use_ma60_skip: bool = True,
+    require_ma30: bool = True,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     s = float(pt_scale) if pt_scale and pt_scale > 0 else 1.0
@@ -379,7 +380,7 @@ def detect_signals(
         for j in range(break_idx + 1, min(break_idx + reclaim_window + 1, n)):
             if np.isnan(ma30[j]):
                 continue
-            reclaimed = close[j] > ma20[j] and close[j] > ma30[j]
+            reclaimed = close[j] > ma20[j] and (not require_ma30 or close[j] > ma30[j])
             bull_stack = ma5[j] > ma10[j] > ma20[j]
             if not (reclaimed and bull_stack):
                 continue
@@ -1264,6 +1265,8 @@ def detect_kwargs(args) -> dict:
     if getattr(args, "allow_open_hour", False):
         kw["skip_hour_start"] = None
         kw["skip_hour_end"] = None
+    if getattr(args, "reclaim_ma20_only", False):
+        kw["require_ma30"] = False
     return kw
 
 
@@ -1299,7 +1302,13 @@ def cmd_backtest(args) -> int:
     extra_trades: List[TradeResult] = []
     extra_funnel: Dict[str, int] = {}
     allow_open = bool(getattr(args, "allow_open_hour", False))
-    if getattr(args, "pages", False) and not getattr(args, "loose", False) and not allow_open:
+    ma20_only = bool(getattr(args, "reclaim_ma20_only", False))
+    if (
+        getattr(args, "pages", False)
+        and not getattr(args, "loose", False)
+        and not allow_open
+        and not ma20_only
+    ):
         core_sigs = detect_signals(df, funnel=extra_funnel, **CORE_DETECT)
         extra_trades = simulate(df, core_sigs)
         extra_stats = summarize_trades(extra_trades)
@@ -1319,6 +1328,8 @@ def cmd_backtest(args) -> int:
     if getattr(args, "pages", False):
         if allow_open:
             html_path = html_path or str(REPO_ROOT / "docs" / "nq-ma-reclaim-0910" / "index.html")
+        elif ma20_only:
+            html_path = html_path or str(REPO_ROOT / "docs" / "nq-ma-reclaim-ma20" / "index.html")
         else:
             html_path = html_path or str(PAGES_HTML)
     period_label = args.period
@@ -1328,6 +1339,12 @@ def cmd_backtest(args) -> int:
         note = (
             "預設美東 09:00–10:00 不進。這頁只關掉那一道，hug / MA60 / 風險上限仍在。"
             "多出來、標了「09–10 才放進來」的就是被這道檔掉的單。"
+        )
+    elif ma20_only:
+        period_label = f"{args.period} · 只要收復 MA20"
+        note = (
+            "收復條件改成收盤站上 MA20 即可，不再要求同時站上 MA30。"
+            "MA5>MA10>MA20、hug、09–10、風險上限都還在。"
         )
     if html_path:
         out = write_html_report(
@@ -1342,7 +1359,7 @@ def cmd_backtest(args) -> int:
             note=note,
         )
         print(f"html={out}")
-        if allow_open:
+        if allow_open or ma20_only:
             view = write_view_html(out)
             print(f"view={view}")
     return 0
@@ -1404,6 +1421,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="關掉美東 09–10 不進場（其餘嚴格規則不變）",
     )
+    b.add_argument(
+        "--reclaim-ma20-only",
+        action="store_true",
+        help="收復只要求站上 MA20，不要求同時站上 MA30",
+    )
     b.set_defaults(func=cmd_backtest)
 
     a = sub.add_parser("alert", help="Telegram 輪詢")
@@ -1427,6 +1449,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-open-hour",
         action="store_true",
         help="關掉美東 09–10 不進場（其餘嚴格規則不變）",
+    )
+    p.add_argument(
+        "--reclaim-ma20-only",
+        action="store_true",
+        help="收復只要求站上 MA20，不要求同時站上 MA30",
     )
     return p
 
