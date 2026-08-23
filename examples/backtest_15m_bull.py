@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """回測：收盤高於 MA7/25/200，且 7>25。MA14 只畫圖、不擋單。
 
-通知只推本根剛站上該週期 MA200，且 1h MA25 未下彎；15m 還要 1h 7>25。
+通知只推本根剛站上該週期 MA200，且 1h MA25 未下彎；15m 還要 1h 7>25，
+以及剛站上後連續 3 根 15m 收盤都在 MA200 上（訊號在第 3 根）。
 15m 圖例疊 15m / 1h / 4h（4h 只對照、不擋單）。大週期 SMA200 只對照、不擋單。
 
     python3 examples/backtest_15m_bull.py --demo
@@ -35,6 +36,7 @@ from nq.ma15_bull import (
     above_htf_ma200,
     apply_filter,
     bar_above_ma200,
+    confirm_reclaim_hold,
     detect_combo,
     fail_rate,
     forward_moves,
@@ -82,6 +84,7 @@ class TfSpec:
     require_h1_ma25_up: bool = False
     require_h1_stack: bool = False
     lookback: int = 48
+    min_hold_bars: int | None = None
 
     @property
     def htf_ms(self) -> int:
@@ -113,6 +116,7 @@ TF_SPECS = {
         require_htf=False,
         require_h1_ma25_up=True,
         require_h1_stack=True,
+        min_hold_bars=3,
     ),
     "1h": TfSpec(
         signal="1h",
@@ -149,7 +153,9 @@ TF_SPECS = {
 
 def notify_kwargs(spec: TfSpec) -> dict:
     kw: dict = {}
-    if spec.max_bars_above is not None:
+    if spec.min_hold_bars:
+        kw["hold_confirmed"] = True
+    elif spec.max_bars_above is not None:
         kw["max_bars_above"] = spec.max_bars_above
     else:
         kw["crossed"] = True
@@ -171,7 +177,9 @@ def notify_kwargs(spec: TfSpec) -> dict:
 
 
 def notify_label(spec: TfSpec) -> str:
-    if spec.max_bars_above is not None:
+    if spec.min_hold_bars:
+        base = f"通知：剛站上 {spec.signal} MA200 後連 {spec.min_hold_bars} 根"
+    elif spec.max_bars_above is not None:
         base = (
             f"通知：剛站上 {spec.signal} MA200，或站上後 {spec.max_bars_above} 根內收出 7>25"
         )
@@ -195,6 +203,14 @@ def filter_defs(spec: TfSpec) -> tuple:
         ("距 MA200 ≤ 1.0%", {"crossed": None, "formed": None, "min_vol": None, "max_ext": 1.0}),
         (notify_label(spec), notify_kwargs(spec)),
     ]
+    if spec.min_hold_bars is not None:
+        rows.insert(
+            -1,
+            (
+                f"剛站上後 {tf} MA200 連 {spec.min_hold_bars} 根",
+                {"hold_confirmed": True},
+            ),
+        )
     if spec.max_bars_above is not None:
         rows.insert(
             -1,
@@ -248,6 +264,50 @@ def pct(v: float | None) -> str:
     return f'<span class="{cls}">{v:+.2f}%</span>'
 
 
+def row_from_sig(
+    sym: str,
+    d: dict,
+    d_htf: dict | None,
+    sig,
+    spec: TfSpec,
+    *,
+    hold_confirmed: bool = False,
+) -> SignalRow | None:
+    ts = int(d["t"][sig.idx])
+    if spec.require_htf and not above_htf_ma200(d_htf, ts, sig.close, spec.htf_ms):
+        return None
+    entry, moves = forward_moves(d, sig)
+    if np.isnan(entry):
+        return None
+    ma_h = htf_ma200_at(d_htf, ts, sig.close, spec.htf_ms) if d_htf is not None else None
+    ext_h = (sig.close / ma_h - 1.0) * 100.0 if ma_h else None
+    src_1h = d if spec.signal == "1h" else d_htf
+    bar_1h = INTERVAL_MS["1h"]
+    ma25_now, ma25_prev = htf_ma25_now_prev(src_1h, ts, sig.close, bar_1h)
+    h1_m7, h1_m25_now = htf_ma7_25_at(src_1h, ts, sig.close, bar_1h)
+    if h1_m25_now is not None:
+        ma25_now = h1_m25_now
+    return SignalRow(
+        symbol=sym,
+        sig=sig,
+        time_ms=ts,
+        entry=entry,
+        moves=moves,
+        h1_ma200=ma_h,
+        h1_ext_pct=ext_h,
+        h1_ma25=ma25_now,
+        h1_ma25_prev=ma25_prev,
+        h1_ma25_up=bool(
+            ma25_now is not None and ma25_prev is not None and ma25_now >= ma25_prev
+        ),
+        h1_m7=h1_m7,
+        h1_stack_ok=bool(
+            h1_m7 is not None and ma25_now is not None and sig.close > h1_m7 > ma25_now
+        ),
+        hold_confirmed=hold_confirmed,
+    )
+
+
 def scan_symbol(sym: str, days: int, spec: TfSpec) -> tuple[str, dict | None, list[SignalRow], int, int]:
     raw = fetch_klines(sym, interval=spec.signal, days=days, extra_bars=220)
     if raw is None or len(raw["c"]) < 220:
@@ -261,43 +321,21 @@ def scan_symbol(sym: str, days: int, spec: TfSpec) -> tuple[str, dict | None, li
     n_drop = 0
     for sig in detect_combo(d):
         ts = int(d["t"][sig.idx])
+        if spec.min_hold_bars and sig.crossed_200:
+            held = confirm_reclaim_hold(d, sig, spec.min_hold_bars)
+            if held is not None and int(d["t"][held.idx]) >= cutoff:
+                hr = row_from_sig(sym, d, d_htf, held, spec, hold_confirmed=True)
+                if hr is not None:
+                    rows.append(hr)
         if ts < cutoff:
             continue
         n_raw += 1
         if spec.require_htf and not above_htf_ma200(d_htf, ts, sig.close, spec.htf_ms):
             n_drop += 1
             continue
-        entry, moves = forward_moves(d, sig)
-        if np.isnan(entry):
-            continue
-        ma_h = htf_ma200_at(d_htf, ts, sig.close, spec.htf_ms) if d_htf is not None else None
-        ext_h = (sig.close / ma_h - 1.0) * 100.0 if ma_h else None
-        src_1h = d if spec.signal == "1h" else d_htf
-        bar_1h = INTERVAL_MS["1h"]
-        ma25_now, ma25_prev = htf_ma25_now_prev(src_1h, ts, sig.close, bar_1h)
-        h1_m7, h1_m25_now = htf_ma7_25_at(src_1h, ts, sig.close, bar_1h)
-        if h1_m25_now is not None:
-            ma25_now = h1_m25_now
-        rows.append(
-            SignalRow(
-                symbol=sym,
-                sig=sig,
-                time_ms=ts,
-                entry=entry,
-                moves=moves,
-                h1_ma200=ma_h,
-                h1_ext_pct=ext_h,
-                h1_ma25=ma25_now,
-                h1_ma25_prev=ma25_prev,
-                h1_ma25_up=bool(
-                    ma25_now is not None and ma25_prev is not None and ma25_now >= ma25_prev
-                ),
-                h1_m7=h1_m7,
-                h1_stack_ok=bool(
-                    h1_m7 is not None and ma25_now is not None and sig.close > h1_m7 > ma25_now
-                ),
-            )
-        )
+        row = row_from_sig(sym, d, d_htf, sig, spec)
+        if row is not None:
+            rows.append(row)
     return sym, d, rows, n_raw, n_drop
 
 
@@ -423,7 +461,10 @@ def draw_chart(
     r4 = row.moves.get(spec.hold4)
     rtxt = f"  4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
     title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
-    kind = "reclaim MA200" if row.crossed_200d else f"stack within {row.bars_above} bars of MA200"
+    if row.hold_confirmed and spec.min_hold_bars:
+        kind = f"MA200 held {spec.min_hold_bars} bars"
+    else:
+        kind = "reclaim MA200" if row.crossed_200d else f"stack within {row.bars_above} bars of MA200"
     extra = f"  below={row.bars_below}  above={row.bars_above}  vol={row.vol_ratio:.2f}x  ext={row.ext_pct:+.2f}%"
     if row.h1_ma25 is not None and row.h1_ma25_prev is not None:
         extra += "  1hMA25 " + ("up" if row.h1_ma25_up else "down")
@@ -551,7 +592,11 @@ def signal_table(rows: list[SignalRow], spec: TfSpec, limit: int = 80) -> str:
     )[:limit]
     body = []
     for r in ranked:
-        kind = "站上MA200" if r.crossed_200d else f"站上後{r.bars_above}根內"
+        kind = (
+            f"年線連{spec.min_hold_bars}根"
+            if r.hold_confirmed and spec.min_hold_bars
+            else ("站上MA200" if r.crossed_200d else f"站上後{r.bars_above}根內")
+        )
         cells = [
             f'<td class="mono">{hm(r.time_ms)}</td>',
             f"<td>{html.escape(sym_label(r.symbol))}</td>",
@@ -615,9 +660,13 @@ def gallery_html(gallery: list[tuple[SignalRow, str]], spec: TfSpec) -> str:
     cards = []
     for row, rel in gallery:
         kind = (
-            f"本根剛站上 {spec.signal} MA200"
-            if row.crossed_200d
-            else f"站上後 {row.bars_above} 根內才收出 7>25"
+            f"年線上第 {spec.min_hold_bars} 根"
+            if row.hold_confirmed and spec.min_hold_bars
+            else (
+                f"本根剛站上 {spec.signal} MA200"
+                if row.crossed_200d
+                else f"站上後 {row.bars_above} 根內才收出 7>25"
+            )
         )
         r4 = row.moves.get(spec.hold4)
         rtxt = f"4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
@@ -689,6 +738,10 @@ def write_html(
             )
         if spec.require_h1_stack:
             htf_rule += "且當時 <strong>1h 收盤 &gt; MA7 &gt; MA25</strong>。"
+        if spec.min_hold_bars:
+            htf_rule += (
+                f"15m 還要剛站上後<strong>連續 {spec.min_hold_bars} 根收盤都在 MA200 上</strong>。"
+            )
         if spec.min_below is not None:
             extra = ""
             if spec.min_vol is not None:
@@ -704,22 +757,28 @@ def write_html(
                 f"且站上前連續至少 <strong>{spec.min_below} 根</strong>收盤在 MA200 下、"
                 f"{extra}"
             )
+        elif spec.max_bars_above is not None:
+            notify_rule = (
+                f"Telegram 通知：<strong>剛站上 {html.escape(tf)} MA200</strong>"
+                f"（前收還在 MA200 下、本根收盤站上且 7&gt;25），"
+                f"或<strong>站上後 {spec.max_bars_above} 根內</strong>才收出 7&gt;25。"
+                f"不會把已經在 MA200 上很久才排好的訊號都打進去。"
+            )
         else:
-            if spec.max_bars_above is not None:
-                notify_rule = (
-                    f"Telegram 通知：<strong>剛站上 {html.escape(tf)} MA200</strong>"
-                    f"（前收還在 MA200 下、本根收盤站上且 7&gt;25），"
-                    f"或<strong>站上後 {spec.max_bars_above} 根內</strong>才收出 7&gt;25。"
-                    f"不會把已經在 MA200 上很久才排好的訊號都打進去。"
+            hold_txt = ""
+            if spec.min_hold_bars:
+                hold_txt = (
+                    f"之後還要連續 <strong>{spec.min_hold_bars} 根</strong>收盤都在 MA200 上才推；"
+                    f"訊號時間是第 {spec.min_hold_bars} 根，進場用再下一根開盤。"
                 )
-            else:
-                notify_rule = (
-                    f"Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
-                    f"這一根收盤站上，同時收盤也在 7>25 之上"
-                    + ("，且 <strong>1h MA25 未下彎</strong>" if spec.require_h1_ma25_up else "")
-                    + ("，且 <strong>1h 7&gt;25 多頭排列</strong>" if spec.require_h1_stack else "")
-                    + "。"
-                )
+            notify_rule = (
+                f"Telegram 通知要用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
+                f"這一根收盤站上，同時收盤也在 7>25 之上。"
+                f"{hold_txt}"
+                + ("且當時 <strong>1h MA25 未下彎</strong>" if spec.require_h1_ma25_up else "")
+                + ("，且 <strong>1h 7&gt;25 多頭排列</strong>" if spec.require_h1_stack else "")
+                + "。"
+            )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -774,7 +833,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <div class="card">
     <h2>過濾對照</h2>
     <div class="table-wrap">{stats_table(stats, spec)}</div>
-    <p class="note">底下 = 站上前連續幾根收盤在 MA200 下。距{html.escape(tf)}MA200 =（收盤 / {html.escape(tf)} SMA200 − 1）× 100%。距{html.escape(htf)}MA200 用訊號當下價 vs 當時 {html.escape(htf)} SMA200。量比 = 當根量 / 20 根均量。1h MA25 未下彎 = 當下 1h SMA25 ≥ 前一根已收完。1h 7&gt;25 = 當時 1h 收盤 &gt; MA7 &gt; MA25（未收完的 1h 用當下收盤）。</p>
+    <p class="note">底下 = 站上前連續幾根收盤在 MA200 下。距{html.escape(tf)}MA200 =（收盤 / {html.escape(tf)} SMA200 − 1）× 100%。距{html.escape(htf)}MA200 用訊號當下價 vs 當時 {html.escape(htf)} SMA200。量比 = 當根量 / 20 根均量。1h MA25 未下彎 = 當下 1h SMA25 ≥ 前一根已收完。1h 7&gt;25 = 當時 1h 收盤 &gt; MA7 &gt; MA25（未收完的 1h 用當下收盤）。年線連 3 根 = 剛站上那根起連續 3 根收盤都在 MA200 上；通知時間是第 3 根。</p>
   </div>
   <div class="card">
     <h2>訊號表（通知條件，依 4h 報酬排序）</h2>
@@ -822,6 +881,15 @@ def run_demo() -> int:
         return 1
     if any(s.close <= s.m7 or s.close <= s.m25 or s.close <= s.ma200 or s.m7 <= s.m25 for s in hits):
         print("demo 失敗：收盤必須在 7>25 且 > MA200")
+        return 1
+    crossed = next(s for s in hits if s.crossed_200)
+    held = confirm_reclaim_hold(d, crossed, 3)
+    print(
+        "demo 年線連 3 根 → "
+        + (f"idx={held.idx} close={held.close:.3f}" if held else "未過")
+    )
+    if held is None or held.idx != crossed.idx + 2:
+        print("demo 失敗：剛站上後應連 3 根都在 MA200 上")
         return 1
     return 0
 

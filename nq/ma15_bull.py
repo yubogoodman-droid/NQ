@@ -56,6 +56,66 @@ def bars_above_ma200(c, m200, i: int) -> int:
     return n
 
 
+def signal_at(d: dict, i: int) -> BullSignal | None:
+    """第 i 根若收盤 > MA7>25 且 > MA200，組成訊號；否則 None。"""
+    if i < 200 or i >= len(d["c"]):
+        return None
+    c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
+    m7, m14, m25, m200 = d["m7"], d["m14"], d["m25"], d["m200"]
+    v20 = d["v20"]
+    if np.isnan([m200[i], m200[i - 1]]).any():
+        return None
+    if not _stack_ok(c, m7, m14, m25, m200, i):
+        return None
+    vr = float(v[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
+    ext = (c[i] / m200[i] - 1.0) * 100.0 if m200[i] else 0.0
+    return BullSignal(
+        idx=i,
+        open=float(o[i]),
+        high=float(h[i]),
+        low=float(l[i]),
+        close=float(c[i]),
+        prev_close=float(c[i - 1]),
+        m7=float(m7[i]),
+        m14=float(m14[i]),
+        m25=float(m25[i]),
+        ma200=float(m200[i]),
+        vol_ratio=vr,
+        ext_pct=float(ext),
+        crossed_200=bool(c[i - 1] <= m200[i - 1] and c[i] > m200[i]),
+        formed_align=bool(c[i - 1] > m200[i - 1] and not _stack_ok(c, m7, m14, m25, m200, i - 1)),
+        bars_below=bars_below_ma200(c, m200, i),
+        rng24=rng24_pct(h, l, m200, i),
+        bars_above=bars_above_ma200(c, m200, i),
+    )
+
+
+def ma200_held(d: dict, start: int, n: int) -> bool:
+    """從 start 起連續 n 根收盤都在各自 MA200 上。"""
+    end = start + n - 1
+    if start < 1 or end >= len(d["c"]):
+        return False
+    c, m200 = d["c"], d["m200"]
+    for k in range(start, end + 1):
+        if np.isnan(m200[k]) or float(c[k]) <= float(m200[k]):
+            return False
+    return True
+
+
+def confirm_reclaim_hold(d: dict, sig: BullSignal, hold_bars: int) -> BullSignal | None:
+    """剛站上 MA200 之後，再連 hold_bars 根收盤都站上；回傳第 hold_bars 根。
+
+    第 1 根必須是剛站上且 7>25；中間根只要求收盤 > MA200；最後一根仍要 7>25。
+    """
+    if hold_bars <= 1:
+        return sig if sig.crossed_200 else None
+    if not sig.crossed_200:
+        return None
+    if not ma200_held(d, sig.idx, hold_bars):
+        return None
+    return signal_at(d, sig.idx + hold_bars - 1)
+
+
 def rng24_pct(h, l, m200, i: int) -> float:
     """站上前 24 根的高低差，相對當時 MA200。"""
     a0 = max(0, i - 24)
@@ -107,11 +167,9 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
 
     crossed_200：前收還在 MA200 下，本根收盤站上。
     formed_align：已經在 MA200 上，本根才收上短均／排成 7>25。
-    15m 通知：crossed_200（本根剛站上 MA200 且 7>25）。
+    15m 通知：剛站上後還要連續 3 根收盤都在 MA200 上（見 confirm_reclaim_hold）。
     """
-    c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
-    m7, m14, m25, m200 = d["m7"], d["m14"], d["m25"], d["m200"]
-    v20 = d["v20"]
+    c, m7, m14, m25, m200 = d["c"], d["m7"], d["m14"], d["m25"], d["m200"]
     out: list[BullSignal] = []
     last_i = -10_000
     for i in range(200, len(c)):
@@ -123,29 +181,10 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
             continue
         if i - last_i < min_gap_bars:
             continue
-        vr = float(v[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
-        ext = (c[i] / m200[i] - 1.0) * 100.0 if m200[i] else 0.0
-        out.append(
-            BullSignal(
-                idx=i,
-                open=float(o[i]),
-                high=float(h[i]),
-                low=float(l[i]),
-                close=float(c[i]),
-                prev_close=float(c[i - 1]),
-                m7=float(m7[i]),
-                m14=float(m14[i]),
-                m25=float(m25[i]),
-                ma200=float(m200[i]),
-                vol_ratio=vr,
-                ext_pct=float(ext),
-                crossed_200=bool(c[i - 1] <= m200[i - 1] and c[i] > m200[i]),
-                formed_align=bool(c[i - 1] > m200[i - 1] and not _stack_ok(c, m7, m14, m25, m200, i - 1)),
-                bars_below=bars_below_ma200(c, m200, i),
-                rng24=rng24_pct(h, l, m200, i),
-                bars_above=bars_above_ma200(c, m200, i),
-            )
-        )
+        sig = signal_at(d, i)
+        if sig is None:
+            continue
+        out.append(sig)
         last_i = i
     return out
 
@@ -265,6 +304,7 @@ class SignalRow:
     h1_ma25_up: bool | None = None
     h1_m7: float | None = None
     h1_stack_ok: bool | None = None
+    hold_confirmed: bool = False
 
     @property
     def vol_ratio(self) -> float:
@@ -375,8 +415,13 @@ def apply_filter(
     require_btc_1h: bool | None = None,
     require_h1_ma25_up: bool | None = None,
     require_h1_stack: bool | None = None,
+    hold_confirmed: bool | None = None,
 ) -> list[SignalRow]:
     out = rows
+    if hold_confirmed:
+        out = [r for r in out if r.hold_confirmed]
+    else:
+        out = [r for r in out if not r.hold_confirmed]
     if crossed:
         out = [r for r in out if r.crossed_200d]
     if formed:

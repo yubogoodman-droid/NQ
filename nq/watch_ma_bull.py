@@ -1,6 +1,7 @@
 """15 分 / 1 小時 MA200 剛站上 → Telegram（與回測同一套規則）。
 
 15m / 1h：收盤 > MA7>25 且本根剛站上該週期 MA200。
+15m 還要剛站上後連續 3 根收盤都在 MA200 上才推（訊號是第 3 根）。
 15m Telegram 圖由上到下是 15m / 1h / 4h（4h 只對照、不擋單）。
 """
 
@@ -22,6 +23,7 @@ from nq.ma15_bull import (
     add_15m_mas,
     above_htf_ma200,
     bar_above_ma200,
+    confirm_reclaim_hold,
     detect_combo,
     htf_ma200_at,
     htf_ma25_not_down,
@@ -63,7 +65,8 @@ TF_WATCH = {
         "require_h1_ma25_up": True,
         "require_h1_stack": True,
         "lookback": 48,
-        "title": "15m 剛站上 MA200",
+        "min_hold_bars": 3,
+        "title": "15m MA200 上連 3 根",
     },
     "1h": {
         "signal": "1h",
@@ -322,6 +325,8 @@ def passes_notify(sig, spec: dict, d, d_htf, ts: int, btc_1h: dict | None) -> bo
         src = d if spec["signal"] == "1h" else d_htf
         if not htf_ma7_25_stack(src, ts, sig.close, INTERVAL_MS["1h"]):
             return False
+    if spec.get("min_hold_bars"):
+        return True
     return quality_reclaim(
         sig,
         min_below=spec["min_below"],
@@ -340,16 +345,35 @@ def scan_symbol(sym: str, spec: dict, btc_1h: dict | None = None) -> list[dict]:
     raw_h = fetch_klines(sym, interval=spec["htf"], limit=spec["htf_limit"], extra_bars=8)
     d_htf = add_15m_mas(raw_h) if raw_h is not None and len(raw_h["c"]) >= 200 else None
     n = len(d["c"])
+    combos = detect_combo(d, min_gap_bars=0)
+    by_idx = {s.idx: s for s in combos}
+    hold = spec.get("min_hold_bars")
     events = []
     for closed in (n - 1, n - 2):
         if closed < 200:
             continue
-        hits = [s for s in detect_combo(d, min_gap_bars=0) if s.idx == closed]
-        for sig in hits:
-            ts = int(d["t"][sig.idx])
-            if not passes_notify(sig, spec, d, d_htf, ts, btc_1h):
+        if hold:
+            start = closed - (hold - 1)
+            if start < 200:
                 continue
-            events.append({"symbol": sym, "sig": sig, "d": d, "d_htf": d_htf, "spec": spec})
+            sig0 = by_idx.get(start)
+            if sig0 is None or not sig0.crossed_200:
+                continue
+            held = confirm_reclaim_hold(d, sig0, hold)
+            if held is None or held.idx != closed:
+                continue
+            ts = int(d["t"][held.idx])
+            if not passes_notify(held, spec, d, d_htf, ts, btc_1h):
+                continue
+            events.append({"symbol": sym, "sig": held, "d": d, "d_htf": d_htf, "spec": spec})
+            continue
+        sig = by_idx.get(closed)
+        if sig is None:
+            continue
+        ts = int(d["t"][sig.idx])
+        if not passes_notify(sig, spec, d, d_htf, ts, btc_1h):
+            continue
+        events.append({"symbol": sym, "sig": sig, "d": d, "d_htf": d_htf, "spec": spec})
     return events
 
 
@@ -369,7 +393,9 @@ def format_ev(ev: dict) -> str:
     else:
         hline = f"{htxt}（參考，不擋單）"
     extra = ""
-    if not sig.crossed_200:
+    if spec.get("min_hold_bars"):
+        extra += f"{tf} MA200 上已連 {spec['min_hold_bars']} 根（剛站上後維持）\n"
+    elif not sig.crossed_200:
         extra += f"站上後第 {sig.bars_above} 根才收出 7&gt;25\n"
     if spec["min_below"] is not None:
         extra += (
@@ -448,7 +474,7 @@ def test_telegram() -> int:
     apply_keys()
     ok = telegram_send(
         "MA200 監看測試\n"
-        "15m：剛站上 15m MA200（收盤 > 7>25），且 1h MA25 未下彎、1h 7>25\n"
+        "15m：剛站上 15m MA200（收盤 > 7>25），連 3 根都在年線上，且 1h MA25 未下彎、1h 7>25\n"
         "1h：剛站上 1h MA200（收盤 > 7>25），且 1h MA25 未下彎\n"
         "如果你看到這則，Telegram 已通。"
     )
@@ -458,6 +484,7 @@ def test_telegram() -> int:
 
 def spec_note(spec: dict) -> str:
     n = spec.get("max_bars_above")
+    hold = spec.get("min_hold_bars")
     if n is not None:
         return (
             f"{spec['signal']} 剛站上 MA200，或站上後 {n} 根內收出 7>25"
@@ -465,6 +492,7 @@ def spec_note(spec: dict) -> str:
         )
     return (
         f"{spec['signal']} 剛站上 MA200、收盤 > 7>25"
+        + (f"，再連 {hold} 根都在 MA200 上" if hold else "")
         + ("，且 1h MA25 未下彎" if spec.get("require_h1_ma25_up") else "")
         + ("，且 1h 7>25" if spec.get("require_h1_stack") else "")
         + f"（{spec['htf']} SMA200 只畫圖、不擋單）"
