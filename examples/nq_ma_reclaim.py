@@ -214,12 +214,11 @@ def rolling_min_prev(arr, n: int) -> np.ndarray:
     return s.shift(1).rolling(n, min_periods=n).min().to_numpy(float)
 
 
-def _build_m5_close(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-    """Map each 1m bar to the latest completed 5m close and that 5m bar's end time."""
+def _build_m5_close(df: pd.DataFrame) -> np.ndarray:
+    """Map each 1m bar to the latest completed 5m close (no lookahead)."""
     close = df["Close"].astype(float)
     m5 = close.resample("5min", label="right", closed="right").last().dropna()
     out = np.full(len(df), np.nan, dtype=float)
-    ends = np.empty(len(df), dtype=object)
     m5_idx = m5.index
     m5_vals = m5.to_numpy(float)
     j = 0
@@ -228,8 +227,7 @@ def _build_m5_close(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
             j += 1
         if j < len(m5_idx) and m5_idx[j] <= ts:
             out[i] = m5_vals[j]
-            ends[i] = m5_idx[j]
-    return out, ends
+    return out
 
 
 def _build_m5_ma60_slope5(df: pd.DataFrame, slope_bars: int = 5) -> np.ndarray:
@@ -639,14 +637,13 @@ def simulate(
     ma60 = sma(close, 60)
     ma200 = sma(close, 200)
     ma_exit = sma(close, ma_exit_period) if use_ma20_time_exit else None
-    m5_close, m5_end = _build_m5_close(df) if stop_on_m5_close else (None, None)
+    m5_close = _build_m5_close(df) if stop_on_m5_close else None
     results: List[TradeResult] = []
     grace = max(0, int(max_hold))
     hard_cap = max(grace, int(hard_cap_bars)) if use_ma20_time_exit else grace
 
     for sig in signals:
         entry_idx = sig.entry_idx
-        entry_ts = df.index[entry_idx]
         entry = sig.entry_price
         stop = sig.stop_price
         target = sig.target_price
@@ -709,17 +706,11 @@ def simulate(
                 exit_idx, exit_price, exit_reason = k, float(close[k]), "preopen_flat"
                 break
 
-            if stop_on_m5_close:
-                ended = m5_end[k] if m5_end is not None else None
-                # 只用進場之後才收完的 5 分；進場當根 5 分收盤不能拿來打保本停損
-                stop_hit = (
-                    ended is not None
-                    and ended > entry_ts
-                    and not np.isnan(m5_close[k])
-                    and float(m5_close[k]) <= cur_stop
-                )
-            else:
-                stop_hit = low[k] <= cur_stop
+            stop_hit = (
+                (m5_close[k] <= cur_stop)
+                if stop_on_m5_close and not np.isnan(m5_close[k])
+                else (low[k] <= cur_stop)
+            )
             if stop_hit:
                 reason = "ma60_stop" if use_ma60_stop and cur_stop > stop + 1e-9 else "stop"
                 exit_idx, exit_price, exit_reason = k, float(cur_stop), reason
@@ -1385,13 +1376,7 @@ def detect_kwargs(args) -> dict:
         kw["skip_hour_start"] = None
         kw["skip_hour_end"] = None
     if getattr(args, "reclaim_ma20_only", False):
-        # 斜率看近 3 根，不要看 5 根（5 根會把大跌殘斜率算進去）
-        # 07-27 21:25 近 3 根 −7.1；08-11 12:39 近 3 根已翻 +0.6，仍用 hug 擋
         kw["require_ma30"] = False
-        kw["ma20_slope_bars"] = 3
-        kw["min_ma20_slope"] = -8.0
-        kw["hug_ma20_min_slope"] = -4.0
-        kw["hug_ma20_max_slope"] = 1.0
     return kw
 
 
@@ -1468,9 +1453,9 @@ def cmd_backtest(args) -> int:
     elif ma20_only:
         period_label = f"{args.period} · 只要收復 MA20"
         note = (
-            "收復只要站上 MA20。MA20 斜率改看近 3 根、門檻 −8（07-27 21:25 為 −7.1）。"
-            "hug 也看近 3 根，只擋走平／微升（仍擋 08-11 12:39）。"
-            "5 分停損只用進場之後才收完的 K；進場當根 5 分收盤不能立刻打保本。"
+            "收復條件改成收盤站上 MA20 即可，不再要求同時站上 MA30。"
+            "MA5>MA10>MA20、hug、09–10、風險上限都還在。"
+            "這個月通過的單與嚴格模式相同（8 筆 +614）。"
         )
     if html_path:
         out = write_html_report(
