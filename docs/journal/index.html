@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0e11" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="description" content="股市進出簿 — 紀錄買賣、持倉與損益，資料存在本機。" />
@@ -593,7 +594,7 @@
       const closed = positionsFrom(buildBooks(state.trades).books).filter((p) => Math.abs(p.qty) <= 1e-9 && (p.buyQty || p.sellQty));
       return `
         ${open.length ? open.map(posCard).join("") : `<div class="card empty">目前沒有未平倉部位。</div>`}
-        ${closed.length ? `<div class="section-title">已平倉</div>${closed.map((p) => `<div class="card"><div class="pos-top"><div><div class="sym">${esc(p.symbol)} <span class="name">${esc(p.name)}</span></div><div class="name">已出清</div></div><div class="mono ${clsPnl(p.realized)}">${signed(p.realized, 0)}</div></div></div>`).join("")}` : ""}
+        ${closed.length ? `<div class="section-title">已平倉</div>${closed.map((p) => `<div class="card"><div class="pos-top"><div><div class="sym">${esc(p.symbol)} <span class="name">${esc(p.name)}</span></div><div class="name">已出清 · 已實現損益</div></div><div class="mono ${clsPnl(p.realized)}">${signed(p.realized, 0)}</div></div></div>`).join("")}` : ""}
       `;
     }
 
@@ -701,15 +702,35 @@
 
     function askQuote(key) {
       const cur = state.quotes[key];
-      const next = prompt("輸入目前市價（留空則清除）", cur ? cur.price : "");
-      if (next == null) return;
-      if (String(next).trim() === "") delete state.quotes[key];
-      else {
-        const price = Number(next);
+      const pos = positionsFrom(buildBooks(state.trades).books).find((p) => posKey(p) === key);
+      document.getElementById("sheetCard").innerHTML = `
+        <div class="grab"></div>
+        <div class="sheet-title">設定現價</div>
+        <p class="help" style="margin-bottom:12px">${esc(pos ? pos.symbol + " " + pos.name : key)} · 均價 ${pos ? money(pos.avgCost, 2) : "—"}</p>
+        <form id="quoteForm">
+          <label>目前市價</label>
+          <input class="field" name="price" type="number" inputmode="decimal" step="0.01" min="0" value="${cur ? esc(cur.price) : ""}" placeholder="例如 960" required />
+          <div class="row-actions" style="margin-top:14px">
+            <button class="btn block" style="flex:1;background:#238636;color:#fff;border:0" type="submit">更新現價</button>
+          </div>
+          ${cur ? `<button type="button" class="btn block ghost" id="btnClearQuote" style="margin-top:8px">清除現價</button>` : ""}
+          <button type="button" class="btn block ghost" id="btnCancelQuote" style="margin-top:8px">取消</button>
+        </form>
+      `;
+      document.getElementById("sheet").classList.add("open");
+      document.getElementById("quoteForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const price = Number(new FormData(e.target).get("price"));
         if (!(price > 0)) return toast("現價需大於 0");
         state.quotes[key] = { price, updatedAt: new Date().toISOString() };
-      }
-      save(); render();
+        save(); closeSheet(); render(); toast("已更新現價");
+      });
+      document.getElementById("btnCancelQuote").addEventListener("click", closeSheet);
+      const clearBtn = document.getElementById("btnClearQuote");
+      if (clearBtn) clearBtn.addEventListener("click", () => {
+        delete state.quotes[key];
+        save(); closeSheet(); render(); toast("已清除現價");
+      });
     }
 
     function lookupName(symbol, market) {

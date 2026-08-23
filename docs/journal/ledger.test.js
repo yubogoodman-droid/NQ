@@ -43,6 +43,15 @@ almost(realizedByTrade["3"], (1050 - (fee1050 + tax1050) / 1000 - (890 + fee890 
 almost(pos.unrealized, (960 - pos.avgCost) * 1000, 0.02, "unrealized");
 assert(realizedByTrade["1"] === 0 && realizedByTrade["2"] === 0, "buys realize 0");
 
+const media = buildBooks([
+  { id: "m1", date: "2026-06-15", time: "10:02", market: "TW", symbol: "2454", name: "聯發科", side: "buy", price: 1280, qty: 500, fee: calcFee(1280, 500, "TW", settings), tax: 0 },
+  { id: "m2", date: "2026-08-01", time: "13:33", market: "TW", symbol: "2454", name: "聯發科", side: "sell", price: 1190, qty: 500, fee: calcFee(1190, 500, "TW", settings), tax: calcTax(1190, 500, "sell", "TW", settings) }
+]);
+const mediaPos = positionsFrom(media.books, {})[0];
+almost(mediaPos.qty, 0, 1e-6, "2454 closed");
+assert(media.realizedByTrade.m2 < 0, "2454 sell is a loss");
+almost(mediaPos.realized, -47841, 1, "2454 closed realized");
+
 const shorts = buildBooks([
   { id: "s1", date: "2026-01-01", time: "09:00", market: "TW", symbol: "2603", side: "sell", price: 200, qty: 1000, fee: 0, tax: 600 },
   { id: "s2", date: "2026-01-02", time: "09:00", market: "TW", symbol: "2603", side: "buy", price: 180, qty: 1000, fee: 0, tax: 0 }
