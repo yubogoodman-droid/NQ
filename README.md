@@ -22,6 +22,44 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 一分 K 破底翻 MA Reclaim
+
+1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
+停損在破底低點下方；目標 2R（MA20 上彎時 3R）。品質看 1m MA5 / 1m MA60 / 5m MA60 斜率。
+
+```bash
+# 近 8 天 / 近一個月回測 + 手機版 HTML（每筆一張圖）
+python3 examples/nq_ma_reclaim.py backtest --period 8d --html output/nq_ma_reclaim.html
+python3 examples/nq_ma_reclaim.py backtest --period 30d --pages
+
+# Telegram 輪詢（憑證放 tg_config.env，勿提交）
+python3 examples/nq_ma_reclaim.py alert --test
+python3 examples/nq_ma_reclaim.py alert --dry-run --once
+python3 examples/nq_ma_reclaim.py alert
+```
+
+近一個月 Yahoo 1m（2026-07-24 → 08-21）：**嚴格 8 筆、勝率 62.5%、約 +614 點**。  
+漏斗：破底 1197 → 深度≥10點 293 → 收復+排列後還被 hug/MA60/9–10點/風險擋掉，只剩 8。  
+關掉 hug／MA60 特例後（核心）變成 **25 筆、+815 點**，但會多出幾筆 −50 停損（含原本要擋的 08-11 12:39）。
+
+外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
+現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
+
+## 台股成交額前 100 · 同一套破底翻（一週）
+
+```bash
+python3 examples/scan_tw_ma_reclaim.py --limit 100 --range 7d --pages
+```
+
+2026-08-21 成交額前 100（第 100 名約 17 億）：一週 **7 筆**。  
+近一個月、**股價 ≤ 600**：100 檔（台積電／聯發科／大立光等已濾掉）**32 筆、勝率 21.9%、−6.55**。
+
+```bash
+python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --pages
+```
+
+月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
