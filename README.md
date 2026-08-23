@@ -28,11 +28,9 @@
 停損在破底低點下方；目標 2R（MA20 上彎時 3R）。品質看 1m MA5 / 1m MA60 / 5m MA60 斜率。
 
 ```bash
-# 近 8 天回測 + 手機版 HTML（每筆一張圖）
+# 近 8 天 / 近一個月回測 + 手機版 HTML（每筆一張圖）
 python3 examples/nq_ma_reclaim.py backtest --period 8d --html output/nq_ma_reclaim.html
-
-# 寫到 GitHub Pages
-python3 examples/nq_ma_reclaim.py backtest --period 8d --pages
+python3 examples/nq_ma_reclaim.py backtest --period 30d --pages
 
 # Telegram 輪詢（憑證放 tg_config.env，勿提交）
 python3 examples/nq_ma_reclaim.py alert --test
@@ -40,8 +38,8 @@ python3 examples/nq_ma_reclaim.py alert --dry-run --once
 python3 examples/nq_ma_reclaim.py alert
 ```
 
-近 8 天 Yahoo 1m（2026-08-14 → 08-21）：**3 筆、勝率 66.7%、+153.4 點**
-（QB 08-18 +62 / QA 08-20 −5.5 / QA 08-21 +96.9）
+近一個月 Yahoo 1m（2026-07-24 → 08-21，Yahoo 一分 K 最遠約 30 天）：**8 筆、勝率 62.5%、+614.8 點**
+（QA 07-28 +296 / QB 07-31 +111 / 其餘見報告）
 
 外網：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/
 
