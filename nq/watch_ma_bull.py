@@ -289,7 +289,7 @@ def draw_chart(
     if d_htf is not None and hi is not None:
         b0 = max(0, hi - 48)
         b1 = min(len(d_htf["c"]), hi + 2)
-        note = "（只對照，不擋單）" if spec["htf"] == "4h" else ""
+        note = "  compare only" if spec["htf"] == "4h" else ""
         panels.append((d_htf, spec["htf"], b0, b1, hi, _panel_title(title_sym, spec["htf"], d_htf, hi, note=note)))
     if spec["signal"] == "15m" and d_4h is not None and len(d_4h.get("c", [])):
         i4 = tf_bar_idx(d_4h, ts, INTERVAL_MS["4h"])
@@ -297,7 +297,7 @@ def draw_chart(
             c0 = max(0, i4 - 48)
             c1 = min(len(d_4h["c"]), i4 + 2)
             panels.append(
-                (d_4h, "4h", c0, c1, i4, _panel_title(title_sym, "4h", d_4h, i4, note="（只對照，不擋單）"))
+                (d_4h, "4h", c0, c1, i4, _panel_title(title_sym, "4h", d_4h, i4, note="  compare only"))
             )
     return _save_stacked_chart(path, panels)
 
