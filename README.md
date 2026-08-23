@@ -52,7 +52,7 @@ python3 examples/nq_ma_reclaim.py backtest --period 30d --allow-open-hour --page
 
 拆解頁：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim/research-view.html  
 允許 09–10 的 9 筆圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim-0910/view.html  
-只要收復 MA20：斜率門檻放到 −13、hug 只擋走平。07-27 21:25 會進（QB 2 分鐘打平）。  
+只要收復 MA20：斜率改看近 3 根（門檻 −8）。07-27 21:25 會進（打平）；08-11 12:39 近 3 根已翻正，仍被 hug 擋。  
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim-ma20/view.html
 
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  

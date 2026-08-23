@@ -29,13 +29,17 @@ from nq_ma_reclaim import (  # noqa: E402
 
 
 def test_hug_band_skips_flat_not_steep() -> None:
-    """08-11 型走平要擋；07-27 21:25 型大跌收復（斜率 -12）不擋。"""
+    """近 3 根：08-11 微升仍 hug；07-27 21:25 大跌收復不 hug。"""
     kw = detect_kwargs(SimpleNamespace(reclaim_ma20_only=True))
     assert kw["require_ma30"] is False
-    assert kw["min_ma20_slope"] == -13.0
-    assert kw["hug_ma20_min_slope"] == -8.0
-    assert -13.0 <= -12.12 < -8.0
-    assert -8.0 <= -0.95 <= 0.5
+    assert kw["ma20_slope_bars"] == 3
+    assert kw["min_ma20_slope"] == -8.0
+    assert kw["hug_ma20_min_slope"] == -4.0
+    assert kw["hug_ma20_max_slope"] == 1.0
+    # 07-27 21:25 近 3 根 −7.12：過斜率、不進 hug 帶
+    assert -8.0 <= -7.12 < -4.0
+    # 08-11 12:39 近 3 根 +0.57：在 hug 帶
+    assert -4.0 <= 0.57 <= 1.0
 
 
 def test_detect_kwargs_allow_open_hour() -> None:

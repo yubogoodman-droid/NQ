@@ -1376,10 +1376,13 @@ def detect_kwargs(args) -> dict:
         kw["skip_hour_start"] = None
         kw["skip_hour_end"] = None
     if getattr(args, "reclaim_ma20_only", False):
-        # 07-27 21:25：斜率 −12 仍可收復；hug 只擋走平／小跌（08-11 12:39）
+        # 斜率看近 3 根，不要看 5 根（5 根會把大跌殘斜率算進去）
+        # 07-27 21:25 近 3 根 −7.1；08-11 12:39 近 3 根已翻 +0.6，仍用 hug 擋
         kw["require_ma30"] = False
-        kw["min_ma20_slope"] = -13.0
-        kw["hug_ma20_min_slope"] = -8.0
+        kw["ma20_slope_bars"] = 3
+        kw["min_ma20_slope"] = -8.0
+        kw["hug_ma20_min_slope"] = -4.0
+        kw["hug_ma20_max_slope"] = 1.0
     return kw
 
 
@@ -1456,8 +1459,8 @@ def cmd_backtest(args) -> int:
     elif ma20_only:
         period_label = f"{args.period} · 只要收復 MA20"
         note = (
-            "收復只要站上 MA20。MA20 斜率門檻改 −13（放行 07-27 21:25 那種 −12）；"
-            "hug 只擋走平／小跌（仍擋 08-11 12:39），大跌後收復不擋。"
+            "收復只要站上 MA20。MA20 斜率改看近 3 根、門檻 −8（07-27 21:25 為 −7.1）。"
+            "hug 也看近 3 根，只擋走平／微升（仍擋 08-11 12:39）。"
         )
     if html_path:
         out = write_html_report(
