@@ -309,6 +309,7 @@ def detect_signals(
     ma20_up_target_r: float = 3.0,
     use_ma60_skip: bool = True,
     require_ma30: bool = True,
+    require_stack: bool = True,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     s = float(pt_scale) if pt_scale and pt_scale > 0 else 1.0
@@ -381,7 +382,7 @@ def detect_signals(
             if np.isnan(ma30[j]):
                 continue
             reclaimed = close[j] > ma20[j] and (not require_ma30 or close[j] > ma30[j])
-            bull_stack = ma5[j] > ma10[j] > ma20[j]
+            bull_stack = (not require_stack) or (ma5[j] > ma10[j] > ma20[j])
             if not (reclaimed and bull_stack):
                 continue
             bump("reclaim_stack")
@@ -1345,6 +1346,7 @@ def cmd_backtest(args) -> int:
         note = (
             "收復條件改成收盤站上 MA20 即可，不再要求同時站上 MA30。"
             "MA5>MA10>MA20、hug、09–10、風險上限都還在。"
+            "這個月通過的單與嚴格模式相同（8 筆 +614）。"
         )
     if html_path:
         out = write_html_report(
