@@ -71,6 +71,8 @@ def test_filter_by_max_price() -> None:
 def test_last_session_skips_weekend() -> None:
     sunday = datetime(2026, 8, 23, 12, 0, tzinfo=TPE)
     assert last_tw_session_yyyymmdd(sunday) == "20260821"
+    monday_morning = datetime(2026, 8, 24, 10, 0, tzinfo=TPE)
+    assert last_tw_session_yyyymmdd(monday_morning) == "20260821"
 
 
 def main() -> int:

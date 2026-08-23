@@ -90,9 +90,29 @@ def session_mask(index: pd.DatetimeIndex) -> pd.Series:
 
 def last_tw_session_yyyymmdd(now: datetime | None = None) -> str:
     cur = (now or datetime.now(TPE)).date()
+    # 當日收盤資料通常傍晚才齊，15:00 前先用上一個交易日
+    if cur.weekday() < 5 and (now or datetime.now(TPE)).hour < 15:
+        cur -= timedelta(days=1)
     while cur.weekday() >= 5:
         cur -= timedelta(days=1)
     return cur.strftime("%Y%m%d")
+
+
+def resolve_twse_date(date: str) -> str:
+    cur = datetime.strptime(date, "%Y%m%d").date()
+    last_err = "no date"
+    for _ in range(8):
+        ymd = cur.strftime("%Y%m%d")
+        payload = _get_json(
+            f"https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date={ymd}&type=ALLBUT0999&response=json"
+        )
+        if payload.get("stat") == "OK":
+            return ymd
+        last_err = str(payload.get("stat"))
+        cur -= timedelta(days=1)
+        while cur.weekday() >= 5:
+            cur -= timedelta(days=1)
+    raise RuntimeError(f"TWSE no session near {date}: {last_err}")
 
 
 def fetch_top_turnover(date: str, limit: int) -> list[dict]:
@@ -380,7 +400,7 @@ def main(argv=None) -> int:
     p.add_argument("--html", default="")
     args = p.parse_args(argv)
 
-    date = args.date or last_tw_session_yyyymmdd()
+    date = resolve_twse_date(args.date or last_tw_session_yyyymmdd())
     pool = max(args.limit, args.pool if args.max_price else args.limit)
     print(
         f"universe date={date} limit={args.limit} pool={pool} "
