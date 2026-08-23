@@ -40,6 +40,9 @@ python3 examples/nq_ma_reclaim.py alert --dry-run --once
 python3 examples/nq_ma_reclaim.py alert
 ```
 
+近 8 天 Yahoo 1m（2026-08-14 → 08-21）：**3 筆、勝率 66.7%、+153.4 點**
+（QB 08-18 +62 / QA 08-20 −5.5 / QA 08-21 +96.9）
+
 外網：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/
 
 ## 幣安黏帶三幕 Telegram
