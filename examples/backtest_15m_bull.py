@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """回測：收盤高於 MA7/25/200，且 7>25。MA14 只畫圖、不擋單。
 
-通知只推本根剛站上該週期 MA200，且 1h MA25 未下彎。大週期 SMA200 只對照、不擋單。
+通知只推本根剛站上該週期 MA200，且 1h MA25 未下彎；15m 還要 1h 7>25。大週期 SMA200 只對照、不擋單。
 
     python3 examples/backtest_15m_bull.py --demo
     python3 examples/backtest_15m_bull.py --days 7 --stocks --pages
@@ -39,6 +39,7 @@ from nq.ma15_bull import (
     forward_moves,
     htf_ma200_at,
     htf_ma25_now_prev,
+    htf_ma7_25_at,
     sma,
     summarize_rows,
 )
@@ -78,6 +79,7 @@ class TfSpec:
     max_bars_above: int | None = None
     require_btc_1h: bool = False
     require_h1_ma25_up: bool = False
+    require_h1_stack: bool = False
     lookback: int = 48
 
     @property
@@ -109,6 +111,7 @@ TF_SPECS = {
         ),
         require_htf=False,
         require_h1_ma25_up=True,
+        require_h1_stack=True,
     ),
     "1h": TfSpec(
         signal="1h",
@@ -161,6 +164,8 @@ def notify_kwargs(spec: TfSpec) -> dict:
         kw["require_btc_1h"] = True
     if spec.require_h1_ma25_up:
         kw["require_h1_ma25_up"] = True
+    if spec.require_h1_stack:
+        kw["require_h1_stack"] = True
     return kw
 
 
@@ -173,6 +178,8 @@ def notify_label(spec: TfSpec) -> str:
         base = f"通知：本根剛站上 {spec.signal} MA200"
     if spec.require_h1_ma25_up:
         base += "，且 1h MA25 未下彎"
+    if spec.require_h1_stack:
+        base += "，且 1h 7>25"
     return base
 
 
@@ -267,6 +274,9 @@ def scan_symbol(sym: str, days: int, spec: TfSpec) -> tuple[str, dict | None, li
         src_1h = d if spec.signal == "1h" else d_htf
         bar_1h = INTERVAL_MS["1h"]
         ma25_now, ma25_prev = htf_ma25_now_prev(src_1h, ts, sig.close, bar_1h)
+        h1_m7, h1_m25_now = htf_ma7_25_at(src_1h, ts, sig.close, bar_1h)
+        if h1_m25_now is not None:
+            ma25_now = h1_m25_now
         rows.append(
             SignalRow(
                 symbol=sym,
@@ -280,6 +290,10 @@ def scan_symbol(sym: str, days: int, spec: TfSpec) -> tuple[str, dict | None, li
                 h1_ma25_prev=ma25_prev,
                 h1_ma25_up=bool(
                     ma25_now is not None and ma25_prev is not None and ma25_now >= ma25_prev
+                ),
+                h1_m7=h1_m7,
+                h1_stack_ok=bool(
+                    h1_m7 is not None and ma25_now is not None and sig.close > h1_m7 > ma25_now
                 ),
             )
         )
@@ -366,6 +380,8 @@ def draw_chart(
     extra = f"  below={row.bars_below}  above={row.bars_above}  vol={row.vol_ratio:.2f}x  ext={row.ext_pct:+.2f}%"
     if row.h1_ma25 is not None and row.h1_ma25_prev is not None:
         extra += "  1hMA25 " + ("up" if row.h1_ma25_up else "down")
+    if row.h1_stack_ok is not None:
+        extra += "  1h7>25 " + ("ok" if row.h1_stack_ok else "no")
 
     hi = tf_bar_idx(d_htf, row.time_ms, spec.htf_ms) if d_htf is not None and len(d_htf.get("c", [])) else None
     stacked = hi is not None
@@ -564,6 +580,8 @@ def gallery_html(gallery: list[tuple[SignalRow, str]], spec: TfSpec) -> str:
         slope = ""
         if row.h1_ma25 is not None and row.h1_ma25_prev is not None:
             slope = " · 1hMA25 未下彎" if row.h1_ma25_up else " · 1hMA25 下彎"
+        if row.h1_stack_ok:
+            slope += " · 1h 7>25"
         cards.append(
             f'<div class="card"><div class="cap">{html.escape(sym_label(row.symbol))} · {hm(row.time_ms)} · '
             f"{html.escape(kind)} · 底下 {row.bars_below} 根 · 量比 {row.vol_ratio:.2f} · "
@@ -622,6 +640,8 @@ def write_html(
                 "另要求當時 <strong>1h SMA25 未下彎</strong>"
                 "（當下 1h MA25 ≥ 前一根已收完；未收完的 1h 用當下收盤，不看未來）。"
             )
+        if spec.require_h1_stack:
+            htf_rule += "且當時 <strong>1h 收盤 &gt; MA7 &gt; MA25</strong>。"
         if spec.min_below is not None:
             extra = ""
             if spec.min_vol is not None:
@@ -649,7 +669,9 @@ def write_html(
                 notify_rule = (
                     f"Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
                     f"這一根收盤站上，同時收盤也在 7>25 之上"
-                    + ("，且 <strong>1h MA25 未下彎</strong>。" if spec.require_h1_ma25_up else "。")
+                    + ("，且 <strong>1h MA25 未下彎</strong>" if spec.require_h1_ma25_up else "")
+                    + ("，且 <strong>1h 7&gt;25 多頭排列</strong>" if spec.require_h1_stack else "")
+                    + "。"
                 )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -701,7 +723,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
   <div class="card">
     <h2>過濾對照</h2>
     <div class="table-wrap">{stats_table(stats, spec)}</div>
-    <p class="note">底下 = 站上前連續幾根收盤在 MA200 下。距{html.escape(tf)}MA200 =（收盤 / {html.escape(tf)} SMA200 − 1）× 100%。距{html.escape(htf)}MA200 用訊號當下價 vs 當時 {html.escape(htf)} SMA200。量比 = 當根量 / 20 根均量。1h MA25 未下彎 = 當下 1h SMA25 ≥ 前一根已收完（未收完的 1h 用當下收盤）。</p>
+    <p class="note">底下 = 站上前連續幾根收盤在 MA200 下。距{html.escape(tf)}MA200 =（收盤 / {html.escape(tf)} SMA200 − 1）× 100%。距{html.escape(htf)}MA200 用訊號當下價 vs 當時 {html.escape(htf)} SMA200。量比 = 當根量 / 20 根均量。1h MA25 未下彎 = 當下 1h SMA25 ≥ 前一根已收完。1h 7&gt;25 = 當時 1h 收盤 &gt; MA7 &gt; MA25（未收完的 1h 用當下收盤）。</p>
   </div>
   <div class="card">
     <h2>訊號表（通知條件，依 4h 報酬排序）</h2>
@@ -838,7 +860,7 @@ def main() -> int:
     print(f"TUT 通知：{len(tut)} 筆")
     for r in tut:
         mv = r.moves.get(spec.hold4)
-        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  crossed={r.crossed_200d}  above={r.bars_above}  vol={r.vol_ratio:.2f}  1hMA25={'up' if r.h1_ma25_up else 'down'}  4h={mv.ret_pct if mv else None}")
+        print(f"  {hm(r.time_ms)}  close={r.sig.close:g}  crossed={r.crossed_200d}  above={r.bars_above}  vol={r.vol_ratio:.2f}  1hMA25={'up' if r.h1_ma25_up else 'down'}  1h7>25={r.h1_stack_ok}  4h={mv.ret_pct if mv else None}")
     btc = [r for r in notify_rows if r.symbol == "BTCUSDT"]
     print(f"BTC 通知：{len(btc)} 筆")
     for r in btc:

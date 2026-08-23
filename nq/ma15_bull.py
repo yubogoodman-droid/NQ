@@ -192,6 +192,23 @@ def htf_ma25_now_prev(
     return now, float(prev_win.mean())
 
 
+def htf_ma7_25_at(
+    d_htf: dict | None, time_ms: int, last_price: float, bar_ms: int
+) -> tuple[float | None, float | None]:
+    if d_htf is None:
+        return None, None
+    return (
+        htf_sma_at(d_htf, time_ms, last_price, bar_ms, 7),
+        htf_sma_at(d_htf, time_ms, last_price, bar_ms, 25),
+    )
+
+
+def htf_ma7_25_stack(d_htf: dict | None, time_ms: int, last_price: float, bar_ms: int) -> bool:
+    """1h 多頭排列：當下收盤 > MA7 > MA25（未收完用 last_price）。"""
+    m7, m25 = htf_ma7_25_at(d_htf, time_ms, last_price, bar_ms)
+    return m7 is not None and m25 is not None and float(last_price) > m7 > m25
+
+
 def htf_ma25_not_down(d_htf: dict | None, time_ms: int, last_price: float, bar_ms: int) -> bool:
     """1h MA25 未下彎：當下 ≥ 前一根已收完。"""
     now, prev = htf_ma25_now_prev(d_htf, time_ms, last_price, bar_ms)
@@ -246,6 +263,8 @@ class SignalRow:
     h1_ma25: float | None = None
     h1_ma25_prev: float | None = None
     h1_ma25_up: bool | None = None
+    h1_m7: float | None = None
+    h1_stack_ok: bool | None = None
 
     @property
     def vol_ratio(self) -> float:
@@ -355,6 +374,7 @@ def apply_filter(
     max_bars_above: int | None = None,
     require_btc_1h: bool | None = None,
     require_h1_ma25_up: bool | None = None,
+    require_h1_stack: bool | None = None,
 ) -> list[SignalRow]:
     out = rows
     if crossed:
@@ -379,6 +399,8 @@ def apply_filter(
         out = [r for r in out if r.btc_1h_ok]
     if require_h1_ma25_up:
         out = [r for r in out if r.h1_ma25_up]
+    if require_h1_stack:
+        out = [r for r in out if r.h1_stack_ok]
     return out
 
 

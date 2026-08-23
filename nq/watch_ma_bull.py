@@ -25,6 +25,8 @@ from nq.ma15_bull import (
     htf_ma200_at,
     htf_ma25_not_down,
     htf_ma25_now_prev,
+    htf_ma7_25_at,
+    htf_ma7_25_stack,
     quality_reclaim,
     sma,
 )
@@ -58,6 +60,7 @@ TF_WATCH = {
         "max_bars_above": None,
         "require_btc_1h": False,
         "require_h1_ma25_up": True,
+        "require_h1_stack": True,
         "lookback": 48,
         "title": "15m 剛站上 MA200",
     },
@@ -75,6 +78,7 @@ TF_WATCH = {
         "max_bars_above": None,
         "require_btc_1h": False,
         "require_h1_ma25_up": True,
+        "require_h1_stack": False,
         "lookback": 80,
         "title": "1h 剛站上 MA200",
     },
@@ -279,6 +283,10 @@ def passes_notify(sig, spec: dict, d, d_htf, ts: int, btc_1h: dict | None) -> bo
         src = d if spec["signal"] == "1h" else d_htf
         if not htf_ma25_not_down(src, ts, sig.close, INTERVAL_MS["1h"]):
             return False
+    if spec.get("require_h1_stack"):
+        src = d if spec["signal"] == "1h" else d_htf
+        if not htf_ma7_25_stack(src, ts, sig.close, INTERVAL_MS["1h"]):
+            return False
     return quality_reclaim(
         sig,
         min_below=spec["min_below"],
@@ -342,6 +350,11 @@ def format_ev(ev: dict) -> str:
         now, prev = htf_ma25_now_prev(src, int(d["t"][sig.idx]), sig.close, INTERVAL_MS["1h"])
         if now is not None and prev is not None:
             extra += f"1h MA25 {now:g} ≥ 前一根 {prev:g}（未下彎）\n"
+    if spec.get("require_h1_stack"):
+        src = d if spec["signal"] == "1h" else ev.get("d_htf")
+        m7, m25 = htf_ma7_25_at(src, int(d["t"][sig.idx]), sig.close, INTERVAL_MS["1h"])
+        if m7 is not None and m25 is not None:
+            extra += f"1h MA7 {m7:g} &gt; MA25 {m25:g}（多頭排列）\n"
     return (
         f"<b>{spec['title']}</b>\n"
         f"<b>{sym_label(sym)}</b>  {sym}\n"
@@ -397,7 +410,7 @@ def test_telegram() -> int:
     apply_keys()
     ok = telegram_send(
         "MA200 監看測試\n"
-        "15m：剛站上 15m MA200（收盤 > 7>25），且 1h MA25 未下彎\n"
+        "15m：剛站上 15m MA200（收盤 > 7>25），且 1h MA25 未下彎、1h 7>25\n"
         "1h：剛站上 1h MA200（收盤 > 7>25），且 1h MA25 未下彎\n"
         "如果你看到這則，Telegram 已通。"
     )
@@ -415,6 +428,7 @@ def spec_note(spec: dict) -> str:
     return (
         f"{spec['signal']} 剛站上 MA200、收盤 > 7>25"
         + ("，且 1h MA25 未下彎" if spec.get("require_h1_ma25_up") else "")
+        + ("，且 1h 7>25" if spec.get("require_h1_stack") else "")
         + f"（{spec['htf']} SMA200 只畫圖、不擋單）"
     )
 
