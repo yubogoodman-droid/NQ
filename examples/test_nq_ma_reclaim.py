@@ -126,6 +126,13 @@ def test_detect_and_simulate_reclaim() -> None:
     assert trades[0].pnl_points != 0 or trades[0].exit_reason
 
 
+def test_trace_records_taken() -> None:
+    df = _make_reclaim_bars()
+    trace: list = []
+    detect_signals(df, trace=trace)
+    assert any(row["reason"] == "taken" for row in trace)
+
+
 def test_write_html_report(tmp_path: Path | None = None) -> None:
     df = _make_reclaim_bars()
     sigs = detect_signals(df)
@@ -148,6 +155,7 @@ def main() -> int:
     test_sma()
     test_summarize_trades()
     test_detect_and_simulate_reclaim()
+    test_trace_records_taken()
     test_write_html_report()
     print("ok")
     return 0

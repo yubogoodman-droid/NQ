@@ -311,6 +311,7 @@ def detect_signals(
     require_ma30: bool = True,
     require_stack: bool = True,
     funnel: Optional[Dict[str, int]] = None,
+    trace: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Signal]:
     s = float(pt_scale) if pt_scale and pt_scale > 0 else 1.0
     stop_buffer *= s
@@ -348,6 +349,20 @@ def detect_signals(
 
     def bump(key: str) -> None:
         fun[key] = fun.get(key, 0) + 1
+
+    def mark(j: int, reason: str, **extra: Any) -> None:
+        if trace is None:
+            return
+        row = {
+            "idx": int(j),
+            "reason": reason,
+            "close": float(close[j]),
+            "ma20": float(ma20[j]),
+            "ma30": float(ma30[j]),
+            "above_ma30": bool(close[j] > ma30[j]),
+        }
+        row.update(extra)
+        trace.append(row)
 
     while i < n - 1:
         if np.isnan(two_hr_low[i]) or np.isnan(ma30[i]):
@@ -389,14 +404,17 @@ def detect_signals(
             vol_avg = np.mean(volume[max(0, j - vol_lookback) : j]) or 1.0
             if volume[j] / vol_avg > max_entry_vol:
                 bump("skip_vol")
+                mark(j, "skip_vol")
                 continue
             if j >= ma20_slope_bars and (ma20[j] - ma20[j - ma20_slope_bars]) < min_ma20_slope:
                 bump("skip_ma20_slope")
+                mark(j, "skip_ma20_slope")
                 continue
             # ⑯ 收盤貼著 1m MA20，且 MA20 仍下彎/走平 → 放棄這波破底
             ma20_s5 = float(ma20[j] - ma20[j - ma20_slope_bars]) if j >= ma20_slope_bars else 0.0
             if hug_ma20_pts > 0 and (close[j] - ma20[j]) < hug_ma20_pts and ma20_s5 <= hug_ma20_max_slope:
                 bump("skip_hug_ma20")
+                mark(j, "skip_hug_ma20")
                 abandon_break = True
                 last_entry = j
                 break
@@ -404,23 +422,28 @@ def detect_signals(
                 h = df.index[j].hour
                 if skip_hour_start <= h < skip_hour_end:
                     bump("skip_open_hour")
+                    mark(j, "skip_open_hour")
                     continue
             if j - last_entry < min_entry_gap:
                 bump("skip_entry_gap")
+                mark(j, "skip_entry_gap")
                 break
             entry = float(close[j])
             stop = break_low - stop_buffer
             risk = entry - stop
             if risk <= 0:
                 bump("skip_bad_risk")
+                mark(j, "skip_bad_risk")
                 break
             if max_risk > 0 and risk > max_risk:
                 bump("skip_max_risk")
+                mark(j, "skip_max_risk", risk=risk)
                 continue
             if not np.isnan(ma200[j]):
                 dist_ma200 = entry - float(ma200[j])
                 if dist_ma200 <= 0 and dist_ma200 > -ma200_buffer:
                     bump("skip_ma200_hug")
+                    mark(j, "skip_ma200_hug")
                     continue
             slope5 = 0.0
             if j >= ma60_slope_bars and not np.isnan(ma60[j]) and not np.isnan(ma60[j - ma60_slope_bars]):
@@ -512,6 +535,7 @@ def detect_signals(
                     hard_skip_break = True
                 if skip_ma60:
                     bump("skip_ma60")
+                    mark(j, "skip_ma60")
                     if hard_skip_break:
                         abandon_break = True
                         break
@@ -529,8 +553,10 @@ def detect_signals(
             # ⑮ 寬停損只做 QA
             if max_risk_non_qa > 0 and risk > max_risk_non_qa and q_score < 2:
                 bump("skip_wide_risk")
+                mark(j, "skip_wide_risk", risk=risk)
                 continue
             bump("taken")
+            mark(j, "taken")
             signals.append(
                 Signal(
                     break_idx,

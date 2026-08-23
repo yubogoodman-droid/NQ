@@ -52,7 +52,8 @@ python3 examples/nq_ma_reclaim.py backtest --period 30d --allow-open-hour --page
 
 拆解頁：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim/research-view.html  
 允許 09–10 的 9 筆圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim-0910/view.html  
-只要收復 MA20（不要求 MA30）：這個月仍是同一 8 筆。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim-ma20/view.html
+只要收復 MA20（不要求 MA30）：這個月仍是同一 8 筆。  
+為什麼：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim-ma20/why.html
 
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
