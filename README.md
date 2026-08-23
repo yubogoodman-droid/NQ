@@ -42,13 +42,16 @@ python3 examples/nq_ma_reclaim.py alert
 漏斗：破底 1197 → 深度≥10點 293 → 收復+排列後還被 hug/MA60/9–10點/風險擋掉，只剩 8。  
 關掉 hug／MA60 特例後（核心）變成 **25 筆、+815 點**，但會多出幾筆 −50 停損（含原本要擋的 08-11 12:39）。
 
-拆過濾器（同一份 30d）：**只關 09–10 檔最好**（9 筆、+837），多出來的是 08-06 09:39 QA target +223；hug 關掉反而比較差；關 100 點風險會擠掉 07-28 那筆 +296。
+拆過濾器（同一份 30d）：**只關 09–10 檔最好**（9 筆、+837）。  
+意思是：預設美東 09:00–10:00 不進，這組只拿掉那一道，其他嚴格規則不變。多出來的是 08-06 09:39 QA target +223。
 
 ```bash
 python3 examples/research_nq_ma_reclaim.py --period 30d --pages
+python3 examples/nq_ma_reclaim.py backtest --period 30d --allow-open-hour --pages
 ```
 
-拆解頁：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/research-view.html
+拆解頁：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim/research-view.html  
+允許 09–10 的 9 筆圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim-0910/view.html
 
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
