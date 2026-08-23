@@ -1,7 +1,7 @@
 """15 分 / 1 小時 MA200 剛站上 → Telegram（與回測同一套規則）。
 
-15m：剛站上，或站上後 4 根內才收出 7>14>25。
-1h：只推本根剛站上 1h MA200。
+15m：收盤 > MA7>25 且剛站上 MA200，或站上後 4 根內才收出 7>25。
+1h：只推本根剛站上 1h MA200（同樣 7>25）。
 """
 
 from __future__ import annotations
@@ -320,7 +320,7 @@ def format_ev(ev: dict) -> str:
         hline = f"{htxt}（參考，不擋單）"
     extra = ""
     if not sig.crossed_200:
-        extra += f"站上後第 {sig.bars_above} 根才收出 7&gt;14&gt;25\n"
+        extra += f"站上後第 {sig.bars_above} 根才收出 7&gt;25\n"
     if spec["min_below"] is not None:
         extra += (
             f"底下已跌 {sig.bars_below} 根　高低差 {sig.rng24:.2f}%　"
@@ -334,7 +334,7 @@ def format_ev(ev: dict) -> str:
         f"<b>{spec['title']}</b>\n"
         f"<b>{sym_label(sym)}</b>  {sym}\n"
         f"{ts}  收 {sig.close:g}\n"
-        f"收盤 &gt; MA7 {sig.m7:g} &gt; MA14 {sig.m14:g} &gt; MA25 {sig.m25:g}\n"
+        f"收盤 &gt; MA7 {sig.m7:g} &gt; MA25 {sig.m25:g}\n"
         f"且 &gt; {tf} MA200 {sig.ma200:g}\n"
         f"{extra}"
         f"{hline}"
@@ -385,8 +385,8 @@ def test_telegram() -> int:
     apply_keys()
     ok = telegram_send(
         "MA200 監看測試\n"
-        "15m：剛站上，或站上後 4 根內才收出 7>14>25\n"
-        "1h：剛站上 1h MA200（收盤 > 7>14>25）\n"
+        "15m：剛站上，或站上後 4 根內才收出 7>25\n"
+        "1h：剛站上 1h MA200（收盤 > 7>25）\n"
         "如果你看到這則，Telegram 已通。"
     )
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
@@ -397,10 +397,10 @@ def spec_note(spec: dict) -> str:
     n = spec.get("max_bars_above")
     if n is not None:
         return (
-            f"{spec['signal']} 剛站上 MA200，或站上後 {n} 根內收出 7>14>25"
+            f"{spec['signal']} 剛站上 MA200，或站上後 {n} 根內收出 7>25"
             f"（{spec['htf']} 只畫圖、不擋單）"
         )
-    return f"{spec['signal']} 剛站上 MA200、收盤 > 7>14>25（{spec['htf']} 只畫圖、不擋單）"
+    return f"{spec['signal']} 剛站上 MA200、收盤 > 7>25（{spec['htf']} 只畫圖、不擋單）"
 
 
 def main() -> int:

@@ -22,9 +22,9 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
-## 幣安 15 分 K：7/14/25 多頭 + 站上 MA200
+## 幣安 15 分 K：7>25 多頭 + 站上 MA200
 
-15 分圖收盤同時高於 **MA7、MA14、MA25、MA200**，且 SMA7 > SMA14 > SMA25。Telegram 推「這一根剛站上 15m MA200」，**或站上後 4 根（1 小時）內才收出 7>14>25**（避免 TUT 那種先站上、兩根後才排好均線卻漏推）。小時圖仍只推本根剛站上 1h MA200。大週期圖只對照，不擋單；不再看量比、底下根數、高低差、BTC。
+15 分圖收盤同時高於 **MA7、MA25、MA200**，且 SMA7 > SMA25（MA14 只畫圖、不擋單）。Telegram 推「這一根剛站上 15m MA200」，**或站上後 4 根（1 小時）內才收出 7>25**。小時圖仍只推本根剛站上 1h MA200（同樣 7>25）。大週期圖只對照，不擋單；不再看量比、底下根數、高低差、BTC。
 
 ```bash
 python3 examples/backtest_15m_bull.py --demo
@@ -123,7 +123,7 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
-3. **15 分 K 7/14/25 站上 MA200（這次 PR）**  
+3. **15 分 K 7>25 站上 MA200（這次 PR）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html  
    只掃幣安股票：  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html

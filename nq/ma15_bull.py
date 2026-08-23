@@ -1,4 +1,4 @@
-"""15 分 K：收盤高於 MA7 / MA14 / MA25 / MA200，且 7>14>25。"""
+"""15 分 K：收盤高於 MA7 / MA25 / MA200，且 7>25。圖上仍畫 MA14，不當過濾。"""
 
 from __future__ import annotations
 
@@ -29,11 +29,11 @@ def add_15m_mas(d: dict) -> dict:
 
 
 def _stack_ok(c, m7, m14, m25, m200, i: int) -> bool:
-    """收盤同時在 MA7 / MA14 / MA25 / MA200 之上，且 7>14>25。"""
-    px, ma7, ma14, ma25, ma200 = c[i], m7[i], m14[i], m25[i], m200[i]
-    if np.isnan([px, ma7, ma14, ma25, ma200]).any():
+    """收盤同時在 MA7 / MA25 / MA200 之上，且 7>25。MA14 不擋單。"""
+    px, ma7, ma25, ma200 = c[i], m7[i], m25[i], m200[i]
+    if np.isnan([px, ma7, ma25, ma200]).any():
         return False
-    return bool(px > ma7 > ma14 > ma25 and px > ma200)
+    return bool(px > ma7 > ma25 and px > ma200)
 
 
 def bars_below_ma200(c, m200, i: int) -> int:
@@ -66,7 +66,7 @@ def rng24_pct(h, l, m200, i: int) -> float:
 
 @dataclass(frozen=True)
 class BullSignal:
-    """15m 收盤在 MA7/14/25/200 之上，且 7>14>25。"""
+    """15m 收盤在 MA7/25/200 之上，且 7>25。"""
 
     idx: int
     open: float
@@ -102,11 +102,11 @@ class BullSignal:
 
 def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
     """
-    進場：這一根收盤 > MA7 > MA14 > MA25，且收盤 > 15 分 MA200，
-    前一根還沒同時成立。
+    進場：這一根收盤 > MA7 > MA25，且收盤 > 15 分 MA200，
+    前一根還沒同時成立。MA14 只畫圖、不擋單。
 
     crossed_200：前收還在 MA200 下，本根收盤站上。
-    formed_align：已經在 MA200 上，本根才收上短均／排成 7>14>25。
+    formed_align：已經在 MA200 上，本根才收上短均／排成 7>25。
     15m 通知：crossed_200，或 formed_align 且 bars_above ≤ 4（站上後 1 小時內才排好）。
     """
     c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
@@ -355,7 +355,7 @@ def quality_reclaim(
     max_rng24: float | None = None,
     max_bars_above: int | None = None,
 ) -> bool:
-    """剛站上；15m 可放寬：站上後 max_bars_above 根內才收出 7>14>25。"""
+    """剛站上；15m 可放寬：站上後 max_bars_above 根內才收出 7>25。"""
     if sig.crossed_200:
         pass
     elif max_bars_above is not None and sig.formed_align and sig.bars_above <= max_bars_above:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""回測：收盤高於 MA7/14/25/200，且 7>14>25。
+"""回測：收盤高於 MA7/25/200，且 7>25。MA14 只畫圖、不擋單。
 
-15m 通知：剛站上 MA200，或站上後 4 根內才收出 7>14>25。
+15m 通知：剛站上 MA200，或站上後 4 根內才收出 7>25。
 1h 通知：只推本根剛站上 1h MA200。大週期圖只對照、不擋單。
 
     python3 examples/backtest_15m_bull.py --demo
@@ -163,7 +163,7 @@ def notify_kwargs(spec: TfSpec) -> dict:
 def notify_label(spec: TfSpec) -> str:
     if spec.max_bars_above is not None:
         return (
-            f"通知：剛站上 {spec.signal} MA200，或站上後 {spec.max_bars_above} 根內收出 7>14>25"
+            f"通知：剛站上 {spec.signal} MA200，或站上後 {spec.max_bars_above} 根內收出 7>25"
         )
     return f"通知：本根剛站上 {spec.signal} MA200"
 
@@ -171,9 +171,9 @@ def notify_label(spec: TfSpec) -> str:
 def filter_defs(spec: TfSpec) -> tuple:
     tf = spec.signal
     rows = [
-        (f"原始：收盤 > MA7>14>25 且 > {tf} MA200（組合剛成立）", {"crossed": None, "formed": None, "min_vol": None, "max_ext": None}),
+        (f"原始：收盤 > MA7>25 且 > {tf} MA200（組合剛成立）", {"crossed": None, "formed": None, "min_vol": None, "max_ext": None}),
         (f"本根剛站上 {tf} MA200", {"crossed": True, "formed": None, "min_vol": None, "max_ext": None}),
-        ("已在 MA200 上，本根才收上 7/14/25", {"crossed": None, "formed": True, "min_vol": None, "max_ext": None}),
+        ("已在 MA200 上，本根才收上 7>25", {"crossed": None, "formed": True, "min_vol": None, "max_ext": None}),
         ("放量 ≥ 1.5×", {"crossed": None, "formed": None, "min_vol": 1.5, "max_ext": None}),
         ("剛站上 MA200 + 放量 ≥ 1.5×", {"crossed": True, "formed": None, "min_vol": 1.5, "max_ext": None}),
         ("距 MA200 ≤ 1.0%", {"crossed": None, "formed": None, "min_vol": None, "max_ext": 1.0}),
@@ -538,7 +538,7 @@ def gallery_html(gallery: list[tuple[SignalRow, str]], spec: TfSpec) -> str:
         kind = (
             f"本根剛站上 {spec.signal} MA200"
             if row.crossed_200d
-            else f"站上後 {row.bars_above} 根內才收出 7>14>25"
+            else f"站上後 {row.bars_above} 根內才收出 7>25"
         )
         r4 = row.moves.get(spec.hold4)
         rtxt = f"4h {r4.ret_pct:+.2f}%" if r4 and r4.ret_pct is not None else ""
@@ -576,8 +576,8 @@ def write_html(
     )
     tf = spec.signal
     htf = spec.htf
-    title = f"{tf} 收盤在 7/14/25/200 之上" + (" · 幣安股票" if stocks_only else "")
-    heading = f"{tf} K：收盤在 7 / 14 / 25 / 200 之上" + ("（只掃幣安股票）" if stocks_only else "")
+    title = f"{tf} 收盤在 7/25/200 之上" + (" · 幣安股票" if stocks_only else "")
+    heading = f"{tf} K：收盤在 7 / 25 / 200 之上" + ("（只掃幣安股票）" if stocks_only else "")
     if spec.min_below is not None:
         heading += " · 底下夠久、波動不大、BTC 先站上"
     universe_txt = (
@@ -589,7 +589,7 @@ def write_html(
         htf_rule = f"還要當下價格在<strong>{html.escape(htf)} 圖 SMA200</strong>之上。"
         notify_rule = (
             f"Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
-            f"這一根收盤站上，同時收盤也在 7/14/25 之上，"
+            f"這一根收盤站上，同時收盤也在 7>25 之上，"
             f"<strong>且當下價格已在 {html.escape(htf)} MA200 上方</strong>"
             f"（未收完的大週期 K 用當下收盤，不看未來）。"
         )
@@ -614,15 +614,14 @@ def write_html(
             if spec.max_bars_above is not None:
                 notify_rule = (
                     f"Telegram 通知：<strong>剛站上 {html.escape(tf)} MA200</strong>"
-                    f"（前收還在 MA200 下、本根收盤站上且 7&gt;14&gt;25），"
-                    f"或<strong>站上後 {spec.max_bars_above} 根內</strong>才收出 7&gt;14&gt;25"
-                    f"（避免像 TUT 先站上 MA200、兩根後才排好均線卻漏推）。"
+                    f"（前收還在 MA200 下、本根收盤站上且 7&gt;25），"
+                    f"或<strong>站上後 {spec.max_bars_above} 根內</strong>才收出 7&gt;25。"
                     f"不會把已經在 MA200 上很久才排好的訊號都打進去。"
                 )
             else:
                 notify_rule = (
                     f"Telegram 通知只用「本根剛站上 {html.escape(tf)} MA200」：前收還在 {html.escape(tf)} MA200 下，"
-                    f"這一根收盤站上，同時收盤也在 7/14/25 之上。"
+                    f"這一根收盤站上，同時收盤也在 7>25 之上。"
                 )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -655,7 +654,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
 <div class="wrap">
   <h1>{html.escape(heading)}</h1>
   <p class="sub">
-    規則：收盤同時高於 <strong>MA7、MA14、MA25、MA200</strong>（同一張 {html.escape(tf)} 圖），且 SMA7 &gt; SMA14 &gt; SMA25。
+    規則：收盤同時高於 <strong>MA7、MA25、MA200</strong>（同一張 {html.escape(tf)} 圖），且 SMA7 &gt; SMA25。MA14 只畫圖、不擋單。
     {htf_rule}
     {notify_rule}
     進場用訊號下一根開盤。假突破 = 進場那根 {html.escape(tf)} 收盤又跌回 MA200 下方。
@@ -707,11 +706,11 @@ def make_demo_bars() -> dict:
 def run_demo() -> int:
     d = add_15m_mas(make_demo_bars())
     hits = detect_combo(d)
-    print(f"demo 偵測到 {len(hits)} 筆（收盤 > 7>14>25 且 > MA200）")
+    print(f"demo 偵測到 {len(hits)} 筆（收盤 > 7>25 且 > MA200）")
     for sig in hits:
         print(
             f"  idx={sig.idx} close={sig.close:.3f} ma200={sig.ma200:.3f} "
-            f"close>7>14>25={sig.close:.3f}>{sig.m7:.3f}>{sig.m14:.3f}>{sig.m25:.3f} "
+            f"close>7>25={sig.close:.3f}>{sig.m7:.3f}>{sig.m25:.3f} "
             f"crossed={sig.crossed_200} formed={sig.formed_align} below={sig.bars_below}"
         )
     if not hits:
@@ -720,14 +719,14 @@ def run_demo() -> int:
     if not any(s.crossed_200 for s in hits):
         print("demo 失敗：應該有剛站上 MA200")
         return 1
-    if any(s.close <= s.m7 or s.close <= s.m14 or s.close <= s.m25 or s.close <= s.ma200 for s in hits):
-        print("demo 失敗：收盤必須在 7/14/25/200 之上")
+    if any(s.close <= s.m7 or s.close <= s.m25 or s.close <= s.ma200 or s.m7 <= s.m25 for s in hits):
+        print("demo 失敗：收盤必須在 7>25 且 > MA200")
         return 1
     return 0
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="收盤在 7/14/25/200 之上（15m 或 1h）")
+    p = argparse.ArgumentParser(description="收盤在 7>25 且 > MA200 之上（15m 或 1h）")
     p.add_argument("--demo", action="store_true")
     p.add_argument("--days", type=int, default=7)
     p.add_argument("--workers", type=int, default=8)
@@ -785,10 +784,10 @@ def main() -> int:
     stats = filter_stats(rows, spec)
     notify_rows = apply_filter(rows, **notify_kwargs(spec))
     if spec.require_htf:
-        print(f"\n=== {spec.signal} 7/14/25 + MA200，且當下在 {spec.htf} MA200 上 ===")
+        print(f"\n=== {spec.signal} 7>25 + MA200，且當下在 {spec.htf} MA200 上 ===")
         print(f"{spec.signal} 組合 {n_raw} 筆，未站上 {spec.htf} MA200 去掉 {n_drop} 筆，留下 {n_raw - n_drop}")
     else:
-        print(f"\n=== {spec.signal} 7/14/25 + MA200（不擋 {spec.htf} MA200）===")
+        print(f"\n=== {spec.signal} 7>25 + MA200（不擋 {spec.htf} MA200）===")
         print(f"{spec.signal} 組合 {n_raw} 筆，留下 {n_raw - n_drop}")
         print(f"{notify_label(spec)} → {len(notify_rows)} 筆")
     for s in stats:
