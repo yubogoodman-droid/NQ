@@ -70,6 +70,11 @@ def _price(value: object) -> float | None:
         return None
 
 
+def _is_stock_code(code: str) -> bool:
+    """上市櫃普通股：四位數字。排除 ETF / 債 / 權證代號。"""
+    return code.isdigit() and len(code) == 4 and not code.startswith("00")
+
+
 def yahoo_symbol(code: str, market: str) -> str:
     return f"{code}.TW" if market == "tse" else f"{code}.TWO"
 
@@ -99,16 +104,15 @@ def fetch_top_turnover(date: str, limit: int) -> list[dict]:
     tables = twse.get("tables") or []
     items: list[tuple[int, str, str, str, float | None]] = []
     for table in tables:
+        fields = [str(x) for x in (table.get("fields") or [])]
         rows = table.get("data") or []
         if not rows or len(rows[0]) < 9:
             continue
-        # 個股: 代號、名稱、成交股數、成交筆數、成交金額、開、高、低、收
-        sample = str(rows[0][0])
-        if not sample.isdigit() or len(sample) != 4:
+        if not fields or "證券代號" not in fields[0]:
             continue
         for rec in rows:
             code, name = str(rec[0]).strip(), str(rec[1]).strip()
-            if not code.isdigit():
+            if not _is_stock_code(code):
                 continue
             amt = _num(rec[4])
             if amt > 0:
@@ -123,6 +127,8 @@ def fetch_top_turnover(date: str, limit: int) -> list[dict]:
                 continue
             code = str(rec["SecuritiesCompanyCode"]).strip()
             name = str(rec["CompanyName"]).strip()
+            if not _is_stock_code(code):
+                continue
             amt = _num(rec.get("TransactionAmount") or 0)
             if amt > 0:
                 items.append((amt, code, name, "otc", _price(rec.get("Close"))))

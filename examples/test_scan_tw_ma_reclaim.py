@@ -13,11 +13,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scan_tw_ma_reclaim import (  # noqa: E402
     TPE,
+    _is_stock_code,
     last_tw_session_yyyymmdd,
     session_mask,
     tw_pt_scale,
     yahoo_symbol,
 )
+
+
+def test_is_stock_code() -> None:
+    assert _is_stock_code("2330")
+    assert _is_stock_code("8358")
+    assert not _is_stock_code("0050")
+    assert not _is_stock_code("00937B")
+    assert not _is_stock_code("00400A")
 
 
 def test_yahoo_symbol() -> None:
@@ -51,6 +60,7 @@ def test_last_session_skips_weekend() -> None:
 
 
 def main() -> int:
+    test_is_stock_code()
     test_yahoo_symbol()
     test_tw_pt_scale()
     test_session_mask()
