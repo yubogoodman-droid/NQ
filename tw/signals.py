@@ -1,0 +1,183 @@
+"""五分 K：MA5 < MA10 < MA20 空頭排列，跌破 MA200，且 15 分／小時 K 都在各自 MA20 之下。"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+
+import pandas as pd
+
+from tw.kline import resample_ohlcv
+
+
+MA_FAST = 5
+MA_MID = 10
+MA_SLOW = 20
+MA_LONG = 200
+H1_MA = 20
+M15_MA = 20
+
+
+@dataclass(frozen=True)
+class AlertSnapshot:
+    timestamp: pd.Timestamp
+    close: float
+    prev_close: float
+    ma5: float
+    ma10: float
+    ma20: float
+    ma200: float
+    prev_ma5: float
+    prev_ma10: float
+    prev_ma20: float
+    prev_ma200: float
+    h1_close: float | None = None
+    h1_ma20: float | None = None
+    m15_close: float | None = None
+    m15_ma20: float | None = None
+
+    @property
+    def bearish_aligned(self) -> bool:
+        return self.ma5 < self.ma10 < self.ma20
+
+    @property
+    def crossed_below_ma200(self) -> bool:
+        return self.close < self.ma200 and self.prev_close >= self.prev_ma200
+
+    @property
+    def close_below_short_mas(self) -> bool:
+        return self.close < self.ma5 and self.close < self.ma10 and self.close < self.ma20
+
+    @property
+    def hourly_close_below_ma20(self) -> bool:
+        return (
+            self.h1_close is not None
+            and self.h1_ma20 is not None
+            and self.h1_close < self.h1_ma20
+        )
+
+    @property
+    def m15_close_below_ma20(self) -> bool:
+        return (
+            self.m15_close is not None
+            and self.m15_ma20 is not None
+            and self.m15_close < self.m15_ma20
+        )
+
+
+def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    close = out["close"]
+    out["ma5"] = close.rolling(MA_FAST, min_periods=MA_FAST).mean()
+    out["ma10"] = close.rolling(MA_MID, min_periods=MA_MID).mean()
+    out["ma20"] = close.rolling(MA_SLOW, min_periods=MA_SLOW).mean()
+    out["ma200"] = close.rolling(MA_LONG, min_periods=MA_LONG).mean()
+    return out
+
+
+def higher_tf_close_and_ma20(
+    five_min: pd.DataFrame,
+    rule: str,
+    period: int = 20,
+) -> tuple[float, float] | None:
+    """用截至目前的五分K合成較長週期，回傳（該週期收盤, 該週期MA）。"""
+    frame = resample_ohlcv(five_min, rule)
+    if len(frame) < period or "close" not in frame.columns:
+        return None
+    ma = frame["close"].rolling(period, min_periods=period).mean()
+    if pd.isna(ma.iloc[-1]) or pd.isna(frame["close"].iloc[-1]):
+        return None
+    return float(frame["close"].iloc[-1]), float(ma.iloc[-1])
+
+
+def hourly_close_and_ma20(five_min: pd.DataFrame) -> tuple[float, float] | None:
+    """用截至目前的五分K合成小時K，回傳（小時收盤, 小時MA20）。"""
+    return higher_tf_close_and_ma20(five_min, "1h", H1_MA)
+
+
+def m15_close_and_ma20(five_min: pd.DataFrame) -> tuple[float, float] | None:
+    """用截至目前的五分K合成十五分K，回傳（十五分收盤, 十五分MA20）。"""
+    return higher_tf_close_and_ma20(five_min, "15min", M15_MA)
+
+
+def iter_5m_ma200_short_alerts(
+    df: pd.DataFrame,
+    *,
+    since: pd.Timestamp | None = None,
+    until: pd.Timestamp | None = None,
+    latest_only: bool = False,
+) -> list[AlertSnapshot]:
+    """同一交易日連續五分 K：MA5 < MA10 < MA20，當根收盤剛跌破 MA200，且 15 分／小時 K 都在 MA20 之下。"""
+    if df is None or len(df) < MA_LONG + 1:
+        return []
+    work = add_moving_averages(df)
+    hits: list[AlertSnapshot] = []
+    start = MA_LONG
+    if since is not None:
+        matched = False
+        for i, ts in enumerate(work.index):
+            if ts >= since:
+                start = max(start, i)
+                matched = True
+                break
+        if not matched:
+            return []
+    for i in range(start, len(work)):
+        ts = work.index[i]
+        if until is not None and ts > until:
+            break
+        snap = _snapshot_at(work, i)
+        if snap is None:
+            continue
+        prev_ts = work.index[i - 1]
+        if pd.Timestamp(ts).date() != pd.Timestamp(prev_ts).date():
+            continue
+        if not (snap.bearish_aligned and snap.crossed_below_ma200):
+            continue
+        window = work.iloc[: i + 1]
+        m15 = m15_close_and_ma20(window)
+        if m15 is None:
+            continue
+        m15_close, m15_ma20 = m15
+        if m15_close >= m15_ma20:
+            continue
+        hourly = hourly_close_and_ma20(window)
+        if hourly is None:
+            continue
+        h1_close, h1_ma20 = hourly
+        if h1_close >= h1_ma20:
+            continue
+        hits.append(
+            replace(
+                snap,
+                h1_close=h1_close,
+                h1_ma20=h1_ma20,
+                m15_close=m15_close,
+                m15_ma20=m15_ma20,
+            )
+        )
+    if latest_only and hits:
+        return hits[-1:]
+    return hits
+
+
+def _snapshot_at(work: pd.DataFrame, idx: int) -> AlertSnapshot | None:
+    if idx < 1:
+        return None
+    last = work.iloc[idx]
+    prev = work.iloc[idx - 1]
+    needed = ("ma5", "ma10", "ma20", "ma200")
+    if any(pd.isna(last[col]) or pd.isna(prev[col]) for col in needed):
+        return None
+    return AlertSnapshot(
+        timestamp=work.index[idx],
+        close=float(last["close"]),
+        prev_close=float(prev["close"]),
+        ma5=float(last["ma5"]),
+        ma10=float(last["ma10"]),
+        ma20=float(last["ma20"]),
+        ma200=float(last["ma200"]),
+        prev_ma5=float(prev["ma5"]),
+        prev_ma10=float(prev["ma10"]),
+        prev_ma20=float(prev["ma20"]),
+        prev_ma200=float(prev["ma200"]),
+    )
