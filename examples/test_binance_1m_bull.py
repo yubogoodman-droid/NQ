@@ -205,6 +205,29 @@ def test_is_usdt_um_perp() -> None:
     assert not is_usdt_um_perp({**ok, "status": "BREAK"})
 
 
+def test_inline_img_srcs() -> None:
+    import importlib.util
+
+    path = Path(__file__).resolve().parent / "binance_1m_bull.py"
+    spec = importlib.util.spec_from_file_location("binance_1m_bull", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    tmp = Path("/tmp/ma1m-inline-test")
+    img_dir = tmp / "img" / "ma1m-bull"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
+        b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    (img_dir / "FOO_0824_0100.png").write_bytes(png)
+    html = "<img src='img/ma1m-bull/FOO_0824_0100.png' alt='x'/><img src='img/ma1m-bull/missing.png'/>"
+    out = mod.inline_img_srcs(html, tmp)
+    assert out.startswith("<img src='data:image/")
+    assert "src='img/ma1m-bull/missing.png'" in out
+
+
 def main() -> int:
     test_sma()
     test_detects_first_stack_above_ma200()
@@ -216,6 +239,7 @@ def main() -> int:
     test_below_ma200_is_not_a_signal()
     test_default_date_uses_yesterday_before_2am()
     test_is_usdt_um_perp()
+    test_inline_img_srcs()
     print("ok")
     return 0
 
