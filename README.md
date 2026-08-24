@@ -60,6 +60,23 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
+## 幣安 1 分 K：7/14/25/99 多頭排列上站 MA200
+
+收盤 > MA7 > MA14 > MA25 > MA99 > MA200，前一根還沒同時成立才算訊號（站上後持續排列不重發）。  
+預設掃 U 本位永續 **24h 成交額前 50**，符合就推 Telegram（帶圖）。
+
+```bash
+# 今天回測（台北日；凌晨 2 點前自動用昨天）
+python3 examples/binance_1m_bull.py backtest --top 50 --today --pages
+
+# Telegram：憑證放 tg_config.env 或 一分K多排.py 最上面
+python3 examples/binance_1m_bull.py alert --test
+python3 examples/binance_1m_bull.py alert --once --dry-run
+python3 一分K多排.py
+```
+
+報告：`docs/binance/ma1m-bull.html`
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
