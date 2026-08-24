@@ -3,87 +3,60 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>回測 2026-08-21（週五）· 一分K站穩 MA240</title>
+  <title>回測 2026-08-21～2026-08-24 · 一分K站穩 MA240</title>
   <style>
     :root {
       color-scheme: dark;
-      --bg: #0b0e11;
-      --card: #161b22;
-      --line: #30363d;
-      --text: #e6edf3;
-      --muted: #8b949e;
-      --up: #ff5c7a;
-      --ok: #7ee787;
-      --chip: #21262d;
+      --bg: #0b0e11; --card: #161b22; --line: #30363d;
+      --text: #e6edf3; --muted: #8b949e; --up: #ff5c7a; --ok: #7ee787; --chip: #21262d;
     }
     * { box-sizing: border-box; }
     body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
+      margin: 0; background: var(--bg); color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
-      -webkit-font-smoothing: antialiased;
     }
     .page { max-width: 760px; margin: 0 auto; padding: 16px 12px 40px; }
     h1 { font-size: 1.2rem; margin: 0 0 6px; }
+    h2 { font-size: 1.05rem; margin: 22px 0 6px; }
     .lead { color: var(--muted); font-size: .9rem; line-height: 1.55; margin: 0 0 12px; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
     .chip {
       background: var(--chip); border: 1px solid var(--line); border-radius: 999px;
       padding: 4px 10px; font-size: 12px; color: var(--muted);
     }
-    .legend {
-      display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted);
-      margin: 0 0 12px;
-    }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); margin: 0 0 12px; }
     .swatch { display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 4px; }
     .summary {
       background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-      padding: 12px 14px; margin-bottom: 14px; font-size: .9rem; line-height: 1.65;
-      color: var(--muted);
+      padding: 12px 14px; margin-bottom: 14px; font-size: .9rem; line-height: 1.65; color: var(--muted);
     }
-    .summary .ok { color: var(--ok); font-weight: 700; font-size: 1.05rem; }
-    .run {
-      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-      padding: 12px 14px; margin: 0 0 14px; font-size: .85rem; color: var(--muted);
-    }
-    .run b { color: var(--text); }
-    .run pre {
-      margin: 8px 0 0; overflow-x: auto; background: #0b0e11; border-radius: 8px;
-      padding: 10px 12px; color: var(--ok); white-space: pre-wrap; line-height: 1.55;
-    }
+    .summary .ok { color: var(--ok); font-weight: 700; }
     .card {
       background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-      padding: 14px 10px 10px; margin: 0 0 14px; color: inherit;
+      padding: 14px 10px 10px; margin: 0 0 14px;
     }
-    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 0 6px; }
+    .top { display: flex; justify-content: space-between; gap: 8px; padding: 0 6px; }
     .name { font-weight: 700; font-size: 1.05rem; }
-    .sym a { color: var(--muted); font-weight: 500; margin-left: 6px; font-size: .9rem; text-decoration: none; }
+    .sym a { color: var(--muted); margin-left: 6px; font-size: .9rem; text-decoration: none; }
     .price { color: var(--up); font-weight: 700; white-space: nowrap; }
     .row { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: .9rem; color: var(--muted); padding: 0 6px; }
     .row b { color: var(--text); font-weight: 600; }
     .chart { margin-top: 10px; }
     .chart img { width: 100%; height: auto; display: block; border-radius: 8px; }
-    .chart-label {
-      font-size: 12px; color: var(--ok); font-weight: 700;
-      padding: 8px 6px 4px;
-    }
+    .chart-label { font-size: 12px; color: var(--ok); font-weight: 700; padding: 8px 6px 4px; }
     .empty { color: var(--muted); }
-    footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }
+    section { margin-top: 8px; }
   </style>
 </head>
 <body>
   <div class="page">
-    <h1>回測 2026-08-21（週五）· 站穩 MA240</h1>
-    
-    <p class="lead">用 2026-08-21（週五）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF、金融股與收盤價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）。含該根的五分K收盤也必須高於五分 MA240。K 棒漲紅跌綠。</p>
+    <h1>回測 2026-08-21～2026-08-24 · 一分K站穩 MA240</h1>
+    <p class="lead">MA240 規則：一分K MA5&gt;MA10&gt;MA20 拉開 ≥0.4%，MA20 與 MA240 差 0.4%～1.0%，從 240 下穿上、連續兩根站穩、09:10 以後；五分收盤也要高於五分 MA240。</p>
     <div class="chips">
-      <span class="chip">不含 ETF</span>
-      <span class="chip">不含金融股</span>
-      <span class="chip">股價 &lt; 650</span>
-      <span class="chip">MA5 &gt; 10 &gt; 20 扇開</span>
-      <span class="chip">MA20/MA240 0.4%～1.0%</span>
-      <span class="chip">09:10 後從下穿上</span>
+      <span class="chip">成交額前 100</span>
+      <span class="chip">不含 ETF／金融／≥650</span>
+      <span class="chip">站穩兩根</span>
+      <span class="chip">09:10 以後</span>
       <span class="chip">五分收盤 &gt; MA240</span>
     </div>
     <div class="legend">
@@ -92,13 +65,17 @@
       <span><i class="swatch" style="background:#66bb6a"></i>MA20</span>
       <span><i class="swatch" style="background:#ce93d8"></i>MA240</span>
     </div>
-    <div class="summary">
-      命中 <span class="ok">3</span> 檔<br/>
-      掃描時間 2026-08-25 00:28:59（台北）<br/>
-      排行時間 2026-08-21 盤後成交額；盤中名單另含週四前100多出的 18 檔<br/>
-      前 100 名 → 濾掉股價 40、ETF 6、金融 5 → 掃描 67 檔 → 均線糾結 0 → MA20/MA240不符 0 → 五分MA240底下 4
-    </div>
     
+    <section>
+      <h2>週五 2026-08-21 · 3 檔</h2>
+      <p class="lead">台虹、聯一光、先進光　排行 2026-08-21 盤後成交額；盤中名單另含週四前100多出的 18 檔</p>
+      <div class="summary">
+        前 118 → 濾掉股價 40、ETF 6、金融 5
+        → 掃描 67 → 均線糾結 0
+        → MA20/MA240不符 0 → 五分MA240底下 4
+        → <span class="ok">命中 3</span>
+      </div>
+      
     <article class="card">
       <div class="top">
         <div class="name">1. 台虹<span class="sym"><a href="https://tw.stock.yahoo.com/quote/8039.TW" target="_blank" rel="noopener">8039.TW</a></span></div>
@@ -152,7 +129,55 @@
       <div class="chart"><img alt="先進光 3362.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-21/3362.TWO-5m.png"/></div>
     </article>
 
-    <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
+    </section>
+
+    <section>
+      <h2>週一 2026-08-24 · 2 檔</h2>
+      <p class="lead">萬海、聯一光　排行 2026-08-24 盤後成交額</p>
+      <div class="summary">
+        前 100 → 濾掉股價 34、ETF 4、金融 1
+        → 掃描 61 → 均線糾結 0
+        → MA20/MA240不符 0 → 五分MA240底下 0
+        → <span class="ok">命中 2</span>
+      </div>
+      
+    <article class="card">
+      <div class="top">
+        <div class="name">1. 萬海<span class="sym"><a href="https://tw.stock.yahoo.com/quote/2615.TW" target="_blank" rel="noopener">2615.TW</a></span></div>
+        <div class="price">124.50 +0.00%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>11:31</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>126.00 &gt; 125.77</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>126.00 &gt; 111.96（+12.5%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>125.70 &gt; 125.35 &gt; 125.17</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>125.17 / 125.77（差 0.5%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#17 · 113.12 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="萬海 2615.TW 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-24/2615.TW-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="萬海 2615.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-24/2615.TW-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">2. 聯一光<span class="sym"><a href="https://tw.stock.yahoo.com/quote/3441.TWO" target="_blank" rel="noopener">3441.TWO</a></span></div>
+        <div class="price">112.50 +5.14%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>12:59</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>111.50 &gt; 111.08</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>111.50 &gt; 96.62（+15.4%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>111.00 &gt; 110.70 &gt; 110.40</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>110.40 / 111.08（差 0.6%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#64 · 31.43 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="聯一光 3441.TWO 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-24/3441.TWO-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="聯一光 3441.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-24/3441.TWO-5m.png"/></div>
+    </article>
+
+    </section>
+
   </div>
 </body>
 </html>
