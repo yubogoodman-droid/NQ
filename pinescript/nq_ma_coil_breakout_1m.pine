@@ -2,16 +2,17 @@
 indicator("NQ 一分K 起漲點（均線糾結突破）", overlay=true, max_labels_count=200)
 
 // 訊號在 1 分圖上抓。5 分用來對照進場當下那根 5 分長什麼樣。
-// 先鎖住盤整箱，再允許之後 8 根放量站上箱頂。
+// 先鎖住短均線（MA5–MA60）糾結的盤整箱，長下影會修剪。再允許之後 8 根放量站上箱頂。
 // 進場：第一次站上 MA200，且 5>10>20>30、MA60/120 在 MA200 下方。不要等放量長綠。
 // 不追已經噴出去的長實體。進場當下 5 分收盤要在 5 分 MA20 與 5 分 MA30 上方。
 // 走到 1R 後停損移到 +0.3R（移動停利）；2R 仍是目標。
 
-minCoilBars   = input.int(10, "盤整最少 K 數", minval=8, maxval=20)
+minCoilBars   = input.int(7, "盤整最少 K 數", minval=6, maxval=20)
 maxCoilBars   = input.int(18, "盤整最多 K 數", minval=10, maxval=30)
-maxCoilRange  = input.float(36.0, "盤整最大區間（點）", minval=10, step=2)
+maxCoilRange  = input.float(50.0, "盤整最大區間（點）", minval=10, step=2)
 minCoilRange  = input.float(10.0, "盤整最小區間（點）", minval=0, step=1)
-maxRibbon     = input.float(42.0, "均線最大帶寬（點）", minval=10, step=2)
+maxRibbon     = input.float(42.0, "短均線最大帶寬（點）", minval=10, step=2)
+maxWick       = input.float(15.0, "下影修剪（點，0=不修）", minval=0, step=1)
 minBody       = input.float(0.0, "突破 K 最小實體（點）", minval=0, step=1)
 maxBody       = input.float(40.0, "突破 K 最大實體（點，0=不限）", minval=0, step=1)
 volMult       = input.float(2.0, "量能倍數（對成交量中位數）", minval=1.0, step=0.1)
@@ -36,7 +37,7 @@ ma100 = ta.sma(close, 100)
 ma120 = ta.sma(close, 120)
 ma200 = ta.sma(close, 200)
 
-ribbon = array.from(ma5, ma10, ma20, ma30, ma60, ma100, ma120, ma200)
+ribbon = array.from(ma5, ma10, ma20, ma30, ma60)
 ribbonHigh = array.max(ribbon)
 ribbonLow  = array.min(ribbon)
 ribbonWidth = ribbonHigh - ribbonLow
@@ -47,6 +48,8 @@ priorLow  = ta.lowest(low, priorLookback + maxCoilBars)
 priorDrop = priorHigh - priorLow
 ma200Flat = na(ma200[20]) or (ma200[1] - ma200[21]) >= -maxMa200Drop
 body = close - open
+bodyLo = math.min(open, close)
+effLow = maxWick > 0 and (bodyLo - low > maxWick) ? bodyLo : low
 
 bestRange = 1e10
 float bestHigh = na
@@ -54,7 +57,7 @@ float bestLow = na
 int bestLen = 0
 for len = minCoilBars to maxCoilBars
     ch = ta.highest(high[1], len)
-    cl = ta.lowest(low[1], len)
+    cl = ta.lowest(effLow[1], len)
     rng = ch - cl
     preHi = ta.highest(high[len], priorLookback)
     preLo = ta.lowest(low[len], priorLookback)

@@ -559,7 +559,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（均線糾結突破）</h1>
-<p class="muted">訊號只看 1分K。進場當下 5 分收盤要在 5 分 MA20 與 5 分 MA30 上方。停損＝盤整低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R（移動停利）。連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
+<p class="muted">訊號只看 1分K。盤整看 MA5–MA60 帶寬，長下影會修剪。進場當下 5 分收盤要在 5 分 MA20 與 5 分 MA30 上方。停損＝盤整低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R（移動停利）。連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>

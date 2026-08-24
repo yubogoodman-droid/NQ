@@ -251,6 +251,21 @@ def m5_asof_ma200_dist(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.nda
     return close5, ma200, dist
 
 
+def _clipped_low(
+    o: np.ndarray,
+    l: np.ndarray,
+    c: np.ndarray,
+    j: int,
+    max_wick: float,
+) -> float:
+    """長下影不當成盤整低點，避免一根插針把箱子撐破。"""
+    body_lo = min(float(o[j]), float(c[j]))
+    raw = float(l[j])
+    if max_wick > 0 and (body_lo - raw) > max_wick:
+        return body_lo
+    return raw
+
+
 @dataclass
 class _LiveCoil:
     start_idx: int
@@ -266,11 +281,13 @@ def detect_coil_breakouts(
     df: pd.DataFrame,
     *,
     coil_bars: int = 15,
-    min_coil_bars: int = 10,
+    min_coil_bars: int = 7,
     max_coil_bars: int = 18,
-    max_coil_range: float = 36.0,
+    max_coil_range: float = 50.0,
     min_coil_range: float = 10.0,
     max_ribbon_width: float = 42.0,
+    ribbon_n: int = 5,
+    max_wick: float = 15.0,
     min_body: float = 0.0,
     min_vol_ratio: float = 2.0,
     vol_lookback: int = 60,
@@ -294,13 +311,14 @@ def detect_coil_breakouts(
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[CoilSignal]:
     """
-    抓起漲點：先鎖住均線糾結的盤整箱，再允許之後幾根放量站上箱頂。
+    抓起漲點：先鎖住短均線糾結的盤整箱，再允許之後幾根放量站上箱頂。
 
     進場是「第一次」收盤站上 MA200，且 MA5>MA10>MA20>MA30、
     MA60 與 MA120 仍在 MA200 下方。不要等後面那根放量長綠。
 
+    盤整看 MA5–MA60 帶寬（不把還在頭上的 MA200 算進去），長下影會修剪。
     另外不接已經噴超過 max_body 的長實體。進場當下，當時 5 分收盤要在
-    5 分 MA20 與 5 分 MA30 上方。5 分 MA200 深度過濾預設關掉（max_m5_below_200<0）。
+    5 分 MA20 與 5 分 MA30 上方。
     """
     if df is None or len(df) == 0:
         return []
@@ -326,11 +344,12 @@ def detect_coil_breakouts(
             if start < 0:
                 continue
             coil_high = float(np.max(h[start:i]))
-            coil_low = float(np.min(l[start:i]))
+            coil_low = min(_clipped_low(o, l, c, j, max_wick) for j in range(start, i))
             coil_range = coil_high - coil_low
             if coil_range > max_coil_range or coil_range < min_coil_range:
                 continue
-            ribbon_prev = np.array([float(ma[i - 1]) for ma in mas], dtype=float)
+            use = mas[: max(1, min(int(ribbon_n), len(mas)))]
+            ribbon_prev = np.array([float(ma[i - 1]) for ma in use], dtype=float)
             ribbon_width = float(ribbon_prev.max() - ribbon_prev.min())
             if ribbon_width > max_ribbon_width:
                 continue
@@ -353,8 +372,8 @@ def detect_coil_breakouts(
                     continue
             inside = 0
             for j in range(start, i):
-                rhi = max(float(ma[j]) for ma in mas)
-                rlo = min(float(ma[j]) for ma in mas)
+                rhi = max(float(ma[j]) for ma in use)
+                rlo = min(float(ma[j]) for ma in use)
                 if np.isnan(rhi) or np.isnan(rlo):
                     continue
                 if (rlo - hug_buffer) <= c[j] <= (rhi + hug_buffer):

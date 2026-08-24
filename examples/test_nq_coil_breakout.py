@@ -114,6 +114,28 @@ def test_real_chart_stands_on_ma200() -> None:
     assert abs(trades[0].pnl_points - 0.3 * risk) < 0.6
 
 
+def test_real_chart_catches_1129() -> None:
+    """08-24 11:21 插針後，11:29 第一次站上 MA200 要進。"""
+    path = Path(__file__).resolve().parent / "fixtures" / "nq_2026-08-24_1129.csv"
+    df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
+    if df.index.tz is None:
+        df.index = df.index.tz_localize(ET)
+    sigs = detect_coil_breakouts(df)
+    hits = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "11:29"]
+    assert hits, f"expected 11:29 站上MA200, got {[df.index[s.entry_idx].strftime('%H:%M') for s in sigs]}"
+    sig = hits[0]
+    assert abs(sig.entry_price - 29121.25) < 0.3
+    assert sig.entry_price > sig.ma200
+    assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
+    assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
+    assert sig.vol_ratio >= 2.0
+    assert sig.body <= 40.0
+    look = m5_look_at(df, df.index[sig.entry_idx])
+    assert look is not None
+    if not np.isnan(look["ma30"]):
+        assert look["close"] > look["ma30"]
+
+
 def test_trail_locks_after_1r() -> None:
     idx = pd.date_range("2026-08-24 07:32", periods=6, freq="1min", tz=ET)
     close = np.array([100.0, 108.0, 112.0, 104.0, 103.0, 102.0])
@@ -371,6 +393,7 @@ def main() -> int:
     test_quality_of()
     test_demo_catches_0735_breakout()
     test_real_chart_stands_on_ma200()
+    test_real_chart_catches_1129()
     test_trail_locks_after_1r()
     test_m5_asof_ma200_dist_matches_look_at()
     test_skip_5m_waterfall_bounce()
