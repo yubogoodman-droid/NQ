@@ -48,6 +48,9 @@ def test_demo_catches_0735_breakout() -> None:
     assert sig.entry_price > sig.stop_price
     assert sig.vol_ratio >= 2.0
     assert sig.quality == "A"
+    assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
+    assert sig.entry_price > sig.ma200
+    assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
     # 不該在盤整區就進場
     for s in sigs:
         assert df.index[s.entry_idx] >= pd.Timestamp("2026-08-24 07:30", tz=ET)
@@ -68,6 +71,9 @@ def test_real_chart_0735() -> None:
     assert sig.coil_low > 29160
     assert sig.vol_ratio >= 2.0
     assert sig.body >= 10.0
+    assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
+    assert sig.entry_price > sig.ma200
+    assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
 
 
 def test_no_signal_in_wide_trend() -> None:

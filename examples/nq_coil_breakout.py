@@ -256,7 +256,9 @@ def write_html_report(
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"盤整 {t.signal.coil_low:.2f}–{t.signal.coil_high:.2f}  "
             f"區間 {t.signal.coil_range:.1f}  帶寬 {t.signal.ribbon_width:.1f}\n"
-            f"量能 {t.signal.vol_ratio:.2f}x  實體 {t.signal.body:.1f}  前回檔 {t.signal.prior_drop:.1f}"
+            f"量能 {t.signal.vol_ratio:.2f}x  實體 {t.signal.body:.1f}  前回檔 {t.signal.prior_drop:.1f}\n"
+            f"MA {t.signal.ma5:.1f}>{t.signal.ma10:.1f}>{t.signal.ma20:.1f}>{t.signal.ma30:.1f}  "
+            f"60 {t.signal.ma60:.1f} / 120 {t.signal.ma120:.1f} < 200 {t.signal.ma200:.1f}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -271,7 +273,9 @@ def write_html_report(
             f"等待突破 {funnel.get('sticky', 0)} → "
             f"長實體 {funnel.get('body', 0)} → "
             f"站上盤整 {funnel.get('above_coil', 0)} → "
-            f"站上均線 {funnel.get('above_ribbon', 0)} → "
+            f"5/10/20/30排列 {funnel.get('stack', 0)} → "
+            f"站上MA200 {funnel.get('above_200', 0)} → "
+            f"60與120在200下 {funnel.get('long_below', 0)} → "
             f"放量 {funnel.get('volume', 0)} → "
             f"進場 {funnel.get('taken', 0)}</p>"
         )
@@ -384,7 +388,8 @@ def cmd_backtest(args) -> int:
             "funnel "
             f"checked={funnel.get('checked', 0)} coil={funnel.get('coil', 0)} "
             f"sticky={funnel.get('sticky', 0)} body={funnel.get('body', 0)} "
-            f"above={funnel.get('above_coil', 0)} ribbon_break={funnel.get('above_ribbon', 0)} "
+            f"above={funnel.get('above_coil', 0)} stack={funnel.get('stack', 0)} "
+            f"ma200={funnel.get('above_200', 0)} below={funnel.get('long_below', 0)} "
             f"vol={funnel.get('volume', 0)} taken={funnel.get('taken', 0)}"
         )
     print_signals(df, sigs, trades)
@@ -429,6 +434,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"盤整: <code>{sig.coil_low:.1f}–{sig.coil_high:.1f}</code> "
         f"區間 {sig.coil_range:.1f} / 帶寬 {sig.ribbon_width:.1f}\n"
         f"量能: {sig.vol_ratio:.2f}x · 現價 <code>{last:.2f}</code>\n"
+        f"排列: 5>10>20>30 · 站上MA200 · 60/120&lt;200\n"
         f"#起漲點 #NQ #Q{sig.quality}"
     )
 

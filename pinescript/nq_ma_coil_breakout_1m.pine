@@ -2,7 +2,7 @@
 indicator("NQ 一分K 起漲點（均線糾結突破）", overlay=true, max_labels_count=200)
 
 // 先鎖住盤整箱，再允許之後 8 根放量站上箱頂。
-// 不要用當根往回固定 15 根當盤整，否則起漲 K 會把箱子撐破（08-24 07:35 那種）。
+// 進場：5>10>20>30 多頭、收盤站上 MA200，且 MA60、MA120 在 MA200 下方。
 
 minCoilBars   = input.int(10, "盤整最少 K 數", minval=8, maxval=20)
 maxCoilBars   = input.int(18, "盤整最多 K 數", minval=10, maxval=30)
@@ -75,7 +75,10 @@ if not na(stickyBar) and bar_index - stickyBar > breakWindow
     stickyBar := na
 
 volOk = na(volMed) or volMed <= 0 or volume >= volMed * volMult
-breakout = not na(stickyHigh) and body >= minBody and close >= stickyHigh + minBreakOver and close > ribbonHigh and volOk
+stackOk = ma5 > ma10 and ma10 > ma20 and ma20 > ma30
+above200 = close > ma200
+longBelow = ma60 < ma200 and ma120 < ma200
+breakout = not na(stickyHigh) and body >= minBody and close >= stickyHigh + minBreakOver and stackOk and above200 and longBelow and volOk
 
 plot(ma5,   "MA5",   color=#ffa726, linewidth=1)
 plot(ma10,  "MA10",  color=#42a5f5, linewidth=1)

@@ -142,8 +142,8 @@ def detect_coil_breakouts(
     """
     抓起漲點：先鎖住均線糾結的盤整箱，再允許之後幾根放量站上箱頂。
 
-    不能用「當根往回固定 15 根」當盤整，否則 07:30 起漲的 K 會把箱子撐破，
-    07:35 那根真正的起漲就抓不到。
+    進場還要：MA5>MA10>MA20>MA30 多頭排列、收盤站上 MA200，
+    且 MA60、MA120 都在 MA200 下方（長均還沒被帶走）。
     """
     if df is None or len(df) == 0:
         return []
@@ -234,20 +234,32 @@ def detect_coil_breakouts(
             vol_win = v[max(0, i - vol_lookback) : i]
             vol_ref = float(np.median(vol_win)) if len(vol_win) else 0.0
             vol_ratio = float(v[i] / vol_ref) if vol_ref > 1e-9 else 1.0
-            ribbon_now = max(float(ma[i]) for ma in mas)
+            ma5 = float(mas[0][i])
+            ma10 = float(mas[1][i])
+            ma20 = float(mas[2][i])
+            ma30 = float(mas[3][i])
+            ma60 = float(mas[4][i])
+            ma120 = float(mas[6][i])
+            ma200 = float(mas[7][i])
             ok_body = body >= min_body
             ok_break = c[i] >= last_coil.high + min_break_over
-            ok_ribbon = c[i] > ribbon_now
+            ok_stack = ma5 > ma10 > ma20 > ma30
+            ok_above_200 = c[i] > ma200
+            ok_long_below = ma60 < ma200 and ma120 < ma200
             ok_vol = vol_ref <= 1e-9 or vol_ratio >= min_vol_ratio
             if ok_body:
                 bump("body")
             if ok_break:
                 bump("above_coil")
-            if ok_ribbon:
-                bump("above_ribbon")
+            if ok_stack:
+                bump("stack")
+            if ok_above_200:
+                bump("above_200")
+            if ok_long_below:
+                bump("long_below")
             if ok_vol:
                 bump("volume")
-            if ok_body and ok_break and ok_ribbon and ok_vol:
+            if ok_body and ok_break and ok_stack and ok_above_200 and ok_long_below and ok_vol:
                 entry = float(c[i])
                 stop = last_coil.low - stop_buffer
                 risk = entry - stop
@@ -271,14 +283,14 @@ def detect_coil_breakouts(
                             vol_ratio=vol_ratio,
                             prior_drop=last_coil.prior_drop,
                             body=body,
-                            ma5=float(mas[0][i]),
-                            ma10=float(mas[1][i]),
-                            ma20=float(mas[2][i]),
-                            ma30=float(mas[3][i]),
-                            ma60=float(mas[4][i]),
+                            ma5=ma5,
+                            ma10=ma10,
+                            ma20=ma20,
+                            ma30=ma30,
+                            ma60=ma60,
                             ma100=float(mas[5][i]),
-                            ma120=float(mas[6][i]),
-                            ma200=float(mas[7][i]),
+                            ma120=ma120,
+                            ma200=ma200,
                             quality=q_grade,
                             quality_score=q_score,
                         )
