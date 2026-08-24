@@ -63,7 +63,8 @@ def test_detects_first_stack_above_ma200() -> None:
     assert stack_ok(d["c"], d["m7"], d["m14"], d["m25"], d["m99"], d["m200"], first.idx)
     assert not stack_ok(d["c"], d["m7"], d["m14"], d["m25"], d["m99"], d["m200"], first.idx - 1)
     assert d["c"][first.idx] > d["m7"][first.idx] > d["m14"][first.idx]
-    assert d["m14"][first.idx] > d["m25"][first.idx] > d["m99"][first.idx] > d["m200"][first.idx]
+    assert d["m14"][first.idx] > d["m25"][first.idx] > d["m99"][first.idx]
+    assert d["c"][first.idx] > d["m200"][first.idx]
 
 
 def test_no_repeat_while_stack_holds() -> None:
@@ -124,6 +125,25 @@ def test_forward_and_summarize() -> None:
     assert stats["wr"] == 100.0
 
 
+def test_cross_only_keeps_ma200_reclaim() -> None:
+    raw = _make_stack_bars(300)
+    raw["c"][:220] = 100.0
+    raw["o"][:220] = 100.0
+    raw["h"][:220] = 100.08
+    raw["l"][:220] = 99.92
+    for i in range(220, 300):
+        raw["c"][i] = raw["c"][i - 1] + 0.40
+        raw["h"][i] = raw["c"][i] + 0.08
+        raw["l"][i] = raw["c"][i] - 0.08
+        raw["o"][i] = raw["c"][i - 1]
+    d = add_mas(raw)
+    all_sigs = detect_combo(d, cross_only=False)
+    crosses = detect_combo(d, cross_only=True)
+    assert len(crosses) >= 1
+    assert all(s.crossed_200 for s in crosses)
+    assert len(crosses) <= len(all_sigs)
+
+
 def test_below_ma200_is_not_a_signal() -> None:
     n = 250
     close = np.full(n, 100.0)
@@ -164,6 +184,7 @@ def main() -> int:
     test_rearms_after_break()
     test_min_gap()
     test_forward_and_summarize()
+    test_cross_only_keeps_ma200_reclaim()
     test_below_ma200_is_not_a_signal()
     test_default_date_uses_yesterday_before_2am()
     print("ok")

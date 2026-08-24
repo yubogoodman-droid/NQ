@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""幣安 1 分 K：7>14>25>99 多頭排列上站 MA200。
+"""幣安 1 分 K：7>14>25>99 多頭排列上站 1m MA200（均線都用一分K，不是日線/小時線）。
 
     python3 examples/binance_1m_bull.py backtest --top 50 --today --pages
     python3 examples/binance_1m_bull.py alert --test
@@ -32,7 +32,6 @@ from nq.ma1m_bull import (
     detect_combo,
     forward_moves,
     sma,
-    stack_ok,
     summarize_rows,
 )
 
@@ -189,11 +188,11 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
     if 0 <= x < len(c):
         ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
         ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
-    kind = "剛站上 MA200" if row.crossed_200 else "多頭排列成立"
+    kind = "剛站上 1m MA200" if row.crossed_200 else "多頭排列成立"
     r15 = row.moves.get(15)
     rtxt = f"  15m {r15.ret_pct:+.2f}%" if r15 and r15.ret_pct is not None else ""
     ax.set_title(
-        f"{sym}  1m  {hm(row.time_ms)}  {kind}  ext={row.ext_pct:+.2f}%  vol={row.vol_ratio:.2f}x{rtxt}",
+        f"{sym}  1m  {hm(row.time_ms)}  {kind}  vs 1mMA200 {row.ext_pct:+.2f}%  vol={row.vol_ratio:.2f}x{rtxt}",
         color="#e8f0ea",
         fontsize=11,
     )
@@ -209,6 +208,7 @@ def scan_symbol(
     item: tuple[int, str, float],
     date: str,
     min_gap: int,
+    cross_only: bool,
 ) -> tuple[str, dict | None, list[SignalRow], str]:
     rank, sym, qv = item
     lo, hi = day_window_ms(date)
@@ -220,7 +220,7 @@ def scan_symbol(
         return sym, None, [], "too_few_bars"
     d = add_mas(raw)
     rows: list[SignalRow] = []
-    for sig in detect_combo(d, min_gap_bars=min_gap):
+    for sig in detect_combo(d, min_gap_bars=min_gap, cross_only=cross_only):
         ts = int(d["t"][sig.idx])
         if ts < lo or ts >= hi:
             continue
@@ -242,16 +242,16 @@ def scan_symbol(
 
 
 def format_alert(row: SignalRow) -> str:
-    kind = "剛站上 MA200" if row.crossed_200 else "多頭排列剛成立"
-    below = f"底下 {row.bars_below} 根" if row.bars_below else "已在 MA200 上"
+    kind = "剛站上 1m MA200" if row.crossed_200 else "多頭排列剛成立"
+    below = f"底下 {row.bars_below} 根" if row.bars_below else "已在 1m MA200 上"
     return (
-        f"<b>1m 多頭排列上站 MA200</b>\n"
-        f"<b>{row.symbol}</b>  {hm(row.time_ms)}\n"
+        f"<b>1m 多頭排列上站 1m MA200</b>\n"
+        f"<b>{row.symbol}</b>  一分K  {hm(row.time_ms)}\n"
         f"{kind} · {below}\n"
         f"現價 {row.sig.close:g}　進 {row.entry:g}\n"
-        f"MA7 {row.sig.m7:g} &gt; 14 {row.sig.m14:g} &gt; 25 {row.sig.m25:g} "
-        f"&gt; 99 {row.sig.m99:g} &gt; 200 {row.sig.ma200:g}\n"
-        f"偏離 MA200 {row.ext_pct:+.2f}%　量比 {row.vol_ratio:.2f}x"
+        f"1m MA7 {row.sig.m7:g} &gt; 14 {row.sig.m14:g} &gt; 25 {row.sig.m25:g} "
+        f"&gt; 99 {row.sig.m99:g}　1m MA200 {row.sig.ma200:g}\n"
+        f"偏離 1m MA200 {row.ext_pct:+.2f}%　量比 {row.vol_ratio:.2f}x"
     )
 
 
@@ -286,7 +286,7 @@ def write_html(
             out = draw_chart(row.symbol, d, row, img_dir / img_name)
             if out is not None:
                 img_html = f"<div class='mini-chart'><img src='{escape(img_rel)}' alt='{escape(row.symbol)}'/></div>"
-        kind = "剛站上 MA200" if row.crossed_200 else "排列成立"
+        kind = "剛站上 1m MA200" if row.crossed_200 else "排列成立"
         r15 = row.moves.get(15)
         pnl = r15.ret_pct if r15 and r15.ret_pct is not None else None
         cls = "pnl-win" if pnl is not None and pnl > 0 else ("pnl-loss" if pnl is not None and pnl < 0 else "pnl-flat")
@@ -347,7 +347,7 @@ def write_html(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>幣安 1m 多頭排列上站 MA200 · {escape(date)}</title>
+<title>幣安 1m 多頭排列上站 1m MA200 · {escape(date)}</title>
 <style>
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -373,9 +373,9 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 </style></head><body>
 <div class="page wide">
 <section class="summary">
-<h1>幣安 1m · 7/14/25/99 多頭排列上站 MA200</h1>
+<h1>幣安一分K · 7/14/25/99 多頭排列上站 1m MA200</h1>
 <p class="muted">{escape(date)} 台北時間 · 成交額前 {universe_n} · {len(rows)} 筆訊號（剛站上 {cross_n}）
-<br/>規則：收盤 &gt; MA7 &gt; MA14 &gt; MA25 &gt; MA99 &gt; MA200，前一根尚未同時成立。進場用下一根開盤。
+<br/>規則：一分K 的 MA7 &gt; MA14 &gt; MA25 &gt; MA99，且本根收盤剛站上<strong>一分K MA200</strong>（不是日線/小時線）。進場用下一根開盤。
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
 <div class="card">筆數<b>{len(rows)}</b></div>
@@ -384,7 +384,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 </div>
 {extra}
 </section>
-{''.join(cards) or "<div class='empty'>這段期間沒有多頭排列上站 MA200</div>"}
+{''.join(cards) or "<div class='empty'>這段期間沒有多頭排列上站 1m MA200</div>"}
 <section class="summary">
 <h1>全部訊號</h1>
 <table>
@@ -402,7 +402,8 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 
 def run_backtest(args: argparse.Namespace) -> int:
     date = args.date or default_date()
-    print(f"date={date} top={args.top} min_gap={args.min_gap}", flush=True)
+    cross_only = not args.all_stack
+    print(f"date={date} top={args.top} min_gap={args.min_gap} cross_only={cross_only}", flush=True)
     uni = universe(top_n=args.top)
     if not uni:
         print("no universe", file=sys.stderr)
@@ -417,7 +418,7 @@ def run_backtest(args: argparse.Namespace) -> int:
     frames: dict[str, dict] = {}
     errors = 0
     with ThreadPoolExecutor(8) as ex:
-        futs = {ex.submit(scan_symbol, it, date, args.min_gap): it for it in items}
+        futs = {ex.submit(scan_symbol, it, date, args.min_gap, cross_only): it for it in items}
         for fut in as_completed(futs):
             rank, sym, _qv = futs[fut]
             try:
@@ -469,28 +470,27 @@ def wait_next_close() -> None:
     time.sleep(max(1, nxt - now))
 
 
-def scan_live(sym: str, qv: float, rank: int) -> list[SignalRow]:
+def scan_live(sym: str, qv: float, rank: int, *, cross_only: bool = True) -> list[SignalRow]:
     raw = fetch_klines(sym, interval="1m", limit=260)
     if raw is None or len(raw["c"]) < 220:
         return []
     d = add_mas(raw)
     n = len(d["c"])
     out = []
-    for closed in (n - 1, n - 2):
-        if closed < 200:
-            continue
-        if not stack_ok(d["c"], d["m7"], d["m14"], d["m25"], d["m99"], d["m200"], closed):
-            continue
-        if stack_ok(d["c"], d["m7"], d["m14"], d["m25"], d["m99"], d["m200"], closed - 1):
-            continue
-        from nq.ma1m_bull import signal_at
-
-        sig = signal_at(d, closed)
-        if sig is None:
+    for sig in detect_combo(d, cross_only=cross_only):
+        if sig.idx not in (n - 1, n - 2):
             continue
         entry, moves = forward_moves(d, sig)
-        entry = float(d["c"][closed]) if np.isnan(entry) else entry
-        row = SignalRow(symbol=sym, sig=sig, time_ms=int(d["t"][closed]), entry=entry, quote_volume=qv, rank=rank, moves=moves)
+        entry = float(d["c"][sig.idx]) if np.isnan(entry) else entry
+        row = SignalRow(
+            symbol=sym,
+            sig=sig,
+            time_ms=int(d["t"][sig.idx]),
+            entry=entry,
+            quote_volume=qv,
+            rank=rank,
+            moves=moves,
+        )
         row._frame = d  # type: ignore[attr-defined]
         out.append(row)
     return out
@@ -520,14 +520,14 @@ def notify(row: SignalRow, *, dry_run: bool) -> None:
 def run_alert(args: argparse.Namespace) -> int:
     apply_keys()
     if args.test:
-        ok = telegram_send("1m 多頭排列上站 MA200 測試\n如果你看到這則，Telegram 已通。")
+        ok = telegram_send("一分K 多頭排列上站 1m MA200 測試\n如果你看到這則，Telegram 已通。")
         print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
         return 0 if ok else 1
 
     seen = load_seen()
     print("載入標的…", flush=True)
     uni = universe(top_n=args.top)
-    print(f"監看成交額前 {len(uni)} 個 USDT 永續。7>14>25>99>200 剛成立就推。", flush=True)
+    print(f"監看成交額前 {len(uni)} 個 USDT 永續。7>14>25>99 且剛站上 1m MA200 才推。", flush=True)
     uni_ts = time.time()
 
     def round_once() -> None:
@@ -539,7 +539,10 @@ def run_alert(args: argparse.Namespace) -> int:
         t0 = time.time()
         events: list[SignalRow] = []
         with ThreadPoolExecutor(8) as ex:
-            futs = {ex.submit(scan_live, sym, qv, i): sym for i, (sym, qv) in enumerate(uni, 1)}
+            futs = {
+                ex.submit(scan_live, sym, qv, i, cross_only=not args.all_stack): sym
+                for i, (sym, qv) in enumerate(uni, 1)
+            }
             for fut in as_completed(futs):
                 try:
                     events.extend(fut.result())
@@ -573,7 +576,7 @@ def run_alert(args: argparse.Namespace) -> int:
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(description="幣安 1m 多頭排列上站 MA200")
+    p = argparse.ArgumentParser(description="幣安一分K：7/14/25/99 多頭排列上站 1m MA200")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     b = sub.add_parser("backtest", help="回測成交額前 N（預設今天）")
@@ -581,6 +584,7 @@ def main(argv=None) -> int:
     b.add_argument("--date", default="", help="YYYY-MM-DD，台北日，預設今天（凌晨 2 點前用昨天）")
     b.add_argument("--today", action="store_true", help="明確指定用今天（同預設）")
     b.add_argument("--min-gap", type=int, default=0, help="同一標的訊號最少間隔根數")
+    b.add_argument("--all-stack", action="store_true", help="含已在 MA200 上才排好均線（會很多）")
     b.add_argument("--pages", action="store_true")
     b.add_argument("--html", default="")
     b.add_argument("--charts", type=int, default=40)
@@ -591,6 +595,7 @@ def main(argv=None) -> int:
     a.add_argument("--once", action="store_true")
     a.add_argument("--test", action="store_true")
     a.add_argument("--dry-run", action="store_true")
+    a.add_argument("--all-stack", action="store_true", help="含已在 MA200 上才排好均線（會很多）")
     a.set_defaults(func=run_alert)
 
     args = p.parse_args(argv)

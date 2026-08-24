@@ -1,4 +1,7 @@
-"""幣安 1 分 K：MA7 > MA14 > MA25 > MA99 > MA200，且收盤在均線之上。"""
+"""幣安 1 分 K：MA7 > MA14 > MA25 > MA99 多頭排列，上站同一根 1m 圖的 MA200。
+
+所有均線都用 1 分鐘收盤 SMA，不用日線／小時線 MA200。
+"""
 
 from __future__ import annotations
 
@@ -17,6 +20,7 @@ def sma(arr: np.ndarray, n: int) -> np.ndarray:
 
 
 def add_mas(d: dict) -> dict:
+    """1 分鐘收盤的 SMA 7/14/25/99/200。"""
     out = dict(d)
     c, v = d["c"], d["v"]
     out["m7"] = sma(c, 7)
@@ -29,11 +33,11 @@ def add_mas(d: dict) -> dict:
 
 
 def stack_ok(c, m7, m14, m25, m99, m200, i: int) -> bool:
-    """收盤 > MA7 > MA14 > MA25 > MA99 > MA200。"""
+    """7/14/25/99 多頭排列，且收盤在 1m MA200 上。不要求 MA99 已高於 MA200。"""
     vals = [c[i], m7[i], m14[i], m25[i], m99[i], m200[i]]
     if np.isnan(vals).any():
         return False
-    return bool(c[i] > m7[i] > m14[i] > m25[i] > m99[i] > m200[i])
+    return bool(c[i] > m7[i] > m14[i] > m25[i] > m99[i] and c[i] > m200[i])
 
 
 def bars_below_ma200(c, m200, i: int) -> int:
@@ -128,8 +132,11 @@ def signal_at(d: dict, i: int) -> BullSignal | None:
     )
 
 
-def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
-    """排列剛成立的那一根：本根 收盤>7>14>25>99>200，前一根還沒同時成立。"""
+def detect_combo(d: dict, *, min_gap_bars: int = 0, cross_only: bool = False) -> list[BullSignal]:
+    """本根 收盤>MA7>14>25>99 且收盤>1m MA200；前一根還沒同時成立。
+
+    cross_only：只保留「前收還在 1m MA200 下、本根收盤站上」——這才是上站，而不是已在線上又排一次均線。
+    """
     c, m7, m14, m25, m99, m200 = d["c"], d["m7"], d["m14"], d["m25"], d["m99"], d["m200"]
     out: list[BullSignal] = []
     last_i = -10_000
@@ -138,6 +145,9 @@ def detect_combo(d: dict, *, min_gap_bars: int = 0) -> list[BullSignal]:
         prev_ok = stack_ok(c, m7, m14, m25, m99, m200, i - 1)
         if not now_ok or prev_ok:
             continue
+        if cross_only:
+            if np.isnan(m200[i - 1]) or not (c[i - 1] <= m200[i - 1] and c[i] > m200[i]):
+                continue
         if i - last_i < min_gap_bars:
             continue
         sig = signal_at(d, i)

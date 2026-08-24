@@ -60,10 +60,11 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## 幣安 1 分 K：7/14/25/99 多頭排列上站 MA200
+## 幣安 1 分 K：7/14/25/99 多頭排列上站 1m MA200
 
-收盤 > MA7 > MA14 > MA25 > MA99 > MA200，前一根還沒同時成立才算訊號（站上後持續排列不重發）。  
-預設掃 U 本位永續 **24h 成交額前 50**，符合就推 Telegram（帶圖）。
+全部用**一分 K 自己的均線**（SMA7/14/25/99/200），不是日線年線、也不是小時 MA200。  
+收盤在 MA7 > MA14 > MA25 > MA99 多頭排列上，且**本根收盤剛站上 1m MA200**（前收仍在線下）才算訊號。  
+已在 1m MA200 上又重新排均線不推。預設掃 U 本位永續 **24h 成交額前 50**。
 
 ```bash
 # 今天回測（台北日；凌晨 2 點前自動用昨天）
