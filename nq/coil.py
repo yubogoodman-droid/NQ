@@ -301,6 +301,7 @@ def detect_coil_breakouts(
     stop_lookback: int = 20,
     target_r: float = 2.0,
     min_entry_gap: int = 45,
+    confirm_bars: int = 2,
     max_body: float = 40.0,
     max_m5_below_200: float = -1.0,
     require_m5_above_ma20: bool = False,
@@ -310,11 +311,11 @@ def detect_coil_breakouts(
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[CoilSignal]:
     """
-    1 分 K 起漲點：MA5>MA10>MA20>MA30 多頭排列，且這一根才收盤站上 MA200。
+    1 分 K 起漲點：MA5>MA10>MA20>MA30，且連續 confirm_bars 根收盤站上 MA200。
 
-    前一根收盤還在 MA200 下方（或等於），這一根收盤站上，才算「站上」。
-    不要等後面那根放量長綠。盤整箱子、放量、5 分均線都不是進場條件
-    （仍可用參數打開）。停損用進場前 stop_lookback 根的修剪低點 − buffer。
+    預設兩根：第一根站上還不進，第二根仍排列且收在 MA200 上才進。
+    盤整箱子、放量、5 分均線都不是進場條件（仍可用參數打開）。
+    停損用進場前 stop_lookback 根的修剪低點 − buffer。
     """
     if df is None or len(df) == 0:
         return []
@@ -409,11 +410,23 @@ def detect_coil_breakouts(
         ma60 = float(mas[4][i])
         ma120 = float(mas[6][i])
         ma200 = float(mas[7][i])
-        prev_ma200 = float(mas[7][i - 1])
         ok_stack = ma5 > ma10 > ma20 > ma30
         ok_above_200 = c[i] > ma200
-        ok_reclaim = ok_above_200 and float(c[i - 1]) <= prev_ma200
-        ok_body = body >= min_body
+
+        def bar_hold(j: int) -> bool:
+            if j < 0:
+                return False
+            if any(np.isnan(ma[j]) for ma in mas[:4]) or np.isnan(mas[-1][j]):
+                return False
+            return (
+                float(mas[0][j]) > float(mas[1][j]) > float(mas[2][j]) > float(mas[3][j])
+                and float(c[j]) > float(mas[-1][j])
+            )
+
+        need = max(1, int(confirm_bars))
+        ok_hold = all(bar_hold(i - k) for k in range(need))
+        ok_fresh = not bar_hold(i - need)
+        ok_body = min_body <= 0 or body >= min_body
         ok_max_body = max_body <= 0 or body <= max_body
         ok_long_below = (not require_long_below) or (ma60 < ma200 and ma120 < ma200)
         ok_vol = min_vol_ratio <= 0 or vol_ref <= 1e-9 or vol_ratio >= min_vol_ratio
@@ -431,8 +444,10 @@ def detect_coil_breakouts(
             bump("stack")
         if ok_above_200:
             bump("above_200")
-        if ok_reclaim:
-            bump("reclaim")
+        if ok_hold:
+            bump("hold")
+        if ok_fresh:
+            bump("fresh")
         if ok_body:
             bump("body")
         if ok_max_body:
@@ -450,7 +465,8 @@ def detect_coil_breakouts(
         if (
             i - last_entry >= min_entry_gap
             and ok_stack
-            and ok_reclaim
+            and ok_hold
+            and ok_fresh
             and ok_body
             and ok_max_body
             and ok_long_below

@@ -353,7 +353,7 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"<p class='muted'>漏斗：檢查 {funnel.get('checked', 0)} → "
         f"5/10/20/30排列 {funnel.get('stack', 0)} → "
         f"站上MA200 {funnel.get('above_200', 0)} → "
-        f"這一根才站上 {funnel.get('reclaim', 0)} → "
+        f"連續兩根站穩 {funnel.get('hold', 0)} → "
         f"進場 {funnel.get('taken', 0)}</p>"
     )
 
@@ -549,8 +549,8 @@ a{{color:#79c0ff}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{escape(symbol)} 起漲點（1分 5>10>20>30 站上MA200）</h1>
-<p class="muted">訊號只看 1分K：MA5&gt;MA10&gt;MA20&gt;MA30，且這一根才收盤站上 MA200。不要等後面放量長綠。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。下面每筆附「當時 5分K」只是對照，不是進場條件。</p>
+<h1>{escape(symbol)} 起漲點（1分 5>10>20>30 連兩根站上MA200）</h1>
+<p class="muted">訊號只看 1分K：MA5&gt;MA10&gt;MA20&gt;MA30，且連續兩根收盤站上 MA200。第一根站上還不進。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。下面每筆附「當時 5分K」只是對照，不是進場條件。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -633,7 +633,7 @@ def _print_funnel(funnel: Dict[str, int]) -> None:
     print(
         "funnel "
         f"checked={funnel.get('checked', 0)} stack={funnel.get('stack', 0)} "
-        f"ma200={funnel.get('above_200', 0)} reclaim={funnel.get('reclaim', 0)} "
+        f"ma200={funnel.get('above_200', 0)} hold={funnel.get('hold', 0)} "
         f"taken={funnel.get('taken', 0)}"
     )
 
@@ -705,7 +705,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
             f"MA30 {_fmt_ma(look['ma30'])} {above30}\n"
         )
     return (
-        f"🟢 <b>起漲點（1分 5&gt;10&gt;20&gt;30 站上MA200）</b>\n"
+        f"🟢 <b>起漲點（1分 5&gt;10&gt;20&gt;30 連兩根站上MA200）</b>\n"
         f"時間: <code>{ts.strftime('%Y-%m-%d %H:%M')} ET</code>\n"
         f"品質: <b>Q{sig.quality}</b> ({sig.quality_score}/4)\n"
         f"進場: <code>{sig.entry_price:.2f}</code>\n"
@@ -715,7 +715,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"回看低 / MA200: <code>{sig.coil_low:.1f}–{sig.coil_high:.1f}</code>\n"
         f"{m5_line}"
         f"量能: {sig.vol_ratio:.2f}x · 現價 <code>{last:.2f}</code>\n"
-        f"排列: 5&gt;10&gt;20&gt;30 · 這一根才站上 MA200\n"
+        f"排列: 5&gt;10&gt;20&gt;30 · 連續兩根站上 MA200\n"
         f"#起漲點 #NQ #Q{sig.quality}"
     )
 
@@ -874,7 +874,7 @@ def cmd_alert(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="NQ 起漲點（1分 5>10>20>30 站上MA200）")
+    p = argparse.ArgumentParser(description="NQ 起漲點（1分 5>10>20>30 連兩根站上MA200）")
     sub = p.add_subparsers(dest="cmd")
 
     d = sub.add_parser("demo", help="用模擬那張圖的走勢示範")

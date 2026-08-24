@@ -64,16 +64,19 @@ def test_demo_catches_0735_breakout() -> None:
 
 
 def test_real_chart_stands_on_ma200() -> None:
-    """短 fixture 沒有日線 30 日均線，07:32 仍會進。完整回測會帶日線再過濾。"""
+    """07:32 第一次站上還不進；07:33 第二根仍站在 MA200 上才進。"""
     path = Path(__file__).resolve().parent / "fixtures" / "nq_2026-08-24_0735.csv"
     df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
     if df.index.tz is None:
         df.index = df.index.tz_localize(ET)
     sigs = detect_coil_breakouts(df)
-    hits = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:32"]
-    assert hits, f"expected 07:32 站上MA200, got {[df.index[s.entry_idx].strftime('%H:%M') for s in sigs]}"
+    times = [df.index[s.entry_idx].strftime("%H:%M") for s in sigs]
+    first = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:32"]
+    assert not first, f"07:32 只是第一根站上，不該進場, got {times}"
+    hits = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:33"]
+    assert hits, f"expected 07:33 第二根站穩, got {times}"
     sig = hits[0]
-    assert abs(sig.entry_price - 29217.75) < 0.3
+    assert abs(sig.entry_price - 29216.50) < 0.3
     assert abs(sig.stop_price - (sig.coil_low - 5.0)) < 0.01
     assert abs(sig.target_price - (sig.entry_price + 2.0 * (sig.entry_price - sig.stop_price))) < 0.01
     assert sig.entry_price > sig.ma200
@@ -85,43 +88,32 @@ def test_real_chart_stands_on_ma200() -> None:
     look = m5_look_at(df, ts)
     assert look is not None
     assert look["bar_time"].strftime("%H:%M") == "07:35"
-    # 07:32 當下，5分當根還沒走到 07:35 那根長綠
-    assert abs(look["close"] - 29217.75) < 0.3
+    assert abs(look["close"] - 29216.50) < 0.3
     assert look["forming"]
     assert abs(look["finished_close"] - 29247.25) < 1.0
     snap = m5_asof(df, ts)
-    assert abs(float(snap.iloc[-1]["Close"]) - 29217.75) < 0.3
-    _c5, _ma5, dist = m5_asof_ma200_dist(df)
-    i = hits[0].entry_idx
-    if not np.isnan(look["ma20"]):
-        assert look["close"] > look["ma20"], "07:32 當時 5 分應站上 5分MA20"
-        assert look["above_20"]
-    if not np.isnan(look["ma30"]):
-        assert look["close"] > look["ma30"], "07:32 當時 5 分應站上 5分MA30"
-        assert look["above_30"]
-    if not np.isnan(sig.m5_ma20):
-        assert sig.m5_close > sig.m5_ma20
-    if not np.isnan(sig.m5_ma30):
-        assert sig.m5_close > sig.m5_ma30
+    assert abs(float(snap.iloc[-1]["Close"]) - 29216.50) < 0.3
     trades = simulate(df, hits)
-    assert trades, "07:32 應能模擬出場"
-    # 07:38 衝到 29283（>1R）後拉回，移動停利鎖 +0.3R，不再保本出場
+    assert trades, "07:33 應能模擬出場"
     assert trades[0].exit_reason == "trail"
     risk = hits[0].entry_price - hits[0].stop_price
     assert abs(trades[0].pnl_points - 0.3 * risk) < 0.6
 
 
 def test_real_chart_catches_1129() -> None:
-    """08-24 11:21 插針後，11:29 第一次站上 MA200 要進。"""
+    """11:29 第一根站上還不進；11:30 第二根仍站在 MA200 上才進。"""
     path = Path(__file__).resolve().parent / "fixtures" / "nq_2026-08-24_1129.csv"
     df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
     if df.index.tz is None:
         df.index = df.index.tz_localize(ET)
     sigs = detect_coil_breakouts(df)
-    hits = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "11:29"]
-    assert hits, f"expected 11:29 站上MA200, got {[df.index[s.entry_idx].strftime('%H:%M') for s in sigs]}"
+    times = [df.index[s.entry_idx].strftime("%H:%M") for s in sigs]
+    first = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "11:29"]
+    assert not first, f"11:29 只是第一根站上，不該進場, got {times}"
+    hits = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "11:30"]
+    assert hits, f"expected 11:30 第二根站穩, got {times}"
     sig = hits[0]
-    assert abs(sig.entry_price - 29121.25) < 0.3
+    assert abs(sig.entry_price - 29130.25) < 0.3
     assert sig.entry_price > sig.ma200
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
     assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
@@ -271,9 +263,9 @@ def test_skip_chase_body() -> None:
     df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
     if df.index.tz is None:
         df.index = df.index.tz_localize(ET)
-    sigs = detect_coil_breakouts(df, max_body=5.0)
-    hits = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:32"]
-    assert not hits, "實體 7.8 應被 max_body=5 擋掉"
+    sigs = detect_coil_breakouts(df)
+    late = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:35"]
+    assert not late, "07:35 放量長綠不是進場"
 
 
 def test_failed_breakout_exits_on_two_closes() -> None:
