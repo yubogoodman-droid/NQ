@@ -246,6 +246,7 @@ def test_write_view_html_uses_pages_urls() -> None:
     text = out.read_text(encoding="utf-8")
     assert "https://yubogoodman-droid.github.io/NQ/binance/img/ma1m-bull/SNDK_0824_0642.png" in text
     assert "src='img/" not in text
+    assert "yubogoodman-droid.github.io/NQ/binance/img/ma1m-bull/" in mod.img_src("img/ma1m-bull/SNDK_0825_0156.png")
 
 
 def main() -> int:

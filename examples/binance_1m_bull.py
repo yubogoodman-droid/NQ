@@ -31,6 +31,7 @@ from nq.ma1m_bull import (
     add_mas,
     detect_combo,
     forward_moves,
+    signal_at,
     sma,
     summarize_rows,
 )
@@ -41,6 +42,10 @@ SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
 PAGES_IMG = "https://yubogoodman-droid.github.io/NQ/binance/"
+# 使用者傳的 SNDK 截圖當下（台北 2026-08-25 01:56，價約 1481）
+REF_SYMBOL = "SNDKUSDT"
+REF_WHEN = datetime(2026, 8, 25, 1, 56, tzinfo=TZ)
+IMG_VER = "ref0156"
 # 幣安 App 淺色盤：黃/橘/紫/藍/青 + 深灰 MA200
 PAL = {7: "#F0B90B", 14: "#FF6D00", 25: "#D500F9", 99: "#2962FF", 120: "#00B8D4", 200: "#474D57"}
 VOL_MA = {5: "#F0B90B", 10: "#D500F9"}
@@ -87,6 +92,45 @@ def file_base(symbol: str) -> str:
     base = symbol.replace("USDT", "")
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("_")
     return safe or f"s{abs(hash(symbol)) % 10_000_000_000}"
+
+
+def img_src(rel: str) -> str:
+    """Pages 絕對網址，避免相對路徑在 preview / 舊頁被清掉後圖不見。"""
+    return f"{PAGES_IMG}{rel}?v={IMG_VER}"
+
+
+def nearest_bar(d: dict, when: datetime) -> int:
+    target = int(when.timestamp() * 1000)
+    return int(np.argmin(np.abs(d["t"].astype(np.int64) - target)))
+
+
+def load_ref_row(frames: dict[str, dict]) -> tuple[SignalRow | None, dict | None]:
+    """使用者傳的 SNDK 截圖那一根，即使不是訊號也要畫出來。"""
+    d = frames.get(REF_SYMBOL)
+    if d is None or len(d.get("c", [])) < 220:
+        try:
+            raw = fetch_klines(REF_SYMBOL, interval="1m", days=2, extra_bars=240)
+        except Exception:
+            return None, None
+        if raw is None or len(raw["c"]) < 220:
+            return None, None
+        d = add_mas(raw)
+    i = nearest_bar(d, REF_WHEN)
+    sig = signal_at(d, i, require_stack=False)
+    if sig is None:
+        return None, d
+    return (
+        SignalRow(
+            symbol=REF_SYMBOL,
+            sig=sig,
+            time_ms=int(d["t"][i]),
+            entry=float(d["c"][i]),
+            quote_volume=0.0,
+            rank=1,
+            moves={},
+        ),
+        d,
+    )
 
 
 def default_date(now: datetime | None = None) -> str:
@@ -160,7 +204,7 @@ def _style_ax(ax) -> None:
     ax.spines["right"].set_visible(False)
 
 
-def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
+def draw_chart(sym: str, d: dict, row: SignalRow, path: Path, title_note: str = "") -> Path | None:
     try:
         import matplotlib
 
@@ -223,7 +267,7 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
             bbox={"boxstyle": "round,pad=0.15", "fc": UP if c[x] >= o[x] else DOWN, "ec": "none"},
         )
     name = f"{sym} 永續"
-    ax.set_title(f"{name}   1m   {hm(row.time_ms)}", color=TEXT, fontsize=12, loc="left", pad=8)
+    ax.set_title(f"{name}   1m   {hm(row.time_ms)}{title_note}", color=TEXT, fontsize=12, loc="left", pad=8)
     ax.legend(
         loc="upper left",
         fontsize=7,
@@ -306,6 +350,19 @@ def key_of(row: SignalRow) -> str:
     return f"{row.symbol}:{row.time_ms}"
 
 
+def _card_img(sym: str, d: dict | None, row: SignalRow, img_dir: Path, title_note: str = "") -> str:
+    img_name = f"{file_base(sym)}_{datetime.fromtimestamp(row.time_ms/1000, TZ).strftime('%m%d_%H%M')}.png"
+    if d is None:
+        return ""
+    out = draw_chart(sym, d, row, img_dir / img_name, title_note=title_note)
+    if out is None:
+        return ""
+    return (
+        f"<div class='mini-chart'><img src='{escape(img_src('img/ma1m-bull/' + img_name))}' "
+        f"alt='{escape(sym)}'/></div>"
+    )
+
+
 def write_html(
     path: Path,
     rows: list[SignalRow],
@@ -316,6 +373,7 @@ def write_html(
     names: list[str],
     max_charts: int,
     pool_label: str = "USDT 股票合約成交額前 10",
+    refs: list[SignalRow] | None = None,
 ) -> Path:
     stats = {h: summarize_rows(rows, h) for h in HORIZONS}
     cross_n = sum(1 for r in rows if r.crossed_200)
@@ -326,15 +384,34 @@ def write_html(
     if img_dir.exists():
         for old in img_dir.glob("*.png"):
             old.unlink()
+    for row in refs or []:
+        d = frames.get(row.symbol)
+        img_html = _card_img(row.symbol, d, row, img_dir, title_note="  · 你傳的參考")
+        cards.append(
+            "<article class='trade-card'>"
+            "<header class='card-header'>"
+            f"<div class='card-title'><span class='trade-no'>{escape(row.symbol)} 永續</span>"
+            f"<span class='trade-time'>你傳的參考圖 · 1m · {escape(hm(row.time_ms))}</span></div>"
+            "<div class='card-pnl pnl-flat'>參考</div>"
+            "</header>"
+            f"<div class='px pnl-flat'>{row.sig.close:g} "
+            f"<span class='px-sub'>截圖當下 · 短均距 {row.sig.short_pct:.2f}% · 全距 {row.sig.ribbon_pct:.2f}%</span></div>"
+            "<div class='tags'><span class='tag'>參考圖</span>"
+            f"<span class='tag'>黏帶 {row.sig.ribbon_pct:.2f}%</span>"
+            f"<span class='tag'>短均 {row.sig.short_pct:.2f}%</span></div>"
+            "<pre class='trade-detail'>"
+            f"close {row.sig.close:g}\n"
+            f"MA7 {row.sig.m7:g}  14 {row.sig.m14:g}  25 {row.sig.m25:g}  "
+            f"99 {row.sig.m99:g}  120 {row.sig.m120:g}  200 {row.sig.ma200:g}\n"
+            f"均線全距 {row.sig.ribbon_pct:.2f}%  短均距 {row.sig.short_pct:.2f}%\n"
+            "這根短均黏在一起，但不是 7&gt;14&gt;25&gt;99&gt;120，收盤也還在 MA200 下，所以不當訊號。"
+            "</pre>"
+            f"{img_html}"
+            "</article>"
+        )
     for i, row in enumerate(gallery, 1):
         d = frames.get(row.symbol)
-        img_name = f"{file_base(row.symbol)}_{datetime.fromtimestamp(row.time_ms/1000, TZ).strftime('%m%d_%H%M')}.png"
-        img_rel = f"img/ma1m-bull/{img_name}"
-        img_html = ""
-        if d is not None:
-            out = draw_chart(row.symbol, d, row, img_dir / img_name)
-            if out is not None:
-                img_html = f"<div class='mini-chart'><img src='{escape(img_rel)}' alt='{escape(row.symbol)}'/></div>"
+        img_html = _card_img(row.symbol, d, row, img_dir)
         kind = "剛站上 1m MA200" if row.crossed_200 else "排列成立"
         r15 = row.moves.get(15)
         pnl = r15.ret_pct if r15 and r15.ret_pct is not None else None
@@ -428,6 +505,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 <section class="summary">
 <h1>幣安一分K · 7&gt;14&gt;25&gt;99&gt;120 黏帶上站 MA200</h1>
 <p class="muted">{escape(date)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}）
+<br/>最上面那張是你傳的 <strong>SNDK 參考圖</strong>（08-25 01:56 · 約 1481）。下面才是符合規則的訊號。
 <br/>規則：均線<strong>排列</strong> MA7 &gt; MA14 &gt; MA25 &gt; MA99 &gt; MA120，本根收盤剛站上 1m MA200。均線<strong>距離</strong>要像截圖那種黏帶（六條全距 ≤0.45%、短均 7/14/25 ≤0.25%），扇開不算。進場用下一根開盤。
 <br/>只掃幣安 <strong>USDT 股票合約</strong>（美股／韓股／港股／A 股／Pre-IPO），不含加密、黃金原油等商品。
 <br/>標的：{escape(names_txt)}</p>
@@ -528,6 +606,14 @@ def run_backtest(args: argparse.Namespace) -> int:
 
     html_path = Path(args.html) if args.html else (PAGES if args.pages else None)
     if html_path:
+        ref_row, ref_d = load_ref_row(frames)
+        if ref_row and ref_d is not None:
+            frames[ref_row.symbol] = ref_d
+            print(
+                f"ref {ref_row.symbol} {hm(ref_row.time_ms)} close={ref_row.sig.close:g} "
+                f"ribbon={ref_row.sig.ribbon_pct:.2f}% short={ref_row.sig.short_pct:.2f}%",
+                flush=True,
+            )
         out = write_html(
             html_path,
             rows,
@@ -537,6 +623,7 @@ def run_backtest(args: argparse.Namespace) -> int:
             names=[s for s, _ in uni],
             max_charts=args.charts,
             pool_label=pool,
+            refs=[ref_row] if ref_row else None,
         )
         view = write_view_html(out)
         print(f"html={out}")

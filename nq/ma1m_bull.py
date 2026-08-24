@@ -138,14 +138,14 @@ class SignalRow:
         return self.sig.bars_below
 
 
-def signal_at(d: dict, i: int) -> BullSignal | None:
+def signal_at(d: dict, i: int, *, require_stack: bool = True) -> BullSignal | None:
     if i < 1 or i >= len(d["c"]):
         return None
     c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
     m7, m14, m25 = d["m7"], d["m14"], d["m25"]
     m99, m120, m200 = d["m99"], d["m120"], d["m200"]
     v20 = d["v20"]
-    if not stack_ok(d, i):
+    if require_stack and not stack_ok(d, i):
         return None
     vr = float(v[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
     ext = (c[i] / m200[i] - 1.0) * 100.0 if m200[i] else 0.0
