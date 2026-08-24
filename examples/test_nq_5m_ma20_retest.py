@@ -179,6 +179,8 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
     text = path.read_text(encoding="utf-8")
     assert "回踩 MA20" in text
     assert "5m MA60" in text
+    assert "日盤" in text
+    assert "全時段對照" not in text
     if trades:
         assert "<img src='img/" in text
         img_dir = path.parent / "img"

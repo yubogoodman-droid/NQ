@@ -617,8 +617,8 @@ def write_html_report(
         extra_stats = summarize_trades(extra_trades)
         extra_cls = "pnl-win" if extra_stats["total_points"] >= 0 else "pnl-loss"
         extra_html = (
-            f"<section class='summary'><h1>{escape(extra_title or '全時段對照')}</h1>"
-            f"<p class='muted'>同一套破底→收復→回踩，不限 09:30–15:45。夜盤噪音較大，只當樣本。</p>"
+            f"<section class='summary'><h1>{escape(extra_title or '對照')}</h1>"
+            f"<p class='muted'>額外樣本，預設報告不含此段。</p>"
             f"<div class='cards'><div class='card'>筆數<b>{extra_stats['count']}</b></div>"
             f"<div class='card'>勝率<b>{extra_stats['win_rate']:.1f}%</b></div>"
             f"<div class='card'>總點數<b class='{extra_cls}'>{extra_stats['total_points']:+.1f}</b></div>"
@@ -681,7 +681,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} {escape(interval)} 破翻回踩 MA20</h1>
-<p class="muted">RTH 09:30–15:45。破底 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後回踩進場。停損在破底下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內）則略過。{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
+<p class="muted">日盤 09:30–15:45 ET，不含夜盤。破底 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後回踩進場。停損在破底下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內）則略過。{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -763,22 +763,6 @@ def cmd_backtest(args) -> int:
         )
 
     extra_trades: List[TradeResult] = []
-    if args.pages and args.session != "all":
-        extra_funnel: Dict[str, int] = {}
-        extra_sigs = detect_signals(df, funnel=extra_funnel, **detect_kwargs(interval, session="all"))
-        extra_trades = simulate(df, extra_sigs, **skw)
-        extra_stats = summarize_trades(extra_trades)
-        print(
-            f"all-session trades={extra_stats['count']} WR={extra_stats['win_rate']:.1f}% "
-            f"pnl={extra_stats['total_points']:+.1f}"
-        )
-        for i, t in enumerate(extra_trades, 1):
-            print(
-                f"  [all {i}] Q{t.quality} {df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
-                f"-> {df.index[t.exit_idx].strftime('%m-%d %H:%M')} "
-                f"{t.exit_reason} {t.pnl_points:+.1f}"
-            )
-
     html_path = args.html
     if args.pages:
         html_path = html_path or str(PAGES_HTML[interval])
@@ -795,7 +779,7 @@ def cmd_backtest(args) -> int:
             args.period,
             funnel=funnel,
             extra_trades=extra_trades,
-            extra_title="全時段對照（含夜盤）",
+            extra_title="",
             interval=interval,
             df_5m=(resample_ohlc(df) if interval == "1m" else None),
         )
