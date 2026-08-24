@@ -67,7 +67,7 @@ def test_demo_catches_0735_breakout() -> None:
 
 
 def test_real_chart_stands_on_ma200() -> None:
-    """你貼的那張圖：進場是 07:32 站上 MA200（29217.75），不是 07:35 放量追高。"""
+    """短 fixture 沒有 200 根 5 分，07:32 仍會進。完整 10d/30d 裡 5 分還在 MA200 下，不會觸發。"""
     path = Path(__file__).resolve().parent / "fixtures" / "nq_2026-08-24_0735.csv"
     df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
     if df.index.tz is None:
@@ -199,10 +199,10 @@ def test_skip_5m_waterfall_bounce() -> None:
     with_filter = detect_coil_breakouts(df)
     without = detect_coil_breakouts(df, max_m5_below_200=-1.0)
     assert without, "關掉 5 分深度過濾後，模擬圖仍應有起漲點"
-    # 有過濾時不該在大空下方接同一筆
+    # 有過濾時，算得出 5 分 MA200 的單必須站上
     if with_filter:
         for s in with_filter:
-            assert np.isnan(s.m5_dist) or s.m5_dist >= -100.0
+            assert np.isnan(s.m5_dist) or s.m5_dist > 0.0
 
 
 def test_skip_chase_body() -> None:

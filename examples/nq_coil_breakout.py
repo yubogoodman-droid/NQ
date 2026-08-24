@@ -360,7 +360,7 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"站上MA200 {funnel.get('above_200', 0)} → "
         f"60與120在200下 {funnel.get('long_below', 0)} → "
         f"放量 {funnel.get('volume', 0)} → "
-        f"5分未過深 {funnel.get('m5_ok', 0)} → "
+        f"5分站上MA200 {funnel.get('m5_ok', 0)} → "
         f"5分站上MA20 {funnel.get('m5_ma20', 0)} → "
         f"進場 {funnel.get('taken', 0)}</p>"
     )
@@ -559,7 +559,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（均線糾結突破）</h1>
-<p class="muted">訊號只看 1分K。進場當下 5 分收盤要在 5 分 MA20 上方。停損＝盤整低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R（移動停利）。連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體，當時 5 分若還在 MA200 下方超過 100 點也不接。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
+<p class="muted">訊號只看 1分K。進場當下 5 分收盤要在 5 分 MA20 上方，也要站上 5 分 MA200。停損＝盤整低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R（移動停利）。連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -729,7 +729,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"區間 {sig.coil_range:.1f} / 帶寬 {sig.ribbon_width:.1f}\n"
         f"{m5_line}"
         f"量能: {sig.vol_ratio:.2f}x · 現價 <code>{last:.2f}</code>\n"
-        f"排列: 5>10>20>30 · 站上MA200 · 60/120&lt;200 · 5分站上MA20\n"
+        f"排列: 5>10>20>30 · 站上MA200 · 60/120&lt;200 · 5分站上MA20與MA200\n"
         f"#起漲點 #NQ #Q{sig.quality}"
     )
 

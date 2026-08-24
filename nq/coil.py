@@ -279,7 +279,7 @@ def detect_coil_breakouts(
     target_r: float = 2.0,
     min_entry_gap: int = 45,
     max_body: float = 40.0,
-    max_m5_below_200: float = 100.0,
+    max_m5_below_200: float = 0.0,
     require_m5_above_ma20: bool = True,
     ma_periods: Sequence[int] = MA_PERIODS,
     funnel: Optional[Dict[str, int]] = None,
@@ -290,9 +290,8 @@ def detect_coil_breakouts(
     進場是「第一次」收盤站上 MA200，且 MA5>MA10>MA20>MA30、
     MA60 與 MA120 仍在 MA200 下方。不要等後面那根放量長綠。
 
-    另外不接兩種假突破：1 分實體已經噴超過 max_body，或當時 5 分還在
-    MA200 下方超過 max_m5_below_200 點（大空裡的 1 分反彈）。
-    進場當下，5 分收盤還要在 5 分 MA20 上方。
+    另外不接已經噴超過 max_body 的長實體。進場當下，當時 5 分收盤要在
+    5 分 MA20 上方，也要站上 5 分 MA200（max_m5_below_200=0；設成負數則關掉）。
     """
     if df is None or len(df) == 0:
         return []
@@ -402,7 +401,7 @@ def detect_coil_breakouts(
             ok_m5 = (
                 max_m5_below_200 < 0
                 or np.isnan(m5d)
-                or m5d >= -max_m5_below_200
+                or m5d > -max_m5_below_200
             )
             m5_20 = float(m5_ma20[i])
             ok_m5_20 = (not require_m5_above_ma20) or np.isnan(m5_20) or float(_m5_c[i]) > m5_20
