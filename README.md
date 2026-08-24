@@ -22,6 +22,29 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 一分 K 起漲點（均線糾結突破）
+
+1 分鐘圖：下跌後均線（MA5/10/20/30/60/100/120/200）收成一束、窄幅盤整，再放量長綠 K 站上盤整高點與整束均線。起漲點是突破那根，不是最低點。停損在盤整低點下方；目標 2R。
+
+```bash
+# 模擬那張「07:35 放量突破」的走勢
+python3 examples/nq_coil_breakout.py --demo
+
+# Yahoo 1m 回測 + 手機版 HTML
+python3 examples/nq_coil_breakout.py backtest --period 8d --html output/nq_coil.html
+python3 examples/nq_coil_breakout.py backtest --period 8d --pages
+
+# Telegram 輪詢（憑證放 tg_config.env）
+python3 examples/nq_coil_breakout.py alert --dry-run --once
+```
+
+近 8 天 Yahoo 1m（2026-08-16 → 08-24）：**12 筆、勝率 50%、約 +158 點**。
+漏斗：盤整 3372 → 均線糾結 1772 → 長實體 47 → 站上盤整+均線 17 → 放量進場 12。
+
+TradingView：把 `pinescript/nq_ma_coil_breakout_1m.pine` 貼進 Pine Editor，套用到 NQ1! / MNQ1! 一分圖，可設「NQ 起漲點」警示。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/view.html
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
@@ -125,7 +148,8 @@ python3 examples/chart_today.py
 
 ## TradingView
 
-`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
+- `pinescript/nq_w_bottom_5m.pine` — NQ 五分 K W 底，套用至 NQ1! / MNQ1! 五分圖。
+- `pinescript/nq_ma_coil_breakout_1m.pine` — NQ 一分 K 均線糾結起漲點。
 
 ## 參數調整
 

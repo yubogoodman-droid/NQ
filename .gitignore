@@ -4,7 +4,9 @@ __pycache__/
 venv/
 output/*.html
 output/*.json
+output/img/
 tg_config.env
 tg_alert_state.json
 examples/tg_alert_state.json
+examples/tg_coil_alert_state.json
 examples/tg_config.env

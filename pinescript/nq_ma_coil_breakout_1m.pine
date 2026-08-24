@@ -1,0 +1,74 @@
+//@version=5
+indicator("NQ 一分K 起漲點（均線糾結突破）", overlay=true, max_labels_count=200)
+
+// 對應手機圖：MA 收成一束 + 窄幅盤整後，放量長綠站上盤整高點與整束均線。
+// 套用在 NQ1! / MNQ1! / NQ=F 一分圖。起漲點是突破那根，不是最低點。
+
+coilBars      = input.int(15, "盤整 K 數", minval=8, maxval=40)
+maxCoilRange  = input.float(36.0, "盤整最大區間（點）", minval=10, step=2)
+minCoilRange  = input.float(10.0, "盤整最小區間（點）", minval=0, step=1)
+maxRibbon     = input.float(32.0, "均線最大帶寬（點）", minval=10, step=2)
+minBody       = input.float(10.0, "突破 K 最小實體（點）", minval=0, step=1)
+volMult       = input.float(2.0, "量能倍數（對成交量中位數）", minval=1.0, step=0.1)
+minPriorDrop  = input.float(30.0, "盤整前最少回檔（點）", minval=0, step=5)
+priorLookback = input.int(120, "回檔回看 K 數", minval=30)
+minBreakOver  = input.float(3.0, "收盤高出盤整高點（點）", minval=0, step=0.5)
+maxMa200Drop  = input.float(25.0, "MA200 最多下跌（20根）", minval=0, step=5)
+stopBuffer    = input.float(5.0, "停損低於盤整低點（點）", minval=0, step=1)
+targetR       = input.float(2.0, "目標 R 倍數", minval=1.0, step=0.5)
+
+ma5   = ta.sma(close, 5)
+ma10  = ta.sma(close, 10)
+ma20  = ta.sma(close, 20)
+ma30  = ta.sma(close, 30)
+ma60  = ta.sma(close, 60)
+ma100 = ta.sma(close, 100)
+ma120 = ta.sma(close, 120)
+ma200 = ta.sma(close, 200)
+
+ribbon = array.from(ma5, ma10, ma20, ma30, ma60, ma100, ma120, ma200)
+ribbonHigh = array.max(ribbon)
+ribbonLow  = array.min(ribbon)
+ribbonWidth = ribbonHigh - ribbonLow
+
+coilHigh = ta.highest(high[1], coilBars)
+coilLow  = ta.lowest(low[1], coilBars)
+coilRange = coilHigh - coilLow
+volMed = ta.percentile_nearest_rank(volume, 60, 50)
+priorHigh = ta.highest(high, priorLookback + coilBars)
+priorLow  = ta.lowest(low, priorLookback + coilBars)
+priorDrop = priorHigh - priorLow
+preRange = ta.highest(high[coilBars], priorLookback) - ta.lowest(low[coilBars], priorLookback)
+squeezeOk = na(preRange) or preRange <= 0 or coilRange <= preRange * 0.65
+ma200Flat = na(ma200[20]) or (ma200[1] - ma200[21]) >= -maxMa200Drop
+body = close - open
+
+wasCoil = coilRange <= maxCoilRange and coilRange >= minCoilRange and ribbonWidth[1] <= maxRibbon
+volOk = na(volMed) or volMed <= 0 or volume >= volMed * volMult
+breakout = wasCoil and squeezeOk and ma200Flat and body >= minBody and close >= coilHigh + minBreakOver and close > ribbonHigh and priorDrop >= minPriorDrop and volOk
+
+plot(ma5,   "MA5",   color=#ffa726, linewidth=1)
+plot(ma10,  "MA10",  color=#42a5f5, linewidth=1)
+plot(ma20,  "MA20",  color=#ec407a, linewidth=1)
+plot(ma30,  "MA30",  color=#26c6da, linewidth=1)
+plot(ma60,  "MA60",  color=#66bb6a, linewidth=1)
+plot(ma100, "MA100", color=#ffeb3b, linewidth=1)
+plot(ma120, "MA120", color=#ef5350, linewidth=1)
+plot(ma200, "MA200", color=#26a69a, linewidth=1)
+
+plotshape(breakout, title="起漲點", style=shape.triangleup, location=location.belowbar, color=color.new(#00e676, 0), size=size.small, text="起漲")
+
+var float stopLevel = na
+var float tgtLevel  = na
+if breakout
+    stopLevel := coilLow - stopBuffer
+    risk = close - stopLevel
+    tgtLevel := close + risk * targetR
+
+plot(breakout ? coilHigh : na, "盤整高點", color=color.orange, style=plot.style_circles, linewidth=2)
+plot(breakout ? stopLevel : na, "停損", color=color.red, style=plot.style_circles, linewidth=2)
+plot(breakout ? tgtLevel : na, "目標", color=color.lime, style=plot.style_circles, linewidth=2)
+
+bgcolor(wasCoil and not breakout ? color.new(#ffeb3b, 92) : na, title="糾結盤整")
+
+alertcondition(breakout, title="NQ 起漲點", message="NQ 一分K 均線糾結放量突破（起漲點）")
