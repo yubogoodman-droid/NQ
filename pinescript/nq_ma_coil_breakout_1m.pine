@@ -1,6 +1,7 @@
 //@version=5
-indicator("NQ 一分K 起漲點（均線糾結突破）", overlay=true, max_labels_count=200)
+indicator("NQ 起漲點（均線糾結突破）", overlay=true, max_labels_count=200)
 
+// 1 分或 5 分圖都可套。規則以 K 數計：10 根盤整在 5 分圖約 50 分鐘。
 // 先鎖住盤整箱，再允許之後 8 根放量站上箱頂。
 // 進場：第一次站上 MA200，且 5>10>20>30、MA60/120 在 MA200 下方。不要等放量長綠。
 
@@ -106,4 +107,4 @@ plot(breakout ? tgtLevel : na, "目標", color=color.lime, style=plot.style_circ
 
 bgcolor(not na(stickyHigh) and not breakout ? color.new(#ffeb3b, 92) : na, title="糾結盤整")
 
-alertcondition(breakout, title="NQ 起漲點", message="NQ 一分K 均線糾結放量突破（起漲點）")
+alertcondition(breakout, title="NQ 起漲點", message="NQ 均線糾結突破（起漲點）")

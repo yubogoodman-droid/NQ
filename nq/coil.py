@@ -1,7 +1,9 @@
-"""NQ 一分 K 均線糾結後放量突破（起漲點）。
+"""NQ 均線糾結後放量突破（起漲點）。
 
 對應手機圖那種走法：先跌、均線收成一束、窄幅盤整，再放量長綠 K
 一次站上盤整高點與整束均線。起漲點是突破那根，不是最低點。
+
+規則以 K 數計，1 分與 5 分圖用同一套門檻；5 分的 10 根盤整約 50 分鐘。
 """
 
 from __future__ import annotations
@@ -82,6 +84,43 @@ def _ohlcv(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.nda
     except KeyError:
         v = np.ones(len(df), dtype=float)
     return o, h, l, c, v
+
+
+def resample_ohlcv(df: pd.DataFrame, rule: str = "5min") -> pd.DataFrame:
+    """把 1 分 OHLCV 聚合成更高週期（右標、右閉，與 Yahoo 5m 對齊）。"""
+    if df is None or len(df) == 0:
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise TypeError("resample_ohlcv requires a DatetimeIndex")
+    work = df.copy()
+    rename = {}
+    for c in work.columns:
+        key = str(c).lower()
+        if key == "open":
+            rename[c] = "Open"
+        elif key == "high":
+            rename[c] = "High"
+        elif key == "low":
+            rename[c] = "Low"
+        elif key == "close":
+            rename[c] = "Close"
+        elif key == "volume":
+            rename[c] = "Volume"
+    work = work.rename(columns=rename)
+    agg = {
+        "Open": "first",
+        "High": "max",
+        "Low": "min",
+        "Close": "last",
+        "Volume": "sum",
+    }
+    use = {k: v for k, v in agg.items() if k in work.columns}
+    out = work[list(use)].resample(rule, label="right", closed="right").agg(use)
+    if "Close" in out.columns:
+        out = out.dropna(subset=["Close"])
+    else:
+        out = out.dropna(how="all")
+    return out
 
 
 def quality_of(coil_range: float, ribbon_width: float, vol_ratio: float, body: float) -> Tuple[int, str]:

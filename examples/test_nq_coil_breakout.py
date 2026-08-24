@@ -18,6 +18,7 @@ from nq.coil import (  # noqa: E402
     detect_coil_breakouts,
     make_coil_demo_bars,
     quality_of,
+    resample_ohlcv,
     simulate,
     sma,
     summarize_trades,
@@ -106,7 +107,60 @@ def test_simulate_and_html(tmp_path: Path | None = None) -> None:
     assert "起漲點" in text
     assert "<img src='img/" in text
     img_dir = path.parent / "img"
-    assert any(img_dir.glob("t01_*.png")), "expected a static trade PNG"
+    assert any(img_dir.glob("*t01_*.png")), "expected a static trade PNG"
+
+
+def test_resample_ohlcv_5m() -> None:
+    df = make_coil_demo_bars()
+    m5 = resample_ohlcv(df, "5min")
+    assert not m5.empty
+    assert list(m5.columns)[:4] == ["Open", "High", "Low", "Close"]
+    assert abs(float(m5["High"].max()) - float(df["High"].max())) < 1e-9
+    assert abs(float(m5["Low"].min()) - float(df["Low"].min())) < 1e-9
+    ts = m5.index[12]
+    win = df.loc[(df.index > ts - pd.Timedelta(minutes=5)) & (df.index <= ts)]
+    assert len(win) >= 1
+    assert abs(float(m5.loc[ts, "Close"]) - float(win["Close"].iloc[-1])) < 1e-9
+    assert abs(float(m5.loc[ts, "High"]) - float(win["High"].max())) < 1e-9
+    assert abs(float(m5.loc[ts, "Low"]) - float(win["Low"].min())) < 1e-9
+
+
+def test_same_rules_on_5m_bars() -> None:
+    """同一套 K 數規則套在 5 分序列上仍抓得到那波起漲。"""
+    df = make_coil_demo_bars()
+    df = df.copy()
+    df.index = pd.date_range("2026-08-24 02:00", periods=len(df), freq="5min", tz=ET)
+    sigs = detect_coil_breakouts(df)
+    assert sigs
+    sig = sigs[0]
+    assert sig.entry_price > sig.coil_high
+    assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
+    assert sig.entry_price > sig.ma200
+    assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
+
+
+def test_html_1m_5m_compare(tmp_path: Path | None = None) -> None:
+    df1 = make_coil_demo_bars()
+    trades1 = simulate(df1, detect_coil_breakouts(df1))
+    df5 = df1.copy()
+    df5.index = pd.date_range("2026-08-24 02:00", periods=len(df5), freq="5min", tz=ET)
+    trades5 = simulate(df5, detect_coil_breakouts(df5))
+    out = Path("/tmp/nq_coil_compare.html") if tmp_path is None else Path(tmp_path) / "c.html"
+    path = write_html_report(
+        out,
+        df1,
+        trades1,
+        "NQ=F",
+        "demo",
+        interval="1m",
+        others=[("5m", df5, trades5, {})],
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "1分K" in text and "5分K" in text
+    assert "同日進場對照" in text
+    img_dir = path.parent / "img"
+    assert any(img_dir.glob("m1_t01_*.png"))
+    assert any(img_dir.glob("m5_t01_*.png"))
 
 
 def main() -> int:
@@ -116,6 +170,9 @@ def main() -> int:
     test_real_chart_stands_on_ma200()
     test_no_signal_in_wide_trend()
     test_simulate_and_html()
+    test_resample_ohlcv_5m()
+    test_same_rules_on_5m_bars()
+    test_html_1m_5m_compare()
     print("ok")
     return 0
 

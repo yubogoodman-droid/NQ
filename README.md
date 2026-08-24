@@ -22,15 +22,17 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
-## NQ 一分 K 起漲點（均線糾結突破）
+## NQ 起漲點（均線糾結突破）· 1 分 / 5 分對照
 
-1 分鐘圖：下跌後均線糾結、窄幅盤整。進場是 **第一次收盤站上 MA200**，且 **MA5>MA10>MA20>MA30**，**MA60、MA120 都在 MA200 下方**。不要等後面那根放量長綠。停損在盤整低點下方；目標 2R。
+1 分鐘與 5 分鐘用**同一套規則**（以 K 數計）：下跌後均線糾結、窄幅盤整。進場是 **第一次收盤站上 MA200**，且 **MA5>MA10>MA20>MA30**，**MA60、MA120 都在 MA200 下方**。不要等後面那根放量長綠。停損在盤整低點下方；目標 2R。
+
+5 分 K 由 1 分重採樣，時段對齊。5 分的 10 根盤整約 50 分鐘，MA200 約 16.7 小時。
 
 ```bash
 # 模擬那張「07:35 放量突破」的走勢
 python3 examples/nq_coil_breakout.py --demo
 
-# Yahoo 1m 回測 + 手機版 HTML
+# Yahoo 1m 回測，並重採樣 5m 對照 + 手機版 HTML
 python3 examples/nq_coil_breakout.py backtest --period 10d --html output/nq_coil.html
 python3 examples/nq_coil_breakout.py backtest --period 10d --pages
 
@@ -38,10 +40,10 @@ python3 examples/nq_coil_breakout.py backtest --period 10d --pages
 python3 examples/nq_coil_breakout.py alert --dry-run --once
 ```
 
-近 10 天 Yahoo 1m（2026-08-14 → 08-24）：**16 筆、勝率 31.2%、約 +93 點**。
-你那張圖的進場是 **08-24 07:32 站上 MA200 @ 29217.75**，不是 07:35 放量追高。
+近 10 天 Yahoo（2026-08-14 → 08-24）：**1分 16 筆、勝率 31.2%、約 +93 點**。5 分數字寫在 HTML 對照表。
+你那張圖的 1 分進場是 **08-24 07:32 站上 MA200 @ 29217.75**，不是 07:35 放量追高；同一根在 5 分會收在 **07:35** 那根 K。
 
-TradingView：把 `pinescript/nq_ma_coil_breakout_1m.pine` 貼進 Pine Editor，套用到 NQ1! / MNQ1! 一分圖，可設「NQ 起漲點」警示。
+TradingView：把 `pinescript/nq_ma_coil_breakout_1m.pine` 貼進 Pine Editor，套用到 NQ1! / MNQ1! 的 **1 分或 5 分圖**，可設「NQ 起漲點」警示。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/view.html
 
