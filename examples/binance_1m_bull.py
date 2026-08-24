@@ -41,7 +41,15 @@ SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
 PAGES_IMG = "https://yubogoodman-droid.github.io/NQ/binance/"
-PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
+# 幣安 App 淺色盤：黃/橘/紫/藍/青 + 深灰 MA200
+PAL = {7: "#F0B90B", 14: "#FF6D00", 25: "#D500F9", 99: "#2962FF", 120: "#00B8D4", 200: "#474D57"}
+VOL_MA = {5: "#F0B90B", 10: "#D500F9"}
+UP = "#0ECB81"
+DOWN = "#F6465D"
+BG = "#FFFFFF"
+GRID = "#EAECEF"
+TEXT = "#1E2329"
+MUTED = "#707A8A"
 LABELS = {5: "5m", 15: "15m", 30: "30m", 60: "1h", 240: "4h"}
 
 
@@ -142,10 +150,14 @@ def telegram_send(text: str, photo: str | None = None) -> bool:
 
 
 def _style_ax(ax) -> None:
-    ax.set_facecolor("#101814")
-    ax.tick_params(colors="#8aa193", labelsize=8)
+    ax.set_facecolor(BG)
+    ax.tick_params(colors=MUTED, labelsize=8)
+    ax.grid(True, axis="y", color=GRID, lw=0.6)
+    ax.set_axisbelow(True)
     for sp in ax.spines.values():
-        sp.set_color("#2a3a33")
+        sp.set_color(GRID)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
 
 def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
@@ -164,39 +176,72 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
     xs = np.arange(a1 - a0)
     o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
     fig, (ax, axv) = plt.subplots(
-        2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
+        2,
+        1,
+        figsize=(8.4, 7.2),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.35, 1]},
+        facecolor=BG,
     )
     for a in (ax, axv):
         _style_ax(a)
     colors_v = []
     for k in range(len(c)):
         up = c[k] >= o[k]
-        col = "#3dba7a" if up else "#e35d5d"
-        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.7)
+        col = UP if up else DOWN
+        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.85)
         y0, y1 = min(o[k], c[k]), max(o[k], c[k])
         if y1 == y0:
             y1 = y0 + max(h[k] - l[k], 1e-12) * 0.02
-        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
-        colors_v.append("#3dba7a99" if up else "#e35d5d99")
-    axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
+        ax.add_patch(Rectangle((xs[k] - 0.38, y0), 0.76, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+        colors_v.append(col)
+    axv.bar(xs, v, width=0.82, color=colors_v, linewidth=0, alpha=0.92)
+    vma5 = sma(d["v"], 5)[sl]
+    vma10 = sma(d["v"], 10)[sl]
+    axv.plot(xs, vma5, color=VOL_MA[5], lw=1.05, label="MA(5)")
+    axv.plot(xs, vma10, color=VOL_MA[10], lw=1.05, label="MA(10)")
     for n, col in PAL.items():
-        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.35 if n == 200 else 1.15, label=f"MA{n}")
+        series = sma(d["c"], n)[sl]
+        val = series[i - a0] if 0 <= i - a0 < len(series) else np.nan
+        lab = f"MA({n}): {val:g}" if not np.isnan(val) else f"MA({n})"
+        ax.plot(xs, series, color=col, lw=1.55 if n == 200 else 1.15, label=lab)
     x = i - a0
     if 0 <= x < len(c):
-        ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
-        ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
-    kind = "reclaim 1m MA200" if row.crossed_200 else "stack"
-    r15 = row.moves.get(15)
-    rtxt = f"  15m {r15.ret_pct:+.2f}%" if r15 and r15.ret_pct is not None else ""
-    ax.set_title(
-        f"{sym}  1m  {hm(row.time_ms)}  {kind}  vs 1mMA200 {row.ext_pct:+.2f}%  vol={row.vol_ratio:.2f}x{rtxt}",
-        color="#e8f0ea",
-        fontsize=11,
+        ax.axvline(x, color="#F0B90B", ls="--", lw=0.85, alpha=0.85)
+        ax.axhline(c[x], color=UP if c[x] >= o[x] else DOWN, ls=":", lw=0.7, alpha=0.7)
+        ax.annotate(
+            f"{c[x]:g}",
+            xy=(xs[-1], c[x]),
+            xytext=(4, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=8,
+            color="#fff",
+            bbox={"boxstyle": "round,pad=0.15", "fc": UP if c[x] >= o[x] else DOWN, "ec": "none"},
+        )
+    name = f"{sym} 永續"
+    ax.set_title(f"{name}   1m   {hm(row.time_ms)}", color=TEXT, fontsize=12, loc="left", pad=8, fontweight=600)
+    ax.legend(
+        loc="upper left",
+        fontsize=7,
+        frameon=False,
+        labelcolor=TEXT,
+        ncol=3,
+        borderaxespad=0.2,
     )
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
-    fig.tight_layout(pad=0.5)
+    axv.legend(loc="upper left", fontsize=7, frameon=False, labelcolor=TEXT, ncol=2)
+    axv.set_ylabel("VOL", color=MUTED, fontsize=8)
+    axv.yaxis.set_label_position("right")
+    nbar = len(xs)
+    step = max(1, nbar // 6)
+    ticks = list(range(0, nbar, step))
+    labels = [datetime.fromtimestamp(int(d["t"][a0 + k]) / 1000, TZ).strftime("%H:%M") for k in ticks]
+    axv.set_xticks(ticks)
+    axv.set_xticklabels(labels, color=MUTED, fontsize=8)
+    ax.set_xlim(-0.7, nbar - 0.15)
+    fig.tight_layout(pad=0.45, h_pad=0.2)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    fig.savefig(path, dpi=130, facecolor=BG)
     plt.close(fig)
     return path
 
@@ -299,17 +344,16 @@ def write_html(
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
-            f"<div class='card-title'><span class='trade-no'>#{i} · {escape(row.symbol)} · {escape(kind)}</span>"
-            f"<span class='trade-time'>{escape(hm(row.time_ms))}  成交額第 {row.rank}</span></div>"
+            f"<div class='card-title'><span class='trade-no'>{escape(row.symbol)} 永續</span>"
+            f"<span class='trade-time'>#{i} · 1m · {escape(hm(row.time_ms))} · 成交額第 {row.rank}</span></div>"
             f"<div class='card-pnl {cls}'>{escape(pnl_txt)}</div>"
             "</header>"
-            f"<div class='tags'><span class='tag'>1m</span>"
-            f"<span class='tag'>{escape(kind)}</span>"
-            f"<span class='tag'>ext {row.ext_pct:+.2f}%</span></div>"
+            f"<div class='px {cls}'>{row.sig.close:g} <span class='px-sub'>{escape(kind)} · ext {row.ext_pct:+.2f}%</span></div>"
+            f"<div class='tags'><span class='tag'>MA7&gt;14&gt;25&gt;99&gt;120</span>"
+            f"<span class='tag'>剛站上 1m MA200</span></div>"
             "<pre class='trade-detail'>"
             f"close {row.sig.close:g}  entry {row.entry:g}\n"
-            f"1m MA7 {row.sig.m7:g} > 14 {row.sig.m14:g} > 25 {row.sig.m25:g} > 99 {row.sig.m99:g} > 120 {row.sig.m120:g}\n"
-            f"1m MA200 {row.sig.ma200:g}  ({row.ext_pct:+.2f}%)\n"
+            f"MA7 {row.sig.m7:g}  14 {row.sig.m14:g}  25 {row.sig.m25:g}  99 {row.sig.m99:g}  120 {row.sig.m120:g}  200 {row.sig.ma200:g}\n"
             f"{fwd}"
             "</pre>"
             f"{img_html}"
@@ -349,27 +393,30 @@ def write_html(
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>幣安 1m 7/14/25/99/120 多頭排列上站 1m MA200 · {escape(date)}</title>
 <style>
-body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}}
+body{{margin:0;background:#f5f6f7;color:#1e2329;font-family:-apple-system,"Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
 .wide{{max-width:920px}}
-.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
-h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-height:1.5}}
+.summary{{background:#fff;border:1px solid #eaecef;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
+h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#707a8a;font-size:13px;line-height:1.5}}
 .cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
-.card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:110px;border:1px solid #21262d}}
+.card{{background:#fafafa;padding:10px 12px;border-radius:10px;min-width:110px;border:1px solid #eaecef}}
 .card b{{display:block;font-size:18px;margin-top:4px}}
-.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}}
+.trade-card{{background:#fff;border:1px solid #eaecef;border-radius:14px;padding:14px;margin-bottom:14px}}
 .card-header{{display:flex;justify-content:space-between;gap:10px}}
-.trade-no{{font-weight:700}} .trade-time{{font-size:12px;color:#8b949e}}
-.card-pnl{{font-weight:700}} .pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}} .pnl-flat{{color:#8b949e}}
+.trade-no{{font-weight:700}} .trade-time{{font-size:12px;color:#707a8a}}
+.card-pnl{{font-weight:700}} .pnl-win{{color:#0ecb81}} .pnl-loss{{color:#f6465d}} .pnl-flat{{color:#707a8a}}
+.px{{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:6px 0 4px}}
+.px.pnl-win{{color:#0ecb81}} .px.pnl-loss{{color:#f6465d}}
+.px-sub{{font-size:13px;font-weight:500;color:#707a8a}}
 .tags{{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}}
-.tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#79c0ff}}
-.trade-detail{{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}}
-.mini-chart img{{width:100%;display:block;border-radius:10px}}
-.empty{{text-align:center;color:#8b949e;padding:40px 12px;border:1px solid #30363d;border-radius:14px}}
+.tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #eaecef;color:#474d57;background:#fafafa}}
+.trade-detail{{background:#fafafa;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap;color:#474d57}}
+.mini-chart img{{width:100%;display:block;border-radius:8px;border:1px solid #eaecef}}
+.empty{{text-align:center;color:#707a8a;padding:40px 12px;border:1px solid #eaecef;border-radius:14px;background:#fff}}
 table{{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}}
-th,td{{padding:6px 4px;border-bottom:1px solid #21262d;text-align:right}}
+th,td{{padding:6px 4px;border-bottom:1px solid #eaecef;text-align:right}}
 th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4){{text-align:left}}
-.pos{{color:#00c805}} .neg{{color:#ff5252}}
+.pos{{color:#0ecb81}} .neg{{color:#f6465d}}
 </style></head><body>
 <div class="page wide">
 <section class="summary">
