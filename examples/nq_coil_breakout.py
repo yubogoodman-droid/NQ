@@ -305,8 +305,6 @@ def draw_m5_asof_png(
 
     ax.axhline(trade.signal.coil_high, color="#f0c14b", ls="--", lw=0.9, alpha=0.75)
     ax.axhline(trade.entry_price, color="#00e676", ls=":", lw=0.9, alpha=0.85)
-    if trade.signal.d30 == trade.signal.d30:
-        ax.axhline(trade.signal.d30, color="#d2a8ff", ls="-.", lw=1.05, alpha=0.9, label="30日")
     ax.axvline(last_i, color="#f0c14b", ls="--", lw=0.9, alpha=0.8)
     ax.scatter([last_i], [look["close"]], s=46, color="#f0c14b", marker="o", zorder=6)
     ax.annotate(
@@ -320,15 +318,11 @@ def draw_m5_asof_png(
     )
 
     forming = "未收完" if look["forming"] else "已收完"
-    d30_s = "—" if np.isnan(trade.signal.d30) else f"{trade.signal.d30:.1f}"
-    above_d30 = (
-        "站上30日"
-        if (not np.isnan(trade.signal.d30) and look["close"] > trade.signal.d30)
-        else ("未站上30日" if not np.isnan(trade.signal.d30) else "30日不足")
-    )
+    ma30_s = "—" if np.isnan(look["ma30"]) else f"{look['ma30']:.1f}"
+    above_30 = "站上MA30" if look.get("above_30") else "未站上MA30"
     ax.set_title(
         f"5分當時  截止 {ts.strftime('%m-%d %H:%M')}  當根 {look['bar_time'].strftime('%H:%M')} {forming}  "
-        f"C {look['close']:.2f}  30日 {d30_s}  {above_d30}",
+        f"C {look['close']:.2f}  MA30 {ma30_s}  {above_30}",
         color="#e8f0ea",
         fontsize=11,
     )
@@ -367,7 +361,7 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"60與120在200下 {funnel.get('long_below', 0)} → "
         f"放量 {funnel.get('volume', 0)} → "
         f"5分站上MA20 {funnel.get('m5_ma20', 0)} → "
-        f"站上30日均線 {funnel.get('d30', 0)} → "
+        f"5分站上MA30 {funnel.get('m5_ma30', 0)} → "
         f"進場 {funnel.get('taken', 0)}</p>"
     )
 
@@ -381,7 +375,7 @@ def _fmt_ma(v: float) -> str:
     return "—" if v is None or np.isnan(v) else f"{v:.1f}"
 
 
-def _m5_detail(look: dict, trade_d30: float = float("nan")) -> str:
+def _m5_detail(look: dict) -> str:
     forming = "未收完" if look["forming"] else "已收完"
     later = ""
     if look["forming"]:
@@ -391,11 +385,7 @@ def _m5_detail(look: dict, trade_d30: float = float("nan")) -> str:
         )
     stack = "是" if look["stack"] else "否"
     above20 = "是" if look.get("above_20") else "否"
-    d30_txt = "—"
-    above_d30 = "—"
-    if trade_d30 is not None and trade_d30 == trade_d30:
-        d30_txt = f"{trade_d30:.1f}"
-        above_d30 = "是" if look["close"] > trade_d30 else "否"
+    above30 = "是" if look.get("above_30") else "否"
     return (
         f"5分當根 {look['bar_time'].strftime('%m-%d %H:%M')}  {forming}\n"
         f"當時 O {look['open']:.2f}  H {look['high']:.2f}  "
@@ -404,8 +394,7 @@ def _m5_detail(look: dict, trade_d30: float = float("nan")) -> str:
         f"5分MA {_fmt_ma(look['ma5'])}>{_fmt_ma(look['ma10'])}>"
         f"{_fmt_ma(look['ma20'])}>{_fmt_ma(look['ma30'])}  "
         f"200 {_fmt_ma(look['ma200'])}\n"
-        f"當時站上5分MA20 {above20}  站上30日均線 {above_d30}  30日 {d30_txt}  "
-        f"5>10>20>30 {stack}"
+        f"當時站上5分MA20 {above20}  站上5分MA30 {above30}  5>10>20>30 {stack}"
     )
 
 
@@ -441,7 +430,7 @@ def _trade_cards(
                 keep.discard(img5)
             m5_html = (
                 "<p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p>"
-                f"<pre class='trade-detail'>{escape(_m5_detail(look, t.signal.d30))}</pre>"
+                f"<pre class='trade-detail'>{escape(_m5_detail(look))}</pre>"
                 + (
                     f"<div class='mini-chart'><img src='img/{escape(img5)}' alt='5分當時 #{i}' "
                     "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -454,14 +443,12 @@ def _trade_cards(
             m5_html = "<p class='muted'>沒有對應的 5分K</p>"
         m5_line = ""
         if t.signal.m5_close == t.signal.m5_close:
-            dist_s = ""
-            if t.signal.d30 == t.signal.d30:
-                dist_s = f"  30日 {t.signal.d30:.1f}  Δ30 {t.signal.d30_dist:+.1f}"
-            elif t.signal.m5_dist == t.signal.m5_dist:
-                dist_s = f"  MA200 {t.signal.m5_ma200:.1f}  Δ200 {t.signal.m5_dist:+.1f}"
+            extra = ""
+            if t.signal.m5_ma30 == t.signal.m5_ma30:
+                extra = f"  MA30 {t.signal.m5_ma30:.1f}"
             m5_line = (
                 f"\n5分當時 C {t.signal.m5_close:.1f}  MA20 {_fmt_ma(t.signal.m5_ma20)}"
-                f"{dist_s}"
+                f"{extra}"
             )
         cards.append(
             "<article class='trade-card'>"
@@ -572,7 +559,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（均線糾結突破）</h1>
-<p class="muted">訊號只看 1分K。進場當下 5 分收盤要在 5 分 MA20 上方，也要站上日線 30 日均線。停損＝盤整低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R（移動停利）。連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
+<p class="muted">訊號只看 1分K。進場當下 5 分收盤要在 5 分 MA20 與 5 分 MA30 上方。停損＝盤整低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R（移動停利）。連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -621,8 +608,8 @@ def print_signals(
                 f"  | 5分當時 {look['bar_time'].strftime('%H:%M')} {form} "
                 f"C {look['close']:.2f} MA20 {_fmt_ma(look['ma20'])} "
                 f"{'站上MA20' if look.get('above_20') else '未站上MA20'} "
-                f"30日 {_fmt_ma(sig.d30)} "
-                f"{'站上30日' if (sig.d30 == sig.d30 and look['close'] > sig.d30) else '未站上30日'}"
+                f"MA30 {_fmt_ma(look['ma30'])} "
+                f"{'站上MA30' if look.get('above_30') else '未站上MA30'}"
             )
             if look["forming"]:
                 m5 += f" 後來 {look['finished_close']:.2f}"
@@ -660,20 +647,9 @@ def _print_funnel(funnel: Dict[str, int]) -> None:
         f"above={funnel.get('above_coil', 0)} stack={funnel.get('stack', 0)} "
         f"ma200={funnel.get('above_200', 0)} below={funnel.get('long_below', 0)} "
         f"vol={funnel.get('volume', 0)} m5={funnel.get('m5_ok', 0)} "
-        f"m5ma20={funnel.get('m5_ma20', 0)} d30={funnel.get('d30', 0)} "
+        f"m5ma20={funnel.get('m5_ma20', 0)} m5ma30={funnel.get('m5_ma30', 0)} "
         f"taken={funnel.get('taken', 0)}"
     )
-
-
-def load_daily(symbol: str) -> pd.DataFrame:
-    df = to_et(load_yfinance(symbol, "1d", "6mo"))
-    if df.empty:
-        df = to_et(load_yfinance(symbol, "1d", "1y"))
-    if not df.empty:
-        print(f"[data] daily {symbol} bars={len(df)} {df.index[0].date()} -> {df.index[-1].date()}", file=sys.stderr)
-    else:
-        print(f"[data] daily {symbol} empty", file=sys.stderr)
-    return df
 
 
 def cmd_backtest(args) -> int:
@@ -681,9 +657,8 @@ def cmd_backtest(args) -> int:
     if df1.empty:
         print("no data", file=sys.stderr)
         return 1
-    daily = load_daily(args.symbol)
     funnel: Dict[str, int] = {}
-    sigs = detect_coil_breakouts(df1, funnel=funnel, daily=daily)
+    sigs = detect_coil_breakouts(df1, funnel=funnel)
     trades = simulate(df1, sigs)
     stats = summarize_trades(trades)
     print(f"{args.symbol} {args.period} 1m bars={len(df1)} {df1.index[0]} -> {df1.index[-1]}")
@@ -737,15 +712,11 @@ def fmt_entry(df, sig: CoilSignal) -> str:
     if look is not None:
         form = "未收完" if look["forming"] else "已收完"
         above20 = "站上MA20" if look.get("above_20") else "未站上MA20"
-        above_d30 = (
-            "站上30日"
-            if (sig.d30 == sig.d30 and look["close"] > sig.d30)
-            else ("未站上30日" if sig.d30 == sig.d30 else "30日不足")
-        )
+        above30 = "站上MA30" if look.get("above_30") else "未站上MA30"
         m5_line = (
             f"5分當時: <code>{look['bar_time'].strftime('%H:%M')}</code> {form} "
             f"C {look['close']:.2f} / MA20 {_fmt_ma(look['ma20'])} {above20} / "
-            f"30日 {_fmt_ma(sig.d30)} {above_d30}\n"
+            f"MA30 {_fmt_ma(look['ma30'])} {above30}\n"
         )
     return (
         f"🟢 <b>起漲點（均線糾結突破）</b>\n"
@@ -759,7 +730,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"區間 {sig.coil_range:.1f} / 帶寬 {sig.ribbon_width:.1f}\n"
         f"{m5_line}"
         f"量能: {sig.vol_ratio:.2f}x · 現價 <code>{last:.2f}</code>\n"
-        f"排列: 5>10>20>30 · 站上MA200 · 60/120&lt;200 · 5分站上MA20與30日均線\n"
+        f"排列: 5>10>20>30 · 站上MA200 · 60/120&lt;200 · 5分站上MA20與MA30\n"
         f"#起漲點 #NQ #Q{sig.quality}"
     )
 
@@ -789,8 +760,7 @@ def scan_once(
     period: str = "5d",
 ) -> None:
     df = to_et(load_yfinance("NQ=F", "1m", period))
-    daily = load_daily("NQ=F")
-    sigs = detect_coil_breakouts(df, daily=daily)
+    sigs = detect_coil_breakouts(df)
     trades = simulate(df, sigs)
     state = _load_coil_state()
     alerted_e: Set[str] = set(state.get("alerted_entries") or [])

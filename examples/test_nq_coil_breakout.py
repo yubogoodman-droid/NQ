@@ -16,7 +16,6 @@ from nq.coil import (  # noqa: E402
     ET,
     CoilSignal,
     CoilTrade,
-    d30_asof,
     detect_coil_breakouts,
     make_coil_demo_bars,
     m5_asof,
@@ -100,8 +99,13 @@ def test_real_chart_stands_on_ma200() -> None:
     if not np.isnan(look["ma20"]):
         assert look["close"] > look["ma20"], "07:32 當時 5 分應站上 5分MA20"
         assert look["above_20"]
+    if not np.isnan(look["ma30"]):
+        assert look["close"] > look["ma30"], "07:32 當時 5 分應站上 5分MA30"
+        assert look["above_30"]
     if not np.isnan(sig.m5_ma20):
         assert sig.m5_close > sig.m5_ma20
+    if not np.isnan(sig.m5_ma30):
+        assert sig.m5_close > sig.m5_ma30
     trades = simulate(df, hits)
     assert trades, "07:32 應能模擬出場"
     # 07:38 衝到 29283（>1R）後拉回，移動停利鎖 +0.3R，不再保本出場
@@ -168,7 +172,7 @@ def test_m5_asof_ma200_dist_matches_look_at() -> None:
         },
         index=idx,
     )
-    _c5, ma20, _ma200, dist = m5_asof_mas(df)
+    _c5, ma20, ma30, _ma200, dist = m5_asof_mas(df)
     look = m5_look_at(df, df.index[-1])
     assert look is not None
     assert not np.isnan(dist[-1])
@@ -177,6 +181,8 @@ def test_m5_asof_ma200_dist_matches_look_at() -> None:
     assert dist[-1] < -100
     assert not np.isnan(ma20[-1])
     assert abs(ma20[-1] - look["ma20"]) < 1.5
+    assert not np.isnan(ma30[-1])
+    assert abs(ma30[-1] - look["ma30"]) < 1.5
 
 
 def test_skip_5m_waterfall_bounce() -> None:
@@ -198,10 +204,10 @@ def test_skip_5m_waterfall_bounce() -> None:
     df = pd.concat([head, tail])
     df = df[~df.index.duplicated(keep="last")]
     with_filter = detect_coil_breakouts(
-        df, max_m5_below_200=0.0, require_above_d30=False
+        df, max_m5_below_200=0.0, require_m5_above_ma30=False
     )
     without = detect_coil_breakouts(
-        df, max_m5_below_200=-1.0, require_above_d30=False
+        df, max_m5_below_200=-1.0, require_m5_above_ma30=False
     )
     assert without, "關掉 5 分深度過濾後，模擬圖仍應有起漲點"
     if with_filter:
@@ -209,51 +215,36 @@ def test_skip_5m_waterfall_bounce() -> None:
             assert np.isnan(s.m5_dist) or s.m5_dist > 0.0
 
 
-def _daily_flat(price: float, end: str = "2026-08-23", n: int = 40) -> pd.DataFrame:
-    idx = pd.bdate_range(end=end, periods=n, tz=ET)
-    return pd.DataFrame(
-        {
-            "Open": np.full(n, price),
-            "High": np.full(n, price),
-            "Low": np.full(n, price),
-            "Close": np.full(n, price),
-            "Volume": np.full(n, 1.0),
-        },
-        index=idx,
-    )
-
-
-def test_d30_asof_uses_forming_close() -> None:
-    daily = _daily_flat(100.0, end="2026-08-23", n=40)
-    idx = pd.date_range("2026-08-24 09:00", periods=3, freq="1min", tz=ET)
-    df = pd.DataFrame(
-        {
-            "Open": [130.0, 130.0, 130.0],
-            "High": [131.0, 131.0, 131.0],
-            "Low": [129.0, 129.0, 129.0],
-            "Close": [130.0, 130.0, 130.0],
-            "Volume": [10.0, 10.0, 10.0],
-        },
-        index=idx,
-    )
-    ma, dist = d30_asof(df, daily=daily, period=30)
-    # 29 根 100 + 當根 130
-    expect = (29 * 100.0 + 130.0) / 30.0
-    assert abs(ma[-1] - expect) < 1e-9
-    assert abs(dist[-1] - (130.0 - expect)) < 1e-9
-
-
-def test_require_above_30day_ma() -> None:
+def test_require_above_5m_ma30() -> None:
     df = make_coil_demo_bars()
-    blocked = detect_coil_breakouts(df, daily=_daily_flat(30000.0))
-    assert not blocked, "5 分還在 30 日均線下不應進"
-    allowed = detect_coil_breakouts(df, daily=_daily_flat(28000.0))
-    assert allowed, "站上 30 日均線後模擬圖仍應有起漲點"
-    assert allowed[0].d30 < allowed[0].entry_price
-    off = detect_coil_breakouts(
-        df, daily=_daily_flat(30000.0), require_above_d30=False
+    allowed = detect_coil_breakouts(df)
+    assert allowed, "模擬圖 5 分應站上 MA30"
+    sig = allowed[0]
+    if not np.isnan(sig.m5_ma30):
+        assert sig.m5_close > sig.m5_ma30
+    head_n = 250
+    head_close = np.full(head_n, 29450.0)
+    head_idx = pd.date_range("2026-08-23 21:50", periods=head_n, freq="1min", tz=ET)
+    head = pd.DataFrame(
+        {
+            "Open": np.r_[head_close[0], head_close[:-1]],
+            "High": head_close + 2.0,
+            "Low": head_close - 2.0,
+            "Close": head_close,
+            "Volume": np.full(head_n, 90.0),
+        },
+        index=head_idx,
     )
-    assert off, "關掉 30 日過濾後應能進"
+    high = pd.concat([head, df])
+    high = high[~high.index.duplicated(keep="last")]
+    blocked = detect_coil_breakouts(high)
+    if blocked:
+        for s in blocked:
+            assert np.isnan(s.m5_ma30) or s.m5_close > s.m5_ma30
+    off = detect_coil_breakouts(
+        high, require_m5_above_ma30=False, require_m5_above_ma20=False
+    )
+    assert off, "關掉 5 分 MA20/MA30 後模擬圖仍應有起漲點"
 
 
 def test_skip_chase_body() -> None:
@@ -383,8 +374,7 @@ def main() -> int:
     test_trail_locks_after_1r()
     test_m5_asof_ma200_dist_matches_look_at()
     test_skip_5m_waterfall_bounce()
-    test_d30_asof_uses_forming_close()
-    test_require_above_30day_ma()
+    test_require_above_5m_ma30()
     test_skip_chase_body()
     test_failed_breakout_exits_on_two_closes()
     test_no_signal_in_wide_trend()
