@@ -1,0 +1,101 @@
+//@version=5
+strategy("NQ 一分K 破翻回踩MA20", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, pyramiding=0, calc_on_every_tick=false)
+
+// 與五分版同一套：破底 → 收復 MA20 → 連續離開 → 回踩 MA20 做多
+// 1m 根數：2 小時=120 根；離開 8 根。1m MA20 ≈ 20 分鐘，比 5m 更貼，故 failBelow 較寬。
+
+lookback      = input.int(120, "破底回看 K 數（1m×120≈2小時）", minval=20)
+minDepth      = input.float(10.0, "最小破底深度（點）", minval=5)
+reclaimWin    = input.int(120, "收復 MA20 時限（根）", minval=10)
+retestWin     = input.int(90, "回踩時限（根）", minval=10)
+leaveBars     = input.int(8, "離開 MA20 連續根數", minval=1)
+leaveBuf      = input.float(6.0, "離開緩衝（點）", minval=0)
+touchAbove    = input.float(8.0, "回踩允許高於 MA20（點）", minval=0)
+maxPierce     = input.float(12.0, "回踩允許刺穿 MA20（點）", minval=0)
+failBelow     = input.float(40.0, "收盤跌破 MA20 則作廢（點）", minval=0)
+stopBuf       = input.float(10.0, "停損在破底下方（點）", minval=0)
+targetR       = input.float(1.5, "停利 R", minval=0.5, step=0.1)
+maxRisk       = input.float(180.0, "最大風險（點）", minval=10)
+minRisk       = input.float(20.0, "最小風險（點）", minval=1)
+maLen         = input.int(20, "回踩均線", minval=5)
+rthOnly       = input.bool(true, "只做 09:30–15:45 ET")
+maExitAfter   = input.int(60, "滿 N 根後收破 MA20 出場", minval=1)
+maxHold       = input.int(180, "最長持有根數", minval=10)
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, maLen)
+ma60 = ta.sma(close, 60)
+floor = ta.lowest(low, lookback)[1]
+
+inRth() =>
+    not rthOnly or (time(timeframe.period, "0930-1545", "America/New_York") != 0)
+
+var float breakLow = na
+var int   breakBar = na
+var int   troughBar = na
+var int   reclaimBar = na
+var int   leftRun = 0
+var bool  leftOk = false
+var bool  inSetup = false
+
+newBreak = not inSetup and not na(floor) and low < floor and (floor - low) >= minDepth
+
+if newBreak and strategy.position_size == 0
+    inSetup := true
+    breakLow := low
+    breakBar := bar_index
+    troughBar := bar_index
+    reclaimBar := na
+    leftRun := 0
+    leftOk := false
+
+if inSetup
+    if low < breakLow
+        breakLow := low
+        troughBar := bar_index
+        reclaimBar := na
+        leftRun := 0
+        leftOk := false
+    if na(reclaimBar)
+        expired = bar_index - troughBar > reclaimWin
+        if expired
+            inSetup := false
+        else if close > ma20 and breakLow < ma20
+            reclaimBar := bar_index
+    else
+        expiredRetest = bar_index - reclaimBar > retestWin
+        failed = close < ma20 - failBelow
+        if expiredRetest or failed
+            inSetup := false
+        else if bar_index > reclaimBar
+            if low > ma20 + leaveBuf
+                leftRun += 1
+                if leftRun >= leaveBars
+                    leftOk := true
+            else
+                leftRun := 0
+            pierce = ma20 - low
+            touch = leftOk and pierce >= -touchAbove and pierce <= maxPierce and close >= ma20
+            risk = close - (breakLow - stopBuf)
+            if touch and inRth() and risk >= minRisk and risk <= maxRisk and strategy.position_size == 0
+                stopLevel = breakLow - stopBuf
+                tgt = close + risk * targetR
+                strategy.entry("破翻回踩", strategy.long)
+                strategy.exit("破翻出場", "破翻回踩", stop=stopLevel, limit=tgt)
+                inSetup := false
+
+if strategy.position_size > 0
+    held = bar_index - strategy.opentrades.entry_bar_index(0)
+    if held >= maExitAfter and close < ma20
+        strategy.close("破翻回踩", comment="ma20")
+    if held >= maxHold
+        strategy.close("破翻回踩", comment="timeout")
+
+plot(ma5,  "MA5",  color=color.new(#ffa726, 0), linewidth=1)
+plot(ma10, "MA10", color=color.new(#26c6da, 0), linewidth=1)
+plot(ma20, "MA20", color=color.new(#ec407a, 0), linewidth=2)
+plot(ma60, "MA60", color=color.new(#66bb6a, 0), linewidth=1)
+plot(inSetup and not na(breakLow) ? breakLow : na, "破底", color=color.new(#f472b6, 0), style=plot.style_circles, linewidth=2)
+
+plotshape(newBreak, title="破底", style=shape.triangledown, location=location.belowbar, color=color.new(#f472b6, 0), size=size.tiny)

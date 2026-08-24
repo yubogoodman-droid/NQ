@@ -14,9 +14,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nq.ma20_retest import (  # noqa: E402
     TradeResult,
+    detect_kwargs,
     detect_signals,
     quality_at_entry,
     simulate,
+    simulate_kwargs,
     sma,
     summarize_trades,
 )
@@ -158,6 +160,93 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
         assert any(img_dir.glob("t01_*.png")), "expected a static trade PNG"
 
 
+def _1m_range_dump_reclaim_retest(n: int = 420) -> pd.DataFrame:
+    """1m 版：盤整 → 破底 → 收復 → 離開 15 根 → 回踩。"""
+    close = np.full(n, 29200.0)
+    high = np.full(n, 29204.0)
+    low = np.full(n, 29196.0)
+    for i in range(n):
+        close[i] = 29200.0 + (3.0 if i % 2 == 0 else -2.0)
+        high[i] = close[i] + 4.0
+        low[i] = max(close[i] - 4.0, 29190.0)
+
+    path = [
+        (200, 29120.0, 18.0, 8.0),
+        (201, 29070.0, 18.0, 8.0),
+        (202, 28980.0, 18.0, 8.0),
+        (203, 28955.0, 18.0, 8.0),
+        (204, 28950.0, 18.0, 3.25),
+        (205, 28980.0, 18.0, 8.0),
+        (206, 28990.0, 18.0, 8.0),
+        (207, 28978.0, 18.0, 8.0),
+        (208, 29012.0, 12.0, 14.0),
+        (209, 29076.0, 12.0, 14.0),
+        (210, 29081.0, 12.0, 14.0),
+        (211, 29085.0, 12.0, 14.0),
+        (212, 29106.0, 12.0, 14.0),
+    ]
+    for i, px, up, dn in path:
+        close[i] = px
+        high[i] = px + up
+        low[i] = px - dn
+    low[204] = 28946.75
+
+    for j in range(8):
+        i = 213 + j
+        px = 29110.0
+        close[i] = px
+        high[i] = px + 8.0
+        low[i] = px - 4.0
+
+    retest_i = 221
+    close[retest_i] = 29095.0
+    high[retest_i] = 29105.0
+    low[retest_i] = 29078.0
+
+    for i in range(retest_i + 1, n):
+        close[i] = close[i - 1] + 1.2
+        high[i] = close[i] + 4.0
+        low[i] = close[i] - 4.0
+
+    idx = pd.date_range("2026-08-24 06:30", periods=n, freq="1min", tz=ET)
+    return pd.DataFrame(
+        {
+            "Open": np.r_[close[0], close[:-1]],
+            "High": high,
+            "Low": low,
+            "Close": close,
+            "Volume": np.full(n, 80.0),
+        },
+        index=idx,
+    )
+
+
+def test_1m_preset_detects_retest() -> None:
+    df = _1m_range_dump_reclaim_retest()
+    sigs = detect_signals(df, **detect_kwargs("1m", session="day"))
+    assert sigs, "expected a 1m 回踩 MA20 signal"
+    sig = sigs[0]
+    assert sig.entry_idx > sig.reclaim_idx
+    assert sig.entry_idx - sig.reclaim_idx >= 8
+    assert sig.entry_price > sig.stop_price
+    trades = simulate(df, sigs, **simulate_kwargs("1m"))
+    assert trades
+    assert trades[0].exit_idx >= trades[0].entry_idx
+
+
+def test_detect_kwargs_intervals() -> None:
+    d1 = detect_kwargs("1m")
+    d5 = detect_kwargs("5m")
+    assert d1["lookback"] == 120
+    assert d5["lookback"] == 24
+    assert d1["leave_bars"] == 8
+    assert d5["leave_bars"] == 3
+    assert d1["min_break_depth"] == 10.0
+    assert d1["fail_below"] == 40.0
+    s1 = simulate_kwargs("1m")
+    assert s1["ma_exit_after"] == 60
+
+
 def main() -> int:
     test_parse_period_days()
     test_quality_at_entry()
@@ -167,6 +256,8 @@ def main() -> int:
     test_no_entry_if_never_leaves_ma20()
     test_simulate_exits()
     test_write_html_report()
+    test_detect_kwargs_intervals()
+    test_1m_preset_detects_retest()
     print("ok")
     return 0
 

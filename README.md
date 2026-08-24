@@ -48,6 +48,20 @@ TradingView：`pinescript/nq_5m_ma20_retest.pine` 貼到 Pine Editor，套用 NQ
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-5m-ma20-retest/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-ma20-retest-8357/docs/nq-5m-ma20-retest/view.html
 
+## NQ 一分 K 破翻回踩 MA20
+
+同一套想法，改用 **1 分鐘 K**。時間門檻換成根數（2 小時=120 根，離開均線 15 根≈15 分鐘）。  
+注意：1m MA20 只有約 20 分鐘，比 5m MA20（約 100 分鐘）更貼價格，訊號會比較密。  
+1m 預設因此放寬「收盤跌破作廢」到 40 點、離開均線改 8 根（約 8 分鐘），破底深度 10 點。
+
+這和下面「1m 破底翻 MA Reclaim」（收復當根就進）不同：**這裡一樣等回踩 MA20**。
+
+```bash
+python3 examples/nq_5m_ma20_retest.py --interval 1m --period 30d --pages
+```
+
+TradingView：`pinescript/nq_1m_ma20_retest.pine` 套用一分圖。
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
@@ -152,7 +166,8 @@ python3 examples/chart_today.py
 ## TradingView
 
 `pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
-`pinescript/nq_5m_ma20_retest.pine` 是五分 K 破翻回踩 MA20（藍圈進場）。
+`pinescript/nq_5m_ma20_retest.pine` 是五分 K 破翻回踩 MA20（藍圈進場）。  
+`pinescript/nq_1m_ma20_retest.pine` 是同一套一分 K 版。
 
 ## 參數調整
 

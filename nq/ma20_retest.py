@@ -1,4 +1,4 @@
-"""NQ 五分 K 破底翻：反彈收復 MA20 後，回踩 MA20 做多。"""
+"""NQ 破底翻：反彈收復 MA20 後，回踩 MA20 做多（5m / 1m）。"""
 
 from __future__ import annotations
 
@@ -103,6 +103,67 @@ def _in_session(ts, session: str) -> bool:
     if session == "day":
         return (8 * 60) <= minutes <= (16 * 60)
     return True
+
+
+# 同一套破翻回踩；只把「時間」換成根數。點數門檻（深度／刺穿／風險）不變。
+# 5m MA20 ≈ 100 分鐘；1m MA20 ≈ 20 分鐘，均線更貼、訊號會比較密。
+INTERVAL_DETECT = {
+    "5m": dict(
+        lookback=24,
+        min_break_depth=25.0,
+        reclaim_window=24,
+        retest_window=18,
+        leave_bars=3,
+        leave_buffer=10.0,
+        touch_above=8.0,
+        max_pierce=12.0,
+        fail_below=8.0,
+        stop_buffer=10.0,
+        target_r=1.5,
+        max_risk=180.0,
+        min_risk=20.0,
+        min_entry_gap=12,
+        ma20_slope_bars=4,
+    ),
+    "1m": dict(
+        lookback=120,
+        min_break_depth=10.0,
+        reclaim_window=120,
+        retest_window=90,
+        leave_bars=8,
+        leave_buffer=6.0,
+        touch_above=8.0,
+        max_pierce=12.0,
+        fail_below=40.0,
+        stop_buffer=10.0,
+        target_r=1.5,
+        max_risk=180.0,
+        min_risk=20.0,
+        min_entry_gap=60,
+        ma20_slope_bars=20,
+    ),
+}
+
+INTERVAL_SIMULATE = {
+    "5m": dict(max_hold=36, ma_exit_after=12),
+    "1m": dict(max_hold=180, ma_exit_after=60),
+}
+
+
+def detect_kwargs(interval: str, **overrides) -> dict:
+    if interval not in INTERVAL_DETECT:
+        raise ValueError(f"unsupported interval {interval!r}, expected {tuple(INTERVAL_DETECT)}")
+    kw = dict(INTERVAL_DETECT[interval])
+    kw.update({k: v for k, v in overrides.items() if v is not None})
+    return kw
+
+
+def simulate_kwargs(interval: str, **overrides) -> dict:
+    if interval not in INTERVAL_SIMULATE:
+        raise ValueError(f"unsupported interval {interval!r}, expected {tuple(INTERVAL_SIMULATE)}")
+    kw = dict(INTERVAL_SIMULATE[interval])
+    kw.update({k: v for k, v in overrides.items() if v is not None})
+    return kw
 
 
 def detect_signals(

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""NQ 五分 K 破翻回踩 MA20。
+"""NQ 五分 / 一分 K 破翻回踩 MA20。
 
 破底（跌破近 2 小時低點）→ 反彈收復 MA20 → 先離開均線 → 回踩 MA20 做多。
 對齊手機圖藍圈：反彈後踩回粉紅 MA20 才進，不在收復當根追。
 
 用法:
-  python3 examples/nq_5m_ma20_retest.py --period 30d
   python3 examples/nq_5m_ma20_retest.py --period 30d --pages
+  python3 examples/nq_5m_ma20_retest.py --interval 1m --period 30d --pages
   python3 examples/nq_5m_ma20_retest.py --period 5d --html output/nq_5m_ma20.html
 """
 
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
@@ -27,15 +28,21 @@ import yfinance as yf
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.ma20_retest import (  # noqa: E402
+    INTERVAL_SIMULATE,
     TradeResult,
+    detect_kwargs,
     detect_signals,
+    simulate_kwargs,
     summarize_trades,
     simulate,
 )
 
 ET = ZoneInfo("America/New_York")
 REPO = Path(__file__).resolve().parents[1]
-PAGES_HTML = REPO / "docs" / "nq-5m-ma20-retest" / "index.html"
+PAGES_HTML = {
+    "5m": REPO / "docs" / "nq-5m-ma20-retest" / "index.html",
+    "1m": REPO / "docs" / "nq-1m-ma20-retest" / "index.html",
+}
 
 # 盡量對齊手機均線顏色；MA20 用粉紅（藍圈那條）
 MA_COLORS = {
@@ -103,6 +110,7 @@ def load_yahoo_intraday(
         else:
             print(f"[data] {cur.date()} → {nxt.date()} empty", file=sys.stderr)
         cur = nxt
+        time.sleep(0.4)
     if not chunks:
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
     df = pd.concat(chunks).sort_index()
@@ -110,7 +118,15 @@ def load_yahoo_intraday(
 
 
 def load_bars(symbol: str, interval: str, period: str) -> pd.DataFrame:
+    """Yahoo 1m period= 最多約 7–8 天；超過改用 7 日切片（約可回看 30 天）。"""
     days = parse_period_days(period)
+    if interval == "1m" and days is not None and days > 8:
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=days)
+        df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=7)
+        if not df.empty:
+            return df
+        print(f"[data] chunked {period} empty, fallback period download", file=sys.stderr)
     df = load_yfinance(symbol, interval, period)
     if not df.empty:
         return df
@@ -340,6 +356,7 @@ def _render_trade_cards(
     html_path: Path,
     *,
     prefix: str = "t",
+    interval: str = "5m",
 ) -> str:
     cards: List[str] = []
     for i, t in enumerate(trades, 1):
@@ -370,7 +387,7 @@ def _render_trade_cards(
             "</header>"
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            f"<span class='tag tag-info'>5m</span>"
+            f"<span class='tag tag-info'>{escape(interval)}</span>"
             f"<span class='tag tag-info'>回踩MA20</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
             "</div>"
@@ -398,6 +415,7 @@ def write_html_report(
     funnel: Optional[Dict[str, int]] = None,
     extra_trades: Optional[List[TradeResult]] = None,
     extra_title: str = "",
+    interval: str = "5m",
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -406,7 +424,9 @@ def write_html_report(
         q_bits.append(f"Q{q} {info['n']}筆 {info['pnl']:+.1f}")
     q_line = " · ".join(q_bits) if q_bits else "無品質分組"
     out = Path(path)
-    cards = _render_trade_cards(df, trades, out, prefix="t")
+    ma_exit_after = INTERVAL_SIMULATE[interval]["ma_exit_after"]
+    ma20_note = "約 20 分鐘" if interval == "1m" else "約 100 分鐘"
+    cards = _render_trade_cards(df, trades, out, prefix="t", interval=interval)
     extra_html = ""
     if extra_trades:
         extra_stats = summarize_trades(extra_trades)
@@ -419,7 +439,10 @@ def write_html_report(
             f"<div class='card'>總點數<b class='{extra_cls}'>{extra_stats['total_points']:+.1f}</b></div>"
             f"<div class='card'>勝/負<b>{extra_stats['wins']}/{extra_stats['count']-extra_stats['wins']}</b></div></div>"
             f"<div class='equity'>{_equity_svg([t.pnl_points for t in extra_trades])}</div></section>"
-            + (_render_trade_cards(df, extra_trades, out, prefix="a") or "<div class='empty'>無交易</div>")
+            + (
+                _render_trade_cards(df, extra_trades, out, prefix="a", interval=interval)
+                or "<div class='empty'>無交易</div>"
+            )
         )
     funnel_line = ""
     if funnel:
@@ -440,7 +463,7 @@ def write_html_report(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>{escape(symbol)} 五分K 破翻回踩 MA20</title>
+<title>{escape(symbol)} {escape(interval)} 破翻回踩 MA20</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -470,8 +493,8 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{escape(symbol)} 五分K 破翻回踩 MA20</h1>
-<p class="muted">RTH 09:30–15:45。破底 → 收復粉紅 MA20 → 離開後回踩進場。停損在破底下方，目標 1.5R；持有滿 12 根若收破 MA20 出場。</p>
+<h1>{escape(symbol)} {escape(interval)} 破翻回踩 MA20</h1>
+<p class="muted">RTH 09:30–15:45。破底 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後回踩進場。停損在破底下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -493,16 +516,15 @@ h1{{font-size:18px;margin:0 0 6px}}
     return out
 
 
-RAW_IMG_BASE = (
-    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
-    "cursor/nq-5m-ma20-retest-8357/docs/nq-5m-ma20-retest/"
-)
+RAW_BRANCH = "cursor/nq-5m-ma20-retest-8357"
 
 
 def write_view_html(index_path: Path) -> Path:
     """htmlpreview 用：把相對圖片改成 GitHub raw。"""
     text = index_path.read_text(encoding="utf-8")
-    view = text.replace("src='img/", f"src='{RAW_IMG_BASE}img/")
+    rel = index_path.parent.relative_to(REPO).as_posix()
+    raw = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{RAW_BRANCH}/{rel}/"
+    view = text.replace("src='img/", f"src='{raw}img/")
     out = index_path.parent / "view.html"
     out.write_text(view, encoding="utf-8")
     return out
@@ -514,18 +536,21 @@ def write_view_html(index_path: Path) -> Path:
 
 
 def cmd_backtest(args) -> int:
+    interval = args.interval
     if args.csv:
         df = load_csv(args.csv)
     else:
-        df = to_et(load_bars(args.symbol, "5m", args.period))
+        df = to_et(load_bars(args.symbol, interval, args.period))
     if df.empty:
         print("no data", file=sys.stderr)
         return 1
+    dkw = detect_kwargs(interval, session=args.session)
+    skw = simulate_kwargs(interval)
     funnel: Dict[str, int] = {}
-    sigs = detect_signals(df, session=args.session, funnel=funnel)
-    trades = simulate(df, sigs)
+    sigs = detect_signals(df, funnel=funnel, **dkw)
+    trades = simulate(df, sigs, **skw)
     stats = summarize_trades(trades)
-    print(f"{args.symbol} 5m {args.period} bars={len(df)} {df.index[0]} -> {df.index[-1]}")
+    print(f"{args.symbol} {interval} {args.period} bars={len(df)} {df.index[0]} -> {df.index[-1]}")
     print(f"trades={stats['count']} WR={stats['win_rate']:.1f}% pnl={stats['total_points']:+.1f}")
     if funnel:
         print(
@@ -552,8 +577,8 @@ def cmd_backtest(args) -> int:
     extra_trades: List[TradeResult] = []
     if args.pages and args.session != "all":
         extra_funnel: Dict[str, int] = {}
-        extra_sigs = detect_signals(df, session="all", funnel=extra_funnel)
-        extra_trades = simulate(df, extra_sigs)
+        extra_sigs = detect_signals(df, funnel=extra_funnel, **detect_kwargs(interval, session="all"))
+        extra_trades = simulate(df, extra_sigs, **skw)
         extra_stats = summarize_trades(extra_trades)
         print(
             f"all-session trades={extra_stats['count']} WR={extra_stats['win_rate']:.1f}% "
@@ -568,7 +593,7 @@ def cmd_backtest(args) -> int:
 
     html_path = args.html
     if args.pages:
-        html_path = html_path or str(PAGES_HTML)
+        html_path = html_path or str(PAGES_HTML[interval])
     if html_path:
         out = write_html_report(
             html_path,
@@ -579,6 +604,7 @@ def cmd_backtest(args) -> int:
             funnel=funnel,
             extra_trades=extra_trades,
             extra_title="全時段對照（含夜盤）",
+            interval=interval,
         )
         print(f"html={out}")
         if args.pages:
@@ -588,12 +614,13 @@ def cmd_backtest(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="NQ 五分K 破翻回踩 MA20")
+    p = argparse.ArgumentParser(description="NQ 破翻回踩 MA20（5m / 1m）")
     p.add_argument("--symbol", default="NQ=F")
+    p.add_argument("--interval", default="5m", choices=("5m", "1m"))
     p.add_argument("--period", default="30d")
-    p.add_argument("--csv", default="", help="自備五分 K CSV（datetime,open,high,low,close）")
+    p.add_argument("--csv", default="", help="自備 K 線 CSV（datetime,open,high,low,close）")
     p.add_argument("--html", default="")
-    p.add_argument("--pages", action="store_true", help="寫到 docs/nq-5m-ma20-retest/index.html")
+    p.add_argument("--pages", action="store_true", help="寫到 docs/nq-{interval}-ma20-retest/index.html")
     p.add_argument(
         "--session",
         default="rth",
