@@ -42,6 +42,7 @@ def get_json(path: str, params=None, retries: int = 6):
 
 def universe(*, top_n: int = 50) -> list[tuple[str, float]]:
     """USDT 永續，依 24h 成交額（quoteVolume）由高到低取前 `top_n`。"""
+    skip = {"USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "DAIUSDT", "EURUSDT", "BFUSDUSDT"}
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
     ranked: list[tuple[float, str]] = []
@@ -55,6 +56,8 @@ def universe(*, top_n: int = 50) -> list[tuple[str, float]]:
         if s.get("underlyingType") == "INDEX":
             continue
         sym = s["symbol"]
+        if sym in skip:
+            continue
         qv = float((tickers.get(sym) or {}).get("quoteVolume") or 0)
         ranked.append((qv, sym))
     ranked.sort(reverse=True)

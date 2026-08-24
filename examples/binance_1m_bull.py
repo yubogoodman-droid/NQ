@@ -42,7 +42,7 @@ PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = (
     "https://htmlpreview.github.io/?"
     "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
-    "cursor/binance-1m-ma-stack-4908/docs/binance/ma1m-bull.html"
+    "cursor/binance-1m-ma-stack-4908/docs/binance/ma1m-bull-view.html"
 )
 PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 200: "#ffffff"}
 LABELS = {5: "5m", 15: "15m", 30: "30m", 60: "1h", 240: "4h"}
@@ -188,7 +188,7 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
     if 0 <= x < len(c):
         ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
         ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
-    kind = "剛站上 1m MA200" if row.crossed_200 else "多頭排列成立"
+    kind = "reclaim 1m MA200" if row.crossed_200 else "stack"
     r15 = row.moves.get(15)
     rtxt = f"  15m {r15.ret_pct:+.2f}%" if r15 and r15.ret_pct is not None else ""
     ax.set_title(
@@ -309,7 +309,8 @@ def write_html(
             f"<span class='tag'>ext {row.ext_pct:+.2f}%</span></div>"
             "<pre class='trade-detail'>"
             f"close {row.sig.close:g}  entry {row.entry:g}\n"
-            f"MA7 {row.sig.m7:g} > 14 {row.sig.m14:g} > 25 {row.sig.m25:g} > 99 {row.sig.m99:g} > 200 {row.sig.ma200:g}\n"
+            f"1m MA7 {row.sig.m7:g} > 14 {row.sig.m14:g} > 25 {row.sig.m25:g} > 99 {row.sig.m99:g}\n"
+            f"1m MA200 {row.sig.ma200:g}  ({row.ext_pct:+.2f}%)\n"
             f"{fwd}"
             "</pre>"
             f"{img_html}"
@@ -400,6 +401,17 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
     return path
 
 
+def write_view_html(src: Path) -> Path:
+    base = (
+        "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+        "cursor/binance-1m-ma-stack-4908/docs/binance/"
+    )
+    text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    out = src.with_name("ma1m-bull-view.html")
+    out.write_text(text, encoding="utf-8")
+    return out
+
+
 def run_backtest(args: argparse.Namespace) -> int:
     date = args.date or default_date()
     cross_only = not args.all_stack
@@ -459,8 +471,10 @@ def run_backtest(args: argparse.Namespace) -> int:
             names=[s for s, _ in uni],
             max_charts=args.charts,
         )
+        view = write_view_html(out)
         print(f"html={out}")
         print(f"preview={PUBLIC}")
+        print(f"view={view}")
     return 0
 
 

@@ -76,7 +76,8 @@ python3 examples/binance_1m_bull.py alert --once --dry-run
 python3 一分K多排.py
 ```
 
-報告：`docs/binance/ma1m-bull.html`
+報告：`docs/binance/ma1m-bull.html`  
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-1m-ma-stack-4908/docs/binance/ma1m-bull-view.html
 
 ## 幣安黏帶三幕 Telegram
 
