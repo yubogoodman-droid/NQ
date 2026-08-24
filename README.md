@@ -60,10 +60,10 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## 幣安 1 分 K：7/14/25/99 多頭排列上站 1m MA200
+## 幣安 1 分 K：7/14/25/99/120 多頭排列上站 1m MA200
 
 全部用**一分 K 自己的均線**（SMA7/14/25/99/200），不是日線年線、也不是小時 MA200。  
-收盤在 MA7 > MA14 > MA25 > MA99 多頭排列上，且**本根收盤剛站上 1m MA200**（前收仍在線下）才算訊號。  
+收盤在 MA7 > MA14 > MA25 > MA99 > MA120 多頭排列上，且**本根收盤剛站上 1m MA200**（前收仍在線下）才算訊號。  
 已在 1m MA200 上又重新排均線不推。  
 **只掃幣安 U 本位 USDT 永續合約**（`fapi`），不含現貨、幣本位、USDC-M、TradFi 股票。  
 回測預設成交額前 50；Telegram 監看預設掃**全部 USDT 合約**。

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic tests for 1m MA7>14>25>99>MA200 stack (no Binance)."""
+"""Synthetic tests for 1m MA7>14>25>99>120 above MA200 stack (no Binance)."""
 
 from __future__ import annotations
 
@@ -60,10 +60,10 @@ def test_detects_first_stack_above_ma200() -> None:
     assert len(sigs) >= 1
     first = sigs[0]
     assert first.idx >= 199
-    assert stack_ok(d["c"], d["m7"], d["m14"], d["m25"], d["m99"], d["m200"], first.idx)
-    assert not stack_ok(d["c"], d["m7"], d["m14"], d["m25"], d["m99"], d["m200"], first.idx - 1)
+    assert stack_ok(d, first.idx)
+    assert not stack_ok(d, first.idx - 1)
     assert d["c"][first.idx] > d["m7"][first.idx] > d["m14"][first.idx]
-    assert d["m14"][first.idx] > d["m25"][first.idx] > d["m99"][first.idx]
+    assert d["m14"][first.idx] > d["m25"][first.idx] > d["m99"][first.idx] > d["m120"][first.idx]
     assert d["c"][first.idx] > d["m200"][first.idx]
 
 
