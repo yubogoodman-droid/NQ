@@ -202,7 +202,7 @@ def test_is_usdt_stock_perp() -> None:
     assert not is_usdt_stock_perp({**stock, "status": "BREAK"})
 
 
-def test_inline_img_srcs() -> None:
+def test_write_view_html_uses_pages_urls() -> None:
     import importlib.util
 
     path = Path(__file__).resolve().parent / "binance_1m_bull.py"
@@ -210,19 +210,14 @@ def test_inline_img_srcs() -> None:
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    tmp = Path("/tmp/ma1m-inline-test")
-    img_dir = tmp / "img" / "ma1m-bull"
-    img_dir.mkdir(parents=True, exist_ok=True)
-    png = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
-        b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
-    (img_dir / "FOO_0824_0100.png").write_bytes(png)
-    html = "<img src='img/ma1m-bull/FOO_0824_0100.png' alt='x'/><img src='img/ma1m-bull/missing.png'/>"
-    out = mod.inline_img_srcs(html, tmp)
-    assert out.startswith("<img src='data:image/")
-    assert "src='img/ma1m-bull/missing.png'" in out
+    tmp = Path("/tmp/ma1m-view-test")
+    tmp.mkdir(parents=True, exist_ok=True)
+    src = tmp / "ma1m-bull.html"
+    src.write_text("<img src='img/ma1m-bull/SNDK_0824_0642.png' alt='SNDKUSDT'/>", encoding="utf-8")
+    out = mod.write_view_html(src)
+    text = out.read_text(encoding="utf-8")
+    assert "https://yubogoodman-droid.github.io/NQ/binance/img/ma1m-bull/SNDK_0824_0642.png" in text
+    assert "src='img/" not in text
 
 
 def main() -> int:
@@ -236,7 +231,7 @@ def main() -> int:
     test_below_ma200_is_not_a_signal()
     test_default_date_uses_yesterday_before_2am()
     test_is_usdt_stock_perp()
-    test_inline_img_srcs()
+    test_write_view_html_uses_pages_urls()
     print("ok")
     return 0
 

@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import os
 import re
@@ -40,11 +39,8 @@ TZ = timezone(timedelta(hours=8))
 REPO = Path(__file__).resolve().parents[1]
 SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
-PUBLIC = (
-    "https://htmlpreview.github.io/?"
-    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
-    "cursor/binance-1m-ma-stack-4908/docs/binance/ma1m-bull-view.html"
-)
+PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
+PAGES_IMG = "https://yubogoodman-droid.github.io/NQ/binance/"
 PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
 LABELS = {5: "5m", 15: "15m", 30: "30m", 60: "1h", 240: "4h"}
 
@@ -405,42 +401,9 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
     return path
 
 
-_IMG_SRC = re.compile(r"src='(img/[^']+)'")
-
-
-def _data_uri(path: Path) -> str:
-    raw = path.read_bytes()
-    try:
-        import io
-
-        from PIL import Image
-
-        im = Image.open(io.BytesIO(raw)).convert("RGB")
-        buf = io.BytesIO()
-        im.save(buf, format="JPEG", quality=78, optimize=True)
-        payload = buf.getvalue()
-        if len(payload) < len(raw):
-            return "data:image/jpeg;base64," + base64.b64encode(payload).decode("ascii")
-    except Exception:
-        pass
-    return "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
-
-
-def inline_img_srcs(html: str, root: Path) -> str:
-    """Turn relative chart paths into data URIs so htmlpreview does not fetch GitHub raw PNGs."""
-
-    def repl(m: re.Match[str]) -> str:
-        rel = m.group(1)
-        p = root / rel
-        if not p.is_file():
-            return m.group(0)
-        return f"src='{_data_uri(p)}'"
-
-    return _IMG_SRC.sub(repl, html)
-
-
 def write_view_html(src: Path) -> Path:
-    text = inline_img_srcs(src.read_text(encoding="utf-8"), src.parent)
+    """Absolute GitHub Pages image URLs so htmlpreview / raw HTML still show the new charts."""
+    text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{PAGES_IMG}img/")
     out = src.with_name("ma1m-bull-view.html")
     out.write_text(text, encoding="utf-8")
     return out
