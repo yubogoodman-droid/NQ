@@ -18,7 +18,7 @@ minBreakOver  = input.float(1.0, "收盤高出盤整高點（點）", minval=0, 
 maxMa200Drop  = input.float(25.0, "MA200 最多下跌（20根）", minval=0, step=5)
 breakWindow   = input.int(8, "盤整後允許多少根突破", minval=1, maxval=20)
 stopBuffer    = input.float(5.0, "停損低於盤整低點（點）", minval=0, step=1)
-targetR       = input.float(2.0, "目標 R 倍數", minval=1.0, step=0.5)
+targetPts     = input.float(50.0, "固定停利（點）", minval=1, step=5)
 
 ma5   = ta.sma(close, 5)
 ma10  = ta.sma(close, 10)
@@ -96,8 +96,7 @@ var float stopLevel = na
 var float tgtLevel  = na
 if breakout
     stopLevel := stickyLow - stopBuffer
-    risk = close - stopLevel
-    tgtLevel := close + risk * targetR
+    tgtLevel := close + targetPts
     stickyHigh := na
     stickyLow := na
     stickyBar := na

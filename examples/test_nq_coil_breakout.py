@@ -49,6 +49,7 @@ def test_demo_catches_0735_breakout() -> None:
     assert ts.hour == 7 and ts.minute >= 30
     assert sig.entry_price > sig.coil_high
     assert sig.entry_price > sig.stop_price
+    assert abs(sig.target_price - (sig.entry_price + 50.0)) < 0.01
     assert sig.vol_ratio >= 2.0
     assert sig.quality == "A"
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
@@ -70,6 +71,7 @@ def test_real_chart_stands_on_ma200() -> None:
     assert hits, f"expected 07:32 站上MA200, got {[df.index[s.entry_idx].strftime('%H:%M') for s in sigs]}"
     sig = hits[0]
     assert abs(sig.entry_price - 29217.75) < 0.3
+    assert abs(sig.target_price - (sig.entry_price + 50.0)) < 0.01
     assert sig.entry_price > sig.ma200
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
     assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
