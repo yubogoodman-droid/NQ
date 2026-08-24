@@ -40,8 +40,8 @@ python3 examples/nq_coil_breakout.py backtest --period 10d --pages
 python3 examples/nq_coil_breakout.py alert --dry-run --once
 ```
 
-近 10 天 Yahoo（2026-08-14 → 08-24）：**1分 16 筆、勝率 31.2%、約 +93 點**。5 分數字寫在 HTML 對照表。
-你那張圖的 1 分進場是 **08-24 07:32 站上 MA200 @ 29217.75**，不是 07:35 放量追高；同一根在 5 分會收在 **07:35** 那根 K。
+近 10 天 Yahoo（2026-08-14 → 08-24）：**1分 16 筆、勝率 31.2%、約 +93 點**；**5分 0 筆**。
+你那張圖的 1 分進場是 **08-24 07:32 站上 MA200 @ 29217.75**，不是 07:35 放量追高。同一根在 5 分收在 **07:35 @ 29247**，但當時 **5分 MA200 還在 ~29302**，沒站上，所以 5 分不進。
 
 TradingView：把 `pinescript/nq_ma_coil_breakout_1m.pine` 貼進 Pine Editor，套用到 NQ1! / MNQ1! 的 **1 分或 5 分圖**，可設「NQ 起漲點」警示。
 

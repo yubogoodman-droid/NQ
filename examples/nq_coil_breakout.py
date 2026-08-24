@@ -300,6 +300,71 @@ def _compare_table(
     )
 
 
+def _align_idx(index: pd.DatetimeIndex, ts) -> Optional[int]:
+    if index is None or len(index) == 0:
+        return None
+    pos = int(index.searchsorted(ts))
+    if pos < len(index):
+        return pos
+    return len(index) - 1
+
+
+def _cross_tf_html(
+    df1: pd.DataFrame,
+    trades1: Sequence[CoilTrade],
+    df5: pd.DataFrame,
+    trades5: Sequence[CoilTrade],
+) -> str:
+    if df5 is None or len(df5) == 0 or not trades1:
+        return ""
+    close5 = df5["Close"].astype(float)
+    ma = {n: close5.rolling(n, min_periods=n).mean() for n in (5, 10, 20, 30, 200)}
+    rows: List[str] = []
+    for i, t in enumerate(trades1, 1):
+        ts = df1.index[t.entry_idx]
+        j = _align_idx(df5.index, ts)
+        if j is None:
+            continue
+        ts5 = df5.index[j]
+        c5 = float(close5.iloc[j])
+        ma5 = float(ma[5].iloc[j])
+        ma10 = float(ma[10].iloc[j])
+        ma20 = float(ma[20].iloc[j])
+        ma30 = float(ma[30].iloc[j])
+        ma200 = float(ma[200].iloc[j])
+        if any(np.isnan(x) for x in (ma5, ma10, ma20, ma30, ma200)):
+            stack, above, ma200_s = "均線不足", "均線不足", "—"
+        else:
+            stack = "是" if ma5 > ma10 > ma20 > ma30 else "否"
+            above = "是" if c5 > ma200 else "否"
+            ma200_s = f"{ma200:.1f}"
+        hit = "無"
+        for k, t5 in enumerate(trades5, 1):
+            dt = abs((df5.index[t5.entry_idx] - ts).total_seconds())
+            if dt <= 90 * 60:
+                hit = f"#{k} {df5.index[t5.entry_idx].strftime('%H:%M')}"
+                break
+        rows.append(
+            f"<tr><th>#{i} {escape(ts.strftime('%m-%d %H:%M'))}<br>"
+            f"<span class='muted'>{t.entry_price:.2f}</span></th>"
+            f"<td>{escape(ts5.strftime('%H:%M'))}<br>{c5:.2f}</td>"
+            f"<td>{escape(ma200_s)}</td>"
+            f"<td>{escape(above)}</td>"
+            f"<td>{escape(stack)}</td>"
+            f"<td>{escape(hit)}</td></tr>"
+        )
+    return (
+        "<p class='muted' style='margin-top:12px'>每筆 1分進場對上當根 5分（右標）。"
+        "5分 MA200 更慢，很多 1分站上 200 的反彈，5分還在 200 下面。</p>"
+        "<table class='compare'><thead><tr>"
+        "<th>1分進場</th><th>5分當根</th><th>5分MA200</th><th>站上200</th>"
+        "<th>5&gt;10&gt;20&gt;30</th><th>5分訊號</th>"
+        "</tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+    )
+
+
 def _trade_cards(
     df: pd.DataFrame,
     trades: List[CoilTrade],
@@ -415,6 +480,10 @@ def write_html_report(
 
     compare_rows = [(iv, frame, tr) for iv, frame, tr, _fun in frames]
     compare_html = _compare_table(compare_rows) if len(frames) > 1 else ""
+    by_iv = {iv: (frame, tr) for iv, frame, tr, _fun in frames}
+    cross_html = ""
+    if "1m" in by_iv and "5m" in by_iv:
+        cross_html = _cross_tf_html(by_iv["1m"][0], by_iv["1m"][1], by_iv["5m"][0], by_iv["5m"][1])
     jump = ""
     if len(frames) > 1:
         links = " · ".join(
@@ -426,7 +495,13 @@ def write_html_report(
     for iv, frame, tr, fun in frames:
         tf = TF_LABELS.get(iv, iv)
         sections.append(f"<h2 class='tf-h' id='sec-{escape(iv)}'>{escape(tf)} 交易</h2>")
-        sections.append(_trade_cards(frame, tr, img_dir, iv, keep))
+        cards = _trade_cards(frame, tr, img_dir, iv, keep)
+        if not tr and iv == "5m":
+            cards = (
+                "<div class='empty'>沒有 5分起漲點。5分 MA200 更慢，"
+                "上面對照表可看每筆 1分進場當時 5分有沒有站上 200。</div>"
+            )
+        sections.append(cards)
 
     for old in img_dir.glob("*.png"):
         if old.name not in keep:
@@ -437,8 +512,9 @@ def write_html_report(
     if len(frames) > 1:
         note = (
             "<p class='muted'>同一套規則對照：盤整 10–18 根、區間 ≤36 點、第一次收盤站上 MA200，"
-            "且 5&gt;10&gt;20&gt;30、MA60/120 在 200 下方。5分K 的 10 根盤整約 50 分鐘，MA200 約 16.7 小時。"
-            "5分K 由 1分K 重採樣，時段對齊。</p>"
+            "且 5&gt;10&gt;20&gt;30、MA60/120 在 200 下方。5分K 由 1分K 重採樣。"
+            "5分的 10 根盤整約 50 分鐘，MA200 約 16.7 小時，所以 1分起漲在 5分常常還沒站上 200。"
+            "</p>"
         )
 
     html = f"""<!DOCTYPE html>
@@ -487,6 +563,7 @@ a{{color:#79c0ff}}
 <p class="muted">圖是靜態 K 線。手機請往下捲。</p>
 {note}
 {compare_html}
+{cross_html}
 {jump}
 </section>
 {summaries}

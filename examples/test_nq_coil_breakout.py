@@ -73,6 +73,11 @@ def test_real_chart_stands_on_ma200() -> None:
     assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
     late = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:35"]
     assert not late, "07:35 is the chase bar, not the entry"
+    m5 = resample_ohlcv(df, "5min")
+    ts = df.index[hits[0].entry_idx]
+    pos = int(m5.index.searchsorted(ts))
+    assert m5.index[pos].strftime("%H:%M") == "07:35"
+    assert abs(float(m5.iloc[pos]["Close"]) - 29247.25) < 1.0
 
 
 def test_no_signal_in_wide_trend() -> None:
@@ -158,6 +163,7 @@ def test_html_1m_5m_compare(tmp_path: Path | None = None) -> None:
     text = path.read_text(encoding="utf-8")
     assert "1分K" in text and "5分K" in text
     assert "同日進場對照" in text
+    assert "1分進場" in text and "5分當根" in text
     img_dir = path.parent / "img"
     assert any(img_dir.glob("m1_t01_*.png"))
     assert any(img_dir.glob("m5_t01_*.png"))
