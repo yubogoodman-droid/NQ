@@ -3,6 +3,7 @@ indicator("NQ 一分K 起漲點（5>10>20>30 連兩根站上MA200）", overlay=t
 
 // 訊號只在 1 分圖上抓。
 // 進場：MA5>MA10>MA20>MA30，且連續兩根收盤站上 MA200。第一根站上還不進。
+// MA200 上頭不能再掛 MA100 或 MA120。
 // 不要等後面那根放量長綠。5 分均線、盤整箱子、放量都不是進場條件。
 // 停損＝進場前 N 根修剪低點 − buffer；走到 1R 後停損移到 +0.3R；目標 2R。
 
@@ -13,7 +14,7 @@ stopBuffer    = input.float(5.0, "停損低於回看低點（點）", minval=0, 
 targetR       = input.float(2.0, "目標 R 倍數", minval=1.0, step=0.5)
 trailAfterR   = input.float(1.0, "移動停利啟動（R）", minval=0, step=0.1)
 trailLockR    = input.float(0.3, "移動後鎖利（R）", minval=0, step=0.1)
-requireLongBelow = input.bool(false, "MA60 與 MA120 仍要在 MA200 下方")
+requireLongBelow = input.bool(true, "MA100 與 MA120 都要在 MA200 下方")
 
 ma5   = ta.sma(close, 5)
 ma10  = ta.sma(close, 10)
@@ -30,9 +31,9 @@ effLow = maxWick > 0 and (bodyLo - low > maxWick) ? bodyLo : low
 bodyOk = maxBody <= 0 or body <= maxBody
 stackOk = ma5 > ma10 and ma10 > ma20 and ma20 > ma30
 hold = stackOk and close > ma200
-longBelow = not requireLongBelow or (ma60 < ma200 and ma120 < ma200)
+longBelow = not requireLongBelow or (ma100 < ma200 and ma120 < ma200)
 fresh = na(ma200[2]) or close[2] <= ma200[2]
-breakout = hold and hold[1] and fresh and bodyOk and longBelow
+breakout = hold and hold[1] and fresh and bodyOk and longBelow and longBelow[1]
 
 plot(ma5,   "MA5",   color=#ffa726, linewidth=1)
 plot(ma10,  "MA10",  color=#42a5f5, linewidth=1)

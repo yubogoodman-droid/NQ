@@ -57,7 +57,7 @@ def test_demo_catches_0735_breakout() -> None:
     assert abs(sig.stop_price - (sig.coil_low - 5.0)) < 0.01
     assert abs(sig.target_price - (sig.entry_price + 2.0 * (sig.entry_price - sig.stop_price))) < 0.01
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
-    assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
+    assert sig.ma100 < sig.ma200 and sig.ma120 < sig.ma200
     # 不該在還沒收在 MA200 上時就進場
     for s in sigs:
         assert df.index[s.entry_idx] >= pd.Timestamp("2026-08-24 07:30", tz=ET)
@@ -81,7 +81,7 @@ def test_real_chart_stands_on_ma200() -> None:
     assert abs(sig.target_price - (sig.entry_price + 2.0 * (sig.entry_price - sig.stop_price))) < 0.01
     assert sig.entry_price > sig.ma200
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
-    assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
+    assert sig.ma100 < sig.ma200 and sig.ma120 < sig.ma200
     late = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:35"]
     assert not late, "07:35 is the chase bar, not the entry"
     ts = df.index[hits[0].entry_idx]
@@ -116,7 +116,7 @@ def test_real_chart_catches_1129() -> None:
     assert abs(sig.entry_price - 29130.25) < 0.3
     assert sig.entry_price > sig.ma200
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
-    assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
+    assert sig.ma100 < sig.ma200 and sig.ma120 < sig.ma200
     look = m5_look_at(df, df.index[sig.entry_idx])
     assert look is not None
     if not np.isnan(look["ma30"]):
@@ -329,13 +329,39 @@ def test_no_repeat_while_already_above_ma200() -> None:
         },
         index=idx,
     )
-    sigs = detect_coil_breakouts(df)
+    sigs = detect_coil_breakouts(df, require_long_below=False)
     assert sigs, "第一次 5>10>20>30 且站上 MA200 應進場"
     assert len(sigs) == 1
     sig = sigs[0]
     assert sig.entry_price > sig.ma200
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
     assert df.index[sig.entry_idx] >= idx[240]
+
+
+def test_reject_when_ma100_or_ma120_above_200() -> None:
+    """已經走多、MA100/120 掛在 MA200 上頭時，回測站上也不進。"""
+    n = 420
+    close = np.linspace(29000.0, 29600.0, n)
+    # 末端先跌破 MA200，再連兩根收回，模擬「200 上面還掛著 100/120」
+    close[-8:-4] = close[-9] - 120.0
+    close[-4:] = close[-9] + 10.0
+    idx = pd.date_range("2026-08-24 02:00", periods=n, freq="1min", tz=ET)
+    df = pd.DataFrame(
+        {
+            "Open": np.r_[close[0], close[:-1]],
+            "High": close + 4.0,
+            "Low": close - 4.0,
+            "Close": close,
+            "Volume": np.full(n, 200.0),
+        },
+        index=idx,
+    )
+    blocked = detect_coil_breakouts(df)
+    if blocked:
+        for s in blocked:
+            assert s.ma100 < s.ma200 and s.ma120 < s.ma200
+    allowed = detect_coil_breakouts(df, require_long_below=False)
+    assert allowed, "關掉 100/120 過濾後，末端收回仍應有訊號"
 
 
 def test_simulate_and_html(tmp_path: Path | None = None) -> None:
@@ -398,6 +424,7 @@ def main() -> int:
     test_skip_chase_body()
     test_failed_breakout_exits_on_two_closes()
     test_no_repeat_while_already_above_ma200()
+    test_reject_when_ma100_or_ma120_above_200()
     test_simulate_and_html()
     test_resample_ohlcv_5m()
     test_html_1m_5m_asof()

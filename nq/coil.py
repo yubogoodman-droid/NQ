@@ -306,7 +306,7 @@ def detect_coil_breakouts(
     max_m5_below_200: float = -1.0,
     require_m5_above_ma20: bool = False,
     require_m5_above_ma30: bool = False,
-    require_long_below: bool = False,
+    require_long_below: bool = True,
     ma_periods: Sequence[int] = MA_PERIODS,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[CoilSignal]:
@@ -314,6 +314,7 @@ def detect_coil_breakouts(
     1 分 K 起漲點：MA5>MA10>MA20>MA30，且連續 confirm_bars 根收盤站上 MA200。
 
     預設兩根：第一根站上還不進，第二根仍排列且收在 MA200 上才進。
+    MA200 上頭不能再掛 MA100 或 MA120（兩條都要在 200 下面）。
     盤整箱子、放量、5 分均線都不是進場條件（仍可用參數打開）。
     停損用進場前 stop_lookback 根的修剪低點 − buffer。
     """
@@ -408,6 +409,7 @@ def detect_coil_breakouts(
         ma20 = float(mas[2][i])
         ma30 = float(mas[3][i])
         ma60 = float(mas[4][i])
+        ma100 = float(mas[5][i])
         ma120 = float(mas[6][i])
         ma200 = float(mas[7][i])
         ok_stack = ma5 > ma10 > ma20 > ma30
@@ -432,7 +434,14 @@ def detect_coil_breakouts(
             ok_fresh = float(c[prior]) <= float(mas[-1][prior])
         ok_body = min_body <= 0 or body >= min_body
         ok_max_body = max_body <= 0 or body <= max_body
-        ok_long_below = (not require_long_below) or (ma60 < ma200 and ma120 < ma200)
+        def no_overhead(j: int) -> bool:
+            if j < 0 or np.isnan(mas[5][j]) or np.isnan(mas[6][j]) or np.isnan(mas[-1][j]):
+                return True
+            return float(mas[5][j]) < float(mas[-1][j]) and float(mas[6][j]) < float(mas[-1][j])
+
+        ok_long_below = (not require_long_below) or all(
+            no_overhead(i - k) for k in range(need)
+        )
         ok_vol = min_vol_ratio <= 0 or vol_ref <= 1e-9 or vol_ratio >= min_vol_ratio
         m5d = float(m5_dist[i])
         ok_m5 = (
@@ -522,7 +531,7 @@ def detect_coil_breakouts(
                         ma20=ma20,
                         ma30=ma30,
                         ma60=ma60,
-                        ma100=float(mas[5][i]),
+                        ma100=ma100,
                         ma120=ma120,
                         ma200=ma200,
                         m5_close=float(_m5_c[i]),

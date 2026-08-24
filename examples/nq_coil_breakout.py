@@ -354,6 +354,7 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"5/10/20/30排列 {funnel.get('stack', 0)} → "
         f"站上MA200 {funnel.get('above_200', 0)} → "
         f"連續兩根站穩 {funnel.get('hold', 0)} → "
+        f"100與120在200下 {funnel.get('long_below', 0)} → "
         f"進場 {funnel.get('taken', 0)}</p>"
     )
 
@@ -464,7 +465,7 @@ def _trade_cards(
             f"回看低 {t.signal.coil_low:.2f}  進場MA200 {t.signal.coil_high:.2f}\n"
             f"量能 {t.signal.vol_ratio:.2f}x  實體 {t.signal.body:.1f}\n"
             f"1分MA {t.signal.ma5:.1f}>{t.signal.ma10:.1f}>{t.signal.ma20:.1f}>{t.signal.ma30:.1f}  "
-            f"60 {t.signal.ma60:.1f} / 120 {t.signal.ma120:.1f} / 200 {t.signal.ma200:.1f}"
+            f"100 {t.signal.ma100:.1f} / 120 {t.signal.ma120:.1f} &lt; 200 {t.signal.ma200:.1f}"
             f"{m5_line}"
             "</pre>"
             "<p class='chart-cap'>1分K</p>"
@@ -550,7 +551,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（1分 5>10>20>30 連兩根站上MA200）</h1>
-<p class="muted">訊號只看 1分K：MA5&gt;MA10&gt;MA20&gt;MA30，且連續兩根收盤站上 MA200。第一根站上還不進。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。下面每筆附「當時 5分K」只是對照，不是進場條件。</p>
+<p class="muted">訊號只看 1分K：MA5&gt;MA10&gt;MA20&gt;MA30，且連續兩根收盤站上 MA200。第一根站上還不進。MA200 上頭不能再掛 MA100 或 MA120。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。下面每筆附「當時 5分K」只是對照，不是進場條件。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -634,7 +635,7 @@ def _print_funnel(funnel: Dict[str, int]) -> None:
         "funnel "
         f"checked={funnel.get('checked', 0)} stack={funnel.get('stack', 0)} "
         f"ma200={funnel.get('above_200', 0)} hold={funnel.get('hold', 0)} "
-        f"taken={funnel.get('taken', 0)}"
+        f"below={funnel.get('long_below', 0)} taken={funnel.get('taken', 0)}"
     )
 
 
@@ -715,7 +716,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"回看低 / MA200: <code>{sig.coil_low:.1f}–{sig.coil_high:.1f}</code>\n"
         f"{m5_line}"
         f"量能: {sig.vol_ratio:.2f}x · 現價 <code>{last:.2f}</code>\n"
-        f"排列: 5&gt;10&gt;20&gt;30 · 連續兩根站上 MA200\n"
+        f"排列: 5&gt;10&gt;20&gt;30 · 連兩根站上 MA200 · 100與120在200下\n"
         f"#起漲點 #NQ #Q{sig.quality}"
     )
 
