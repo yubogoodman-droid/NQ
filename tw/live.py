@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from tw.signals import AlertSnapshot, iter_15m_ma200_alerts, iter_5m_ma200_alerts
+from tw.signals import AlertSnapshot, iter_15m_ma240_alerts, iter_5m_ma240_alerts
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 SESSION_OPEN = time(9, 0)
@@ -156,11 +156,11 @@ def alerts_on_closed_bar(
     day = mark.normalize()
     until = mark + pd.Timedelta(minutes=4, seconds=59)
     if tf == "15m":
-        hits = iter_15m_ma200_alerts(
+        hits = iter_15m_ma240_alerts(
             frame, since=day, until=until + pd.Timedelta(minutes=10), side=side
         )
         return [h for h in hits if _same_15m(h.timestamp, mark)]
-    hits = iter_5m_ma200_alerts(frame, since=day, until=until, side=side)
+    hits = iter_5m_ma240_alerts(frame, since=day, until=until, side=side)
     return [h for h in hits if _as_taipei(h.timestamp) == mark]
 
 
@@ -174,9 +174,9 @@ def _same_15m(signal_ts: pd.Timestamp, five_start: pd.Timestamp) -> bool:
 def format_telegram(name: str, symbol: str, snap: AlertSnapshot, tf: str) -> str:
     short = getattr(snap, "side", "long") == "short"
     if tf == "15m":
-        title = "十五分K 剛跌破 MA200" if short else "十五分K 剛站上 MA200"
+        title = "十五分K 剛跌破 MA240" if short else "十五分K 剛站上 MA240"
     else:
-        title = "五分K 剛跌破 MA200" if short else "五分K 剛站上 MA200"
+        title = "五分K 剛跌破 MA240" if short else "五分K 剛站上 MA240"
     cmp = "&lt;" if short else "&gt;"
     ts = pd.Timestamp(snap.timestamp).tz_convert(TAIPEI).strftime("%H:%M")
     url = f"https://tw.stock.yahoo.com/quote/{symbol}"
@@ -184,7 +184,7 @@ def format_telegram(name: str, symbol: str, snap: AlertSnapshot, tf: str) -> str
         f"<b>{title}</b>",
         f"{html.escape(name)} {html.escape(symbol)}",
         f"時間 {ts}",
-        f"收盤 {snap.close:.2f} {cmp} MA200 {snap.ma200:.2f}",
+        f"收盤 {snap.close:.2f} {cmp} MA240 {snap.ma240:.2f}",
         f"短均 {snap.ma5:.2f} / {snap.ma10:.2f} / {snap.ma20:.2f}",
     ]
     lines.append(url)

@@ -1,4 +1,4 @@
-"""台股五分／十五分 K 回測：成交額前 N、多方站上或空方跌破 MA200。"""
+"""台股五分／十五分 K 回測：成交額前 N、多方站上或空方跌破 MA240。"""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from tw.ranking import (
     filter_financials,
     filter_telecoms,
 )
-from tw.signals import AlertSnapshot, iter_15m_ma200_alerts, iter_5m_ma200_alerts
+from tw.signals import AlertSnapshot, iter_15m_ma240_alerts, iter_5m_ma240_alerts
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
@@ -102,10 +102,10 @@ def run_5m_backtest(
             if df is None or df.empty:
                 skipped.append((item.day, stock, "無五分 K 資料"))
                 continue
-            if len(df) < 201:
-                skipped.append((item.day, stock, f"五分 K 不足 201 根（{len(df)}）"))
+            if len(df) < 241:
+                skipped.append((item.day, stock, f"五分 K 不足 241 根（{len(df)}）"))
                 continue
-            alerts = iter_5m_ma200_alerts(df, since=since, until=until, side=cfg.side)
+            alerts = iter_5m_ma240_alerts(df, since=since, until=until, side=cfg.side)
             if not alerts:
                 continue
             for snap in alerts:
@@ -153,10 +153,10 @@ def run_15m_backtest(
             if df is None or df.empty:
                 skipped.append((item.day, stock, "無五分 K 資料"))
                 continue
-            if len(df) < 600:
-                skipped.append((item.day, stock, f"五分 K 不足 600 根（{len(df)}）"))
+            if len(df) < 721:
+                skipped.append((item.day, stock, f"五分 K 不足 721 根（{len(df)}）"))
                 continue
-            alerts = iter_15m_ma200_alerts(df, since=since, until=until, side=cfg.side)
+            alerts = iter_15m_ma240_alerts(df, since=since, until=until, side=cfg.side)
             if not alerts:
                 continue
             for snap in alerts:

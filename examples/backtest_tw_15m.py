@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""台股十五分 K 回測：多方剛站上、或空方剛跌破十五分 MA200。"""
+"""台股十五分 K 回測：多方剛站上、或空方剛跌破十五分 MA240。"""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from tw.report import save_backtest_html, weekday_zh
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="台股十五分K：MA5>MA10>MA20且往上、剛站上十五分MA200，回測近 N 個交易日"
+        description="台股十五分K：MA5>MA10>MA20且往上、剛站上十五分MA240，回測近 N 個交易日"
     )
     p.add_argument("--days", type=int, default=10, help="回測交易日數（預設 10）")
     p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
         "--side",
         choices=("long", "short"),
         default="long",
-        help="多方剛站上 MA200，或空方剛跌破（預設 long）",
+        help="多方剛站上 MA240，或空方剛跌破（預設 long）",
     )
     p.add_argument("-o", "--output", default="docs/tw/backtest-15m-1h.html")
     return p.parse_args()

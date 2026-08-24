@@ -28,7 +28,7 @@ MA_COLORS = {
     10: "#ffeb3b",
     20: "#66bb6a",
     60: "#00e5ff",
-    200: "#ce93d8",
+    240: "#ce93d8",
 }
 CHART_BARS = {
     "5m": (36, 8),
@@ -120,8 +120,8 @@ def _lead_block(result: BacktestResult) -> str:
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
       十五分K <strong>MA5 &lt; MA10 &lt; MA20 且往下</strong>，
-      <strong>當根收盤剛跌破十五分 MA200</strong>（前一根尚未跌破），
-      且這根收盤必須低於 MA5／10／20／200。
+      <strong>當根收盤剛跌破十五分 MA240</strong>（前一根尚未跌破），
+      且這根收盤必須低於 MA5／10／20／240。
       開盤第一根十五分跳空跌破也算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
@@ -132,8 +132,8 @@ def _lead_block(result: BacktestResult) -> str:
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
       十五分K <strong>MA5 &gt; MA10 &gt; MA20 且往上</strong>，
-      <strong>當根收盤剛站上十五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200。
+      <strong>當根收盤剛站上十五分 MA240</strong>（前一根尚未站上），
+      且這根收盤必須高於 MA5／10／20／240。
       開盤第一根十五分跳空站上也算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
@@ -145,8 +145,8 @@ def _lead_block(result: BacktestResult) -> str:
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
       五分K <strong>MA5 &lt; MA10 &lt; MA20 且往下</strong>，
-      <strong>當根收盤剛跌破五分 MA200</strong>（前一根尚未跌破），
-      且這根收盤必須低於 MA5／10／20／200。開盤第一根跳空跌破也算。
+      <strong>當根收盤剛跌破五分 MA240</strong>（前一根尚未跌破），
+      且這根收盤必須低於 MA5／10／20／240。開盤第一根跳空跌破也算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
       K 棒漲紅跌綠。
@@ -156,8 +156,8 @@ def _lead_block(result: BacktestResult) -> str:
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且往上</strong>，
-      <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200。開盤第一根跳空站上也算。
+      <strong>當根收盤剛站上五分 MA240</strong>（前一根尚未站上），
+      且這根收盤必須高於 MA5／10／20／240。開盤第一根跳空站上也算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
       K 棒漲紅跌綠。
@@ -174,7 +174,7 @@ def _chips_html(result: BacktestResult) -> str:
       <span class="chip">股價 &lt; 500</span>
       <span class="chip">空方</span>
       <span class="chip">MA5 &lt; 10 &lt; 20 往下</span>
-      <span class="chip">當根收盤跌破 MA200</span>
+      <span class="chip">當根收盤跌破 MA240</span>
       <span class="chip">收盤 &lt; 所有均線</span>"""
     else:
         common = """
@@ -184,7 +184,7 @@ def _chips_html(result: BacktestResult) -> str:
       <span class="chip">成交額前 100</span>
       <span class="chip">股價 &lt; 500</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 往上</span>
-      <span class="chip">當根收盤站上 MA200</span>
+      <span class="chip">當根收盤站上 MA240</span>
       <span class="chip">收盤 &gt; 所有均線</span>"""
     if result.signal_tf == "15m":
         return f"""
@@ -346,7 +346,7 @@ def _render(
       <span><i class="swatch" style="background:#ffeb3b"></i>MA10</span>
       <span><i class="swatch" style="background:#66bb6a"></i>MA20</span>
       <span><i class="swatch" style="background:#00e5ff"></i>MA60</span>
-      <span><i class="swatch" style="background:#ce93d8"></i>MA200</span>
+      <span><i class="swatch" style="background:#ce93d8"></i>MA240</span>
     </div>
     <div class="summary">
       {len(result.days)} 個交易日共通知 <span class="ok">{len(result.hits)}</span> 則<br/>
@@ -390,10 +390,10 @@ def _hit_card(
             f'<div class="row"><span>十五分K / MA5 10 20</span>'
             f"<b>{snap.m15_close:.2f} &gt; {snap.m15_ma5:.2f} / {snap.m15_ma10:.2f} / {snap.m15_ma20:.2f}</b></div>"
         )
-        if snap.m15_ma200 is not None and snap.m15_above_ma200_minutes is not None:
+        if snap.m15_ma240 is not None and snap.m15_above_ma240_minutes is not None:
             extra_rows += (
-                f'<div class="row"><span>十五分K / MA200</span>'
-                f"<b>{snap.m15_close:.2f} &gt; {snap.m15_ma200:.2f}　已在上 {snap.m15_above_ma200_minutes} 分</b></div>"
+                f'<div class="row"><span>十五分K / MA240</span>'
+                f"<b>{snap.m15_close:.2f} &gt; {snap.m15_ma240:.2f}　已在上 {snap.m15_above_ma240_minutes} 分</b></div>"
             )
     if signal_tf == "15m" and snap.hourly_close_above_short_mas:
         extra_rows += (
@@ -421,11 +421,11 @@ def _hit_card(
         <div class="price">{s.price:.2f}{html.escape(chg)}</div>
       </div>
       <div class="row"><span>{stand_label}</span><b>{ts}</b></div>
-      <div class="row"><span>收盤 / MA200</span><b>{snap.close:.2f} {cmp} {snap.ma200:.2f}</b></div>
+      <div class="row"><span>收盤 / MA240</span><b>{snap.close:.2f} {cmp} {snap.ma240:.2f}</b></div>
       <div class="row"><span>收盤 vs 均線</span><b>{snap.close:.2f} {cmp} MA5 {snap.ma5:.2f} / 10 {snap.ma10:.2f} / 20 {snap.ma20:.2f}</b></div>
       <div class="row"><span>均線發散</span><b>MA5/MA20 {snap.ribbon_fan_pct:+.2f}%　5–10 {snap.gap_5_10_pct:.2f}%　10–20 {snap.gap_10_20_pct:.2f}%</b></div>
       {extra_rows}
-      <div class="row"><span>前收 / 前MA200</span><b>{snap.prev_close:.2f} {prev_cmp} {snap.prev_ma200:.2f}</b></div>
+      <div class="row"><span>前收 / 前MA240</span><b>{snap.prev_close:.2f} {prev_cmp} {snap.prev_ma240:.2f}</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
       <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K　最下＝日K</div>
       <div class="chart">{chart}</div>
@@ -563,7 +563,7 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
             continue
         if period == 60:
             width = 2.6
-        elif period == 200 or (period == 20 and timeframe == "1h"):
+        elif period == 240 or (period == 20 and timeframe == "1h"):
             width = 2.4
         else:
             width = 1.35
@@ -578,15 +578,17 @@ def _draw_panel(ax, hit: BacktestHit, timeframe: str) -> bool:
         )
 
     loc = int(window.index.get_indexer([mark_ts], method="nearest")[0])
+    short = getattr(hit.snapshot, "side", "long") == "short"
+    cross = "跌破MA240" if short else "站上MA240"
     if hit.signal_tf == "15m":
         if timeframe == "15m":
-            marker_label = "站上MA200"
+            marker_label = cross
         elif timeframe == "1d":
             marker_label = "訊號日"
         else:
             marker_label = "十五分訊號"
     elif timeframe == "5m":
-        marker_label = "站上MA200"
+        marker_label = cross
     elif timeframe == "1d":
         marker_label = "訊號日"
     else:
@@ -674,11 +676,11 @@ def _daily_ma_row(hit: BacktestHit) -> str:
         return ""
     row = work.iloc[loc]
     parts = [f"{float(row['close']):.2f}"]
-    for name in ("ma5", "ma10", "ma20", "ma60", "ma200"):
+    for name in ("ma5", "ma10", "ma20", "ma60", "ma240"):
         val = row.get(name)
         parts.append("—" if val is None or pd.isna(val) else f"{float(val):.2f}")
     return (
-        f'<div class="row"><span>日K / MA5 10 20 60 200</span>'
+        f'<div class="row"><span>日K / MA5 10 20 60 240</span>'
         f"<b>{parts[0]}　MA {parts[1]} / {parts[2]} / {parts[3]} / {parts[4]} / {parts[5]}</b></div>"
     )
 
@@ -729,7 +731,7 @@ def _axis_ylim(
 ) -> tuple[float, float]:
     lows: list[float] = [float(window["low"].min())]
     highs: list[float] = [float(window["high"].max())]
-    for col in ("ma5", "ma10", "ma20", "ma60", "ma200"):
+    for col in ("ma5", "ma10", "ma20", "ma60", "ma240"):
         if col not in window.columns:
             continue
         series = window[col].astype(float)

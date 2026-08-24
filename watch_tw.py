@@ -2,7 +2,7 @@
 """台股永豐監控（單一檔，可直接放到 PyCharm 執行）。
 
 成交額前 100，濾 ETF／金融／電信／股價 500 以上。
-五分或十五分剛站上／剛跌破 MA200 就推 Telegram（預設多方＋空方）。
+五分或十五分剛站上／剛跌破 MA240 就推 Telegram（預設多方＋空方）。
 
 把下面四行金鑰填好，然後 Run。不要把檔名取成 tw.py。
 
@@ -507,14 +507,14 @@ MA_FAST = 5
 MA_MID = 10
 MA_SLOW = 20
 MA_MED = 60
-MA_LONG = 200
+MA_LONG = 240
 H1_MA = 20
 # MA5 相對 MA20 至少拉開這麼多（％），否則算糾結。
 MIN_RIBBON_FAN_PCT = 0.50
 # MA5–MA10、MA10–MA20 各自相對收盤至少這麼多（％），避免其中兩條黏在一起。
 MIN_RIBBON_GAP_PCT = 0.10
-# 十五分收盤要在 MA200 上，而且連續至少這麼久。
-M15_ABOVE_MA200_MINUTES = 30
+# 十五分收盤要在 MA240 上，而且連續至少這麼久。
+M15_ABOVE_MA240_MINUTES = 30
 M15_BAR_MINUTES = 15
 
 
@@ -526,11 +526,11 @@ class AlertSnapshot:
     ma5: float
     ma10: float
     ma20: float
-    ma200: float
+    ma240: float
     prev_ma5: float
     prev_ma10: float
     prev_ma20: float
-    prev_ma200: float
+    prev_ma240: float
     h1_close: float | None = None
     h1_ma5: float | None = None
     h1_ma10: float | None = None
@@ -539,8 +539,8 @@ class AlertSnapshot:
     m15_ma5: float | None = None
     m15_ma10: float | None = None
     m15_ma20: float | None = None
-    m15_ma200: float | None = None
-    m15_above_ma200_minutes: int | None = None
+    m15_ma240: float | None = None
+    m15_above_ma240_minutes: int | None = None
     side: str = "long"
 
     @property
@@ -588,12 +588,12 @@ class AlertSnapshot:
         return self.bearish_aligned and self.mas_falling
 
     @property
-    def crossed_above_ma200(self) -> bool:
-        return self.close > self.ma200 and self.prev_close <= self.prev_ma200
+    def crossed_above_ma240(self) -> bool:
+        return self.close > self.ma240 and self.prev_close <= self.prev_ma240
 
     @property
-    def crossed_below_ma200(self) -> bool:
-        return self.close < self.ma200 and self.prev_close >= self.prev_ma200
+    def crossed_below_ma240(self) -> bool:
+        return self.close < self.ma240 and self.prev_close >= self.prev_ma240
 
     @property
     def close_above_all_mas(self) -> bool:
@@ -601,7 +601,7 @@ class AlertSnapshot:
             self.close > self.ma5
             and self.close > self.ma10
             and self.close > self.ma20
-            and self.close > self.ma200
+            and self.close > self.ma240
         )
 
     @property
@@ -610,7 +610,7 @@ class AlertSnapshot:
             self.close < self.ma5
             and self.close < self.ma10
             and self.close < self.ma20
-            and self.close < self.ma200
+            and self.close < self.ma240
         )
 
     @property
@@ -646,13 +646,13 @@ class AlertSnapshot:
         )
 
     @property
-    def fifteen_above_ma200_half_hour(self) -> bool:
+    def fifteen_above_ma240_half_hour(self) -> bool:
         return (
             self.m15_close is not None
-            and self.m15_ma200 is not None
-            and self.m15_above_ma200_minutes is not None
-            and self.m15_close > self.m15_ma200
-            and self.m15_above_ma200_minutes >= M15_ABOVE_MA200_MINUTES
+            and self.m15_ma240 is not None
+            and self.m15_above_ma240_minutes is not None
+            and self.m15_close > self.m15_ma240
+            and self.m15_above_ma240_minutes >= M15_ABOVE_MA240_MINUTES
         )
 
 
@@ -663,7 +663,7 @@ def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
     out["ma10"] = close.rolling(MA_MID, min_periods=MA_MID).mean()
     out["ma20"] = close.rolling(MA_SLOW, min_periods=MA_SLOW).mean()
     out["ma60"] = close.rolling(MA_MED, min_periods=MA_MED).mean()
-    out["ma200"] = close.rolling(MA_LONG, min_periods=MA_LONG).mean()
+    out["ma240"] = close.rolling(MA_LONG, min_periods=MA_LONG).mean()
     return out
 
 
@@ -696,40 +696,40 @@ class FifteenSnapshot:
     ma5: float
     ma10: float
     ma20: float
-    ma200: float
-    above_ma200_minutes: int
+    ma240: float
+    above_ma240_minutes: int
 
 
 def fifteen_close_and_mas(five_min: pd.DataFrame) -> FifteenSnapshot | None:
-    """用截至目前的五分K合成十五分K，含短均與 MA200，以及收盤在 MA200 上多久。"""
+    """用截至目前的五分K合成十五分K，含短均與 MA240，以及收盤在 MA240 上多久。"""
     m15 = resample_ohlcv(five_min, "15min")
     if len(m15) < MA_LONG or "close" not in m15.columns:
         return None
     work = add_moving_averages(m15)
     last = work.iloc[-1]
-    needed = ("close", "ma5", "ma10", "ma20", "ma200")
+    needed = ("close", "ma5", "ma10", "ma20", "ma240")
     if any(pd.isna(last[col]) for col in needed):
         return None
-    minutes = _minutes_above_ma200(work, pd.Timestamp(five_min.index[-1]))
+    minutes = _minutes_above_ma240(work, pd.Timestamp(five_min.index[-1]))
     return FifteenSnapshot(
         close=float(last["close"]),
         ma5=float(last["ma5"]),
         ma10=float(last["ma10"]),
         ma20=float(last["ma20"]),
-        ma200=float(last["ma200"]),
-        above_ma200_minutes=minutes,
+        ma240=float(last["ma240"]),
+        above_ma240_minutes=minutes,
     )
 
 
-def _minutes_above_ma200(m15: pd.DataFrame, signal_ts: pd.Timestamp) -> int:
-    """當根必須收在 MA200 上；已走完的十五分K可用收盤站上（含剛好碰到）。"""
+def _minutes_above_ma240(m15: pd.DataFrame, signal_ts: pd.Timestamp) -> int:
+    """當根必須收在 MA240 上；已走完的十五分K可用收盤站上（含剛好碰到）。"""
     last = m15.iloc[-1]
-    if last["close"] <= last["ma200"] or pd.isna(last["ma200"]):
+    if last["close"] <= last["ma240"] or pd.isna(last["ma240"]):
         return 0
     completed = 0
     for i in range(len(m15) - 2, -1, -1):
         row = m15.iloc[i]
-        if pd.isna(row["ma200"]) or row["close"] < row["ma200"]:
+        if pd.isna(row["ma240"]) or row["close"] < row["ma240"]:
             break
         completed += 1
     last_ts = pd.Timestamp(m15.index[-1])
@@ -753,18 +753,18 @@ def _wanted_sides(side: str) -> tuple[str, ...]:
 
 def _passes(snap: AlertSnapshot, side: str) -> bool:
     if side == "short":
-        return snap.ribbon_down and snap.crossed_below_ma200 and snap.close_below_all_mas
-    return snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas
+        return snap.ribbon_down and snap.crossed_below_ma240 and snap.close_below_all_mas
+    return snap.ribbon_fanned and snap.crossed_above_ma240 and snap.close_above_all_mas
 
 
-def iter_5m_ma200_alerts(
+def iter_5m_ma240_alerts(
     df: pd.DataFrame,
     *,
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
     side: str = "long",
 ) -> list[AlertSnapshot]:
-    """同一交易日連續五分 K。多方：MA5>MA10>MA20 且往上，剛站上 MA200；空方鏡像跌破。含開盤第一根。"""
+    """同一交易日連續五分 K。多方：MA5>MA10>MA20 且往上，剛站上 MA240；空方鏡像跌破。含開盤第一根。"""
     if df is None or len(df) < MA_LONG + 1:
         return []
     work = add_moving_averages(df)
@@ -794,14 +794,14 @@ def iter_5m_ma200_alerts(
     return hits
 
 
-def iter_15m_ma200_alerts(
+def iter_15m_ma240_alerts(
     df: pd.DataFrame,
     *,
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
     side: str = "long",
 ) -> list[AlertSnapshot]:
-    """同一交易日連續十五分 K。多方剛站上／空方剛跌破十五分 MA200（含開盤第一根）。"""
+    """同一交易日連續十五分 K。多方剛站上／空方剛跌破十五分 MA240（含開盤第一根）。"""
     if df is None or df.empty or "close" not in df.columns:
         return []
     m15 = resample_ohlcv(df, "15min")
@@ -844,7 +844,7 @@ def _snapshot_at(work: pd.DataFrame, idx: int) -> AlertSnapshot | None:
         return None
     last = work.iloc[idx]
     prev = work.iloc[idx - 1]
-    needed = ("ma5", "ma10", "ma20", "ma200")
+    needed = ("ma5", "ma10", "ma20", "ma240")
     if any(pd.isna(last[col]) or pd.isna(prev[col]) for col in needed):
         return None
     return AlertSnapshot(
@@ -854,11 +854,11 @@ def _snapshot_at(work: pd.DataFrame, idx: int) -> AlertSnapshot | None:
         ma5=float(last["ma5"]),
         ma10=float(last["ma10"]),
         ma20=float(last["ma20"]),
-        ma200=float(last["ma200"]),
+        ma240=float(last["ma240"]),
         prev_ma5=float(prev["ma5"]),
         prev_ma10=float(prev["ma10"]),
         prev_ma20=float(prev["ma20"]),
-        prev_ma200=float(prev["ma200"]),
+        prev_ma240=float(prev["ma240"]),
     )
 
 
@@ -1008,11 +1008,11 @@ def alerts_on_closed_bar(
     day = mark.normalize()
     until = mark + pd.Timedelta(minutes=4, seconds=59)
     if tf == "15m":
-        hits = iter_15m_ma200_alerts(
+        hits = iter_15m_ma240_alerts(
             frame, since=day, until=until + pd.Timedelta(minutes=10), side=side
         )
         return [h for h in hits if _same_15m(h.timestamp, mark)]
-    hits = iter_5m_ma200_alerts(frame, since=day, until=until, side=side)
+    hits = iter_5m_ma240_alerts(frame, since=day, until=until, side=side)
     return [h for h in hits if _as_taipei(h.timestamp) == mark]
 
 
@@ -1026,9 +1026,9 @@ def _same_15m(signal_ts: pd.Timestamp, five_start: pd.Timestamp) -> bool:
 def format_telegram(name: str, symbol: str, snap: AlertSnapshot, tf: str) -> str:
     short = getattr(snap, "side", "long") == "short"
     if tf == "15m":
-        title = "十五分K 剛跌破 MA200" if short else "十五分K 剛站上 MA200"
+        title = "十五分K 剛跌破 MA240" if short else "十五分K 剛站上 MA240"
     else:
-        title = "五分K 剛跌破 MA200" if short else "五分K 剛站上 MA200"
+        title = "五分K 剛跌破 MA240" if short else "五分K 剛站上 MA240"
     cmp = "&lt;" if short else "&gt;"
     ts = pd.Timestamp(snap.timestamp).tz_convert(TAIPEI).strftime("%H:%M")
     url = f"https://tw.stock.yahoo.com/quote/{symbol}"
@@ -1036,7 +1036,7 @@ def format_telegram(name: str, symbol: str, snap: AlertSnapshot, tf: str) -> str
         f"<b>{title}</b>",
         f"{html.escape(name)} {html.escape(symbol)}",
         f"時間 {ts}",
-        f"收盤 {snap.close:.2f} {cmp} MA200 {snap.ma200:.2f}",
+        f"收盤 {snap.close:.2f} {cmp} MA240 {snap.ma240:.2f}",
         f"短均 {snap.ma5:.2f} / {snap.ma10:.2f} / {snap.ma20:.2f}",
     ]
     lines.append(url)
@@ -1155,7 +1155,7 @@ def resolve_contract(api, stock: RankedStock):
     return None
 
 
-def fetch_history(api, contract, days: int = 20) -> pd.DataFrame:
+def fetch_history(api, contract, days: int = 30) -> pd.DataFrame:
     end = datetime.now(TAIPEI).date()
     start = end - timedelta(days=days)
     kbars = api.kbars(
@@ -1225,16 +1225,16 @@ def scan_once(
             continue
         print(f"歷史K {i}/{len(candidates)} {stock.name} {stock.code}", flush=True)
         frame = fetch_history(api, contract)
-        if frame.empty or len(frame) < 201:
+        if frame.empty or len(frame) < 241:
             continue
         since = pd.Timestamp(datetime.now(TAIPEI).date(), tz=TAIPEI)
         until = since + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
         before = len(seen)
         if "5m" in tfs:
-            for snap in iter_5m_ma200_alerts(frame, since=since, until=until, side=side):
+            for snap in iter_5m_ma240_alerts(frame, since=since, until=until, side=side):
                 push_snap(stock, snap, "5m", seen, dry=dry)
         if "15m" in tfs:
-            for snap in iter_15m_ma200_alerts(frame, since=since, until=until, side=side):
+            for snap in iter_15m_ma240_alerts(frame, since=since, until=until, side=side):
                 push_snap(stock, snap, "15m", seen, dry=dry)
         save_seen(seen)
         n += len(seen) - before
@@ -1361,7 +1361,7 @@ def test_telegram() -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="永豐 Shioaji 台股五分／十五分 MA200 Telegram 監控")
+    p = argparse.ArgumentParser(description="永豐 Shioaji 台股五分／十五分 MA240 Telegram 監控")
     p.add_argument("--tf", choices=("5m", "15m", "both"), default="both")
     p.add_argument(
         "--side",

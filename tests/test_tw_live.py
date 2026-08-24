@@ -17,7 +17,7 @@ from tw.live import (
     should_run_15m,
     upsert_bar,
 )
-from tw.signals import iter_5m_ma200_alerts
+from tw.signals import iter_5m_ma240_alerts
 from tests.test_tw_5m import _history_then_live
 
 TAIPEI = ZoneInfo("Asia/Taipei")
@@ -76,20 +76,20 @@ class LiveHelperTests(unittest.TestCase):
 
     def test_format_telegram_mentions_cross(self) -> None:
         df = _history_then_live([99.0, 105.0])
-        hits = iter_5m_ma200_alerts(df)
+        hits = iter_5m_ma240_alerts(df)
         self.assertEqual(len(hits), 1)
         text = format_telegram("創見", "2451.TW", hits[0], "5m")
-        self.assertIn("五分K 剛站上 MA200", text)
+        self.assertIn("五分K 剛站上 MA240", text)
         self.assertIn("創見", text)
         self.assertIn("2451.TW", text)
         self.assertNotIn("十五分", text)
 
     def test_format_telegram_short_mentions_break(self) -> None:
         df = _history_then_live([101.0, 95.0])
-        hits = iter_5m_ma200_alerts(df, side="short")
+        hits = iter_5m_ma240_alerts(df, side="short")
         self.assertEqual(len(hits), 1)
         text = format_telegram("創見", "2451.TW", hits[0], "5m")
-        self.assertIn("五分K 剛跌破 MA200", text)
+        self.assertIn("五分K 剛跌破 MA240", text)
         self.assertIn("&lt;", text)
         self.assertNotIn("剛站上", text)
 

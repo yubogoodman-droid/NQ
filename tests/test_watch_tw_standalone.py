@@ -27,22 +27,22 @@ class StandaloneWatcherTests(unittest.TestCase):
 
     def test_same_5m_alert_as_package(self) -> None:
         df = _history_then_live([99.0, 105.0])
-        hits = watch_tw.iter_5m_ma200_alerts(df)
+        hits = watch_tw.iter_5m_ma240_alerts(df)
         self.assertEqual(len(hits), 1)
         bar = watch_tw.OhlcvBar(pd.Timestamp("2026-08-21 09:05:00", tz=TAIPEI), 105, 105, 105, 105)
         self.assertEqual(len(watch_tw.alerts_on_closed_bar(df, bar, tf="5m")), 1)
         text = watch_tw.format_telegram("創見", "2451.TW", hits[0], "5m")
-        self.assertIn("五分K 剛站上 MA200", text)
+        self.assertIn("五分K 剛站上 MA240", text)
 
     def test_same_5m_short_alert_as_package(self) -> None:
         df = _history_then_live([101.0, 95.0])
-        hits = watch_tw.iter_5m_ma200_alerts(df, side="short")
+        hits = watch_tw.iter_5m_ma240_alerts(df, side="short")
         self.assertEqual(len(hits), 1)
         self.assertEqual(hits[0].side, "short")
         bar = watch_tw.OhlcvBar(pd.Timestamp("2026-08-21 09:05:00", tz=TAIPEI), 95, 95, 95, 95)
         self.assertEqual(len(watch_tw.alerts_on_closed_bar(df, bar, tf="5m", side="short")), 1)
         text = watch_tw.format_telegram("創見", "2451.TW", hits[0], "5m")
-        self.assertIn("五分K 剛跌破 MA200", text)
+        self.assertIn("五分K 剛跌破 MA240", text)
 
 
 if __name__ == "__main__":
