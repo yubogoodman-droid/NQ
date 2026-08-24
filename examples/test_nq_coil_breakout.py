@@ -375,11 +375,19 @@ def test_reject_when_ma100_or_ma120_above_200() -> None:
         },
         index=idx,
     )
-    blocked = detect_coil_breakouts(df, **LOOSE)
+    # 這則只測 100/120 掛在 200 上頭；合成走勢箱子寬，不套第 7 張窄箱。
+    wide = {
+        **LOOSE,
+        "max_recent_range": 200.0,
+        "max_ribbon_width": 200.0,
+        "max_reclaim_ext": 200.0,
+        "max_body": 200.0,
+    }
+    blocked = detect_coil_breakouts(df, **wide)
     if blocked:
         for s in blocked:
             assert s.ma100 < s.ma200 and s.ma120 < s.ma200
-    allowed = detect_coil_breakouts(df, require_long_below=False, **LOOSE)
+    allowed = detect_coil_breakouts(df, require_long_below=False, **wide)
     assert allowed, "關掉 100/120 過濾後，末端收回仍應有訊號"
 
 
