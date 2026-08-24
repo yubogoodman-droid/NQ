@@ -267,12 +267,8 @@ def write_html_report(
     if funnel:
         funnel_line = (
             f"<p class='muted'>漏斗：檢查 {funnel.get('checked', 0)} → "
-            f"盤整區間 {funnel.get('coil_range', 0)} → "
-            f"均線糾結 {funnel.get('ribbon', 0)} → "
-            f"前回檔 {funnel.get('prior_drop', 0)} → "
-            f"收斂 {funnel.get('squeeze', 0)} → "
-            f"MA200走平 {funnel.get('ma200_flat', 0)} → "
-            f"吻均線 {funnel.get('hug', 0)} → "
+            f"盤整箱 {funnel.get('coil', 0)} → "
+            f"等待突破 {funnel.get('sticky', 0)} → "
             f"長實體 {funnel.get('body', 0)} → "
             f"站上盤整 {funnel.get('above_coil', 0)} → "
             f"站上均線 {funnel.get('above_ribbon', 0)} → "
@@ -386,10 +382,8 @@ def cmd_backtest(args) -> int:
     if funnel:
         print(
             "funnel "
-            f"checked={funnel.get('checked', 0)} coil={funnel.get('coil_range', 0)} "
-            f"ribbon={funnel.get('ribbon', 0)} drop={funnel.get('prior_drop', 0)} "
-            f"squeeze={funnel.get('squeeze', 0)} ma200={funnel.get('ma200_flat', 0)} "
-            f"hug={funnel.get('hug', 0)} body={funnel.get('body', 0)} "
+            f"checked={funnel.get('checked', 0)} coil={funnel.get('coil', 0)} "
+            f"sticky={funnel.get('sticky', 0)} body={funnel.get('body', 0)} "
             f"above={funnel.get('above_coil', 0)} ribbon_break={funnel.get('above_ribbon', 0)} "
             f"vol={funnel.get('volume', 0)} taken={funnel.get('taken', 0)}"
         )

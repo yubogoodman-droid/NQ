@@ -38,8 +38,9 @@ python3 examples/nq_coil_breakout.py backtest --period 10d --pages
 python3 examples/nq_coil_breakout.py alert --dry-run --once
 ```
 
-近 10 天 Yahoo 1m（2026-08-14 → 08-24）：**14 筆、勝率 57.1%、約 +195 點**。
-漏斗：盤整 3700 → 均線糾結 1897 → 長實體 50 → 站上盤整+均線 19 → 放量進場 14。
+近 10 天 Yahoo 1m（2026-08-14 → 08-24）：**27 筆、勝率 48.1%、約 −21 點**。
+其中包含你那張圖的 **08-24 07:35** 起漲（29247，盤整 29172–29203，量能 7.8x）。
+漏斗：盤整箱 2764 → 等待突破 3230 → 放量進場 27。
 
 TradingView：把 `pinescript/nq_ma_coil_breakout_1m.pine` 貼進 Pine Editor，套用到 NQ1! / MNQ1! 一分圖，可設「NQ 起漲點」警示。
 

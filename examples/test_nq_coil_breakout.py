@@ -53,6 +53,23 @@ def test_demo_catches_0735_breakout() -> None:
         assert df.index[s.entry_idx] >= pd.Timestamp("2026-08-24 07:30", tz=ET)
 
 
+def test_real_chart_0735() -> None:
+    """你貼的那張圖：08-24 07:07 低點 29145.75，07:35 放量長綠起漲。"""
+    path = Path(__file__).resolve().parent / "fixtures" / "nq_2026-08-24_0735.csv"
+    df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
+    if df.index.tz is None:
+        df.index = df.index.tz_localize(ET)
+    sigs = detect_coil_breakouts(df)
+    hits = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:35"]
+    assert hits, f"expected 07:35 起漲, got {[df.index[s.entry_idx].strftime('%H:%M') for s in sigs]}"
+    sig = hits[0]
+    assert abs(sig.entry_price - 29247.25) < 0.3
+    assert sig.coil_high < 29220
+    assert sig.coil_low > 29160
+    assert sig.vol_ratio >= 2.0
+    assert sig.body >= 10.0
+
+
 def test_no_signal_in_wide_trend() -> None:
     n = 320
     close = np.linspace(29000.0, 29600.0, n)
@@ -92,6 +109,7 @@ def main() -> int:
     test_sma()
     test_quality_of()
     test_demo_catches_0735_breakout()
+    test_real_chart_0735()
     test_no_signal_in_wide_trend()
     test_simulate_and_html()
     print("ok")

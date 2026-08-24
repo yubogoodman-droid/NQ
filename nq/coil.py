@@ -101,13 +101,26 @@ def quality_of(coil_range: float, ribbon_width: float, vol_ratio: float, body: f
     return score, "C"
 
 
+@dataclass
+class _LiveCoil:
+    start_idx: int
+    end_idx: int
+    high: float
+    low: float
+    range: float
+    ribbon_width: float
+    prior_drop: float
+
+
 def detect_coil_breakouts(
     df: pd.DataFrame,
     *,
     coil_bars: int = 15,
+    min_coil_bars: int = 10,
+    max_coil_bars: int = 18,
     max_coil_range: float = 36.0,
     min_coil_range: float = 10.0,
-    max_ribbon_width: float = 32.0,
+    max_ribbon_width: float = 42.0,
     min_body: float = 10.0,
     min_vol_ratio: float = 2.0,
     vol_lookback: int = 60,
@@ -115,10 +128,11 @@ def detect_coil_breakouts(
     prior_lookback: int = 120,
     hug_buffer: float = 18.0,
     min_hug_frac: float = 0.55,
-    min_break_over: float = 3.0,
+    min_break_over: float = 1.0,
     max_ma200_drop: float = 25.0,
     ma200_slope_bars: int = 20,
-    max_coil_vs_prior: float = 0.65,
+    max_coil_vs_prior: float = 0.70,
+    break_window: int = 8,
     stop_buffer: float = 5.0,
     target_r: float = 2.0,
     min_entry_gap: int = 45,
@@ -126,7 +140,10 @@ def detect_coil_breakouts(
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[CoilSignal]:
     """
-    抓起漲點：前一段均線糾結 + 窄幅盤整，當根放量收盤站上盤整高點與整束均線。
+    抓起漲點：先鎖住均線糾結的盤整箱，再允許之後幾根放量站上箱頂。
+
+    不能用「當根往回固定 15 根」當盤整，否則 07:30 起漲的 K 會把箱子撐破，
+    07:35 那根真正的起漲就抓不到。
     """
     if df is None or len(df) == 0:
         return []
@@ -134,143 +151,150 @@ def detect_coil_breakouts(
     n = len(c)
     mas = [sma(c, int(p)) for p in ma_periods]
     warmup = max(int(p) for p in ma_periods)
+    lo = min(min_coil_bars, coil_bars)
+    hi = max(max_coil_bars, coil_bars)
     signals: List[CoilSignal] = []
     last_entry = -(10**9)
+    last_coil: Optional[_LiveCoil] = None
     fun = funnel if funnel is not None else {}
 
     def bump(key: str) -> None:
         fun[key] = fun.get(key, 0) + 1
 
+    def find_coil(i: int) -> Optional[_LiveCoil]:
+        best: Optional[_LiveCoil] = None
+        for length in range(lo, hi + 1):
+            start = i - length
+            if start < 0:
+                continue
+            coil_high = float(np.max(h[start:i]))
+            coil_low = float(np.min(l[start:i]))
+            coil_range = coil_high - coil_low
+            if coil_range > max_coil_range or coil_range < min_coil_range:
+                continue
+            ribbon_prev = np.array([float(ma[i - 1]) for ma in mas], dtype=float)
+            ribbon_width = float(ribbon_prev.max() - ribbon_prev.min())
+            if ribbon_width > max_ribbon_width:
+                continue
+            look_from = max(0, start - prior_lookback)
+            prior_drop = float(np.max(h[look_from:i]) - np.min(l[look_from:i]))
+            if prior_drop < min_prior_drop:
+                continue
+            pre_start = max(0, start - prior_lookback)
+            if start > pre_start + 5:
+                pre_range = float(np.max(h[pre_start:start]) - np.min(l[pre_start:start]))
+                if pre_range > 0 and coil_range > max_coil_vs_prior * pre_range:
+                    continue
+            ma200 = mas[-1]
+            if (
+                i - 1 >= ma200_slope_bars
+                and not np.isnan(ma200[i - 1])
+                and not np.isnan(ma200[i - 1 - ma200_slope_bars])
+            ):
+                if float(ma200[i - 1] - ma200[i - 1 - ma200_slope_bars]) < -max_ma200_drop:
+                    continue
+            inside = 0
+            for j in range(start, i):
+                rhi = max(float(ma[j]) for ma in mas)
+                rlo = min(float(ma[j]) for ma in mas)
+                if np.isnan(rhi) or np.isnan(rlo):
+                    continue
+                if (rlo - hug_buffer) <= c[j] <= (rhi + hug_buffer):
+                    inside += 1
+            if inside < length * min_hug_frac:
+                continue
+            cand = _LiveCoil(
+                start_idx=start,
+                end_idx=i - 1,
+                high=coil_high,
+                low=coil_low,
+                range=coil_range,
+                ribbon_width=ribbon_width,
+                prior_drop=prior_drop,
+            )
+            if best is None or cand.range < best.range or (
+                cand.range == best.range and length > (best.end_idx - best.start_idx + 1)
+            ):
+                best = cand
+        return best
+
     i = warmup
     while i < n:
-        if i - last_entry < min_entry_gap:
-            i += 1
-            continue
         if any(np.isnan(ma[i]) or np.isnan(ma[i - 1]) for ma in mas):
             i += 1
             continue
-
         bump("checked")
-        coil_start = i - coil_bars
-        if coil_start < 0:
-            i += 1
-            continue
-        coil_high = float(np.max(h[coil_start:i]))
-        coil_low = float(np.min(l[coil_start:i]))
-        coil_range = coil_high - coil_low
-        if coil_range > max_coil_range or coil_range < min_coil_range:
-            i += 1
-            continue
-        bump("coil_range")
 
-        ribbon_prev = np.array([float(ma[i - 1]) for ma in mas], dtype=float)
-        ribbon_width = float(ribbon_prev.max() - ribbon_prev.min())
-        if ribbon_width > max_ribbon_width:
-            i += 1
-            continue
-        bump("ribbon")
+        if last_coil is not None and (i - last_coil.end_idx) > break_window:
+            last_coil = None
 
-        look_from = max(0, coil_start - prior_lookback)
-        prior_high = float(np.max(h[look_from:i]))
-        prior_low = float(np.min(l[look_from:i]))
-        prior_drop = prior_high - prior_low
-        if prior_drop < min_prior_drop:
-            i += 1
-            continue
-        bump("prior_drop")
+        if last_coil is not None and i - last_entry >= min_entry_gap:
+            bump("sticky")
+            body = float(c[i] - o[i])
+            vol_win = v[max(0, i - vol_lookback) : i]
+            vol_ref = float(np.median(vol_win)) if len(vol_win) else 0.0
+            vol_ratio = float(v[i] / vol_ref) if vol_ref > 1e-9 else 1.0
+            ribbon_now = max(float(ma[i]) for ma in mas)
+            ok_body = body >= min_body
+            ok_break = c[i] >= last_coil.high + min_break_over
+            ok_ribbon = c[i] > ribbon_now
+            ok_vol = vol_ref <= 1e-9 or vol_ratio >= min_vol_ratio
+            if ok_body:
+                bump("body")
+            if ok_break:
+                bump("above_coil")
+            if ok_ribbon:
+                bump("above_ribbon")
+            if ok_vol:
+                bump("volume")
+            if ok_body and ok_break and ok_ribbon and ok_vol:
+                entry = float(c[i])
+                stop = last_coil.low - stop_buffer
+                risk = entry - stop
+                if risk > 0:
+                    bump("taken")
+                    q_score, q_grade = quality_of(
+                        last_coil.range, last_coil.ribbon_width, vol_ratio, body
+                    )
+                    signals.append(
+                        CoilSignal(
+                            coil_start_idx=last_coil.start_idx,
+                            coil_end_idx=last_coil.end_idx,
+                            entry_idx=i,
+                            entry_price=entry,
+                            stop_price=float(stop),
+                            target_price=float(entry + risk * target_r),
+                            coil_high=last_coil.high,
+                            coil_low=last_coil.low,
+                            coil_range=last_coil.range,
+                            ribbon_width=last_coil.ribbon_width,
+                            vol_ratio=vol_ratio,
+                            prior_drop=last_coil.prior_drop,
+                            body=body,
+                            ma5=float(mas[0][i]),
+                            ma10=float(mas[1][i]),
+                            ma20=float(mas[2][i]),
+                            ma30=float(mas[3][i]),
+                            ma60=float(mas[4][i]),
+                            ma100=float(mas[5][i]),
+                            ma120=float(mas[6][i]),
+                            ma200=float(mas[7][i]),
+                            quality=q_grade,
+                            quality_score=q_score,
+                        )
+                    )
+                    last_entry = i
+                    last_coil = None
+                    i += min_entry_gap
+                    continue
 
-        pre_start = max(0, coil_start - prior_lookback)
-        if coil_start > pre_start + 5:
-            pre_range = float(np.max(h[pre_start:coil_start]) - np.min(l[pre_start:coil_start]))
-            if pre_range > 0 and coil_range > max_coil_vs_prior * pre_range:
-                i += 1
-                continue
-        bump("squeeze")
-
-        ma200 = mas[-1]
-        if i - 1 >= ma200_slope_bars and not np.isnan(ma200[i - 1]) and not np.isnan(ma200[i - 1 - ma200_slope_bars]):
-            ma200_delta = float(ma200[i - 1] - ma200[i - 1 - ma200_slope_bars])
-            if ma200_delta < -max_ma200_drop:
-                i += 1
-                continue
-        bump("ma200_flat")
-
-        inside = 0
-        for j in range(coil_start, i):
-            rhi = max(float(ma[j]) for ma in mas)
-            rlo = min(float(ma[j]) for ma in mas)
-            if np.isnan(rhi) or np.isnan(rlo):
-                continue
-            if (rlo - hug_buffer) <= c[j] <= (rhi + hug_buffer):
-                inside += 1
-        if inside < coil_bars * min_hug_frac:
-            i += 1
-            continue
-        bump("hug")
-
-        body = float(c[i] - o[i])
-        if body < min_body:
-            i += 1
-            continue
-        bump("body")
-
-        if c[i] < coil_high + min_break_over:
-            i += 1
-            continue
-        bump("above_coil")
-
-        ribbon_now = np.array([float(ma[i]) for ma in mas], dtype=float)
-        if c[i] <= float(ribbon_now.max()):
-            i += 1
-            continue
-        bump("above_ribbon")
-
-        vol_win = v[max(0, i - vol_lookback) : i]
-        vol_ref = float(np.median(vol_win)) if len(vol_win) else 0.0
-        vol_ratio = float(v[i] / vol_ref) if vol_ref > 1e-9 else 1.0
-        if vol_ref > 1e-9 and vol_ratio < min_vol_ratio:
-            i += 1
-            continue
-        bump("volume")
-
-        entry = float(c[i])
-        stop = coil_low - stop_buffer
-        risk = entry - stop
-        if risk <= 0:
-            i += 1
-            continue
-        target = entry + risk * target_r
-        q_score, q_grade = quality_of(coil_range, ribbon_width, vol_ratio, body)
-        bump("taken")
-        signals.append(
-            CoilSignal(
-                coil_start_idx=coil_start,
-                coil_end_idx=i - 1,
-                entry_idx=i,
-                entry_price=entry,
-                stop_price=float(stop),
-                target_price=float(target),
-                coil_high=coil_high,
-                coil_low=coil_low,
-                coil_range=coil_range,
-                ribbon_width=ribbon_width,
-                vol_ratio=vol_ratio,
-                prior_drop=prior_drop,
-                body=body,
-                ma5=float(mas[0][i]),
-                ma10=float(mas[1][i]),
-                ma20=float(mas[2][i]),
-                ma30=float(mas[3][i]),
-                ma60=float(mas[4][i]),
-                ma100=float(mas[5][i]),
-                ma120=float(mas[6][i]),
-                ma200=float(mas[7][i]),
-                quality=q_grade,
-                quality_score=q_score,
-            )
-        )
-        last_entry = i
-        i += min_entry_gap
+        coil = find_coil(i)
+        if coil is not None:
+            bump("coil")
+            # 價格已離開舊箱時不要用起漲 K 重算盤整，否則箱子會被撐破
+            if last_coil is None or c[i] <= last_coil.high:
+                last_coil = coil
+        i += 1
     return signals
 
 
