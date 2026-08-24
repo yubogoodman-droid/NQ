@@ -240,14 +240,6 @@ def test_1m_preset_detects_retest() -> None:
     assert "進場當下 5分K" in text
     assert "5m MA20" in text
     assert any((path.parent / "img").glob("t5m*.png")), "expected a 5m comparison PNG"
-    df5 = resample_ohlc(df)
-    assert len(df5) > 20
-    out = Path("/tmp/nq_1m_ma20_5m_compare.html")
-    path = write_html_report(out, df, trades, "NQ=F", "demo", interval="1m", df_5m=df5)
-    text = path.read_text(encoding="utf-8")
-    assert "進場當下 5分K" in text
-    assert "5m MA20" in text
-    assert any(path.parent.glob("img/t5m*.png")), "expected a 5m comparison PNG"
 
 
 def test_detect_kwargs_intervals() -> None:
