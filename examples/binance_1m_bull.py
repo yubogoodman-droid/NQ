@@ -303,7 +303,7 @@ def scan_symbol(
     rank, sym, qv = item
     lo, hi = day_window_ms(date)
     try:
-        raw = fetch_klines(sym, interval="1m", days=1, extra_bars=240)
+        raw = fetch_klines(sym, interval="1m", days=2, extra_bars=260)
     except Exception as exc:  # noqa: BLE001
         return sym, None, [], str(exc)[:80]
     if raw is None or len(raw["c"]) < 220:
