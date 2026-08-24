@@ -1,7 +1,7 @@
-"""幣安 1 分 K：短均 7>14>25 黏在 1m MA200 上，剛站上才算。
+"""幣安 1 分 K：7>14>25>99>120 多頭排列，剛站上 1m MA200。
 
-截圖那種排列：7/14/25 跟 MA200 擠成一包，99/120 可以還在上面當壓力。
-不要求 7>14>25>99>120。均線都用一分 K 收盤 SMA。
+截圖紅圈那種：短均先黏成帶，收盤穿過 MA200，99/120 還在帶的下沿。
+均線都用一分 K 收盤 SMA。不要求 120 已高於 200。
 """
 
 from __future__ import annotations
@@ -35,13 +35,13 @@ def add_mas(d: dict) -> dict:
 
 
 def stack_ok(d: dict, i: int) -> bool:
-    """短均 7>14>25，且收盤在 1m MA200 上。99/120 可以還在上面。"""
+    """7>14>25>99>120，且收盤在 1m MA200 上。200 可以還壓在短均上面。"""
     c, m7, m14, m25 = d["c"], d["m7"], d["m14"], d["m25"]
-    m200 = d["m200"]
-    vals = [c[i], m7[i], m14[i], m25[i], m200[i]]
+    m99, m120, m200 = d["m99"], d["m120"], d["m200"]
+    vals = [c[i], m7[i], m14[i], m25[i], m99[i], m120[i], m200[i]]
     if np.isnan(vals).any():
         return False
-    return bool(c[i] > m7[i] > m14[i] > m25[i] and c[i] > m200[i])
+    return bool(c[i] > m7[i] > m14[i] > m25[i] > m99[i] > m120[i] and c[i] > m200[i])
 
 
 def ma_widths(d: dict, i: int) -> tuple[float, float, float]:
@@ -60,10 +60,10 @@ def ribbon_ok(
     d: dict,
     i: int,
     *,
-    max_ribbon_pct: float | None = 0.30,
-    max_short_pct: float | None = 0.25,
+    max_ribbon_pct: float | None = 0.65,
+    max_short_pct: float | None = 0.50,
 ) -> bool:
-    """距離像截圖：7/14/25 黏、再跟 MA200 擠成一包。99/120 不進這包。"""
+    """距離像截圖紅圈：短均黏帶，再跟 MA200 擠在一起。"""
     _ribbon, short, pack = ma_widths(d, i)
     if np.isnan(pack):
         return False
@@ -179,12 +179,12 @@ def detect_combo(
     *,
     min_gap_bars: int = 0,
     cross_only: bool = False,
-    max_ribbon_pct: float | None = 0.30,
-    max_short_pct: float | None = 0.25,
+    max_ribbon_pct: float | None = 0.65,
+    max_short_pct: float | None = 0.50,
 ) -> list[BullSignal]:
-    """本根 收盤>MA7>14>25 且收盤>1m MA200，短均跟 MA200 黏成一包。
+    """本根 收盤>MA7>14>25>99>120 且收盤>1m MA200。
 
-    99/120 可以還在上面。cross_only：只留剛站上 1m MA200。
+    距離用短均距、短均+MA200 包距（截圖 23:35 那種）。cross_only：只留剛站上。
     """
     c, m200 = d["c"], d["m200"]
     out: list[BullSignal] = []

@@ -15,6 +15,7 @@ from nq.ma1m_bull import (  # noqa: E402
     detect_combo,
     forward_moves,
     ma_widths,
+    ribbon_ok,
     sma,
     stack_ok,
     summarize_rows,
@@ -66,6 +67,7 @@ def test_detects_first_stack_above_ma200() -> None:
     assert stack_ok(d, first.idx)
     assert not stack_ok(d, first.idx - 1)
     assert d["c"][first.idx] > d["m7"][first.idx] > d["m14"][first.idx] > d["m25"][first.idx]
+    assert d["m25"][first.idx] > d["m99"][first.idx] > d["m120"][first.idx]
     assert d["c"][first.idx] > d["m200"][first.idx]
 
 
@@ -180,21 +182,22 @@ def test_stack_allows_ma200_still_above_shorts() -> None:
     assert not stack_ok(d, 2)
 
 
-def test_stack_allows_99_120_overhead() -> None:
-    """截圖那種：7>14>25 黏在 MA200，99/120 還在上面。"""
+def test_screenshot_circle_stack_and_width() -> None:
+    """SNDK 08-24 23:35 紅圈：7>14>25>99>120，剛站上 MA200。"""
     d = {
-        "c": np.array([1481.8] * 3),
-        "m7": np.array([1481.5] * 3),
-        "m14": np.array([1481.2] * 3),
-        "m25": np.array([1480.9] * 3),
-        "m99": np.array([1493.5] * 3),
-        "m120": np.array([1492.8] * 3),
-        "m200": np.array([1481.4] * 3),
+        "c": np.array([1470.0, 1472.97, 1472.97]),
+        "m7": np.array([1468.13] * 3),
+        "m14": np.array([1464.19] * 3),
+        "m25": np.array([1461.97] * 3),
+        "m99": np.array([1450.89] * 3),
+        "m120": np.array([1448.16] * 3),
+        "m200": np.array([1471.07, 1470.89, 1470.89]),
     }
-    assert stack_ok(d, 2)
-    _ribbon, short, pack = ma_widths(d, 2)
-    assert short < 0.10
-    assert pack < 0.10
+    assert stack_ok(d, 1)
+    _ribbon, short, pack = ma_widths(d, 1)
+    assert 0.40 < short < 0.45
+    assert 0.60 < pack < 0.63
+    assert ribbon_ok(d, 1)
 
 
 def test_tight_ribbon_rejects_fanned_stack() -> None:
@@ -202,7 +205,7 @@ def test_tight_ribbon_rejects_fanned_stack() -> None:
     loose = detect_combo(d, **LOOSE)
     assert len(loose) >= 1
     _ribbon, short, pack = ma_widths(d, loose[0].idx)
-    assert pack > 0.30 or short > 0.25
+    assert pack > 0.65 or short > 0.50
     assert detect_combo(d) == []
 
 
@@ -277,7 +280,7 @@ def main() -> int:
     test_cross_only_keeps_ma200_reclaim()
     test_below_ma200_is_not_a_signal()
     test_stack_allows_ma200_still_above_shorts()
-    test_stack_allows_99_120_overhead()
+    test_screenshot_circle_stack_and_width()
     test_tight_ribbon_rejects_fanned_stack()
     test_default_date_uses_yesterday_before_2am()
     test_is_usdt_stock_perp()
