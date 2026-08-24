@@ -66,8 +66,7 @@ def test_detects_first_stack_above_ma200() -> None:
     assert stack_ok(d, first.idx)
     assert not stack_ok(d, first.idx - 1)
     assert d["c"][first.idx] > d["m7"][first.idx] > d["m14"][first.idx]
-    assert d["m14"][first.idx] > d["m25"][first.idx] > d["m99"][first.idx] > d["m120"][first.idx]
-    assert d["c"][first.idx] > d["m200"][first.idx]
+    assert d["m14"][first.idx] > d["m25"][first.idx] > d["m99"][first.idx] > d["m120"][first.idx] > d["m200"][first.idx]
 
 
 def test_no_repeat_while_stack_holds() -> None:
@@ -165,6 +164,21 @@ def test_below_ma200_is_not_a_signal() -> None:
     assert detect_combo(d, **LOOSE) == []
 
 
+def test_stack_requires_ma120_above_ma200() -> None:
+    d = {
+        "c": np.array([10.5] * 3),
+        "m7": np.array([10.4] * 3),
+        "m14": np.array([10.3] * 3),
+        "m25": np.array([10.2] * 3),
+        "m99": np.array([10.1] * 3),
+        "m120": np.array([9.8] * 3),
+        "m200": np.array([9.9] * 3),
+    }
+    assert not stack_ok(d, 2)
+    d["m200"] = np.array([9.7] * 3)
+    assert stack_ok(d, 2)
+
+
 def test_tight_ribbon_rejects_fanned_stack() -> None:
     d = add_mas(_make_stack_bars())
     loose = detect_combo(d, **LOOSE)
@@ -241,6 +255,7 @@ def main() -> int:
     test_forward_and_summarize()
     test_cross_only_keeps_ma200_reclaim()
     test_below_ma200_is_not_a_signal()
+    test_stack_requires_ma120_above_ma200()
     test_tight_ribbon_rejects_fanned_stack()
     test_default_date_uses_yesterday_before_2am()
     test_is_usdt_stock_perp()
