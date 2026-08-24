@@ -37,15 +37,17 @@ python3 examples/nq_coil_breakout.py --demo
 # Yahoo 1m 回測，每筆附當時 5分K + 手機版 HTML
 python3 examples/nq_coil_breakout.py backtest --period 10d --html output/nq_coil.html
 python3 examples/nq_coil_breakout.py backtest --period 10d --pages
+python3 examples/nq_coil_breakout.py backtest --period 30d --pages
 
 # Telegram 輪詢（憑證放 tg_config.env）
 python3 examples/nq_coil_breakout.py alert --dry-run --once
 ```
 
-近 10 天 Yahoo 1m（2026-08-14 → 08-24）：**10 筆、勝率 50%、約 +318 點**。
-近 30 天約 **29 筆、勝率 27.6%、+266 點**（同樣規則，樣本仍少，只是回測不是保證）。
+近 10 天 Yahoo 1m（2026-08-14 → 08-24）：**10 筆、勝率 60%、約 +333 點**。
+近一個月 Yahoo 1m（2026-07-26 → 08-24）：**29 筆、勝率 44.8%、+330.5 點**（13 勝；含 4 筆移動停利鎖利、4 筆打到 2R）。樣本仍少，只是回測不是保證。
+預覽目前是這份一個月的圖。
 你那張圖的 1 分進場是 **08-24 07:32 站上 MA200 @ 29217.75**，不是 07:35 放量追高。
-當時 5 分當根（07:35 那根）**還沒走完**，收在 29217.75；這根後來才收到 29247。5 分 MA200 當時還在 ~29302，差 85 點（沒超過 100 點門檻），所以這筆還是會進；高點之後 rec 保本 **+0**。
+當時 5 分當根（07:35 那根）**還沒走完**，收在 29217.75；這根後來才收到 29247。5 分 MA200 當時還在 ~29302，差 85 點（沒超過 100 點門檻），所以這筆還是會進。07:38 衝到 29283 後拉回，移動停利鎖 **+15.3 點**。
 
 TradingView：把 `pinescript/nq_ma_coil_breakout_1m.pine` 貼進 Pine Editor，套用到 NQ1! / MNQ1! 一分圖，可設「NQ 起漲點」警示。
 
