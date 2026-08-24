@@ -60,11 +60,11 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## 幣安 1 分 K：7>14>25>99>120 黏帶上站 1m MA200
+## 幣安 1 分 K：7>14>25 黏在 MA200 剛站上
 
 全部用**一分 K 自己的均線**（SMA7/14/25/99/120/200），不是日線年線、也不是小時 MA200。  
-**排列**：收盤 > MA7 > MA14 > MA25 > MA99 > MA120，且收盤剛站上 1m MA200（前收仍在線下）。剛站上時 MA200 可以還壓在短均上面。  
-**距離**：六條均線要像截圖那種黏帶（全距 ≤0.45%、短均 7/14/25 ≤0.25%），扇開不算。  
+**排列**：收盤 > MA7 > MA14 > MA25，且收盤剛站上 1m MA200。99/120 可以還在上面當壓力。  
+**距離**：短均 7/14/25 ≤0.25%，再跟 MA200 擠成一包（包距 ≤0.30%），像截圖那種黏帶。  
 已在 1m MA200 上又重新排均線不推。  
 **只掃幣安 USDT 股票合約**（美股／韓股／港股／A 股／Pre-IPO），不含加密、黃金原油等商品。  
 回測與 Telegram 預設掃**股票成交額前 10**。

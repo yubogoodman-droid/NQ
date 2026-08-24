@@ -1,7 +1,7 @@
-"""幣安 1 分 K：MA7>14>25>99>120 多頭排列，剛站上 1m MA200，且均線距離要黏在一起。
+"""幣安 1 分 K：短均 7>14>25 黏在 1m MA200 上，剛站上才算。
 
-所有均線都用 1 分鐘收盤 SMA，不用日線／小時線 MA200。
-剛站上時 MA200 常還壓在短均上面（收盤 > 200 > 7>14>25>99>120），不要求 120 已高於 200。
+截圖那種排列：7/14/25 跟 MA200 擠成一包，99/120 可以還在上面當壓力。
+不要求 7>14>25>99>120。均線都用一分 K 收盤 SMA。
 """
 
 from __future__ import annotations
@@ -35,37 +35,39 @@ def add_mas(d: dict) -> dict:
 
 
 def stack_ok(d: dict, i: int) -> bool:
-    """7>14>25>99>120 多頭排列，且收盤在 1m MA200 上。不要求 MA120 已高於 MA200。"""
+    """短均 7>14>25，且收盤在 1m MA200 上。99/120 可以還在上面。"""
     c, m7, m14, m25 = d["c"], d["m7"], d["m14"], d["m25"]
-    m99, m120, m200 = d["m99"], d["m120"], d["m200"]
-    vals = [c[i], m7[i], m14[i], m25[i], m99[i], m120[i], m200[i]]
+    m200 = d["m200"]
+    vals = [c[i], m7[i], m14[i], m25[i], m200[i]]
     if np.isnan(vals).any():
         return False
-    return bool(c[i] > m7[i] > m14[i] > m25[i] > m99[i] > m120[i] and c[i] > m200[i])
+    return bool(c[i] > m7[i] > m14[i] > m25[i] and c[i] > m200[i])
 
 
-def ma_widths(d: dict, i: int) -> tuple[float, float]:
-    """六條均線全距%、短均 7/14/25 全距%。"""
+def ma_widths(d: dict, i: int) -> tuple[float, float, float]:
+    """六條全距%、短均 7/14/25 全距%、短均+MA200 包距%。"""
     ms = [d["m7"][i], d["m14"][i], d["m25"][i], d["m99"][i], d["m120"][i], d["m200"][i]]
-    if np.isnan(ms).any() or min(ms) <= 0:
-        return float("nan"), float("nan")
+    pack = [d["m7"][i], d["m14"][i], d["m25"][i], d["m200"][i]]
+    if np.isnan(ms).any() or min(ms) <= 0 or min(pack) <= 0:
+        return float("nan"), float("nan"), float("nan")
     ribbon = (max(ms) / min(ms) - 1.0) * 100.0
     short = (max(ms[:3]) / min(ms[:3]) - 1.0) * 100.0
-    return float(ribbon), float(short)
+    pack_pct = (max(pack) / min(pack) - 1.0) * 100.0
+    return float(ribbon), float(short), float(pack_pct)
 
 
 def ribbon_ok(
     d: dict,
     i: int,
     *,
-    max_ribbon_pct: float | None = 0.45,
+    max_ribbon_pct: float | None = 0.30,
     max_short_pct: float | None = 0.25,
 ) -> bool:
-    """均線間距要像截圖那種黏帶：六條擠在一起，不要扇開。"""
-    ribbon, short = ma_widths(d, i)
-    if np.isnan(ribbon):
+    """距離像截圖：7/14/25 黏、再跟 MA200 擠成一包。99/120 不進這包。"""
+    _ribbon, short, pack = ma_widths(d, i)
+    if np.isnan(pack):
         return False
-    if max_ribbon_pct is not None and ribbon > max_ribbon_pct:
+    if max_ribbon_pct is not None and pack > max_ribbon_pct:
         return False
     if max_short_pct is not None and short > max_short_pct:
         return False
@@ -149,7 +151,7 @@ def signal_at(d: dict, i: int, *, require_stack: bool = True) -> BullSignal | No
         return None
     vr = float(v[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
     ext = (c[i] / m200[i] - 1.0) * 100.0 if m200[i] else 0.0
-    ribbon, short = ma_widths(d, i)
+    _ribbon, short, pack = ma_widths(d, i)
     return BullSignal(
         idx=i,
         open=float(o[i]),
@@ -165,7 +167,7 @@ def signal_at(d: dict, i: int, *, require_stack: bool = True) -> BullSignal | No
         ma200=float(m200[i]),
         vol_ratio=vr,
         ext_pct=float(ext),
-        ribbon_pct=float(ribbon),
+        ribbon_pct=float(pack),
         short_pct=float(short),
         crossed_200=bool(c[i - 1] <= m200[i - 1] and c[i] > m200[i]),
         bars_below=bars_below_ma200(c, m200, i),
@@ -177,14 +179,12 @@ def detect_combo(
     *,
     min_gap_bars: int = 0,
     cross_only: bool = False,
-    max_ribbon_pct: float | None = 0.45,
+    max_ribbon_pct: float | None = 0.30,
     max_short_pct: float | None = 0.25,
 ) -> list[BullSignal]:
-    """本根 收盤>MA7>14>25>99>120 且收盤>1m MA200；前一根還沒同時成立。
+    """本根 收盤>MA7>14>25 且收盤>1m MA200，短均跟 MA200 黏成一包。
 
-    排列是 7>14>25>99>120；距離是黏帶（六條全距、短均 7/14/25 全距）。
-    剛站上 MA200 時，200 可以還在短均上面。
-    cross_only：只保留「前收還在 1m MA200 下、本根收盤站上」。
+    99/120 可以還在上面。cross_only：只留剛站上 1m MA200。
     """
     c, m200 = d["c"], d["m200"]
     out: list[BullSignal] = []

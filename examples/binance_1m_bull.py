@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""幣安 1 分 K：7>14>25>99>120 多頭黏帶，剛站上 1m MA200（均線都用一分K）。
+"""幣安 1 分 K：7>14>25 黏在 MA200，剛站上（99/120 可以還在上面）。
 
     python3 examples/binance_1m_bull.py backtest --top 10 --today --pages
     python3 examples/binance_1m_bull.py alert --test
@@ -31,7 +31,6 @@ from nq.ma1m_bull import (
     add_mas,
     detect_combo,
     forward_moves,
-    signal_at,
     sma,
     summarize_rows,
 )
@@ -42,10 +41,7 @@ SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
 PAGES_IMG = "https://raw.githubusercontent.com/yubogoodman-droid/NQ/gh-pages/binance/"
-# 使用者傳的 SNDK 截圖當下（台北 2026-08-25 01:56，價約 1481）
-REF_SYMBOL = "SNDKUSDT"
-REF_WHEN = datetime(2026, 8, 25, 1, 56, tzinfo=TZ)
-IMG_VER = "ref0156"
+IMG_VER = "kiss0152"
 # 幣安 App 淺色盤：黃/橘/紫/藍/青 + 深灰 MA200
 PAL = {7: "#F0B90B", 14: "#FF6D00", 25: "#D500F9", 99: "#2962FF", 120: "#00B8D4", 200: "#474D57"}
 VOL_MA = {5: "#F0B90B", 10: "#D500F9"}
@@ -99,40 +95,6 @@ def img_src(rel: str) -> str:
     return f"{PAGES_IMG}{rel}?v={IMG_VER}"
 
 
-def nearest_bar(d: dict, when: datetime) -> int:
-    target = int(when.timestamp() * 1000)
-    return int(np.argmin(np.abs(d["t"].astype(np.int64) - target)))
-
-
-def load_ref_row(frames: dict[str, dict]) -> tuple[SignalRow | None, dict | None]:
-    """使用者傳的 SNDK 截圖那一根，即使不是訊號也要畫出來。"""
-    d = frames.get(REF_SYMBOL)
-    if d is None or len(d.get("c", [])) < 220:
-        try:
-            raw = fetch_klines(REF_SYMBOL, interval="1m", days=2, extra_bars=240)
-        except Exception:
-            return None, None
-        if raw is None or len(raw["c"]) < 220:
-            return None, None
-        d = add_mas(raw)
-    i = nearest_bar(d, REF_WHEN)
-    sig = signal_at(d, i, require_stack=False)
-    if sig is None:
-        return None, d
-    return (
-        SignalRow(
-            symbol=REF_SYMBOL,
-            sig=sig,
-            time_ms=int(d["t"][i]),
-            entry=float(d["c"][i]),
-            quote_volume=0.0,
-            rank=1,
-            moves={},
-        ),
-        d,
-    )
-
-
 def default_date(now: datetime | None = None) -> str:
     """台北日。凌晨 2 點前改用前一日（才有完整一天可回測）。"""
     cur = now or datetime.now(TZ)
@@ -142,9 +104,9 @@ def default_date(now: datetime | None = None) -> str:
     return day.isoformat()
 
 
-def day_window_ms(date: str) -> tuple[int, int]:
-    start = datetime.fromisoformat(date).replace(tzinfo=TZ)
-    end = start + timedelta(days=1)
+def day_window_ms(date: str, days: int = 1) -> tuple[int, int]:
+    end = datetime.fromisoformat(date).replace(tzinfo=TZ) + timedelta(days=1)
+    start = end - timedelta(days=max(1, int(days)))
     return int(start.timestamp() * 1000), int(end.timestamp() * 1000)
 
 
@@ -299,9 +261,10 @@ def scan_symbol(
     min_gap: int,
     cross_only: bool,
     ribbon_kw: dict | None = None,
+    days: int = 1,
 ) -> tuple[str, dict | None, list[SignalRow], str]:
     rank, sym, qv = item
-    lo, hi = day_window_ms(date)
+    lo, hi = day_window_ms(date, days)
     try:
         raw = fetch_klines(sym, interval="1m", days=2, extra_bars=260)
     except Exception as exc:  # noqa: BLE001
@@ -339,8 +302,8 @@ def format_alert(row: SignalRow) -> str:
         f"<b>{row.symbol}</b>  一分K  {hm(row.time_ms)}\n"
         f"{kind} · {below}\n"
         f"現價 {row.sig.close:g}　進 {row.entry:g}\n"
-        f"1m MA7 {row.sig.m7:g} &gt; 14 {row.sig.m14:g} &gt; 25 {row.sig.m25:g} "
-        f"&gt; 99 {row.sig.m99:g} &gt; 120 {row.sig.m120:g}　1m MA200 {row.sig.ma200:g}\n"
+        f"1m MA7 {row.sig.m7:g} &gt; 14 {row.sig.m14:g} &gt; 25 {row.sig.m25:g}　"
+        f"1m MA200 {row.sig.ma200:g}　99 {row.sig.m99:g}　120 {row.sig.m120:g}\n"
         f"黏帶全距 {row.sig.ribbon_pct:.2f}%　短均距 {row.sig.short_pct:.2f}%　"
         f"偏離 1m MA200 {row.ext_pct:+.2f}%　量比 {row.vol_ratio:.2f}x"
     )
@@ -373,7 +336,6 @@ def write_html(
     names: list[str],
     max_charts: int,
     pool_label: str = "USDT 股票合約成交額前 10",
-    refs: list[SignalRow] | None = None,
 ) -> Path:
     stats = {h: summarize_rows(rows, h) for h in HORIZONS}
     cross_n = sum(1 for r in rows if r.crossed_200)
@@ -384,31 +346,6 @@ def write_html(
     if img_dir.exists():
         for old in img_dir.glob("*.png"):
             old.unlink()
-    for row in refs or []:
-        d = frames.get(row.symbol)
-        img_html = _card_img(row.symbol, d, row, img_dir, title_note="  · 你傳的參考")
-        cards.append(
-            "<article class='trade-card'>"
-            "<header class='card-header'>"
-            f"<div class='card-title'><span class='trade-no'>{escape(row.symbol)} 永續</span>"
-            f"<span class='trade-time'>你傳的參考圖 · 1m · {escape(hm(row.time_ms))}</span></div>"
-            "<div class='card-pnl pnl-flat'>參考</div>"
-            "</header>"
-            f"<div class='px pnl-flat'>{row.sig.close:g} "
-            f"<span class='px-sub'>截圖當下 · 短均距 {row.sig.short_pct:.2f}% · 全距 {row.sig.ribbon_pct:.2f}%</span></div>"
-            "<div class='tags'><span class='tag'>參考圖</span>"
-            f"<span class='tag'>黏帶 {row.sig.ribbon_pct:.2f}%</span>"
-            f"<span class='tag'>短均 {row.sig.short_pct:.2f}%</span></div>"
-            "<pre class='trade-detail'>"
-            f"close {row.sig.close:g}\n"
-            f"MA7 {row.sig.m7:g}  14 {row.sig.m14:g}  25 {row.sig.m25:g}  "
-            f"99 {row.sig.m99:g}  120 {row.sig.m120:g}  200 {row.sig.ma200:g}\n"
-            f"均線全距 {row.sig.ribbon_pct:.2f}%  短均距 {row.sig.short_pct:.2f}%\n"
-            "這根短均黏在一起，但不是 7&gt;14&gt;25&gt;99&gt;120，收盤也還在 MA200 下，所以不當訊號。"
-            "</pre>"
-            f"{img_html}"
-            "</article>"
-        )
     for i, row in enumerate(gallery, 1):
         d = frames.get(row.symbol)
         img_html = _card_img(row.symbol, d, row, img_dir)
@@ -431,7 +368,7 @@ def write_html(
             f"<div class='card-pnl {cls}'>{escape(pnl_txt)}</div>"
             "</header>"
             f"<div class='px {cls}'>{row.sig.close:g} <span class='px-sub'>{escape(kind)} · ext {row.ext_pct:+.2f}%</span></div>"
-            f"<div class='tags'><span class='tag'>MA7&gt;14&gt;25&gt;99&gt;120</span>"
+            f"<div class='tags'><span class='tag'>MA7&gt;14&gt;25 黏 MA200</span>"
             f"<span class='tag'>黏帶 {row.sig.ribbon_pct:.2f}%</span></div>"
             "<pre class='trade-detail'>"
             f"close {row.sig.close:g}  entry {row.entry:g}\n"
@@ -474,7 +411,7 @@ def write_html(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>幣安 1m 7&gt;14&gt;25&gt;99&gt;120 黏帶上站 MA200 · {escape(date)}</title>
+<title>幣安 1m 7&gt;14&gt;25 黏 MA200 · {escape(date)}</title>
 <style>
 body{{margin:0;background:#f5f6f7;color:#1e2329;font-family:-apple-system,"Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -503,10 +440,9 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 </style></head><body>
 <div class="page wide">
 <section class="summary">
-<h1>幣安一分K · 7&gt;14&gt;25&gt;99&gt;120 黏帶上站 MA200</h1>
+<h1>幣安一分K · 7&gt;14&gt;25 黏在 MA200 剛站上</h1>
 <p class="muted">{escape(date)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}）
-<br/>最上面那張是你傳的 <strong>SNDK 參考圖</strong>（08-25 01:56 · 約 1481）。下面才是符合規則的訊號。
-<br/>規則：均線<strong>排列</strong> MA7 &gt; MA14 &gt; MA25 &gt; MA99 &gt; MA120，本根收盤剛站上 1m MA200。均線<strong>距離</strong>要像截圖那種黏帶（六條全距 ≤0.45%、短均 7/14/25 ≤0.25%），扇開不算。進場用下一根開盤。
+<br/>規則：短均<strong>排列</strong> MA7 &gt; MA14 &gt; MA25，跟 MA200 黏成一包，本根收盤剛站上 1m MA200。99/120 可以還在上面。短均距 ≤0.25%、短均+MA200 包距 ≤0.30%。進場用下一根開盤。
 <br/>只掃幣安 <strong>USDT 股票合約</strong>（美股／韓股／港股／A 股／Pre-IPO），不含加密、黃金原油等商品。
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
@@ -552,8 +488,8 @@ def run_backtest(args: argparse.Namespace) -> int:
     cross_only = not args.all_stack
     rkw = ribbon_kwargs(args)
     print(
-        f"date={date} top={args.top or 'all'} min_gap={args.min_gap} cross_only={cross_only} "
-        f"ribbon≤{rkw['max_ribbon_pct']} short≤{rkw['max_short_pct']}",
+        f"date={date} days={getattr(args, 'days', 1)} top={args.top or 'all'} min_gap={args.min_gap} "
+        f"cross_only={cross_only} pack≤{rkw['max_ribbon_pct']} short≤{rkw['max_short_pct']}",
         flush=True,
     )
     uni = universe(top_n=args.top)
@@ -571,7 +507,10 @@ def run_backtest(args: argparse.Namespace) -> int:
     frames: dict[str, dict] = {}
     errors = 0
     with ThreadPoolExecutor(8) as ex:
-        futs = {ex.submit(scan_symbol, it, date, args.min_gap, cross_only, rkw): it for it in items}
+        futs = {
+            ex.submit(scan_symbol, it, date, args.min_gap, cross_only, rkw, getattr(args, "days", 1)): it
+            for it in items
+        }
         for fut in as_completed(futs):
             rank, sym, _qv = futs[fut]
             try:
@@ -606,14 +545,6 @@ def run_backtest(args: argparse.Namespace) -> int:
 
     html_path = Path(args.html) if args.html else (PAGES if args.pages else None)
     if html_path:
-        ref_row, ref_d = load_ref_row(frames)
-        if ref_row and ref_d is not None:
-            frames[ref_row.symbol] = ref_d
-            print(
-                f"ref {ref_row.symbol} {hm(ref_row.time_ms)} close={ref_row.sig.close:g} "
-                f"ribbon={ref_row.sig.ribbon_pct:.2f}% short={ref_row.sig.short_pct:.2f}%",
-                flush=True,
-            )
         out = write_html(
             html_path,
             rows,
@@ -623,7 +554,6 @@ def run_backtest(args: argparse.Namespace) -> int:
             names=[s for s, _ in uni],
             max_charts=args.charts,
             pool_label=pool,
-            refs=[ref_row] if ref_row else None,
         )
         view = write_view_html(out)
         print(f"html={out}")
@@ -703,7 +633,7 @@ def run_alert(args: argparse.Namespace) -> int:
         else "全部 USDT 股票合約"
     )
     print(
-        f"監看 {pool} {len(uni)} 個。只掃股票合約。7>14>25>99>120 黏帶、剛站上 1m MA200 才推。",
+        f"監看 {pool} {len(uni)} 個。只掃股票合約。7>14>25 黏 MA200、剛站上才推。",
         flush=True,
     )
     uni_ts = time.time()
@@ -755,16 +685,17 @@ def run_alert(args: argparse.Namespace) -> int:
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(description="幣安一分K：7>14>25>99>120 黏帶上站 1m MA200")
+    p = argparse.ArgumentParser(description="幣安一分K：7>14>25 黏 MA200 剛站上")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     b = sub.add_parser("backtest", help="回測 USDT 股票合約（預設成交額前 10、今天）")
     b.add_argument("--top", type=int, default=10, help="成交額前 N；0 表示全部股票合約")
     b.add_argument("--date", default="", help="YYYY-MM-DD，台北日，預設今天（凌晨 2 點前用昨天）")
     b.add_argument("--today", action="store_true", help="明確指定用今天（同預設）")
+    b.add_argument("--days", type=int, default=1, help="往回幾天（含 --date 當天）")
     b.add_argument("--min-gap", type=int, default=0, help="同一標的訊號最少間隔根數")
     b.add_argument("--all-stack", action="store_true", help="含已在 MA200 上才排好均線（會很多）")
-    b.add_argument("--max-ribbon", type=float, default=0.45, help="六條均線全距%上限（黏帶距離）；0=不限")
+    b.add_argument("--max-ribbon", type=float, default=0.30, help="短均+MA200 包距%上限；0=不限")
     b.add_argument("--max-short", type=float, default=0.25, help="MA7/14/25 全距%上限；0=不限")
     b.add_argument("--pages", action="store_true")
     b.add_argument("--html", default="")
@@ -777,7 +708,7 @@ def main(argv=None) -> int:
     a.add_argument("--test", action="store_true")
     a.add_argument("--dry-run", action="store_true")
     a.add_argument("--all-stack", action="store_true", help="含已在 MA200 上才排好均線（會很多）")
-    a.add_argument("--max-ribbon", type=float, default=0.45, help="六條均線全距%上限（黏帶距離）；0=不限")
+    a.add_argument("--max-ribbon", type=float, default=0.30, help="短均+MA200 包距%上限；0=不限")
     a.add_argument("--max-short", type=float, default=0.25, help="MA7/14/25 全距%上限；0=不限")
     a.set_defaults(func=run_alert)
 
