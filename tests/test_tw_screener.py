@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from tw.ranking import RankedStock
-from tw.screener import ScanHit, apply_5m_ma200_filter
+from tw.screener import ScanHit, apply_5m_ma240_filter
 from tw.signals import AlertSnapshot
 
 
@@ -46,8 +46,8 @@ def _hit(
             ma5=ma5,
             ma10=ma10,
             ma20=ma20,
-            ma200=close - 0.5,
-            prev_ma200=close - 0.4,
+            ma240=close - 0.5,
+            prev_ma240=close - 0.4,
         ),
         bars=240,
         frame=None,
@@ -56,25 +56,25 @@ def _hit(
 
 
 class FiveMinuteFilterTests(unittest.TestCase):
-    def test_drops_hits_below_5m_ma200(self) -> None:
-        above_df = _bars([100.0] * 219 + [110.0])
-        below_df = _bars([100.0] * 219 + [90.0])
+    def test_drops_hits_below_5m_ma240(self) -> None:
+        above_df = _bars([100.0] * 259 + [110.0])
+        below_df = _bars([100.0] * 259 + [90.0])
         ts = above_df.index[-1] + pd.Timedelta(minutes=3)
         above = _hit("1303.TW", above_df, ts)
         below = _hit("2313.TW", below_df, ts)
         missing = _hit("2486.TW", None, ts)
-        kept, dropped, skipped = apply_5m_ma200_filter([above, below, missing])
+        kept, dropped, skipped = apply_5m_ma240_filter([above, below, missing])
         self.assertEqual([h.stock.symbol for h in kept], ["1303.TW"])
         self.assertEqual(dropped, 2)
         reasons = {stock.symbol: reason for stock, reason in skipped}
-        self.assertIn("MA200", reasons["2313.TW"])
+        self.assertIn("MA240", reasons["2313.TW"])
         self.assertIn("無五分", reasons["2486.TW"])
 
-    def test_keeps_hits_just_above_5m_ma200(self) -> None:
-        hug_df = _bars([100.0] * 219 + [101.0])
+    def test_keeps_hits_just_above_5m_ma240(self) -> None:
+        hug_df = _bars([100.0] * 259 + [101.0])
         ts = hug_df.index[-1] + pd.Timedelta(minutes=3)
         hug = _hit("3605.TW", hug_df, ts)
-        kept, dropped, skipped = apply_5m_ma200_filter([hug])
+        kept, dropped, skipped = apply_5m_ma240_filter([hug])
         self.assertEqual([h.stock.symbol for h in kept], ["3605.TW"])
         self.assertEqual(dropped, 0)
         self.assertEqual(skipped, [])

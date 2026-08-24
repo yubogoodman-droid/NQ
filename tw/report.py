@@ -18,7 +18,7 @@ import pandas as pd
 from matplotlib.patches import Rectangle
 
 from tw.screener import ScanHit, ScanResult
-from tw.signals import add_moving_averages, ma200_at
+from tw.signals import add_moving_averages, ma240_at
 
 WEEKDAY_ZH = "一二三四五六日"
 
@@ -26,9 +26,9 @@ MA_COLORS = {
     5: "#ffa726",
     10: "#ffeb3b",
     20: "#66bb6a",
-    200: "#ce93d8",
+    240: "#ce93d8",
 }
-# 一分K 只畫金叉附近：拉太長會把更早的回檔畫成「MA200 在天花板」。
+# 一分K 只畫金叉附近：拉太長會把更早的回檔畫成「MA240 在天花板」。
 CHART_BARS_1M = (24, 10)
 CHART_BARS_5M = (70, 12)
 UP = "#ef5350"
@@ -89,9 +89,9 @@ def save_week_index(results: list[ScanResult], path: str | Path) -> Path:
         "",
         "同一套規則，**每天分開**掃成交額前 100。",
         "",
-        "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA200 差距 0.4%～1.0%，"
-        "從 200 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）；"
-        "含該根的五分K收盤必須高於五分 MA200。不含 ETF、金融股。",
+        "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
+        "從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）；"
+        "含該根的五分K收盤必須高於五分 MA240。不含 ETF、金融股。",
         "",
         "| 日期 | 命中 | 標的 |",
         "|---|---:|---|",
@@ -130,20 +130,20 @@ def _render(
     if result.as_of is not None:
         as_of = result.as_of.isoformat()
         wd = weekday_zh(result.as_of)
-        title = f"回測 {as_of}（{wd}）· 一分K站穩 MA200"
-        heading = f"回測 {as_of}（{wd}）· 站穩 MA200"
+        title = f"回測 {as_of}（{wd}）· 一分K站穩 MA240"
+        heading = f"回測 {as_of}（{wd}）· 站穩 MA240"
         lead = (
             f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF、金融股與收盤價 650 以上。"
-            "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA200 差距 0.4%～1.0%，"
-            "從 200 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）。"
-            "含該根的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
+            "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
+            "從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）。"
+            "含該根的五分K收盤也必須高於五分 MA240。K 棒漲紅跌綠。"
         )
     else:
-        title = "台股一分K · 多頭排列站上 MA200"
-        heading = "台股一分K · 站穩 MA200"
+        title = "台股一分K · 多頭排列站上 MA240"
+        heading = "台股一分K · 站穩 MA240"
         lead = (
-            "成交額前 100、濾掉 ETF、金融股與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA200 差距 0.4%～1.0%，"
-            "從 200 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）。含該根的五分K收盤也必須高於五分 MA200。K 棒漲紅跌綠。"
+            "成交額前 100、濾掉 ETF、金融股與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
+            "從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）。含該根的五分K收盤也必須高於五分 MA240。K 棒漲紅跌綠。"
         )
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -229,21 +229,21 @@ def _render(
       <span class="chip">不含金融股</span>
       <span class="chip">股價 &lt; 650</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 扇開</span>
-      <span class="chip">MA20/MA200 0.4%～1.0%</span>
+      <span class="chip">MA20/MA240 0.4%～1.0%</span>
       <span class="chip">09:10 後從下穿上</span>
-      <span class="chip">五分收盤 &gt; MA200</span>
+      <span class="chip">五分收盤 &gt; MA240</span>
     </div>
     <div class="legend">
       <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
       <span><i class="swatch" style="background:#ffeb3b"></i>MA10</span>
       <span><i class="swatch" style="background:#66bb6a"></i>MA20</span>
-      <span><i class="swatch" style="background:#ce93d8"></i>MA200</span>
+      <span><i class="swatch" style="background:#ce93d8"></i>MA240</span>
     </div>
     <div class="summary">
       命中 <span class="ok">{len(result.hits)}</span> 檔<br/>
       掃描時間 {html.escape(scanned)}（台北）<br/>
       排行時間 {rank_time}<br/>
-      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped}、金融 {result.financial_dropped} → 掃描 {len(result.candidates)} 檔 → 均線糾結 {result.tangled_dropped} → MA20/MA200不符 {result.far_ma_dropped} → 五分MA200底下 {result.below_5m_dropped}
+      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped}、金融 {result.financial_dropped} → 掃描 {len(result.candidates)} 檔 → 均線糾結 {result.tangled_dropped} → MA20/MA240不符 {result.far_ma_dropped} → 五分MA240底下 {result.below_5m_dropped}
     </div>
     {hit_rows}
     <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
@@ -281,10 +281,10 @@ def _hit_card(
         <div class="price">{s.price:.2f}{html.escape(chg)}</div>
       </div>
       <div class="row"><span>1分站穩時間</span><b>{ts}</b></div>
-      <div class="row"><span>1分收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
-      <div class="row"><span>五分收盤 / MA200</span><b>{html.escape(_five_min_ma200_text(hit))}</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>{snap.close:.2f} &gt; {snap.ma240:.2f}</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>{html.escape(_five_min_ma240_text(hit))}</b></div>
       <div class="row"><span>1分 MA5 / 10 / 20</span><b>{snap.ma5:.2f} &gt; {snap.ma10:.2f} &gt; {snap.ma20:.2f}</b></div>
-      <div class="row"><span>MA20 與 MA200</span><b>{snap.ma20:.2f} / {snap.ma200:.2f}（差 {snap.ma20_ma200_gap_pct:.1%}）</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>{snap.ma20:.2f} / {snap.ma240:.2f}（差 {snap.ma20_ma240_gap_pct:.1%}）</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
       <div class="chart-label">一分 K</div>
       <div class="chart">{chart_1m}</div>
@@ -294,13 +294,13 @@ def _hit_card(
 """
 
 
-def _five_min_ma200_text(hit: ScanHit) -> str:
-    pair = ma200_at(hit.frame_5m, hit.snapshot.timestamp, floor="5min")
+def _five_min_ma240_text(hit: ScanHit) -> str:
+    pair = ma240_at(hit.frame_5m, hit.snapshot.timestamp, floor="5min")
     if pair is None:
         return "—"
-    close, ma200 = pair
-    gap = (close - ma200) / ma200 if ma200 else 0.0
-    return f"{close:.2f} > {ma200:.2f}（{gap:+.1%}）"
+    close, ma240 = pair
+    gap = (close - ma240) / ma240 if ma240 else 0.0
+    return f"{close:.2f} > {ma240:.2f}（{gap:+.1%}）"
 
 
 def build_k_chart(
@@ -311,7 +311,7 @@ def build_k_chart(
     chart_dir: Path | None = None,
     image_base: str | None = None,
 ) -> str:
-    """K 棒圖 + MA5/10/20/200。有 chart_dir 就存成檔，否則退回 data URI（測試用）。"""
+    """K 棒圖 + MA5/10/20/240。有 chart_dir 就存成檔，否則退回 data URI（測試用）。"""
     png = render_k_chart_png(hit, timeframe=timeframe)
     if not png:
         label = "五分" if timeframe == "5m" else "一分"
@@ -404,18 +404,18 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
     if result.as_of is not None:
         as_of = result.as_of.isoformat()
         wd = weekday_zh(result.as_of)
-        title = f"回測 {as_of}（{wd}）· 一分K站穩 MA200"
+        title = f"回測 {as_of}（{wd}）· 一分K站穩 MA240"
         lead = (
             f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF、金融股與收盤價 650 以上。"
-            "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA200 差距 0.4%～1.0%，"
-            "從 200 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）；"
-            "含該根的五分K收盤也必須高於五分 MA200。"
+            "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
+            "從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）；"
+            "含該根的五分K收盤也必須高於五分 MA240。"
         )
     else:
-        title = "台股一分K · 站穩 MA200"
+        title = "台股一分K · 站穩 MA240"
         lead = (
-            "成交額前 100、濾掉 ETF、金融股與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA200 差距 0.4%～1.0%，"
-            "從 200 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）；含該根的五分K收盤也必須高於五分 MA200。"
+            "成交額前 100、濾掉 ETF、金融股與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
+            "從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）；含該根的五分K收盤也必須高於五分 MA240。"
         )
     lines = [
         f"# {title}",
@@ -426,7 +426,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         f"- 命中 **{len(result.hits)}** 檔",
         f"- 掃描時間 {result.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}（台北）",
         f"- 排行 {result.rank_time or '—'}",
-        f"- 前 100 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped}、金融 {result.financial_dropped} → 掃描 {len(result.candidates)} → 均線糾結 {result.tangled_dropped} → MA20/MA200不符 {result.far_ma_dropped} → 五分MA200底下 {result.below_5m_dropped}",
+        f"- 前 100 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped}、金融 {result.financial_dropped} → 掃描 {len(result.candidates)} → 均線糾結 {result.tangled_dropped} → MA20/MA240不符 {result.far_ma_dropped} → 五分MA240底下 {result.below_5m_dropped}",
         "",
     ]
     for i, hit in enumerate(result.hits, 1):
@@ -434,15 +434,15 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         chg = f" {s.change_percent:+.2f}%" if s.change_percent is not None else ""
         sym = _safe_symbol(s.symbol)
         rel = chart_rel.as_posix()
-        five = _five_min_ma200_text(hit)
+        five = _five_min_ma240_text(hit)
         lines.extend(
             [
                 f"## {i}. {s.name} [{s.symbol}](https://tw.stock.yahoo.com/quote/{s.symbol})",
                 "",
                 f"- 價格 {s.price:.2f}{chg}　成交額排名 #{s.rank}　{s.turnover/1e8:.2f} 億",
-                f"- 1分站穩 {snap.timestamp.strftime('%H:%M')}　收 {snap.close:.2f} > MA200 {snap.ma200:.2f}",
-                f"- 1分 MA5 {snap.ma5:.2f} > MA10 {snap.ma10:.2f} > MA20 {snap.ma20:.2f}　MA20/MA200 差 {snap.ma20_ma200_gap_pct:.1%}",
-                f"- 五分收盤 / MA200　{five}",
+                f"- 1分站穩 {snap.timestamp.strftime('%H:%M')}　收 {snap.close:.2f} > MA240 {snap.ma240:.2f}",
+                f"- 1分 MA5 {snap.ma5:.2f} > MA10 {snap.ma10:.2f} > MA20 {snap.ma20:.2f}　MA20/MA240 差 {snap.ma20_ma240_gap_pct:.1%}",
+                f"- 五分收盤 / MA240　{five}",
                 "",
                 "**一分 K**",
                 "",
@@ -513,7 +513,7 @@ def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
             xs,
             vals,
             color=color,
-            linewidth=2.0 if period == 200 else 1.35,
+            linewidth=2.0 if period == 240 else 1.35,
             label=f"MA{period}",
             zorder=4,
             solid_capstyle="round",
@@ -533,18 +533,18 @@ def render_k_chart_png(hit: ScanHit, timeframe: str = "1m") -> bytes | None:
             label=marker_label,
         )
 
-    # 一分K 縱軸對準金叉時的 MA20/MA200，至少留 3%，不要被旁邊的回檔撐開。
+    # 一分K 縱軸對準金叉時的 MA20/MA240，至少留 3%，不要被旁邊的回檔撐開。
     ref = float(hit.snapshot.close) if hit.snapshot.close else float(window["close"].iloc[-1])
     if timeframe == "1m":
-        mid = (float(hit.snapshot.ma20) + float(hit.snapshot.ma200)) / 2.0
+        mid = (float(hit.snapshot.ma20) + float(hit.snapshot.ma240)) / 2.0
         ax.set_ylim(*_centered_ylim(mid, ref, span_pct=0.03))
     else:
         ax.set_ylim(*_axis_ylim(window, ref, min_span_pct=0.03))
     ax.set_xlim(-1, n)
     bar_time = pd.Timestamp(window.index[loc]).strftime("%H:%M") if 0 <= loc < n else hit.snapshot.timestamp.strftime("%H:%M")
-    gap = hit.snapshot.ma20_ma200_gap_pct
+    gap = hit.snapshot.ma20_ma240_gap_pct
     if timeframe == "1m":
-        title = f"{hit.stock.name} {hit.stock.symbol}  {tf_name}  {bar_time}  MA20/MA200 差 {gap:.1%}"
+        title = f"{hit.stock.name} {hit.stock.symbol}  {tf_name}  {bar_time}  MA20/MA240 差 {gap:.1%}"
     else:
         title = f"{hit.stock.name} {hit.stock.symbol}  {tf_name}  {bar_time}"
     ax.set_title(title, color=FG, fontsize=11, pad=8, fontproperties=_FONT)
@@ -595,7 +595,7 @@ def _axis_ylim(
     """縱軸至少覆蓋 min_span_pct，避免一分K把均線差放大成整張圖。"""
     lows: list[float] = [float(window["low"].min())]
     highs: list[float] = [float(window["high"].max())]
-    for col in ("ma5", "ma10", "ma20", "ma200"):
+    for col in ("ma5", "ma10", "ma20", "ma240"):
         if col not in window.columns:
             continue
         series = window[col].astype(float)

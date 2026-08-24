@@ -26,7 +26,7 @@ def send_notifications(title: str, body: str) -> list[str]:
 def format_hit_message(hits: list[ScanHit]) -> tuple[str, str]:
     if not hits:
         return "台股一分K掃描", "目前沒有符合條件的標的"
-    title = f"台股一分K站穩MA200 × {len(hits)}"
+    title = f"台股一分K站穩MA240 × {len(hits)}"
     lines = []
     for hit in hits:
         stock = hit.stock
@@ -37,8 +37,8 @@ def format_hit_message(hits: list[ScanHit]) -> tuple[str, str]:
         lines.append(
             f"{stock.rank}. {stock.name} {stock.symbol} "
             f"{stock.price:.2f}{chg}\n"
-            f"   收 {snap.close:.2f} > MA200 {snap.ma200:.2f} "
-            f"（前收 {snap.prev_close:.2f} / 前MA200 {snap.prev_ma200:.2f}）\n"
+            f"   收 {snap.close:.2f} > MA240 {snap.ma240:.2f} "
+            f"（前收 {snap.prev_close:.2f} / 前MA240 {snap.prev_ma240:.2f}）\n"
             f"   MA5 {snap.ma5:.2f} > MA10 {snap.ma10:.2f} > MA20 {snap.ma20:.2f}\n"
             f"   {snap.timestamp.strftime('%H:%M')}  成交額 {stock.turnover/1e8:.2f} 億"
         )

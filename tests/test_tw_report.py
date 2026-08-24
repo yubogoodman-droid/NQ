@@ -43,8 +43,8 @@ def _hit(*, frame: pd.DataFrame, frame_5m: pd.DataFrame | None = None) -> ScanHi
             ma5=207.8,
             ma10=207.6,
             ma20=207.5,
-            ma200=207.5,
-            prev_ma200=207.5,
+            ma240=207.5,
+            prev_ma240=207.5,
         ),
         bars=len(frame),
         frame=frame,
@@ -69,13 +69,13 @@ class ReportChartTests(unittest.TestCase):
                 "low": [265.0] * 10,
                 "high": [268.5] * 10,
                 "ma20": [267.15] * 10,
-                "ma200": [267.61] * 10,
+                "ma240": [267.61] * 10,
             },
             index=idx,
         )
         lo, hi = _axis_ylim(window, 268.0, min_span_pct=0.03)
         self.assertGreaterEqual(hi - lo, 268.0 * 0.03)
-        # 0.46 元的 MA20/MA200 差不該佔滿縱軸
+        # 0.46 元的 MA20/MA240 差不該佔滿縱軸
         self.assertLess(0.46 / (hi - lo), 0.12)
 
     def test_k_chart_contains_candlestick(self) -> None:
@@ -119,10 +119,10 @@ class ReportChartTests(unittest.TestCase):
         self.assertIn("南亞", text)
         self.assertIn("一分 K", text)
         self.assertIn("五分 K（對照）", text)
-        self.assertIn("五分收盤 &gt; MA200", text)
-        self.assertIn("MA20/MA200 0.4%", text)
+        self.assertIn("五分收盤 &gt; MA240", text)
+        self.assertIn("MA20/MA240 0.4%", text)
         self.assertIn("MA5", text)
-        self.assertIn("MA200", text)
+        self.assertIn("MA240", text)
         self.assertIn("scan_tw_1m.py --watch", text)
         self.assertIn("scan_tw_1m.py --watch", md)
 

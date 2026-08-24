@@ -76,7 +76,7 @@ def fetch_1m_bars_many(
 
 
 def kline_window_for_date(on_date: date, lookback_days: int = 7) -> tuple[date, date]:
-    """回測某日時，往前 lookback_days 抓 K 線（含前一交易日，MA200 才算得出來）。end 不含當天之後。"""
+    """回測某日時，往前 lookback_days 抓 K 線（含前一交易日，MA240 才算得出來）。end 不含當天之後。"""
     return on_date - timedelta(days=lookback_days), on_date + timedelta(days=1)
 
 

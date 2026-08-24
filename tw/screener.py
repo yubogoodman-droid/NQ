@@ -1,4 +1,4 @@
-"""掃描成交額前 N 名，找出一分 K 多頭排列且連續兩根站穩 MA200 的標的。"""
+"""掃描成交額前 N 名，找出一分 K 多頭排列且連續兩根站穩 MA240 的標的。"""
 
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ from tw.ranking import (
 )
 from tw.signals import (
     AlertSnapshot,
-    close_above_ma200,
-    latest_ma200_breakout_bullish,
-    ma20_near_ma200,
+    close_above_ma240,
+    latest_ma240_breakout_bullish,
+    ma20_near_ma240,
     mas_are_open,
 )
 
@@ -42,8 +42,8 @@ class ScanConfig:
     exclude_financial: bool = True
     on_date: date | None = None
     min_ma_span: float = 0.004
-    min_ma20_ma200_gap: float = 0.004
-    max_ma20_ma200_gap: float = 0.010
+    min_ma20_ma240_gap: float = 0.004
+    max_ma20_ma240_gap: float = 0.010
     kline_start: date | None = None
     kline_end: date | None = None
     reuse_universe: list[RankedStock] | None = None
@@ -149,8 +149,8 @@ def run_scan(
         if df is None or df.empty:
             skipped.append((stock, "無一分 K 資料"))
             continue
-        if len(df) < 201:
-            skipped.append((stock, f"一分 K 不足 201 根（{len(df)}）"))
+        if len(df) < 241:
+            skipped.append((stock, f"一分 K 不足 241 根（{len(df)}）"))
             continue
         since = None
         until = None
@@ -160,14 +160,14 @@ def run_scan(
         elif not cfg.latest_only:
             now = datetime.now(TAIPEI)
             since = pd.Timestamp(now.date(), tz=TAIPEI)
-        snapshot = latest_ma200_breakout_bullish(
+        snapshot = latest_ma240_breakout_bullish(
             df,
             since=since,
             until=until,
             latest_only=cfg.latest_only,
             min_ma_span=cfg.min_ma_span,
-            min_ma20_ma200_gap=cfg.min_ma20_ma200_gap,
-            max_ma20_ma200_gap=cfg.max_ma20_ma200_gap,
+            min_ma20_ma240_gap=cfg.min_ma20_ma240_gap,
+            max_ma20_ma240_gap=cfg.max_ma20_ma240_gap,
         )
         if snapshot is None:
             continue
@@ -175,12 +175,12 @@ def run_scan(
             skipped.append((stock, "均線糾結"))
             tangled_dropped += 1
             continue
-        if not ma20_near_ma200(
+        if not ma20_near_ma240(
             snapshot,
-            max_gap=cfg.max_ma20_ma200_gap,
-            min_gap=cfg.min_ma20_ma200_gap,
+            max_gap=cfg.max_ma20_ma240_gap,
+            min_gap=cfg.min_ma20_ma240_gap,
         ):
-            skipped.append((stock, "MA20/MA200 距離不對"))
+            skipped.append((stock, "MA20/MA240 距離不對"))
             far_ma_dropped += 1
             continue
         hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=len(df), frame=df))
@@ -205,7 +205,7 @@ def run_scan(
             below_5m_dropped = len(hits)
             hits = []
         else:
-            hits, dropped_5m, skip_5m = apply_5m_ma200_filter(hits)
+            hits, dropped_5m, skip_5m = apply_5m_ma240_filter(hits)
             skipped.extend(skip_5m)
             below_5m_dropped = dropped_5m
 
@@ -229,10 +229,10 @@ def run_scan(
     )
 
 
-def apply_5m_ma200_filter(
+def apply_5m_ma240_filter(
     hits: list[ScanHit],
 ) -> tuple[list[ScanHit], int, list[tuple[RankedStock, str]]]:
-    """一分站穩當下的五分K收盤必須高於五分 MA200。"""
+    """一分站穩當下的五分K收盤必須高於五分 MA240。"""
     kept: list[ScanHit] = []
     skipped: list[tuple[RankedStock, str]] = []
     for hit in hits:
@@ -240,8 +240,8 @@ def apply_5m_ma200_filter(
         if frame is None or frame.empty:
             skipped.append((hit.stock, "無五分 K 資料"))
             continue
-        if not close_above_ma200(frame, hit.snapshot.timestamp, floor="5min"):
-            skipped.append((hit.stock, "五分K收盤在 MA200 底下"))
+        if not close_above_ma240(frame, hit.snapshot.timestamp, floor="5min"):
+            skipped.append((hit.stock, "五分K收盤在 MA240 底下"))
             continue
         kept.append(hit)
     return kept, len(skipped), skipped

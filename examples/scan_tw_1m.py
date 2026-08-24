@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""台股一分 K：MA5/10/20 多頭排列，連續兩根收盤站穩 MA200 再通知。"""
+"""台股一分 K：MA5/10/20 多頭排列，連續兩根收盤站穩 MA240 再通知。"""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="台股一分K多頭排列＋站穩MA200掃描")
+    p = argparse.ArgumentParser(description="台股一分K多頭排列＋站穩MA240掃描")
     p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--watch", action="store_true", help="盤中每分鐘重掃，同一根 K 不重複通知")
@@ -105,8 +105,8 @@ def print_result(result, *, quiet_empty: bool) -> None:
         f"成交額前 {len(result.universe)}／股價濾掉 {result.price_dropped}／"
         f"ETF濾掉 {result.etf_dropped}／金融濾掉 {result.financial_dropped}／掃描 {len(result.candidates)}／"
         f"均線糾結濾掉 {result.tangled_dropped}／"
-        f"MA20/MA200不符 {result.far_ma_dropped}／"
-        f"五分MA200濾掉 {result.below_5m_dropped}／"
+        f"MA20/MA240不符 {result.far_ma_dropped}／"
+        f"五分MA240濾掉 {result.below_5m_dropped}／"
         f"命中 {len(result.hits)}／略過 {len(result.skipped)}／錯誤 {len(result.errors)}"
     )
     if result.as_of:
@@ -130,7 +130,7 @@ def print_result(result, *, quiet_empty: bool) -> None:
         print(
             f"  #{s.rank:3d} {s.name:8s} {s.symbol:10s} "
             f"{s.price:8.2f} {chg:>8s}  "
-            f"收 {snap.close:.2f} > MA200 {snap.ma200:.2f}  "
+            f"收 {snap.close:.2f} > MA240 {snap.ma240:.2f}  "
             f"前收 {snap.prev_close:.2f}  "
             f"MA {snap.ma5:.2f}/{snap.ma10:.2f}/{snap.ma20:.2f}  "
             f"{snap.timestamp.strftime('%H:%M')}"
