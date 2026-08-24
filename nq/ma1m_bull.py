@@ -35,13 +35,13 @@ def add_mas(d: dict) -> dict:
 
 
 def stack_ok(d: dict, i: int) -> bool:
-    """7>14>25>99>120，且收盤在 1m MA200 上。200 可以還壓在短均上面。"""
+    """截圖紅圈：收盤 > MA200 > 7 > 14 > 25 > 99 > 120。"""
     c, m7, m14, m25 = d["c"], d["m7"], d["m14"], d["m25"]
     m99, m120, m200 = d["m99"], d["m120"], d["m200"]
     vals = [c[i], m7[i], m14[i], m25[i], m99[i], m120[i], m200[i]]
     if np.isnan(vals).any():
         return False
-    return bool(c[i] > m7[i] > m14[i] > m25[i] > m99[i] > m120[i] and c[i] > m200[i])
+    return bool(c[i] > m200[i] > m7[i] > m14[i] > m25[i] > m99[i] > m120[i])
 
 
 def ma_widths(d: dict, i: int) -> tuple[float, float, float]:
@@ -63,7 +63,7 @@ def ribbon_ok(
     max_ribbon_pct: float | None = 0.65,
     max_short_pct: float | None = 0.50,
 ) -> bool:
-    """距離像截圖紅圈：短均黏帶，再跟 MA200 擠在一起。"""
+    """站上當下短均還沒扇開，仍跟 MA200 黏在一起。"""
     _ribbon, short, pack = ma_widths(d, i)
     if np.isnan(pack):
         return False
@@ -72,6 +72,28 @@ def ribbon_ok(
     if max_short_pct is not None and short > max_short_pct:
         return False
     return True
+
+
+def coil_ok(d: dict, i: int, *, lookback: int = 20, max_prior_short: float | None = 0.15) -> bool:
+    """站上前短均先黏成帶（紅圈左邊那段）。"""
+    if max_prior_short is None or lookback <= 0:
+        return True
+    prior: list[float] = []
+    for j in range(max(1, i - lookback), i):
+        _ribbon, short, _pack = ma_widths(d, j)
+        if not np.isnan(short):
+            prior.append(short)
+    return bool(prior) and min(prior) <= max_prior_short
+
+
+def vol_ok(d: dict, i: int, *, min_vol_ratio: float = 1.4) -> bool:
+    """紅圈那根放量。"""
+    if min_vol_ratio <= 0:
+        return True
+    v20 = d["v20"][i]
+    if not v20 or np.isnan(v20) or v20 <= 0:
+        return False
+    return bool(d["v"][i] / v20 >= min_vol_ratio)
 
 
 def bars_below_ma200(c, m200, i: int) -> int:
@@ -174,6 +196,29 @@ def signal_at(d: dict, i: int, *, require_stack: bool = True) -> BullSignal | No
     )
 
 
+def _bar_ok(
+    d: dict,
+    i: int,
+    *,
+    max_ribbon_pct: float | None,
+    max_short_pct: float | None,
+    max_prior_short: float | None,
+    min_vol_ratio: float,
+    min_below: int,
+) -> bool:
+    if not stack_ok(d, i):
+        return False
+    if not ribbon_ok(d, i, max_ribbon_pct=max_ribbon_pct, max_short_pct=max_short_pct):
+        return False
+    if not coil_ok(d, i, max_prior_short=max_prior_short):
+        return False
+    if not vol_ok(d, i, min_vol_ratio=min_vol_ratio):
+        return False
+    if min_below > 0 and bars_below_ma200(d["c"], d["m200"], i) < min_below:
+        return False
+    return True
+
+
 def detect_combo(
     d: dict,
     *,
@@ -181,21 +226,27 @@ def detect_combo(
     cross_only: bool = False,
     max_ribbon_pct: float | None = 0.65,
     max_short_pct: float | None = 0.50,
+    max_prior_short: float | None = 0.15,
+    min_vol_ratio: float = 1.4,
+    min_below: int = 20,
 ) -> list[BullSignal]:
-    """本根 收盤>MA7>14>25>99>120 且收盤>1m MA200。
+    """截圖紅圈：短均先黏帶，長期在 MA200 下，放量剛站上。
 
-    距離用短均距、短均+MA200 包距（截圖 23:35 那種）。cross_only：只留剛站上。
+    排列：收盤 > MA200 > 7 > 14 > 25 > 99 > 120。
     """
     c, m200 = d["c"], d["m200"]
+    kw = dict(
+        max_ribbon_pct=max_ribbon_pct,
+        max_short_pct=max_short_pct,
+        max_prior_short=max_prior_short,
+        min_vol_ratio=min_vol_ratio,
+        min_below=min_below,
+    )
     out: list[BullSignal] = []
     last_i = -10_000
     for i in range(1, len(c)):
-        now_ok = stack_ok(d, i) and ribbon_ok(
-            d, i, max_ribbon_pct=max_ribbon_pct, max_short_pct=max_short_pct
-        )
-        prev_ok = stack_ok(d, i - 1) and ribbon_ok(
-            d, i - 1, max_ribbon_pct=max_ribbon_pct, max_short_pct=max_short_pct
-        )
+        now_ok = _bar_ok(d, i, **kw)
+        prev_ok = _bar_ok(d, i - 1, **kw)
         if not now_ok or prev_ok:
             continue
         if cross_only:

@@ -302,8 +302,8 @@ def format_alert(row: SignalRow) -> str:
         f"<b>{row.symbol}</b>  一分K  {hm(row.time_ms)}\n"
         f"{kind} · {below}\n"
         f"現價 {row.sig.close:g}　進 {row.entry:g}\n"
-        f"1m MA7 {row.sig.m7:g} &gt; 14 {row.sig.m14:g} &gt; 25 {row.sig.m25:g} "
-        f"&gt; 99 {row.sig.m99:g} &gt; 120 {row.sig.m120:g}　1m MA200 {row.sig.ma200:g}\n"
+        f"1m MA200 {row.sig.ma200:g} &gt; 7 {row.sig.m7:g} &gt; 14 {row.sig.m14:g} "
+        f"&gt; 25 {row.sig.m25:g} &gt; 99 {row.sig.m99:g} &gt; 120 {row.sig.m120:g}\n"
         f"黏帶全距 {row.sig.ribbon_pct:.2f}%　短均距 {row.sig.short_pct:.2f}%　"
         f"偏離 1m MA200 {row.ext_pct:+.2f}%　量比 {row.vol_ratio:.2f}x"
     )
@@ -368,8 +368,9 @@ def write_html(
             f"<div class='card-pnl {cls}'>{escape(pnl_txt)}</div>"
             "</header>"
             f"<div class='px {cls}'>{row.sig.close:g} <span class='px-sub'>{escape(kind)} · ext {row.ext_pct:+.2f}%</span></div>"
-            f"<div class='tags'><span class='tag'>MA7&gt;14&gt;25&gt;99&gt;120</span>"
-            f"<span class='tag'>黏帶 {row.sig.ribbon_pct:.2f}%</span></div>"
+            f"<div class='tags'><span class='tag'>200&gt;7&gt;14&gt;25&gt;99&gt;120</span>"
+            f"<span class='tag'>黏帶 {row.sig.ribbon_pct:.2f}%</span>"
+            f"<span class='tag'>量 {row.vol_ratio:.1f}x</span></div>"
             "<pre class='trade-detail'>"
             f"close {row.sig.close:g}  entry {row.entry:g}\n"
             f"MA7 {row.sig.m7:g}  14 {row.sig.m14:g}  25 {row.sig.m25:g}  99 {row.sig.m99:g}  120 {row.sig.m120:g}  200 {row.sig.ma200:g}\n"
@@ -442,7 +443,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 <section class="summary">
 <h1>幣安一分K · 7&gt;14&gt;25&gt;99&gt;120 黏帶上站 MA200</h1>
 <p class="muted">{escape(date)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}）
-<br/>規則：<strong>排列</strong> MA7 &gt; MA14 &gt; MA25 &gt; MA99 &gt; MA120，本根收盤剛站上 1m MA200（截圖紅圈那種）。<strong>距離</strong>短均 ≤0.50%、短均+MA200 包距 ≤0.65%。進場用下一根開盤。
+<br/>規則（截圖紅圈）：短均先黏帶，長期在 MA200 下，<strong>放量剛站上</strong>。排列 收盤 &gt; MA200 &gt; 7 &gt; 14 &gt; 25 &gt; 99 &gt; 120。進場用下一根開盤。
 <br/>只掃幣安 <strong>USDT 股票合約</strong>（美股／韓股／港股／A 股／Pre-IPO），不含加密、黃金原油等商品。
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
@@ -480,6 +481,9 @@ def ribbon_kwargs(args: argparse.Namespace) -> dict:
     return {
         "max_ribbon_pct": None if args.max_ribbon <= 0 else args.max_ribbon,
         "max_short_pct": None if args.max_short <= 0 else args.max_short,
+        "max_prior_short": None if getattr(args, "max_prior_short", 0.15) <= 0 else args.max_prior_short,
+        "min_vol_ratio": float(getattr(args, "min_vol", 1.4)),
+        "min_below": int(getattr(args, "min_below", 20)),
     }
 
 
@@ -489,7 +493,8 @@ def run_backtest(args: argparse.Namespace) -> int:
     rkw = ribbon_kwargs(args)
     print(
         f"date={date} days={getattr(args, 'days', 1)} top={args.top or 'all'} min_gap={args.min_gap} "
-        f"cross_only={cross_only} pack≤{rkw['max_ribbon_pct']} short≤{rkw['max_short_pct']}",
+        f"cross_only={cross_only} pack≤{rkw['max_ribbon_pct']} short≤{rkw['max_short_pct']} "
+        f"prior≤{rkw['max_prior_short']} vol≥{rkw['min_vol_ratio']} below≥{rkw['min_below']}",
         flush=True,
     )
     uni = universe(top_n=args.top)
@@ -633,7 +638,7 @@ def run_alert(args: argparse.Namespace) -> int:
         else "全部 USDT 股票合約"
     )
     print(
-        f"監看 {pool} {len(uni)} 個。只掃股票合約。7>14>25>99>120 黏帶、剛站上 1m MA200 才推。",
+        f"監看 {pool} {len(uni)} 個。只掃股票合約。黏帶後放量剛站上 1m MA200 才推。",
         flush=True,
     )
     uni_ts = time.time()
@@ -697,6 +702,9 @@ def main(argv=None) -> int:
     b.add_argument("--all-stack", action="store_true", help="含已在 MA200 上才排好均線（會很多）")
     b.add_argument("--max-ribbon", type=float, default=0.65, help="短均+MA200 包距%上限；0=不限")
     b.add_argument("--max-short", type=float, default=0.50, help="MA7/14/25 全距%上限；0=不限")
+    b.add_argument("--max-prior-short", type=float, default=0.15, help="站上前 20 根短均最小距%上限；0=不限")
+    b.add_argument("--min-vol", type=float, default=1.4, help="量比下限；0=不限")
+    b.add_argument("--min-below", type=int, default=20, help="站上前至少連續幾根在 MA200 下")
     b.add_argument("--pages", action="store_true")
     b.add_argument("--html", default="")
     b.add_argument("--charts", type=int, default=0, help="圖表筆數；0=全部")
@@ -710,6 +718,9 @@ def main(argv=None) -> int:
     a.add_argument("--all-stack", action="store_true", help="含已在 MA200 上才排好均線（會很多）")
     a.add_argument("--max-ribbon", type=float, default=0.65, help="短均+MA200 包距%上限；0=不限")
     a.add_argument("--max-short", type=float, default=0.50, help="MA7/14/25 全距%上限；0=不限")
+    a.add_argument("--max-prior-short", type=float, default=0.15, help="站上前 20 根短均最小距%上限；0=不限")
+    a.add_argument("--min-vol", type=float, default=1.4, help="量比下限；0=不限")
+    a.add_argument("--min-below", type=int, default=20, help="站上前至少連續幾根在 MA200 下")
     a.set_defaults(func=run_alert)
 
     args = p.parse_args(argv)

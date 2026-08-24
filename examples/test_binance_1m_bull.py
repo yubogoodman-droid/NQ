@@ -22,7 +22,13 @@ from nq.ma1m_bull import (  # noqa: E402
     SignalRow,
 )
 
-LOOSE = dict(max_ribbon_pct=None, max_short_pct=None)
+LOOSE = dict(
+    max_ribbon_pct=None,
+    max_short_pct=None,
+    max_prior_short=None,
+    min_vol_ratio=0,
+    min_below=0,
+)
 
 
 def test_sma() -> None:
@@ -33,17 +39,17 @@ def test_sma() -> None:
     assert abs(out[4] - 4.0) < 1e-9
 
 
-def _make_stack_bars(n: int = 280) -> dict:
-    """Slow grind then a lift so short MAs stack above MA200."""
+def _make_stack_bars(n: int = 360) -> dict:
+    """先慢慢跌、再往上黏，讓收盤剛過 MA200 時仍是 200>7>14>25>99>120。"""
     close = np.zeros(n, dtype=float)
-    close[0] = 100.0
-    for i in range(1, 200):
-        close[i] = close[i - 1] + (0.02 if i % 3 else -0.01)
-    for i in range(200, n):
-        close[i] = close[i - 1] + 0.35
+    close[0] = 110.0
+    for i in range(1, 220):
+        close[i] = close[i - 1] - 0.05
+    for i in range(220, n):
+        close[i] = close[i - 1] + 0.015
     rng = np.random.default_rng(0)
-    high = close + 0.08
-    low = close - 0.08
+    high = close + 0.04
+    low = close - 0.04
     open_ = np.roll(close, 1)
     open_[0] = close[0]
     vol = rng.uniform(100, 200, n)
@@ -66,9 +72,8 @@ def test_detects_first_stack_above_ma200() -> None:
     assert first.idx >= 199
     assert stack_ok(d, first.idx)
     assert not stack_ok(d, first.idx - 1)
-    assert d["c"][first.idx] > d["m7"][first.idx] > d["m14"][first.idx] > d["m25"][first.idx]
-    assert d["m25"][first.idx] > d["m99"][first.idx] > d["m120"][first.idx]
-    assert d["c"][first.idx] > d["m200"][first.idx]
+    assert d["c"][first.idx] > d["m200"][first.idx] > d["m7"][first.idx] > d["m14"][first.idx]
+    assert d["m14"][first.idx] > d["m25"][first.idx] > d["m99"][first.idx] > d["m120"][first.idx]
 
 
 def test_no_repeat_while_stack_holds() -> None:
@@ -78,40 +83,34 @@ def test_no_repeat_while_stack_holds() -> None:
     assert len(sigs) == 1
 
 
+def _make_rearm_bars() -> dict:
+    """第一次站上後跌破，短均再黏、再剛過 MA200。"""
+    raw = _make_stack_bars(460)
+    for i in range(325, 333):
+        raw["c"][i] = raw["c"][i - 1] - 0.15
+    for i in range(333, 453):
+        raw["c"][i] = raw["c"][i - 1]
+    raw["c"][453] = raw["c"][452] + 0.8
+    for i in range(325, len(raw["c"])):
+        raw["h"][i] = raw["c"][i] + 0.04
+        raw["l"][i] = raw["c"][i] - 0.04
+        raw["o"][i] = raw["c"][i - 1]
+    return raw
+
+
 def test_rearms_after_break() -> None:
-    raw = _make_stack_bars(360)
-    # After the first stack, dump below MA200 then lift again.
-    for i in range(250, 280):
-        raw["c"][i] = raw["c"][249] - (i - 249) * 0.8
-        raw["h"][i] = raw["c"][i] + 0.08
-        raw["l"][i] = raw["c"][i] - 0.08
-        raw["o"][i] = raw["c"][i - 1]
-    for i in range(280, 360):
-        raw["c"][i] = raw["c"][i - 1] + 0.45
-        raw["h"][i] = raw["c"][i] + 0.08
-        raw["l"][i] = raw["c"][i] - 0.08
-        raw["o"][i] = raw["c"][i - 1]
-    d = add_mas(raw)
+    d = add_mas(_make_rearm_bars())
     sigs = detect_combo(d, **LOOSE)
     assert len(sigs) >= 2
     assert sigs[1].idx > sigs[0].idx + 10
+    assert stack_ok(d, sigs[1].idx)
+    assert d["m200"][sigs[1].idx] > d["m7"][sigs[1].idx]
 
 
 def test_min_gap() -> None:
-    raw = _make_stack_bars(360)
-    for i in range(250, 260):
-        raw["c"][i] = raw["c"][249] - (i - 249) * 0.9
-        raw["h"][i] = raw["c"][i] + 0.08
-        raw["l"][i] = raw["c"][i] - 0.08
-        raw["o"][i] = raw["c"][i - 1]
-    for i in range(260, 360):
-        raw["c"][i] = raw["c"][i - 1] + 0.5
-        raw["h"][i] = raw["c"][i] + 0.08
-        raw["l"][i] = raw["c"][i] - 0.08
-        raw["o"][i] = raw["c"][i - 1]
-    d = add_mas(raw)
+    d = add_mas(_make_rearm_bars())
     all_sigs = detect_combo(d, min_gap_bars=0, **LOOSE)
-    gapped = detect_combo(d, min_gap_bars=80, **LOOSE)
+    gapped = detect_combo(d, min_gap_bars=200, **LOOSE)
     assert len(all_sigs) >= 2
     assert len(gapped) == 1
 
@@ -130,17 +129,7 @@ def test_forward_and_summarize() -> None:
 
 
 def test_cross_only_keeps_ma200_reclaim() -> None:
-    raw = _make_stack_bars(300)
-    raw["c"][:220] = 100.0
-    raw["o"][:220] = 100.0
-    raw["h"][:220] = 100.08
-    raw["l"][:220] = 99.92
-    for i in range(220, 300):
-        raw["c"][i] = raw["c"][i - 1] + 0.40
-        raw["h"][i] = raw["c"][i] + 0.08
-        raw["l"][i] = raw["c"][i] - 0.08
-        raw["o"][i] = raw["c"][i - 1]
-    d = add_mas(raw)
+    d = add_mas(_make_stack_bars())
     all_sigs = detect_combo(d, cross_only=False, **LOOSE)
     crosses = detect_combo(d, cross_only=True, **LOOSE)
     assert len(crosses) >= 1
@@ -194,18 +183,34 @@ def test_screenshot_circle_stack_and_width() -> None:
         "m200": np.array([1471.07, 1470.89, 1470.89]),
     }
     assert stack_ok(d, 1)
+    assert d["m200"][1] > d["m7"][1]
     _ribbon, short, pack = ma_widths(d, 1)
     assert 0.40 < short < 0.45
     assert 0.60 < pack < 0.63
     assert ribbon_ok(d, 1)
 
 
-def test_tight_ribbon_rejects_fanned_stack() -> None:
+def test_ribbon_ok_rejects_fanned_shorts() -> None:
+    d = {
+        "c": np.array([101.0] * 3),
+        "m7": np.array([100.0] * 3),
+        "m14": np.array([99.2] * 3),
+        "m25": np.array([98.5] * 3),
+        "m99": np.array([97.8] * 3),
+        "m120": np.array([97.2] * 3),
+        "m200": np.array([100.4] * 3),
+    }
+    assert stack_ok(d, 1)
+    _ribbon, short, pack = ma_widths(d, 1)
+    assert short > 0.50
+    assert pack > 0.65
+    assert not ribbon_ok(d, 1)
+
+
+def test_default_circled_filters_need_volume() -> None:
     d = add_mas(_make_stack_bars())
-    loose = detect_combo(d, **LOOSE)
-    assert len(loose) >= 1
-    _ribbon, short, pack = ma_widths(d, loose[0].idx)
-    assert pack > 0.65 or short > 0.50
+    assert detect_combo(d, **LOOSE)
+    # 合成量沒放量，紅圈預設 vol≥1.4 不該過
     assert detect_combo(d) == []
 
 
@@ -281,7 +286,8 @@ def main() -> int:
     test_below_ma200_is_not_a_signal()
     test_stack_allows_ma200_still_above_shorts()
     test_screenshot_circle_stack_and_width()
-    test_tight_ribbon_rejects_fanned_stack()
+    test_ribbon_ok_rejects_fanned_shorts()
+    test_default_circled_filters_need_volume()
     test_default_date_uses_yesterday_before_2am()
     test_is_usdt_stock_perp()
     test_write_view_html_uses_pages_urls()
