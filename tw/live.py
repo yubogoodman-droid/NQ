@@ -177,24 +177,8 @@ def format_telegram(name: str, symbol: str, snap: AlertSnapshot, tf: str) -> str
         f"{html.escape(name)} {html.escape(symbol)}",
         f"時間 {ts}",
         f"收盤 {snap.close:.2f} &gt; MA200 {snap.ma200:.2f}",
-        f"發散 MA5/MA20 +{snap.ribbon_fan_pct:.2f}%",
         f"短均 {snap.ma5:.2f} / {snap.ma10:.2f} / {snap.ma20:.2f}",
     ]
-    if tf == "15m" and snap.hourly_close_above_short_mas:
-        lines.append(
-            f"小時K {snap.h1_close:.2f} &gt; {snap.h1_ma5:.2f} / {snap.h1_ma10:.2f} / {snap.h1_ma20:.2f}"
-        )
-    elif snap.h1_close is not None and snap.h1_ma20 is not None:
-        lines.append(f"小時K {snap.h1_close:.2f} &gt; MA20 {snap.h1_ma20:.2f}")
-    if (
-        tf != "15m"
-        and snap.m15_close is not None
-        and snap.m15_ma200 is not None
-        and snap.m15_above_ma200_minutes is not None
-    ):
-        lines.append(
-            f"十五分 {snap.m15_close:.2f} &gt; MA200 {snap.m15_ma200:.2f}　已在上 {snap.m15_above_ma200_minutes} 分"
-        )
     lines.append(url)
     return "\n".join(lines)
 

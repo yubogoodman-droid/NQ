@@ -41,14 +41,14 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 ## 台股五分 K 回測
 
-成交額前 100、濾掉 ETF／金融股／電信股／股價 500 以上。五分 K **MA5 > MA10 > MA20 且均線發散**（不要糾結），當根收盤剛站上五分 **MA200**（**開盤第一根跳空也算**），收盤高於所有均線，也在十五分 **MA5／10／20** 之上，**十五分K已在 MA200 上至少半小時**（開盤第一根不要求滿半小時），**小時K收在 MA20 之上**，記一則通知。
+成交額前 100、濾掉 ETF／金融股／電信股／股價 500 以上。五分 K **MA5 > MA10 > MA20 且往上**，當根收盤剛站上五分 **MA200**（開盤第一根跳空也算），收盤高於 MA5／10／20／200，記一則通知。
 
 ```bash
 python3 examples/backtest_tw_5m.py --days 10
 python3 examples/backtest_tw_15m.py --days 10
 ```
 
-報告：`docs/tw/backtest-5m-15m-1h.html`（五分K）、`docs/tw/backtest-15m-1h.html`（十五分K；同一套發散＋剛站上 MA200，小時K要在 MA5／10／20 之上）
+報告：`docs/tw/backtest-5m-15m-1h.html`（五分K）、`docs/tw/backtest-15m-1h.html`（十五分K；同一套多頭排列＋剛站上 MA200）
 
 ## 永豐盤中監控 → Telegram
 

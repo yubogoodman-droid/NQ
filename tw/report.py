@@ -112,9 +112,9 @@ def _lead_block(result: BacktestResult) -> str:
     <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
-      十五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
+      十五分K <strong>MA5 &gt; MA10 &gt; MA20 且往上</strong>，
       <strong>當根收盤剛站上十五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200，<strong>小時K也要在 MA5／10／20 之上</strong>。
+      且這根收盤必須高於 MA5／10／20／200。
       開盤第一根十五分跳空站上也算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
@@ -124,11 +124,9 @@ def _lead_block(result: BacktestResult) -> str:
     <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
     <p class="lead">
       同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
-      五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
+      五分K <strong>MA5 &gt; MA10 &gt; MA20 且往上</strong>，
       <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
-      且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
-      且<strong>十五分K已在 MA200 上至少半小時</strong>（開盤第一根跳空站上時，當根還沒走滿半小時就不要求），
-      且小時K收盤也要在小時 MA20 之上。開盤第一根跳空站上也算。
+      且這根收盤必須高於 MA5／10／20／200。開盤第一根跳空站上也算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
       K 棒漲紅跌綠。
@@ -142,21 +140,17 @@ def _chips_html(result: BacktestResult) -> str:
       <span class="chip">不含電信股</span>
       <span class="chip">成交額前 100</span>
       <span class="chip">股價 &lt; 500</span>
-      <span class="chip">MA5 &gt; 10 &gt; 20 發散</span>
+      <span class="chip">MA5 &gt; 10 &gt; 20 往上</span>
       <span class="chip">當根收盤站上 MA200</span>
       <span class="chip">收盤 &gt; 所有均線</span>"""
     if result.signal_tf == "15m":
         return f"""
       <span class="chip">十五分K</span>{common}
-      <span class="chip">小時K &gt; MA5／10／20</span>
       <span class="chip">五分K對照</span>
       <span class="chip">小時K對照</span>
       <span class="chip">日K對照</span>"""
     return f"""
       <span class="chip">五分K</span>{common}
-      <span class="chip">收盤 &gt; 十五分 MA5／10／20</span>
-      <span class="chip">十五分K在 MA200 上 ≥ 半小時</span>
-      <span class="chip">小時K &gt; MA20</span>
       <span class="chip">十五分K對照</span>
       <span class="chip">小時K對照</span>
       <span class="chip">日K對照</span>"""

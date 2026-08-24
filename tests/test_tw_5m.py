@@ -75,26 +75,15 @@ def _history_then_live(live_closes: list[float], live_day: date = date(2026, 8, 
 
 
 class FiveMinSignalTests(unittest.TestCase):
-    def test_alerts_on_cross_while_ribbon_is_fanned(self) -> None:
+    def test_alerts_on_cross_with_bullish_mas(self) -> None:
         df = _history_then_live([99.0, 105.0])
         hits = iter_5m_ma200_alerts(df)
         self.assertEqual(len(hits), 1)
         hit = hits[0]
         self.assertTrue(hit.bullish_aligned)
-        self.assertTrue(hit.ribbon_fanned)
+        self.assertTrue(hit.mas_rising)
         self.assertTrue(hit.crossed_above_ma200)
         self.assertTrue(hit.close_above_all_mas)
-        self.assertTrue(hit.hourly_close_above_ma20)
-        self.assertTrue(hit.close_above_15m_mas)
-        self.assertIsNotNone(hit.h1_close)
-        self.assertGreater(hit.h1_close, hit.h1_ma20)
-        self.assertGreater(hit.m15_close, hit.m15_ma5)
-        self.assertGreater(hit.m15_close, hit.m15_ma10)
-        self.assertGreater(hit.m15_close, hit.m15_ma20)
-        self.assertGreater(hit.m15_close, hit.m15_ma200)
-        self.assertGreaterEqual(hit.m15_above_ma200_minutes, 30)
-        self.assertTrue(hit.fifteen_above_ma200_half_hour)
-        self.assertGreaterEqual(hit.ribbon_fan_pct, 0.50)
         self.assertGreater(hit.close, hit.ma5)
         self.assertGreater(hit.close, hit.ma200)
         self.assertLessEqual(hit.prev_close, hit.prev_ma200)
@@ -133,44 +122,6 @@ class FiveMinSignalTests(unittest.TestCase):
             [90.0] * 10 + [111.0],
             _session_index([date(2026, 8, 21)])[:11],
         )
-        hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
-        self.assertEqual(hits, [])
-
-    def test_rejects_tangled_ribbon(self) -> None:
-        df = _history_then_live([100.0, 100.4, 100.8, 101.2])
-        hits = iter_5m_ma200_alerts(df)
-        self.assertEqual(hits, [])
-
-    def test_rejects_when_hourly_close_below_ma20(self) -> None:
-        hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
-        idx = _session_index(hist_days)
-        closes = [200.0] * 24 + [100.0] * (len(idx) - 24)
-        hist = _ohlcv(closes, idx)
-        live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
-        hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
-        self.assertEqual(hits, [])
-
-    def test_rejects_when_15m_just_crossed_ma200(self) -> None:
-        hist_days = _weekdays_before(date(2026, 8, 20), 14)
-        idx = _session_index(hist_days)
-        closes = [100.0] * len(idx)
-        # 最近兩根十五分K壓回 MA200 下，當根才剛站上，未滿半小時。
-        for i in range(len(closes) - 6, len(closes)):
-            closes[i] = 90.0
-        hist = _ohlcv(closes, idx)
-        live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
-        hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
-        self.assertEqual(hits, [])
-
-    def test_rejects_when_close_below_15m_mas(self) -> None:
-        hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
-        idx = _session_index(hist_days)
-        closes = [100.0] * len(idx)
-        # 一根還在最近 20 根十五分K裡的高K，把十五分 MA20 抬高，但不破壞五分剛站上。
-        for i in range(159, 162):
-            closes[i] = 400.0
-        hist = _ohlcv(closes, idx)
-        live = _ohlcv([99.0, 105.0], _session_index([date(2026, 8, 21)])[:2])
         hits = iter_5m_ma200_alerts(pd.concat([hist, live]))
         self.assertEqual(hits, [])
 
@@ -245,22 +196,17 @@ class ReportTests(unittest.TestCase):
                 self.assertGreater(im.height, 1400)
         self.assertIn("南亞科", text)
         self.assertIn("十五分K", text)
-        self.assertIn("十五分K / MA5 10 20", text)
-        self.assertIn("十五分K / MA200", text)
-        self.assertIn("已在上", text)
-        self.assertIn("半小時", text)
-        self.assertIn("小時K", text)
         self.assertIn("日K", text)
         self.assertIn("日K / MA5 10 20 60 200", text)
         self.assertIn("最下＝日K", text)
         self.assertIn("上＝五分K", text)
-        self.assertIn("均線發散", text)
         self.assertIn("成交額前 100", text)
         self.assertIn("股價 &lt; 500", text)
         self.assertIn("一小時後", text)
         self.assertIn("進場後一小時勝率", text)
         self.assertIn("個交易日共通知", text)
         self.assertNotIn("小時 MA20 不下彎", text)
+        self.assertNotIn("十五分K已在 MA200 上至少半小時", text)
         self.assertEqual(text.count("<img "), 1)
         self.assertEqual(weekday_zh(date(2026, 8, 21)), "週五")
 
@@ -321,7 +267,6 @@ class FifteenMinSignalTests(unittest.TestCase):
         self.assertTrue(hit.ribbon_fanned)
         self.assertTrue(hit.crossed_above_ma200)
         self.assertTrue(hit.close_above_all_mas)
-        self.assertTrue(hit.hourly_close_above_short_mas)
         self.assertGreater(hit.close, hit.ma200)
         self.assertLessEqual(hit.prev_close, hit.prev_ma200)
         self.assertEqual(hit.timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 25, tzinfo=TAIPEI)))
@@ -336,12 +281,6 @@ class FifteenMinSignalTests(unittest.TestCase):
         hits = iter_15m_ma200_alerts(df)
         self.assertEqual(len(hits), 1)
         self.assertEqual(hits[0].timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 10, tzinfo=TAIPEI)))
-
-    def test_rejects_when_hourly_close_below_short_mas(self) -> None:
-        df = _history_then_live([99.0, 99.0, 99.0, 105.0, 105.0, 105.0])
-        with patch("tw.signals.hourly_close_and_mas", return_value=(100.0, 101.0, 101.0, 101.0)):
-            hits = iter_15m_ma200_alerts(df)
-        self.assertEqual(hits, [])
 
 
 class FifteenMinReportTests(unittest.TestCase):
@@ -381,9 +320,9 @@ class FifteenMinReportTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
         self.assertIn("台股十五分K回測", text)
         self.assertIn("十五分站上時間", text)
-        self.assertIn("小時K / MA5 10 20", text)
         self.assertIn("當根收盤剛站上十五分 MA200", text)
         self.assertNotIn("十五分K已在 MA200 上至少半小時", text)
+        self.assertNotIn("小時K也要在 MA5／10／20 之上", text)
 
 
 class ResampleTests(unittest.TestCase):

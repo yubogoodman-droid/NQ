@@ -1,4 +1,4 @@
-"""五分 K：MA5/10/20 多頭發散，當根收盤站上所有均線（含 MA200），也在十五分 MA5/10/20 之上，十五分已在 MA200 上至少半小時（開盤第一根跳空除外），且小時K在 MA20 之上。"""
+"""五分 K：MA5 > MA10 > MA20 且往上，當根收盤剛站上五分 MA200，收盤高於 MA5／10／20／200。"""
 
 from __future__ import annotations
 
@@ -76,14 +76,8 @@ class AlertSnapshot:
 
     @property
     def ribbon_fanned(self) -> bool:
-        """多頭排列且均線發散：三條往上打開，不是黏在一起。"""
-        return (
-            self.bullish_aligned
-            and self.mas_rising
-            and self.ribbon_fan_pct >= MIN_RIBBON_FAN_PCT
-            and self.gap_5_10_pct >= MIN_RIBBON_GAP_PCT
-            and self.gap_10_20_pct >= MIN_RIBBON_GAP_PCT
-        )
+        """多頭排列：MA5 > MA10 > MA20，且三條都比前一根高。"""
+        return self.bullish_aligned and self.mas_rising
 
     @property
     def crossed_above_ma200(self) -> bool:
@@ -234,7 +228,7 @@ def iter_5m_ma200_alerts(
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
 ) -> list[AlertSnapshot]:
-    """同一交易日連續五分 K：短均發散、剛站上五分 MA200（含開盤第一根跳空），當根也在十五分短均上，十五分已在 MA200 上至少半小時（開盤第一根除外），小時K收在 MA20 之上。"""
+    """同一交易日連續五分 K：MA5 > MA10 > MA20 且往上，剛站上五分 MA200（含開盤第一根），收盤高於 MA5／10／20／200。"""
     if df is None or len(df) < MA_LONG + 1:
         return []
     work = add_moving_averages(df)
@@ -256,40 +250,9 @@ def iter_5m_ma200_alerts(
         snap = _snapshot_at(work, i)
         if snap is None:
             continue
-        prev_ts = work.index[i - 1]
-        first_of_day = pd.Timestamp(ts).date() != pd.Timestamp(prev_ts).date()
         if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
             continue
-        window = work.iloc[: i + 1]
-        m15 = fifteen_close_and_mas(window)
-        if m15 is None:
-            continue
-        if m15.close <= m15.ma5 or m15.close <= m15.ma10 or m15.close <= m15.ma20:
-            continue
-        if m15.close <= m15.ma200:
-            continue
-        # 開盤第一根跳空站上算訊號；當根還沒走滿半小時，不要求十五分已在 MA200 上 30 分。
-        if not first_of_day and m15.above_ma200_minutes < M15_ABOVE_MA200_MINUTES:
-            continue
-        hourly = hourly_close_and_ma20(window)
-        if hourly is None:
-            continue
-        h1_close, h1_ma20 = hourly
-        if h1_close <= h1_ma20:
-            continue
-        hits.append(
-            replace(
-                snap,
-                h1_close=h1_close,
-                h1_ma20=h1_ma20,
-                m15_close=m15.close,
-                m15_ma5=m15.ma5,
-                m15_ma10=m15.ma10,
-                m15_ma20=m15.ma20,
-                m15_ma200=m15.ma200,
-                m15_above_ma200_minutes=m15.above_ma200_minutes,
-            )
-        )
+        hits.append(snap)
     return hits
 
 
@@ -299,7 +262,7 @@ def iter_15m_ma200_alerts(
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
 ) -> list[AlertSnapshot]:
-    """同一交易日連續十五分 K：短均發散、剛站上十五分 MA200（含開盤第一根跳空），且小時K收在 MA5／10／20 之上。"""
+    """同一交易日連續十五分 K：MA5 > MA10 > MA20 且往上，剛站上十五分 MA200（含開盤第一根），收盤高於 MA5／10／20／200。"""
     if df is None or df.empty or "close" not in df.columns:
         return []
     m15 = resample_ohlcv(df, "15min")
@@ -330,23 +293,8 @@ def iter_15m_ma200_alerts(
         five_window = df[df.index < bar_end]
         if five_window.empty:
             continue
-        hourly = hourly_close_and_mas(five_window)
-        if hourly is None:
-            continue
-        h1_close, h1_ma5, h1_ma10, h1_ma20 = hourly
-        if h1_close <= h1_ma5 or h1_close <= h1_ma10 or h1_close <= h1_ma20:
-            continue
         signal_ts = pd.Timestamp(five_window.index[-1])
-        hits.append(
-            replace(
-                snap,
-                timestamp=signal_ts,
-                h1_close=h1_close,
-                h1_ma5=h1_ma5,
-                h1_ma10=h1_ma10,
-                h1_ma20=h1_ma20,
-            )
-        )
+        hits.append(replace(snap, timestamp=signal_ts))
     return hits
 
 

@@ -82,7 +82,7 @@ class LiveHelperTests(unittest.TestCase):
         self.assertIn("五分K 剛站上 MA200", text)
         self.assertIn("創見", text)
         self.assertIn("2451.TW", text)
-        self.assertIn("十五分", text)
+        self.assertNotIn("十五分", text)
 
     def test_alerts_on_closed_bar_only_that_five(self) -> None:
         df = _history_then_live([99.0, 105.0])
