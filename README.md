@@ -38,7 +38,7 @@ python3 examples/nq_coil_breakout.py backtest --period 10d --pages
 python3 examples/nq_coil_breakout.py alert --dry-run --once
 ```
 
-近 10 天 Yahoo 1m（2026-08-14 → 08-24）：**27 筆、勝率 48.1%、約 −21 點**。
+近 10 天 Yahoo 1m（2026-08-14 → 08-24）：**27 筆、勝率 48.1%、約 −16 點**。
 其中包含你那張圖的 **08-24 07:35** 起漲（29247，盤整 29172–29203，量能 7.8x）。
 漏斗：盤整箱 2764 → 等待突破 3230 → 放量進場 27。
 
