@@ -1,0 +1,372 @@
+"""NQ 五分 K 破底翻：反彈收復 MA20 後，回踩 MA20 做多。"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Sequence, Tuple
+
+import numpy as np
+import pandas as pd
+
+
+@dataclass
+class Signal:
+    break_idx: int
+    trough_idx: int
+    reclaim_idx: int
+    entry_idx: int
+    entry_price: float
+    stop_price: float
+    target_price: float
+    break_low: float
+    support: float
+    ma5: float
+    ma10: float
+    ma20: float
+    ma60: float
+    quality: str = "C"
+    quality_score: int = 0
+
+
+@dataclass
+class TradeResult:
+    signal: Signal
+    entry_idx: int
+    exit_idx: int
+    entry_price: float
+    exit_price: float
+    stop_price: float
+    target_price: float
+    pnl_points: float
+    exit_reason: str
+    quality: str
+
+
+def sma(arr, n: int) -> np.ndarray:
+    s = pd.Series(arr, dtype=float)
+    return s.rolling(n, min_periods=n).mean().to_numpy(float)
+
+
+def rolling_min_prev(arr, n: int) -> np.ndarray:
+    s = pd.Series(arr, dtype=float)
+    return s.shift(1).rolling(n, min_periods=n).min().to_numpy(float)
+
+
+def quality_at_entry(ma5: float, ma10: float, ma20: float, ma20_slope: float) -> Tuple[int, str]:
+    """A：MA20 上彎且短均多頭；B：收在 MA20 之上且 MA5>MA20；C：其餘。"""
+    score = 0
+    if ma20_slope > 0:
+        score += 1
+    if ma5 > ma10:
+        score += 1
+    if ma5 > ma20:
+        score += 1
+    if score >= 2:
+        return score, "A"
+    if score == 1:
+        return score, "B"
+    return score, "C"
+
+
+def summarize_trades(trades: Sequence) -> dict:
+    pnls = [float(getattr(t, "pnl_points", 0.0)) for t in trades]
+    n = len(pnls)
+    wins = sum(1 for p in pnls if p > 0)
+    by_q: Dict[str, List[float]] = {}
+    for t in trades:
+        by_q.setdefault(getattr(t, "quality", "?"), []).append(float(getattr(t, "pnl_points", 0.0)))
+    return {
+        "count": n,
+        "wins": wins,
+        "win_rate": 100.0 * wins / n if n else 0.0,
+        "total_points": float(sum(pnls)),
+        "pnl": float(sum(pnls)),
+        "n": n,
+        "by_quality": {
+            q: {
+                "n": len(v),
+                "wins": sum(1 for p in v if p > 0),
+                "pnl": float(sum(v)),
+            }
+            for q, v in sorted(by_q.items())
+        },
+    }
+
+
+def _in_session(ts, session: str) -> bool:
+    if session == "all":
+        return True
+    h, m = ts.hour, ts.minute
+    minutes = h * 60 + m
+    if session == "rth":
+        return (9 * 60 + 30) <= minutes <= (15 * 60 + 45)
+    if session == "day":
+        return (8 * 60) <= minutes <= (16 * 60)
+    return True
+
+
+def detect_signals(
+    df: pd.DataFrame,
+    *,
+    lookback: int = 24,
+    min_break_depth: float = 25.0,
+    reclaim_window: int = 24,
+    retest_window: int = 18,
+    leave_bars: int = 3,
+    leave_buffer: float = 10.0,
+    touch_above: float = 8.0,
+    max_pierce: float = 12.0,
+    fail_below: float = 8.0,
+    stop_buffer: float = 10.0,
+    target_r: float = 1.5,
+    max_risk: float = 180.0,
+    min_risk: float = 20.0,
+    min_entry_gap: int = 12,
+    session: str = "rth",
+    ma20_len: int = 20,
+    ma20_slope_bars: int = 4,
+    funnel: Optional[Dict[str, int]] = None,
+) -> List[Signal]:
+    """
+    破底 → 反彈收復 MA20 → 先離開均線 → 回踩 MA20 進場。
+
+    對齊 2026-08-24 藍圈：09:50 低點 28946.75，10:35 收復，11:00–11:20 回踩。
+    """
+    close = df["Close"].to_numpy(float)
+    high = df["High"].to_numpy(float)
+    low = df["Low"].to_numpy(float)
+
+    ma5 = sma(close, 5)
+    ma10 = sma(close, 10)
+    ma20 = sma(close, ma20_len)
+    ma60 = sma(close, 60)
+    floor = rolling_min_prev(low, lookback)
+
+    n = len(close)
+    warmup = max(lookback, 60, ma20_len)
+    signals: List[Signal] = []
+    last_entry = -(10**9)
+    i = warmup
+    fun = funnel if funnel is not None else {}
+
+    def bump(key: str) -> None:
+        fun[key] = fun.get(key, 0) + 1
+
+    while i < n - 1:
+        if np.isnan(floor[i]) or np.isnan(ma20[i]):
+            i += 1
+            continue
+        if low[i] >= float(floor[i]):
+            i += 1
+            continue
+
+        support = float(floor[i])
+        break_low = float(low[i])
+        depth = support - break_low
+        bump("break")
+        if depth < min_break_depth:
+            bump("shallow")
+            i += 1
+            continue
+        bump("deep_break")
+
+        break_idx = i
+        trough_idx = i
+        end_scan = min(n - 1, break_idx + reclaim_window)
+        reclaim_idx: Optional[int] = None
+        k = break_idx + 1
+        while k <= end_scan:
+            if low[k] < break_low:
+                break_low = float(low[k])
+                trough_idx = k
+                end_scan = min(n - 1, k + reclaim_window)
+            if (
+                not np.isnan(ma20[k])
+                and close[k] > float(ma20[k])
+                and break_low < float(ma20[k])
+            ):
+                reclaim_idx = k
+                bump("reclaim")
+                break
+            k += 1
+
+        if reclaim_idx is None:
+            bump("no_reclaim")
+            i = trough_idx + 1
+            continue
+
+        retest_end = min(n - 1, reclaim_idx + retest_window)
+        left_run = 0
+        left_ok = False
+        entry_idx: Optional[int] = None
+        dead = False
+        for t in range(reclaim_idx + 1, retest_end + 1):
+            if np.isnan(ma20[t]):
+                continue
+            m20 = float(ma20[t])
+            if low[t] < break_low:
+                bump("new_low")
+                dead = True
+                break
+            if close[t] < m20 - fail_below:
+                bump("fail_hold")
+                dead = True
+                break
+
+            if float(low[t]) > m20 + leave_buffer:
+                left_run += 1
+                if left_run >= leave_bars:
+                    left_ok = True
+            else:
+                left_run = 0
+
+            if not left_ok:
+                continue
+
+            pierce = m20 - float(low[t])
+            if pierce < -touch_above or pierce > max_pierce:
+                continue
+            if close[t] < m20:
+                continue
+            entry_idx = t
+            bump("retest")
+            break
+
+        if dead or entry_idx is None:
+            if entry_idx is None and not dead:
+                bump("no_retest")
+            i = (reclaim_idx if reclaim_idx is not None else trough_idx) + 1
+            continue
+
+        ts = df.index[entry_idx]
+        if not _in_session(ts, session):
+            bump("skip_session")
+            i = entry_idx + 1
+            continue
+        if entry_idx - last_entry < min_entry_gap:
+            bump("skip_gap")
+            i = entry_idx + 1
+            continue
+
+        entry = float(close[entry_idx])
+        stop = break_low - stop_buffer
+        risk = entry - stop
+        if risk < min_risk:
+            bump("skip_tiny_risk")
+            i = entry_idx + 1
+            continue
+        if max_risk > 0 and risk > max_risk:
+            bump("skip_max_risk")
+            i = entry_idx + 1
+            continue
+
+        slope = 0.0
+        if entry_idx >= ma20_slope_bars and not np.isnan(ma20[entry_idx - ma20_slope_bars]):
+            slope = float(ma20[entry_idx] - ma20[entry_idx - ma20_slope_bars])
+        q_score, q_grade = quality_at_entry(
+            float(ma5[entry_idx]),
+            float(ma10[entry_idx]),
+            float(ma20[entry_idx]),
+            slope,
+        )
+        bump("taken")
+        signals.append(
+            Signal(
+                break_idx=break_idx,
+                trough_idx=trough_idx,
+                reclaim_idx=reclaim_idx,
+                entry_idx=entry_idx,
+                entry_price=entry,
+                stop_price=stop,
+                target_price=entry + risk * target_r,
+                break_low=break_low,
+                support=support,
+                ma5=float(ma5[entry_idx]),
+                ma10=float(ma10[entry_idx]),
+                ma20=float(ma20[entry_idx]),
+                ma60=float(ma60[entry_idx]) if not np.isnan(ma60[entry_idx]) else 0.0,
+                quality=q_grade,
+                quality_score=q_score,
+            )
+        )
+        last_entry = entry_idx
+        i = entry_idx + 1
+
+    return signals
+
+
+def simulate(
+    df: pd.DataFrame,
+    signals: List[Signal],
+    *,
+    max_hold: int = 36,
+    ma_exit_after: int = 12,
+    be_after_r: float = 0.8,
+    trail_after_r: float = 1.2,
+    trail_lock_r: float = 0.4,
+    ma_exit_period: int = 20,
+) -> List[TradeResult]:
+    close = df["Close"].to_numpy(float)
+    high = df["High"].to_numpy(float)
+    low = df["Low"].to_numpy(float)
+    ma_exit = sma(close, ma_exit_period)
+    results: List[TradeResult] = []
+    busy_until = -1
+
+    for sig in signals:
+        entry_idx = sig.entry_idx
+        if entry_idx <= busy_until:
+            continue
+        entry = sig.entry_price
+        stop = sig.stop_price
+        target = sig.target_price
+        risk = entry - stop
+        if risk <= 0:
+            continue
+        cur_stop = stop
+        mfe = 0.0
+        limit = min(entry_idx + max_hold, len(df) - 1)
+        exit_idx = limit
+        exit_price = float(close[exit_idx])
+        exit_reason = "timeout"
+
+        for k in range(entry_idx + 1, limit + 1):
+            mfe = max(mfe, float(high[k] - entry))
+            if be_after_r > 0 and mfe / risk >= be_after_r:
+                cur_stop = max(cur_stop, entry)
+            if trail_after_r > 0 and mfe / risk >= trail_after_r:
+                cur_stop = max(cur_stop, entry + trail_lock_r * risk)
+
+            if low[k] <= cur_stop:
+                reason = "be_stop" if cur_stop > stop + 1e-9 else "stop"
+                exit_idx, exit_price, exit_reason = k, float(cur_stop), reason
+                break
+            if high[k] >= target:
+                exit_idx, exit_price, exit_reason = k, float(target), "target"
+                break
+            held = k - entry_idx
+            if (
+                held >= ma_exit_after
+                and not np.isnan(ma_exit[k])
+                and float(close[k]) < float(ma_exit[k])
+            ):
+                exit_idx, exit_price, exit_reason = k, float(close[k]), "ma20"
+                break
+
+        busy_until = exit_idx
+        pnl = exit_price - entry
+        results.append(
+            TradeResult(
+                signal=sig,
+                entry_idx=entry_idx,
+                exit_idx=exit_idx,
+                entry_price=entry,
+                exit_price=exit_price,
+                stop_price=stop,
+                target_price=target,
+                pnl_points=float(pnl),
+                exit_reason=exit_reason,
+                quality=sig.quality,
+            )
+        )
+    return results

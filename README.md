@@ -22,6 +22,26 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 五分 K 破翻回踩 MA20
+
+對齊手機圖藍圈：先破底，反彈**收復粉紅 MA20**，等價格離開均線後再**回踩 MA20** 才做多，不在收復當根追。
+
+```
+破底（近 2 小時低點） → 收復 MA20 → 連續 3 根低點離開均線 → 回踩 MA20 進場
+停損：破底低點下方 10 點
+停利：1.5R；滿 12 根若收盤跌破 MA20 出場
+```
+
+2026-08-24 實例：09:50 低點 28946.75 → 10:35 收復 → **11:00 回踩進場 29059**（藍圈起點），13:00 收破 MA20 出，約 **+100 點**。
+
+```bash
+# 近 30 天 Yahoo 5m 回測 + 手機版 HTML（每筆一張圖）
+python3 examples/nq_5m_ma20_retest.py --period 30d --pages
+python3 examples/nq_5m_ma20_retest.py --period 5d --html output/nq_5m_ma20.html
+```
+
+TradingView：`pinescript/nq_5m_ma20_retest.pine` 貼到 Pine Editor，套用 NQ1! / MNQ1! 五分圖。
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
@@ -125,7 +145,8 @@ python3 examples/chart_today.py
 
 ## TradingView
 
-`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
+`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
+`pinescript/nq_5m_ma20_retest.pine` 是五分 K 破翻回踩 MA20（藍圈進場）。
 
 ## 參數調整
 
