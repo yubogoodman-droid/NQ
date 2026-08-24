@@ -268,6 +268,7 @@ def write_html(
     universe_n: int,
     names: list[str],
     max_charts: int,
+    pool_label: str = "USDT U本位永續合約成交額前 50",
 ) -> Path:
     stats = {h: summarize_rows(rows, h) for h in HORIZONS}
     cross_n = sum(1 for r in rows if r.crossed_200)
@@ -375,8 +376,9 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 <div class="page wide">
 <section class="summary">
 <h1>幣安一分K · 7/14/25/99 多頭排列上站 1m MA200</h1>
-<p class="muted">{escape(date)} 台北時間 · 成交額前 {universe_n} · {len(rows)} 筆訊號（剛站上 {cross_n}）
+<p class="muted">{escape(date)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}）
 <br/>規則：一分K 的 MA7 &gt; MA14 &gt; MA25 &gt; MA99，且本根收盤剛站上<strong>一分K MA200</strong>（不是日線/小時線）。進場用下一根開盤。
+<br/>只掃幣安 <strong>U 本位 USDT 永續合約</strong>（fapi），不含現貨／幣本位／USDC-M。
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
 <div class="card">筆數<b>{len(rows)}</b></div>
@@ -415,13 +417,14 @@ def write_view_html(src: Path) -> Path:
 def run_backtest(args: argparse.Namespace) -> int:
     date = args.date or default_date()
     cross_only = not args.all_stack
-    print(f"date={date} top={args.top} min_gap={args.min_gap} cross_only={cross_only}", flush=True)
+    print(f"date={date} top={args.top or 'all'} min_gap={args.min_gap} cross_only={cross_only}", flush=True)
     uni = universe(top_n=args.top)
     if not uni:
         print("no universe", file=sys.stderr)
         return 1
+    pool = "USDT U本位永續合約" + (f"成交額前 {args.top}" if args.top and args.top > 0 else "全部")
     print(
-        f"universe {len(uni)}  #{1} {uni[0][0]} {uni[0][1]/1e6:.0f}M  "
+        f"{pool} {len(uni)}  #{1} {uni[0][0]} {uni[0][1]/1e6:.0f}M  "
         f"末 {uni[-1][0]} {uni[-1][1]/1e6:.0f}M",
         flush=True,
     )
@@ -470,6 +473,7 @@ def run_backtest(args: argparse.Namespace) -> int:
             universe_n=len(uni),
             names=[s for s, _ in uni],
             max_charts=args.charts,
+            pool_label=pool,
         )
         view = write_view_html(out)
         print(f"html={out}")
@@ -541,7 +545,12 @@ def run_alert(args: argparse.Namespace) -> int:
     seen = load_seen()
     print("載入標的…", flush=True)
     uni = universe(top_n=args.top)
-    print(f"監看成交額前 {len(uni)} 個 USDT 永續。7>14>25>99 且剛站上 1m MA200 才推。", flush=True)
+    pool = (
+        f"USDT U本位永續合約成交額前 {args.top}"
+        if args.top and args.top > 0
+        else "全部 USDT U本位永續合約"
+    )
+    print(f"監看 {pool} {len(uni)} 個。只掃合約、只掃 USDT。7>14>25>99 且剛站上 1m MA200 才推。", flush=True)
     uni_ts = time.time()
 
     def round_once() -> None:
@@ -593,8 +602,8 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="幣安一分K：7/14/25/99 多頭排列上站 1m MA200")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    b = sub.add_parser("backtest", help="回測成交額前 N（預設今天）")
-    b.add_argument("--top", type=int, default=50)
+    b = sub.add_parser("backtest", help="回測 USDT U本位永續合約（預設成交額前 50、今天）")
+    b.add_argument("--top", type=int, default=50, help="成交額前 N；0 表示全部 USDT 合約")
     b.add_argument("--date", default="", help="YYYY-MM-DD，台北日，預設今天（凌晨 2 點前用昨天）")
     b.add_argument("--today", action="store_true", help="明確指定用今天（同預設）")
     b.add_argument("--min-gap", type=int, default=0, help="同一標的訊號最少間隔根數")
@@ -604,8 +613,8 @@ def main(argv=None) -> int:
     b.add_argument("--charts", type=int, default=40)
     b.set_defaults(func=run_backtest)
 
-    a = sub.add_parser("alert", help="每根 1m 收盤掃一次，符合就推 Telegram")
-    a.add_argument("--top", type=int, default=50)
+    a = sub.add_parser("alert", help="掃 USDT U本位永續合約，符合就推 Telegram")
+    a.add_argument("--top", type=int, default=0, help="成交額前 N；預設 0=全部 USDT 合約")
     a.add_argument("--once", action="store_true")
     a.add_argument("--test", action="store_true")
     a.add_argument("--dry-run", action="store_true")

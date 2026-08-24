@@ -177,6 +177,26 @@ def test_default_date_uses_yesterday_before_2am() -> None:
     assert hi - lo == 24 * 60 * 60 * 1000
 
 
+def test_is_usdt_um_perp() -> None:
+    from nq.binance import is_usdt_um_perp
+
+    ok = {
+        "symbol": "BTCUSDT",
+        "quoteAsset": "USDT",
+        "marginAsset": "USDT",
+        "status": "TRADING",
+        "contractType": "PERPETUAL",
+        "underlyingType": "COIN",
+    }
+    assert is_usdt_um_perp(ok)
+    assert not is_usdt_um_perp({**ok, "quoteAsset": "USDC"})
+    assert not is_usdt_um_perp({**ok, "marginAsset": "BTC"})
+    assert not is_usdt_um_perp({**ok, "contractType": "CURRENT_QUARTER"})
+    assert not is_usdt_um_perp({**ok, "underlyingType": "EQUITY"})
+    assert not is_usdt_um_perp({**ok, "symbol": "USDCUSDT"})
+    assert not is_usdt_um_perp({**ok, "status": "BREAK"})
+
+
 def main() -> int:
     test_sma()
     test_detects_first_stack_above_ma200()
@@ -187,6 +207,7 @@ def main() -> int:
     test_cross_only_keeps_ma200_reclaim()
     test_below_ma200_is_not_a_signal()
     test_default_date_uses_yesterday_before_2am()
+    test_is_usdt_um_perp()
     print("ok")
     return 0
 

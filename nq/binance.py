@@ -1,4 +1,4 @@
-"""幣安 U 本位永續：標的清單與 K 線。"""
+"""幣安 U 本位 USDT 永續合約（fapi），不含現貨、幣本位、USDC-M。"""
 
 from __future__ import annotations
 
@@ -7,11 +7,14 @@ import time
 import numpy as np
 import requests
 
-BASE = "https://www.binance.com"
+BASE = "https://www.binance.com"  # fapi.binance.com 在部分區會 451；此路徑仍打 U 本位合約 API
 SESSION = requests.Session()
 SESSION.headers.update(
     {"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"}
 )
+# 股票／ETF／Pre-IPO TradFi，不當一般 USDT 加密合約掃。
+STOCK_UNDERLYING = {"EQUITY", "HK_EQUITY", "KR_EQUITY", "CN_EQUITY", "PREMARKET"}
+STABLE_USDT = {"USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "DAIUSDT", "EURUSDT", "BFUSDUSDT"}
 
 BARS_PER_DAY = {"15m": 96, "5m": 288, "1m": 1440, "1h": 24, "4h": 6, "1d": 1}
 INTERVAL_MS = {
@@ -40,27 +43,38 @@ def get_json(path: str, params=None, retries: int = 6):
     raise last
 
 
-def universe(*, top_n: int = 50) -> list[tuple[str, float]]:
-    """USDT 永續，依 24h 成交額（quoteVolume）由高到低取前 `top_n`。"""
-    skip = {"USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "DAIUSDT", "EURUSDT", "BFUSDUSDT"}
+def is_usdt_um_perp(s: dict) -> bool:
+    """U 本位 USDT 永續合約。排除現貨、幣本位、USDC-M、TradFi 股票、指數。"""
+    if s.get("quoteAsset") != "USDT":
+        return False
+    margin = s.get("marginAsset")
+    if margin and margin != "USDT":
+        return False
+    if s.get("status") != "TRADING":
+        return False
+    if s.get("contractType") != "PERPETUAL":
+        return False
+    if s.get("underlyingType") in STOCK_UNDERLYING or s.get("underlyingType") == "INDEX":
+        return False
+    if s.get("symbol") in STABLE_USDT:
+        return False
+    return True
+
+
+def universe(*, top_n: int | None = 50) -> list[tuple[str, float]]:
+    """USDT U本位永續。`top_n` 為 None 或 <=0 時掃全部合約，否則取 24h 成交額前 N。"""
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
     ranked: list[tuple[float, str]] = []
     for s in info["symbols"]:
-        if s.get("quoteAsset") != "USDT":
-            continue
-        if s.get("status") != "TRADING":
-            continue
-        if s.get("contractType") != "PERPETUAL":
-            continue
-        if s.get("underlyingType") == "INDEX":
+        if not is_usdt_um_perp(s):
             continue
         sym = s["symbol"]
-        if sym in skip:
-            continue
         qv = float((tickers.get(sym) or {}).get("quoteVolume") or 0)
         ranked.append((qv, sym))
     ranked.sort(reverse=True)
+    if top_n is None or top_n <= 0:
+        return [(sym, qv) for qv, sym in ranked]
     return [(sym, qv) for qv, sym in ranked[:top_n]]
 
 
