@@ -31,7 +31,7 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 
 @dataclass(frozen=True)
 class ScanConfig:
-    top: int = 100
+    top: int = 200
     max_price: float = 650.0
     kline_range: str = "5d"
     closed_only: bool = False

@@ -30,7 +30,7 @@ TELEGRAM_BOT_TOKEN = ""     # Telegram BotFather 給的 token
 TELEGRAM_CHAT_ID = ""       # 你的 Telegram chat id
 # ═══════════════════════════════════════════════════════════════
 
-SCRIPT_VERSION = "2026-08-24-a"
+SCRIPT_VERSION = "2026-08-24-b"
 
 
 def _apply_secrets() -> None:
@@ -387,7 +387,7 @@ class RankedStock:
 
 
 def fetch_turnover_ranking(
-    top: int = 100,
+    top: int = 200,
     session: requests.Session | None = None,
     timeout: int = 20,
     as_of: date | None = None,
@@ -449,7 +449,7 @@ def previous_weekdays(today: date | None = None, weeks: int = 1) -> list[date]:
 
 def fetch_daily_turnover_ranking(
     on_date: date,
-    top: int = 100,
+    top: int = 200,
     session: requests.Session | None = None,
     timeout: int = 20,
 ) -> tuple[list[RankedStock], str | None]:
@@ -1001,7 +1001,7 @@ def login():
 SNAPSHOT_BATCH = 80
 
 
-def fetch_snapshot_ranking(top: int = 100) -> tuple[list, str | None]:
+def fetch_snapshot_ranking(top: int = 200) -> tuple[list, str | None]:
     """用永豐快照排上市＋上櫃成交金額。"""
     api = login()
     contracts = _stock_contracts(api)
@@ -1442,7 +1442,7 @@ def _empty() -> pd.DataFrame:
 
 @dataclass(frozen=True)
 class ScanConfig:
-    top: int = 100
+    top: int = 200
     max_price: float = 650.0
     kline_range: str = "5d"
     closed_only: bool = False
@@ -1751,7 +1751,7 @@ def _discord(title: str, body: str) -> bool:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="台股一分K多頭排列＋站穩MA240掃描（單檔）")
-    p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
+    p.add_argument("--top", type=int, default=200, help="成交額前 N 名（預設 200）")
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--watch", action="store_true", help="盤中持續監控（PyCharm 直接 Run 預設就是這個）")
     p.add_argument("--once", action="store_true", help="只掃一次，不持續監控")

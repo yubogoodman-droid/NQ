@@ -68,7 +68,7 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="台股一分K多頭排列＋站穩MA240掃描")
-    p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
+    p.add_argument("--top", type=int, default=200, help="成交額前 N 名（預設 200）")
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--watch", action="store_true", help="盤中每分鐘重掃，同一根 K 不重複通知")
     p.add_argument(

@@ -223,7 +223,7 @@ def login():
 SNAPSHOT_BATCH = 80
 
 
-def fetch_snapshot_ranking(top: int = 100) -> tuple[list, str | None]:
+def fetch_snapshot_ranking(top: int = 200) -> tuple[list, str | None]:
     """用永豐快照排上市＋上櫃成交金額，不經過 Yahoo。"""
     from tw.ranking import RankedStock
 

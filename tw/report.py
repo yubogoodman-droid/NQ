@@ -87,7 +87,7 @@ def save_week_index(results: list[ScanResult], path: str | Path) -> Path:
     lines = [
         f"# {title}",
         "",
-        "同一套規則，**每天分開**掃成交額前 100。",
+        "同一套規則，**每天分開**掃成交額前 200。",
         "",
         "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
         "從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）；"
@@ -121,6 +121,7 @@ def _render(
 ) -> str:
     scanned = result.scanned_at.strftime("%Y-%m-%d %H:%M:%S")
     rank_time = html.escape(result.rank_time or "—")
+    n = len(result.universe)
     hit_rows = "\n".join(
         _hit_card(i, h, chart_rel=chart_rel, chart_dir=chart_dir, image_base=image_base)
         for i, h in enumerate(result.hits, 1)
@@ -133,7 +134,7 @@ def _render(
         title = f"回測 {as_of}（{wd}）· 一分K站穩 MA240"
         heading = f"回測 {as_of}（{wd}）· 站穩 MA240"
         lead = (
-            f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF、金融股與收盤價 650 以上。"
+            f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 {n}（盤後），濾掉 ETF、金融股與收盤價 650 以上。"
             "一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
             "從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）。"
             "含該根的五分K收盤也必須高於五分 MA240。K 棒漲紅跌綠。"
@@ -142,7 +143,7 @@ def _render(
         title = "台股一分K · 多頭排列站上 MA240"
         heading = "台股一分K · 站穩 MA240"
         lead = (
-            "成交額前 100、濾掉 ETF、金融股與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
+            f"成交額前 {n}、濾掉 ETF、金融股與股價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
             "從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）。含該根的五分K收盤也必須高於五分 MA240。K 棒漲紅跌綠。"
         )
     return f"""<!DOCTYPE html>
@@ -243,7 +244,7 @@ def _render(
       命中 <span class="ok">{len(result.hits)}</span> 檔<br/>
       掃描時間 {html.escape(scanned)}（台北）<br/>
       排行時間 {rank_time}<br/>
-      前 100 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped}、金融 {result.financial_dropped} → 掃描 {len(result.candidates)} 檔 → 均線糾結 {result.tangled_dropped} → MA20/MA240不符 {result.far_ma_dropped} → 五分MA240底下 {result.below_5m_dropped}
+      前 {n} 名 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped}、金融 {result.financial_dropped} → 掃描 {len(result.candidates)} 檔 → 均線糾結 {result.tangled_dropped} → MA20/MA240不符 {result.far_ma_dropped} → 五分MA240底下 {result.below_5m_dropped}
     </div>
     {hit_rows}
     <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
@@ -401,12 +402,13 @@ def _watch_script_html(result: ScanResult) -> str:
 
 
 def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
+    n = len(result.universe)
     if result.as_of is not None:
         as_of = result.as_of.isoformat()
         wd = weekday_zh(result.as_of)
         title = f"回測 {as_of}（{wd}）· 一分K站穩 MA240"
         lead = (
-            f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 100（盤後），濾掉 ETF、金融股與收盤價 650 以上。"
+            f"用 {as_of}（{wd}）當天上市＋上櫃成交額前 {n}（盤後），濾掉 ETF、金融股與收盤價 650 以上。"
             "一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
             "從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）；"
             "含該根的五分K收盤也必須高於五分 MA240。"
@@ -414,7 +416,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
     else:
         title = "台股一分K · 站穩 MA240"
         lead = (
-            "成交額前 100、濾掉 ETF、金融股與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
+            f"成交額前 {n}、濾掉 ETF、金融股與股價 650 以上。一分K MA5>MA10>MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，"
             "從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）；含該根的五分K收盤也必須高於五分 MA240。"
         )
     lines = [
@@ -426,7 +428,7 @@ def _write_markdown(result: ScanResult, path: Path, *, chart_rel: Path) -> None:
         f"- 命中 **{len(result.hits)}** 檔",
         f"- 掃描時間 {result.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}（台北）",
         f"- 排行 {result.rank_time or '—'}",
-        f"- 前 100 → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped}、金融 {result.financial_dropped} → 掃描 {len(result.candidates)} → 均線糾結 {result.tangled_dropped} → MA20/MA240不符 {result.far_ma_dropped} → 五分MA240底下 {result.below_5m_dropped}",
+        f"- 前 {n} → 濾掉股價 {result.price_dropped}、ETF {result.etf_dropped}、金融 {result.financial_dropped} → 掃描 {len(result.candidates)} → 均線糾結 {result.tangled_dropped} → MA20/MA240不符 {result.far_ma_dropped} → 五分MA240底下 {result.below_5m_dropped}",
         "",
     ]
     for i, hit in enumerate(result.hits, 1):
