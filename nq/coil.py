@@ -496,8 +496,10 @@ def simulate(
     max_hold: int = 90,
     be_after_r: float = 0.70,
     fail_closes: int = 2,
+    trail_after_r: float = 1.0,
+    trail_lock_r: float = 0.3,
 ) -> List[CoilTrade]:
-    """停損＝盤整低點；0.7R 後保本；目標 2R。
+    """停損＝盤整低點；0.7R 後保本；走到 1R 後停損移到 +0.3R（移動停利）；目標 2R。
 
     若連續 fail_closes 根收回到盤整高點下方，視為突破失敗，用收盤出場，
     不再等到盤整低點。
@@ -524,10 +526,17 @@ def simulate(
         exit_reason = "timeout"
         for k in range(entry_idx + 1, limit + 1):
             mfe = max(mfe, float(h[k] - entry))
-            if be_after_r > 0 and mfe / risk >= be_after_r:
+            rr = mfe / risk
+            if be_after_r > 0 and rr >= be_after_r:
                 cur_stop = max(cur_stop, entry)
+            if trail_after_r > 0 and trail_lock_r > 0 and rr >= trail_after_r:
+                cur_stop = max(cur_stop, entry + risk * trail_lock_r)
             if l[k] <= cur_stop:
-                exit_idx, exit_price, exit_reason = k, float(cur_stop), "stop"
+                if cur_stop > entry + 1e-9:
+                    reason = "trail"
+                else:
+                    reason = "stop"
+                exit_idx, exit_price, exit_reason = k, float(cur_stop), reason
                 break
             if h[k] >= target:
                 exit_idx, exit_price, exit_reason = k, float(target), "target"

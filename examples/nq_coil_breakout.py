@@ -411,7 +411,12 @@ def _trade_cards(
         cls = "pnl-win" if t.pnl_points > 0 else ("pnl-flat" if t.pnl_points == 0 else "pnl-loss")
         risk = t.entry_price - t.stop_price
         r_mult = (t.target_price - t.entry_price) / risk if risk > 0 else 0
-        reason_cls = {"target": "tag-tp", "stop": "tag-sl", "fail": "tag-fail"}.get(t.exit_reason, "tag-time")
+        reason_cls = {
+            "target": "tag-tp",
+            "trail": "tag-tp",
+            "stop": "tag-sl",
+            "fail": "tag-fail",
+        }.get(t.exit_reason, "tag-time")
         img1 = _trade_img_name(df, t, i, "1m")
         img5 = _trade_img_name(df, t, i, "5m")
         keep.add(img1)
@@ -554,7 +559,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（均線糾結突破）</h1>
-<p class="muted">訊號只看 1分K。進場當下 5 分收盤要在 5 分 MA20 上方。停損＝盤整低點 − 5 點，停利 2R；連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體，當時 5 分若還在 MA200 下方超過 100 點也不接（大空反彈）。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
+<p class="muted">訊號只看 1分K。進場當下 5 分收盤要在 5 分 MA20 上方。停損＝盤整低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R（移動停利）。連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體，當時 5 分若還在 MA200 下方超過 100 點也不接。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -719,6 +724,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"進場: <code>{sig.entry_price:.2f}</code>\n"
         f"停損: <code>{sig.stop_price:.2f}</code> (−{risk:.1f} pts)\n"
         f"目標: <code>{sig.target_price:.2f}</code> ({r_mult:.1f}R)\n"
+        f"移動: 0.7R 保本 · 1R 後停損移到 +0.3R\n"
         f"盤整: <code>{sig.coil_low:.1f}–{sig.coil_high:.1f}</code> "
         f"區間 {sig.coil_range:.1f} / 帶寬 {sig.ribbon_width:.1f}\n"
         f"{m5_line}"

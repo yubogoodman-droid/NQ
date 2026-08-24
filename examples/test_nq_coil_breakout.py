@@ -101,6 +101,55 @@ def test_real_chart_stands_on_ma200() -> None:
         assert look["above_20"]
     if not np.isnan(sig.m5_ma20):
         assert sig.m5_close > sig.m5_ma20
+    trades = simulate(df, hits)
+    assert trades, "07:32 應能模擬出場"
+    # 07:38 衝到 29283（>1R）後拉回，移動停利鎖 +0.3R，不再保本出場
+    assert trades[0].exit_reason == "trail"
+    risk = hits[0].entry_price - hits[0].stop_price
+    assert abs(trades[0].pnl_points - 0.3 * risk) < 0.6
+
+
+def test_trail_locks_after_1r() -> None:
+    idx = pd.date_range("2026-08-24 07:32", periods=6, freq="1min", tz=ET)
+    close = np.array([100.0, 108.0, 112.0, 104.0, 103.0, 102.0])
+    high = np.array([100.0, 111.0, 113.0, 112.0, 104.0, 103.0])
+    low = np.array([99.0, 107.0, 110.0, 102.5, 102.0, 101.0])
+    df = pd.DataFrame(
+        {
+            "Open": close,
+            "High": high,
+            "Low": low,
+            "Close": close,
+            "Volume": np.full(6, 100.0),
+        },
+        index=idx,
+    )
+    sig = CoilSignal(
+        coil_start_idx=0,
+        coil_end_idx=0,
+        entry_idx=0,
+        entry_price=100.0,
+        stop_price=90.0,
+        target_price=120.0,
+        coil_high=95.0,
+        coil_low=91.0,
+        coil_range=4.0,
+        ribbon_width=5.0,
+        vol_ratio=3.0,
+        prior_drop=40.0,
+        body=8.0,
+        ma5=101.0,
+        ma10=100.0,
+        ma20=99.0,
+        ma30=98.0,
+        ma60=97.0,
+        ma100=96.0,
+        ma120=95.0,
+        ma200=94.0,
+    )
+    trades = simulate(df, [sig])
+    assert trades[0].exit_reason == "trail"
+    assert abs(trades[0].pnl_points - 3.0) < 1e-9
 
 
 def test_m5_asof_ma200_dist_matches_look_at() -> None:
@@ -280,6 +329,7 @@ def main() -> int:
     test_quality_of()
     test_demo_catches_0735_breakout()
     test_real_chart_stands_on_ma200()
+    test_trail_locks_after_1r()
     test_m5_asof_ma200_dist_matches_look_at()
     test_skip_5m_waterfall_bounce()
     test_skip_chase_body()
