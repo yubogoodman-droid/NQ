@@ -43,6 +43,9 @@ class CoilSignal:
     ma100: float
     ma120: float
     ma200: float
+    m5_close: float = float("nan")
+    m5_ma200: float = float("nan")
+    m5_dist: float = float("nan")
     quality: str = "C"
     quality_score: int = 0
 
@@ -189,13 +192,43 @@ def quality_of(coil_range: float, ribbon_width: float, vol_ratio: float, body: f
         score += 1
     if vol_ratio >= 1.8:
         score += 1
-    if body >= 12.0:
+    # 起漲點應是剛站上，不是已經噴出去的長實體
+    if body <= 25.0:
         score += 1
-    if score >= 3:
+    if score >= 4:
         return score, "A"
     if score >= 2:
         return score, "B"
     return score, "C"
+
+
+def m5_asof_ma200_dist(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """每個 1 分時刻：當時 5 分當根收盤、5分 MA200、收盤相對 MA200 的距離（不偷看後面）。"""
+    n = 0 if df is None else len(df)
+    close5 = np.full(n, np.nan, dtype=float)
+    ma200 = np.full(n, np.nan, dtype=float)
+    dist = np.full(n, np.nan, dtype=float)
+    if n == 0:
+        return close5, ma200, dist
+    _o, _h, _l, c, _v = _ohlcv(df)
+    idx = df.index
+    completed: List[float] = []
+    cur_bucket = None
+    cur_c = float("nan")
+    for i in range(n):
+        ts = pd.Timestamp(idx[i])
+        bucket = ts.ceil("5min")
+        if cur_bucket is None or bucket != cur_bucket:
+            if cur_bucket is not None and not np.isnan(cur_c):
+                completed.append(cur_c)
+            cur_bucket = bucket
+        cur_c = float(c[i])
+        close5[i] = cur_c
+        if len(completed) >= 199:
+            ma = (float(sum(completed[-199:])) + cur_c) / 200.0
+            ma200[i] = ma
+            dist[i] = cur_c - ma
+    return close5, ma200, dist
 
 
 @dataclass
@@ -233,6 +266,8 @@ def detect_coil_breakouts(
     stop_buffer: float = 5.0,
     target_r: float = 2.0,
     min_entry_gap: int = 45,
+    max_body: float = 40.0,
+    max_m5_below_200: float = 100.0,
     ma_periods: Sequence[int] = MA_PERIODS,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[CoilSignal]:
@@ -241,12 +276,16 @@ def detect_coil_breakouts(
 
     進場是「第一次」收盤站上 MA200，且 MA5>MA10>MA20>MA30、
     MA60 與 MA120 仍在 MA200 下方。不要等後面那根放量長綠。
+
+    另外不接兩種假突破：1 分實體已經噴超過 max_body，或當時 5 分還在
+    MA200 下方超過 max_m5_below_200 點（大空裡的 1 分反彈）。
     """
     if df is None or len(df) == 0:
         return []
     o, h, l, c, v = _ohlcv(df)
     n = len(c)
     mas = [sma(c, int(p)) for p in ma_periods]
+    _m5_c, m5_ma200, m5_dist = m5_asof_ma200_dist(df)
     warmup = max(int(p) for p in ma_periods)
     lo = min(min_coil_bars, coil_bars)
     hi = max(max_coil_bars, coil_bars)
@@ -339,13 +378,22 @@ def detect_coil_breakouts(
             ma120 = float(mas[6][i])
             ma200 = float(mas[7][i])
             ok_body = body >= min_body
+            ok_max_body = max_body <= 0 or body <= max_body
             ok_break = c[i] >= last_coil.high + min_break_over
             ok_stack = ma5 > ma10 > ma20 > ma30
             ok_above_200 = c[i] > ma200
             ok_long_below = ma60 < ma200 and ma120 < ma200
             ok_vol = vol_ref <= 1e-9 or vol_ratio >= min_vol_ratio
+            m5d = float(m5_dist[i])
+            ok_m5 = (
+                max_m5_below_200 < 0
+                or np.isnan(m5d)
+                or m5d >= -max_m5_below_200
+            )
             if ok_body:
                 bump("body")
+            if ok_max_body:
+                bump("not_chase")
             if ok_break:
                 bump("above_coil")
             if ok_stack:
@@ -356,7 +404,18 @@ def detect_coil_breakouts(
                 bump("long_below")
             if ok_vol:
                 bump("volume")
-            if ok_body and ok_break and ok_stack and ok_above_200 and ok_long_below and ok_vol:
+            if ok_m5:
+                bump("m5_ok")
+            if (
+                ok_body
+                and ok_max_body
+                and ok_break
+                and ok_stack
+                and ok_above_200
+                and ok_long_below
+                and ok_vol
+                and ok_m5
+            ):
                 entry = float(c[i])
                 stop = last_coil.low - stop_buffer
                 risk = entry - stop
@@ -388,6 +447,9 @@ def detect_coil_breakouts(
                             ma100=float(mas[5][i]),
                             ma120=ma120,
                             ma200=ma200,
+                            m5_close=float(_m5_c[i]),
+                            m5_ma200=float(m5_ma200[i]),
+                            m5_dist=m5d,
                             quality=q_grade,
                             quality_score=q_score,
                         )
@@ -413,7 +475,13 @@ def simulate(
     *,
     max_hold: int = 90,
     be_after_r: float = 0.70,
+    fail_closes: int = 2,
 ) -> List[CoilTrade]:
+    """停損＝盤整低點；0.7R 後保本；目標 2R。
+
+    若連續 fail_closes 根收回到盤整高點下方，視為突破失敗，用收盤出場，
+    不再等到盤整低點。
+    """
     if not signals:
         return []
     _o, h, l, c, _v = _ohlcv(df)
@@ -429,6 +497,7 @@ def simulate(
             continue
         cur_stop = stop
         mfe = 0.0
+        fail_n = 0
         limit = min(entry_idx + max_hold, n - 1)
         exit_idx = limit
         exit_price = float(c[exit_idx])
@@ -443,6 +512,13 @@ def simulate(
             if h[k] >= target:
                 exit_idx, exit_price, exit_reason = k, float(target), "target"
                 break
+            if fail_closes > 0 and float(c[k]) < sig.coil_high:
+                fail_n += 1
+                if fail_n >= fail_closes:
+                    exit_idx, exit_price, exit_reason = k, float(c[k]), "fail"
+                    break
+            else:
+                fail_n = 0
         out.append(
             CoilTrade(
                 signal=sig,

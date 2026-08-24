@@ -354,11 +354,13 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"盤整箱 {funnel.get('coil', 0)} → "
         f"等待突破 {funnel.get('sticky', 0)} → "
         f"長實體 {funnel.get('body', 0)} → "
+        f"非追高 {funnel.get('not_chase', 0)} → "
         f"站上盤整 {funnel.get('above_coil', 0)} → "
         f"5/10/20/30排列 {funnel.get('stack', 0)} → "
         f"站上MA200 {funnel.get('above_200', 0)} → "
         f"60與120在200下 {funnel.get('long_below', 0)} → "
         f"放量 {funnel.get('volume', 0)} → "
+        f"5分未過深 {funnel.get('m5_ok', 0)} → "
         f"進場 {funnel.get('taken', 0)}</p>"
     )
 
@@ -407,7 +409,7 @@ def _trade_cards(
         cls = "pnl-win" if t.pnl_points > 0 else ("pnl-flat" if t.pnl_points == 0 else "pnl-loss")
         risk = t.entry_price - t.stop_price
         r_mult = (t.target_price - t.entry_price) / risk if risk > 0 else 0
-        reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
+        reason_cls = {"target": "tag-tp", "stop": "tag-sl", "fail": "tag-fail"}.get(t.exit_reason, "tag-time")
         img1 = _trade_img_name(df, t, i, "1m")
         img5 = _trade_img_name(df, t, i, "5m")
         keep.add(img1)
@@ -432,6 +434,12 @@ def _trade_cards(
         else:
             keep.discard(img5)
             m5_html = "<p class='muted'>沒有對應的 5分K</p>"
+        m5_line = ""
+        if t.signal.m5_dist == t.signal.m5_dist:
+            m5_line = (
+                f"\n5分當時 C {t.signal.m5_close:.1f}  MA200 {t.signal.m5_ma200:.1f}  "
+                f"Δ {t.signal.m5_dist:+.1f}"
+            )
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -456,6 +464,7 @@ def _trade_cards(
             f"量能 {t.signal.vol_ratio:.2f}x  實體 {t.signal.body:.1f}  前回檔 {t.signal.prior_drop:.1f}\n"
             f"1分MA {t.signal.ma5:.1f}>{t.signal.ma10:.1f}>{t.signal.ma20:.1f}>{t.signal.ma30:.1f}  "
             f"60 {t.signal.ma60:.1f} / 120 {t.signal.ma120:.1f} < 200 {t.signal.ma200:.1f}"
+            f"{m5_line}"
             "</pre>"
             "<p class='chart-cap'>1分K</p>"
             f"<div class='mini-chart'><img src='img/{escape(img1)}' alt='1分K #{i}' "
@@ -528,6 +537,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-tp{{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}}
 .tag-sl{{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}}
 .tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
+.tag-fail{{background:rgba(163,113,247,0.15);color:#d2a8ff;border-color:rgba(163,113,247,0.35)}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .tag-tf1{{background:rgba(88,166,255,0.18);color:#79c0ff;border-color:rgba(88,166,255,0.4)}}
 .tag-tf5{{background:rgba(163,113,247,0.18);color:#d2a8ff;border-color:rgba(163,113,247,0.4)}}
@@ -539,7 +549,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（均線糾結突破）</h1>
-<p class="muted">訊號只看 1分K。停損＝盤整低點 − 5 點，停利 2R。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
+<p class="muted">訊號只看 1分K。停損＝盤整低點 − 5 點，停利 2R；連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體，當時 5 分若還在 MA200 下方超過 100 點也不接（大空反彈）。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -621,9 +631,10 @@ def _print_funnel(funnel: Dict[str, int]) -> None:
         "funnel "
         f"checked={funnel.get('checked', 0)} coil={funnel.get('coil', 0)} "
         f"sticky={funnel.get('sticky', 0)} body={funnel.get('body', 0)} "
+        f"not_chase={funnel.get('not_chase', 0)} "
         f"above={funnel.get('above_coil', 0)} stack={funnel.get('stack', 0)} "
         f"ma200={funnel.get('above_200', 0)} below={funnel.get('long_below', 0)} "
-        f"vol={funnel.get('volume', 0)} taken={funnel.get('taken', 0)}"
+        f"vol={funnel.get('volume', 0)} m5={funnel.get('m5_ok', 0)} taken={funnel.get('taken', 0)}"
     )
 
 

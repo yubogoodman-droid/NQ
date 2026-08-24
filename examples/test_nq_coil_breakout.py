@@ -14,10 +14,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nq.coil import (  # noqa: E402
     ET,
+    CoilSignal,
     CoilTrade,
     detect_coil_breakouts,
     make_coil_demo_bars,
     m5_asof,
+    m5_asof_ma200_dist,
     m5_look_at,
     quality_of,
     resample_ohlcv,
@@ -38,6 +40,8 @@ def test_sma() -> None:
 def test_quality_of() -> None:
     assert quality_of(20.0, 18.0, 2.1, 14.0)[1] == "A"
     assert quality_of(40.0, 40.0, 1.5, 8.0)[1] == "C"
+    assert quality_of(20.0, 18.0, 2.1, 52.0)[1] == "B"
+
 
 
 def test_demo_catches_0735_breakout() -> None:
@@ -89,6 +93,115 @@ def test_real_chart_stands_on_ma200() -> None:
     assert abs(look["finished_close"] - 29247.25) < 1.0
     snap = m5_asof(df, ts)
     assert abs(float(snap.iloc[-1]["Close"]) - 29217.75) < 0.3
+    _c5, _ma5, dist = m5_asof_ma200_dist(df)
+    i = hits[0].entry_idx
+    if not np.isnan(look["ma200"]) and not np.isnan(dist[i]):
+        assert abs(dist[i] - (look["close"] - look["ma200"])) < 2.0
+
+
+def test_m5_asof_ma200_dist_matches_look_at() -> None:
+    n = 200 * 5 + 8
+    close = np.full(n, 30000.0, dtype=float)
+    close[-4:] = 29880.0
+    idx = pd.date_range("2026-07-01 00:00", periods=n, freq="1min", tz=ET)
+    df = pd.DataFrame(
+        {
+            "Open": np.r_[close[0], close[:-1]],
+            "High": close + 2.0,
+            "Low": close - 2.0,
+            "Close": close,
+            "Volume": np.full(n, 80.0),
+        },
+        index=idx,
+    )
+    _c5, _ma, dist = m5_asof_ma200_dist(df)
+    look = m5_look_at(df, df.index[-1])
+    assert look is not None
+    assert not np.isnan(dist[-1])
+    assert not np.isnan(look["ma200"])
+    assert abs(dist[-1] - (look["close"] - look["ma200"])) < 1.5
+    assert dist[-1] < -100
+
+
+def test_skip_5m_waterfall_bounce() -> None:
+    """5 分還在 MA200 下方很深時，1 分糾結突破當大空反彈，不接。"""
+    head_n = 1000
+    head_close = np.array([29450.0 + (3.0 if i % 2 == 0 else -3.0) for i in range(head_n)])
+    head_idx = pd.date_range("2026-08-23 09:20", periods=head_n, freq="1min", tz=ET)
+    head = pd.DataFrame(
+        {
+            "Open": np.r_[head_close[0], head_close[:-1]],
+            "High": head_close + 2.0,
+            "Low": head_close - 2.0,
+            "Close": head_close,
+            "Volume": np.full(head_n, 90.0),
+        },
+        index=head_idx,
+    )
+    tail = make_coil_demo_bars()
+    df = pd.concat([head, tail])
+    df = df[~df.index.duplicated(keep="last")]
+    with_filter = detect_coil_breakouts(df)
+    without = detect_coil_breakouts(df, max_m5_below_200=-1.0)
+    assert without, "關掉 5 分深度過濾後，模擬圖仍應有起漲點"
+    # 有過濾時不該在大空下方接同一筆
+    if with_filter:
+        for s in with_filter:
+            assert np.isnan(s.m5_dist) or s.m5_dist >= -100.0
+
+
+def test_skip_chase_body() -> None:
+    path = Path(__file__).resolve().parent / "fixtures" / "nq_2026-08-24_0735.csv"
+    df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
+    if df.index.tz is None:
+        df.index = df.index.tz_localize(ET)
+    sigs = detect_coil_breakouts(df, max_body=5.0)
+    hits = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:32"]
+    assert not hits, "實體 7.8 應被 max_body=5 擋掉"
+
+
+def test_failed_breakout_exits_on_two_closes() -> None:
+    idx = pd.date_range("2026-08-24 07:32", periods=8, freq="1min", tz=ET)
+    close = np.array([110.0, 108.0, 99.0, 98.0, 97.0, 96.0, 95.0, 94.0])
+    df = pd.DataFrame(
+        {
+            "Open": close,
+            "High": close + 1.0,
+            "Low": close - 1.0,
+            "Close": close,
+            "Volume": np.full(8, 100.0),
+        },
+        index=idx,
+    )
+    sig = CoilSignal(
+        coil_start_idx=0,
+        coil_end_idx=0,
+        entry_idx=0,
+        entry_price=110.0,
+        stop_price=80.0,
+        target_price=170.0,
+        coil_high=100.0,
+        coil_low=85.0,
+        coil_range=15.0,
+        ribbon_width=10.0,
+        vol_ratio=3.0,
+        prior_drop=40.0,
+        body=8.0,
+        ma5=109.0,
+        ma10=108.0,
+        ma20=107.0,
+        ma30=106.0,
+        ma60=105.0,
+        ma100=104.0,
+        ma120=103.0,
+        ma200=102.0,
+    )
+    trades = simulate(df, [sig])
+    assert trades
+    assert trades[0].exit_reason == "fail"
+    assert trades[0].exit_idx == 3
+    assert abs(trades[0].exit_price - 98.0) < 1e-9
+    assert trades[0].pnl_points < 0
 
 
 def test_no_signal_in_wide_trend() -> None:
@@ -161,6 +274,10 @@ def main() -> int:
     test_quality_of()
     test_demo_catches_0735_breakout()
     test_real_chart_stands_on_ma200()
+    test_m5_asof_ma200_dist_matches_look_at()
+    test_skip_5m_waterfall_bounce()
+    test_skip_chase_body()
+    test_failed_breakout_exits_on_two_closes()
     test_no_signal_in_wide_trend()
     test_simulate_and_html()
     test_resample_ohlcv_5m()
