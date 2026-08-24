@@ -406,7 +406,7 @@ def _trade_cards(
         xt = df.index[t.exit_idx]
         cls = "pnl-win" if t.pnl_points > 0 else ("pnl-flat" if t.pnl_points == 0 else "pnl-loss")
         risk = t.entry_price - t.stop_price
-        tp_pts = t.target_price - t.entry_price
+        r_mult = (t.target_price - t.entry_price) / risk if risk > 0 else 0
         reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
         img1 = _trade_img_name(df, t, i, "1m")
         img5 = _trade_img_name(df, t, i, "5m")
@@ -449,7 +449,7 @@ def _trade_cards(
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}\n"
             f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts)\n"
-            f"target {t.target_price:.2f}  (+{tp_pts:.0f} pts)\n"
+            f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"盤整 {t.signal.coil_low:.2f}–{t.signal.coil_high:.2f}  "
             f"區間 {t.signal.coil_range:.1f}  帶寬 {t.signal.ribbon_width:.1f}\n"
@@ -539,7 +539,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（均線糾結突破）</h1>
-<p class="muted">訊號只看 1分K。停損＝盤整低點 − 5 點，停利固定 +50 點。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
+<p class="muted">訊號只看 1分K。停損＝跌破前一根 1分K 低點，停利 2R。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -680,7 +680,7 @@ def exit_key(df, tr: CoilTrade) -> str:
 def fmt_entry(df, sig: CoilSignal) -> str:
     ts = _ts_et(df.index[sig.entry_idx])
     risk = sig.entry_price - sig.stop_price
-    tp_pts = sig.target_price - sig.entry_price
+    r_mult = (sig.target_price - sig.entry_price) / risk if risk > 0 else 0
     last = float(df["Close"].iloc[-1])
     look = m5_look_at(df, df.index[sig.entry_idx])
     m5_line = ""
@@ -697,7 +697,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"品質: <b>Q{sig.quality}</b> ({sig.quality_score}/4)\n"
         f"進場: <code>{sig.entry_price:.2f}</code>\n"
         f"停損: <code>{sig.stop_price:.2f}</code> (−{risk:.1f} pts)\n"
-        f"目標: <code>{sig.target_price:.2f}</code> (+{tp_pts:.0f} pts)\n"
+        f"目標: <code>{sig.target_price:.2f}</code> ({r_mult:.1f}R)\n"
         f"盤整: <code>{sig.coil_low:.1f}–{sig.coil_high:.1f}</code> "
         f"區間 {sig.coil_range:.1f} / 帶寬 {sig.ribbon_width:.1f}\n"
         f"{m5_line}"
