@@ -57,9 +57,9 @@ python3 examples/nq_coil_breakout.py alert --dry-run --once
 
 | 區間 | 筆數 | 勝率 | 加總 |
 |------|------|------|------|
-| 10 天 | （回測中） | — | — |
+| 10 天 | 6 | 66.7% | +162.8 |
 
-樣本很小，回測不是保證。
+08-19 08:15 仍在（+102）。07:33、11:30、08-20 09:36 開盤追價已擋掉。樣本很小，回測不是保證。
 
 TradingView：把 `pinescript/nq_ma_coil_breakout_1m.pine` 貼進 Pine Editor，套用到 NQ1! / MNQ1! 一分圖，可設「NQ 起漲點」警示。
 
