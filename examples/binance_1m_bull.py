@@ -41,7 +41,7 @@ SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
 PAGES_IMG = "https://raw.githubusercontent.com/yubogoodman-droid/NQ/gh-pages/binance/"
-IMG_VER = "kiss0152"
+IMG_VER = "kiss0153"
 # 幣安 App 淺色盤：黃/橘/紫/藍/青 + 深灰 MA200
 PAL = {7: "#F0B90B", 14: "#FF6D00", 25: "#D500F9", 99: "#2962FF", 120: "#00B8D4", 200: "#474D57"}
 VOL_MA = {5: "#F0B90B", 10: "#D500F9"}
