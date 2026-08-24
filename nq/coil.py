@@ -278,7 +278,7 @@ def d30_asof(
     daily: Optional[pd.DataFrame] = None,
     period: int = 30,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """每個 1 分時刻：當時日線 MA30（含當根收盤當今日形成中收盤），以及相對距離。不偷看後面。"""
+    """每個 1 分時刻：當時日線 MA30（已收完日 K 用日線，今日用當根收盤）。不偷看後面。"""
     n = 0 if df is None else len(df)
     ma = np.full(n, np.nan, dtype=float)
     dist = np.full(n, np.nan, dtype=float)
@@ -286,26 +286,29 @@ def d30_asof(
         return ma, dist
     _o, _h, _l, c, _v = _ohlcv(df)
     keys = nq_session_key(df.index)
-    completed: List[float] = []
+    hist: Dict[int, float] = {}
     if daily is not None and len(daily):
-        hist = _daily_close_series(daily)
-        first = int(keys[0])
-        for dt, px in hist.items():
+        for dt, px in _daily_close_series(daily).items():
             ymd = int(dt.year) * 10000 + int(dt.month) * 100 + int(dt.day)
-            if ymd < first:
-                completed.append(float(px))
-    cur_sess: Optional[int] = None
-    cur_c = float("nan")
+            hist[ymd] = float(px)
+    if len(hist) < period - 1:
+        return ma, dist
+    hist_keys = sorted(hist)
     need = int(period) - 1
+    last_sess: Optional[int] = None
+    prior_sum = float("nan")
     for i in range(n):
         sess = int(keys[i])
-        if cur_sess is None or sess != cur_sess:
-            if cur_sess is not None and not np.isnan(cur_c):
-                completed.append(cur_c)
-            cur_sess = sess
+        if last_sess is None or sess != last_sess:
+            prior = [hist[k] for k in hist_keys if k < sess]
+            if len(prior) >= need:
+                prior_sum = float(sum(prior[-need:]))
+            else:
+                prior_sum = float("nan")
+            last_sess = sess
         cur_c = float(c[i])
-        if len(completed) >= need:
-            ma[i] = (float(sum(completed[-need:])) + cur_c) / float(period)
+        if prior_sum == prior_sum:
+            ma[i] = (prior_sum + cur_c) / float(period)
             dist[i] = cur_c - ma[i]
     return ma, dist
 
