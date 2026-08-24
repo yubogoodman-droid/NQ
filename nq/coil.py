@@ -121,7 +121,7 @@ def detect_coil_breakouts(
     max_coil_range: float = 36.0,
     min_coil_range: float = 10.0,
     max_ribbon_width: float = 42.0,
-    min_body: float = 10.0,
+    min_body: float = 0.0,
     min_vol_ratio: float = 2.0,
     vol_lookback: int = 60,
     min_prior_drop: float = 30.0,
@@ -142,8 +142,8 @@ def detect_coil_breakouts(
     """
     抓起漲點：先鎖住均線糾結的盤整箱，再允許之後幾根放量站上箱頂。
 
-    進場還要：MA5>MA10>MA20>MA30 多頭排列、收盤站上 MA200，
-    且 MA60、MA120 都在 MA200 下方（長均還沒被帶走）。
+    進場是「第一次」收盤站上 MA200，且 MA5>MA10>MA20>MA30、
+    MA60 與 MA120 仍在 MA200 下方。不要等後面那根放量長綠。
     """
     if df is None or len(df) == 0:
         return []
