@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NQ 起漲點：均線糾結盤整後放量突破（1 分訊號，對照當時 5 分長相）。
+"""NQ 起漲點：1 分 K 上 5>10>20>30 且這一根才站上 MA200。
 
 用法:
   python3 examples/nq_coil_breakout.py --demo
@@ -351,17 +351,9 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         return ""
     return (
         f"<p class='muted'>漏斗：檢查 {funnel.get('checked', 0)} → "
-        f"盤整箱 {funnel.get('coil', 0)} → "
-        f"等待突破 {funnel.get('sticky', 0)} → "
-        f"長實體 {funnel.get('body', 0)} → "
-        f"非追高 {funnel.get('not_chase', 0)} → "
-        f"站上盤整 {funnel.get('above_coil', 0)} → "
         f"5/10/20/30排列 {funnel.get('stack', 0)} → "
         f"站上MA200 {funnel.get('above_200', 0)} → "
-        f"60與120在200下 {funnel.get('long_below', 0)} → "
-        f"放量 {funnel.get('volume', 0)} → "
-        f"5分站上MA20 {funnel.get('m5_ma20', 0)} → "
-        f"5分站上MA30 {funnel.get('m5_ma30', 0)} → "
+        f"這一根才站上 {funnel.get('reclaim', 0)} → "
         f"進場 {funnel.get('taken', 0)}</p>"
     )
 
@@ -469,11 +461,10 @@ def _trade_cards(
             f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts)\n"
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
-            f"盤整 {t.signal.coil_low:.2f}–{t.signal.coil_high:.2f}  "
-            f"區間 {t.signal.coil_range:.1f}  帶寬 {t.signal.ribbon_width:.1f}\n"
-            f"量能 {t.signal.vol_ratio:.2f}x  實體 {t.signal.body:.1f}  前回檔 {t.signal.prior_drop:.1f}\n"
+            f"回看低 {t.signal.coil_low:.2f}  進場MA200 {t.signal.coil_high:.2f}\n"
+            f"量能 {t.signal.vol_ratio:.2f}x  實體 {t.signal.body:.1f}\n"
             f"1分MA {t.signal.ma5:.1f}>{t.signal.ma10:.1f}>{t.signal.ma20:.1f}>{t.signal.ma30:.1f}  "
-            f"60 {t.signal.ma60:.1f} / 120 {t.signal.ma120:.1f} < 200 {t.signal.ma200:.1f}"
+            f"60 {t.signal.ma60:.1f} / 120 {t.signal.ma120:.1f} / 200 {t.signal.ma200:.1f}"
             f"{m5_line}"
             "</pre>"
             "<p class='chart-cap'>1分K</p>"
@@ -558,8 +549,8 @@ a{{color:#79c0ff}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{escape(symbol)} 起漲點（均線糾結突破）</h1>
-<p class="muted">訊號只看 1分K。盤整看 MA5–MA60 帶寬，長下影會修剪。進場當下 5 分收盤要在 5 分 MA20 與 5 分 MA30 上方。停損＝盤整低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R（移動停利）。連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
+<h1>{escape(symbol)} 起漲點（1分 5>10>20>30 站上MA200）</h1>
+<p class="muted">訊號只看 1分K：MA5&gt;MA10&gt;MA20&gt;MA30，且這一根才收盤站上 MA200。不要等後面放量長綠。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。下面每筆附「當時 5分K」只是對照，不是進場條件。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -615,7 +606,7 @@ def print_signals(
                 m5 += f" 後來 {look['finished_close']:.2f}"
         print(
             f"{prefix}[{i}] Q{sig.quality} {ts.strftime('%Y-%m-%d %H:%M')}  "
-            f"起漲 {sig.entry_price:.2f}  盤整 {sig.coil_low:.2f}-{sig.coil_high:.2f}  "
+            f"起漲 {sig.entry_price:.2f}  回看低 {sig.coil_low:.2f}  MA200 {sig.coil_high:.2f}  "
             f"帶寬 {sig.ribbon_width:.1f}  量 {sig.vol_ratio:.2f}x  "
             f"停損 {sig.stop_price:.2f}  目標 {sig.target_price:.2f}{extra}{m5}"
         )
@@ -641,13 +632,8 @@ def _print_funnel(funnel: Dict[str, int]) -> None:
         return
     print(
         "funnel "
-        f"checked={funnel.get('checked', 0)} coil={funnel.get('coil', 0)} "
-        f"sticky={funnel.get('sticky', 0)} body={funnel.get('body', 0)} "
-        f"not_chase={funnel.get('not_chase', 0)} "
-        f"above={funnel.get('above_coil', 0)} stack={funnel.get('stack', 0)} "
-        f"ma200={funnel.get('above_200', 0)} below={funnel.get('long_below', 0)} "
-        f"vol={funnel.get('volume', 0)} m5={funnel.get('m5_ok', 0)} "
-        f"m5ma20={funnel.get('m5_ma20', 0)} m5ma30={funnel.get('m5_ma30', 0)} "
+        f"checked={funnel.get('checked', 0)} stack={funnel.get('stack', 0)} "
+        f"ma200={funnel.get('above_200', 0)} reclaim={funnel.get('reclaim', 0)} "
         f"taken={funnel.get('taken', 0)}"
     )
 
@@ -719,18 +705,17 @@ def fmt_entry(df, sig: CoilSignal) -> str:
             f"MA30 {_fmt_ma(look['ma30'])} {above30}\n"
         )
     return (
-        f"🟢 <b>起漲點（均線糾結突破）</b>\n"
+        f"🟢 <b>起漲點（1分 5&gt;10&gt;20&gt;30 站上MA200）</b>\n"
         f"時間: <code>{ts.strftime('%Y-%m-%d %H:%M')} ET</code>\n"
         f"品質: <b>Q{sig.quality}</b> ({sig.quality_score}/4)\n"
         f"進場: <code>{sig.entry_price:.2f}</code>\n"
         f"停損: <code>{sig.stop_price:.2f}</code> (−{risk:.1f} pts)\n"
         f"目標: <code>{sig.target_price:.2f}</code> ({r_mult:.1f}R)\n"
         f"移動: 0.7R 保本 · 1R 後停損移到 +0.3R\n"
-        f"盤整: <code>{sig.coil_low:.1f}–{sig.coil_high:.1f}</code> "
-        f"區間 {sig.coil_range:.1f} / 帶寬 {sig.ribbon_width:.1f}\n"
+        f"回看低 / MA200: <code>{sig.coil_low:.1f}–{sig.coil_high:.1f}</code>\n"
         f"{m5_line}"
         f"量能: {sig.vol_ratio:.2f}x · 現價 <code>{last:.2f}</code>\n"
-        f"排列: 5>10>20>30 · 站上MA200 · 60/120&lt;200 · 5分站上MA20與MA30\n"
+        f"排列: 5&gt;10&gt;20&gt;30 · 這一根才站上 MA200\n"
         f"#起漲點 #NQ #Q{sig.quality}"
     )
 

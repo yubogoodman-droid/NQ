@@ -52,16 +52,13 @@ def test_demo_catches_0735_breakout() -> None:
     sig = sigs[0]
     ts = df.index[sig.entry_idx]
     assert ts.hour == 7 and ts.minute >= 30
-    assert sig.entry_price > sig.coil_high
+    assert sig.entry_price > sig.ma200
     assert sig.entry_price > sig.stop_price
     assert abs(sig.stop_price - (sig.coil_low - 5.0)) < 0.01
     assert abs(sig.target_price - (sig.entry_price + 2.0 * (sig.entry_price - sig.stop_price))) < 0.01
-    assert sig.vol_ratio >= 2.0
-    assert sig.quality == "A"
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
-    assert sig.entry_price > sig.ma200
     assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
-    # 不該在盤整區就進場
+    # 不該在還沒收在 MA200 上時就進場
     for s in sigs:
         assert df.index[s.entry_idx] >= pd.Timestamp("2026-08-24 07:30", tz=ET)
 
@@ -128,8 +125,6 @@ def test_real_chart_catches_1129() -> None:
     assert sig.entry_price > sig.ma200
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
     assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
-    assert sig.vol_ratio >= 2.0
-    assert sig.body <= 40.0
     look = m5_look_at(df, df.index[sig.entry_idx])
     assert look is not None
     if not np.isnan(look["ma30"]):
@@ -239,7 +234,7 @@ def test_skip_5m_waterfall_bounce() -> None:
 
 def test_require_above_5m_ma30() -> None:
     df = make_coil_demo_bars()
-    allowed = detect_coil_breakouts(df)
+    allowed = detect_coil_breakouts(df, require_m5_above_ma20=True, require_m5_above_ma30=True)
     assert allowed, "模擬圖 5 分應站上 MA30"
     sig = allowed[0]
     if not np.isnan(sig.m5_ma30):
@@ -259,7 +254,9 @@ def test_require_above_5m_ma30() -> None:
     )
     high = pd.concat([head, df])
     high = high[~high.index.duplicated(keep="last")]
-    blocked = detect_coil_breakouts(high)
+    blocked = detect_coil_breakouts(
+        high, require_m5_above_ma20=True, require_m5_above_ma30=True
+    )
     if blocked:
         for s in blocked:
             assert np.isnan(s.m5_ma30) or s.m5_close > s.m5_ma30
@@ -323,9 +320,12 @@ def test_failed_breakout_exits_on_two_closes() -> None:
     assert trades[0].pnl_points < 0
 
 
-def test_no_signal_in_wide_trend() -> None:
+def test_no_repeat_while_already_above_ma200() -> None:
+    """已經站上 MA200 之後，同一次多頭不會一直進場。"""
     n = 320
-    close = np.linspace(29000.0, 29600.0, n)
+    close = np.full(n, 29100.0)
+    close[240:260] = np.linspace(29100.0, 29220.0, 20)
+    close[260:] = np.linspace(29220.0, 29400.0, n - 260)
     idx = pd.date_range("2026-08-24 02:00", periods=n, freq="1min", tz=ET)
     df = pd.DataFrame(
         {
@@ -338,7 +338,12 @@ def test_no_signal_in_wide_trend() -> None:
         index=idx,
     )
     sigs = detect_coil_breakouts(df)
-    assert not sigs, "a one-way trend with fanned MAs should not count as 起漲"
+    assert sigs, "第一次 5>10>20>30 且站上 MA200 應進場"
+    assert len(sigs) == 1
+    sig = sigs[0]
+    assert sig.entry_price > sig.ma200
+    assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
+    assert df.index[sig.entry_idx] >= idx[240]
 
 
 def test_simulate_and_html(tmp_path: Path | None = None) -> None:
@@ -400,7 +405,7 @@ def main() -> int:
     test_require_above_5m_ma30()
     test_skip_chase_body()
     test_failed_breakout_exits_on_two_closes()
-    test_no_signal_in_wide_trend()
+    test_no_repeat_while_already_above_ma200()
     test_simulate_and_html()
     test_resample_ohlcv_5m()
     test_html_1m_5m_asof()

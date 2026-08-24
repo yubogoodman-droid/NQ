@@ -1,9 +1,6 @@
-"""NQ 均線糾結後放量突破（起漲點）。
+"""NQ 1 分起漲點：5>10>20>30 且這一根才站上 MA200。
 
-對應手機圖那種走法：先跌、均線收成一束、窄幅盤整，再放量長綠 K
-一次站上盤整高點與整束均線。起漲點是突破那根，不是最低點。
-
-訊號只在 1 分 K 上抓。5 分用來對照「1 分條件成立當下」那根 5 分長什麼樣。
+訊號只在 1 分 K 上抓。5 分用來對照進場當下那根 5 分長什麼樣，不是進場條件。
 """
 
 from __future__ import annotations
@@ -289,7 +286,7 @@ def detect_coil_breakouts(
     ribbon_n: int = 5,
     max_wick: float = 15.0,
     min_body: float = 0.0,
-    min_vol_ratio: float = 2.0,
+    min_vol_ratio: float = 0.0,
     vol_lookback: int = 60,
     min_prior_drop: float = 30.0,
     prior_lookback: int = 120,
@@ -301,24 +298,23 @@ def detect_coil_breakouts(
     max_coil_vs_prior: float = 0.70,
     break_window: int = 8,
     stop_buffer: float = 5.0,
+    stop_lookback: int = 20,
     target_r: float = 2.0,
     min_entry_gap: int = 45,
     max_body: float = 40.0,
     max_m5_below_200: float = -1.0,
-    require_m5_above_ma20: bool = True,
-    require_m5_above_ma30: bool = True,
+    require_m5_above_ma20: bool = False,
+    require_m5_above_ma30: bool = False,
+    require_long_below: bool = False,
     ma_periods: Sequence[int] = MA_PERIODS,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[CoilSignal]:
     """
-    抓起漲點：先鎖住短均線糾結的盤整箱，再允許之後幾根放量站上箱頂。
+    1 分 K 起漲點：MA5>MA10>MA20>MA30 多頭排列，且這一根才收盤站上 MA200。
 
-    進場是「第一次」收盤站上 MA200，且 MA5>MA10>MA20>MA30、
-    MA60 與 MA120 仍在 MA200 下方。不要等後面那根放量長綠。
-
-    盤整看 MA5–MA60 帶寬（不把還在頭上的 MA200 算進去），長下影會修剪。
-    另外不接已經噴超過 max_body 的長實體。進場當下，當時 5 分收盤要在
-    5 分 MA20 與 5 分 MA30 上方。
+    前一根收盤還在 MA200 下方（或等於），這一根收盤站上，才算「站上」。
+    不要等後面那根放量長綠。盤整箱子、放量、5 分均線都不是進場條件
+    （仍可用參數打開）。停損用進場前 stop_lookback 根的修剪低點 − buffer。
     """
     if df is None or len(df) == 0:
         return []
@@ -402,122 +398,126 @@ def detect_coil_breakouts(
             continue
         bump("checked")
 
-        if last_coil is not None and (i - last_coil.end_idx) > break_window:
-            last_coil = None
-
-        if last_coil is not None and i - last_entry >= min_entry_gap:
-            bump("sticky")
-            body = float(c[i] - o[i])
-            vol_win = v[max(0, i - vol_lookback) : i]
-            vol_ref = float(np.median(vol_win)) if len(vol_win) else 0.0
-            vol_ratio = float(v[i] / vol_ref) if vol_ref > 1e-9 else 1.0
-            ma5 = float(mas[0][i])
-            ma10 = float(mas[1][i])
-            ma20 = float(mas[2][i])
-            ma30 = float(mas[3][i])
-            ma60 = float(mas[4][i])
-            ma120 = float(mas[6][i])
-            ma200 = float(mas[7][i])
-            ok_body = body >= min_body
-            ok_max_body = max_body <= 0 or body <= max_body
-            ok_break = c[i] >= last_coil.high + min_break_over
-            ok_stack = ma5 > ma10 > ma20 > ma30
-            ok_above_200 = c[i] > ma200
-            ok_long_below = ma60 < ma200 and ma120 < ma200
-            ok_vol = vol_ref <= 1e-9 or vol_ratio >= min_vol_ratio
-            m5d = float(m5_dist[i])
-            ok_m5 = (
-                max_m5_below_200 < 0
-                or np.isnan(m5d)
-                or m5d > -max_m5_below_200
-            )
-            m5_20 = float(m5_ma20[i])
-            ok_m5_20 = (not require_m5_above_ma20) or np.isnan(m5_20) or float(_m5_c[i]) > m5_20
-            m5_30 = float(m5_ma30[i])
-            ok_m5_30 = (not require_m5_above_ma30) or np.isnan(m5_30) or float(_m5_c[i]) > m5_30
-            if ok_body:
-                bump("body")
-            if ok_max_body:
-                bump("not_chase")
-            if ok_break:
-                bump("above_coil")
-            if ok_stack:
-                bump("stack")
-            if ok_above_200:
-                bump("above_200")
-            if ok_long_below:
-                bump("long_below")
-            if ok_vol:
-                bump("volume")
-            if ok_m5:
-                bump("m5_ok")
-            if ok_m5_20:
-                bump("m5_ma20")
-            if ok_m5_30:
-                bump("m5_ma30")
-            if (
-                ok_body
-                and ok_max_body
-                and ok_break
-                and ok_stack
-                and ok_above_200
-                and ok_long_below
-                and ok_vol
-                and ok_m5
-                and ok_m5_20
-                and ok_m5_30
-            ):
-                entry = float(c[i])
-                stop = last_coil.low - stop_buffer
-                risk = entry - stop
-                if risk > 0:
-                    bump("taken")
-                    q_score, q_grade = quality_of(
-                        last_coil.range, last_coil.ribbon_width, vol_ratio, body
-                    )
-                    signals.append(
-                        CoilSignal(
-                            coil_start_idx=last_coil.start_idx,
-                            coil_end_idx=last_coil.end_idx,
-                            entry_idx=i,
-                            entry_price=entry,
-                            stop_price=float(stop),
-                            target_price=float(entry + risk * target_r),
-                            coil_high=last_coil.high,
-                            coil_low=last_coil.low,
-                            coil_range=last_coil.range,
-                            ribbon_width=last_coil.ribbon_width,
-                            vol_ratio=vol_ratio,
-                            prior_drop=last_coil.prior_drop,
-                            body=body,
-                            ma5=ma5,
-                            ma10=ma10,
-                            ma20=ma20,
-                            ma30=ma30,
-                            ma60=ma60,
-                            ma100=float(mas[5][i]),
-                            ma120=ma120,
-                            ma200=ma200,
-                            m5_close=float(_m5_c[i]),
-                            m5_ma20=m5_20,
-                            m5_ma30=m5_30,
-                            m5_ma200=float(m5_ma200[i]),
-                            m5_dist=m5d,
-                            quality=q_grade,
-                            quality_score=q_score,
-                        )
-                    )
-                    last_entry = i
-                    last_coil = None
-                    i += min_entry_gap
-                    continue
-
-        coil = find_coil(i)
-        if coil is not None:
-            bump("coil")
-            # 價格已離開舊箱時不要用起漲 K 重算盤整，否則箱子會被撐破
-            if last_coil is None or c[i] <= last_coil.high:
+        body = float(c[i] - o[i])
+        vol_win = v[max(0, i - vol_lookback) : i]
+        vol_ref = float(np.median(vol_win)) if len(vol_win) else 0.0
+        vol_ratio = float(v[i] / vol_ref) if vol_ref > 1e-9 else 1.0
+        ma5 = float(mas[0][i])
+        ma10 = float(mas[1][i])
+        ma20 = float(mas[2][i])
+        ma30 = float(mas[3][i])
+        ma60 = float(mas[4][i])
+        ma120 = float(mas[6][i])
+        ma200 = float(mas[7][i])
+        prev_ma200 = float(mas[7][i - 1])
+        ok_stack = ma5 > ma10 > ma20 > ma30
+        ok_above_200 = c[i] > ma200
+        ok_reclaim = ok_above_200 and float(c[i - 1]) <= prev_ma200
+        ok_body = body >= min_body
+        ok_max_body = max_body <= 0 or body <= max_body
+        ok_long_below = (not require_long_below) or (ma60 < ma200 and ma120 < ma200)
+        ok_vol = min_vol_ratio <= 0 or vol_ref <= 1e-9 or vol_ratio >= min_vol_ratio
+        m5d = float(m5_dist[i])
+        ok_m5 = (
+            max_m5_below_200 < 0
+            or np.isnan(m5d)
+            or m5d > -max_m5_below_200
+        )
+        m5_20 = float(m5_ma20[i])
+        ok_m5_20 = (not require_m5_above_ma20) or np.isnan(m5_20) or float(_m5_c[i]) > m5_20
+        m5_30 = float(m5_ma30[i])
+        ok_m5_30 = (not require_m5_above_ma30) or np.isnan(m5_30) or float(_m5_c[i]) > m5_30
+        if ok_stack:
+            bump("stack")
+        if ok_above_200:
+            bump("above_200")
+        if ok_reclaim:
+            bump("reclaim")
+        if ok_body:
+            bump("body")
+        if ok_max_body:
+            bump("not_chase")
+        if ok_long_below:
+            bump("long_below")
+        if ok_vol:
+            bump("volume")
+        if ok_m5:
+            bump("m5_ok")
+        if ok_m5_20:
+            bump("m5_ma20")
+        if ok_m5_30:
+            bump("m5_ma30")
+        if (
+            i - last_entry >= min_entry_gap
+            and ok_stack
+            and ok_reclaim
+            and ok_body
+            and ok_max_body
+            and ok_long_below
+            and ok_vol
+            and ok_m5
+            and ok_m5_20
+            and ok_m5_30
+        ):
+            look_from = max(0, i - int(stop_lookback))
+            swing_low = min(_clipped_low(o, l, c, j, max_wick) for j in range(look_from, i))
+            swing_high = float(np.max(h[look_from:i])) if i > look_from else float(h[i])
+            coil = find_coil(i)
+            if coil is not None:
+                bump("coil")
+                swing_low = min(swing_low, coil.low)
+                swing_high = max(swing_high, coil.high)
                 last_coil = coil
+            entry = float(c[i])
+            stop = float(swing_low - stop_buffer)
+            risk = entry - stop
+            if risk > 0:
+                bump("taken")
+                ribbon = np.array(
+                    [float(ma[i]) for ma in mas[: max(1, min(int(ribbon_n), len(mas)))]],
+                    dtype=float,
+                )
+                ribbon_width = float(ribbon.max() - ribbon.min())
+                coil_range = swing_high - swing_low
+                look_prior = max(0, look_from - prior_lookback)
+                prior_drop = float(np.max(h[look_prior:i]) - np.min(l[look_prior:i]))
+                q_score, q_grade = quality_of(coil_range, ribbon_width, vol_ratio, body)
+                signals.append(
+                    CoilSignal(
+                        coil_start_idx=look_from if last_coil is None else last_coil.start_idx,
+                        coil_end_idx=i - 1 if last_coil is None else last_coil.end_idx,
+                        entry_idx=i,
+                        entry_price=entry,
+                        stop_price=float(stop),
+                        target_price=float(entry + risk * target_r),
+                        coil_high=float(ma200),
+                        coil_low=float(swing_low),
+                        coil_range=float(coil_range),
+                        ribbon_width=ribbon_width,
+                        vol_ratio=vol_ratio,
+                        prior_drop=prior_drop if last_coil is None else last_coil.prior_drop,
+                        body=body,
+                        ma5=ma5,
+                        ma10=ma10,
+                        ma20=ma20,
+                        ma30=ma30,
+                        ma60=ma60,
+                        ma100=float(mas[5][i]),
+                        ma120=ma120,
+                        ma200=ma200,
+                        m5_close=float(_m5_c[i]),
+                        m5_ma20=m5_20,
+                        m5_ma30=m5_30,
+                        m5_ma200=float(m5_ma200[i]),
+                        m5_dist=m5d,
+                        quality=q_grade,
+                        quality_score=q_score,
+                    )
+                )
+                last_entry = i
+                last_coil = None
+                i += min_entry_gap
+                continue
         i += 1
     return signals
 
@@ -532,10 +532,9 @@ def simulate(
     trail_after_r: float = 1.0,
     trail_lock_r: float = 0.3,
 ) -> List[CoilTrade]:
-    """停損＝盤整低點；0.7R 後保本；走到 1R 後停損移到 +0.3R（移動停利）；目標 2R。
+    """停損＝進場前波段低點；0.7R 後保本；走到 1R 後停損移到 +0.3R；目標 2R。
 
-    若連續 fail_closes 根收回到盤整高點下方，視為突破失敗，用收盤出場，
-    不再等到盤整低點。
+    若連續 fail_closes 根收回到進場時的 MA200 下方，視為站上失敗，用收盤出場。
     """
     if not signals:
         return []
@@ -625,14 +624,14 @@ def make_coil_demo_bars(n: int = 420) -> pd.DataFrame:
     open_ = np.zeros(n, dtype=float)
     vol = np.full(n, 90.0, dtype=float)
 
-    # 02:00 起橫盤，讓 8 條均線黏在一起
-    close[0] = 29200.0
+    # 02:00 起在 MA200 上方橫盤，後面下殺後 MA200 仍在頭上
+    close[0] = 29240.0
     for i in range(1, 250):
-        close[i] = 29200.0 + (3.0 if i % 2 == 0 else -3.0)
+        close[i] = 29240.0 + (3.0 if i % 2 == 0 else -3.0)
     # 緩跌到 07:10 附近
     for i in range(250, 310):
         t = (i - 250) / 60.0
-        close[i] = 29200.0 - t * 54.0 + (2.0 if i % 2 == 0 else -2.0)
+        close[i] = 29240.0 - t * 94.0 + (2.0 if i % 2 == 0 else -2.0)
     # 07:10 觸底 29145.75 後拉回
     close[310] = 29145.75
     close[311] = 29162.0
