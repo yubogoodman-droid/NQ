@@ -84,6 +84,23 @@ class LiveHelperTests(unittest.TestCase):
         self.assertIn("2451.TW", text)
         self.assertNotIn("十五分", text)
 
+    def test_format_telegram_short_mentions_break(self) -> None:
+        df = _history_then_live([101.0, 95.0])
+        hits = iter_5m_ma200_alerts(df, side="short")
+        self.assertEqual(len(hits), 1)
+        text = format_telegram("創見", "2451.TW", hits[0], "5m")
+        self.assertIn("五分K 剛跌破 MA200", text)
+        self.assertIn("&lt;", text)
+        self.assertNotIn("剛站上", text)
+
+    def test_alerts_on_closed_bar_short_side(self) -> None:
+        df = _history_then_live([101.0, 95.0])
+        bar = OhlcvBar(pd.Timestamp("2026-08-21 09:05:00", tz=TAIPEI), 95, 95, 95, 95)
+        hits = alerts_on_closed_bar(df, bar, tf="5m", side="short")
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].side, "short")
+        self.assertEqual(alerts_on_closed_bar(df, bar, tf="5m", side="long"), [])
+
     def test_alerts_on_closed_bar_only_that_five(self) -> None:
         df = _history_then_live([99.0, 105.0])
         bar = OhlcvBar(pd.Timestamp("2026-08-21 09:05:00", tz=TAIPEI), 105, 105, 105, 105)

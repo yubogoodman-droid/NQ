@@ -2,12 +2,13 @@
 """台股永豐監控（單一檔，可直接放到 PyCharm 執行）。
 
 成交額前 100，濾 ETF／金融／電信／股價 500 以上。
-五分或十五分剛站上 MA200 就推 Telegram。
+五分或十五分剛站上／剛跌破 MA200 就推 Telegram（預設多方＋空方）。
 
 把下面四行金鑰填好，然後 Run。不要把檔名取成 tw.py。
 
     python watch_tw.py --test
     python watch_tw.py
+    python watch_tw.py --side short
 """
 
 from __future__ import annotations
@@ -540,14 +541,23 @@ class AlertSnapshot:
     m15_ma20: float | None = None
     m15_ma200: float | None = None
     m15_above_ma200_minutes: int | None = None
+    side: str = "long"
 
     @property
     def bullish_aligned(self) -> bool:
         return self.ma5 > self.ma10 > self.ma20
 
     @property
+    def bearish_aligned(self) -> bool:
+        return self.ma5 < self.ma10 < self.ma20
+
+    @property
     def mas_rising(self) -> bool:
         return self.ma5 > self.prev_ma5 and self.ma10 > self.prev_ma10 and self.ma20 > self.prev_ma20
+
+    @property
+    def mas_falling(self) -> bool:
+        return self.ma5 < self.prev_ma5 and self.ma10 < self.prev_ma10 and self.ma20 < self.prev_ma20
 
     @property
     def ribbon_fan_pct(self) -> float:
@@ -573,8 +583,17 @@ class AlertSnapshot:
         return self.bullish_aligned and self.mas_rising
 
     @property
+    def ribbon_down(self) -> bool:
+        """空頭排列：MA5 < MA10 < MA20，且三條都比前一根低。"""
+        return self.bearish_aligned and self.mas_falling
+
+    @property
     def crossed_above_ma200(self) -> bool:
         return self.close > self.ma200 and self.prev_close <= self.prev_ma200
+
+    @property
+    def crossed_below_ma200(self) -> bool:
+        return self.close < self.ma200 and self.prev_close >= self.prev_ma200
 
     @property
     def close_above_all_mas(self) -> bool:
@@ -583,6 +602,15 @@ class AlertSnapshot:
             and self.close > self.ma10
             and self.close > self.ma20
             and self.close > self.ma200
+        )
+
+    @property
+    def close_below_all_mas(self) -> bool:
+        return (
+            self.close < self.ma5
+            and self.close < self.ma10
+            and self.close < self.ma20
+            and self.close < self.ma200
         )
 
     @property
@@ -715,13 +743,28 @@ def _minutes_above_ma200(m15: pd.DataFrame, signal_ts: pd.Timestamp) -> int:
     return completed * M15_BAR_MINUTES + elapsed
 
 
+def _wanted_sides(side: str) -> tuple[str, ...]:
+    if side == "both":
+        return ("long", "short")
+    if side in ("long", "short"):
+        return (side,)
+    raise ValueError(f"unknown side: {side}")
+
+
+def _passes(snap: AlertSnapshot, side: str) -> bool:
+    if side == "short":
+        return snap.ribbon_down and snap.crossed_below_ma200 and snap.close_below_all_mas
+    return snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas
+
+
 def iter_5m_ma200_alerts(
     df: pd.DataFrame,
     *,
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
+    side: str = "long",
 ) -> list[AlertSnapshot]:
-    """同一交易日連續五分 K：MA5 > MA10 > MA20 且往上，剛站上五分 MA200（含開盤第一根），收盤高於 MA5／10／20／200。"""
+    """同一交易日連續五分 K。多方：MA5>MA10>MA20 且往上，剛站上 MA200；空方鏡像跌破。含開盤第一根。"""
     if df is None or len(df) < MA_LONG + 1:
         return []
     work = add_moving_averages(df)
@@ -736,6 +779,7 @@ def iter_5m_ma200_alerts(
                 break
         if not matched:
             return []
+    wanted = _wanted_sides(side)
     for i in range(start, len(work)):
         ts = work.index[i]
         if until is not None and ts > until:
@@ -743,9 +787,10 @@ def iter_5m_ma200_alerts(
         snap = _snapshot_at(work, i)
         if snap is None:
             continue
-        if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
-            continue
-        hits.append(snap)
+        for want in wanted:
+            if _passes(snap, want):
+                hits.append(replace(snap, side=want))
+                break
     return hits
 
 
@@ -754,8 +799,9 @@ def iter_15m_ma200_alerts(
     *,
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
+    side: str = "long",
 ) -> list[AlertSnapshot]:
-    """同一交易日連續十五分 K：MA5 > MA10 > MA20 且往上，剛站上十五分 MA200（含開盤第一根），收盤高於 MA5／10／20／200。"""
+    """同一交易日連續十五分 K。多方剛站上／空方剛跌破十五分 MA200（含開盤第一根）。"""
     if df is None or df.empty or "close" not in df.columns:
         return []
     m15 = resample_ohlcv(df, "15min")
@@ -773,6 +819,7 @@ def iter_15m_ma200_alerts(
                 break
         if not matched:
             return []
+    wanted = _wanted_sides(side)
     for i in range(start, len(work)):
         ts = work.index[i]
         if until is not None and ts > until:
@@ -780,14 +827,15 @@ def iter_15m_ma200_alerts(
         snap = _snapshot_at(work, i)
         if snap is None:
             continue
-        if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
+        matched_side = next((want for want in wanted if _passes(snap, want)), None)
+        if matched_side is None:
             continue
         bar_end = pd.Timestamp(ts) + pd.Timedelta(minutes=15)
         five_window = df[df.index < bar_end]
         if five_window.empty:
             continue
         signal_ts = pd.Timestamp(five_window.index[-1])
-        hits.append(replace(snap, timestamp=signal_ts))
+        hits.append(replace(snap, timestamp=signal_ts, side=matched_side))
     return hits
 
 
@@ -951,6 +999,7 @@ def alerts_on_closed_bar(
     bar: OhlcvBar,
     *,
     tf: str,
+    side: str = "both",
 ) -> list[AlertSnapshot]:
     """只收「剛收完這根」對應的通知，避免把歷史交叉重發。"""
     if frame is None or frame.empty:
@@ -959,9 +1008,11 @@ def alerts_on_closed_bar(
     day = mark.normalize()
     until = mark + pd.Timedelta(minutes=4, seconds=59)
     if tf == "15m":
-        hits = iter_15m_ma200_alerts(frame, since=day, until=until + pd.Timedelta(minutes=10))
+        hits = iter_15m_ma200_alerts(
+            frame, since=day, until=until + pd.Timedelta(minutes=10), side=side
+        )
         return [h for h in hits if _same_15m(h.timestamp, mark)]
-    hits = iter_5m_ma200_alerts(frame, since=day, until=until)
+    hits = iter_5m_ma200_alerts(frame, since=day, until=until, side=side)
     return [h for h in hits if _as_taipei(h.timestamp) == mark]
 
 
@@ -973,14 +1024,19 @@ def _same_15m(signal_ts: pd.Timestamp, five_start: pd.Timestamp) -> bool:
 
 
 def format_telegram(name: str, symbol: str, snap: AlertSnapshot, tf: str) -> str:
-    title = "十五分K 剛站上 MA200" if tf == "15m" else "五分K 剛站上 MA200"
+    short = getattr(snap, "side", "long") == "short"
+    if tf == "15m":
+        title = "十五分K 剛跌破 MA200" if short else "十五分K 剛站上 MA200"
+    else:
+        title = "五分K 剛跌破 MA200" if short else "五分K 剛站上 MA200"
+    cmp = "&lt;" if short else "&gt;"
     ts = pd.Timestamp(snap.timestamp).tz_convert(TAIPEI).strftime("%H:%M")
     url = f"https://tw.stock.yahoo.com/quote/{symbol}"
     lines = [
         f"<b>{title}</b>",
         f"{html.escape(name)} {html.escape(symbol)}",
         f"時間 {ts}",
-        f"收盤 {snap.close:.2f} &gt; MA200 {snap.ma200:.2f}",
+        f"收盤 {snap.close:.2f} {cmp} MA200 {snap.ma200:.2f}",
         f"短均 {snap.ma5:.2f} / {snap.ma10:.2f} / {snap.ma20:.2f}",
     ]
     lines.append(url)
@@ -1115,12 +1171,13 @@ def fetch_history(api, contract, days: int = 20) -> pd.DataFrame:
 
 def push_snap(stock: RankedStock, snap, tf: str, seen: set[str], *, dry: bool) -> bool:
     day = datetime.now(TAIPEI).date().isoformat()
-    key = f"{day}:{stock.symbol}:{pd.Timestamp(snap.timestamp)}:{tf}"
+    side = getattr(snap, "side", "long")
+    key = f"{day}:{stock.symbol}:{pd.Timestamp(snap.timestamp)}:{tf}:{side}"
     if key in seen:
         return False
     seen.add(key)
     text = format_telegram(stock.name, stock.symbol, snap, tf)
-    print(text.replace("&gt;", ">"), flush=True)
+    print(text.replace("&gt;", ">").replace("&lt;", "<"), flush=True)
     if dry:
         return True
     if telegram_send(text):
@@ -1138,6 +1195,7 @@ def emit_alerts(
     seen: set[str],
     *,
     dry: bool,
+    side: str = "both",
 ) -> None:
     jobs = []
     if "5m" in tfs:
@@ -1145,12 +1203,20 @@ def emit_alerts(
     if "15m" in tfs and should_run_15m(bar):
         jobs.append("15m")
     for tf in jobs:
-        for snap in alerts_on_closed_bar(frame, bar, tf=tf):
+        for snap in alerts_on_closed_bar(frame, bar, tf=tf, side=side):
             push_snap(stock, snap, tf, seen, dry=dry)
     save_seen(seen)
 
 
-def scan_once(api, candidates: list[RankedStock], tfs: list[str], seen: set[str], *, dry: bool) -> int:
+def scan_once(
+    api,
+    candidates: list[RankedStock],
+    tfs: list[str],
+    seen: set[str],
+    *,
+    dry: bool,
+    side: str = "both",
+) -> int:
     n = 0
     for i, stock in enumerate(candidates, 1):
         contract = resolve_contract(api, stock)
@@ -1165,10 +1231,10 @@ def scan_once(api, candidates: list[RankedStock], tfs: list[str], seen: set[str]
         until = since + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
         before = len(seen)
         if "5m" in tfs:
-            for snap in iter_5m_ma200_alerts(frame, since=since, until=until):
+            for snap in iter_5m_ma200_alerts(frame, since=since, until=until, side=side):
                 push_snap(stock, snap, "5m", seen, dry=dry)
         if "15m" in tfs:
-            for snap in iter_15m_ma200_alerts(frame, since=since, until=until):
+            for snap in iter_15m_ma200_alerts(frame, since=since, until=until, side=side):
                 push_snap(stock, snap, "15m", seen, dry=dry)
         save_seen(seen)
         n += len(seen) - before
@@ -1179,13 +1245,15 @@ def scan_once(api, candidates: list[RankedStock], tfs: list[str], seen: set[str]
 def run_watch(args: argparse.Namespace) -> int:
     apply_keys()
     tfs = ["5m", "15m"] if args.tf == "both" else [args.tf]
+    side = args.side
+    side_zh = {"long": "多方", "short": "空方", "both": "多方＋空方"}[side]
     seen = load_seen()
     candidates, label = load_universe(args.top, args.max_price)
-    print(f"{label} → 掃描 {len(candidates)} 檔  tf={'+'.join(tfs)}", flush=True)
+    print(f"{label} → 掃描 {len(candidates)} 檔  tf={'+'.join(tfs)}  {side_zh}", flush=True)
 
     api, sj = login_shioaji(simulation=args.sim)
     if args.once:
-        found = scan_once(api, candidates, tfs, seen, dry=args.dry)
+        found = scan_once(api, candidates, tfs, seen, dry=args.dry, side=side)
         print(f"掃完，新通知 {found} 則", flush=True)
         try:
             api.logout()
@@ -1247,7 +1315,7 @@ def run_watch(args: argparse.Namespace) -> int:
     print(f"已訂閱 {subscribed} 檔 tick。Ctrl+C 結束。", flush=True)
     if not args.dry:
         telegram_send(
-            f"台股監控已啟動\n{label}\n掃描 {len(builders)} 檔　{'＋'.join(tfs)}"
+            f"台股監控已啟動\n{label}\n掃描 {len(builders)} 檔　{'＋'.join(tfs)}　{side_zh}"
         )
 
     try:
@@ -1274,7 +1342,7 @@ def run_watch(args: argparse.Namespace) -> int:
                 f"{bar.start.strftime('%H:%M')} 收 {stock.name} {bar.close:.2f}",
                 flush=True,
             )
-            emit_alerts(stock, frames[code], bar, tfs, seen, dry=args.dry)
+            emit_alerts(stock, frames[code], bar, tfs, seen, dry=args.dry, side=side)
     except KeyboardInterrupt:
         print("\n結束監控", flush=True)
     finally:
@@ -1295,6 +1363,12 @@ def test_telegram() -> int:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="永豐 Shioaji 台股五分／十五分 MA200 Telegram 監控")
     p.add_argument("--tf", choices=("5m", "15m", "both"), default="both")
+    p.add_argument(
+        "--side",
+        choices=("long", "short", "both"),
+        default="both",
+        help="多方站上／空方跌破／兩邊都盯（預設 both）",
+    )
     p.add_argument("--top", type=int, default=100)
     p.add_argument("--max-price", type=float, default=500.0)
     p.add_argument("--test", action="store_true", help="只測 Telegram")

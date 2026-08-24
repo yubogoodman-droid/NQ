@@ -41,18 +41,24 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 ## 台股五分 K 回測
 
-成交額前 100、濾掉 ETF／金融股／電信股／股價 500 以上。五分 K **MA5 > MA10 > MA20 且往上**，當根收盤剛站上五分 **MA200**（開盤第一根跳空也算），收盤高於 MA5／10／20／200，記一則通知。
+成交額前 100、濾掉 ETF／金融股／電信股／股價 500 以上。
+
+**多方：** 五分 K **MA5 > MA10 > MA20 且往上**，當根收盤剛站上五分 **MA200**（開盤第一根跳空也算），收盤高於 MA5／10／20／200。
+
+**空方：** 鏡像條件，**MA5 < MA10 < MA20 且往下**，當根收盤剛跌破 MA200，收盤低於 MA5／10／20／200。
 
 ```bash
 python3 examples/backtest_tw_5m.py --days 10
 python3 examples/backtest_tw_15m.py --days 10
+python3 examples/backtest_tw_5m.py --side short --days 1 --today 2026-08-24 -o docs/tw/backtest-5m-short-2026-08-24.html
+python3 examples/backtest_tw_15m.py --side short --days 1 --today 2026-08-24 -o docs/tw/backtest-15m-short-2026-08-24.html
 ```
 
-報告：`docs/tw/backtest-5m-15m-1h.html`（五分K）、`docs/tw/backtest-15m-1h.html`（十五分K；同一套多頭排列＋剛站上 MA200）
+報告：`docs/tw/backtest-5m-15m-1h.html`（五分K 多方）、`docs/tw/backtest-15m-1h.html`（十五分K 多方）
 
 ## 永豐盤中監控 → Telegram
 
-同一套掃描池與進場條件。啟動時用永豐抓一次歷史 1 分K 當均線底，盤中改訂閱 tick 合成五分／十五分（不要盤中重覆打 kbars）。符合就推 Telegram，同一根 K 不重發。
+同一套掃描池。預設 **多方＋空方** 都盯：五分／十五分剛站上或剛跌破 MA200 就推 Telegram（標題會標「剛站上」或「剛跌破」），同一根 K 不重發。啟動時用永豐抓一次歷史 1 分K 當均線底，盤中改訂閱 tick 合成五分／十五分（不要盤中重覆打 kbars）。
 
 本機金鑰請填在 `watch_tw.py` 最上面四行，或放旁邊的 `local_secrets.py`（已 gitignore，不要 commit）。
 
@@ -67,8 +73,8 @@ TELEGRAM_CHAT_ID=...     # 也可用 TG_CHAT_ID
 pip install pandas requests shioaji
 python watch_tw.py --test     # 先測 Telegram
 python watch_tw.py --once     # 盤後用歷史K掃今天
-python watch_tw.py            # 盤中一直盯（五分＋十五分）
-python watch_tw.py --tf 5m
+python watch_tw.py            # 盤中一直盯（五分＋十五分，多方＋空方）
+python watch_tw.py --tf 5m --side short
 ```
 
 PyCharm：只要這一個檔 `watch_tw.py`。下載後放到專案裡，填金鑰，按 Run。檔名不要叫 `tw.py`。

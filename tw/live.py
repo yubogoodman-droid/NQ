@@ -147,6 +147,7 @@ def alerts_on_closed_bar(
     bar: OhlcvBar,
     *,
     tf: str,
+    side: str = "both",
 ) -> list[AlertSnapshot]:
     """只收「剛收完這根」對應的通知，避免把歷史交叉重發。"""
     if frame is None or frame.empty:
@@ -155,9 +156,11 @@ def alerts_on_closed_bar(
     day = mark.normalize()
     until = mark + pd.Timedelta(minutes=4, seconds=59)
     if tf == "15m":
-        hits = iter_15m_ma200_alerts(frame, since=day, until=until + pd.Timedelta(minutes=10))
+        hits = iter_15m_ma200_alerts(
+            frame, since=day, until=until + pd.Timedelta(minutes=10), side=side
+        )
         return [h for h in hits if _same_15m(h.timestamp, mark)]
-    hits = iter_5m_ma200_alerts(frame, since=day, until=until)
+    hits = iter_5m_ma200_alerts(frame, since=day, until=until, side=side)
     return [h for h in hits if _as_taipei(h.timestamp) == mark]
 
 
@@ -169,14 +172,19 @@ def _same_15m(signal_ts: pd.Timestamp, five_start: pd.Timestamp) -> bool:
 
 
 def format_telegram(name: str, symbol: str, snap: AlertSnapshot, tf: str) -> str:
-    title = "十五分K 剛站上 MA200" if tf == "15m" else "五分K 剛站上 MA200"
+    short = getattr(snap, "side", "long") == "short"
+    if tf == "15m":
+        title = "十五分K 剛跌破 MA200" if short else "十五分K 剛站上 MA200"
+    else:
+        title = "五分K 剛跌破 MA200" if short else "五分K 剛站上 MA200"
+    cmp = "&lt;" if short else "&gt;"
     ts = pd.Timestamp(snap.timestamp).tz_convert(TAIPEI).strftime("%H:%M")
     url = f"https://tw.stock.yahoo.com/quote/{symbol}"
     lines = [
         f"<b>{title}</b>",
         f"{html.escape(name)} {html.escape(symbol)}",
         f"時間 {ts}",
-        f"收盤 {snap.close:.2f} &gt; MA200 {snap.ma200:.2f}",
+        f"收盤 {snap.close:.2f} {cmp} MA200 {snap.ma200:.2f}",
         f"短均 {snap.ma5:.2f} / {snap.ma10:.2f} / {snap.ma20:.2f}",
     ]
     lines.append(url)

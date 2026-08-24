@@ -1,4 +1,4 @@
-"""台股五分 K 回測：成交額前 N、MA5>MA10>MA20 且往上、當根收盤剛站上 MA200。"""
+"""台股五分／十五分 K 回測：成交額前 N、多方站上或空方跌破 MA200。"""
 
 from __future__ import annotations
 
@@ -35,6 +35,7 @@ class BacktestConfig:
     daily_range: str = "2y"
     today: date | None = None
     timeout: int = 20
+    side: str = "long"
 
 
 @dataclass
@@ -68,6 +69,7 @@ class BacktestResult:
     skipped: list[tuple[date, RankedStock, str]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     signal_tf: str = "5m"
+    side: str = "long"
 
     def hits_on(self, day: date) -> list[BacktestHit]:
         return [h for h in self.hits if h.day == day]
@@ -103,7 +105,7 @@ def run_5m_backtest(
             if len(df) < 201:
                 skipped.append((item.day, stock, f"五分 K 不足 201 根（{len(df)}）"))
                 continue
-            alerts = iter_5m_ma200_alerts(df, since=since, until=until)
+            alerts = iter_5m_ma200_alerts(df, since=since, until=until, side=cfg.side)
             if not alerts:
                 continue
             for snap in alerts:
@@ -120,6 +122,7 @@ def run_5m_backtest(
         hits=hits,
         skipped=skipped,
         signal_tf="5m",
+        side=cfg.side,
     )
 
 
@@ -153,7 +156,7 @@ def run_15m_backtest(
             if len(df) < 600:
                 skipped.append((item.day, stock, f"五分 K 不足 600 根（{len(df)}）"))
                 continue
-            alerts = iter_15m_ma200_alerts(df, since=since, until=until)
+            alerts = iter_15m_ma200_alerts(df, since=since, until=until, side=cfg.side)
             if not alerts:
                 continue
             for snap in alerts:
@@ -176,6 +179,7 @@ def run_15m_backtest(
         hits=hits,
         skipped=skipped,
         signal_tf="15m",
+        side=cfg.side,
     )
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""台股十五分 K 回測：MA5 > MA10 > MA20 且往上，當根收盤剛站上十五分 MA200。"""
+"""台股十五分 K 回測：多方剛站上、或空方剛跌破十五分 MA200。"""
 
 from __future__ import annotations
 
@@ -27,6 +27,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--include-financial", action="store_true", help="不過濾金融股")
     p.add_argument("--include-telecom", action="store_true", help="不過濾電信股")
     p.add_argument("--today", help="回測截止日 YYYY-MM-DD（預設台北今天）")
+    p.add_argument(
+        "--side",
+        choices=("long", "short"),
+        default="long",
+        help="多方剛站上 MA200，或空方剛跌破（預設 long）",
+    )
     p.add_argument("-o", "--output", default="docs/tw/backtest-15m-1h.html")
     return p.parse_args()
 
@@ -44,6 +50,7 @@ def main() -> int:
             exclude_telecom=not args.include_telecom,
             kline_range=args.kline_range,
             today=today,
+            side=args.side,
         )
     )
     print()

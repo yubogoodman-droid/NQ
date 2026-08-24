@@ -62,10 +62,15 @@ def weekday_zh(d) -> str:
     return f"週{WEEKDAY_ZH[d.weekday()]}"
 
 
+def _result_side(result: BacktestResult) -> str:
+    return getattr(result, "side", "long")
+
+
 def _hour_later_summary_html(result: BacktestResult) -> str:
     stats = summarize_hour_later(result.hits)
+    note = "空方以一小時後價格下跌為贏。" if _result_side(result) == "short" else ""
     if stats.n_scored <= 0 or stats.win_rate is None:
-        return "進場後一小時勝率 —（沒有滿一小時的樣本）<br/>"
+        return f"進場後一小時勝率 —（沒有滿一小時的樣本）{note}<br/>"
     avg = f"{stats.avg_pct:+.2f}%" if stats.avg_pct is not None else "—"
     med = f"{stats.med_pct:+.2f}%" if stats.med_pct is not None else "—"
     short = (
@@ -77,7 +82,7 @@ def _hour_later_summary_html(result: BacktestResult) -> str:
         f"進場後一小時勝率 <span class=\"ok\">{stats.win_rate:.0f}%</span>"
         f"（滿一小時 {stats.n_scored}/{stats.n_hits} 則，"
         f"{stats.wins} 贏 {stats.flats} 平 {stats.losses} 輸，"
-        f"平均 {avg}、中位 {med}{short}）<br/>"
+        f"平均 {avg}、中位 {med}{short}）{note}<br/>"
     )
 
 
@@ -107,7 +112,21 @@ def _universe_line(uni: DayUniverse, hit_count: int) -> str:
 
 
 def _lead_block(result: BacktestResult) -> str:
+    short = _result_side(result) == "short"
     if result.signal_tf == "15m":
+        if short:
+            return """
+    <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
+    <p class="lead">
+      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
+      十五分K <strong>MA5 &lt; MA10 &lt; MA20 且往下</strong>，
+      <strong>當根收盤剛跌破十五分 MA200</strong>（前一根尚未跌破），
+      且這根收盤必須低於 MA5／10／20／200。
+      開盤第一根十五分跳空跌破也算。
+      <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
+      最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
+      K 棒漲紅跌綠。
+    </p>"""
         return """
     <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
     <p class="lead">
@@ -116,6 +135,18 @@ def _lead_block(result: BacktestResult) -> str:
       <strong>當根收盤剛站上十五分 MA200</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／200。
       開盤第一根十五分跳空站上也算。
+      <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
+      最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
+      K 棒漲紅跌綠。
+    </p>"""
+    if short:
+        return """
+    <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
+    <p class="lead">
+      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
+      五分K <strong>MA5 &lt; MA10 &lt; MA20 且往下</strong>，
+      <strong>當根收盤剛跌破五分 MA200</strong>（前一根尚未跌破），
+      且這根收盤必須低於 MA5／10／20／200。開盤第一根跳空跌破也算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
       K 棒漲紅跌綠。
@@ -134,7 +165,19 @@ def _lead_block(result: BacktestResult) -> str:
 
 
 def _chips_html(result: BacktestResult) -> str:
-    common = """
+    if _result_side(result) == "short":
+        common = """
+      <span class="chip">不含 ETF</span>
+      <span class="chip">不含金融股</span>
+      <span class="chip">不含電信股</span>
+      <span class="chip">成交額前 100</span>
+      <span class="chip">股價 &lt; 500</span>
+      <span class="chip">空方</span>
+      <span class="chip">MA5 &lt; 10 &lt; 20 往下</span>
+      <span class="chip">當根收盤跌破 MA200</span>
+      <span class="chip">收盤 &lt; 所有均線</span>"""
+    else:
+        common = """
       <span class="chip">不含 ETF</span>
       <span class="chip">不含金融股</span>
       <span class="chip">不含電信股</span>
@@ -181,10 +224,11 @@ def _render(
 ) -> str:
     scanned = result.scanned_at.strftime("%Y-%m-%d %H:%M:%S")
     start, end = result.days[0], result.days[-1]
+    prefix = "空方" if _result_side(result) == "short" else ""
     if result.signal_tf == "15m":
-        title = f"台股十五分K回測 {start.isoformat()}～{end.isoformat()}"
+        title = f"台股{prefix}十五分K回測 {start.isoformat()}～{end.isoformat()}"
     else:
-        title = f"台股五分K回測 {start.isoformat()}～{end.isoformat()}"
+        title = f"台股{prefix}五分K回測 {start.isoformat()}～{end.isoformat()}"
     day_chips = "".join(
         f'<span class="chip">{weekday_zh(day)} {day.isoformat()} · {len(result.hits_on(day))} 則</span>'
         for day in result.days
@@ -363,7 +407,13 @@ def _hit_card(
         )
     extra_rows += _hour_later_row(hour_later_for_hit(hit))
     extra_rows += _daily_ma_row(hit)
-    stand_label = "十五分站上時間" if signal_tf == "15m" else "五分站上時間"
+    short = getattr(snap, "side", "long") == "short"
+    if signal_tf == "15m":
+        stand_label = "十五分跌破時間" if short else "十五分站上時間"
+    else:
+        stand_label = "五分跌破時間" if short else "五分站上時間"
+    cmp = "&lt;" if short else "&gt;"
+    prev_cmp = "≥" if short else "≤"
     return f"""
     <article class="card">
       <div class="top">
@@ -371,11 +421,11 @@ def _hit_card(
         <div class="price">{s.price:.2f}{html.escape(chg)}</div>
       </div>
       <div class="row"><span>{stand_label}</span><b>{ts}</b></div>
-      <div class="row"><span>收盤 / MA200</span><b>{snap.close:.2f} &gt; {snap.ma200:.2f}</b></div>
-      <div class="row"><span>收盤 vs 均線</span><b>{snap.close:.2f} &gt; MA5 {snap.ma5:.2f} / 10 {snap.ma10:.2f} / 20 {snap.ma20:.2f}</b></div>
-      <div class="row"><span>均線發散</span><b>MA5/MA20 +{snap.ribbon_fan_pct:.2f}%　5–10 {snap.gap_5_10_pct:.2f}%　10–20 {snap.gap_10_20_pct:.2f}%</b></div>
+      <div class="row"><span>收盤 / MA200</span><b>{snap.close:.2f} {cmp} {snap.ma200:.2f}</b></div>
+      <div class="row"><span>收盤 vs 均線</span><b>{snap.close:.2f} {cmp} MA5 {snap.ma5:.2f} / 10 {snap.ma10:.2f} / 20 {snap.ma20:.2f}</b></div>
+      <div class="row"><span>均線發散</span><b>MA5/MA20 {snap.ribbon_fan_pct:+.2f}%　5–10 {snap.gap_5_10_pct:.2f}%　10–20 {snap.gap_10_20_pct:.2f}%</b></div>
       {extra_rows}
-      <div class="row"><span>前收 / 前MA200</span><b>{snap.prev_close:.2f} ≤ {snap.prev_ma200:.2f}</b></div>
+      <div class="row"><span>前收 / 前MA200</span><b>{snap.prev_close:.2f} {prev_cmp} {snap.prev_ma200:.2f}</b></div>
       <div class="row"><span>成交額排名</span><b>#{s.rank} · {s.turnover/1e8:.2f} 億</b></div>
       <div class="chart-label">▼ 同一張圖：上＝五分K　中＝十五分K　下＝小時K　最下＝日K</div>
       <div class="chart">{chart}</div>

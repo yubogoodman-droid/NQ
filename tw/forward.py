@@ -17,15 +17,19 @@ class HourLater:
     entry: float
     later: float
     later_ts: pd.Timestamp
+    side: str = "long"
 
     @property
     def ret_pct(self) -> float:
         if not self.entry:
             return 0.0
-        return (self.later / self.entry - 1.0) * 100.0
+        raw = (self.later / self.entry - 1.0) * 100.0
+        return -raw if self.side == "short" else raw
 
     @property
     def win(self) -> bool:
+        if self.side == "short":
+            return self.later < self.entry
         return self.later > self.entry
 
     @property
@@ -56,8 +60,9 @@ def hour_later(
     ts: pd.Timestamp,
     entry: float,
     minutes: int = HOLD_MINUTES,
+    side: str = "long",
 ) -> HourLater | None:
-    """進場收盤 vs 同一交易日 +minutes 那根五分K收盤。尾盤不夠則 None。"""
+    """進場收盤 vs 同一交易日 +minutes 那根五分K收盤。尾盤不夠則 None。空方以價格下跌為贏。"""
     if frame is None or frame.empty or "close" not in frame.columns or not entry:
         return None
     work = frame.sort_index()
@@ -75,11 +80,19 @@ def hour_later(
     if later.empty:
         return None
     row = later.iloc[0]
-    return HourLater(entry=float(entry), later=float(row["close"]), later_ts=later.index[0])
+    return HourLater(
+        entry=float(entry),
+        later=float(row["close"]),
+        later_ts=later.index[0],
+        side=side,
+    )
 
 
 def hour_later_for_hit(hit: BacktestHit, minutes: int = HOLD_MINUTES) -> HourLater | None:
-    return hour_later(hit.frame, hit.snapshot.timestamp, hit.snapshot.close, minutes=minutes)
+    side = getattr(hit.snapshot, "side", "long")
+    return hour_later(
+        hit.frame, hit.snapshot.timestamp, hit.snapshot.close, minutes=minutes, side=side
+    )
 
 
 def summarize_hour_later(hits: list[BacktestHit], minutes: int = HOLD_MINUTES) -> HourLaterStats:

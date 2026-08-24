@@ -1,4 +1,4 @@
-"""五分 K：MA5 > MA10 > MA20 且往上，當根收盤剛站上五分 MA200，收盤高於 MA5／10／20／200。"""
+"""五分／十五分 K：多方剛站上 MA200，或空方剛跌破 MA200。"""
 
 from __future__ import annotations
 
@@ -47,14 +47,23 @@ class AlertSnapshot:
     m15_ma20: float | None = None
     m15_ma200: float | None = None
     m15_above_ma200_minutes: int | None = None
+    side: str = "long"
 
     @property
     def bullish_aligned(self) -> bool:
         return self.ma5 > self.ma10 > self.ma20
 
     @property
+    def bearish_aligned(self) -> bool:
+        return self.ma5 < self.ma10 < self.ma20
+
+    @property
     def mas_rising(self) -> bool:
         return self.ma5 > self.prev_ma5 and self.ma10 > self.prev_ma10 and self.ma20 > self.prev_ma20
+
+    @property
+    def mas_falling(self) -> bool:
+        return self.ma5 < self.prev_ma5 and self.ma10 < self.prev_ma10 and self.ma20 < self.prev_ma20
 
     @property
     def ribbon_fan_pct(self) -> float:
@@ -80,8 +89,17 @@ class AlertSnapshot:
         return self.bullish_aligned and self.mas_rising
 
     @property
+    def ribbon_down(self) -> bool:
+        """空頭排列：MA5 < MA10 < MA20，且三條都比前一根低。"""
+        return self.bearish_aligned and self.mas_falling
+
+    @property
     def crossed_above_ma200(self) -> bool:
         return self.close > self.ma200 and self.prev_close <= self.prev_ma200
+
+    @property
+    def crossed_below_ma200(self) -> bool:
+        return self.close < self.ma200 and self.prev_close >= self.prev_ma200
 
     @property
     def close_above_all_mas(self) -> bool:
@@ -90,6 +108,15 @@ class AlertSnapshot:
             and self.close > self.ma10
             and self.close > self.ma20
             and self.close > self.ma200
+        )
+
+    @property
+    def close_below_all_mas(self) -> bool:
+        return (
+            self.close < self.ma5
+            and self.close < self.ma10
+            and self.close < self.ma20
+            and self.close < self.ma200
         )
 
     @property
@@ -222,13 +249,28 @@ def _minutes_above_ma200(m15: pd.DataFrame, signal_ts: pd.Timestamp) -> int:
     return completed * M15_BAR_MINUTES + elapsed
 
 
+def _wanted_sides(side: str) -> tuple[str, ...]:
+    if side == "both":
+        return ("long", "short")
+    if side in ("long", "short"):
+        return (side,)
+    raise ValueError(f"unknown side: {side}")
+
+
+def _passes(snap: AlertSnapshot, side: str) -> bool:
+    if side == "short":
+        return snap.ribbon_down and snap.crossed_below_ma200 and snap.close_below_all_mas
+    return snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas
+
+
 def iter_5m_ma200_alerts(
     df: pd.DataFrame,
     *,
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
+    side: str = "long",
 ) -> list[AlertSnapshot]:
-    """同一交易日連續五分 K：MA5 > MA10 > MA20 且往上，剛站上五分 MA200（含開盤第一根），收盤高於 MA5／10／20／200。"""
+    """同一交易日連續五分 K。多方：MA5>MA10>MA20 且往上，剛站上 MA200；空方鏡像跌破。含開盤第一根。"""
     if df is None or len(df) < MA_LONG + 1:
         return []
     work = add_moving_averages(df)
@@ -243,6 +285,7 @@ def iter_5m_ma200_alerts(
                 break
         if not matched:
             return []
+    wanted = _wanted_sides(side)
     for i in range(start, len(work)):
         ts = work.index[i]
         if until is not None and ts > until:
@@ -250,9 +293,10 @@ def iter_5m_ma200_alerts(
         snap = _snapshot_at(work, i)
         if snap is None:
             continue
-        if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
-            continue
-        hits.append(snap)
+        for want in wanted:
+            if _passes(snap, want):
+                hits.append(replace(snap, side=want))
+                break
     return hits
 
 
@@ -261,8 +305,9 @@ def iter_15m_ma200_alerts(
     *,
     since: pd.Timestamp | None = None,
     until: pd.Timestamp | None = None,
+    side: str = "long",
 ) -> list[AlertSnapshot]:
-    """同一交易日連續十五分 K：MA5 > MA10 > MA20 且往上，剛站上十五分 MA200（含開盤第一根），收盤高於 MA5／10／20／200。"""
+    """同一交易日連續十五分 K。多方剛站上／空方剛跌破十五分 MA200（含開盤第一根）。"""
     if df is None or df.empty or "close" not in df.columns:
         return []
     m15 = resample_ohlcv(df, "15min")
@@ -280,6 +325,7 @@ def iter_15m_ma200_alerts(
                 break
         if not matched:
             return []
+    wanted = _wanted_sides(side)
     for i in range(start, len(work)):
         ts = work.index[i]
         if until is not None and ts > until:
@@ -287,14 +333,15 @@ def iter_15m_ma200_alerts(
         snap = _snapshot_at(work, i)
         if snap is None:
             continue
-        if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
+        matched_side = next((want for want in wanted if _passes(snap, want)), None)
+        if matched_side is None:
             continue
         bar_end = pd.Timestamp(ts) + pd.Timedelta(minutes=15)
         five_window = df[df.index < bar_end]
         if five_window.empty:
             continue
         signal_ts = pd.Timestamp(five_window.index[-1])
-        hits.append(replace(snap, timestamp=signal_ts))
+        hits.append(replace(snap, timestamp=signal_ts, side=matched_side))
     return hits
 
 

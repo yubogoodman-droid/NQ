@@ -126,6 +126,52 @@ class FiveMinSignalTests(unittest.TestCase):
         self.assertEqual(hits, [])
 
 
+class ShortFiveMinSignalTests(unittest.TestCase):
+    def test_alerts_on_cross_with_bearish_mas(self) -> None:
+        df = _history_then_live([101.0, 95.0])
+        hits = iter_5m_ma200_alerts(df, side="short")
+        self.assertEqual(len(hits), 1)
+        hit = hits[0]
+        self.assertEqual(hit.side, "short")
+        self.assertTrue(hit.bearish_aligned)
+        self.assertTrue(hit.mas_falling)
+        self.assertTrue(hit.ribbon_down)
+        self.assertTrue(hit.crossed_below_ma200)
+        self.assertTrue(hit.close_below_all_mas)
+        self.assertLess(hit.close, hit.ma5)
+        self.assertLess(hit.close, hit.ma200)
+        self.assertGreaterEqual(hit.prev_close, hit.prev_ma200)
+        self.assertEqual(hit.timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 5, tzinfo=TAIPEI)))
+
+    def test_does_not_repeat_while_staying_below(self) -> None:
+        df = _history_then_live([101.0] + [95.0] * 8)
+        hits = iter_5m_ma200_alerts(df, side="short")
+        self.assertEqual(len(hits), 1)
+
+    def test_counts_gap_down_first_bar_of_the_day(self) -> None:
+        df = _history_then_live([95.0, 95.0])
+        hits = iter_5m_ma200_alerts(df, side="short")
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 0, tzinfo=TAIPEI)))
+
+    def test_long_cross_is_not_a_short_alert(self) -> None:
+        df = _history_then_live([100.0, 105.0])
+        self.assertEqual(iter_5m_ma200_alerts(df, side="short"), [])
+        both = iter_5m_ma200_alerts(df, side="both")
+        self.assertEqual(len(both), 1)
+        self.assertEqual(both[0].side, "long")
+
+    def test_requires_bearish_ribbon(self) -> None:
+        hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
+        hist = _ohlcv([90.0] * (54 * 4), _session_index(hist_days))
+        live = _ohlcv(
+            [110.0] * 10 + [89.0],
+            _session_index([date(2026, 8, 21)])[:11],
+        )
+        hits = iter_5m_ma200_alerts(pd.concat([hist, live]), side="short")
+        self.assertEqual(hits, [])
+
+
 class FiveMinBacktestTests(unittest.TestCase):
     def test_run_scan_uses_daily_universe_and_5m_alerts(self) -> None:
         df = _history_then_live([99.0, 105.0])
@@ -152,6 +198,34 @@ class FiveMinBacktestTests(unittest.TestCase):
         self.assertEqual(len(result.hits), 1)
         self.assertEqual(result.hits[0].stock.symbol, "2408.TW")
         self.assertEqual(result.hits[0].day, date(2026, 8, 21))
+
+    def test_run_scan_short_side_uses_down_cross(self) -> None:
+        df = _history_then_live([101.0, 95.0])
+        stock = RankedStock(1, "2408.TW", "南亞科", 95.0, -1.0, -1.0, 100, 1e9, "TAI")
+        universe = DayUniverse(
+            day=date(2026, 8, 21),
+            rank_time="test",
+            universe=[stock],
+            candidates=[stock],
+            price_dropped=0,
+            etf_dropped=0,
+            financial_dropped=0,
+            telecom_dropped=0,
+        )
+
+        def fake_universes(cfg, as_of, sess):
+            return [universe]
+
+        with (
+            patch("tw.backtest_5m._load_session_universes", side_effect=fake_universes),
+            patch("tw.backtest_5m.fetch_bars_many", return_value={"2408.TW": df}),
+        ):
+            result = run_5m_backtest(
+                BacktestConfig(days=1, today=date(2026, 8, 21), side="short")
+            )
+        self.assertEqual(len(result.hits), 1)
+        self.assertEqual(result.side, "short")
+        self.assertEqual(result.hits[0].snapshot.side, "short")
 
 
 class ReportTests(unittest.TestCase):
@@ -233,6 +307,17 @@ class HourLaterTests(unittest.TestCase):
         self.assertTrue(move.win)
         self.assertAlmostEqual(move.ret_pct, 3.0)
 
+    def test_short_win_when_price_drops(self) -> None:
+        idx = _session_index([date(2026, 8, 21)])
+        closes = [100.0] * len(idx)
+        closes[12] = 97.0
+        df = _ohlcv(closes, idx)
+        move = hour_later(df, idx[0], 100.0, side="short")
+        self.assertIsNotNone(move)
+        self.assertEqual(move.later, 97.0)
+        self.assertTrue(move.win)
+        self.assertAlmostEqual(move.ret_pct, 3.0)
+
     def test_skips_when_the_session_has_no_full_hour(self) -> None:
         idx = _session_index([date(2026, 8, 21)])
         df = _ohlcv([100.0] * len(idx), idx)
@@ -282,6 +367,23 @@ class FifteenMinSignalTests(unittest.TestCase):
         self.assertEqual(len(hits), 1)
         self.assertEqual(hits[0].timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 10, tzinfo=TAIPEI)))
 
+    def test_alerts_on_15m_down_cross(self) -> None:
+        df = _history_then_live([101.0, 101.0, 101.0, 95.0, 95.0, 95.0])
+        hits = iter_15m_ma200_alerts(df, side="short")
+        self.assertEqual(len(hits), 1)
+        hit = hits[0]
+        self.assertEqual(hit.side, "short")
+        self.assertTrue(hit.ribbon_down)
+        self.assertTrue(hit.crossed_below_ma200)
+        self.assertTrue(hit.close_below_all_mas)
+        self.assertEqual(hit.timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 25, tzinfo=TAIPEI)))
+
+    def test_counts_first_15m_gap_down(self) -> None:
+        df = _history_then_live([101.0, 90.0, 90.0])
+        hits = iter_15m_ma200_alerts(df, side="short")
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 10, tzinfo=TAIPEI)))
+
 
 class FifteenMinReportTests(unittest.TestCase):
     def test_html_uses_15m_copy(self) -> None:
@@ -323,6 +425,47 @@ class FifteenMinReportTests(unittest.TestCase):
         self.assertIn("當根收盤剛站上十五分 MA200", text)
         self.assertNotIn("十五分K已在 MA200 上至少半小時", text)
         self.assertNotIn("小時K也要在 MA5／10／20 之上", text)
+
+
+class ShortReportTests(unittest.TestCase):
+    def test_html_uses_short_copy(self) -> None:
+        df = _history_then_live([101.0, 95.0])
+        hits = iter_5m_ma200_alerts(df, side="short")
+        stock = RankedStock(1, "2408.TW", "南亞科", 95.0, -1.0, -1.0, 100, 1e9, "TAI")
+        result = BacktestResult(
+            scanned_at=datetime(2026, 8, 21, 17, 0, tzinfo=TAIPEI),
+            days=[date(2026, 8, 21)],
+            universes={
+                date(2026, 8, 21): DayUniverse(
+                    day=date(2026, 8, 21),
+                    rank_time="t",
+                    universe=[stock],
+                    candidates=[stock],
+                    price_dropped=2,
+                    etf_dropped=1,
+                    financial_dropped=0,
+                    telecom_dropped=0,
+                )
+            },
+            hits=[
+                BacktestHit(
+                    day=date(2026, 8, 21),
+                    stock=stock,
+                    snapshot=hits[0],
+                    frame=df,
+                    daily=_daily_ohlcv(date(2026, 8, 21), last_close=95.0),
+                )
+            ],
+            side="short",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = save_backtest_html(result, Path(tmp) / "out.html")
+            text = path.read_text(encoding="utf-8")
+        self.assertIn("台股空方五分K回測", text)
+        self.assertIn("五分跌破時間", text)
+        self.assertIn("當根收盤剛跌破五分 MA200", text)
+        self.assertIn("MA5 &lt; MA10 &lt; MA20 且往下", text)
+        self.assertIn("空方以一小時後價格下跌為贏", text)
 
 
 class ResampleTests(unittest.TestCase):
