@@ -539,7 +539,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（均線糾結突破）</h1>
-<p class="muted">訊號只看 1分K。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完，不會偷看後面。</p>
+<p class="muted">訊號只看 1分K。停損＝盤整低點 − 5 點，停利固定 +50 點。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
