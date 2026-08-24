@@ -167,6 +167,9 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         from matplotlib.patches import Rectangle
+
+        plt.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei", "Droid Sans Fallback", "DejaVu Sans"]
+        plt.rcParams["axes.unicode_minus"] = False
     except Exception:
         return None
     i = row.sig.idx
@@ -220,7 +223,7 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path) -> Path | None:
             bbox={"boxstyle": "round,pad=0.15", "fc": UP if c[x] >= o[x] else DOWN, "ec": "none"},
         )
     name = f"{sym} 永續"
-    ax.set_title(f"{name}   1m   {hm(row.time_ms)}", color=TEXT, fontsize=12, loc="left", pad=8, fontweight=600)
+    ax.set_title(f"{name}   1m   {hm(row.time_ms)}", color=TEXT, fontsize=12, loc="left", pad=8)
     ax.legend(
         loc="upper left",
         fontsize=7,
