@@ -47,6 +47,8 @@ class CoilSignal:
     m5_ma20: float = float("nan")
     m5_ma200: float = float("nan")
     m5_dist: float = float("nan")
+    d30: float = float("nan")
+    d30_dist: float = float("nan")
     quality: str = "C"
     quality_score: int = 0
 
@@ -243,6 +245,71 @@ def m5_asof_ma200_dist(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.nda
     return close5, ma200, dist
 
 
+def nq_session_key(idx: pd.DatetimeIndex) -> np.ndarray:
+    """CME 日盤日期鍵（YYYYMMDD）。18:00 ET 起算下一交易日。"""
+    if not isinstance(idx, pd.DatetimeIndex):
+        raise TypeError("nq_session_key requires a DatetimeIndex")
+    t = idx.tz_convert(ET) if idx.tz is not None else idx.tz_localize(ET)
+    extra = np.where(t.hour.to_numpy() >= 18, 1, 0)
+    sess = t.normalize() + pd.to_timedelta(extra, unit="D")
+    return (sess.year * 10000 + sess.month * 100 + sess.day).to_numpy(dtype=np.int32)
+
+
+def _daily_close_series(daily: pd.DataFrame) -> pd.Series:
+    col = None
+    for c in daily.columns:
+        if str(c).lower() == "close":
+            col = c
+            break
+    if col is None:
+        raise KeyError("Close")
+    s = daily[col].astype(float)
+    idx = daily.index
+    if not isinstance(idx, pd.DatetimeIndex):
+        idx = pd.to_datetime(idx)
+    if idx.tz is not None:
+        idx = idx.tz_convert(ET)
+    out = pd.Series(s.to_numpy(float), index=pd.DatetimeIndex(idx.date))
+    return out[~out.index.duplicated(keep="last")].sort_index()
+
+
+def d30_asof(
+    df: pd.DataFrame,
+    daily: Optional[pd.DataFrame] = None,
+    period: int = 30,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """每個 1 分時刻：當時日線 MA30（含當根收盤當今日形成中收盤），以及相對距離。不偷看後面。"""
+    n = 0 if df is None else len(df)
+    ma = np.full(n, np.nan, dtype=float)
+    dist = np.full(n, np.nan, dtype=float)
+    if n == 0 or period < 2:
+        return ma, dist
+    _o, _h, _l, c, _v = _ohlcv(df)
+    keys = nq_session_key(df.index)
+    completed: List[float] = []
+    if daily is not None and len(daily):
+        hist = _daily_close_series(daily)
+        first = int(keys[0])
+        for dt, px in hist.items():
+            ymd = int(dt.year) * 10000 + int(dt.month) * 100 + int(dt.day)
+            if ymd < first:
+                completed.append(float(px))
+    cur_sess: Optional[int] = None
+    cur_c = float("nan")
+    need = int(period) - 1
+    for i in range(n):
+        sess = int(keys[i])
+        if cur_sess is None or sess != cur_sess:
+            if cur_sess is not None and not np.isnan(cur_c):
+                completed.append(cur_c)
+            cur_sess = sess
+        cur_c = float(c[i])
+        if len(completed) >= need:
+            ma[i] = (float(sum(completed[-need:])) + cur_c) / float(period)
+            dist[i] = cur_c - ma[i]
+    return ma, dist
+
+
 @dataclass
 class _LiveCoil:
     start_idx: int
@@ -279,8 +346,11 @@ def detect_coil_breakouts(
     target_r: float = 2.0,
     min_entry_gap: int = 45,
     max_body: float = 40.0,
-    max_m5_below_200: float = 0.0,
+    max_m5_below_200: float = -1.0,
     require_m5_above_ma20: bool = True,
+    require_above_d30: bool = True,
+    daily: Optional[pd.DataFrame] = None,
+    d30_period: int = 30,
     ma_periods: Sequence[int] = MA_PERIODS,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[CoilSignal]:
@@ -291,7 +361,8 @@ def detect_coil_breakouts(
     MA60 與 MA120 仍在 MA200 下方。不要等後面那根放量長綠。
 
     另外不接已經噴超過 max_body 的長實體。進場當下，當時 5 分收盤要在
-    5 分 MA20 上方，也要站上 5 分 MA200（max_m5_below_200=0；設成負數則關掉）。
+    5 分 MA20 上方，也要站上日線 30 日均線（require_above_d30；日線不夠時略過）。
+    5 分 MA200 深度過濾預設關掉（max_m5_below_200<0）。
     """
     if df is None or len(df) == 0:
         return []
@@ -299,6 +370,7 @@ def detect_coil_breakouts(
     n = len(c)
     mas = [sma(c, int(p)) for p in ma_periods]
     _m5_c, m5_ma20, m5_ma200, m5_dist = m5_asof_mas(df)
+    d30_ma, d30_dist = d30_asof(df, daily=daily, period=d30_period)
     warmup = max(int(p) for p in ma_periods)
     lo = min(min_coil_bars, coil_bars)
     hi = max(max_coil_bars, coil_bars)
@@ -405,6 +477,8 @@ def detect_coil_breakouts(
             )
             m5_20 = float(m5_ma20[i])
             ok_m5_20 = (not require_m5_above_ma20) or np.isnan(m5_20) or float(_m5_c[i]) > m5_20
+            d30v = float(d30_ma[i])
+            ok_d30 = (not require_above_d30) or np.isnan(d30v) or float(_m5_c[i]) > d30v
             if ok_body:
                 bump("body")
             if ok_max_body:
@@ -423,6 +497,8 @@ def detect_coil_breakouts(
                 bump("m5_ok")
             if ok_m5_20:
                 bump("m5_ma20")
+            if ok_d30:
+                bump("d30")
             if (
                 ok_body
                 and ok_max_body
@@ -433,6 +509,7 @@ def detect_coil_breakouts(
                 and ok_vol
                 and ok_m5
                 and ok_m5_20
+                and ok_d30
             ):
                 entry = float(c[i])
                 stop = last_coil.low - stop_buffer
@@ -469,6 +546,8 @@ def detect_coil_breakouts(
                             m5_ma20=m5_20,
                             m5_ma200=float(m5_ma200[i]),
                             m5_dist=m5d,
+                            d30=d30v,
+                            d30_dist=float(d30_dist[i]),
                             quality=q_grade,
                             quality_score=q_score,
                         )

@@ -16,6 +16,7 @@ from nq.coil import (  # noqa: E402
     ET,
     CoilSignal,
     CoilTrade,
+    d30_asof,
     detect_coil_breakouts,
     make_coil_demo_bars,
     m5_asof,
@@ -67,7 +68,7 @@ def test_demo_catches_0735_breakout() -> None:
 
 
 def test_real_chart_stands_on_ma200() -> None:
-    """短 fixture 沒有 200 根 5 分，07:32 仍會進。完整 10d/30d 裡 5 分還在 MA200 下，不會觸發。"""
+    """短 fixture 沒有日線 30 日均線，07:32 仍會進。完整回測會帶日線再過濾。"""
     path = Path(__file__).resolve().parent / "fixtures" / "nq_2026-08-24_0735.csv"
     df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
     if df.index.tz is None:
@@ -179,7 +180,7 @@ def test_m5_asof_ma200_dist_matches_look_at() -> None:
 
 
 def test_skip_5m_waterfall_bounce() -> None:
-    """5 分還在 MA200 下方很深時，1 分糾結突破當大空反彈，不接。"""
+    """5 分還在 MA200 下方很深時，若打開 5 分 MA200 過濾，1 分糾結突破當大空反彈，不接。"""
     head_n = 1000
     head_close = np.array([29450.0 + (3.0 if i % 2 == 0 else -3.0) for i in range(head_n)])
     head_idx = pd.date_range("2026-08-23 09:20", periods=head_n, freq="1min", tz=ET)
@@ -196,13 +197,63 @@ def test_skip_5m_waterfall_bounce() -> None:
     tail = make_coil_demo_bars()
     df = pd.concat([head, tail])
     df = df[~df.index.duplicated(keep="last")]
-    with_filter = detect_coil_breakouts(df)
-    without = detect_coil_breakouts(df, max_m5_below_200=-1.0)
+    with_filter = detect_coil_breakouts(
+        df, max_m5_below_200=0.0, require_above_d30=False
+    )
+    without = detect_coil_breakouts(
+        df, max_m5_below_200=-1.0, require_above_d30=False
+    )
     assert without, "關掉 5 分深度過濾後，模擬圖仍應有起漲點"
-    # 有過濾時，算得出 5 分 MA200 的單必須站上
     if with_filter:
         for s in with_filter:
             assert np.isnan(s.m5_dist) or s.m5_dist > 0.0
+
+
+def _daily_flat(price: float, end: str = "2026-08-23", n: int = 40) -> pd.DataFrame:
+    idx = pd.bdate_range(end=end, periods=n, tz=ET)
+    return pd.DataFrame(
+        {
+            "Open": np.full(n, price),
+            "High": np.full(n, price),
+            "Low": np.full(n, price),
+            "Close": np.full(n, price),
+            "Volume": np.full(n, 1.0),
+        },
+        index=idx,
+    )
+
+
+def test_d30_asof_uses_forming_close() -> None:
+    daily = _daily_flat(100.0, end="2026-08-23", n=40)
+    idx = pd.date_range("2026-08-24 09:00", periods=3, freq="1min", tz=ET)
+    df = pd.DataFrame(
+        {
+            "Open": [130.0, 130.0, 130.0],
+            "High": [131.0, 131.0, 131.0],
+            "Low": [129.0, 129.0, 129.0],
+            "Close": [130.0, 130.0, 130.0],
+            "Volume": [10.0, 10.0, 10.0],
+        },
+        index=idx,
+    )
+    ma, dist = d30_asof(df, daily=daily, period=30)
+    # 29 根 100 + 當根 130
+    expect = (29 * 100.0 + 130.0) / 30.0
+    assert abs(ma[-1] - expect) < 1e-9
+    assert abs(dist[-1] - (130.0 - expect)) < 1e-9
+
+
+def test_require_above_30day_ma() -> None:
+    df = make_coil_demo_bars()
+    blocked = detect_coil_breakouts(df, daily=_daily_flat(30000.0))
+    assert not blocked, "5 分還在 30 日均線下不應進"
+    allowed = detect_coil_breakouts(df, daily=_daily_flat(28000.0))
+    assert allowed, "站上 30 日均線後模擬圖仍應有起漲點"
+    assert allowed[0].d30 < allowed[0].entry_price
+    off = detect_coil_breakouts(
+        df, daily=_daily_flat(30000.0), require_above_d30=False
+    )
+    assert off, "關掉 30 日過濾後應能進"
 
 
 def test_skip_chase_body() -> None:
@@ -332,6 +383,8 @@ def main() -> int:
     test_trail_locks_after_1r()
     test_m5_asof_ma200_dist_matches_look_at()
     test_skip_5m_waterfall_bounce()
+    test_d30_asof_uses_forming_close()
+    test_require_above_30day_ma()
     test_skip_chase_body()
     test_failed_breakout_exits_on_two_closes()
     test_no_signal_in_wide_trend()
