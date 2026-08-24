@@ -54,7 +54,7 @@ python3 examples/backtest_tw_15m.py --days 10
 
 同一套掃描池與進場條件。啟動時用永豐抓一次歷史 1 分K 當均線底，盤中改訂閱 tick 合成五分／十五分（不要盤中重覆打 kbars）。符合就推 Telegram，同一根 K 不重發。
 
-本機金鑰請放 `examples/local_secrets.py`（已 gitignore，不要 commit），或設環境變數。腳本上方的空字串不要填真的金鑰。
+本機金鑰請填在 `watch_tw.py` 最上面四行，或放旁邊的 `local_secrets.py`（已 gitignore，不要 commit）。
 
 ```
 SHIOAJI_API_KEY=...
@@ -64,14 +64,14 @@ TELEGRAM_CHAT_ID=...     # 也可用 TG_CHAT_ID
 ```
 
 ```bash
-pip install shioaji
-python3 examples/watch_tw_shioaji.py --test     # 先測 Telegram
-python3 examples/watch_tw_shioaji.py --once     # 盤後用歷史K掃今天
-python3 examples/watch_tw_shioaji.py            # 盤中一直盯（五分＋十五分）
-python3 examples/watch_tw_shioaji.py --tf 5m
+pip install pandas requests shioaji
+python watch_tw.py --test     # 先測 Telegram
+python watch_tw.py --once     # 盤後用歷史K掃今天
+python watch_tw.py            # 盤中一直盯（五分＋十五分）
+python watch_tw.py --tf 5m
 ```
 
-PyCharm：請 **Open 整個 NQ 專案資料夾**（裡面要有 `tw\` 套件），執行根目錄 `watch_tw.py` 或 `examples/watch_tw_shioaji.py`。不要只複製一支腳本到別的專案，也不要在專案裡放 `tw.py`（會蓋掉 `tw` 資料夾，出現 `'tw' is not a package`）。
+PyCharm：只要這一個檔 `watch_tw.py`。下載後放到專案裡，填金鑰，按 Run。檔名不要叫 `tw.py`。
 
 建議每個交易日開盤前重開。金鑰不要 commit。
 
