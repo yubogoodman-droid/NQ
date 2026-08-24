@@ -43,7 +43,9 @@ python3 examples/nq_coil_breakout.py backtest --period 30d --pages
 python3 examples/nq_coil_breakout.py alert --dry-run --once
 ```
 
-近 10 天／近一個月數字見下方回測（改成必須站上 5 分 MA200 後會重跑）。
+近 10 天 Yahoo 1m（2026-08-14 → 08-24）：**7 筆、勝率 57.1%、+192.4 點**（改前 10 筆、60%、+333）。
+近一個月 Yahoo 1m（2026-07-26 → 08-24）：**21 筆、勝率 42.9%、+196.9 點**（改前 29 筆、44.8%、+330.5）。樣本仍少，只是回測不是保證。
+預覽目前是這份一個月的圖。
 你那張圖 **08-24 07:32 @ 29217.75** 當時 5 分 MA200 約 29302，還在下方 85 點，**這條規則下不會觸發**。1 分確實站上了 1 分 MA200，但 5 分還沒站上 5 分 MA200。
 
 TradingView：把 `pinescript/nq_ma_coil_breakout_1m.pine` 貼進 Pine Editor，套用到 NQ1! / MNQ1! 一分圖，可設「NQ 起漲點」警示。
