@@ -22,8 +22,8 @@ import numpy as np
 import requests
 
 # —— 填這裡 ——
-TELEGRAM_BOT_TOKEN = ""  # BotFather 給的 token，例如 123456:ABC...
-TELEGRAM_CHAT_ID = ""    # 你的 chat id，數字
+TELEGRAM_BOT_TOKEN = "8556700236:AAFvQCgyK_tr9Sbc-_S3b1A8QRKQonEhsqA"
+TELEGRAM_CHAT_ID = "1297264584"
 
 TZ = timezone(timedelta(hours=8))
 BASE = "https://www.binance.com"
