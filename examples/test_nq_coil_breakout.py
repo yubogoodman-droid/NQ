@@ -20,6 +20,7 @@ from nq.coil import (  # noqa: E402
     make_coil_demo_bars,
     m5_asof,
     m5_asof_ma200_dist,
+    m5_asof_mas,
     m5_look_at,
     quality_of,
     resample_ohlcv,
@@ -95,8 +96,11 @@ def test_real_chart_stands_on_ma200() -> None:
     assert abs(float(snap.iloc[-1]["Close"]) - 29217.75) < 0.3
     _c5, _ma5, dist = m5_asof_ma200_dist(df)
     i = hits[0].entry_idx
-    if not np.isnan(look["ma200"]) and not np.isnan(dist[i]):
-        assert abs(dist[i] - (look["close"] - look["ma200"])) < 2.0
+    if not np.isnan(look["ma20"]):
+        assert look["close"] > look["ma20"], "07:32 當時 5 分應站上 5分MA20"
+        assert look["above_20"]
+    if not np.isnan(sig.m5_ma20):
+        assert sig.m5_close > sig.m5_ma20
 
 
 def test_m5_asof_ma200_dist_matches_look_at() -> None:
@@ -114,13 +118,15 @@ def test_m5_asof_ma200_dist_matches_look_at() -> None:
         },
         index=idx,
     )
-    _c5, _ma, dist = m5_asof_ma200_dist(df)
+    _c5, ma20, _ma200, dist = m5_asof_mas(df)
     look = m5_look_at(df, df.index[-1])
     assert look is not None
     assert not np.isnan(dist[-1])
     assert not np.isnan(look["ma200"])
     assert abs(dist[-1] - (look["close"] - look["ma200"])) < 1.5
     assert dist[-1] < -100
+    assert not np.isnan(ma20[-1])
+    assert abs(ma20[-1] - look["ma20"]) < 1.5
 
 
 def test_skip_5m_waterfall_bounce() -> None:

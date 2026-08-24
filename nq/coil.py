@@ -44,6 +44,7 @@ class CoilSignal:
     ma120: float
     ma200: float
     m5_close: float = float("nan")
+    m5_ma20: float = float("nan")
     m5_ma200: float = float("nan")
     m5_dist: float = float("nan")
     quality: str = "C"
@@ -157,6 +158,7 @@ def m5_look_at(df_1m: pd.DataFrame, ts) -> Optional[dict]:
         ma5 > ma10 > ma20 > ma30
     )
     above_200 = (not np.isnan(ma200)) and float(last["Close"]) > ma200
+    above_20 = (not np.isnan(ma20)) and float(last["Close"]) > ma20
     return {
         "bar_time": last.name,
         "open": float(last["Open"]),
@@ -179,6 +181,7 @@ def m5_look_at(df_1m: pd.DataFrame, ts) -> Optional[dict]:
         "ma120": mas[120],
         "ma200": ma200,
         "stack": stack,
+        "above_20": above_20,
         "above_200": above_200,
         "snap": snap,
     }
@@ -202,14 +205,15 @@ def quality_of(coil_range: float, ribbon_width: float, vol_ratio: float, body: f
     return score, "C"
 
 
-def m5_asof_ma200_dist(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """每個 1 分時刻：當時 5 分當根收盤、5分 MA200、收盤相對 MA200 的距離（不偷看後面）。"""
+def m5_asof_mas(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """每個 1 分時刻：當時 5 分當根收盤、5分 MA20、5分 MA200、收盤相對 MA200 距離（不偷看後面）。"""
     n = 0 if df is None else len(df)
     close5 = np.full(n, np.nan, dtype=float)
+    ma20 = np.full(n, np.nan, dtype=float)
     ma200 = np.full(n, np.nan, dtype=float)
     dist = np.full(n, np.nan, dtype=float)
     if n == 0:
-        return close5, ma200, dist
+        return close5, ma20, ma200, dist
     _o, _h, _l, c, _v = _ohlcv(df)
     idx = df.index
     completed: List[float] = []
@@ -224,10 +228,18 @@ def m5_asof_ma200_dist(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.nda
             cur_bucket = bucket
         cur_c = float(c[i])
         close5[i] = cur_c
+        if len(completed) >= 19:
+            ma20[i] = (float(sum(completed[-19:])) + cur_c) / 20.0
         if len(completed) >= 199:
             ma = (float(sum(completed[-199:])) + cur_c) / 200.0
             ma200[i] = ma
             dist[i] = cur_c - ma
+    return close5, ma20, ma200, dist
+
+
+def m5_asof_ma200_dist(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """每個 1 分時刻：當時 5 分當根收盤、5分 MA200、收盤相對 MA200 的距離（不偷看後面）。"""
+    close5, _ma20, ma200, dist = m5_asof_mas(df)
     return close5, ma200, dist
 
 
@@ -268,6 +280,7 @@ def detect_coil_breakouts(
     min_entry_gap: int = 45,
     max_body: float = 40.0,
     max_m5_below_200: float = 100.0,
+    require_m5_above_ma20: bool = True,
     ma_periods: Sequence[int] = MA_PERIODS,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[CoilSignal]:
@@ -279,13 +292,14 @@ def detect_coil_breakouts(
 
     另外不接兩種假突破：1 分實體已經噴超過 max_body，或當時 5 分還在
     MA200 下方超過 max_m5_below_200 點（大空裡的 1 分反彈）。
+    進場當下，5 分收盤還要在 5 分 MA20 上方。
     """
     if df is None or len(df) == 0:
         return []
     o, h, l, c, v = _ohlcv(df)
     n = len(c)
     mas = [sma(c, int(p)) for p in ma_periods]
-    _m5_c, m5_ma200, m5_dist = m5_asof_ma200_dist(df)
+    _m5_c, m5_ma20, m5_ma200, m5_dist = m5_asof_mas(df)
     warmup = max(int(p) for p in ma_periods)
     lo = min(min_coil_bars, coil_bars)
     hi = max(max_coil_bars, coil_bars)
@@ -390,6 +404,8 @@ def detect_coil_breakouts(
                 or np.isnan(m5d)
                 or m5d >= -max_m5_below_200
             )
+            m5_20 = float(m5_ma20[i])
+            ok_m5_20 = (not require_m5_above_ma20) or np.isnan(m5_20) or float(_m5_c[i]) > m5_20
             if ok_body:
                 bump("body")
             if ok_max_body:
@@ -406,6 +422,8 @@ def detect_coil_breakouts(
                 bump("volume")
             if ok_m5:
                 bump("m5_ok")
+            if ok_m5_20:
+                bump("m5_ma20")
             if (
                 ok_body
                 and ok_max_body
@@ -415,6 +433,7 @@ def detect_coil_breakouts(
                 and ok_long_below
                 and ok_vol
                 and ok_m5
+                and ok_m5_20
             ):
                 entry = float(c[i])
                 stop = last_coil.low - stop_buffer
@@ -448,6 +467,7 @@ def detect_coil_breakouts(
                             ma120=ma120,
                             ma200=ma200,
                             m5_close=float(_m5_c[i]),
+                            m5_ma20=m5_20,
                             m5_ma200=float(m5_ma200[i]),
                             m5_dist=m5d,
                             quality=q_grade,

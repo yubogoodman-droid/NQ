@@ -361,6 +361,7 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"60與120在200下 {funnel.get('long_below', 0)} → "
         f"放量 {funnel.get('volume', 0)} → "
         f"5分未過深 {funnel.get('m5_ok', 0)} → "
+        f"5分站上MA20 {funnel.get('m5_ma20', 0)} → "
         f"進場 {funnel.get('taken', 0)}</p>"
     )
 
@@ -384,6 +385,7 @@ def _m5_detail(look: dict) -> str:
         )
     stack = "是" if look["stack"] else "否"
     above = "是" if look["above_200"] else "否"
+    above20 = "是" if look.get("above_20") else "否"
     return (
         f"5分當根 {look['bar_time'].strftime('%m-%d %H:%M')}  {forming}\n"
         f"當時 O {look['open']:.2f}  H {look['high']:.2f}  "
@@ -392,7 +394,7 @@ def _m5_detail(look: dict) -> str:
         f"5分MA {_fmt_ma(look['ma5'])}>{_fmt_ma(look['ma10'])}>"
         f"{_fmt_ma(look['ma20'])}>{_fmt_ma(look['ma30'])}  "
         f"200 {_fmt_ma(look['ma200'])}\n"
-        f"當時站上5分MA200 {above}  5>10>20>30 {stack}"
+        f"當時站上5分MA20 {above20}  站上5分MA200 {above}  5>10>20>30 {stack}"
     )
 
 
@@ -435,10 +437,13 @@ def _trade_cards(
             keep.discard(img5)
             m5_html = "<p class='muted'>沒有對應的 5分K</p>"
         m5_line = ""
-        if t.signal.m5_dist == t.signal.m5_dist:
+        if t.signal.m5_close == t.signal.m5_close:
+            dist_s = ""
+            if t.signal.m5_dist == t.signal.m5_dist:
+                dist_s = f"  MA200 {t.signal.m5_ma200:.1f}  Δ200 {t.signal.m5_dist:+.1f}"
             m5_line = (
-                f"\n5分當時 C {t.signal.m5_close:.1f}  MA200 {t.signal.m5_ma200:.1f}  "
-                f"Δ {t.signal.m5_dist:+.1f}"
+                f"\n5分當時 C {t.signal.m5_close:.1f}  MA20 {_fmt_ma(t.signal.m5_ma20)}"
+                f"{dist_s}"
             )
         cards.append(
             "<article class='trade-card'>"
@@ -549,7 +554,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（均線糾結突破）</h1>
-<p class="muted">訊號只看 1分K。停損＝盤整低點 − 5 點，停利 2R；連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體，當時 5 分若還在 MA200 下方超過 100 點也不接（大空反彈）。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
+<p class="muted">訊號只看 1分K。進場當下 5 分收盤要在 5 分 MA20 上方。停損＝盤整低點 − 5 點，停利 2R；連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體，當時 5 分若還在 MA200 下方超過 100 點也不接（大空反彈）。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -596,7 +601,9 @@ def print_signals(
             form = "未收完" if look["forming"] else "已收完"
             m5 = (
                 f"  | 5分當時 {look['bar_time'].strftime('%H:%M')} {form} "
-                f"C {look['close']:.2f} MA200 {_fmt_ma(look['ma200'])} "
+                f"C {look['close']:.2f} MA20 {_fmt_ma(look['ma20'])} "
+                f"{'站上MA20' if look.get('above_20') else '未站上MA20'} "
+                f"MA200 {_fmt_ma(look['ma200'])} "
                 f"{'站上200' if look['above_200'] else '未站上200'}"
             )
             if look["forming"]:
@@ -634,7 +641,8 @@ def _print_funnel(funnel: Dict[str, int]) -> None:
         f"not_chase={funnel.get('not_chase', 0)} "
         f"above={funnel.get('above_coil', 0)} stack={funnel.get('stack', 0)} "
         f"ma200={funnel.get('above_200', 0)} below={funnel.get('long_below', 0)} "
-        f"vol={funnel.get('volume', 0)} m5={funnel.get('m5_ok', 0)} taken={funnel.get('taken', 0)}"
+        f"vol={funnel.get('volume', 0)} m5={funnel.get('m5_ok', 0)} "
+        f"m5ma20={funnel.get('m5_ma20', 0)} taken={funnel.get('taken', 0)}"
     )
 
 
@@ -698,9 +706,11 @@ def fmt_entry(df, sig: CoilSignal) -> str:
     if look is not None:
         form = "未收完" if look["forming"] else "已收完"
         above = "站上200" if look["above_200"] else "未站上200"
+        above20 = "站上MA20" if look.get("above_20") else "未站上MA20"
         m5_line = (
             f"5分當時: <code>{look['bar_time'].strftime('%H:%M')}</code> {form} "
-            f"C {look['close']:.2f} / MA200 {_fmt_ma(look['ma200'])} {above}\n"
+            f"C {look['close']:.2f} / MA20 {_fmt_ma(look['ma20'])} {above20} / "
+            f"MA200 {_fmt_ma(look['ma200'])} {above}\n"
         )
     return (
         f"🟢 <b>起漲點（均線糾結突破）</b>\n"
@@ -713,7 +723,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"區間 {sig.coil_range:.1f} / 帶寬 {sig.ribbon_width:.1f}\n"
         f"{m5_line}"
         f"量能: {sig.vol_ratio:.2f}x · 現價 <code>{last:.2f}</code>\n"
-        f"排列: 5>10>20>30 · 站上MA200 · 60/120&lt;200\n"
+        f"排列: 5>10>20>30 · 站上MA200 · 60/120&lt;200 · 5分站上MA20\n"
         f"#起漲點 #NQ #Q{sig.quality}"
     )
 

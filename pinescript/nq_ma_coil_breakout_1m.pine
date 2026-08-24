@@ -5,6 +5,7 @@ indicator("NQ 一分K 起漲點（均線糾結突破）", overlay=true, max_labe
 // 先鎖住盤整箱，再允許之後 8 根放量站上箱頂。
 // 進場：第一次站上 MA200，且 5>10>20>30、MA60/120 在 MA200 下方。不要等放量長綠。
 // 不追已經噴出去的長實體；當時 5 分若還在 MA200 下方超過 100 點，當成大空反彈不接。
+// 進場當下 5 分收盤要在 5 分 MA20 上方。
 
 minCoilBars   = input.int(10, "盤整最少 K 數", minval=8, maxval=20)
 maxCoilBars   = input.int(18, "盤整最多 K 數", minval=10, maxval=30)
@@ -84,8 +85,10 @@ above200 = close > ma200
 longBelow = ma60 < ma200 and ma120 < ma200
 bodyOk = body >= minBody and (maxBody <= 0 or body <= maxBody)
 ma200_5 = request.security(syminfo.tickerid, "5", ta.sma(close, 200), lookahead=barmerge.lookahead_off)
+ma20_5  = request.security(syminfo.tickerid, "5", ta.sma(close, 20), lookahead=barmerge.lookahead_off)
 m5ok = na(ma200_5) or (close - ma200_5) >= -maxM5Below
-breakout = not na(stickyHigh) and bodyOk and close >= stickyHigh + minBreakOver and stackOk and above200 and longBelow and volOk and m5ok
+m5ma20ok = na(ma20_5) or close > ma20_5
+breakout = not na(stickyHigh) and bodyOk and close >= stickyHigh + minBreakOver and stackOk and above200 and longBelow and volOk and m5ok and m5ma20ok
 
 plot(ma5,   "MA5",   color=#ffa726, linewidth=1)
 plot(ma10,  "MA10",  color=#42a5f5, linewidth=1)
