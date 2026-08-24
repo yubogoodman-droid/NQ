@@ -16,6 +16,7 @@ from nq.ma20_retest import (  # noqa: E402
     TradeResult,
     detect_kwargs,
     detect_signals,
+    near_falling_5m_ma60,
     quality_at_entry,
     simulate,
     simulate_kwargs,
@@ -36,6 +37,29 @@ def test_quality_at_entry() -> None:
     assert quality_at_entry(20.0, 19.0, 18.0, 2.0)[1] == "A"
     assert quality_at_entry(20.0, 21.0, 18.0, -1.0)[1] == "B"
     assert quality_at_entry(10.0, 11.0, 12.0, -1.0)[1] == "C"
+
+
+def test_near_falling_5m_ma60() -> None:
+    assert near_falling_5m_ma60(29060.0, 29080.0, -8.0, 40.0)
+    assert not near_falling_5m_ma60(29060.0, 29080.0, 8.0, 40.0)
+    assert not near_falling_5m_ma60(29060.0, 29180.0, -8.0, 40.0)
+    assert not near_falling_5m_ma60(29060.0, 29080.0, -8.0, 0.0)
+
+
+def test_skips_hug_falling_5m_ma60() -> None:
+    df = _range_then_dump_reclaim_retest()
+    open_sigs = detect_signals(df, session="day", ma60_5m_near=0.0)
+    assert open_sigs
+    sig = open_sigs[0]
+    dist = abs(sig.entry_price - sig.ma60_5m)
+    assert dist > 40.0, "08-24 style retest should sit well below 5m MA60"
+    default = detect_signals(df, session="day")
+    assert default, "40-pt 5m MA60 filter must keep the blue-circle style fill"
+    if sig.ma60_5m_slope < 0:
+        funnel: dict = {}
+        blocked = detect_signals(df, session="day", ma60_5m_near=dist + 1.0, funnel=funnel)
+        assert not blocked
+        assert funnel.get("skip_ma60", 0) >= 1
 
 
 def test_sma() -> None:
@@ -154,6 +178,7 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
     path = write_html_report(out, df, trades, "NQ=F", "demo")
     text = path.read_text(encoding="utf-8")
     assert "回踩 MA20" in text
+    assert "5m MA60" in text
     if trades:
         assert "<img src='img/" in text
         img_dir = path.parent / "img"
@@ -251,6 +276,8 @@ def test_detect_kwargs_intervals() -> None:
     assert d5["leave_bars"] == 3
     assert d1["min_break_depth"] == 10.0
     assert d1["fail_below"] == 40.0
+    assert d1["ma60_5m_near"] == 40.0
+    assert d5["ma60_5m_near"] == 40.0
     s1 = simulate_kwargs("1m")
     assert s1["ma_exit_after"] == 60
 
@@ -258,6 +285,8 @@ def test_detect_kwargs_intervals() -> None:
 def main() -> int:
     test_parse_period_days()
     test_quality_at_entry()
+    test_near_falling_5m_ma60()
+    test_skips_hug_falling_5m_ma60()
     test_sma()
     test_summarize_trades()
     test_detects_retest_not_reclaim()

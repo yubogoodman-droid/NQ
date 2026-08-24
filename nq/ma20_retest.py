@@ -24,6 +24,8 @@ class Signal:
     ma10: float
     ma20: float
     ma60: float
+    ma60_5m: float = 0.0
+    ma60_5m_slope: float = 0.0
     quality: str = "C"
     quality_score: int = 0
 
@@ -50,6 +52,62 @@ def sma(arr, n: int) -> np.ndarray:
 def rolling_min_prev(arr, n: int) -> np.ndarray:
     s = pd.Series(arr, dtype=float)
     return s.shift(1).rolling(n, min_periods=n).min().to_numpy(float)
+
+
+def align_5m_ma60(
+    df: pd.DataFrame,
+    *,
+    ma_len: int = 60,
+    slope_bars: int = 6,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """5 分 MA60 與斜率，對齊 df.index，不用未來 1m。
+
+    一分圖用已收盤的 5 分 K（與 TradingView lookahead_off 相同）：
+    10:51–10:54 仍用 10:50 收完的那根 5 分 MA60。
+    """
+    close = df["Close"].astype(float)
+    idx = df.index
+    n = len(df)
+    if n == 0:
+        return np.array([], dtype=float), np.array([], dtype=float)
+
+    bar_min = 5.0
+    if n >= 2:
+        bar_min = max((idx[1] - idx[0]).total_seconds() / 60.0, 0.5)
+
+    if bar_min >= 4.0:
+        ma = close.rolling(ma_len, min_periods=ma_len).mean()
+        slope = ma - ma.shift(slope_bars)
+        return ma.to_numpy(float), slope.to_numpy(float)
+
+    m5 = close.resample("5min", label="right", closed="right").last().dropna()
+    ma5 = m5.rolling(ma_len, min_periods=ma_len).mean()
+    slope5 = ma5 - ma5.shift(slope_bars)
+    ma_out = np.full(n, np.nan, dtype=float)
+    slope_out = np.full(n, np.nan, dtype=float)
+    m5_idx = ma5.index
+    ma_vals = ma5.to_numpy(float)
+    sl_vals = slope5.to_numpy(float)
+    j = 0
+    for i, ts in enumerate(idx):
+        while j + 1 < len(m5_idx) and m5_idx[j + 1] <= ts:
+            j += 1
+        if j < len(m5_idx) and m5_idx[j] <= ts:
+            ma_out[i] = ma_vals[j]
+            slope_out[i] = sl_vals[j]
+    return ma_out, slope_out
+
+
+def near_falling_5m_ma60(
+    entry: float,
+    ma60_5m: float,
+    slope: float,
+    near: float,
+) -> bool:
+    """進場價貼著下彎的 5m MA60（綠線）→ 濾掉。"""
+    if near <= 0 or np.isnan(ma60_5m) or np.isnan(slope):
+        return False
+    return float(slope) < 0.0 and abs(float(entry) - float(ma60_5m)) <= float(near)
 
 
 def quality_at_entry(ma5: float, ma10: float, ma20: float, ma20_slope: float) -> Tuple[int, str]:
@@ -124,6 +182,8 @@ INTERVAL_DETECT = {
         min_risk=20.0,
         min_entry_gap=12,
         ma20_slope_bars=4,
+        ma60_5m_near=40.0,
+        ma60_5m_slope_bars=6,
     ),
     "1m": dict(
         lookback=120,
@@ -141,6 +201,8 @@ INTERVAL_DETECT = {
         min_risk=20.0,
         min_entry_gap=60,
         ma20_slope_bars=20,
+        ma60_5m_near=40.0,
+        ma60_5m_slope_bars=6,
     ),
 }
 
@@ -186,6 +248,8 @@ def detect_signals(
     session: str = "rth",
     ma20_len: int = 20,
     ma20_slope_bars: int = 4,
+    ma60_5m_near: float = 40.0,
+    ma60_5m_slope_bars: int = 6,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """
@@ -201,6 +265,7 @@ def detect_signals(
     ma10 = sma(close, 10)
     ma20 = sma(close, ma20_len)
     ma60 = sma(close, 60)
+    ma60_5m, ma60_5m_slope = align_5m_ma60(df, slope_bars=ma60_5m_slope_bars)
     floor = rolling_min_prev(low, lookback)
 
     n = len(close)
@@ -321,6 +386,17 @@ def detect_signals(
             i = entry_idx + 1
             continue
 
+        m60_5 = float(ma60_5m[entry_idx]) if not np.isnan(ma60_5m[entry_idx]) else float("nan")
+        m60_5_s = (
+            float(ma60_5m_slope[entry_idx])
+            if not np.isnan(ma60_5m_slope[entry_idx])
+            else float("nan")
+        )
+        if near_falling_5m_ma60(entry, m60_5, m60_5_s, ma60_5m_near):
+            bump("skip_ma60")
+            i = entry_idx + 1
+            continue
+
         slope = 0.0
         if entry_idx >= ma20_slope_bars and not np.isnan(ma20[entry_idx - ma20_slope_bars]):
             slope = float(ma20[entry_idx] - ma20[entry_idx - ma20_slope_bars])
@@ -346,6 +422,8 @@ def detect_signals(
                 ma10=float(ma10[entry_idx]),
                 ma20=float(ma20[entry_idx]),
                 ma60=float(ma60[entry_idx]) if not np.isnan(ma60[entry_idx]) else 0.0,
+                ma60_5m=m60_5 if not np.isnan(m60_5) else 0.0,
+                ma60_5m_slope=m60_5_s if not np.isnan(m60_5_s) else 0.0,
                 quality=q_grade,
                 quality_score=q_score,
             )
