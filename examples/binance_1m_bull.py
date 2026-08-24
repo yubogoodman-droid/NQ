@@ -41,7 +41,7 @@ REPO = Path(__file__).resolve().parents[1]
 SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
-PAGES_IMG = "https://yubogoodman-droid.github.io/NQ/binance/"
+PAGES_IMG = "https://raw.githubusercontent.com/yubogoodman-droid/NQ/gh-pages/binance/"
 # 使用者傳的 SNDK 截圖當下（台北 2026-08-25 01:56，價約 1481）
 REF_SYMBOL = "SNDKUSDT"
 REF_WHEN = datetime(2026, 8, 25, 1, 56, tzinfo=TZ)
