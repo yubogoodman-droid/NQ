@@ -194,18 +194,25 @@ def _trade_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     return start, end
 
 
-def draw_trade_png(
-    df: pd.DataFrame,
-    trade: TradeResult,
-    path: Path,
-    trade_no: int,
-) -> Path:
+def resample_ohlc(df: pd.DataFrame, rule: str = "5min") -> pd.DataFrame:
+    cols: Dict[str, str] = {"Open": "first", "High": "max", "Low": "min", "Close": "last"}
+    if "Volume" in df.columns:
+        cols["Volume"] = "sum"
+    out = df.resample(rule, label="left", closed="left").agg(cols)
+    return out.dropna(subset=["Open", "High", "Low", "Close"])
+
+
+def _asof_bar(df: pd.DataFrame, ts) -> int:
+    pos = int(df.index.searchsorted(ts, side="right")) - 1
+    return max(0, min(pos, len(df) - 1))
+
+
+def _setup_mpl():
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib import font_manager
-    from matplotlib.patches import Ellipse, Rectangle
 
     for fp in (
         "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
@@ -219,6 +226,17 @@ def draw_trade_png(
             ]
             plt.rcParams["axes.unicode_minus"] = False
             break
+    return plt
+
+
+def draw_trade_png(
+    df: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+) -> Path:
+    plt = _setup_mpl()
+    from matplotlib.patches import Ellipse, Rectangle
 
     sig = trade.signal
     start, end = _trade_window(df, trade)
@@ -347,6 +365,138 @@ def draw_trade_png(
     return path
 
 
+def draw_5m_at_entry_png(
+    df_1m: pd.DataFrame,
+    df_5m: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+) -> Path:
+    """一分進場時刻的五分 K 對照：粉紅線是 5m MA20（手機圖那條）。"""
+    plt = _setup_mpl()
+    from matplotlib.patches import Ellipse, Rectangle
+
+    sig = trade.signal
+    entry_ts = df_1m.index[trade.entry_idx]
+    trough_ts = df_1m.index[sig.trough_idx]
+    reclaim_ts = df_1m.index[sig.reclaim_idx]
+    exit_ts = df_1m.index[trade.exit_idx]
+    i_entry = _asof_bar(df_5m, entry_ts)
+    i_trough = _asof_bar(df_5m, trough_ts)
+    i_reclaim = _asof_bar(df_5m, reclaim_ts)
+    i_exit = _asof_bar(df_5m, exit_ts)
+    start = max(0, i_trough - 16)
+    end = min(len(df_5m) - 1, max(i_entry + 16, i_exit + 4))
+    window = df_5m.iloc[start : end + 1]
+    xs = range(len(window))
+    o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
+    vol = window["Volume"] if "Volume" in window.columns else None
+    close_full = df_5m["Close"].astype(float)
+    ma20_5 = float(close_full.rolling(20, min_periods=20).mean().iloc[i_entry])
+
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.6),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+
+    colors_v = []
+    for k in range(len(window)):
+        up = float(c.iloc[k]) >= float(o.iloc[k])
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.85)
+        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
+        if y1 == y0:
+            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    if vol is not None:
+        axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
+
+    for n, col in MA_COLORS.items():
+        ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
+        lw = 2.4 if n == 20 else (1.25 if n <= 10 else 1.0)
+        ax.plot(list(xs), ma, color=col, lw=lw, label=f"5m MA{n}")
+
+    bx, rx, ex = i_trough - start, i_reclaim - start, i_entry - start
+    if 0 <= bx < len(window):
+        ax.scatter([bx], [float(window["Low"].iloc[bx])], s=38, color="#f472b6", zorder=5)
+        ax.annotate(
+            "破底",
+            (bx, float(window["Low"].iloc[bx])),
+            textcoords="offset points",
+            xytext=(0, -12),
+            ha="center",
+            color="#f9a8d4",
+            fontsize=8,
+        )
+    if 0 <= rx < len(window):
+        ax.scatter([rx], [float(window["Close"].iloc[rx])], s=36, color="#67e8f9", zorder=5)
+        ax.annotate(
+            "1m收復",
+            (rx, float(window["Close"].iloc[rx])),
+            textcoords="offset points",
+            xytext=(0, 10),
+            ha="center",
+            color="#67e8f9",
+            fontsize=8,
+        )
+    if 0 <= ex < len(window):
+        ax.axvline(ex, color="#3dba7a", ls="--", lw=1.0)
+        ax.scatter([ex], [trade.entry_price], s=52, color="#00e676", marker="^", zorder=6)
+        yspan = float(window["High"].max() - window["Low"].min()) or 1.0
+        ax.add_patch(
+            Ellipse(
+                (ex, float(window["Low"].iloc[ex])),
+                width=2.4,
+                height=max(yspan * 0.10, 28.0),
+                fill=False,
+                edgecolor="#38bdf8",
+                lw=1.8,
+                alpha=0.95,
+                zorder=7,
+            )
+        )
+        ax.annotate(
+            "1m進場",
+            (ex, trade.entry_price),
+            textcoords="offset points",
+            xytext=(10, 8),
+            ha="left",
+            color="#86efac",
+            fontsize=8,
+        )
+        if not np.isnan(ma20_5):
+            ax.axhline(ma20_5, color="#ec407a", ls=":", lw=1.0, alpha=0.55)
+
+    sign = "+" if trade.pnl_points >= 0 else ""
+    ma_txt = f"5mMA20 {ma20_5:.1f}" if not np.isnan(ma20_5) else "5mMA20 n/a"
+    ax.set_title(
+        f"#{trade_no}  進場當下 5分K  {entry_ts.strftime('%m-%d %H:%M')}  "
+        f"{ma_txt}  1m進場 {trade.entry_price:.1f}  {sign}{trade.pnl_points:.1f}pt",
+        color="#e8f0ea",
+        fontsize=11,
+    )
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=7)
+    step = max(1, len(window) // 6)
+    ticks = list(range(0, len(window), step))
+    axv.set_xticks(ticks)
+    axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
 def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int, prefix: str = "t") -> str:
     et = df.index[trade.entry_idx]
     return f"{prefix}{trade_no:02d}_{et.strftime('%m%d_%H%M')}_q{trade.quality.lower()}.png"
@@ -359,6 +509,7 @@ def _render_trade_cards(
     *,
     prefix: str = "t",
     interval: str = "5m",
+    df_5m: Optional[pd.DataFrame] = None,
 ) -> str:
     cards: List[str] = []
     for i, t in enumerate(trades, 1):
@@ -377,9 +528,26 @@ def _render_trade_cards(
         img_name = _trade_img_name(df, t, i, prefix=prefix)
         draw_trade_png(df, t, html_path.parent / "img" / img_name, i)
         chart = (
-            f"<img src='img/{escape(img_name)}' alt='#{i} Q{escape(t.quality)}' "
+            f"<p class='chart-label'>{escape(interval)} K</p>"
+            f"<img src='img/{escape(img_name)}' alt='#{i} Q{escape(t.quality)} {escape(interval)}' "
             "style='width:100%;display:block;border-radius:10px'/>"
         )
+        ma20_5_line = ""
+        if df_5m is not None and len(df_5m):
+            img5 = _trade_img_name(df, t, i, prefix=f"{prefix}5m")
+            draw_5m_at_entry_png(df, df_5m, t, html_path.parent / "img" / img5, i)
+            i5 = _asof_bar(df_5m, et)
+            ma20_5 = float(df_5m["Close"].rolling(20, min_periods=20).mean().iloc[i5])
+            bar5 = df_5m.index[i5]
+            ma20_5_line = (
+                f"\n5m MA20 {ma20_5:.1f}  @ {bar5.strftime('%H:%M')}  "
+                f"（1m進場 − 5mMA20 = {t.entry_price - ma20_5:+.1f}）"
+            )
+            chart += (
+                "<p class='chart-label'>進場當下 5分K（粉紅 = 5m MA20）</p>"
+                f"<img src='img/{escape(img5)}' alt='#{i} 5m對照' "
+                "style='width:100%;display:block;border-radius:10px;margin-top:8px'/>"
+            )
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -392,15 +560,17 @@ def _render_trade_cards(
             f"<span class='tag tag-info'>{escape(interval)}</span>"
             f"<span class='tag tag-info'>回踩MA20</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
-            "</div>"
+            + ("<span class='tag tag-info'>5m對照</span>" if df_5m is not None else "")
+            + "</div>"
             "<pre class='trade-detail'>"
-            f"entry {t.entry_price:.2f}  （回踩 MA20 {t.signal.ma20:.2f}）\n"
+            f"entry {t.entry_price:.2f}  （回踩 1m MA20 {t.signal.ma20:.2f}）\n"
             f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts，破底下方）\n"
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {br.strftime('%m-%d %H:%M')} low {t.signal.break_low:.2f} / 2h低 {t.signal.support:.2f}\n"
             f"收復 {rc.strftime('%H:%M')} → 回踩 {et.strftime('%H:%M')}\n"
             f"MA5 {t.signal.ma5:.1f} / MA10 {t.signal.ma10:.1f} / MA20 {t.signal.ma20:.1f} / MA60 {t.signal.ma60:.1f}"
+            f"{ma20_5_line}"
             "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
             "</article>"
@@ -418,6 +588,7 @@ def write_html_report(
     extra_trades: Optional[List[TradeResult]] = None,
     extra_title: str = "",
     interval: str = "5m",
+    df_5m: Optional[pd.DataFrame] = None,
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -428,7 +599,7 @@ def write_html_report(
     out = Path(path)
     ma_exit_after = INTERVAL_SIMULATE[interval]["ma_exit_after"]
     ma20_note = "約 20 分鐘" if interval == "1m" else "約 100 分鐘"
-    cards = _render_trade_cards(df, trades, out, prefix="t", interval=interval)
+    cards = _render_trade_cards(df, trades, out, prefix="t", interval=interval, df_5m=df_5m)
     extra_html = ""
     if extra_trades:
         extra_stats = summarize_trades(extra_trades)
@@ -442,7 +613,7 @@ def write_html_report(
             f"<div class='card'>勝/負<b>{extra_stats['wins']}/{extra_stats['count']-extra_stats['wins']}</b></div></div>"
             f"<div class='equity'>{_equity_svg([t.pnl_points for t in extra_trades])}</div></section>"
             + (
-                _render_trade_cards(df, extra_trades, out, prefix="a", interval=interval)
+                _render_trade_cards(df, extra_trades, out, prefix="a", interval=interval, df_5m=df_5m)
                 or "<div class='empty'>無交易</div>"
             )
         )
@@ -491,12 +662,13 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
 .mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+.chart-label{{margin:8px 4px 6px;color:#8b949e;font-size:12px;font-weight:600}}
 .empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
 </style></head><body>
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} {escape(interval)} 破翻回踩 MA20</h1>
-<p class="muted">RTH 09:30–15:45。破底 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後回踩進場。停損在破底下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。</p>
+<p class="muted">RTH 09:30–15:45。破底 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後回踩進場。停損在破底下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -607,6 +779,7 @@ def cmd_backtest(args) -> int:
             extra_trades=extra_trades,
             extra_title="全時段對照（含夜盤）",
             interval=interval,
+            df_5m=(resample_ohlc(df) if interval == "1m" else None),
         )
         print(f"html={out}")
         if args.pages:

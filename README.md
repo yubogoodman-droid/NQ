@@ -64,6 +64,8 @@ TradingView：`pinescript/nq_5m_ma20_retest.pine` 貼到 Pine Editor，套用 NQ
 python3 examples/nq_5m_ma20_retest.py --interval 1m --period 30d --pages
 ```
 
+報告每筆會附 **進場當下的五分 K**（粉紅線是 5m MA20），方便跟手機圖對照。
+
 TradingView：`pinescript/nq_1m_ma20_retest.pine` 套用一分圖。
 
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-ma20-retest-8357/docs/nq-1m-ma20-retest/view.html
