@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """幣安 1 分 K：7>14>25>99>120 多頭排列上站 1m MA200（均線都用一分K，不是日線/小時線）。
 
-    python3 examples/binance_1m_bull.py backtest --today --pages
+    python3 examples/binance_1m_bull.py backtest --top 10 --today --pages
     python3 examples/binance_1m_bull.py alert --test
     python3 examples/binance_1m_bull.py alert --once --dry-run
     python3 examples/binance_1m_bull.py alert
@@ -265,7 +265,7 @@ def write_html(
     universe_n: int,
     names: list[str],
     max_charts: int,
-    pool_label: str = "全部 USDT 股票合約",
+    pool_label: str = "USDT 股票合約成交額前 10",
 ) -> Path:
     stats = {h: summarize_rows(rows, h) for h in HORIZONS}
     cross_n = sum(1 for r in rows if r.crossed_200)
@@ -597,8 +597,8 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="幣安一分K：7/14/25/99/120 多頭排列上站 1m MA200")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    b = sub.add_parser("backtest", help="回測 USDT 股票合約（預設全部、今天）")
-    b.add_argument("--top", type=int, default=0, help="成交額前 N；0 表示全部股票合約")
+    b = sub.add_parser("backtest", help="回測 USDT 股票合約（預設成交額前 10、今天）")
+    b.add_argument("--top", type=int, default=10, help="成交額前 N；0 表示全部股票合約")
     b.add_argument("--date", default="", help="YYYY-MM-DD，台北日，預設今天（凌晨 2 點前用昨天）")
     b.add_argument("--today", action="store_true", help="明確指定用今天（同預設）")
     b.add_argument("--min-gap", type=int, default=0, help="同一標的訊號最少間隔根數")
@@ -609,7 +609,7 @@ def main(argv=None) -> int:
     b.set_defaults(func=run_backtest)
 
     a = sub.add_parser("alert", help="掃 USDT 股票合約，符合就推 Telegram")
-    a.add_argument("--top", type=int, default=0, help="成交額前 N；預設 0=全部股票合約")
+    a.add_argument("--top", type=int, default=10, help="成交額前 N；預設 10；0=全部股票合約")
     a.add_argument("--once", action="store_true")
     a.add_argument("--test", action="store_true")
     a.add_argument("--dry-run", action="store_true")

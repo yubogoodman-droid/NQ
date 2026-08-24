@@ -66,11 +66,11 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 收盤在 MA7 > MA14 > MA25 > MA99 > MA120 多頭排列上，且**本根收盤剛站上 1m MA200**（前收仍在線下）才算訊號。  
 已在 1m MA200 上又重新排均線不推。  
 **只掃幣安 USDT 股票合約**（美股／韓股／港股／A 股／Pre-IPO），不含加密、黃金原油等商品。  
-回測與 Telegram 預設掃**全部股票合約**。
+回測與 Telegram 預設掃**股票成交額前 10**。
 
 ```bash
 # 今天回測（台北日；凌晨 2 點前自動用昨天）
-python3 examples/binance_1m_bull.py backtest --today --pages
+python3 examples/binance_1m_bull.py backtest --top 10 --today --pages
 
 # Telegram：憑證放 tg_config.env 或 一分K多排.py 最上面
 python3 examples/binance_1m_bull.py alert --test

@@ -61,7 +61,7 @@ def is_usdt_stock_perp(s: dict) -> bool:
     return True
 
 
-def universe(*, top_n: int | None = 50) -> list[tuple[str, float]]:
+def universe(*, top_n: int | None = 10) -> list[tuple[str, float]]:
     """USDT 股票永續。`top_n` 為 None 或 <=0 時掃全部，否則取 24h 成交額前 N。"""
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}

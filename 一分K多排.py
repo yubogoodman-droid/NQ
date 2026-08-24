@@ -7,7 +7,7 @@
 
     pip install numpy requests matplotlib
     python 一分K多排.py --test          # 先測 Telegram 通不通
-    python 一分K多排.py                 # 掃全部 USDT 股票合約
+    python 一分K多排.py                 # 掃 USDT 股票成交額前 10
     python 一分K多排.py --once          # 只掃一輪
     python 一分K多排.py backtest --today --pages
 
