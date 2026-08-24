@@ -574,7 +574,7 @@ def _render_trade_cards(
             + ("<span class='tag tag-info'>5m對照</span>" if df_5m is not None else "")
             + "</div>"
             "<pre class='trade-detail'>"
-            f"entry {t.entry_price:.2f}  （回踩 1m MA20 {t.signal.ma20:.2f}）\n"
+            f"entry {t.entry_price:.2f}  （回踩 {escape(interval)} MA20 {t.signal.ma20:.2f}）\n"
             f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts，破底下方）\n"
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
