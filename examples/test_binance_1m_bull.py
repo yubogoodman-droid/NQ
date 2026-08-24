@@ -14,11 +14,14 @@ from nq.ma1m_bull import (  # noqa: E402
     add_mas,
     detect_combo,
     forward_moves,
+    ma_widths,
     sma,
     stack_ok,
     summarize_rows,
     SignalRow,
 )
+
+LOOSE = dict(max_ribbon_pct=None, max_short_pct=None)
 
 
 def test_sma() -> None:
@@ -56,7 +59,7 @@ def _make_stack_bars(n: int = 280) -> dict:
 
 def test_detects_first_stack_above_ma200() -> None:
     d = add_mas(_make_stack_bars())
-    sigs = detect_combo(d)
+    sigs = detect_combo(d, **LOOSE)
     assert len(sigs) >= 1
     first = sigs[0]
     assert first.idx >= 199
@@ -69,7 +72,7 @@ def test_detects_first_stack_above_ma200() -> None:
 
 def test_no_repeat_while_stack_holds() -> None:
     d = add_mas(_make_stack_bars())
-    sigs = detect_combo(d)
+    sigs = detect_combo(d, **LOOSE)
     # After the first print, the grind keeps the stack; should not spam every bar.
     assert len(sigs) == 1
 
@@ -88,7 +91,7 @@ def test_rearms_after_break() -> None:
         raw["l"][i] = raw["c"][i] - 0.08
         raw["o"][i] = raw["c"][i - 1]
     d = add_mas(raw)
-    sigs = detect_combo(d)
+    sigs = detect_combo(d, **LOOSE)
     assert len(sigs) >= 2
     assert sigs[1].idx > sigs[0].idx + 10
 
@@ -106,15 +109,15 @@ def test_min_gap() -> None:
         raw["l"][i] = raw["c"][i] - 0.08
         raw["o"][i] = raw["c"][i - 1]
     d = add_mas(raw)
-    all_sigs = detect_combo(d, min_gap_bars=0)
-    gapped = detect_combo(d, min_gap_bars=80)
+    all_sigs = detect_combo(d, min_gap_bars=0, **LOOSE)
+    gapped = detect_combo(d, min_gap_bars=80, **LOOSE)
     assert len(all_sigs) >= 2
     assert len(gapped) == 1
 
 
 def test_forward_and_summarize() -> None:
     d = add_mas(_make_stack_bars())
-    sigs = detect_combo(d)
+    sigs = detect_combo(d, **LOOSE)
     entry, moves = forward_moves(d, sigs[0])
     assert entry > 0
     assert moves[5].ret_pct is not None
@@ -137,8 +140,8 @@ def test_cross_only_keeps_ma200_reclaim() -> None:
         raw["l"][i] = raw["c"][i] - 0.08
         raw["o"][i] = raw["c"][i - 1]
     d = add_mas(raw)
-    all_sigs = detect_combo(d, cross_only=False)
-    crosses = detect_combo(d, cross_only=True)
+    all_sigs = detect_combo(d, cross_only=False, **LOOSE)
+    crosses = detect_combo(d, cross_only=True, **LOOSE)
     assert len(crosses) >= 1
     assert all(s.crossed_200 for s in crosses)
     assert len(crosses) <= len(all_sigs)
@@ -159,6 +162,15 @@ def test_below_ma200_is_not_a_signal() -> None:
             "v": np.ones(n) * 10,
         }
     )
+    assert detect_combo(d, **LOOSE) == []
+
+
+def test_tight_ribbon_rejects_fanned_stack() -> None:
+    d = add_mas(_make_stack_bars())
+    loose = detect_combo(d, **LOOSE)
+    assert len(loose) >= 1
+    ribbon, short = ma_widths(d, loose[0].idx)
+    assert ribbon > 0.45 or short > 0.25
     assert detect_combo(d) == []
 
 
@@ -229,6 +241,7 @@ def main() -> int:
     test_forward_and_summarize()
     test_cross_only_keeps_ma200_reclaim()
     test_below_ma200_is_not_a_signal()
+    test_tight_ribbon_rejects_fanned_stack()
     test_default_date_uses_yesterday_before_2am()
     test_is_usdt_stock_perp()
     test_write_view_html_uses_pages_urls()

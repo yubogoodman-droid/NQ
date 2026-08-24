@@ -254,6 +254,7 @@ def scan_symbol(
     date: str,
     min_gap: int,
     cross_only: bool,
+    ribbon_kw: dict | None = None,
 ) -> tuple[str, dict | None, list[SignalRow], str]:
     rank, sym, qv = item
     lo, hi = day_window_ms(date)
@@ -265,7 +266,7 @@ def scan_symbol(
         return sym, None, [], "too_few_bars"
     d = add_mas(raw)
     rows: list[SignalRow] = []
-    for sig in detect_combo(d, min_gap_bars=min_gap, cross_only=cross_only):
+    for sig in detect_combo(d, min_gap_bars=min_gap, cross_only=cross_only, **(ribbon_kw or {})):
         ts = int(d["t"][sig.idx])
         if ts < lo or ts >= hi:
             continue
@@ -296,6 +297,7 @@ def format_alert(row: SignalRow) -> str:
         f"現價 {row.sig.close:g}　進 {row.entry:g}\n"
         f"1m MA7 {row.sig.m7:g} &gt; 14 {row.sig.m14:g} &gt; 25 {row.sig.m25:g} "
         f"&gt; 99 {row.sig.m99:g} &gt; 120 {row.sig.m120:g}　1m MA200 {row.sig.ma200:g}\n"
+        f"黏帶全距 {row.sig.ribbon_pct:.2f}%　短均距 {row.sig.short_pct:.2f}%　"
         f"偏離 1m MA200 {row.ext_pct:+.2f}%　量比 {row.vol_ratio:.2f}x"
     )
 
@@ -353,10 +355,11 @@ def write_html(
             "</header>"
             f"<div class='px {cls}'>{row.sig.close:g} <span class='px-sub'>{escape(kind)} · ext {row.ext_pct:+.2f}%</span></div>"
             f"<div class='tags'><span class='tag'>MA7&gt;14&gt;25&gt;99&gt;120</span>"
-            f"<span class='tag'>剛站上 1m MA200</span></div>"
+            f"<span class='tag'>黏帶 {row.sig.ribbon_pct:.2f}%</span></div>"
             "<pre class='trade-detail'>"
             f"close {row.sig.close:g}  entry {row.entry:g}\n"
             f"MA7 {row.sig.m7:g}  14 {row.sig.m14:g}  25 {row.sig.m25:g}  99 {row.sig.m99:g}  120 {row.sig.m120:g}  200 {row.sig.ma200:g}\n"
+            f"均線全距 {row.sig.ribbon_pct:.2f}%  短均距 {row.sig.short_pct:.2f}%\n"
             f"{fwd}"
             "</pre>"
             f"{img_html}"
@@ -425,7 +428,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 <section class="summary">
 <h1>幣安一分K · 7/14/25/99/120 多頭排列上站 1m MA200</h1>
 <p class="muted">{escape(date)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}）
-<br/>規則：一分K 的 MA7 &gt; MA14 &gt; MA25 &gt; MA99 &gt; MA120，且本根收盤剛站上<strong>一分K MA200</strong>（不是日線/小時線）。進場用下一根開盤。
+<br/>規則：一分K 的 MA7 &gt; MA14 &gt; MA25 &gt; MA99 &gt; MA120，且本根收盤剛站上<strong>一分K MA200</strong>。六條均線要黏在一起（全距 ≤0.45%、短均 7/14/25 ≤0.25%），距離像幣安那種帶。進場用下一根開盤。
 <br/>只掃幣安 <strong>USDT 股票合約</strong>（美股／韓股／港股／A 股／Pre-IPO），不含加密、黃金原油等商品。
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
@@ -459,10 +462,22 @@ def write_view_html(src: Path) -> Path:
     return out
 
 
+def ribbon_kwargs(args: argparse.Namespace) -> dict:
+    return {
+        "max_ribbon_pct": None if args.max_ribbon <= 0 else args.max_ribbon,
+        "max_short_pct": None if args.max_short <= 0 else args.max_short,
+    }
+
+
 def run_backtest(args: argparse.Namespace) -> int:
     date = args.date or default_date()
     cross_only = not args.all_stack
-    print(f"date={date} top={args.top or 'all'} min_gap={args.min_gap} cross_only={cross_only}", flush=True)
+    rkw = ribbon_kwargs(args)
+    print(
+        f"date={date} top={args.top or 'all'} min_gap={args.min_gap} cross_only={cross_only} "
+        f"ribbon≤{rkw['max_ribbon_pct']} short≤{rkw['max_short_pct']}",
+        flush=True,
+    )
     uni = universe(top_n=args.top)
     if not uni:
         print("no universe", file=sys.stderr)
@@ -478,7 +493,7 @@ def run_backtest(args: argparse.Namespace) -> int:
     frames: dict[str, dict] = {}
     errors = 0
     with ThreadPoolExecutor(8) as ex:
-        futs = {ex.submit(scan_symbol, it, date, args.min_gap, cross_only): it for it in items}
+        futs = {ex.submit(scan_symbol, it, date, args.min_gap, cross_only, rkw): it for it in items}
         for fut in as_completed(futs):
             rank, sym, _qv = futs[fut]
             try:
@@ -506,7 +521,10 @@ def run_backtest(args: argparse.Namespace) -> int:
         kind = "上站" if row.crossed_200 else "排列"
         r15 = row.moves.get(15)
         rtxt = f"{r15.ret_pct:+.2f}%" if r15 and r15.ret_pct is not None else "—"
-        print(f"  [{i:3d}] {row.symbol:12s} {hm(row.time_ms)} {kind} ext={row.ext_pct:+.2f}% 15m={rtxt}")
+        print(
+            f"  [{i:3d}] {row.symbol:12s} {hm(row.time_ms)} {kind} "
+            f"ribbon={row.sig.ribbon_pct:.2f}% ext={row.ext_pct:+.2f}% 15m={rtxt}"
+        )
 
     html_path = Path(args.html) if args.html else (PAGES if args.pages else None)
     if html_path:
@@ -533,14 +551,16 @@ def wait_next_close() -> None:
     time.sleep(max(1, nxt - now))
 
 
-def scan_live(sym: str, qv: float, rank: int, *, cross_only: bool = True) -> list[SignalRow]:
+def scan_live(
+    sym: str, qv: float, rank: int, *, cross_only: bool = True, ribbon_kw: dict | None = None
+) -> list[SignalRow]:
     raw = fetch_klines(sym, interval="1m", limit=260)
     if raw is None or len(raw["c"]) < 220:
         return []
     d = add_mas(raw)
     n = len(d["c"])
     out = []
-    for sig in detect_combo(d, cross_only=cross_only):
+    for sig in detect_combo(d, cross_only=cross_only, **(ribbon_kw or {})):
         if sig.idx not in (n - 1, n - 2):
             continue
         entry, moves = forward_moves(d, sig)
@@ -595,8 +615,12 @@ def run_alert(args: argparse.Namespace) -> int:
         if args.top and args.top > 0
         else "全部 USDT 股票合約"
     )
-    print(f"監看 {pool} {len(uni)} 個。只掃股票合約。7>14>25>99>120 且剛站上 1m MA200 才推。", flush=True)
+    print(
+        f"監看 {pool} {len(uni)} 個。只掃股票合約。7>14>25>99>120、均線黏帶、剛站上 1m MA200 才推。",
+        flush=True,
+    )
     uni_ts = time.time()
+    rkw = ribbon_kwargs(args)
 
     def round_once() -> None:
         nonlocal uni, uni_ts
@@ -608,7 +632,7 @@ def run_alert(args: argparse.Namespace) -> int:
         events: list[SignalRow] = []
         with ThreadPoolExecutor(8) as ex:
             futs = {
-                ex.submit(scan_live, sym, qv, i, cross_only=not args.all_stack): sym
+                ex.submit(scan_live, sym, qv, i, cross_only=not args.all_stack, ribbon_kw=rkw): sym
                 for i, (sym, qv) in enumerate(uni, 1)
             }
             for fut in as_completed(futs):
@@ -653,6 +677,8 @@ def main(argv=None) -> int:
     b.add_argument("--today", action="store_true", help="明確指定用今天（同預設）")
     b.add_argument("--min-gap", type=int, default=0, help="同一標的訊號最少間隔根數")
     b.add_argument("--all-stack", action="store_true", help="含已在 MA200 上才排好均線（會很多）")
+    b.add_argument("--max-ribbon", type=float, default=0.45, help="六條均線全距%上限；0=不限")
+    b.add_argument("--max-short", type=float, default=0.25, help="MA7/14/25 全距%上限；0=不限")
     b.add_argument("--pages", action="store_true")
     b.add_argument("--html", default="")
     b.add_argument("--charts", type=int, default=0, help="圖表筆數；0=全部")
@@ -664,6 +690,8 @@ def main(argv=None) -> int:
     a.add_argument("--test", action="store_true")
     a.add_argument("--dry-run", action="store_true")
     a.add_argument("--all-stack", action="store_true", help="含已在 MA200 上才排好均線（會很多）")
+    a.add_argument("--max-ribbon", type=float, default=0.45, help="六條均線全距%上限；0=不限")
+    a.add_argument("--max-short", type=float, default=0.25, help="MA7/14/25 全距%上限；0=不限")
     a.set_defaults(func=run_alert)
 
     args = p.parse_args(argv)

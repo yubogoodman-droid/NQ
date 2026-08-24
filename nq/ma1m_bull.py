@@ -43,6 +43,34 @@ def stack_ok(d: dict, i: int) -> bool:
     return bool(c[i] > m7[i] > m14[i] > m25[i] > m99[i] > m120[i] and c[i] > m200[i])
 
 
+def ma_widths(d: dict, i: int) -> tuple[float, float]:
+    """六條均線全距%、短均 7/14/25 全距%。"""
+    ms = [d["m7"][i], d["m14"][i], d["m25"][i], d["m99"][i], d["m120"][i], d["m200"][i]]
+    if np.isnan(ms).any() or min(ms) <= 0:
+        return float("nan"), float("nan")
+    ribbon = (max(ms) / min(ms) - 1.0) * 100.0
+    short = (max(ms[:3]) / min(ms[:3]) - 1.0) * 100.0
+    return float(ribbon), float(short)
+
+
+def ribbon_ok(
+    d: dict,
+    i: int,
+    *,
+    max_ribbon_pct: float | None = 0.45,
+    max_short_pct: float | None = 0.25,
+) -> bool:
+    """均線要黏在一起，距離像幣安那種帶，不要散開。"""
+    ribbon, short = ma_widths(d, i)
+    if np.isnan(ribbon):
+        return False
+    if max_ribbon_pct is not None and ribbon > max_ribbon_pct:
+        return False
+    if max_short_pct is not None and short > max_short_pct:
+        return False
+    return True
+
+
 def bars_below_ma200(c, m200, i: int) -> int:
     n = 0
     j = i - 1
@@ -68,6 +96,8 @@ class BullSignal:
     ma200: float
     vol_ratio: float
     ext_pct: float
+    ribbon_pct: float
+    short_pct: float
     crossed_200: bool
     bars_below: int
 
@@ -118,6 +148,7 @@ def signal_at(d: dict, i: int) -> BullSignal | None:
         return None
     vr = float(v[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
     ext = (c[i] / m200[i] - 1.0) * 100.0 if m200[i] else 0.0
+    ribbon, short = ma_widths(d, i)
     return BullSignal(
         idx=i,
         open=float(o[i]),
@@ -133,22 +164,36 @@ def signal_at(d: dict, i: int) -> BullSignal | None:
         ma200=float(m200[i]),
         vol_ratio=vr,
         ext_pct=float(ext),
+        ribbon_pct=float(ribbon),
+        short_pct=float(short),
         crossed_200=bool(c[i - 1] <= m200[i - 1] and c[i] > m200[i]),
         bars_below=bars_below_ma200(c, m200, i),
     )
 
 
-def detect_combo(d: dict, *, min_gap_bars: int = 0, cross_only: bool = False) -> list[BullSignal]:
+def detect_combo(
+    d: dict,
+    *,
+    min_gap_bars: int = 0,
+    cross_only: bool = False,
+    max_ribbon_pct: float | None = 0.45,
+    max_short_pct: float | None = 0.25,
+) -> list[BullSignal]:
     """本根 收盤>MA7>14>25>99>120 且收盤>1m MA200；前一根還沒同時成立。
 
-    cross_only：只保留「前收還在 1m MA200 下、本根收盤站上」——這才是上站，而不是已在線上又排一次均線。
+    六條均線要黏在一起（全距、短均距），才像幣安那種均線距離，不要散開。
+    cross_only：只保留「前收還在 1m MA200 下、本根收盤站上」。
     """
     c, m200 = d["c"], d["m200"]
     out: list[BullSignal] = []
     last_i = -10_000
     for i in range(1, len(c)):
-        now_ok = stack_ok(d, i)
-        prev_ok = stack_ok(d, i - 1)
+        now_ok = stack_ok(d, i) and ribbon_ok(
+            d, i, max_ribbon_pct=max_ribbon_pct, max_short_pct=max_short_pct
+        )
+        prev_ok = stack_ok(d, i - 1) and ribbon_ok(
+            d, i - 1, max_ribbon_pct=max_ribbon_pct, max_short_pct=max_short_pct
+        )
         if not now_ok or prev_ok:
             continue
         if cross_only:
