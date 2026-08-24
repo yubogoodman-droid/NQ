@@ -3,7 +3,7 @@
 對應手機圖那種走法：先跌、均線收成一束、窄幅盤整，再放量長綠 K
 一次站上盤整高點與整束均線。起漲點是突破那根，不是最低點。
 
-規則以 K 數計，1 分與 5 分圖用同一套門檻；5 分的 10 根盤整約 50 分鐘。
+訊號只在 1 分 K 上抓。5 分用來對照「1 分條件成立當下」那根 5 分長什麼樣。
 """
 
 from __future__ import annotations
@@ -121,6 +121,64 @@ def resample_ohlcv(df: pd.DataFrame, rule: str = "5min") -> pd.DataFrame:
     else:
         out = out.dropna(how="all")
     return out
+
+
+def m5_asof(df_1m: pd.DataFrame, ts) -> pd.DataFrame:
+    """只看到 ts 為止的 5 分 K。最後一根可能還沒收完（當下長相，不偷看後面）。"""
+    if df_1m is None or len(df_1m) == 0:
+        return resample_ohlcv(df_1m)
+    ts = pd.Timestamp(ts)
+    if df_1m.index.tz is not None and ts.tzinfo is None:
+        ts = ts.tz_localize(df_1m.index.tz)
+    elif df_1m.index.tz is None and ts.tzinfo is not None:
+        ts = ts.tz_localize(None)
+    return resample_ohlcv(df_1m.loc[df_1m.index <= ts], "5min")
+
+
+def m5_look_at(df_1m: pd.DataFrame, ts) -> Optional[dict]:
+    """1 分進場當下，對應那根 5 分的 OHLC / 均線，以及這根後來收完的價。"""
+    snap = m5_asof(df_1m, ts)
+    if snap.empty:
+        return None
+    last = snap.iloc[-1]
+    full = resample_ohlcv(df_1m, "5min")
+    finished = full.loc[last.name] if last.name in full.index else last
+    close = snap["Close"].astype(float)
+    mas = {}
+    for n in (5, 10, 20, 30, 60, 120, 200):
+        series = close.rolling(n, min_periods=n).mean()
+        mas[n] = float(series.iloc[-1]) if len(series) else float("nan")
+    body = float(last["Close"]) - float(last["Open"])
+    ma5, ma10, ma20, ma30, ma200 = mas[5], mas[10], mas[20], mas[30], mas[200]
+    stack = (not any(np.isnan(x) for x in (ma5, ma10, ma20, ma30))) and (
+        ma5 > ma10 > ma20 > ma30
+    )
+    above_200 = (not np.isnan(ma200)) and float(last["Close"]) > ma200
+    return {
+        "bar_time": last.name,
+        "open": float(last["Open"]),
+        "high": float(last["High"]),
+        "low": float(last["Low"]),
+        "close": float(last["Close"]),
+        "volume": float(last["Volume"]) if "Volume" in snap.columns else 0.0,
+        "body": body,
+        "finished_open": float(finished["Open"]),
+        "finished_high": float(finished["High"]),
+        "finished_low": float(finished["Low"]),
+        "finished_close": float(finished["Close"]),
+        "forming": abs(float(last["Close"]) - float(finished["Close"])) > 0.05
+        or abs(float(last["High"]) - float(finished["High"])) > 0.05,
+        "ma5": ma5,
+        "ma10": ma10,
+        "ma20": ma20,
+        "ma30": ma30,
+        "ma60": mas[60],
+        "ma120": mas[120],
+        "ma200": ma200,
+        "stack": stack,
+        "above_200": above_200,
+        "snap": snap,
+    }
 
 
 def quality_of(coil_range: float, ribbon_width: float, vol_ratio: float, body: float) -> Tuple[int, str]:

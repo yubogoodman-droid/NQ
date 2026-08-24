@@ -17,6 +17,8 @@ from nq.coil import (  # noqa: E402
     CoilTrade,
     detect_coil_breakouts,
     make_coil_demo_bars,
+    m5_asof,
+    m5_look_at,
     quality_of,
     resample_ohlcv,
     simulate,
@@ -73,11 +75,16 @@ def test_real_chart_stands_on_ma200() -> None:
     assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
     late = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:35"]
     assert not late, "07:35 is the chase bar, not the entry"
-    m5 = resample_ohlcv(df, "5min")
     ts = df.index[hits[0].entry_idx]
-    pos = int(m5.index.searchsorted(ts))
-    assert m5.index[pos].strftime("%H:%M") == "07:35"
-    assert abs(float(m5.iloc[pos]["Close"]) - 29247.25) < 1.0
+    look = m5_look_at(df, ts)
+    assert look is not None
+    assert look["bar_time"].strftime("%H:%M") == "07:35"
+    # 07:32 當下，5分當根還沒走到 07:35 那根長綠
+    assert abs(look["close"] - 29217.75) < 0.3
+    assert look["forming"]
+    assert abs(look["finished_close"] - 29247.25) < 1.0
+    snap = m5_asof(df, ts)
+    assert abs(float(snap.iloc[-1]["Close"]) - 29217.75) < 0.3
 
 
 def test_no_signal_in_wide_trend() -> None:
@@ -111,8 +118,10 @@ def test_simulate_and_html(tmp_path: Path | None = None) -> None:
     text = path.read_text(encoding="utf-8")
     assert "起漲點" in text
     assert "<img src='img/" in text
+    assert "5分K 當時" in text
     img_dir = path.parent / "img"
-    assert any(img_dir.glob("*t01_*.png")), "expected a static trade PNG"
+    assert any(img_dir.glob("m1_t01_*.png")), "expected a static 1m trade PNG"
+    assert any(img_dir.glob("m5_t01_*.png")), "expected the 5m as-of snapshot"
 
 
 def test_resample_ohlcv_5m() -> None:
@@ -130,40 +139,14 @@ def test_resample_ohlcv_5m() -> None:
     assert abs(float(m5.loc[ts, "Low"]) - float(win["Low"].min())) < 1e-9
 
 
-def test_same_rules_on_5m_bars() -> None:
-    """同一套 K 數規則套在 5 分序列上仍抓得到那波起漲。"""
-    df = make_coil_demo_bars()
-    df = df.copy()
-    df.index = pd.date_range("2026-08-24 02:00", periods=len(df), freq="5min", tz=ET)
-    sigs = detect_coil_breakouts(df)
-    assert sigs
-    sig = sigs[0]
-    assert sig.entry_price > sig.coil_high
-    assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
-    assert sig.entry_price > sig.ma200
-    assert sig.ma60 < sig.ma200 and sig.ma120 < sig.ma200
-
-
-def test_html_1m_5m_compare(tmp_path: Path | None = None) -> None:
+def test_html_1m_5m_asof(tmp_path: Path | None = None) -> None:
     df1 = make_coil_demo_bars()
     trades1 = simulate(df1, detect_coil_breakouts(df1))
-    df5 = df1.copy()
-    df5.index = pd.date_range("2026-08-24 02:00", periods=len(df5), freq="5min", tz=ET)
-    trades5 = simulate(df5, detect_coil_breakouts(df5))
     out = Path("/tmp/nq_coil_compare.html") if tmp_path is None else Path(tmp_path) / "c.html"
-    path = write_html_report(
-        out,
-        df1,
-        trades1,
-        "NQ=F",
-        "demo",
-        interval="1m",
-        others=[("5m", df5, trades5, {})],
-    )
+    path = write_html_report(out, df1, trades1, "NQ=F", "demo")
     text = path.read_text(encoding="utf-8")
-    assert "1分K" in text and "5分K" in text
-    assert "同日進場對照" in text
-    assert "1分進場" in text and "5分當根" in text
+    assert "5分K 當時" in text
+    assert "未收完" in text or "已收完" in text
     img_dir = path.parent / "img"
     assert any(img_dir.glob("m1_t01_*.png"))
     assert any(img_dir.glob("m5_t01_*.png"))
@@ -177,8 +160,7 @@ def main() -> int:
     test_no_signal_in_wide_trend()
     test_simulate_and_html()
     test_resample_ohlcv_5m()
-    test_same_rules_on_5m_bars()
-    test_html_1m_5m_compare()
+    test_html_1m_5m_asof()
     print("ok")
     return 0
 

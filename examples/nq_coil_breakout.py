@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NQ 起漲點：均線糾結盤整後放量突破（1 分 / 5 分對照）。
+"""NQ 起漲點：均線糾結盤整後放量突破（1 分訊號，對照當時 5 分長相）。
 
 用法:
   python3 examples/nq_coil_breakout.py --demo
@@ -21,7 +21,7 @@ import traceback
 from datetime import datetime
 from html import escape
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 import numpy as np
 import pandas as pd
@@ -37,7 +37,7 @@ from nq.coil import (  # noqa: E402
     CoilTrade,
     detect_coil_breakouts,
     make_coil_demo_bars,
-    resample_ohlcv,
+    m5_look_at,
     simulate,
     summarize_trades,
 )
@@ -220,6 +220,124 @@ def draw_trade_png(
     return path
 
 
+def draw_m5_asof_png(
+    df_1m: pd.DataFrame,
+    trade: CoilTrade,
+    path: Path,
+    trade_no: int,
+    lookback: int = 40,
+) -> Optional[Path]:
+    """1 分進場當下的 5 分圖：最後一根是未收完的當根。"""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+    from matplotlib.patches import Rectangle
+
+    for fp in (
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ):
+        if Path(fp).exists():
+            font_manager.fontManager.addfont(fp)
+            plt.rcParams["font.sans-serif"] = [
+                font_manager.FontProperties(fname=fp).get_name(),
+                "DejaVu Sans",
+            ]
+            plt.rcParams["axes.unicode_minus"] = False
+            break
+
+    ts = df_1m.index[trade.entry_idx]
+    look = m5_look_at(df_1m, ts)
+    if look is None or look["snap"].empty:
+        return None
+    snap = look["snap"]
+    window = snap.iloc[max(0, len(snap) - lookback) :]
+    xs = range(len(window))
+    o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
+    vol = window["Volume"] if "Volume" in window.columns else None
+    close_full = snap["Close"].astype(float)
+    start = len(snap) - len(window)
+
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.6),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+
+    colors_v = []
+    last_i = len(window) - 1
+    for k in range(len(window)):
+        up = float(c.iloc[k]) >= float(o.iloc[k])
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.9 if k == last_i else 0.65)
+        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
+        if y1 == y0:
+            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
+        edge = "#f0c14b" if k == last_i else col
+        ax.add_patch(
+            Rectangle(
+                (xs[k] - 0.35, y0),
+                0.7,
+                y1 - y0,
+                facecolor=col,
+                edgecolor=edge,
+                lw=1.1 if k == last_i else 0.25,
+                linestyle="--" if k == last_i and look["forming"] else "-",
+            )
+        )
+        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    if vol is not None:
+        axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
+
+    for n, col in MA_COLORS.items():
+        ma = close_full.rolling(n, min_periods=n).mean().iloc[start : start + len(window)]
+        ax.plot(list(xs), ma, color=col, lw=1.2 if n <= 20 else 0.95, label=f"MA{n}")
+
+    ax.axhline(trade.signal.coil_high, color="#f0c14b", ls="--", lw=0.9, alpha=0.75)
+    ax.axhline(trade.entry_price, color="#00e676", ls=":", lw=0.9, alpha=0.85)
+    ax.axvline(last_i, color="#f0c14b", ls="--", lw=0.9, alpha=0.8)
+    ax.scatter([last_i], [look["close"]], s=46, color="#f0c14b", marker="o", zorder=6)
+    ax.annotate(
+        "當時",
+        (last_i, look["close"]),
+        textcoords="offset points",
+        xytext=(0, 10),
+        ha="center",
+        color="#fde68a",
+        fontsize=8,
+    )
+
+    forming = "未收完" if look["forming"] else "已收完"
+    ma200_s = "—" if np.isnan(look["ma200"]) else f"{look['ma200']:.1f}"
+    above = "站上200" if look["above_200"] else "未站上200"
+    ax.set_title(
+        f"5分當時  截止 {ts.strftime('%m-%d %H:%M')}  當根 {look['bar_time'].strftime('%H:%M')} {forming}  "
+        f"C {look['close']:.2f}  MA200 {ma200_s}  {above}",
+        color="#e8f0ea",
+        fontsize=11,
+    )
+    ax.legend(loc="upper left", fontsize=6, frameon=False, labelcolor="#c8d5cc", ncol=8)
+    step = max(1, len(window) // 6)
+    ticks = list(range(0, len(window), step))
+    axv.set_xticks(ticks)
+    axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
 def _trade_img_name(
     df: pd.DataFrame, trade: CoilTrade, trade_no: int, interval: str = "1m"
 ) -> str:
@@ -250,118 +368,29 @@ def _quality_line(stats: Dict[str, Any]) -> str:
     return " · ".join(q_bits) if q_bits else "無品質分組"
 
 
-def _day_hits(df: pd.DataFrame, trades: Sequence[CoilTrade]) -> Dict[str, List[str]]:
-    days: Dict[str, List[str]] = {}
-    for i, t in enumerate(trades, 1):
-        ts = df.index[t.entry_idx]
-        days.setdefault(ts.strftime("%m-%d"), []).append(f"#{i} {ts.strftime('%H:%M')}")
-    return days
+def _fmt_ma(v: float) -> str:
+    return "—" if v is None or np.isnan(v) else f"{v:.1f}"
 
 
-def _compare_table(
-    rows: Sequence[Tuple[str, pd.DataFrame, List[CoilTrade]]],
-) -> str:
-    if len(rows) < 2:
-        return ""
-    labels = [TF_LABELS.get(iv, iv) for iv, _df, _tr in rows]
-    stats = [summarize_trades(tr) for _iv, _df, tr in rows]
-    keys = [
-        ("K 數", [str(len(df)) for _iv, df, _tr in rows]),
-        ("筆數", [str(s["count"]) for s in stats]),
-        ("勝率", [f"{s['win_rate']:.1f}%" for s in stats]),
-        ("淨點數", [f"{s['total_points']:+.1f}" for s in stats]),
-        ("勝/負", [f"{s['wins']}/{s['count'] - s['wins']}" for s in stats]),
-    ]
-    head = "".join(f"<th>{escape(lab)}</th>" for lab in labels)
-    body = []
-    for name, vals in keys:
-        tds = "".join(f"<td>{escape(v)}</td>" for v in vals)
-        body.append(f"<tr><th>{escape(name)}</th>{tds}</tr>")
-
-    day_maps = [_day_hits(df, tr) for _iv, df, tr in rows]
-    all_days = sorted(set().union(*[set(m) for m in day_maps]))
-    day_rows = []
-    for d in all_days:
-        tds = []
-        for m in day_maps:
-            tds.append(f"<td>{escape(' · '.join(m.get(d, [])) or '—')}</td>")
-        day_rows.append(f"<tr><th>{escape(d)}</th>{''.join(tds)}</tr>")
-    day_html = (
-        "<p class='muted' style='margin-top:12px'>同日進場對照（日期為美東）</p>"
-        f"<table class='compare'><thead><tr><th>日期</th>{head}</tr></thead>"
-        f"<tbody>{''.join(day_rows)}</tbody></table>"
-        if day_rows
-        else ""
-    )
-    return (
-        "<table class='compare'><thead><tr><th></th>"
-        f"{head}</tr></thead><tbody>{''.join(body)}</tbody></table>"
-        + day_html
-    )
-
-
-def _align_idx(index: pd.DatetimeIndex, ts) -> Optional[int]:
-    if index is None or len(index) == 0:
-        return None
-    pos = int(index.searchsorted(ts))
-    if pos < len(index):
-        return pos
-    return len(index) - 1
-
-
-def _cross_tf_html(
-    df1: pd.DataFrame,
-    trades1: Sequence[CoilTrade],
-    df5: pd.DataFrame,
-    trades5: Sequence[CoilTrade],
-) -> str:
-    if df5 is None or len(df5) == 0 or not trades1:
-        return ""
-    close5 = df5["Close"].astype(float)
-    ma = {n: close5.rolling(n, min_periods=n).mean() for n in (5, 10, 20, 30, 200)}
-    rows: List[str] = []
-    for i, t in enumerate(trades1, 1):
-        ts = df1.index[t.entry_idx]
-        j = _align_idx(df5.index, ts)
-        if j is None:
-            continue
-        ts5 = df5.index[j]
-        c5 = float(close5.iloc[j])
-        ma5 = float(ma[5].iloc[j])
-        ma10 = float(ma[10].iloc[j])
-        ma20 = float(ma[20].iloc[j])
-        ma30 = float(ma[30].iloc[j])
-        ma200 = float(ma[200].iloc[j])
-        if any(np.isnan(x) for x in (ma5, ma10, ma20, ma30, ma200)):
-            stack, above, ma200_s = "均線不足", "均線不足", "—"
-        else:
-            stack = "是" if ma5 > ma10 > ma20 > ma30 else "否"
-            above = "是" if c5 > ma200 else "否"
-            ma200_s = f"{ma200:.1f}"
-        hit = "無"
-        for k, t5 in enumerate(trades5, 1):
-            dt = abs((df5.index[t5.entry_idx] - ts).total_seconds())
-            if dt <= 90 * 60:
-                hit = f"#{k} {df5.index[t5.entry_idx].strftime('%H:%M')}"
-                break
-        rows.append(
-            f"<tr><th>#{i} {escape(ts.strftime('%m-%d %H:%M'))}<br>"
-            f"<span class='muted'>{t.entry_price:.2f}</span></th>"
-            f"<td>{escape(ts5.strftime('%H:%M'))}<br>{c5:.2f}</td>"
-            f"<td>{escape(ma200_s)}</td>"
-            f"<td>{escape(above)}</td>"
-            f"<td>{escape(stack)}</td>"
-            f"<td>{escape(hit)}</td></tr>"
+def _m5_detail(look: dict) -> str:
+    forming = "未收完" if look["forming"] else "已收完"
+    later = ""
+    if look["forming"]:
+        later = (
+            f"這根後來收到 {look['finished_close']:.2f}  "
+            f"H {look['finished_high']:.2f} / L {look['finished_low']:.2f}\n"
         )
+    stack = "是" if look["stack"] else "否"
+    above = "是" if look["above_200"] else "否"
     return (
-        "<p class='muted' style='margin-top:12px'>每筆 1分進場對上當根 5分（右標）。"
-        "5分 MA200 更慢，很多 1分站上 200 的反彈，5分還在 200 下面。</p>"
-        "<table class='compare'><thead><tr>"
-        "<th>1分進場</th><th>5分當根</th><th>5分MA200</th><th>站上200</th>"
-        "<th>5&gt;10&gt;20&gt;30</th><th>5分訊號</th>"
-        "</tr></thead><tbody>"
-        + "".join(rows)
-        + "</tbody></table>"
+        f"5分當根 {look['bar_time'].strftime('%m-%d %H:%M')}  {forming}\n"
+        f"當時 O {look['open']:.2f}  H {look['high']:.2f}  "
+        f"L {look['low']:.2f}  C {look['close']:.2f}  實體 {look['body']:.1f}\n"
+        f"{later}"
+        f"5分MA {_fmt_ma(look['ma5'])}>{_fmt_ma(look['ma10'])}>"
+        f"{_fmt_ma(look['ma20'])}>{_fmt_ma(look['ma30'])}  "
+        f"200 {_fmt_ma(look['ma200'])}\n"
+        f"當時站上5分MA200 {above}  5>10>20>30 {stack}"
     )
 
 
@@ -369,12 +398,9 @@ def _trade_cards(
     df: pd.DataFrame,
     trades: List[CoilTrade],
     img_dir: Path,
-    interval: str,
     keep: Set[str],
 ) -> str:
     cards: List[str] = []
-    tf = TF_LABELS.get(interval, interval)
-    tf_cls = "tag-tf1" if interval == "1m" else "tag-tf5"
     for i, t in enumerate(trades, 1):
         et = df.index[t.entry_idx]
         xt = df.index[t.exit_idx]
@@ -382,9 +408,30 @@ def _trade_cards(
         risk = t.entry_price - t.stop_price
         r_mult = (t.target_price - t.entry_price) / risk if risk > 0 else 0
         reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
-        img_name = _trade_img_name(df, t, i, interval)
-        keep.add(img_name)
-        draw_trade_png(df, t, img_dir / img_name, i, interval=interval)
+        img1 = _trade_img_name(df, t, i, "1m")
+        img5 = _trade_img_name(df, t, i, "5m")
+        keep.add(img1)
+        keep.add(img5)
+        draw_trade_png(df, t, img_dir / img1, i, interval="1m")
+        look = m5_look_at(df, et)
+        m5_html = ""
+        if look is not None:
+            drawn = draw_m5_asof_png(df, t, img_dir / img5, i)
+            if drawn is None:
+                keep.discard(img5)
+            m5_html = (
+                "<p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p>"
+                f"<pre class='trade-detail'>{escape(_m5_detail(look))}</pre>"
+                + (
+                    f"<div class='mini-chart'><img src='img/{escape(img5)}' alt='5分當時 #{i}' "
+                    "style='width:100%;display:block;border-radius:10px'/></div>"
+                    if drawn is not None
+                    else ""
+                )
+            )
+        else:
+            keep.discard(img5)
+            m5_html = "<p class='muted'>沒有對應的 5分K</p>"
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -393,10 +440,11 @@ def _trade_cards(
             f"<div class='card-pnl {cls}'>{t.pnl_points:+.1f} pts</div>"
             "</header>"
             "<div class='tags'>"
-            f"<span class='tag {tf_cls}'>{escape(tf)}</span>"
+            "<span class='tag tag-tf1'>1分K</span>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            f"<span class='tag tag-info'>起漲</span>"
+            "<span class='tag tag-info'>起漲</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
+            "<span class='tag tag-tf5'>5分當時</span>"
             "</div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}\n"
@@ -406,44 +454,16 @@ def _trade_cards(
             f"盤整 {t.signal.coil_low:.2f}–{t.signal.coil_high:.2f}  "
             f"區間 {t.signal.coil_range:.1f}  帶寬 {t.signal.ribbon_width:.1f}\n"
             f"量能 {t.signal.vol_ratio:.2f}x  實體 {t.signal.body:.1f}  前回檔 {t.signal.prior_drop:.1f}\n"
-            f"MA {t.signal.ma5:.1f}>{t.signal.ma10:.1f}>{t.signal.ma20:.1f}>{t.signal.ma30:.1f}  "
+            f"1分MA {t.signal.ma5:.1f}>{t.signal.ma10:.1f}>{t.signal.ma20:.1f}>{t.signal.ma30:.1f}  "
             f"60 {t.signal.ma60:.1f} / 120 {t.signal.ma120:.1f} < 200 {t.signal.ma200:.1f}"
             "</pre>"
-            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(tf)} #{i}' "
+            "<p class='chart-cap'>1分K</p>"
+            f"<div class='mini-chart'><img src='img/{escape(img1)}' alt='1分K #{i}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
+            f"{m5_html}"
             "</article>"
         )
     return "".join(cards) or "<div class='empty'>無起漲點</div>"
-
-
-def _tf_summary(
-    interval: str,
-    df: pd.DataFrame,
-    trades: List[CoilTrade],
-    period: str,
-    funnel: Optional[Dict[str, int]],
-) -> str:
-    stats = summarize_trades(trades)
-    pnls = [t.pnl_points for t in trades]
-    total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
-    start = df.index[0].strftime("%Y-%m-%d %H:%M") if len(df) else "—"
-    end = df.index[-1].strftime("%Y-%m-%d %H:%M") if len(df) else "—"
-    tf = TF_LABELS.get(interval, interval)
-    return (
-        f"<section class='summary' id='tf-{escape(interval)}'>"
-        f"<h2>{escape(tf)}</h2>"
-        f"<p class='muted'>{escape(period)} · {escape(start)} → {escape(end)} · bars={len(df)}</p>"
-        "<div class='cards'>"
-        f"<div class='card'>筆數<b>{stats['count']}</b></div>"
-        f"<div class='card'>勝率<b>{stats['win_rate']:.1f}%</b></div>"
-        f"<div class='card'>總點數<b class='{total_cls}'>{stats['total_points']:+.1f}</b></div>"
-        f"<div class='card'>勝/負<b>{stats['wins']}/{stats['count'] - stats['wins']}</b></div>"
-        "</div>"
-        f"<p class='muted'>{escape(_quality_line(stats))}</p>"
-        f"{_funnel_html(funnel)}"
-        f"<div class='equity'>{_equity_svg(pnls)}</div>"
-        "</section>"
-    )
 
 
 def write_view_html(src: Path) -> Path:
@@ -463,81 +483,40 @@ def write_html_report(
     period: str,
     funnel: Optional[Dict[str, int]] = None,
     *,
-    interval: str = "1m",
-    others: Optional[Sequence[Tuple[str, pd.DataFrame, List[CoilTrade], Optional[Dict[str, int]]]]] = None,
     write_view: bool = False,
+    **_legacy: Any,
 ) -> Path:
     out = Path(path)
     img_dir = out.parent / "img"
     img_dir.mkdir(parents=True, exist_ok=True)
     keep: Set[str] = set()
-
-    frames: List[Tuple[str, pd.DataFrame, List[CoilTrade], Optional[Dict[str, int]]]] = [
-        (interval, df, trades, funnel)
-    ]
-    if others:
-        frames.extend(list(others))
-
-    compare_rows = [(iv, frame, tr) for iv, frame, tr, _fun in frames]
-    compare_html = _compare_table(compare_rows) if len(frames) > 1 else ""
-    by_iv = {iv: (frame, tr) for iv, frame, tr, _fun in frames}
-    cross_html = ""
-    if "1m" in by_iv and "5m" in by_iv:
-        cross_html = _cross_tf_html(by_iv["1m"][0], by_iv["1m"][1], by_iv["5m"][0], by_iv["5m"][1])
-    jump = ""
-    if len(frames) > 1:
-        links = " · ".join(
-            f"<a href='#sec-{escape(iv)}'>{escape(TF_LABELS.get(iv, iv))}</a>" for iv, *_rest in frames
-        )
-        jump = f"<p class='muted'>跳到交易：{links}</p>"
-
-    sections: List[str] = []
-    for iv, frame, tr, fun in frames:
-        tf = TF_LABELS.get(iv, iv)
-        sections.append(f"<h2 class='tf-h' id='sec-{escape(iv)}'>{escape(tf)} 交易</h2>")
-        cards = _trade_cards(frame, tr, img_dir, iv, keep)
-        if not tr and iv == "5m":
-            cards = (
-                "<div class='empty'>沒有 5分起漲點。5分 MA200 更慢，"
-                "上面對照表可看每筆 1分進場當時 5分有沒有站上 200。</div>"
-            )
-        sections.append(cards)
-
+    stats = summarize_trades(trades)
+    pnls = [t.pnl_points for t in trades]
+    total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
+    start = df.index[0].strftime("%Y-%m-%d %H:%M") if len(df) else "—"
+    end = df.index[-1].strftime("%Y-%m-%d %H:%M") if len(df) else "—"
+    cards = _trade_cards(df, trades, img_dir, keep)
     for old in img_dir.glob("*.png"):
         if old.name not in keep:
             old.unlink()
-
-    summaries = "".join(_tf_summary(iv, frame, tr, period, fun) for iv, frame, tr, fun in frames)
-    note = ""
-    if len(frames) > 1:
-        note = (
-            "<p class='muted'>同一套規則對照：盤整 10–18 根、區間 ≤36 點、第一次收盤站上 MA200，"
-            "且 5&gt;10&gt;20&gt;30、MA60/120 在 200 下方。5分K 由 1分K 重採樣。"
-            "5分的 10 根盤整約 50 分鐘，MA200 約 16.7 小時，所以 1分起漲在 5分常常還沒站上 200。"
-            "</p>"
-        )
 
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>{escape(symbol)} 起漲點（1分 / 5分對照）</title>
+<title>{escape(symbol)} 起漲點（1分訊號 · 5分當時）</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
 h1{{font-size:18px;margin:0 0 6px}}
-h2{{font-size:15px;margin:0 0 6px}}
-.tf-h{{font-size:16px;margin:22px 0 10px;padding-top:4px}}
 .muted{{color:#8b949e;font-size:13px;line-height:1.5}}
+.chart-cap{{color:#8b949e;font-size:12px;margin:12px 0 6px}}
 .summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
 .cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
 .card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}}
 .card b{{display:block;font-size:20px;margin-top:4px}}
 .equity{{margin:10px 0 4px}}
-.compare{{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 4px}}
-.compare th,.compare td{{padding:7px 8px;border-bottom:1px solid #30363d;text-align:right;vertical-align:top}}
-.compare th:first-child,.compare td:first-child{{text-align:left;color:#8b949e;font-weight:600}}
 .trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}}
 .card-header{{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}}
 .trade-no{{font-size:15px;font-weight:700}}
@@ -553,21 +532,26 @@ h2{{font-size:15px;margin:0 0 6px}}
 .tag-tf1{{background:rgba(88,166,255,0.18);color:#79c0ff;border-color:rgba(88,166,255,0.4)}}
 .tag-tf5{{background:rgba(163,113,247,0.18);color:#d2a8ff;border-color:rgba(163,113,247,0.4)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
-.mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+.mini-chart{{margin:0 -6px 8px;border-radius:10px;overflow:hidden}}
 .empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
 a{{color:#79c0ff}}
 </style></head><body>
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（均線糾結突破）</h1>
-<p class="muted">圖是靜態 K 線。手機請往下捲。</p>
-{note}
-{compare_html}
-{cross_html}
-{jump}
+<p class="muted">訊號只看 1分K。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完，不會偷看後面。</p>
+<p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
+<div class="cards">
+<div class="card">筆數<b>{stats['count']}</b></div>
+<div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
+<div class="card">總點數<b class="{total_cls}">{stats['total_points']:+.1f}</b></div>
+<div class="card">勝/負<b>{stats['wins']}/{stats['count'] - stats['wins']}</b></div>
+</div>
+<p class="muted">{escape(_quality_line(stats))}</p>
+{_funnel_html(funnel)}
+<div class="equity">{_equity_svg(pnls)}</div>
 </section>
-{summaries}
-{"".join(sections)}
+{cards}
 </div>
 </body></html>
 """
@@ -596,11 +580,22 @@ def print_signals(
         extra = ""
         if t is not None:
             extra = f" | {t.exit_reason} {t.pnl_points:+.1f}"
+        look = m5_look_at(df, ts)
+        m5 = ""
+        if look is not None:
+            form = "未收完" if look["forming"] else "已收完"
+            m5 = (
+                f"  | 5分當時 {look['bar_time'].strftime('%H:%M')} {form} "
+                f"C {look['close']:.2f} MA200 {_fmt_ma(look['ma200'])} "
+                f"{'站上200' if look['above_200'] else '未站上200'}"
+            )
+            if look["forming"]:
+                m5 += f" 後來 {look['finished_close']:.2f}"
         print(
             f"{prefix}[{i}] Q{sig.quality} {ts.strftime('%Y-%m-%d %H:%M')}  "
             f"起漲 {sig.entry_price:.2f}  盤整 {sig.coil_low:.2f}-{sig.coil_high:.2f}  "
             f"帶寬 {sig.ribbon_width:.1f}  量 {sig.vol_ratio:.2f}x  "
-            f"停損 {sig.stop_price:.2f}  目標 {sig.target_price:.2f}{extra}"
+            f"停損 {sig.stop_price:.2f}  目標 {sig.target_price:.2f}{extra}{m5}"
         )
 
 
@@ -632,31 +627,19 @@ def _print_funnel(funnel: Dict[str, int]) -> None:
     )
 
 
-def _run_tf(df: pd.DataFrame) -> Tuple[List[CoilSignal], List[CoilTrade], Dict[str, int]]:
-    funnel: Dict[str, int] = {}
-    sigs = detect_coil_breakouts(df, funnel=funnel)
-    trades = simulate(df, sigs)
-    return sigs, trades, funnel
-
-
 def cmd_backtest(args) -> int:
     df1 = to_et(load_bars(args.symbol, "1m", args.period))
     if df1.empty:
         print("no data", file=sys.stderr)
         return 1
-    df5 = resample_ohlcv(df1, "5min")
-    sigs1, trades1, funnel1 = _run_tf(df1)
-    sigs5, trades5, funnel5 = _run_tf(df5)
-    stats1 = summarize_trades(trades1)
-    stats5 = summarize_trades(trades5)
+    funnel: Dict[str, int] = {}
+    sigs = detect_coil_breakouts(df1, funnel=funnel)
+    trades = simulate(df1, sigs)
+    stats = summarize_trades(trades)
     print(f"{args.symbol} {args.period} 1m bars={len(df1)} {df1.index[0]} -> {df1.index[-1]}")
-    print(f"1m trades={stats1['count']} WR={stats1['win_rate']:.1f}% pnl={stats1['total_points']:+.1f}")
-    _print_funnel(funnel1)
-    print_signals(df1, sigs1, trades1, label="1m")
-    print(f"{args.symbol} {args.period} 5m bars={len(df5)} {df5.index[0]} -> {df5.index[-1]}")
-    print(f"5m trades={stats5['count']} WR={stats5['win_rate']:.1f}% pnl={stats5['total_points']:+.1f}")
-    _print_funnel(funnel5)
-    print_signals(df5, sigs5, trades5, label="5m")
+    print(f"1m trades={stats['count']} WR={stats['win_rate']:.1f}% pnl={stats['total_points']:+.1f}")
+    _print_funnel(funnel)
+    print_signals(df1, sigs, trades, label="1m")
     html_path = args.html
     pages = getattr(args, "pages", False)
     if pages:
@@ -665,12 +648,10 @@ def cmd_backtest(args) -> int:
         out = write_html_report(
             html_path,
             df1,
-            trades1,
+            trades,
             args.symbol,
             args.period,
-            funnel=funnel1,
-            interval="1m",
-            others=[("5m", df5, trades5, funnel5)],
+            funnel=funnel,
             write_view=pages,
         )
         print(f"html={out}")
@@ -701,6 +682,15 @@ def fmt_entry(df, sig: CoilSignal) -> str:
     risk = sig.entry_price - sig.stop_price
     r_mult = (sig.target_price - sig.entry_price) / risk if risk > 0 else 0
     last = float(df["Close"].iloc[-1])
+    look = m5_look_at(df, df.index[sig.entry_idx])
+    m5_line = ""
+    if look is not None:
+        form = "未收完" if look["forming"] else "已收完"
+        above = "站上200" if look["above_200"] else "未站上200"
+        m5_line = (
+            f"5分當時: <code>{look['bar_time'].strftime('%H:%M')}</code> {form} "
+            f"C {look['close']:.2f} / MA200 {_fmt_ma(look['ma200'])} {above}\n"
+        )
     return (
         f"🟢 <b>起漲點（均線糾結突破）</b>\n"
         f"時間: <code>{ts.strftime('%Y-%m-%d %H:%M')} ET</code>\n"
@@ -710,6 +700,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"目標: <code>{sig.target_price:.2f}</code> ({r_mult:.1f}R)\n"
         f"盤整: <code>{sig.coil_low:.1f}–{sig.coil_high:.1f}</code> "
         f"區間 {sig.coil_range:.1f} / 帶寬 {sig.ribbon_width:.1f}\n"
+        f"{m5_line}"
         f"量能: {sig.vol_ratio:.2f}x · 現價 <code>{last:.2f}</code>\n"
         f"排列: 5>10>20>30 · 站上MA200 · 60/120&lt;200\n"
         f"#起漲點 #NQ #Q{sig.quality}"
@@ -870,14 +861,14 @@ def cmd_alert(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="NQ 起漲點（均線糾結突破，1分/5分對照）")
+    p = argparse.ArgumentParser(description="NQ 起漲點（1分訊號，對照當時 5分長相）")
     sub = p.add_subparsers(dest="cmd")
 
     d = sub.add_parser("demo", help="用模擬那張圖的走勢示範")
     d.add_argument("--html", default="")
     d.set_defaults(func=cmd_demo)
 
-    b = sub.add_parser("backtest", help="Yahoo 1m 回測，並重採樣 5m 對照")
+    b = sub.add_parser("backtest", help="Yahoo 1m 回測，每筆附當時 5分K 長相")
     b.add_argument("--symbol", default="NQ=F")
     b.add_argument("--period", default="8d")
     b.add_argument("--html", default="")
