@@ -26,6 +26,7 @@ h1{font-size:18px;margin:0 0 6px}
 .tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
 .tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
 .tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.tag-fail{background:rgba(163,113,247,0.15);color:#d2a8ff;border-color:rgba(163,113,247,0.35)}
 .tag-info{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}
 .tag-tf1{background:rgba(88,166,255,0.18);color:#79c0ff;border-color:rgba(88,166,255,0.4)}
 .tag-tf5{background:rgba(163,113,247,0.18);color:#d2a8ff;border-color:rgba(163,113,247,0.4)}
@@ -37,17 +38,17 @@ a{color:#79c0ff}
 <div class="page">
 <section class="summary">
 <h1>NQ=F 起漲點（均線糾結突破）</h1>
-<p class="muted">訊號只看 1分K。停損＝盤整低點 − 5 點，停利 2R。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
-<p class="muted">10d · 2026-08-14 09:54 → 2026-08-24 09:43 · 1分 bars=8207</p>
+<p class="muted">訊號只看 1分K。停損＝盤整低點 − 5 點，停利 2R；連續 2 根收回盤整高點下視為突破失敗、收盤離場。不追超過 40 點的長實體，當時 5 分若還在 MA200 下方超過 100 點也不接（大空反彈）。下面每筆都附「當時 5分K」：只用到 1分進場那一分為止，當根 5分可能還沒收完。</p>
+<p class="muted">10d · 2026-08-14 10:04 → 2026-08-24 09:53 · 1分 bars=8207</p>
 <div class="cards">
-<div class="card">筆數<b>16</b></div>
-<div class="card">勝率<b>31.2%</b></div>
-<div class="card">總點數<b class="pnl-win">+92.8</b></div>
-<div class="card">勝/負<b>5/11</b></div>
+<div class="card">筆數<b>10</b></div>
+<div class="card">勝率<b>50.0%</b></div>
+<div class="card">總點數<b class="pnl-win">+318.0</b></div>
+<div class="card">勝/負<b>5/5</b></div>
 </div>
-<p class="muted">QA 11筆 -29.0 · QB 3筆 +154.2 · QC 2筆 -32.5</p>
-<p class='muted'>漏斗：檢查 7303 → 盤整箱 2913 → 等待突破 3465 → 長實體 1741 → 站上盤整 544 → 5/10/20/30排列 640 → 站上MA200 1551 → 60與120在200下 1277 → 放量 498 → 進場 16</p>
-<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="61.5" x2="720" y2="61.5" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,61.5 45.0,48.6 90.0,72.9 135.0,72.9 180.0,89.3 225.0,103.3 270.0,119.1 315.0,142.7 360.0,162.6 405.0,117.5 450.0,70.0 495.0,30.3 540.0,30.3 585.0,45.7 630.0,17.4 675.0,17.4 720.0,17.4"/></svg></div>
+<p class="muted">QA 5筆 +77.8 · QB 5筆 +240.2</p>
+<p class='muted'>漏斗：檢查 7567 → 盤整箱 3094 → 等待突破 3688 → 長實體 1848 → 非追高 3687 → 站上盤整 594 → 5/10/20/30排列 714 → 站上MA200 1675 → 60與120在200下 1431 → 放量 551 → 5分未過深 2533 → 進場 10</p>
+<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="160.0" x2="720" y2="160.0" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,160.0 72.0,147.8 144.0,151.8 216.0,162.6 288.0,120.1 360.0,75.3 432.0,37.8 504.0,37.8 576.0,44.1 648.0,17.4 720.0,17.4"/></svg></div>
 </section>
 <article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · QA</span><span class='trade-time'>2026-08-16 22:21 → 08-16 23:51</span></div><div class='card-pnl pnl-win'>+27.2 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-time'>timeout</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 30214.50
 stop  30180.25  (−34.2 pts)
@@ -59,152 +60,102 @@ exit  30241.75  timeout
 當時 O 30202.50  H 30216.50  L 30202.00  C 30214.50  實體 12.0
 這根後來收到 30215.00  H 30222.25 / L 30202.00
 5分MA 30199.9&gt;30198.7&gt;30206.9&gt;30205.5  200 —
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t01_0816_2221_qa.png' alt='5分當時 #1' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · QA</span><span class='trade-time'>2026-08-17 06:29 → 08-17 07:59</span></div><div class='card-pnl pnl-loss'>-51.2 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-time'>timeout</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 30338.00
-stop  30274.00  (−64.0 pts)
-target 30466.00  (2.0R)
-exit  30286.75  timeout
+當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t01_0816_2221_qa.png' alt='5分當時 #1' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · QA</span><span class='trade-time'>2026-08-17 06:31 → 08-17 06:33</span></div><div class='card-pnl pnl-loss'>-9.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 30310.75
+stop  30274.00  (−36.8 pts)
+target 30384.25  (2.0R)
+exit  30301.75  fail
 盤整 30279.00–30303.25  區間 24.2  帶寬 10.7
-量能 24.99x  實體 52.5  前回檔 51.8
-1分MA 30294.8>30291.8>30291.4>30288.8  60 30284.6 / 120 30289.2 < 200 30294.2</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t02_0817_0629_qa.png' alt='1分K #2' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-17 06:30  未收完
-當時 O 30286.50  H 30343.00  L 30279.00  C 30338.00  實體 51.5
-這根後來收到 30299.50  H 30343.00 / L 30279.00
-5分MA 30298.8&gt;30292.9&gt;30288.9&gt;30295.4  200 30209.1
-當時站上5分MA200 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t02_0817_0629_qa.png' alt='5分當時 #2' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · QA</span><span class='trade-time'>2026-08-17 19:31 → 08-17 21:01</span></div><div class='card-pnl pnl-flat'>+0.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 30093.50
-stop  30072.00  (−21.5 pts)
-target 30136.50  (2.0R)
-exit  30093.50  stop
-盤整 30077.00–30087.50  區間 10.5  帶寬 6.6
-量能 7.84x  實體 8.5  前回檔 37.2
-1分MA 30085.2>30082.5>30082.0>30080.8  60 30077.3 / 120 30075.3 < 200 30081.5</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t03_0817_1931_qa.png' alt='1分K #3' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-17 19:35  未收完
-當時 O 30085.00  H 30100.00  L 30085.00  C 30093.50  實體 8.5
-這根後來收到 30097.00  H 30103.00 / L 30085.00
-5分MA 30083.9&gt;30081.0&gt;30078.3&gt;30075.8  200 30205.2
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 是</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t03_0817_1931_qa.png' alt='5分當時 #3' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · QA</span><span class='trade-time'>2026-08-18 02:58 → 08-18 03:16</span></div><div class='card-pnl pnl-loss'>-34.5 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29895.00
-stop  29860.50  (−34.5 pts)
-target 29964.00  (2.0R)
-exit  29860.50  stop
-盤整 29865.50–29877.75  區間 12.2  帶寬 28.5
-量能 2.15x  實體 18.2  前回檔 141.2
-1分MA 29878.1>29875.6>29872.4>29869.6  60 29849.5 / 120 29863.2 < 200 29877.0</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t04_0818_0258_qa.png' alt='1分K #4' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-18 03:00  未收完
-當時 O 29875.00  H 29896.00  L 29872.00  C 29895.00  實體 20.0
-這根後來收到 29881.25  H 29896.00 / L 29872.00
-5分MA 29876.0&gt;29862.9&gt;29858.9&gt;29872.2  200 30060.2
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t04_0818_0258_qa.png' alt='5分當時 #4' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · QA</span><span class='trade-time'>2026-08-18 07:02 → 08-18 07:39</span></div><div class='card-pnl pnl-loss'>-29.2 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29761.25
-stop  29732.00  (−29.2 pts)
-target 29819.75  (2.0R)
-exit  29732.00  stop
-盤整 29737.00–29752.75  區間 15.8  帶寬 24.1
-量能 4.39x  實體 8.5  前回檔 90.8
-1分MA 29747.5>29746.2>29743.4>29740.7  60 29732.0 / 120 29732.6 < 200 29750.3</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t05_0818_0702_qa.png' alt='1分K #5' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-18 07:05  未收完
-當時 O 29746.00  H 29763.00  L 29744.75  C 29761.25  實體 15.2
-這根後來收到 29761.75  H 29765.50 / L 29744.75
-5分MA 29746.3&gt;29735.0&gt;29728.2&gt;29737.6  200 29951.6
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t05_0818_0702_qa.png' alt='5分當時 #5' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · QA</span><span class='trade-time'>2026-08-18 18:20 → 08-18 18:29</span></div><div class='card-pnl pnl-loss'>-33.2 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29585.50
-stop  29552.25  (−33.2 pts)
-target 29652.00  (2.0R)
-exit  29552.25  stop
-盤整 29557.25–29578.50  區間 21.2  帶寬 12.6
-量能 2.19x  實體 3.0  前回檔 61.0
-1分MA 29579.5>29577.2>29574.6>29570.1  60 29572.2 / 120 29578.9 < 200 29580.2</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t06_0818_1820_qa.png' alt='1分K #6' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-18 18:20  已收完
-當時 O 29578.50  H 29587.75  L 29569.50  C 29585.50  實體 7.0
-5分MA 29575.3&gt;29571.5&gt;29575.2&gt;29578.2  200 29697.5
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t06_0818_1820_qa.png' alt='5分當時 #6' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · QA</span><span class='trade-time'>2026-08-18 19:22 → 08-18 20:01</span></div><div class='card-pnl pnl-loss'>-49.8 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29565.75
-stop  29516.00  (−49.8 pts)
-target 29665.25  (2.0R)
-exit  29516.00  stop
-盤整 29521.00–29536.00  區間 15.0  帶寬 39.2
-量能 8.17x  實體 33.5  前回檔 79.2
-1分MA 29535.5>29532.3>29532.2>29528.8  60 29535.1 / 120 29553.9 < 200 29565.4</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t07_0818_1922_qa.png' alt='1分K #7' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-18 19:25  未收完
-當時 O 29530.00  H 29567.25  L 29530.00  C 29565.75  實體 35.8
-這根後來收到 29553.50  H 29567.25 / L 29530.00
-5分MA 29536.8&gt;29531.2&gt;29548.6&gt;29557.5  200 29674.8
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t07_0818_1922_qa.png' alt='5分當時 #7' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · QA</span><span class='trade-time'>2026-08-18 23:36 → 08-19 00:09</span></div><div class='card-pnl pnl-loss'>-41.8 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29556.50
+量能 4.68x  實體 11.5  前回檔 51.8
+1分MA 30302.6>30294.9>30293.8>30290.4  60 30285.5 / 120 30289.0 < 200 30294.3
+5分當時 C 30310.8  MA200 30210.1  Δ +100.6</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t02_0817_0631_qa.png' alt='1分K #2' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-17 06:35  未收完
+當時 O 30299.25  H 30312.25  L 30294.00  C 30310.75  實體 11.5
+這根後來收到 30299.75  H 30312.25 / L 30292.75
+5分MA 30296.8&gt;30291.2&gt;30288.0&gt;30294.1  200 30210.1
+當時站上5分MA200 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t02_0817_0631_qa.png' alt='5分當時 #2' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · QA</span><span class='trade-time'>2026-08-18 23:36 → 08-18 23:42</span></div><div class='card-pnl pnl-loss'>-24.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29556.50
 stop  29514.75  (−41.8 pts)
 target 29640.00  (2.0R)
-exit  29514.75  stop
+exit  29532.50  fail
 盤整 29519.75–29541.00  區間 21.2  帶寬 19.6
 量能 2.23x  實體 8.5  前回檔 95.5
-1分MA 29547.6>29541.5>29537.8>29535.6  60 29533.9 / 120 29544.6 < 200 29551.9</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t08_0818_2336_qa.png' alt='1分K #8' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-18 23:40  未收完
+1分MA 29547.6>29541.5>29537.8>29535.6  60 29533.9 / 120 29544.6 < 200 29551.9
+5分當時 C 29556.5  MA200 29610.4  Δ -53.9</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t03_0818_2336_qa.png' alt='1分K #3' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-18 23:40  未收完
 當時 O 29548.00  H 29557.00  L 29543.25  C 29556.50  實體 8.5
 這根後來收到 29541.00  H 29567.00 / L 29535.50
 5分MA 29543.4&gt;29540.1&gt;29539.3&gt;29553.6  200 29610.4
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t08_0818_2336_qa.png' alt='5分當時 #8' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · QB</span><span class='trade-time'>2026-08-19 02:48 → 08-19 04:18</span></div><div class='card-pnl pnl-win'>+94.8 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-time'>timeout</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29528.25
+當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t03_0818_2336_qa.png' alt='5分當時 #3' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · QB</span><span class='trade-time'>2026-08-19 02:48 → 08-19 04:18</span></div><div class='card-pnl pnl-win'>+94.8 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-time'>timeout</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29528.25
 stop  29455.00  (−73.2 pts)
 target 29674.75  (2.0R)
 exit  29623.00  timeout
 盤整 29460.00–29489.75  區間 29.8  帶寬 31.5
 量能 3.06x  實體 0.0  前回檔 104.5
-1分MA 29512.5>29493.0>29488.6>29488.1  60 29470.5 / 120 29479.3 < 200 29497.6</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t09_0819_0248_qb.png' alt='1分K #9' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-19 02:50  未收完
+1分MA 29512.5>29493.0>29488.6>29488.1  60 29470.5 / 120 29479.3 < 200 29497.6
+5分當時 C 29528.2  MA200 29565.9  Δ -37.7</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t04_0819_0248_qb.png' alt='1分K #4' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-19 02:50  未收完
 當時 O 29505.50  H 29532.25  L 29502.75  C 29528.25  實體 22.8
 這根後來收到 29524.75  H 29532.25 / L 29502.75
 5分MA 29494.8&gt;29480.4&gt;29477.3&gt;29487.3  200 29565.9
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t09_0819_0248_qb.png' alt='5分當時 #9' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · QA</span><span class='trade-time'>2026-08-19 08:07 → 08-19 08:37</span></div><div class='card-pnl pnl-win'>+100.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-tp'>target</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29555.25
+當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t04_0819_0248_qb.png' alt='5分當時 #4' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · QB</span><span class='trade-time'>2026-08-19 08:07 → 08-19 08:37</span></div><div class='card-pnl pnl-win'>+100.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-tp'>target</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29555.25
 stop  29505.25  (−50.0 pts)
 target 29655.25  (2.0R)
 exit  29655.25  target
 盤整 29510.25–29537.50  區間 27.2  帶寬 36.1
 量能 2.76x  實體 13.5  前回檔 71.2
-1分MA 29539.0>29537.7>29528.7>29525.9  60 29534.4 / 120 29536.5 < 200 29553.8</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t10_0819_0807_qa.png' alt='1分K #10' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-19 08:10  未收完
+1分MA 29539.0>29537.7>29528.7>29525.9  60 29534.4 / 120 29536.5 < 200 29553.8
+5分當時 C 29555.2  MA200 29548.0  Δ +7.2</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t05_0819_0807_qb.png' alt='1分K #5' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-19 08:10  未收完
 當時 O 29530.25  H 29558.50  L 29525.75  C 29555.25  實體 25.0
 這根後來收到 29549.75  H 29558.50 / L 29525.75
 5分MA 29528.0&gt;29530.2&gt;29537.5&gt;29537.0  200 29548.0
-當時站上5分MA200 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t10_0819_0807_qa.png' alt='5分當時 #10' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · QA</span><span class='trade-time'>2026-08-19 16:59 → 08-19 18:59</span></div><div class='card-pnl pnl-win'>+83.5 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-tp'>target</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29561.00
+當時站上5分MA200 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t05_0819_0807_qb.png' alt='5分當時 #5' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · QA</span><span class='trade-time'>2026-08-19 16:59 → 08-19 18:59</span></div><div class='card-pnl pnl-win'>+83.5 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-tp'>target</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29561.00
 stop  29519.25  (−41.8 pts)
 target 29644.50  (2.0R)
 exit  29644.50  target
 盤整 29524.25–29551.50  區間 27.2  帶寬 19.2
 量能 2.50x  實體 4.0  前回檔 104.8
-1分MA 29555.8>29552.8>29542.0>29536.9  60 29530.7 / 120 29536.2 < 200 29537.5</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t11_0819_1659_qa.png' alt='1分K #11' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-19 17:00  已收完
+1分MA 29555.8>29552.8>29542.0>29536.9  60 29530.7 / 120 29536.2 < 200 29537.5
+5分當時 C 29561.0  MA200 29556.1  Δ +4.9</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t06_0819_1659_qa.png' alt='1分K #6' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-19 17:00  已收完
 當時 O 29554.00  H 29562.50  L 29552.75  C 29561.00  實體 7.0
 5分MA 29543.2&gt;29532.8&gt;29533.0&gt;29539.2  200 29556.1
-當時站上5分MA200 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t11_0819_1659_qa.png' alt='5分當時 #11' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · QA</span><span class='trade-time'>2026-08-20 02:05 → 08-20 03:01</span></div><div class='card-pnl pnl-flat'>+0.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29645.00
+當時站上5分MA200 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t06_0819_1659_qa.png' alt='5分當時 #6' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · QA</span><span class='trade-time'>2026-08-20 02:05 → 08-20 03:01</span></div><div class='card-pnl pnl-flat'>+0.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29645.00
 stop  29594.75  (−50.2 pts)
 target 29745.50  (2.0R)
 exit  29645.00  stop
 盤整 29599.75–29616.00  區間 16.2  帶寬 19.5
 量能 3.05x  實體 13.0  前回檔 68.2
-1分MA 29627.0>29616.5>29612.9>29612.6  60 29614.0 / 120 29622.6 < 200 29624.9</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t12_0820_0205_qa.png' alt='1分K #12' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-20 02:05  已收完
+1分MA 29627.0>29616.5>29612.9>29612.6  60 29614.0 / 120 29622.6 < 200 29624.9
+5分當時 C 29645.0  MA200 29601.2  Δ +43.8</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t07_0820_0205_qa.png' alt='1分K #7' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-20 02:05  已收完
 當時 O 29607.75  H 29645.75  L 29602.25  C 29645.00  實體 37.2
 5分MA 29615.8&gt;29616.0&gt;29617.2&gt;29620.9  200 29601.2
-當時站上5分MA200 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t12_0820_0205_qa.png' alt='5分當時 #12' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · QC</span><span class='trade-time'>2026-08-21 15:00 → 08-21 16:30</span></div><div class='card-pnl pnl-loss'>-32.5 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-time'>timeout</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QC</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29405.25
+當時站上5分MA200 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t07_0820_0205_qa.png' alt='5分當時 #7' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · QB</span><span class='trade-time'>2026-08-21 15:00 → 08-21 15:05</span></div><div class='card-pnl pnl-loss'>-14.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29405.25
 stop  29358.50  (−46.8 pts)
 target 29498.75  (2.0R)
-exit  29372.75  timeout
+exit  29391.25  fail
 盤整 29363.50–29396.00  區間 32.5  帶寬 30.6
 量能 2.67x  實體 5.2  前回檔 70.2
-1分MA 29398.8>29394.2>29383.6>29376.2  60 29378.3 / 120 29388.5 < 200 29400.5</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t13_0821_1500_qc.png' alt='1分K #13' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-21 15:00  已收完
+1分MA 29398.8>29394.2>29383.6>29376.2  60 29378.3 / 120 29388.5 < 200 29400.5
+5分當時 C 29405.2  MA200 29406.9  Δ -1.6</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t08_0821_1500_qb.png' alt='1分K #8' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-21 15:00  已收完
 當時 O 29388.00  H 29408.00  L 29386.75  C 29405.25  實體 17.2
 5分MA 29384.2&gt;29377.9&gt;29384.2&gt;29390.7  200 29406.9
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t13_0821_1500_qc.png' alt='5分當時 #13' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · QB</span><span class='trade-time'>2026-08-23 18:43 → 08-23 20:13</span></div><div class='card-pnl pnl-win'>+59.5 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-time'>timeout</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29382.00
+當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t08_0821_1500_qb.png' alt='5分當時 #8' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · QB</span><span class='trade-time'>2026-08-23 18:43 → 08-23 20:13</span></div><div class='card-pnl pnl-win'>+59.5 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-time'>timeout</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29382.00
 stop  29330.00  (−52.0 pts)
 target 29486.00  (2.0R)
 exit  29441.50  timeout
 盤整 29335.00–29346.00  區間 11.0  帶寬 41.3
 量能 2.67x  實體 9.2  前回檔 119.2
-1分MA 29363.4>29352.7>29346.3>29340.6  60 29356.4 / 120 29373.6 < 200 29377.9</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t14_0823_1843_qb.png' alt='1分K #14' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-23 18:45  未收完
+1分MA 29363.4>29352.7>29346.3>29340.6  60 29356.4 / 120 29373.6 < 200 29377.9
+5分當時 C 29382.0  MA200 29409.2  Δ -27.2</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t09_0823_1843_qb.png' alt='1分K #9' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-23 18:45  未收完
 當時 O 29352.75  H 29384.75  L 29351.00  C 29382.00  實體 29.2
 這根後來收到 29394.50  H 29395.25 / L 29351.00
 5分MA 29351.6&gt;29350.7&gt;29364.8&gt;29376.3  200 29409.2
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t14_0823_1843_qb.png' alt='5分當時 #14' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · QB</span><span class='trade-time'>2026-08-24 04:19 → 08-24 05:00</span></div><div class='card-pnl pnl-flat'>+0.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29205.50
-stop  29157.75  (−47.8 pts)
-target 29301.00  (2.0R)
-exit  29205.50  stop
-盤整 29162.75–29188.25  區間 25.5  帶寬 37.8
-量能 2.19x  實體 8.5  前回檔 95.8
-1分MA 29186.3>29183.0>29166.4>29159.7  60 29172.8 / 120 29171.4 < 200 29194.2</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t15_0824_0419_qb.png' alt='1分K #15' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-24 04:20  未收完
-當時 O 29179.75  H 29210.50  L 29171.75  C 29205.50  實體 25.8
-這根後來收到 29200.75  H 29210.50 / L 29171.75
-5分MA 29171.0&gt;29172.1&gt;29175.4&gt;29173.1  200 29336.9
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t15_0824_0419_qb.png' alt='5分當時 #15' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · QC</span><span class='trade-time'>2026-08-24 07:32 → 08-24 08:08</span></div><div class='card-pnl pnl-flat'>+0.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QC</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29217.75
+當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t09_0823_1843_qb.png' alt='5分當時 #9' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · QB</span><span class='trade-time'>2026-08-24 07:32 → 08-24 08:08</span></div><div class='card-pnl pnl-flat'>+0.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29217.75
 stop  29166.75  (−51.0 pts)
 target 29319.75  (2.0R)
 exit  29217.75  stop
 盤整 29171.75–29203.00  區間 31.2  帶寬 38.5
 量能 4.26x  實體 7.8  前回檔 104.0
-1分MA 29200.0>29195.1>29185.1>29175.7  60 29188.3 / 120 29208.4 < 200 29210.8</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t16_0824_0732_qc.png' alt='1分K #16' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-24 07:35  未收完
+1分MA 29200.0>29195.1>29185.1>29175.7  60 29188.3 / 120 29208.4 < 200 29210.8
+5分當時 C 29217.8  MA200 29302.3  Δ -84.6</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m1_t10_0824_0732_qb.png' alt='1分K #10' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-24 07:35  未收完
 當時 O 29204.50  H 29230.00  L 29202.75  C 29217.75  實體 13.2
 這根後來收到 29247.25  H 29248.50 / L 29202.75
 5分MA 29193.2&gt;29183.8&gt;29202.5&gt;29211.5  200 29302.3
-當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t16_0824_0732_qc.png' alt='5分當時 #16' style='width:100%;display:block;border-radius:10px'/></div></article>
+當時站上5分MA200 否  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/img/m5_t10_0824_0732_qb.png' alt='5分當時 #10' style='width:100%;display:block;border-radius:10px'/></div></article>
 </div>
 </body></html>
