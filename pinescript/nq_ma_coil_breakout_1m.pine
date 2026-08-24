@@ -31,7 +31,8 @@ bodyOk = maxBody <= 0 or body <= maxBody
 stackOk = ma5 > ma10 and ma10 > ma20 and ma20 > ma30
 hold = stackOk and close > ma200
 longBelow = not requireLongBelow or (ma60 < ma200 and ma120 < ma200)
-breakout = hold and hold[1] and not hold[2] and bodyOk and longBelow
+fresh = na(ma200[2]) or close[2] <= ma200[2]
+breakout = hold and hold[1] and fresh and bodyOk and longBelow
 
 plot(ma5,   "MA5",   color=#ffa726, linewidth=1)
 plot(ma10,  "MA10",  color=#42a5f5, linewidth=1)

@@ -425,7 +425,11 @@ def detect_coil_breakouts(
 
         need = max(1, int(confirm_bars))
         ok_hold = all(bar_hold(i - k) for k in range(need))
-        ok_fresh = not bar_hold(i - need)
+        prior = i - need
+        if prior < 0 or np.isnan(mas[-1][prior]):
+            ok_fresh = True
+        else:
+            ok_fresh = float(c[prior]) <= float(mas[-1][prior])
         ok_body = min_body <= 0 or body >= min_body
         ok_max_body = max_body <= 0 or body <= max_body
         ok_long_below = (not require_long_below) or (ma60 < ma200 and ma120 < ma200)
