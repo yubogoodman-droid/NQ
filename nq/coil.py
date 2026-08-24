@@ -230,6 +230,7 @@ def detect_coil_breakouts(
     ma200_slope_bars: int = 20,
     max_coil_vs_prior: float = 0.70,
     break_window: int = 8,
+    stop_buffer: float = 5.0,
     target_r: float = 2.0,
     min_entry_gap: int = 45,
     ma_periods: Sequence[int] = MA_PERIODS,
@@ -356,12 +357,8 @@ def detect_coil_breakouts(
             if ok_vol:
                 bump("volume")
             if ok_body and ok_break and ok_stack and ok_above_200 and ok_long_below and ok_vol:
-                if i < 1:
-                    i += 1
-                    continue
                 entry = float(c[i])
-                # 停損：跌破進場前一根 1 分 K 低點
-                stop = float(l[i - 1])
+                stop = last_coil.low - stop_buffer
                 risk = entry - stop
                 if risk > 0:
                     bump("taken")
