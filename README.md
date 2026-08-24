@@ -34,6 +34,9 @@
 
 2026-08-24 實例：09:50 低點 28946.75 → 10:35 收復 → **11:00 回踩進場 29059**（藍圈起點），13:00 收破 MA20 出，約 **+100 點**。
 
+近一個月 Yahoo 5m（2026-07-21 → 08-24，RTH）：**2 筆、勝率 50%、+86 點**（08-18 −14、08-24 +100）。  
+同一套不限時段約 15 筆、+121 點，夜盤雜訊較多。
+
 ```bash
 # 近 30 天 Yahoo 5m 回測 + 手機版 HTML（每筆一張圖）
 python3 examples/nq_5m_ma20_retest.py --period 30d --pages
@@ -41,6 +44,9 @@ python3 examples/nq_5m_ma20_retest.py --period 5d --html output/nq_5m_ma20.html
 ```
 
 TradingView：`pinescript/nq_5m_ma20_retest.pine` 貼到 Pine Editor，套用 NQ1! / MNQ1! 五分圖。
+
+外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-5m-ma20-retest/  
+現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-ma20-retest-8357/docs/nq-5m-ma20-retest/view.html
 
 ## NQ 一分 K 破底翻 MA Reclaim
 

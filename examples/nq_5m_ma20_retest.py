@@ -329,12 +329,18 @@ def draw_trade_png(
     return path
 
 
-def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
+def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int, prefix: str = "t") -> str:
     et = df.index[trade.entry_idx]
-    return f"t{trade_no:02d}_{et.strftime('%m%d_%H%M')}_q{trade.quality.lower()}.png"
+    return f"{prefix}{trade_no:02d}_{et.strftime('%m%d_%H%M')}_q{trade.quality.lower()}.png"
 
 
-def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: Path) -> str:
+def _render_trade_cards(
+    df: pd.DataFrame,
+    trades: List[TradeResult],
+    html_path: Path,
+    *,
+    prefix: str = "t",
+) -> str:
     cards: List[str] = []
     for i, t in enumerate(trades, 1):
         et = df.index[t.entry_idx]
@@ -349,7 +355,7 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: 
             "stop": "tag-sl",
             "be_stop": "tag-sl",
         }.get(t.exit_reason, "tag-time")
-        img_name = _trade_img_name(df, t, i)
+        img_name = _trade_img_name(df, t, i, prefix=prefix)
         draw_trade_png(df, t, html_path.parent / "img" / img_name, i)
         chart = (
             f"<img src='img/{escape(img_name)}' alt='#{i} Q{escape(t.quality)}' "
@@ -390,6 +396,8 @@ def write_html_report(
     symbol: str,
     period: str,
     funnel: Optional[Dict[str, int]] = None,
+    extra_trades: Optional[List[TradeResult]] = None,
+    extra_title: str = "",
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -398,7 +406,21 @@ def write_html_report(
         q_bits.append(f"Q{q} {info['n']}筆 {info['pnl']:+.1f}")
     q_line = " · ".join(q_bits) if q_bits else "無品質分組"
     out = Path(path)
-    cards = _render_trade_cards(df, trades, out)
+    cards = _render_trade_cards(df, trades, out, prefix="t")
+    extra_html = ""
+    if extra_trades:
+        extra_stats = summarize_trades(extra_trades)
+        extra_cls = "pnl-win" if extra_stats["total_points"] >= 0 else "pnl-loss"
+        extra_html = (
+            f"<section class='summary'><h1>{escape(extra_title or '全時段對照')}</h1>"
+            f"<p class='muted'>同一套破底→收復→回踩，不限 09:30–15:45。夜盤噪音較大，只當樣本。</p>"
+            f"<div class='cards'><div class='card'>筆數<b>{extra_stats['count']}</b></div>"
+            f"<div class='card'>勝率<b>{extra_stats['win_rate']:.1f}%</b></div>"
+            f"<div class='card'>總點數<b class='{extra_cls}'>{extra_stats['total_points']:+.1f}</b></div>"
+            f"<div class='card'>勝/負<b>{extra_stats['wins']}/{extra_stats['count']-extra_stats['wins']}</b></div></div>"
+            f"<div class='equity'>{_equity_svg([t.pnl_points for t in extra_trades])}</div></section>"
+            + (_render_trade_cards(df, extra_trades, out, prefix="a") or "<div class='empty'>無交易</div>")
+        )
     funnel_line = ""
     if funnel:
         funnel_line = (
@@ -449,7 +471,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 五分K 破翻回踩 MA20</h1>
-<p class="muted">破底 → 收復粉紅 MA20 → 離開後回踩進場。停損在破底下方，目標 1.5R；持有滿 12 根若收破 MA20 出場。</p>
+<p class="muted">RTH 09:30–15:45。破底 → 收復粉紅 MA20 → 離開後回踩進場。停損在破底下方，目標 1.5R；持有滿 12 根若收破 MA20 出場。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -462,11 +484,27 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="equity">{_equity_svg(pnls)}</div>
 </section>
 {cards or "<div class='empty'>無交易</div>"}
+{extra_html}
 </div>
 </body></html>
 """
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
+    return out
+
+
+RAW_IMG_BASE = (
+    "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+    "cursor/nq-5m-ma20-retest-8357/docs/nq-5m-ma20-retest/"
+)
+
+
+def write_view_html(index_path: Path) -> Path:
+    """htmlpreview 用：把相對圖片改成 GitHub raw。"""
+    text = index_path.read_text(encoding="utf-8")
+    view = text.replace("src='img/", f"src='{RAW_IMG_BASE}img/")
+    out = index_path.parent / "view.html"
+    out.write_text(view, encoding="utf-8")
     return out
 
 
@@ -511,12 +549,41 @@ def cmd_backtest(args) -> int:
             f"收復 {df.index[t.signal.reclaim_idx].strftime('%H:%M')}"
         )
 
+    extra_trades: List[TradeResult] = []
+    if args.pages and args.session != "all":
+        extra_funnel: Dict[str, int] = {}
+        extra_sigs = detect_signals(df, session="all", funnel=extra_funnel)
+        extra_trades = simulate(df, extra_sigs)
+        extra_stats = summarize_trades(extra_trades)
+        print(
+            f"all-session trades={extra_stats['count']} WR={extra_stats['win_rate']:.1f}% "
+            f"pnl={extra_stats['total_points']:+.1f}"
+        )
+        for i, t in enumerate(extra_trades, 1):
+            print(
+                f"  [all {i}] Q{t.quality} {df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
+                f"-> {df.index[t.exit_idx].strftime('%m-%d %H:%M')} "
+                f"{t.exit_reason} {t.pnl_points:+.1f}"
+            )
+
     html_path = args.html
     if args.pages:
         html_path = html_path or str(PAGES_HTML)
     if html_path:
-        out = write_html_report(html_path, df, trades, args.symbol, args.period, funnel=funnel)
+        out = write_html_report(
+            html_path,
+            df,
+            trades,
+            args.symbol,
+            args.period,
+            funnel=funnel,
+            extra_trades=extra_trades,
+            extra_title="全時段對照（含夜盤）",
+        )
         print(f"html={out}")
+        if args.pages:
+            view = write_view_html(out)
+            print(f"view={view}")
     return 0
 
 
