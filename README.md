@@ -50,17 +50,23 @@ TradingView：`pinescript/nq_5m_ma20_retest.pine` 貼到 Pine Editor，套用 NQ
 
 ## NQ 一分 K 破翻回踩 MA20
 
-同一套想法，改用 **1 分鐘 K**。時間門檻換成根數（2 小時=120 根，離開均線 15 根≈15 分鐘）。  
+同一套想法，改用 **1 分鐘 K**。時間門檻換成根數（2 小時=120 根，離開均線 8 根≈8 分鐘）。  
 注意：1m MA20 只有約 20 分鐘，比 5m MA20（約 100 分鐘）更貼價格，訊號會比較密。  
 1m 預設因此放寬「收盤跌破作廢」到 40 點、離開均線改 8 根（約 8 分鐘），破底深度 10 點。
 
 這和下面「1m 破底翻 MA Reclaim」（收復當根就進）不同：**這裡一樣等回踩 MA20**。
+
+近一個月 Yahoo 1m（2026-07-26 → 08-24，RTH）：**16 筆、勝率 68.8%、+470 點**。  
+08-24 同一波：09:53 破底 28946.75 → 09:58 收復 1m MA20 → **10:50 回踩進場 29094**，+74 點（1m 均線較快，比五分版 11:00 稍早）。  
+全時段 52 筆、勝率 50%、+391 點，夜盤較雜。
 
 ```bash
 python3 examples/nq_5m_ma20_retest.py --interval 1m --period 30d --pages
 ```
 
 TradingView：`pinescript/nq_1m_ma20_retest.pine` 套用一分圖。
+
+現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-ma20-retest-8357/docs/nq-1m-ma20-retest/view.html
 
 ## NQ 一分 K 破底翻 MA Reclaim
 

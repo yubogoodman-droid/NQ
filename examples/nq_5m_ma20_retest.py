@@ -122,8 +122,10 @@ def load_bars(symbol: str, interval: str, period: str) -> pd.DataFrame:
     days = parse_period_days(period)
     if interval == "1m" and days is not None and days > 8:
         end = datetime.now(timezone.utc)
-        start = end - timedelta(days=days)
-        df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=7)
+        # Yahoo 1m 只留約 30 曆日；多要一天常會整段空掉。
+        lookback = min(int(days), 29)
+        start = end - timedelta(days=lookback)
+        df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=6)
         if not df.empty:
             return df
         print(f"[data] chunked {period} empty, fallback period download", file=sys.stderr)
