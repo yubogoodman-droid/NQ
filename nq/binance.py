@@ -12,8 +12,6 @@ SESSION = requests.Session()
 SESSION.headers.update(
     {"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"}
 )
-# 股票／ETF／商品 TradFi 也算 USDT 合約（SNDK 等）；只排除指數。
-KEEP = {"SNDKUSDT", "NBISUSDT", "UBUSDT", "STXXUSDT"}
 STABLE_USDT = {"USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "DAIUSDT", "EURUSDT", "BFUSDUSDT"}
 
 BARS_PER_DAY = {"15m": 96, "5m": 288, "1m": 1440, "1h": 24, "4h": 6, "1d": 1}
@@ -62,7 +60,7 @@ def is_usdt_um_perp(s: dict) -> bool:
 
 
 def universe(*, top_n: int | None = 50) -> list[tuple[str, float]]:
-    """USDT U本位永續（含股票合約）。`top_n` <=0 掃全部；否則成交額前 N，並強制納入 KEEP。"""
+    """USDT U本位永續（含股票合約）。`top_n` 為 None 或 <=0 時掃全部，否則取 24h 成交額前 N。"""
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
     ranked: list[tuple[float, str]] = []
@@ -75,11 +73,7 @@ def universe(*, top_n: int | None = 50) -> list[tuple[str, float]]:
     ranked.sort(reverse=True)
     if top_n is None or top_n <= 0:
         return [(sym, qv) for qv, sym in ranked]
-    picked = ranked[:top_n]
-    have = {sym for _, sym in picked}
-    extras = [(qv, sym) for qv, sym in ranked if sym in KEEP and sym not in have]
-    picked = picked + extras
-    return [(sym, qv) for qv, sym in picked]
+    return [(sym, qv) for qv, sym in ranked[:top_n]]
 
 
 def _to_ohlcv(rows: list) -> dict:
