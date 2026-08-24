@@ -30,7 +30,36 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+def find_nq_root() -> Path:
+    """找到含 tw/kline.py 的專案根目錄；若被 tw.py 擋住就直接說明。"""
+    here = Path(__file__).resolve().parent
+    for cand in [here, *here.parents]:
+        shadow = cand / "tw.py"
+        pkg = cand / "tw" / "kline.py"
+        if shadow.is_file() and not pkg.is_file():
+            raise SystemExit(
+                f"找到 {shadow}\n"
+                "這個 tw.py 會讓 Python 以為 tw 不是套件，所以出現：\n"
+                "  ModuleNotFoundError: No module named 'tw.kline'; 'tw' is not a package\n"
+                "請把 tw.py 刪掉或改名，並把整個 tw 資料夾放到專案裡。"
+            )
+        if pkg.is_file():
+            if shadow.is_file():
+                raise SystemExit(
+                    f"找到 {shadow}，它會蓋掉 tw 資料夾。請刪掉或改名 tw.py。"
+                )
+            return cand
+    raise SystemExit(
+        "找不到 tw\\kline.py。\n"
+        "請用 PyCharm 打開整個 NQ 專案（裡面要有 tw 資料夾），\n"
+        "不要只把一支腳本複製到 PythonProject2。\n"
+        "套件：https://github.com/yubogoodman-droid/NQ/tree/cursor/tw-5m-ma200-5d-327f/tw"
+    )
+
+
+ROOT = find_nq_root()
+sys.path.insert(0, str(ROOT))
 
 from tw.kline import resample_ohlcv
 from tw.live import (
@@ -60,8 +89,12 @@ SHIOAJI_SECRET_KEY = ""
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
 
-SEEN_PATH = Path(__file__).resolve().parents[1] / "output" / "tw_shioaji_seen.json"
+SEEN_PATH = ROOT / "output" / "tw_shioaji_seen.json"
 LOCAL_SECRETS = Path(__file__).resolve().parent / "local_secrets.py"
+if not LOCAL_SECRETS.exists():
+    LOCAL_SECRETS = ROOT / "examples" / "local_secrets.py"
+if not LOCAL_SECRETS.exists():
+    LOCAL_SECRETS = ROOT / "local_secrets.py"
 TG_SESSION = requests.Session()
 
 

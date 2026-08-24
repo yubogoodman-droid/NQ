@@ -71,6 +71,8 @@ python3 examples/watch_tw_shioaji.py            # 盤中一直盯（五分＋十
 python3 examples/watch_tw_shioaji.py --tf 5m
 ```
 
+PyCharm：請 **Open 整個 NQ 專案資料夾**（裡面要有 `tw\` 套件），執行根目錄 `watch_tw.py` 或 `examples/watch_tw_shioaji.py`。不要只複製一支腳本到別的專案，也不要在專案裡放 `tw.py`（會蓋掉 `tw` 資料夾，出現 `'tw' is not a package`）。
+
 建議每個交易日開盤前重開。金鑰不要 commit。
 
 ## 快速開始
