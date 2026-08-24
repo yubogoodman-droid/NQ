@@ -12,8 +12,8 @@ SESSION = requests.Session()
 SESSION.headers.update(
     {"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"}
 )
-# 股票／ETF／Pre-IPO TradFi，不當一般 USDT 加密合約掃。
-STOCK_UNDERLYING = {"EQUITY", "HK_EQUITY", "KR_EQUITY", "CN_EQUITY", "PREMARKET"}
+# 股票／ETF／商品 TradFi 也算 USDT 合約（SNDK 等）；只排除指數。
+KEEP = {"SNDKUSDT", "NBISUSDT", "UBUSDT", "STXXUSDT"}
 STABLE_USDT = {"USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "DAIUSDT", "EURUSDT", "BFUSDUSDT"}
 
 BARS_PER_DAY = {"15m": 96, "5m": 288, "1m": 1440, "1h": 24, "4h": 6, "1d": 1}
@@ -44,7 +44,7 @@ def get_json(path: str, params=None, retries: int = 6):
 
 
 def is_usdt_um_perp(s: dict) -> bool:
-    """U 本位 USDT 永續合約。排除現貨、幣本位、USDC-M、TradFi 股票、指數。"""
+    """U 本位 USDT 永續合約（含 SNDK 等 TradFi 股票／商品）。排除現貨、幣本位、指數。"""
     if s.get("quoteAsset") != "USDT":
         return False
     margin = s.get("marginAsset")
@@ -52,9 +52,9 @@ def is_usdt_um_perp(s: dict) -> bool:
         return False
     if s.get("status") != "TRADING":
         return False
-    if s.get("contractType") != "PERPETUAL":
+    if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
         return False
-    if s.get("underlyingType") in STOCK_UNDERLYING or s.get("underlyingType") == "INDEX":
+    if s.get("underlyingType") == "INDEX":
         return False
     if s.get("symbol") in STABLE_USDT:
         return False
@@ -62,7 +62,7 @@ def is_usdt_um_perp(s: dict) -> bool:
 
 
 def universe(*, top_n: int | None = 50) -> list[tuple[str, float]]:
-    """USDT U本位永續。`top_n` 為 None 或 <=0 時掃全部合約，否則取 24h 成交額前 N。"""
+    """USDT U本位永續（含股票合約）。`top_n` <=0 掃全部；否則成交額前 N，並強制納入 KEEP。"""
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
     ranked: list[tuple[float, str]] = []
@@ -75,7 +75,11 @@ def universe(*, top_n: int | None = 50) -> list[tuple[str, float]]:
     ranked.sort(reverse=True)
     if top_n is None or top_n <= 0:
         return [(sym, qv) for qv, sym in ranked]
-    return [(sym, qv) for qv, sym in ranked[:top_n]]
+    picked = ranked[:top_n]
+    have = {sym for _, sym in picked}
+    extras = [(qv, sym) for qv, sym in ranked if sym in KEEP and sym not in have]
+    picked = picked + extras
+    return [(sym, qv) for qv, sym in picked]
 
 
 def _to_ohlcv(rows: list) -> dict:

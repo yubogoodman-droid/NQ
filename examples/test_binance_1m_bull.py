@@ -189,10 +189,18 @@ def test_is_usdt_um_perp() -> None:
         "underlyingType": "COIN",
     }
     assert is_usdt_um_perp(ok)
+    assert is_usdt_um_perp(
+        {
+            **ok,
+            "symbol": "SNDKUSDT",
+            "contractType": "TRADIFI_PERPETUAL",
+            "underlyingType": "EQUITY",
+        }
+    )
     assert not is_usdt_um_perp({**ok, "quoteAsset": "USDC"})
     assert not is_usdt_um_perp({**ok, "marginAsset": "BTC"})
     assert not is_usdt_um_perp({**ok, "contractType": "CURRENT_QUARTER"})
-    assert not is_usdt_um_perp({**ok, "underlyingType": "EQUITY"})
+    assert not is_usdt_um_perp({**ok, "underlyingType": "INDEX"})
     assert not is_usdt_um_perp({**ok, "symbol": "USDCUSDT"})
     assert not is_usdt_um_perp({**ok, "status": "BREAK"})
 

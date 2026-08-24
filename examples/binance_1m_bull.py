@@ -379,7 +379,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 <h1>幣安一分K · 7/14/25/99/120 多頭排列上站 1m MA200</h1>
 <p class="muted">{escape(date)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}）
 <br/>規則：一分K 的 MA7 &gt; MA14 &gt; MA25 &gt; MA99 &gt; MA120，且本根收盤剛站上<strong>一分K MA200</strong>（不是日線/小時線）。進場用下一根開盤。
-<br/>只掃幣安 <strong>U 本位 USDT 永續合約</strong>（fapi），不含現貨／幣本位／USDC-M。
+<br/>只掃幣安 <strong>U 本位 USDT 永續合約</strong>（含 SNDK 等股票合約），不含現貨／幣本位。
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
 <div class="card">筆數<b>{len(rows)}</b></div>
