@@ -874,7 +874,7 @@ def cmd_alert(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="NQ 起漲點（1分訊號，對照當時 5分長相）")
+    p = argparse.ArgumentParser(description="NQ 起漲點（1分 5>10>20>30 站上MA200）")
     sub = p.add_subparsers(dest="cmd")
 
     d = sub.add_parser("demo", help="用模擬那張圖的走勢示範")
