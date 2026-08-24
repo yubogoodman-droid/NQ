@@ -30,6 +30,14 @@ from nq.coil import (  # noqa: E402
 )
 from nq_coil_breakout import write_html_report  # noqa: E402
 
+# 07:33 / 11:30 那種較鬆的站上，用來測其他規則；預設只收 08-19 08:15 那種糾結。
+LOOSE = dict(
+    max_ribbon_width=50.0,
+    max_recent_range=100.0,
+    max_reclaim_ext=50.0,
+    max_body=40.0,
+)
+
 
 def test_sma() -> None:
     arr = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -45,22 +53,25 @@ def test_quality_of() -> None:
 
 
 
-def test_demo_catches_0735_breakout() -> None:
-    df = make_coil_demo_bars()
+def test_ideal_0815_coil() -> None:
+    """第 7 張那種：下跌後均線收束，08:15 第二根站穩才進。"""
+    path = Path(__file__).resolve().parent / "fixtures" / "nq_2026-08-19_0815.csv"
+    df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
+    if df.index.tz is None:
+        df.index = df.index.tz_localize(ET)
     sigs = detect_coil_breakouts(df)
-    assert sigs, "expected the 07:35-style coil breakout"
-    sig = sigs[0]
-    ts = df.index[sig.entry_idx]
-    assert ts.hour == 7 and ts.minute >= 30
+    hits = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "08:15"]
+    assert hits, f"expected 08:15 糾結起漲, got {[df.index[s.entry_idx].strftime('%H:%M') for s in sigs]}"
+    sig = hits[0]
+    assert abs(sig.entry_price - 29557.50) < 0.5
     assert sig.entry_price > sig.ma200
-    assert sig.entry_price > sig.stop_price
-    assert abs(sig.stop_price - (sig.coil_low - 5.0)) < 0.01
-    assert abs(sig.target_price - (sig.entry_price + 2.0 * (sig.entry_price - sig.stop_price))) < 0.01
+    assert (sig.entry_price - sig.ma200) <= 15.0
+    assert sig.ribbon_width <= 20.0
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
     assert sig.ma100 < sig.ma200 and sig.ma120 < sig.ma200
-    # 不該在還沒收在 MA200 上時就進場
-    for s in sigs:
-        assert df.index[s.entry_idx] >= pd.Timestamp("2026-08-24 07:30", tz=ET)
+    trades = simulate(df, hits)
+    assert trades
+    assert trades[0].pnl_points > 0
 
 
 def test_real_chart_stands_on_ma200() -> None:
@@ -69,7 +80,11 @@ def test_real_chart_stands_on_ma200() -> None:
     df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
     if df.index.tz is None:
         df.index = df.index.tz_localize(ET)
-    sigs = detect_coil_breakouts(df)
+    tight = detect_coil_breakouts(df)
+    assert not [
+        s for s in tight if df.index[s.entry_idx].strftime("%H:%M") == "07:33"
+    ], "07:33 箱子太寬，預設不該進（要像 08-19 08:15 那種糾結）"
+    sigs = detect_coil_breakouts(df, **LOOSE)
     times = [df.index[s.entry_idx].strftime("%H:%M") for s in sigs]
     first = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "07:32"]
     assert not first, f"07:32 只是第一根站上，不該進場, got {times}"
@@ -106,7 +121,9 @@ def test_real_chart_catches_1129() -> None:
     df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
     if df.index.tz is None:
         df.index = df.index.tz_localize(ET)
-    sigs = detect_coil_breakouts(df)
+    tight = detect_coil_breakouts(df)
+    assert not tight, "11:21 急殺後箱子太寬，預設不該進"
+    sigs = detect_coil_breakouts(df, **LOOSE)
     times = [df.index[s.entry_idx].strftime("%H:%M") for s in sigs]
     first = [s for s in sigs if df.index[s.entry_idx].strftime("%H:%M") == "11:29"]
     assert not first, f"11:29 只是第一根站上，不該進場, got {times}"
@@ -213,10 +230,10 @@ def test_skip_5m_waterfall_bounce() -> None:
     df = pd.concat([head, tail])
     df = df[~df.index.duplicated(keep="last")]
     with_filter = detect_coil_breakouts(
-        df, max_m5_below_200=0.0, require_m5_above_ma30=False
+        df, max_m5_below_200=0.0, require_m5_above_ma30=False, **LOOSE
     )
     without = detect_coil_breakouts(
-        df, max_m5_below_200=-1.0, require_m5_above_ma30=False
+        df, max_m5_below_200=-1.0, require_m5_above_ma30=False, **LOOSE
     )
     assert without, "關掉 5 分深度過濾後，模擬圖仍應有起漲點"
     if with_filter:
@@ -226,7 +243,9 @@ def test_skip_5m_waterfall_bounce() -> None:
 
 def test_require_above_5m_ma30() -> None:
     df = make_coil_demo_bars()
-    allowed = detect_coil_breakouts(df, require_m5_above_ma20=True, require_m5_above_ma30=True)
+    allowed = detect_coil_breakouts(
+        df, require_m5_above_ma20=True, require_m5_above_ma30=True, **LOOSE
+    )
     assert allowed, "模擬圖 5 分應站上 MA30"
     sig = allowed[0]
     if not np.isnan(sig.m5_ma30):
@@ -247,13 +266,13 @@ def test_require_above_5m_ma30() -> None:
     high = pd.concat([head, df])
     high = high[~high.index.duplicated(keep="last")]
     blocked = detect_coil_breakouts(
-        high, require_m5_above_ma20=True, require_m5_above_ma30=True
+        high, require_m5_above_ma20=True, require_m5_above_ma30=True, **LOOSE
     )
     if blocked:
         for s in blocked:
             assert np.isnan(s.m5_ma30) or s.m5_close > s.m5_ma30
     off = detect_coil_breakouts(
-        high, require_m5_above_ma30=False, require_m5_above_ma20=False
+        high, require_m5_above_ma30=False, require_m5_above_ma20=False, **LOOSE
     )
     assert off, "關掉 5 分 MA20/MA30 後模擬圖仍應有起漲點"
 
@@ -329,7 +348,7 @@ def test_no_repeat_while_already_above_ma200() -> None:
         },
         index=idx,
     )
-    sigs = detect_coil_breakouts(df, require_long_below=False)
+    sigs = detect_coil_breakouts(df, require_long_below=False, **LOOSE)
     assert sigs, "第一次 5>10>20>30 且站上 MA200 應進場"
     assert len(sigs) == 1
     sig = sigs[0]
@@ -356,17 +375,17 @@ def test_reject_when_ma100_or_ma120_above_200() -> None:
         },
         index=idx,
     )
-    blocked = detect_coil_breakouts(df)
+    blocked = detect_coil_breakouts(df, **LOOSE)
     if blocked:
         for s in blocked:
             assert s.ma100 < s.ma200 and s.ma120 < s.ma200
-    allowed = detect_coil_breakouts(df, require_long_below=False)
+    allowed = detect_coil_breakouts(df, require_long_below=False, **LOOSE)
     assert allowed, "關掉 100/120 過濾後，末端收回仍應有訊號"
 
 
 def test_simulate_and_html(tmp_path: Path | None = None) -> None:
     df = make_coil_demo_bars()
-    sigs = detect_coil_breakouts(df)
+    sigs = detect_coil_breakouts(df, **LOOSE)
     trades = simulate(df, sigs)
     assert trades
     assert isinstance(trades[0], CoilTrade)
@@ -400,7 +419,7 @@ def test_resample_ohlcv_5m() -> None:
 
 def test_html_1m_5m_asof(tmp_path: Path | None = None) -> None:
     df1 = make_coil_demo_bars()
-    trades1 = simulate(df1, detect_coil_breakouts(df1))
+    trades1 = simulate(df1, detect_coil_breakouts(df1, **LOOSE))
     out = Path("/tmp/nq_coil_compare.html") if tmp_path is None else Path(tmp_path) / "c.html"
     path = write_html_report(out, df1, trades1, "NQ=F", "demo")
     text = path.read_text(encoding="utf-8")
@@ -414,7 +433,7 @@ def test_html_1m_5m_asof(tmp_path: Path | None = None) -> None:
 def main() -> int:
     test_sma()
     test_quality_of()
-    test_demo_catches_0735_breakout()
+    test_ideal_0815_coil()
     test_real_chart_stands_on_ma200()
     test_real_chart_catches_1129()
     test_trail_locks_after_1r()

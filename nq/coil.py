@@ -1,6 +1,7 @@
-"""NQ 1 分起漲點：5>10>20>30 且這一根才站上 MA200。
+"""NQ 1 分起漲點：糾結後 5>10>20>30，連兩根剛站上 MA200。
 
-訊號只在 1 分 K 上抓。5 分用來對照進場當下那根 5 分長什麼樣，不是進場條件。
+模板是 08-19 08:15：下跌後短均收成一束，近 12 根還在窄箱，
+收盤剛站上 MA200，100/120 都在 200 下面。5 分只對照長相，不是進場條件。
 """
 
 from __future__ import annotations
@@ -282,7 +283,7 @@ def detect_coil_breakouts(
     max_coil_bars: int = 18,
     max_coil_range: float = 50.0,
     min_coil_range: float = 10.0,
-    max_ribbon_width: float = 42.0,
+    max_ribbon_width: float = 20.0,
     ribbon_n: int = 5,
     max_wick: float = 15.0,
     min_body: float = 0.0,
@@ -302,7 +303,11 @@ def detect_coil_breakouts(
     target_r: float = 2.0,
     min_entry_gap: int = 45,
     confirm_bars: int = 2,
-    max_body: float = 40.0,
+    max_body: float = 20.0,
+    max_reclaim_ext: float = 15.0,
+    recent_range_bars: int = 12,
+    min_recent_range: float = 10.0,
+    max_recent_range: float = 40.0,
     max_m5_below_200: float = -1.0,
     require_m5_above_ma20: bool = False,
     require_m5_above_ma30: bool = False,
@@ -315,7 +320,8 @@ def detect_coil_breakouts(
 
     預設兩根：第一根站上還不進，第二根仍排列且收在 MA200 上才進。
     MA200 上頭不能再掛 MA100 或 MA120（兩條都要在 200 下面）。
-    盤整箱子、放量、5 分均線都不是進場條件（仍可用參數打開）。
+    要像 08-19 08:15 那種：下跌後短均線收成一束（MA5–MA60 帶寬），
+    近 12 根還在窄箱裡，收盤剛站上 MA200（不要已經噴遠）。
     停損用進場前 stop_lookback 根的修剪低點 − buffer。
     """
     if df is None or len(df) == 0:
@@ -433,7 +439,26 @@ def detect_coil_breakouts(
         else:
             ok_fresh = float(c[prior]) <= float(mas[-1][prior])
         ok_body = min_body <= 0 or body >= min_body
-        ok_max_body = max_body <= 0 or body <= max_body
+        ok_max_body = max_body <= 0 or abs(body) <= max_body
+        ext200 = float(c[i] - ma200)
+        ok_ext = max_reclaim_ext <= 0 or ext200 <= max_reclaim_ext
+        rng_n = max(2, int(recent_range_bars))
+        rng_from = max(0, i - rng_n)
+        recent_hi = float(np.max(h[rng_from:i])) if i > rng_from else float(h[i])
+        recent_lo = min(_clipped_low(o, l, c, j, max_wick) for j in range(rng_from, i)) if i > rng_from else float(l[i])
+        recent_range = recent_hi - recent_lo
+        ok_box = (
+            recent_range_bars <= 0
+            or (
+                recent_range >= min_recent_range
+                and recent_range <= max_recent_range
+            )
+        )
+        use_rib = mas[: max(1, min(int(ribbon_n), len(mas)))]
+        ribbon_now = float(
+            max(float(ma[i]) for ma in use_rib) - min(float(ma[i]) for ma in use_rib)
+        )
+        ok_ribbon = max_ribbon_width <= 0 or ribbon_now <= max_ribbon_width
         def no_overhead(j: int) -> bool:
             if j < 0 or np.isnan(mas[5][j]) or np.isnan(mas[6][j]) or np.isnan(mas[-1][j]):
                 return True
@@ -465,6 +490,12 @@ def detect_coil_breakouts(
             bump("body")
         if ok_max_body:
             bump("not_chase")
+        if ok_ext:
+            bump("near_200")
+        if ok_box:
+            bump("tight_box")
+        if ok_ribbon:
+            bump("ribbon")
         if ok_long_below:
             bump("long_below")
         if ok_vol:
@@ -482,6 +513,9 @@ def detect_coil_breakouts(
             and ok_fresh
             and ok_body
             and ok_max_body
+            and ok_ext
+            and ok_box
+            and ok_ribbon
             and ok_long_below
             and ok_vol
             and ok_m5

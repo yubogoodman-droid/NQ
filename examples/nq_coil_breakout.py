@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NQ 起漲點：1 分 K 上 5>10>20>30 且這一根才站上 MA200。
+"""NQ 起漲點：糾結後 5>10>20>30，連兩根剛站上 MA200（08-19 08:15 模板）。
 
 用法:
   python3 examples/nq_coil_breakout.py --demo
@@ -354,6 +354,9 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"5/10/20/30排列 {funnel.get('stack', 0)} → "
         f"站上MA200 {funnel.get('above_200', 0)} → "
         f"連續兩根站穩 {funnel.get('hold', 0)} → "
+        f"靠近MA200 {funnel.get('near_200', 0)} → "
+        f"窄箱 {funnel.get('tight_box', 0)} → "
+        f"短均收束 {funnel.get('ribbon', 0)} → "
         f"100與120在200下 {funnel.get('long_below', 0)} → "
         f"進場 {funnel.get('taken', 0)}</p>"
     )
@@ -463,6 +466,7 @@ def _trade_cards(
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"回看低 {t.signal.coil_low:.2f}  進場MA200 {t.signal.coil_high:.2f}\n"
+            f"帶寬 {t.signal.ribbon_width:.1f}  高出MA200 {t.entry_price - t.signal.ma200:.1f}  "
             f"量能 {t.signal.vol_ratio:.2f}x  實體 {t.signal.body:.1f}\n"
             f"1分MA {t.signal.ma5:.1f}>{t.signal.ma10:.1f}>{t.signal.ma20:.1f}>{t.signal.ma30:.1f}  "
             f"100 {t.signal.ma100:.1f} / 120 {t.signal.ma120:.1f} &lt; 200 {t.signal.ma200:.1f}"
@@ -515,7 +519,7 @@ def write_html_report(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>{escape(symbol)} 起漲點（1分訊號 · 5分當時）</title>
+<title>{escape(symbol)} 起漲點（糾結後連兩根剛站上MA200）</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -550,8 +554,8 @@ a{{color:#79c0ff}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{escape(symbol)} 起漲點（1分 5>10>20>30 連兩根站上MA200）</h1>
-<p class="muted">訊號只看 1分K：MA5&gt;MA10&gt;MA20&gt;MA30，且連續兩根收盤站上 MA200。第一根站上還不進。MA200 上頭不能再掛 MA100 或 MA120。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。下面每筆附「當時 5分K」只是對照，不是進場條件。</p>
+<h1>{escape(symbol)} 起漲點（糾結後連兩根剛站上MA200）</h1>
+<p class="muted">模板是 08-19 08:15：下跌後短均線收成一束（MA5–MA60 ≤ 20），近 12 根箱子 10–40 點，收盤剛站上 MA200（高出 ≤ 15）。MA5&gt;MA10&gt;MA20&gt;MA30，連續兩根收在 MA200 上才進；第一根還不進。MA200 上頭不能再掛 MA100 或 MA120。開盤追價、急殺後寬箱（07:33 / 11:30 那種）不進。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。下面每筆附「當時 5分K」只是對照，不是進場條件。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -613,8 +617,19 @@ def print_signals(
         )
 
 
+def _demo_df() -> pd.DataFrame:
+    """08-19 08:15 那張理想圖；沒有 fixture 才退回模擬走勢。"""
+    path = ROOT / "fixtures" / "nq_2026-08-19_0815.csv"
+    if path.exists():
+        df = pd.read_csv(path, parse_dates=["Datetime"], index_col="Datetime")
+        if df.index.tz is None:
+            df.index = df.index.tz_localize(ET)
+        return df
+    return make_coil_demo_bars()
+
+
 def cmd_demo(args) -> int:
-    df = make_coil_demo_bars()
+    df = _demo_df()
     funnel: Dict[str, int] = {}
     sigs = detect_coil_breakouts(df, funnel=funnel)
     trades = simulate(df, sigs)
@@ -635,7 +650,9 @@ def _print_funnel(funnel: Dict[str, int]) -> None:
         "funnel "
         f"checked={funnel.get('checked', 0)} stack={funnel.get('stack', 0)} "
         f"ma200={funnel.get('above_200', 0)} hold={funnel.get('hold', 0)} "
-        f"below={funnel.get('long_below', 0)} taken={funnel.get('taken', 0)}"
+        f"near={funnel.get('near_200', 0)} box={funnel.get('tight_box', 0)} "
+        f"ribbon={funnel.get('ribbon', 0)} below={funnel.get('long_below', 0)} "
+        f"taken={funnel.get('taken', 0)}"
     )
 
 
@@ -706,7 +723,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
             f"MA30 {_fmt_ma(look['ma30'])} {above30}\n"
         )
     return (
-        f"🟢 <b>起漲點（1分 5&gt;10&gt;20&gt;30 連兩根站上MA200）</b>\n"
+        f"🟢 <b>起漲點（糾結後連兩根剛站上MA200）</b>\n"
         f"時間: <code>{ts.strftime('%Y-%m-%d %H:%M')} ET</code>\n"
         f"品質: <b>Q{sig.quality}</b> ({sig.quality_score}/4)\n"
         f"進場: <code>{sig.entry_price:.2f}</code>\n"
@@ -716,7 +733,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"回看低 / MA200: <code>{sig.coil_low:.1f}–{sig.coil_high:.1f}</code>\n"
         f"{m5_line}"
         f"量能: {sig.vol_ratio:.2f}x · 現價 <code>{last:.2f}</code>\n"
-        f"排列: 5&gt;10&gt;20&gt;30 · 連兩根站上 MA200 · 100與120在200下\n"
+        f"排列: 5&gt;10&gt;20&gt;30 · 糾結後連兩根剛站上 MA200 · 100與120在200下\n"
         f"#起漲點 #NQ #Q{sig.quality}"
     )
 
@@ -875,10 +892,10 @@ def cmd_alert(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="NQ 起漲點（1分 5>10>20>30 連兩根站上MA200）")
+    p = argparse.ArgumentParser(description="NQ 起漲點（糾結後連兩根剛站上MA200）")
     sub = p.add_subparsers(dest="cmd")
 
-    d = sub.add_parser("demo", help="用模擬那張圖的走勢示範")
+    d = sub.add_parser("demo", help="用 08-19 08:15 那張理想圖示範")
     d.add_argument("--html", default="")
     d.set_defaults(func=cmd_demo)
 

@@ -1,14 +1,17 @@
 //@version=5
-indicator("NQ 一分K 起漲點（5>10>20>30 連兩根站上MA200）", overlay=true, max_labels_count=200)
+indicator("NQ 一分K 起漲點（糾結後連兩根站上MA200）", overlay=true, max_labels_count=200)
 
-// 訊號只在 1 分圖上抓。
-// 進場：MA5>MA10>MA20>MA30，且連續兩根收盤站上 MA200。第一根站上還不進。
-// MA200 上頭不能再掛 MA100 或 MA120。
-// 不要等後面那根放量長綠。5 分均線、盤整箱子、放量都不是進場條件。
-// 停損＝進場前 N 根修剪低點 − buffer；走到 1R 後停損移到 +0.3R；目標 2R。
+// 模板：08-19 08:15。下跌後短均線收成一束，近 12 根還在窄箱，
+// 5>10>20>30，連兩根收在 MA200 上，且 100/120 都在 200 下面。
+// 第一根站上還不進。不要追已經噴遠或放量長綠。
 
 maxWick       = input.float(15.0, "下影修剪（點，0=不修）", minval=0, step=1)
-maxBody       = input.float(40.0, "進場 K 最大實體（點，0=不限）", minval=0, step=1)
+maxBody       = input.float(20.0, "進場 K 最大實體（點，0=不限）", minval=0, step=1)
+maxRibbon     = input.float(20.0, "短均線最大帶寬（MA5–MA60）", minval=0, step=2)
+maxExt        = input.float(15.0, "收盤最多高出 MA200（點）", minval=0, step=1)
+boxBars       = input.int(12, "盤整回看 K 數", minval=4, maxval=30)
+minBox        = input.float(10.0, "盤整最小區間（點）", minval=0, step=1)
+maxBox        = input.float(40.0, "盤整最大區間（點）", minval=5, step=2)
 stopLookback  = input.int(20, "停損回看 K 數", minval=5, maxval=60)
 stopBuffer    = input.float(5.0, "停損低於回看低點（點）", minval=0, step=1)
 targetR       = input.float(2.0, "目標 R 倍數", minval=1.0, step=0.5)
@@ -28,12 +31,19 @@ ma200 = ta.sma(close, 200)
 body = close - open
 bodyLo = math.min(open, close)
 effLow = maxWick > 0 and (bodyLo - low > maxWick) ? bodyLo : low
-bodyOk = maxBody <= 0 or body <= maxBody
+bodyOk = maxBody <= 0 or math.abs(body) <= maxBody
 stackOk = ma5 > ma10 and ma10 > ma20 and ma20 > ma30
 hold = stackOk and close > ma200
 longBelow = not requireLongBelow or (ma100 < ma200 and ma120 < ma200)
 fresh = na(ma200[2]) or close[2] <= ma200[2]
-breakout = hold and hold[1] and fresh and bodyOk and longBelow and longBelow[1]
+ribbon = math.max(ma5, math.max(ma10, math.max(ma20, math.max(ma30, ma60)))) - math.min(ma5, math.min(ma10, math.min(ma20, math.min(ma30, ma60))))
+ribbonOk = maxRibbon <= 0 or ribbon <= maxRibbon
+extOk = maxExt <= 0 or (close - ma200) <= maxExt
+boxHi = ta.highest(high[1], boxBars)
+boxLo = ta.lowest(effLow[1], boxBars)
+boxRng = boxHi - boxLo
+boxOk = boxRng >= minBox and boxRng <= maxBox
+breakout = hold and hold[1] and fresh and bodyOk and longBelow and longBelow[1] and ribbonOk and extOk and boxOk
 
 plot(ma5,   "MA5",   color=#ffa726, linewidth=1)
 plot(ma10,  "MA10",  color=#42a5f5, linewidth=1)
@@ -60,4 +70,4 @@ plot(breakout ? stopLevel : na, "停損", color=color.red, style=plot.style_circ
 plot(breakout ? trailLevel : na, "移動鎖利", color=color.orange, style=plot.style_circles, linewidth=2)
 plot(breakout ? tgtLevel : na, "目標", color=color.lime, style=plot.style_circles, linewidth=2)
 
-alertcondition(breakout, title="NQ 起漲點", message="NQ 1分 5>10>20>30 站上MA200")
+alertcondition(breakout, title="NQ 起漲點", message="NQ 1分 糾結後連兩根站上MA200")
