@@ -1,6 +1,7 @@
-"""幣安 1 分 K：MA7>14>25>99>120>200 多頭排列，且六條均線距離要黏在一起。
+"""幣安 1 分 K：MA7>14>25>99>120 多頭排列，剛站上 1m MA200，且均線距離要黏在一起。
 
 所有均線都用 1 分鐘收盤 SMA，不用日線／小時線 MA200。
+剛站上時 MA200 常還壓在短均上面（收盤 > 200 > 7>14>25>99>120），不要求 120 已高於 200。
 """
 
 from __future__ import annotations
@@ -34,13 +35,13 @@ def add_mas(d: dict) -> dict:
 
 
 def stack_ok(d: dict, i: int) -> bool:
-    """收盤 > MA7 > 14 > 25 > 99 > 120 > 200，六條均線同向多頭排列。"""
+    """7>14>25>99>120 多頭排列，且收盤在 1m MA200 上。不要求 MA120 已高於 MA200。"""
     c, m7, m14, m25 = d["c"], d["m7"], d["m14"], d["m25"]
     m99, m120, m200 = d["m99"], d["m120"], d["m200"]
     vals = [c[i], m7[i], m14[i], m25[i], m99[i], m120[i], m200[i]]
     if np.isnan(vals).any():
         return False
-    return bool(c[i] > m7[i] > m14[i] > m25[i] > m99[i] > m120[i] > m200[i])
+    return bool(c[i] > m7[i] > m14[i] > m25[i] > m99[i] > m120[i] and c[i] > m200[i])
 
 
 def ma_widths(d: dict, i: int) -> tuple[float, float]:
@@ -179,9 +180,10 @@ def detect_combo(
     max_ribbon_pct: float | None = 0.45,
     max_short_pct: float | None = 0.25,
 ) -> list[BullSignal]:
-    """本根 收盤>MA7>14>25>99>120>200；前一根還沒同時成立。
+    """本根 收盤>MA7>14>25>99>120 且收盤>1m MA200；前一根還沒同時成立。
 
-    排列是順序，距離是黏帶（六條全距、短均 7/14/25 全距）。
+    排列是 7>14>25>99>120；距離是黏帶（六條全距、短均 7/14/25 全距）。
+    剛站上 MA200 時，200 可以還在短均上面。
     cross_only：只保留「前收還在 1m MA200 下、本根收盤站上」。
     """
     c, m200 = d["c"], d["m200"]

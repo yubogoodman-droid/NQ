@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""幣安 1 分 K：7>14>25>99>120>200 多頭黏帶，剛站上 1m MA200（均線都用一分K）。
+"""幣安 1 分 K：7>14>25>99>120 多頭黏帶，剛站上 1m MA200（均線都用一分K）。
 
     python3 examples/binance_1m_bull.py backtest --top 10 --today --pages
     python3 examples/binance_1m_bull.py alert --test
@@ -354,7 +354,7 @@ def write_html(
             f"<div class='card-pnl {cls}'>{escape(pnl_txt)}</div>"
             "</header>"
             f"<div class='px {cls}'>{row.sig.close:g} <span class='px-sub'>{escape(kind)} · ext {row.ext_pct:+.2f}%</span></div>"
-            f"<div class='tags'><span class='tag'>MA7&gt;14&gt;25&gt;99&gt;120&gt;200</span>"
+            f"<div class='tags'><span class='tag'>MA7&gt;14&gt;25&gt;99&gt;120</span>"
             f"<span class='tag'>黏帶 {row.sig.ribbon_pct:.2f}%</span></div>"
             "<pre class='trade-detail'>"
             f"close {row.sig.close:g}  entry {row.entry:g}\n"
@@ -397,7 +397,7 @@ def write_html(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>幣安 1m 7&gt;14&gt;25&gt;99&gt;120&gt;200 多頭黏帶 · {escape(date)}</title>
+<title>幣安 1m 7&gt;14&gt;25&gt;99&gt;120 黏帶上站 MA200 · {escape(date)}</title>
 <style>
 body{{margin:0;background:#f5f6f7;color:#1e2329;font-family:-apple-system,"Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -426,9 +426,9 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 </style></head><body>
 <div class="page wide">
 <section class="summary">
-<h1>幣安一分K · 7&gt;14&gt;25&gt;99&gt;120&gt;200 多頭黏帶</h1>
+<h1>幣安一分K · 7&gt;14&gt;25&gt;99&gt;120 黏帶上站 MA200</h1>
 <p class="muted">{escape(date)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}）
-<br/>規則：一分K 均線<strong>排列</strong> MA7 &gt; MA14 &gt; MA25 &gt; MA99 &gt; MA120 &gt; MA200，本根收盤剛站上 MA200。均線<strong>距離</strong>要像截圖那種黏帶（六條全距 ≤0.45%、短均 7/14/25 ≤0.25%），扇開不算。進場用下一根開盤。
+<br/>規則：均線<strong>排列</strong> MA7 &gt; MA14 &gt; MA25 &gt; MA99 &gt; MA120，本根收盤剛站上 1m MA200。均線<strong>距離</strong>要像截圖那種黏帶（六條全距 ≤0.45%、短均 7/14/25 ≤0.25%），扇開不算。進場用下一根開盤。
 <br/>只掃幣安 <strong>USDT 股票合約</strong>（美股／韓股／港股／A 股／Pre-IPO），不含加密、黃金原油等商品。
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
@@ -616,7 +616,7 @@ def run_alert(args: argparse.Namespace) -> int:
         else "全部 USDT 股票合約"
     )
     print(
-        f"監看 {pool} {len(uni)} 個。只掃股票合約。7>14>25>99>120>200 黏帶、剛站上 1m MA200 才推。",
+        f"監看 {pool} {len(uni)} 個。只掃股票合約。7>14>25>99>120 黏帶、剛站上 1m MA200 才推。",
         flush=True,
     )
     uni_ts = time.time()
@@ -668,7 +668,7 @@ def run_alert(args: argparse.Namespace) -> int:
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(description="幣安一分K：7>14>25>99>120>200 多頭黏帶上站 1m MA200")
+    p = argparse.ArgumentParser(description="幣安一分K：7>14>25>99>120 黏帶上站 1m MA200")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     b = sub.add_parser("backtest", help="回測 USDT 股票合約（預設成交額前 10、今天）")
