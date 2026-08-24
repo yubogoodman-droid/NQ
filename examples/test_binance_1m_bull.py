@@ -177,32 +177,29 @@ def test_default_date_uses_yesterday_before_2am() -> None:
     assert hi - lo == 24 * 60 * 60 * 1000
 
 
-def test_is_usdt_um_perp() -> None:
-    from nq.binance import is_usdt_um_perp
+def test_is_usdt_stock_perp() -> None:
+    from nq.binance import is_usdt_stock_perp
 
-    ok = {
-        "symbol": "BTCUSDT",
+    stock = {
+        "symbol": "SNDKUSDT",
         "quoteAsset": "USDT",
         "marginAsset": "USDT",
         "status": "TRADING",
-        "contractType": "PERPETUAL",
-        "underlyingType": "COIN",
+        "contractType": "TRADIFI_PERPETUAL",
+        "underlyingType": "EQUITY",
     }
-    assert is_usdt_um_perp(ok)
-    assert is_usdt_um_perp(
-        {
-            **ok,
-            "symbol": "SNDKUSDT",
-            "contractType": "TRADIFI_PERPETUAL",
-            "underlyingType": "EQUITY",
-        }
+    assert is_usdt_stock_perp(stock)
+    assert is_usdt_stock_perp({**stock, "symbol": "SKHYNIXUSDT", "underlyingType": "KR_EQUITY"})
+    assert is_usdt_stock_perp({**stock, "symbol": "OPENAIUSDT", "underlyingType": "PREMARKET"})
+    assert not is_usdt_stock_perp(
+        {**stock, "symbol": "BTCUSDT", "contractType": "PERPETUAL", "underlyingType": "COIN"}
     )
-    assert not is_usdt_um_perp({**ok, "quoteAsset": "USDC"})
-    assert not is_usdt_um_perp({**ok, "marginAsset": "BTC"})
-    assert not is_usdt_um_perp({**ok, "contractType": "CURRENT_QUARTER"})
-    assert not is_usdt_um_perp({**ok, "underlyingType": "INDEX"})
-    assert not is_usdt_um_perp({**ok, "symbol": "USDCUSDT"})
-    assert not is_usdt_um_perp({**ok, "status": "BREAK"})
+    assert not is_usdt_stock_perp({**stock, "symbol": "XAUUSDT", "underlyingType": "COMMODITY"})
+    assert not is_usdt_stock_perp({**stock, "quoteAsset": "USDC"})
+    assert not is_usdt_stock_perp({**stock, "marginAsset": "BTC"})
+    assert not is_usdt_stock_perp({**stock, "contractType": "CURRENT_QUARTER"})
+    assert not is_usdt_stock_perp({**stock, "underlyingType": "INDEX"})
+    assert not is_usdt_stock_perp({**stock, "status": "BREAK"})
 
 
 def test_inline_img_srcs() -> None:
@@ -238,7 +235,7 @@ def main() -> int:
     test_cross_only_keeps_ma200_reclaim()
     test_below_ma200_is_not_a_signal()
     test_default_date_uses_yesterday_before_2am()
-    test_is_usdt_um_perp()
+    test_is_usdt_stock_perp()
     test_inline_img_srcs()
     print("ok")
     return 0

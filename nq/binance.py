@@ -1,4 +1,4 @@
-"""幣安 U 本位 USDT 永續合約（fapi），不含現貨、幣本位、USDC-M。"""
+"""幣安 U 本位 USDT 股票永續合約（TradFi EQUITY），不含加密、商品、現貨、幣本位。"""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ SESSION = requests.Session()
 SESSION.headers.update(
     {"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"}
 )
+# 股票／ETF／Pre-IPO；不含加密、黃金原油等商品、指數。
+STOCK_UNDERLYING = {"EQUITY", "HK_EQUITY", "KR_EQUITY", "CN_EQUITY", "PREMARKET"}
 STABLE_USDT = {"USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "DAIUSDT", "EURUSDT", "BFUSDUSDT"}
 
 BARS_PER_DAY = {"15m": 96, "5m": 288, "1m": 1440, "1h": 24, "4h": 6, "1d": 1}
@@ -41,8 +43,8 @@ def get_json(path: str, params=None, retries: int = 6):
     raise last
 
 
-def is_usdt_um_perp(s: dict) -> bool:
-    """U 本位 USDT 永續合約（含 SNDK 等 TradFi 股票／商品）。排除現貨、幣本位、指數。"""
+def is_usdt_stock_perp(s: dict) -> bool:
+    """U 本位 USDT 股票永續（美股／韓股／港股／A 股／Pre-IPO）。不含加密、商品、指數。"""
     if s.get("quoteAsset") != "USDT":
         return False
     margin = s.get("marginAsset")
@@ -52,7 +54,7 @@ def is_usdt_um_perp(s: dict) -> bool:
         return False
     if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
         return False
-    if s.get("underlyingType") == "INDEX":
+    if s.get("underlyingType") not in STOCK_UNDERLYING:
         return False
     if s.get("symbol") in STABLE_USDT:
         return False
@@ -60,12 +62,12 @@ def is_usdt_um_perp(s: dict) -> bool:
 
 
 def universe(*, top_n: int | None = 50) -> list[tuple[str, float]]:
-    """USDT U本位永續（含股票合約）。`top_n` 為 None 或 <=0 時掃全部，否則取 24h 成交額前 N。"""
+    """USDT 股票永續。`top_n` 為 None 或 <=0 時掃全部，否則取 24h 成交額前 N。"""
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
     ranked: list[tuple[float, str]] = []
     for s in info["symbols"]:
-        if not is_usdt_um_perp(s):
+        if not is_usdt_stock_perp(s):
             continue
         sym = s["symbol"]
         qv = float((tickers.get(sym) or {}).get("quoteVolume") or 0)
