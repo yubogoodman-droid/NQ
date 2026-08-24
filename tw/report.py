@@ -115,7 +115,7 @@ def _lead_block(result: BacktestResult) -> str:
       十五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
       <strong>當根收盤剛站上十五分 MA200</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／200，<strong>小時K也要在 MA5／10／20 之上</strong>。
-      開盤第一根十五分因隔夜跳空不算。
+      開盤第一根十五分跳空站上也算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
       K 棒漲紅跌綠。
@@ -127,8 +127,8 @@ def _lead_block(result: BacktestResult) -> str:
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且均線發散</strong>（MA5 比 MA20 至少拉開 0.5%，中間兩段至少 0.10%），
       <strong>當根收盤剛站上五分 MA200</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／200，<strong>也要在十五分K的 MA5／10／20 之上</strong>，
-      且<strong>十五分K已在 MA200 上至少半小時</strong>，
-      且小時K收盤也要在小時 MA20 之上。開盤第一根因隔夜跳空不算。
+      且<strong>十五分K已在 MA200 上至少半小時</strong>（開盤第一根跳空站上時，當根還沒走滿半小時就不要求），
+      且小時K收盤也要在小時 MA20 之上。開盤第一根跳空站上也算。
       <strong>均線只數交易日 K 棒</strong>（週末／休市沒有 K 就不算），圖上 K 棒等距排列，換日會標日期並畫虛線。
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
       K 棒漲紅跌綠。

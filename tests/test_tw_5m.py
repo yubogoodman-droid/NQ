@@ -105,10 +105,11 @@ class FiveMinSignalTests(unittest.TestCase):
         hits = iter_5m_ma200_alerts(df)
         self.assertEqual(len(hits), 1)
 
-    def test_skips_first_bar_of_the_day(self) -> None:
-        df = _history_then_live([102.0, 102.0])
+    def test_counts_gap_up_first_bar_of_the_day(self) -> None:
+        df = _history_then_live([105.0, 105.0])
         hits = iter_5m_ma200_alerts(df)
-        self.assertEqual(hits, [])
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 0, tzinfo=TAIPEI)))
 
     def test_since_until_keeps_only_that_session(self) -> None:
         df = _history_then_live([99.0, 105.0])
@@ -123,7 +124,7 @@ class FiveMinSignalTests(unittest.TestCase):
     def test_rejects_close_below_ma5(self) -> None:
         df = _history_then_live([110.0] * 5 + [99.0, 100.5])
         hits = iter_5m_ma200_alerts(df)
-        self.assertEqual(hits, [])
+        self.assertFalse(any(abs(h.close - 100.5) < 1e-9 for h in hits))
 
     def test_requires_bullish_ribbon(self) -> None:
         hist_days = [date(2026, 8, 17), date(2026, 8, 18), date(2026, 8, 19), date(2026, 8, 20)]
@@ -330,10 +331,11 @@ class FifteenMinSignalTests(unittest.TestCase):
         hits = iter_15m_ma200_alerts(df)
         self.assertEqual(len(hits), 1)
 
-    def test_skips_first_15m_of_the_day(self) -> None:
+    def test_counts_first_15m_of_the_day(self) -> None:
         df = _history_then_live([99.0, 110.0, 110.0])
         hits = iter_15m_ma200_alerts(df)
-        self.assertEqual(hits, [])
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].timestamp, pd.Timestamp(datetime(2026, 8, 21, 9, 10, tzinfo=TAIPEI)))
 
     def test_rejects_when_hourly_close_below_short_mas(self) -> None:
         df = _history_then_live([99.0, 99.0, 99.0, 105.0, 105.0, 105.0])

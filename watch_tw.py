@@ -750,8 +750,7 @@ def iter_5m_ma200_alerts(
         if snap is None:
             continue
         prev_ts = work.index[i - 1]
-        if pd.Timestamp(ts).date() != pd.Timestamp(prev_ts).date():
-            continue
+        first_of_day = pd.Timestamp(ts).date() != pd.Timestamp(prev_ts).date()
         if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
             continue
         window = work.iloc[: i + 1]
@@ -760,7 +759,10 @@ def iter_5m_ma200_alerts(
             continue
         if m15.close <= m15.ma5 or m15.close <= m15.ma10 or m15.close <= m15.ma20:
             continue
-        if m15.close <= m15.ma200 or m15.above_ma200_minutes < M15_ABOVE_MA200_MINUTES:
+        if m15.close <= m15.ma200:
+            continue
+        # 開盤第一根跳空站上算訊號；當根還沒走滿半小時，不要求十五分已在 MA200 上 30 分。
+        if not first_of_day and m15.above_ma200_minutes < M15_ABOVE_MA200_MINUTES:
             continue
         hourly = hourly_close_and_ma20(window)
         if hourly is None:
@@ -814,9 +816,6 @@ def iter_15m_ma200_alerts(
             break
         snap = _snapshot_at(work, i)
         if snap is None:
-            continue
-        prev_ts = work.index[i - 1]
-        if pd.Timestamp(ts).date() != pd.Timestamp(prev_ts).date():
             continue
         if not (snap.ribbon_fanned and snap.crossed_above_ma200 and snap.close_above_all_mas):
             continue
