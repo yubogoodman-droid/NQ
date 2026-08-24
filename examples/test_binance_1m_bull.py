@@ -218,7 +218,7 @@ def test_default_date_uses_yesterday_before_2am() -> None:
     from datetime import datetime, timedelta, timezone
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from binance_1m_bull import default_date, day_window_ms
+    from binance_1m_bull import default_date, day_window_ms, kline_fetch_days, window_label
 
     tz = timezone(timedelta(hours=8))
     early = datetime(2026, 8, 25, 0, 58, tzinfo=tz)
@@ -227,10 +227,14 @@ def test_default_date_uses_yesterday_before_2am() -> None:
     assert default_date(late) == "2026-08-24"
     lo, hi = day_window_ms("2026-08-24")
     assert hi - lo == 24 * 60 * 60 * 1000
+    lo30, hi30 = day_window_ms("2026-08-25", 30)
+    assert hi30 - lo30 == 30 * 24 * 60 * 60 * 1000
+    assert window_label("2026-08-25", 30) == "2026-07-27 → 2026-08-25"
+    assert kline_fetch_days(30) == 31
 
 
 def test_is_usdt_stock_perp() -> None:
-    from nq.binance import is_usdt_stock_perp
+    from nq.binance import is_usdt_crypto_perp, is_usdt_stock_perp, select_universe
 
     stock = {
         "symbol": "SNDKUSDT",
@@ -240,18 +244,38 @@ def test_is_usdt_stock_perp() -> None:
         "contractType": "TRADIFI_PERPETUAL",
         "underlyingType": "EQUITY",
     }
+    btc = {**stock, "symbol": "BTCUSDT", "contractType": "PERPETUAL", "underlyingType": "COIN"}
     assert is_usdt_stock_perp(stock)
     assert is_usdt_stock_perp({**stock, "symbol": "SKHYNIXUSDT", "underlyingType": "KR_EQUITY"})
     assert is_usdt_stock_perp({**stock, "symbol": "OPENAIUSDT", "underlyingType": "PREMARKET"})
-    assert not is_usdt_stock_perp(
-        {**stock, "symbol": "BTCUSDT", "contractType": "PERPETUAL", "underlyingType": "COIN"}
-    )
+    assert not is_usdt_stock_perp(btc)
+    assert is_usdt_crypto_perp(btc)
+    assert not is_usdt_crypto_perp(stock)
     assert not is_usdt_stock_perp({**stock, "symbol": "XAUUSDT", "underlyingType": "COMMODITY"})
+    assert not is_usdt_crypto_perp({**btc, "symbol": "XAUUSDT", "underlyingType": "COMMODITY"})
     assert not is_usdt_stock_perp({**stock, "quoteAsset": "USDC"})
     assert not is_usdt_stock_perp({**stock, "marginAsset": "BTC"})
     assert not is_usdt_stock_perp({**stock, "contractType": "CURRENT_QUARTER"})
     assert not is_usdt_stock_perp({**stock, "underlyingType": "INDEX"})
     assert not is_usdt_stock_perp({**stock, "status": "BREAK"})
+
+    eth = {**btc, "symbol": "ETHUSDT"}
+    doge = {**btc, "symbol": "DOGEUSDT"}
+    mu = {**stock, "symbol": "MUUSDT"}
+    symbols = [stock, mu, btc, eth, doge, {**stock, "symbol": "XAUUSDT", "underlyingType": "COMMODITY"}]
+    tickers = {
+        "SNDKUSDT": {"quoteVolume": "100"},
+        "MUUSDT": {"quoteVolume": "40"},
+        "BTCUSDT": {"quoteVolume": "900"},
+        "ETHUSDT": {"quoteVolume": "500"},
+        "DOGEUSDT": {"quoteVolume": "80"},
+        "XAUUSDT": {"quoteVolume": "300"},
+    }
+    both = select_universe(symbols, tickers, pool="both", top_n=1)
+    assert [x[0] for x in both] == ["BTCUSDT", "SNDKUSDT"]
+    assert [x[2] for x in both] == ["crypto", "stock"]
+    assert select_universe(symbols, tickers, pool="crypto", top_n=2)[0][0] == "BTCUSDT"
+    assert "XAUUSDT" not in {x[0] for x in select_universe(symbols, tickers, pool="both", top_n=0)}
 
 
 def test_write_view_html_uses_pages_urls() -> None:

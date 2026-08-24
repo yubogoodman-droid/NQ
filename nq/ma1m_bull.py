@@ -143,7 +143,12 @@ class SignalRow:
     entry: float
     quote_volume: float = 0.0
     rank: int = 0
+    kind: str = "stock"
     moves: dict[int, ForwardMove] = field(default_factory=dict)
+
+    @property
+    def kind_label(self) -> str:
+        return "加密" if self.kind == "crypto" else "股票"
 
     @property
     def vol_ratio(self) -> float:

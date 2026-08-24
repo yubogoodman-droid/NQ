@@ -66,12 +66,14 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 **排列**：收盤 > MA200 > MA7 > MA14 > MA25 > MA99 > MA120，且本根剛站上 1m MA200。  
 **邏輯**（截圖紅圈）：短均先黏帶，長期在 MA200 下，放量站上。  
 已在 1m MA200 上又重新排均線不推。  
-**只掃幣安 USDT 股票合約**（美股／韓股／港股／A 股／Pre-IPO），不含加密、黃金原油等商品。  
-回測與 Telegram 預設掃**股票成交額前 10**。
+回測與 Telegram 預設掃**股票成交額前 10**。可用 `--pool both` 把加密 USDT 永續一併掃（各取前 N）。不含黃金原油等商品、指數。
 
 ```bash
 # 今天回測（台北日；凌晨 2 點前自動用昨天）
 python3 examples/binance_1m_bull.py backtest --top 10 --today --pages
+
+# 近 30 天：股票前 10 ＋ 加密前 10
+python3 examples/binance_1m_bull.py backtest --date 2026-08-25 --days 30 --top 10 --pool both --pages
 
 # Telegram：憑證放 tg_config.env 或 一分K多排.py 最上面
 python3 examples/binance_1m_bull.py alert --test

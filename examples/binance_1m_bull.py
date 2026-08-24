@@ -41,7 +41,7 @@ SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
 PAGES_IMG = "https://raw.githubusercontent.com/yubogoodman-droid/NQ/gh-pages/binance/"
-IMG_VER = "kiss0153"
+IMG_VER = "kiss0154"
 # 幣安 App 淺色盤：黃/橘/紫/藍/青 + 深灰 MA200
 PAL = {7: "#F0B90B", 14: "#FF6D00", 25: "#D500F9", 99: "#2962FF", 120: "#00B8D4", 200: "#474D57"}
 VOL_MA = {5: "#F0B90B", 10: "#D500F9"}
@@ -108,6 +108,30 @@ def day_window_ms(date: str, days: int = 1) -> tuple[int, int]:
     end = datetime.fromisoformat(date).replace(tzinfo=TZ) + timedelta(days=1)
     start = end - timedelta(days=max(1, int(days)))
     return int(start.timestamp() * 1000), int(end.timestamp() * 1000)
+
+
+def window_label(date: str, days: int = 1) -> str:
+    """台北日區間，例如 2026-07-27 → 2026-08-25。"""
+    days = max(1, int(days))
+    end = datetime.fromisoformat(date).date()
+    start = end - timedelta(days=days - 1)
+    if days == 1:
+        return end.isoformat()
+    return f"{start.isoformat()} → {end.isoformat()}"
+
+
+def kline_fetch_days(window_days: int) -> int:
+    """回測窗再多抓 1 天，加上 extra_bars 才夠算 MA200。"""
+    return max(int(window_days), 1) + 1
+
+
+def pool_label_of(pool: str, top: int | None) -> str:
+    top_txt = f"成交額前 {top}" if top and top > 0 else "全部"
+    if pool == "crypto":
+        return f"USDT 加密永續{top_txt}"
+    if pool == "both":
+        return f"USDT 股票{top_txt} ＋ 加密{top_txt}"
+    return f"USDT 股票合約{top_txt}"
 
 
 def load_seen() -> set[str]:
@@ -256,17 +280,17 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path, title_note: str = 
 
 
 def scan_symbol(
-    item: tuple[int, str, float],
+    item: tuple[int, str, float, str],
     date: str,
     min_gap: int,
     cross_only: bool,
     ribbon_kw: dict | None = None,
     days: int = 1,
 ) -> tuple[str, dict | None, list[SignalRow], str]:
-    rank, sym, qv = item
+    rank, sym, qv, kind = item
     lo, hi = day_window_ms(date, days)
     try:
-        raw = fetch_klines(sym, interval="1m", days=2, extra_bars=260)
+        raw = fetch_klines(sym, interval="1m", days=kline_fetch_days(days), extra_bars=260)
     except Exception as exc:  # noqa: BLE001
         return sym, None, [], str(exc)[:80]
     if raw is None or len(raw["c"]) < 220:
@@ -288,6 +312,7 @@ def scan_symbol(
                 entry=entry,
                 quote_volume=qv,
                 rank=rank,
+                kind=kind,
                 moves=moves,
             )
         )
@@ -336,9 +361,20 @@ def write_html(
     names: list[str],
     max_charts: int,
     pool_label: str = "USDT 股票合約成交額前 10",
+    days: int = 1,
+    pool: str = "stocks",
 ) -> Path:
     stats = {h: summarize_rows(rows, h) for h in HORIZONS}
+    date_label = window_label(date, days)
     cross_n = sum(1 for r in rows if r.crossed_200)
+    stock_n = sum(1 for r in rows if r.kind != "crypto")
+    crypto_n = sum(1 for r in rows if r.kind == "crypto")
+    if pool == "crypto":
+        pool_note = "只掃幣安 <strong>USDT 加密永續</strong>，不含股票、黃金原油等商品、指數。"
+    elif pool == "both":
+        pool_note = "股票與加密 <strong>各取成交額前 N</strong>（USDT 永續）。不含黃金原油等商品、指數。"
+    else:
+        pool_note = "只掃幣安 <strong>USDT 股票合約</strong>（美股／韓股／港股／A 股／Pre-IPO），不含加密、黃金原油等商品。"
     cards = []
     limit = len(rows) if max_charts <= 0 else max_charts
     gallery = rows[:limit]
@@ -364,11 +400,12 @@ def write_html(
             "<article class='trade-card'>"
             "<header class='card-header'>"
             f"<div class='card-title'><span class='trade-no'>{escape(row.symbol)} 永續</span>"
-            f"<span class='trade-time'>#{i} · 1m · {escape(hm(row.time_ms))} · 成交額第 {row.rank}</span></div>"
+            f"<span class='trade-time'>#{i} · 1m · {escape(hm(row.time_ms))} · {escape(row.kind_label)} · 成交額第 {row.rank}</span></div>"
             f"<div class='card-pnl {cls}'>{escape(pnl_txt)}</div>"
             "</header>"
             f"<div class='px {cls}'>{row.sig.close:g} <span class='px-sub'>{escape(kind)} · ext {row.ext_pct:+.2f}%</span></div>"
-            f"<div class='tags'><span class='tag'>200&gt;7&gt;14&gt;25&gt;99&gt;120</span>"
+            f"<div class='tags'><span class='tag'>{escape(row.kind_label)}</span>"
+            f"<span class='tag'>200&gt;7&gt;14&gt;25&gt;99&gt;120</span>"
             f"<span class='tag'>黏帶 {row.sig.ribbon_pct:.2f}%</span>"
             f"<span class='tag'>量 {row.vol_ratio:.1f}x</span></div>"
             "<pre class='trade-detail'>"
@@ -393,7 +430,8 @@ def write_html(
         )
         table_rows.append(
             "<tr>"
-            f"<td>{i}</td><td>{escape(row.symbol)}</td><td>{escape(hm(row.time_ms))}</td>"
+            f"<td>{i}</td><td>{escape(row.symbol)}</td><td>{escape(row.kind_label)}</td>"
+            f"<td>{escape(hm(row.time_ms))}</td>"
             f"<td>{escape(kind)}</td><td>{row.ext_pct:+.2f}%</td>{cells}"
             "</tr>"
         )
@@ -412,7 +450,7 @@ def write_html(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>幣安 1m 7&gt;14&gt;25&gt;99&gt;120 上站 MA200 · {escape(date)}</title>
+<title>幣安 1m 7&gt;14&gt;25&gt;99&gt;120 上站 MA200 · {escape(date_label)}</title>
 <style>
 body{{margin:0;background:#f5f6f7;color:#1e2329;font-family:-apple-system,"Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -436,18 +474,20 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#707a8a;font-size:13px;line-he
 .empty{{text-align:center;color:#707a8a;padding:40px 12px;border:1px solid #eaecef;border-radius:14px;background:#fff}}
 table{{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}}
 th,td{{padding:6px 4px;border-bottom:1px solid #eaecef;text-align:right}}
-th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4){{text-align:left}}
+th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){{text-align:left}}
 .pos{{color:#0ecb81}} .neg{{color:#f6465d}}
 </style></head><body>
 <div class="page wide">
 <section class="summary">
 <h1>幣安一分K · 7&gt;14&gt;25&gt;99&gt;120 黏帶上站 MA200</h1>
-<p class="muted">{escape(date)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}）
+<p class="muted">{escape(date_label)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}；股票 {stock_n}／加密 {crypto_n}）
 <br/>規則（截圖紅圈）：短均先黏帶，長期在 MA200 下，<strong>放量剛站上</strong>。排列 收盤 &gt; MA200 &gt; 7 &gt; 14 &gt; 25 &gt; 99 &gt; 120。進場用下一根開盤。
-<br/>只掃幣安 <strong>USDT 股票合約</strong>（美股／韓股／港股／A 股／Pre-IPO），不含加密、黃金原油等商品。
+<br/>{pool_note}
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
 <div class="card">筆數<b>{len(rows)}</b></div>
+<div class="card">股票<b>{stock_n}</b></div>
+<div class="card">加密<b>{crypto_n}</b></div>
 <div class="card">標的<b>{len({r.symbol for r in rows})}</b></div>
 {''.join(kpis)}
 </div>
@@ -457,9 +497,9 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 <section class="summary">
 <h1>全部訊號</h1>
 <table>
-<thead><tr><th>#</th><th>標的</th><th>時間</th><th>種類</th><th>偏離</th>
+<thead><tr><th>#</th><th>標的</th><th>池</th><th>時間</th><th>種類</th><th>偏離</th>
 <th>5m</th><th>15m</th><th>30m</th><th>1h</th><th>4h</th></tr></thead>
-<tbody>{''.join(table_rows) or "<tr><td colspan='10'>無</td></tr>"}</tbody>
+<tbody>{''.join(table_rows) or "<tr><td colspan='11'>無</td></tr>"}</tbody>
 </table>
 </section>
 </div></body></html>
@@ -489,40 +529,43 @@ def ribbon_kwargs(args: argparse.Namespace) -> dict:
 
 def run_backtest(args: argparse.Namespace) -> int:
     date = args.date or default_date()
+    days = getattr(args, "days", 1)
+    pool = getattr(args, "pool", "stocks")
     cross_only = not args.all_stack
     rkw = ribbon_kwargs(args)
     print(
-        f"date={date} days={getattr(args, 'days', 1)} top={args.top or 'all'} min_gap={args.min_gap} "
+        f"date={date} days={days} window={window_label(date, days)} pool={pool} "
+        f"top={args.top or 'all'} min_gap={args.min_gap} "
         f"cross_only={cross_only} pack≤{rkw['max_ribbon_pct']} short≤{rkw['max_short_pct']} "
         f"prior≤{rkw['max_prior_short']} vol≥{rkw['min_vol_ratio']} below≥{rkw['min_below']}",
         flush=True,
     )
-    uni = universe(top_n=args.top)
+    uni = universe(top_n=args.top, pool=pool)
     if not uni:
         print("no universe", file=sys.stderr)
         return 1
-    pool = "USDT 股票合約" + (f"成交額前 {args.top}" if args.top and args.top > 0 else "全部")
+    label = pool_label_of(pool, args.top)
     print(
-        f"{pool} {len(uni)}  #{1} {uni[0][0]} {uni[0][1]/1e6:.0f}M  "
+        f"{label} {len(uni)}  #{1} {uni[0][0]} {uni[0][1]/1e6:.0f}M  "
         f"末 {uni[-1][0]} {uni[-1][1]/1e6:.0f}M",
         flush=True,
     )
-    items = [(i, sym, qv) for i, (sym, qv) in enumerate(uni, 1)]
+    items = [(i, sym, qv, kind) for i, (sym, qv, kind) in enumerate(uni, 1)]
     rows: list[SignalRow] = []
     frames: dict[str, dict] = {}
     errors = 0
-    with ThreadPoolExecutor(8) as ex:
+    with ThreadPoolExecutor(6) as ex:
         futs = {
-            ex.submit(scan_symbol, it, date, args.min_gap, cross_only, rkw, getattr(args, "days", 1)): it
+            ex.submit(scan_symbol, it, date, args.min_gap, cross_only, rkw, days): it
             for it in items
         }
         for fut in as_completed(futs):
-            rank, sym, _qv = futs[fut]
+            rank, sym, _qv, kind = futs[fut]
             try:
                 _s, d, hits, err = fut.result()
             except Exception as exc:  # noqa: BLE001
                 errors += 1
-                print(f"[{rank:2d}/{len(items)}] {sym} err {exc}", flush=True)
+                print(f"[{rank:2d}/{len(items)}] {sym} {kind} err {exc}", flush=True)
                 continue
             if err:
                 errors += 1
@@ -530,21 +573,29 @@ def run_backtest(args: argparse.Namespace) -> int:
                 frames[sym] = d
             rows.extend(hits)
             flag = f" hits={len(hits)}" if hits else ""
-            print(f"[{rank:2d}/{len(items)}] {sym} bars={0 if d is None else len(d['c'])}{flag} {err}", flush=True)
+            print(f"[{rank:2d}/{len(items)}] {sym} {kind} bars={0 if d is None else len(d['c'])}{flag} {err}", flush=True)
     rows.sort(key=lambda r: r.time_ms)
+    stock_n = sum(1 for r in rows if r.kind != "crypto")
+    crypto_n = sum(1 for r in rows if r.kind == "crypto")
     print(
-        f"done errors={errors} signals={len(rows)} symbols={len({r.symbol for r in rows})}",
+        f"done errors={errors} signals={len(rows)} stock={stock_n} crypto={crypto_n} "
+        f"symbols={len({r.symbol for r in rows})}",
         flush=True,
     )
     for h in HORIZONS:
         s = summarize_rows(rows, h)
         print(f"  {LABELS[h]:>4s}  n={s['n']:3d}  WR={s['wr']:.1f}%  avg={s['avg']:+.2f}%  med={s['med']:+.2f}%")
+    for kind_name, subset in (("股票", [r for r in rows if r.kind != "crypto"]), ("加密", [r for r in rows if r.kind == "crypto"])):
+        if not subset:
+            continue
+        s15 = summarize_rows(subset, 15)
+        print(f"  {kind_name}  n={s15['n']:3d}  15m WR={s15['wr']:.1f}%  avg={s15['avg']:+.2f}%")
     for i, row in enumerate(rows, 1):
         kind = "上站" if row.crossed_200 else "排列"
         r15 = row.moves.get(15)
         rtxt = f"{r15.ret_pct:+.2f}%" if r15 and r15.ret_pct is not None else "—"
         print(
-            f"  [{i:3d}] {row.symbol:12s} {hm(row.time_ms)} {kind} "
+            f"  [{i:3d}] {row.kind_label} {row.symbol:12s} {hm(row.time_ms)} {kind} "
             f"ribbon={row.sig.ribbon_pct:.2f}% ext={row.ext_pct:+.2f}% 15m={rtxt}"
         )
 
@@ -556,9 +607,11 @@ def run_backtest(args: argparse.Namespace) -> int:
             frames,
             date=date,
             universe_n=len(uni),
-            names=[s for s, _ in uni],
+            names=[s for s, _qv, _k in uni],
             max_charts=args.charts,
-            pool_label=pool,
+            pool_label=label,
+            days=days,
+            pool=pool,
         )
         view = write_view_html(out)
         print(f"html={out}")
@@ -574,7 +627,13 @@ def wait_next_close() -> None:
 
 
 def scan_live(
-    sym: str, qv: float, rank: int, *, cross_only: bool = True, ribbon_kw: dict | None = None
+    sym: str,
+    qv: float,
+    rank: int,
+    *,
+    kind: str = "stock",
+    cross_only: bool = True,
+    ribbon_kw: dict | None = None,
 ) -> list[SignalRow]:
     raw = fetch_klines(sym, interval="1m", limit=260)
     if raw is None or len(raw["c"]) < 220:
@@ -594,6 +653,7 @@ def scan_live(
             entry=entry,
             quote_volume=qv,
             rank=rank,
+            kind=kind,
             moves=moves,
         )
         row._frame = d  # type: ignore[attr-defined]
@@ -631,14 +691,11 @@ def run_alert(args: argparse.Namespace) -> int:
 
     seen = load_seen()
     print("載入標的…", flush=True)
-    uni = universe(top_n=args.top)
-    pool = (
-        f"USDT 股票合約成交額前 {args.top}"
-        if args.top and args.top > 0
-        else "全部 USDT 股票合約"
-    )
+    pool = getattr(args, "pool", "stocks")
+    uni = universe(top_n=args.top, pool=pool)
+    label = pool_label_of(pool, args.top)
     print(
-        f"監看 {pool} {len(uni)} 個。只掃股票合約。黏帶後放量剛站上 1m MA200 才推。",
+        f"監看 {label} {len(uni)} 個。黏帶後放量剛站上 1m MA200 才推。",
         flush=True,
     )
     uni_ts = time.time()
@@ -647,15 +704,23 @@ def run_alert(args: argparse.Namespace) -> int:
     def round_once() -> None:
         nonlocal uni, uni_ts
         if time.time() - uni_ts > 1800:
-            uni = universe(top_n=args.top)
+            uni = universe(top_n=args.top, pool=pool)
             uni_ts = time.time()
             print(f"更新標的 {len(uni)}", flush=True)
         t0 = time.time()
         events: list[SignalRow] = []
         with ThreadPoolExecutor(8) as ex:
             futs = {
-                ex.submit(scan_live, sym, qv, i, cross_only=not args.all_stack, ribbon_kw=rkw): sym
-                for i, (sym, qv) in enumerate(uni, 1)
+                ex.submit(
+                    scan_live,
+                    sym,
+                    qv,
+                    i,
+                    kind=kind,
+                    cross_only=not args.all_stack,
+                    ribbon_kw=rkw,
+                ): sym
+                for i, (sym, qv, kind) in enumerate(uni, 1)
             }
             for fut in as_completed(futs):
                 try:
@@ -693,8 +758,9 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="幣安一分K：7>14>25>99>120 黏帶上站 1m MA200")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    b = sub.add_parser("backtest", help="回測 USDT 股票合約（預設成交額前 10、今天）")
-    b.add_argument("--top", type=int, default=10, help="成交額前 N；0 表示全部股票合約")
+    b = sub.add_parser("backtest", help="回測 USDT 永續（預設股票成交額前 10、今天）")
+    b.add_argument("--top", type=int, default=10, help="成交額前 N；both 時股票、加密各取 N；0=該池全部")
+    b.add_argument("--pool", choices=("stocks", "crypto", "both"), default="stocks", help="stocks / crypto / both")
     b.add_argument("--date", default="", help="YYYY-MM-DD，台北日，預設今天（凌晨 2 點前用昨天）")
     b.add_argument("--today", action="store_true", help="明確指定用今天（同預設）")
     b.add_argument("--days", type=int, default=1, help="往回幾天（含 --date 當天）")
@@ -710,8 +776,9 @@ def main(argv=None) -> int:
     b.add_argument("--charts", type=int, default=0, help="圖表筆數；0=全部")
     b.set_defaults(func=run_backtest)
 
-    a = sub.add_parser("alert", help="掃 USDT 股票合約，符合就推 Telegram")
-    a.add_argument("--top", type=int, default=10, help="成交額前 N；預設 10；0=全部股票合約")
+    a = sub.add_parser("alert", help="掃 USDT 永續，符合就推 Telegram")
+    a.add_argument("--top", type=int, default=10, help="成交額前 N；both 時股票、加密各取 N；0=該池全部")
+    a.add_argument("--pool", choices=("stocks", "crypto", "both"), default="stocks", help="stocks / crypto / both")
     a.add_argument("--once", action="store_true")
     a.add_argument("--test", action="store_true")
     a.add_argument("--dry-run", action="store_true")
