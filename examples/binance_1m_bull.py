@@ -273,7 +273,8 @@ def write_html(
     stats = {h: summarize_rows(rows, h) for h in HORIZONS}
     cross_n = sum(1 for r in rows if r.crossed_200)
     cards = []
-    gallery = rows[:max_charts]
+    limit = len(rows) if max_charts <= 0 else max_charts
+    gallery = rows[:limit]
     img_dir = path.parent / "img" / "ma1m-bull"
     if img_dir.exists():
         for old in img_dir.glob("*.png"):
@@ -342,8 +343,8 @@ def write_html(
             f"<b>{s['wr']:.1f}%</b><span class='muted'>{s['n']} 筆 · 均 {s['avg']:+.2f}%</span></div>"
         )
     extra = ""
-    if len(rows) > max_charts:
-        extra = f"<p class='muted'>圖表只畫前 {max_charts} 筆，表格含全部 {len(rows)} 筆。</p>"
+    if len(rows) > len(gallery):
+        extra = f"<p class='muted'>圖表只畫前 {len(gallery)} 筆，表格含全部 {len(rows)} 筆。</p>"
     names_txt = "、".join(names[:12]) + ("…" if len(names) > 12 else "")
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
@@ -610,7 +611,7 @@ def main(argv=None) -> int:
     b.add_argument("--all-stack", action="store_true", help="含已在 MA200 上才排好均線（會很多）")
     b.add_argument("--pages", action="store_true")
     b.add_argument("--html", default="")
-    b.add_argument("--charts", type=int, default=40)
+    b.add_argument("--charts", type=int, default=0, help="圖表筆數；0=全部")
     b.set_defaults(func=run_backtest)
 
     a = sub.add_parser("alert", help="掃 USDT U本位永續合約，符合就推 Telegram")
