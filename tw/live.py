@@ -147,7 +147,7 @@ def alerts_on_closed_bar(
     bar: OhlcvBar,
     *,
     tf: str,
-    side: str = "both",
+    side: str = "long",
 ) -> list[AlertSnapshot]:
     """只收「剛收完這根」對應的通知，避免把歷史交叉重發。"""
     if frame is None or frame.empty:

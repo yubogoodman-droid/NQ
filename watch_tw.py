@@ -2,13 +2,12 @@
 """台股永豐監控（單一檔，可直接放到 PyCharm 執行）。
 
 成交額前 100，濾 ETF／金融／電信／股價 500 以上。
-五分或十五分剛站上／剛跌破 MA240 就推 Telegram（預設多方＋空方）。
+五分或十五分剛站上 MA240 就推 Telegram（只做多方）。
 
 把下面四行金鑰填好，然後 Run。不要把檔名取成 tw.py。
 
     python watch_tw.py --test
     python watch_tw.py
-    python watch_tw.py --side short
 """
 
 from __future__ import annotations
@@ -999,7 +998,7 @@ def alerts_on_closed_bar(
     bar: OhlcvBar,
     *,
     tf: str,
-    side: str = "both",
+    side: str = "long",
 ) -> list[AlertSnapshot]:
     """只收「剛收完這根」對應的通知，避免把歷史交叉重發。"""
     if frame is None or frame.empty:
@@ -1195,7 +1194,6 @@ def emit_alerts(
     seen: set[str],
     *,
     dry: bool,
-    side: str = "both",
 ) -> None:
     jobs = []
     if "5m" in tfs:
@@ -1203,7 +1201,7 @@ def emit_alerts(
     if "15m" in tfs and should_run_15m(bar):
         jobs.append("15m")
     for tf in jobs:
-        for snap in alerts_on_closed_bar(frame, bar, tf=tf, side=side):
+        for snap in alerts_on_closed_bar(frame, bar, tf=tf, side="long"):
             push_snap(stock, snap, tf, seen, dry=dry)
     save_seen(seen)
 
@@ -1215,7 +1213,6 @@ def scan_once(
     seen: set[str],
     *,
     dry: bool,
-    side: str = "both",
 ) -> int:
     n = 0
     for i, stock in enumerate(candidates, 1):
@@ -1231,10 +1228,10 @@ def scan_once(
         until = since + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
         before = len(seen)
         if "5m" in tfs:
-            for snap in iter_5m_ma240_alerts(frame, since=since, until=until, side=side):
+            for snap in iter_5m_ma240_alerts(frame, since=since, until=until, side="long"):
                 push_snap(stock, snap, "5m", seen, dry=dry)
         if "15m" in tfs:
-            for snap in iter_15m_ma240_alerts(frame, since=since, until=until, side=side):
+            for snap in iter_15m_ma240_alerts(frame, since=since, until=until, side="long"):
                 push_snap(stock, snap, "15m", seen, dry=dry)
         save_seen(seen)
         n += len(seen) - before
@@ -1245,15 +1242,13 @@ def scan_once(
 def run_watch(args: argparse.Namespace) -> int:
     apply_keys()
     tfs = ["5m", "15m"] if args.tf == "both" else [args.tf]
-    side = args.side
-    side_zh = {"long": "多方", "short": "空方", "both": "多方＋空方"}[side]
     seen = load_seen()
     candidates, label = load_universe(args.top, args.max_price)
-    print(f"{label} → 掃描 {len(candidates)} 檔  tf={'+'.join(tfs)}  {side_zh}", flush=True)
+    print(f"{label} → 掃描 {len(candidates)} 檔  tf={'+'.join(tfs)}  多方", flush=True)
 
     api, sj = login_shioaji(simulation=args.sim)
     if args.once:
-        found = scan_once(api, candidates, tfs, seen, dry=args.dry, side=side)
+        found = scan_once(api, candidates, tfs, seen, dry=args.dry)
         print(f"掃完，新通知 {found} 則", flush=True)
         try:
             api.logout()
@@ -1315,7 +1310,7 @@ def run_watch(args: argparse.Namespace) -> int:
     print(f"已訂閱 {subscribed} 檔 tick。Ctrl+C 結束。", flush=True)
     if not args.dry:
         telegram_send(
-            f"台股監控已啟動\n{label}\n掃描 {len(builders)} 檔　{'＋'.join(tfs)}　{side_zh}"
+            f"台股監控已啟動\n{label}\n掃描 {len(builders)} 檔　{'＋'.join(tfs)}　多方"
         )
 
     try:
@@ -1342,7 +1337,7 @@ def run_watch(args: argparse.Namespace) -> int:
                 f"{bar.start.strftime('%H:%M')} 收 {stock.name} {bar.close:.2f}",
                 flush=True,
             )
-            emit_alerts(stock, frames[code], bar, tfs, seen, dry=args.dry, side=side)
+            emit_alerts(stock, frames[code], bar, tfs, seen, dry=args.dry)
     except KeyboardInterrupt:
         print("\n結束監控", flush=True)
     finally:
@@ -1363,12 +1358,6 @@ def test_telegram() -> int:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="永豐 Shioaji 台股五分／十五分 MA240 Telegram 監控")
     p.add_argument("--tf", choices=("5m", "15m", "both"), default="both")
-    p.add_argument(
-        "--side",
-        choices=("long", "short", "both"),
-        default="both",
-        help="多方站上／空方跌破／兩邊都盯（預設 both）",
-    )
     p.add_argument("--top", type=int, default=100)
     p.add_argument("--max-price", type=float, default=500.0)
     p.add_argument("--test", action="store_true", help="只測 Telegram")
