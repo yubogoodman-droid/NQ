@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
@@ -41,7 +40,6 @@ KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT", "HK1810USDT"}
 DISPLAY = {"HK1810USDT": "小米"}
 STOCK_UNDERLYING = {"EQUITY", "KR_EQUITY", "HK_EQUITY", "CN_EQUITY"}
 INTERVAL_MS = {"1m": 60_000, "15m": 15 * 60_000}
-PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
 
 
 def apply_keys() -> None:
@@ -247,12 +245,6 @@ def html_label(symbol: str) -> str:
     )
 
 
-def file_base(symbol: str) -> str:
-    base = symbol.replace("USDT", "")
-    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("_")
-    return safe or f"s{abs(hash(symbol)) % 10_000_000_000}"
-
-
 def load_seen() -> set[str]:
     if not SEEN_PATH.exists():
         return set()
@@ -267,27 +259,12 @@ def save_seen(seen: set[str]) -> None:
     SEEN_PATH.write_text(json.dumps(sorted(seen)))
 
 
-def telegram_send(text: str, *, strong: bool = False, photo: str | None = None) -> bool:
+def telegram_send(text: str, *, strong: bool = False) -> bool:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
     if not token or not chat_id:
         return False
     try:
-        if photo and Path(photo).exists():
-            with open(photo, "rb") as f:
-                r = SESSION.post(
-                    f"https://api.telegram.org/bot{token}/sendPhoto",
-                    data={
-                        "chat_id": chat_id,
-                        "caption": text[:1024],
-                        "parse_mode": "HTML",
-                        "disable_notification": "false" if strong else "false",
-                    },
-                    files={"photo": f},
-                    timeout=25,
-                )
-            if r.ok:
-                return True
         r = SESSION.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             json={
@@ -302,104 +279,6 @@ def telegram_send(text: str, *, strong: bool = False, photo: str | None = None) 
         return bool(r.ok)
     except requests.RequestException:
         return False
-
-
-def draw_chart(sym: str, d: dict, kiss_i: int, lift_i: int, path: str) -> str | None:
-    try:
-        import matplotlib
-
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import Rectangle
-    except Exception:
-        return None
-    a0 = max(0, kiss_i - 70)
-    a1 = min(len(d["c"]), kiss_i + 45)
-    sl = slice(a0, a1)
-    xs = np.arange(a1 - a0)
-    o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
-    fig, (ax, axv) = plt.subplots(
-        2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
-    )
-    for a in (ax, axv):
-        a.set_facecolor("#101814")
-        a.tick_params(colors="#8aa193", labelsize=8)
-        for sp in a.spines.values():
-            sp.set_color("#2a3a33")
-    colors_v = []
-    for k in range(len(c)):
-        up = c[k] >= o[k]
-        col = "#3dba7a" if up else "#e35d5d"
-        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.7)
-        y0, y1 = min(o[k], c[k]), max(o[k], c[k])
-        if y1 == y0:
-            y1 = y0 + max(h[k] - l[k], 1e-12) * 0.02
-        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
-        colors_v.append("#3dba7a99" if up else "#e35d5d99")
-    axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
-    pal = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
-    for n, col in pal.items():
-        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.05, label=f"MA{n}")
-    for idx, label, color in ((kiss_i, "吻", "#c9a227"), (lift_i, "離開", "#3dba7a")):
-        x = idx - a0
-        if 0 <= x < len(c):
-            ax.axvline(x, color=color, ls="--", lw=0.9)
-            ax.scatter([x], [c[x]], s=32, color=color, zorder=5)
-    ax.set_title(f"{sym}  1m", color="#e8f0ea", fontsize=12)
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
-    fig.tight_layout(pad=0.5)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
-    plt.close(fig)
-    return path
-
-
-def draw_15m_chart(sym: str, d: dict, mark_idx: int, path: str) -> str | None:
-    try:
-        import matplotlib
-
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import Rectangle
-    except Exception:
-        return None
-    if mark_idx < 0 or mark_idx >= len(d["c"]):
-        return None
-    a0 = max(0, mark_idx - 48)
-    a1 = min(len(d["c"]), mark_idx + 8)
-    sl = slice(a0, a1)
-    xs = np.arange(a1 - a0)
-    o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
-    fig, (ax, axv) = plt.subplots(
-        2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
-    )
-    for a in (ax, axv):
-        a.set_facecolor("#101814")
-        a.tick_params(colors="#8aa193", labelsize=8)
-        for sp in a.spines.values():
-            sp.set_color("#2a3a33")
-    colors_v = []
-    for k in range(len(c)):
-        up = c[k] >= o[k]
-        col = "#3dba7a" if up else "#e35d5d"
-        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.7)
-        y0, y1 = min(o[k], c[k]), max(o[k], c[k])
-        if y1 == y0:
-            y1 = y0 + max(h[k] - l[k], 1e-12) * 0.02
-        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
-        colors_v.append("#3dba7a99" if up else "#e35d5d99")
-    axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
-    for n, col in PAL.items():
-        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.05, label=f"MA{n}")
-    x = mark_idx - a0
-    ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
-    ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
-    title_sym = file_base(sym) if any(ord(ch) >= 128 for ch in sym) else sym
-    ax.set_title(f"{title_sym}  15m  {hm(int(d['t'][mark_idx]))}", color="#e8f0ea", fontsize=12)
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
-    fig.tight_layout(pad=0.5)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
-    plt.close(fig)
-    return path
 
 
 def scan_symbol(sym: str) -> list[dict]:
@@ -561,20 +440,12 @@ def notify(ev: dict) -> None:
     if ev["kind"] == "m15":
         text = format_m15(ev)
         print("\n" + strip_html(text))
-        tmp = Path("/tmp") / f"ribbon15_{file_base(ev['symbol'])}_{ev['break'].idx}.png"
-        photo = draw_15m_chart(ev["symbol"], ev["d"], ev["break"].idx, str(tmp))
-        telegram_send("15分 同時站上 " + sym_label(ev["symbol"]), strong=True)
-        ok = telegram_send(text, strong=True, photo=photo)
+        ok = telegram_send(text, strong=True)
     else:
         strong = ev["kind"] == "look"
         text = format_look(ev) if strong else format_lift(ev)
         print("\n" + strip_html(text))
-        photo = None
-        if strong:
-            tmp = Path("/tmp") / f"ribbon_{ev['symbol']}_{ev['kiss_i']}.png"
-            photo = draw_chart(ev["symbol"], ev["d"], ev["kiss_i"], ev["lift_i"], str(tmp))
-            telegram_send("🔥🔥🔥 完全符合（強） " + ev["symbol"], strong=True)
-        ok = telegram_send(text, strong=strong, photo=photo)
+        ok = telegram_send(text, strong=strong)
     if ok:
         print("  → Telegram 已送")
     else:
