@@ -22,6 +22,7 @@ rthOnly       = input.bool(true, "只做 09:30–15:45 ET")
 maExitAfter   = input.int(60, "滿 N 根後收破 MA20 出場", minval=1)
 maxHold       = input.int(180, "最長持有根數", minval=10)
 ma60Near      = input.float(40.0, "避開下彎 5m MA60（點，0=關）", minval=0)
+ma20Near      = input.float(40.0, "避開下彎 5m MA20/MA30（點，0=關）", minval=0)
 ma60SlopeBars = input.int(6, "5m MA60 斜率回看（5分K根數）", minval=1)
 
 ma5  = ta.sma(close, 5)
@@ -30,6 +31,10 @@ ma20 = ta.sma(close, maLen)
 ma60 = ta.sma(close, 60)
 ma60_5 = request.security(syminfo.tickerid, "5", ta.sma(close, 60), barmerge.gaps_off, barmerge.lookahead_off)
 ma60_5_prev = request.security(syminfo.tickerid, "5", ta.sma(close, 60)[ma60SlopeBars], barmerge.gaps_off, barmerge.lookahead_off)
+ma20_5 = request.security(syminfo.tickerid, "5", ta.sma(close, 20), barmerge.gaps_off, barmerge.lookahead_off)
+ma20_5_prev = request.security(syminfo.tickerid, "5", ta.sma(close, 20)[ma60SlopeBars], barmerge.gaps_off, barmerge.lookahead_off)
+ma30_5 = request.security(syminfo.tickerid, "5", ta.sma(close, 30), barmerge.gaps_off, barmerge.lookahead_off)
+ma30_5_prev = request.security(syminfo.tickerid, "5", ta.sma(close, 30)[ma60SlopeBars], barmerge.gaps_off, barmerge.lookahead_off)
 floor = ta.lowest(low, lookback)[1]
 
 inRth() =>
@@ -83,7 +88,8 @@ if inSetup
             touch = leftOk and pierce >= -touchAbove and pierce <= maxPierce and close >= ma20
             risk = close - (breakLow - stopBuf)
             ma60FallingNear = ma60Near > 0 and not na(ma60_5) and not na(ma60_5_prev) and ma60_5 < ma60_5_prev and math.abs(close - ma60_5) <= ma60Near
-            if touch and inRth() and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and strategy.position_size == 0
+            ma20_30FallingNear = ma20Near > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma30_5) and not na(ma30_5_prev) and ma20_5 < ma20_5_prev and ma30_5 < ma30_5_prev and close < ma20_5 and close < ma30_5 and ma20_5 < ma30_5 and (ma20_5 - close) <= ma20Near and (ma30_5 - close) <= ma20Near
+            if touch and inRth() and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and strategy.position_size == 0
                 stopLevel = breakLow - stopBuf
                 tgt = close + risk * targetR
                 strategy.entry("破翻回踩", strategy.long)

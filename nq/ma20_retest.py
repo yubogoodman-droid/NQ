@@ -26,6 +26,10 @@ class Signal:
     ma60: float
     ma60_5m: float = 0.0
     ma60_5m_slope: float = 0.0
+    ma20_5m: float = 0.0
+    ma20_5m_slope: float = 0.0
+    ma30_5m: float = 0.0
+    ma30_5m_slope: float = 0.0
     quality: str = "C"
     quality_score: int = 0
 
@@ -54,16 +58,16 @@ def rolling_min_prev(arr, n: int) -> np.ndarray:
     return s.shift(1).rolling(n, min_periods=n).min().to_numpy(float)
 
 
-def align_5m_ma60(
+def align_5m_ma(
     df: pd.DataFrame,
     *,
     ma_len: int = 60,
     slope_bars: int = 6,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """5 分 MA60 與斜率，對齊 df.index，不用未來 1m。
+    """5 分均線與斜率，對齊 df.index，不用未來 1m。
 
     一分圖用已收盤的 5 分 K（與 TradingView lookahead_off 相同）：
-    10:51–10:54 仍用 10:50 收完的那根 5 分 MA60。
+    10:51–10:54 仍用 10:50 收完的那根 5 分均線。
     """
     close = df["Close"].astype(float)
     idx = df.index
@@ -98,6 +102,15 @@ def align_5m_ma60(
     return ma_out, slope_out
 
 
+def align_5m_ma60(
+    df: pd.DataFrame,
+    *,
+    ma_len: int = 60,
+    slope_bars: int = 6,
+) -> Tuple[np.ndarray, np.ndarray]:
+    return align_5m_ma(df, ma_len=ma_len, slope_bars=slope_bars)
+
+
 def near_falling_5m_ma60(
     entry: float,
     ma60_5m: float,
@@ -108,6 +121,33 @@ def near_falling_5m_ma60(
     if near <= 0 or np.isnan(ma60_5m) or np.isnan(slope):
         return False
     return float(slope) < 0.0 and abs(float(entry) - float(ma60_5m)) <= float(near)
+
+
+def near_falling_5m_ma20_ma30(
+    entry: float,
+    ma20_5m: float,
+    slope20: float,
+    ma30_5m: float,
+    slope30: float,
+    near: float,
+) -> bool:
+    """進場夾在下彎 5m MA20 / MA30 蓋頭底下（空頭排列）→ 濾掉。
+
+    要粉紅在藍線下方（MA20 < MA30），避免均線纏在一起往上穿的 V 彈也被砍。
+    """
+    if near <= 0:
+        return False
+    if any(np.isnan(x) for x in (ma20_5m, slope20, ma30_5m, slope30)):
+        return False
+    if float(slope20) >= 0.0 or float(slope30) >= 0.0:
+        return False
+    if not (float(entry) < float(ma20_5m) and float(entry) < float(ma30_5m)):
+        return False
+    if float(ma20_5m) >= float(ma30_5m):
+        return False
+    return (float(ma20_5m) - float(entry)) <= float(near) and (
+        float(ma30_5m) - float(entry)
+    ) <= float(near)
 
 
 def quality_at_entry(ma5: float, ma10: float, ma20: float, ma20_slope: float) -> Tuple[int, str]:
@@ -184,6 +224,7 @@ INTERVAL_DETECT = {
         ma20_slope_bars=4,
         ma60_5m_near=40.0,
         ma60_5m_slope_bars=6,
+        ma20_5m_near=0.0,  # 五分圖進場本就貼 MA20；蓋頭濾只給一分用
     ),
     "1m": dict(
         lookback=120,
@@ -203,6 +244,7 @@ INTERVAL_DETECT = {
         ma20_slope_bars=20,
         ma60_5m_near=40.0,
         ma60_5m_slope_bars=6,
+        ma20_5m_near=40.0,
     ),
 }
 
@@ -250,6 +292,7 @@ def detect_signals(
     ma20_slope_bars: int = 4,
     ma60_5m_near: float = 40.0,
     ma60_5m_slope_bars: int = 6,
+    ma20_5m_near: float = 40.0,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """
@@ -265,7 +308,9 @@ def detect_signals(
     ma10 = sma(close, 10)
     ma20 = sma(close, ma20_len)
     ma60 = sma(close, 60)
-    ma60_5m, ma60_5m_slope = align_5m_ma60(df, slope_bars=ma60_5m_slope_bars)
+    ma20_5m, ma20_5m_slope = align_5m_ma(df, ma_len=20, slope_bars=ma60_5m_slope_bars)
+    ma30_5m, ma30_5m_slope = align_5m_ma(df, ma_len=30, slope_bars=ma60_5m_slope_bars)
+    ma60_5m, ma60_5m_slope = align_5m_ma(df, ma_len=60, slope_bars=ma60_5m_slope_bars)
     floor = rolling_min_prev(low, lookback)
 
     n = len(close)
@@ -397,6 +442,23 @@ def detect_signals(
             i = entry_idx + 1
             continue
 
+        m20_5 = float(ma20_5m[entry_idx]) if not np.isnan(ma20_5m[entry_idx]) else float("nan")
+        m20_5_s = (
+            float(ma20_5m_slope[entry_idx])
+            if not np.isnan(ma20_5m_slope[entry_idx])
+            else float("nan")
+        )
+        m30_5 = float(ma30_5m[entry_idx]) if not np.isnan(ma30_5m[entry_idx]) else float("nan")
+        m30_5_s = (
+            float(ma30_5m_slope[entry_idx])
+            if not np.isnan(ma30_5m_slope[entry_idx])
+            else float("nan")
+        )
+        if near_falling_5m_ma20_ma30(entry, m20_5, m20_5_s, m30_5, m30_5_s, ma20_5m_near):
+            bump("skip_ma20_30")
+            i = entry_idx + 1
+            continue
+
         slope = 0.0
         if entry_idx >= ma20_slope_bars and not np.isnan(ma20[entry_idx - ma20_slope_bars]):
             slope = float(ma20[entry_idx] - ma20[entry_idx - ma20_slope_bars])
@@ -424,6 +486,10 @@ def detect_signals(
                 ma60=float(ma60[entry_idx]) if not np.isnan(ma60[entry_idx]) else 0.0,
                 ma60_5m=m60_5 if not np.isnan(m60_5) else 0.0,
                 ma60_5m_slope=m60_5_s if not np.isnan(m60_5_s) else 0.0,
+                ma20_5m=m20_5 if not np.isnan(m20_5) else 0.0,
+                ma20_5m_slope=m20_5_s if not np.isnan(m20_5_s) else 0.0,
+                ma30_5m=m30_5 if not np.isnan(m30_5) else 0.0,
+                ma30_5m_slope=m30_5_s if not np.isnan(m30_5_s) else 0.0,
                 quality=q_grade,
                 quality_score=q_score,
             )

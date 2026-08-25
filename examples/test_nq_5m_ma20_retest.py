@@ -16,6 +16,7 @@ from nq.ma20_retest import (  # noqa: E402
     TradeResult,
     detect_kwargs,
     detect_signals,
+    near_falling_5m_ma20_ma30,
     near_falling_5m_ma60,
     quality_at_entry,
     simulate,
@@ -44,6 +45,23 @@ def test_near_falling_5m_ma60() -> None:
     assert not near_falling_5m_ma60(29060.0, 29080.0, 8.0, 40.0)
     assert not near_falling_5m_ma60(29060.0, 29180.0, -8.0, 40.0)
     assert not near_falling_5m_ma60(29060.0, 29080.0, -8.0, 0.0)
+
+
+def test_near_falling_5m_ma20_ma30() -> None:
+    # #9 style: below stacked falling MA20 < MA30
+    assert near_falling_5m_ma20_ma30(29651.0, 29670.0, -5.0, 29685.0, -4.0, 40.0)
+    # #34 style: MA20/MA30 tangled (MA20 above MA30) — keep
+    assert not near_falling_5m_ma20_ma30(29186.0, 29204.0, -5.0, 29200.0, -4.0, 40.0)
+    # already above 5m MA20 — keep
+    assert not near_falling_5m_ma20_ma30(29094.0, 29060.0, -5.0, 29080.0, -4.0, 40.0)
+    # MA20 rising — keep
+    assert not near_falling_5m_ma20_ma30(29651.0, 29670.0, 3.0, 29685.0, -4.0, 40.0)
+    # MA30 still rising — keep
+    assert not near_falling_5m_ma20_ma30(29651.0, 29670.0, -5.0, 29685.0, 2.0, 40.0)
+    # farther than 40 pts — keep
+    assert not near_falling_5m_ma20_ma30(29651.0, 29720.0, -5.0, 29740.0, -4.0, 40.0)
+    # filter off
+    assert not near_falling_5m_ma20_ma30(29651.0, 29670.0, -5.0, 29685.0, -4.0, 0.0)
 
 
 def test_skips_hug_falling_5m_ma60() -> None:
@@ -279,6 +297,8 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["fail_below"] == 40.0
     assert d1["ma60_5m_near"] == 40.0
     assert d5["ma60_5m_near"] == 40.0
+    assert d1["ma20_5m_near"] == 40.0
+    assert d5["ma20_5m_near"] == 0.0
     s1 = simulate_kwargs("1m")
     assert s1["ma_exit_after"] == 60
 
@@ -287,6 +307,7 @@ def main() -> int:
     test_parse_period_days()
     test_quality_at_entry()
     test_near_falling_5m_ma60()
+    test_near_falling_5m_ma20_ma30()
     test_skips_hug_falling_5m_ma60()
     test_sma()
     test_summarize_trades()

@@ -532,28 +532,28 @@ def _render_trade_cards(
             f"<img src='img/{escape(img_name)}' alt='#{i} Q{escape(t.quality)} {escape(interval)}' "
             "style='width:100%;display:block;border-radius:10px'/>"
         )
-        ma20_5_line = ""
         slope60 = t.signal.ma60_5m_slope
-        if slope60 < 0:
-            slope_txt = "下彎"
-        elif slope60 > 0:
-            slope_txt = "上彎"
-        else:
-            slope_txt = "走平"
+
+        def _htf_slope_txt(s: float) -> str:
+            if s < 0:
+                return "下彎"
+            if s > 0:
+                return "上彎"
+            return "走平"
+
         ma60_5_line = (
-            f"\n5m MA60 {t.signal.ma60_5m:.1f}  {slope_txt} {slope60:+.1f}  "
+            f"\n5m MA60 {t.signal.ma60_5m:.1f}  {_htf_slope_txt(slope60)} {slope60:+.1f}  "
             f"（進場 − 5mMA60 = {t.entry_price - t.signal.ma60_5m:+.1f}）"
+        )
+        ma20_30_line = (
+            f"\n5m MA20 {t.signal.ma20_5m:.1f}  {_htf_slope_txt(t.signal.ma20_5m_slope)} "
+            f"{t.signal.ma20_5m_slope:+.1f}  （進場 − 5mMA20 = {t.entry_price - t.signal.ma20_5m:+.1f}）"
+            f"\n5m MA30 {t.signal.ma30_5m:.1f}  {_htf_slope_txt(t.signal.ma30_5m_slope)} "
+            f"{t.signal.ma30_5m_slope:+.1f}  （進場 − 5mMA30 = {t.entry_price - t.signal.ma30_5m:+.1f}）"
         )
         if df_5m is not None and len(df_5m):
             img5 = _trade_img_name(df, t, i, prefix=f"{prefix}5m")
             draw_5m_at_entry_png(df, df_5m, t, html_path.parent / "img" / img5, i)
-            i5 = _asof_bar(df_5m, et)
-            ma20_5 = float(df_5m["Close"].rolling(20, min_periods=20).mean().iloc[i5])
-            bar5 = df_5m.index[i5]
-            ma20_5_line = (
-                f"\n5m MA20 {ma20_5:.1f}  @ {bar5.strftime('%H:%M')}  "
-                f"（1m進場 − 5mMA20 = {t.entry_price - ma20_5:+.1f}）"
-            )
             chart += (
                 "<p class='chart-label'>進場當下 5分K（粉紅 = 5m MA20）</p>"
                 f"<img src='img/{escape(img5)}' alt='#{i} 5m對照' "
@@ -581,8 +581,8 @@ def _render_trade_cards(
             f"破底 {br.strftime('%m-%d %H:%M')} low {t.signal.break_low:.2f} / 2h低 {t.signal.support:.2f}\n"
             f"收復 {rc.strftime('%H:%M')} → 回踩 {et.strftime('%H:%M')}\n"
             f"MA5 {t.signal.ma5:.1f} / MA10 {t.signal.ma10:.1f} / MA20 {t.signal.ma20:.1f} / MA60 {t.signal.ma60:.1f}"
+            f"{ma20_30_line}"
             f"{ma60_5_line}"
-            f"{ma20_5_line}"
             "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
             "</article>"
@@ -640,6 +640,7 @@ def write_html_report(
             f"（沒離開 {funnel.get('no_retest', 0)} · 沒收復 {funnel.get('no_reclaim', 0)} · "
             f"沒守住 {funnel.get('fail_hold', 0)} · 風險 {funnel.get('skip_max_risk', 0)} · "
             f"貼下彎5mMA60 {funnel.get('skip_ma60', 0)} · "
+            f"貼下彎5mMA20/30 {funnel.get('skip_ma20_30', 0)} · "
             f"時段 {funnel.get('skip_session', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -681,7 +682,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} {escape(interval)} 破翻回踩 MA20</h1>
-<p class="muted">上面日盤 09:30–15:45 ET；下面附全時段（含夜盤）給研究。破底 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後回踩進場。停損在破底下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內）則略過。{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
+<p class="muted">上面日盤 09:30–15:45 ET；下面附全時段（含夜盤）給研究。破底 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後回踩進場。停損在破底下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內），或夾在下彎的 5m MA20/MA30 蓋頭底下，則略過。{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -748,6 +749,7 @@ def cmd_backtest(args) -> int:
             f"no_reclaim={funnel.get('no_reclaim', 0)} no_retest={funnel.get('no_retest', 0)} "
             f"fail={funnel.get('fail_hold', 0)} risk={funnel.get('skip_max_risk', 0)} "
             f"ma60={funnel.get('skip_ma60', 0)} "
+            f"ma20_30={funnel.get('skip_ma20_30', 0)} "
             f"session={funnel.get('skip_session', 0)}"
         )
     for q, info in stats.get("by_quality", {}).items():
