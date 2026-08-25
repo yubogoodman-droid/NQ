@@ -60,6 +60,20 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
+## NQ 五分 K 急跌 V 反（力成邏輯）
+
+台股那種「均線黏在一起、30 分內灌穿 MA20、放量、反攻 K 做多」搬到 NQ。  
+停損在急跌低下方；目標 MA20 或 1.5R。只做 RTH，09–10 不進。  
+NQ 不能用個股那種 4～5% 跌幅（約等於一千點），改成 ≥40 點或 2 ATR。
+
+```bash
+python3 examples/nq_sharp_drop.py backtest --period 60d --html output/nq_sharp_drop.html
+python3 examples/nq_sharp_drop.py backtest --period 60d --pages
+python3 examples/test_nq_sharp_drop.py
+```
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-sharp-drop-2f6f/docs/nq-sharp-drop/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
