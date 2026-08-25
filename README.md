@@ -47,14 +47,14 @@ python3 examples/nq_ma_reclaim.py alert
 
 ## 台股 5 分 K 破底反彈 → 5/10/20 多頭排列通知
 
-對齊力成（6239）那種五分圖：急殺破近期低點後 V 彈，**第一次**出現 `5MA > 10MA > 20MA` 就推 Telegram（可帶圖）。
+對齊力成（6239）那種五分圖：急殺破近期低點後 V 彈，**5MA > 10MA > 20MA 明顯分開、往上張開**才推 Telegram。均線黏在一起、橫盤糾結的不算。
 
 | 條件 | 預設 |
 |------|------|
 | 週期 | 5 分 K |
 | 破底 | 跌破近 48 根（約 4 小時）低點，且自該段高點跌幅 ≥ 2% |
 | 反彈視窗 | 破底後 24 根內 |
-| 通知 | 5MA > 10MA > 20MA 剛成立，MA5 上彎，自低點反彈 ≥ 1%；09:30 前不報（避開開盤雜訊） |
+| 通知 | 5MA > 10MA > 20MA 分開上彎（MA5−MA10 ≥ 0.125%、MA5−MA20 ≥ 0.15%），MA5/10 上彎、扇形張開；09:30 前不報 |
 
 ```bash
 # 先看力成近 5 日有沒有這種圖
@@ -66,7 +66,7 @@ python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
 # 只看今天（台北）的訊號，並把力成併進去
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pages
 
-# 近一週、700 以上拿掉
+# 近一週、700 以上拿掉；均線糾結的不會算
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 7d --pages
 
 # Telegram（憑證放 tg_config.env）

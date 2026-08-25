@@ -170,6 +170,68 @@ def sma(arr, n: int) -> np.ndarray:
     return pd.Series(arr, dtype=float).rolling(n, min_periods=n).mean().to_numpy(float)
 
 
+def _finite(*vals: float) -> bool:
+    return all(v is not None and not np.isnan(v) for v in vals)
+
+
+def ma_flip_count(fast: np.ndarray, slow: np.ndarray, i: int, lookback: int) -> int:
+    """近 lookback 根裡 fast/slow 上下穿越的次數（糾結帶會很高）。"""
+    flips = 0
+    start = max(1, i - lookback + 1)
+    for k in range(start, i + 1):
+        if not _finite(fast[k], slow[k], fast[k - 1], slow[k - 1]):
+            continue
+        if (fast[k] > slow[k]) != (fast[k - 1] > slow[k - 1]):
+            flips += 1
+    return flips
+
+
+def stack_pretty(
+    ma5: np.ndarray,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    close: np.ndarray,
+    i: int,
+    *,
+    slope_bars: int = 3,
+    min_gap_5_10: float = 0.00125,
+    min_gap_5_20: float = 0.0015,
+    min_ma5_slope: float = 0.0010,
+    min_ma10_slope: float = 0.00035,
+    min_ma20_slope: float = 0.0,
+    tangle_lookback: int = 8,
+    max_ma5_ma10_flips: int = 3,
+) -> bool:
+    """5/10/20 明顯分開、往上張開。黏在一起或橫盤穿越的糾結帶不算。"""
+    if i < max(slope_bars, 1):
+        return False
+    a5, a10, a20, px = float(ma5[i]), float(ma10[i]), float(ma20[i]), float(close[i])
+    if not _finite(a5, a10, a20, px) or px <= 0:
+        return False
+    if not (a5 > a10 > a20):
+        return False
+    gap5 = (a5 - a10) / px
+    gap20 = (a5 - a20) / px
+    if gap5 < min_gap_5_10 or gap20 < min_gap_5_20:
+        return False
+    p5, p10, p20 = float(ma5[i - slope_bars]), float(ma10[i - slope_bars]), float(ma20[i - slope_bars])
+    if not _finite(p5, p10, p20):
+        return False
+    if (a5 - p5) / px < min_ma5_slope:
+        return False
+    if (a10 - p10) / px < min_ma10_slope:
+        return False
+    if (a20 - p20) / px < min_ma20_slope:
+        return False
+    if gap20 <= (p5 - p20) / px:
+        return False
+    if ma_flip_count(ma5, ma10, i, tangle_lookback) > max_ma5_ma10_flips:
+        return False
+    if px < a5:
+        return False
+    return True
+
+
 def detect_signals(
     df: pd.DataFrame,
     *,
@@ -181,8 +243,9 @@ def detect_signals(
     min_entry_gap: int = 12,
     vol_lookback: int = 20,
     skip_before: tuple[int, int] = (9, 30),
+    require_pretty: bool = True,
 ) -> list[BounceSignal]:
-    """急殺破近期低點後，在視窗內第一次出現 5>10>20 就出訊號。"""
+    """急殺破近期低點後，等 5>10>20 排漂亮（分開、上彎）才出訊號。"""
     if df is None or len(df) < lookback + 20:
         return []
     close = df["Close"].to_numpy(float)
@@ -256,7 +319,13 @@ def detect_signals(
             continue
         if i - last_entry < min_entry_gap:
             continue
-        if not stacked_at(i) or stacked_at(i - 1):
+        if require_pretty:
+            ready = stack_pretty(ma5, ma10, ma20, close, i, slope_bars=slope_bars)
+            was_ready = stack_pretty(ma5, ma10, ma20, close, i - 1, slope_bars=slope_bars)
+        else:
+            ready = stacked_at(i)
+            was_ready = stacked_at(i - 1)
+        if not ready or was_ready:
             continue
         if trough_low <= 0:
             continue
@@ -491,6 +560,7 @@ def write_html_report(
             f"進場 {sig.entry_price:.2f}  破底 {sig.break_low:.2f} @ {bt.strftime('%H:%M')}\n"
             f"跌幅 {sig.drop_pct*100:.1f}%  反彈 {sig.bounce_pct*100:.1f}%\n"
             f"MA5 {sig.ma5:.2f}  MA10 {sig.ma10:.2f}  MA20 {sig.ma20:.2f}"
+            f"  間隔 {(sig.ma5-sig.ma20)/sig.entry_price*100:.2f}%"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -522,7 +592,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 5分K 破底反彈</h1>
 <p class="muted">{escape(period)} · {len(universe)} 檔
-<br/>急殺破近 4 小時低點或今日低點（跌幅 ≥ 2%）後，24 根內第一次 5MA &gt; 10MA &gt; 20MA 就通知。</p>
+<br/>急殺破近 4 小時低點或今日低點（跌幅 ≥ 2%）後，24 根內 5MA &gt; 10MA &gt; 20MA 要明顯分開、往上張開才算；糾結黏帶不算。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -643,7 +713,8 @@ def fmt_alert(row: dict, df: pd.DataFrame, sig: BounceSignal) -> str:
         f"現價: <code>{sig.entry_price:.2f}</code>（最新 {last:.2f}）\n"
         f"破底: <code>{bt.strftime('%H:%M')}</code> low={sig.break_low:.2f}\n"
         f"跌幅: <b>{sig.drop_pct*100:.1f}%</b> → 反彈 <b>{sig.bounce_pct*100:.1f}%</b>\n"
-        f"MA5 {sig.ma5:.2f} &gt; MA10 {sig.ma10:.2f} &gt; MA20 {sig.ma20:.2f}\n"
+        f"MA5 {sig.ma5:.2f} &gt; MA10 {sig.ma10:.2f} &gt; MA20 {sig.ma20:.2f}"
+        f"（間隔 {(sig.ma5-sig.ma20)/sig.entry_price*100:.2f}%）\n"
         f"#台股 #五分K #破底反彈 #{row['code']}"
     )
 
@@ -741,7 +812,12 @@ def resolve_universe(args) -> list[dict]:
     return merge_universe(universe, extra)
 
 
-def scan_symbol(row: dict, range_: str) -> tuple[list[tuple[BounceSignal, pd.DataFrame]], dict]:
+def scan_symbol(
+    row: dict,
+    range_: str,
+    *,
+    require_pretty: bool = True,
+) -> tuple[list[tuple[BounceSignal, pd.DataFrame]], dict]:
     meta = {**row, "bars": 0, "error": "", "n_sig": 0}
     try:
         df = fetch_yahoo_5m(row["symbol"], range_)
@@ -754,7 +830,7 @@ def scan_symbol(row: dict, range_: str) -> tuple[list[tuple[BounceSignal, pd.Dat
         return [], meta
     if row.get("close") is None and len(df):
         row["close"] = float(df["Close"].iloc[-1])
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, require_pretty=require_pretty)
     meta["n_sig"] = len(sigs)
     return [(s, df) for s in sigs], meta
 
@@ -769,8 +845,9 @@ def cmd_scan(args) -> int:
     on_day = resolve_on_day(args)
     if on_day is not None:
         print(f"filter day={on_day}")
+    pretty = not getattr(args, "loose", False)
     for i, row in enumerate(universe, 1):
-        pairs, meta = scan_symbol(row, args.range_)
+        pairs, meta = scan_symbol(row, args.range_, require_pretty=pretty)
         if meta["error"]:
             errors += 1
         trades_by_entry = {}
@@ -811,6 +888,8 @@ def cmd_scan(args) -> int:
             period = f"{on_day.isoformat()} · {args.range_}資料"
         if args.max_price is not None:
             period += f" · 股價≤{args.max_price:g}"
+        if pretty:
+            period += " · 均線不糾結"
         out = write_html_report(html_path, hits, universe, period)
         write_view_html(out)
         print(f"html={out}")
@@ -826,13 +905,14 @@ def scan_once(
     dry_run: bool,
     seed_alert: bool,
     sleep_s: float,
+    require_pretty: bool = True,
 ) -> None:
     state = load_state()
     alerted = set(state.get("alerted") or [])
     first_run = not state.get("initialized")
     new_items: list[tuple[str, dict, BounceSignal, pd.DataFrame]] = []
     for row in universe:
-        pairs, meta = scan_symbol(row, range_)
+        pairs, meta = scan_symbol(row, range_, require_pretty=require_pretty)
         if meta["error"]:
             print(f"  skip {row['symbol']} {meta['error']}", file=sys.stderr)
         for sig, df in pairs:
@@ -895,7 +975,7 @@ def cmd_alert(args) -> int:
         return 1
     print(
         f"TW 5m bounce TG | n={len(universe)} | dry_run={args.dry_run} | "
-        f"range={args.range_} | session_only={not args.all_hours}"
+        f"range={args.range_} | pretty={not args.loose} | session_only={not args.all_hours}"
     )
     while True:
         try:
@@ -908,6 +988,7 @@ def cmd_alert(args) -> int:
                     dry_run=args.dry_run,
                     seed_alert=args.seed_alert,
                     sleep_s=args.sleep,
+                    require_pretty=not args.loose,
                 )
             else:
                 print(f"[{datetime.now(TPE).strftime('%H:%M:%S')}] outside session, skip")
@@ -933,6 +1014,11 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--also", default="", help="額外併入掃描的代號，例如 6239")
         sp.add_argument("--range", dest="range_", default="5d")
         sp.add_argument("--sleep", type=float, default=0.2)
+        sp.add_argument(
+            "--loose",
+            action="store_true",
+            help="不擋均線糾結，第一次 5>10>20 就算",
+        )
 
     s = sub.add_parser("scan", help="回看近幾日並可出 HTML")
     add_universe(s)

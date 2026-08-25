@@ -25,6 +25,7 @@ from watch_tw_5m_bounce import (  # noqa: E402
     signal_key,
     simulate,
     sma,
+    stack_pretty,
     summarize_trades,
     write_html_report,
 )
@@ -73,6 +74,20 @@ def make_v_bounce_bars(n: int = 90) -> pd.DataFrame:
     df.loc[df.index[dump_i], "Volume"] = 4800.0
     df.loc[df.index[dump_i + 6], "Volume"] = 3600.0
     return df
+
+
+def make_tangled_bounce_bars(n: int = 90) -> pd.DataFrame:
+    """急殺後在均線附近橫盤磨，5/10/20 黏在一起。"""
+    close = np.full(n, 212.0, dtype=float)
+    for i in range(1, 52):
+        close[i] = 211.8 + (i % 3) * 0.04
+    dump_i = 58
+    close[52:dump_i] = np.linspace(211.8, 209.4, dump_i - 52, endpoint=False)
+    close[dump_i] = 209.0
+    wobble = np.array([0.10, -0.08, 0.06, -0.05, 0.08, -0.07, 0.05, -0.04, 0.07, -0.06, 0.04, -0.03])
+    for j, i in enumerate(range(dump_i + 1, n)):
+        close[i] = 211.15 + wobble[j % len(wobble)]
+    return _ohlc(close, dump_i, 208.9)
 
 
 def make_flat_bars(n: int = 80) -> pd.DataFrame:
@@ -149,6 +164,28 @@ def test_flat_market_has_no_signal() -> None:
     assert detect_signals(make_flat_bars()) == []
 
 
+def test_tangled_ribbon_skipped() -> None:
+    df = make_tangled_bounce_bars()
+    pretty = detect_signals(df, require_pretty=True)
+    loose = detect_signals(df, require_pretty=False)
+    assert pretty == []
+    assert len(pretty) <= len(loose)
+
+
+def test_stack_pretty_rejects_glued_mas() -> None:
+    n = 30
+    ma5 = np.linspace(100.02, 100.08, n)
+    ma10 = ma5 - 0.01
+    ma20 = ma10 - 0.01
+    close = ma5 + 0.02
+    assert not stack_pretty(ma5, ma10, ma20, close, n - 1)
+    ma5b = np.array([100.0 + i * 0.35 for i in range(n)])
+    ma10b = np.array([99.6 + i * 0.22 for i in range(n)])
+    ma20b = np.array([99.3 + i * 0.12 for i in range(n)])
+    closeb = ma5b + 0.4
+    assert stack_pretty(ma5b, ma10b, ma20b, closeb, n - 1)
+
+
 def test_drop_incomplete_5m() -> None:
     idx = pd.DatetimeIndex(
         [
@@ -196,6 +233,7 @@ def test_signal_key_and_alert_text() -> None:
     assert "6239" in text
     assert "多頭排列" in text
     assert "MA5" in text
+    assert "間隔" in text
 
 
 def test_in_tw_session() -> None:
@@ -219,6 +257,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     text = path.read_text(encoding="utf-8")
     assert "破底反彈" in text
     assert "6239" in text
+    assert "間隔" in text
     assert (path.parent / "img").exists()
 
 
@@ -229,6 +268,8 @@ def main() -> int:
     test_detect_v_bounce_like_6239()
     test_skip_before_filters_open()
     test_flat_market_has_no_signal()
+    test_tangled_ribbon_skipped()
+    test_stack_pretty_rejects_glued_mas()
     test_drop_incomplete_5m()
     test_shallow_dip_ignored()
     test_simulate_and_summarize()
