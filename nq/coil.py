@@ -308,6 +308,13 @@ def detect_coil_breakouts(
     recent_range_bars: int = 12,
     min_recent_range: float = 10.0,
     max_recent_range: float = 40.0,
+    require_ma200_falling: bool = True,
+    min_recent_drop: float = 45.0,
+    recent_drop_bars: int = 60,
+    min_below_bars: int = 4,
+    min_ma200_hug: int = 4,
+    hug_dist: float = 8.0,
+    hug_lookback: int = 12,
     max_m5_below_200: float = -1.0,
     require_m5_above_ma20: bool = False,
     require_m5_above_ma30: bool = False,
@@ -320,8 +327,9 @@ def detect_coil_breakouts(
 
     預設兩根：第一根站上還不進，第二根仍排列且收在 MA200 上才進。
     MA200 上頭不能再掛 MA100 或 MA120（兩條都要在 200 下面）。
-    要像 08-19 08:15 那種：下跌後短均線收成一束（MA5–MA60 帶寬），
-    近 12 根還在窄箱裡，收盤剛站上 MA200（不要已經噴遠）。
+    要像 08-19 08:15 / 16:48 那種：先跌一段，短均收成一束，
+    近 12 根還在窄箱裡貼著 MA200，收盤剛站上（不要已經噴遠）。
+    MA200 還在往下，進場前至少有幾根收在 200 下面。
     停損用進場前 stop_lookback 根的修剪低點 − buffer。
     """
     if df is None or len(df) == 0:
@@ -459,6 +467,32 @@ def detect_coil_breakouts(
             max(float(ma[i]) for ma in use_rib) - min(float(ma[i]) for ma in use_rib)
         )
         ok_ribbon = max_ribbon_width <= 0 or ribbon_now <= max_ribbon_width
+        if i >= ma200_slope_bars and not np.isnan(mas[-1][i - ma200_slope_bars]):
+            sl200 = float(ma200 - float(mas[-1][i - ma200_slope_bars]))
+            ok_falling = (not require_ma200_falling) or sl200 < 0.0
+        else:
+            ok_falling = True
+        drop_n = max(2, int(recent_drop_bars))
+        drop_from = max(0, i - drop_n)
+        recent_drop = (
+            float(np.max(h[drop_from:i]) - np.min(l[drop_from:i])) if i > drop_from else 0.0
+        )
+        ok_drop = min_recent_drop <= 0 or recent_drop >= min_recent_drop
+        below = 0
+        j = prior
+        while j >= 0 and not np.isnan(mas[-1][j]) and float(c[j]) <= float(mas[-1][j]):
+            below += 1
+            j -= 1
+        ok_below = min_below_bars <= 0 or below >= min_below_bars
+        hug_n = max(1, int(hug_lookback))
+        hug_from = max(0, i - hug_n)
+        hug_hits = 0
+        for j in range(hug_from, i):
+            if np.isnan(mas[-1][j]):
+                continue
+            if abs(float(c[j]) - float(mas[-1][j])) <= hug_dist:
+                hug_hits += 1
+        ok_hug = min_ma200_hug <= 0 or hug_hits >= min_ma200_hug
         def no_overhead(j: int) -> bool:
             if j < 0 or np.isnan(mas[5][j]) or np.isnan(mas[6][j]) or np.isnan(mas[-1][j]):
                 return True
@@ -496,6 +530,14 @@ def detect_coil_breakouts(
             bump("tight_box")
         if ok_ribbon:
             bump("ribbon")
+        if ok_falling:
+            bump("falling")
+        if ok_drop:
+            bump("prior_drop")
+        if ok_below:
+            bump("was_below")
+        if ok_hug:
+            bump("hug_200")
         if ok_long_below:
             bump("long_below")
         if ok_vol:
@@ -516,6 +558,10 @@ def detect_coil_breakouts(
             and ok_ext
             and ok_box
             and ok_ribbon
+            and ok_falling
+            and ok_drop
+            and ok_below
+            and ok_hug
             and ok_long_below
             and ok_vol
             and ok_m5

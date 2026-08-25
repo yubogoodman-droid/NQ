@@ -1,7 +1,7 @@
 //@version=5
 indicator("NQ 一分K 起漲點（糾結後連兩根站上MA200）", overlay=true, max_labels_count=200)
 
-// 模板：08-19 08:15。下跌後短均線收成一束，近 12 根還在窄箱，
+// 模板：08-19 08:15 / 16:48。先跌一段，短均收成一束貼著 MA200，
 // 5>10>20>30，連兩根收在 MA200 上，且 100/120 都在 200 下面。
 // 第一根站上還不進。不要追已經噴遠或放量長綠。
 
@@ -12,6 +12,11 @@ maxExt        = input.float(15.0, "收盤最多高出 MA200（點）", minval=0,
 boxBars       = input.int(12, "盤整回看 K 數", minval=4, maxval=30)
 minBox        = input.float(10.0, "盤整最小區間（點）", minval=0, step=1)
 maxBox        = input.float(40.0, "盤整最大區間（點）", minval=5, step=2)
+requireFalling = input.bool(true, "MA200 近 20 根仍在往下")
+minDrop       = input.float(45.0, "近 60 根至少先跌（點）", minval=0, step=5)
+minBelow      = input.int(4, "進場前至少幾根收在 MA200 下", minval=0, maxval=20)
+minHug        = input.int(4, "近 12 根至少幾根貼著 MA200", minval=0, maxval=12)
+hugDist       = input.float(8.0, "貼著 MA200 的距離（點）", minval=1, step=1)
 stopLookback  = input.int(20, "停損回看 K 數", minval=5, maxval=60)
 stopBuffer    = input.float(5.0, "停損低於回看低點（點）", minval=0, step=1)
 targetR       = input.float(2.0, "目標 R 倍數", minval=1.0, step=0.5)
@@ -43,7 +48,20 @@ boxHi = ta.highest(high[1], boxBars)
 boxLo = ta.lowest(effLow[1], boxBars)
 boxRng = boxHi - boxLo
 boxOk = boxRng >= minBox and boxRng <= maxBox
-breakout = hold and hold[1] and fresh and bodyOk and longBelow and longBelow[1] and ribbonOk and extOk and boxOk
+fallingOk = not requireFalling or ma200 < ma200[20]
+dropOk = minDrop <= 0 or (ta.highest(high[1], 60) - ta.lowest(low[1], 60) >= minDrop)
+belowCnt = 0
+for k = 2 to 40
+    if close[k] <= ma200[k]
+        belowCnt += 1
+    else
+        break
+belowOk = minBelow <= 0 or belowCnt >= minBelow
+hugN = 0
+for k = 1 to 12
+    hugN += math.abs(close[k] - ma200[k]) <= hugDist ? 1 : 0
+hugOk = hugN >= minHug
+breakout = hold and hold[1] and fresh and bodyOk and longBelow and longBelow[1] and ribbonOk and extOk and boxOk and fallingOk and dropOk and belowOk and hugOk
 
 plot(ma5,   "MA5",   color=#ffa726, linewidth=1)
 plot(ma10,  "MA10",  color=#42a5f5, linewidth=1)

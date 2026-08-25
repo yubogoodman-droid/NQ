@@ -357,6 +357,10 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"靠近MA200 {funnel.get('near_200', 0)} → "
         f"窄箱 {funnel.get('tight_box', 0)} → "
         f"短均收束 {funnel.get('ribbon', 0)} → "
+        f"MA200仍跌 {funnel.get('falling', 0)} → "
+        f"先跌一段 {funnel.get('prior_drop', 0)} → "
+        f"先在200下 {funnel.get('was_below', 0)} → "
+        f"貼著200 {funnel.get('hug_200', 0)} → "
         f"100與120在200下 {funnel.get('long_below', 0)} → "
         f"進場 {funnel.get('taken', 0)}</p>"
     )
@@ -555,7 +559,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（糾結後連兩根剛站上MA200）</h1>
-<p class="muted">模板是 08-19 08:15：下跌後短均線收成一束（MA5–MA60 ≤ 20），近 12 根箱子 10–40 點，收盤剛站上 MA200（高出 ≤ 15）。MA5&gt;MA10&gt;MA20&gt;MA30，連續兩根收在 MA200 上才進；第一根還不進。MA200 上頭不能再掛 MA100 或 MA120。開盤追價、急殺後寬箱（07:33 / 11:30 那種）不進。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。下面每筆附「當時 5分K」只是對照，不是進場條件。</p>
+<p class="muted">模板是 08-19 08:15 與 16:48：先跌一段（近 60 根至少 45 點），短均線收成一束（MA5–MA60 ≤ 20），近 12 根箱子 10–40 點且至少 4 根貼著 MA200。MA200 還在往下，進場前至少 4 根收在 200 下面，收盤剛站上（高出 ≤ 15）。MA5&gt;MA10&gt;MA20&gt;MA30，連續兩根收在 MA200 上才進；第一根還不進。MA200 上頭不能再掛 MA100 或 MA120。開盤假突破、尾盤刺穿 200、只淺淺跌破就收回，都不進。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。下面每筆附「當時 5分K」只是對照，不是進場條件。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -651,7 +655,9 @@ def _print_funnel(funnel: Dict[str, int]) -> None:
         f"checked={funnel.get('checked', 0)} stack={funnel.get('stack', 0)} "
         f"ma200={funnel.get('above_200', 0)} hold={funnel.get('hold', 0)} "
         f"near={funnel.get('near_200', 0)} box={funnel.get('tight_box', 0)} "
-        f"ribbon={funnel.get('ribbon', 0)} below={funnel.get('long_below', 0)} "
+        f"ribbon={funnel.get('ribbon', 0)} fall={funnel.get('falling', 0)} "
+        f"drop={funnel.get('prior_drop', 0)} under={funnel.get('was_below', 0)} "
+        f"hug={funnel.get('hug_200', 0)} below={funnel.get('long_below', 0)} "
         f"taken={funnel.get('taken', 0)}"
     )
 

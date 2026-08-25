@@ -36,6 +36,10 @@ LOOSE = dict(
     max_recent_range=100.0,
     max_reclaim_ext=50.0,
     max_body=40.0,
+    require_ma200_falling=False,
+    min_recent_drop=0.0,
+    min_below_bars=0,
+    min_ma200_hug=0,
 )
 
 
@@ -69,6 +73,7 @@ def test_ideal_0815_coil() -> None:
     assert sig.ribbon_width <= 20.0
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
     assert sig.ma100 < sig.ma200 and sig.ma120 < sig.ma200
+    assert sig.prior_drop >= 45.0
     trades = simulate(df, hits)
     assert trades
     assert trades[0].pnl_points > 0
