@@ -194,13 +194,14 @@ def stack_pretty(
     i: int,
     *,
     slope_bars: int = 3,
-    min_gap_5_10: float = 0.00125,
-    min_gap_5_20: float = 0.0015,
-    min_ma5_slope: float = 0.0010,
-    min_ma10_slope: float = 0.00035,
-    min_ma20_slope: float = 0.0,
+    min_gap_5_10: float = 0.0015,
+    min_gap_10_20: float = 0.0012,
+    min_gap_5_20: float = 0.0030,
+    min_ma5_slope: float = 0.0020,
+    min_ma10_slope: float = 0.0015,
+    min_ma20_slope: float = 0.0005,
     tangle_lookback: int = 8,
-    max_ma5_ma10_flips: int = 3,
+    max_ma5_ma10_flips: int = 2,
 ) -> bool:
     """5/10/20 明顯分開、往上張開。黏在一起或橫盤穿越的糾結帶不算。"""
     if i < max(slope_bars, 1):
@@ -211,8 +212,9 @@ def stack_pretty(
     if not (a5 > a10 > a20):
         return False
     gap5 = (a5 - a10) / px
+    gap10 = (a10 - a20) / px
     gap20 = (a5 - a20) / px
-    if gap5 < min_gap_5_10 or gap20 < min_gap_5_20:
+    if gap5 < min_gap_5_10 or gap10 < min_gap_10_20 or gap20 < min_gap_5_20:
         return False
     p5, p10, p20 = float(ma5[i - slope_bars]), float(ma10[i - slope_bars]), float(ma20[i - slope_bars])
     if not _finite(p5, p10, p20):

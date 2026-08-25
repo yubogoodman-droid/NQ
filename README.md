@@ -54,7 +54,7 @@ python3 examples/nq_ma_reclaim.py alert
 | 週期 | 5 分 K |
 | 破底 | 跌破近 48 根（約 4 小時）低點，且自該段高點跌幅 ≥ 2% |
 | 反彈視窗 | 破底後 24 根內 |
-| 通知 | 5MA > 10MA > 20MA 分開上彎（MA5−MA10 ≥ 0.125%、MA5−MA20 ≥ 0.15%），MA5/10 上彎、扇形張開；09:30 前不報 |
+| 通知 | 5/10/20 三條都要看得見、往上張開（MA5−MA10 ≥ 0.15%、MA10−MA20 ≥ 0.12%、MA5−MA20 ≥ 0.30%），MA20 也要上彎；黏帶／糾結不算。09:30 前不報 |
 
 ```bash
 # 先看力成近 5 日有沒有這種圖
@@ -77,7 +77,8 @@ python3 examples/watch_tw_5m_bounce.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_bounce_ma_stack.pine`。
 
-近一週（2026-08-18→08-25）成交額前 80、**700 以上拿掉**： **107 筆**、勝率 57%、合計 +97.7%。  
+近一週（2026-08-18→08-25）成交額前 80、**700 以上拿掉**、均線糾結不算： **69 筆**、勝率 59%、合計 +54.3%。  
+（未濾糾結時是 107 筆、+97.7%；南亞／鴻海那種黏帶已拿掉，力成改在扇形張開時才進。）  
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）

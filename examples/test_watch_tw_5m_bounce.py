@@ -179,6 +179,12 @@ def test_stack_pretty_rejects_glued_mas() -> None:
     ma20 = ma10 - 0.01
     close = ma5 + 0.02
     assert not stack_pretty(ma5, ma10, ma20, close, n - 1)
+    # 5 拉開了但 10/20 還黏著，一樣不算漂亮
+    ma5c = np.linspace(100.0, 101.2, n)
+    ma10c = np.linspace(99.95, 100.05, n)
+    ma20c = ma10c - 0.02
+    closec = ma5c + 0.3
+    assert not stack_pretty(ma5c, ma10c, ma20c, closec, n - 1)
     ma5b = np.array([100.0 + i * 0.35 for i in range(n)])
     ma10b = np.array([99.6 + i * 0.22 for i in range(n)])
     ma20b = np.array([99.3 + i * 0.12 for i in range(n)])

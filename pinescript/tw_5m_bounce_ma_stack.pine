@@ -6,8 +6,9 @@ minDropPct  = input.float(2.0, "最小跌幅 %", minval=0.5, step=0.1)
 minBouncePct = input.float(1.0, "最小反彈 %", minval=0.3, step=0.1)
 reboundBars = input.int(24, "反彈視窗（根）", minval=6)
 slopeBars   = input.int(3, "均線上彎回看", minval=1)
-minGap5_10  = input.float(0.125, "MA5-MA10 最小間隔 %", minval=0.0, step=0.025)
-minGap5_20  = input.float(0.15, "MA5-MA20 最小間隔 %", minval=0.0, step=0.025)
+minGap5_10  = input.float(0.15, "MA5-MA10 最小間隔 %", minval=0.0, step=0.025)
+minGap10_20 = input.float(0.12, "MA10-MA20 最小間隔 %", minval=0.0, step=0.025)
+minGap5_20  = input.float(0.30, "MA5-MA20 最小間隔 %", minval=0.0, step=0.025)
 requirePretty = input.bool(true, "擋掉糾結黏帶")
 
 ma5  = ta.sma(close, 5)
@@ -19,12 +20,13 @@ ma240 = ta.sma(close, 240)
 
 stacked    = ma5 > ma10 and ma10 > ma20
 gap5       = close > 0 ? (ma5 - ma10) / close * 100 : 0
+gap10      = close > 0 ? (ma10 - ma20) / close * 100 : 0
 gap20      = close > 0 ? (ma5 - ma20) / close * 100 : 0
 ma5Up      = ma5 > ma5[slopeBars]
-ma10Up     = ma10 > ma10[slopeBars]
-ma20Up     = ma20 >= ma20[slopeBars]
+ma10Up     = (ma10 - ma10[slopeBars]) / close * 100 >= 0.15
+ma20Up     = (ma20 - ma20[slopeBars]) / close * 100 >= 0.05
 fanOpen    = (ma5 - ma20) > (ma5[slopeBars] - ma20[slopeBars])
-pretty     = stacked and gap5 >= minGap5_10 and gap20 >= minGap5_20 and ma5Up and ma10Up and ma20Up and fanOpen and close >= ma5
+pretty     = stacked and gap5 >= minGap5_10 and gap10 >= minGap10_20 and gap20 >= minGap5_20 and ma5Up and ma10Up and ma20Up and fanOpen and close >= ma5
 ready      = requirePretty ? pretty : stacked
 readyNew   = ready and not ready[1]
 priorLow   = ta.lowest(low[1], lookback)
