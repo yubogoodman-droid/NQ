@@ -13,16 +13,21 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from nq.patterns import detect_w_bottoms, detect_w_ma20_crosses  # noqa: E402
+from nq.patterns import WMa20Signal, detect_w_bottoms, detect_w_ma20_crosses  # noqa: E402
 from watch_tw_w_ma20 import (  # noqa: E402
     TPE,
+    TwHit,
+    bounce_pct,
     drop_forming_bar,
     fill_chinese_names,
+    filter_hits_days,
     filter_price_below,
     has_cjk,
     hit_key,
+    is_notable_hit,
     parse_symbols,
     recent_hits,
+    stand_pct,
 )
 
 
@@ -277,6 +282,62 @@ def test_has_cjk_and_chinese_names() -> None:
     assert [r["name"] for r in out] == ["國巨", "南亞科", "聯電"]
 
 
+def _fake_hit(code: str, name: str, when: str, *, bounce: float = 2.0, stand: float = 0.4) -> TwHit:
+    ts = pd.Timestamp(when, tz=TPE)
+    start = ts.normalize() + pd.Timedelta(hours=9)
+    idx = pd.date_range(start, periods=54, freq="5min", tz=TPE)
+    close = np.linspace(100, 110, len(idx))
+    df = pd.DataFrame(
+        {
+            "Open": close,
+            "High": close + 1,
+            "Low": close - 1,
+            "Close": close,
+            "Volume": np.full(len(idx), 1000.0),
+        },
+        index=idx,
+    )
+    loc = int(df.index.get_indexer([ts], method="nearest")[0])
+    base = 100.0
+    cross = base * (1 + bounce / 100.0)
+    ma20 = cross / (1 + stand / 100.0)
+    sig = WMa20Signal(
+        first_low_idx=max(0, loc - 10),
+        second_low_idx=max(0, loc - 4),
+        neckline_idx=max(0, loc - 7),
+        first_low=base,
+        second_low=base,
+        neckline=base * 1.02,
+        cross_idx=loc,
+        cross_price=cross,
+        ma20=ma20,
+    )
+    row = {"code": code, "name": name, "symbol": f"{code}.TW"}
+    return TwHit(row, sig, df)
+
+
+def test_filter_hits_days_one_week() -> None:
+    now = datetime(2026, 8, 25, 15, 0, tzinfo=TPE)
+    hits = [
+        _fake_hit("2327", "國巨", "2026-08-18 11:25"),
+        _fake_hit("2408", "南亞科", "2026-08-19 10:00"),
+        _fake_hit("1303", "南亞", "2026-08-25 11:30"),
+    ]
+    week = filter_hits_days(hits, 7, now=now)
+    assert [h.row["code"] for h in week] == ["2408", "1303"]
+    today = filter_hits_days(hits, 1, now=now)
+    assert [h.row["code"] for h in today] == ["1303"]
+
+
+def test_notable_bounce_and_stand() -> None:
+    good = _fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=1.5, stand=0.4)
+    weak = _fake_hit("2408", "南亞科", "2026-08-25 11:30", bounce=0.4, stand=0.1)
+    assert bounce_pct(good.signal) >= 1.2
+    assert stand_pct(good.signal) >= 0.25
+    assert is_notable_hit(good)
+    assert not is_notable_hit(weak)
+
+
 def main() -> int:
     test_yageo_like_alerts()
     test_yageo_plateau_second_bottom()
@@ -291,6 +352,8 @@ def main() -> int:
     test_hit_key_and_recent()
     test_filter_price_below_700()
     test_has_cjk_and_chinese_names()
+    test_filter_hits_days_one_week()
+    test_notable_bounce_and_stand()
     print("ok")
     return 0
 

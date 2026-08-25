@@ -8,6 +8,7 @@
   python3 examples/watch_tw_w_ma20.py --dry-run --once
   python3 examples/watch_tw_w_ma20.py --once --symbols 2327,2408
   python3 examples/watch_tw_w_ma20.py scan --limit 100 --pages
+  python3 examples/watch_tw_w_ma20.py scan --range 10d --days 7 --pages  # 回測一週
   python3 examples/watch_tw_w_ma20.py          # 盤中每根 5 分收盤掃一次
 
 Telegram 憑證放 tg_config.env（勿提交）:
@@ -212,6 +213,41 @@ def hit_under_max_price(hit: TwHit, max_price: float | None) -> bool:
     listed = hit.row.get("close")
     px = max(last, float(listed) if listed is not None else last)
     return px < max_price
+
+
+def hit_ts(hit: TwHit) -> pd.Timestamp:
+    ts = hit.df.index[hit.signal.cross_idx]
+    if getattr(ts, "tzinfo", None) is None:
+        return pd.Timestamp(ts).tz_localize(TPE)
+    return pd.Timestamp(ts).tz_convert(TPE)
+
+
+def filter_hits_days(hits: list[TwHit], days: int, now: datetime | None = None) -> list[TwHit]:
+    """只留最近 N 個日曆日（含今天）。days=7 就是一週。"""
+    if not days or days <= 0:
+        return hits
+    cur = now or datetime.now(TPE)
+    if cur.tzinfo is None:
+        cur = cur.replace(tzinfo=TPE)
+    start = cur.date() - timedelta(days=days - 1)
+    return [h for h in hits if hit_ts(h).date() >= start]
+
+
+def bounce_pct(sig: WMa20Signal) -> float:
+    base = min(sig.first_low, sig.second_low)
+    if base <= 0:
+        return 0.0
+    return (sig.cross_price / base - 1.0) * 100.0
+
+
+def stand_pct(sig: WMa20Signal) -> float:
+    if sig.ma20 <= 0:
+        return 0.0
+    return (sig.cross_price / sig.ma20 - 1.0) * 100.0
+
+
+def is_notable_hit(hit: TwHit, *, min_bounce: float = 1.2, min_stand: float = 0.25) -> bool:
+    return bounce_pct(hit.signal) >= min_bounce and stand_pct(hit.signal) >= min_stand
 
 
 def load_universe(args: argparse.Namespace) -> list[dict]:
@@ -448,16 +484,94 @@ def tg_send(token: str, chat_id: str, text: str, photo: Path | None = None, dry_
         return False
 
 
-def write_html(path: Path, hits: list[TwHit], universe: list[dict], period: str) -> Path:
+def _day_summary_html(hits: list[TwHit]) -> str:
+    buckets: dict[str, list[TwHit]] = {}
+    for hit in hits:
+        buckets.setdefault(hit_ts(hit).strftime("%m-%d"), []).append(hit)
+    if not buckets:
+        return ""
+    parts = []
+    extra = []
+    for day, group in buckets.items():
+        seen: list[str] = []
+        seen_codes: set[str] = set()
+        for hit in group:
+            code = str(hit.row["code"])
+            if code in seen_codes:
+                continue
+            seen_codes.add(code)
+            seen.append(f"{code} {hit.row.get('name') or ''}".strip())
+        parts.append(
+            "<div class='card'>"
+            f"{escape(day)}<b>{len(group)}</b>"
+            f"<span class='muted' style='font-size:11px'>{len(seen_codes)} 檔</span>"
+            "</div>"
+        )
+        extra.append(
+            f"<p class='muted' style='margin:6px 0 0'><b>{escape(day)}</b>　"
+            + "、".join(escape(n) for n in seen)
+            + "</p>"
+        )
+    return "<div class='cards'>" + "".join(parts) + "</div>" + "".join(extra)
+
+
+def _compact_hit_list_html(hits: list[TwHit]) -> str:
+    if not hits:
+        return ""
+    lines = []
+    last_day = ""
+    for hit in hits:
+        ts = hit_ts(hit)
+        day = ts.strftime("%m-%d")
+        if day != last_day:
+            lines.append(f"—— {day} ——")
+            last_day = day
+        sig = hit.signal
+        lines.append(
+            f"{ts.strftime('%H:%M')}  {hit.row['code']} {hit.row.get('name') or ''}  "
+            f"{sig.cross_price:.2f}  彈回 {bounce_pct(sig):.2f}%  站上 {stand_pct(sig):.2f}%"
+        )
+    return (
+        "<article class='trade-card'><header class='card-header'>"
+        "<div class='card-title'><span class='trade-no'>全部訊號</span></div></header>"
+        "<pre class='trade-detail'>" + escape("\n".join(lines)) + "</pre></article>"
+    )
+
+
+def write_html(
+    path: Path,
+    hits: list[TwHit],
+    universe: list[dict],
+    period: str,
+    chart_hits: list[TwHit] | None = None,
+) -> Path:
     cards: list[str] = []
     img_dir = path.parent / "img"
-    for i, hit in enumerate(hits, 1):
+    show_all_cards = chart_hits is None or chart_hits is hits
+    detail_hits = hits if show_all_cards else list(chart_hits or [])
+    if img_dir.exists() and not show_all_cards:
+        for old in img_dir.glob("t*.png"):
+            old.unlink()
+    chart_i = 0
+    for i, hit in enumerate(detail_hits, 1):
         sig = hit.signal
-        ts = hit.df.index[sig.cross_idx]
+        ts = hit_ts(hit)
         label = f"{hit.row['code']} {hit.row['name']}"
-        img_name = f"t{i:02d}_{hit.row['code']}_{ts.strftime('%m%d_%H%M')}.png"
+        chart_i += 1
+        img_name = f"t{chart_i:02d}_{hit.row['code']}_{ts.strftime('%m%d_%H%M')}.png"
         title = f"{label}  5分K W底上MA20  {ts.strftime('%m-%d %H:%M')}"
         draw_signal_png(hit.df, sig, img_dir / img_name, title)
+        img_html = (
+            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
+            "style='width:100%;display:block;border-radius:10px'/></div>"
+        )
+        tags = (
+            f"<div class='tags'><span class='tag tag-info'>{escape(hit.row['symbol'])}</span>"
+            "<span class='tag'>W底</span><span class='tag'>上MA20</span>"
+        )
+        if is_notable_hit(hit):
+            tags += "<span class='tag'>像樣</span>"
+        tags += "</div>"
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -465,16 +579,23 @@ def write_html(path: Path, hits: list[TwHit], universe: list[dict], period: str)
             f"<span class='trade-time'>{escape(ts.strftime('%Y-%m-%d %H:%M'))}</span></div>"
             f"<div class='card-pnl pnl-win'>{sig.cross_price:.2f}</div>"
             "</header>"
-            f"<div class='tags'><span class='tag tag-info'>{escape(hit.row['symbol'])}</span>"
-            "<span class='tag'>W底</span><span class='tag'>上MA20</span></div>"
-            "<pre class='trade-detail'>"
+            + tags
+            + "<pre class='trade-detail'>"
             f"收盤 {sig.cross_price:.2f}  MA20 {sig.ma20:.2f}\n"
             f"L1 {sig.first_low:.2f} / L2 {sig.second_low:.2f} / 頸線 {sig.neckline:.2f}\n"
             f"停損 {sig.stop_loss:.2f}  量度 {sig.target:.2f}"
+            f"　彈回 {bounce_pct(sig):.2f}%  站上 {stand_pct(sig):.2f}%"
             "</pre>"
-            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
-            "style='width:100%;display:block;border-radius:10px'/></div>"
-            "</article>"
+            + img_html
+            + "</article>"
+        )
+    if not show_all_cards:
+        cards.append(_compact_hit_list_html(hits))
+    note = ""
+    if not show_all_cards:
+        note = (
+            "<br/>圖卡只畫彈回 ≥1.2% 且站上 MA20 ≥0.25% 的（較像樣）；"
+            "全部筆數在頁面最下方清單。"
         )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
@@ -502,11 +623,13 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 5分K W底上 MA20</h1>
 <p class="muted">{escape(period)} · 掃描 {len(universe)} 檔
-<br/>規則：五分 K 做出 W 底（先大跌、兩個相近低點），收盤由下往上穿過五分 MA20 才通知。</p>
+<br/>規則：五分 K 做出 W 底（先大跌、兩個相近低點），收盤由下往上穿過五分 MA20 才通知。{note}</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">標的<b>{len({h.row['code'] for h in hits})}</b></div>
+<div class="card">像樣<b>{sum(1 for h in hits if is_notable_hit(h))}</b></div>
 </div>
+{_day_summary_html(hits)}
 </section>
 {''.join(cards) or "<div class='empty'>這段期間沒有 W 底上 MA20</div>"}
 </div></body></html>
@@ -612,33 +735,53 @@ def cmd_scan(args: argparse.Namespace) -> int:
         return 1
     hits = collect_hits(universe, args.range, args.sleep, live=False)
     hits = [h for h in hits if hit_under_max_price(h, args.max_price)]
+    days = int(getattr(args, "days", 0) or 0)
     if getattr(args, "today", False):
-        day = datetime.now(TPE).strftime("%m-%d")
-        hits = [h for h in hits if h.df.index[h.signal.cross_idx].strftime("%m-%d") == day]
+        hits = filter_hits_days(hits, 1)
+    elif days:
+        hits = filter_hits_days(hits, days)
     print(f"done hits={len(hits)}")
     for i, hit in enumerate(hits, 1):
-        ts = hit.df.index[hit.signal.cross_idx]
+        ts = hit_ts(hit)
         print(
             f"  [{i}] {hit.row['code']} {hit.row.get('name','')} "
             f"{ts.strftime('%m-%d %H:%M')} close={hit.signal.cross_price:.2f} "
             f"ma20={hit.signal.ma20:.2f} L1={hit.signal.first_low:.2f} L2={hit.signal.second_low:.2f}"
+            f" bounce={bounce_pct(hit.signal):.2f}% stand={stand_pct(hit.signal):.2f}%"
         )
     html_path = Path(args.html).resolve() if args.html else None
     if html_path is None and args.pages:
-        html_path = (
-            REPO / "docs" / "tw-w-ma20-today" / "index.html"
-            if getattr(args, "today", False)
-            else PAGES
-        )
+        if getattr(args, "today", False):
+            html_path = REPO / "docs" / "tw-w-ma20-today" / "index.html"
+        elif days >= 7:
+            html_path = REPO / "docs" / "tw-w-ma20-week" / "index.html"
+        else:
+            html_path = PAGES
     if html_path:
         period = args.range
         if args.max_price:
             period += f" · 股價<{args.max_price:g}"
         if getattr(args, "today", False):
             period = datetime.now(TPE).strftime("%Y-%m-%d") + " · " + period
-        out = write_html(html_path, hits, universe, period)
+        elif days:
+            start = (datetime.now(TPE).date() - timedelta(days=days - 1)).isoformat()
+            end = datetime.now(TPE).date().isoformat()
+            period = f"{start}～{end} · {period}"
+        notable = [h for h in hits if is_notable_hit(h)]
+        if len(hits) > 40:
+            if len(notable) > 50:
+                notable = sorted(
+                    notable,
+                    key=lambda h: (bounce_pct(h.signal), stand_pct(h.signal)),
+                    reverse=True,
+                )[:50]
+                notable.sort(key=lambda h: hit_ts(h))
+            chart_hits = notable
+        else:
+            chart_hits = hits
+        out = write_html(html_path, hits, universe, period, chart_hits=chart_hits)
         write_view_html(out)
-        print(f"html={out}")
+        print(f"html={out} charts={len(chart_hits)}")
     return 0
 
 
@@ -706,6 +849,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--pages", action="store_true")
     s.add_argument("--html", default="")
     s.add_argument("--today", action="store_true", help="只留今天的訊號")
+    s.add_argument("--days", type=int, default=0, help="只留最近 N 個日曆日，例如 7=一週")
     s.set_defaults(func=cmd_scan, range=None)
 
     a = sub.add_parser("alert", help="Telegram 輪詢")
@@ -726,6 +870,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
     p.add_argument("--today", action="store_true", help="只留今天的訊號")
+    p.add_argument("--days", type=int, default=0, help="只留最近 N 個日曆日，例如 7=一週")
     return p
 
 
