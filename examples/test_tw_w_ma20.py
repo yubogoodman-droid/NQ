@@ -86,7 +86,7 @@ def make_yageo_plateau() -> pd.DataFrame:
     # 第二腳平底 515
     close[37:44] = [518, 516, 516, 515, 515, 518, 516]
     # 11:20 起翻上
-    close[44:] = [517, 521, 523, 520, 524, 523, 524, 524, 527, 527, 527, 529, 530, 530] + [530] * (n - 58)
+    close[44:] = [517, 523, 524, 522, 525, 524, 525, 525, 527, 527, 527, 529, 530, 530] + [530] * (n - 58)
     close = close[:n]
     low = np.minimum(close, np.roll(close, 1)) - 0.2
     low[0] = close[0] - 0.2
@@ -302,6 +302,7 @@ def _fake_hit(code: str, name: str, when: str, *, bounce: float = 2.0, stand: fl
         index=idx,
     )
     loc = int(df.index.get_indexer([ts], method="nearest")[0])
+    df.iloc[max(0, loc - 20), df.columns.get_loc("High")] = 108.0
     base = 100.0
     cross = base * (1 + bounce / 100.0)
     ma20 = cross / (1 + stand / 100.0)
@@ -355,7 +356,7 @@ def test_strict_keeps_broker_examples() -> None:
 def test_strict_rejects_open_gap_and_weak_kiss() -> None:
     open_gap = _fake_hit("2408", "南亞科", "2026-08-25 09:00", bounce=2.0, stand=1.0)
     weak = _fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=0.4, stand=0.1)
-    huge = _fake_hit("8039", "台虹", "2026-08-25 10:00", bounce=8.0, stand=5.0)
+    huge = _fake_hit("8039", "台虹", "2026-08-25 10:00", bounce=3.2, stand=1.0)
     assert not is_strict_hit(open_gap)
     assert not is_strict_hit(weak)
     assert not is_strict_hit(huge)

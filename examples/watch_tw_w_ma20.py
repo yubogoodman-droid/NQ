@@ -308,13 +308,13 @@ def is_strict_hit(hit: TwHit) -> bool:
         prior_drop_pct(hit),
         skew_pct(sig),
     )
-    if not (1.10 <= bounce <= 3.50):
+    if not (1.10 <= bounce <= 2.50):
         return False
-    if stand < 0.30:
+    if stand < 0.45:
         return False
     if depth < 1.20:
         return False
-    if drop < 4.00:
+    if drop < 5.50:
         return False
     if skew > 1.50:
         return False
@@ -688,8 +688,8 @@ def write_html(
     if not show_all_cards:
         cards.append(_compact_hit_list_html(hits))
     note = (
-        "<br/>嚴格：同一天做出 W、09:15 後、先跌 ≥4%、頸線深度 ≥1.2%、"
-        "兩低點價差 ≤1.5%、從低點彈回 1.1%～3.5%、收盤站上 MA20 ≥0.3%。"
+        "<br/>嚴格：同一天做出 W、09:15 後、先跌 ≥5.5%、頸線深度 ≥1.2%、"
+        "兩低點價差 ≤1.5%、從低點彈回 1.1%～2.5%、收盤站上 MA20 ≥0.45%。"
         "對齊國巨 515/515→521、南亞科 480/481→487。"
     )
     html = f"""<!DOCTYPE html>

@@ -8,10 +8,10 @@ maxBars       = input.int(48, "兩低點最多間隔", minval=10)
 lowBelowPct   = input.float(1.5, "第二低最多低於第一低 (%)", minval=0.2, step=0.1) / 100
 lowAbovePct   = input.float(1.5, "第二低最多高於第一低 (%)", minval=0.2, step=0.1) / 100
 minNeckPct    = input.float(1.2, "頸線相對低點最小高度 (%)", minval=0.2, step=0.1) / 100
-minDropPct    = input.float(4.0, "進場前最小跌幅 (%)", minval=0.5, step=0.1) / 100
+minDropPct    = input.float(5.5, "進場前最小跌幅 (%)", minval=0.5, step=0.1) / 100
 minBouncePct  = input.float(1.1, "從低點最小彈回 (%)", minval=0.3, step=0.1) / 100
-maxBouncePct  = input.float(3.5, "從低點最大彈回 (%)", minval=1.0, step=0.1) / 100
-minStandPct   = input.float(0.3, "收盤站上 MA20 (%)", minval=0.1, step=0.05) / 100
+maxBouncePct  = input.float(2.5, "從低點最大彈回 (%)", minval=1.0, step=0.1) / 100
+minStandPct   = input.float(0.45, "收盤站上 MA20 (%)", minval=0.1, step=0.05) / 100
 priorBars     = input.int(36, "回看出發高點 K 數", minval=8)
 maxCrossBars  = input.int(36, "第二低後幾根內上穿", minval=4)
 maLen         = input.int(20, "MA 週期", minval=5)
