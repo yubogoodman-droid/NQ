@@ -337,9 +337,9 @@ def test_write_view_html_uses_pages_urls() -> None:
     src.write_text("<img src='img/ma1m-bull/SNDK_0824_0642.png' alt='SNDKUSDT'/>", encoding="utf-8")
     out = mod.write_view_html(src)
     text = out.read_text(encoding="utf-8")
-    assert "https://raw.githubusercontent.com/yubogoodman-droid/NQ/gh-pages/binance/img/ma1m-bull/SNDK_0824_0642.png" in text
+    assert "https://yubogoodman-droid.github.io/NQ/binance/img/ma1m-bull/SNDK_0824_0642.png" in text
     assert "src='img/" not in text
-    assert "raw.githubusercontent.com/yubogoodman-droid/NQ/gh-pages/binance/img/ma1m-bull/" in mod.img_src(
+    assert "yubogoodman-droid.github.io/NQ/binance/img/ma1m-bull/" in mod.img_src(
         "img/ma1m-bull/SNDK_0825_0156.png"
     )
 

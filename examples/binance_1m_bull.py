@@ -43,8 +43,8 @@ REPO = Path(__file__).resolve().parents[1]
 SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
-PAGES_IMG = "https://raw.githubusercontent.com/yubogoodman-droid/NQ/gh-pages/binance/"
-IMG_VER = "kiss0155"
+PAGES_IMG = "https://yubogoodman-droid.github.io/NQ/binance/"
+IMG_VER = "kiss0156"
 CIRCLE = "#F6465D"
 # 幣安 App 淺色盤：黃/橘/紫/藍/青 + 深灰 MA200
 PAL = {7: "#F0B90B", 14: "#FF6D00", 25: "#D500F9", 99: "#2962FF", 120: "#00B8D4", 200: "#474D57"}
@@ -406,16 +406,18 @@ def _card_img(sym: str, d: dict | None, row: SignalRow, img_dir: Path, title_not
     d5 = add_mas(resample_ohlcv(d, FIVE_MIN_MS))
     out5 = draw_chart(sym, d5, row, img_dir / img_5m, title_note=title_note, tf="5m") if len(d5["c"]) >= 8 else None
     blocks = [
-        "<div class='tf-block'><div class='tf-lab'>1 分 K · 紅圈＝下一根開盤進場</div>"
+        "<div class='tf-row'>",
+        "<div class='tf-block'><div class='tf-lab tf-1m'>1 分 K · 紅圈＝進場</div>"
         f"<div class='mini-chart'><img src='{escape(img_src('img/ma1m-bull/' + img_1m))}' "
-        f"alt='{escape(sym)} 1m'/></div></div>"
+        f"alt='{escape(sym)} 1m'/></div></div>",
     ]
     if out5 is not None:
         blocks.append(
-            "<div class='tf-block'><div class='tf-lab'>5 分 K 對照（同一時間）</div>"
+            "<div class='tf-block'><div class='tf-lab tf-5m'>5 分 K 對照</div>"
             f"<div class='mini-chart'><img src='{escape(img_src('img/ma1m-bull/' + img_5m))}' "
             f"alt='{escape(sym)} 5m'/></div></div>"
         )
+    blocks.append("</div>")
     return "".join(blocks)
 
 
@@ -538,8 +540,11 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#707a8a;font-size:13px;line-he
 .tags{{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}}
 .tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #eaecef;color:#474d57;background:#fafafa}}
 .trade-detail{{background:#fafafa;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap;color:#474d57}}
-.tf-block{{margin-top:10px}}
-.tf-lab{{font-size:12px;color:#707a8a;margin:0 0 6px}}
+.tf-row{{display:flex;flex-direction:column;gap:12px;margin-top:10px}}
+@media (min-width:720px){{.tf-row{{flex-direction:row;align-items:flex-start}}.tf-row .tf-block{{flex:1;min-width:0}}}}
+.tf-lab{{font-size:14px;font-weight:700;color:#1e2329;margin:0 0 8px;padding:6px 10px;border-radius:8px}}
+.tf-1m{{background:#fff8e1;border:1px solid #f0b90b}}
+.tf-5m{{background:#e3f2fd;border:1px solid #2962ff}}
 .mini-chart img{{width:100%;display:block;border-radius:8px;border:1px solid #eaecef}}
 .empty{{text-align:center;color:#707a8a;padding:40px 12px;border:1px solid #eaecef;border-radius:14px;background:#fff}}
 table{{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}}
