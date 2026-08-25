@@ -2,8 +2,7 @@
 
 截圖紅圈那種：短均先黏成帶，收盤穿過 MA200，99/120 還在帶的下沿。
 均線都用一分 K 收盤 SMA。不要求 120 已高於 200。
-    預設再看 5 分 K（不偷看未走完的分鐘）：MA7>MA14、MA7 向上、收盤站上 MA7。
-    不要求 5 分已經站上 MA200，也不強求 5 分 7>14>25（那組會濾掉不少贏家）。
+預設再看 5 分 K（不偷看未走完的分鐘）：MA7>MA14、MA7 向上、收盤站上 5m MA7，且收盤站上 5m MA200。
 """
 
 from __future__ import annotations
@@ -14,6 +13,8 @@ import numpy as np
 
 HORIZONS = (5, 15, 30, 60, 240)  # 1m 根數 → 5m / 15m / 30m / 1h / 4h
 FIVE_MIN_MS = 5 * 60_000
+# 5m MA200 需要 200 根 5 分 ≈ 1000 根 1 分；多留一點給斜率。
+FIVE_M_MA200_1M_BARS = 200 * 5 + 40
 
 
 def sma(arr: np.ndarray, n: int) -> np.ndarray:
@@ -73,11 +74,13 @@ def five_m_last_ok(
     slope_bars: int = 3,
     require_short_stack: bool = True,
     require_close_above_ma7: bool = True,
+    require_close_above_ma200: bool = True,
 ) -> bool:
-    """5 分 K 確認：MA7>MA14、MA7 向上、收盤站上 MA7。不要求站上 MA200，也不強求 25。"""
+    """5 分 K 確認：MA7>MA14、MA7 向上、收盤站上 MA7，且收盤站上 MA200。"""
     c = np.asarray(closes, dtype=float)
     j = int(c.size) - 1
-    if j < 13:
+    need = 199 if require_close_above_ma200 else 13
+    if j < need:
         return False
     last = float(c[j])
     m7 = float(c[j - 6 : j + 1].mean())
@@ -86,6 +89,10 @@ def five_m_last_ok(
         return False
     if require_close_above_ma7 and not (last > m7):
         return False
+    if require_close_above_ma200:
+        m200 = float(c[j - 199 : j + 1].mean())
+        if not (last > m200):
+            return False
     prev_j = j - max(1, int(slope_bars))
     if prev_j < 6:
         return False
@@ -100,6 +107,7 @@ def five_m_ok(
     slope_bars: int = 3,
     require_short_stack: bool = True,
     require_close_above_ma7: bool = True,
+    require_close_above_ma200: bool = True,
 ) -> bool:
     """用「當下這根 1m 為止」的 5 分 K（含未走完那根），不偷看後面的分鐘。"""
     d5 = resample_ohlcv_upto(d, i)
@@ -110,6 +118,7 @@ def five_m_ok(
         slope_bars=slope_bars,
         require_short_stack=require_short_stack,
         require_close_above_ma7=require_close_above_ma7,
+        require_close_above_ma200=require_close_above_ma200,
     )
 
 
@@ -120,6 +129,7 @@ def five_m_ok_mask(
     slope_bars: int = 3,
     require_short_stack: bool = True,
     require_close_above_ma7: bool = True,
+    require_close_above_ma200: bool = True,
 ) -> np.ndarray:
     """每個 1m 指數對應的 5 分確認（形成中的 5m 只用到該分鐘）。"""
     c = np.asarray(d["c"], dtype=float)
@@ -133,6 +143,7 @@ def five_m_ok_mask(
         slope_bars=slope_bars,
         require_short_stack=require_short_stack,
         require_close_above_ma7=require_close_above_ma7,
+        require_close_above_ma200=require_close_above_ma200,
     )
     for i in range(last):
         b = int(t[i] - (t[i] % FIVE_MIN_MS))
@@ -397,9 +408,8 @@ def detect_combo(
     """短均先黏帶，長期在 MA200 下，放量上站後再連收至少 min_above 根站穩。
 
     排列：收盤 > MA200 > 7 > 14 > 25 > 99 > 120。
-    預設再加 5 分 K 確認（不偷看未走完的分鐘）：MA7>MA14、MA7 向上、收盤站上 5m MA7。
-    不要求 5 分收盤已站上 5m MA200（截圖 SNDK 當時還在下面）。
-    5 分只用來過濾「1 分剛成立」的那根，不會等到後面才追進。
+    預設再加 5 分 K 確認（不偷看未走完的分鐘）：MA7>MA14、MA7 向上、收盤站上 5m MA7，
+    且收盤站上 5m MA200。5 分只用來過濾「1 分剛成立」的那根，不會等到後面才追進。
     """
     c, m200 = d["c"], d["m200"]
     kw = dict(

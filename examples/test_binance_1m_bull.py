@@ -328,7 +328,7 @@ def test_resample_5m_and_bar_at() -> None:
 
 
 def test_five_m_ok_rising_not_falling() -> None:
-    n = 200
+    n = 1100  # 夠算 5m MA200
     t0 = 1_700_000_100_000
     t = np.arange(n, dtype=np.int64) * 60_000 + t0
     up = 100.0 + np.arange(n) * 0.05
@@ -340,7 +340,7 @@ def test_five_m_ok_rising_not_falling() -> None:
 
 
 def test_five_m_allows_ma25_still_above_ma14() -> None:
-    """剛翻上來時 5m 常見 7>14 但 25 還沒掉下來，這組仍算確認。"""
+    """剛翻上來時 5m 常見 7>14 但 25 還沒掉下來，這組仍算短均確認（不含 MA200）。"""
     n = 280
     t0 = 1_700_000_100_000
     t = np.arange(n, dtype=np.int64) * 60_000 + t0
@@ -364,14 +364,14 @@ def test_five_m_allows_ma25_still_above_ma14() -> None:
     j = len(d5["c"]) - 1
     assert d5["m7"][j] > d5["m14"][j]
     assert not (d5["m7"][j] > d5["m14"][j] > d5["m25"][j])
-    assert five_m_ok(d, n - 1)
+    assert five_m_ok(d, n - 1, require_close_above_ma200=False)
 
 
 def test_five_m_mask_matches_snapshot() -> None:
     d = add_mas(_make_stack_bars())
-    mask = five_m_ok_mask(d)
+    mask = five_m_ok_mask(d, require_close_above_ma200=False)
     for i in (80, 160, 240, 300, 350):
-        assert bool(mask[i]) == five_m_ok(d, i)
+        assert bool(mask[i]) == five_m_ok(d, i, require_close_above_ma200=False)
 
 
 def test_use_5m_is_subset_and_can_wait() -> None:
@@ -382,33 +382,50 @@ def test_use_5m_is_subset_and_can_wait() -> None:
     assert {s.idx for s in five} <= {s.idx for s in one}
 
 
-def test_five_m_does_not_require_ma200() -> None:
-    """5 分收盤可以還在 MA200 下，只要短均向上、收盤站上 MA7。"""
+def test_five_m_requires_close_above_ma200() -> None:
+    """5 分收盤還在 MA200 下不進；長升後站上 5m MA200 才過。"""
     t0 = 1_700_000_100_000
     high = np.full(800, 150.0)
     dump = 150.0 - np.arange(1, 81) * 0.10  # → 142
-    bounce = dump[-1] + np.arange(1, 201) * 0.03  # 40 根 5m 往上
-    close = np.concatenate([high, dump, bounce])
-    n = len(close)
+    bounce = dump[-1] + np.arange(1, 201) * 0.03
+    below = np.concatenate([high, dump, bounce])
+    n = len(below)
     t = np.arange(n, dtype=np.int64) * 60_000 + t0
-    d = add_mas(
+    d_below = add_mas(
         {
             "t": t,
-            "o": np.r_[close[0], close[:-1]],
-            "h": close + 0.03,
-            "l": close - 0.03,
-            "c": close,
+            "o": np.r_[below[0], below[:-1]],
+            "h": below + 0.03,
+            "l": below - 0.03,
+            "c": below,
             "v": np.ones(n),
         }
     )
     i = n - 1
-    assert five_m_ok(d, i)
-    d5 = add_mas(resample_ohlcv_upto(d, i))
+    d5 = add_mas(resample_ohlcv_upto(d_below, i))
     j = len(d5["c"]) - 1
-    assert d5["c"][j] > d5["m7"][j]
-    assert d5["m7"][j] > d5["m14"][j]
     assert not np.isnan(d5["m200"][j])
     assert d5["c"][j] < d5["m200"][j]
+    assert five_m_ok(d_below, i, require_close_above_ma200=False)
+    assert not five_m_ok(d_below, i)
+
+    n_up = 1100
+    up = 100.0 + np.arange(n_up) * 0.02
+    t_up = np.arange(n_up, dtype=np.int64) * 60_000 + t0
+    d_up = add_mas(
+        {
+            "t": t_up,
+            "o": np.r_[up[0], up[:-1]],
+            "h": up + 0.02,
+            "l": up - 0.02,
+            "c": up,
+            "v": np.ones(n_up),
+        }
+    )
+    d5u = add_mas(resample_ohlcv_upto(d_up, n_up - 1))
+    ju = len(d5u["c"]) - 1
+    assert d5u["c"][ju] > d5u["m200"][ju]
+    assert five_m_ok(d_up, n_up - 1)
 
 
 def test_entry_mark_is_next_1m_open() -> None:
@@ -470,7 +487,7 @@ def main() -> int:
     test_five_m_allows_ma25_still_above_ma14()
     test_five_m_mask_matches_snapshot()
     test_use_5m_is_subset_and_can_wait()
-    test_five_m_does_not_require_ma200()
+    test_five_m_requires_close_above_ma200()
     test_entry_mark_is_next_1m_open()
     test_write_view_html_uses_pages_urls()
     print("ok")

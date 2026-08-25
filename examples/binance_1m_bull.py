@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nq.binance import SESSION, fetch_klines, universe
 from nq.ma1m_bull import (
     FIVE_MIN_MS,
+    FIVE_M_MA200_1M_BARS,
     HORIZONS,
     SignalRow,
     add_mas,
@@ -45,7 +46,7 @@ SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
 PAGES_IMG = "https://yubogoodman-droid.github.io/NQ/binance/"
-IMG_VER = "kiss0158"
+IMG_VER = "kiss0159"
 CIRCLE = "#F6465D"
 # 幣安 App 淺色盤：黃/橘/紫/藍/青 + 深灰 MA200
 PAL = {7: "#F0B90B", 14: "#FF6D00", 25: "#D500F9", 99: "#2962FF", 120: "#00B8D4", 200: "#474D57"}
@@ -126,7 +127,7 @@ def window_label(date: str, days: int = 1) -> str:
 
 
 def kline_fetch_days(window_days: int) -> int:
-    """回測窗再多抓 1 天，加上 extra_bars 才夠算 MA200。"""
+    """回測窗再多抓 1 天，加上 extra_bars 才夠算 1m / 5m MA200。"""
     return max(int(window_days), 1) + 1
 
 
@@ -346,7 +347,7 @@ def scan_symbol(
     rank, sym, qv, kind = item
     lo, hi = day_window_ms(date, days)
     try:
-        raw = fetch_klines(sym, interval="1m", days=kline_fetch_days(days), extra_bars=260)
+        raw = fetch_klines(sym, interval="1m", days=kline_fetch_days(days), extra_bars=FIVE_M_MA200_1M_BARS)
     except Exception as exc:  # noqa: BLE001
         return sym, None, [], str(exc)[:80]
     if raw is None or len(raw["c"]) < 220:
@@ -382,7 +383,7 @@ def format_alert(row: SignalRow) -> str:
         f"<b>1m 多頭排列上站 1m MA200</b>\n"
         f"<b>{row.symbol}</b>  一分K  {hm(row.time_ms)}\n"
         f"{kind} · {below}\n"
-        f"5m 確認 7&gt;14 · MA7↑ · 收&gt;7（不要求 5m MA200）\n"
+        f"5m 確認 收&gt;5m MA200 · 7&gt;14 · MA7↑ · 收&gt;7\n"
         f"現價 {row.sig.close:g}　進 {row.entry:g}\n"
         f"1m MA200 {row.sig.ma200:g} &gt; 7 {row.sig.m7:g} &gt; 14 {row.sig.m14:g} "
         f"&gt; 25 {row.sig.m25:g} &gt; 99 {row.sig.m99:g} &gt; 120 {row.sig.m120:g}\n"
@@ -469,7 +470,7 @@ def write_html(
             else f"{LABELS[h]} —"
             for h in (5, 15, 30, 60)
         )
-        five_tag = "<span class='tag'>5m 7&gt;14 ↑ 收&gt;7</span>" if use_5m else ""
+        five_tag = "<span class='tag'>5m 收&gt;200</span>" if use_5m else ""
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -523,8 +524,7 @@ def write_html(
         extra = f"<p class='muted'>圖表只畫前 {len(gallery)} 筆，表格含全部 {len(rows)} 筆。</p>"
     names_txt = "、".join(names[:12]) + ("…" if len(names) > 12 else "")
     five_rule = (
-        "再加 <strong>5 分 K 確認</strong>（不偷看未走完的分鐘）：MA7&gt;MA14、MA7 向上、收盤站上 5m MA7。"
-        "不要求 5 分已站上 MA200，也不強求 5 分 7&gt;14&gt;25。"
+        "再加 <strong>5 分 K 確認</strong>（不偷看未走完的分鐘）：收盤站上 5m MA200，且 MA7&gt;MA14、MA7 向上、收盤站上 5m MA7。"
         if use_5m
         else "本次未開 5 分 K 確認。"
     )
@@ -726,8 +726,8 @@ def scan_live(
     cross_only: bool = True,
     ribbon_kw: dict | None = None,
 ) -> list[SignalRow]:
-    raw = fetch_klines(sym, interval="1m", limit=260)
-    if raw is None or len(raw["c"]) < 220:
+    raw = fetch_klines(sym, interval="1m", limit=FIVE_M_MA200_1M_BARS)
+    if raw is None or len(raw["c"]) < FIVE_M_MA200_1M_BARS - 40:
         return []
     d = add_mas(raw)
     n = len(d["c"])
@@ -788,7 +788,7 @@ def run_alert(args: argparse.Namespace) -> int:
     rkw = ribbon_kwargs(args)
     print(
         f"監看 {label} {len(uni)} 個。黏帶後放量上站，連收至少 {rkw['min_above']} 根站穩 1m MA200"
-        f"{'，再加 5 分 K 確認' if rkw['use_5m'] else ''}才推。",
+        f"{'，再加 5 分站上 MA200 才推' if rkw['use_5m'] else '才推'}。",
         flush=True,
     )
     uni_ts = time.time()
