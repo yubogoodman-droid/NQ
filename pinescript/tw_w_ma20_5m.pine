@@ -61,7 +61,8 @@ if not na(pl) and not na(firstLow) and (bar_index - swingLen) > firstLowBar
     rel = (pl - firstLow) / firstLow
     dropOk = (priorHigh - firstLow) / firstLow >= minDropPct
     neckOk = not na(neckline) and (neckline - (firstLow + pl) / 2) / ((firstLow + pl) / 2) >= minNeckPct
-    if gap >= minBars and gap <= maxBars and rel >= -lowBelowPct and rel <= lowAbovePct and dropOk and neckOk
+    neckSpacingOk = not na(necklineBar) and necklineBar >= firstLowBar + 2 and (bar_index - swingLen) >= necklineBar + 3
+    if gap >= minBars and gap <= maxBars and rel >= -lowBelowPct and rel <= lowAbovePct and dropOk and neckOk and neckSpacingOk
         secondLow := pl
         secondLowBar := bar_index - swingLen
         secondLowTime := time[swingLen]

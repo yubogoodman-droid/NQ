@@ -127,6 +127,35 @@ def make_nanya_like() -> pd.DataFrame:
     return _ohlc(close, low=low, high=high)
 
 
+def make_range_after_dump() -> pd.DataFrame:
+    """旺宏 8/25：殺到 117.5 後立刻碰到箱頂，接著多次測同一層，不是 W。"""
+    n = 90
+    close = np.full(n, 126.0)
+    close[:12] = 126.0
+    close[12:18] = [124.0, 122.0, 120.5, 119.5, 118.5, 118.2]
+    # 第一低之後馬上碰到箱頂 119.5，接著橫盤
+    rest = []
+    box = [119.0, 118.5, 118.0, 118.6, 119.2, 118.4, 118.0, 119.0, 118.2, 118.8]
+    while len(rest) < n - 18:
+        rest.extend(box)
+    close[18:] = rest[: n - 18]
+    close[-6:] = [119.5, 120.0, 120.8, 121.5, 122.0, 122.5]
+    low = np.minimum(close, np.roll(close, 1)) - 0.15
+    low[0] = close[0] - 0.15
+    low[17] = 117.5
+    close[17] = 118.5
+    # 同一層被反覆測
+    for i in (25, 33, 41, 49, 57):
+        low[i] = 117.5
+        close[i] = 117.8
+    high = np.maximum(close, np.roll(close, 1)) + 0.2
+    high[0] = close[0] + 0.2
+    high[12] = 128.0
+    high[18] = 119.5
+    high[19] = 119.5
+    return _ohlc(close, low=low, high=high)
+
+
 def make_no_w_ma20_cross() -> pd.DataFrame:
     """只有單腳回升上穿 MA20，沒有 W。"""
     n = 80
@@ -189,6 +218,10 @@ def test_nanya_like_higher_second_low() -> None:
 
 def test_no_w_no_alert() -> None:
     assert detect_w_ma20_crosses(make_no_w_ma20_cross()) == []
+
+
+def test_range_after_dump_is_not_a_w() -> None:
+    assert detect_w_ma20_crosses(make_range_after_dump()) == [], "橫盤箱型不該算 W 底"
 
 
 def test_w_without_ma20_no_alert() -> None:
@@ -388,6 +421,7 @@ def main() -> int:
     test_yageo_plateau_second_bottom()
     test_nanya_like_higher_second_low()
     test_no_w_no_alert()
+    test_range_after_dump_is_not_a_w()
     test_w_without_ma20_no_alert()
     test_falling_ma_onto_flat_close_is_not_a_cross()
     test_accepts_lowercase_columns()
