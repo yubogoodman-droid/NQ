@@ -61,6 +61,7 @@ SEEN_PATH = REPO / "output" / "tw_5m_bounce_seen.json"
 STATE_PATH = Path(__file__).resolve().parent / "tw_5m_bounce_state.json"
 
 # 截圖同款均線色：5 藍、10 綠、20 橘、60 青、120 紫、240 粉
+MA_PERIODS = (5, 10, 20, 60, 120, 240)
 MA_COLORS = {
     5: "#3b82f6",
     10: "#22c55e",
@@ -174,6 +175,18 @@ def _finite(*vals: float) -> bool:
     return all(v is not None and not np.isnan(v) for v in vals)
 
 
+def trough_clear_of_mas(low_px: float, *ma_vals: float) -> bool:
+    """破底那根的下方不能有任何均線。還沒算出來的長均（NaN）不算。"""
+    if low_px <= 0:
+        return False
+    for v in ma_vals:
+        if v is None or (isinstance(v, (float, np.floating)) and np.isnan(v)):
+            continue
+        if float(v) < low_px:
+            return False
+    return True
+
+
 def ma_flip_count(fast: np.ndarray, slow: np.ndarray, i: int, lookback: int) -> int:
     """近 lookback 根裡 fast/slow 上下穿越的次數（糾結帶會很高）。"""
     flips = 0
@@ -257,6 +270,9 @@ def detect_signals(
     ma5 = sma(close, 5)
     ma10 = sma(close, 10)
     ma20 = sma(close, 20)
+    ma60 = sma(close, 60)
+    ma120 = sma(close, 120)
+    ma240 = sma(close, 240)
     n = len(close)
     warmup = max(lookback, 20)
     dates = np.array([ts.date() for ts in df.index])
@@ -330,6 +346,16 @@ def detect_signals(
         if not ready or was_ready:
             continue
         if trough_low <= 0:
+            continue
+        if not trough_clear_of_mas(
+            trough_low,
+            ma5[trough_idx],
+            ma10[trough_idx],
+            ma20[trough_idx],
+            ma60[trough_idx],
+            ma120[trough_idx],
+            ma240[trough_idx],
+        ):
             continue
         bounce = (float(close[i]) - trough_low) / trough_low
         if bounce < min_bounce_pct:
@@ -594,7 +620,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 5分K 破底反彈</h1>
 <p class="muted">{escape(period)} · {len(universe)} 檔
-<br/>急殺破近 4 小時低點或今日低點（跌幅 ≥ 2%）後，24 根內 5MA &gt; 10MA &gt; 20MA 要明顯分開、往上張開才算；糾結黏帶不算。</p>
+<br/>急殺破近 4 小時低點或今日低點（跌幅 ≥ 2%），且破底那根下方不能有任何均線。24 根內 5MA &gt; 10MA &gt; 20MA 要明顯分開、往上張開才算；糾結黏帶不算。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

@@ -10,6 +10,7 @@ minGap5_10  = input.float(0.15, "MA5-MA10 最小間隔 %", minval=0.0, step=0.02
 minGap10_20 = input.float(0.12, "MA10-MA20 最小間隔 %", minval=0.0, step=0.025)
 minGap5_20  = input.float(0.30, "MA5-MA20 最小間隔 %", minval=0.0, step=0.025)
 requirePretty = input.bool(true, "擋掉糾結黏帶")
+clearTrough   = input.bool(true, "破底那根下方不能有均線")
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -51,7 +52,10 @@ if not na(troughBar) and bar_index - troughBar > reboundBars
 
 bouncePct = not na(trough) and trough > 0 ? (close - trough) / trough * 100 : 0
 skipOpen = hour(time, "Asia/Taipei") == 9 and minute(time, "Asia/Taipei") < 30
-sig = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen
+maClear(src) =>
+    na(troughBar) or na(src[bar_index - troughBar]) or src[bar_index - troughBar] > trough
+troughClear = not clearTrough or (maClear(ma5) and maClear(ma10) and maClear(ma20) and maClear(ma60) and maClear(ma120) and maClear(ma240))
+sig = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear
 
 if sig
     trough := na

@@ -27,6 +27,7 @@ from watch_tw_5m_bounce import (  # noqa: E402
     sma,
     stack_pretty,
     summarize_trades,
+    trough_clear_of_mas,
     write_html_report,
 )
 
@@ -192,6 +193,37 @@ def test_stack_pretty_rejects_glued_mas() -> None:
     assert stack_pretty(ma5b, ma10b, ma20b, closeb, n - 1)
 
 
+def test_trough_clear_of_mas() -> None:
+    assert trough_clear_of_mas(259.0, 260.8, 261.0, 261.5, 267.6, 268.0, 266.0)
+    assert trough_clear_of_mas(259.0, 260.8, np.nan, np.nan)  # 長均還沒畫不算
+    assert not trough_clear_of_mas(95.5, 96.5, 97.4, 98.3, 98.2, 95.2, 91.2)
+    df = make_v_bounce_bars()
+    assert detect_signals(df)
+
+
+def make_bounce_resting_on_long_ma(n: int = 280) -> pd.DataFrame:
+    """急殺仍停在長均上方，破底那根底下還墊著 60/120/240。"""
+    close = 90.0 + np.linspace(0, 30, n)
+    dump_i = n - 20
+    close[dump_i] = close[dump_i - 1] * 0.97
+    close[dump_i + 1 : dump_i + 8] = np.linspace(close[dump_i] + 1.2, close[dump_i - 1] + 0.8, 7)
+    for i in range(dump_i + 8, n):
+        close[i] = close[i - 1] + 0.15
+    return _ohlc(close, dump_i, float(close[dump_i]) - 0.4)
+
+
+def test_dump_with_ma_underneath_skipped() -> None:
+    n = 280
+    df = make_bounce_resting_on_long_ma(n)
+    close = df["Close"].to_numpy(float)
+    low = df["Low"].to_numpy(float)
+    dump_i = n - 20
+    vals = [float(sma(close, p)[dump_i]) for p in (5, 10, 20, 60, 120, 240)]
+    assert vals[-1] == vals[-1]  # not NaN
+    assert vals[-1] < float(low[dump_i])
+    assert not trough_clear_of_mas(float(low[dump_i]), *vals)
+
+
 def test_drop_incomplete_5m() -> None:
     idx = pd.DatetimeIndex(
         [
@@ -276,6 +308,8 @@ def main() -> int:
     test_flat_market_has_no_signal()
     test_tangled_ribbon_skipped()
     test_stack_pretty_rejects_glued_mas()
+    test_trough_clear_of_mas()
+    test_dump_with_ma_underneath_skipped()
     test_drop_incomplete_5m()
     test_shallow_dip_ignored()
     test_simulate_and_summarize()
