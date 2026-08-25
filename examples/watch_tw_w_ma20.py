@@ -212,7 +212,7 @@ def hit_under_max_price(hit: TwHit, max_price: float | None) -> bool:
         return True
     last = float(hit.df["Close"].iloc[-1])
     listed = hit.row.get("close")
-    px = max(last, float(listed) if listed is not None else last)
+    px = max(last, float(listed) if listed is not None else last, float(hit.signal.cross_price))
     return px < max_price
 
 
