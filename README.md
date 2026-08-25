@@ -68,6 +68,9 @@ python3 examples/watch_tw_w_ma20.py scan --limit 100 --pages
 
 2026-08-25 實盤對過兩張圖：國巨 11:25 收盤 521 上穿 MA20（雙底 515），南亞科 11:30 收盤 487 上穿（L1 480 / L2 481）。
 
+當日成交額前 100 還有其他訊號；較像樣的圖卡：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-w-ma20-alert-a91a/docs/tw-w-ma20-today/view.html
+
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-w-ma20-alert-a91a/docs/tw-w-ma20/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
