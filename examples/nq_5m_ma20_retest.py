@@ -764,7 +764,6 @@ def cmd_backtest(args) -> int:
             f"收復 {df.index[t.signal.reclaim_idx].strftime('%H:%M')}"
         )
 
-    extra_trades: List[TradeResult] = []
     html_path = args.html
     if args.pages:
         html_path = html_path or str(PAGES_HTML[interval])
