@@ -300,6 +300,154 @@
       width: 100%;
       animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
       box-shadow: 0 16px 40px rgba(255, 122, 24, 0.2);
+      max-height: min(90vh, 720px);
+      overflow-y: auto;
+    }
+
+    .result-card.spell-mode {
+      max-width: 400px;
+      padding: 1.35rem 1.15rem 1.5rem;
+    }
+
+    /* Chinese Greed Island card face */
+    .gi-face {
+      display: none;
+      margin: 0.35rem auto 0.75rem;
+      width: min(280px, 82vw);
+      aspect-ratio: 280 / 400;
+      border-radius: 6px;
+      padding: 7px;
+      background: linear-gradient(160deg, #1a1a1a 0%, #0a0a0a 40%, #1c2433 100%);
+      box-shadow: 0 10px 28px rgba(43, 33, 24, 0.18);
+      animation: bounce 0.6s ease;
+      text-align: left;
+    }
+
+    .gi-face.show { display: block; }
+
+    .gi-inner {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: #0b1220;
+      border: 2px solid #2a3f63;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .gi-head {
+      display: grid;
+      grid-template-columns: 48px 1fr 54px;
+      align-items: center;
+      gap: 0.2rem;
+      padding: 0.4rem 0.45rem;
+      background: linear-gradient(180deg, #f7f4ea 0%, #ebe4d2 100%);
+      color: #1a1a1a;
+      border-bottom: 2px solid #2a3f63;
+      min-height: 2.9rem;
+    }
+
+    .gi-no { font-family: Orbitron, sans-serif; font-size: 0.72rem; font-weight: 700; }
+    .gi-title { text-align: center; font-size: 1.2rem; font-weight: 900; line-height: 1.15; letter-spacing: 0.05em; }
+    .gi-title small { display: block; font-size: 0.58rem; font-weight: 500; color: #666; margin-bottom: 0.05rem; }
+    .gi-rank { text-align: right; font-family: Orbitron, sans-serif; font-size: 0.72rem; font-weight: 700; }
+
+    .gi-art {
+      position: relative;
+      flex: 1.05;
+      min-height: 0;
+      background: #000;
+      overflow: hidden;
+      border-bottom: 2px solid #2a3f63;
+    }
+
+    .gi-art img {
+      width: 100%;
+      height: 155%;
+      object-fit: cover;
+      object-position: center 40%;
+      display: block;
+      transform: translateY(-8%);
+    }
+
+    .gi-text {
+      flex: 0.95;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(120,180,255,0.18), transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(80,140,220,0.16), transparent 45%),
+        #dce8f7;
+      padding: 0.45rem;
+    }
+
+    .gi-desc-box {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #9bb4d4;
+      border-radius: 3px;
+      padding: 0.4rem 0.45rem;
+      overflow: auto;
+    }
+
+    .gi-desc {
+      color: #1c2433;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      font-weight: 500;
+      white-space: pre-wrap;
+    }
+
+    .gi-icons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.28rem;
+      margin-top: 0.3rem;
+    }
+
+    .gi-icon {
+      width: 1.45rem;
+      height: 1.45rem;
+      border-radius: 50%;
+      border: 1.5px solid #2a3f63;
+      background: #fff;
+      color: #1a2436;
+      font-size: 0.68rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gi-icon.range { background: #e8f4ff; }
+
+    .spell-scan-note {
+      display: none;
+      margin: 0.15rem auto 0.85rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: left;
+      max-width: min(280px, 82vw);
+      border: 1px solid rgba(255, 159, 67, 0.3);
+      border-radius: 10px;
+      padding: 0.45rem 0.65rem;
+      background: #fffaf2;
+    }
+
+    .spell-scan-note.show { display: block; }
+
+    .spell-scan-note summary {
+      cursor: pointer;
+      font-weight: 500;
+      list-style: none;
+    }
+
+    .spell-scan-note summary::-webkit-details-marker { display: none; }
+
+    .spell-scan-note .result-card-img {
+      width: 100%;
+      margin: 0.55rem auto 0.15rem;
     }
 
     @keyframes popIn {
@@ -316,8 +464,9 @@
       50% { transform: scale(1.2); }
     }
 
-    .result-label { color: var(--muted); font-size: 0.9rem; }
+    .result-label { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.35rem; }
     .result-prize { font-size: 1.6rem; font-weight: 900; margin: 0.4rem 0 1.25rem; color: var(--glow); }
+    .result-card.spell-mode .result-close { margin-top: 0.35rem; }
 
     .result-card-img {
       display: none;
@@ -482,10 +631,32 @@
   </div>
 
   <div class="result-overlay" id="result-overlay">
-    <div class="result-card">
-      <div class="result-emoji" id="result-emoji"></div>
-      <img class="result-card-img" id="result-card-img" alt="" />
+    <div class="result-card" id="result-card">
       <p class="result-label" id="result-label">恭喜獲得</p>
+      <div class="result-emoji" id="result-emoji"></div>
+      <div class="gi-face" id="spell-face">
+        <div class="gi-inner">
+          <div class="gi-head">
+            <div class="gi-no" id="spell-face-no"></div>
+            <div class="gi-title" id="spell-face-name"></div>
+            <div class="gi-rank" id="spell-face-rank"></div>
+          </div>
+          <div class="gi-art">
+            <img id="spell-face-art" alt="" />
+          </div>
+          <div class="gi-text">
+            <div class="gi-desc-box">
+              <p class="gi-desc" id="spell-face-desc"></p>
+            </div>
+            <div class="gi-icons" id="spell-face-icons"></div>
+          </div>
+        </div>
+      </div>
+      <img class="result-card-img" id="result-card-img" alt="" />
+      <details class="spell-scan-note" id="spell-scan-note">
+        <summary>查看原版日文掃描</summary>
+        <img class="result-card-img show" id="result-scan-img" alt="" />
+      </details>
       <p class="result-prize" id="result-prize"></p>
       <p class="result-sub" id="result-sub"></p>
       <button class="result-close" id="result-close">太棒了！</button>
@@ -508,46 +679,46 @@
     ];
 
     const SPELL_CARDS = [
-      { id: 1001, name: "盜視", rank: "G" },
-      { id: 1002, name: "透視", rank: "F" },
-      { id: 1003, name: "防壁", rank: "G" },
-      { id: 1004, name: "反射", rank: "E" },
-      { id: 1005, name: "磁力", rank: "C" },
-      { id: 1006, name: "掏摸", rank: "F" },
-      { id: 1007, name: "竊盜", rank: "C" },
-      { id: 1008, name: "交換", rank: "E" },
-      { id: 1009, name: "再來", rank: "G" },
-      { id: 1010, name: "擬態", rank: "A" },
-      { id: 1011, name: "複製", rank: "D" },
-      { id: 1012, name: "左遷", rank: "F" },
-      { id: 1013, name: "初心", rank: "D" },
-      { id: 1014, name: "離脫", rank: "B" },
-      { id: 1015, name: "念視", rank: "D" },
-      { id: 1016, name: "漂流", rank: "F" },
-      { id: 1017, name: "衝突", rank: "F" },
-      { id: 1018, name: "徵收", rank: "B" },
-      { id: 1019, name: "城門", rank: "F" },
-      { id: 1020, name: "贗作", rank: "C" },
-      { id: 1021, name: "強奪", rank: "B" },
-      { id: 1022, name: "墜落", rank: "C" },
-      { id: 1023, name: "妥協", rank: "B" },
-      { id: 1024, name: "看破", rank: "D" },
-      { id: 1025, name: "暗幕", rank: "F" },
-      { id: 1026, name: "聖水", rank: "A" },
-      { id: 1027, name: "追蹤", rank: "E" },
-      { id: 1028, name: "投石", rank: "E" },
-      { id: 1029, name: "凶彈", rank: "B" },
-      { id: 1030, name: "道標", rank: "E" },
-      { id: 1031, name: "解析", rank: "G" },
-      { id: 1032, name: "寶籤", rank: "G" },
-      { id: 1033, name: "密著", rank: "C" },
-      { id: 1034, name: "淨化", rank: "D" },
-      { id: 1035, name: "堅牢", rank: "S" },
-      { id: 1036, name: "神眼", rank: "S" },
-      { id: 1037, name: "再生", rank: "F" },
-      { id: 1038, name: "名簿", rank: "G" },
-      { id: 1039, name: "同行", rank: "F" },
-      { id: 1040, name: "交信", rank: "F" },
+      { id: 1001, name: "盜視", nameJp: "盗視", rank: "G", limit: 200, range: "long", desc: "查看一位目標玩家的所有自由卡槽。（僅限於在遊戲中遇到過的玩家）" },
+      { id: 1002, name: "透視", nameJp: "透視", rank: "F", limit: 150, range: "long", desc: "查看一位目標玩家的所有指定卡槽。（僅限於在遊戲中遇到過的玩家）" },
+      { id: 1003, name: "防壁", nameJp: "ディフェンシブウォール", rank: "G", limit: 400, range: "short", desc: "防止一次來自其他玩家的攻擊咒文。" },
+      { id: 1004, name: "反射", nameJp: "リフレクト", rank: "E", limit: 120, range: "short", desc: "擊退其他玩家的攻擊咒文，並將效果返回給對方。" },
+      { id: 1005, name: "磁力", nameJp: "マグネティックフォース", rank: "C", limit: 50, range: "long", desc: "飛到指定玩家（僅限於在遊戲中遇到過的玩家）所在的地點。" },
+      { id: 1006, name: "掏摸", nameJp: "ピックポケット", rank: "F", limit: 170, range: "short", desc: "隨機從另一位玩家的自由卡槽竊取一張卡。" },
+      { id: 1007, name: "竊盜", nameJp: "シーフ", rank: "C", limit: 50, range: "short", desc: "從另一位玩家的指定卡槽中隨機竊取一張卡。" },
+      { id: 1008, name: "交換", nameJp: "トレード", rank: "E", limit: 100, range: "short", desc: "隨機用自己的一張卡替換另一位玩家的一張卡。" },
+      { id: 1009, name: "再來", nameJp: "リターン", rank: "G", limit: 380, range: "long", desc: "飛往指定的城市（僅限於去過的城市）。" },
+      { id: 1010, name: "擬態", nameJp: "トランスフォーム", rank: "A", limit: 20, range: "short", desc: "將自己擁有的一張卡轉換為擁有的另一張卡。變化後的卡片計入該卡的卡片化限度枚數；若已達 MAX，變化失敗且「擬態」被銷毀。" },
+      { id: 1011, name: "複製", nameJp: "クローン", rank: "D", limit: 70, range: "short", desc: "從目標玩家的指定卡槽中隨機選一張，將自己的卡轉換為該卡。若目標指定卡槽無卡，或變化後卡片的限度枚數已 MAX，則變化失敗且「複製」被銷毀。" },
+      { id: 1012, name: "左遷", nameJp: "レルゲイト", rank: "F", limit: 140, range: "short", desc: "令目標玩家飛往島上某處。" },
+      { id: 1013, name: "初心", nameJp: "デパーチャー", rank: "D", limit: 65, range: "short", desc: "令一名目標玩家飛到遊戲起點。" },
+      { id: 1014, name: "離脫", nameJp: "リーブ", rank: "B", limit: 30, range: "short", desc: "令一名目標玩家離開貪婪之島（飛到島外）。" },
+      { id: 1015, name: "念視", nameJp: "サイトビジョン", rank: "D", limit: 70, range: "long", desc: "查看一位目標玩家的所有卡牌資料。" },
+      { id: 1016, name: "漂流", nameJp: "ドリフト", rank: "F", limit: 200, range: "short", desc: "飛往從未去過的城市。若已去過所有城市，則不移動且卡片被銷毀。" },
+      { id: 1017, name: "衝突", nameJp: "コリジョン", rank: "F", limit: 200, range: "short", desc: "飛到從未遇到過的玩家所在之處。若遊戲中已無未遇過的玩家，則不移動且卡片被銷毀。" },
+      { id: 1018, name: "徵收", nameJp: "レビー", rank: "B", limit: 25, range: "short", desc: "從施咒者周圍 20 公尺半徑內的所有玩家中，各隨機竊取一張卡。" },
+      { id: 1019, name: "城門", nameJp: "キャッスルゲート", rank: "F", limit: 200, range: "short", desc: "防止一次其他玩家的近距離攻擊咒文。" },
+      { id: 1020, name: "贗作", nameJp: "フェイク", rank: "C", limit: 40, range: "short", desc: "將「贗作」變為 No.001～099 中的任意一張卡。可放入指定卡槽，但不計入集卡條件，也無法實體化，不計入卡片化限度枚數。" },
+      { id: 1021, name: "強奪", nameJp: "ロブ", rank: "B", limit: 30, range: "short", desc: "從另一位玩家手中任意奪取一張卡。" },
+      { id: 1022, name: "墜落", nameJp: "コラプション", rank: "C", limit: 40, range: "short", desc: "選擇目標玩家一張 B 級以上卡片，轉換為 D 級以下任意編號的卡。若限度枚數已 MAX 或目標無 B 級以上卡，則「墜落」被銷毀。變化後指定卡槽中編號不符的卡將被銷毀。" },
+      { id: 1023, name: "妥協", nameJp: "コンプロマイズ", rank: "B", limit: 25, range: "short", desc: "選擇目標玩家一張 A 級以上卡片並銷毀。被銷毀卡的玩家可指定獲得一張低三級的卡。若目標無 A 級以上卡，「妥協」重新卡片化並退還施咒者。" },
+      { id: 1024, name: "看破", nameJp: "ペネトレイト", rank: "D", limit: 80, range: "short", desc: "恢復目標玩家所有由「贗作」「複製」「擬態」變化的卡。指定卡槽中編號不符的卡將被銷毀。「看破」不能成為上述三張卡的變化目標。" },
+      { id: 1025, name: "暗幕", nameJp: "ブラックアウトカーテン", rank: "F", limit: 200, range: "short", desc: "防止一次其他玩家的「竊盜」與「透視」。效果持續中再使用「暗幕」不會疊加防禦次數。" },
+      { id: 1026, name: "聖水", nameJp: "ホーリーウォーター", rank: "A", limit: 20, range: "short", desc: "防禦其他玩家的攻擊咒文 10 次。效果持續中再使用「聖水」不會增加防禦次數。此卡不能被咒文奪取或銷毀。" },
+      { id: 1027, name: "追蹤", nameJp: "トレース", rank: "E", limit: 90, range: "short", desc: "可隨時得知目標玩家的當前位置。效果持續至目標玩家退出遊戲為止。" },
+      { id: 1028, name: "投石", nameJp: "ストーンスロー", rank: "E", limit: 100, range: "short", desc: "隨機銷毀另一位玩家自由卡槽中的一張卡。若目標自由卡槽無卡，則「投石」被銷毀。" },
+      { id: 1029, name: "凶彈", nameJp: "ショット", rank: "B", limit: 25, range: "short", desc: "隨機銷毀另一位玩家指定卡槽中的一張卡。若目標指定卡槽無卡，則「凶彈」被銷毀。" },
+      { id: 1030, name: "道標", nameJp: "ガイドポスト", rank: "E", limit: 120, range: "long", desc: "得知指定編號物品所在的位置。（No.000 除外）" },
+      { id: 1031, name: "解析", nameJp: "アナリシス", rank: "G", limit: 400, range: "long", desc: "查看指定編號物品卡的說明。（No.000 除外）" },
+      { id: 1032, name: "寶籤", nameJp: "ロトリー", rank: "G", limit: 350, range: "short", desc: "隨機轉換為一張物品卡。" },
+      { id: 1033, name: "密著", nameJp: "アドヒージョン", rank: "C", limit: 50, range: "short", desc: "可隨時得知目標玩家指定卡槽的所有資料。效果持續至目標玩家退出遊戲為止。" },
+      { id: 1034, name: "淨化", nameJp: "ピュリファイ", rank: "D", limit: 55, range: "short", desc: "取消攻擊咒文的變身效果並恢復原狀。若恢復後卡片限度枚數已 MAX，則變回物品且無法再卡片化；若為咒語卡則銷毀，除非可立即使用。" },
+      { id: 1035, name: "堅牢", nameJp: "プリズン", rank: "S", limit: 10, range: "short", desc: "指定頁面（第 1～11 頁，不含自由卡槽）卡槽中的卡片，只要仍在卡槽內，永遠不會被咒文奪取或破壞。" },
+      { id: 1036, name: "神眼", nameJp: "ゴッドアイ", rank: "S", limit: 10, range: "long", desc: "對 No.001～099 的所有卡片，隨時獲得「解析」與「名簿」效果。效果持續至施咒者退出遊戲為止。" },
+      { id: 1037, name: "再生", nameJp: "リサイクル", rank: "F", limit: 170, range: "short", desc: "解除卡片化後的物品可再次轉為卡片。（僅限 C 級以下物品。若目標物品限度枚數已 MAX，則無法再卡片化且「再生」被銷毀。）" },
+      { id: 1038, name: "名簿", nameJp: "リスト", rank: "G", limit: 350, range: "long", desc: "指定一種物品，得知目前擁有該物品卡的人數與卡片總數。" },
+      { id: 1039, name: "同行", nameJp: "アカンパニー", rank: "F", limit: 130, range: "short", desc: "施咒者及半徑 20 公尺內所有玩家，一同飛往指定城市（僅限去過）或指定玩家（僅限遊戲中遇過）所在之處。" },
+      { id: 1040, name: "交信", nameJp: "コンタクト", rank: "F", limit: 200, range: "long", desc: "透過卡片書與另一位玩家（僅限遊戲中遇過）交談，最長三分鐘，僅施咒者可中途切斷通訊。" },
     ];
 
     let state = loadState();
@@ -562,6 +733,10 @@
       return `../images/modal/${id}.webp`;
     }
 
+    function rangeLabel(range) {
+      return range === "long" ? "遠距離" : "近距離";
+    }
+
     function resolvePrize(base) {
       if (!base.spellDraw) return { ...base };
       const card = pickSpellCard();
@@ -570,7 +745,7 @@
         spellCard: card,
         name: `貪婪之島卡 · ${card.name}`,
         displayName: card.name,
-        sub: `NO.${card.id} · ${card.rank} 級咒語卡`,
+        sub: `NO.${card.id} · ${card.rank} 級 · ${rangeLabel(card.range)}`,
       };
     }
 
@@ -785,25 +960,61 @@
     }
 
     function showResult(prize) {
+      const cardEl = document.getElementById("result-card");
       const emojiEl = document.getElementById("result-emoji");
       const imgEl = document.getElementById("result-card-img");
       const subEl = document.getElementById("result-sub");
       const labelEl = document.getElementById("result-label");
+      const spellFace = document.getElementById("spell-face");
+      const scanNote = document.getElementById("spell-scan-note");
+      const scanImg = document.getElementById("result-scan-img");
+
+      cardEl.classList.remove("spell-mode");
+      spellFace.classList.remove("show");
+      scanNote.classList.remove("show");
+      scanNote.open = false;
+      imgEl.classList.remove("show");
+      imgEl.removeAttribute("src");
 
       if (prize.spellCard) {
+        const c = prize.spellCard;
         emojiEl.classList.add("hidden");
         emojiEl.textContent = "";
-        imgEl.src = spellImageSrc(prize.spellCard.id);
-        imgEl.alt = `NO.${prize.spellCard.id} ${prize.spellCard.name}`;
-        imgEl.onerror = () => {
-          imgEl.onerror = null;
-          imgEl.src = `../greed-island/images/modal/${prize.spellCard.id}.webp`;
+        cardEl.classList.add("spell-mode");
+
+        document.getElementById("spell-face-no").textContent = c.id;
+        document.getElementById("spell-face-name").innerHTML = `<small>咒語卡</small>${c.name}`;
+        document.getElementById("spell-face-rank").textContent = `${c.rank}-${c.limit || "?"}`;
+        document.getElementById("spell-face-desc").textContent = c.desc || "";
+        document.getElementById("spell-face-icons").innerHTML =
+          `<span class="gi-icon range">${c.range === "long" ? "遠" : "近"}</span>` +
+          `<span class="gi-icon">咒</span>`;
+
+        const artEl = document.getElementById("spell-face-art");
+        const artSrc = spellImageSrc(c.id);
+        artEl.src = artSrc;
+        artEl.alt = "";
+        artEl.onerror = () => {
+          artEl.onerror = null;
+          artEl.src = `../greed-island/images/modal/${c.id}.webp`;
         };
-        imgEl.classList.add("show");
-        labelEl.textContent = "恭喜抽中咒語卡";
-        document.getElementById("result-prize").textContent = prize.displayName;
-        subEl.textContent = prize.sub;
-        subEl.classList.add("show");
+
+        spellFace.classList.add("show");
+
+        scanImg.src = artSrc;
+        scanImg.alt = `NO.${c.id} ${c.name} 原版掃描`;
+        scanImg.onerror = () => {
+          scanImg.onerror = null;
+          scanImg.src = `../greed-island/images/modal/${c.id}.webp`;
+        };
+        scanNote.classList.add("show");
+        scanNote.open = false;
+
+        labelEl.textContent = "恭喜抽中咒語卡（中文卡面）";
+        document.getElementById("result-prize").textContent = "";
+        document.getElementById("result-prize").style.display = "none";
+        subEl.classList.remove("show");
+        subEl.textContent = "";
       } else if (prize.image) {
         emojiEl.classList.add("hidden");
         emojiEl.textContent = "";
@@ -812,18 +1023,17 @@
         imgEl.onerror = null;
         imgEl.classList.add("show");
         labelEl.textContent = "恭喜獲得";
+        document.getElementById("result-prize").style.display = "";
         document.getElementById("result-prize").textContent = prize.name;
         subEl.classList.remove("show");
         subEl.textContent = "";
       } else {
         emojiEl.classList.remove("hidden");
         emojiEl.textContent = prize.emoji;
-        imgEl.classList.remove("show");
-        imgEl.removeAttribute("src");
-        imgEl.removeAttribute("alt");
         labelEl.textContent = "恭喜獲得";
         subEl.classList.remove("show");
         subEl.textContent = "";
+        document.getElementById("result-prize").style.display = "";
         document.getElementById("result-prize").textContent = prize.name;
       }
 
