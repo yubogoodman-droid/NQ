@@ -17,7 +17,9 @@ from nq.patterns import detect_w_bottoms, detect_w_ma20_crosses  # noqa: E402
 from watch_tw_w_ma20 import (  # noqa: E402
     TPE,
     drop_forming_bar,
+    fill_chinese_names,
     filter_price_below,
+    has_cjk,
     hit_key,
     parse_symbols,
     recent_hits,
@@ -256,6 +258,25 @@ def test_filter_price_below_700() -> None:
     assert kept[0]["rank"] == 1
 
 
+def test_has_cjk_and_chinese_names() -> None:
+    import watch_tw_w_ma20 as mod
+
+    assert has_cjk("國巨")
+    assert has_cjk("南亞科")
+    assert not has_cjk("YAGEO CORP")
+    assert not has_cjk("2327")
+    mod._NAME_MAP.clear()
+    mod._NAME_MAP.update({"2327": "國巨", "2408": "南亞科"})
+    mod._NAME_MAP_LOADED = True
+    rows = [
+        {"code": "2327", "name": "YAGEO CORP"},
+        {"code": "2408", "name": "2408"},
+        {"code": "2303", "name": "聯電"},
+    ]
+    out = fill_chinese_names(rows)
+    assert [r["name"] for r in out] == ["國巨", "南亞科", "聯電"]
+
+
 def main() -> int:
     test_yageo_like_alerts()
     test_yageo_plateau_second_bottom()
@@ -269,6 +290,7 @@ def main() -> int:
     test_drop_forming_bar()
     test_hit_key_and_recent()
     test_filter_price_below_700()
+    test_has_cjk_and_chinese_names()
     print("ok")
     return 0
 

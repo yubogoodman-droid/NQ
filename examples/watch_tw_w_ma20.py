@@ -140,6 +140,51 @@ def parse_symbols(text: str) -> list[dict]:
     return rows
 
 
+def has_cjk(text: object) -> bool:
+    return any("\u4e00" <= ch <= "\u9fff" for ch in str(text or ""))
+
+
+_NAME_MAP: dict[str, str] = {}
+_NAME_MAP_LOADED = False
+
+
+def remember_names(rows: list[dict]) -> None:
+    for row in rows:
+        name = str(row.get("name") or "").strip()
+        if row.get("code") and has_cjk(name):
+            _NAME_MAP[str(row["code"])] = name.rstrip("*").strip()
+
+
+def load_tw_name_map() -> dict[str, str]:
+    """上市櫃中文股名；同一行程只抓一次。"""
+    global _NAME_MAP_LOADED
+    if _NAME_MAP_LOADED:
+        return _NAME_MAP
+    try:
+        date = resolve_twse_date(last_tw_session_yyyymmdd())
+        remember_names(fetch_top_turnover(date, 10000))
+        _NAME_MAP_LOADED = True
+    except Exception as exc:  # noqa: BLE001
+        print(f"[name] {exc}", file=sys.stderr)
+    return _NAME_MAP
+
+
+def fill_chinese_names(rows: list[dict]) -> list[dict]:
+    remember_names(rows)
+    missing = [row for row in rows if not has_cjk(row.get("name"))]
+    if missing:
+        load_tw_name_map()
+    out: list[dict] = []
+    for row in rows:
+        current = str(row.get("name") or "").rstrip("*").strip()
+        if has_cjk(current):
+            out.append({**row, "name": current})
+            continue
+        zh = _NAME_MAP.get(str(row.get("code") or ""))
+        out.append({**row, "name": zh} if zh else {**row, "name": current or row.get("name")})
+    return out
+
+
 def filter_price_below(rows: list[dict], max_price: float | None, limit: int) -> tuple[list[dict], list[dict]]:
     """股價達到 max_price（含）以上的剔除，例如 700 以上不看。"""
     if max_price is None:
@@ -171,7 +216,7 @@ def hit_under_max_price(hit: TwHit, max_price: float | None) -> bool:
 
 def load_universe(args: argparse.Namespace) -> list[dict]:
     if getattr(args, "symbols", ""):
-        return parse_symbols(args.symbols)
+        return fill_chinese_names(parse_symbols(args.symbols))
     date = resolve_twse_date(args.date or last_tw_session_yyyymmdd())
     max_price = args.max_price
     pool = max(args.limit, args.pool if max_price else args.limit)
@@ -189,17 +234,16 @@ def load_universe(args: argparse.Namespace) -> list[dict]:
         f"{universe[0]['code']} {universe[0]['name']}" if universe else "universe empty",
         file=sys.stderr,
     )
-    return universe
+    return fill_chinese_names(universe)
 
 
 def scan_symbol(row: dict, range_: str, *, live: bool) -> tuple[list[TwHit], dict]:
     meta = {**row, "bars": 0, "error": "", "n_sig": 0}
     try:
-        df, yahoo_name = fetch_yahoo_5m(row["symbol"], range_)
+        df, _yahoo_name = fetch_yahoo_5m(row["symbol"], range_)
         if live:
             df = drop_forming_bar(df)
-        if yahoo_name and (not row.get("name") or row["name"] == row["code"]):
-            row = {**row, "name": yahoo_name}
+        # 股名用上市櫃中文，不用 Yahoo 英文簡稱
     except Exception as exc:  # noqa: BLE001
         meta["error"] = str(exc)[:80]
         return [], meta
@@ -485,6 +529,7 @@ def write_view_html(src: Path) -> Path:
 
 
 def collect_hits(universe: list[dict], range_: str, sleep: float, live: bool) -> list[TwHit]:
+    universe = fill_chinese_names(universe)
     hits: list[TwHit] = []
     for i, row in enumerate(universe, 1):
         stock_hits, meta = scan_symbol(row, range_, live=live)
