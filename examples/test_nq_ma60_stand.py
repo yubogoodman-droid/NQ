@@ -15,8 +15,10 @@ from nq_ma60_stand import (  # noqa: E402
     ET,
     TradeResult,
     detect_signals,
+    m5_context,
     macd,
     quality_from_stand,
+    resample_m5,
     simulate,
     write_html_report,
 )
@@ -107,6 +109,16 @@ def test_simulate_target_or_stop() -> None:
     assert trades[0].exit_reason in {"target", "stop", "timeout", "preopen_flat"}
 
 
+def test_resample_m5() -> None:
+    df = _make_stand_bars()
+    m5 = resample_m5(df)
+    assert len(m5) >= 40
+    assert {"Open", "High", "Low", "Close", "Volume"} <= set(m5.columns)
+    ctx = m5_context(m5, df.index[210])
+    assert ctx["idx"] >= 0
+    assert ctx["close"] > 0
+
+
 def test_write_html_report(tmp_path: Path | None = None) -> None:
     df = _make_stand_bars()
     sigs = detect_signals(df, skip_hour_start=None, skip_hour_end=None, use_cluster=False)
@@ -115,10 +127,12 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
     path = write_html_report(out, df, trades, "NQ=F", "demo")
     text = path.read_text(encoding="utf-8")
     assert "站上季線" in text
+    assert "五分K對照" in text
     if trades:
         assert "<img src='img/" in text
         img_dir = path.parent / "img"
         assert any(img_dir.glob("t01_*.png")), "expected a static trade PNG"
+        assert any(img_dir.glob("t01_*_5m.png")), "expected a 5m comparison PNG"
 
 
 def main() -> int:
@@ -127,6 +141,7 @@ def main() -> int:
     test_detect_stand_on_ma60()
     test_skip_bearish_cross()
     test_simulate_target_or_stop()
+    test_resample_m5()
     test_write_html_report()
     print("ok")
     return 0

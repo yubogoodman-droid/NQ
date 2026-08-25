@@ -358,6 +358,55 @@ MA_COLORS = {
 }
 
 
+def resample_m5(df: pd.DataFrame) -> pd.DataFrame:
+    """1m → 5m OHLC（label/closed=right，不含未完成的對照用歷史 K）。"""
+    out = (
+        df.resample("5min", label="right", closed="right")
+        .agg({"Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"})
+        .dropna(subset=["Close"])
+    )
+    return out
+
+
+def m5_bar_idx(m5: pd.DataFrame, ts) -> int:
+    if m5.empty:
+        return -1
+    i = int(m5.index.searchsorted(ts, side="left"))
+    if i >= len(m5):
+        return len(m5) - 1
+    return i
+
+
+def m5_context(m5: pd.DataFrame, ts) -> Dict[str, Any]:
+    """一分進場當下，落在哪根五分 K、相對五分季線。"""
+    i = m5_bar_idx(m5, ts)
+    empty = {
+        "idx": -1,
+        "close": float("nan"),
+        "ma60": float("nan"),
+        "dist": float("nan"),
+        "above": None,
+        "label": "5m 資料不足",
+    }
+    if i < 0:
+        return empty
+    close = float(m5["Close"].iloc[i])
+    ma60_s = m5["Close"].astype(float).rolling(60, min_periods=60).mean()
+    ma60 = float(ma60_s.iloc[i]) if not np.isnan(ma60_s.iloc[i]) else float("nan")
+    if np.isnan(ma60):
+        return {**empty, "idx": i, "close": close, "label": "5m 季線不足"}
+    dist = close - ma60
+    above = dist > 0
+    return {
+        "idx": i,
+        "close": close,
+        "ma60": ma60,
+        "dist": dist,
+        "above": above,
+        "label": f"5m 已站上季線 +{dist:.1f}" if above else f"5m 仍在季線下 {dist:.1f}",
+    }
+
+
 def _equity_svg(pnls: List[float], width: int = 720, height: int = 180) -> str:
     if not pnls:
         return "<p class='muted'>no trades</p>"
@@ -390,13 +439,9 @@ def _trade_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     return start, end
 
 
-def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
-    import matplotlib
-
-    matplotlib.use("Agg")
+def _apply_cjk_font() -> None:
     import matplotlib.pyplot as plt
     from matplotlib import font_manager
-    from matplotlib.patches import Rectangle
 
     for fp in (
         "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
@@ -408,27 +453,13 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             plt.rcParams["axes.unicode_minus"] = False
             break
 
-    start, end = _trade_window(df, trade)
-    window = df.iloc[start : end + 1]
+
+def _paint_candles(ax, axv, window: pd.DataFrame) -> None:
+    from matplotlib.patches import Rectangle
+
     xs = range(len(window))
     o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
     vol = window["Volume"] if "Volume" in window.columns else None
-    close_full = df["Close"].astype(float)
-
-    fig, (ax, axv) = plt.subplots(
-        2,
-        1,
-        figsize=(10.4, 5.6),
-        sharex=True,
-        gridspec_kw={"height_ratios": [3.2, 1]},
-        facecolor="#0c1210",
-    )
-    for a in (ax, axv):
-        a.set_facecolor("#101814")
-        a.tick_params(colors="#8aa193", labelsize=8)
-        for sp in a.spines.values():
-            sp.set_color("#2a3a33")
-
     colors_v = []
     for k in range(len(window)):
         up = float(c.iloc[k]) >= float(o.iloc[k])
@@ -441,6 +472,39 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         colors_v.append("#3dba7a99" if up else "#e35d5d99")
     if vol is not None:
         axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
+
+
+def _style_axes(ax, axv) -> None:
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+
+
+def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    _apply_cjk_font()
+
+    start, end = _trade_window(df, trade)
+    window = df.iloc[start : end + 1]
+    xs = range(len(window))
+    close_full = df["Close"].astype(float)
+
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.6),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    _style_axes(ax, axv)
+    _paint_candles(ax, axv, window)
 
     for n, col in MA_COLORS.items():
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
@@ -483,12 +547,91 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     return path
 
 
-def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
+def draw_m5_png(
+    m5: pd.DataFrame,
+    trade: TradeResult,
+    entry_ts,
+    exit_ts,
+    path: Path,
+    trade_no: int,
+    ctx: Dict[str, Any],
+) -> Path:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    _apply_cjk_font()
+    ei = ctx.get("idx", -1)
+    if m5.empty or ei < 0:
+        return path
+    start = max(0, ei - 36)
+    xi = int(m5.index.searchsorted(exit_ts, side="left"))
+    if xi >= len(m5):
+        xi = len(m5) - 1
+    end = min(len(m5) - 1, max(ei, xi) + 10)
+    window = m5.iloc[start : end + 1]
+    xs = range(len(window))
+    close_full = m5["Close"].astype(float)
+
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.6),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    _style_axes(ax, axv)
+    _paint_candles(ax, axv, window)
+
+    for n, col in MA_COLORS.items():
+        ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
+        lw = 2.0 if n == 60 else (1.25 if n <= 20 else 1.0)
+        ax.plot(list(xs), ma, color=col, lw=lw, label="5m季線" if n == 60 else f"MA{n}")
+
+    ex = ei - start
+    xx = xi - start
+    if 0 <= ex < len(window):
+        ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
+        ax.scatter([ex], [float(window["Close"].iloc[ex])], s=42, color="#00e676", marker="^", zorder=6)
+        ax.annotate("1m進場", (ex, float(window["Close"].iloc[ex])), textcoords="offset points",
+                    xytext=(0, 10), ha="center", color="#86efac", fontsize=8)
+    if 0 <= xx < len(window) and xx != ex:
+        ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
+
+    if not np.isnan(ctx.get("ma60", float("nan"))):
+        ax.axhline(ctx["ma60"], color="#26a69a", ls="--", lw=0.9, alpha=0.55)
+
+    sign = "+" if ctx.get("dist", 0) >= 0 else ""
+    dist = ctx.get("dist", float("nan"))
+    dist_s = f"{sign}{dist:.1f}" if not np.isnan(dist) else "n/a"
+    ax.set_title(
+        f"#{trade_no}  5分K對照  {pd.Timestamp(entry_ts).strftime('%m-%d %H:%M')}  "
+        f"{ctx.get('label', '')}  ({dist_s} vs 季線)",
+        color="#e8f0ea",
+        fontsize=11,
+    )
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    step = max(1, len(window) // 6)
+    ticks = list(range(0, len(window), step))
+    axv.set_xticks(ticks)
+    axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
+def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int, suffix: str = "") -> str:
     et = df.index[trade.entry_idx]
-    return f"t{trade_no:02d}_{et.strftime('%m%d_%H%M')}_q{trade.quality.lower()}.png"
+    extra = f"_{suffix}" if suffix else ""
+    return f"t{trade_no:02d}_{et.strftime('%m%d_%H%M')}_q{trade.quality.lower()}{extra}.png"
 
 
 def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: Path) -> str:
+    m5 = resample_m5(df)
     cards: List[str] = []
     for i, t in enumerate(trades, 1):
         et = df.index[t.entry_idx]
@@ -497,8 +640,20 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: 
         risk = t.entry_price - t.stop_price
         r_mult = (t.target_price - t.entry_price) / risk if risk > 0 else 0
         reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
+        ctx = m5_context(m5, et)
         img_name = _trade_img_name(df, t, i)
+        img5_name = _trade_img_name(df, t, i, suffix="5m")
         draw_trade_png(df, t, html_path.parent / "img" / img_name, i)
+        draw_m5_png(m5, t, et, xt, html_path.parent / "img" / img5_name, i, ctx)
+        m5_tag = "tag-tp" if ctx.get("above") else ("tag-sl" if ctx.get("above") is False else "tag-time")
+        m5_line = ""
+        if not np.isnan(ctx.get("ma60", float("nan"))):
+            m5_line = (
+                f"5m收 {ctx['close']:.2f} / 5m季線 {ctx['ma60']:.1f}  "
+                f"{'+' if ctx['dist'] >= 0 else ''}{ctx['dist']:.1f}  {ctx['label']}\n"
+            )
+        else:
+            m5_line = f"5m {ctx['label']}\n"
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -509,6 +664,7 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: 
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
             f"<span class='tag tag-info'>1m 季線</span>"
+            f"<span class='tag {m5_tag}'>{escape(ctx['label'])}</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
             "</div>"
             "<pre class='trade-detail'>"
@@ -516,11 +672,16 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: 
             f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts)\n"
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
-            f"季線 MA60 {t.signal.ma60:.1f}  站上 +{t.signal.dist_above:.1f}  帶寬 {t.signal.cluster_width:.1f}  下方 {t.signal.below_bars} 根\n"
+            f"1m季線 MA60 {t.signal.ma60:.1f}  站上 +{t.signal.dist_above:.1f}  帶寬 {t.signal.cluster_width:.1f}  下方 {t.signal.below_bars} 根\n"
+            f"{m5_line}"
             f"MACD DIF {t.signal.dif:.3f} / DEA {t.signal.dea:.3f}  量比 {t.signal.vol_ratio:.2f}x\n"
             f"MA5 {t.signal.ma5:.1f} / MA10 {t.signal.ma10:.1f} / MA20 {t.signal.ma20:.1f}"
             "</pre>"
-            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i}' "
+            "<p class='chart-label'>一分K</p>"
+            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i} 1m' "
+            "style='width:100%;display:block;border-radius:10px'/></div>"
+            "<p class='chart-label'>五分K對照</p>"
+            f"<div class='mini-chart'><img src='img/{escape(img5_name)}' alt='#{i} 5m' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
             "</article>"
         )
@@ -541,6 +702,20 @@ def write_html_report(
     q_line = " · ".join(q_bits) if q_bits else "無品質分組"
     out = Path(path)
     cards = _render_trade_cards(df, trades, out)
+    m5 = resample_m5(df)
+    n_above = n_below = 0
+    for t in trades:
+        ctx = m5_context(m5, df.index[t.entry_idx])
+        if ctx.get("above") is True:
+            n_above += 1
+        elif ctx.get("above") is False:
+            n_below += 1
+    m5_line = (
+        f"<p class='muted'>一分進場當下，五分收盤已站上季線 <b>{n_above}</b> 筆、"
+        f"仍在季線下 <b>{n_below}</b> 筆。</p>"
+        if trades
+        else ""
+    )
     funnel_line = ""
     if funnel:
         funnel_line = (
@@ -584,14 +759,15 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
-.mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+.chart-label{{margin:10px 2px 6px;font-size:12px;font-weight:600;color:#8b949e}}
+.mini-chart{{margin:0 -6px 4px;border-radius:10px;overflow:hidden}}
 .empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
 </style></head><body>
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 一分K 站上季線</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">收盤從 SMA60（季線）下方站上、陽線、穿過 MA60/100/120 黏帶、MACD 多頭、放量。停損在低點／季線下方，目標 2R。</p>
+<p class="muted">收盤從 SMA60（季線）下方站上、陽線、穿過 MA60/100/120 黏帶、MACD 多頭、放量。停損在低點／季線下方，目標 2R。每筆附一分K與五分K對照。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -599,6 +775,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">勝/負<b>{stats['wins']}/{stats['count']-stats['wins']}</b></div>
 </div>
 <p class="muted">{escape(q_line)}</p>
+{m5_line}
 {funnel_line}
 <div class="equity">{_equity_svg(pnls)}</div>
 </section>
@@ -613,7 +790,7 @@ h1{{font-size:18px;margin:0 0 6px}}
         view.write_text(
             html.replace(
                 f"<p class=\"muted\">{escape(period)}",
-                "<p class=\"muted\">圖是靜態 1m K 線。手機請往下捲。</p>\n\n<p class=\"muted\">" + escape(period),
+                "<p class=\"muted\">每筆一張一分K、一張五分K對照。手機請往下捲。</p>\n\n<p class=\"muted\">" + escape(period),
                 1,
             ),
             encoding="utf-8",

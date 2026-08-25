@@ -136,7 +136,7 @@ python3 examples/nq_ma60_stand.py alert --dry-run --once
 
 TradingView：`pinescript/nq_1m_ma60_stand.pine` 貼到 Pine Editor，套用至 NQ1! / MNQ1! **一分圖**。
 
-近 8 天 Yahoo 1m（2026-08-17 → 08-25）：18 筆、勝率 11%、約 −227 點。這幾天嚴格訊號 7 筆，其中週日 08-23 18:42 達標 +66.5。一分圖季線交叉本身很密，腳本用黏帶／MACD／放量把「整理後踩穩穿過」留下來；實盤請再自己看圖。
+每筆 HTML 卡片會附 **一分K** 與 **五分K對照**（綠三角標 1m 進場落在哪根 5 分 K，並看五分收盤是否已站上五分季線）。
 
 報告：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma60-stand-fbcb/docs/nq-ma60-stand/view.html
 
