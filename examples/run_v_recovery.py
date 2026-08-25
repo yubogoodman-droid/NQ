@@ -54,28 +54,64 @@ def _stem(ts: pd.Timestamp) -> str:
     return t.strftime("%m%d_%H%M")
 
 
-def _fwd(df: pd.DataFrame, idx: int, minutes: int) -> float | None:
-    j = idx + minutes
-    if j >= len(df):
-        return None
-    return float(df["close"].iloc[j] - df["close"].iloc[idx])
+EXIT_LABEL = {
+    "stop": "停損",
+    "ma20": "跌破 MA20",
+    "time": "持滿 90 分",
+}
+
+
+def _use_cjk_font() -> None:
+    import matplotlib
+
+    matplotlib.rcParams["font.sans-serif"] = [
+        "WenQuanYi Micro Hei",
+        "Droid Sans Fallback",
+        "DejaVu Sans",
+    ]
+    matplotlib.rcParams["axes.unicode_minus"] = False
+
+
+def _ring(ax, x: float, y: float, color: str, label: str, dy: int = 12) -> None:
+    ax.scatter(
+        [x],
+        [y],
+        s=720,
+        facecolors="none",
+        edgecolors=color,
+        linewidths=2.4,
+        zorder=8,
+        marker="o",
+    )
+    ax.scatter([x], [y], s=28, color=color, zorder=9)
+    ax.annotate(
+        label,
+        (x, y),
+        xytext=(10, dy),
+        textcoords="offset points",
+        color=color,
+        fontsize=10,
+        fontweight="normal",
+        zorder=10,
+    )
 
 
 def draw_combo(df: pd.DataFrame, combo: ComboSignal, path: Path, *, title: str) -> Path:
     import matplotlib
 
     matplotlib.use("Agg")
+    _use_cjk_font()
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
     dump = combo.dump
     last = dump.idx
-    if combo.full:
-        last = combo.full.idx
-    elif combo.short:
-        last = combo.short.idx
+    if combo.short:
+        last = max(last, combo.short.idx)
+    if combo.exit_event:
+        last = max(last, combo.exit_event.idx)
     start = max(0, dump.idx - 18)
-    end = min(len(df) - 1, last + 25)
+    end = min(len(df) - 1, last + 18)
     window = df.iloc[start : end + 1]
     xs = range(len(window))
     o, h, l, c, v = window["open"], window["high"], window["low"], window["close"], window["volume"]
@@ -83,7 +119,7 @@ def draw_combo(df: pd.DataFrame, combo: ComboSignal, path: Path, *, title: str) 
     fig, (ax, axv) = plt.subplots(
         2,
         1,
-        figsize=(10.4, 5.6),
+        figsize=(10.4, 5.8),
         sharex=True,
         gridspec_kw={"height_ratios": [3.15, 1]},
         facecolor="#0c1210",
@@ -110,18 +146,19 @@ def draw_combo(df: pd.DataFrame, combo: ComboSignal, path: Path, *, title: str) 
         ax.plot(list(xs), window[f"ma{n}"], color=col, lw=1.3 if n <= 20 else 1.05, label=f"MA{n}")
 
     dx = dump.idx - start
-    ax.axvline(dx, color="#e35d5d", ls="--", lw=1.0)
-    ax.scatter([dx], [c.iloc[dx]], s=36, color="#e35d5d", zorder=5)
+    ax.axvline(dx, color="#e35d5d", ls="--", lw=0.9, alpha=0.85)
+    ax.axhline(dump.low, color="#e35d5d", ls=":", lw=0.9, alpha=0.7)
     if combo.short:
         sx = combo.short.idx - start
         if 0 <= sx < len(window):
-            ax.axvline(sx, color="#3dba7a", ls="--", lw=1.0)
-            ax.scatter([sx], [c.iloc[sx]], s=36, color="#3dba7a", zorder=5)
-    if combo.full and combo.short and combo.full.idx != combo.short.idx:
-        fx = combo.full.idx - start
-        if 0 <= fx < len(window):
-            ax.axvline(fx, color="#c9a227", ls=":", lw=1.1)
-            ax.scatter([fx], [c.iloc[fx]], s=32, color="#c9a227", zorder=5)
+            _ring(ax, sx, combo.short.entry, "#3dba7a", "進場", dy=14)
+    if combo.exit_event:
+        ex = combo.exit_event
+        xx = ex.idx - start
+        if 0 <= xx < len(window):
+            out_color = "#c9a227" if ex.pnl >= 0 else "#e35d5d"
+            dy = -18 if combo.short and abs(ex.idx - combo.short.idx) <= 8 else 14
+            _ring(ax, xx, ex.price, out_color, "出場", dy=dy)
 
     ax.set_title(title, color="#e8f0ea", fontsize=11)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=8)
@@ -169,24 +206,20 @@ def write_report(
         dump = combo.dump
         png = img_dir / f"hit_{_stem(dump.timestamp)}.png"
         short_t = _fmt(combo.short.timestamp) if combo.short else "—"
-        full_t = _fmt(combo.full.timestamp) if combo.full else "未完成"
-        draw_combo(
-            df,
-            combo,
-            png,
-            title=f"NQ 1m  dump {_fmt(dump.timestamp)}  ->  stack {short_t}  full {full_t}",
-        )
+        ex = combo.exit_event
+        exit_t = _fmt(ex.timestamp) if ex else "—"
+        reason = EXIT_LABEL.get(ex.reason, ex.reason) if ex else "—"
+        title = f"NQ 1m  進場 {short_t}  →  出場 {exit_t}  {reason}"
+        draw_combo(df, combo, png, title=title)
         entry = combo.short
-        pts = {m: _fwd(df, entry.idx, m) for m in (15, 30, 60)} if entry else {15: None, 30: None, 60: None}
         cards.append(
             f"""
   <div class="card">
-    <h2>{html.escape(tag)}　急跌 {_fmt(dump.timestamp)} → 短均 {html.escape(short_t)} → 完整 {html.escape(full_t)}</h2>
+    <h2>{html.escape(tag)}　進場 {html.escape(short_t)} → 出場 {html.escape(exit_t)}</h2>
     <img src="./img/{html.escape(png.name)}" alt="combo {_fmt(dump.timestamp)}"/>
     <p class="note">
-      急跌 {dump.range_pts:.1f} 點 · 量比 {dump.vol_ratio:.1f}× · ATR {dump.range_atr:.1f}×<br/>
-      短均進場 {(entry.entry if entry else 0):.2f} · {html.escape(entry.order_text if entry else '')}<br/>
-      進場後 15/30/60m：{_pt(pts[15])} / {_pt(pts[30])} / {_pt(pts[60])}
+      急跌 {_fmt(dump.timestamp)} {dump.range_pts:.1f} 點 · 停損 {dump.low:.2f}<br/>
+      進場綠圈 {(entry.entry if entry else 0):.2f} · 出場圈 {ex.price if ex else 0:.2f} · {html.escape(reason)} · {_pt(ex.pnl if ex else None)}
     </p>
   </div>"""
         )
@@ -224,7 +257,7 @@ th{{color:#8aa193;font-weight:600}}
   <p class="sub">
     {html.escape(symbol)} · {days[0]} ~ {days[-1]} · {len(df)} 根 1m
     （{html.escape(start)} ~ {html.escape(end)} ET）。<br/>
-    只畫急跌後 90 分鐘內不破低、再走出 MA5&gt;10&gt;20 的命中。紅虛線急跌、綠虛線短均排列、金虛線完整八條。
+    只畫急跌後 90 分鐘內不破低、再走出 MA5&gt;10&gt;20 的命中。綠圈進場、另一圈出場（停損急跌低、收盤跌破 MA20、或持滿 90 分）。
   </p>
   <div class="kpis">
     <div class="kpi"><div class="k">嚴格命中</div><div class="v pos">{strict['short']}</div></div>
@@ -261,8 +294,13 @@ def _print(name: str, ladder: dict) -> None:
     for c in ladder["signals"]:
         d = c.dump
         st = _fmt(c.short.timestamp) if c.short else "—"
-        ft = _fmt(c.full.timestamp) if c.full else "—"
-        print(f"  急跌 {_fmt(d.timestamp)} {d.range_pts:.1f}pt → 短均 {st} → 完整 {ft}")
+        if c.exit_event:
+            et = _fmt(c.exit_event.timestamp)
+            why = EXIT_LABEL.get(c.exit_event.reason, c.exit_event.reason)
+            pnl = f"{c.exit_event.pnl:+.1f}pt"
+        else:
+            et, why, pnl = "—", "—", ""
+        print(f"  急跌 {_fmt(d.timestamp)} {d.range_pts:.1f}pt → 進場 {st} → 出場 {et} {why} {pnl}")
 
 
 def main() -> int:

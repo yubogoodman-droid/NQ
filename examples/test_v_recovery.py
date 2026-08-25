@@ -47,6 +47,28 @@ def test_dump_plus_stack() -> None:
     sig = ladder["signals"][0]
     assert sig.short is not None
     assert sig.short.idx > sig.dump.idx
+    assert sig.exit_event is not None
+    assert sig.exit_event.idx > sig.short.idx
+    assert sig.exit_event.reason in {"stop", "ma20", "time"}
+
+
+def test_exit_hits_dump_low() -> None:
+    raw = make_dump_then_stack()
+    preview = dump_align_ladder(add_indicators(raw.copy()), STRICT_DUMP, max_bars=120)
+    assert preview["short"] >= 1
+    crash = preview["signals"][0].short.idx + 3
+    raw = raw.copy()
+    prev_close = float(raw["close"].iloc[crash - 1])
+    raw.iloc[crash, raw.columns.get_loc("open")] = prev_close
+    raw.iloc[crash, raw.columns.get_loc("high")] = prev_close
+    raw.iloc[crash, raw.columns.get_loc("low")] = 29380.0
+    raw.iloc[crash, raw.columns.get_loc("close")] = 29400.0
+    df = add_indicators(raw)
+    ladder = dump_align_ladder(df, STRICT_DUMP, max_bars=120)
+    ex = ladder["signals"][0].exit_event
+    assert ex is not None
+    assert ex.reason == "stop"
+    assert ex.price == ladder["signals"][0].dump.low
 
 
 def test_align_only_still_counts() -> None:
@@ -71,5 +93,6 @@ def test_align_only_still_counts() -> None:
 
 if __name__ == "__main__":
     test_dump_plus_stack()
+    test_exit_hits_dump_low()
     test_align_only_still_counts()
     print("self-test ok")

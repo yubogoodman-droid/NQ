@@ -66,10 +66,20 @@ class ComboSignal:
     short: StackSignal | None = None
     mid: StackSignal | None = None
     full: StackSignal | None = None
+    exit_event: "ExitEvent | None" = None
 
     @property
     def aligned(self) -> bool:
-        return self.short is not None and not self.broke_low
+        return self.short is not None
+
+
+@dataclass(frozen=True)
+class ExitEvent:
+    idx: int
+    timestamp: pd.Timestamp
+    price: float
+    reason: str
+    pnl: float
 
 
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
@@ -211,7 +221,8 @@ def scan_dump(
             break
         row = df.iloc[j]
         if row["low"] < dump.low - TICK_SIZE:
-            combo.broke_low = True
+            if combo.short is None:
+                combo.broke_low = True
             break
         above = bool(row["above_all"])
         if combo.short is None and above and bool(row["stack_short"]):
@@ -223,6 +234,32 @@ def scan_dump(
     return combo
 
 
+def simulate_exit(
+    df: pd.DataFrame,
+    combo: ComboSignal,
+    *,
+    max_bars: int = 90,
+) -> ExitEvent | None:
+    """進場後：先看急跌低點停損，再看收盤跌破 MA20，否則持滿 max_bars。"""
+    if combo.short is None:
+        return None
+    entry = combo.short
+    stop = combo.dump.low
+    end = min(len(df) - 1, entry.idx + max_bars)
+    if end <= entry.idx:
+        return None
+    for j in range(entry.idx + 1, end + 1):
+        row = df.iloc[j]
+        if float(row["low"]) <= stop + 1e-12:
+            return ExitEvent(j, df.index[j], stop, "stop", stop - entry.entry)
+        ma20 = row.get("ma20")
+        if pd.notna(ma20) and float(row["close"]) < float(ma20):
+            px = float(row["close"])
+            return ExitEvent(j, df.index[j], px, "ma20", px - entry.entry)
+    px = float(df["close"].iloc[end])
+    return ExitEvent(end, df.index[end], px, "time", px - entry.entry)
+
+
 def dump_align_ladder(
     df: pd.DataFrame,
     spec: DumpSpec = STRICT_DUMP,
@@ -231,6 +268,9 @@ def dump_align_ladder(
 ) -> dict:
     dumps = find_dumps(df, spec)
     combos = [scan_dump(df, d, max_bars=max_bars) for d in dumps]
+    for combo in combos:
+        if combo.short is not None:
+            combo.exit_event = simulate_exit(df, combo)
     v = [c for c in combos if not c.broke_low]
     return {
         "dumps": len(dumps),
