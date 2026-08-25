@@ -14,6 +14,7 @@ class TradeResult:
     signal: Signal
     exit_price: float
     exit_time: pd.Timestamp
+    exit_idx: int
     exit_reason: str
     pnl_points: float
     pnl_dollars: float
@@ -76,6 +77,7 @@ def run_backtest(
                 signal=sig,
                 exit_price=exit_price,
                 exit_time=exit_time,
+                exit_idx=exit_idx,
                 exit_reason=exit_reason,
                 pnl_points=pnl_points,
                 pnl_dollars=pnl_points * strategy.point_value,

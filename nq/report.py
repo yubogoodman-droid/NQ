@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import html
 from datetime import datetime
 from pathlib import Path
@@ -76,14 +77,16 @@ def _ma_snapshot(row: pd.Series) -> str:
 
 def _chart_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     p = trade.signal.pattern
-    start = max(0, p.first_low_idx - 18)
-    end = trade.signal.bar_idx + 28
-    for i in range(trade.signal.bar_idx + 1, len(df)):
-        if df.index[i] == trade.exit_time:
-            end = min(len(df) - 1, i + 10)
-            break
-    end = min(len(df) - 1, end)
+    start = max(0, p.first_low_idx - 12)
+    end = min(
+        len(df) - 1,
+        max(trade.exit_idx + 8, trade.signal.bar_idx + 16, p.second_low_idx + 14),
+    )
     return start, end
+
+
+def _img_data_uri(path: Path) -> str:
+    return f"data:image/png;base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
 
 
 def _trade_img_name(trade: TradeResult, trade_no: int) -> str:
@@ -125,10 +128,12 @@ def _draw_trade_png(
     o, h, l, c = window["open"], window["high"], window["low"], window["close"]
     vol = window["volume"] if "volume" in window.columns else None
 
+    close_full = df["close"].astype(float)
+
     fig, (ax, axv) = plt.subplots(
         2,
         1,
-        figsize=(10.4, 5.2),
+        figsize=(10.4, 5.6),
         sharex=True,
         gridspec_kw={"height_ratios": [3.2, 1]},
         facecolor="#0c1210",
@@ -153,15 +158,17 @@ def _draw_trade_png(
         axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
 
     for period in MA_PERIODS:
-        col_name = f"ma{period}"
-        if col_name not in window.columns:
-            continue
-        ma = window[col_name]
+        ma = close_full.rolling(period, min_periods=period).mean().iloc[start : end + 1]
         if ma.notna().sum() == 0:
             continue
         ax.plot(list(xs), ma, color=MA_COLORS[period], lw=1.35 if period <= 20 else 1.05, label=f"MA{period}")
 
-    ax.axhline(p.neckline, color="#ffa726", ls="--", lw=1.0, alpha=0.8)
+    neck_start = p.neckline_idx - start
+    neck_end = sig.bar_idx - start
+    if 0 <= neck_start < len(window) and 0 <= neck_end < len(window):
+        ax.hlines(p.neckline, neck_start, neck_end, colors="#ffa726", linestyles="--", lw=1.0, alpha=0.9)
+    else:
+        ax.axhline(p.neckline, color="#ffa726", ls="--", lw=1.0, alpha=0.8)
     ax.axhline(sig.stop_loss, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
     ax.axhline(sig.target, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
 
@@ -176,8 +183,8 @@ def _draw_trade_png(
         ax.annotate("L2", (l2_rel, p.second_low), textcoords="offset points", xytext=(0, -12),
                     ha="center", color="#f9a8d4", fontsize=8)
 
-    entry_rel = window.index.get_indexer([sig.timestamp], method="nearest")[0]
-    exit_rel = window.index.get_indexer([trade.exit_time], method="nearest")[0]
+    entry_rel = sig.bar_idx - start
+    exit_rel = trade.exit_idx - start
     if 0 <= entry_rel < len(window):
         ax.axvline(entry_rel, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([entry_rel], [sig.entry], s=48, color="#00e676", marker="^", zorder=6)
@@ -185,6 +192,11 @@ def _draw_trade_png(
         ax.axvline(exit_rel, color="#f0c14b", ls=":", lw=0.9)
         exit_color = "#00c805" if trade.pnl_points > 0 else "#ff5252"
         ax.scatter([exit_rel], [trade.exit_price], s=44, color=exit_color, marker="x", zorder=6)
+
+    y_min = float(window["low"].min())
+    y_max = float(window["high"].max())
+    pad = max((y_max - y_min) * 0.06, 2.0)
+    ax.set_ylim(y_min - pad, y_max + pad)
 
     sign = "+" if trade.pnl_points >= 0 else ""
     ax.set_title(
@@ -265,18 +277,18 @@ def build_report_html(
     title: str,
     symbol: str = "NQ=F",
     img_dir: Path | None = None,
-    img_href_prefix: str = "img/",
+    embed_images: bool = True,
 ) -> str:
     df = _add_mas(df)
     stats = summarize(results)
     cards_parts: list[str] = []
     for i, trade in enumerate(results, 1):
         img_name = _trade_img_name(trade, i)
+        img_href = ""
         if img_dir is not None:
-            _draw_trade_png(df, trade, img_dir / img_name, i)
-        cards_parts.append(
-            _render_trade_card(df, trade, i, img_href=f"{img_href_prefix}{img_name}")
-        )
+            png_path = _draw_trade_png(df, trade, img_dir / img_name, i)
+            img_href = _img_data_uri(png_path) if embed_images else f"img/{img_name}"
+        cards_parts.append(_render_trade_card(df, trade, i, img_href=img_href))
     cards = "".join(cards_parts)
     empty = '<div class="empty">今日未偵測到 W 底突破訊號</div>' if not results else ""
 
@@ -468,7 +480,7 @@ def save_report_html(
         title=title,
         symbol=symbol,
         img_dir=img_dir,
-        img_href_prefix="img/",
+        embed_images=True,
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(content, encoding="utf-8")
