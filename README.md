@@ -77,7 +77,7 @@ python3 examples/watch_tw_5m_bounce.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_bounce_ma_stack.pine`。
 
-2026-08-25 成交額前 80、**股價 ≤ 600**：今天 **30 筆**（力成 11:40 仍在；高價的群聯／台光電／緯穎等已拿掉）。  
+2026-08-25 成交額前 80、**進場／現價／當日最高 ≤ 400**：今天 **23 筆**。  
 圖卡：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
