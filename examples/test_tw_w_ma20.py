@@ -24,7 +24,7 @@ from watch_tw_w_ma20 import (  # noqa: E402
     filter_price_below,
     has_cjk,
     hit_key,
-    is_notable_hit,
+    is_strict_hit,
     parse_symbols,
     recent_hits,
     stand_pct,
@@ -56,7 +56,9 @@ def make_yageo_like() -> pd.DataFrame:
     close[28:43] = np.linspace(554.0, 516.0, 15)
     close[43:51] = np.linspace(517.0, 528.0, 8)
     close[51:59] = np.linspace(527.0, 518.5, 8)
-    close[59:] = np.linspace(520.0, 538.0, n - 59)
+    close[59] = 519.0
+    close[60] = 525.0  # 明確站上 MA20，對齊 521 vs 518.55
+    close[61:] = np.linspace(526.0, 538.0, n - 61)
     low = np.minimum(close, np.roll(close, 1)) - 0.4
     low[0] = close[0] - 0.4
     low[42] = 515.0
@@ -108,7 +110,9 @@ def make_nanya_like() -> pd.DataFrame:
     close[26:40] = np.linspace(507.0, 481.0, 14)
     close[40:48] = np.linspace(482.0, 492.0, 8)
     close[48:56] = np.linspace(491.0, 483.5, 8)
-    close[56:] = np.linspace(485.0, 504.0, n - 56)
+    close[56] = 483.8
+    close[57] = 489.5  # 明確站上 MA20，對齊 487 vs 484.43
+    close[58:] = np.linspace(490.0, 504.0, n - 58)
     low = np.minimum(close, np.roll(close, 1)) - 0.35
     low[0] = close[0] - 0.35
     low[39] = 480.0
@@ -329,24 +333,45 @@ def test_filter_hits_days_one_week() -> None:
     assert [h.row["code"] for h in today] == ["1303"]
 
 
-def test_notable_bounce_and_stand() -> None:
-    good = _fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=1.17, stand=0.47)
-    weak = _fake_hit("2408", "南亞科", "2026-08-25 11:30", bounce=0.4, stand=0.1)
-    assert is_notable_hit(good)
-    assert not is_notable_hit(weak)
+def test_strict_keeps_broker_examples() -> None:
+    from watch_tw_w_ma20 import depth_pct, prior_drop_pct
+
+    cases = (
+        (make_yageo_plateau(), "2327", "國巨"),
+        (make_nanya_like(), "2408", "南亞科"),
+        (make_yageo_like(), "2327", "國巨"),
+    )
+    for df, code, name in cases:
+        sigs = detect_w_ma20_crosses(df)
+        assert sigs, name
+        hit = TwHit({"code": code, "name": name, "symbol": f"{code}.TW"}, sigs[-1], df)
+        assert is_strict_hit(hit), (
+            f"{name} bounce={bounce_pct(hit.signal):.2f} stand={stand_pct(hit.signal):.2f} "
+            f"depth={depth_pct(hit.signal):.2f} drop={prior_drop_pct(hit):.2f} "
+            f"ts={df.index[hit.signal.cross_idx]}"
+        )
 
 
-def test_select_chart_hits_pins_yageo() -> None:
+def test_strict_rejects_open_gap_and_weak_kiss() -> None:
+    open_gap = _fake_hit("2408", "南亞科", "2026-08-25 09:00", bounce=2.0, stand=1.0)
+    weak = _fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=0.4, stand=0.1)
+    huge = _fake_hit("8039", "台虹", "2026-08-25 10:00", bounce=8.0, stand=5.0)
+    assert not is_strict_hit(open_gap)
+    assert not is_strict_hit(weak)
+    assert not is_strict_hit(huge)
+
+
+def test_select_chart_hits_picks_strict() -> None:
     from watch_tw_w_ma20 import select_chart_hits
 
-    hits = []
-    for i, bounce in enumerate([3.5, 3.2, 3.0, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8], 1):
-        hits.append(_fake_hit("1000", f"dummy{i}", f"2026-08-25 10:{i:02d}", bounce=bounce, stand=0.4))
-    hits.append(_fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=1.17, stand=0.47))
+    hits = [
+        _fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=1.17, stand=0.47),
+        _fake_hit("2408", "南亞科", "2026-08-25 11:30", bounce=1.46, stand=0.53),
+        _fake_hit("2303", "聯電", "2026-08-25 11:00", bounce=0.3, stand=0.05),
+    ]
     picked = select_chart_hits(hits, per_day=7)
     codes = [h.row["code"] for h in picked]
-    assert codes.count("2327") == 1
-    assert len(picked) <= 8
+    assert codes == ["2327", "2408"]
 
 
 def main() -> int:
@@ -364,8 +389,9 @@ def main() -> int:
     test_filter_price_below_700()
     test_has_cjk_and_chinese_names()
     test_filter_hits_days_one_week()
-    test_notable_bounce_and_stand()
-    test_select_chart_hits_pins_yageo()
+    test_strict_keeps_broker_examples()
+    test_strict_rejects_open_gap_and_weak_kiss()
+    test_select_chart_hits_picks_strict()
     print("ok")
     return 0
 

@@ -6,9 +6,12 @@ swingLen      = input.int(2, "轉折確認 K 數", minval=1)
 minBars       = input.int(6, "兩低點最少間隔", minval=3)
 maxBars       = input.int(48, "兩低點最多間隔", minval=10)
 lowBelowPct   = input.float(1.5, "第二低最多低於第一低 (%)", minval=0.2, step=0.1) / 100
-lowAbovePct   = input.float(2.5, "第二低最多高於第一低 (%)", minval=0.2, step=0.1) / 100
-minNeckPct    = input.float(0.8, "頸線相對低點最小高度 (%)", minval=0.2, step=0.1) / 100
-minDropPct    = input.float(2.5, "進場前最小跌幅 (%)", minval=0.5, step=0.1) / 100
+lowAbovePct   = input.float(1.5, "第二低最多高於第一低 (%)", minval=0.2, step=0.1) / 100
+minNeckPct    = input.float(1.2, "頸線相對低點最小高度 (%)", minval=0.2, step=0.1) / 100
+minDropPct    = input.float(4.0, "進場前最小跌幅 (%)", minval=0.5, step=0.1) / 100
+minBouncePct  = input.float(1.1, "從低點最小彈回 (%)", minval=0.3, step=0.1) / 100
+maxBouncePct  = input.float(3.5, "從低點最大彈回 (%)", minval=1.0, step=0.1) / 100
+minStandPct   = input.float(0.3, "收盤站上 MA20 (%)", minval=0.1, step=0.05) / 100
 priorBars     = input.int(36, "回看出發高點 K 數", minval=8)
 maxCrossBars  = input.int(36, "第二低後幾根內上穿", minval=4)
 maLen         = input.int(20, "MA 週期", minval=5)
@@ -21,8 +24,10 @@ phHigh = ta.highest(high, math.max(1, maxBars))
 
 var float firstLow = na
 var int   firstLowBar = na
+var int   firstLowTime = na
 var float secondLow = na
 var int   secondLowBar = na
+var int   secondLowTime = na
 var float neckline = na
 var int   necklineBar = na
 var bool  wReady = false
@@ -33,8 +38,10 @@ priorHigh = ta.highest(high, priorBars)
 if not na(pl)
     firstLow := pl
     firstLowBar := bar_index - swingLen
+    firstLowTime := time[swingLen]
     secondLow := na
     secondLowBar := na
+    secondLowTime := na
     neckline := na
     necklineBar := na
     wReady := false
@@ -53,6 +60,7 @@ if not na(pl) and not na(firstLow) and (bar_index - swingLen) > firstLowBar
     if gap >= minBars and gap <= maxBars and rel >= -lowBelowPct and rel <= lowAbovePct and dropOk and neckOk
         secondLow := pl
         secondLowBar := bar_index - swingLen
+        secondLowTime := time[swingLen]
         wReady := true
         fired := false
 
@@ -60,7 +68,16 @@ crossUp = ta.crossover(close, ma20)
 confirmBar = not na(secondLowBar) and bar_index >= secondLowBar + swingLen
 stillValid = not na(secondLow) and low >= math.min(firstLow, secondLow) * 0.997
 fresh = not na(secondLowBar) and bar_index - secondLowBar <= maxCrossBars
-longSignal = wReady and not fired and confirmBar and stillValid and fresh and crossUp and close > ma20
+floorPx = math.min(firstLow, secondLow)
+bounce = close / floorPx - 1
+stand = close / ma20 - 1
+taipeiHour = hour(time, "Asia/Taipei")
+taipeiMinute = minute(time, "Asia/Taipei")
+afterOpen = taipeiHour > 9 or (taipeiHour == 9 and taipeiMinute >= 15)
+bounceOk = bounce >= minBouncePct and bounce <= maxBouncePct
+standOk = stand >= minStandPct
+sameDay = not na(firstLowTime) and not na(secondLowTime) and year(time, "Asia/Taipei") == year(firstLowTime, "Asia/Taipei") and dayofyear(time, "Asia/Taipei") == dayofyear(firstLowTime, "Asia/Taipei") and dayofyear(time, "Asia/Taipei") == dayofyear(secondLowTime, "Asia/Taipei")
+longSignal = wReady and not fired and confirmBar and stillValid and fresh and crossUp and close > ma20 and afterOpen and bounceOk and standOk and sameDay
 
 if longSignal
     fired := true

@@ -8,7 +8,8 @@
   python3 examples/watch_tw_w_ma20.py --dry-run --once
   python3 examples/watch_tw_w_ma20.py --once --symbols 2327,2408
   python3 examples/watch_tw_w_ma20.py scan --limit 100 --pages
-  python3 examples/watch_tw_w_ma20.py scan --range 10d --days 7 --pages  # 回測一週
+  python3 examples/watch_tw_w_ma20.py scan --range 10d --days 7 --pages  # 一週，預設嚴格
+  python3 examples/watch_tw_w_ma20.py scan --range 10d --days 7 --loose --pages
   python3 examples/watch_tw_w_ma20.py          # 盤中每根 5 分收盤掃一次
 
 Telegram 憑證放 tg_config.env（勿提交）:
@@ -233,6 +234,18 @@ def filter_hits_days(hits: list[TwHit], days: int, now: datetime | None = None) 
     return [h for h in hits if hit_ts(h).date() >= start]
 
 
+def _series(df: pd.DataFrame, name: str) -> pd.Series:
+    lower = {str(c).lower(): c for c in df.columns}
+    return df[lower[name]]
+
+
+def _taipei_ts(ts: object) -> pd.Timestamp:
+    t = pd.Timestamp(ts)
+    if t.tzinfo is None:
+        return t.tz_localize(TPE)
+    return t.tz_convert(TPE)
+
+
 def bounce_pct(sig: WMa20Signal) -> float:
     base = min(sig.first_low, sig.second_low)
     if base <= 0:
@@ -246,37 +259,88 @@ def stand_pct(sig: WMa20Signal) -> float:
     return (sig.cross_price / sig.ma20 - 1.0) * 100.0
 
 
+def depth_pct(sig: WMa20Signal) -> float:
+    return float(sig.w_depth_pct) * 100.0
+
+
+def skew_pct(sig: WMa20Signal) -> float:
+    base = min(sig.first_low, sig.second_low)
+    if base <= 0:
+        return 0.0
+    return abs(sig.second_low - sig.first_low) / base * 100.0
+
+
+def prior_drop_pct(hit: TwHit, lookback: int = 36) -> float:
+    sig = hit.signal
+    highs = _series(hit.df, "high")
+    start = max(0, sig.first_low_idx - lookback)
+    prior_high = float(highs.iloc[start : sig.first_low_idx + 1].max())
+    base = min(sig.first_low, sig.second_low)
+    if base <= 0:
+        return 0.0
+    return (prior_high / base - 1.0) * 100.0
+
+
+def same_session(hit: TwHit) -> bool:
+    idx = hit.df.index
+    sig = hit.signal
+    d1 = _taipei_ts(idx[sig.first_low_idx]).date()
+    d2 = _taipei_ts(idx[sig.second_low_idx]).date()
+    dx = _taipei_ts(idx[sig.cross_idx]).date()
+    return d1 == d2 == dx
+
+
+def is_strict_hit(hit: TwHit) -> bool:
+    """對齊券商那種盤中 W：同一天、先大跌、雙底夠深，收盤明顯站上 MA20。
+
+    國巨 8/25：515/515 → 521 上穿 518.55（彈回 1.17%、站上 0.47%）
+    南亞科 8/25：480/481 → 487 上穿 484.43（彈回 1.46%、站上 0.53%）
+    """
+    sig = hit.signal
+    if not same_session(hit):
+        return False
+    if hit_ts(hit).strftime("%H:%M") < "09:15":
+        return False
+    bounce, stand, depth, drop, skew = (
+        bounce_pct(sig),
+        stand_pct(sig),
+        depth_pct(sig),
+        prior_drop_pct(hit),
+        skew_pct(sig),
+    )
+    if not (1.10 <= bounce <= 3.50):
+        return False
+    if stand < 0.30:
+        return False
+    if depth < 1.20:
+        return False
+    if drop < 4.00:
+        return False
+    if skew > 1.50:
+        return False
+    return True
+
+
 def is_notable_hit(hit: TwHit, *, min_bounce: float = 1.15, min_stand: float = 0.25) -> bool:
-    return bounce_pct(hit.signal) >= min_bounce and stand_pct(hit.signal) >= min_stand
+    return is_strict_hit(hit)
 
 
 def select_chart_hits(hits: list[TwHit], *, per_day: int = 7) -> list[TwHit]:
-    """每天留幾筆較像樣的圖；開盤缺口先讓路給盤中，國巨/南亞科一定留。"""
-    pin = {"2327", "2408"}
+    """每天留幾筆較像樣的圖；開盤缺口先讓路給盤中。"""
     buckets: dict[str, list[TwHit]] = {}
     for hit in hits:
         buckets.setdefault(hit_ts(hit).strftime("%Y-%m-%d"), []).append(hit)
     picked: list[TwHit] = []
     seen: set[tuple[str, str]] = set()
     for _day, group in buckets.items():
-        notable = [h for h in group if is_notable_hit(h)]
-        later = [h for h in notable if hit_ts(h).strftime("%H:%M") >= "09:10"]
-        opens = [h for h in notable if hit_ts(h).strftime("%H:%M") < "09:10"]
-        ranked = sorted(later, key=lambda h: (bounce_pct(h.signal), stand_pct(h.signal)), reverse=True)
-        ranked += sorted(opens, key=lambda h: (bounce_pct(h.signal), stand_pct(h.signal)), reverse=True)
-        chosen = ranked[:per_day]
-        for hit in group:
-            if str(hit.row.get("code")) in pin and bounce_pct(hit.signal) >= 1.0 and stand_pct(hit.signal) >= 0.25:
-                chosen.append(hit)
-        day_picked = []
-        for hit in chosen:
+        notable = [h for h in group if is_strict_hit(h)]
+        ranked = sorted(notable, key=lambda h: (bounce_pct(h.signal), stand_pct(h.signal)), reverse=True)
+        for hit in ranked[:per_day]:
             key = (str(hit.row["code"]), hit_ts(hit).strftime("%Y-%m-%d %H:%M"))
             if key in seen:
                 continue
             seen.add(key)
-            day_picked.append(hit)
-        day_picked.sort(key=lambda h: hit_ts(h))
-        picked.extend(day_picked)
+            picked.append(hit)
     picked.sort(key=lambda h: hit_ts(h))
     return picked
 
@@ -578,11 +642,11 @@ def write_html(
 ) -> Path:
     cards: list[str] = []
     img_dir = path.parent / "img"
-    show_all_cards = chart_hits is None or chart_hits is hits
-    detail_hits = hits if show_all_cards else list(chart_hits or [])
-    if img_dir.exists() and not show_all_cards:
+    if img_dir.exists():
         for old in img_dir.glob("t*.png"):
             old.unlink()
+    show_all_cards = chart_hits is None or chart_hits is hits
+    detail_hits = hits if show_all_cards else list(chart_hits or [])
     chart_i = 0
     for i, hit in enumerate(detail_hits, 1):
         sig = hit.signal
@@ -600,8 +664,8 @@ def write_html(
             f"<div class='tags'><span class='tag tag-info'>{escape(hit.row['symbol'])}</span>"
             "<span class='tag'>W底</span><span class='tag'>上MA20</span>"
         )
-        if is_notable_hit(hit):
-            tags += "<span class='tag'>像樣</span>"
+        if is_strict_hit(hit):
+            tags += "<span class='tag'>嚴格</span>"
         tags += "</div>"
         cards.append(
             "<article class='trade-card'>"
@@ -614,21 +678,20 @@ def write_html(
             + "<pre class='trade-detail'>"
             f"收盤 {sig.cross_price:.2f}  MA20 {sig.ma20:.2f}\n"
             f"L1 {sig.first_low:.2f} / L2 {sig.second_low:.2f} / 頸線 {sig.neckline:.2f}\n"
-            f"停損 {sig.stop_loss:.2f}  量度 {sig.target:.2f}"
-            f"　彈回 {bounce_pct(sig):.2f}%  站上 {stand_pct(sig):.2f}%"
+            f"停損 {sig.stop_loss:.2f}  量度 {sig.target:.2f}\n"
+            f"彈回 {bounce_pct(sig):.2f}%  站上 {stand_pct(sig):.2f}%"
+            f"  深度 {depth_pct(sig):.2f}%  跌幅 {prior_drop_pct(hit):.2f}%"
             "</pre>"
             + img_html
             + "</article>"
         )
     if not show_all_cards:
         cards.append(_compact_hit_list_html(hits))
-    note = ""
-    if not show_all_cards:
-        note = (
-            "<br/>圖卡每天留盤中較像樣的幾筆（彈回 ≥1.15% 且站上 ≥0.25%）；"
-            "開盤跳空先讓路。國巨/南亞科有訊號會另外留圖。"
-            "全部筆數在頁面最下方清單。"
-        )
+    note = (
+        "<br/>嚴格：同一天做出 W、09:15 後、先跌 ≥4%、頸線深度 ≥1.2%、"
+        "兩低點價差 ≤1.5%、從低點彈回 1.1%～3.5%、收盤站上 MA20 ≥0.3%。"
+        "對齊國巨 515/515→521、南亞科 480/481→487。"
+    )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -659,7 +722,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">標的<b>{len({h.row['code'] for h in hits})}</b></div>
-<div class="card">像樣<b>{sum(1 for h in hits if is_notable_hit(h))}</b></div>
+<div class="card">嚴格<b>{sum(1 for h in hits if is_strict_hit(h))}</b></div>
 </div>
 {_day_summary_html(hits)}
 </section>
@@ -772,7 +835,10 @@ def cmd_scan(args: argparse.Namespace) -> int:
         hits = filter_hits_days(hits, 1)
     elif days:
         hits = filter_hits_days(hits, days)
-    print(f"done hits={len(hits)}")
+    loose = bool(getattr(args, "loose", False))
+    if not loose:
+        hits = [h for h in hits if is_strict_hit(h)]
+    print(f"done hits={len(hits)} {'loose' if loose else 'strict'}")
     for i, hit in enumerate(hits, 1):
         ts = hit_ts(hit)
         print(
@@ -780,6 +846,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
             f"{ts.strftime('%m-%d %H:%M')} close={hit.signal.cross_price:.2f} "
             f"ma20={hit.signal.ma20:.2f} L1={hit.signal.first_low:.2f} L2={hit.signal.second_low:.2f}"
             f" bounce={bounce_pct(hit.signal):.2f}% stand={stand_pct(hit.signal):.2f}%"
+            f" depth={depth_pct(hit.signal):.2f}% drop={prior_drop_pct(hit):.2f}%"
         )
     html_path = Path(args.html).resolve() if args.html else None
     if html_path is None and args.pages:
@@ -799,8 +866,10 @@ def cmd_scan(args: argparse.Namespace) -> int:
             start = (datetime.now(TPE).date() - timedelta(days=days - 1)).isoformat()
             end = datetime.now(TPE).date().isoformat()
             period = f"{start}～{end} · {period}"
-        notable = [h for h in hits if is_notable_hit(h)]
-        if len(hits) > 40:
+        if not loose:
+            period += " · 嚴格"
+        notable = [h for h in hits if is_strict_hit(h)]
+        if loose and len(hits) > 40:
             chart_hits = select_chart_hits(hits)
         else:
             chart_hits = hits
@@ -835,6 +904,8 @@ def cmd_alert(args: argparse.Namespace) -> int:
             universe = load_universe(args)
             hits = collect_hits(universe, args.range, args.sleep, live=True)
             hits = [h for h in hits if hit_under_max_price(h, args.max_price)]
+            if not getattr(args, "loose", False):
+                hits = [h for h in hits if is_strict_hit(h)]
             fresh = recent_hits(hits, args.lookback_hours)
             sent = notify_hits(
                 fresh,
@@ -868,6 +939,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--symbols", default="", help="指定代號，例如 2327,2408")
         sp.add_argument("--range", dest="range_", default="5d")
         sp.add_argument("--sleep", type=float, default=0.2)
+        sp.add_argument("--loose", action="store_true", help="不過濾，列出全部吻線訊號")
 
     s = sub.add_parser("scan", help="回看最近幾天的 W 底上 MA20")
     add_common(s)
