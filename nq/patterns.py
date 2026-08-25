@@ -295,6 +295,7 @@ def detect_w_ma20_crosses(
     low_above_pct: float = 0.025,
     min_neck_pct: float = 0.008,
     min_prior_drop_pct: float = 0.025,
+    min_session_drop_pct: float = 0.035,
     prior_lookback: int = 36,
     max_bars_to_cross: int = 36,
     invalidate_pct: float = 0.003,
@@ -309,7 +310,8 @@ def detect_w_ma20_crosses(
     對齊券商五分圖：先大跌做出雙底，反彈等到 5/10/20 多排
     （收盤也站上 MA5）才通知。不要求先突破頸線。
 
-    排除缺口後貼著箱型打底（例如旺宏 8/25 117.5–119.5 橫盤）：
+    排除缺口後貼著箱型打底（例如旺宏、華邦電）：
+    當天五分圖要先有夠深的殺勢（不能只靠隔夜缺口），
     頸線不能貼在第一低旁邊、兩低點之間不能一再測底，
     而且第一低不能已是當天同一層的第二次。
     """
@@ -342,6 +344,13 @@ def detect_w_ma20_crosses(
         look_from = max(0, first_idx - prior_lookback)
         prior_high = max(highs[look_from : first_idx + 1])
         if (prior_high - first_low) / first_low < min_prior_drop_pct:
+            continue
+        sess = first_idx
+        first_day = _bar_day(ohlc.index[first_idx])
+        while sess > 0 and _bar_day(ohlc.index[sess - 1]) == first_day:
+            sess -= 1
+        sess_high = max(highs[sess : first_idx + 1])
+        if (sess_high - first_low) / first_low < min_session_drop_pct:
             continue
         ma1 = ma20[first_idx]
         if ma1 != ma1 or first_low >= ma1:

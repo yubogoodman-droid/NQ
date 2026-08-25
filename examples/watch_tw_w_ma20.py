@@ -281,6 +281,22 @@ def prior_drop_pct(hit: TwHit, lookback: int = 36) -> float:
     return (prior_high / base - 1.0) * 100.0
 
 
+def session_drop_pct(hit: TwHit) -> float:
+    """當天五分圖從開盤高點殺到 W 低點的跌幅；缺口後橫盤這段會很小。"""
+    sig = hit.signal
+    idx = hit.df.index
+    highs = _series(hit.df, "high")
+    day = _taipei_ts(idx[sig.first_low_idx]).date()
+    start = sig.first_low_idx
+    while start > 0 and _taipei_ts(idx[start - 1]).date() == day:
+        start -= 1
+    session_high = float(highs.iloc[start : sig.first_low_idx + 1].max())
+    base = min(sig.first_low, sig.second_low)
+    if base <= 0:
+        return 0.0
+    return (session_high / base - 1.0) * 100.0
+
+
 def same_session(hit: TwHit) -> bool:
     idx = hit.df.index
     sig = hit.signal
@@ -301,12 +317,13 @@ def is_strict_hit(hit: TwHit) -> bool:
         return False
     if hit_ts(hit).strftime("%H:%M") < "09:15":
         return False
-    bounce, stand, depth, drop, skew = (
+    bounce, stand, depth, drop, skew, intra = (
         bounce_pct(sig),
         stand_pct(sig),
         depth_pct(sig),
         prior_drop_pct(hit),
         skew_pct(sig),
+        session_drop_pct(hit),
     )
     if not (1.10 <= bounce <= 3.50):
         return False
@@ -316,7 +333,9 @@ def is_strict_hit(hit: TwHit) -> bool:
         return False
     if drop < 5.50:
         return False
-    if skew > 1.50:
+    if intra < 3.50:
+        return False
+    if skew > 1.00:
         return False
     if not (sig.ma5 > sig.ma10 > sig.ma20 and sig.cross_price > sig.ma5):
         return False
@@ -684,6 +703,7 @@ def write_html(
             f"停損 {sig.stop_loss:.2f}  量度 {sig.target:.2f}\n"
             f"彈回 {bounce_pct(sig):.2f}%  站上 {stand_pct(sig):.2f}%"
             f"  深度 {depth_pct(sig):.2f}%  跌幅 {prior_drop_pct(hit):.2f}%"
+            f"  當日殺 {session_drop_pct(hit):.2f}%"
             "</pre>"
             + img_html
             + "</article>"
@@ -691,11 +711,11 @@ def write_html(
     if not show_all_cards:
         cards.append(_compact_hit_list_html(hits))
     note = (
-        "<br/>嚴格：同一天做出 W、09:15 後、先跌 ≥5.5%、頸線深度 ≥1.2%、"
-        "兩低點價差 ≤1.5%、從低點彈回 1.1%～3.5%、收盤站上 MA20 ≥0.45%，"
+        "<br/>嚴格：同一天做出 W、09:15 後、當天五分圖先跌 ≥3.5%、回看出發高點跌 ≥5.5%、"
+        "頸線深度 ≥1.2%、兩低點價差 ≤1.0%、從低點彈回 1.1%～3.5%、收盤站上 MA20 ≥0.45%，"
         "且五分 MA5&gt;MA10&gt;MA20 多頭排列才進場。"
         "對齊國巨 515/515→11:50 多排、南亞科 480/482→11:55 多排。"
-        "缺口後貼箱型打底（如旺宏 117.5–119.5 橫盤）不算 W。"
+        "缺口後貼箱型打底（旺宏、華邦電那種）不算 W。"
     )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
@@ -853,6 +873,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
             f"L1={hit.signal.first_low:.2f} L2={hit.signal.second_low:.2f}"
             f" bounce={bounce_pct(hit.signal):.2f}% stand={stand_pct(hit.signal):.2f}%"
             f" depth={depth_pct(hit.signal):.2f}% drop={prior_drop_pct(hit):.2f}%"
+            f" intra={session_drop_pct(hit):.2f}%"
         )
     html_path = Path(args.html).resolve() if args.html else None
     if html_path is None and args.pages:

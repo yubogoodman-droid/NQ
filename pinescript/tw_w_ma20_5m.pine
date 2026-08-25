@@ -6,9 +6,10 @@ swingLen      = input.int(2, "轉折確認 K 數", minval=1)
 minBars       = input.int(6, "兩低點最少間隔", minval=3)
 maxBars       = input.int(48, "兩低點最多間隔", minval=10)
 lowBelowPct   = input.float(1.5, "第二低最多低於第一低 (%)", minval=0.2, step=0.1) / 100
-lowAbovePct   = input.float(1.5, "第二低最多高於第一低 (%)", minval=0.2, step=0.1) / 100
+lowAbovePct   = input.float(1.0, "第二低最多高於第一低 (%)", minval=0.2, step=0.1) / 100
 minNeckPct    = input.float(1.2, "頸線相對低點最小高度 (%)", minval=0.2, step=0.1) / 100
 minDropPct    = input.float(5.5, "進場前最小跌幅 (%)", minval=0.5, step=0.1) / 100
+minSessionDropPct = input.float(3.5, "當天五分圖最小跌幅 (%)", minval=0.5, step=0.1) / 100
 minBouncePct  = input.float(1.1, "從低點最小彈回 (%)", minval=0.3, step=0.1) / 100
 maxBouncePct  = input.float(3.5, "從低點最大彈回 (%)", minval=1.0, step=0.1) / 100
 minStandPct   = input.float(0.45, "收盤站上 MA20 (%)", minval=0.1, step=0.05) / 100
@@ -80,10 +81,14 @@ stand = close / ma20 - 1
 taipeiHour = hour(time, "Asia/Taipei")
 taipeiMinute = minute(time, "Asia/Taipei")
 afterOpen = taipeiHour > 9 or (taipeiHour == 9 and taipeiMinute >= 15)
+taipeiMins = taipeiHour * 60 + taipeiMinute
+barsToday = math.max(1, int((taipeiMins - 540) / 5) + 1)
+sessHigh = ta.highest(high, barsToday)
+intraOk = not na(firstLow) and (sessHigh - math.min(firstLow, nz(secondLow, firstLow))) / math.min(firstLow, nz(secondLow, firstLow)) >= minSessionDropPct
 bounceOk = bounce >= minBouncePct and bounce <= maxBouncePct
 standOk = stand >= minStandPct
 sameDay = not na(firstLowTime) and not na(secondLowTime) and year(time, "Asia/Taipei") == year(firstLowTime, "Asia/Taipei") and dayofyear(time, "Asia/Taipei") == dayofyear(firstLowTime, "Asia/Taipei") and dayofyear(time, "Asia/Taipei") == dayofyear(secondLowTime, "Asia/Taipei")
-longSignal = wReady and not fired and confirmBar and stillValid and fresh and stackFlip and close > ma20 and afterOpen and bounceOk and standOk and sameDay
+longSignal = wReady and not fired and confirmBar and stillValid and fresh and stackFlip and close > ma20 and afterOpen and bounceOk and standOk and sameDay and intraOk
 
 if longSignal
     fired := true

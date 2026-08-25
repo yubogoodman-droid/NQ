@@ -321,7 +321,16 @@ def test_has_cjk_and_chinese_names() -> None:
     assert [r["name"] for r in out] == ["國巨", "南亞科", "聯電"]
 
 
-def _fake_hit(code: str, name: str, when: str, *, bounce: float = 2.0, stand: float = 0.4) -> TwHit:
+def _fake_hit(
+    code: str,
+    name: str,
+    when: str,
+    *,
+    bounce: float = 2.0,
+    stand: float = 0.4,
+    intra: float = 8.0,
+    skew: float = 0.0,
+) -> TwHit:
     ts = pd.Timestamp(when, tz=TPE)
     start = ts.normalize() + pd.Timedelta(hours=9)
     idx = pd.date_range(start, periods=54, freq="5min", tz=TPE)
@@ -337,8 +346,9 @@ def _fake_hit(code: str, name: str, when: str, *, bounce: float = 2.0, stand: fl
         index=idx,
     )
     loc = int(df.index.get_indexer([ts], method="nearest")[0])
-    df.iloc[max(0, loc - 20), df.columns.get_loc("High")] = 108.0
     base = 100.0
+    session_high = base * (1 + intra / 100.0)
+    df.iloc[max(0, loc - 20), df.columns.get_loc("High")] = session_high
     cross = base * (1 + bounce / 100.0)
     ma20 = cross / (1 + stand / 100.0)
     ma5 = cross * 0.999
@@ -350,7 +360,7 @@ def _fake_hit(code: str, name: str, when: str, *, bounce: float = 2.0, stand: fl
         second_low_idx=max(0, loc - 4),
         neckline_idx=max(0, loc - 7),
         first_low=base,
-        second_low=base,
+        second_low=base * (1 + skew / 100.0),
         neckline=base * 1.02,
         cross_idx=loc,
         cross_price=cross,
@@ -376,7 +386,7 @@ def test_filter_hits_days_one_week() -> None:
 
 
 def test_strict_keeps_broker_examples() -> None:
-    from watch_tw_w_ma20 import depth_pct, prior_drop_pct
+    from watch_tw_w_ma20 import depth_pct, prior_drop_pct, session_drop_pct
 
     cases = (
         (make_yageo_plateau(), "2327", "國巨"),
@@ -390,6 +400,7 @@ def test_strict_keeps_broker_examples() -> None:
         assert is_strict_hit(hit), (
             f"{name} bounce={bounce_pct(hit.signal):.2f} stand={stand_pct(hit.signal):.2f} "
             f"depth={depth_pct(hit.signal):.2f} drop={prior_drop_pct(hit):.2f} "
+            f"intra={session_drop_pct(hit):.2f} "
             f"ts={df.index[hit.signal.cross_idx]}"
         )
 
@@ -398,9 +409,13 @@ def test_strict_rejects_open_gap_and_weak_kiss() -> None:
     open_gap = _fake_hit("2408", "南亞科", "2026-08-25 09:00", bounce=2.0, stand=1.0)
     weak = _fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=0.4, stand=0.1)
     huge = _fake_hit("8039", "台虹", "2026-08-25 10:00", bounce=4.0, stand=1.0)
+    gap_range = _fake_hit("2344", "華邦電", "2026-08-25 11:15", bounce=1.8, stand=0.6, intra=2.7)
+    high_l2 = _fake_hit("2303", "聯電", "2026-08-25 11:35", bounce=2.2, stand=0.6, skew=1.32)
     assert not is_strict_hit(open_gap)
     assert not is_strict_hit(weak)
     assert not is_strict_hit(huge)
+    assert not is_strict_hit(gap_range)
+    assert not is_strict_hit(high_l2)
 
 
 def test_select_chart_hits_picks_strict() -> None:
