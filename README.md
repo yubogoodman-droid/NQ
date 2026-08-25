@@ -45,6 +45,35 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## 台股 5 分 K 破底反彈 → 5/10/20 多頭排列通知
+
+對齊力成（6239）那種五分圖：急殺破近期低點後 V 彈，**第一次**出現 `5MA > 10MA > 20MA` 就推 Telegram（可帶圖）。
+
+| 條件 | 預設 |
+|------|------|
+| 週期 | 5 分 K |
+| 破底 | 跌破近 48 根（約 4 小時）低點，且自該段高點跌幅 ≥ 2% |
+| 反彈視窗 | 破底後 24 根內 |
+| 通知 | 5MA > 10MA > 20MA 剛成立，MA5 上彎，自低點反彈 ≥ 1%；09:30 前不報（避開開盤雜訊） |
+
+```bash
+# 先看力成近 5 日有沒有這種圖
+python3 examples/watch_tw_5m_bounce.py scan --symbols 6239 --range 5d --pages
+
+# 成交額前 80 回看 + 手機版 HTML
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
+
+# Telegram（憑證放 tg_config.env）
+python3 examples/watch_tw_5m_bounce.py alert --test
+python3 examples/watch_tw_5m_bounce.py alert --dry-run --once
+python3 examples/watch_tw_5m_bounce.py alert
+```
+
+盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_bounce_ma_stack.pine`。
+
+力成 6239 近 5 日（含今日 10:55 破 259、11:40 成 5>10>20）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash

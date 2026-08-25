@@ -1,0 +1,57 @@
+//@version=5
+indicator("台股 5分K 破底反彈 · 5/10/20 多頭排列", overlay=true)
+
+lookback    = input.int(48, "破底回看 K 數", minval=12)
+minDropPct  = input.float(2.0, "最小跌幅 %", minval=0.5, step=0.1)
+minBouncePct = input.float(1.0, "最小反彈 %", minval=0.3, step=0.1)
+reboundBars = input.int(24, "反彈視窗（根）", minval=6)
+slopeBars   = input.int(3, "MA5 上彎回看", minval=1)
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, 20)
+ma60 = ta.sma(close, 60)
+ma120 = ta.sma(close, 120)
+ma240 = ta.sma(close, 240)
+
+stacked    = ma5 > ma10 and ma10 > ma20
+stackNew   = stacked and not stacked[1]
+priorLow   = ta.lowest(low[1], lookback)
+winHigh    = ta.highest(high[1], lookback)
+dropPct    = winHigh > 0 ? (winHigh - low) / winHigh * 100 : 0
+dumpBar    = low < priorLow and dropPct >= minDropPct
+
+var float trough = na
+var int   troughBar = na
+var float dumpHigh = na
+
+if dumpBar
+    if na(trough) or low < trough
+        trough := low
+        troughBar := bar_index
+        dumpHigh := winHigh
+
+if not na(troughBar) and bar_index - troughBar > reboundBars
+    trough := na
+    troughBar := na
+    dumpHigh := na
+
+bouncePct = not na(trough) and trough > 0 ? (close - trough) / trough * 100 : 0
+ma5Up = ma5 > ma5[slopeBars]
+skipOpen = hour(time, "Asia/Taipei") == 9 and minute(time, "Asia/Taipei") < 30
+sig = stackNew and not na(trough) and bouncePct >= minBouncePct and ma5Up and bar_index > troughBar and not skipOpen
+
+if sig
+    trough := na
+    troughBar := na
+    dumpHigh := na
+
+plot(ma5, "5MA", color=color.new(#3b82f6, 0), linewidth=2)
+plot(ma10, "10MA", color=color.new(#22c55e, 0), linewidth=2)
+plot(ma20, "20MA", color=color.new(#f59e0b, 0), linewidth=2)
+plot(ma60, "60MA", color=color.new(#14b8a6, 0))
+plot(ma120, "120MA", color=color.new(#a855f7, 0))
+plot(ma240, "240MA", color=color.new(#f472b6, 0))
+
+plotshape(sig, title="破底反彈多頭排列", style=shape.triangleup, location=location.belowbar, color=color.red, size=size.small)
+alertcondition(sig, title="破底後 5/10/20 多頭排列", message="破底反彈：5分K 5>10>20 多頭排列")
