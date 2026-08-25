@@ -66,6 +66,9 @@ python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
 # 只看今天（台北）的訊號，並把力成併進去
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pages
 
+# 拿掉股價 600 以上
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 600 --today --pages
+
 # Telegram（憑證放 tg_config.env）
 python3 examples/watch_tw_5m_bounce.py alert --test
 python3 examples/watch_tw_5m_bounce.py alert --dry-run --once

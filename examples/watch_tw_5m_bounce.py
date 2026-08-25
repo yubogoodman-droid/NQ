@@ -787,6 +787,8 @@ def cmd_scan(args) -> int:
         on_day = resolve_on_day(args)
         if on_day is not None:
             period = f"{on_day.isoformat()} · {args.range_}資料"
+        if args.max_price is not None:
+            period += f" · 股價≤{args.max_price:g}"
         out = write_html_report(html_path, hits, universe, period)
         write_view_html(out)
         print(f"html={out}")
