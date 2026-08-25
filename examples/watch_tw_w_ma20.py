@@ -40,7 +40,6 @@ from scan_tw_ma_reclaim import (  # noqa: E402
     _chart_payload_to_df,
     _get_json,
     fetch_top_turnover,
-    filter_by_max_price,
     last_tw_session_yyyymmdd,
     resolve_twse_date,
     yahoo_symbol,
@@ -141,22 +140,52 @@ def parse_symbols(text: str) -> list[dict]:
     return rows
 
 
+def filter_price_below(rows: list[dict], max_price: float | None, limit: int) -> tuple[list[dict], list[dict]]:
+    """股價達到 max_price（含）以上的剔除，例如 700 以上不看。"""
+    if max_price is None:
+        kept = rows[:limit]
+        return kept, []
+    kept: list[dict] = []
+    dropped: list[dict] = []
+    for row in rows:
+        px = row.get("close")
+        if px is None or float(px) >= max_price:
+            dropped.append(row)
+            continue
+        kept.append(row)
+        if len(kept) >= limit:
+            break
+    for i, row in enumerate(kept, 1):
+        row["rank"] = i
+    return kept, dropped
+
+
+def hit_under_max_price(hit: TwHit, max_price: float | None) -> bool:
+    if max_price is None:
+        return True
+    last = float(hit.df["Close"].iloc[-1])
+    listed = hit.row.get("close")
+    px = max(last, float(listed) if listed is not None else last)
+    return px < max_price
+
+
 def load_universe(args: argparse.Namespace) -> list[dict]:
     if getattr(args, "symbols", ""):
         return parse_symbols(args.symbols)
     date = resolve_twse_date(args.date or last_tw_session_yyyymmdd())
-    pool = max(args.limit, args.pool if args.max_price else args.limit)
+    max_price = args.max_price
+    pool = max(args.limit, args.pool if max_price else args.limit)
     raw = fetch_top_turnover(date, pool)
-    universe, dropped = filter_by_max_price(raw, args.max_price, args.limit)
+    universe, dropped = filter_price_below(raw, max_price, args.limit)
     if dropped:
         print(
-            f"drop price>{args.max_price}: "
+            f"drop price>={max_price:g}: "
             + ", ".join(f"{r['code']} {r['close']}" for r in dropped[:8])
             + (" …" if len(dropped) > 8 else ""),
             file=sys.stderr,
         )
     print(
-        f"universe date={date} n={len(universe)} "
+        f"universe date={date} n={len(universe)} max_price={max_price} "
         f"{universe[0]['code']} {universe[0]['name']}" if universe else "universe empty",
         file=sys.stderr,
     )
@@ -536,6 +565,10 @@ def cmd_scan(args: argparse.Namespace) -> int:
     if not universe:
         return 1
     hits = collect_hits(universe, args.range, args.sleep, live=False)
+    hits = [h for h in hits if hit_under_max_price(h, args.max_price)]
+    if getattr(args, "today", False):
+        day = datetime.now(TPE).strftime("%m-%d")
+        hits = [h for h in hits if h.df.index[h.signal.cross_idx].strftime("%m-%d") == day]
     print(f"done hits={len(hits)}")
     for i, hit in enumerate(hits, 1):
         ts = hit.df.index[hit.signal.cross_idx]
@@ -544,9 +577,20 @@ def cmd_scan(args: argparse.Namespace) -> int:
             f"{ts.strftime('%m-%d %H:%M')} close={hit.signal.cross_price:.2f} "
             f"ma20={hit.signal.ma20:.2f} L1={hit.signal.first_low:.2f} L2={hit.signal.second_low:.2f}"
         )
-    html_path = Path(args.html) if args.html else (PAGES if args.pages else None)
+    html_path = Path(args.html) if args.html else None
+    if html_path is None and args.pages:
+        html_path = (
+            REPO / "docs" / "tw-w-ma20-today" / "index.html"
+            if getattr(args, "today", False)
+            else PAGES
+        )
     if html_path:
-        out = write_html(html_path, hits, universe, args.range)
+        period = args.range
+        if args.max_price:
+            period += f" · 股價<{args.max_price:g}"
+        if getattr(args, "today", False):
+            period = datetime.now(TPE).strftime("%Y-%m-%d") + " · " + period
+        out = write_html(html_path, hits, universe, period)
         write_view_html(out)
         print(f"html={out}")
     return 0
@@ -576,6 +620,7 @@ def cmd_alert(args: argparse.Namespace) -> int:
         try:
             universe = load_universe(args)
             hits = collect_hits(universe, args.range, args.sleep, live=True)
+            hits = [h for h in hits if hit_under_max_price(h, args.max_price)]
             fresh = recent_hits(hits, args.lookback_hours)
             sent = notify_hits(
                 fresh,
@@ -605,7 +650,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--date", default="", help="成交額排名基準日 YYYYMMDD")
         sp.add_argument("--limit", type=int, default=100)
         sp.add_argument("--pool", type=int, default=200)
-        sp.add_argument("--max-price", type=float, default=None)
+        sp.add_argument("--max-price", type=float, default=700, help="股價達此值以上剔除，預設 700")
         sp.add_argument("--symbols", default="", help="指定代號，例如 2327,2408")
         sp.add_argument("--range", dest="range_", default="5d")
         sp.add_argument("--sleep", type=float, default=0.2)
@@ -614,6 +659,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(s)
     s.add_argument("--pages", action="store_true")
     s.add_argument("--html", default="")
+    s.add_argument("--today", action="store_true", help="只留今天的訊號")
     s.set_defaults(func=cmd_scan, range=None)
 
     a = sub.add_parser("alert", help="Telegram 輪詢")
@@ -633,6 +679,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lookback-hours", type=float, default=8.0)
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
+    p.add_argument("--today", action="store_true", help="只留今天的訊號")
     return p
 
 

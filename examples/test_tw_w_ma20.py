@@ -17,6 +17,7 @@ from nq.patterns import detect_w_bottoms, detect_w_ma20_crosses  # noqa: E402
 from watch_tw_w_ma20 import (  # noqa: E402
     TPE,
     drop_forming_bar,
+    filter_price_below,
     hit_key,
     parse_symbols,
     recent_hits,
@@ -240,6 +241,21 @@ def test_hit_key_and_recent() -> None:
     assert old == [] or df.index[sigs[-1].cross_idx] >= datetime.now(TPE) - pd.Timedelta(hours=0.01)
 
 
+def test_filter_price_below_700() -> None:
+    rows = [
+        {"code": "2327", "close": 537.0},
+        {"code": "2408", "close": 503.0},
+        {"code": "2330", "close": 1400.0},
+        {"code": "2454", "close": 700.0},
+        {"code": "2303", "close": 55.0},
+        {"code": "3008", "close": 2500.0},
+    ]
+    kept, dropped = filter_price_below(rows, 700.0, 100)
+    assert [r["code"] for r in kept] == ["2327", "2408", "2303"]
+    assert {r["code"] for r in dropped} == {"2330", "2454", "3008"}
+    assert kept[0]["rank"] == 1
+
+
 def main() -> int:
     test_yageo_like_alerts()
     test_yageo_plateau_second_bottom()
@@ -252,6 +268,7 @@ def main() -> int:
     test_parse_symbols()
     test_drop_forming_bar()
     test_hit_key_and_recent()
+    test_filter_price_below_700()
     print("ok")
     return 0
 
