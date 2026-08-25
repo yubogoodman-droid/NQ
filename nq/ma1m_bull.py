@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 HORIZONS = (5, 15, 30, 60, 240)  # 1m 根數 → 5m / 15m / 30m / 1h / 4h
+FIVE_MIN_MS = 5 * 60_000
 
 
 def sma(arr: np.ndarray, n: int) -> np.ndarray:
@@ -21,7 +22,7 @@ def sma(arr: np.ndarray, n: int) -> np.ndarray:
 
 
 def add_mas(d: dict) -> dict:
-    """1 分鐘收盤的 SMA 7/14/25/99/120/200。"""
+    """收盤 SMA 7/14/25/99/120/200（週期隨 K 線，1m 就是 1m 均、5m 就是 5m 均）。"""
     out = dict(d)
     c, v = d["c"], d["v"]
     out["m7"] = sma(c, 7)
@@ -32,6 +33,34 @@ def add_mas(d: dict) -> dict:
     out["m200"] = sma(c, 200)
     out["v20"] = sma(v, 20)
     return out
+
+
+def resample_ohlcv(d: dict, interval_ms: int = FIVE_MIN_MS) -> dict:
+    """把已排序的較細 K 線合成較大週期（預設 5 分）。"""
+    t = np.asarray(d["t"], dtype=np.int64)
+    if t.size == 0:
+        return {k: np.array([]) for k in ("t", "o", "h", "l", "c", "v")}
+    bucket = t - (t % interval_ms)
+    change = np.ones(t.size, dtype=bool)
+    change[1:] = bucket[1:] != bucket[:-1]
+    starts = np.flatnonzero(change)
+    ends = np.r_[starts[1:], t.size]
+    return {
+        "t": bucket[starts],
+        "o": np.asarray(d["o"], dtype=float)[starts],
+        "h": np.maximum.reduceat(np.asarray(d["h"], dtype=float), starts),
+        "l": np.minimum.reduceat(np.asarray(d["l"], dtype=float), starts),
+        "c": np.asarray(d["c"], dtype=float)[ends - 1],
+        "v": np.add.reduceat(np.asarray(d["v"], dtype=float), starts),
+    }
+
+
+def bar_index_at(times: np.ndarray, ts: int) -> int:
+    """含 ts 的那根（開盤時間 ≤ ts 的最後一根）。"""
+    if len(times) == 0:
+        return 0
+    i = int(np.searchsorted(times, ts, side="right") - 1)
+    return max(i, 0)
 
 
 def stack_ok(d: dict, i: int) -> bool:

@@ -11,10 +11,13 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.ma1m_bull import (  # noqa: E402
+    FIVE_MIN_MS,
     add_mas,
+    bar_index_at,
     detect_combo,
     forward_moves,
     ma_widths,
+    resample_ohlcv,
     ribbon_ok,
     sma,
     stack_ok,
@@ -278,6 +281,48 @@ def test_is_usdt_stock_perp() -> None:
     assert "XAUUSDT" not in {x[0] for x in select_universe(symbols, tickers, pool="both", top_n=0)}
 
 
+def test_resample_5m_and_bar_at() -> None:
+    t0 = 1_700_000_100_000  # 對齊 5 分鐘（300_000 ms）
+    n = 10
+    raw = {
+        "t": np.arange(n, dtype=np.int64) * 60_000 + t0,
+        "o": np.array([10.0, 11, 12, 13, 14, 20, 21, 22, 23, 24], dtype=float),
+        "h": np.array([10.5, 11.5, 12.5, 13.5, 14.5, 20.5, 21.5, 22.5, 23.5, 24.5], dtype=float),
+        "l": np.array([9.5, 10.5, 11.5, 12.5, 13.5, 19.5, 20.5, 21.5, 22.5, 23.5], dtype=float),
+        "c": np.array([11.0, 12, 13, 14, 15, 21, 22, 23, 24, 25], dtype=float),
+        "v": np.ones(n, dtype=float),
+    }
+    d5 = resample_ohlcv(raw, FIVE_MIN_MS)
+    assert len(d5["c"]) == 2
+    assert d5["t"][0] == t0
+    assert d5["o"][0] == 10.0
+    assert d5["c"][0] == 15.0
+    assert d5["h"][0] == 14.5
+    assert d5["l"][0] == 9.5
+    assert d5["v"][0] == 5.0
+    assert d5["o"][1] == 20.0
+    assert d5["c"][1] == 25.0
+    assert bar_index_at(d5["t"], t0 + 60_000) == 0
+    assert bar_index_at(d5["t"], t0 + 5 * 60_000) == 1
+
+
+def test_entry_mark_is_next_1m_open() -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from binance_1m_bull import entry_mark
+
+    d = add_mas(_make_stack_bars())
+    sigs = detect_combo(d, **LOOSE)
+    entry, _moves = forward_moves(d, sigs[0])
+    row = SignalRow(symbol="TESTUSDT", sig=sigs[0], time_ms=int(d["t"][sigs[0].idx]), entry=entry, moves=_moves)
+    i, px = entry_mark(d, row, "1m")
+    assert i == sigs[0].idx + 1
+    assert abs(px - d["o"][i]) < 1e-9
+    d5 = resample_ohlcv(d, FIVE_MIN_MS)
+    j, px5 = entry_mark(d5, row, "5m")
+    assert 0 <= j < len(d5["c"])
+    assert abs(px5 - entry) < 1e-9
+
+
 def test_write_view_html_uses_pages_urls() -> None:
     import importlib.util
 
@@ -314,6 +359,8 @@ def main() -> int:
     test_default_circled_filters_need_volume()
     test_default_date_uses_yesterday_before_2am()
     test_is_usdt_stock_perp()
+    test_resample_5m_and_bar_at()
+    test_entry_mark_is_next_1m_open()
     test_write_view_html_uses_pages_urls()
     print("ok")
     return 0

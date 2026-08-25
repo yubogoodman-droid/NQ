@@ -26,11 +26,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.binance import SESSION, fetch_klines, universe
 from nq.ma1m_bull import (
+    FIVE_MIN_MS,
     HORIZONS,
     SignalRow,
     add_mas,
+    bar_index_at,
     detect_combo,
     forward_moves,
+    resample_ohlcv,
     sma,
     summarize_rows,
 )
@@ -41,7 +44,8 @@ SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
 PAGES_IMG = "https://raw.githubusercontent.com/yubogoodman-droid/NQ/gh-pages/binance/"
-IMG_VER = "kiss0154"
+IMG_VER = "kiss0155"
+CIRCLE = "#F6465D"
 # 幣安 App 淺色盤：黃/橘/紫/藍/青 + 深灰 MA200
 PAL = {7: "#F0B90B", 14: "#FF6D00", 25: "#D500F9", 99: "#2962FF", 120: "#00B8D4", 200: "#474D57"}
 VOL_MA = {5: "#F0B90B", 10: "#D500F9"}
@@ -190,21 +194,44 @@ def _style_ax(ax) -> None:
     ax.spines["right"].set_visible(False)
 
 
-def draw_chart(sym: str, d: dict, row: SignalRow, path: Path, title_note: str = "") -> Path | None:
+def entry_mark(d: dict, row: SignalRow, tf: str) -> tuple[int, float]:
+    """進場＝訊號下一根 1m 開盤。1m 圖圈那根；5m 圖圈含進場時間的那根。"""
+    if tf == "1m":
+        nxt = row.sig.idx + 1
+        if 0 <= nxt < len(d["c"]):
+            px = float(row.entry) if row.entry == row.entry else float(d["o"][nxt])
+            return nxt, px
+        return row.sig.idx, float(row.sig.close)
+    ts = int(row.time_ms) + 60_000
+    i = bar_index_at(d["t"], ts)
+    px = float(row.entry) if row.entry == row.entry else float(d["c"][i])
+    return i, px
+
+
+def draw_chart(
+    sym: str,
+    d: dict,
+    row: SignalRow,
+    path: Path,
+    title_note: str = "",
+    *,
+    tf: str = "1m",
+) -> Path | None:
     try:
         import matplotlib
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        from matplotlib.patches import Rectangle
+        from matplotlib.patches import Ellipse, Rectangle
 
         plt.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei", "Droid Sans Fallback", "DejaVu Sans"]
         plt.rcParams["axes.unicode_minus"] = False
     except Exception:
         return None
-    i = row.sig.idx
-    a0 = max(0, i - 80)
-    a1 = min(len(d["c"]), i + 30)
+    mark_i, mark_px = entry_mark(d, row, tf)
+    lookback, lookfwd = (80, 30) if tf == "1m" else (70, 20)
+    a0 = max(0, mark_i - lookback)
+    a1 = min(len(d["c"]), mark_i + lookfwd + 1)
     sl = slice(a0, a1)
     xs = np.arange(a1 - a0)
     o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
@@ -235,25 +262,53 @@ def draw_chart(sym: str, d: dict, row: SignalRow, path: Path, title_note: str = 
     axv.plot(xs, vma10, color=VOL_MA[10], lw=1.05, label="MA(10)")
     for n, col in PAL.items():
         series = sma(d["c"], n)[sl]
-        val = series[i - a0] if 0 <= i - a0 < len(series) else np.nan
+        val = series[mark_i - a0] if 0 <= mark_i - a0 < len(series) else np.nan
         lab = f"MA({n}): {val:g}" if not np.isnan(val) else f"MA({n})"
         ax.plot(xs, series, color=col, lw=1.55 if n == 200 else 1.15, label=lab)
-    x = i - a0
+    x = mark_i - a0
     if 0 <= x < len(c):
         ax.axvline(x, color="#F0B90B", ls="--", lw=0.85, alpha=0.85)
-        ax.axhline(c[x], color=UP if c[x] >= o[x] else DOWN, ls=":", lw=0.7, alpha=0.7)
+        ax.axhline(mark_px, color=CIRCLE, ls=":", lw=0.7, alpha=0.75)
         ax.annotate(
-            f"{c[x]:g}",
-            xy=(xs[-1], c[x]),
+            f"{mark_px:g}",
+            xy=(xs[-1], mark_px),
             xytext=(4, 0),
             textcoords="offset points",
             va="center",
             fontsize=8,
             color="#fff",
-            bbox={"boxstyle": "round,pad=0.15", "fc": UP if c[x] >= o[x] else DOWN, "ec": "none"},
+            bbox={"boxstyle": "round,pad=0.15", "fc": CIRCLE, "ec": "none"},
+        )
+        ax.relim()
+        ax.autoscale_view()
+        ymin, ymax = ax.get_ylim()
+        pad = (ymax - ymin) * 0.07
+        ax.set_ylim(ymin - pad, ymax + pad)
+        ymin, ymax = ax.get_ylim()
+        ax.add_patch(
+            Ellipse(
+                (x, mark_px),
+                width=5.4 if tf == "1m" else 4.6,
+                height=(ymax - ymin) * 0.18,
+                fill=False,
+                edgecolor=CIRCLE,
+                lw=2.15,
+                zorder=7,
+            )
+        )
+        ax.annotate(
+            "進",
+            xy=(x, mark_px),
+            xytext=(0, 14),
+            textcoords="offset points",
+            ha="center",
+            fontsize=9,
+            fontweight="bold",
+            color=CIRCLE,
+            zorder=8,
         )
     name = f"{sym} 永續"
-    ax.set_title(f"{name}   1m   {hm(row.time_ms)}{title_note}", color=TEXT, fontsize=12, loc="left", pad=8)
+    ax.set_title(f"{name}   {tf}   {hm(row.time_ms)}{title_note}", color=TEXT, fontsize=12, loc="left", pad=8)
     ax.legend(
         loc="upper left",
         fontsize=7,
@@ -339,16 +394,29 @@ def key_of(row: SignalRow) -> str:
 
 
 def _card_img(sym: str, d: dict | None, row: SignalRow, img_dir: Path, title_note: str = "") -> str:
-    img_name = f"{file_base(sym)}_{datetime.fromtimestamp(row.time_ms/1000, TZ).strftime('%m%d_%H%M')}.png"
+    stamp = datetime.fromtimestamp(row.time_ms / 1000, TZ).strftime("%m%d_%H%M")
+    base = f"{file_base(sym)}_{stamp}"
+    img_1m = f"{base}.png"
+    img_5m = f"{base}_5m.png"
     if d is None:
         return ""
-    out = draw_chart(sym, d, row, img_dir / img_name, title_note=title_note)
-    if out is None:
+    out1 = draw_chart(sym, d, row, img_dir / img_1m, title_note=title_note, tf="1m")
+    if out1 is None:
         return ""
-    return (
-        f"<div class='mini-chart'><img src='{escape(img_src('img/ma1m-bull/' + img_name))}' "
-        f"alt='{escape(sym)}'/></div>"
-    )
+    d5 = add_mas(resample_ohlcv(d, FIVE_MIN_MS))
+    out5 = draw_chart(sym, d5, row, img_dir / img_5m, title_note=title_note, tf="5m") if len(d5["c"]) >= 8 else None
+    blocks = [
+        "<div class='tf-block'><div class='tf-lab'>1 分 K · 紅圈＝下一根開盤進場</div>"
+        f"<div class='mini-chart'><img src='{escape(img_src('img/ma1m-bull/' + img_1m))}' "
+        f"alt='{escape(sym)} 1m'/></div></div>"
+    ]
+    if out5 is not None:
+        blocks.append(
+            "<div class='tf-block'><div class='tf-lab'>5 分 K 對照（同一時間）</div>"
+            f"<div class='mini-chart'><img src='{escape(img_src('img/ma1m-bull/' + img_5m))}' "
+            f"alt='{escape(sym)} 5m'/></div></div>"
+        )
+    return "".join(blocks)
 
 
 def write_html(
@@ -470,6 +538,8 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#707a8a;font-size:13px;line-he
 .tags{{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}}
 .tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #eaecef;color:#474d57;background:#fafafa}}
 .trade-detail{{background:#fafafa;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap;color:#474d57}}
+.tf-block{{margin-top:10px}}
+.tf-lab{{font-size:12px;color:#707a8a;margin:0 0 6px}}
 .mini-chart img{{width:100%;display:block;border-radius:8px;border:1px solid #eaecef}}
 .empty{{text-align:center;color:#707a8a;padding:40px 12px;border:1px solid #eaecef;border-radius:14px;background:#fff}}
 table{{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}}
@@ -481,7 +551,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 <section class="summary">
 <h1>幣安一分K · 7&gt;14&gt;25&gt;99&gt;120 黏帶上站 MA200</h1>
 <p class="muted">{escape(date_label)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}；股票 {stock_n}／加密 {crypto_n}）
-<br/>規則（截圖紅圈）：短均先黏帶，長期在 MA200 下，<strong>放量剛站上</strong>。排列 收盤 &gt; MA200 &gt; 7 &gt; 14 &gt; 25 &gt; 99 &gt; 120。進場用下一根開盤。
+<br/>規則（截圖紅圈）：短均先黏帶，長期在 MA200 下，<strong>放量剛站上</strong>。排列 收盤 &gt; MA200 &gt; 7 &gt; 14 &gt; 25 &gt; 99 &gt; 120。進場用下一根開盤（圖上紅圈）。每筆附 1 分 K ＋ 當下 5 分 K。
 <br/>{pool_note}
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
