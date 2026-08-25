@@ -15,9 +15,12 @@ from nq.ma1m_bull import (  # noqa: E402
     add_mas,
     bar_index_at,
     detect_combo,
+    five_m_ok,
+    five_m_ok_mask,
     forward_moves,
     ma_widths,
     resample_ohlcv,
+    resample_ohlcv_upto,
     ribbon_ok,
     sma,
     stack_ok,
@@ -32,6 +35,7 @@ LOOSE = dict(
     min_vol_ratio=0,
     min_below=0,
     min_above=0,
+    use_5m=False,
 )
 
 
@@ -316,6 +320,69 @@ def test_resample_5m_and_bar_at() -> None:
     assert d5["c"][1] == 25.0
     assert bar_index_at(d5["t"], t0 + 60_000) == 0
     assert bar_index_at(d5["t"], t0 + 5 * 60_000) == 1
+    mid = resample_ohlcv_upto(raw, 6)
+    assert len(mid["c"]) == 2
+    assert mid["c"][0] == 15.0
+    assert mid["c"][1] == 22.0  # 第二根 5m 只用到 idx=6，不偷看 7..9
+    assert d5["c"][1] == 25.0
+
+
+def test_five_m_ok_rising_not_falling() -> None:
+    n = 200
+    t0 = 1_700_000_100_000
+    t = np.arange(n, dtype=np.int64) * 60_000 + t0
+    up = 100.0 + np.arange(n) * 0.05
+    d_up = add_mas({"t": t, "o": up, "h": up + 0.02, "l": up - 0.02, "c": up, "v": np.ones(n)})
+    assert five_m_ok(d_up, n - 1)
+    down = 200.0 - np.arange(n) * 0.05
+    d_dn = add_mas({"t": t, "o": down, "h": down + 0.02, "l": down - 0.02, "c": down, "v": np.ones(n)})
+    assert not five_m_ok(d_dn, n - 1)
+
+
+def test_five_m_mask_matches_snapshot() -> None:
+    d = add_mas(_make_stack_bars())
+    mask = five_m_ok_mask(d)
+    for i in (80, 160, 240, 300, 350):
+        assert bool(mask[i]) == five_m_ok(d, i)
+
+
+def test_use_5m_is_subset_and_can_wait() -> None:
+    d = add_mas(_make_stack_bars(500))
+    one = detect_combo(d, **LOOSE)
+    five = detect_combo(d, **{**LOOSE, "use_5m": True})
+    assert one
+    assert {s.idx for s in five} <= {s.idx for s in one}
+    if five:
+        assert five[0].idx >= one[0].idx
+
+
+def test_five_m_does_not_require_ma200() -> None:
+    """5 分收盤可以還在 MA200 下，只要短均向上、收盤站上 MA7。"""
+    t0 = 1_700_000_100_000
+    high = np.full(800, 150.0)
+    dump = 150.0 - np.arange(1, 81) * 0.10  # → 142
+    bounce = dump[-1] + np.arange(1, 201) * 0.03  # 40 根 5m 往上
+    close = np.concatenate([high, dump, bounce])
+    n = len(close)
+    t = np.arange(n, dtype=np.int64) * 60_000 + t0
+    d = add_mas(
+        {
+            "t": t,
+            "o": np.r_[close[0], close[:-1]],
+            "h": close + 0.03,
+            "l": close - 0.03,
+            "c": close,
+            "v": np.ones(n),
+        }
+    )
+    i = n - 1
+    assert five_m_ok(d, i)
+    d5 = add_mas(resample_ohlcv_upto(d, i))
+    j = len(d5["c"]) - 1
+    assert d5["c"][j] > d5["m7"][j]
+    assert d5["m7"][j] > d5["m14"][j] > d5["m25"][j]
+    assert not np.isnan(d5["m200"][j])
+    assert d5["c"][j] < d5["m200"][j]
 
 
 def test_entry_mark_is_next_1m_open() -> None:
@@ -373,6 +440,10 @@ def main() -> int:
     test_default_date_uses_yesterday_before_2am()
     test_is_usdt_stock_perp()
     test_resample_5m_and_bar_at()
+    test_five_m_ok_rising_not_falling()
+    test_five_m_mask_matches_snapshot()
+    test_use_5m_is_subset_and_can_wait()
+    test_five_m_does_not_require_ma200()
     test_entry_mark_is_next_1m_open()
     test_write_view_html_uses_pages_urls()
     print("ok")

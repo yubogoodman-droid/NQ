@@ -2,6 +2,8 @@
 
 截圖紅圈那種：短均先黏成帶，收盤穿過 MA200，99/120 還在帶的下沿。
 均線都用一分 K 收盤 SMA。不要求 120 已高於 200。
+預設再看 5 分 K（不偷看未走完的分鐘）：短均 7>14>25、MA7 向上、收盤站上 MA7。
+不要求 5 分已經站上 MA200。
 """
 
 from __future__ import annotations
@@ -53,6 +55,95 @@ def resample_ohlcv(d: dict, interval_ms: int = FIVE_MIN_MS) -> dict:
         "c": np.asarray(d["c"], dtype=float)[ends - 1],
         "v": np.add.reduceat(np.asarray(d["v"], dtype=float), starts),
     }
+
+
+def resample_ohlcv_upto(d: dict, end_idx: int, interval_ms: int = FIVE_MIN_MS) -> dict:
+    """合成到 1m end_idx 為止看得到的較大週期（最後一根可以還沒走完，不偷看後面分鐘）。"""
+    n = len(d.get("c", []))
+    if n == 0:
+        return resample_ohlcv(d, interval_ms)
+    hi = max(0, min(int(end_idx) + 1, n))
+    sliced = {k: np.asarray(d[k])[:hi] for k in ("t", "o", "h", "l", "c", "v") if k in d}
+    return resample_ohlcv(sliced, interval_ms)
+
+
+def five_m_last_ok(
+    closes,
+    *,
+    slope_bars: int = 3,
+    require_short_stack: bool = True,
+    require_close_above_ma7: bool = True,
+) -> bool:
+    """5 分 K 確認：短均 7>14>25、MA7 向上、收盤站上 MA7。不要求站上 MA200。"""
+    c = np.asarray(closes, dtype=float)
+    j = int(c.size) - 1
+    if j < 24:
+        return False
+    last = float(c[j])
+    m7 = float(c[j - 6 : j + 1].mean())
+    m14 = float(c[j - 13 : j + 1].mean())
+    m25 = float(c[j - 24 : j + 1].mean())
+    if require_short_stack and not (m7 > m14 > m25):
+        return False
+    if require_close_above_ma7 and not (last > m7):
+        return False
+    prev_j = j - max(1, int(slope_bars))
+    if prev_j < 6:
+        return False
+    m7_prev = float(c[prev_j - 6 : prev_j + 1].mean())
+    return bool(m7 > m7_prev)
+
+
+def five_m_ok(
+    d: dict,
+    i: int,
+    *,
+    slope_bars: int = 3,
+    require_short_stack: bool = True,
+    require_close_above_ma7: bool = True,
+) -> bool:
+    """用「當下這根 1m 為止」的 5 分 K（含未走完那根），不偷看後面的分鐘。"""
+    d5 = resample_ohlcv_upto(d, i)
+    if len(d5.get("c", [])) == 0:
+        return False
+    return five_m_last_ok(
+        d5["c"],
+        slope_bars=slope_bars,
+        require_short_stack=require_short_stack,
+        require_close_above_ma7=require_close_above_ma7,
+    )
+
+
+def five_m_ok_mask(
+    d: dict,
+    *,
+    end: int | None = None,
+    slope_bars: int = 3,
+    require_short_stack: bool = True,
+    require_close_above_ma7: bool = True,
+) -> np.ndarray:
+    """每個 1m 指數對應的 5 分確認（形成中的 5m 只用到該分鐘）。"""
+    c = np.asarray(d["c"], dtype=float)
+    n = len(c)
+    t = np.asarray(d["t"], dtype=np.int64) if "t" in d else np.arange(n, dtype=np.int64) * 60_000
+    last = n if end is None else max(0, min(int(end) + 1, n))
+    out = np.zeros(n, dtype=bool)
+    closes: list[float] = []
+    cur_b: int | None = None
+    kw = dict(
+        slope_bars=slope_bars,
+        require_short_stack=require_short_stack,
+        require_close_above_ma7=require_close_above_ma7,
+    )
+    for i in range(last):
+        b = int(t[i] - (t[i] % FIVE_MIN_MS))
+        if cur_b is None or b != cur_b:
+            closes.append(float(c[i]))
+            cur_b = b
+        else:
+            closes[-1] = float(c[i])
+        out[i] = five_m_last_ok(closes, **kw)
+    return out
 
 
 def bar_index_at(times: np.ndarray, ts: int) -> int:
@@ -272,6 +363,7 @@ def _bar_ok(
     min_vol_ratio: float,
     min_below: int,
     min_above: int,
+    ok5: np.ndarray | None = None,
 ) -> bool:
     if not stack_ok(d, i):
         return False
@@ -287,6 +379,8 @@ def _bar_ok(
         return False
     if min_below > 0 and bars_below_ma200(d["c"], d["m200"], start) < min_below:
         return False
+    if ok5 is not None and not bool(ok5[i]):
+        return False
     return True
 
 
@@ -301,10 +395,14 @@ def detect_combo(
     min_vol_ratio: float = 1.4,
     min_below: int = 20,
     min_above: int = 2,
+    use_5m: bool = True,
+    five_m_slope: int = 3,
 ) -> list[BullSignal]:
     """短均先黏帶，長期在 MA200 下，放量上站後再連收至少 min_above 根站穩。
 
     排列：收盤 > MA200 > 7 > 14 > 25 > 99 > 120。
+    預設再加 5 分 K 確認（不偷看未走完的分鐘）：7>14>25、MA7 向上、收盤站上 5m MA7。
+    不要求 5 分收盤已站上 5m MA200（截圖 SNDK 當時還在下面）。
     """
     c, m200 = d["c"], d["m200"]
     kw = dict(
@@ -314,6 +412,7 @@ def detect_combo(
         min_vol_ratio=min_vol_ratio,
         min_below=min_below,
         min_above=min_above,
+        ok5=five_m_ok_mask(d, slope_bars=five_m_slope) if use_5m else None,
     )
     out: list[BullSignal] = []
     last_i = -10_000

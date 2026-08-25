@@ -2,6 +2,7 @@
 """幣安 1 分 K：7>14>25 黏在 MA200，剛站上（99/120 可以還在上面）。
 
     python3 examples/binance_1m_bull.py backtest --top 10 --today --pages
+    python3 examples/binance_1m_bull.py backtest --date 2026-08-25 --days 30 --top 10 --pool both --pages
     python3 examples/binance_1m_bull.py alert --test
     python3 examples/binance_1m_bull.py alert --once --dry-run
     python3 examples/binance_1m_bull.py alert
@@ -44,7 +45,7 @@ SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
 PAGES_IMG = "https://yubogoodman-droid.github.io/NQ/binance/"
-IMG_VER = "kiss0157"
+IMG_VER = "kiss0158"
 CIRCLE = "#F6465D"
 # 幣安 App 淺色盤：黃/橘/紫/藍/青 + 深灰 MA200
 PAL = {7: "#F0B90B", 14: "#FF6D00", 25: "#D500F9", 99: "#2962FF", 120: "#00B8D4", 200: "#474D57"}
@@ -381,6 +382,7 @@ def format_alert(row: SignalRow) -> str:
         f"<b>1m 多頭排列上站 1m MA200</b>\n"
         f"<b>{row.symbol}</b>  一分K  {hm(row.time_ms)}\n"
         f"{kind} · {below}\n"
+        f"5m 確認 7&gt;14&gt;25 · MA7↑ · 收&gt;7（不要求 5m MA200）\n"
         f"現價 {row.sig.close:g}　進 {row.entry:g}\n"
         f"1m MA200 {row.sig.ma200:g} &gt; 7 {row.sig.m7:g} &gt; 14 {row.sig.m14:g} "
         f"&gt; 25 {row.sig.m25:g} &gt; 99 {row.sig.m99:g} &gt; 120 {row.sig.m120:g}\n"
@@ -413,7 +415,7 @@ def _card_img(sym: str, d: dict | None, row: SignalRow, img_dir: Path, title_not
     ]
     if out5 is not None:
         blocks.append(
-            "<div class='tf-block'><div class='tf-lab tf-5m'>5 分 K 對照</div>"
+            "<div class='tf-block'><div class='tf-lab tf-5m'>5 分 K 確認（不偷看未走完分鐘）</div>"
             f"<div class='mini-chart'><img src='{escape(img_src('img/ma1m-bull/' + img_5m))}' "
             f"alt='{escape(sym)} 5m'/></div></div>"
         )
@@ -433,6 +435,7 @@ def write_html(
     pool_label: str = "USDT 股票合約成交額前 10",
     days: int = 1,
     pool: str = "stocks",
+    use_5m: bool = True,
 ) -> Path:
     stats = {h: summarize_rows(rows, h) for h in HORIZONS}
     date_label = window_label(date, days)
@@ -466,6 +469,7 @@ def write_html(
             else f"{LABELS[h]} —"
             for h in (5, 15, 30, 60)
         )
+        five_tag = "<span class='tag'>5m 7↑ 收&gt;7</span>" if use_5m else ""
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -477,6 +481,7 @@ def write_html(
             f"<div class='tags'><span class='tag'>{escape(row.kind_label)}</span>"
             f"<span class='tag'>200&gt;7&gt;14&gt;25&gt;99&gt;120</span>"
             f"<span class='tag'>站穩 {row.bars_above} 根</span>"
+            f"{five_tag}"
             f"<span class='tag'>黏帶 {row.sig.ribbon_pct:.2f}%</span>"
             f"<span class='tag'>量 {row.vol_ratio:.1f}x</span></div>"
             "<pre class='trade-detail'>"
@@ -517,6 +522,12 @@ def write_html(
     if len(rows) > len(gallery):
         extra = f"<p class='muted'>圖表只畫前 {len(gallery)} 筆，表格含全部 {len(rows)} 筆。</p>"
     names_txt = "、".join(names[:12]) + ("…" if len(names) > 12 else "")
+    five_rule = (
+        "再加 <strong>5 分 K 確認</strong>（不偷看未走完的分鐘）：7&gt;14&gt;25、MA7 向上、收盤站上 5m MA7。"
+        "不要求 5 分已站上 MA200。"
+        if use_5m
+        else "本次未開 5 分 K 確認。"
+    )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -557,7 +568,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 <section class="summary">
 <h1>幣安一分K · 7&gt;14&gt;25&gt;99&gt;120 黏帶上站 MA200</h1>
 <p class="muted">{escape(date_label)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}；股票 {stock_n}／加密 {crypto_n}）
-<br/>規則：短均先黏帶，長期在 MA200 下，放量上站後<strong>連收至少 2 根站穩</strong>再進。排列 收盤 &gt; MA200 &gt; 7 &gt; 14 &gt; 25 &gt; 99 &gt; 120。進場用確認根的下一根開盤（圖上紅圈）。每筆附 1 分 K ＋ 5 分 K。
+<br/>規則：短均先黏帶，長期在 MA200 下，放量上站後<strong>連收至少 2 根站穩</strong>再進。排列 收盤 &gt; MA200 &gt; 7 &gt; 14 &gt; 25 &gt; 99 &gt; 120。進場用確認根的下一根開盤（圖上紅圈）。{five_rule} 每筆附 1 分 K ＋ 5 分 K。
 <br/>{pool_note}
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
@@ -601,6 +612,7 @@ def ribbon_kwargs(args: argparse.Namespace) -> dict:
         "min_vol_ratio": float(getattr(args, "min_vol", 1.4)),
         "min_below": int(getattr(args, "min_below", 20)),
         "min_above": int(getattr(args, "min_above", 2)),
+        "use_5m": not bool(getattr(args, "no_5m", False)),
     }
 
 
@@ -615,7 +627,7 @@ def run_backtest(args: argparse.Namespace) -> int:
         f"top={args.top or 'all'} min_gap={args.min_gap} "
         f"cross_only={cross_only} pack≤{rkw['max_ribbon_pct']} short≤{rkw['max_short_pct']} "
         f"prior≤{rkw['max_prior_short']} vol≥{rkw['min_vol_ratio']} below≥{rkw['min_below']} "
-        f"above≥{rkw['min_above']}",
+        f"above≥{rkw['min_above']} use_5m={rkw['use_5m']}",
         flush=True,
     )
     uni = universe(top_n=args.top, pool=pool)
@@ -690,6 +702,7 @@ def run_backtest(args: argparse.Namespace) -> int:
             pool_label=label,
             days=days,
             pool=pool,
+            use_5m=rkw["use_5m"],
         )
         view = write_view_html(out)
         print(f"html={out}")
@@ -774,7 +787,8 @@ def run_alert(args: argparse.Namespace) -> int:
     label = pool_label_of(pool, args.top)
     rkw = ribbon_kwargs(args)
     print(
-        f"監看 {label} {len(uni)} 個。黏帶後放量上站，連收至少 {rkw['min_above']} 根站穩 1m MA200 才推。",
+        f"監看 {label} {len(uni)} 個。黏帶後放量上站，連收至少 {rkw['min_above']} 根站穩 1m MA200"
+        f"{'，再加 5 分 K 確認' if rkw['use_5m'] else ''}才推。",
         flush=True,
     )
     uni_ts = time.time()
@@ -850,6 +864,7 @@ def main(argv=None) -> int:
     b.add_argument("--min-vol", type=float, default=1.4, help="量比下限；0=不限")
     b.add_argument("--min-below", type=int, default=20, help="站上前至少連續幾根在 MA200 下")
     b.add_argument("--min-above", type=int, default=2, help="收盤站上 MA200 至少連續幾根才進")
+    b.add_argument("--no-5m", action="store_true", help="關閉 5 分 K 確認（勝率較低）")
     b.add_argument("--pages", action="store_true")
     b.add_argument("--html", default="")
     b.add_argument("--charts", type=int, default=0, help="圖表筆數；0=全部")
@@ -868,6 +883,7 @@ def main(argv=None) -> int:
     a.add_argument("--min-vol", type=float, default=1.4, help="量比下限；0=不限")
     a.add_argument("--min-below", type=int, default=20, help="站上前至少連續幾根在 MA200 下")
     a.add_argument("--min-above", type=int, default=2, help="收盤站上 MA200 至少連續幾根才進")
+    a.add_argument("--no-5m", action="store_true", help="關閉 5 分 K 確認（勝率較低）")
     a.set_defaults(func=run_alert)
 
     args = p.parse_args(argv)
