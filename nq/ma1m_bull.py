@@ -2,8 +2,8 @@
 
 截圖紅圈那種：短均先黏成帶，收盤穿過 MA200，99/120 還在帶的下沿。
 均線都用一分 K 收盤 SMA。不要求 120 已高於 200。
-預設再看 5 分 K（不偷看未走完的分鐘）：短均 7>14>25、MA7 向上、收盤站上 MA7。
-不要求 5 分已經站上 MA200。
+    預設再看 5 分 K（不偷看未走完的分鐘）：MA7>MA14、MA7 向上、收盤站上 MA7。
+    不要求 5 分已經站上 MA200，也不強求 5 分 7>14>25（那組會濾掉不少贏家）。
 """
 
 from __future__ import annotations
@@ -74,16 +74,15 @@ def five_m_last_ok(
     require_short_stack: bool = True,
     require_close_above_ma7: bool = True,
 ) -> bool:
-    """5 分 K 確認：短均 7>14>25、MA7 向上、收盤站上 MA7。不要求站上 MA200。"""
+    """5 分 K 確認：MA7>MA14、MA7 向上、收盤站上 MA7。不要求站上 MA200，也不強求 25。"""
     c = np.asarray(closes, dtype=float)
     j = int(c.size) - 1
-    if j < 24:
+    if j < 13:
         return False
     last = float(c[j])
     m7 = float(c[j - 6 : j + 1].mean())
     m14 = float(c[j - 13 : j + 1].mean())
-    m25 = float(c[j - 24 : j + 1].mean())
-    if require_short_stack and not (m7 > m14 > m25):
+    if require_short_stack and not (m7 > m14):
         return False
     if require_close_above_ma7 and not (last > m7):
         return False
@@ -363,7 +362,6 @@ def _bar_ok(
     min_vol_ratio: float,
     min_below: int,
     min_above: int,
-    ok5: np.ndarray | None = None,
 ) -> bool:
     if not stack_ok(d, i):
         return False
@@ -378,8 +376,6 @@ def _bar_ok(
     if not vol_ok_streak(d, i, min_vol_ratio=min_vol_ratio):
         return False
     if min_below > 0 and bars_below_ma200(d["c"], d["m200"], start) < min_below:
-        return False
-    if ok5 is not None and not bool(ok5[i]):
         return False
     return True
 
@@ -401,8 +397,9 @@ def detect_combo(
     """短均先黏帶，長期在 MA200 下，放量上站後再連收至少 min_above 根站穩。
 
     排列：收盤 > MA200 > 7 > 14 > 25 > 99 > 120。
-    預設再加 5 分 K 確認（不偷看未走完的分鐘）：7>14>25、MA7 向上、收盤站上 5m MA7。
+    預設再加 5 分 K 確認（不偷看未走完的分鐘）：MA7>MA14、MA7 向上、收盤站上 5m MA7。
     不要求 5 分收盤已站上 5m MA200（截圖 SNDK 當時還在下面）。
+    5 分只用來過濾「1 分剛成立」的那根，不會等到後面才追進。
     """
     c, m200 = d["c"], d["m200"]
     kw = dict(
@@ -412,7 +409,6 @@ def detect_combo(
         min_vol_ratio=min_vol_ratio,
         min_below=min_below,
         min_above=min_above,
-        ok5=five_m_ok_mask(d, slope_bars=five_m_slope) if use_5m else None,
     )
     out: list[BullSignal] = []
     last_i = -10_000
@@ -429,6 +425,8 @@ def detect_combo(
             if not (c[start - 1] <= m200[start - 1] and c[start] > m200[start]):
                 continue
         if i - last_i < min_gap_bars:
+            continue
+        if use_5m and not five_m_ok(d, i, slope_bars=five_m_slope):
             continue
         sig = signal_at(d, i)
         if sig is None:

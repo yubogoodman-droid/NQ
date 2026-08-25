@@ -339,6 +339,34 @@ def test_five_m_ok_rising_not_falling() -> None:
     assert not five_m_ok(d_dn, n - 1)
 
 
+def test_five_m_allows_ma25_still_above_ma14() -> None:
+    """剛翻上來時 5m 常見 7>14 但 25 還沒掉下來，這組仍算確認。"""
+    n = 280
+    t0 = 1_700_000_100_000
+    t = np.arange(n, dtype=np.int64) * 60_000 + t0
+    close = np.zeros(n, dtype=float)
+    close[0] = 120.0
+    for i in range(1, 220):
+        close[i] = close[i - 1] - 0.08
+    for i in range(220, n):
+        close[i] = close[i - 1] + 0.06
+    d = add_mas(
+        {
+            "t": t,
+            "o": np.r_[close[0], close[:-1]],
+            "h": close + 0.03,
+            "l": close - 0.03,
+            "c": close,
+            "v": np.ones(n),
+        }
+    )
+    d5 = add_mas(resample_ohlcv_upto(d, n - 1))
+    j = len(d5["c"]) - 1
+    assert d5["m7"][j] > d5["m14"][j]
+    assert not (d5["m7"][j] > d5["m14"][j] > d5["m25"][j])
+    assert five_m_ok(d, n - 1)
+
+
 def test_five_m_mask_matches_snapshot() -> None:
     d = add_mas(_make_stack_bars())
     mask = five_m_ok_mask(d)
@@ -352,8 +380,6 @@ def test_use_5m_is_subset_and_can_wait() -> None:
     five = detect_combo(d, **{**LOOSE, "use_5m": True})
     assert one
     assert {s.idx for s in five} <= {s.idx for s in one}
-    if five:
-        assert five[0].idx >= one[0].idx
 
 
 def test_five_m_does_not_require_ma200() -> None:
@@ -380,7 +406,7 @@ def test_five_m_does_not_require_ma200() -> None:
     d5 = add_mas(resample_ohlcv_upto(d, i))
     j = len(d5["c"]) - 1
     assert d5["c"][j] > d5["m7"][j]
-    assert d5["m7"][j] > d5["m14"][j] > d5["m25"][j]
+    assert d5["m7"][j] > d5["m14"][j]
     assert not np.isnan(d5["m200"][j])
     assert d5["c"][j] < d5["m200"][j]
 
@@ -441,6 +467,7 @@ def main() -> int:
     test_is_usdt_stock_perp()
     test_resample_5m_and_bar_at()
     test_five_m_ok_rising_not_falling()
+    test_five_m_allows_ma25_still_above_ma14()
     test_five_m_mask_matches_snapshot()
     test_use_5m_is_subset_and_can_wait()
     test_five_m_does_not_require_ma200()

@@ -382,7 +382,7 @@ def format_alert(row: SignalRow) -> str:
         f"<b>1m 多頭排列上站 1m MA200</b>\n"
         f"<b>{row.symbol}</b>  一分K  {hm(row.time_ms)}\n"
         f"{kind} · {below}\n"
-        f"5m 確認 7&gt;14&gt;25 · MA7↑ · 收&gt;7（不要求 5m MA200）\n"
+        f"5m 確認 7&gt;14 · MA7↑ · 收&gt;7（不要求 5m MA200）\n"
         f"現價 {row.sig.close:g}　進 {row.entry:g}\n"
         f"1m MA200 {row.sig.ma200:g} &gt; 7 {row.sig.m7:g} &gt; 14 {row.sig.m14:g} "
         f"&gt; 25 {row.sig.m25:g} &gt; 99 {row.sig.m99:g} &gt; 120 {row.sig.m120:g}\n"
@@ -469,7 +469,7 @@ def write_html(
             else f"{LABELS[h]} —"
             for h in (5, 15, 30, 60)
         )
-        five_tag = "<span class='tag'>5m 7↑ 收&gt;7</span>" if use_5m else ""
+        five_tag = "<span class='tag'>5m 7&gt;14 ↑ 收&gt;7</span>" if use_5m else ""
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -523,8 +523,8 @@ def write_html(
         extra = f"<p class='muted'>圖表只畫前 {len(gallery)} 筆，表格含全部 {len(rows)} 筆。</p>"
     names_txt = "、".join(names[:12]) + ("…" if len(names) > 12 else "")
     five_rule = (
-        "再加 <strong>5 分 K 確認</strong>（不偷看未走完的分鐘）：7&gt;14&gt;25、MA7 向上、收盤站上 5m MA7。"
-        "不要求 5 分已站上 MA200。"
+        "再加 <strong>5 分 K 確認</strong>（不偷看未走完的分鐘）：MA7&gt;MA14、MA7 向上、收盤站上 5m MA7。"
+        "不要求 5 分已站上 MA200，也不強求 5 分 7&gt;14&gt;25。"
         if use_5m
         else "本次未開 5 分 K 確認。"
     )
