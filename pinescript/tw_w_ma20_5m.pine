@@ -1,7 +1,7 @@
 //@version=5
-indicator("台股 五分K W底上MA20", overlay=true, max_labels_count=50)
+indicator("台股 五分K W底 5/10/20多排", overlay=true, max_labels_count=50)
 
-// 五分圖：W 底確認後，收盤上穿 MA20 跳通知（不要求先過頸線）
+// 五分圖：W 底確認後，第一次翻成 MA5>MA10>MA20 多排才進場（不要求先過頸線）
 swingLen      = input.int(2, "轉折確認 K 數", minval=1)
 minBars       = input.int(6, "兩低點最少間隔", minval=3)
 maxBars       = input.int(48, "兩低點最多間隔", minval=10)
@@ -10,13 +10,17 @@ lowAbovePct   = input.float(1.5, "第二低最多高於第一低 (%)", minval=0.
 minNeckPct    = input.float(1.2, "頸線相對低點最小高度 (%)", minval=0.2, step=0.1) / 100
 minDropPct    = input.float(5.5, "進場前最小跌幅 (%)", minval=0.5, step=0.1) / 100
 minBouncePct  = input.float(1.1, "從低點最小彈回 (%)", minval=0.3, step=0.1) / 100
-maxBouncePct  = input.float(2.5, "從低點最大彈回 (%)", minval=1.0, step=0.1) / 100
+maxBouncePct  = input.float(3.5, "從低點最大彈回 (%)", minval=1.0, step=0.1) / 100
 minStandPct   = input.float(0.45, "收盤站上 MA20 (%)", minval=0.1, step=0.05) / 100
 priorBars     = input.int(36, "回看出發高點 K 數", minval=8)
-maxCrossBars  = input.int(36, "第二低後幾根內上穿", minval=4)
-maLen         = input.int(20, "MA 週期", minval=5)
+maxCrossBars  = input.int(36, "第二低後幾根內等多排", minval=4)
+maLen         = input.int(20, "MA20 週期", minval=5)
 
+ma5 = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
 ma20 = ta.sma(close, maLen)
+plot(ma5, "MA5", color=color.new(color.aqua, 0))
+plot(ma10, "MA10", color=color.new(color.lime, 0))
 plot(ma20, "MA20", color=color.new(color.yellow, 0), linewidth=2)
 
 pl = ta.pivotlow(low, swingLen, swingLen)
@@ -64,7 +68,8 @@ if not na(pl) and not na(firstLow) and (bar_index - swingLen) > firstLowBar
         wReady := true
         fired := false
 
-crossUp = ta.crossover(close, ma20)
+stacked = ma5 > ma10 and ma10 > ma20 and close > ma5
+stackFlip = stacked and not stacked[1]
 confirmBar = not na(secondLowBar) and bar_index >= secondLowBar + swingLen
 stillValid = not na(secondLow) and low >= math.min(firstLow, secondLow) * 0.997
 fresh = not na(secondLowBar) and bar_index - secondLowBar <= maxCrossBars
@@ -77,11 +82,11 @@ afterOpen = taipeiHour > 9 or (taipeiHour == 9 and taipeiMinute >= 15)
 bounceOk = bounce >= minBouncePct and bounce <= maxBouncePct
 standOk = stand >= minStandPct
 sameDay = not na(firstLowTime) and not na(secondLowTime) and year(time, "Asia/Taipei") == year(firstLowTime, "Asia/Taipei") and dayofyear(time, "Asia/Taipei") == dayofyear(firstLowTime, "Asia/Taipei") and dayofyear(time, "Asia/Taipei") == dayofyear(secondLowTime, "Asia/Taipei")
-longSignal = wReady and not fired and confirmBar and stillValid and fresh and crossUp and close > ma20 and afterOpen and bounceOk and standOk and sameDay
+longSignal = wReady and not fired and confirmBar and stillValid and fresh and stackFlip and close > ma20 and afterOpen and bounceOk and standOk and sameDay
 
 if longSignal
     fired := true
-    label.new(bar_index, low, "W底上MA20", style=label.style_label_up, color=color.new(color.lime, 20), textcolor=color.black, size=size.small)
+    label.new(bar_index, low, "W底多排", style=label.style_label_up, color=color.new(color.lime, 20), textcolor=color.black, size=size.small)
 
-alertcondition(longSignal, title="五分K W底上MA20", message="{{ticker}} 五分K W底，收盤上穿 MA20")
-plotshape(longSignal, title="W底上MA20", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
+alertcondition(longSignal, title="五分K W底 5/10/20多排", message="{{ticker}} 五分K W底，MA5>MA10>MA20 多排進場")
+plotshape(longSignal, title="W底多排", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)

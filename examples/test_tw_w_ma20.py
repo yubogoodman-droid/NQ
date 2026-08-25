@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""五分 K W 底上 MA20（無網路）。"""
+"""五分 K W 底後 5/10/20 多排（無網路）。"""
 
 from __future__ import annotations
 
@@ -157,12 +157,12 @@ def make_w_never_cross() -> pd.DataFrame:
 def test_yageo_like_alerts() -> None:
     df = make_yageo_like()
     sigs = detect_w_ma20_crosses(df)
-    assert sigs, "國巨型 W 底上 MA20 應有訊號"
+    assert sigs, "國巨型 W 底後 5/10/20 多排應有訊號"
     sig = sigs[-1]
     assert df["Low"].iloc[sig.first_low_idx] <= 516.5
     assert sig.second_low >= sig.first_low - 2
-    assert sig.cross_price > sig.ma20
-    assert df["Close"].iloc[sig.cross_idx - 1] <= df["Close"].rolling(20).mean().iloc[sig.cross_idx - 1]
+    assert sig.ma5 > sig.ma10 > sig.ma20
+    assert sig.cross_price > sig.ma5
 
 
 def test_yageo_plateau_second_bottom() -> None:
@@ -172,17 +172,19 @@ def test_yageo_plateau_second_bottom() -> None:
     sig = sigs[-1]
     assert abs(sig.first_low - 515.0) < 1.0
     assert abs(sig.second_low - 515.0) < 1.0
-    assert sig.cross_price > sig.ma20
+    assert sig.ma5 > sig.ma10 > sig.ma20
+    assert sig.cross_price > sig.ma5
 
 
 def test_nanya_like_higher_second_low() -> None:
     df = make_nanya_like()
     sigs = detect_w_ma20_crosses(df)
-    assert sigs, "南亞科型 W 底上 MA20 應有訊號"
+    assert sigs, "南亞科型 W 底後 5/10/20 多排應有訊號"
     sig = sigs[-1]
     assert sig.second_low >= sig.first_low
     assert abs(sig.first_low - 480.0) < 1.5
-    assert sig.cross_price > sig.ma20
+    assert sig.ma5 > sig.ma10 > sig.ma20
+    assert sig.cross_price > sig.ma5
 
 
 def test_no_w_no_alert() -> None:
@@ -306,6 +308,10 @@ def _fake_hit(code: str, name: str, when: str, *, bounce: float = 2.0, stand: fl
     base = 100.0
     cross = base * (1 + bounce / 100.0)
     ma20 = cross / (1 + stand / 100.0)
+    ma5 = cross * 0.999
+    if ma5 <= ma20:
+        ma5 = (cross + ma20) / 2.0
+    ma10 = (ma5 + ma20) / 2.0
     sig = WMa20Signal(
         first_low_idx=max(0, loc - 10),
         second_low_idx=max(0, loc - 4),
@@ -315,6 +321,8 @@ def _fake_hit(code: str, name: str, when: str, *, bounce: float = 2.0, stand: fl
         neckline=base * 1.02,
         cross_idx=loc,
         cross_price=cross,
+        ma5=ma5,
+        ma10=ma10,
         ma20=ma20,
     )
     row = {"code": code, "name": name, "symbol": f"{code}.TW"}
@@ -356,7 +364,7 @@ def test_strict_keeps_broker_examples() -> None:
 def test_strict_rejects_open_gap_and_weak_kiss() -> None:
     open_gap = _fake_hit("2408", "南亞科", "2026-08-25 09:00", bounce=2.0, stand=1.0)
     weak = _fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=0.4, stand=0.1)
-    huge = _fake_hit("8039", "台虹", "2026-08-25 10:00", bounce=3.2, stand=1.0)
+    huge = _fake_hit("8039", "台虹", "2026-08-25 10:00", bounce=4.0, stand=1.0)
     assert not is_strict_hit(open_gap)
     assert not is_strict_hit(weak)
     assert not is_strict_hit(huge)

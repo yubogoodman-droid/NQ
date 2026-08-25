@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""台股五分 K：W 底之後收盤上穿 MA20，推 Telegram。
+"""台股五分 K：W 底之後五分 MA5>MA10>MA20 多排才進場，推 Telegram。
 
-對齊券商 App 那種圖：大跌做出雙底，反彈站上五分 MA20 就跳通知。
+對齊券商 App 那種圖：大跌做出雙底，反彈等到五分 5/10/20 多頭排列才通知。
 
 用法:
   python3 examples/watch_tw_w_ma20.py --test
@@ -291,10 +291,10 @@ def same_session(hit: TwHit) -> bool:
 
 
 def is_strict_hit(hit: TwHit) -> bool:
-    """對齊券商那種盤中 W：同一天、先大跌、雙底夠深，收盤明顯站上 MA20。
+    """對齊券商那種盤中 W：同一天、先大跌、雙底夠深，再等到 5/10/20 多排。
 
-    國巨 8/25：515/515 → 521 上穿 518.55（彈回 1.17%、站上 0.47%）
-    南亞科 8/25：480/481 → 487 上穿 484.43（彈回 1.46%、站上 0.53%）
+    國巨 8/25：515/515 平底後，11:50 收 523、MA5 522.60 > MA10 520.20 > MA20 519.40
+    南亞科 8/25：480/481 後，11:55 收 488.50、MA5 486.90 > MA10 485.40 > MA20 485.15
     """
     sig = hit.signal
     if not same_session(hit):
@@ -308,7 +308,7 @@ def is_strict_hit(hit: TwHit) -> bool:
         prior_drop_pct(hit),
         skew_pct(sig),
     )
-    if not (1.10 <= bounce <= 2.50):
+    if not (1.10 <= bounce <= 3.50):
         return False
     if stand < 0.45:
         return False
@@ -317,6 +317,8 @@ def is_strict_hit(hit: TwHit) -> bool:
     if drop < 5.50:
         return False
     if skew > 1.50:
+        return False
+    if not (sig.ma5 > sig.ma10 > sig.ma20 and sig.cross_price > sig.ma5):
         return False
     return True
 
@@ -463,7 +465,7 @@ def draw_signal_png(df: pd.DataFrame, sig: WMa20Signal, path: Path, title: str) 
         (sig.first_low_idx, sig.first_low, "L1", "#80deea"),
         (sig.second_low_idx, sig.second_low, "L2", "#80deea"),
         (sig.neckline_idx, sig.neckline, "頸", "#ffb74d"),
-        (sig.cross_idx, sig.cross_price, "MA20", "#00e676"),
+        (sig.cross_idx, sig.cross_price, "多排", "#00e676"),
     )
     for idx, price, label, color in marks:
         x = idx - start
@@ -503,15 +505,16 @@ def fmt_alert(hit: TwHit) -> str:
     last = float(df["Close"].iloc[-1])
     name = row.get("name") or row["code"]
     return (
-        f"🟢 <b>五分K W底 上 MA20</b>\n"
+        f"🟢 <b>五分K W底 5/10/20多排</b>\n"
         f"<b>{escape(str(row['code']))} {escape(str(name))}</b>\n"
         f"時間: <code>{ts.strftime('%Y-%m-%d %H:%M')} 台北</code>\n"
-        f"收盤: <code>{sig.cross_price:.2f}</code>  MA20: <code>{sig.ma20:.2f}</code>\n"
+        f"收盤: <code>{sig.cross_price:.2f}</code>\n"
+        f"多排: MA5 <code>{sig.ma5:.2f}</code> &gt; MA10 <code>{sig.ma10:.2f}</code> &gt; MA20 <code>{sig.ma20:.2f}</code>\n"
         f"L1: <code>{l1t.strftime('%H:%M')}</code> {sig.first_low:.2f}　"
         f"L2: <code>{l2t.strftime('%H:%M')}</code> {sig.second_low:.2f}\n"
         f"頸線: <code>{sig.neckline:.2f}</code>　量度: <code>{sig.target:.2f}</code>\n"
         f"停損: <code>{sig.stop_loss:.2f}</code>　現價: <code>{last:.2f}</code>\n"
-        f"#W底 #MA20 #五分K #{escape(str(row['code']))}"
+        f"#W底 #多排 #五分K #{escape(str(row['code']))}"
     )
 
 
@@ -654,7 +657,7 @@ def write_html(
         label = f"{hit.row['code']} {hit.row['name']}"
         chart_i += 1
         img_name = f"t{chart_i:02d}_{hit.row['code']}_{ts.strftime('%m%d_%H%M')}.png"
-        title = f"{label}  5分K W底上MA20  {ts.strftime('%m-%d %H:%M')}"
+        title = f"{label}  5分K W底 5/10/20多排  {ts.strftime('%m-%d %H:%M')}"
         draw_signal_png(hit.df, sig, img_dir / img_name, title)
         img_html = (
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
@@ -662,7 +665,7 @@ def write_html(
         )
         tags = (
             f"<div class='tags'><span class='tag tag-info'>{escape(hit.row['symbol'])}</span>"
-            "<span class='tag'>W底</span><span class='tag'>上MA20</span>"
+            "<span class='tag'>W底</span><span class='tag'>5/10/20多排</span>"
         )
         if is_strict_hit(hit):
             tags += "<span class='tag'>嚴格</span>"
@@ -676,7 +679,7 @@ def write_html(
             "</header>"
             + tags
             + "<pre class='trade-detail'>"
-            f"收盤 {sig.cross_price:.2f}  MA20 {sig.ma20:.2f}\n"
+            f"收盤 {sig.cross_price:.2f}  MA5 {sig.ma5:.2f} &gt; MA10 {sig.ma10:.2f} &gt; MA20 {sig.ma20:.2f}\n"
             f"L1 {sig.first_low:.2f} / L2 {sig.second_low:.2f} / 頸線 {sig.neckline:.2f}\n"
             f"停損 {sig.stop_loss:.2f}  量度 {sig.target:.2f}\n"
             f"彈回 {bounce_pct(sig):.2f}%  站上 {stand_pct(sig):.2f}%"
@@ -689,14 +692,15 @@ def write_html(
         cards.append(_compact_hit_list_html(hits))
     note = (
         "<br/>嚴格：同一天做出 W、09:15 後、先跌 ≥5.5%、頸線深度 ≥1.2%、"
-        "兩低點價差 ≤1.5%、從低點彈回 1.1%～2.5%、收盤站上 MA20 ≥0.45%。"
+        "兩低點價差 ≤1.5%、從低點彈回 1.1%～3.5%、收盤站上 MA20 ≥0.45%，"
+        "且五分 MA5&gt;MA10&gt;MA20 多頭排列才進場。"
         "對齊國巨 515/515→521、南亞科 480/481→487。"
     )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>台股五分K W底上MA20</title>
+<title>台股五分K W底 5/10/20多排</title>
 <style>
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -716,9 +720,9 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>台股 5分K W底上 MA20</h1>
+<h1>台股 5分K W底 5/10/20多排</h1>
 <p class="muted">{escape(period)} · 掃描 {len(universe)} 檔
-<br/>規則：五分 K 做出 W 底（先大跌、兩個相近低點），收盤由下往上穿過五分 MA20 才通知。{note}</p>
+<br/>規則：五分 K 做出 W 底（先大跌、兩個相近低點），等五分 MA5&gt;MA10&gt;MA20 多頭排列才進場。{note}</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">標的<b>{len({h.row['code'] for h in hits})}</b></div>
@@ -726,7 +730,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </div>
 {_day_summary_html(hits)}
 </section>
-{''.join(cards) or "<div class='empty'>這段期間沒有 W 底上 MA20</div>"}
+{''.join(cards) or "<div class='empty'>這段期間沒有 W 底 5/10/20 多排</div>"}
 </div></body></html>
 """
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -791,7 +795,7 @@ def notify_hits(hits: list[TwHit], *, token: str, chat_id: str, dry_run: bool, s
         ts = hit.df.index[hit.signal.cross_idx]
         label = f"{hit.row['code']} {hit.row.get('name','')}"
         png = REPO / "output" / f"tw_w_ma20_{hit.row['code']}_{ts.strftime('%m%d_%H%M')}.png"
-        draw_signal_png(hit.df, hit.signal, png, f"{label}  5分K W底上MA20")
+        draw_signal_png(hit.df, hit.signal, png, f"{label}  5分K W底 5/10/20多排")
         ok = tg_send(token, chat_id, fmt_alert(hit), photo=png, dry_run=dry_run)
         if ok:
             seen.add(hit_key(hit))
@@ -844,7 +848,8 @@ def cmd_scan(args: argparse.Namespace) -> int:
         print(
             f"  [{i}] {hit.row['code']} {hit.row.get('name','')} "
             f"{ts.strftime('%m-%d %H:%M')} close={hit.signal.cross_price:.2f} "
-            f"ma20={hit.signal.ma20:.2f} L1={hit.signal.first_low:.2f} L2={hit.signal.second_low:.2f}"
+            f"ma5={hit.signal.ma5:.2f} ma10={hit.signal.ma10:.2f} ma20={hit.signal.ma20:.2f} "
+            f"L1={hit.signal.first_low:.2f} L2={hit.signal.second_low:.2f}"
             f" bounce={bounce_pct(hit.signal):.2f}% stand={stand_pct(hit.signal):.2f}%"
             f" depth={depth_pct(hit.signal):.2f}% drop={prior_drop_pct(hit):.2f}%"
         )
@@ -887,7 +892,7 @@ def cmd_alert(args: argparse.Namespace) -> int:
         ok = tg_send(
             token,
             chat_id,
-            f"✅ 台股五分K W底上MA20 測試\n{datetime.now(TPE).strftime('%Y-%m-%d %H:%M:%S')} 台北",
+            f"✅ 台股五分K W底 5/10/20多排 測試\n{datetime.now(TPE).strftime('%Y-%m-%d %H:%M:%S')} 台北",
             dry_run=args.dry_run,
         )
         return 0 if ok else 1
@@ -896,7 +901,7 @@ def cmd_alert(args: argparse.Namespace) -> int:
         return 2
 
     print(
-        f"TW 5m W+MA20 | range={args.range} | lookback={args.lookback_hours}h | "
+        f"TW 5m W+5/10/20 | range={args.range} | lookback={args.lookback_hours}h | "
         f"dry_run={args.dry_run} | once={args.once}"
     )
     while True:
@@ -928,7 +933,7 @@ def cmd_alert(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="台股五分K W底上MA20 通知")
+    p = argparse.ArgumentParser(description="台股五分K W底後 5/10/20 多排進場通知")
     sub = p.add_subparsers(dest="cmd")
 
     def add_common(sp: argparse.ArgumentParser) -> None:
@@ -939,9 +944,9 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--symbols", default="", help="指定代號，例如 2327,2408")
         sp.add_argument("--range", dest="range_", default="5d")
         sp.add_argument("--sleep", type=float, default=0.2)
-        sp.add_argument("--loose", action="store_true", help="不過濾，列出全部吻線訊號")
+        sp.add_argument("--loose", action="store_true", help="不過濾，列出全部 W 底多排訊號")
 
-    s = sub.add_parser("scan", help="回看最近幾天的 W 底上 MA20")
+    s = sub.add_parser("scan", help="回看最近幾天的 W 底 5/10/20 多排")
     add_common(s)
     s.add_argument("--pages", action="store_true")
     s.add_argument("--html", default="")

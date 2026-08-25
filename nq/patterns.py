@@ -179,7 +179,7 @@ def _dedupe_patterns(patterns: Iterable[WBottomPattern]) -> list[WBottomPattern]
 
 @dataclass(frozen=True)
 class WMa20Signal:
-    """五分 K W 底之後，收盤上穿 MA20。"""
+    """五分 K W 底之後，MA5 > MA10 > MA20 多頭排列進場。"""
 
     first_low_idx: int
     second_low_idx: int
@@ -189,6 +189,8 @@ class WMa20Signal:
     neckline: float
     cross_idx: int
     cross_price: float
+    ma5: float
+    ma10: float
     ma20: float
 
     @property
@@ -206,6 +208,10 @@ class WMa20Signal:
         if base <= 0:
             return 0.0
         return (self.neckline - base) / base
+
+    @property
+    def stacked(self) -> bool:
+        return self.ma5 > self.ma10 > self.ma20 and self.cross_price > self.ma5
 
 
 def _ohlc_frame(df: pd.DataFrame) -> pd.DataFrame:
@@ -244,10 +250,10 @@ def detect_w_ma20_crosses(
     invalidate_pct: float = 0.003,
 ) -> list[WMa20Signal]:
     """
-    視覺 W 底（雙底）形成後，收盤由下往上穿過 MA20。
+    視覺 W 底形成後，五分 K 出現 MA5 > MA10 > MA20 多頭排列才進場。
 
-    對齊券商五分 K 圖那種走法：先大跌、做出兩個相近低點，
-    反彈過程收盤站上五分 MA20 才通知。不要求先突破頸線。
+    對齊券商五分圖：先大跌做出雙底，反彈等到 5/10/20 多排
+    （收盤也站上 MA5）才通知。不要求先突破頸線。
     """
     ohlc = _ohlc_frame(df)
     if len(ohlc) < ma_period + max_bars_between_lows:
@@ -256,7 +262,17 @@ def detect_w_ma20_crosses(
     highs = ohlc["high"].tolist()
     lows = ohlc["low"].tolist()
     closes = ohlc["close"].tolist()
-    ma = ohlc["close"].rolling(ma_period, min_periods=ma_period).mean().tolist()
+    ma5 = ohlc["close"].rolling(5, min_periods=5).mean().tolist()
+    ma10 = ohlc["close"].rolling(10, min_periods=10).mean().tolist()
+    ma20 = ohlc["close"].rolling(ma_period, min_periods=ma_period).mean().tolist()
+
+    def _stacked(k: int) -> bool:
+        if k < 0:
+            return False
+        a, b, c = ma5[k], ma10[k], ma20[k]
+        if a != a or b != b or c != c:
+            return False
+        return a > b > c and closes[k] > a
 
     swing_lows = _find_swing_lows(lows, swing_lookback, allow_tie=True)
     signals: list[WMa20Signal] = []
@@ -269,7 +285,7 @@ def detect_w_ma20_crosses(
         prior_high = max(highs[look_from : first_idx + 1])
         if (prior_high - first_low) / first_low < min_prior_drop_pct:
             continue
-        ma1 = ma[first_idx]
+        ma1 = ma20[first_idx]
         if ma1 != ma1 or first_low >= ma1:
             continue
 
@@ -287,7 +303,7 @@ def detect_w_ma20_crosses(
             if rel < -low_below_pct or rel > low_above_pct:
                 continue
 
-            ma2 = ma[second_idx]
+            ma2 = ma20[second_idx]
             if ma2 != ma2 or second_low >= ma2:
                 continue
 
@@ -305,31 +321,22 @@ def detect_w_ma20_crosses(
                 continue
 
             floor = min(first_low, second_low) * (1.0 - invalidate_pct)
-            first_cross: int | None = None
-            start_k = max(second_idx, ma_period)
+            entry: int | None = None
+            start_k = max(confirm, ma_period)
             end_k = min(len(closes), second_idx + max_bars_to_cross + 1)
             for k in range(start_k, end_k):
                 if min(lows[second_idx : k + 1]) < floor:
                     break
-                prev_ma, cur_ma = ma[k - 1], ma[k]
-                if prev_ma != prev_ma or cur_ma != cur_ma:
+                if not _stacked(k):
                     continue
-                # 要價往上穿均線，不要均線掉下來吻到走平的收盤
-                if closes[k] <= closes[k - 1]:
+                # 第一次翻成多排才進，已經多排走的不算
+                if _stacked(k - 1):
                     continue
-                if closes[k - 1] <= prev_ma and closes[k] > cur_ma:
-                    first_cross = k
-                    break
-            if first_cross is None:
+                entry = k
+                break
+            if entry is None:
                 continue
-
-            if first_cross >= confirm:
-                cross_idx = first_cross
-            elif closes[confirm] > ma[confirm]:
-                cross_idx = confirm
-            else:
-                continue
-            if min(lows[second_idx : cross_idx + 1]) < floor:
+            if min(lows[second_idx : entry + 1]) < floor:
                 continue
 
             signals.append(
@@ -340,9 +347,11 @@ def detect_w_ma20_crosses(
                     first_low=first_low,
                     second_low=second_low,
                     neckline=neckline_price,
-                    cross_idx=cross_idx,
-                    cross_price=closes[cross_idx],
-                    ma20=float(ma[cross_idx]),
+                    cross_idx=entry,
+                    cross_price=closes[entry],
+                    ma5=float(ma5[entry]),
+                    ma10=float(ma10[entry]),
+                    ma20=float(ma20[entry]),
                 )
             )
 
@@ -350,7 +359,7 @@ def detect_w_ma20_crosses(
 
 
 def _w_ma20_rank(sig: WMa20Signal) -> tuple[int, float, float]:
-    """同一根上穿：優先剛完成的 W，再看兩低點對稱、深度。"""
+    """同一根進場：優先剛完成的 W，再看兩低點對稱、深度。"""
     recency = -(sig.cross_idx - sig.second_low_idx)
     avg = (sig.first_low + sig.second_low) / 2
     equal = -abs(sig.first_low - sig.second_low) / avg if avg else 0.0
@@ -358,7 +367,7 @@ def _w_ma20_rank(sig: WMa20Signal) -> tuple[int, float, float]:
 
 
 def _dedupe_w_ma20(signals: Iterable[WMa20Signal], min_gap: int = 6) -> list[WMa20Signal]:
-    """同一根上穿只留一組 W；30 分鐘內的連續上穿合併成一筆。"""
+    """同一根多排只留一組 W；30 分鐘內的連續訊號合併成一筆。"""
     by_cross: dict[int, WMa20Signal] = {}
     for sig in signals:
         existing = by_cross.get(sig.cross_idx)
