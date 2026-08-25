@@ -308,11 +308,11 @@ def detect_coil_breakouts(
     recent_range_bars: int = 12,
     min_recent_range: float = 10.0,
     max_recent_range: float = 40.0,
-    require_ma200_falling: bool = True,
-    min_recent_drop: float = 45.0,
+    require_ma200_falling: bool = False,
+    min_recent_drop: float = 0.0,
     recent_drop_bars: int = 60,
-    min_below_bars: int = 4,
-    min_ma200_hug: int = 4,
+    min_below_bars: int = 0,
+    min_ma200_hug: int = 0,
     hug_dist: float = 8.0,
     hug_lookback: int = 12,
     max_m5_below_200: float = -1.0,
@@ -327,9 +327,8 @@ def detect_coil_breakouts(
 
     預設兩根：第一根站上還不進，第二根仍排列且收在 MA200 上才進。
     MA200 上頭不能再掛 MA100 或 MA120（兩條都要在 200 下面）。
-    要像 08-19 08:15 / 16:48 那種：先跌一段，短均收成一束，
-    近 12 根還在窄箱裡貼著 MA200，收盤剛站上（不要已經噴遠）。
-    MA200 還在往下，進場前至少有幾根收在 200 下面。
+    要像 08-19 08:15 那種：下跌後短均收成一束（MA5–MA60 帶寬），
+    近 12 根還在窄箱裡，收盤剛站上 MA200（不要已經噴遠）。
     停損用進場前 stop_lookback 根的修剪低點 − buffer。
     """
     if df is None or len(df) == 0:
