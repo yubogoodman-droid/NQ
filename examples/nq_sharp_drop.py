@@ -179,6 +179,7 @@ def detect_signals(
     target_r: float = 1.5,
     max_risk: float = 90.0,
     min_room_to_ma20: float = 12.0,
+    min_rr: float = 1.0,
     skip_hour_start: Optional[int] = 9,
     skip_hour_end: Optional[int] = 10,
     rth_only: bool = True,
@@ -323,6 +324,10 @@ def detect_signals(
             target = min(float(ma20[j]), target_by_r) if room > 0 else target_by_r
             if target <= entry:
                 bump("skip_bad_target")
+                continue
+            rr = (target - entry) / risk
+            if min_rr > 0 and rr < min_rr:
+                bump("skip_rr")
                 continue
 
             pierced_ma60 = (not np.isnan(ma60[dump_idx])) and dump_low < float(ma60[dump_idx])
@@ -626,10 +631,6 @@ def write_html_report(
             f"<div class='card'>總點數<b class='{extra_cls}'>{extra_stats['total_points']:+.1f}</b></div>"
             f"<div class='card'>勝/負<b>{extra_stats['wins']}/{extra_stats['count']-extra_stats['wins']}</b></div></div>"
             f"<div class='equity'>{_equity_svg([t.pnl_points for t in extra_trades])}</div></section>"
-            + (
-                _render_trade_cards(df, extra_trades, out, prefix="c")
-                or "<div class='empty'>無交易</div>"
-            )
         )
     funnel_line = ""
     if funnel:
@@ -642,7 +643,7 @@ def write_html_report(
             f"（黏帶擋 {funnel.get('skip_ribbon', 0)} · 沒貼 MA20 {funnel.get('skip_pre_ma20', 0)} · "
             f"量能 {funnel.get('skip_vol', 0)} · 開盤檔 {funnel.get('skip_open_hour', 0)} · "
             f"ETH {funnel.get('skip_eth', 0)} · 太晚 {funnel.get('skip_late', 0)} · "
-            f"風險 {funnel.get('skip_max_risk', 0)}）</p>"
+            f"RR不足 {funnel.get('skip_rr', 0)} · 風險 {funnel.get('skip_max_risk', 0)}）</p>"
         )
 
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -773,13 +774,13 @@ def cmd_backtest(args) -> int:
         _print_trades(df, extra_trades, "core")
 
     if stats["count"] == 0:
-        verdict = "這段樣本沒打到力成那種急跌。NQ 五分很少出現「黏帶後灌 2ATR+」的 V。"
+        verdict = "這段樣本沒打到力成那種急跌。NQ 五分很少出現「黏帶後灌 2ATR+、還有 1R 回到 MA20」的 V。"
     elif stats["total_points"] > 0 and stats["win_rate"] >= 45:
         verdict = "有料：RTH 過濾後期望值為正。仍是接刀，樣本少、遇到單邊續跌會一次吐回去。"
     elif stats["total_points"] > 0:
         verdict = "邊緣：總點數正，但勝率不高，比較像偶爾抓到 V，不是穩的優勢。"
     else:
-        verdict = "沒料：力成那種個股恐慌回補，搬到 NQ 容易變成趨勢日接飛刀。"
+        verdict = "沒料：力成是個股恐慌回補；NQ 急跌後常續跌。贏家回到 MA20，輸家一次吃掉整段急跌。"
 
     print(f"verdict: {verdict}")
 

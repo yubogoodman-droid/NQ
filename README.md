@@ -63,8 +63,12 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 ## NQ 五分 K 急跌 V 反（力成邏輯）
 
 台股那種「均線黏在一起、30 分內灌穿 MA20、放量、反攻 K 做多」搬到 NQ。  
-停損在急跌低下方；目標 MA20 或 1.5R。只做 RTH，09–10 不進。  
+停損在急跌低下方；目標 MA20 或 1.5R（至少 1R）。只做 RTH，09–10 不進。  
 NQ 不能用個股那種 4～5% 跌幅（約等於一千點），改成 ≥40 點或 2 ATR。
+
+Yahoo 五分 60 天（2026-06-15 → 08-25）：**11 筆、勝率 45.5%、−10 點**。  
+QA（灌得夠深）9 筆 +114，QB 2 筆 −124。含 ETH／開盤變成 76 筆、−142。  
+結論：**沒料。** 力成是個股恐慌回補；NQ 急跌後常續跌，贏家只回到 MA20，輸家一次吃掉整段急跌。NQ 還是用破底翻。
 
 ```bash
 python3 examples/nq_sharp_drop.py backtest --period 60d --html output/nq_sharp_drop.html

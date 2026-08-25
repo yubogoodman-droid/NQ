@@ -103,6 +103,8 @@ def test_detect_flush_bounce() -> None:
     assert sig.entry_price > sig.stop_price
     assert sig.dump_low < sig.dump_high
     assert sig.drop_pts >= 40
+    risk = sig.entry_price - sig.stop_price
+    assert (sig.target_price - sig.entry_price) / risk >= 1.0 - 1e-9
 
 
 def test_no_signal_on_continued_dump() -> None:
