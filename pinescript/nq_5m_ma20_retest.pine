@@ -83,7 +83,7 @@ if inSetup
             touch = leftOk and pierce >= -touchAbove and pierce <= maxPierce and close >= ma20
             risk = close - (breakLow - stopBuf)
             ma60FallingNear = ma60Near > 0 and not na(ma60) and not na(ma60[ma60SlopeBars]) and ma60 < ma60[ma60SlopeBars] and math.abs(close - ma60) <= ma60Near
-            ma20_30FallingNear = ma20Near > 0 and not na(ma20) and not na(ma20[ma60SlopeBars]) and not na(ma30) and not na(ma30[ma60SlopeBars]) and ma20 < ma20[ma60SlopeBars] and ma30 < ma30[ma60SlopeBars] and close < ma20 and close < ma30 and ma20 < ma30 and (ma20 - close) <= ma20Near and (ma30 - close) <= ma20Near
+            ma20_30FallingNear = ma20Near > 0 and not na(ma20) and not na(ma20[ma60SlopeBars]) and not na(ma30) and not na(ma30[ma60SlopeBars]) and not na(ma60) and not na(ma60[ma60SlopeBars]) and ma20 < ma20[ma60SlopeBars] and ma30 < ma30[ma60SlopeBars] and ma60 < ma60[ma60SlopeBars] and close < ma20 and close < ma30 and ma20 < ma30 and ma30 < ma60 and (ma20 - close) <= ma20Near and (ma30 - close) <= ma20Near
             if touch and inRth() and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and strategy.position_size == 0
                 stopLevel = breakLow - stopBuf
                 tgt = close + risk * targetR

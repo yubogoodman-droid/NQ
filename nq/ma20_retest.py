@@ -130,20 +130,24 @@ def near_falling_5m_ma20_ma30(
     ma30_5m: float,
     slope30: float,
     near: float,
+    ma60_5m: float = float("nan"),
+    slope60: float = float("nan"),
 ) -> bool:
     """進場夾在下彎 5m MA20 / MA30 蓋頭底下（空頭排列）→ 濾掉。
 
-    要粉紅在藍線下方（MA20 < MA30），避免均線纏在一起往上穿的 V 彈也被砍。
+    要粉紅 < 藍 < 綠（MA20 < MA30 < MA60）且三條都下彎。
+    08-18 10:34 是蓋頭；08-24 07:27 均線纏在一起、綠線還在藍線下面，會留。
     """
     if near <= 0:
         return False
-    if any(np.isnan(x) for x in (ma20_5m, slope20, ma30_5m, slope30)):
+    vals = (ma20_5m, slope20, ma30_5m, slope30, ma60_5m, slope60)
+    if any(np.isnan(x) for x in vals):
         return False
-    if float(slope20) >= 0.0 or float(slope30) >= 0.0:
+    if float(slope20) >= 0.0 or float(slope30) >= 0.0 or float(slope60) >= 0.0:
         return False
     if not (float(entry) < float(ma20_5m) and float(entry) < float(ma30_5m)):
         return False
-    if float(ma20_5m) >= float(ma30_5m):
+    if not (float(ma20_5m) < float(ma30_5m) < float(ma60_5m)):
         return False
     return (float(ma20_5m) - float(entry)) <= float(near) and (
         float(ma30_5m) - float(entry)
@@ -244,7 +248,7 @@ INTERVAL_DETECT = {
         ma20_slope_bars=20,
         ma60_5m_near=40.0,
         ma60_5m_slope_bars=6,
-        ma20_5m_near=40.0,
+        ma20_5m_near=45.0,
     ),
 }
 
@@ -292,7 +296,7 @@ def detect_signals(
     ma20_slope_bars: int = 4,
     ma60_5m_near: float = 40.0,
     ma60_5m_slope_bars: int = 6,
-    ma20_5m_near: float = 40.0,
+    ma20_5m_near: float = 45.0,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """
@@ -454,7 +458,9 @@ def detect_signals(
             if not np.isnan(ma30_5m_slope[entry_idx])
             else float("nan")
         )
-        if near_falling_5m_ma20_ma30(entry, m20_5, m20_5_s, m30_5, m30_5_s, ma20_5m_near):
+        if near_falling_5m_ma20_ma30(
+            entry, m20_5, m20_5_s, m30_5, m30_5_s, ma20_5m_near, m60_5, m60_5_s
+        ):
             bump("skip_ma20_30")
             i = entry_idx + 1
             continue

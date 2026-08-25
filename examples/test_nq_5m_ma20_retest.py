@@ -48,20 +48,34 @@ def test_near_falling_5m_ma60() -> None:
 
 
 def test_near_falling_5m_ma20_ma30() -> None:
-    # #9 style: below stacked falling MA20 < MA30
-    assert near_falling_5m_ma20_ma30(29651.0, 29670.0, -5.0, 29685.0, -4.0, 40.0)
-    # #34 style: MA20/MA30 tangled (MA20 above MA30) — keep
-    assert not near_falling_5m_ma20_ma30(29186.0, 29204.0, -5.0, 29200.0, -4.0, 40.0)
-    # already above 5m MA20 — keep
-    assert not near_falling_5m_ma20_ma30(29094.0, 29060.0, -5.0, 29080.0, -4.0, 40.0)
+    # 08-18 10:34 #9: below falling MA20 < MA30 < MA60, MA30 40.4 pts away
+    assert near_falling_5m_ma20_ma30(
+        29651.0, 29676.7, -19.9, 29691.4, -22.8, 45.0, 29715.0, -11.0
+    )
+    # 40-pt cap misses #9 (MA30 is 40.4)
+    assert not near_falling_5m_ma20_ma30(
+        29651.0, 29676.7, -19.9, 29691.4, -22.8, 40.0, 29715.0, -11.0
+    )
+    # 08-24 07:27: MA20/MA30 tight but MA60 below MA30 and rising — keep
+    assert not near_falling_5m_ma20_ma30(
+        29185.75, 29205.2, -15.7, 29212.1, -8.1, 45.0, 29197.0, 0.8
+    )
+    # 08-24 10:50 already above 5m MA20 — keep
+    assert not near_falling_5m_ma20_ma30(
+        29094.25, 29064.8, -45.8, 29115.0, -32.9, 45.0, 29164.4, -16.6
+    )
+    # 07-29 deep dump: MA30 47.6 pts away — keep
+    assert not near_falling_5m_ma20_ma30(
+        27512.25, 27535.6, -24.4, 27559.8, -63.6, 45.0, 27730.3, -50.8
+    )
     # MA20 rising — keep
-    assert not near_falling_5m_ma20_ma30(29651.0, 29670.0, 3.0, 29685.0, -4.0, 40.0)
-    # MA30 still rising — keep
-    assert not near_falling_5m_ma20_ma30(29651.0, 29670.0, -5.0, 29685.0, 2.0, 40.0)
-    # farther than 40 pts — keep
-    assert not near_falling_5m_ma20_ma30(29651.0, 29720.0, -5.0, 29740.0, -4.0, 40.0)
+    assert not near_falling_5m_ma20_ma30(
+        29651.0, 29676.7, 3.0, 29691.4, -22.8, 45.0, 29715.0, -11.0
+    )
     # filter off
-    assert not near_falling_5m_ma20_ma30(29651.0, 29670.0, -5.0, 29685.0, -4.0, 0.0)
+    assert not near_falling_5m_ma20_ma30(
+        29651.0, 29676.7, -19.9, 29691.4, -22.8, 0.0, 29715.0, -11.0
+    )
 
 
 def test_skips_hug_falling_5m_ma60() -> None:
@@ -297,7 +311,7 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["fail_below"] == 40.0
     assert d1["ma60_5m_near"] == 40.0
     assert d5["ma60_5m_near"] == 40.0
-    assert d1["ma20_5m_near"] == 40.0
+    assert d1["ma20_5m_near"] == 45.0
     assert d5["ma20_5m_near"] == 0.0
     s1 = simulate_kwargs("1m")
     assert s1["ma_exit_after"] == 60
