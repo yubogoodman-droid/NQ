@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from tw.ranking import RankedStock
-from tw.screener import ScanHit, hit_key
-from tw.signals import AlertSnapshot, close_above_ma240
+from tw.screener import ScanHit, apply_5m_ma240_filter
+from tw.signals import AlertSnapshot
 
 
 TAIPEI = ZoneInfo("Asia/Taipei")
@@ -55,25 +55,29 @@ def _hit(
     )
 
 
-class ChartOnlyFiveMinuteTests(unittest.TestCase):
-    def test_5m_below_ma240_does_not_drop_1m_hit(self) -> None:
+class FiveMinuteFilterTests(unittest.TestCase):
+    def test_drops_hits_below_5m_ma240(self) -> None:
+        above_df = _bars([100.0] * 259 + [110.0])
         below_df = _bars([100.0] * 259 + [90.0])
-        ts = below_df.index[-1] + pd.Timedelta(minutes=3)
-        hit = _hit("2313.TW", below_df, ts)
-        self.assertFalse(close_above_ma240(hit.frame_5m, hit.snapshot.timestamp, floor="5min"))
-        self.assertTrue(hit.snapshot.bullish_aligned)
-        self.assertTrue(hit.snapshot.crossed_above_ma240)
+        ts = above_df.index[-1] + pd.Timedelta(minutes=3)
+        above = _hit("1303.TW", above_df, ts)
+        below = _hit("2313.TW", below_df, ts)
+        missing = _hit("2486.TW", None, ts)
+        kept, dropped, skipped = apply_5m_ma240_filter([above, below, missing])
+        self.assertEqual([h.stock.symbol for h in kept], ["1303.TW"])
+        self.assertEqual(dropped, 2)
+        reasons = {stock.symbol: reason for stock, reason in skipped}
+        self.assertIn("MA240", reasons["2313.TW"])
+        self.assertIn("無五分", reasons["2486.TW"])
 
-    def test_missing_5m_does_not_drop_1m_hit(self) -> None:
-        ts = pd.Timestamp("2026-08-17 11:03", tz=TAIPEI)
-        hit = _hit("2486.TW", None, ts)
-        self.assertIsNone(hit.frame_5m)
-        self.assertTrue(hit.snapshot.crossed_above_ma240)
-
-    def test_hit_key_uses_symbol_and_timestamp(self) -> None:
-        ts = pd.Timestamp("2026-08-17 11:03", tz=TAIPEI)
-        hit = _hit("1303.TW", None, ts)
-        self.assertEqual(hit_key(hit), ("1303.TW", ts))
+    def test_keeps_hits_just_above_5m_ma240(self) -> None:
+        hug_df = _bars([100.0] * 259 + [101.0])
+        ts = hug_df.index[-1] + pd.Timedelta(minutes=3)
+        hug = _hit("3605.TW", hug_df, ts)
+        kept, dropped, skipped = apply_5m_ma240_filter([hug])
+        self.assertEqual([h.stock.symbol for h in kept], ["3605.TW"])
+        self.assertEqual(dropped, 0)
+        self.assertEqual(skipped, [])
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ def send_notifications(title: str, body: str) -> list[str]:
 def format_hit_message(hits: list[ScanHit]) -> tuple[str, str]:
     if not hits:
         return "台股一分K掃描", "目前沒有符合條件的標的"
-    title = f"台股一分K上MA240 × {len(hits)}"
+    title = f"台股一分K站穩MA240 × {len(hits)}"
     lines = []
     for hit in hits:
         stock = hit.stock

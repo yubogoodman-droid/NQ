@@ -30,7 +30,7 @@ TELEGRAM_BOT_TOKEN = ""     # Telegram BotFather 給的 token
 TELEGRAM_CHAT_ID = ""       # 你的 Telegram chat id
 # ═══════════════════════════════════════════════════════════════
 
-SCRIPT_VERSION = "2026-08-25-a"
+SCRIPT_VERSION = "2026-08-25-b"
 
 
 def _apply_secrets() -> None:
@@ -59,7 +59,15 @@ MA_FAST = 5
 MA_MID = 10
 MA_SLOW = 20
 MA_LONG = 240
+# 09:00–09:04 開盤跳空不算「當下那根站上 240」。
+ENTRY_AFTER_HOUR = 9
+ENTRY_AFTER_MINUTE = 5
+# 站穩那根要過開盤前 10 分鐘（09:06 那種開盤第一根不算）。
+CONFIRM_AFTER_MINUTE = 10
 MAX_BAR_GAP = pd.Timedelta(minutes=2)
+HOLD_BARS = 2
+# 金叉前連續收在 MA240 下，才算從下面穿上，不是貼著磨。
+BARS_BELOW_BEFORE_CROSS = 3
 
 
 @dataclass(frozen=True)
@@ -83,19 +91,21 @@ class AlertSnapshot:
 
     @property
     def ma_span_pct(self) -> float:
+        """MA5 與 MA20 的距離／收盤。太小代表均線糾結。"""
         if self.close <= 0:
             return 0.0
         return (self.ma5 - self.ma20) / self.close
 
     @property
     def ma20_ma240_gap_pct(self) -> float:
+        """MA20 與 MA240 的距離／收盤。太大代表兩條線差太遠（像華新科）。"""
         if self.close <= 0:
             return 0.0
         return abs(self.ma240 - self.ma20) / self.close
 
 
 def is_intraday_entry_bar(prev_ts: pd.Timestamp, ts: pd.Timestamp) -> bool:
-    """前一根必須是同一交易日、連續的一分 K（隔夜跳空不算）。"""
+    """同一根進場：前一根必須是同一交易日、連續的一分K，且已過開盤跳空時段。"""
     prev = pd.Timestamp(prev_ts)
     cur = pd.Timestamp(ts)
     if prev.tzinfo is not None and cur.tzinfo is None:
@@ -104,7 +114,36 @@ def is_intraday_entry_bar(prev_ts: pd.Timestamp, ts: pd.Timestamp) -> bool:
         prev = prev.tz_localize(cur.tzinfo)
     if cur.date() != prev.date():
         return False
+    if cur.hour < ENTRY_AFTER_HOUR or (
+        cur.hour == ENTRY_AFTER_HOUR and cur.minute < ENTRY_AFTER_MINUTE
+    ):
+        return False
     if cur - prev > MAX_BAR_GAP:
+        return False
+    return True
+
+
+def mas_are_open(snapshot: AlertSnapshot, min_span: float = 0.004) -> bool:
+    """多頭排列且 MA5–MA20 拉開到 min_span 以上（預設 0.4%，短均要扇開）。"""
+    return snapshot.bullish_aligned and snapshot.ma_span_pct >= min_span
+
+
+def ma20_near_ma240(
+    snapshot: AlertSnapshot,
+    max_gap: float = 0.010,
+    min_gap: float = 0.004,
+) -> bool:
+    """MA20 與 MA240 距離要剛好（預設 0.4%～1.0%）。太近是貼著磨，太遠不像踩線。"""
+    gap = snapshot.ma20_ma240_gap_pct
+    return min_gap <= gap <= max_gap
+
+
+def is_confirm_time(ts: pd.Timestamp) -> bool:
+    """站穩通知那一根：09:10 以後。"""
+    cur = pd.Timestamp(ts)
+    if cur.hour < ENTRY_AFTER_HOUR:
+        return False
+    if cur.hour == ENTRY_AFTER_HOUR and cur.minute < CONFIRM_AFTER_MINUTE:
         return False
     return True
 
@@ -120,7 +159,7 @@ def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def is_ma240_breakout_bullish(df: pd.DataFrame) -> AlertSnapshot | None:
-    """最新一根就是多頭排列＋剛站上 MA240。"""
+    """最新一根：前一根剛站上 MA240，這一根仍收在 MA240 上（站穩兩根）。"""
     return latest_ma240_breakout_bullish(df, latest_only=True)
 
 
@@ -135,17 +174,22 @@ def latest_ma240_breakout_bullish(
     max_ma20_ma240_gap: float | None = None,
 ) -> AlertSnapshot | None:
     """
-    通知那一根：MA5>MA10>MA20，且收盤從 MA240 下面（含等於）穿上。
-    latest_only 只看最後一根（watch）。隔夜跳空不算。
-    多餘參數保留是為了舊呼叫端相容，不再使用。
+    進場／通知那一根：從 MA240 下面穿上，連續兩根收盤站穩。
+    站穩要 09:10 以後；金叉前至少三根收在 240 下。
+    latest_only 只看最後一根（watch）。隔夜跳空、開盤前 5 分鐘不算。
     """
-    del min_ma_span, min_ma20_ma240_gap, max_ma20_ma240_gap
-    if df is None or len(df) < MA_LONG + 1:
+    if df is None or len(df) < MA_LONG + HOLD_BARS + BARS_BELOW_BEFORE_CROSS:
         return None
     work = add_moving_averages(df)
     if latest_only:
         loc = len(work) - 1
-        snap = _cross_at(work, loc)
+        snap = _hold_confirm_at(
+            work,
+            loc,
+            min_ma_span=min_ma_span,
+            min_ma20_ma240_gap=min_ma20_ma240_gap,
+            max_ma20_ma240_gap=max_ma20_ma240_gap,
+        )
         if snap is None:
             return None
         if since is not None and snap.timestamp < since:
@@ -154,7 +198,7 @@ def latest_ma240_breakout_bullish(
             return None
         return snap
 
-    start = MA_LONG
+    start = MA_LONG + HOLD_BARS + BARS_BELOW_BEFORE_CROSS - 1
     if since is not None:
         matched = False
         for i, ts in enumerate(work.index):
@@ -169,26 +213,77 @@ def latest_ma240_breakout_bullish(
         ts = work.index[i]
         if until is not None and ts > until:
             break
-        snap = _cross_at(work, i)
+        snap = _hold_confirm_at(
+            work,
+            i,
+            min_ma_span=min_ma_span,
+            min_ma20_ma240_gap=min_ma20_ma240_gap,
+            max_ma20_ma240_gap=max_ma20_ma240_gap,
+        )
         if snap is not None:
             return snap
     return None
 
 
-def _cross_at(work: pd.DataFrame, idx: int) -> AlertSnapshot | None:
-    """idx 為剛站上 MA240 的那一根。"""
-    if idx < 1:
+def _hold_confirm_at(
+    work: pd.DataFrame,
+    idx: int,
+    *,
+    min_ma_span: float = 0.0,
+    min_ma20_ma240_gap: float = 0.0,
+    max_ma20_ma240_gap: float | None = None,
+) -> AlertSnapshot | None:
+    """idx 為站穩的第二根；前一根必須是剛站上 240 的進場K。"""
+    if idx < 2:
+        return None
+    if not is_confirm_time(work.index[idx]):
         return None
     if not is_intraday_entry_bar(work.index[idx - 1], work.index[idx]):
         return None
-    snap = _snapshot_at(work, idx)
-    if snap is None:
+    if not is_intraday_entry_bar(work.index[idx - 2], work.index[idx - 1]):
         return None
-    if not snap.crossed_above_ma240:
+    if not _run_below_ma240(work, idx - 1):
         return None
-    if not snap.bullish_aligned:
+    confirm = _snapshot_at(work, idx)
+    cross = _snapshot_at(work, idx - 1)
+    if confirm is None or cross is None:
         return None
-    return snap
+    if not cross.crossed_above_ma240:
+        return None
+    if not (confirm.close > confirm.ma240):
+        return None
+    if not (confirm.bullish_aligned and cross.bullish_aligned):
+        return None
+    if min_ma_span and not mas_are_open(confirm, min_ma_span):
+        return None
+    if max_ma20_ma240_gap is not None or min_ma20_ma240_gap > 0:
+        max_gap = 1.0 if max_ma20_ma240_gap is None else max_ma20_ma240_gap
+        if not ma20_near_ma240(
+            confirm, max_gap=max_gap, min_gap=min_ma20_ma240_gap
+        ):
+            return None
+    return confirm
+
+
+def _run_below_ma240(
+    work: pd.DataFrame,
+    cross_idx: int,
+    bars: int = BARS_BELOW_BEFORE_CROSS,
+) -> bool:
+    """金叉前連續 bars 根收盤都在 MA240 下（含等於），同一交易日。"""
+    if cross_idx < bars:
+        return False
+    cross_day = pd.Timestamp(work.index[cross_idx]).date()
+    for i in range(cross_idx - bars, cross_idx):
+        ts = pd.Timestamp(work.index[i])
+        if ts.date() != cross_day:
+            return False
+        row = work.iloc[i]
+        if pd.isna(row.get("ma240")):
+            return False
+        if float(row["close"]) > float(row["ma240"]):
+            return False
+    return True
 
 
 def ma240_at(
@@ -1487,6 +1582,18 @@ def run_scan(
         )
         if snapshot is None:
             continue
+        if not mas_are_open(snapshot, cfg.min_ma_span):
+            skipped.append((stock, "均線糾結"))
+            tangled_dropped += 1
+            continue
+        if not ma20_near_ma240(
+            snapshot,
+            max_gap=cfg.max_ma20_ma240_gap,
+            min_gap=cfg.min_ma20_ma240_gap,
+        ):
+            skipped.append((stock, "MA20/MA240 距離不對"))
+            far_ma_dropped += 1
+            continue
         hits.append(ScanHit(stock=stock, snapshot=snapshot, bars=len(df), frame=df))
 
     below_5m_dropped = 0
@@ -1504,6 +1611,14 @@ def run_scan(
                 hit.frame_5m = frames_5m.get(hit.stock.symbol)
         except Exception as exc:  # noqa: BLE001
             errors.append((hits[0].stock, f"五分K下載失敗：{exc}"))
+            for hit in hits:
+                skipped.append((hit.stock, "五分K下載失敗"))
+            below_5m_dropped = len(hits)
+            hits = []
+        else:
+            hits, dropped_5m, skip_5m = apply_5m_ma240_filter(hits)
+            skipped.extend(skip_5m)
+            below_5m_dropped = dropped_5m
 
     hits.sort(key=lambda h: h.stock.rank)
     skipped.sort(key=lambda item: item[0].rank)
@@ -1525,6 +1640,24 @@ def run_scan(
     )
 
 
+def apply_5m_ma240_filter(
+    hits: list[ScanHit],
+) -> tuple[list[ScanHit], int, list[tuple[RankedStock, str]]]:
+    """一分站穩當下的五分K收盤必須高於五分 MA240。"""
+    kept: list[ScanHit] = []
+    skipped: list[tuple[RankedStock, str]] = []
+    for hit in hits:
+        frame = hit.frame_5m
+        if frame is None or frame.empty:
+            skipped.append((hit.stock, "無五分 K 資料"))
+            continue
+        if not close_above_ma240(frame, hit.snapshot.timestamp, floor="5min"):
+            skipped.append((hit.stock, "五分K收盤在 MA240 底下"))
+            continue
+        kept.append(hit)
+    return kept, len(skipped), skipped
+
+
 def hit_key(hit: ScanHit) -> tuple[str, pd.Timestamp]:
     return hit.stock.symbol, hit.snapshot.timestamp
 
@@ -1544,7 +1677,7 @@ def send_notifications(title: str, body: str) -> list[str]:
 def format_hit_message(hits: list[ScanHit]) -> tuple[str, str]:
     if not hits:
         return "台股一分K掃描", "目前沒有符合條件的標的"
-    title = f"台股一分K上MA240 × {len(hits)}"
+    title = f"台股一分K站穩MA240 × {len(hits)}"
     lines = []
     for hit in hits:
         stock = hit.stock
@@ -1617,7 +1750,7 @@ def _discord(title: str, body: str) -> bool:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="台股一分K多頭排列＋收盤上MA240掃描（單檔）")
+    p = argparse.ArgumentParser(description="台股一分K多頭排列＋站穩MA240掃描（單檔）")
     p.add_argument("--top", type=int, default=200, help="成交額前 N 名（預設 200）")
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--watch", action="store_true", help="盤中持續監控（PyCharm 直接 Run 預設就是這個）")
@@ -1647,6 +1780,9 @@ def print_result(result, *, quiet_empty: bool) -> None:
         f"[{result.scanned_at.strftime('%H:%M:%S')}] "
         f"成交額前 {len(result.universe)}／股價濾掉 {result.price_dropped}／"
         f"ETF濾掉 {result.etf_dropped}／金融濾掉 {result.financial_dropped}／掃描 {len(result.candidates)}／"
+        f"均線糾結濾掉 {result.tangled_dropped}／"
+        f"MA20/MA240不符 {result.far_ma_dropped}／"
+        f"五分MA240濾掉 {result.below_5m_dropped}／"
         f"命中 {len(result.hits)}／略過 {len(result.skipped)}／錯誤 {len(result.errors)}"
     )
     if result.as_of:
