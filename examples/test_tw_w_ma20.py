@@ -156,6 +156,49 @@ def make_range_after_dump() -> pd.DataFrame:
     return _ohlc(close, low=low, high=high)
 
 
+def make_open_v_retest() -> pd.DataFrame:
+    """台虹 8/19：開盤長黑當 L1，立刻漲回開盤高，再慢慢回測，是 V 不是 W。"""
+    n = 70
+    close = np.full(n, 280.0)
+    close[:8] = 280.0
+    # 09:00 開盤殺到 266，09:15 回到 284
+    close[8:20] = [268.0, 278.0, 284.0, 280.0, 276.0, 273.0, 271.0, 270.0, 269.0, 268.5, 268.0, 269.0]
+    close[20:32] = [270.0, 271.0, 272.0, 273.0, 273.5, 274.0, 274.5, 275.0, 275.5, 276.0, 276.5, 277.0]
+    close[32:] = np.linspace(277.5, 282.0, n - 32)
+    low = np.minimum(close, np.roll(close, 1)) - 0.4
+    low[0] = close[0] - 0.4
+    low[8] = 266.0
+    low[19] = 268.0
+    high = np.maximum(close, np.roll(close, 1)) + 0.5
+    high[0] = close[0] + 0.5
+    high[8] = 279.0
+    high[10] = 284.0
+    return _ohlc(close, low=low, high=high)
+
+
+def make_shallow_shelf_after_dump() -> pd.DataFrame:
+    """台勝科 8/19：大跌後貼著地板的淺箱，兩低點之間每根都在谷底附近。"""
+    n = 70
+    close = np.full(n, 372.0)
+    close[:10] = 372.0
+    close[10:24] = np.linspace(370.0, 346.0, 14)
+    # 344.5-349.5 淺箱，低點幾乎都貼地板
+    shelf = [346.0, 347.0, 346.5, 347.5, 346.0, 347.0, 346.2, 347.8, 348.5, 349.0, 350.5, 352.0, 353.5]
+    close[24:24 + len(shelf)] = shelf
+    close[24 + len(shelf) :] = np.linspace(354.0, 360.0, n - 24 - len(shelf))
+    low = np.minimum(close, np.roll(close, 1)) - 0.3
+    low[0] = close[0] - 0.3
+    low[23] = 344.5
+    for i in range(24, 33):
+        low[i] = min(low[i], 345.2)
+    low[30] = 345.5
+    high = np.maximum(close, np.roll(close, 1)) + 0.4
+    high[0] = close[0] + 0.4
+    high[10] = 375.0
+    high[26] = 349.5
+    return _ohlc(close, low=low, high=high)
+
+
 def make_no_w_ma20_cross() -> pd.DataFrame:
     """只有單腳回升上穿 MA20，沒有 W。"""
     n = 80
@@ -222,6 +265,14 @@ def test_no_w_no_alert() -> None:
 
 def test_range_after_dump_is_not_a_w() -> None:
     assert detect_w_ma20_crosses(make_range_after_dump()) == [], "橫盤箱型不該算 W 底"
+
+
+def test_open_v_retest_is_not_a_w() -> None:
+    assert detect_w_ma20_crosses(make_open_v_retest()) == [], "開盤 V 再回測不該算 W 底"
+
+
+def test_shallow_shelf_after_dump_is_not_a_w() -> None:
+    assert detect_w_ma20_crosses(make_shallow_shelf_after_dump()) == [], "殺完淺箱不該算 W 底"
 
 
 def test_w_without_ma20_no_alert() -> None:
@@ -437,6 +488,8 @@ def main() -> int:
     test_nanya_like_higher_second_low()
     test_no_w_no_alert()
     test_range_after_dump_is_not_a_w()
+    test_open_v_retest_is_not_a_w()
+    test_shallow_shelf_after_dump_is_not_a_w()
     test_w_without_ma20_no_alert()
     test_falling_ma_onto_flat_close_is_not_a_cross()
     test_accepts_lowercase_columns()

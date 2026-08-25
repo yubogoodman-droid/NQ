@@ -264,6 +264,58 @@ def _is_visual_w_pair(
     return extra <= max_mid_swing_lows
 
 
+def _neck_retrace_ok(
+    neckline: float,
+    floor: float,
+    session_high: float,
+    *,
+    max_retrace: float = 0.80,
+) -> bool:
+    """頸線若幾乎漲回殺勢起點，那是 V 型反彈再回測，不是打在低檔的 W。"""
+    dump = session_high - floor
+    if dump <= 0 or neckline < floor:
+        return False
+    return (neckline - floor) / dump <= max_retrace
+
+
+def _w_height_vs_bar_ok(
+    highs: Sequence[float],
+    lows: Sequence[float],
+    first_idx: int,
+    second_idx: int,
+    neckline: float,
+    floor: float,
+    *,
+    min_ratio: float = 2.3,
+) -> bool:
+    """W 高度要明顯大於區間內平均振幅，否則只是殺完貼著的淺箱。"""
+    if second_idx < first_idx or floor <= 0:
+        return False
+    ranges = [highs[i] - lows[i] for i in range(first_idx, second_idx + 1)]
+    avg = sum(ranges) / len(ranges) if ranges else 0.0
+    if avg <= 0:
+        return False
+    return (neckline - floor) / avg >= min_ratio
+
+
+def _w_not_floor_box(
+    lows: Sequence[float],
+    first_idx: int,
+    second_idx: int,
+    floor: float,
+    *,
+    max_hug: float = 0.85,
+    hug_pct: float = 0.006,
+) -> bool:
+    """兩低點之間大多數 K 都貼著地板 → 箱型，不是兩個谷。"""
+    n = second_idx - first_idx + 1
+    if n <= 0 or floor <= 0:
+        return False
+    ceiling = floor * (1.0 + hug_pct)
+    hug = sum(1 for i in range(first_idx, second_idx + 1) if lows[i] <= ceiling)
+    return hug / n <= max_hug
+
+
 def _ohlc_frame(df: pd.DataFrame) -> pd.DataFrame:
     """接受 open/high/low/close 或 Open/High/Low/Close。"""
     lower = {str(c).lower(): c for c in df.columns}
@@ -303,6 +355,10 @@ def detect_w_ma20_crosses(
     min_right_bars: int = 3,
     max_mid_swing_lows: int = 1,
     earlier_shelf_pct: float = 0.004,
+    min_dump_bars: int = 4,
+    max_neck_retrace: float = 0.80,
+    min_height_vs_bar: float = 2.3,
+    max_floor_hug: float = 0.85,
 ) -> list[WMa20Signal]:
     """
     視覺 W 底形成後，五分 K 出現 MA5 > MA10 > MA20 多頭排列才進場。
@@ -314,6 +370,10 @@ def detect_w_ma20_crosses(
     當天五分圖要先有夠深的殺勢（不能只靠隔夜缺口），
     頸線不能貼在第一低旁邊、兩低點之間不能一再測底，
     而且第一低不能已是當天同一層的第二次。
+
+    也排除看起來不像 W 的三種圖：
+    開盤當根就當 L1、頸線幾乎漲回殺勢起點（台虹那種 V），
+    以及殺完貼著地板的淺箱（台勝科、台玻那種）。
     """
     ohlc = _ohlc_frame(df)
     if len(ohlc) < ma_period + max_bars_between_lows:
@@ -351,6 +411,8 @@ def detect_w_ma20_crosses(
             sess -= 1
         sess_high = max(highs[sess : first_idx + 1])
         if (sess_high - first_low) / first_low < min_session_drop_pct:
+            continue
+        if first_idx - sess < min_dump_bars:
             continue
         ma1 = ma20[first_idx]
         if ma1 != ma1 or first_low >= ma1:
@@ -399,6 +461,32 @@ def detect_w_ma20_crosses(
                 min_neck_offset=min_neck_offset,
                 min_right_bars=min_right_bars,
                 max_mid_swing_lows=max_mid_swing_lows,
+            ):
+                continue
+            w_floor = min(first_low, second_low)
+            if not _neck_retrace_ok(
+                neckline_price,
+                w_floor,
+                sess_high,
+                max_retrace=max_neck_retrace,
+            ):
+                continue
+            if not _w_height_vs_bar_ok(
+                highs,
+                lows,
+                first_idx,
+                second_idx,
+                neckline_price,
+                w_floor,
+                min_ratio=min_height_vs_bar,
+            ):
+                continue
+            if not _w_not_floor_box(
+                lows,
+                first_idx,
+                second_idx,
+                w_floor,
+                max_hug=max_floor_hug,
             ):
                 continue
 
