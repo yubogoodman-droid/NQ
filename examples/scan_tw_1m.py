@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""台股一分 K：MA5/10/20 多頭排列，連續兩根收盤站穩 MA240 再通知。"""
+"""台股一分 K：MA5>MA10>MA20 多頭排列，收盤剛上 MA240 就通知。"""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="台股一分K多頭排列＋站穩MA240掃描")
+    p = argparse.ArgumentParser(description="台股一分K多頭排列＋收盤上MA240掃描")
     p.add_argument("--top", type=int, default=200, help="成交額前 N 名（預設 200）")
     p.add_argument("--max-price", type=float, default=650.0, help="濾掉此價格以上（預設 650）")
     p.add_argument("--watch", action="store_true", help="盤中每分鐘重掃，同一根 K 不重複通知")
@@ -84,7 +84,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--include-financial", action="store_true", help="不過濾金融股")
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("-o", "--output", default="docs/tw/index.html")
-    p.add_argument("--date", help="回測指定日（YYYY-MM-DD），只找當天站穩")
+    p.add_argument("--date", help="回測指定日（YYYY-MM-DD），只找當天站上 MA240")
     p.add_argument("--last-friday", action="store_true", help="回測上週五")
     p.add_argument("--last-week", action="store_true", help="回測上週一到五，每天分開一頁")
     p.add_argument("--quiet-empty", action="store_true", help="沒命中時不印詳細清單")
@@ -104,9 +104,6 @@ def print_result(result, *, quiet_empty: bool) -> None:
         f"[{result.scanned_at.strftime('%H:%M:%S')}] "
         f"成交額前 {len(result.universe)}／股價濾掉 {result.price_dropped}／"
         f"ETF濾掉 {result.etf_dropped}／金融濾掉 {result.financial_dropped}／掃描 {len(result.candidates)}／"
-        f"均線糾結濾掉 {result.tangled_dropped}／"
-        f"MA20/MA240不符 {result.far_ma_dropped}／"
-        f"五分MA240濾掉 {result.below_5m_dropped}／"
         f"命中 {len(result.hits)}／略過 {len(result.skipped)}／錯誤 {len(result.errors)}"
     )
     if result.as_of:
