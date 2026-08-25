@@ -1,0 +1,70 @@
+//@version=5
+indicator("台股 五分K W底上MA20", overlay=true, max_labels_count=50)
+
+// 五分圖：W 底確認後，收盤上穿 MA20 跳通知（不要求先過頸線）
+swingLen      = input.int(2, "轉折確認 K 數", minval=1)
+minBars       = input.int(6, "兩低點最少間隔", minval=3)
+maxBars       = input.int(48, "兩低點最多間隔", minval=10)
+lowBelowPct   = input.float(1.5, "第二低最多低於第一低 (%)", minval=0.2, step=0.1) / 100
+lowAbovePct   = input.float(2.5, "第二低最多高於第一低 (%)", minval=0.2, step=0.1) / 100
+minNeckPct    = input.float(0.8, "頸線相對低點最小高度 (%)", minval=0.2, step=0.1) / 100
+minDropPct    = input.float(2.5, "進場前最小跌幅 (%)", minval=0.5, step=0.1) / 100
+priorBars     = input.int(36, "回看出發高點 K 數", minval=8)
+maxCrossBars  = input.int(36, "第二低後幾根內上穿", minval=4)
+maLen         = input.int(20, "MA 週期", minval=5)
+
+ma20 = ta.sma(close, maLen)
+plot(ma20, "MA20", color=color.new(color.yellow, 0), linewidth=2)
+
+pl = ta.pivotlow(low, swingLen, swingLen)
+phHigh = ta.highest(high, math.max(1, maxBars))
+
+var float firstLow = na
+var int   firstLowBar = na
+var float secondLow = na
+var int   secondLowBar = na
+var float neckline = na
+var int   necklineBar = na
+var bool  wReady = false
+var bool  fired = false
+
+priorHigh = ta.highest(high, priorBars)
+
+if not na(pl)
+    firstLow := pl
+    firstLowBar := bar_index - swingLen
+    secondLow := na
+    secondLowBar := na
+    neckline := na
+    necklineBar := na
+    wReady := false
+    fired := false
+
+if not na(firstLow) and na(secondLow) and not na(phHigh)
+    if na(neckline) or high > neckline
+        neckline := high
+        necklineBar := bar_index
+
+if not na(pl) and not na(firstLow) and (bar_index - swingLen) > firstLowBar
+    gap = bar_index - swingLen - firstLowBar
+    rel = (pl - firstLow) / firstLow
+    dropOk = (priorHigh - firstLow) / firstLow >= minDropPct
+    neckOk = not na(neckline) and (neckline - (firstLow + pl) / 2) / ((firstLow + pl) / 2) >= minNeckPct
+    if gap >= minBars and gap <= maxBars and rel >= -lowBelowPct and rel <= lowAbovePct and dropOk and neckOk
+        secondLow := pl
+        secondLowBar := bar_index - swingLen
+        wReady := true
+        fired := false
+
+crossUp = ta.crossover(close, ma20)
+confirmBar = not na(secondLowBar) and bar_index >= secondLowBar + swingLen
+stillValid = not na(secondLow) and low >= math.min(firstLow, secondLow) * 0.997
+fresh = not na(secondLowBar) and bar_index - secondLowBar <= maxCrossBars
+longSignal = wReady and not fired and confirmBar and stillValid and fresh and crossUp and close > ma20
+
+if longSignal
+    fired := true
+    label.new(bar_index, low, "W底上MA20", style=label.style_label_up, color=color.new(color.lime, 20), textcolor=color.black, size=size.small)
+
+alertcondition(longSignal, title="五分K W底上MA20", message="{{ticker}} 五分K W底，收盤上穿 MA20")
+plotshape(longSignal, title="W底上MA20", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)

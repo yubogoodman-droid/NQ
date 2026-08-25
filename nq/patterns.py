@@ -166,3 +166,185 @@ def _dedupe_patterns(patterns: Iterable[WBottomPattern]) -> list[WBottomPattern]
         if rr > ex_rr:
             by_breakout[p.breakout_idx] = p
     return sorted(by_breakout.values(), key=lambda p: p.breakout_idx or 0)
+
+
+@dataclass(frozen=True)
+class WMa20Signal:
+    """五分 K W 底之後，收盤上穿 MA20。"""
+
+    first_low_idx: int
+    second_low_idx: int
+    neckline_idx: int
+    first_low: float
+    second_low: float
+    neckline: float
+    cross_idx: int
+    cross_price: float
+    ma20: float
+
+    @property
+    def stop_loss(self) -> float:
+        return min(self.first_low, self.second_low)
+
+    @property
+    def target(self) -> float:
+        depth = self.neckline - min(self.first_low, self.second_low)
+        return self.neckline + depth
+
+    @property
+    def w_depth_pct(self) -> float:
+        base = min(self.first_low, self.second_low)
+        if base <= 0:
+            return 0.0
+        return (self.neckline - base) / base
+
+
+def _ohlc_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """接受 open/high/low/close 或 Open/High/Low/Close。"""
+    lower = {str(c).lower(): c for c in df.columns}
+    missing = {"open", "high", "low", "close"} - set(lower)
+    if missing:
+        raise ValueError(f"DataFrame 缺少欄位: {missing}")
+    out = pd.DataFrame(
+        {
+            "open": df[lower["open"]],
+            "high": df[lower["high"]],
+            "low": df[lower["low"]],
+            "close": df[lower["close"]],
+        },
+        index=df.index,
+    )
+    if "volume" in lower:
+        out["volume"] = df[lower["volume"]]
+    return out
+
+
+def detect_w_ma20_crosses(
+    df: pd.DataFrame,
+    *,
+    ma_period: int = 20,
+    swing_lookback: int = 2,
+    min_bars_between_lows: int = 6,
+    max_bars_between_lows: int = 48,
+    low_below_pct: float = 0.015,
+    low_above_pct: float = 0.025,
+    min_neck_pct: float = 0.008,
+    min_prior_drop_pct: float = 0.025,
+    prior_lookback: int = 36,
+    max_bars_to_cross: int = 36,
+    invalidate_pct: float = 0.003,
+) -> list[WMa20Signal]:
+    """
+    視覺 W 底（雙底）形成後，收盤由下往上穿過 MA20。
+
+    對齊券商五分 K 圖那種走法：先大跌、做出兩個相近低點，
+    反彈過程收盤站上五分 MA20 才通知。不要求先突破頸線。
+    """
+    ohlc = _ohlc_frame(df)
+    if len(ohlc) < ma_period + max_bars_between_lows:
+        return []
+
+    highs = ohlc["high"].tolist()
+    lows = ohlc["low"].tolist()
+    closes = ohlc["close"].tolist()
+    ma = ohlc["close"].rolling(ma_period, min_periods=ma_period).mean().tolist()
+
+    swing_lows = _find_swing_lows(lows, swing_lookback)
+    signals: list[WMa20Signal] = []
+
+    for i, first_idx in enumerate(swing_lows):
+        first_low = lows[first_idx]
+        if first_low <= 0:
+            continue
+        look_from = max(0, first_idx - prior_lookback)
+        prior_high = max(highs[look_from : first_idx + 1])
+        if (prior_high - first_low) / first_low < min_prior_drop_pct:
+            continue
+        ma1 = ma[first_idx]
+        if ma1 != ma1 or first_low >= ma1:
+            continue
+
+        for second_idx in swing_lows[i + 1 :]:
+            gap = second_idx - first_idx
+            if gap < min_bars_between_lows:
+                continue
+            if gap > max_bars_between_lows:
+                break
+
+            second_low = lows[second_idx]
+            if second_low <= 0:
+                continue
+            rel = (second_low - first_low) / first_low
+            if rel < -low_below_pct or rel > low_above_pct:
+                continue
+
+            ma2 = ma[second_idx]
+            if ma2 != ma2 or second_low >= ma2:
+                continue
+
+            mid_slice = slice(first_idx + 1, second_idx)
+            if second_idx - first_idx < 2:
+                continue
+            neckline_price = max(highs[mid_slice])
+            neckline_idx = first_idx + 1 + highs[mid_slice].index(neckline_price)
+            avg_low = (first_low + second_low) / 2
+            if (neckline_price - avg_low) / avg_low < min_neck_pct:
+                continue
+
+            confirm = second_idx + swing_lookback
+            if confirm >= len(closes):
+                continue
+
+            floor = min(first_low, second_low) * (1.0 - invalidate_pct)
+            first_cross: int | None = None
+            start_k = max(second_idx, ma_period)
+            end_k = min(len(closes), second_idx + max_bars_to_cross + 1)
+            for k in range(start_k, end_k):
+                if min(lows[second_idx : k + 1]) < floor:
+                    break
+                prev_ma, cur_ma = ma[k - 1], ma[k]
+                if prev_ma != prev_ma or cur_ma != cur_ma:
+                    continue
+                # 要價往上穿均線，不要均線掉下來吻到走平的收盤
+                if closes[k] <= closes[k - 1]:
+                    continue
+                if closes[k - 1] <= prev_ma and closes[k] > cur_ma:
+                    first_cross = k
+                    break
+            if first_cross is None:
+                continue
+
+            if first_cross >= confirm:
+                cross_idx = first_cross
+            elif closes[confirm] > ma[confirm]:
+                cross_idx = confirm
+            else:
+                continue
+            if min(lows[second_idx : cross_idx + 1]) < floor:
+                continue
+
+            signals.append(
+                WMa20Signal(
+                    first_low_idx=first_idx,
+                    second_low_idx=second_idx,
+                    neckline_idx=neckline_idx,
+                    first_low=first_low,
+                    second_low=second_low,
+                    neckline=neckline_price,
+                    cross_idx=cross_idx,
+                    cross_price=closes[cross_idx],
+                    ma20=float(ma[cross_idx]),
+                )
+            )
+
+    return _dedupe_w_ma20(signals)
+
+
+def _dedupe_w_ma20(signals: Iterable[WMa20Signal]) -> list[WMa20Signal]:
+    """同一根上穿 K 只留結構較完整的 W。"""
+    by_cross: dict[int, WMa20Signal] = {}
+    for sig in signals:
+        existing = by_cross.get(sig.cross_idx)
+        if existing is None or sig.w_depth_pct > existing.w_depth_pct:
+            by_cross[sig.cross_idx] = sig
+    return sorted(by_cross.values(), key=lambda s: s.cross_idx)

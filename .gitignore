@@ -8,3 +8,5 @@ tg_config.env
 tg_alert_state.json
 examples/tg_alert_state.json
 examples/tg_config.env
+output/tw_w_ma20_seen.json
+output/tw_w_ma20_*.png

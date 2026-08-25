@@ -45,6 +45,27 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## 台股五分 K W 底上 MA20 跳通知
+
+券商 App 那種圖：五分 K 先大跌做出 **W 底**，反彈過程 **收盤站上五分 MA20** 就推 Telegram。  
+不要求先過頸線。國巨（2327）、南亞科（2408）那種殺完雙底再翻上均線，就是這條。
+
+```bash
+# 先測 Telegram
+python3 examples/watch_tw_w_ma20.py --test
+
+# 指定兩檔乾跑（不真的推）
+python3 examples/watch_tw_w_ma20.py --dry-run --once --symbols 2327,2408
+
+# 成交額前 100，盤中每根 5 分收盤掃一次
+python3 examples/watch_tw_w_ma20.py
+
+# 回看近 5 天 + 手機版 HTML
+python3 examples/watch_tw_w_ma20.py scan --limit 100 --pages
+```
+
+憑證放 `tg_config.env`。TradingView：`pinescript/tw_w_ma20_5m.pine` 貼到五分圖即可設警報。
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash
