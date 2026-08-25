@@ -330,12 +330,23 @@ def test_filter_hits_days_one_week() -> None:
 
 
 def test_notable_bounce_and_stand() -> None:
-    good = _fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=1.5, stand=0.4)
+    good = _fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=1.17, stand=0.47)
     weak = _fake_hit("2408", "南亞科", "2026-08-25 11:30", bounce=0.4, stand=0.1)
-    assert bounce_pct(good.signal) >= 1.2
-    assert stand_pct(good.signal) >= 0.25
     assert is_notable_hit(good)
     assert not is_notable_hit(weak)
+
+
+def test_select_chart_hits_pins_yageo() -> None:
+    from watch_tw_w_ma20 import select_chart_hits
+
+    hits = []
+    for i, bounce in enumerate([3.5, 3.2, 3.0, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8], 1):
+        hits.append(_fake_hit("1000", f"dummy{i}", f"2026-08-25 10:{i:02d}", bounce=bounce, stand=0.4))
+    hits.append(_fake_hit("2327", "國巨", "2026-08-25 11:25", bounce=1.17, stand=0.47))
+    picked = select_chart_hits(hits, per_day=7)
+    codes = [h.row["code"] for h in picked]
+    assert codes.count("2327") == 1
+    assert len(picked) <= 8
 
 
 def main() -> int:
@@ -354,6 +365,7 @@ def main() -> int:
     test_has_cjk_and_chinese_names()
     test_filter_hits_days_one_week()
     test_notable_bounce_and_stand()
+    test_select_chart_hits_pins_yageo()
     print("ok")
     return 0
 

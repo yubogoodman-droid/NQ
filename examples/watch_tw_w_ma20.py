@@ -246,8 +246,39 @@ def stand_pct(sig: WMa20Signal) -> float:
     return (sig.cross_price / sig.ma20 - 1.0) * 100.0
 
 
-def is_notable_hit(hit: TwHit, *, min_bounce: float = 1.2, min_stand: float = 0.25) -> bool:
+def is_notable_hit(hit: TwHit, *, min_bounce: float = 1.15, min_stand: float = 0.25) -> bool:
     return bounce_pct(hit.signal) >= min_bounce and stand_pct(hit.signal) >= min_stand
+
+
+def select_chart_hits(hits: list[TwHit], *, per_day: int = 7) -> list[TwHit]:
+    """每天留幾筆較像樣的圖；開盤缺口先讓路給盤中，國巨/南亞科一定留。"""
+    pin = {"2327", "2408"}
+    buckets: dict[str, list[TwHit]] = {}
+    for hit in hits:
+        buckets.setdefault(hit_ts(hit).strftime("%Y-%m-%d"), []).append(hit)
+    picked: list[TwHit] = []
+    seen: set[tuple[str, str]] = set()
+    for _day, group in buckets.items():
+        notable = [h for h in group if is_notable_hit(h)]
+        later = [h for h in notable if hit_ts(h).strftime("%H:%M") >= "09:10"]
+        opens = [h for h in notable if hit_ts(h).strftime("%H:%M") < "09:10"]
+        ranked = sorted(later, key=lambda h: (bounce_pct(h.signal), stand_pct(h.signal)), reverse=True)
+        ranked += sorted(opens, key=lambda h: (bounce_pct(h.signal), stand_pct(h.signal)), reverse=True)
+        chosen = ranked[:per_day]
+        for hit in group:
+            if str(hit.row.get("code")) in pin and bounce_pct(hit.signal) >= 1.0 and stand_pct(hit.signal) >= 0.25:
+                chosen.append(hit)
+        day_picked = []
+        for hit in chosen:
+            key = (str(hit.row["code"]), hit_ts(hit).strftime("%Y-%m-%d %H:%M"))
+            if key in seen:
+                continue
+            seen.add(key)
+            day_picked.append(hit)
+        day_picked.sort(key=lambda h: hit_ts(h))
+        picked.extend(day_picked)
+    picked.sort(key=lambda h: hit_ts(h))
+    return picked
 
 
 def load_universe(args: argparse.Namespace) -> list[dict]:
@@ -594,7 +625,8 @@ def write_html(
     note = ""
     if not show_all_cards:
         note = (
-            "<br/>圖卡只畫彈回 ≥1.2% 且站上 MA20 ≥0.25% 的（較像樣）；"
+            "<br/>圖卡每天留盤中較像樣的幾筆（彈回 ≥1.15% 且站上 ≥0.25%）；"
+            "開盤跳空先讓路。國巨/南亞科有訊號會另外留圖。"
             "全部筆數在頁面最下方清單。"
         )
     html = f"""<!DOCTYPE html>
@@ -769,19 +801,12 @@ def cmd_scan(args: argparse.Namespace) -> int:
             period = f"{start}～{end} · {period}"
         notable = [h for h in hits if is_notable_hit(h)]
         if len(hits) > 40:
-            if len(notable) > 50:
-                notable = sorted(
-                    notable,
-                    key=lambda h: (bounce_pct(h.signal), stand_pct(h.signal)),
-                    reverse=True,
-                )[:50]
-                notable.sort(key=lambda h: hit_ts(h))
-            chart_hits = notable
+            chart_hits = select_chart_hits(hits)
         else:
             chart_hits = hits
         out = write_html(html_path, hits, universe, period, chart_hits=chart_hits)
         write_view_html(out)
-        print(f"html={out} charts={len(chart_hits)}")
+        print(f"html={out} charts={len(chart_hits)} notable={len(notable)}")
     return 0
 
 
