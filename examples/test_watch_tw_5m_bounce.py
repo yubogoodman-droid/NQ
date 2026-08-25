@@ -119,6 +119,11 @@ def test_merge_universe_and_day_filter() -> None:
     assert not hit_within_max_price(row, sig, df, 100.0)
     expensive = {"code": "2327", "close": 590.0}
     assert not hit_within_max_price(expensive, sig, df, 400.0)
+    prev = df.iloc[[0]].copy()
+    prev.index = prev.index - pd.Timedelta(days=1)
+    prev["High"] = 900.0
+    week = pd.concat([prev, df])
+    assert hit_within_max_price(row, detect_signals(week)[0], week, 400.0)
 
 
 def test_detect_v_bounce_like_6239() -> None:

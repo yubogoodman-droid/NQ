@@ -691,9 +691,13 @@ def hit_prices(row: dict, sig: BounceSignal, df: pd.DataFrame) -> list[float]:
     out: list[float] = [float(sig.entry_price), float(sig.break_low)]
     if row.get("close") is not None:
         out.append(float(row["close"]))
-    if df is not None and len(df):
-        out.append(float(df["Close"].iloc[-1]))
-        out.append(float(df["High"].max()))
+    if df is None or not len(df):
+        return out
+    out.append(float(df["Close"].iloc[-1]))
+    ts = df.index[sig.entry_idx]
+    same_day = df.index.normalize() == ts.normalize()
+    if same_day.any():
+        out.append(float(df.loc[same_day, "High"].max()))
     return out
 
 
