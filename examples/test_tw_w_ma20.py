@@ -63,6 +63,34 @@ def make_yageo_like() -> pd.DataFrame:
     return _ohlc(close, low=low, high=high)
 
 
+def make_yageo_plateau() -> pd.DataFrame:
+    """國巨 8/25：515 尖底 + 515 平底，11:25 收盤站上 MA20。"""
+    n = 70
+    close = np.full(n, 556.0)
+    close[:20] = 556.0
+    # 09:00-09:50 殺到 515
+    drop = [535, 533, 532, 532, 524, 523, 521, 525, 521, 518, 519]
+    close[20:31] = drop
+    # 反彈 10:10-10:35
+    close[31:37] = [523, 522, 521, 521, 522, 520]
+    # 第二腳平底 515
+    close[37:44] = [518, 516, 516, 515, 515, 518, 516]
+    # 11:20 起翻上
+    close[44:] = [517, 521, 523, 520, 524, 523, 524, 524, 527, 527, 527, 529, 530, 530] + [530] * (n - 58)
+    close = close[:n]
+    low = np.minimum(close, np.roll(close, 1)) - 0.2
+    low[0] = close[0] - 0.2
+    low[20:31] = [534, 527, 528, 530, 523, 521, 521, 521, 521, 517, 515]
+    low[31:37] = [517, 520, 521, 520, 520, 519]
+    low[37:44] = [518, 515, 515, 515, 515, 515, 515]
+    low[44:47] = [517, 517, 519]
+    high = np.maximum(close, np.roll(close, 1)) + 0.4
+    high[0] = close[0] + 0.4
+    high[20] = 548.0
+    high[31] = 523.0
+    return _ohlc(close, low=low, high=high)
+
+
 def make_nanya_like() -> pd.DataFrame:
     """南亞科那種：殺到 480，第二腳稍高，再站上 MA20。"""
     n = 96
@@ -123,6 +151,16 @@ def test_yageo_like_alerts() -> None:
     assert sig.second_low >= sig.first_low - 2
     assert sig.cross_price > sig.ma20
     assert df["Close"].iloc[sig.cross_idx - 1] <= df["Close"].rolling(20).mean().iloc[sig.cross_idx - 1]
+
+
+def test_yageo_plateau_second_bottom() -> None:
+    df = make_yageo_plateau()
+    sigs = detect_w_ma20_crosses(df)
+    assert sigs, "515 平底第二腳也要能出訊號"
+    sig = sigs[-1]
+    assert abs(sig.first_low - 515.0) < 1.0
+    assert abs(sig.second_low - 515.0) < 1.0
+    assert sig.cross_price > sig.ma20
 
 
 def test_nanya_like_higher_second_low() -> None:
@@ -186,6 +224,10 @@ def test_drop_forming_bar() -> None:
     assert len(trimmed) == len(df) - 1
     closed = drop_forming_bar(df, now=(last + pd.Timedelta(minutes=5, seconds=1)).to_pydatetime())
     assert len(closed) == len(df)
+    messy = df.copy()
+    messy.index = messy.index[:-1].append(pd.DatetimeIndex([last + pd.Timedelta(minutes=2, seconds=9)]))
+    dropped = drop_forming_bar(messy, now=(last + pd.Timedelta(minutes=10)).to_pydatetime())
+    assert len(dropped) == len(df) - 1
 
 
 def test_hit_key_and_recent() -> None:
@@ -200,6 +242,7 @@ def test_hit_key_and_recent() -> None:
 
 def main() -> int:
     test_yageo_like_alerts()
+    test_yageo_plateau_second_bottom()
     test_nanya_like_higher_second_low()
     test_no_w_no_alert()
     test_w_without_ma20_no_alert()

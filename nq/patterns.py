@@ -32,12 +32,21 @@ class WBottomPattern:
         return self.neckline + depth
 
 
-def _is_swing_low(lows: Sequence[float], idx: int, lookback: int) -> bool:
+def _is_swing_low(lows: Sequence[float], idx: int, lookback: int, allow_tie: bool = False) -> bool:
     if idx < lookback or idx >= len(lows) - lookback:
         return False
     pivot = lows[idx]
     window = lows[idx - lookback : idx + lookback + 1]
-    return pivot == min(window) and window.count(pivot) == 1
+    if pivot != min(window):
+        return False
+    if not allow_tie:
+        return window.count(pivot) == 1
+    # 平底只取最後一根，避免 515/515/515 整段都不是轉折
+    last = lookback
+    for j in range(lookback + 1, len(window)):
+        if window[j] == pivot:
+            last = j
+    return last == lookback
 
 
 def _is_swing_high(highs: Sequence[float], idx: int, lookback: int) -> bool:
@@ -48,8 +57,8 @@ def _is_swing_high(highs: Sequence[float], idx: int, lookback: int) -> bool:
     return pivot == max(window) and window.count(pivot) == 1
 
 
-def _find_swing_lows(lows: Sequence[float], lookback: int) -> list[int]:
-    return [i for i in range(len(lows)) if _is_swing_low(lows, i, lookback)]
+def _find_swing_lows(lows: Sequence[float], lookback: int, allow_tie: bool = False) -> list[int]:
+    return [i for i in range(len(lows)) if _is_swing_low(lows, i, lookback, allow_tie)]
 
 
 def detect_w_bottoms(
@@ -249,7 +258,7 @@ def detect_w_ma20_crosses(
     closes = ohlc["close"].tolist()
     ma = ohlc["close"].rolling(ma_period, min_periods=ma_period).mean().tolist()
 
-    swing_lows = _find_swing_lows(lows, swing_lookback)
+    swing_lows = _find_swing_lows(lows, swing_lookback, allow_tie=True)
     signals: list[WMa20Signal] = []
 
     for i, first_idx in enumerate(swing_lows):
@@ -340,11 +349,24 @@ def detect_w_ma20_crosses(
     return _dedupe_w_ma20(signals)
 
 
-def _dedupe_w_ma20(signals: Iterable[WMa20Signal]) -> list[WMa20Signal]:
-    """同一根上穿 K 只留結構較完整的 W。"""
+def _w_ma20_rank(sig: WMa20Signal) -> tuple[int, float, float]:
+    """同一根上穿：優先剛完成的 W，再看兩低點對稱、深度。"""
+    recency = -(sig.cross_idx - sig.second_low_idx)
+    avg = (sig.first_low + sig.second_low) / 2
+    equal = -abs(sig.first_low - sig.second_low) / avg if avg else 0.0
+    return (recency, equal, sig.w_depth_pct)
+
+
+def _dedupe_w_ma20(signals: Iterable[WMa20Signal], min_gap: int = 6) -> list[WMa20Signal]:
+    """同一根上穿只留一組 W；30 分鐘內的連續上穿合併成一筆。"""
     by_cross: dict[int, WMa20Signal] = {}
     for sig in signals:
         existing = by_cross.get(sig.cross_idx)
-        if existing is None or sig.w_depth_pct > existing.w_depth_pct:
+        if existing is None or _w_ma20_rank(sig) > _w_ma20_rank(existing):
             by_cross[sig.cross_idx] = sig
-    return sorted(by_cross.values(), key=lambda s: s.cross_idx)
+    kept: list[WMa20Signal] = []
+    for sig in sorted(by_cross.values(), key=lambda s: s.cross_idx):
+        if kept and sig.cross_idx - kept[-1].cross_idx < min_gap:
+            continue
+        kept.append(sig)
+    return kept

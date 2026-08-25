@@ -86,12 +86,15 @@ def env(name: str, default: str | None = None) -> str | None:
     return value if value not in (None, "") else default
 
 
-def fetch_yahoo_5m(symbol: str, range_: str = "5d") -> pd.DataFrame:
+def fetch_yahoo_5m(symbol: str, range_: str = "5d") -> tuple[pd.DataFrame, str]:
     url = (
         f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
         f"?interval=5m&range={range_}&includePrePost=false"
     )
-    return _chart_payload_to_df(_get_json(url))
+    payload = _get_json(url)
+    result = ((payload.get("chart") or {}).get("result") or [None])[0] or {}
+    name = str((result.get("meta") or {}).get("shortName") or "").strip()
+    return _chart_payload_to_df(payload), name
 
 
 def drop_forming_bar(df: pd.DataFrame, now: datetime | None = None) -> pd.DataFrame:
@@ -104,7 +107,8 @@ def drop_forming_bar(df: pd.DataFrame, now: datetime | None = None) -> pd.DataFr
     last = df.index[-1]
     if last.tzinfo is None:
         last = last.tz_localize(TPE)
-    if cur < last + timedelta(minutes=5):
+    aligned = last.second == 0 and last.microsecond == 0 and last.minute % 5 == 0
+    if (not aligned) or cur < last + timedelta(minutes=5):
         return df.iloc[:-1].copy()
     return df
 
@@ -162,9 +166,11 @@ def load_universe(args: argparse.Namespace) -> list[dict]:
 def scan_symbol(row: dict, range_: str, *, live: bool) -> tuple[list[TwHit], dict]:
     meta = {**row, "bars": 0, "error": "", "n_sig": 0}
     try:
-        df = fetch_yahoo_5m(row["symbol"], range_)
+        df, yahoo_name = fetch_yahoo_5m(row["symbol"], range_)
         if live:
             df = drop_forming_bar(df)
+        if yahoo_name and (not row.get("name") or row["name"] == row["code"]):
+            row = {**row, "name": yahoo_name}
     except Exception as exc:  # noqa: BLE001
         meta["error"] = str(exc)[:80]
         return [], meta
@@ -439,7 +445,10 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 
 def write_view_html(src: Path) -> Path:
     rel = src.parent.relative_to(REPO).as_posix()
-    base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/{rel}/"
+    base = (
+        "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+        f"cursor/tw-5m-w-ma20-alert-a91a/{rel}/"
+    )
     text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
     out = src.with_name("view.html")
     out.write_text(text, encoding="utf-8")
