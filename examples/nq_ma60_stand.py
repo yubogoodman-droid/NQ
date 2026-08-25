@@ -126,15 +126,17 @@ def detect_signals(
     df: pd.DataFrame,
     ma60_len: int = 60,
     min_below_bars: int = 8,
-    max_stand_pts: float = 28.0,
+    max_stand_pts: float = 40.0,
     min_stand_pts: float = 1.0,
-    cluster_pts: float = 28.0,
+    cluster_pts: float = 40.0,
     stand_touch_pts: float = 22.0,
-    use_cluster: bool = True,
+    use_cluster: bool = False,
+    use_stack: bool = True,
     use_macd: bool = True,
+    use_macd_cross: bool = False,
     use_vol: bool = True,
     vol_len: int = 20,
-    vol_mult: float = 1.4,
+    vol_mult: float = 1.2,
     use_slope: bool = True,
     slope_bars: int = 5,
     min_slope: float = -6.0,
@@ -146,7 +148,7 @@ def detect_signals(
     skip_hour_end: Optional[int] = 10,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """收盤站上 1 分季線（SMA60）做多。"""
+    """一分收盤站上 SMA60（季線）。對齊截圖：整理後陽線踩上、MA5>MA10、MACD 柱翻綠、放量。黏帶只作品質，不當硬過濾。"""
     close = df["Close"].to_numpy(float)
     open_ = df["Open"].to_numpy(float)
     low = df["Low"].to_numpy(float)
@@ -213,6 +215,10 @@ def detect_signals(
         elif use_cluster:
             bump("skip_cluster")
             continue
+        if use_stack:
+            if np.isnan(ma5[i]) or np.isnan(ma10[i]) or not (ma5[i] > ma10[i]):
+                bump("skip_stack")
+                continue
         below_prev = int(below[i - 1])
         if below_prev < min_below_bars:
             bump("skip_below")
@@ -225,7 +231,11 @@ def detect_signals(
             continue
         d_i = float(dif[i]) if not np.isnan(dif[i]) else 0.0
         e_i = float(dea[i]) if not np.isnan(dea[i]) else 0.0
-        if use_macd and d_i <= e_i:
+        h_i = float(hist[i]) if not np.isnan(hist[i]) else 0.0
+        if use_macd and h_i <= 0:
+            bump("skip_macd")
+            continue
+        if use_macd_cross and d_i <= e_i:
             bump("skip_macd")
             continue
         v_avg = float(vol_ma[i]) if not np.isnan(vol_ma[i]) else 0.0
@@ -249,7 +259,6 @@ def detect_signals(
             bump("skip_risk")
             continue
 
-        h_i = float(hist[i]) if not np.isnan(hist[i]) else 0.0
         q_score, q_grade = quality_from_stand(slope60, v_ratio, d_i, e_i, dist, cluster_width, h_i)
         bump("taken")
         signals.append(
@@ -723,6 +732,7 @@ def write_html_report(
             f"進場 {funnel.get('taken', 0)}"
             f"（陰線 {funnel.get('skip_bear', 0)} · 距離 {funnel.get('skip_dist', 0)} · "
             f"沒踩到線 {funnel.get('skip_touch', 0)} · 季線帶 {funnel.get('skip_cluster', 0)} · "
+            f"短均未轉 {funnel.get('skip_stack', 0)} · "
             f"下方不夠 {funnel.get('skip_below', 0)} · 斜率 {funnel.get('skip_slope', 0)} · "
             f"MACD {funnel.get('skip_macd', 0)} · 量能 {funnel.get('skip_vol', 0)} · "
             f"冷卻 {funnel.get('skip_cooldown', 0)}）</p>"
@@ -767,7 +777,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 一分K 站上季線</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">收盤從 SMA60（季線）下方站上、陽線、穿過 MA60/100/120 黏帶、MACD 多頭、放量。停損在低點／季線下方，目標 2R。每筆附一分K與五分K對照。</p>
+<p class="muted">收盤從 SMA60（季線）下方站上、陽線、MA5&gt;MA10、MACD 柱翻綠、放量。黏帶寬度只記在卡片上，不擋進場。停損在低點／季線下方，目標 2R。每筆附一分K與五分K對照。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -969,6 +979,7 @@ def cmd_backtest(args) -> int:
             f"cross={funnel.get('cross', 0)} taken={funnel.get('taken', 0)} "
             f"bear={funnel.get('skip_bear', 0)} dist={funnel.get('skip_dist', 0)} "
             f"touch={funnel.get('skip_touch', 0)} cluster={funnel.get('skip_cluster', 0)} "
+            f"stack={funnel.get('skip_stack', 0)} "
             f"below={funnel.get('skip_below', 0)} slope={funnel.get('skip_slope', 0)} "
             f"macd={funnel.get('skip_macd', 0)} vol={funnel.get('skip_vol', 0)} "
             f"cool={funnel.get('skip_cooldown', 0)}"
