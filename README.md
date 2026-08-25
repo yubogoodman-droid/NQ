@@ -61,12 +61,14 @@ python3 examples/nq_coil_breakout.py alert --dry-run --once
 | 區間 | 筆數 | 勝率 | 加總 |
 |------|------|------|------|
 | 10 天 | 2 | 100% | +149.0 |
+| 30 天 | 4 | 50.0% | +132.2 |
 
-只留 08-19 08:15（+102）與 16:48（+47）。樣本很小，回測不是保證。
+10 天只留 08-19 08:15（+102）與 16:48（+47）。30 天多 08-05 19:27（fail −13.2）與 08-13 05:45（fail −3.5）。樣本很小，回測不是保證。
 
 TradingView：把 `pinescript/nq_ma_coil_breakout_1m.pine` 貼進 Pine Editor，套用到 NQ1! / MNQ1! 一分圖，可設「NQ 起漲點」警示。
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/view.html
+預覽（10 天）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/view.html  
+預覽（30 天）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout-30d/view.html
 
 ## NQ 一分 K 破底翻 MA Reclaim
 
