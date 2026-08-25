@@ -44,7 +44,7 @@ SEEN_PATH = REPO / "output" / "binance_1m_bull_seen.json"
 PAGES = REPO / "docs" / "binance" / "ma1m-bull.html"
 PUBLIC = "https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html"
 PAGES_IMG = "https://yubogoodman-droid.github.io/NQ/binance/"
-IMG_VER = "kiss0156"
+IMG_VER = "kiss0157"
 CIRCLE = "#F6465D"
 # 幣安 App 淺色盤：黃/橘/紫/藍/青 + 深灰 MA200
 PAL = {7: "#F0B90B", 14: "#FF6D00", 25: "#D500F9", 99: "#2962FF", 120: "#00B8D4", 200: "#474D57"}
@@ -375,7 +375,7 @@ def scan_symbol(
 
 
 def format_alert(row: SignalRow) -> str:
-    kind = "剛站上 1m MA200" if row.crossed_200 else "多頭排列剛成立"
+    kind = f"站穩 1m MA200 {row.bars_above} 根" if row.crossed_200 else "多頭排列剛成立"
     below = f"底下 {row.bars_below} 根" if row.bars_below else "已在 1m MA200 上"
     return (
         f"<b>1m 多頭排列上站 1m MA200</b>\n"
@@ -455,7 +455,7 @@ def write_html(
     for i, row in enumerate(gallery, 1):
         d = frames.get(row.symbol)
         img_html = _card_img(row.symbol, d, row, img_dir)
-        kind = "剛站上 1m MA200" if row.crossed_200 else "排列成立"
+        kind = f"站穩 1m MA200 {row.bars_above} 根" if row.crossed_200 else "排列成立"
         r15 = row.moves.get(15)
         pnl = r15.ret_pct if r15 and r15.ret_pct is not None else None
         cls = "pnl-win" if pnl is not None and pnl > 0 else ("pnl-loss" if pnl is not None and pnl < 0 else "pnl-flat")
@@ -476,6 +476,7 @@ def write_html(
             f"<div class='px {cls}'>{row.sig.close:g} <span class='px-sub'>{escape(kind)} · ext {row.ext_pct:+.2f}%</span></div>"
             f"<div class='tags'><span class='tag'>{escape(row.kind_label)}</span>"
             f"<span class='tag'>200&gt;7&gt;14&gt;25&gt;99&gt;120</span>"
+            f"<span class='tag'>站穩 {row.bars_above} 根</span>"
             f"<span class='tag'>黏帶 {row.sig.ribbon_pct:.2f}%</span>"
             f"<span class='tag'>量 {row.vol_ratio:.1f}x</span></div>"
             "<pre class='trade-detail'>"
@@ -556,7 +557,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3),th:nth-child(4),
 <section class="summary">
 <h1>幣安一分K · 7&gt;14&gt;25&gt;99&gt;120 黏帶上站 MA200</h1>
 <p class="muted">{escape(date_label)} 台北時間 · {escape(pool_label)} · {len(rows)} 筆訊號（剛站上 {cross_n}；股票 {stock_n}／加密 {crypto_n}）
-<br/>規則（截圖紅圈）：短均先黏帶，長期在 MA200 下，<strong>放量剛站上</strong>。排列 收盤 &gt; MA200 &gt; 7 &gt; 14 &gt; 25 &gt; 99 &gt; 120。進場用下一根開盤（圖上紅圈）。每筆附 1 分 K ＋ 當下 5 分 K。
+<br/>規則：短均先黏帶，長期在 MA200 下，放量上站後<strong>連收至少 2 根站穩</strong>再進。排列 收盤 &gt; MA200 &gt; 7 &gt; 14 &gt; 25 &gt; 99 &gt; 120。進場用確認根的下一根開盤（圖上紅圈）。每筆附 1 分 K ＋ 5 分 K。
 <br/>{pool_note}
 <br/>標的：{escape(names_txt)}</p>
 <div class="cards">
@@ -599,6 +600,7 @@ def ribbon_kwargs(args: argparse.Namespace) -> dict:
         "max_prior_short": None if getattr(args, "max_prior_short", 0.15) <= 0 else args.max_prior_short,
         "min_vol_ratio": float(getattr(args, "min_vol", 1.4)),
         "min_below": int(getattr(args, "min_below", 20)),
+        "min_above": int(getattr(args, "min_above", 2)),
     }
 
 
@@ -612,7 +614,8 @@ def run_backtest(args: argparse.Namespace) -> int:
         f"date={date} days={days} window={window_label(date, days)} pool={pool} "
         f"top={args.top or 'all'} min_gap={args.min_gap} "
         f"cross_only={cross_only} pack≤{rkw['max_ribbon_pct']} short≤{rkw['max_short_pct']} "
-        f"prior≤{rkw['max_prior_short']} vol≥{rkw['min_vol_ratio']} below≥{rkw['min_below']}",
+        f"prior≤{rkw['max_prior_short']} vol≥{rkw['min_vol_ratio']} below≥{rkw['min_below']} "
+        f"above≥{rkw['min_above']}",
         flush=True,
     )
     uni = universe(top_n=args.top, pool=pool)
@@ -769,12 +772,12 @@ def run_alert(args: argparse.Namespace) -> int:
     pool = getattr(args, "pool", "stocks")
     uni = universe(top_n=args.top, pool=pool)
     label = pool_label_of(pool, args.top)
+    rkw = ribbon_kwargs(args)
     print(
-        f"監看 {label} {len(uni)} 個。黏帶後放量剛站上 1m MA200 才推。",
+        f"監看 {label} {len(uni)} 個。黏帶後放量上站，連收至少 {rkw['min_above']} 根站穩 1m MA200 才推。",
         flush=True,
     )
     uni_ts = time.time()
-    rkw = ribbon_kwargs(args)
 
     def round_once() -> None:
         nonlocal uni, uni_ts
@@ -846,6 +849,7 @@ def main(argv=None) -> int:
     b.add_argument("--max-prior-short", type=float, default=0.15, help="站上前 20 根短均最小距%上限；0=不限")
     b.add_argument("--min-vol", type=float, default=1.4, help="量比下限；0=不限")
     b.add_argument("--min-below", type=int, default=20, help="站上前至少連續幾根在 MA200 下")
+    b.add_argument("--min-above", type=int, default=2, help="收盤站上 MA200 至少連續幾根才進")
     b.add_argument("--pages", action="store_true")
     b.add_argument("--html", default="")
     b.add_argument("--charts", type=int, default=0, help="圖表筆數；0=全部")
@@ -863,6 +867,7 @@ def main(argv=None) -> int:
     a.add_argument("--max-prior-short", type=float, default=0.15, help="站上前 20 根短均最小距%上限；0=不限")
     a.add_argument("--min-vol", type=float, default=1.4, help="量比下限；0=不限")
     a.add_argument("--min-below", type=int, default=20, help="站上前至少連續幾根在 MA200 下")
+    a.add_argument("--min-above", type=int, default=2, help="收盤站上 MA200 至少連續幾根才進")
     a.set_defaults(func=run_alert)
 
     args = p.parse_args(argv)

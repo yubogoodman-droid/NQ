@@ -31,6 +31,7 @@ LOOSE = dict(
     max_prior_short=None,
     min_vol_ratio=0,
     min_below=0,
+    min_above=0,
 )
 
 
@@ -65,6 +66,17 @@ def _make_stack_bars(n: int = 360) -> dict:
         "c": close,
         "v": vol,
     }
+
+
+def test_needs_two_closes_above_ma200() -> None:
+    d = add_mas(_make_stack_bars())
+    first = detect_combo(d, **LOOSE)[0]
+    held = detect_combo(d, **{**LOOSE, "min_above": 2})
+    assert held
+    assert held[0].idx >= first.idx + 1
+    assert held[0].bars_above >= 2
+    assert d["c"][held[0].idx] > d["m200"][held[0].idx]
+    assert d["c"][held[0].idx - 1] > d["m200"][held[0].idx - 1]
 
 
 def test_detects_first_stack_above_ma200() -> None:
@@ -346,6 +358,7 @@ def test_write_view_html_uses_pages_urls() -> None:
 
 def main() -> int:
     test_sma()
+    test_needs_two_closes_above_ma200()
     test_detects_first_stack_above_ma200()
     test_no_repeat_while_stack_holds()
     test_rearms_after_break()

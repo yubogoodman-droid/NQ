@@ -134,6 +134,29 @@ def bars_below_ma200(c, m200, i: int) -> int:
     return n
 
 
+def bars_above_ma200(c, m200, i: int) -> int:
+    """含本根，連續幾根收盤站在 MA200 上。"""
+    n = 0
+    j = i
+    while j >= 0 and not np.isnan(m200[j]) and c[j] > m200[j]:
+        n += 1
+        j -= 1
+    return n
+
+
+def streak_start(c, m200, i: int) -> int:
+    n = bars_above_ma200(c, m200, i)
+    return i - n + 1 if n else i
+
+
+def vol_ok_streak(d: dict, i: int, *, min_vol_ratio: float) -> bool:
+    """站穩這段裡有一根放量即可（常在第一根上站，不在確認根）。"""
+    if min_vol_ratio <= 0:
+        return True
+    start = streak_start(d["c"], d["m200"], i)
+    return any(vol_ok(d, j, min_vol_ratio=min_vol_ratio) for j in range(start, i + 1))
+
+
 @dataclass(frozen=True)
 class BullSignal:
     idx: int
@@ -154,6 +177,7 @@ class BullSignal:
     short_pct: float
     crossed_200: bool
     bars_below: int
+    bars_above: int
 
 
 @dataclass
@@ -195,6 +219,10 @@ class SignalRow:
     def bars_below(self) -> int:
         return self.sig.bars_below
 
+    @property
+    def bars_above(self) -> int:
+        return self.sig.bars_above
+
 
 def signal_at(d: dict, i: int, *, require_stack: bool = True) -> BullSignal | None:
     if i < 1 or i >= len(d["c"]):
@@ -208,6 +236,9 @@ def signal_at(d: dict, i: int, *, require_stack: bool = True) -> BullSignal | No
     vr = float(v[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
     ext = (c[i] / m200[i] - 1.0) * 100.0 if m200[i] else 0.0
     _ribbon, short, pack = ma_widths(d, i)
+    above = bars_above_ma200(c, m200, i)
+    start = i - above + 1 if above else i
+    crossed = bool(start >= 1 and c[start - 1] <= m200[start - 1] and c[start] > m200[start])
     return BullSignal(
         idx=i,
         open=float(o[i]),
@@ -225,8 +256,9 @@ def signal_at(d: dict, i: int, *, require_stack: bool = True) -> BullSignal | No
         ext_pct=float(ext),
         ribbon_pct=float(pack),
         short_pct=float(short),
-        crossed_200=bool(c[i - 1] <= m200[i - 1] and c[i] > m200[i]),
-        bars_below=bars_below_ma200(c, m200, i),
+        crossed_200=crossed,
+        bars_below=bars_below_ma200(c, m200, start),
+        bars_above=above,
     )
 
 
@@ -239,16 +271,21 @@ def _bar_ok(
     max_prior_short: float | None,
     min_vol_ratio: float,
     min_below: int,
+    min_above: int,
 ) -> bool:
     if not stack_ok(d, i):
         return False
     if not ribbon_ok(d, i, max_ribbon_pct=max_ribbon_pct, max_short_pct=max_short_pct):
         return False
-    if not coil_ok(d, i, max_prior_short=max_prior_short):
+    above = bars_above_ma200(d["c"], d["m200"], i)
+    if above < max(1, int(min_above)):
         return False
-    if not vol_ok(d, i, min_vol_ratio=min_vol_ratio):
+    start = i - above + 1
+    if not coil_ok(d, start, max_prior_short=max_prior_short):
         return False
-    if min_below > 0 and bars_below_ma200(d["c"], d["m200"], i) < min_below:
+    if not vol_ok_streak(d, i, min_vol_ratio=min_vol_ratio):
+        return False
+    if min_below > 0 and bars_below_ma200(d["c"], d["m200"], start) < min_below:
         return False
     return True
 
@@ -263,8 +300,9 @@ def detect_combo(
     max_prior_short: float | None = 0.15,
     min_vol_ratio: float = 1.4,
     min_below: int = 20,
+    min_above: int = 2,
 ) -> list[BullSignal]:
-    """截圖紅圈：短均先黏帶，長期在 MA200 下，放量剛站上。
+    """短均先黏帶，長期在 MA200 下，放量上站後再連收至少 min_above 根站穩。
 
     排列：收盤 > MA200 > 7 > 14 > 25 > 99 > 120。
     """
@@ -275,6 +313,7 @@ def detect_combo(
         max_prior_short=max_prior_short,
         min_vol_ratio=min_vol_ratio,
         min_below=min_below,
+        min_above=min_above,
     )
     out: list[BullSignal] = []
     last_i = -10_000
@@ -284,7 +323,11 @@ def detect_combo(
         if not now_ok or prev_ok:
             continue
         if cross_only:
-            if np.isnan(m200[i - 1]) or not (c[i - 1] <= m200[i - 1] and c[i] > m200[i]):
+            n = bars_above_ma200(c, m200, i)
+            start = i - n + 1
+            if start < 1 or np.isnan(m200[start - 1]):
+                continue
+            if not (c[start - 1] <= m200[start - 1] and c[start] > m200[start]):
                 continue
         if i - last_i < min_gap_bars:
             continue
