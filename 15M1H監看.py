@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""15 分 + 1 小時 MA200 監看 → Telegram。這一個檔就能跑，不必 nq 資料夾。
+"""15 分 + 1 小時 MA200 監看 → Telegram。只需要這一個檔，不必 nq 資料夾。
 
-PyCharm：開新專案，把本檔貼進去，按 Run，視窗不要關。
+PyCharm：
+1. File → New Project，建一個空資料夾
+2. 把本檔複製進去（檔名維持 15M1H監看.py）
+3. 最上面兩行填 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
+4. 終端機：pip install numpy requests matplotlib
+5. 右鍵本檔 → Run「15M1H監看」，Parameters 先填 --test 確認 Telegram 有收到
+6. 再把 Parameters 清空後 Run，視窗不要關
 
-    pip install numpy requests matplotlib
     python 15M1H監看.py --test
     python 15M1H監看.py
 
@@ -27,7 +32,7 @@ from pathlib import Path
 import numpy as np
 import requests
 
-# —— 填這裡 ——
+# —— 填這裡（GitHub 上故意留空，不要把 token 推上去）——
 TELEGRAM_BOT_TOKEN = ""  # BotFather 給的 token
 TELEGRAM_CHAT_ID = ""    # 你的 chat id，數字
 
