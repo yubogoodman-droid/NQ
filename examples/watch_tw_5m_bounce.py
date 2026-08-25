@@ -672,9 +672,34 @@ def wait_next_5m_close() -> None:
 # ---------------------------------------------------------------------------
 
 
+def merge_universe(base: list[dict], extra: list[dict]) -> list[dict]:
+    seen = {r["code"] for r in base}
+    out = list(base)
+    for row in extra:
+        if row["code"] in seen:
+            continue
+        seen.add(row["code"])
+        out.append(row)
+    return out
+
+
+def hit_on_day(df: pd.DataFrame, sig: BounceSignal, day) -> bool:
+    return df.index[sig.entry_idx].date() == day
+
+
+def resolve_on_day(args) -> object | None:
+    if getattr(args, "today", False):
+        return datetime.now(TPE).date()
+    text = getattr(args, "on", "") or ""
+    if not text:
+        return None
+    return datetime.strptime(text, "%Y-%m-%d").date()
+
+
 def resolve_universe(args) -> list[dict]:
+    extra = parse_symbols(getattr(args, "also", "") or "")
     if getattr(args, "symbols", ""):
-        return parse_symbols(args.symbols)
+        return merge_universe(parse_symbols(args.symbols), extra)
     date = resolve_twse_date(args.date or last_tw_session_yyyymmdd())
     pool = max(args.limit, args.pool if args.max_price else args.limit)
     print(f"universe date={date} limit={args.limit} pool={pool} max_price={args.max_price}")
@@ -693,7 +718,7 @@ def resolve_universe(args) -> list[dict]:
             f"keep {len(universe)}  {universe[0]['code']} {universe[0]['name']} "
             f"{universe[0]['amount']/1e8:.1f}億 / {universe[0]['close']}"
         )
-    return universe
+    return merge_universe(universe, extra)
 
 
 def scan_symbol(row: dict, range_: str) -> tuple[list[tuple[BounceSignal, pd.DataFrame]], dict]:
@@ -721,6 +746,9 @@ def cmd_scan(args) -> int:
         return 1
     hits: list[tuple[dict, BounceSignal, BounceTrade | None, pd.DataFrame]] = []
     errors = 0
+    on_day = resolve_on_day(args)
+    if on_day is not None:
+        print(f"filter day={on_day}")
     for i, row in enumerate(universe, 1):
         pairs, meta = scan_symbol(row, args.range_)
         if meta["error"]:
@@ -731,6 +759,8 @@ def cmd_scan(args) -> int:
             for t in simulate(df0, [s for s, _ in pairs]):
                 trades_by_entry[t.entry_idx] = t
         for sig, df in pairs:
+            if on_day is not None and not hit_on_day(df, sig, on_day):
+                continue
             hits.append((row, sig, trades_by_entry.get(sig.entry_idx), df))
         flag = f" sigs={meta['n_sig']}" if meta["n_sig"] else ""
         err = f" {meta['error']}" if meta["error"] else ""
@@ -753,7 +783,11 @@ def cmd_scan(args) -> int:
 
     html_path = Path(args.html) if args.html else (PAGES if args.pages else None)
     if html_path:
-        out = write_html_report(html_path, hits, universe, args.range_)
+        period = args.range_
+        on_day = resolve_on_day(args)
+        if on_day is not None:
+            period = f"{on_day.isoformat()} · {args.range_}資料"
+        out = write_html_report(html_path, hits, universe, period)
         write_view_html(out)
         print(f"html={out}")
     return 0
@@ -872,11 +906,14 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--pool", type=int, default=160)
         sp.add_argument("--max-price", type=float, default=None)
         sp.add_argument("--symbols", default="", help="逗號分隔代號，例如 6239,2330")
+        sp.add_argument("--also", default="", help="額外併入掃描的代號，例如 6239")
         sp.add_argument("--range", dest="range_", default="5d")
         sp.add_argument("--sleep", type=float, default=0.2)
 
     s = sub.add_parser("scan", help="回看近幾日並可出 HTML")
     add_universe(s)
+    s.add_argument("--today", action="store_true", help="只留台北今天的訊號")
+    s.add_argument("--on", default="", help="只留這一天 YYYY-MM-DD")
     s.add_argument("--pages", action="store_true")
     s.add_argument("--html", default="")
     s.set_defaults(func=cmd_scan)

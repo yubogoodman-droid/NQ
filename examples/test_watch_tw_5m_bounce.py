@@ -17,7 +17,9 @@ from watch_tw_5m_bounce import (  # noqa: E402
     detect_signals,
     drop_incomplete_5m,
     fmt_alert,
+    hit_on_day,
     in_tw_session,
+    merge_universe,
     parse_symbols,
     signal_key,
     simulate,
@@ -100,6 +102,17 @@ def test_parse_symbols() -> None:
     assert [r["symbol"] for r in rows] == ["6239.TW", "2330.TW", "6488.TWO"]
     assert rows[0]["code"] == "6239"
     assert rows[2]["market"] == "otc"
+
+
+def test_merge_universe_and_day_filter() -> None:
+    base = parse_symbols("2330")
+    extra = parse_symbols("6239,2330")
+    merged = merge_universe(base, extra)
+    assert [r["code"] for r in merged] == ["2330", "6239"]
+    df = make_v_bounce_bars()
+    sig = detect_signals(df)[0]
+    assert hit_on_day(df, sig, df.index[sig.entry_idx].date())
+    assert not hit_on_day(df, sig, datetime(2026, 1, 1).date())
 
 
 def test_detect_v_bounce_like_6239() -> None:
@@ -201,6 +214,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
 def main() -> int:
     test_sma()
     test_parse_symbols()
+    test_merge_universe_and_day_filter()
     test_detect_v_bounce_like_6239()
     test_skip_before_filters_open()
     test_flat_market_has_no_signal()

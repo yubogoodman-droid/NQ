@@ -63,6 +63,9 @@ python3 examples/watch_tw_5m_bounce.py scan --symbols 6239 --range 5d --pages
 # 成交額前 80 回看 + 手機版 HTML
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
 
+# 只看今天（台北）的訊號，並把力成併進去
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pages
+
 # Telegram（憑證放 tg_config.env）
 python3 examples/watch_tw_5m_bounce.py alert --test
 python3 examples/watch_tw_5m_bounce.py alert --dry-run --once
