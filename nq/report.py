@@ -8,10 +8,11 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-import plotly.graph_objects as go
 
 from nq.backtest import TradeResult, run_backtest, summarize
 from nq.strategy import NQWBottomStrategy
+
+_IMG_PREFIX = "wbt"
 
 MA_PERIODS = (5, 10, 20, 60, 120, 200)
 MA_COLORS = {
@@ -85,128 +86,138 @@ def _chart_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     return start, end
 
 
-def _build_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
-    p = trade.signal.pattern
-    start, end = _chart_window(df, trade)
-    window = df.iloc[start : end + 1].copy()
-    times = [t.tz_localize(None) if t.tzinfo else t for t in window.index]
+def _trade_img_name(trade: TradeResult, trade_no: int) -> str:
+    ts = trade.signal.timestamp
+    if hasattr(ts, "tz_convert"):
+        ts = ts.tz_convert("America/New_York")
+    return f"{_IMG_PREFIX}{trade_no:02d}_{ts.strftime('%m%d_%H%M')}.png"
 
-    fig = go.Figure()
-    fig.add_trace(
-        go.Candlestick(
-            x=times,
-            open=window["open"],
-            high=window["high"],
-            low=window["low"],
-            close=window["close"],
-            increasing_line_color="#26a69a",
-            decreasing_line_color="#ef5350",
-            name="K",
-            showlegend=False,
-        )
+
+def _draw_trade_png(
+    df: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+) -> Path:
+    """以整數 x 軸繪製靜態 K 線圖，避免盤中缺口造成連線扭曲。"""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+    from matplotlib.patches import Rectangle
+
+    for fp in (
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ):
+        if Path(fp).exists():
+            font_manager.fontManager.addfont(fp)
+            plt.rcParams["font.sans-serif"] = [font_manager.FontProperties(fname=fp).get_name(), "DejaVu Sans"]
+            plt.rcParams["axes.unicode_minus"] = False
+            break
+
+    sig = trade.signal
+    p = sig.pattern
+    start, end = _chart_window(df, trade)
+    window = df.iloc[start : end + 1]
+    xs = range(len(window))
+    o, h, l, c = window["open"], window["high"], window["low"], window["close"]
+    vol = window["volume"] if "volume" in window.columns else None
+
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.2),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
     )
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+
+    colors_v = []
+    for k in range(len(window)):
+        up = float(c.iloc[k]) >= float(o.iloc[k])
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.65)
+        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
+        if y1 == y0:
+            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    if vol is not None:
+        axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
 
     for period in MA_PERIODS:
-        col = f"ma{period}"
-        if col not in window.columns:
+        col_name = f"ma{period}"
+        if col_name not in window.columns:
             continue
-        ma_vals = window[col]
-        if ma_vals.notna().sum() == 0:
+        ma = window[col_name]
+        if ma.notna().sum() == 0:
             continue
-        fig.add_trace(
-            go.Scatter(
-                x=times,
-                y=ma_vals,
-                mode="lines",
-                name=f"MA{period}",
-                line=dict(color=MA_COLORS[period], width=1.3 if period <= 20 else 1.1),
-                connectgaps=False,
-            )
-        )
+        ax.plot(list(xs), ma, color=MA_COLORS[period], lw=1.35 if period <= 20 else 1.05, label=f"MA{period}")
 
-    if df.index[p.first_low_idx] in window.index:
-        l1_t = window.index.get_loc(df.index[p.first_low_idx])
-        fig.add_trace(
-            go.Scatter(
-                x=[times[l1_t]],
-                y=[p.first_low],
-                mode="markers+text",
-                marker=dict(symbol="circle", size=8, color="#42a5f5"),
-                text=["L1"],
-                textposition="bottom center",
-                showlegend=False,
-            )
-        )
-    if df.index[p.second_low_idx] in window.index:
-        l2_t = window.index.get_loc(df.index[p.second_low_idx])
-        fig.add_trace(
-            go.Scatter(
-                x=[times[l2_t]],
-                y=[p.second_low],
-                mode="markers+text",
-                marker=dict(symbol="circle", size=8, color="#ec407a"),
-                text=["L2"],
-                textposition="bottom center",
-                showlegend=False,
-            )
-        )
+    ax.axhline(p.neckline, color="#ffa726", ls="--", lw=1.0, alpha=0.8)
+    ax.axhline(sig.stop_loss, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
+    ax.axhline(sig.target, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
 
-    entry_t = _fmt_time(trade.signal.timestamp)
-    fig.add_hline(y=p.neckline, line_dash="dash", line_color="#ffa726", opacity=0.75)
-    fig.add_hline(y=trade.signal.stop_loss, line_dash="dot", line_color="#ff5252", opacity=0.65)
-    fig.add_hline(y=trade.signal.target, line_dash="dot", line_color="#00c805", opacity=0.65)
+    l1_rel = p.first_low_idx - start
+    l2_rel = p.second_low_idx - start
+    if 0 <= l1_rel < len(window):
+        ax.scatter([l1_rel], [p.first_low], s=42, color="#42a5f5", zorder=5)
+        ax.annotate("L1", (l1_rel, p.first_low), textcoords="offset points", xytext=(0, -12),
+                    ha="center", color="#79c0ff", fontsize=8)
+    if 0 <= l2_rel < len(window):
+        ax.scatter([l2_rel], [p.second_low], s=42, color="#ec407a", zorder=5)
+        ax.annotate("L2", (l2_rel, p.second_low), textcoords="offset points", xytext=(0, -12),
+                    ha="center", color="#f9a8d4", fontsize=8)
 
-    entry_idx = window.index.get_indexer([trade.signal.timestamp], method="nearest")[0]
-    fig.add_trace(
-        go.Scatter(
-            x=[times[entry_idx]],
-            y=[trade.signal.entry],
-            mode="markers",
-            marker=dict(symbol="triangle-up", size=12, color="#00e676"),
-            name="進場",
-            showlegend=False,
-        )
+    entry_rel = window.index.get_indexer([sig.timestamp], method="nearest")[0]
+    exit_rel = window.index.get_indexer([trade.exit_time], method="nearest")[0]
+    if 0 <= entry_rel < len(window):
+        ax.axvline(entry_rel, color="#3dba7a", ls="--", lw=0.9)
+        ax.scatter([entry_rel], [sig.entry], s=48, color="#00e676", marker="^", zorder=6)
+    if 0 <= exit_rel < len(window):
+        ax.axvline(exit_rel, color="#f0c14b", ls=":", lw=0.9)
+        exit_color = "#00c805" if trade.pnl_points > 0 else "#ff5252"
+        ax.scatter([exit_rel], [trade.exit_price], s=44, color=exit_color, marker="x", zorder=6)
+
+    sign = "+" if trade.pnl_points >= 0 else ""
+    ax.set_title(
+        f"#{trade_no}  W底  {_fmt_time(sig.timestamp)} → {_fmt_time(trade.exit_time)}  "
+        f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
+        color="#e8f0ea",
+        fontsize=11,
     )
-
-    exit_idx = window.index.get_indexer([trade.exit_time], method="nearest")[0]
-    exit_color = "#00c805" if trade.pnl_points > 0 else "#ff5252"
-    fig.add_trace(
-        go.Scatter(
-            x=[times[exit_idx]],
-            y=[trade.exit_price],
-            mode="markers",
-            marker=dict(symbol="x", size=10, color=exit_color),
-            name="出場",
-            showlegend=False,
-        )
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    step = max(1, len(window) // 6)
+    ticks = list(range(0, len(window), step))
+    axv.set_xticks(ticks)
+    axv.set_xticklabels(
+        [_fmt_time(window.index[i]) for i in ticks],
+        color="#8aa193",
+        rotation=20,
+        ha="right",
     )
-
-    fig.update_layout(
-        template="plotly_dark",
-        height=300,
-        margin=dict(l=42, r=10, t=54, b=24),
-        title=dict(text=f"#{trade_no} W底 | {entry_t}", x=0.02, font=dict(size=12)),
-        xaxis_rangeslider_visible=False,
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0,
-            font=dict(size=9),
-            bgcolor="rgba(0,0,0,0)",
-        ),
-        paper_bgcolor="#161b22",
-        plot_bgcolor="#161b22",
-    )
-    fig.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickformat="%H:%M")
-    fig.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.06)")
-
-    return fig.to_html(full_html=False, include_plotlyjs=False, config={"displayModeBar": False})
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
 
 
-def _render_trade_card(df: pd.DataFrame, trade: TradeResult, trade_no: int, contracts: int = 1) -> str:
+def _render_trade_card(
+    df: pd.DataFrame,
+    trade: TradeResult,
+    trade_no: int,
+    *,
+    img_href: str,
+    contracts: int = 1,
+) -> str:
     sig = trade.signal
     p = sig.pattern
     pnl_class = "pnl-win" if trade.pnl_points > 0 else "pnl-loss"
@@ -217,8 +228,6 @@ def _render_trade_card(df: pd.DataFrame, trade: TradeResult, trade_no: int, cont
     gap_pct = low_gap / avg_low * 100 if avg_low else 0
     entry_row = df.iloc[sig.bar_idx]
     ma_line = _ma_snapshot(entry_row)
-
-    chart_html = _build_trade_chart(df, trade, trade_no)
 
     return f"""
     <article class="trade-card">
@@ -244,7 +253,7 @@ W底 L1 {p.first_low:.2f} / L2 {p.second_low:.2f}
 {ma_line}
 $ {trade.pnl_dollars:+,.2f} NQ×{contracts}</pre>
       <div class="tf-badge">🕐 5分 K</div>
-      <div class="mini-chart">{chart_html}</div>
+      <div class="mini-chart"><img src="{html.escape(img_href)}" alt="trade #{trade_no}" loading="lazy" /></div>
     </article>
     """
 
@@ -255,10 +264,20 @@ def build_report_html(
     *,
     title: str,
     symbol: str = "NQ=F",
+    img_dir: Path | None = None,
+    img_href_prefix: str = "img/",
 ) -> str:
     df = _add_mas(df)
     stats = summarize(results)
-    cards = "".join(_render_trade_card(df, r, i + 1) for i, r in enumerate(results))
+    cards_parts: list[str] = []
+    for i, trade in enumerate(results, 1):
+        img_name = _trade_img_name(trade, i)
+        if img_dir is not None:
+            _draw_trade_png(df, trade, img_dir / img_name, i)
+        cards_parts.append(
+            _render_trade_card(df, trade, i, img_href=f"{img_href_prefix}{img_name}")
+        )
+    cards = "".join(cards_parts)
     empty = '<div class="empty">今日未偵測到 W 底突破訊號</div>' if not results else ""
 
     return f"""<!DOCTYPE html>
@@ -267,7 +286,6 @@ def build_report_html(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>{html.escape(title)}</title>
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     * {{ box-sizing: border-box; }}
     body {{
@@ -381,6 +399,12 @@ def build_report_html(
       border-radius: 10px;
       overflow: hidden;
     }}
+    .mini-chart img {{
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }}
     .empty {{
       text-align: center;
       color: #8b949e;
@@ -436,8 +460,16 @@ def save_report_html(
         today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
         title = f"NQ W底回測 — {today}"
 
-    content = build_report_html(df, results, title=title, symbol=symbol)
     out = Path(output)
+    img_dir = out.parent / "img"
+    content = build_report_html(
+        df,
+        results,
+        title=title,
+        symbol=symbol,
+        img_dir=img_dir,
+        img_href_prefix="img/",
+    )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(content, encoding="utf-8")
     return out
