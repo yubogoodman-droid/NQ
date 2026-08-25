@@ -316,6 +316,33 @@ def _w_not_floor_box(
     return hug / n <= max_hug
 
 
+def _right_leg_ok(neckline: float, second_low: float, *, min_pct: float = 0.010) -> bool:
+    """右腳要從頸線明顯回落，否則只是殺完貼箱、沒有第二個谷。"""
+    if second_low <= 0 or neckline <= second_low:
+        return False
+    return (neckline - second_low) / second_low >= min_pct
+
+
+def _w_vs_dump_atr_ok(
+    highs: Sequence[float],
+    lows: Sequence[float],
+    sess: int,
+    first_idx: int,
+    neckline: float,
+    floor: float,
+    *,
+    min_ratio: float = 1.10,
+) -> bool:
+    """W 高度要蓋過殺勢那一段的平均振幅，否則瀑布圖上只剩一個小台階。"""
+    if first_idx < sess or floor <= 0:
+        return False
+    ranges = [highs[i] - lows[i] for i in range(sess, first_idx + 1)]
+    avg = sum(ranges) / len(ranges) if ranges else 0.0
+    if avg <= 0:
+        return False
+    return (neckline - floor) / avg >= min_ratio
+
+
 def _ohlc_frame(df: pd.DataFrame) -> pd.DataFrame:
     """接受 open/high/low/close 或 Open/High/Low/Close。"""
     lower = {str(c).lower(): c for c in df.columns}
@@ -343,13 +370,13 @@ def detect_w_ma20_crosses(
     swing_lookback: int = 2,
     min_bars_between_lows: int = 6,
     max_bars_between_lows: int = 48,
-    low_below_pct: float = 0.015,
+    low_below_pct: float = 0.002,
     low_above_pct: float = 0.025,
-    min_neck_pct: float = 0.008,
+    min_neck_pct: float = 0.015,
     min_prior_drop_pct: float = 0.025,
     min_session_drop_pct: float = 0.035,
     prior_lookback: int = 36,
-    max_bars_to_cross: int = 36,
+    max_bars_to_cross: int = 14,
     invalidate_pct: float = 0.003,
     min_neck_offset: int = 2,
     min_right_bars: int = 3,
@@ -359,6 +386,8 @@ def detect_w_ma20_crosses(
     max_neck_retrace: float = 0.80,
     min_height_vs_bar: float = 2.3,
     max_floor_hug: float = 0.85,
+    min_right_leg_pct: float = 0.010,
+    min_height_vs_dump_atr: float = 1.10,
 ) -> list[WMa20Signal]:
     """
     視覺 W 底形成後，五分 K 出現 MA5 > MA10 > MA20 多頭排列才進場。
@@ -374,6 +403,8 @@ def detect_w_ma20_crosses(
     也排除看起來不像 W 的三種圖：
     開盤當根就當 L1、頸線幾乎漲回殺勢起點（台虹那種 V），
     以及殺完貼著地板的淺箱（台勝科、台玻那種）。
+    第二腳明顯更低（下階）、右腳沒從頸線掉下來、
+    或第二低之後橫很久才多排，也不算。
     """
     ohlc = _ohlc_frame(df)
     if len(ohlc) < ma_period + max_bars_between_lows:
@@ -487,6 +518,22 @@ def detect_w_ma20_crosses(
                 second_idx,
                 w_floor,
                 max_hug=max_floor_hug,
+            ):
+                continue
+            if not _right_leg_ok(
+                neckline_price,
+                second_low,
+                min_pct=min_right_leg_pct,
+            ):
+                continue
+            if not _w_vs_dump_atr_ok(
+                highs,
+                lows,
+                sess,
+                first_idx,
+                neckline_price,
+                w_floor,
+                min_ratio=min_height_vs_dump_atr,
             ):
                 continue
 

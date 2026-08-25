@@ -176,6 +176,48 @@ def make_open_v_retest() -> pd.DataFrame:
     return _ohlc(close, low=low, high=high)
 
 
+def make_falling_second_low() -> pd.DataFrame:
+    """亞電那種：沖高後下階，第二腳明顯更低，不是 W。"""
+    n = 80
+    close = np.full(n, 62.0)
+    close[:8] = 62.0
+    close[8:14] = [64.0, 66.0, 65.5, 64.5, 63.5, 63.2]
+    close[14:24] = np.linspace(63.0, 62.9, 10)
+    close[24:32] = np.linspace(63.2, 62.6, 8)
+    close[32:40] = np.linspace(62.7, 63.3, 8)
+    close[40:] = np.linspace(63.4, 64.5, n - 40)
+    low = np.minimum(close, np.roll(close, 1)) - 0.08
+    low[0] = close[0] - 0.08
+    low[8] = 61.8
+    low[23] = 62.8
+    low[31] = 62.2
+    high = np.maximum(close, np.roll(close, 1)) + 0.1
+    high[0] = close[0] + 0.1
+    high[9] = 66.8
+    high[27] = 63.9
+    return _ohlc(close, low=low, high=high)
+
+
+def make_shallow_right_leg() -> pd.DataFrame:
+    """南亞 8/19 那種：大跌後右腳幾乎沒從頸線掉下來，是淺箱不是雙谷。"""
+    n = 70
+    close = np.full(n, 198.0)
+    close[:10] = 198.0
+    close[10:24] = np.linspace(196.0, 188.5, 14)
+    close[24:30] = [189.5, 190.5, 191.0, 190.4, 190.0, 189.7]
+    close[30:38] = [190.2, 190.8, 191.2, 191.5, 191.8, 192.0, 192.2, 192.5]
+    close[38:] = np.linspace(192.6, 195.0, n - 38)
+    low = np.minimum(close, np.roll(close, 1)) - 0.15
+    low[0] = close[0] - 0.15
+    low[23] = 188.0
+    low[29] = 189.5
+    high = np.maximum(close, np.roll(close, 1)) + 0.2
+    high[0] = close[0] + 0.2
+    high[10] = 201.0
+    high[26] = 191.0
+    return _ohlc(close, low=low, high=high)
+
+
 def make_shallow_shelf_after_dump() -> pd.DataFrame:
     """台勝科 8/19：大跌後貼著地板的淺箱，兩低點之間每根都在谷底附近。"""
     n = 70
@@ -273,6 +315,14 @@ def test_open_v_retest_is_not_a_w() -> None:
 
 def test_shallow_shelf_after_dump_is_not_a_w() -> None:
     assert detect_w_ma20_crosses(make_shallow_shelf_after_dump()) == [], "殺完淺箱不該算 W 底"
+
+
+def test_falling_second_low_is_not_a_w() -> None:
+    assert detect_w_ma20_crosses(make_falling_second_low()) == [], "第二腳更低的下階不該算 W 底"
+
+
+def test_shallow_right_leg_is_not_a_w() -> None:
+    assert detect_w_ma20_crosses(make_shallow_right_leg()) == [], "右腳沒掉下來的淺箱不該算 W 底"
 
 
 def test_w_without_ma20_no_alert() -> None:
@@ -462,11 +512,13 @@ def test_strict_rejects_open_gap_and_weak_kiss() -> None:
     huge = _fake_hit("8039", "台虹", "2026-08-25 10:00", bounce=4.0, stand=1.0)
     gap_range = _fake_hit("2344", "華邦電", "2026-08-25 11:15", bounce=1.8, stand=0.6, intra=2.7)
     high_l2 = _fake_hit("2303", "聯電", "2026-08-25 11:35", bounce=2.2, stand=0.6, skew=1.32)
+    lower_l2 = _fake_hit("4939", "亞電", "2026-08-20 12:10", bounce=1.2, stand=0.6, skew=-0.95)
     assert not is_strict_hit(open_gap)
     assert not is_strict_hit(weak)
     assert not is_strict_hit(huge)
     assert not is_strict_hit(gap_range)
     assert not is_strict_hit(high_l2)
+    assert not is_strict_hit(lower_l2)
 
 
 def test_select_chart_hits_picks_strict() -> None:
@@ -490,6 +542,8 @@ def main() -> int:
     test_range_after_dump_is_not_a_w()
     test_open_v_retest_is_not_a_w()
     test_shallow_shelf_after_dump_is_not_a_w()
+    test_falling_second_low_is_not_a_w()
+    test_shallow_right_leg_is_not_a_w()
     test_w_without_ma20_no_alert()
     test_falling_ma_onto_flat_close_is_not_a_cross()
     test_accepts_lowercase_columns()

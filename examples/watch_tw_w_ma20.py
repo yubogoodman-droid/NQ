@@ -329,13 +329,17 @@ def is_strict_hit(hit: TwHit) -> bool:
         return False
     if stand < 0.45:
         return False
-    if depth < 1.20:
+    if depth < 1.50:
         return False
     if drop < 5.50:
         return False
     if intra < 3.50:
         return False
     if skew > 1.00:
+        return False
+    if sig.second_low < sig.first_low * 0.9985:
+        return False
+    if sig.second_low <= 0 or (sig.neckline - sig.second_low) / sig.second_low < 0.010:
         return False
     if not (sig.ma5 > sig.ma10 > sig.ma20 and sig.cross_price > sig.ma5):
         return False
@@ -712,12 +716,14 @@ def write_html(
         cards.append(_compact_hit_list_html(hits))
     note = (
         "<br/>嚴格：同一天做出 W、09:15 後、當天五分圖先跌 ≥3.5%、回看出發高點跌 ≥5.5%、"
-        "頸線深度 ≥1.2%、兩低點價差 ≤1.0%、從低點彈回 1.1%～3.5%、收盤站上 MA20 ≥0.45%，"
+        "頸線深度 ≥1.5%、兩低點價差 ≤1.0%、第二腳不能更低、右腳從頸線回落 ≥1.0%、"
+        "從低點彈回 1.1%～3.5%、收盤站上 MA20 ≥0.45%，"
         "且五分 MA5&gt;MA10&gt;MA20 多頭排列才進場。"
         "對齊國巨 515/515→11:50 多排、南亞科 480/482→11:55 多排。"
         "缺口後貼箱型打底（旺宏、華邦電那種）不算 W。"
         "開盤當根當 L1、頸線幾乎漲回殺勢起點（台虹那種 V）、"
         "或殺完貼著地板的淺箱（台勝科、台玻那種）也不算 W。"
+        "瀑布殺完的小台階、第二腳更低的下階、第二低後橫很久才多排也不算。"
     )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
