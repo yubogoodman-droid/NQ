@@ -66,8 +66,8 @@ python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
 # 只看今天（台北）的訊號，並把力成併進去
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pages
 
-# 拿掉高價股（看昨天收盤、進場價、當日最高）
-python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 400 --today --pages
+# 只拿掉股價 700 以上（收盤、進場價、當日最高）
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --today --pages
 
 # Telegram（憑證放 tg_config.env）
 python3 examples/watch_tw_5m_bounce.py alert --test
@@ -77,8 +77,8 @@ python3 examples/watch_tw_5m_bounce.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_bounce_ma_stack.pine`。
 
-2026-08-25 成交額前 80、**進場／現價／當日最高 ≤ 400**：今天 **23 筆**。  
-圖卡：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
+2026-08-25 成交額前 80、**股價 700 以上拿掉**：今天訊號圖卡。  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
