@@ -517,6 +517,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 
 
 def write_view_html(src: Path) -> Path:
+    src = src.resolve()
     rel = src.parent.relative_to(REPO).as_posix()
     base = (
         "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
@@ -622,7 +623,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
             f"{ts.strftime('%m-%d %H:%M')} close={hit.signal.cross_price:.2f} "
             f"ma20={hit.signal.ma20:.2f} L1={hit.signal.first_low:.2f} L2={hit.signal.second_low:.2f}"
         )
-    html_path = Path(args.html) if args.html else None
+    html_path = Path(args.html).resolve() if args.html else None
     if html_path is None and args.pages:
         html_path = (
             REPO / "docs" / "tw-w-ma20-today" / "index.html"
