@@ -214,17 +214,20 @@ def write_report(
     for old in img_dir.glob("*.png"):
         old.unlink()
 
-    strict_ids = {c.dump.idx for c in strict["signals"]}
-    mid_ids = {c.dump.idx for c in mid["signals"]}
+    seen: set[int] = set()
+    ranked: list[tuple[str, ComboSignal]] = []
+    for tag, bucket in (("嚴格", strict), ("中等", mid), ("寬鬆", loose)):
+        for combo in bucket["signals"]:
+            idx = combo.dump.idx
+            if idx in seen:
+                continue
+            seen.add(idx)
+            ranked.append((tag, combo))
+    ranked.sort(key=lambda item: item[1].dump.idx)
+
     cards = []
-    for combo in loose["signals"]:
+    for tag, combo in ranked:
         dump = combo.dump
-        if dump.idx in strict_ids:
-            tag = "嚴格"
-        elif dump.idx in mid_ids:
-            tag = "中等"
-        else:
-            tag = "寬鬆"
         png = img_dir / f"hit_{_stem(dump.timestamp)}.png"
         short_t = _fmt(combo.short.timestamp) if combo.short else "—"
         full_t = _fmt(combo.full.timestamp) if combo.full else "未完成"
@@ -314,7 +317,7 @@ th{{color:#8aa193;font-weight:600}}
   <p class="sub">
     {html.escape(symbol)} · {days[0]} ~ {days[-1]} · {len(df)} 根 1m
     （{html.escape(start)} ~ {html.escape(end)} ET）。<br/>
-    紅虛線急跌、綠虛線短均排列、金虛線完整八條打開。下面三區：急跌+排列全部命中、急跌失敗、以及只看均線的 40 張完整打開。
+    紅虛線急跌、綠虛線短均排列、金虛線完整八條打開。下面三區：急跌+排列全部命中、急跌失敗、以及只看均線的 {len(stack_cards)} 張完整打開。
   </p>
   <p class="sub">
     <a href="#hits" style="color:#c9a227">急跌+排列 {len(cards)}</a> ·
@@ -335,10 +338,10 @@ th{{color:#8aa193;font-weight:600}}
       <tr><td>寬鬆急跌</td><td>{loose['dumps']}</td><td>{loose['v']}</td><td>{loose['short']}</td><td>{loose['mid']}</td><td>{loose['full']}</td></tr>
       <tr><td>只看均線、不看急跌（30 分鐘去重）</td><td>—</td><td>—</td><td>{align_only['short']}</td><td>{align_only['mid']}</td><td>{align_only['full']}</td></tr>
     </table>
-    <p class="note">只看排列一週有 40 筆完整打開；加上急跌之後，嚴格條件只剩截圖那一筆。</p>
+    <p class="note">只看排列這一窗有 {align_only['full']} 筆完整打開；急跌+排列以嚴格條件為準。</p>
   </div>
   <h1 id="hits" style="margin-top:8px">急跌 + 排列（全部命中）</h1>
-  <p class="sub">寬鬆門檻下的全部命中；標籤標嚴／中／寬。</p>
+  <p class="sub">嚴格／中等／寬鬆命中去重後全部列出；標籤取最嚴那一檔。</p>
   {''.join(cards) if cards else '<div class="card"><p class="note">這一週沒有急跌後走出排列的訊號。</p></div>'}
   <h1 id="fails" style="margin-top:28px">嚴格急跌但沒走出排列</h1>
   <p class="sub">有砸、有量，但 90 分鐘內破低或均線沒排成多頭。</p>
