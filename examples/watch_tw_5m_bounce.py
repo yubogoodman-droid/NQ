@@ -687,6 +687,22 @@ def hit_on_day(df: pd.DataFrame, sig: BounceSignal, day) -> bool:
     return df.index[sig.entry_idx].date() == day
 
 
+def hit_prices(row: dict, sig: BounceSignal, df: pd.DataFrame) -> list[float]:
+    out: list[float] = [float(sig.entry_price), float(sig.break_low)]
+    if row.get("close") is not None:
+        out.append(float(row["close"]))
+    if df is not None and len(df):
+        out.append(float(df["Close"].iloc[-1]))
+        out.append(float(df["High"].max()))
+    return out
+
+
+def hit_within_max_price(row: dict, sig: BounceSignal, df: pd.DataFrame, max_price: float | None) -> bool:
+    if max_price is None:
+        return True
+    return all(px <= max_price for px in hit_prices(row, sig, df))
+
+
 def resolve_on_day(args) -> object | None:
     if getattr(args, "today", False):
         return datetime.now(TPE).date()
@@ -760,6 +776,8 @@ def cmd_scan(args) -> int:
                 trades_by_entry[t.entry_idx] = t
         for sig, df in pairs:
             if on_day is not None and not hit_on_day(df, sig, on_day):
+                continue
+            if not hit_within_max_price(row, sig, df, getattr(args, "max_price", None)):
                 continue
             hits.append((row, sig, trades_by_entry.get(sig.entry_idx), df))
         flag = f" sigs={meta['n_sig']}" if meta["n_sig"] else ""

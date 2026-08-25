@@ -18,6 +18,7 @@ from watch_tw_5m_bounce import (  # noqa: E402
     drop_incomplete_5m,
     fmt_alert,
     hit_on_day,
+    hit_within_max_price,
     in_tw_session,
     merge_universe,
     parse_symbols,
@@ -113,6 +114,11 @@ def test_merge_universe_and_day_filter() -> None:
     sig = detect_signals(df)[0]
     assert hit_on_day(df, sig, df.index[sig.entry_idx].date())
     assert not hit_on_day(df, sig, datetime(2026, 1, 1).date())
+    row = {"code": "6239", "close": 269.0}
+    assert hit_within_max_price(row, sig, df, 400.0)
+    assert not hit_within_max_price(row, sig, df, 100.0)
+    expensive = {"code": "2327", "close": 590.0}
+    assert not hit_within_max_price(expensive, sig, df, 400.0)
 
 
 def test_detect_v_bounce_like_6239() -> None:
