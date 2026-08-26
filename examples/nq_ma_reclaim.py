@@ -1416,26 +1416,7 @@ def cmd_backtest(args) -> int:
     extra_funnel: Dict[str, int] = {}
     allow_open = bool(getattr(args, "allow_open_hour", False))
     ma20_only = bool(getattr(args, "reclaim_ma20_only", False))
-    if (
-        getattr(args, "pages", False)
-        and not getattr(args, "loose", False)
-        and not allow_open
-        and not ma20_only
-    ):
-        core_sigs = detect_signals(df, funnel=extra_funnel, **CORE_DETECT)
-        extra_trades = simulate(df, core_sigs)
-        extra_stats = summarize_trades(extra_trades)
-        print(
-            f"core  trades={extra_stats['count']} WR={extra_stats['win_rate']:.1f}% "
-            f"pnl={extra_stats['total_points']:+.1f}  "
-            f"(no hug / no MA60 specials / no wide-risk QA gate)"
-        )
-        for i, t in enumerate(extra_trades, 1):
-            print(
-                f"  [core {i}] Q{t.quality} {df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
-                f"-> {df.index[t.exit_idx].strftime('%m-%d %H:%M')} "
-                f"{t.exit_reason} {t.pnl_points:+.1f}"
-            )
+    # 預設頁只出這組進場圖，不再附核心 30 筆對照
 
     html_path = args.html
     if getattr(args, "pages", False):
