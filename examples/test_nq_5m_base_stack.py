@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nq_5m_base_stack import (  # noqa: E402
     ET,
+    LOOSE_DETECT,
     TradeResult,
     detect_signals,
     quality_from_setup,
@@ -166,6 +167,34 @@ def test_no_signal_on_slow_dump() -> None:
     assert not sigs, "a grind-down pause should not count as the screenshot U"
 
 
+def test_loose_detects_knot() -> None:
+    df = _make_base_stack_bars(bounce=True, knot=True)
+    assert not detect_signals(df)
+    sigs = detect_signals(df, **LOOSE_DETECT)
+    assert sigs, "loose mode should still take a 5/10/20 flip even if the ribbon is a knot"
+
+
+def test_html_extra_blurb(tmp_path: Path | None = None) -> None:
+    df = _make_base_stack_bars(bounce=True)
+    trades = simulate(df, detect_signals(df))
+    out = Path("/tmp/nq_5m_base_stack_extra.html") if tmp_path is None else Path(tmp_path) / "e.html"
+    path = write_html_report(
+        out,
+        df,
+        trades,
+        "NQ=F",
+        "demo",
+        extra_trades=trades,
+        extra_title="嚴格（截圖那種 U）",
+        extra_blurb="急跌集中、短打底、均線散開上攻。",
+        blurb="放寬版說明",
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "放寬版說明" in text
+    assert "嚴格（截圖那種 U）" in text
+    assert "急跌集中、短打底、均線散開上攻。" in text
+
+
 def main() -> int:
     test_quality_from_setup()
     test_sma()
@@ -174,7 +203,9 @@ def main() -> int:
     test_no_signal_on_continued_dump()
     test_no_signal_on_knot_stack()
     test_no_signal_on_slow_dump()
+    test_loose_detects_knot()
     test_simulate_and_html()
+    test_html_extra_blurb()
     print("ok")
     return 0
 

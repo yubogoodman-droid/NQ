@@ -6,7 +6,7 @@
 
 用法:
   python3 examples/nq_5m_base_stack.py
-  python3 examples/nq_5m_base_stack.py backtest --period 8d --pages
+  python3 examples/nq_5m_base_stack.py backtest --period 30d --pages --loose
   python3 examples/nq_5m_base_stack.py backtest --period 60d --html output/nq_5m_base_stack.html
   python3 examples/nq_5m_base_stack.py alert --test
   python3 examples/nq_5m_base_stack.py alert --dry-run --once
@@ -45,6 +45,26 @@ if not CONFIG_ENV.exists():
     CONFIG_ENV = ROOT / "tg_config.env"
 PAGES_HTML = REPO_ROOT / "docs" / "nq-5m-base-stack" / "index.html"
 VIEW_BRANCH = "cursor/nq-5m-base-stack-95d5"
+
+# 關掉散開 / 急跌集中 / 紅 K 墊高，只留「有跌、打底、翻成 5/10/20」。
+LOOSE_DETECT = dict(
+    min_ribbon=0.0,
+    min_ma5_ma10=0.0,
+    min_ma10_ma20=0.0,
+    min_ma5_slope5=-999.0,
+    min_dump_conc_frac=0.0,
+    max_wait_bars=36,
+    min_up_bars=0,
+)
+
+STRICT_BLURB = (
+    "急跌打底後，第一次 MA5>MA10>MA20 要散開上攻才進（MA5 明顯高於 MA10，近幾根多數收紅）。"
+    "黏帶點一下、或低點橫很久才排好的不算。停損打底低下方，目標 2R。"
+)
+LOOSE_BLURB = (
+    "放寬版：跌夠 + 短打底後，只要翻成 MA5>MA10>MA20 就算（不要求散開、可等多一點）。"
+    "很多不是截圖那種急跌 U。嚴格規則仍只留散開上攻。"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -652,7 +672,9 @@ def write_html_report(
     funnel: Optional[Dict[str, int]] = None,
     extra_trades: Optional[List[TradeResult]] = None,
     extra_title: str = "",
+    extra_blurb: str = "",
     verdict: str = "",
+    blurb: str = "",
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -668,7 +690,7 @@ def write_html_report(
         extra_cls = "pnl-win" if extra_stats["total_points"] >= 0 else "pnl-loss"
         extra_html = (
             f"<section class='summary'><h1>{escape(extra_title or 'QA 對照')}</h1>"
-            f"<p class='muted'>只留品質 A：急跌 ≥120、收回 25–60%、均線散開且 MA5 上彎。</p>"
+            f"<p class='muted'>{escape(extra_blurb or '只留品質 A：急跌 ≥120、收回 25–60%、均線散開且 MA5 上彎。')}</p>"
             f"<div class='cards'><div class='card'>筆數<b>{extra_stats['count']}</b></div>"
             f"<div class='card'>勝率<b>{extra_stats['win_rate']:.1f}%</b></div>"
             f"<div class='card'>總點數<b class='{extra_cls}'>{extra_stats['total_points']:+.1f}</b></div>"
@@ -731,7 +753,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 五分打底後 5/10/20 多排</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)} · 五分 K</p>
-<p class="muted">急跌打底後，第一次 MA5&gt;MA10&gt;MA20 要散開上攻才進（MA5 明顯高於 MA10，近幾根多數收紅）。黏帶點一下、或低點橫很久才排好的不算。停損打底低下方，目標 2R。</p>
+<p class="muted">{escape(blurb or STRICT_BLURB)}</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -969,7 +991,11 @@ def _print_trades(df, trades, tag: str = "") -> None:
         )
 
 
-def _verdict(stats: dict) -> str:
+def _verdict(stats: dict, *, loose: bool = False) -> str:
+    if loose:
+        if stats["count"] == 0:
+            return "放寬後這段也沒打到「有跌、有翻 5/10/20」。"
+        return "這是放寬版：跌夠 + 打底後翻成 5/10/20 就算。多數不是截圖那種急跌散開 U。嚴格規則 30 天通常只有 1 筆。"
     if stats["count"] == 0:
         return "這段沒打到「急跌短打底、5/10/20 散開上攻」的圖。"
     if stats["count"] <= 2 and stats["total_points"] > 0:
@@ -977,6 +1003,12 @@ def _verdict(stats: dict) -> str:
     if stats["total_points"] > 0:
         return "有抓到 U 底多排，但筆數少，單筆風險仍在打底低下方。"
     return "濾完以後樣本很小。截圖 08-25 22:20 對得上；其餘常是黏帶或假打底。"
+
+
+def detect_kwargs(args) -> dict:
+    if getattr(args, "loose", False):
+        return dict(LOOSE_DETECT)
+    return {}
 
 
 def cmd_backtest(args) -> int:
@@ -987,29 +1019,46 @@ def cmd_backtest(args) -> int:
         return 1
     print(f"bars={len(df)} {df.index[0]} → {df.index[-1]}", file=sys.stderr)
 
+    loose = bool(getattr(args, "loose", False))
     funnel: Dict[str, int] = {}
-    sigs = detect_signals(df, funnel=funnel)
+    sigs = detect_signals(df, funnel=funnel, **detect_kwargs(args))
     trades = simulate(df, sigs)
     stats = summarize_trades(trades)
+    tag = "loose" if loose else "strict"
     print(
-        f"trades={stats['count']} WR={stats['win_rate']:.1f}% "
+        f"{tag} trades={stats['count']} WR={stats['win_rate']:.1f}% "
         f"pnl={stats['total_points']:+.1f} avg={stats['avg']:+.1f}"
     )
     print("funnel", funnel)
     _print_trades(df, trades)
 
-    extra_trades = [t for t in trades if t.quality == "A"]
-    if extra_trades and extra_trades != trades:
+    extra_trades: List[TradeResult] = []
+    extra_title = "只做 QA（急跌 + 收回 25–60% + 均線散開）"
+    extra_blurb = "只留品質 A：急跌 ≥120、收回 25–60%、均線散開且 MA5 上彎。"
+    if loose:
+        extra_funnel: Dict[str, int] = {}
+        extra_trades = simulate(df, detect_signals(df, funnel=extra_funnel))
         extra_stats = summarize_trades(extra_trades)
+        extra_title = "嚴格（截圖那種 U）"
+        extra_blurb = "急跌集中、短打底、均線散開上攻。黏帶翻排和橫很久的都不算。"
         print(
-            f"QA    trades={extra_stats['count']} WR={extra_stats['win_rate']:.1f}% "
+            f"strict trades={extra_stats['count']} WR={extra_stats['win_rate']:.1f}% "
             f"pnl={extra_stats['total_points']:+.1f}"
         )
-        _print_trades(df, extra_trades, "QA")
+        print("strict funnel", extra_funnel)
+        _print_trades(df, extra_trades, "strict")
     else:
-        extra_trades = []
+        qa = [t for t in trades if t.quality == "A"]
+        if qa and qa != trades:
+            extra_trades = qa
+            extra_stats = summarize_trades(extra_trades)
+            print(
+                f"QA    trades={extra_stats['count']} WR={extra_stats['win_rate']:.1f}% "
+                f"pnl={extra_stats['total_points']:+.1f}"
+            )
+            _print_trades(df, extra_trades, "QA")
 
-    verdict = _verdict(stats)
+    verdict = _verdict(stats, loose=loose)
     print(f"verdict: {verdict}")
 
     html_path = args.html
@@ -1024,8 +1073,10 @@ def cmd_backtest(args) -> int:
             args.period,
             funnel=funnel,
             extra_trades=extra_trades or None,
-            extra_title="只做 QA（急跌 + 收回 25–60% + 均線散開）",
+            extra_title=extra_title,
+            extra_blurb=extra_blurb,
             verdict=verdict,
+            blurb=LOOSE_BLURB if loose else STRICT_BLURB,
         )
         print(f"html={out}")
         if getattr(args, "pages", False):
@@ -1084,6 +1135,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--period", default="8d")
     b.add_argument("--html", default="")
     b.add_argument("--pages", action="store_true", help="寫到 docs/nq-5m-base-stack/index.html")
+    b.add_argument("--loose", action="store_true", help="關掉散開／急跌集中，只留跌夠後翻 5/10/20")
     b.set_defaults(func=cmd_backtest)
 
     a = sub.add_parser("alert", help="Telegram 輪詢")
@@ -1101,6 +1153,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--period", default="8d")
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true")
+    p.add_argument("--loose", action="store_true", help="關掉散開／急跌集中，只留跌夠後翻 5/10/20")
     return p
 
 

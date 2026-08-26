@@ -27,10 +27,11 @@
 五分鐘圖：急跌、低點短打底，然後 **MA5 > MA10 > MA20 散開上攻**才做多。  
 黏帶點一下、下跌中暫停、或橫很久才排好的都不算。對齊 08-26 截圖：21:35 低點 29096，**22:20** 進場 @ 29161.75。
 
-近 30 天 Yahoo 5m（07-23 → 08-26）：漏斗 打底 57 → 多排翻轉 68 → **進場 1 筆**（就是截圖 08-25 22:20，+65）。不是資料少，是規則收到只像那張 U。
+近 30 天 Yahoo 5m（07-23 → 08-26）：嚴格只留截圖那種 U，**1 筆**（08-25 22:20，+65）。  
+`--loose` 關掉散開門檻後約 **14 筆**（跌夠 + 翻 5/10/20 就算），裡面會有黏帶、假打底，不是每張都像截圖。
 
 ```bash
-python3 examples/nq_5m_base_stack.py backtest --period 30d --pages
+python3 examples/nq_5m_base_stack.py backtest --period 30d --pages --loose
 python3 examples/nq_5m_base_stack.py backtest --period 60d --html output/nq_5m_base_stack_60d.html
 python3 examples/nq_5m_base_stack.py alert --test
 python3 examples/nq_5m_base_stack.py alert --dry-run --once
