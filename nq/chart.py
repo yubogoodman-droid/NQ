@@ -55,17 +55,21 @@ def build_chart(
         p = sig.pattern
         trade = results[i] if i < len(results) else None
 
-        low_points_x = [_marker_time(df.index[p.first_low_idx]), _marker_time(df.index[p.second_low_idx])]
-        low_points_y = [p.first_low, p.second_low]
+        low_points_x = [
+            _marker_time(df.index[p.first_low_idx]),
+            _marker_time(df.index[p.spring_idx]),
+            _marker_time(df.index[p.second_low_idx]),
+        ]
+        low_points_y = [p.first_low, p.spring_low, p.second_low]
         fig.add_trace(
             go.Scatter(
                 x=low_points_x,
                 y=low_points_y,
                 mode="markers+text",
                 marker=dict(symbol="circle", size=9, color=color, line=dict(width=1, color="white")),
-                text=["L1", "L2"],
+                text=["L1", "破底", "L2"],
                 textposition="bottom center",
-                name=f"W底 #{i + 1}",
+                name=f"破底W #{i + 1}",
                 showlegend=True,
             ),
             row=1,

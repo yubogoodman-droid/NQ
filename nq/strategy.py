@@ -1,4 +1,4 @@
-"""NQ 五分 K W 底進場策略。"""
+"""NQ 五分 K 破底 W 底進場策略。"""
 
 from __future__ import annotations
 
@@ -38,17 +38,22 @@ class Signal:
 @dataclass
 class NQWBottomStrategy:
     """
-    NQ（那斯達克期貨）五分 K W 底做多策略。
+    NQ（那斯達克期貨）五分 K 破底 W 底做多。
 
-    進場：第二低點確認且收盤突破頸線
-    停損：第二低點
-    停利：量度漲幅（頸線 - 最低點）投射至突破點上方
+    進場：L1 → 反彈 → 破底掃停 → 收復 → L2 → 收盤突破頸線
+    停損：L2（右底）
+    停利：頸線 + (頸線 − 破底低點)
     """
 
     swing_lookback: int = 3
     low_tolerance_pct: float = 0.001
-    min_bars_between_lows: int = 5
-    max_bars_between_lows: int = 60
+    min_bars_between_lows: int = 8
+    max_bars_between_lows: int = 80
+    min_spring_pct: float = 0.0006
+    min_spring_points: float = 10.0
+    min_bounce_pct: float = 0.001
+    max_reclaim_bars: int = 12
+    max_breakout_bars: int = 36
     tick_size: float = 0.25
     point_value: float = 20.0  # NQ 每點 $20
 
@@ -59,6 +64,11 @@ class NQWBottomStrategy:
             low_tolerance_pct=self.low_tolerance_pct,
             min_bars_between_lows=self.min_bars_between_lows,
             max_bars_between_lows=self.max_bars_between_lows,
+            min_spring_pct=self.min_spring_pct,
+            min_spring_points=self.min_spring_points,
+            min_bounce_pct=self.min_bounce_pct,
+            max_reclaim_bars=self.max_reclaim_bars,
+            max_breakout_bars=self.max_breakout_bars,
             require_neckline_break=True,
         )
 

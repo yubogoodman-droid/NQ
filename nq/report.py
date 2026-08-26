@@ -77,7 +77,7 @@ def _ma_snapshot(row: pd.Series) -> str:
 
 def _chart_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     p = trade.signal.pattern
-    start = max(0, p.first_low_idx - 12)
+    start = max(0, min(p.first_low_idx, p.spring_idx) - 12)
     end = min(
         len(df) - 1,
         max(trade.exit_idx + 8, trade.signal.bar_idx + 16, p.second_low_idx + 14),
@@ -174,10 +174,15 @@ def _draw_trade_png(
 
     l1_rel = p.first_low_idx - start
     l2_rel = p.second_low_idx - start
+    sp_rel = p.spring_idx - start
     if 0 <= l1_rel < len(window):
         ax.scatter([l1_rel], [p.first_low], s=42, color="#42a5f5", zorder=5)
         ax.annotate("L1", (l1_rel, p.first_low), textcoords="offset points", xytext=(0, -12),
                     ha="center", color="#79c0ff", fontsize=8)
+    if 0 <= sp_rel < len(window):
+        ax.scatter([sp_rel], [p.spring_low], s=48, color="#f472b6", zorder=5)
+        ax.annotate("破底", (sp_rel, p.spring_low), textcoords="offset points", xytext=(0, -13),
+                    ha="center", color="#f9a8d4", fontsize=8)
     if 0 <= l2_rel < len(window):
         ax.scatter([l2_rel], [p.second_low], s=42, color="#ec407a", zorder=5)
         ax.annotate("L2", (l2_rel, p.second_low), textcoords="offset points", xytext=(0, -12),
@@ -200,7 +205,7 @@ def _draw_trade_png(
 
     sign = "+" if trade.pnl_points >= 0 else ""
     ax.set_title(
-        f"#{trade_no}  W底  {_fmt_time(sig.timestamp)} → {_fmt_time(trade.exit_time)}  "
+        f"#{trade_no}  破底W  {_fmt_time(sig.timestamp)} → {_fmt_time(trade.exit_time)}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
         color="#e8f0ea",
         fontsize=11,
@@ -234,7 +239,8 @@ def _render_trade_card(
     p = sig.pattern
     pnl_class = "pnl-win" if trade.pnl_points > 0 else "pnl-loss"
     tag_text, tag_class = _exit_tag(trade.exit_reason, trade.pnl_points)
-    depth = p.neckline - min(p.first_low, p.second_low)
+    depth = p.neckline - p.spring_low
+    spring_gap = (p.first_low - p.spring_low) / p.first_low * 100 if p.first_low else 0
     low_gap = abs(p.first_low - p.second_low)
     avg_low = (p.first_low + p.second_low) / 2
     gap_pct = low_gap / avg_low * 100 if avg_low else 0
@@ -252,16 +258,17 @@ def _render_trade_card(
       </header>
       <div class="tags">
         <span class="tag {tag_class}">{tag_text}</span>
-        <span class="tag tag-info">W底</span>
+        <span class="tag tag-info">破底W</span>
         <span class="tag tag-info">5m</span>
       </div>
       <pre class="trade-detail">entry(頸線突破) {sig.entry:.2f}
 stop L2 {sig.stop_loss:.2f}
 TP 量度漲幅 = {sig.target:.2f}
 exit {trade.exit_price:.2f}
-W底 L1 {p.first_low:.2f} / L2 {p.second_low:.2f}
-頸線 {p.neckline:.2f} / 深度 {depth:.2f}
+L1 {p.first_low:.2f} / 破底 {p.spring_low:.2f} / L2 {p.second_low:.2f}
+頸線 {p.neckline:.2f} / 深度 {depth:.2f}（含破底）
 雙底價差 {gap_pct:.2f}% (≤0.10%)
+破底深度 {p.first_low - p.spring_low:.2f} pts ({spring_gap:.2f}%)
 {ma_line}
 $ {trade.pnl_dollars:+,.2f} NQ×{contracts}</pre>
       <div class="tf-badge">🕐 5分 K</div>
@@ -290,7 +297,7 @@ def build_report_html(
             img_href = _img_data_uri(png_path) if embed_images else f"img/{img_name}"
         cards_parts.append(_render_trade_card(df, trade, i, img_href=img_href))
     cards = "".join(cards_parts)
-    empty = '<div class="empty">今日未偵測到 W 底突破訊號</div>' if not results else ""
+    empty = '<div class="empty">今日未偵測到破底 W 底突破訊號</div>' if not results else ""
 
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -431,7 +438,7 @@ def build_report_html(
   <div class="page">
     <section class="summary">
       <h1>{html.escape(title)}</h1>
-      <p>{html.escape(symbol)} · 五分 K W底做多 · {html.escape(_report_date_range(df))}</p>
+      <p>{html.escape(symbol)} · 五分 K 破底W底做多 · {html.escape(_report_date_range(df))}</p>
       <div class="total">
         {stats.get("trades", 0)} 筆 · 勝率 {stats.get("win_rate", 0) * 100:.0f}% ·
         總計 {stats.get("total_pnl_points", 0):+.1f} 點 (${stats.get("total_pnl_dollars", 0):+,.0f})
@@ -470,7 +477,7 @@ def save_report_html(
         results = _filter_today_results(df, results)
     if title is None:
         today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
-        title = f"NQ W底回測 — {today}"
+        title = f"NQ 破底W底回測 — {today}"
 
     out = Path(output)
     img_dir = out.parent / "img"

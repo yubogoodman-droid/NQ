@@ -17,32 +17,40 @@ from nq.strategy import NQWBottomStrategy
 
 
 def make_sample_w_bottom_bars(n: int = 200, seed: int = 42) -> pd.DataFrame:
-    """產生含 W 底型態的模擬五分 K 資料。"""
+    """產生含破底 W 底型態的模擬五分 K 資料。"""
     rng = np.random.default_rng(seed)
     base = 18000.0
     prices = [base]
 
     for i in range(1, n):
         drift = 0.0
-        if 40 <= i <= 55:
+        if 40 <= i <= 52:
             drift = -3.0
-        elif 56 <= i <= 70:
-            drift = 4.0
-        elif 71 <= i <= 85:
-            drift = -2.8
-        elif i > 85:
-            drift = 2.5
-        prices.append(prices[-1] + drift + rng.normal(0, 1.5))
+        elif 53 <= i <= 68:
+            drift = 4.2
+        elif 69 <= i <= 74:
+            drift = -8.0  # 破底
+        elif 75 <= i <= 88:
+            drift = 3.5
+        elif 89 <= i <= 96:
+            drift = -2.2  # L2 回測
+        elif i > 96:
+            drift = 3.0
+        prices.append(prices[-1] + drift + rng.normal(0, 1.2))
 
     closes = np.array(prices)
     highs = closes + rng.uniform(0.5, 3.0, n)
     lows = closes - rng.uniform(0.5, 3.0, n)
+    # 強制中間破底長影線，讓偵測穩定
+    lows[72] = min(lows[72], closes[52] - 18.0)
     opens = np.roll(closes, 1)
     opens[0] = base
 
     idx = pd.date_range("2026-08-07 09:30", periods=n, freq="5min")
     return pd.DataFrame(
-        {"open": opens, "high": highs, "low": lows, "close": closes, "volume": rng.integers(100, 1000, n)},
+        {"open": opens, "high": np.maximum(highs, np.maximum(opens, closes)),
+         "low": np.minimum(lows, np.minimum(opens, closes)),
+         "close": closes, "volume": rng.integers(100, 1000, n)},
         index=idx,
     )
 
