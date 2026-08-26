@@ -81,38 +81,46 @@ def _make_setup(
     open_[dump + 4] = 20038.0
     high[dump + 4] = 20062.0
     low[dump + 4] = 20036.0
+    close[dump + 5] = 20070.0
+    open_[dump + 5] = 20054.0
+    high[dump + 5] = 20078.0
+    low[dump + 5] = 20050.0
+    close[dump + 6] = 20078.0
+    open_[dump + 6] = 20068.0
+    high[dump + 6] = 20085.0
+    low[dump + 6] = 20062.0
     if lose_stand:
-        close[dump + 5] = 19970.0
-        open_[dump + 5] = 20050.0
-        high[dump + 5] = 20052.0
-        low[dump + 5] = 19960.0
-        for i in range(dump + 6, n):
+        close[dump + 7] = 19970.0
+        open_[dump + 7] = 20070.0
+        high[dump + 7] = 20072.0
+        low[dump + 7] = 19960.0
+        for i in range(dump + 8, n):
             close[i] = 19965.0
             open_[i] = 19970.0
             high[i] = 19975.0
             low[i] = 19955.0
     elif runaway:
-        for i in range(dump + 5, n):
+        for i in range(dump + 7, n):
             close[i] = close[i - 1] + 12.0
             open_[i] = close[i - 1]
             high[i] = close[i] + 2.0
             low[i] = open_[i] + 4.0
     elif pullback:
-        close[dump + 5] = 20020.0
-        open_[dump + 5] = 20050.0
-        high[dump + 5] = 20058.0
-        low[dump + 5] = 19995.0
-        for i in range(dump + 6, n):
+        close[dump + 7] = 20020.0
+        open_[dump + 7] = 20072.0
+        high[dump + 7] = 20076.0
+        low[dump + 7] = 19995.0
+        for i in range(dump + 8, n):
             close[i] = close[i - 1] + 8.0
             open_[i] = close[i - 1]
             high[i] = close[i] + 2.0
             low[i] = open_[i] - 1.0
     else:
-        for i in range(dump + 5, n):
-            close[i] = 20050.0
-            open_[i] = 20048.0
-            high[i] = 20060.0
-            low[i] = 20040.0
+        for i in range(dump + 7, n):
+            close[i] = 20070.0
+            open_[i] = 20068.0
+            high[i] = 20080.0
+            low[i] = 20050.0
 
     idx = pd.date_range("2026-07-28 08:00", periods=n, freq="5min", tz=ET)
     return pd.DataFrame(
@@ -134,6 +142,28 @@ def test_detect_break_reclaim_retest() -> None:
     assert close[sig.reclaim_idx] > ma10[sig.reclaim_idx]
     assert df["Low"].iloc[sig.entry_idx] <= ma10[sig.entry_idx]
     assert close[sig.entry_idx] >= ma10[sig.entry_idx]
+
+
+def test_retry_after_brief_lost_stand() -> None:
+    df = _make_setup(pullback=True)
+    close = df["Close"].to_numpy(float).copy()
+    low = df["Low"].to_numpy(float).copy()
+    high = df["High"].to_numpy(float).copy()
+    open_ = df["Open"].to_numpy(float).copy()
+    dump = 70
+    ma10 = sma(close, 10)
+    # 站上後下一根收盤只比 MA10 低 2 點，之後再站上並回踩
+    close[dump + 4] = float(ma10[dump + 4]) - 2.0
+    open_[dump + 4] = float(ma10[dump + 4]) + 8.0
+    high[dump + 4] = open_[dump + 4] + 1.0
+    low[dump + 4] = close[dump + 4] - 2.0
+    df = df.copy()
+    df["Close"] = close
+    df["Open"] = open_
+    df["High"] = high
+    df["Low"] = low
+    sigs = detect_signals(df)
+    assert sigs, "a 2-point dip through MA10 should not kill the 破底; wait to 站上 again"
 
 
 def test_no_entry_when_stand_is_lost() -> None:
@@ -178,6 +208,7 @@ def main() -> int:
     test_sma()
     test_summarize_trades()
     test_detect_break_reclaim_retest()
+    test_retry_after_brief_lost_stand()
     test_no_entry_when_stand_is_lost()
     test_no_entry_when_price_runs_away()
     test_simulate_hits_target()

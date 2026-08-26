@@ -89,11 +89,19 @@ def make_demo_bars(n: int = 120) -> pd.DataFrame:
     open_[dump + 4] = 20038.0
     high[dump + 4] = 20062.0
     low[dump + 4] = 20036.0
-    close[dump + 5] = 20020.0
-    open_[dump + 5] = 20050.0
-    high[dump + 5] = 20058.0
-    low[dump + 5] = 19995.0
-    for i in range(dump + 6, n):
+    close[dump + 5] = 20070.0
+    open_[dump + 5] = 20054.0
+    high[dump + 5] = 20078.0
+    low[dump + 5] = 20050.0
+    close[dump + 6] = 20078.0
+    open_[dump + 6] = 20068.0
+    high[dump + 6] = 20085.0
+    low[dump + 6] = 20062.0
+    close[dump + 7] = 20020.0
+    open_[dump + 7] = 20072.0
+    high[dump + 7] = 20076.0
+    low[dump + 7] = 19995.0
+    for i in range(dump + 8, n):
         close[i] = close[i - 1] + 8.0
         open_[i] = close[i - 1]
         high[i] = close[i] + 2.0
@@ -366,7 +374,8 @@ def write_html_report(
             f"站上MA10 {funnel.get('reclaim', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
             f"（未站上 {funnel.get('skip_no_reclaim', 0)} · 未回踩 {funnel.get('skip_no_pullback', 0)} · "
-            f"失守 {funnel.get('skip_lost_stand', 0)} · 刺太深 {funnel.get('skip_deep_pierce', 0)} · "
+            f"再站上 {funnel.get('lost_stand_retry', 0)} · 刺太深 {funnel.get('skip_deep_pierce', 0)} · "
+            f"MA10下彎 {funnel.get('skip_ma10_slope', 0)} · 時段 {funnel.get('skip_session', 0)} · "
             f"風險 {funnel.get('skip_max_risk', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -457,8 +466,9 @@ def cmd_backtest(args) -> int:
             "funnel "
             f"break={funnel.get('break', 0)} reclaim={funnel.get('reclaim', 0)} "
             f"taken={funnel.get('taken', 0)} no_reclaim={funnel.get('skip_no_reclaim', 0)} "
-            f"no_pb={funnel.get('skip_no_pullback', 0)} lost={funnel.get('skip_lost_stand', 0)} "
-            f"pierce={funnel.get('skip_deep_pierce', 0)} risk={funnel.get('skip_max_risk', 0)}"
+            f"no_pb={funnel.get('skip_no_pullback', 0)} retry={funnel.get('lost_stand_retry', 0)} "
+            f"pierce={funnel.get('skip_deep_pierce', 0)} slope={funnel.get('skip_ma10_slope', 0)} "
+            f"session={funnel.get('skip_session', 0)} risk={funnel.get('skip_max_risk', 0)}"
         )
     for q, info in stats.get("by_quality", {}).items():
         print(f"  Q{q}: n={info['n']} wins={info['wins']} pnl={info['pnl']:+.1f}")
