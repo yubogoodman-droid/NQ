@@ -24,7 +24,7 @@
 
 ## NQ 一分 K 破底後回踩 MA60
 
-對齊截圖：1 分鐘圖先破近 2 小時低點（且低於季線），之後收盤突破 MA60，再回踩踩住 MA60 才進場。  
+對齊截圖：1 分鐘圖先破近 2 小時低點，**低點距 1m MA60 不超過 45 點**（截圖約 34 點），之後收盤突破 MA60，再回踩踩住 MA60 才進場。  
 停損在回踩低點／季線下方；目標 2R。
 
 ```bash
@@ -32,9 +32,9 @@ python3 examples/nq_ma60_retest.py backtest --period 8d --html output/nq_ma60_re
 python3 examples/nq_ma60_retest.py backtest --period 30d --pages
 ```
 
-近 8 天（2026-08-17 → 08-25）：**12 筆、勝率 50%、+79 點**，含截圖那筆 08-25 22:04 QA **+48**（21:35 破底 → 21:54 突破 → 22:04 回踩）。  
-近一個月 Yahoo 1m（2026-07-26 → 08-25）：**33 筆、勝率 39.4%、−27 點**。QA 20 筆 **+83**，QB/QC 把整體拉負。  
-漏斗：破底 102 → 突破 MA60 102 → 進場 33（失守 58 · 沒回踩 11）。
+近 8 天（2026-08-18 → 08-26）：**2 筆、勝率 50%、+23 點**，含截圖那筆 08-25 22:04 QA **+48**（破底距 MA60 34 點）。  
+近一個月 Yahoo 1m（2026-07-27 → 08-26）：**5 筆、勝率 40%、+0.9 點**。QA 2 筆皆贏 **+66**。  
+漏斗：破底 102 → 距 MA60 太遠濾掉 92 → 突破後進場 5。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma60-retest-8fa0/docs/nq-ma60-retest/view.html
 
