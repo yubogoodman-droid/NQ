@@ -60,6 +60,18 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
+## 幣安 15m 壓縮後放量擴張
+
+對齊那四張 15 分圖：**FIL / SNDK / CRCL** 是橫盤後連陽噴出，**PIPPIN** 是一段一段墊高。共用條件是前面窄、後面 1.5～7 小時放量走完 ≥7%，收盤還靠近高點。
+
+```bash
+python3 examples/scan_binance_15m_expansion.py --verify   # 回放四張圖
+python3 examples/scan_binance_15m_expansion.py --once     # 掃剛收盤的 15m
+python3 examples/scan_binance_15m_expansion.py            # 每根 15m 收盤掃；可推 Telegram
+```
+
+Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/test_scan_binance_15m_expansion.py`
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
