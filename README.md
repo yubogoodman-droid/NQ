@@ -106,7 +106,8 @@ python examples/chart_spring_week.py                                   # 近一�
 報告：`docs/spring_top50_20260814.html`、`docs/spring_week_20260820_26.md`
 
 外網直接開（手機可）：  
-https://yubogoodman-droid.github.io/NQ/spring/?v=overnight
+https://yubogoodman-droid.github.io/NQ/spring/?v=overnight  
+近一週圖：https://yubogoodman-droid.github.io/NQ/spring/week/?v=week
 
 ## TradingView
 
