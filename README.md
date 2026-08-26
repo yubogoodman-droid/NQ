@@ -39,29 +39,6 @@ TradingView：`pinescript/nq_ma_breakdown_short_5m.pine`
 
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-ma10-retest-59b8/docs/nq-ma-breakdown-short/view.html
 
-## NQ 五分 K 破底回踩 MA10
-
-五分鐘圖：跌破近 **4 小時**低點至少 40 點（且低點在 MA10 下）後，18 根內收盤站上 MA10，再等至少一根完全站上後**回踩 MA10** 做多。  
-短暫刺破 MA10（5 點內）可再站上；進場限 ET 08:00–16:00，且 MA10 需上彎。  
-停損預設在回踩 K / MA10 下方（`--wide-stop` 改停在破底低點）；目標 2R，最多抱 24 根（2 小時）。
-
-```
-破底 ──► 站上 MA10 ──► 回踩 MA10 ──► 做多
-```
-
-```bash
-python3 examples/nq_ma10_retest.py --demo
-python3 examples/nq_ma10_retest.py backtest --period 60d --html output/nq_ma10_retest.html
-python3 examples/nq_ma10_retest.py backtest --period 60d --pages
-```
-
-TradingView：`pinescript/nq_ma10_retest_5m.pine` 貼到 NQ1! / MNQ1! 五分圖。
-
-近 60 天 Yahoo 5m（2026-06-16 → 08-26）：**33 筆、勝率 27.3%、約 +7 點**。  
-07-28 截圖那筆有抓到：10:15 破底 27603.5 → 10:25 站上 MA10 → 11:05 回踩進場，11:20 打到 2R（**+142 點**）。
-
-現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-ma10-retest-59b8/docs/nq-ma10-retest/view.html
-
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
