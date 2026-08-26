@@ -291,11 +291,11 @@ def detect_signals(
     hug_ma20_pts: float = 16.0,
     hug_ma20_min_slope: Optional[float] = None,
     hug_ma20_max_slope: float = 0.5,
-    max_risk: float = 100.0,
+    max_risk: float = 130.0,
     # ⑮：風險偏大時只准 QA（擋 08-05 型寬停損弱品質全損）
     max_risk_non_qa: float = 85.0,
-    skip_hour_start: Optional[int] = 9,
-    skip_hour_end: Optional[int] = 10,
+    skip_hour_start: Optional[int] = None,
+    skip_hour_end: Optional[int] = None,
     ma200_buffer: float = 40.0,
     ma60_buffer: float = 10.0,
     ma60_min_below: float = 6.0,
@@ -1366,10 +1366,13 @@ def scan_once(
 
 
 CORE_DETECT = dict(hug_ma20_pts=0.0, use_ma60_skip=False, max_risk_non_qa=0.0)
+STRICT_DETECT = dict(skip_hour_start=9, skip_hour_end=10, max_risk=100.0)
 
 
 def detect_kwargs(args) -> dict:
     kw: Dict[str, Any] = {}
+    if getattr(args, "strict", False):
+        kw.update(STRICT_DETECT)
     if getattr(args, "loose", False):
         kw.update(CORE_DETECT)
     if getattr(args, "allow_open_hour", False):
@@ -1444,6 +1447,14 @@ def cmd_backtest(args) -> int:
             html_path = html_path or str(PAGES_HTML)
     period_label = args.period
     note = ""
+    if getattr(args, "strict", False):
+        period_label = f"{args.period} · 最嚴（09–10 不進、風險 100）"
+        note = "最嚴版：美東 09–10 不進，風險 >100 全擋。hug / MA60 / 斜率仍在。"
+    elif not getattr(args, "loose", False) and not allow_open and not ma20_only:
+        note = (
+            "比最嚴版放寬兩道：允許美東 09–10，風險上限 100→130。"
+            "hug、MA60 特例、MA20 斜率 −5 仍在。"
+        )
     if allow_open:
         period_label = f"{args.period} · 允許美東 09–10 進場"
         note = (
@@ -1470,7 +1481,7 @@ def cmd_backtest(args) -> int:
             note=note,
         )
         print(f"html={out}")
-        if allow_open or ma20_only:
+        if getattr(args, "pages", False) or allow_open or ma20_only:
             view = write_view_html(out)
             print(f"view={view}")
     return 0
@@ -1527,10 +1538,11 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--html", default="")
     b.add_argument("--pages", action="store_true", help="寫到 docs/nq-ma-reclaim/index.html")
     b.add_argument("--loose", action="store_true", help="關掉 hug / MA60 特例 / 寬停損 QA，只留核心破底翻")
+    b.add_argument("--strict", action="store_true", help="最嚴：09–10 不進、風險上限 100")
     b.add_argument(
         "--allow-open-hour",
         action="store_true",
-        help="關掉美東 09–10 不進場（其餘嚴格規則不變）",
+        help="允許美東 09–10 進場（現已是預設）",
     )
     b.add_argument(
         "--reclaim-ma20-only",
@@ -1556,10 +1568,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true", help="寫到 docs/nq-ma-reclaim/index.html")
     p.add_argument("--loose", action="store_true", help="關掉 hug / MA60 特例 / 寬停損 QA，只留核心破底翻")
+    p.add_argument("--strict", action="store_true", help="最嚴：09–10 不進、風險上限 100")
     p.add_argument(
         "--allow-open-hour",
         action="store_true",
-        help="關掉美東 09–10 不進場（其餘嚴格規則不變）",
+        help="允許美東 09–10 進場（現已是預設）",
     )
     p.add_argument(
         "--reclaim-ma20-only",

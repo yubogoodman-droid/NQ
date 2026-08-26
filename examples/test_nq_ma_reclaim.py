@@ -35,6 +35,10 @@ def test_detect_kwargs_allow_open_hour() -> None:
     assert kw["skip_hour_end"] is None
     kw20 = detect_kwargs(SimpleNamespace(loose=False, reclaim_ma20_only=True))
     assert kw20["require_ma30"] is False
+    strict = detect_kwargs(SimpleNamespace(strict=True))
+    assert strict["skip_hour_start"] == 9
+    assert strict["skip_hour_end"] == 10
+    assert strict["max_risk"] == 100.0
 
 
 def test_parse_period_days() -> None:

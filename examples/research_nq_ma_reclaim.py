@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nq_ma_reclaim import (  # noqa: E402
     CORE_DETECT,
     REPO_ROOT,
+    STRICT_DETECT,
     detect_signals,
     load_bars,
     simulate,
@@ -24,7 +25,8 @@ from nq_ma_reclaim import (  # noqa: E402
 PAGES = REPO_ROOT / "docs" / "nq-ma-reclaim" / "research.html"
 
 VARIANTS: List[Tuple[str, dict]] = [
-    ("嚴格（預設）", {}),
+    ("預設（09–10 可進、風險 130）", {}),
+    ("最嚴（09–10 不進、風險 100）", dict(STRICT_DETECT)),
     ("核心（關 hug / MA60 / 寬停損QA）", dict(CORE_DETECT)),
     ("只關 hug", dict(hug_ma20_pts=0.0)),
     ("只關 MA60 特例", dict(use_ma60_skip=False)),
@@ -67,9 +69,9 @@ def run_research(df) -> dict:
     strict_sigs = detect_signals(df, funnel=funnel)
     strict = simulate(df, strict_sigs)
     variants: List[dict] = []
-    cached: Dict[str, List[Any]] = {"嚴格（預設）": strict}
+    cached: Dict[str, List[Any]] = {"預設（09–10 可進、風險 130）": strict}
     for name, kwargs in VARIANTS:
-        if name == "嚴格（預設）":
+        if name == "預設（09–10 可進、風險 130）":
             trades = strict
         else:
             trades = simulate(df, detect_signals(df, **kwargs))
@@ -95,7 +97,7 @@ def run_research(df) -> dict:
     variant_extras = {}
     variant_dropped = {}
     for name, trades in cached.items():
-        if name == "嚴格（預設）":
+        if name == "預設（09–10 可進、風險 130）":
             continue
         variant_extras[name] = [trade_row(t) for t in extra_vs_base(strict, trades)]
         variant_dropped[name] = [trade_row(t) for t in extra_vs_base(trades, strict)]
