@@ -22,6 +22,23 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 五分 K 同時跌破均線叢做空
+
+五分鐘圖：收盤**同時低於 MA5、MA10、MA20、MA30、MA60、MA120**，且上一根還沒全部跌破，進場做空。  
+必須收陰；進場限 ET 08:00–16:00。停損在當根高點上方，目標 2R。
+
+```bash
+python3 examples/nq_ma_breakdown_short.py --demo
+python3 examples/nq_ma_breakdown_short.py backtest --period 60d --pages
+```
+
+TradingView：`pinescript/nq_ma_breakdown_short_5m.pine`
+
+近 60 天 Yahoo 5m（2026-06-16 → 08-26）：**139 筆、勝率 42.4%、約 +324 點**。  
+07-28 截圖那波急跌有抓到：09:25 收盤同時跌破六均做空，09:35 打到 2R（**+120 點**）。
+
+現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-ma10-retest-59b8/docs/nq-ma-breakdown-short/view.html
+
 ## NQ 五分 K 破底回踩 MA10
 
 五分鐘圖：跌破近 **4 小時**低點至少 40 點（且低點在 MA10 下）後，18 根內收盤站上 MA10，再等至少一根完全站上後**回踩 MA10** 做多。  

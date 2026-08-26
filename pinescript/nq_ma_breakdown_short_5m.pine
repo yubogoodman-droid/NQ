@@ -1,0 +1,46 @@
+//@version=5
+strategy("NQ 五分K 跌破均線叢做空", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
+
+stopBuf   = input.float(12.0, "停損緩衝（點）", minval=0)
+targetR   = input.float(2.0, "目標 R 倍數", minval=0.5)
+maxRisk   = input.float(120.0, "最大風險（點）", minval=5)
+minRisk   = input.float(8.0, "最小風險（點）", minval=1)
+minBreak  = input.float(20.0, "相對最高均線至少跌破（點）", minval=0)
+needBear  = input.bool(true, "必須收陰")
+sessStart = input.int(8, "進場時段起（ET 小時）", minval=0, maxval=23)
+sessEnd   = input.int(16, "進場時段迄（ET 小時，不含）", minval=1, maxval=24)
+
+ma5   = ta.sma(close, 5)
+ma10  = ta.sma(close, 10)
+ma20  = ta.sma(close, 20)
+ma30  = ta.sma(close, 30)
+ma60  = ta.sma(close, 60)
+ma120 = ta.sma(close, 120)
+
+belowAll(c, a5, a10, a20, a30, a60, a120) =>
+    c < a5 and c < a10 and c < a20 and c < a30 and c < a60 and c < a120
+
+nowBelow  = belowAll(close, ma5, ma10, ma20, ma30, ma60, ma120)
+wasBelow  = belowAll(close[1], ma5[1], ma10[1], ma20[1], ma30[1], ma60[1], ma120[1])
+fresh     = nowBelow and not wasBelow
+bearOk    = not needBear or close < open
+inSess    = hour(time, "America/New_York") >= sessStart and hour(time, "America/New_York") < sessEnd
+
+risk = (high + stopBuf) - close
+spanOk = math.max(ma5, math.max(ma10, math.max(ma20, math.max(ma30, math.max(ma60, ma120))))) - close >= minBreak
+shortSignal = fresh and bearOk and inSess and spanOk and risk >= minRisk and risk <= maxRisk
+
+if shortSignal
+    stopPx = high + stopBuf
+    tgtPx  = close - risk * targetR
+    strategy.entry("跌破做空", strategy.short)
+    strategy.exit("空單出場", "跌破做空", stop=stopPx, limit=tgtPx)
+
+plot(ma5,   "MA5",   color=color.new(#ffa726, 0), linewidth=1)
+plot(ma10,  "MA10",  color=color.new(#4dd0e1, 0), linewidth=1)
+plot(ma20,  "MA20",  color=color.new(#ec407a, 0), linewidth=1)
+plot(ma30,  "MA30",  color=color.new(#42a5f5, 0), linewidth=1)
+plot(ma60,  "MA60",  color=color.new(#66bb6a, 0), linewidth=1)
+plot(ma120, "MA120", color=color.new(#ef5350, 0), linewidth=2)
+
+plotshape(shortSignal, title="跌破做空", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
