@@ -10,11 +10,15 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scan_binance_15m_expansion import (  # noqa: E402
+    ALERT_BUCKET_MS,
     collapse_hits,
     detect_expansion,
     indicators,
     rsi_sma,
+    select_alerts,
+    simulate_trade,
     sma,
+    summarize_trades,
 )
 
 
@@ -119,6 +123,61 @@ def test_collapse_keeps_best_of_run() -> None:
     assert out[0]["score"] == 3.0
 
 
+def _impulse_bars() -> dict:
+    n0 = 90
+    close = np.concatenate([_tight(n0, 1.30), 1.30 * (1.022 ** np.arange(1, 10))])
+    vol = np.concatenate([np.full(n0, 1_000.0), np.full(9, 12_000.0)])
+    return indicators(_bars(len(close), close, vol))
+
+
+def test_select_alerts_debounce() -> None:
+    d = _impulse_bars()
+    t0 = int(d["t"][0])
+    t1 = int(d["t"][-1])
+    alerts = select_alerts(d, t0, t1)
+    assert alerts, "合成連陽應有訊號"
+    buckets = {int(d["t"][h["i"]]) // ALERT_BUCKET_MS for h in alerts}
+    assert len(buckets) == len(alerts)
+
+
+def test_simulate_stop() -> None:
+    n0 = 90
+    pump = 1.30 * (1.022 ** np.arange(1, 9))
+    dump = np.array([pump[-1] * 0.94, pump[-1] * 0.92])
+    close = np.concatenate([_tight(n0, 1.30), pump, dump])
+    vol = np.concatenate([np.full(n0, 1_000.0), np.full(8, 12_000.0), np.full(2, 8_000.0)])
+    d = indicators(_bars(len(close), close, vol))
+    hits = detect_expansion(d)
+    assert hits
+    # 在噴完那根進，下一根大跌應停損
+    sig = [h for h in hits if h["i"] == n0 + 7]
+    hit = sig[0] if sig else hits[-1]
+    tr = simulate_trade(d, hit)
+    assert tr is not None
+    assert tr["reason"] in {"stop", "time", "target", "eod"}
+
+
+def test_simulate_target_or_time() -> None:
+    n0 = 90
+    pump = 1.30 * (1.022 ** np.arange(1, 9))
+    cont = pump[-1] * (1.018 ** np.arange(1, 10))
+    close = np.concatenate([_tight(n0, 1.30), pump, cont])
+    vol = np.concatenate([np.full(n0, 1_000.0), np.full(8, 12_000.0), np.full(9, 9_000.0)])
+    d = indicators(_bars(len(close), close, vol))
+    hits = detect_expansion(d)
+    assert hits
+    tr = simulate_trade(d, hits[0])
+    assert tr is not None
+    assert tr["entry"] > 0
+    assert tr["reason"] in {"target", "time", "stop", "eod"}
+
+
+def test_summarize_empty() -> None:
+    s = summarize_trades([])
+    assert s["count"] == 0
+    assert s["pnl"] == 0.0
+
+
 def main() -> int:
     test_sma()
     test_rsi_sma_all_up()
@@ -128,6 +187,10 @@ def main() -> int:
     test_chop_does_not_hit()
     test_slow_grind_does_not_hit()
     test_collapse_keeps_best_of_run()
+    test_select_alerts_debounce()
+    test_simulate_stop()
+    test_simulate_target_or_time()
+    test_summarize_empty()
     print("ok")
     return 0
 

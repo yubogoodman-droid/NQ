@@ -6,6 +6,7 @@
 
 用法:
   python3 examples/scan_binance_15m_expansion.py --verify   # 回放四張圖，確認都抓得到
+  python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
   python3 examples/scan_binance_15m_expansion.py --once     # 掃剛收盤的 15m
   python3 examples/scan_binance_15m_expansion.py            # 每根 15m 收盤掃，可推 Telegram
   python3 examples/scan_binance_15m_expansion.py --test     # 測 Telegram
@@ -14,11 +15,14 @@ Telegram 可在檔案最上面填，或放 tg_config.env。
 """
 from __future__ import annotations
 
+import base64
+import io
 import json
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+from html import escape
 from pathlib import Path
 
 import numpy as np
@@ -53,6 +57,12 @@ MIN_FROM_START = 0.045
 MIN_BARS = 80
 KLINE_LIMIT = 320
 ALERT_BUCKET_MS = 3 * 3600 * 1000  # 同一檔 3 小時內只推一次
+HOLD_BARS = 8          # 最多抱 2 小時
+TARGET_R = 1.5
+MAX_RISK = 0.03        # 單筆風險上限 3%
+MIN_RISK = 0.004
+FWD_BARS = (1, 4, 8, 16)  # 15m / 1h / 2h / 4h
+PAGES_HTML = REPO / "docs" / "binance" / "expansion-15m-7d" / "index.html"
 
 # --verify 對齊那四張截圖的時間窗（台北時間）
 VERIFY_CASES = [
@@ -543,6 +553,454 @@ def test_telegram() -> int:
     return 0 if ok else 1
 
 
+def select_alerts(d: dict, start_ms: int, end_ms: int) -> list[dict]:
+    """跟 Telegram 監看一樣：時間序第一根命中，同一檔 3 小時內只留一筆。"""
+    seen: set[int] = set()
+    out: list[dict] = []
+    for h in sorted(detect_expansion(d), key=lambda x: x["i"]):
+        t = int(d["t"][h["i"]])
+        if t < start_ms or t > end_ms:
+            continue
+        bucket = t // ALERT_BUCKET_MS
+        if bucket in seen:
+            continue
+        seen.add(bucket)
+        out.append(h)
+    return out
+
+
+def _fwd_pct(d: dict, entry_i: int, entry: float, bars: int) -> float | None:
+    j = entry_i + bars
+    if j >= len(d["c"]) or entry <= 0:
+        return None
+    return float(d["c"][j] / entry - 1.0)
+
+
+def simulate_trade(d: dict, hit: dict) -> dict | None:
+    """訊號收盤後下一根開盤做多。停損在訊號 K 低點（風險夾在 0.4%～3%），1.5R 或 8 根時間出場。"""
+    i = hit["i"]
+    o, h, l, c = d["o"], d["h"], d["l"], d["c"]
+    if i + 1 >= len(c):
+        return None
+    entry_i = i + 1
+    entry = float(o[entry_i])
+    if entry <= 0:
+        return None
+    raw_stop = float(l[i])
+    if raw_stop >= entry:
+        raw_stop = entry * (1.0 - MIN_RISK)
+    risk_pct = (entry - raw_stop) / entry
+    if risk_pct > MAX_RISK:
+        stop = entry * (1.0 - MAX_RISK)
+    elif risk_pct < MIN_RISK:
+        stop = entry * (1.0 - MIN_RISK)
+    else:
+        stop = raw_stop
+    risk = entry - stop
+    if risk <= 0:
+        return None
+    target = entry + TARGET_R * risk
+    last = min(entry_i + HOLD_BARS, len(c) - 1)
+    exit_i = last
+    exit_px = float(c[last])
+    reason = "eod" if last < entry_i + HOLD_BARS else "time"
+    mfe = mae = 0.0
+    for k in range(entry_i, last + 1):
+        mfe = max(mfe, float(h[k]) / entry - 1.0)
+        mae = min(mae, float(l[k]) / entry - 1.0)
+        if float(l[k]) <= stop:
+            exit_i, exit_px, reason = k, stop, "stop"
+            break
+        if float(h[k]) >= target:
+            exit_i, exit_px, reason = k, target, "target"
+            break
+    pnl_pct = (exit_px / entry - 1.0) * 100.0
+    fwd = {n: _fwd_pct(d, entry_i, entry, n) for n in FWD_BARS}
+    return {
+        "signal_i": i,
+        "entry_i": entry_i,
+        "exit_i": exit_i,
+        "entry": entry,
+        "stop": stop,
+        "target": target,
+        "exit": exit_px,
+        "reason": reason,
+        "pnl_pct": pnl_pct,
+        "r_mult": (exit_px - entry) / risk,
+        "mfe_pct": mfe * 100.0,
+        "mae_pct": mae * 100.0,
+        "fwd": fwd,
+        "kind": hit["kind"],
+        "move": hit["move"],
+        "vol_ratio": hit["vol_ratio"],
+        "rsi6": hit["rsi6"],
+        "L": hit["L"],
+        "score": hit["score"],
+        "t_signal": int(d["t"][i]),
+        "t_entry": int(d["t"][entry_i]),
+        "t_exit": int(d["t"][exit_i]),
+    }
+
+
+def summarize_trades(trades: list[dict]) -> dict:
+    n = len(trades)
+    if n == 0:
+        return {
+            "count": 0,
+            "wins": 0,
+            "win_rate": 0.0,
+            "pnl": 0.0,
+            "avg": 0.0,
+            "mfe": 0.0,
+            "mae": 0.0,
+            "by_kind": {},
+            "by_reason": {},
+            "fwd": {},
+        }
+    pnls = [t["pnl_pct"] for t in trades]
+    wins = sum(1 for p in pnls if p > 0)
+    by_kind: dict[str, dict] = {}
+    for t in trades:
+        k = t["kind"]
+        slot = by_kind.setdefault(k, {"n": 0, "wins": 0, "pnl": 0.0})
+        slot["n"] += 1
+        slot["pnl"] += t["pnl_pct"]
+        if t["pnl_pct"] > 0:
+            slot["wins"] += 1
+    by_reason: dict[str, int] = {}
+    for t in trades:
+        by_reason[t["reason"]] = by_reason.get(t["reason"], 0) + 1
+    fwd_stats = {}
+    for nbar in FWD_BARS:
+        vals = [t["fwd"][nbar] * 100.0 for t in trades if t["fwd"].get(nbar) is not None]
+        if not vals:
+            fwd_stats[nbar] = {"n": 0, "win_rate": 0.0, "avg": 0.0}
+        else:
+            fwd_stats[nbar] = {
+                "n": len(vals),
+                "win_rate": 100.0 * sum(1 for v in vals if v > 0) / len(vals),
+                "avg": float(np.mean(vals)),
+            }
+    return {
+        "count": n,
+        "wins": wins,
+        "win_rate": 100.0 * wins / n,
+        "pnl": float(sum(pnls)),
+        "avg": float(np.mean(pnls)),
+        "mfe": float(np.mean([t["mfe_pct"] for t in trades])),
+        "mae": float(np.mean([t["mae_pct"] for t in trades])),
+        "by_kind": by_kind,
+        "by_reason": by_reason,
+        "fwd": fwd_stats,
+    }
+
+
+def _equity_svg(pnls: list[float], width: int = 720, height: int = 160) -> str:
+    if not pnls:
+        return "<p class='muted'>no trades</p>"
+    eq = np.cumsum(pnls)
+    xs = np.linspace(0, width, len(eq) + 1)
+    ys = np.concatenate([[0.0], eq])
+    ymin, ymax = float(ys.min()), float(ys.max())
+    pad = max(0.4, (ymax - ymin) * 0.12)
+    ymin -= pad
+    ymax += pad
+    span = ymax - ymin or 1.0
+
+    def yv(v: float) -> float:
+        return height - (v - ymin) / span * height
+
+    pts = " ".join(f"{xs[i]:.1f},{yv(ys[i]):.1f}" for i in range(len(ys)))
+    zero = yv(0.0)
+    color = "#3dba7a" if eq[-1] >= 0 else "#e35d5d"
+    return (
+        f'<svg viewBox="0 0 {width} {height}" width="100%" style="background:#0f1714;border-radius:8px">'
+        f'<line x1="0" y1="{zero:.1f}" x2="{width}" y2="{zero:.1f}" stroke="#2a3a33" stroke-dasharray="4 4"/>'
+        f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{pts}"/>'
+        f"</svg>"
+    )
+
+
+def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
+    except Exception:
+        return None
+    i = tr["signal_i"]
+    a0 = max(0, i - 36)
+    a1 = min(len(d["c"]), tr["exit_i"] + 6)
+    sl = slice(a0, a1)
+    xs = np.arange(a1 - a0)
+    o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
+    fig, (ax, axv) = plt.subplots(
+        2, 1, figsize=(10.2, 5.4), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
+    )
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+    colors_v = []
+    for k in range(len(c)):
+        up = c[k] >= o[k]
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.7)
+        y0, y1 = min(o[k], c[k]), max(o[k], c[k])
+        if y1 == y0:
+            y1 = y0 + max(h[k] - l[k], 1e-12) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
+        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
+    pal = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
+    for n, col in pal.items():
+        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.0, label=f"MA{n}")
+    ax.axhline(tr["entry"], color="#e8f0ea", ls=":", lw=0.7)
+    ax.axhline(tr["stop"], color="#e35d5d", ls="--", lw=0.7)
+    ax.axhline(tr["target"], color="#3dba7a", ls="--", lw=0.7)
+    for idx, color, mark in (
+        (tr["signal_i"], "#c9a227", "o"),
+        (tr["entry_i"], "#3dba7a", "^"),
+        (tr["exit_i"], "#e35d5d" if tr["pnl_pct"] < 0 else "#3dba7a", "x"),
+    ):
+        x = idx - a0
+        if 0 <= x < len(c):
+            ax.axvline(x, color=color, ls="--", lw=0.7)
+            ax.scatter([x], [c[x] if mark != "^" else tr["entry"]], s=28, color=color, marker=mark, zorder=6)
+    tag = "連陽" if tr["kind"] == "vertical" else "墊高"
+    ax.set_title(
+        f"{sym}  15m  {tag}  {tr['reason']}  {tr['pnl_pct']:+.2f}%",
+        color="#e8f0ea",
+        fontsize=11,
+    )
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    fig.tight_layout(pad=0.45)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=100, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def backtest_symbol(sym: str, start_ms: int, end_ms: int, warmup_days: int = 3) -> tuple[str, dict | None, list[dict]]:
+    fetch_start = datetime.fromtimestamp(start_ms / 1000, TZ) - timedelta(days=warmup_days)
+    d0 = fetch_klines(
+        sym,
+        limit=1500,
+        start_ms=int(fetch_start.timestamp() * 1000),
+        end_ms=end_ms + 15 * 60 * 1000,
+        drop_unclosed=True,
+    )
+    if d0 is None:
+        return sym, None, []
+    d = indicators(d0)
+    trades = []
+    for hit in select_alerts(d, start_ms, end_ms):
+        tr = simulate_trade(d, hit)
+        if tr is None:
+            continue
+        tr["symbol"] = sym
+        trades.append(tr)
+    return sym, d, trades
+
+
+def run_backtest(symbols: list[str], days: int = 7) -> tuple[list[dict], dict[str, dict]]:
+    end = datetime.now(TZ)
+    start = end - timedelta(days=days)
+    start_ms = int(start.timestamp() * 1000)
+    end_ms = int(end.timestamp() * 1000)
+    print(
+        f"回測 {start.strftime('%Y-%m-%d %H:%M')} → {end.strftime('%Y-%m-%d %H:%M')}  "
+        f"{len(symbols)} 檔 15m",
+        flush=True,
+    )
+    trades: list[dict] = []
+    data: dict[str, dict] = {}
+    done = 0
+    with ThreadPoolExecutor(6) as ex:
+        futs = {ex.submit(backtest_symbol, s, start_ms, end_ms): s for s in symbols}
+        for fut in as_completed(futs):
+            done += 1
+            try:
+                sym, d, rows = fut.result()
+            except Exception as e:
+                print("err", futs[fut], e, flush=True)
+                continue
+            if d is not None:
+                data[sym] = d
+            trades.extend(rows)
+            if done % 25 == 0 or done == len(symbols):
+                print(f"  {done}/{len(symbols)}  訊號 {len(trades)}", flush=True)
+    trades.sort(key=lambda t: t["t_signal"])
+    return trades, data
+
+
+def write_backtest_html(
+    path: Path,
+    trades: list[dict],
+    data: dict[str, dict],
+    *,
+    days: int,
+    n_symbols: int,
+    chart_limit: int = 60,
+) -> Path:
+    stats = summarize_trades(trades)
+    start = datetime.fromtimestamp(trades[0]["t_signal"] / 1000, TZ).strftime("%Y-%m-%d %H:%M") if trades else ""
+    end = datetime.fromtimestamp(trades[-1]["t_signal"] / 1000, TZ).strftime("%Y-%m-%d %H:%M") if trades else ""
+    total_cls = "pnl-win" if stats["pnl"] >= 0 else "pnl-loss"
+    kind_line = " · ".join(
+        f"{('連陽' if k == 'vertical' else '墊高')} {v['n']}筆 勝率 {100*v['wins']/v['n']:.0f}% {v['pnl']:+.1f}%"
+        for k, v in stats["by_kind"].items()
+        if v["n"]
+    )
+    reason_line = " · ".join(f"{k} {n}" for k, n in stats["by_reason"].items())
+    fwd_bits = []
+    labels = {1: "15m", 4: "1h", 8: "2h", 16: "4h"}
+    for nbar, lab in labels.items():
+        fs = stats["fwd"].get(nbar) or {}
+        if fs.get("n"):
+            fwd_bits.append(f"{lab} 勝率 {fs['win_rate']:.0f}% 均 {fs['avg']:+.2f}%")
+    fwd_line = " · ".join(fwd_bits)
+
+    ranked = sorted(trades, key=lambda t: abs(t["pnl_pct"]), reverse=True)
+    chart_set = {id(t) for t in ranked[:chart_limit]}
+    cards = []
+    for i, t in enumerate(trades, 1):
+        cls = "pnl-win" if t["pnl_pct"] > 0 else ("pnl-flat" if t["pnl_pct"] == 0 else "pnl-loss")
+        reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t["reason"], "tag-time")
+        tag = "連陽噴出" if t["kind"] == "vertical" else "墊高擴張"
+        img = ""
+        if id(t) in chart_set:
+            d = data.get(t["symbol"])
+            b64 = draw_trade_b64(t["symbol"], d, t) if d else None
+            if b64:
+                img = (
+                    f"<div class='mini-chart'><img src='data:image/png;base64,{b64}' "
+                    f"alt='#{i} {escape(t['symbol'])}' style='width:100%;display:block;border-radius:10px'/></div>"
+                )
+        h1 = (t["fwd"].get(4) or 0) * 100
+        h2 = (t["fwd"].get(8) or 0) * 100
+        cards.append(
+            "<article class='trade-card'>"
+            "<header class='card-header'>"
+            f"<div class='card-title'><span class='trade-no'>#{i} · {escape(t['symbol'])}</span>"
+            f"<span class='trade-time'>{escape(hm(t['t_entry']))} → {escape(hm(t['t_exit']))}</span></div>"
+            f"<div class='card-pnl {cls}'>{t['pnl_pct']:+.2f}%</div>"
+            "</header>"
+            "<div class='tags'>"
+            f"<span class='tag {reason_cls}'>{escape(t['reason'])}</span>"
+            f"<span class='tag tag-info'>{escape(tag)}</span>"
+            f"<span class='tag tag-info'>{t['L']}根</span>"
+            "</div>"
+            "<pre class='trade-detail'>"
+            f"entry {t['entry']:g}  stop {t['stop']:g}  target {t['target']:g}\n"
+            f"exit  {t['exit']:g}  {t['reason']}  {t['r_mult']:+.2f}R\n"
+            f"波段已走 {t['move']*100:.1f}%  量比 {t['vol_ratio']:.1f}×  RSI6 {t['rsi6']:.0f}\n"
+            f"MFE {t['mfe_pct']:+.2f}%  MAE {t['mae_pct']:+.2f}%\n"
+            f"無停損 1h {h1:+.2f}%  2h {h2:+.2f}%"
+            "</pre>"
+            f"{img}"
+            "</article>"
+        )
+
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>幣安 15m 壓縮擴張 · 近 {days} 天</title>
+<style>
+*{{box-sizing:border-box}}
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
+.page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
+h1{{font-size:18px;margin:0 0 6px}}
+.muted{{color:#8b949e;font-size:13px;line-height:1.5}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
+.cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
+.card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}}
+.card b{{display:block;font-size:20px;margin-top:4px}}
+.equity{{margin:10px 0 4px}}
+.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}}
+.card-header{{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}}
+.trade-no{{font-size:15px;font-weight:700}}
+.trade-time{{font-size:12px;color:#8b949e}}
+.card-pnl{{font-size:16px;font-weight:700;white-space:nowrap}}
+.pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}} .pnl-flat{{color:#8b949e}}
+.tags{{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}}
+.tag{{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}}
+.tag-tp{{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}}
+.tag-sl{{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}}
+.tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
+.tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
+.trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
+.mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+.empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安 15m 壓縮後放量擴張</h1>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。訊號出現時波段已走 ≥7%，這是<strong>追價做多</strong>：下一根開盤進，停損在訊號 K 低點（風險上限 3%），1.5R 或 2 小時平。</p>
+<div class="cards">
+<div class="card">筆數<b>{stats['count']}</b></div>
+<div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
+<div class="card">總報酬<b class="{total_cls}">{stats['pnl']:+.1f}%</b></div>
+<div class="card">均筆<b class="{total_cls}">{stats['avg']:+.2f}%</b></div>
+</div>
+<div class="equity">{_equity_svg([t['pnl_pct'] for t in trades])}</div>
+<p class="muted">MFE 均 {stats['mfe']:+.2f}% · MAE 均 {stats['mae']:+.2f}%</p>
+<p class="muted">{escape(kind_line) if kind_line else '無分組'}</p>
+<p class="muted">出場 {escape(reason_line) if reason_line else '—'}</p>
+<p class="muted">無停損續走 {escape(fwd_line) if fwd_line else '—'}</p>
+<p class="muted">等權重每筆 1 單位，不含手續費／資金費。圖只畫 |報酬| 最大的 {min(chart_limit, stats['count'])} 筆。</p>
+</section>
+{''.join(cards) if cards else "<div class='empty'>這週沒有訊號</div>"}
+</div></body></html>
+"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    view = path.parent / "view.html"
+    if path.name == "index.html":
+        view.write_text(html, encoding="utf-8")
+    return path
+
+
+def cmd_backtest(args) -> int:
+    days = int(args.days)
+    if args.symbols.strip():
+        symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+        print(f"指定 {len(symbols)} 檔", flush=True)
+    else:
+        print("載入標的…", flush=True)
+        symbols = universe()
+        print(f"{len(symbols)} 個流動永續", flush=True)
+    trades, data = run_backtest(symbols, days=days)
+    stats = summarize_trades(trades)
+    print(
+        f"trades={stats['count']} WR={stats['win_rate']:.1f}% "
+        f"pnl={stats['pnl']:+.1f}% avg={stats['avg']:+.2f}%"
+    )
+    for k, v in stats["by_kind"].items():
+        wr = 100 * v["wins"] / v["n"] if v["n"] else 0
+        print(f"  {k}: n={v['n']} WR={wr:.1f}% pnl={v['pnl']:+.1f}%")
+    for nbar, lab in ((1, "15m"), (4, "1h"), (8, "2h"), (16, "4h")):
+        fs = stats["fwd"].get(nbar) or {}
+        if fs.get("n"):
+            print(f"  fwd {lab}: n={fs['n']} WR={fs['win_rate']:.1f}% avg={fs['avg']:+.2f}%")
+    for i, t in enumerate(trades, 1):
+        print(
+            f"[{i}] {t['symbol']} {hm(t['t_entry'])} {t['kind']} "
+            f"{t['reason']} {t['pnl_pct']:+.2f}%"
+        )
+    html_path = args.html
+    if getattr(args, "pages", False):
+        html_path = html_path or str(PAGES_HTML)
+    if html_path:
+        out = write_backtest_html(Path(html_path), trades, data, days=days, n_symbols=len(symbols))
+        print(f"html={out}")
+    return 0
+
+
 def verify_four() -> int:
     """回放使用者那四張 15m 圖，四檔都要在對應時間窗內命中。"""
     print("回放四張 15m 圖…", flush=True)
@@ -588,6 +1046,10 @@ def main() -> int:
     p.add_argument("--once", action="store_true", help="只掃剛收盤的 15m，然後結束")
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
     p.add_argument("--verify", action="store_true", help="回放四張截圖，確認都抓得到")
+    p.add_argument("--backtest", action="store_true", help="回測近 N 天（預設 7）")
+    p.add_argument("--days", type=int, default=7, help="回測天數")
+    p.add_argument("--html", default="", help="回測 HTML 路徑")
+    p.add_argument("--pages", action="store_true", help="回測寫入 docs/binance/expansion-15m-7d/")
     p.add_argument("--symbols", default="", help="逗號分隔，例如 FILUSDT,PIPPINUSDT")
     p.add_argument("--full", action="store_true", help="掃整段 K 而不只最後 2 根（找正在噴的）")
     args = p.parse_args()
@@ -596,6 +1058,8 @@ def main() -> int:
         return test_telegram()
     if args.verify:
         return verify_four()
+    if args.backtest:
+        return cmd_backtest(args)
 
     seen = load_seen()
     if args.symbols.strip():

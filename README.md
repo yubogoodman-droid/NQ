@@ -72,6 +72,12 @@ python3 examples/scan_binance_15m_expansion.py            # 每根 15m 收盤掃
 
 Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/test_scan_binance_15m_expansion.py`
 
+近一週回測（追價做多、等權重 %）：
+
+```bash
+python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
+```
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
