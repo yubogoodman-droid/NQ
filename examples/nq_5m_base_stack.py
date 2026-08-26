@@ -59,7 +59,7 @@ LOOSE_DETECT = dict(
 
 STRICT_BLURB = (
     "急跌打底後，第一次 MA5>MA10>MA20 要散開上攻才進（MA5 明顯高於 MA10，近幾根多數收紅）。"
-    "黏帶點一下、或低點橫很久才排好的不算。停損打底低下方，目標 2R。"
+    "黏帶點一下、剛戳上 MA30 還纏著、或低點橫很久才排好的不算。停損打底低下方，目標 2R。"
 )
 LOOSE_BLURB = (
     "放寬版：跌夠 + 短打底後，只要翻成 MA5>MA10>MA20 就算（不要求散開、可等多一點）。"
@@ -136,6 +136,7 @@ class Signal:
     ma5: float
     ma10: float
     ma20: float
+    ma30: float = 0.0
     quality: str = "C"
     quality_score: int = 0
 
@@ -208,6 +209,7 @@ def detect_signals(
     max_base_range_frac: float = 0.65,
     min_entry_gap: int = 12,
     require_close_gt_ma5: bool = True,
+    min_ma30_clearance: float = 20.0,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """
@@ -217,6 +219,7 @@ def detect_signals(
       3. 第一次翻成 MA5>MA10>MA20 時必須散開上攻（不是三條黏在一起點一下）
       4. 進場前幾根多數收紅，像在墊高，不是區間裡翻排
       5. 風險最多 max(80, 跌幅×0.55)；帶寬最多 max(40, 跌幅×0.20)
+      6. 收盤剛站上 MA30 但這根低點還在線下、距離又不到 20 點：當壓力濾掉
     """
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
@@ -225,6 +228,7 @@ def detect_signals(
     ma5 = sma(close, 5)
     ma10 = sma(close, 10)
     ma20 = sma(close, 20)
+    ma30 = sma(close, 30)
     ma60 = sma(close, 60)
 
     n = len(close)
@@ -344,6 +348,12 @@ def detect_signals(
             if recover > max_recover:
                 bump("skip_recover")
                 continue
+            if min_ma30_clearance > 0 and not np.isnan(ma30[j]):
+                gap_30 = float(close[j]) - float(ma30[j])
+                # 剛戳上 MA30、這根還在跟均線纏：06-23 那種。收在線下（07-28 V）或整根已離開（08-25）不算。
+                if gap_30 >= 0 and gap_30 < min_ma30_clearance and float(low[j]) <= float(ma30[j]):
+                    bump("skip_ma30")
+                    break
             if j - last_entry < min_entry_gap:
                 bump("skip_gap")
                 break
@@ -381,6 +391,7 @@ def detect_signals(
                     ma5=float(ma5[j]),
                     ma10=float(ma10[j]),
                     ma20=float(ma20[j]),
+                    ma30=float(ma30[j]) if not np.isnan(ma30[j]) else 0.0,
                     quality=q_grade,
                     quality_score=q_score,
                 )
@@ -714,7 +725,8 @@ def _render_trade_cards(
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"打底 {t.signal.base_low:.2f} ← 高點 {t.signal.dump_high:.2f}  (−{t.signal.drop_pts:.1f})\n"
             f"收回 {t.signal.recover * 100:.0f}% · 帶寬 MA5−MA20 {t.signal.ribbon:.1f}\n"
-            f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f}"
+            f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f}\n"
+            f"距 MA30 {t.entry_price - t.signal.ma30:+.1f}"
             "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
             "<p class='muted' style='margin:8px 2px 0'>上：進場放大 · 下：五分 K 參考（MA5/10/20，淡綠是上面那段）</p>"
@@ -769,6 +781,7 @@ def write_html_report(
             f"（慢跌 {funnel.get('skip_slow_dump', 0)} · 沒打底 {funnel.get('skip_no_base', 0)} · "
             f"破底 {funnel.get('skip_new_low', 0)} · 黏帶翻排 {funnel.get('skip_knot', 0)} · "
             f"低點還在均線上 {funnel.get('skip_above_ma60', 0)+funnel.get('skip_ma20_up', 0)} · "
+            f"貼 MA30 {funnel.get('skip_ma30', 0)} · "
             f"收回過多 {funnel.get('skip_recover', 0)} · "
             f"風險 {funnel.get('skip_max_risk', 0)}）</p>"
         )
@@ -835,7 +848,7 @@ h1{{font-size:18px;margin:0 0 6px}}
     return out
 
 
-def write_view_html(src: Path, branch: str = VIEW_BRANCH) -> Path:
+def write_view_html(src: Path, branch: str = VIEW_BRANCH, extra_name: str = "") -> Path:
     rel = src.parent.relative_to(REPO_ROOT).as_posix()
     stamp = datetime.now(ET).strftime("%Y%m%d%H%M%S")
     base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
@@ -843,6 +856,9 @@ def write_view_html(src: Path, branch: str = VIEW_BRANCH) -> Path:
     text = text.replace(".png'", f".png?v={stamp}'")
     out = src.with_name("view.html")
     out.write_text(text, encoding="utf-8")
+    if extra_name:
+        extra = src.with_name(extra_name)
+        extra.write_text(text, encoding="utf-8")
     return out
 
 
@@ -1049,7 +1065,8 @@ def _print_trades(df, trades, tag: str = "") -> None:
             f"  [{prefix}{i}] Q{t.quality} {df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
             f"-> {df.index[t.exit_idx].strftime('%m-%d %H:%M')} "
             f"{t.exit_reason} {t.pnl_points:+.1f}  drop={t.signal.drop_pts:.0f}pt "
-            f"rec={t.signal.recover:.2f} rib={t.signal.ribbon:.1f}"
+            f"rec={t.signal.recover:.2f} rib={t.signal.ribbon:.1f} "
+            f"ma30={t.entry_price - t.signal.ma30:+.1f}"
         )
 
 
@@ -1142,8 +1159,11 @@ def cmd_backtest(args) -> int:
         )
         print(f"html={out}")
         if getattr(args, "pages", False):
-            view = write_view_html(out)
+            extra = "no-ma30.html" if str(getattr(args, "period", "")).startswith("60") else ""
+            view = write_view_html(out, extra_name=extra)
             print(f"view={view}")
+            if extra:
+                print(f"preview={out.with_name(extra)}")
     return 0
 
 

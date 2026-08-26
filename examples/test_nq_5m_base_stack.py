@@ -111,9 +111,13 @@ def _make_base_stack_bars(
     low[low_i] = close[low_i] - 1.0
     high[low_i] = close[low_i] + 2.0
     if bounce:
-        for i in range(low_i + 1, min(low_i + 12, n)):
+        for i in range(low_i + 1, min(low_i + 7, n)):
             open_[i] = close[i] - 1.2
             low[i] = min(close[i] - 1.2, bottom + 3.0)
+            high[i] = close[i] + 1.5
+        for i in range(low_i + 7, min(low_i + 16, n)):
+            open_[i] = close[i] - 1.2
+            low[i] = close[i] - 1.8
             high[i] = close[i] + 1.5
 
     vol = np.full(n, 90.0)
@@ -208,6 +212,24 @@ def test_fat_v_base_span_allowed() -> None:
     assert sigs, "65% 打底 cap should take the V"
 
 
+def test_skip_ma30_hug() -> None:
+    """06-23 style: close just popped above MA30 but this bar's low is still under it."""
+    df = _make_base_stack_bars(bounce=True, deep=True)
+    assert detect_signals(df), "cleared MA30 should still fill"
+    below = _make_base_stack_bars(bounce=True)
+    assert detect_signals(below), "close still under MA30 (08-25/07-28 style room) should fill"
+
+    df = df.copy()
+    j = detect_signals(df)[0].entry_idx
+    ma30 = float(sma(df["Close"].to_numpy(float), 30)[j])
+    df.iloc[j, df.columns.get_loc("Close")] = ma30 + 10.0
+    df.iloc[j, df.columns.get_loc("Open")] = ma30 + 8.0
+    df.iloc[j, df.columns.get_loc("High")] = ma30 + 16.0
+    df.iloc[j, df.columns.get_loc("Low")] = ma30 - 6.0
+    assert not detect_signals(df), "poking MA30 with the low still under it should be filtered"
+    assert detect_signals(df, min_ma30_clearance=0.0), "clearance=0 disables the MA30 hug filter"
+
+
 def test_no_signal_on_knot_stack() -> None:
     df = _make_base_stack_bars(bounce=True, knot=True)
     sigs = detect_signals(df)
@@ -255,6 +277,7 @@ def main() -> int:
     test_detect_base_then_stack()
     test_deep_dump_risk_uses_half_drop()
     test_fat_v_base_span_allowed()
+    test_skip_ma30_hug()
     test_no_signal_on_continued_dump()
     test_no_signal_on_knot_stack()
     test_no_signal_on_slow_dump()

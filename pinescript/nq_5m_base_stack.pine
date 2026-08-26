@@ -18,11 +18,13 @@ minGap10     = input.float(3.0, "MA10−MA20 最小")
 minSlope5    = input.float(15.0, "MA5 五根最小斜率")
 concBars     = input.int(16, "急跌回看 K 數")
 minConc      = input.float(0.80, "急跌佔總跌幅")
+minMa30Gap   = input.float(20.0, "剛站上 MA30 最少距離")
 maxRecover   = input.float(0.85, "最多收回比例")
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
 ma20 = ta.sma(close, 20)
+ma30 = ta.sma(close, 30)
 
 pl = ta.pivotlow(low, swingLen, swingLen)
 stacked = ma5 > ma10 and ma10 > ma20
@@ -67,7 +69,8 @@ if longSignal
     upCount = (close >= open ? 1 : 0) + (close[1] >= open[1] ? 1 : 0) + (close[2] >= open[2] ? 1 : 0) + (close[3] >= open[3] ? 1 : 0) + (close[4] >= open[4] ? 1 : 0) + (close[5] >= open[5] ? 1 : 0)
     ribbonCap = math.max(maxRibbon, maxRibbonFrac * dropPts)
     fan = ribbon >= minRibbon and ribbon <= ribbonCap and gap5 >= minGap5 and gap10 >= minGap10 and slope5 >= minSlope5 and upCount >= 4
-    ok = recover <= maxRecover and fan and risk > 0 and risk <= math.max(maxRisk, maxRiskFrac * dropPts)
+    ma30Hug = close >= ma30 and (close - ma30) < minMa30Gap and low <= ma30
+    ok = recover <= maxRecover and fan and not ma30Hug and risk > 0 and risk <= math.max(maxRisk, maxRiskFrac * dropPts)
     if ok
         stopLevel = baseLow - stopBuf
         targetLevel = close + risk * targetR
