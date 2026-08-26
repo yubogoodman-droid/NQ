@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NQ 五分 K 急跌 V 反 — 對齊力成 6239 那種灌殺後買反彈。
+"""NQ 五分 K 急跌後站上 MA20 做多。
 
 用法:
   python3 examples/nq_sharp_drop.py
@@ -166,7 +166,7 @@ def detect_signals(
     df,
     dump_bars: int = 6,
     min_dump_bars: int = 3,
-    reclaim_window: int = 8,
+    reclaim_window: int = 18,
     atr_len: int = 14,
     min_drop_pts: float = 40.0,
     min_drop_atr: float = 2.0,
@@ -177,9 +177,7 @@ def detect_signals(
     pre_ma20_atr: float = 1.30,
     stop_buffer: float = 8.0,
     target_r: float = 1.5,
-    max_risk: float = 90.0,
-    min_room_to_ma20: float = 12.0,
-    min_rr: float = 1.0,
+    max_risk: float = 120.0,
     skip_hour_start: Optional[int] = 9,
     skip_hour_end: Optional[int] = 10,
     rth_only: bool = True,
@@ -187,11 +185,12 @@ def detect_signals(
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """
-    力成式急跌：
+    急跌後站上 MA20：
       1. 灌殺前均線黏在一起（5/10/20 帶寬窄），價格貼著 MA20
       2. 6 根內（約 30 分）從窗口高點灌下去，深度 ≥ max(40點, 2 ATR, 0.15%)
-      3. 量能放大，收盤跌破 MA20（最好也跌破 MA60）
-      4. 之後 8 根內出現反攻 K（收紅且收在上半），且還在 MA20 下方（有回歸空間）
+      3. 量能放大，收盤跌破 MA20
+      4. 之後 18 根內（約 90 分）收盤站上 MA20（收紅）才進場
+      5. 停損急跌低下方，目標 1.5R
     """
     close = df["Close"].to_numpy(float)
     open_ = df["Open"].to_numpy(float)
@@ -275,18 +274,19 @@ def detect_signals(
         dump_start = win0
         entered = False
 
-        for j in range(dump_idx, min(dump_idx + reclaim_window + 1, n)):
+        for j in range(dump_idx + 1, min(dump_idx + reclaim_window + 1, n)):
             if low[j] < dump_low:
                 dump_low = float(low[j])
                 dump_idx = j
-            if j == dump_idx:
-                # 當根可以是錘子反轉；若收在下半則還在灌
-                if not _is_reversal_bar(float(open_[j]), float(high[j]), float(low[j]), float(close[j])):
-                    continue
-            elif not _is_reversal_bar(float(open_[j]), float(high[j]), float(low[j]), float(close[j])):
+                drop = dump_high - dump_low
+            if np.isnan(ma20[j]):
                 continue
-
-            bump("reversal")
+            if close[j] <= ma20[j]:
+                continue
+            bump("reclaim_ma20")
+            if close[j] < open_[j]:
+                bump("skip_red_reclaim")
+                continue
 
             if rth_only:
                 ts = df.index[j]
@@ -306,10 +306,6 @@ def detect_signals(
                 break
 
             entry = float(close[j])
-            if np.isnan(ma20[j]) or entry >= float(ma20[j]) - min_room_to_ma20:
-                bump("skip_late")
-                continue
-
             stop = dump_low - stop_buffer
             risk = entry - stop
             if risk <= 0:
@@ -319,15 +315,9 @@ def detect_signals(
                 bump("skip_max_risk")
                 continue
 
-            room = float(ma20[j]) - entry
-            target_by_r = entry + risk * target_r
-            target = min(float(ma20[j]), target_by_r) if room > 0 else target_by_r
+            target = entry + risk * target_r
             if target <= entry:
                 bump("skip_bad_target")
-                continue
-            rr = (target - entry) / risk
-            if min_rr > 0 and rr < min_rr:
-                bump("skip_rr")
                 continue
 
             pierced_ma60 = (not np.isnan(ma60[dump_idx])) and dump_low < float(ma60[dump_idx])
@@ -369,7 +359,7 @@ def detect_signals(
 def simulate(
     df,
     signals: List[Signal],
-    max_hold: int = 24,
+    max_hold: int = 36,
 ) -> List[TradeResult]:
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
@@ -589,10 +579,10 @@ def _render_trade_cards(
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}\n"
             f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts)\n"
-            f"target {t.target_price:.2f}  ({r_mult:.1f}R) → MA20\n"
+            f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"急跌 {t.signal.dump_high:.2f} → {t.signal.dump_low:.2f}  (−{t.signal.drop_pts:.1f} / {t.signal.drop_atr:.1f} ATR)\n"
-            f"量能 {t.signal.vol_mult:.1f}x · MA5 {t.signal.ma5:.1f} / MA20 {t.signal.ma20:.1f} / MA60 {t.signal.ma60:.1f}"
+            f"站上 MA20 {t.signal.ma20:.1f} · 量能 {t.signal.vol_mult:.1f}x · MA5 {t.signal.ma5:.1f} / MA60 {t.signal.ma60:.1f}"
             "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
             "</article>"
@@ -625,7 +615,7 @@ def write_html_report(
         extra_cls = "pnl-win" if extra_stats["total_points"] >= 0 else "pnl-loss"
         extra_html = (
             f"<section class='summary'><h1>{escape(extra_title or '核心對照（不過濾開盤／ETH）')}</h1>"
-            f"<p class='muted'>同一套急跌＋反攻 K，但不過濾 09–10 與盤外。</p>"
+            f"<p class='muted'>同一套急跌後站上 MA20，但不過濾 09–10 與盤外。</p>"
             f"<div class='cards'><div class='card'>筆數<b>{extra_stats['count']}</b></div>"
             f"<div class='card'>勝率<b>{extra_stats['win_rate']:.1f}%</b></div>"
             f"<div class='card'>總點數<b class='{extra_cls}'>{extra_stats['total_points']:+.1f}</b></div>"
@@ -638,12 +628,12 @@ def write_html_report(
             f"<p class='muted'>漏斗：急跌 {funnel.get('dump', 0)} → "
             f"穿 MA20 {funnel.get('through_ma', 0)} → "
             f"放量 {funnel.get('vol_ok', 0)} → "
-            f"反攻 {funnel.get('reversal', 0)} → "
+            f"站上MA20 {funnel.get('reclaim_ma20', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
             f"（黏帶擋 {funnel.get('skip_ribbon', 0)} · 沒貼 MA20 {funnel.get('skip_pre_ma20', 0)} · "
             f"量能 {funnel.get('skip_vol', 0)} · 開盤檔 {funnel.get('skip_open_hour', 0)} · "
-            f"ETH {funnel.get('skip_eth', 0)} · 太晚 {funnel.get('skip_late', 0)} · "
-            f"RR不足 {funnel.get('skip_rr', 0)} · 風險 {funnel.get('skip_max_risk', 0)}）</p>"
+            f"ETH {funnel.get('skip_eth', 0)} · 紅K收復 {funnel.get('skip_red_reclaim', 0)} · "
+            f"風險 {funnel.get('skip_max_risk', 0)}）</p>"
         )
 
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -654,7 +644,7 @@ def write_html_report(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>{escape(symbol)} 急跌 V 反</title>
+<title>{escape(symbol)} 急跌後站上 MA20</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -684,9 +674,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{escape(symbol)} 急跌 V 反（力成邏輯）</h1>
+<h1>{escape(symbol)} 急跌後站上 MA20</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)} · 五分 K</p>
-<p class="muted">均線黏帶後 30 分內灌穿 MA20、放量、反攻 K 做多。停損急跌低下方，目標 MA20 或 1.5R。09–10 不進、只做 RTH。</p>
+<p class="muted">均線黏帶後 30 分內灌穿 MA20、放量，之後 90 分內收盤站上 MA20 做多。停損急跌低下方，目標 1.5R。09–10 不進、只做 RTH。</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -774,13 +764,13 @@ def cmd_backtest(args) -> int:
         _print_trades(df, extra_trades, "core")
 
     if stats["count"] == 0:
-        verdict = "這段樣本沒打到力成那種急跌。NQ 五分很少出現「黏帶後灌 2ATR+、還有 1R 回到 MA20」的 V。"
+        verdict = "這段樣本沒打到急跌後站上 MA20。多數灌殺沒在 90 分內收回，或停損太寬被擋。"
     elif stats["total_points"] > 0 and stats["win_rate"] >= 45:
-        verdict = "有料：RTH 過濾後期望值為正。仍是接刀，樣本少、遇到單邊續跌會一次吐回去。"
+        verdict = "有料：急跌後等站上 MA20，比接刀清楚。樣本仍少，續跌假站上會一次吐回去。"
     elif stats["total_points"] > 0:
-        verdict = "邊緣：總點數正，但勝率不高，比較像偶爾抓到 V，不是穩的優勢。"
+        verdict = "邊緣：總點數正，但勝率不高，還不算穩的優勢。"
     else:
-        verdict = "沒料：力成是個股恐慌回補；NQ 急跌後常續跌。贏家回到 MA20，輸家一次吃掉整段急跌。"
+        verdict = "沒料：站上 MA20 進場時離急跌低已遠，停損太寬；假站上後續跌一次吃掉整段。"
 
     print(f"verdict: {verdict}")
 
@@ -807,7 +797,7 @@ def cmd_backtest(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="NQ 五分 K 急跌 V 反（力成邏輯）")
+    p = argparse.ArgumentParser(description="NQ 五分 K 急跌後站上 MA20")
     sub = p.add_subparsers(dest="cmd")
 
     b = sub.add_parser("backtest", help="Yahoo 5m 回測")

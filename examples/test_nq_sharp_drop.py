@@ -97,20 +97,21 @@ def _make_flush_bars(n: int = 180, bounce: bool = True) -> pd.DataFrame:
 def test_detect_flush_bounce() -> None:
     df = _make_flush_bars(bounce=True)
     sigs = detect_signals(df, rth_only=False, skip_hour_start=None, skip_hour_end=None)
-    assert sigs, "expected a V-reversal after the synthetic dump"
+    assert sigs, "expected a MA20 reclaim after the synthetic dump"
     sig = sigs[0]
-    assert sig.entry_idx >= sig.dump_idx
+    assert sig.entry_idx > sig.dump_idx
     assert sig.entry_price > sig.stop_price
     assert sig.dump_low < sig.dump_high
     assert sig.drop_pts >= 40
+    assert sig.entry_price > sig.ma20
     risk = sig.entry_price - sig.stop_price
-    assert (sig.target_price - sig.entry_price) / risk >= 1.0 - 1e-9
+    assert abs((sig.target_price - sig.entry_price) / risk - 1.5) < 1e-6
 
 
 def test_no_signal_on_continued_dump() -> None:
     df = _make_flush_bars(bounce=False)
     sigs = detect_signals(df, rth_only=False, skip_hour_start=None, skip_hour_end=None)
-    assert not sigs, "continued waterfall should not count as a V-reversal"
+    assert not sigs, "continued waterfall should not reclaim MA20"
 
 
 def test_simulate_and_html(tmp_path: Path | None = None) -> None:
