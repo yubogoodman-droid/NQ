@@ -193,9 +193,10 @@ def detect_signals(
     stop_buffer: float = 8.0,
     target_r: float = 2.0,
     max_risk: float = 80.0,
-    max_risk_frac: float = 0.50,
+    max_risk_frac: float = 0.55,
     min_ribbon: float = 14.0,
     max_ribbon: float = 40.0,
+    max_ribbon_frac: float = 0.20,
     min_ma5_ma10: float = 8.0,
     min_ma10_ma20: float = 3.0,
     min_ma5_slope5: float = 15.0,
@@ -204,18 +205,18 @@ def detect_signals(
     up_lookback: int = 6,
     min_up_bars: int = 4,
     max_recover: float = 0.85,
-    max_base_range_frac: float = 0.50,
+    max_base_range_frac: float = 0.65,
     min_entry_gap: int = 12,
     require_close_gt_ma5: bool = True,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """
-    打底後多排（對齊 08-25 夜盤那張 U）：
+    打底後多排（對齊 08-25 U、07-22 夜盤、07-28 急殺 V）：
       1. 急跌：回看高點跌夠，而且最後 16 根就要跌掉八成（不是慢慢磨）
-      2. 低點短打底：至少 6 根不破底，最多再等 16 根
+      2. 低點短打底或急殺 V：至少 6 根不破底，打底區間最多跌幅 65%
       3. 第一次翻成 MA5>MA10>MA20 時必須散開上攻（不是三條黏在一起點一下）
       4. 進場前幾根多數收紅，像在墊高，不是區間裡翻排
-      5. 風險最多 max(80, 跌幅一半)，大跌打底才跟得上 07-22 那種反彈
+      5. 風險最多 max(80, 跌幅×0.55)；帶寬最多 max(40, 跌幅×0.20)
     """
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
@@ -326,9 +327,12 @@ def detect_signals(
             if close[j] <= ma20[j]:
                 bump("skip_below_ma20")
                 continue
+            ribbon_cap = max_ribbon
+            if max_ribbon_frac > 0:
+                ribbon_cap = max(max_ribbon, max_ribbon_frac * drop_pts)
             fan_ok = (
                 ribbon >= min_ribbon
-                and ribbon <= max_ribbon
+                and ribbon <= ribbon_cap
                 and gap_5_10 >= min_ma5_ma10
                 and gap_10_20 >= min_ma10_ma20
                 and ma5_s5 >= min_ma5_slope5

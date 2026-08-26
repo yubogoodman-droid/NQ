@@ -194,6 +194,20 @@ def test_deep_dump_risk_uses_half_drop() -> None:
     assert risk <= max(80.0, 0.50 * sigs[0].drop_pts)
 
 
+def test_fat_v_base_span_allowed() -> None:
+    """07-28 V: first 6 bars already retrace ~58% of the dump. Old 50% 打底 cap missed it."""
+    df = _make_base_stack_bars(bounce=True, deep=True)
+    seed = detect_signals(df, max_base_range_frac=0.90)
+    assert seed
+    sig0 = seed[0]
+    df = df.copy()
+    hi = sig0.base_low + 0.58 * sig0.drop_pts
+    df.iloc[sig0.base_idx + 1 : sig0.base_idx + 7, df.columns.get_loc("High")] = hi
+    assert not detect_signals(df, max_base_range_frac=0.50), "50% 打底 cap should reject the V"
+    sigs = detect_signals(df)
+    assert sigs, "65% 打底 cap should take the V"
+
+
 def test_no_signal_on_knot_stack() -> None:
     df = _make_base_stack_bars(bounce=True, knot=True)
     sigs = detect_signals(df)
@@ -240,6 +254,7 @@ def main() -> int:
     test_summarize_trades()
     test_detect_base_then_stack()
     test_deep_dump_risk_uses_half_drop()
+    test_fat_v_base_span_allowed()
     test_no_signal_on_continued_dump()
     test_no_signal_on_knot_stack()
     test_no_signal_on_slow_dump()
