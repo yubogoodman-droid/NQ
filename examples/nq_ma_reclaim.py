@@ -114,12 +114,12 @@ def load_yahoo_intraday(
 
 
 def load_bars(symbol: str, interval: str, period: str) -> pd.DataFrame:
-    """Yahoo 1m period= 最多約 7–8 天；超過改用 7 日切片（約可回看 30 天）。"""
+    """Yahoo 1m period= 最多約 7–8 天；超過改用 3 日切片（約可回看 30 天）。"""
     days = parse_period_days(period)
     if days is not None and days > 8:
         end = datetime.now(timezone.utc)
         start = end - timedelta(days=days)
-        df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=7)
+        df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=3)
         if not df.empty:
             return df
         print(f"[data] chunked {period} empty, fallback period download", file=sys.stderr)
