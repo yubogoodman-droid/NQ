@@ -50,7 +50,7 @@ class NQWBottomStrategy:
     min_spring_pct: float = 0.0006
     min_spring_points: float = 10.0
     min_bounce_pct: float = 0.001
-    max_reclaim_bars: int = 12
+    max_reclaim_bars: int = 36
     max_breakout_bars: int = 36
     tick_size: float = 0.25
     point_value: float = 20.0

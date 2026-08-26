@@ -74,6 +74,35 @@ def test_detects_l1_l2_breakdown_l3() -> None:
     assert p.stop_loss == p.l3
 
 
+def test_l2_is_the_lowest_bar_between_shoulders() -> None:
+    """中間若有更深的殺，L2 必須抓那根，不能抓後來略破 L1 的回測。"""
+    rows = _flat(8, 10040.0)
+    rows.append((10020, 10024, 10012, 10016))
+    rows.append((10016, 10018, 10000, 10008))  # L1 = 10000
+    rows.append((10008, 10022, 10006, 10020))
+    rows.append((10020, 10032, 10016, 10030))
+    rows.append((10030, 10042, 10026, 10040))
+    rows.append((10040, 10052, 10036, 10048))  # 先彈出頸線
+    rows.append((10048, 10050, 10030, 10032))
+    rows.append((10030, 10018, 9950, 9955))  # 真正破底
+    rows.append((9955, 10020, 9948, 10010))  # 最低 9948 並收復
+    rows.append((10010, 10040, 10004, 10036))
+    rows.append((10036, 10048, 10020, 10028))
+    rows.append((10028, 10030, 9992, 10008))  # 淺回測，不可當 L2
+    rows.append((10008, 10018, 10002, 10012))
+    rows.append((10012, 10016, 10001, 10008))  # L3 ≈ L1
+    rows.append((10008, 10022, 10004, 10018))
+    rows.append((10018, 10034, 10014, 10032))
+    rows.append((10032, 10048, 10028, 10046))
+    rows.append((10046, 10060, 10044, 10056))
+    rows.extend(_flat(6, 10058.0, drift=1.0))
+    patterns = detect_w_bottoms(_df(rows))
+    assert patterns
+    p = patterns[0]
+    assert p.l2 <= 9950
+    assert p.l2 < 9992
+
+
 def test_two_leg_without_right_shoulder_is_ignored() -> None:
     rows = _flat(8, 10040.0)
     rows.append((10020, 10024, 10012, 10016))

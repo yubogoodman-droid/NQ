@@ -70,24 +70,11 @@ def _find_swing_lows(lows: Sequence[float], lookback: int) -> list[int]:
     return [i for i in range(len(lows)) if _is_swing_low(lows, i, lookback)]
 
 
-def _is_l3_trough(
-    lows: Sequence[float],
-    idx: int,
-    *,
-    l2_idx: int,
-    reclaim_idx: int,
-    lookback: int,
-) -> bool:
-    """L3 左側從破底下一根起算，避免 L2 長影線把右腳否決掉。"""
+def _is_right_trough(lows: Sequence[float], idx: int, lookback: int) -> bool:
     n = len(lows)
-    left_start = max(l2_idx + 1, reclaim_idx)
-    if idx <= left_start or idx + lookback >= n:
+    if idx + lookback >= n:
         return False
-    pivot = lows[idx]
-    if pivot != min(lows[idx : idx + lookback + 1]):
-        return False
-    left0 = max(left_start, idx - lookback)
-    return pivot == min(lows[left0 : idx + 1])
+    return lows[idx] == min(lows[idx : idx + lookback + 1])
 
 
 def detect_w_bottoms(
@@ -100,21 +87,14 @@ def detect_w_bottoms(
     min_spring_pct: float = 0.0006,
     min_spring_points: float = 10.0,
     min_bounce_pct: float = 0.001,
-    max_reclaim_bars: int = 12,
+    max_reclaim_bars: int = 36,
     max_breakout_bars: int = 36,
     require_neckline_break: bool = True,
 ) -> list[WBottomPattern]:
     """
     偵測三點破底 W 底。
 
-    結構::
-
-            頸線
-           /    \\
-          /      \\      / 突破
-        L1        \\    L3
-                   \\  /
-                    \\/ L2 破底
+    L2 取 L1 與 L3 之間的最低點，避免把後來略破 L1 的回測當成破底。
     """
     required = {"open", "high", "low", "close"}
     missing = required - set(df.columns)
@@ -133,70 +113,52 @@ def detect_w_bottoms(
         l1 = lows[l1_idx]
         if l1 <= 0:
             continue
-
         min_spring = max(l1 * min_spring_pct, min_spring_points)
         min_bounce = l1 * min_bounce_pct
-        search_end = min(l1_idx + max_bars_between_lows, n - 1)
+        search_end = min(l1_idx + max_bars_between_lows, n - 1 - swing_lookback)
 
-        bounce_high = float("-inf")
-        bounced = False
-        l2_idx: int | None = None
-        l2 = float("inf")
-        reclaim_idx: int | None = None
-
-        for j in range(l1_idx + 1, search_end + 1):
-            if l2_idx is None:
-                if highs[j] > bounce_high:
-                    bounce_high = highs[j]
-                if bounce_high - l1 >= min_bounce:
-                    bounced = True
-                if bounced and l1 - lows[j] >= min_spring:
-                    l2_idx = j
-                    l2 = lows[j]
-                    if closes[j] > l1:
-                        reclaim_idx = j
+        for l3_idx in range(l1_idx + min_bars_between_lows, search_end + 1):
+            if not _is_right_trough(lows, l3_idx, swing_lookback):
                 continue
 
-            if reclaim_idx is None:
-                if lows[j] < l2:
-                    l2_idx = j
-                    l2 = lows[j]
-                if j - l2_idx > max_reclaim_bars:
-                    break
-                if closes[j] > l1:
-                    reclaim_idx = j
-                continue
-
-            if l2_idx is None or reclaim_idx is None:
-                break
-            if j + swing_lookback >= n:
-                break
-            if not _is_l3_trough(
-                lows, j, l2_idx=l2_idx, reclaim_idx=reclaim_idx, lookback=swing_lookback
-            ):
-                continue
-            if j - l1_idx < min_bars_between_lows:
-                continue
-
-            l3 = lows[j]
-            if l3 <= l2:
-                continue
+            l3 = lows[l3_idx]
             avg = (l1 + l3) / 2
             if avg == 0 or abs(l1 - l3) / avg > low_tolerance_pct:
                 continue
 
-            neck_slice = highs[l1_idx + 1 : j]
-            if not neck_slice:
+            mid_lows = lows[l1_idx + 1 : l3_idx]
+            if len(mid_lows) < 3:
                 continue
+            l2 = min(mid_lows)
+            l2_idx = l1_idx + 1 + mid_lows.index(l2)
+            if l1 - l2 < min_spring or l3 <= l2:
+                continue
+            if l2_idx - l1_idx < 2 or l3_idx - l2_idx < 2:
+                continue
+
+            left0 = max(l2_idx + 1, l3_idx - swing_lookback)
+            if lows[l3_idx] != min(lows[left0 : l3_idx + 1]):
+                continue
+
+            neck_slice = highs[l1_idx + 1 : l3_idx]
             neckline = max(neck_slice)
             neckline_idx = l1_idx + 1 + neck_slice.index(neckline)
             if neckline - max(l1, l3) < min_bounce:
                 continue
 
+            reclaim_end = min(l3_idx, l2_idx + max_reclaim_bars)
+            reclaim_idx: int | None = None
+            for k in range(l2_idx, reclaim_end + 1):
+                if closes[k] > l1:
+                    reclaim_idx = k
+                    break
+            if reclaim_idx is None or l3_idx <= reclaim_idx:
+                continue
+
             breakout_idx: int | None = None
             if require_neckline_break:
-                start_k = j + swing_lookback
-                end_k = min(j + max_breakout_bars, n - 1)
+                start_k = l3_idx + swing_lookback
+                end_k = min(l3_idx + max_breakout_bars, n - 1)
                 for k in range(start_k, end_k + 1):
                     if closes[k] > neckline:
                         breakout_idx = k
@@ -208,7 +170,7 @@ def detect_w_bottoms(
                 WBottomPattern(
                     l1_idx=l1_idx,
                     l2_idx=l2_idx,
-                    l3_idx=j,
+                    l3_idx=l3_idx,
                     neckline_idx=neckline_idx,
                     l1=l1,
                     l2=l2,
@@ -218,7 +180,6 @@ def detect_w_bottoms(
                     breakout_idx=breakout_idx,
                 )
             )
-            break
 
     return _dedupe_patterns(patterns)
 
