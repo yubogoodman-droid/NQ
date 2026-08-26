@@ -362,6 +362,9 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"先在200下 {funnel.get('was_below', 0)} → "
         f"貼著200 {funnel.get('hug_200', 0)} → "
         f"100與120在200下 {funnel.get('long_below', 0)} → "
+        f"5分站上MA20 {funnel.get('m5_ma20', 0)} → "
+        f"5分站上MA30 {funnel.get('m5_ma30', 0)} → "
+        f"5分未深跌200 {funnel.get('m5_ok', 0)} → "
         f"進場 {funnel.get('taken', 0)}</p>"
     )
 
@@ -559,7 +562,7 @@ a{{color:#79c0ff}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 起漲點（糾結後連兩根剛站上MA200）</h1>
-<p class="muted">模板是 08-19 08:15：下跌後短均線收成一束（MA5–MA60 ≤ 20），近 12 根箱子 10–40 點，收盤剛站上 MA200（高出 ≤ 15）。MA5&gt;MA10&gt;MA20&gt;MA30，連續兩根收在 MA200 上才進；第一根還不進。MA200 上頭不能再掛 MA100 或 MA120。開盤追價、急殺後寬箱（07:33 / 11:30 那種）不進。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。下面每筆附「當時 5分K」只是對照，不是進場條件。</p>
+<p class="muted">模板是 08-19 08:15：下跌後短均線收成一束（MA5–MA60 ≤ 20），近 12 根箱子 10–40 點，收盤剛站上 MA200（高出 ≤ 15）。MA5&gt;MA10&gt;MA20&gt;MA30，連續兩根收在 MA200 上才進；第一根還不進。MA200 上頭不能再掛 MA100 或 MA120。當時 5 分要站上 MA20 與 MA30，且不能比 5 分 MA200 低超過 25 點（大空反彈不接）。開盤追價、急殺後寬箱（07:33 / 11:30 那種）不進。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} · 1分 bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -658,7 +661,8 @@ def _print_funnel(funnel: Dict[str, int]) -> None:
         f"ribbon={funnel.get('ribbon', 0)} fall={funnel.get('falling', 0)} "
         f"drop={funnel.get('prior_drop', 0)} under={funnel.get('was_below', 0)} "
         f"hug={funnel.get('hug_200', 0)} below={funnel.get('long_below', 0)} "
-        f"taken={funnel.get('taken', 0)}"
+        f"m5_20={funnel.get('m5_ma20', 0)} m5_30={funnel.get('m5_ma30', 0)} "
+        f"m5_200={funnel.get('m5_ok', 0)} taken={funnel.get('taken', 0)}"
     )
 
 
@@ -740,6 +744,7 @@ def fmt_entry(df, sig: CoilSignal) -> str:
         f"{m5_line}"
         f"量能: {sig.vol_ratio:.2f}x · 現價 <code>{last:.2f}</code>\n"
         f"排列: 5&gt;10&gt;20&gt;30 · 糾結後連兩根剛站上 MA200 · 100與120在200下\n"
+        f"5分: 站上 MA20/MA30 · 不能在 5分MA200 下超過 25 點\n"
         f"#起漲點 #NQ #Q{sig.quality}"
     )
 

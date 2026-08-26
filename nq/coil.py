@@ -1,7 +1,8 @@
 """NQ 1 分起漲點：糾結後 5>10>20>30，連兩根剛站上 MA200。
 
 模板是 08-19 08:15：下跌後短均收成一束，近 12 根還在窄箱，
-收盤剛站上 MA200，100/120 都在 200 下面。5 分只對照長相，不是進場條件。
+收盤剛站上 MA200，100/120 都在 200 下面。當時 5 分要站上 MA20/MA30，
+且不能在 5 分 MA200 下面太深。
 """
 
 from __future__ import annotations
@@ -315,9 +316,9 @@ def detect_coil_breakouts(
     min_ma200_hug: int = 0,
     hug_dist: float = 8.0,
     hug_lookback: int = 12,
-    max_m5_below_200: float = -1.0,
-    require_m5_above_ma20: bool = False,
-    require_m5_above_ma30: bool = False,
+    max_m5_below_200: float = 25.0,
+    require_m5_above_ma20: bool = True,
+    require_m5_above_ma30: bool = True,
     require_long_below: bool = True,
     ma_periods: Sequence[int] = MA_PERIODS,
     funnel: Optional[Dict[str, int]] = None,
@@ -329,6 +330,7 @@ def detect_coil_breakouts(
     MA200 上頭不能再掛 MA100 或 MA120（兩條都要在 200 下面）。
     要像 08-19 08:15 那種：下跌後短均收成一束（MA5–MA60 帶寬），
     近 12 根還在窄箱裡，收盤剛站上 MA200（不要已經噴遠）。
+    當時 5 分要站上 MA20 與 MA30，且不能在 5 分 MA200 下面太深。
     停損用進場前 stop_lookback 根的修剪低點 − buffer。
     """
     if df is None or len(df) == 0:

@@ -74,6 +74,10 @@ def test_ideal_0815_coil() -> None:
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
     assert sig.ma100 < sig.ma200 and sig.ma120 < sig.ma200
     assert sig.prior_drop >= 45.0
+    if sig.m5_ma20 == sig.m5_ma20:
+        assert sig.m5_close > sig.m5_ma20
+    if sig.m5_ma30 == sig.m5_ma30:
+        assert sig.m5_close > sig.m5_ma30
     trades = simulate(df, hits)
     assert trades
     assert trades[0].pnl_points > 0
@@ -235,10 +239,18 @@ def test_skip_5m_waterfall_bounce() -> None:
     df = pd.concat([head, tail])
     df = df[~df.index.duplicated(keep="last")]
     with_filter = detect_coil_breakouts(
-        df, max_m5_below_200=0.0, require_m5_above_ma30=False, **LOOSE
+        df,
+        max_m5_below_200=0.0,
+        require_m5_above_ma20=False,
+        require_m5_above_ma30=False,
+        **LOOSE,
     )
     without = detect_coil_breakouts(
-        df, max_m5_below_200=-1.0, require_m5_above_ma30=False, **LOOSE
+        df,
+        max_m5_below_200=-1.0,
+        require_m5_above_ma20=False,
+        require_m5_above_ma30=False,
+        **LOOSE,
     )
     assert without, "關掉 5 分深度過濾後，模擬圖仍應有起漲點"
     if with_filter:

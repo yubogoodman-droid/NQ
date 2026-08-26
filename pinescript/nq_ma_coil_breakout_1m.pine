@@ -23,6 +23,8 @@ targetR       = input.float(2.0, "目標 R 倍數", minval=1.0, step=0.5)
 trailAfterR   = input.float(1.0, "移動停利啟動（R）", minval=0, step=0.1)
 trailLockR    = input.float(0.3, "移動後鎖利（R）", minval=0, step=0.1)
 requireLongBelow = input.bool(true, "MA100 與 MA120 都要在 MA200 下方")
+requireM5        = input.bool(true, "5分當時要站上 MA20 與 MA30")
+maxM5Below       = input.float(25.0, "5分最多低於 MA200（點，<0=不限）", step=5)
 
 ma5   = ta.sma(close, 5)
 ma10  = ta.sma(close, 10)
@@ -61,7 +63,10 @@ hugN = 0
 for k = 1 to 12
     hugN += math.abs(close[k] - ma200[k]) <= hugDist ? 1 : 0
 hugOk = hugN >= minHug
-breakout = hold and hold[1] and fresh and bodyOk and longBelow and longBelow[1] and ribbonOk and extOk and boxOk and fallingOk and dropOk and belowOk and hugOk
+[m5c, m5ma20, m5ma30, m5ma200] = request.security(syminfo.tickerid, "5", [close, ta.sma(close, 20), ta.sma(close, 30), ta.sma(close, 200)], lookahead=barmerge.lookahead_off)
+m5maOk = not requireM5 or ((na(m5ma20) or m5c > m5ma20) and (na(m5ma30) or m5c > m5ma30))
+m5deepOk = maxM5Below < 0 or na(m5ma200) or (m5c - m5ma200) > -maxM5Below
+breakout = hold and hold[1] and fresh and bodyOk and longBelow and longBelow[1] and ribbonOk and extOk and boxOk and fallingOk and dropOk and belowOk and hugOk and m5maOk and m5deepOk
 
 plot(ma5,   "MA5",   color=#ffa726, linewidth=1)
 plot(ma10,  "MA10",  color=#42a5f5, linewidth=1)
