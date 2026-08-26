@@ -22,6 +22,18 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 一分 K 破底後回踩 MA60
+
+看圖：綠線（1m MA60）下面先探一個底，收盤站回綠線，之後綠線當地板——回踩或貼著走就進。  
+08-25 是翻上後回來坐在線上；07-22 是翻上當下就貼著線，然後一路走。停損在那根下方；目標 2R。
+
+```bash
+python3 examples/nq_ma60_retest.py backtest --period 8d --html output/nq_ma60_retest.html
+python3 examples/nq_ma60_retest.py backtest --period 30d --pages
+```
+
+報告每筆附一分 K + 五分 K 對照。預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma60-retest-8fa0/docs/nq-ma60-retest/view.html
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
