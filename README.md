@@ -34,7 +34,8 @@ python3 examples/nq_ma60_retest.py backtest --period 30d --pages
 
 近 8 天（2026-08-18 → 08-26）：**2 筆、勝率 50%、+23 點**，含截圖那筆 08-25 22:04 QA **+48**（破底距 MA60 34 點）。  
 近一個月 Yahoo 1m（2026-07-27 → 08-26）：**5 筆、勝率 40%、+0.9 點**。QA 2 筆皆贏 **+66**。  
-漏斗：破底 102 → 距 MA60 太遠濾掉 92 → 突破後進場 5。
+漏斗：破底 102 → 距 MA60 太遠濾掉 92 → 突破後進場 5。  
+報告每筆附 **一分 K + 五分 K 對照**（5m MA60／季線，標 破底／突破／1m 進場），方便對結構，不是另跑一套 5 分策略。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma60-retest-8fa0/docs/nq-ma60-retest/view.html
 

@@ -924,10 +924,10 @@ def write_view_html(src: Path, branch: str = VIEW_BRANCH) -> Path:
     rel = src.parent.relative_to(REPO_ROOT).as_posix()
     base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
     text = src.read_text(encoding="utf-8")
-    if "圖是靜態 1m K 線" not in text:
+    if "圖是靜態" not in text:
         text = text.replace(
             "</h1>\n<p class=\"muted\">",
-            "</h1>\n<p class=\"muted\">圖是靜態 1m K 線。手機請往下捲。</p>\n<p class=\"muted\">",
+            "</h1>\n<p class=\"muted\">圖是靜態 1m／5m K 線。手機請往下捲。</p>\n<p class=\"muted\">",
             1,
         )
     text = text.replace("src='img/", f"src='{base}img/")
