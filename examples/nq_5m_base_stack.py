@@ -1055,7 +1055,7 @@ def _verdict(stats: dict, *, loose: bool = False) -> str:
     if loose:
         if stats["count"] == 0:
             return "放寬後這段也沒打到「有跌、有翻 5/10/20」。"
-        return "這是放寬版：跌夠 + 打底後翻成 5/10/20 就算。多數不是截圖那種急跌散開 U。嚴格規則 30 天通常只有 1 筆。"
+        return "這是放寬版：跌夠 + 打底後翻成 5/10/20 就算。多數不是截圖那種急跌散開 U。嚴格會少很多。"
     if stats["count"] == 0:
         return "這段沒打到「急跌短打底、5/10/20 散開上攻」的圖。"
     if stats["count"] <= 2 and stats["total_points"] > 0:

@@ -27,11 +27,13 @@
 五分鐘圖：急跌、低點短打底或急殺 V，然後 **MA5 > MA10 > MA20 散開上攻**才做多。  
 對齊三張截圖：08-25 22:20、07-22 19:50、07-28 11:05。
 
-風險 **max(80, 跌幅×0.55)**，帶寬 **max(40, 跌幅×0.20)**，打底 6 根區間最多跌幅 65%（V 才進得去）。
+近一個月 Yahoo 5m（07-23 → 08-26）：嚴格 **5 筆、勝率 100%、+386**（含 07-28 V 和 08-25 U；07-22 夜盤在 30 天窗外）。  
+`--loose` 同區間 **30 筆、勝率 40%、+364**。
 
 ```bash
-python3 examples/nq_5m_base_stack.py backtest --period 60d --pages
+python3 examples/nq_5m_base_stack.py backtest --period 30d --pages
 python3 examples/nq_5m_base_stack.py backtest --period 30d --pages --loose
+python3 examples/nq_5m_base_stack.py backtest --period 60d --html output/nq_5m_base_stack_60d.html
 python3 examples/nq_5m_base_stack.py alert --test
 python3 examples/nq_5m_base_stack.py alert --dry-run --once
 ```
