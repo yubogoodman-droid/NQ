@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""幣安 15m 壓縮後放量擴張：FIL / SNDK / CRCL 那種連陽噴，以及 PIPPIN 那種墊高。
+"""幣安 15m 站上 MA200：FIL / SNDK / CRCL / PIPPIN 那種從 200 線附近放量離開。
 
-四張圖的共同骨架（不是 RSI 頂到 96 才算）：
-  前面窄幅盤整 → 1.5～7 小時內從波段低點漲 ≥10% → 放量、多數陽線、短均往上、收盤還靠近高點。
-  連陽（連續 ≥5 根）與 PIPPIN 那種墊高（至少 +12%、量比 ≥3）分開門檻，避免 7% 小拉一律進場。
+那四張截圖是噴完的樣子；進場要在還貼著 MA200 的時候：
+  前面在 200 線下方或黏著盤 → 這根放量收盤站上 → 收盤離 MA200 仍 ≤2.5%。
 
 用法:
-  python3 examples/scan_binance_15m_expansion.py --verify   # 回放四張圖，確認都抓得到
+  python3 examples/scan_binance_15m_expansion.py --verify
   python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
-  python3 examples/scan_binance_15m_expansion.py --once     # 掃剛收盤的 15m
-  python3 examples/scan_binance_15m_expansion.py            # 每根 15m 收盤掃，可推 Telegram
-  python3 examples/scan_binance_15m_expansion.py --test     # 測 Telegram
-
-Telegram 可在檔案最上面填，或放 tg_config.env。
+  python3 examples/scan_binance_15m_expansion.py --once
+  python3 examples/scan_binance_15m_expansion.py
 """
 from __future__ import annotations
 
@@ -44,62 +40,60 @@ CONFIG_ENV = REPO / "tg_config.env"
 # 這四檔一定進宇宙，即使 24h 成交額暫時不夠
 KEEP = {"FILUSDT", "PIPPINUSDT", "SNDKUSDT", "CRCLUSDT"}
 
-PRE_BARS = 16
-IMPULSE_LENS = (6, 8, 10, 12, 16, 20, 24, 28)
-MIN_MOVE = 0.10          # 波段至少 +10%（那四張都在 12% 以上）
-NEAR_HIGH = 0.965
-MAX_PRE_RANGE = 0.065
-MIN_EXPAND_RATIO = 2.4
-MIN_VOL_RATIO = 2.50
-MIN_GREEN_RATIO = 0.62
-MIN_MA7_SLOPE = 0.018
-MIN_RSI6 = 80.0
-MIN_FROM_START = 0.07
-STAIR_MIN_MOVE = 0.12    # 墊高要比連陽更長一段，才長得像 PIPPIN
-STAIR_MIN_VOL = 3.00
-MIN_BARS = 80
-KLINE_LIMIT = 320
-ALERT_BUCKET_MS = 8 * 3600 * 1000  # 同一檔 8 小時內只推一次（一整段噴一次）
-HOLD_BARS = 8          # 最多抱 2 小時
-TARGET_R = 1.5
-MAX_RISK = 0.03        # 單筆風險上限 3%
+PRE_BARS = 12
+MIN_EXT = 0.0005         # 收盤至少剛站上 200
+MAX_EXT = 0.025          # 離 MA200 超過 2.5% 就不算「附近」
+MAX_RIBBON = 0.055       # MA99/120/200 黏度（15m 比 1m 寬）
+MIN_VOL_RATIO = 1.70
+TOUCH_PCT = 0.015        # 這根低點要碰到 200 附近
+BELOW_LOOK = 12
+BELOW_NEED = 6
+SLOPE_BARS = 20
+SLOPE_MIN = -0.025
+SLOPE_MAX = 0.012
+MIN_BARS = 220
+KLINE_LIMIT = 500
+ALERT_BUCKET_MS = 8 * 3600 * 1000
+HOLD_BARS = 16         # 最多抱 4 小時
+TARGET_R = 2.0
+MAX_RISK = 0.02
 MIN_RISK = 0.004
-FWD_BARS = (1, 4, 8, 16)  # 15m / 1h / 2h / 4h
+FWD_BARS = (1, 4, 8, 16)
 PAGES_HTML = REPO / "docs" / "binance" / "expansion-15m-7d" / "index.html"
 
 # --verify 對齊那四張截圖的時間窗（台北時間）
 VERIFY_CASES = [
     {
         "symbol": "FILUSDT",
-        "title": "FIL 壓縮後連陽",
-        "fetch_start": "2025-12-31 12:00",
+        "title": "FIL 站上 MA200",
+        "fetch_start": "2025-12-28 00:00",
         "fetch_end": "2026-01-02 08:00",
-        "expect_start": "2026-01-01 21:30",
-        "expect_end": "2026-01-02 01:30",
+        "expect_start": "2026-01-01 19:30",
+        "expect_end": "2026-01-01 21:00",
     },
     {
         "symbol": "PIPPINUSDT",
-        "title": "PIPPIN 墊高",
-        "fetch_start": "2026-01-19 12:00",
+        "title": "PIPPIN 站上 MA200",
+        "fetch_start": "2026-01-17 00:00",
         "fetch_end": "2026-01-22 02:00",
-        "expect_start": "2026-01-21 17:00",
-        "expect_end": "2026-01-21 23:30",
+        "expect_start": "2026-01-21 14:30",
+        "expect_end": "2026-01-21 16:00",
     },
     {
         "symbol": "SNDKUSDT",
-        "title": "SNDK 壓縮後噴出",
-        "fetch_start": "2026-07-28 12:00",
+        "title": "SNDK 站上 MA200",
+        "fetch_start": "2026-07-26 00:00",
         "fetch_end": "2026-07-31 08:00",
-        "expect_start": "2026-07-30 19:00",
-        "expect_end": "2026-07-30 22:30",
+        "expect_start": "2026-07-30 19:15",
+        "expect_end": "2026-07-30 20:30",
     },
     {
         "symbol": "CRCLUSDT",
-        "title": "CRCL 壓縮後噴出",
-        "fetch_start": "2026-08-17 12:00",
+        "title": "CRCL 站上 MA200",
+        "fetch_start": "2026-08-15 00:00",
         "fetch_end": "2026-08-20 08:00",
-        "expect_start": "2026-08-19 21:00",
-        "expect_end": "2026-08-20 00:30",
+        "expect_start": "2026-08-19 20:15",
+        "expect_end": "2026-08-19 21:15",
     },
 ]
 
@@ -252,110 +246,82 @@ def bars_from_raw(raw: list) -> dict:
 
 def indicators(d: dict) -> dict:
     d = dict(d)
-    c = d["c"]
+    c, v = d["c"], d["v"]
     d["m7"], d["m14"], d["m25"] = sma(c, 7), sma(c, 14), sma(c, 25)
     d["m99"], d["m120"], d["m200"] = sma(c, 99), sma(c, 120), sma(c, 200)
     d["rsi6"] = rsi_sma(c, 6)
+    d["v20"] = sma(v, 20)
     return d
 
 
 def _hit_at(d: dict, i: int) -> dict | None:
-    """單根收盤是否走出壓縮後擴張。垂直連陽與 PIPPIN 墊高共用這組門檻。"""
+    """15m 收盤剛站上 MA200，而且還貼在 200 線附近。"""
     o, h, l, c, v = d["o"], d["h"], d["l"], d["c"], d["v"]
-    m7, m25, r6 = d["m7"], d["m25"], d["rsi6"]
-    if i < PRE_BARS + IMPULSE_LENS[-1] + 2 or i >= len(c):
+    m7, m25 = d["m7"], d["m25"]
+    m99, m120, m200 = d["m99"], d["m120"], d["m200"]
+    v20, r6 = d["v20"], d["rsi6"]
+    if i < 200 + SLOPE_BARS or i >= len(c):
         return None
-    if np.isnan([m7[i], m25[i], r6[i]]).any():
+    vals = [m7[i], m25[i], m99[i], m120[i], m200[i], m200[i - SLOPE_BARS], v20[i]]
+    if np.isnan(vals).any():
         return None
-    if not (c[i] > m25[i] and m7[i] > m25[i]):
+    if c[i] <= o[i]:
         return None
-    if r6[i] < MIN_RSI6:
+    if not (c[i] > m200[i] and c[i - 1] <= m200[i - 1]):
         return None
-
-    best = None
-    for L in IMPULSE_LENS:
-        s = i - L
-        if s < PRE_BARS + 2:
-            continue
-        ilow = float(l[s : i + 1].min())
-        ihigh = float(h[s : i + 1].max())
-        if ilow <= 0:
-            continue
-        move = float(c[i] / ilow - 1.0)
-        if move < MIN_MOVE:
-            continue
-        if c[i] < ihigh * NEAR_HIGH:
-            continue
-        if c[s] <= 0 or float(c[i] / c[s] - 1.0) < MIN_FROM_START:
-            continue
-
-        pre_h = float(h[s - PRE_BARS : s].max())
-        pre_l = float(l[s - PRE_BARS : s].min())
-        pre_mid = (pre_h + pre_l) / 2.0
-        if pre_mid <= 0:
-            continue
-        pre_rng = (pre_h - pre_l) / pre_mid
-        imp_rng = (ihigh - ilow) / ilow
-        if pre_rng > MAX_PRE_RANGE and (pre_rng <= 0 or imp_rng / pre_rng < MIN_EXPAND_RATIO):
-            continue
-
-        v_pre = float(v[s - PRE_BARS : s].mean())
-        v_imp = float(v[s : i + 1].mean())
-        if v_pre <= 0 or v_imp / v_pre < MIN_VOL_RATIO:
-            continue
-
-        greens = int(np.sum(c[s : i + 1] >= o[s : i + 1]))
-        if greens / L < MIN_GREEN_RATIO:
-            continue
-
-        cons = 0
-        for k in range(i, s - 1, -1):
-            if c[k] >= o[k]:
-                cons += 1
-            elif k == i:
-                continue
-            else:
-                break
-
-        back = min(L, 8)
-        m_back = m7[i - back]
-        if np.isnan(m_back) or m_back <= 0 or float(m7[i] / m_back - 1.0) < MIN_MA7_SLOPE:
-            continue
-
-        kind = "vertical" if cons >= 5 else "stair"
-        if kind == "stair" and (move < STAIR_MIN_MOVE or v_imp / v_pre < STAIR_MIN_VOL):
-            continue
-        score = move * 100.0 + v_imp / v_pre + cons + (2.0 if kind == "vertical" else 0.0)
-        rec = {
-            "i": i,
-            "start_i": s,
-            "L": L,
-            "kind": kind,
-            "move": move,
-            "pre_rng": pre_rng,
-            "imp_rng": imp_rng,
-            "vol_ratio": v_imp / v_pre,
-            "green_ratio": greens / L,
-            "cons": cons,
-            "rsi6": float(r6[i]),
-            "ma7": float(m7[i]),
-            "ma25": float(m25[i]),
-            "close": float(c[i]),
-            "score": float(score),
-        }
-        if best is None or rec["score"] > best["score"]:
-            best = rec
-    return best
+    ext = float(c[i] / m200[i] - 1.0)
+    if not (MIN_EXT <= ext <= MAX_EXT):
+        return None
+    if float(l[i] / m200[i] - 1.0) > TOUCH_PCT:
+        return None
+    ribbon = float(max(m99[i], m120[i], m200[i]) / min(m99[i], m120[i], m200[i]) - 1.0)
+    if ribbon > MAX_RIBBON:
+        return None
+    if v20[i] <= 0 or float(v[i] / v20[i]) < MIN_VOL_RATIO:
+        return None
+    below = 0
+    for j in range(i - 1, max(0, i - BELOW_LOOK) - 1, -1):
+        if np.isnan(m200[j]):
+            break
+        if c[j] <= m200[j] * 1.002:
+            below += 1
+    if below < BELOW_NEED:
+        return None
+    slope = float(m200[i] / m200[i - SLOPE_BARS] - 1.0)
+    if not (SLOPE_MIN <= slope <= SLOPE_MAX):
+        return None
+    vr = float(v[i] / v20[i])
+    return {
+        "i": i,
+        "start_i": max(0, i - PRE_BARS),
+        "L": 1,
+        "kind": "reclaim",
+        "move": ext,
+        "pre_rng": ribbon,
+        "imp_rng": ext,
+        "vol_ratio": vr,
+        "green_ratio": 1.0,
+        "cons": 1,
+        "rsi6": float(r6[i]) if not np.isnan(r6[i]) else 0.0,
+        "ma7": float(m7[i]),
+        "ma25": float(m25[i]),
+        "ma200": float(m200[i]),
+        "close": float(c[i]),
+        "ext": ext,
+        "ribbon": ribbon,
+        "slope": slope,
+        "score": float(vr + (MAX_EXT - ext) * 100.0),
+    }
 
 
 def detect_expansion(d: dict, *, last_bars: int | None = None) -> list[dict]:
-    """回傳所有符合的收盤 K。last_bars=2 時只看剛收的 1～2 根（監看用）。"""
+    """回傳剛站上 MA200 的收盤 K。last_bars=2 時只看剛收的 1～2 根。"""
     n = len(d["c"])
+    lo = 200 + SLOPE_BARS
     if last_bars is None:
-        lo = PRE_BARS + IMPULSE_LENS[-1] + 2
         indices = range(lo, n)
     else:
-        indices = [j for j in range(n - last_bars, n) if j >= 0]
+        indices = [j for j in range(n - last_bars, n) if j >= lo]
     hits = []
     for i in indices:
         hit = _hit_at(d, i)
@@ -468,7 +434,7 @@ def draw_chart(sym: str, d: dict, hit: dict, path: str) -> str | None:
     x0 = hit["start_i"] - a0
     if 0 <= x0 < len(c):
         ax.axvline(x0, color="#c9a227", ls=":", lw=0.8)
-    tag = "連陽噴出" if hit["kind"] == "vertical" else "墊高擴張"
+    tag = "站上 MA200"
     ax.set_title(f"{sym}  15m  {tag}", color="#e8f0ea", fontsize=12)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     fig.tight_layout(pad=0.5)
@@ -479,15 +445,13 @@ def draw_chart(sym: str, d: dict, hit: dict, path: str) -> str | None:
 
 def format_hit(sym: str, d: dict, hit: dict) -> str:
     ts = hm(int(d["t"][hit["i"]]))
-    tag = "連陽噴出" if hit["kind"] == "vertical" else "墊高擴張"
     return (
-        f"<b>{tag}</b>  {sym}  15m\n"
+        f"<b>站上 MA200</b>  {sym}  15m\n"
         f"時間 {ts}\n"
-        f"現價 {hit['close']:g}　波段 {hit['move']*100:.1f}%　{hit['L']} 根\n"
-        f"量比 {hit['vol_ratio']:.1f}×　陽線 {hit['green_ratio']*100:.0f}%　連陽 {hit['cons']}\n"
-        f"壓縮振幅 {hit['pre_rng']*100:.1f}%　RSI6 {hit['rsi6']:.1f}\n"
+        f"現價 {hit['close']:g}　MA200 {hit.get('ma200', 0):g}　離 200 {hit['ext']*100:+.2f}%\n"
+        f"量比 {hit['vol_ratio']:.1f}×　黏帶 {hit['ribbon']*100:.2f}%\n"
         f"MA7 {hit['ma7']:g}　MA25 {hit['ma25']:g}\n"
-        f"<i>對齊 FIL / SNDK / CRCL 的壓縮噴出，以及 PIPPIN 那種墊高。</i>"
+        f"<i>進場在 200 線附近，不是噴完再追。</i>"
     )
 
 
@@ -553,7 +517,7 @@ def wait_next_close() -> None:
 
 def test_telegram() -> int:
     apply_keys()
-    ok = telegram_send("15m 壓縮擴張監看測試\n如果你看到這則，Telegram 已通。")
+    ok = telegram_send("15m 站上 MA200 監看測試\n如果你看到這則，Telegram 已通。")
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
     return 0 if ok else 1
 
@@ -582,7 +546,7 @@ def _fwd_pct(d: dict, entry_i: int, entry: float, bars: int) -> float | None:
 
 
 def simulate_trade(d: dict, hit: dict) -> dict | None:
-    """訊號收盤後下一根開盤做多。停損在訊號 K 低點（風險夾在 0.4%～3%），1.5R 或 8 根時間出場。"""
+    """訊號收盤後下一根開盤做多。停損在訊號 K 低點（風險 0.4%～2%），2R 或 16 根時間出場。"""
     i = hit["i"]
     o, h, l, c = d["o"], d["h"], d["l"], d["c"]
     if i + 1 >= len(c):
@@ -637,10 +601,14 @@ def simulate_trade(d: dict, hit: dict) -> dict | None:
         "fwd": fwd,
         "kind": hit["kind"],
         "move": hit["move"],
+        "ext": hit.get("ext", hit["move"]),
         "vol_ratio": hit["vol_ratio"],
         "rsi6": hit["rsi6"],
         "L": hit["L"],
         "score": hit["score"],
+        "pre_rng": hit.get("pre_rng", hit.get("ribbon", 0.0)),
+        "ribbon": hit.get("ribbon", hit.get("pre_rng", 0.0)),
+        "ma200": hit.get("ma200", 0.0),
         "t_signal": int(d["t"][i]),
         "t_entry": int(d["t"][entry_i]),
         "t_exit": int(d["t"][exit_i]),
@@ -777,7 +745,7 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
         if 0 <= x < len(c):
             ax.axvline(x, color=color, ls="--", lw=0.7)
             ax.scatter([x], [c[x] if mark != "^" else tr["entry"]], s=28, color=color, marker=mark, zorder=6)
-    tag = "vertical" if tr["kind"] == "vertical" else "stair"
+    tag = "MA200"
     ax.set_title(
         f"{sym}  15m  {tag}  {tr['reason']}  {tr['pnl_pct']:+.2f}%",
         color="#e8f0ea",
@@ -793,7 +761,7 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
-def backtest_symbol(sym: str, start_ms: int, end_ms: int, warmup_days: int = 3) -> tuple[str, dict | None, list[dict]]:
+def backtest_symbol(sym: str, start_ms: int, end_ms: int, warmup_days: int = 4) -> tuple[str, dict | None, list[dict]]:
     fetch_start = datetime.fromtimestamp(start_ms / 1000, TZ) - timedelta(days=warmup_days)
     d0 = fetch_klines(
         sym,
@@ -860,7 +828,7 @@ def write_backtest_html(
     end = datetime.fromtimestamp(trades[-1]["t_signal"] / 1000, TZ).strftime("%Y-%m-%d %H:%M") if trades else ""
     total_cls = "pnl-win" if stats["pnl"] >= 0 else "pnl-loss"
     kind_line = " · ".join(
-        f"{('連陽' if k == 'vertical' else '墊高')} {v['n']}筆 勝率 {100*v['wins']/v['n']:.0f}% {v['pnl']:+.1f}%"
+        f"{'站上200' if k == 'reclaim' else k} {v['n']}筆 勝率 {100*v['wins']/v['n']:.0f}% {v['pnl']:+.1f}%"
         for k, v in stats["by_kind"].items()
         if v["n"]
     )
@@ -883,7 +851,7 @@ def write_backtest_html(
     for i, t in enumerate(trades, 1):
         cls = "pnl-win" if t["pnl_pct"] > 0 else ("pnl-flat" if t["pnl_pct"] == 0 else "pnl-loss")
         reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t["reason"], "tag-time")
-        tag = "連陽噴出" if t["kind"] == "vertical" else "墊高擴張"
+        tag = "站上 MA200"
         img = ""
         if id(t) in chart_set:
             d = data.get(t["symbol"])
@@ -912,7 +880,7 @@ def write_backtest_html(
             "<pre class='trade-detail'>"
             f"entry {t['entry']:g}  stop {t['stop']:g}  target {t['target']:g}\n"
             f"exit  {t['exit']:g}  {t['reason']}  {t['r_mult']:+.2f}R\n"
-            f"波段已走 {t['move']*100:.1f}%  量比 {t['vol_ratio']:.1f}×  RSI6 {t['rsi6']:.0f}\n"
+            f"離 MA200 {t.get('ext', t['move'])*100:+.2f}%  量比 {t['vol_ratio']:.1f}×  黏帶 {t.get('ribbon', t.get('pre_rng', 0))*100:.2f}%\n"
             f"MFE {t['mfe_pct']:+.2f}%  MAE {t['mae_pct']:+.2f}%\n"
             f"無停損 1h {h1:+.2f}%  2h {h2:+.2f}%"
             "</pre>"
@@ -924,7 +892,7 @@ def write_backtest_html(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>幣安 15m 壓縮擴張 · 近 {days} 天</title>
+<title>幣安 15m 站上 MA200 · 近 {days} 天</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -954,8 +922,8 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安 15m 壓縮後放量擴張</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。訊號出現時波段已走 ≥10%（墊高 ≥12%），這是<strong>追價做多</strong>：下一根開盤進，停損在訊號 K 低點（風險上限 3%），1.5R 或 2 小時平。</p>
+<h1>幣安 15m 站上 MA200</h1>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>進場在 200 線附近</strong>：放量收盤站上 MA200，離 200 仍 ≤2.5%。下一根開盤進，停損在訊號 K 低點（風險上限 2%），2R 或 4 小時平。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1033,8 +1001,9 @@ def verify_four() -> int:
             h = max(matched, key=lambda x: x["score"])
             print(
                 f"PASS  {sym}  {case['title']}  "
-                f"{hm(int(d['t'][h['i']]))}  {h['kind']}  "
-                f"+{h['move']*100:.1f}%  {h['L']}根  量比{h['vol_ratio']:.1f}×  RSI6={h['rsi6']:.0f}",
+                f"{hm(int(d['t'][h['i']]))}  "
+                f"離200 {h['ext']*100:+.2f}%  量比{h['vol_ratio']:.1f}×  "
+                f"黏帶{h['ribbon']*100:.2f}%  MA200={h['ma200']:g}",
                 flush=True,
             )
         else:
@@ -1054,7 +1023,7 @@ def verify_four() -> int:
 def main() -> int:
     import argparse
 
-    p = argparse.ArgumentParser(description="幣安 15m 壓縮後放量擴張（FIL/PIPPIN/SNDK/CRCL）")
+    p = argparse.ArgumentParser(description="幣安 15m 站上 MA200（FIL/PIPPIN/SNDK/CRCL）")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的 15m，然後結束")
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
     p.add_argument("--verify", action="store_true", help="回放四張截圖，確認都抓得到")

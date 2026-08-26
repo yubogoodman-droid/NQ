@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""15m 壓縮擴張：合成 K 線測試（不連網）。"""
+"""15m 站上 MA200：合成 K 線測試（不連網）。"""
 from __future__ import annotations
 
 import sys
@@ -11,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scan_binance_15m_expansion import (  # noqa: E402
     ALERT_BUCKET_MS,
+    MAX_EXT,
+    MIN_VOL_RATIO,
     collapse_hits,
     detect_expansion,
     indicators,
@@ -33,6 +35,30 @@ def _bars(n: int, close: np.ndarray, vol: np.ndarray | None = None) -> dict:
     return {"t": t, "o": o, "h": h, "l": l, "c": close, "v": v}
 
 
+def _reclaim_series(
+    *,
+    n_base: int = 240,
+    px: float = 100.0,
+    signal_ext: float = 0.008,
+    after: np.ndarray | None = None,
+    vol_base: float = 1_000.0,
+    vol_signal: float = 4_000.0,
+    vol_after: float | None = None,
+) -> dict:
+    """前面貼在均線下方，最後一根放量收盤剛站上 MA200。"""
+    close = np.full(n_base, px * 0.997)
+    sig = px * (1.0 + signal_ext)
+    close = np.concatenate([close, np.array([sig])])
+    if after is not None:
+        close = np.concatenate([close, np.asarray(after, float)])
+    n = len(close)
+    vol = np.full(n, vol_base)
+    vol[n_base] = vol_signal
+    if after is not None and vol_after is not None:
+        vol[n_base + 1 :] = vol_after
+    return indicators(_bars(n, close, vol))
+
+
 def test_sma() -> None:
     out = sma(np.array([1.0, 2.0, 3.0, 4.0, 5.0]), 3)
     assert np.isnan(out[1])
@@ -46,68 +72,39 @@ def test_rsi_sma_all_up() -> None:
     assert r[-1] > 90
 
 
-def _tight(n: int, px: float, seed: int = 1) -> np.ndarray:
-    rng = np.random.default_rng(seed)
-    wobble = rng.uniform(-0.0018, 0.0018, n)
-    return px * (1.0 + np.cumsum(wobble) * 0) * (1.0 + wobble)
-
-
-def test_detect_fil_like_vertical() -> None:
-    """左邊橫盤，右邊連續大陽線。"""
-    n0 = 90
-    close = np.concatenate([_tight(n0, 1.30), 1.30 * (1.022 ** np.arange(1, 9))])
-    vol = np.concatenate([np.full(n0, 1_000.0), np.full(8, 12_000.0)])
-    d = indicators(_bars(len(close), close, vol))
+def test_detect_reclaim_near_ma200() -> None:
+    d = _reclaim_series()
     hits = detect_expansion(d)
-    assert hits, "FIL 那種連陽應該命中"
+    assert hits, "貼著 200 線放量站上應該命中"
     last = hits[-1]
-    assert last["kind"] == "vertical"
-    assert last["move"] >= 0.07
-    assert last["cons"] >= 5
+    assert last["kind"] == "reclaim"
+    assert last["ext"] <= MAX_EXT
+    assert last["vol_ratio"] >= MIN_VOL_RATIO
+    assert last["close"] > last["ma200"]
 
 
-def test_detect_pippin_like_stair() -> None:
-    """一段一段往上墊，中間夾陰線。"""
-    n0 = 90
-    px = 0.29
-    stair = []
-    for i in range(24):
-        if i % 5 == 4:
-            px *= 0.994
-        else:
-            px *= 1.0085
-        stair.append(px)
-    close = np.concatenate([_tight(n0, 0.29, seed=2), np.array(stair)])
-    vol = np.concatenate([np.full(n0, 2_000.0), np.full(24, 8_000.0)])
-    d = indicators(_bars(len(close), close, vol))
-    hits = detect_expansion(d)
-    assert hits, "PIPPIN 那種墊高應該命中"
-    assert hits[-1]["move"] >= 0.07
-    assert hits[-1]["green_ratio"] >= 0.55
+def test_gap_far_from_ma200_skips() -> None:
+    """跳空收在 MA200 上方 8%，不算『附近』。"""
+    d = _reclaim_series(signal_ext=0.08, vol_signal=8_000.0)
+    assert detect_expansion(d) == []
 
 
-def test_detect_crcl_like_volume_spike() -> None:
-    n0 = 90
-    body = 71.4 * (1.012 ** np.arange(1, 13))
-    close = np.concatenate([_tight(n0, 71.4, seed=3), body])
-    vol = np.concatenate([np.full(n0, 8_000.0), np.full(12, 160_000.0)])
-    d = indicators(_bars(len(close), close, vol))
-    hits = detect_expansion(d)
-    assert hits, "CRCL 那種放量噴出應該命中"
-    assert hits[-1]["vol_ratio"] >= 1.5
+def test_no_volume_skips() -> None:
+    d = _reclaim_series(vol_signal=1_050.0)
+    assert detect_expansion(d) == []
+
+
+def test_already_above_ma200_skips() -> None:
+    """一直在 200 線上方緩漲，沒有站上這一根。"""
+    close = 50.0 * (1.00025 ** np.arange(260))
+    d = indicators(_bars(len(close), close, np.full(260, 3000.0)))
+    assert detect_expansion(d) == []
 
 
 def test_chop_does_not_hit() -> None:
     rng = np.random.default_rng(7)
-    close = 100.0 * (1.0 + rng.uniform(-0.004, 0.004, 160))
-    d = indicators(_bars(len(close), close))
-    assert detect_expansion(d) == []
-
-
-def test_slow_grind_does_not_hit() -> None:
-    """25 小時才走 4%，不該當成噴出。"""
-    close = 50.0 * (1.00025 ** np.arange(160))
-    d = indicators(_bars(len(close), close, np.full(160, 3000.0)))
+    close = 100.0 * (1.0 + rng.uniform(-0.0015, 0.0015, 260))
+    d = indicators(_bars(len(close), close, np.full(260, 2000.0)))
     assert detect_expansion(d) == []
 
 
@@ -123,53 +120,37 @@ def test_collapse_keeps_best_of_run() -> None:
     assert out[0]["score"] == 3.0
 
 
-def _impulse_bars() -> dict:
-    n0 = 90
-    close = np.concatenate([_tight(n0, 1.30), 1.30 * (1.022 ** np.arange(1, 10))])
-    vol = np.concatenate([np.full(n0, 1_000.0), np.full(9, 12_000.0)])
-    return indicators(_bars(len(close), close, vol))
-
-
 def test_select_alerts_debounce() -> None:
-    d = _impulse_bars()
+    d = _reclaim_series(after=np.full(8, 100.9))
     t0 = int(d["t"][0])
     t1 = int(d["t"][-1])
     alerts = select_alerts(d, t0, t1)
-    assert alerts, "合成連陽應有訊號"
+    assert alerts, "合成站上 200 應有訊號"
     buckets = {int(d["t"][h["i"]]) // ALERT_BUCKET_MS for h in alerts}
     assert len(buckets) == len(alerts)
 
 
 def test_simulate_stop() -> None:
-    n0 = 90
-    pump = 1.30 * (1.022 ** np.arange(1, 9))
-    dump = np.array([pump[-1] * 0.94, pump[-1] * 0.92])
-    close = np.concatenate([_tight(n0, 1.30), pump, dump])
-    vol = np.concatenate([np.full(n0, 1_000.0), np.full(8, 12_000.0), np.full(2, 8_000.0)])
-    d = indicators(_bars(len(close), close, vol))
+    after = np.array([99.2, 98.5, 98.0])
+    d = _reclaim_series(after=after, vol_after=3_000.0)
     hits = detect_expansion(d)
     assert hits
-    # 在噴完那根進，下一根大跌應停損
-    sig = [h for h in hits if h["i"] == n0 + 7]
-    hit = sig[0] if sig else hits[-1]
-    tr = simulate_trade(d, hit)
+    tr = simulate_trade(d, hits[-1])
     assert tr is not None
-    assert tr["reason"] in {"stop", "time", "target", "eod"}
+    assert tr["reason"] == "stop"
+    assert tr["pnl_pct"] < 0
 
 
 def test_simulate_target_or_time() -> None:
-    n0 = 90
-    pump = 1.30 * (1.022 ** np.arange(1, 9))
-    cont = pump[-1] * (1.018 ** np.arange(1, 10))
-    close = np.concatenate([_tight(n0, 1.30), pump, cont])
-    vol = np.concatenate([np.full(n0, 1_000.0), np.full(8, 12_000.0), np.full(9, 9_000.0)])
-    d = indicators(_bars(len(close), close, vol))
+    after = 101.0 * (1.012 ** np.arange(1, 18))
+    d = _reclaim_series(after=after, vol_after=3_500.0)
     hits = detect_expansion(d)
     assert hits
     tr = simulate_trade(d, hits[0])
     assert tr is not None
     assert tr["entry"] > 0
     assert tr["reason"] in {"target", "time", "stop", "eod"}
+    assert tr["ribbon"] >= 0
 
 
 def test_summarize_empty() -> None:
@@ -181,11 +162,11 @@ def test_summarize_empty() -> None:
 def main() -> int:
     test_sma()
     test_rsi_sma_all_up()
-    test_detect_fil_like_vertical()
-    test_detect_pippin_like_stair()
-    test_detect_crcl_like_volume_spike()
+    test_detect_reclaim_near_ma200()
+    test_gap_far_from_ma200_skips()
+    test_no_volume_skips()
+    test_already_above_ma200_skips()
     test_chop_does_not_hit()
-    test_slow_grind_does_not_hit()
     test_collapse_keeps_best_of_run()
     test_select_alerts_debounce()
     test_simulate_stop()
