@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""幣安 15m 站上 MA200：FIL / SNDK / CRCL / PIPPIN 那種從 200 線附近放量離開。
+"""幣安 15m MA200 站穩三根：FIL / SNDK / CRCL / PIPPIN 那種從 200 線起漲。
 
-那四張截圖是噴完的樣子；進場要在還貼著 MA200 的時候：
-  前面在 200 線下方或黏著盤 → 這根放量收盤站上 → 收盤離 MA200 仍 ≤2.5%。
+  記號：MA7 > MA14 > MA25 多頭排列，且 15m 收盤站上 MA200。
+  進場：記號之後連三根收盤都沒跌破 MA200，第三根收完下一根開盤做多。
 
 用法:
   python3 examples/scan_binance_15m_expansion.py --verify
@@ -41,16 +41,7 @@ CONFIG_ENV = REPO / "tg_config.env"
 KEEP = {"FILUSDT", "PIPPINUSDT", "SNDKUSDT", "CRCLUSDT"}
 
 PRE_BARS = 12
-MIN_EXT = 0.0005         # 收盤至少剛站上 200
-MAX_EXT = 0.025          # 離 MA200 超過 2.5% 就不算「附近」
-MAX_RIBBON = 0.055       # MA99/120/200 黏度（15m 比 1m 寬）
-MIN_VOL_RATIO = 1.70
-TOUCH_PCT = 0.015        # 這根低點要碰到 200 附近
-BELOW_LOOK = 12
-BELOW_NEED = 6
-SLOPE_BARS = 20
-SLOPE_MIN = -0.025
-SLOPE_MAX = 0.012
+CONFIRM_BARS = 3         # 記號之後要連 3 根收盤都沒跌破 MA200
 MIN_BARS = 220
 KLINE_LIMIT = 500
 ALERT_BUCKET_MS = 8 * 3600 * 1000
@@ -65,35 +56,35 @@ PAGES_HTML = REPO / "docs" / "binance" / "expansion-15m-7d" / "index.html"
 VERIFY_CASES = [
     {
         "symbol": "FILUSDT",
-        "title": "FIL 站上 MA200",
+        "title": "FIL 站穩 MA200",
         "fetch_start": "2025-12-28 00:00",
         "fetch_end": "2026-01-02 08:00",
         "expect_start": "2026-01-01 19:30",
-        "expect_end": "2026-01-01 21:00",
+        "expect_end": "2026-01-01 22:00",
     },
     {
         "symbol": "PIPPINUSDT",
-        "title": "PIPPIN 站上 MA200",
+        "title": "PIPPIN 站穩 MA200",
         "fetch_start": "2026-01-17 00:00",
         "fetch_end": "2026-01-22 02:00",
         "expect_start": "2026-01-21 14:30",
-        "expect_end": "2026-01-21 16:00",
+        "expect_end": "2026-01-21 17:00",
     },
     {
         "symbol": "SNDKUSDT",
-        "title": "SNDK 站上 MA200",
+        "title": "SNDK 站穩 MA200",
         "fetch_start": "2026-07-26 00:00",
         "fetch_end": "2026-07-31 08:00",
         "expect_start": "2026-07-30 19:15",
-        "expect_end": "2026-07-30 20:30",
+        "expect_end": "2026-07-30 21:30",
     },
     {
         "symbol": "CRCLUSDT",
-        "title": "CRCL 站上 MA200",
+        "title": "CRCL 站穩 MA200",
         "fetch_start": "2026-08-15 00:00",
         "fetch_end": "2026-08-20 08:00",
         "expect_start": "2026-08-19 20:15",
-        "expect_end": "2026-08-19 21:15",
+        "expect_end": "2026-08-19 22:30",
     },
 ]
 
@@ -255,69 +246,62 @@ def indicators(d: dict) -> dict:
 
 
 def _hit_at(d: dict, i: int) -> dict | None:
-    """15m 收盤剛站上 MA200，而且還貼在 200 線附近。"""
-    o, h, l, c, v = d["o"], d["h"], d["l"], d["c"], d["v"]
-    m7, m25 = d["m7"], d["m25"]
+    """i 是第三根確認棒。
+
+    記號棒：MA7 > MA14 > MA25 多頭排列，且收盤站上 MA200。
+    之後連 CONFIRM_BARS 根收盤都沒跌破 MA200，最後那根就是 i。
+    """
+    l, c, v = d["l"], d["c"], d["v"]
+    m7, m14, m25 = d["m7"], d["m14"], d["m25"]
     m99, m120, m200 = d["m99"], d["m120"], d["m200"]
     v20, r6 = d["v20"], d["rsi6"]
-    if i < 200 + SLOPE_BARS or i >= len(c):
+    mark = i - CONFIRM_BARS
+    if mark < 200 or i >= len(c):
         return None
-    vals = [m7[i], m25[i], m99[i], m120[i], m200[i], m200[i - SLOPE_BARS], v20[i]]
+    vals = [m7[mark], m14[mark], m25[mark], m200[mark], m200[i], m99[i], m120[i], v20[i]]
     if np.isnan(vals).any():
         return None
-    if c[i] <= o[i]:
+    if not (m7[mark] > m14[mark] > m25[mark]):
         return None
-    if not (c[i] > m200[i] and c[i - 1] <= m200[i - 1]):
+    if not (c[mark] > m200[mark] and c[mark - 1] <= m200[mark - 1]):
         return None
+    for j in range(mark + 1, i + 1):
+        if np.isnan(m200[j]) or c[j] < m200[j]:
+            return None
     ext = float(c[i] / m200[i] - 1.0)
-    if not (MIN_EXT <= ext <= MAX_EXT):
-        return None
-    if float(l[i] / m200[i] - 1.0) > TOUCH_PCT:
-        return None
+    mark_ext = float(c[mark] / m200[mark] - 1.0)
     ribbon = float(max(m99[i], m120[i], m200[i]) / min(m99[i], m120[i], m200[i]) - 1.0)
-    if ribbon > MAX_RIBBON:
-        return None
-    if v20[i] <= 0 or float(v[i] / v20[i]) < MIN_VOL_RATIO:
-        return None
-    below = 0
-    for j in range(i - 1, max(0, i - BELOW_LOOK) - 1, -1):
-        if np.isnan(m200[j]):
-            break
-        if c[j] <= m200[j] * 1.002:
-            below += 1
-    if below < BELOW_NEED:
-        return None
-    slope = float(m200[i] / m200[i - SLOPE_BARS] - 1.0)
-    if not (SLOPE_MIN <= slope <= SLOPE_MAX):
-        return None
-    vr = float(v[i] / v20[i])
+    vr = float(v[mark] / v20[mark]) if v20[mark] > 0 else 0.0
     return {
         "i": i,
-        "start_i": max(0, i - PRE_BARS),
-        "L": 1,
-        "kind": "reclaim",
+        "mark_i": mark,
+        "start_i": mark,
+        "L": CONFIRM_BARS + 1,
+        "kind": "hold3",
         "move": ext,
         "pre_rng": ribbon,
         "imp_rng": ext,
         "vol_ratio": vr,
         "green_ratio": 1.0,
-        "cons": 1,
+        "cons": CONFIRM_BARS,
         "rsi6": float(r6[i]) if not np.isnan(r6[i]) else 0.0,
         "ma7": float(m7[i]),
+        "ma14": float(m14[i]),
         "ma25": float(m25[i]),
         "ma200": float(m200[i]),
         "close": float(c[i]),
         "ext": ext,
+        "mark_ext": mark_ext,
         "ribbon": ribbon,
-        "slope": slope,
-        "score": float(vr + (MAX_EXT - ext) * 100.0),
+        "stop_low": float(np.min(l[mark : i + 1])),
+        "score": float(vr + max(0.0, 0.05 - ext) * 100.0),
     }
 
 
 def detect_expansion(d: dict, *, last_bars: int | None = None) -> list[dict]:
-    """回傳剛站上 MA200 的收盤 K。last_bars=2 時只看剛收的 1～2 根。"""
+    """回傳確認完成的第三根收盤。last_bars=2 時只看剛收的 1～2 根。"""
     n = len(d["c"])
-    lo = 200 + SLOPE_BARS
+    lo = 200 + CONFIRM_BARS
     if last_bars is None:
         indices = range(lo, n)
     else:
@@ -431,10 +415,11 @@ def draw_chart(sym: str, d: dict, hit: dict, path: str) -> str | None:
     if 0 <= x < len(c):
         ax.axvline(x, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([x], [c[x]], s=32, color="#3dba7a", zorder=5)
-    x0 = hit["start_i"] - a0
+    x0 = hit.get("mark_i", hit["start_i"]) - a0
     if 0 <= x0 < len(c):
-        ax.axvline(x0, color="#c9a227", ls=":", lw=0.8)
-    tag = "站上 MA200"
+        ax.axvline(x0, color="#c9a227", ls=":", lw=0.9)
+        ax.scatter([x0], [c[x0]], s=28, color="#c9a227", marker="D", zorder=5)
+    tag = f"多頭排列站上 MA200 · 連 {CONFIRM_BARS} 根沒破"
     ax.set_title(f"{sym}  15m  {tag}", color="#e8f0ea", fontsize=12)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     fig.tight_layout(pad=0.5)
@@ -445,13 +430,14 @@ def draw_chart(sym: str, d: dict, hit: dict, path: str) -> str | None:
 
 def format_hit(sym: str, d: dict, hit: dict) -> str:
     ts = hm(int(d["t"][hit["i"]]))
+    mark_ts = hm(int(d["t"][hit.get("mark_i", hit["i"])]))
     return (
-        f"<b>站上 MA200</b>  {sym}  15m\n"
-        f"時間 {ts}\n"
-        f"現價 {hit['close']:g}　MA200 {hit.get('ma200', 0):g}　離 200 {hit['ext']*100:+.2f}%\n"
-        f"量比 {hit['vol_ratio']:.1f}×　黏帶 {hit['ribbon']*100:.2f}%\n"
-        f"MA7 {hit['ma7']:g}　MA25 {hit['ma25']:g}\n"
-        f"<i>進場在 200 線附近，不是噴完再追。</i>"
+        f"<b>MA200 站穩 {CONFIRM_BARS} 根</b>  {sym}  15m\n"
+        f"記號 {mark_ts}（離 200 {hit.get('mark_ext', 0)*100:+.2f}%）\n"
+        f"確認 {ts}　現價 {hit['close']:g}　離 200 {hit['ext']*100:+.2f}%\n"
+        f"MA200 {hit.get('ma200', 0):g}　量比 {hit['vol_ratio']:.1f}×\n"
+        f"MA7 {hit['ma7']:g} &gt; MA14 {hit.get('ma14', 0):g} &gt; MA25 {hit['ma25']:g}\n"
+        f"<i>多頭排列站上 200，連 {CONFIRM_BARS} 根收盤沒跌破才進。</i>"
     )
 
 
@@ -517,7 +503,7 @@ def wait_next_close() -> None:
 
 def test_telegram() -> int:
     apply_keys()
-    ok = telegram_send("15m 站上 MA200 監看測試\n如果你看到這則，Telegram 已通。")
+    ok = telegram_send("15m MA200 站穩三根監看測試\n如果你看到這則，Telegram 已通。")
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
     return 0 if ok else 1
 
@@ -555,7 +541,7 @@ def simulate_trade(d: dict, hit: dict) -> dict | None:
     entry = float(o[entry_i])
     if entry <= 0:
         return None
-    raw_stop = float(l[i])
+    raw_stop = float(hit.get("stop_low") or l[i])
     if raw_stop >= entry:
         raw_stop = entry * (1.0 - MIN_RISK)
     risk_pct = (entry - raw_stop) / entry
@@ -602,6 +588,7 @@ def simulate_trade(d: dict, hit: dict) -> dict | None:
         "kind": hit["kind"],
         "move": hit["move"],
         "ext": hit.get("ext", hit["move"]),
+        "mark_ext": hit.get("mark_ext", 0.0),
         "vol_ratio": hit["vol_ratio"],
         "rsi6": hit["rsi6"],
         "L": hit["L"],
@@ -609,6 +596,8 @@ def simulate_trade(d: dict, hit: dict) -> dict | None:
         "pre_rng": hit.get("pre_rng", hit.get("ribbon", 0.0)),
         "ribbon": hit.get("ribbon", hit.get("pre_rng", 0.0)),
         "ma200": hit.get("ma200", 0.0),
+        "mark_i": hit.get("mark_i", i),
+        "t_mark": int(d["t"][hit.get("mark_i", i)]),
         "t_signal": int(d["t"][i]),
         "t_entry": int(d["t"][entry_i]),
         "t_exit": int(d["t"][exit_i]),
@@ -737,7 +726,8 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
     ax.axhline(tr["stop"], color="#e35d5d", ls="--", lw=0.7)
     ax.axhline(tr["target"], color="#3dba7a", ls="--", lw=0.7)
     for idx, color, mark in (
-        (tr["signal_i"], "#c9a227", "o"),
+        (tr.get("mark_i", tr["signal_i"]), "#c9a227", "D"),
+        (tr["signal_i"], "#8ab4f8", "o"),
         (tr["entry_i"], "#3dba7a", "^"),
         (tr["exit_i"], "#e35d5d" if tr["pnl_pct"] < 0 else "#3dba7a", "x"),
     ):
@@ -745,9 +735,8 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
         if 0 <= x < len(c):
             ax.axvline(x, color=color, ls="--", lw=0.7)
             ax.scatter([x], [c[x] if mark != "^" else tr["entry"]], s=28, color=color, marker=mark, zorder=6)
-    tag = "MA200"
     ax.set_title(
-        f"{sym}  15m  {tag}  {tr['reason']}  {tr['pnl_pct']:+.2f}%",
+        f"{sym}  15m  MA200 站穩{CONFIRM_BARS}根  {tr['reason']}  {tr['pnl_pct']:+.2f}%",
         color="#e8f0ea",
         fontsize=11,
     )
@@ -828,7 +817,7 @@ def write_backtest_html(
     end = datetime.fromtimestamp(trades[-1]["t_signal"] / 1000, TZ).strftime("%Y-%m-%d %H:%M") if trades else ""
     total_cls = "pnl-win" if stats["pnl"] >= 0 else "pnl-loss"
     kind_line = " · ".join(
-        f"{'站上200' if k == 'reclaim' else k} {v['n']}筆 勝率 {100*v['wins']/v['n']:.0f}% {v['pnl']:+.1f}%"
+        f"{'站穩200' if k == 'hold3' else k} {v['n']}筆 勝率 {100*v['wins']/v['n']:.0f}% {v['pnl']:+.1f}%"
         for k, v in stats["by_kind"].items()
         if v["n"]
     )
@@ -856,7 +845,7 @@ def write_backtest_html(
     for i, t in enumerate(trades, 1):
         cls = "pnl-win" if t["pnl_pct"] > 0 else ("pnl-flat" if t["pnl_pct"] == 0 else "pnl-loss")
         reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t["reason"], "tag-time")
-        tag = "站上 MA200"
+        tag = f"站穩 MA200 {CONFIRM_BARS} 根"
         img = ""
         if id(t) in chart_set:
             d = data.get(t["symbol"])
@@ -882,12 +871,12 @@ def write_backtest_html(
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t['reason'])}</span>"
             f"<span class='tag tag-info'>{escape(tag)}</span>"
-            f"<span class='tag tag-info'>{t['L']}根</span>"
+            f"<span class='tag tag-info'>記號 {escape(hm(t.get('t_mark', t['t_signal'])))}</span>"
             "</div>"
             "<pre class='trade-detail'>"
             f"entry {t['entry']:g}  stop {t['stop']:g}  target {t['target']:g}\n"
             f"exit  {t['exit']:g}  {t['reason']}  {t['r_mult']:+.2f}R\n"
-            f"離 MA200 {t.get('ext', t['move'])*100:+.2f}%  量比 {t['vol_ratio']:.1f}×  黏帶 {t.get('ribbon', t.get('pre_rng', 0))*100:.2f}%\n"
+            f"記號離 200 {t.get('mark_ext', 0)*100:+.2f}%  進場離 200 {t.get('ext', t['move'])*100:+.2f}%  記號量比 {t['vol_ratio']:.1f}×\n"
             f"MFE {t['mfe_pct']:+.2f}%  MAE {t['mae_pct']:+.2f}%\n"
             f"無停損 1h {h1:+.2f}%  2h {h2:+.2f}%"
             "</pre>"
@@ -899,7 +888,7 @@ def write_backtest_html(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>幣安 15m 站上 MA200 · 近 {days} 天</title>
+<title>幣安 15m MA200 站穩 {CONFIRM_BARS} 根 · 近 {days} 天</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -929,8 +918,8 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安 15m 站上 MA200</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>進場在 200 線附近</strong>：放量收盤站上 MA200，離 200 仍 ≤2.5%。下一根開盤進，停損在訊號 K 低點（風險上限 2%），2R 或 4 小時平。</p>
+<h1>幣安 15m MA200 站穩 {CONFIRM_BARS} 根</h1>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25 多頭排列</strong>且收盤站上 MA200 先做記號，之後<strong>連 {CONFIRM_BARS} 根收盤都沒跌破 MA200</strong>才進場。下一根開盤做多，停損在記號到確認這段的最低點（風險上限 2%），2R 或 4 小時平。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1010,16 +999,20 @@ def verify_four() -> int:
             h = max(matched, key=lambda x: x["score"])
             print(
                 f"PASS  {sym}  {case['title']}  "
-                f"{hm(int(d['t'][h['i']]))}  "
-                f"離200 {h['ext']*100:+.2f}%  量比{h['vol_ratio']:.1f}×  "
-                f"黏帶{h['ribbon']*100:.2f}%  MA200={h['ma200']:g}",
+                f"記號 {hm(int(d['t'][h['mark_i']]))} ({h['mark_ext']*100:+.2f}%)  "
+                f"進場 {hm(int(d['t'][h['i']]))} ({h['ext']*100:+.2f}%)  "
+                f"MA7>MA14>MA25  MA200={h['ma200']:g}",
                 flush=True,
             )
         else:
             print(f"FAIL  {sym}  {case['title']}  時間窗內沒抓到", flush=True)
             if hits:
                 last = hits[-1]
-                print(f"      最近一次 {hm(int(d['t'][last['i']]))} +{last['move']*100:.1f}%", flush=True)
+                print(
+                    f"      最近一次 記號 {hm(int(d['t'][last['mark_i']]))} "
+                    f"進場 {hm(int(d['t'][last['i']]))} 離200 {last['ext']*100:+.2f}%",
+                    flush=True,
+                )
             failed.append(sym)
         time.sleep(0.2)
     if failed:
@@ -1032,7 +1025,7 @@ def verify_four() -> int:
 def main() -> int:
     import argparse
 
-    p = argparse.ArgumentParser(description="幣安 15m 站上 MA200（FIL/PIPPIN/SNDK/CRCL）")
+    p = argparse.ArgumentParser(description="幣安 15m MA200 站穩三根（FIL/PIPPIN/SNDK/CRCL）")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的 15m，然後結束")
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
     p.add_argument("--verify", action="store_true", help="回放四張截圖，確認都抓得到")
