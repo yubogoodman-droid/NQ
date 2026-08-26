@@ -22,6 +22,20 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 五分 K 打底後 5/10/20 多排
+
+五分鐘圖：先跌一段、低點附近橫盤**打底**，第一次翻成 **MA5 > MA10 > MA20**（收盤站上 MA5）才做多。  
+對齊 08-26 截圖那種夜盤：21:35 低點 29096，22:20 多排進場。停損打底低下方，目標 2R。
+
+```bash
+python3 examples/nq_5m_base_stack.py backtest --period 8d --pages
+python3 examples/nq_5m_base_stack.py backtest --period 60d --html output/nq_5m_base_stack_60d.html
+python3 examples/nq_5m_base_stack.py alert --test
+python3 examples/nq_5m_base_stack.py alert --dry-run --once
+```
+
+TradingView：`pinescript/nq_5m_base_stack.pine`
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  

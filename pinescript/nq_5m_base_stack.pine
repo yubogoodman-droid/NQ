@@ -1,0 +1,70 @@
+//@version=5
+strategy("NQ 五分打底 5/10/20 多排", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
+
+swingLen     = input.int(3, "轉折確認 K 數", minval=1)
+dropLook     = input.int(24, "回看出發高點 K 數")
+minDrop      = input.float(80.0, "最少下跌點數")
+minBase      = input.int(6, "打底最少 K 數")
+maxWait      = input.int(36, "等多排最長 K 數")
+stopBuf      = input.float(8.0, "停損緩衝點數")
+targetR      = input.float(2.0, "目標 R")
+maxRisk      = input.float(80.0, "單筆最大風險")
+maxRibbon    = input.float(50.0, "MA5−MA20 最大帶寬")
+maxRecover   = input.float(0.85, "最多收回比例")
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, 20)
+
+pl = ta.pivotlow(low, swingLen, swingLen)
+stacked = ma5 > ma10 and ma10 > ma20
+stackedPrev = ma5[1] > ma10[1] and ma10[1] > ma20[1]
+stackFlip = stacked and not stackedPrev and close > ma5
+
+var float baseLow = na
+var int   baseBar = na
+var float dumpHigh = na
+var int   dumpBar = na
+var bool  armed = false
+
+if not na(pl)
+    candidate = pl
+    highWin = ta.highest(high, dropLook)
+    dropPts = highWin - candidate
+    already = ma5[swingLen] > ma10[swingLen] and ma10[swingLen] > ma20[swingLen]
+    if dropPts >= minDrop and not already
+        baseLow := candidate
+        baseBar := bar_index - swingLen
+        dumpHigh := highWin
+        dumpBar := bar_index - swingLen
+        armed := true
+
+barsSinceBase = armed ? bar_index - baseBar : na
+brokeBase = armed and not na(baseLow) and low < baseLow
+late = armed and not na(barsSinceBase) and barsSinceBase > maxWait
+tooSoon = armed and not na(barsSinceBase) and barsSinceBase < minBase
+
+if brokeBase or late
+    armed := false
+
+longSignal = armed and not tooSoon and stackFlip and not na(baseLow)
+if longSignal
+    dropPts = dumpHigh - baseLow
+    recover = (close - baseLow) / dropPts
+    ribbon = ma5 - ma20
+    risk = close - (baseLow - stopBuf)
+    ok = recover <= maxRecover and ribbon <= maxRibbon and risk > 0 and risk <= maxRisk
+    if ok
+        stopLevel = baseLow - stopBuf
+        targetLevel = close + risk * targetR
+        strategy.entry("打底多排", strategy.long)
+        strategy.exit("打底出場", "打底多排", stop=stopLevel, limit=targetLevel)
+        armed := false
+    else
+        armed := false
+
+plot(ma5,  "MA5",  color=color.orange)
+plot(ma10, "MA10", color=color.aqua)
+plot(ma20, "MA20", color=color.fuchsia)
+plotshape(longSignal, title="打底多排", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
+plot(armed and not na(baseLow) ? baseLow : na, "打底低", color=color.yellow, style=plot.style_linebr)
