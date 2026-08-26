@@ -123,6 +123,25 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
+## NQ 一分 K 站上季線
+
+1 分鐘圖：對齊 HTML **#25（08-21 10:43 +95）**。先殺深，五分還在五分季線下至少 60 點，一分季線下至少 40 根，近 60 根回撤 ≥ 60 點，只做 **10:00–16:00 ET**。陽線站上 1 分 SMA60、MA5>MA10、MACD 柱翻綠、放量。
+
+```bash
+python3 examples/nq_ma60_stand.py backtest --period 8d --html output/nq_ma60_stand.html
+python3 examples/nq_ma60_stand.py backtest --period 30d --pages
+python3 examples/nq_ma60_stand.py alert --dry-run --once
+```
+
+TradingView：`pinescript/nq_1m_ma60_stand.pine` 貼到 Pine Editor，套用至 NQ1! / MNQ1! **一分圖**。
+
+近 8 天 Yahoo 1m（2026-08-18 → 08-26）：**2 筆、勝率 100%、+138.5 點**（08-20 14:48 +43.5、08-21 10:43 +95.0）。  
+近一個月（2026-07-27 → 08-26）：**4 筆、勝率 50%、+85.0 點**。多出來的 08-05、08-14 兩筆都是盤中殺深後站上，但很快停損。
+
+每筆 HTML 卡片會附 **一分K** 與 **五分K對照**（綠三角標 1m 進場落在哪根 5 分 K，並看五分收盤是否已站上五分季線）。
+
+報告：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma60-stand-fbcb/docs/nq-ma60-stand/view.html
+
 ## TradingView
 
 `pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
