@@ -60,15 +60,16 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## NQ 五分 K 急跌 V 反（力成邏輯）
+## NQ 五分 K 急跌後站上 MA20
 
-台股那種「均線黏在一起、30 分內灌穿 MA20、放量、反攻 K 做多」搬到 NQ。  
-停損在急跌低下方；目標 MA20 或 1.5R（至少 1R）。只做 RTH，09–10 不進。  
-NQ 不能用個股那種 4～5% 跌幅（約等於一千點），改成 ≥40 點或 2 ATR。
+台股那種急殺之後，**等收盤站上 MA20 才做多**（不再接刀）。  
+灌殺前均線黏帶、30 分內穿 MA20、放量；90 分內收紅站上 MA20 進場。  
+停損仍在急跌低下方，目標 1.5R。只做 RTH，09–10 不進。
 
-Yahoo 五分 60 天（2026-06-15 → 08-25）：**11 筆、勝率 45.5%、−10 點**。  
-QA（灌得夠深）9 筆 +114，QB 2 筆 −124。含 ETH／開盤變成 76 筆、−142。  
-結論：**沒料。** 力成是個股恐慌回補；NQ 急跌後常續跌，贏家只回到 MA20，輸家一次吃掉整段急跌。NQ 還是用破底翻。
+Yahoo 五分 60 天（2026-06-16 → 08-26）：**6 筆、勝率 16.7%、−155 點**。  
+漏斗：急跌放量 201 → 站上 MA20 很多，但停損太寬被擋 153，只剩 6 筆；其中 1 筆 +151，其餘停損／時間出場。  
+含 ETH／開盤 89 筆、勝率 37%、−1295。  
+結論：**沒料。** 站上 MA20 時離急跌低已經很遠，停損一次 70～90 點；假站上後續跌會把整段吐回去。接刀版（11 筆 −10）一樣不行。NQ 還是用破底翻。
 
 ```bash
 python3 examples/nq_sharp_drop.py backtest --period 60d --html output/nq_sharp_drop.html
