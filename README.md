@@ -45,6 +45,33 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## 台股 5 分 K 衝高回落 → 5/10/20 空頭排列通知
+
+多頭破底反彈的鏡像。急拉破近期高點後 V 殺，**5MA < 10MA < 20MA 明顯分開、往下張開**才推 Telegram。均線黏在一起、橫盤糾結的不算。
+
+| 條件 | 預設 |
+|------|------|
+| 週期 | 5 分 K |
+| 衝高 | 漲破近 48 根（約 4 小時）高點，且自該段低點漲幅 ≥ 2%；**衝高那根上方不能有任何均線**（5/10/20/60/120/240） |
+| 回落視窗 | 衝高後 24 根內 |
+| 通知 | 5/10/20 三條都要看得見、往下張開（MA10−MA5 ≥ 0.15%、MA20−MA10 ≥ 0.12%、MA20−MA5 ≥ 0.30%），MA20 也要下彎；黏帶／糾結不算。09:30 前不報 |
+| 做空 | 停損在衝高高點上方 0.3%；目標 2R；收到收 |
+
+```bash
+# 成交額前 80 回看 + 手機版 HTML
+python3 examples/watch_tw_5m_fade.py scan --limit 80 --range 5d --pages
+
+# 近一週、700 以上拿掉；均線糾結的不會算
+python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 7d --pages
+
+# Telegram（憑證放 tg_config.env）
+python3 examples/watch_tw_5m_fade.py alert --test
+python3 examples/watch_tw_5m_fade.py alert --dry-run --once
+python3 examples/watch_tw_5m_fade.py alert
+```
+
+盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_fade_ma_stack.pine`。
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash

@@ -1,0 +1,73 @@
+//@version=5
+indicator("台股 5分K 衝高回落 · 5/10/20 空頭排列", overlay=true)
+
+lookback     = input.int(48, "衝高回看 K 數", minval=12)
+minRallyPct  = input.float(2.0, "最小衝高 %", minval=0.5, step=0.1)
+minFadePct   = input.float(1.0, "最小回落 %", minval=0.3, step=0.1)
+fadeBars     = input.int(24, "回落視窗（根）", minval=6)
+slopeBars    = input.int(3, "均線下彎回看", minval=1)
+minGap5_10   = input.float(0.15, "MA10-MA5 最小間隔 %", minval=0.0, step=0.025)
+minGap10_20  = input.float(0.12, "MA20-MA10 最小間隔 %", minval=0.0, step=0.025)
+minGap5_20   = input.float(0.30, "MA20-MA5 最小間隔 %", minval=0.0, step=0.025)
+requirePretty = input.bool(true, "擋掉糾結黏帶")
+clearPeak     = input.bool(true, "衝高那根上方不能有均線")
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, 20)
+ma60 = ta.sma(close, 60)
+ma120 = ta.sma(close, 120)
+ma240 = ta.sma(close, 240)
+
+stacked    = ma5 < ma10 and ma10 < ma20
+gap5       = close > 0 ? (ma10 - ma5) / close * 100 : 0
+gap10      = close > 0 ? (ma20 - ma10) / close * 100 : 0
+gap20      = close > 0 ? (ma20 - ma5) / close * 100 : 0
+ma5Dn      = ma5 < ma5[slopeBars]
+ma10Dn     = (ma10[slopeBars] - ma10) / close * 100 >= 0.15
+ma20Dn     = (ma20[slopeBars] - ma20) / close * 100 >= 0.05
+fanOpen    = (ma20 - ma5) > (ma20[slopeBars] - ma5[slopeBars])
+pretty     = stacked and gap5 >= minGap5_10 and gap10 >= minGap10_20 and gap20 >= minGap5_20 and ma5Dn and ma10Dn and ma20Dn and fanOpen and close <= ma5
+ready      = requirePretty ? pretty : stacked
+readyNew   = ready and not ready[1]
+priorHigh  = ta.highest(high[1], lookback)
+winLow     = ta.lowest(low[1], lookback)
+rallyPct   = winLow > 0 ? (high - winLow) / winLow * 100 : 0
+spikeBar   = high > priorHigh and rallyPct >= minRallyPct
+
+var float peak = na
+var int   peakBar = na
+var float spikeLow = na
+
+if spikeBar
+    if na(peak) or high > peak
+        peak := high
+        peakBar := bar_index
+        spikeLow := winLow
+
+if not na(peakBar) and bar_index - peakBar > fadeBars
+    peak := na
+    peakBar := na
+    spikeLow := na
+
+fadePct = not na(peak) and peak > 0 ? (peak - close) / peak * 100 : 0
+skipOpen = hour(time, "Asia/Taipei") == 9 and minute(time, "Asia/Taipei") < 30
+maClear(src) =>
+    na(peakBar) or na(src[bar_index - peakBar]) or src[bar_index - peakBar] < peak
+peakClear = not clearPeak or (maClear(ma5) and maClear(ma10) and maClear(ma20) and maClear(ma60) and maClear(ma120) and maClear(ma240))
+sig = readyNew and not na(peak) and fadePct >= minFadePct and bar_index > peakBar and not skipOpen and peakClear
+
+if sig
+    peak := na
+    peakBar := na
+    spikeLow := na
+
+plot(ma5, "5MA", color=color.new(#3b82f6, 0), linewidth=2)
+plot(ma10, "10MA", color=color.new(#22c55e, 0), linewidth=2)
+plot(ma20, "20MA", color=color.new(#f59e0b, 0), linewidth=2)
+plot(ma60, "60MA", color=color.new(#14b8a6, 0))
+plot(ma120, "120MA", color=color.new(#a855f7, 0))
+plot(ma240, "240MA", color=color.new(#f472b6, 0))
+
+plotshape(sig, title="衝高回落空頭排列", style=shape.triangledown, location=location.abovebar, color=color.green, size=size.small)
+alertcondition(sig, title="衝高後 5/10/20 空頭排列", message="衝高回落：5分K 5<10<20 排列漂亮")
