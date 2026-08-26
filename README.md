@@ -80,7 +80,7 @@ python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
 
 近一週（2026-08-20 → 08-27，260 檔永續）：**476 筆、勝率 30.0%、等權重合計 −135%、均筆 −0.28%**。四檔回放：FIL 01-01 19:45 離 200 +0.39%；PIPPIN 01-21 14:45 +1.18%；SNDK 07-30 19:30 +0.34%；CRCL 08-19 20:30 +0.09%。
 
-報告：`docs/binance/expansion-15m-7d/index.html`（476 筆每筆都有圖）
+先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-7d/view.html
 
 ## 幣安黏帶三幕 Telegram
 

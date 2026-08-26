@@ -847,6 +847,11 @@ def write_backtest_html(
         ranked = sorted(trades, key=lambda t: abs(t["pnl_pct"]), reverse=True)
         chart_set = {id(t) for t in ranked[:chart_limit]}
     print(f"畫 {len(chart_set)} 張圖…", flush=True)
+    img_dir = path.parent / "img"
+    if img_dir.exists():
+        for old in img_dir.glob("*.png"):
+            old.unlink()
+    img_dir.mkdir(parents=True, exist_ok=True)
     cards = []
     for i, t in enumerate(trades, 1):
         cls = "pnl-win" if t["pnl_pct"] > 0 else ("pnl-flat" if t["pnl_pct"] == 0 else "pnl-loss")
@@ -857,8 +862,10 @@ def write_backtest_html(
             d = data.get(t["symbol"])
             b64 = draw_trade_b64(t["symbol"], d, t) if d else None
             if b64:
+                png_name = f"{i:03d}.png"
+                (img_dir / png_name).write_bytes(base64.b64decode(b64))
                 img = (
-                    f"<div class='mini-chart'><img src='data:image/png;base64,{b64}' "
+                    f"<div class='mini-chart'><img src='img/{png_name}' loading='lazy' "
                     f"alt='#{i} {escape(t['symbol'])}' style='width:100%;display:block;border-radius:10px'/></div>"
                 )
             if i % 40 == 0:
@@ -942,6 +949,8 @@ h1{{font-size:18px;margin:0 0 6px}}
 """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(html, encoding="utf-8")
+    view = path.with_name("view.html")
+    view.write_text(html, encoding="utf-8")
     return path
 
 
