@@ -46,7 +46,8 @@ class NQWBottomStrategy:
     swing_lookback: int = 3
     low_tolerance_pct: float = 0.001
     min_bars_between_lows: int = 8
-    max_bars_between_lows: int = 80
+    max_bars_between_lows: int = 24
+    max_pattern_hours: float = 2.0
     min_spring_pct: float = 0.0006
     min_spring_points: float = 10.0
     min_bounce_pct: float = 0.001
@@ -62,6 +63,7 @@ class NQWBottomStrategy:
             low_tolerance_pct=self.low_tolerance_pct,
             min_bars_between_lows=self.min_bars_between_lows,
             max_bars_between_lows=self.max_bars_between_lows,
+            max_pattern_hours=self.max_pattern_hours,
             min_spring_pct=self.min_spring_pct,
             min_spring_points=self.min_spring_points,
             min_bounce_pct=self.min_bounce_pct,

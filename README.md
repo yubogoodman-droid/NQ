@@ -23,6 +23,7 @@
 | L1 | 左腳波段低點 |
 | L2 破底 | L1 與 L3 **之間的最低點**，必須低於 L1 至少 0.06% 或 10 點，之後收復 L1 |
 | L3 | 右腳，與 L1 價差 ≤ 0.1%，且高於 L2 |
+| 時間 | L1、L2、L3 須在 **2 小時內**完成（五分 K 最多 24 根） |
 | 頸線 | L1～L3 之間最高點 |
 | 進場 | L3 確認後，收盤突破頸線 |
 | 停損 | L3 |
@@ -145,7 +146,8 @@ python3 examples/chart_today.py
 | `min_bounce_pct` | 0.001 | 破底前最少反彈（0.10%） |
 | `max_reclaim_bars` | 36 | L2 之後幾根內須收復 L1 |
 | `min_bars_between_lows` | 8 | L1 到 L3 最少間隔 |
-| `max_bars_between_lows` | 80 | L1 到 L3 最多間隔 |
+| `max_bars_between_lows` | 24 | L1 到 L3 最多間隔（約 2 小時） |
+| `max_pattern_hours` | 2.0 | L1 到 L3 實際時間上限 |
 
 ## 風險提示
 

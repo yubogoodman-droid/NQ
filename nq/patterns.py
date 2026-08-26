@@ -70,6 +70,13 @@ def _find_swing_lows(lows: Sequence[float], lookback: int) -> list[int]:
     return [i for i in range(len(lows)) if _is_swing_low(lows, i, lookback)]
 
 
+def _elapsed_hours(index, start_idx: int, end_idx: int) -> float | None:
+    try:
+        return (index[end_idx] - index[start_idx]).total_seconds() / 3600.0
+    except Exception:
+        return None
+
+
 def _is_right_trough(lows: Sequence[float], idx: int, lookback: int) -> bool:
     n = len(lows)
     if idx + lookback >= n:
@@ -83,7 +90,8 @@ def detect_w_bottoms(
     swing_lookback: int = 3,
     low_tolerance_pct: float = 0.001,
     min_bars_between_lows: int = 8,
-    max_bars_between_lows: int = 80,
+    max_bars_between_lows: int = 24,
+    max_pattern_hours: float = 2.0,
     min_spring_pct: float = 0.0006,
     min_spring_points: float = 10.0,
     min_bounce_pct: float = 0.001,
@@ -94,7 +102,7 @@ def detect_w_bottoms(
     """
     偵測三點破底 W 底。
 
-    L2 取 L1 與 L3 之間的最低點，避免把後來略破 L1 的回測當成破底。
+    L2 取 L1 與 L3 之間的最低點。L1 到 L3 須在 2 小時內完成。
     """
     required = {"open", "high", "low", "close"}
     missing = required - set(df.columns)
@@ -118,6 +126,9 @@ def detect_w_bottoms(
         search_end = min(l1_idx + max_bars_between_lows, n - 1 - swing_lookback)
 
         for l3_idx in range(l1_idx + min_bars_between_lows, search_end + 1):
+            hours = _elapsed_hours(df.index, l1_idx, l3_idx)
+            if hours is not None and hours > max_pattern_hours:
+                break
             if not _is_right_trough(lows, l3_idx, swing_lookback):
                 continue
 

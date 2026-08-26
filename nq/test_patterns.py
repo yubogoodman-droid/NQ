@@ -150,3 +150,13 @@ def test_strategy_emits_long_on_neckline_break() -> None:
     assert sig.pattern.l1_idx < sig.pattern.l2_idx < sig.pattern.l3_idx
     assert sig.pattern.l2 < sig.pattern.l1
     assert sig.entry > sig.stop_loss
+
+
+def test_pattern_longer_than_two_hours_is_ignored() -> None:
+    rows = _l1_l2_l3_rows()
+    # 在 L3 前插入超過 2 小時的空白 K
+    pad = _flat(30, 10020.0)
+    # L1 約在 index 9，L3 原本約 19；插入 30 根後間隔 > 2h
+    head, tail = rows[:18], rows[18:]
+    df = _df(head + pad + tail)
+    assert detect_w_bottoms(df) == []

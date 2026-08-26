@@ -7,7 +7,7 @@ tolPct        = input.float(0.1, "L1/L3 價差容忍 (%)", minval=0.05, step=0.0
 minSpringPct  = input.float(0.06, "L2 低於 L1 最少 (%)", minval=0.02, step=0.01) / 100
 minBouncePct  = input.float(0.10, "破底前最少反彈 (%)", minval=0.05, step=0.01) / 100
 minBars       = input.int(8, "L1 到 L3 最少間隔", minval=4)
-maxBars       = input.int(80, "L1 到 L3 最多間隔", minval=10)
+maxBars       = input.int(24, "L1 到 L3 最多間隔（2小時）", minval=10)
 maxReclaim    = input.int(12, "L2 後最多幾根須收復", minval=2)
 useCloseBreak = input.bool(true, "收盤突破頸線進場")
 
