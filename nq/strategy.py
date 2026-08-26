@@ -16,8 +16,6 @@ class Side(str, Enum):
 
 @dataclass(frozen=True)
 class Signal:
-    """進場訊號。"""
-
     timestamp: pd.Timestamp
     side: Side
     entry: float
@@ -40,17 +38,17 @@ class NQWBottomStrategy:
     """
     NQ 五分 K 破底 W 底做多。
 
-    進場：L1 → 反彈出頸線 → L2 跌破 L1（破底）→ 收復 → 收盤突破頸線
-    停損：L2（破底）
+    L1 左腳 → 反彈 → L2 中間破底 → 收復 → L3 右腳 → 收盤突破頸線
+    停損：L3
     停利：頸線 + (頸線 − L2)
     """
 
     swing_lookback: int = 3
-    min_bars_between_lows: int = 5
-    max_bars_between_lows: int = 60
-    min_spring_pct: float = 0.0004
-    min_spring_points: float = 8.0
-    max_spring_pct: float = 0.004
+    low_tolerance_pct: float = 0.001
+    min_bars_between_lows: int = 8
+    max_bars_between_lows: int = 80
+    min_spring_pct: float = 0.0006
+    min_spring_points: float = 10.0
     min_bounce_pct: float = 0.001
     max_reclaim_bars: int = 12
     max_breakout_bars: int = 36
@@ -61,17 +59,16 @@ class NQWBottomStrategy:
         patterns = detect_w_bottoms(
             df,
             swing_lookback=self.swing_lookback,
+            low_tolerance_pct=self.low_tolerance_pct,
             min_bars_between_lows=self.min_bars_between_lows,
             max_bars_between_lows=self.max_bars_between_lows,
             min_spring_pct=self.min_spring_pct,
             min_spring_points=self.min_spring_points,
-            max_spring_pct=self.max_spring_pct,
             min_bounce_pct=self.min_bounce_pct,
             max_reclaim_bars=self.max_reclaim_bars,
             max_breakout_bars=self.max_breakout_bars,
             require_neckline_break=True,
         )
-
         signals: list[Signal] = []
         for pattern in patterns:
             if pattern.breakout_idx is None:

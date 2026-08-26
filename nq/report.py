@@ -77,10 +77,10 @@ def _ma_snapshot(row: pd.Series) -> str:
 
 def _chart_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     p = trade.signal.pattern
-    start = max(0, p.first_low_idx - 12)
+    start = max(0, p.l1_idx - 12)
     end = min(
         len(df) - 1,
-        max(trade.exit_idx + 8, trade.signal.bar_idx + 16, p.second_low_idx + 14),
+        max(trade.exit_idx + 8, trade.signal.bar_idx + 16, p.l3_idx + 14),
     )
     return start, end
 
@@ -172,16 +172,21 @@ def _draw_trade_png(
     ax.axhline(sig.stop_loss, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
     ax.axhline(sig.target, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
 
-    l1_rel = p.first_low_idx - start
-    l2_rel = p.second_low_idx - start
+    l1_rel = p.l1_idx - start
+    l2_rel = p.l2_idx - start
+    l3_rel = p.l3_idx - start
     if 0 <= l1_rel < len(window):
-        ax.scatter([l1_rel], [p.first_low], s=42, color="#42a5f5", zorder=5)
-        ax.annotate("L1", (l1_rel, p.first_low), textcoords="offset points", xytext=(0, -12),
+        ax.scatter([l1_rel], [p.l1], s=42, color="#42a5f5", zorder=5)
+        ax.annotate("L1", (l1_rel, p.l1), textcoords="offset points", xytext=(0, -12),
                     ha="center", color="#79c0ff", fontsize=8)
     if 0 <= l2_rel < len(window):
-        ax.scatter([l2_rel], [p.second_low], s=48, color="#f472b6", zorder=5)
-        ax.annotate("L2破底", (l2_rel, p.second_low), textcoords="offset points", xytext=(0, -13),
+        ax.scatter([l2_rel], [p.l2], s=48, color="#f472b6", zorder=5)
+        ax.annotate("L2破底", (l2_rel, p.l2), textcoords="offset points", xytext=(0, -13),
                     ha="center", color="#f9a8d4", fontsize=8)
+    if 0 <= l3_rel < len(window):
+        ax.scatter([l3_rel], [p.l3], s=42, color="#ec407a", zorder=5)
+        ax.annotate("L3", (l3_rel, p.l3), textcoords="offset points", xytext=(0, -12),
+                    ha="center", color="#ffab91", fontsize=8)
 
     entry_rel = sig.bar_idx - start
     exit_rel = trade.exit_idx - start
@@ -234,8 +239,9 @@ def _render_trade_card(
     p = sig.pattern
     pnl_class = "pnl-win" if trade.pnl_points > 0 else "pnl-loss"
     tag_text, tag_class = _exit_tag(trade.exit_reason, trade.pnl_points)
-    depth = p.neckline - p.second_low
-    spring_gap = (p.first_low - p.second_low) / p.first_low * 100 if p.first_low else 0
+    depth = p.neckline - p.l2
+    spring_gap = (p.l1 - p.l2) / p.l1 * 100 if p.l1 else 0
+    shoulder_gap = abs(p.l1 - p.l3) / ((p.l1 + p.l3) / 2) * 100 if (p.l1 + p.l3) else 0
     entry_row = df.iloc[sig.bar_idx]
     ma_line = _ma_snapshot(entry_row)
 
@@ -254,12 +260,13 @@ def _render_trade_card(
         <span class="tag tag-info">5m</span>
       </div>
       <pre class="trade-detail">entry(頸線突破) {sig.entry:.2f}
-stop L2破底 {sig.stop_loss:.2f}
+stop L3 {sig.stop_loss:.2f}
 TP 量度漲幅 = {sig.target:.2f}
 exit {trade.exit_price:.2f}
-L1 {p.first_low:.2f} / L2破底 {p.second_low:.2f}
+L1 {p.l1:.2f} / L2破底 {p.l2:.2f} / L3 {p.l3:.2f}
 頸線 {p.neckline:.2f} / 深度 {depth:.2f}
-破底 {p.first_low - p.second_low:.2f} pts ({spring_gap:.2f}%)
+L1-L3 價差 {shoulder_gap:.2f}% (≤0.10%)
+破底 {p.l1 - p.l2:.2f} pts ({spring_gap:.2f}%)
 {ma_line}
 $ {trade.pnl_dollars:+,.2f} NQ×{contracts}</pre>
       <div class="tf-badge">🕐 5分 K</div>
