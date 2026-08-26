@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """NQ 五分 K 打底後 5/10/20 多排進場。
 
-對齊券商 App NQmain 那種圖：先跌一段、低點附近橫盤打底，
-第一次翻成 MA5 > MA10 > MA20（收盤站上 MA5）才做多。
+對齊券商 App NQmain 那種圖：急跌、低點短打底，然後 5/10/20 **散開**成多排才做多。
+黏在一起翻一下、或打底後橫很久才排好的，都不算。
 
 用法:
   python3 examples/nq_5m_base_stack.py
@@ -147,14 +147,14 @@ def _is_swing_low(lows: np.ndarray, idx: int, lookback: int) -> bool:
     return pivot == float(np.min(window)) and int(np.sum(np.isclose(window, pivot))) == 1
 
 
-def quality_from_setup(drop_pts: float, recover: float, ribbon: float) -> Tuple[int, str]:
-    """對齊 08-25 21:35 打底、22:20 多排：大跌、收回不到 6 成、均線還黏。"""
+def quality_from_setup(drop_pts: float, recover: float, ribbon: float, ma5_slope: float = 0.0) -> Tuple[int, str]:
+    """對齊 08-25：急跌 U 底、22:20 均線散開上攻。"""
     score = 0
     if drop_pts >= 120.0:
         score += 1
     if 0.25 <= recover <= 0.60:
         score += 1
-    if ribbon <= 25.0:
+    if ribbon >= 14.0 and ma5_slope >= 18.0:
         score += 1
     if score >= 2:
         return score, "A"
@@ -169,11 +169,19 @@ def detect_signals(
     drop_lookback: int = 24,
     min_drop_pts: float = 80.0,
     min_base_bars: int = 6,
-    max_wait_bars: int = 36,
+    max_wait_bars: int = 16,
     stop_buffer: float = 8.0,
     target_r: float = 2.0,
     max_risk: float = 80.0,
-    max_ribbon: float = 50.0,
+    min_ribbon: float = 14.0,
+    max_ribbon: float = 40.0,
+    min_ma5_ma10: float = 8.0,
+    min_ma10_ma20: float = 3.0,
+    min_ma5_slope5: float = 15.0,
+    dump_conc_bars: int = 16,
+    min_dump_conc_frac: float = 0.80,
+    up_lookback: int = 6,
+    min_up_bars: int = 4,
     max_recover: float = 0.85,
     max_base_range_frac: float = 0.50,
     min_entry_gap: int = 12,
@@ -181,23 +189,25 @@ def detect_signals(
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """
-    打底後多排：
-      1. 先有波段低點，回看出發高點跌 ≥ min_drop_pts
-      2. 低點當時不是 5/10/20 多排（先空後多）
-      3. 之後至少 min_base_bars 根不破底，打底區間相對下跌收斂
-      4. max_wait_bars 內第一次 MA5 > MA10 > MA20，且收盤站上 MA5
+    打底後多排（對齊 08-25 夜盤那張 U）：
+      1. 急跌：回看高點跌夠，而且最後 16 根就要跌掉八成（不是慢慢磨）
+      2. 低點短打底：至少 6 根不破底，最多再等 16 根
+      3. 第一次翻成 MA5>MA10>MA20 時必須散開上攻（不是三條黏在一起點一下）
+      4. 進場前幾根多數收紅，像在墊高，不是區間裡翻排
     """
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
     low = df["Low"].to_numpy(float)
+    open_ = df["Open"].to_numpy(float)
     ma5 = sma(close, 5)
     ma10 = sma(close, 10)
     ma20 = sma(close, 20)
+    ma60 = sma(close, 60)
 
     n = len(close)
     signals: List[Signal] = []
     last_entry = -(10**9)
-    warmup = max(20, drop_lookback, swing_lookback) + 1
+    warmup = max(60, drop_lookback, swing_lookback) + 1
     fun = funnel if funnel is not None else {}
 
     def bump(key: str) -> None:
@@ -226,6 +236,36 @@ def detect_signals(
             continue
         bump("deep_drop")
 
+        conc_from = max(0, base_idx - dump_conc_bars)
+        conc = float(np.max(high[conc_from : base_idx + 1]) - base_low)
+        if drop_pts > 0 and conc / drop_pts < min_dump_conc_frac:
+            bump("skip_slow_dump")
+            i += 1
+            continue
+
+        dump_len = base_idx - dump_idx + 1
+        reds = int(np.sum(close[dump_idx : base_idx + 1] < open_[dump_idx : base_idx + 1]))
+        if dump_len > 0 and reds / dump_len < 0.55:
+            bump("skip_slow_dump")
+            i += 1
+            continue
+        if dump_idx <= base_idx:
+            dump_floor = float(np.min(low[dump_idx : base_idx + 1]))
+            if base_low > dump_floor + 8.0:
+                bump("skip_not_floor")
+                i += 1
+                continue
+
+        if not np.isnan(ma20[base_idx]) and base_idx >= 5 and not np.isnan(ma20[base_idx - 5]):
+            if float(ma20[base_idx] - ma20[base_idx - 5]) >= 0:
+                bump("skip_ma20_up")
+                i += 1
+                continue
+        if not np.isnan(ma60[base_idx]) and float(close[base_idx]) >= float(ma60[base_idx]):
+            bump("skip_above_ma60")
+            i += 1
+            continue
+
         if not np.isnan(ma5[base_idx]) and ma5[base_idx] > ma10[base_idx] > ma20[base_idx]:
             bump("skip_already_stack")
             i += 1
@@ -248,27 +288,33 @@ def detect_signals(
             if np.isnan(ma5[j]) or np.isnan(ma10[j]) or np.isnan(ma20[j]):
                 continue
             stacked = ma5[j] > ma10[j] > ma20[j]
-            prev_stacked = (
-                j > 0
-                and not np.isnan(ma5[j - 1])
-                and not np.isnan(ma10[j - 1])
-                and not np.isnan(ma20[j - 1])
-                and ma5[j - 1] > ma10[j - 1] > ma20[j - 1]
-            )
-            if not stacked or prev_stacked:
+            if not stacked:
                 continue
             bump("stack_flip")
+            ma5_s5 = float(ma5[j] - ma5[j - 5]) if j >= 5 and not np.isnan(ma5[j - 5]) else 0.0
+            gap_5_10 = float(ma5[j] - ma10[j])
+            gap_10_20 = float(ma10[j] - ma20[j])
+            ribbon = float(ma5[j] - ma20[j])
+            up_from = max(0, j - up_lookback + 1)
+            up_bars = int(np.sum(close[up_from : j + 1] >= open_[up_from : j + 1]))
+            recover = (float(close[j]) - base_low) / drop_pts if drop_pts else 1.0
             if require_close_gt_ma5 and close[j] <= ma5[j]:
                 bump("skip_below_ma5")
                 continue
             if close[j] <= ma20[j]:
                 bump("skip_below_ma20")
                 continue
-            ribbon = float(ma5[j] - ma20[j])
-            if ribbon > max_ribbon:
-                bump("skip_ribbon")
+            fan_ok = (
+                ribbon >= min_ribbon
+                and ribbon <= max_ribbon
+                and gap_5_10 >= min_ma5_ma10
+                and gap_10_20 >= min_ma10_ma20
+                and ma5_s5 >= min_ma5_slope5
+                and up_bars >= min_up_bars
+            )
+            if not fan_ok:
+                bump("skip_knot")
                 continue
-            recover = (float(close[j]) - base_low) / drop_pts if drop_pts else 1.0
             if recover > max_recover:
                 bump("skip_recover")
                 continue
@@ -284,9 +330,9 @@ def detect_signals(
                 break
             if max_risk > 0 and risk > max_risk:
                 bump("skip_max_risk")
-                continue
+                break
 
-            q_score, q_grade = quality_from_setup(drop_pts, recover, ribbon)
+            q_score, q_grade = quality_from_setup(drop_pts, recover, ribbon, ma5_s5)
             target = entry + risk * target_r
             bump("taken")
             signals.append(
@@ -622,7 +668,7 @@ def write_html_report(
         extra_cls = "pnl-win" if extra_stats["total_points"] >= 0 else "pnl-loss"
         extra_html = (
             f"<section class='summary'><h1>{escape(extra_title or 'QA 對照')}</h1>"
-            f"<p class='muted'>只留品質 A：下跌 ≥120 點、收回 25–60%、MA5−MA20 ≤25。</p>"
+            f"<p class='muted'>只留品質 A：急跌 ≥120、收回 25–60%、均線散開且 MA5 上彎。</p>"
             f"<div class='cards'><div class='card'>筆數<b>{extra_stats['count']}</b></div>"
             f"<div class='card'>勝率<b>{extra_stats['win_rate']:.1f}%</b></div>"
             f"<div class='card'>總點數<b class='{extra_cls}'>{extra_stats['total_points']:+.1f}</b></div>"
@@ -638,8 +684,10 @@ def write_html_report(
             f"打底 {funnel.get('base_ok', 0)} → "
             f"多排翻轉 {funnel.get('stack_flip', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
-            f"（沒打底 {funnel.get('skip_no_base', 0)} · 破底 {funnel.get('skip_new_low', 0)} · "
-            f"帶太開 {funnel.get('skip_ribbon', 0)} · 收回過多 {funnel.get('skip_recover', 0)} · "
+            f"（慢跌 {funnel.get('skip_slow_dump', 0)} · 沒打底 {funnel.get('skip_no_base', 0)} · "
+            f"破底 {funnel.get('skip_new_low', 0)} · 黏帶翻排 {funnel.get('skip_knot', 0)} · "
+            f"低點還在均線上 {funnel.get('skip_above_ma60', 0)+funnel.get('skip_ma20_up', 0)} · "
+            f"收回過多 {funnel.get('skip_recover', 0)} · "
             f"風險 {funnel.get('skip_max_risk', 0)}）</p>"
         )
 
@@ -683,7 +731,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 五分打底後 5/10/20 多排</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)} · 五分 K</p>
-<p class="muted">下跌打底（≥6 根不破底）後，第一次 MA5&gt;MA10&gt;MA20 且收盤站上 MA5 進場。停損打底低下方，目標 2R；0.6R 保本、1.2R 移動；12 根後收盤跌破 MA20 出場。含夜盤。</p>
+<p class="muted">急跌打底後，第一次 MA5&gt;MA10&gt;MA20 要散開上攻才進（MA5 明顯高於 MA10，近幾根多數收紅）。黏帶點一下、或低點橫很久才排好的不算。停損打底低下方，目標 2R。</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -923,12 +971,12 @@ def _print_trades(df, trades, tag: str = "") -> None:
 
 def _verdict(stats: dict) -> str:
     if stats["count"] == 0:
-        return "這段沒打到「下跌後打底、再等 5/10/20 多排」的圖。"
-    if stats["total_points"] > 0 and stats["win_rate"] >= 45:
-        return "有料：打底後等多排，樣本內期望值為正。停損在打底低下方，單筆風險不小。"
+        return "這段沒打到「急跌短打底、5/10/20 散開上攻」的圖。"
+    if stats["count"] <= 2 and stats["total_points"] > 0:
+        return "只留截圖那種 U：急跌、短打底、均線散開。黏帶翻排和盤很久的已濾掉。"
     if stats["total_points"] > 0:
-        return "邊緣：截圖那種 08-25 夜盤能抓到，但勝率不高，要靠少數大賺把停損補回來。"
-    return "偏沒料：60 天尺度容易在夜盤假打底被掃；截圖 08-25 22:20 那筆對，但樣本外常失敗。"
+        return "有抓到 U 底多排，但筆數少，單筆風險仍在打底低下方。"
+    return "濾完以後樣本很小。截圖 08-25 22:20 對得上；其餘常是黏帶或假打底。"
 
 
 def cmd_backtest(args) -> int:
@@ -976,7 +1024,7 @@ def cmd_backtest(args) -> int:
             args.period,
             funnel=funnel,
             extra_trades=extra_trades or None,
-            extra_title="只做 QA（大跌 + 收回 25–60% + 均線還黏）",
+            extra_title="只做 QA（急跌 + 收回 25–60% + 均線散開）",
             verdict=verdict,
         )
         print(f"html={out}")

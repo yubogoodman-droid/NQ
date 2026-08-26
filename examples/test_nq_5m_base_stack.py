@@ -24,8 +24,8 @@ from nq_5m_base_stack import (  # noqa: E402
 
 
 def test_quality_from_setup() -> None:
-    assert quality_from_setup(152.0, 0.43, 16.8) == (3, "A")
-    assert quality_from_setup(152.0, 0.43, 40.0) == (2, "A")
+    assert quality_from_setup(152.0, 0.43, 16.8, 23.9) == (3, "A")
+    assert quality_from_setup(152.0, 0.43, 16.8, 0.0) == (2, "A")
     assert quality_from_setup(90.0, 0.43, 40.0) == (1, "B")
     assert quality_from_setup(90.0, 0.80, 40.0) == (0, "C")
 
@@ -51,51 +51,64 @@ def test_summarize_trades() -> None:
     assert stats["by_quality"]["A"]["n"] == 2
 
 
-def _make_base_stack_bars(n: int = 220, bounce: bool = True) -> pd.DataFrame:
-    """Grind, dump ~130 pts, chop a base, then lift until 5/10/20 stack."""
+def _make_base_stack_bars(n: int = 220, bounce: bool = True, *, slow: bool = False, knot: bool = False) -> pd.DataFrame:
+    """Grind, dump, optional short base then lift until 5/10/20 fan."""
     close = np.zeros(n, dtype=float)
     close[0] = 20000.0
     for i in range(1, 90):
         close[i] = close[i - 1] + (0.35 if i % 2 == 0 else -0.15)
     peak = close[89]
-    # dump 20 bars
-    for k, i in enumerate(range(90, 110)):
-        close[i] = peak - 6.5 * (k + 1)
-    floor = close[109]
-    # unique swing low a few bars into the base
-    close[112] = floor - 8.0
-    bottom = close[112]
-    if bounce:
-        for i in range(110, 112):
+    if slow:
+        for k, i in enumerate(range(90, 130)):
+            close[i] = peak - 3.2 * (k + 1)
+        floor = close[129]
+        low_i = 132
+        close[low_i] = floor - 8.0
+        bottom = close[low_i]
+        for i in range(130, low_i):
             close[i] = floor + (2.0 if i % 2 == 0 else -1.0)
-        for i in range(113, 125):
-            close[i] = bottom + 6.0 + (3.0 if i % 2 == 0 else 1.5)
-        close[125] = bottom + 28.0
-        for i in range(126, n):
-            close[i] = min(peak + 20.0, close[i - 1] + 4.2)
+        for i in range(low_i + 1, n):
+            close[i] = close[i - 1] + (0.8 if bounce else -3.0)
     else:
-        for i in range(110, 112):
-            close[i] = floor - 2.0
-        for i in range(113, n):
-            close[i] = close[i - 1] - 5.0
+        for k, i in enumerate(range(90, 106)):
+            close[i] = peak - 8.5 * (k + 1)
+        floor = close[105]
+        low_i = 108
+        close[low_i] = floor - 8.0
+        bottom = close[low_i]
+        for i in range(106, low_i):
+            close[i] = floor + (2.0 if i % 2 == 0 else -1.0)
+        if bounce and not knot:
+            for i in range(low_i + 1, 118):
+                close[i] = bottom + 8.0 + 3.5 * (i - low_i)
+            for i in range(118, n):
+                close[i] = min(peak + 20.0, close[i - 1] + 5.0)
+        elif bounce and knot:
+            for i in range(low_i + 1, n):
+                close[i] = bottom + 10.0 + (1.2 if i % 2 == 0 else 0.4)
+        else:
+            for i in range(low_i + 1, n):
+                close[i] = close[i - 1] - 5.0
 
     high = close + 1.8
     low = close - 1.8
     open_ = np.r_[close[0], close[:-1]]
-    for i in range(90, 110):
+    dump_end = 130 if slow else 106
+    dump_start = 90
+    for i in range(dump_start, dump_end):
         open_[i] = close[i] + 4.0
         high[i] = open_[i] + 0.5
         low[i] = close[i] - 2.2
-    low[112] = close[112] - 1.0
-    high[112] = close[112] + 2.0
+    low[low_i] = close[low_i] - 1.0
+    high[low_i] = close[low_i] + 2.0
     if bounce:
-        for i in range(113, 125):
-            open_[i] = close[i] - 1.0
+        for i in range(low_i + 1, min(low_i + 12, n)):
+            open_[i] = close[i] - 1.2
             low[i] = min(close[i] - 1.2, bottom + 3.0)
             high[i] = close[i] + 1.5
 
     vol = np.full(n, 90.0)
-    vol[90:113] = 200.0
+    vol[dump_start:low_i + 1] = 200.0
     idx = pd.date_range("2026-08-25 18:00", periods=n, freq="5min", tz=ET)
     return pd.DataFrame(
         {"Open": open_, "High": high, "Low": low, "Close": close, "Volume": vol},
@@ -141,12 +154,26 @@ def test_simulate_and_html(tmp_path: Path | None = None) -> None:
         assert any(img_dir.glob("t01_*.png")), "expected a static trade PNG"
 
 
+def test_no_signal_on_knot_stack() -> None:
+    df = _make_base_stack_bars(bounce=True, knot=True)
+    sigs = detect_signals(df)
+    assert not sigs, "sticky MA kiss after the low is not 多排"
+
+
+def test_no_signal_on_slow_dump() -> None:
+    df = _make_base_stack_bars(bounce=True, slow=True)
+    sigs = detect_signals(df)
+    assert not sigs, "a grind-down pause should not count as the screenshot U"
+
+
 def main() -> int:
     test_quality_from_setup()
     test_sma()
     test_summarize_trades()
     test_detect_base_then_stack()
     test_no_signal_on_continued_dump()
+    test_no_signal_on_knot_stack()
+    test_no_signal_on_slow_dump()
     test_simulate_and_html()
     print("ok")
     return 0
