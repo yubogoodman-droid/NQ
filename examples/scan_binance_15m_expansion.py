@@ -2,7 +2,8 @@
 """幣安 15m 壓縮後放量擴張：FIL / SNDK / CRCL 那種連陽噴，以及 PIPPIN 那種墊高。
 
 四張圖的共同骨架（不是 RSI 頂到 96 才算）：
-  前面窄幅盤整 → 1.5～7 小時內從波段低點漲 ≥7% → 放量、多數陽線、短均往上、收盤還靠近高點。
+  前面窄幅盤整 → 1.5～7 小時內從波段低點漲 ≥10% → 放量、多數陽線、短均往上、收盤還靠近高點。
+  連陽（連續 ≥5 根）與 PIPPIN 那種墊高（至少 +12%、量比 ≥3）分開門檻，避免 7% 小拉一律進場。
 
 用法:
   python3 examples/scan_binance_15m_expansion.py --verify   # 回放四張圖，確認都抓得到
@@ -45,18 +46,20 @@ KEEP = {"FILUSDT", "PIPPINUSDT", "SNDKUSDT", "CRCLUSDT"}
 
 PRE_BARS = 16
 IMPULSE_LENS = (6, 8, 10, 12, 16, 20, 24, 28)
-MIN_MOVE = 0.07
+MIN_MOVE = 0.10          # 波段至少 +10%（那四張都在 12% 以上）
 NEAR_HIGH = 0.965
-MAX_PRE_RANGE = 0.085
-MIN_EXPAND_RATIO = 2.2
-MIN_VOL_RATIO = 1.50
-MIN_GREEN_RATIO = 0.55
-MIN_MA7_SLOPE = 0.012
-MIN_RSI6 = 70.0
-MIN_FROM_START = 0.045
+MAX_PRE_RANGE = 0.065
+MIN_EXPAND_RATIO = 2.4
+MIN_VOL_RATIO = 2.50
+MIN_GREEN_RATIO = 0.62
+MIN_MA7_SLOPE = 0.018
+MIN_RSI6 = 80.0
+MIN_FROM_START = 0.07
+STAIR_MIN_MOVE = 0.12    # 墊高要比連陽更長一段，才長得像 PIPPIN
+STAIR_MIN_VOL = 3.00
 MIN_BARS = 80
 KLINE_LIMIT = 320
-ALERT_BUCKET_MS = 3 * 3600 * 1000  # 同一檔 3 小時內只推一次
+ALERT_BUCKET_MS = 8 * 3600 * 1000  # 同一檔 8 小時內只推一次（一整段噴一次）
 HOLD_BARS = 8          # 最多抱 2 小時
 TARGET_R = 1.5
 MAX_RISK = 0.03        # 單筆風險上限 3%
@@ -320,6 +323,8 @@ def _hit_at(d: dict, i: int) -> dict | None:
             continue
 
         kind = "vertical" if cons >= 5 else "stair"
+        if kind == "stair" and (move < STAIR_MIN_MOVE or v_imp / v_pre < STAIR_MIN_VOL):
+            continue
         score = move * 100.0 + v_imp / v_pre + cons + (2.0 if kind == "vertical" else 0.0)
         rec = {
             "i": i,
@@ -554,7 +559,7 @@ def test_telegram() -> int:
 
 
 def select_alerts(d: dict, start_ms: int, end_ms: int) -> list[dict]:
-    """跟 Telegram 監看一樣：時間序第一根命中，同一檔 3 小時內只留一筆。"""
+    """跟 Telegram 監看一樣：時間序第一根命中，同一檔 8 小時內只留一筆。"""
     seen: set[int] = set()
     out: list[dict] = []
     for h in sorted(detect_expansion(d), key=lambda x: x["i"]):
@@ -940,7 +945,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 15m 壓縮後放量擴張</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。訊號出現時波段已走 ≥7%，這是<strong>追價做多</strong>：下一根開盤進，停損在訊號 K 低點（風險上限 3%），1.5R 或 2 小時平。</p>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。訊號出現時波段已走 ≥10%（墊高 ≥12%），這是<strong>追價做多</strong>：下一根開盤進，停損在訊號 K 低點（風險上限 3%），1.5R 或 2 小時平。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

@@ -62,7 +62,7 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 ## 幣安 15m 壓縮後放量擴張
 
-對齊那四張 15 分圖：**FIL / SNDK / CRCL** 是橫盤後連陽噴出，**PIPPIN** 是一段一段墊高。共用條件是前面窄、後面 1.5～7 小時放量走完 ≥7%，收盤還靠近高點。
+對齊那四張 15 分圖：**FIL / SNDK / CRCL** 是橫盤後連陽噴出，**PIPPIN** 是一段一段墊高。門檻是前面窄、後面 1.5～7 小時放量走完 ≥10%（墊高 ≥12%、量比 ≥3），收盤還靠近高點。同一檔 8 小時只算一次。
 
 ```bash
 python3 examples/scan_binance_15m_expansion.py --verify   # 回放四張圖
@@ -78,7 +78,7 @@ Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/te
 python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
 ```
 
-近一週（2026-08-20 → 08-27，261 檔永續）：**1075 筆、勝率 45.2%、等權重合計 +197%、均筆 +0.18%**。連陽 227 筆勝率 50.7%，墊高 848 筆勝率 43.8%。這是訊號出現後追價做多，不含手續費；同時間常會 simultaneous 出一堆訊號。
+近一週（2026-08-20 → 08-27，261 檔永續，收緊後）：**228 筆、勝率 43.0%、等權重合計 +38%、均筆 +0.17%**。先前 7%／量比 1.5／3 小時去重會刷出 1075 筆，大多不是那四張圖。
 
 報告：`docs/binance/expansion-15m-7d/`
 

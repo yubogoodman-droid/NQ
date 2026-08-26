@@ -78,7 +78,7 @@ def test_detect_pippin_like_stair() -> None:
             px *= 1.0085
         stair.append(px)
     close = np.concatenate([_tight(n0, 0.29, seed=2), np.array(stair)])
-    vol = np.concatenate([np.full(n0, 2_000.0), np.full(24, 5_500.0)])
+    vol = np.concatenate([np.full(n0, 2_000.0), np.full(24, 8_000.0)])
     d = indicators(_bars(len(close), close, vol))
     hits = detect_expansion(d)
     assert hits, "PIPPIN 那種墊高應該命中"
