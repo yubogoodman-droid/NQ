@@ -832,6 +832,7 @@ def write_html_report(
     symbol: str,
     period: str,
     funnel: Optional[Dict[str, int]] = None,
+    extra_html: str = "",
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -918,12 +919,77 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="equity">{_equity_svg(pnls)}</div>
 </section>
 {cards or "<div class='empty'>無交易</div>"}
+{extra_html}
 </div>
 </body></html>
 """
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
+    img_dir = out.parent / "img"
+    if img_dir.exists():
+        import re as _re
+
+        keep = set(_re.findall(r"img/([A-Za-z0-9_.-]+\.png)", html))
+        for png in img_dir.glob("*.png"):
+            if png.name not in keep:
+                png.unlink()
     return out
+
+
+def expand_2m_to_1m(df: pd.DataFrame) -> pd.DataFrame:
+    """每根 2m 複製成兩根 1m，讓 MA60／2h 視窗仍對齊時鐘分鐘。"""
+    frames: List[pd.Series] = []
+    stamps: List[pd.Timestamp] = []
+    for ts, row in df.iterrows():
+        stamps.append(pd.Timestamp(ts) - pd.Timedelta(minutes=1))
+        frames.append(row)
+        stamps.append(pd.Timestamp(ts))
+        frames.append(row)
+    out = pd.DataFrame(frames, index=pd.DatetimeIndex(stamps, name=df.index.name))
+    return out[~out.index.duplicated(keep="last")].sort_index()
+
+
+def render_july22_fixture(html_path: Path) -> str:
+    """Yahoo 1m 存不到 07-22；2m 展開後確認晚盤截圖那筆進得去。"""
+    try:
+        import yfinance as yf
+    except ImportError:
+        return ""
+    from datetime import datetime, timezone
+
+    start = datetime(2026, 7, 21, 16, tzinfo=timezone.utc)
+    end = datetime(2026, 7, 23, 8, tzinfo=timezone.utc)
+    raw = yf.download("NQ=F", interval="2m", start=start, end=end, progress=False, auto_adjust=True)
+    if raw is None or raw.empty:
+        return ""
+    if isinstance(raw.columns, pd.MultiIndex):
+        raw.columns = raw.columns.get_level_values(0)
+    raw = raw.dropna().rename(columns=str.title)
+    df = expand_2m_to_1m(to_et(raw))
+    funnel: Dict[str, int] = {}
+    sigs = detect_signals(df, funnel=funnel)
+    trades = simulate(df, sigs, preopen_flat=False)
+    evening = [
+        t
+        for t in trades
+        if df.index[t.signal.break_idx].month == 7
+        and df.index[t.signal.break_idx].day == 22
+        and df.index[t.signal.break_idx].hour >= 18
+    ]
+    if not evening:
+        return ""
+    t = evening[0]
+    cards = _render_trade_cards(df, evening, html_path, prefix="x")
+    return (
+        "<section class='summary'><h1>07-22 截圖還原</h1>"
+        "<p class='muted'>Yahoo 1m 只留約 30 天，這筆用 2 分 K 展開成 1 分鐘。"
+        f"破底 {df.index[t.signal.break_idx].strftime('%H:%M')} 低點 {t.signal.break_low:.2f}、"
+        f"距 MA60 {t.signal.below_ma60:.1f} 點 → "
+        f"突破 {df.index[t.signal.breakout_idx].strftime('%H:%M')} → "
+        f"回踩 {df.index[t.entry_idx].strftime('%H:%M')}，{t.exit_reason} {t.pnl_points:+.1f}。"
+        "20:18 那張圖已在目標之後。</p></section>"
+        + cards
+    )
 
 
 def write_view_html(src: Path, branch: str = VIEW_BRANCH) -> Path:
@@ -980,12 +1046,20 @@ def cmd_backtest(args) -> int:
     html_path = args.html
     if getattr(args, "pages", False):
         html_path = html_path or str(PAGES_HTML)
-    if html_path:
+    extra = ""
+    if getattr(args, "pages", False):
+        extra = render_july22_fixture(Path(html_path))
+        if extra:
+            print("fixture=07-22 2m-expanded")
+        out = write_html_report(
+            html_path, df, trades, args.symbol, args.period, funnel=funnel, extra_html=extra
+        )
+        print(f"html={out}")
+        view = write_view_html(out)
+        print(f"view={view}")
+    elif html_path:
         out = write_html_report(html_path, df, trades, args.symbol, args.period, funnel=funnel)
         print(f"html={out}")
-        if getattr(args, "pages", False):
-            view = write_view_html(out)
-            print(f"view={view}")
     return 0
 
 
