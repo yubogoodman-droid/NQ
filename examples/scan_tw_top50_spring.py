@@ -336,7 +336,10 @@ def main() -> None:
         kept = [
             s
             for s in result["signals"]
-            if s["time"] >= args.after and s["date"] in allowed and row["code"] in allowed[s["date"]]
+            if s["time"] >= args.after
+            and s["date"] in allowed
+            and row["code"] in allowed[s["date"]]
+            and s.get("exit") is not None
         ]
         result["signals"] = kept
         if not kept:
@@ -349,11 +352,12 @@ def main() -> None:
         hits.append(result)
         for sig in kept:
             rtxt = "" if sig.get("r") is None else f" {sig['r']:+.2f}R"
+            pnl = 0.0 if sig.get("pnl") is None else sig["pnl"]
             print(
                 f"{tag} | {sig['date']} {sig['time']} 做多 {sig['entry']:.2f} "
                 f"停 {sig['stop']:.2f} 目標 {sig['target']:.2f} | "
                 f"跌破 {sig['break_pct']}% 量 {sig['vol_ratio']}x | "
-                f"{sig['exit']} {sig['pnl']:+.2f}{rtxt}"
+                f"{sig['exit']} {pnl:+.2f}{rtxt}"
             )
 
     trades = [s for h in hits for s in h["signals"]]
