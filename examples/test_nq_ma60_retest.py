@@ -23,10 +23,10 @@ from nq_ma_reclaim import sma  # noqa: E402
 
 
 def test_quality_from_retest() -> None:
-    assert quality_from_retest(2.0, True, 40.0) == (3, "A")
-    assert quality_from_retest(2.0, True, 10.0) == (2, "A")
-    assert quality_from_retest(-1.0, True, 10.0) == (1, "B")
-    assert quality_from_retest(-1.0, False, 10.0) == (0, "C")
+    assert quality_from_retest(2.0, True, 34.0) == (3, "A")
+    assert quality_from_retest(2.0, True, 80.0) == (2, "A")
+    assert quality_from_retest(-1.0, True, 34.0) == (2, "A")
+    assert quality_from_retest(-1.0, False, 80.0) == (0, "C")
 
 
 def _base_dump_recover(n: int = 340) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, int]:
@@ -114,6 +114,7 @@ def test_detect_and_simulate_retest() -> None:
     assert sig.quality in {"A", "B", "C"}
     assert sig.entry_idx - sig.breakout_idx >= 5
     assert sig.entry_idx - sig.break_idx <= 60
+    assert 0 < sig.below_ma60 <= 45.0
 
     trades = simulate(df, sigs, preopen_flat=False, exit_on_ma60_lose=False)
     assert trades
@@ -125,6 +126,20 @@ def test_no_signal_without_retest() -> None:
     df = _make_no_retest_bars()
     sigs = detect_signals(df, skip_hour_start=None, skip_hour_end=None)
     assert not sigs, "breakout without a MA60 retest should not enter"
+
+
+def test_reject_break_too_far_from_ma60() -> None:
+    """瀑布底離 MA60 太遠，不像截圖那種貼季線的破底。"""
+    n = 340
+    close, high, low, base, break_i = _base_dump_recover(n)
+    close[break_i] = base - 80.0
+    low[break_i] = close[break_i] - 0.6
+    high[break_i] = close[break_i] + 1.0
+    df = _to_df(close, high, low)
+    funnel: dict[str, int] = {}
+    sigs = detect_signals(df, funnel=funnel, skip_hour_start=None, skip_hour_end=None)
+    assert not sigs, f"far 破底 should be skipped, funnel={funnel}"
+    assert funnel.get("too_far", 0) >= 1 or funnel.get("break", 0) == 0
 
 
 def test_write_html_report(tmp_path: Path | None = None) -> None:
@@ -145,6 +160,7 @@ def main() -> int:
     test_quality_from_retest()
     test_detect_and_simulate_retest()
     test_no_signal_without_retest()
+    test_reject_break_too_far_from_ma60()
     test_write_html_report()
     print("ok")
     return 0

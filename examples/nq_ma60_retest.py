@@ -2,7 +2,7 @@
 """NQ 一分 K：破底後突破 MA60、回踩 MA60 進場。
 
 對齊截圖（1m NQmain）：
-  破底 → 收盤突破 MA60 → 回踩踩住季線 → 進場做多
+  破底（低點靠近 1m MA60）→ 收盤突破 MA60 → 回踩踩住季線 → 進場做多
 停損在回踩低點／MA60 下方；目標 2R。
 
 用法:
@@ -62,6 +62,7 @@ class Signal:
     ma200: float
     extension: float
     slope60: float
+    below_ma60: float = 0.0
     quality: str = "C"
     quality_score: int = 0
 
@@ -81,12 +82,13 @@ class TradeResult:
 
 
 def quality_from_retest(slope60: float, bull_bar: bool, below_ma60: float) -> Tuple[int, str]:
+    """近 MA60 的破底加分（對齊截圖，不要離季線太遠）。"""
     score = 0
     if slope60 >= 0:
         score += 1
     if bull_bar:
         score += 1
-    if below_ma60 >= 30.0:
+    if 0 < below_ma60 <= 40.0:
         score += 1
     if score >= 2:
         return score, "A"
@@ -99,7 +101,8 @@ def detect_signals(
     df: pd.DataFrame,
     two_hour_bars: int = 120,
     min_break_depth: float = 10.0,
-    min_below_ma60: float = 25.0,
+    min_below_ma60: float = 15.0,
+    max_below_ma60: float = 45.0,
     breakout_window: int = 60,
     retest_window: int = 30,
     min_retest_gap: int = 5,
@@ -118,7 +121,7 @@ def detect_signals(
     require_bull: bool = False,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """破 2h 低且低於 MA60 → 收盤站上 MA60 → 回踩季線進場。"""
+    """破 2h 低且低點靠近 1m MA60 → 收盤站上 MA60 → 回踩季線進場。"""
     close = df["Close"].to_numpy(float)
     open_ = df["Open"].to_numpy(float)
     high = df["High"].to_numpy(float)
@@ -181,6 +184,11 @@ def detect_signals(
 
         if breakout_idx is None:
             bump("no_breakout")
+            i = break_idx + 1
+            continue
+        below60 = float(ma60[break_idx]) - break_low
+        if below60 > max_below_ma60:
+            bump("too_far")
             i = break_idx + 1
             continue
         bump("breakout")
@@ -260,6 +268,7 @@ def detect_signals(
                     ma200=float(ma200[k]) if not np.isnan(ma200[k]) else 0.0,
                     extension=float(ext_high - ma),
                     slope60=slope60,
+                    below_ma60=float(below60),
                     quality=q_grade,
                     quality_score=q_score,
                 )
@@ -591,6 +600,7 @@ def _render_trade_cards(
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {bt.strftime('%H:%M')} low={t.signal.break_low:.2f} / 2h低 {t.signal.two_hr_low:.2f}\n"
+            f"破底距MA60 {t.signal.below_ma60:.1f} pts\n"
             f"突破 {ot.strftime('%H:%M')}  回踩 {et.strftime('%H:%M')}\n"
             f"MA5 {t.signal.ma5:.1f} / MA20 {t.signal.ma20:.1f} / MA60 {t.signal.ma60:.1f} / MA200 {t.signal.ma200:.1f}"
             "</pre>"
@@ -622,7 +632,7 @@ def write_html_report(
             f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → "
             f"突破MA60 {funnel.get('breakout', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
-            f"（沒回踩 {funnel.get('no_retest', 0)} · 失守 {funnel.get('lost_ma60', 0)} · "
+            f"（距MA60太遠 {funnel.get('too_far', 0)} · 沒回踩 {funnel.get('no_retest', 0)} · 失守 {funnel.get('lost_ma60', 0)} · "
             f"刺太深 {funnel.get('pierce_too_deep', 0)} · 沒突破 {funnel.get('no_breakout', 0)} · "
             f"斜率 {funnel.get('skip_slope', 0)} · 9點檔 {funnel.get('skip_open_hour', 0)}）</p>"
         )
@@ -665,7 +675,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底後回踩 MA60</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">1 分鐘：破 2h 低且低於季線 → 收盤突破 MA60 → 回踩踩住 MA60 進場。停損在回踩低點／季線下方，目標 2R。</p>
+<p class="muted">1 分鐘：破 2h 低，低點距 1m MA60 不超過 45 點 → 收盤突破 MA60 → 回踩踩住 MA60 進場。停損在回踩低點／季線下方，目標 2R。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -721,7 +731,8 @@ def cmd_backtest(args) -> int:
         print(
             "funnel "
             f"break={funnel.get('break', 0)} breakout={funnel.get('breakout', 0)} "
-            f"taken={funnel.get('taken', 0)} no_retest={funnel.get('no_retest', 0)} "
+            f"taken={funnel.get('taken', 0)} too_far={funnel.get('too_far', 0)} "
+            f"no_retest={funnel.get('no_retest', 0)} "
             f"lost={funnel.get('lost_ma60', 0)} pierce={funnel.get('pierce_too_deep', 0)} "
             f"no_bo={funnel.get('no_breakout', 0)} slope={funnel.get('skip_slope', 0)} "
             f"hour={funnel.get('skip_open_hour', 0)}"
