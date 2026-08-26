@@ -15,6 +15,8 @@ from nq_5m_base_stack import (  # noqa: E402
     ET,
     LOOSE_DETECT,
     TradeResult,
+    _ref_window,
+    _zoom_window,
     detect_signals,
     quality_from_setup,
     simulate,
@@ -144,15 +146,34 @@ def test_simulate_and_html(tmp_path: Path | None = None) -> None:
     trades = simulate(df, sigs)
     assert trades
     assert isinstance(trades[0], TradeResult)
-    out = Path("/tmp/nq_5m_base_stack_test.html") if tmp_path is None else Path(tmp_path) / "r.html"
-    path = write_html_report(out, df, trades, "NQ=F", "demo")
+    out_dir = Path("/tmp/nq_5m_base_stack_test") if tmp_path is None else Path(tmp_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = write_html_report(out_dir / "r.html", df, trades, "NQ=F", "demo")
     text = path.read_text(encoding="utf-8")
     assert "打底" in text
     assert "多排" in text
     if trades:
         assert "<img src='img/" in text
         img_dir = path.parent / "img"
-        assert any(img_dir.glob("t01_*.png")), "expected a static trade PNG"
+        pngs = list(img_dir.glob("t01_*.png"))
+        assert pngs, "expected a static trade PNG"
+        assert "五分 K 參考" in text
+        import struct
+
+        with pngs[0].open("rb") as fh:
+            fh.read(16)
+            w, h = struct.unpack(">II", fh.read(8))
+        assert h > w * 0.6, "trade card should include a 5m reference pane under the zoom"
+
+
+def test_ref_window_wider_than_zoom() -> None:
+    df = _make_base_stack_bars(bounce=True)
+    trades = simulate(df, detect_signals(df))
+    assert trades
+    z0, z1 = _zoom_window(df, trades[0])
+    r0, r1 = _ref_window(df, trades[0])
+    assert r0 <= z0 and r1 >= z1
+    assert (r1 - r0) > (z1 - z0)
 
 
 def test_no_signal_on_knot_stack() -> None:
@@ -205,6 +226,7 @@ def main() -> int:
     test_no_signal_on_slow_dump()
     test_loose_detects_knot()
     test_simulate_and_html()
+    test_ref_window_wider_than_zoom()
     test_html_extra_blurb()
     print("ok")
     return 0

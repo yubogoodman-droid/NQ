@@ -508,13 +508,90 @@ def _equity_svg(pnls: List[float], width: int = 720, height: int = 180) -> str:
     )
 
 
+def _style_ax(ax) -> None:
+    ax.set_facecolor("#101814")
+    ax.tick_params(colors="#8aa193", labelsize=8)
+    for sp in ax.spines.values():
+        sp.set_color("#2a3a33")
+
+
+def _plot_candles(ax, window: pd.DataFrame):
+    from matplotlib.patches import Rectangle
+
+    o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
+    colors = []
+    for k in range(len(window)):
+        up = float(c.iloc[k]) >= float(o.iloc[k])
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(k, float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.65)
+        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
+        if y1 == y0:
+            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
+        ax.add_patch(Rectangle((k - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+        colors.append("#3dba7a99" if up else "#e35d5d99")
+    return colors
+
+
+def _plot_mas(ax, close_full: pd.Series, start: int, end: int, periods: Sequence[int]) -> None:
+    for nper in periods:
+        col = MA_COLORS.get(nper)
+        if col is None:
+            continue
+        ma = close_full.rolling(nper, min_periods=nper).mean().iloc[start : end + 1]
+        if ma.notna().sum() == 0:
+            continue
+        ax.plot(list(range(len(ma))), ma, color=col, lw=1.35 if nper <= 20 else 1.05, label=f"MA{nper}")
+
+
+def _mark_trade(ax, trade: TradeResult, start: int, n_bars: int, *, annotate_base: bool) -> None:
+    sig = trade.signal
+    bx, ex, xx = sig.base_idx - start, trade.entry_idx - start, trade.exit_idx - start
+    if 0 <= bx < n_bars:
+        ax.scatter([bx], [sig.base_low], s=38, color="#facc15", zorder=5)
+        if annotate_base:
+            ax.annotate(
+                "打底",
+                (bx, sig.base_low),
+                textcoords="offset points",
+                xytext=(0, -12),
+                ha="center",
+                color="#fde68a",
+                fontsize=8,
+            )
+    if 0 <= ex < n_bars:
+        ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
+        ax.scatter([ex], [trade.entry_price], s=42, color="#00e676", marker="^", zorder=6)
+    if 0 <= xx < n_bars:
+        ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
+        ax.scatter(
+            [xx],
+            [trade.exit_price],
+            s=40,
+            color="#00c805" if trade.pnl_points > 0 else "#ff5252",
+            marker="x",
+            zorder=6,
+        )
+
+
+def _zoom_window(df: pd.DataFrame, trade: TradeResult) -> Tuple[int, int]:
+    start = max(0, trade.signal.dump_idx - 10)
+    end = min(len(df) - 1, trade.exit_idx + 10)
+    return start, end
+
+
+def _ref_window(df: pd.DataFrame, trade: TradeResult) -> Tuple[int, int]:
+    """Wider 5m strip (~6h before dump, ~3h after exit) like the broker screenshot."""
+    start = max(0, trade.signal.dump_idx - 72)
+    end = min(len(df) - 1, max(trade.exit_idx + 36, trade.signal.dump_idx + 96))
+    return start, end
+
+
 def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib import font_manager
-    from matplotlib.patches import Rectangle
 
     for fp in (
         "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
@@ -526,69 +603,28 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             plt.rcParams["axes.unicode_minus"] = False
             break
 
-    sig = trade.signal
-    start = max(0, sig.dump_idx - 10)
-    end = min(len(df) - 1, trade.exit_idx + 10)
+    start, end = _zoom_window(df, trade)
+    ref0, ref1 = _ref_window(df, trade)
     window = df.iloc[start : end + 1]
-    xs = range(len(window))
-    o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
+    ref = df.iloc[ref0 : ref1 + 1]
     vol = window["Volume"] if "Volume" in window.columns else None
     close_full = df["Close"].astype(float)
 
-    fig, (ax, axv) = plt.subplots(
-        2,
-        1,
-        figsize=(10.4, 5.6),
-        sharex=True,
-        gridspec_kw={"height_ratios": [3.2, 1]},
-        facecolor="#0c1210",
-    )
-    for a in (ax, axv):
-        a.set_facecolor("#101814")
-        a.tick_params(colors="#8aa193", labelsize=8)
-        for sp in a.spines.values():
-            sp.set_color("#2a3a33")
+    fig = plt.figure(figsize=(10.4, 8.2), facecolor="#0c1210", layout="constrained")
+    gs = fig.add_gridspec(3, 1, height_ratios=[3.0, 0.85, 2.35], hspace=0.18)
+    ax = fig.add_subplot(gs[0])
+    axv = fig.add_subplot(gs[1], sharex=ax)
+    ax5 = fig.add_subplot(gs[2])
+    for a in (ax, axv, ax5):
+        _style_ax(a)
 
-    colors_v = []
-    for k in range(len(window)):
-        up = float(c.iloc[k]) >= float(o.iloc[k])
-        col = "#3dba7a" if up else "#e35d5d"
-        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.65)
-        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
-        if y1 == y0:
-            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
-        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
-        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    colors_v = _plot_candles(ax, window)
     if vol is not None:
-        axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
-
-    for nper, col in MA_COLORS.items():
-        ma = close_full.rolling(nper, min_periods=nper).mean().iloc[start : end + 1]
-        if ma.notna().sum() == 0:
-            continue
-        ax.plot(list(xs), ma, color=col, lw=1.35 if nper <= 20 else 1.05, label=f"MA{nper}")
-
+        axv.bar(list(range(len(window))), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
+    _plot_mas(ax, close_full, start, end, list(MA_COLORS))
     ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
     ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
-
-    bx, ex, xx = sig.base_idx - start, trade.entry_idx - start, trade.exit_idx - start
-    if 0 <= bx < len(window):
-        ax.scatter([bx], [sig.base_low], s=38, color="#facc15", zorder=5)
-        ax.annotate("打底", (bx, sig.base_low), textcoords="offset points", xytext=(0, -12),
-                    ha="center", color="#fde68a", fontsize=8)
-    if 0 <= ex < len(window):
-        ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
-        ax.scatter([ex], [trade.entry_price], s=42, color="#00e676", marker="^", zorder=6)
-    if 0 <= xx < len(window):
-        ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
-        ax.scatter(
-            [xx],
-            [trade.exit_price],
-            s=40,
-            color="#00c805" if trade.pnl_points > 0 else "#ff5252",
-            marker="x",
-            zorder=6,
-        )
+    _mark_trade(ax, trade, start, len(window), annotate_base=True)
 
     et = df.index[trade.entry_idx]
     xt = df.index[trade.exit_idx]
@@ -604,7 +640,20 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
     axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
-    fig.tight_layout(pad=0.45)
+    plt.setp(ax.get_xticklabels(), visible=False)
+
+    _plot_candles(ax5, ref)
+    _plot_mas(ax5, close_full, ref0, ref1, (5, 10, 20))
+    z0, z1 = start - ref0, end - ref0
+    ax5.axvspan(max(0, z0), min(len(ref) - 1, z1), color="#3dba7a", alpha=0.07)
+    _mark_trade(ax5, trade, ref0, len(ref), annotate_base=True)
+    ax5.set_ylabel("五分 K 參考", color="#8aa193", fontsize=9)
+    ax5.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=3)
+    rstep = max(1, len(ref) // 6)
+    rticks = list(range(0, len(ref), rstep))
+    ax5.set_xticks(rticks)
+    ax5.set_xticklabels([ref.index[i].strftime("%m-%d %H:%M") for i in rticks], color="#8aa193")
+
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
     plt.close(fig)
@@ -658,6 +707,7 @@ def _render_trade_cards(
             f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f}"
             "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
+            "<p class='muted' style='margin:8px 2px 0'>上：進場放大 · 下：五分 K 參考（MA5/10/20，淡綠是上面那段）</p>"
             "</article>"
         )
     return "".join(cards)
