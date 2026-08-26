@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from scan_binance_15m_expansion import (  # noqa: E402
     ALERT_BUCKET_MS,
     CONFIRM_BARS,
+    TZ,
     collapse_hits,
     detect_expansion,
     indicators,
@@ -21,6 +22,7 @@ from scan_binance_15m_expansion import (  # noqa: E402
     sma,
     summarize_trades,
 )
+from datetime import datetime
 
 
 def _bars(n: int, close: np.ndarray, vol: np.ndarray | None = None) -> dict:
@@ -30,7 +32,8 @@ def _bars(n: int, close: np.ndarray, vol: np.ndarray | None = None) -> dict:
     h = np.maximum(o, close) + rng * 0.25
     l = np.minimum(o, close) - rng * 0.25
     v = vol if vol is not None else np.full(n, 1000.0)
-    t = np.arange(n, dtype=np.int64) * 900_000
+    t0 = int(datetime(2026, 8, 21, 12, 0, tzinfo=TZ).timestamp() * 1000)
+    t = t0 + np.arange(n, dtype=np.int64) * 900_000
     return {"t": t, "o": o, "h": h, "l": l, "c": close, "v": v}
 
 
@@ -39,6 +42,7 @@ def _series(
     holds: np.ndarray | None = None,
     tail: np.ndarray | None = None,
     mark: float = 100.6,
+    vol_signal: float = 4_000.0,
 ) -> dict:
     """先跌破 200 線、再在線下翹頭（做出 MA7>MA14>MA25），然後一根收盤站上。
 
@@ -54,7 +58,7 @@ def _series(
         parts.append(np.asarray(tail, float))
     close = np.concatenate(parts)
     vol = np.full(len(close), 1_000.0)
-    vol[250 + 20 + 10] = 4_000.0
+    vol[250 + 20 + 10] = vol_signal
     return indicators(_bars(len(close), close, vol))
 
 
@@ -101,6 +105,16 @@ def test_break_below_ma200_cancels() -> None:
     """第二根收盤跌回 200 線下方，整個記號作廢。"""
     holds = np.array([100.4, 96.0, 100.6])
     d = _series(holds=holds)
+    assert detect_expansion(d) == []
+
+
+def test_low_volume_skips() -> None:
+    d = _series(holds=_held(), vol_signal=1_050.0)
+    assert detect_expansion(d) == []
+
+
+def test_mark_too_far_from_ma200_skips() -> None:
+    d = _series(holds=_held(), mark=108.0)
     assert detect_expansion(d) == []
 
 
@@ -157,7 +171,7 @@ def test_simulate_stop_on_breakdown() -> None:
     assert hits
     tr = simulate_trade(d, hits[0])
     assert tr is not None
-    assert tr["reason"] == "stop"
+    assert tr["reason"] == "ma_break"
     assert tr["pnl_pct"] < 0
 
 
@@ -168,7 +182,7 @@ def test_simulate_target_or_time() -> None:
     tr = simulate_trade(d, hits[0])
     assert tr is not None
     assert tr["entry"] > 0
-    assert tr["reason"] in {"target", "time", "stop", "eod"}
+    assert tr["reason"] in {"ma_break", "time", "eod"}
 
 
 def test_summarize_empty() -> None:
@@ -184,6 +198,8 @@ def main() -> int:
     test_mark_bar_alone_is_not_entry()
     test_two_holds_not_enough()
     test_break_below_ma200_cancels()
+    test_low_volume_skips()
+    test_mark_too_far_from_ma200_skips()
     test_bear_stack_skips()
     test_chop_does_not_hit()
     test_collapse_keeps_best_of_run()

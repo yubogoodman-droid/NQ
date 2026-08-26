@@ -42,6 +42,9 @@ KEEP = {"FILUSDT", "PIPPINUSDT", "SNDKUSDT", "CRCLUSDT"}
 
 PRE_BARS = 12
 CONFIRM_BARS = 3         # 記號之後要連 3 根收盤都沒跌破 MA200
+MIN_VOL_RATIO = 1.70     # 大賺單均量 2.7×，四張原圖 1.8～4.0×
+MAX_MARK_EXT = 0.02      # 記號時收盤離 MA200 仍 ≤2%
+SESSION_HOURS = range(8, 21)  # 台北 08–20；21–23 點近一週合計 −72%
 MIN_BARS = 220
 KLINE_LIMIT = 500
 ALERT_BUCKET_MS = 8 * 3600 * 1000
@@ -252,6 +255,7 @@ def _hit_at(d: dict, i: int) -> dict | None:
     之後連 CONFIRM_BARS 根收盤都沒跌破 MA200，最後那根就是 i。
     """
     l, c, v = d["l"], d["c"], d["v"]
+    o = d["o"]
     m7, m14, m25 = d["m7"], d["m14"], d["m25"]
     m99, m120, m200 = d["m99"], d["m120"], d["m200"]
     v20, r6 = d["v20"], d["rsi6"]
@@ -261,7 +265,12 @@ def _hit_at(d: dict, i: int) -> dict | None:
     vals = [m7[mark], m14[mark], m25[mark], m200[mark], m200[i], m99[i], m120[i], v20[i]]
     if np.isnan(vals).any():
         return None
+    hour = datetime.fromtimestamp(int(d["t"][mark]) / 1000, TZ).hour
+    if hour not in SESSION_HOURS:
+        return None
     if not (m7[mark] > m14[mark] > m25[mark]):
+        return None
+    if c[mark] <= o[mark]:
         return None
     if not (c[mark] > m200[mark] and c[mark - 1] <= m200[mark - 1]):
         return None
@@ -270,8 +279,12 @@ def _hit_at(d: dict, i: int) -> dict | None:
             return None
     ext = float(c[i] / m200[i] - 1.0)
     mark_ext = float(c[mark] / m200[mark] - 1.0)
+    if mark_ext > MAX_MARK_EXT:
+        return None
     ribbon = float(max(m99[i], m120[i], m200[i]) / min(m99[i], m120[i], m200[i]) - 1.0)
     vr = float(v[mark] / v20[mark]) if v20[mark] > 0 else 0.0
+    if vr < MIN_VOL_RATIO:
+        return None
     return {
         "i": i,
         "mark_i": mark,
@@ -293,6 +306,7 @@ def _hit_at(d: dict, i: int) -> dict | None:
         "ext": ext,
         "mark_ext": mark_ext,
         "ribbon": ribbon,
+        "hour": hour,
         "stop_low": float(np.min(l[mark : i + 1])),
         "score": float(vr + max(0.0, 0.05 - ext) * 100.0),
     }
@@ -460,9 +474,9 @@ def format_hit(sym: str, d: dict, hit: dict) -> str:
         f"<b>MA200 站穩 {CONFIRM_BARS} 根</b>  {sym}  15m\n"
         f"記號 {mark_ts}（離 200 {hit.get('mark_ext', 0)*100:+.2f}%）\n"
         f"確認 {ts}　現價 {hit['close']:g}　離 200 {hit['ext']*100:+.2f}%\n"
-        f"MA200 {hit.get('ma200', 0):g}　量比 {hit['vol_ratio']:.1f}×\n"
+        f"MA200 {hit.get('ma200', 0):g}　量比 {hit['vol_ratio']:.1f}×　{hit.get('hour', 0):02d} 點\n"
         f"MA7 {hit['ma7']:g} &gt; MA14 {hit.get('ma14', 0):g} &gt; MA25 {hit['ma25']:g}\n"
-        f"<i>多頭排列站上 200，連 {CONFIRM_BARS} 根收盤沒跌破才進。</i>"
+        f"<i>放量多頭排列站上 200，連 {CONFIRM_BARS} 根沒破才進；收盤破 200 出場。</i>"
     )
 
 
@@ -557,29 +571,20 @@ def _fwd_pct(d: dict, entry_i: int, entry: float, bars: int) -> float | None:
 
 
 def simulate_trade(d: dict, hit: dict) -> dict | None:
-    """訊號收盤後下一根開盤做多。停損在訊號 K 低點（風險 0.4%～2%），2R 或 16 根時間出場。"""
+    """訊號收盤後下一根開盤做多。收盤跌破 MA200 出場；最多 HOLD_BARS 根。
+
+    近一週大賺單共同點是真的跑得動（MFE 常 5%+），用 2R／三根低點停損會把
+    VELVET、BB、PORTAL 那種單砍掉。改成跟進場同一條線：收盤破 200 才走。
+    """
     i = hit["i"]
     o, h, l, c = d["o"], d["h"], d["l"], d["c"]
+    m200 = d["m200"]
     if i + 1 >= len(c):
         return None
     entry_i = i + 1
     entry = float(o[entry_i])
     if entry <= 0:
         return None
-    raw_stop = float(hit.get("stop_low") or l[i])
-    if raw_stop >= entry:
-        raw_stop = entry * (1.0 - MIN_RISK)
-    risk_pct = (entry - raw_stop) / entry
-    if risk_pct > MAX_RISK:
-        stop = entry * (1.0 - MAX_RISK)
-    elif risk_pct < MIN_RISK:
-        stop = entry * (1.0 - MIN_RISK)
-    else:
-        stop = raw_stop
-    risk = entry - stop
-    if risk <= 0:
-        return None
-    target = entry + TARGET_R * risk
     last = min(entry_i + HOLD_BARS, len(c) - 1)
     exit_i = last
     exit_px = float(c[last])
@@ -588,21 +593,19 @@ def simulate_trade(d: dict, hit: dict) -> dict | None:
     for k in range(entry_i, last + 1):
         mfe = max(mfe, float(h[k]) / entry - 1.0)
         mae = min(mae, float(l[k]) / entry - 1.0)
-        if float(l[k]) <= stop:
-            exit_i, exit_px, reason = k, stop, "stop"
-            break
-        if float(h[k]) >= target:
-            exit_i, exit_px, reason = k, target, "target"
+        if not np.isnan(m200[k]) and float(c[k]) < float(m200[k]):
+            exit_i, exit_px, reason = k, float(c[k]), "ma_break"
             break
     pnl_pct = (exit_px / entry - 1.0) * 100.0
+    risk = max(entry * MIN_RISK, 1e-12)
     fwd = {n: _fwd_pct(d, entry_i, entry, n) for n in FWD_BARS}
     return {
         "signal_i": i,
         "entry_i": entry_i,
         "exit_i": exit_i,
         "entry": entry,
-        "stop": stop,
-        "target": target,
+        "stop": float(m200[i]) if not np.isnan(m200[i]) else entry * (1.0 - MIN_RISK),
+        "target": entry * 1.0,
         "exit": exit_px,
         "reason": reason,
         "pnl_pct": pnl_pct,
@@ -621,6 +624,7 @@ def simulate_trade(d: dict, hit: dict) -> dict | None:
         "pre_rng": hit.get("pre_rng", hit.get("ribbon", 0.0)),
         "ribbon": hit.get("ribbon", hit.get("pre_rng", 0.0)),
         "ma200": hit.get("ma200", 0.0),
+        "hour": hit.get("hour", 0),
         "mark_i": hit.get("mark_i", i),
         "t_mark": int(d["t"][hit.get("mark_i", i)]),
         "t_signal": int(d["t"][i]),
@@ -750,7 +754,6 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
         ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.0, label=f"MA{n}")
     ax.axhline(tr["entry"], color="#e8f0ea", ls=":", lw=0.7)
     ax.axhline(tr["stop"], color="#e35d5d", ls="--", lw=0.7)
-    ax.axhline(tr["target"], color="#3dba7a", ls="--", lw=0.7)
     for idx, color, mark in (
         (tr.get("mark_i", tr["signal_i"]), "#c9a227", "D"),
         (tr["signal_i"], "#8ab4f8", "o"),
@@ -870,7 +873,7 @@ def write_backtest_html(
     cards = []
     for i, t in enumerate(trades, 1):
         cls = "pnl-win" if t["pnl_pct"] > 0 else ("pnl-flat" if t["pnl_pct"] == 0 else "pnl-loss")
-        reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t["reason"], "tag-time")
+        reason_cls = {"ma_break": "tag-sl", "time": "tag-time", "eod": "tag-time"}.get(t["reason"], "tag-info")
         tag = f"站穩 MA200 {CONFIRM_BARS} 根"
         img = ""
         if id(t) in chart_set:
@@ -900,8 +903,8 @@ def write_backtest_html(
             f"<span class='tag tag-info'>記號 {escape(hm(t.get('t_mark', t['t_signal'])))}</span>"
             "</div>"
             "<pre class='trade-detail'>"
-            f"entry {t['entry']:g}  stop {t['stop']:g}  target {t['target']:g}\n"
-            f"exit  {t['exit']:g}  {t['reason']}  {t['r_mult']:+.2f}R\n"
+            f"entry {t['entry']:g}  MA200 {t['stop']:g}\n"
+            f"exit  {t['exit']:g}  {t['reason']}\n"
             f"記號離 200 {t.get('mark_ext', 0)*100:+.2f}%  進場離 200 {t.get('ext', t['move'])*100:+.2f}%  記號量比 {t['vol_ratio']:.1f}×\n"
             f"MFE {t['mfe_pct']:+.2f}%  MAE {t['mae_pct']:+.2f}%\n"
             f"無停損 1h {h1:+.2f}%  2h {h2:+.2f}%"
@@ -945,7 +948,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 15m MA200 站穩 {CONFIRM_BARS} 根</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25 多頭排列</strong>且收盤站上 MA200 先做記號，之後<strong>連 {CONFIRM_BARS} 根收盤都沒跌破 MA200</strong>才進場。下一根開盤做多，停損在記號到確認這段的最低點（風險上限 2%），2R 或 4 小時平。</p>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25</strong>、放量陽線收盤站上 MA200 做記號（量比 ≥{MIN_VOL_RATIO:.1f}×、離 200 ≤{MAX_MARK_EXT:.0%}、台北 08–20 點），連 {CONFIRM_BARS} 根收盤沒破 200 才進。下一根開盤做多，<strong>收盤跌破 MA200 出場</strong>，最多 4 小時。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
