@@ -1,7 +1,7 @@
 //@version=5
 strategy("NQ 五分K 破底W底進場", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, process_orders_on_close=true)
 
-// L1 左、L2 破底、L3 右；L3 收盤當下進場（不看後面的 K）
+// L1 左、L2 破底、L3 右；L3 收盤進場
 swingLen      = input.int(3, "轉折確認 K 數", minval=1)
 tolPct        = input.float(0.1, "L1/L3 價差容忍 (%)", minval=0.05, step=0.05) / 100
 minSpringPct  = input.float(0.10, "L2 低於 L1 最少 (%)", minval=0.05, step=0.01) / 100
@@ -9,13 +9,18 @@ minSpringPts  = input.float(25.0, "L2 低於 L1 最少點數", minval=0, step=1)
 minBouncePct  = input.float(0.10, "破底前最少反彈 (%)", minval=0.05, step=0.01) / 100
 minBars       = input.int(8, "L1 到 L3 最少間隔", minval=4)
 maxBars       = input.int(24, "L1 到 L3 最多間隔（2小時）", minval=10)
+maxReclaim    = input.int(12, "L2 後最多幾根須收復", minval=2)
 stopPts       = input.float(20.0, "停損在 L3 下方點數", minval=0, step=1)
 
 pl = ta.pivotlow(low, swingLen, swingLen)
 
 var float l1         = na
 var int   l1Bar      = na
+var float bounceHigh = na
+var bool  bounced    = false
 var float l2         = na
+var int   l2Bar      = na
+var int   reclaimBar = na
 var float l3         = na
 var int   l3Bar      = na
 var float neckline   = na
@@ -24,35 +29,35 @@ var bool  wReady     = false
 reset() =>
     l1         := na
     l1Bar      := na
+    bounceHigh := na
+    bounced    := false
     l2         := na
+    l2Bar      := na
+    reclaimBar := na
     l3         := na
     l3Bar      := na
     neckline   := na
     wReady     := false
 
 if not na(pl) and na(l1)
-    l1    := pl
-    l1Bar := bar_index - swingLen
+    l1         := pl
+    l1Bar      := bar_index - swingLen
+    bounceHigh := high
+    bounced    := false
 
-// L3 用當根收盤判定：只看左側，不要求後面幾根守住
-if not na(l1) and na(l3)
-    gap = bar_index - l1Bar
-    if gap >= minBars and gap <= maxBars
-        avgLow = (l1 + low) / 2.0
-        priceOk = avgLow > 0 and math.abs(l1 - low) / avgLow <= tolPct
-        midLow = ta.lowest(low[1], gap - 1)
-        neck = ta.highest(high[1], gap - 1)
-        reclaimed = ta.highest(close[1], gap - 1) > l1
-        springOk = l1 - midLow >= math.max(l1 * minSpringPct, minSpringPts)
-        bounceOk = neck - math.max(l1, low) >= l1 * minBouncePct
-        l2Gap = ta.barssince(low[1] == midLow) + 1
-        win = math.min(swingLen + 1, l2Gap)
-        leftLow = win >= 2 and low == ta.lowest(low, win)
-        if priceOk and leftLow and low > midLow and springOk and bounceOk and reclaimed
+if not na(l1) and na(l3) and not na(pl)
+    candBar = bar_index - swingLen
+    gap = candBar - l1Bar
+    avgLow = (l1 + pl) / 2
+    priceOk = math.abs(l1 - pl) / avgLow <= tolPct
+    if gap >= minBars and gap <= maxBars and priceOk
+        midLow = ta.lowest(low, gap)
+        if l1 - midLow >= math.max(l1 * minSpringPct, minSpringPts) and pl > midLow
             l2       := midLow
-            l3       := low
-            l3Bar    := bar_index
-            neckline := neck
+            l2Bar    := candBar - ta.barssince(low == midLow)
+            l3       := pl
+            l3Bar    := candBar
+            neckline := ta.highest(high, gap)
             wReady   := true
 
 longSignal = wReady and not na(l3)

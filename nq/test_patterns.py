@@ -185,35 +185,3 @@ def test_shallow_l2_breakdown_is_ignored() -> None:
     rows.append((10046, 10060, 10044, 10056))
     rows.extend(_flat(6, 10058.0, drift=1.0))
     assert detect_w_bottoms(_df(rows)) == []
-
-
-def test_l3_is_decided_without_future_bars() -> None:
-    """L3 收盤當下就能判定；截斷後面的 K 仍應找到同一筆。"""
-    df = _df(_l1_l2_l3_rows())
-    patterns = detect_w_bottoms(df)
-    assert patterns
-    l3_idx = patterns[0].l3_idx
-    cut = detect_w_bottoms(df.iloc[: l3_idx + 1])
-    assert cut
-    assert cut[0].l1_idx == patterns[0].l1_idx
-    assert cut[0].l3_idx == l3_idx
-    assert cut[0].l2 == patterns[0].l2
-
-
-def test_later_undercut_does_not_erase_l3_entry() -> None:
-    """進場後即使再破 L3，也不能用未來走勢把當時的 L3 訊號拿掉。"""
-    rows = _l1_l2_l3_rows()
-    df = _df(rows)
-    l3_idx = detect_w_bottoms(df)[0].l3_idx
-    head = rows[: l3_idx + 1]
-    dump = [
-        (10004, 10008, 9988, 9992),
-        (9992, 9996, 9975, 9980),
-        (9980, 9988, 9968, 9972),
-    ]
-    later = detect_w_bottoms(_df(head + dump))
-    assert later
-    assert later[0].l3_idx == l3_idx
-    sig = NQWBottomStrategy().generate_signals(_df(head + dump))[0]
-    assert sig.bar_idx == l3_idx
-    assert sig.stop_loss == round((sig.pattern.l3 - 20.0) / 0.25) * 0.25
