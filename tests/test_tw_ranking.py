@@ -266,7 +266,7 @@ class RankingTests(unittest.TestCase):
             for i in range(60)
         ]
 
-        def fake_daily(on_date, top=100, session=None, timeout=20):
+        def fake_daily(on_date, top=200, session=None, timeout=20):
             if on_date == today:
                 raise ValueError("not published")
             return rows[:top], f"{on_date.isoformat()} 盤後成交額"
@@ -289,6 +289,24 @@ class RankingTests(unittest.TestCase):
             ranked, label = fetch_daily_turnover_ranking(date(2026, 8, 19), top=100)
         self.assertEqual(len(ranked), 40)
         self.assertIn("2026-08-19", label)
+
+    def test_daily_ranking_defaults_to_top_200(self) -> None:
+        twse = [
+            RankedStock(i, f"{1000 + i}.TW", "測", 10.0, None, None, 1, 2e9 - i, "TAI")
+            for i in range(150)
+        ]
+        tpex = [
+            RankedStock(i, f"{3000 + i}.TWO", "測", 10.0, None, None, 1, 1e9 - i, "TWO")
+            for i in range(80)
+        ]
+        with (
+            patch("tw.ranking._fetch_twse_daily", return_value=twse),
+            patch("tw.ranking._fetch_tpex_daily", return_value=tpex),
+        ):
+            ranked, _label = fetch_daily_turnover_ranking(date(2026, 8, 25))
+        self.assertEqual(len(ranked), 200)
+        self.assertEqual(ranked[0].symbol, "1000.TW")
+        self.assertEqual(ranked[-1].rank, 200)
 
 
 if __name__ == "__main__":

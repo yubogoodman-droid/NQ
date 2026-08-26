@@ -113,12 +113,14 @@ def _universe_line(uni: DayUniverse, hit_count: int) -> str:
 
 def _lead_block(result: BacktestResult) -> str:
     short = _result_side(result) == "short"
+    top = getattr(result, "top", 200)
+    pool = f"每天上市＋上櫃成交額前 {top}"
     if result.signal_tf == "15m":
         if short:
-            return """
+            return f"""
     <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
     <p class="lead">
-      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
+      同一套台股掃描池：{pool}，濾掉 ETF、金融股、電信股與收盤價 500 以上。
       十五分K <strong>MA5 &lt; MA10 &lt; MA20 且往下</strong>，
       <strong>當根收盤剛跌破十五分 MA240</strong>（前一根尚未跌破），
       且這根收盤必須低於 MA5／10／20／240。
@@ -127,10 +129,10 @@ def _lead_block(result: BacktestResult) -> str:
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
       K 棒漲紅跌綠。
     </p>"""
-        return """
+        return f"""
     <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
     <p class="lead">
-      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
+      同一套台股掃描池：{pool}，濾掉 ETF、金融股、電信股與收盤價 500 以上。
       十五分K <strong>MA5 &gt; MA10 &gt; MA20 且往上</strong>，
       <strong>當根收盤剛站上十五分 MA240</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／240。
@@ -140,10 +142,10 @@ def _lead_block(result: BacktestResult) -> str:
       K 棒漲紅跌綠。
     </p>"""
     if short:
-        return """
+        return f"""
     <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
     <p class="lead">
-      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
+      同一套台股掃描池：{pool}，濾掉 ETF、金融股、電信股與收盤價 500 以上。
       五分K <strong>MA5 &lt; MA10 &lt; MA20 且往下</strong>，
       <strong>當根收盤剛跌破五分 MA240</strong>（前一根尚未跌破），
       且這根收盤必須低於 MA5／10／20／240。開盤第一根跳空跌破也算。
@@ -151,10 +153,10 @@ def _lead_block(result: BacktestResult) -> str:
       最下面是 <strong>Yahoo 日K</strong>（約兩年，含日線 MA5／10／20／60／200）方便對照。
       K 棒漲紅跌綠。
     </p>"""
-    return """
+    return f"""
     <div class="banner">每檔一張圖：上五分K、中十五分K、下小時K、最下日K（十五分與小時由五分合成，日K另抓 Yahoo 日線）</div>
     <p class="lead">
-      同一套台股掃描池：每天上市＋上櫃成交額前 100，濾掉 ETF、金融股、電信股與收盤價 500 以上。
+      同一套台股掃描池：{pool}，濾掉 ETF、金融股、電信股與收盤價 500 以上。
       五分K <strong>MA5 &gt; MA10 &gt; MA20 且往上</strong>，
       <strong>當根收盤剛站上五分 MA240</strong>（前一根尚未站上），
       且這根收盤必須高於 MA5／10／20／240。開盤第一根跳空站上也算。
@@ -165,23 +167,24 @@ def _lead_block(result: BacktestResult) -> str:
 
 
 def _chips_html(result: BacktestResult) -> str:
+    top = getattr(result, "top", 200)
     if _result_side(result) == "short":
-        common = """
+        common = f"""
       <span class="chip">不含 ETF</span>
       <span class="chip">不含金融股</span>
       <span class="chip">不含電信股</span>
-      <span class="chip">成交額前 100</span>
+      <span class="chip">成交額前 {top}</span>
       <span class="chip">股價 &lt; 500</span>
       <span class="chip">空方</span>
       <span class="chip">MA5 &lt; 10 &lt; 20 往下</span>
       <span class="chip">當根收盤跌破 MA240</span>
       <span class="chip">收盤 &lt; 所有均線</span>"""
     else:
-        common = """
+        common = f"""
       <span class="chip">不含 ETF</span>
       <span class="chip">不含金融股</span>
       <span class="chip">不含電信股</span>
-      <span class="chip">成交額前 100</span>
+      <span class="chip">成交額前 {top}</span>
       <span class="chip">股價 &lt; 500</span>
       <span class="chip">MA5 &gt; 10 &gt; 20 往上</span>
       <span class="chip">當根收盤站上 MA240</span>

@@ -274,7 +274,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("日K / MA5 10 20 60 240", text)
         self.assertIn("最下＝日K", text)
         self.assertIn("上＝五分K", text)
-        self.assertIn("成交額前 100", text)
+        self.assertIn("成交額前 200", text)
         self.assertIn("股價 &lt; 500", text)
         self.assertIn("一小時後", text)
         self.assertIn("進場後一小時勝率", text)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """台股永豐監控（單一檔，可直接放到 PyCharm 執行）。
 
-成交額前 100，濾 ETF／金融／電信／股價 500 以上。
+成交額前 200，濾 ETF／金融／電信／股價 500 以上。
 五分或十五分剛站上 MA240 就推 Telegram（只做多方）。
 
 把下面四行金鑰填好，然後 Run。不要把檔名取成 tw.py。
@@ -98,7 +98,7 @@ class RankedStock:
 
 
 def fetch_turnover_ranking(
-    top: int = 100,
+    top: int = 200,
     session: requests.Session | None = None,
     timeout: int = 20,
     as_of: date | None = None,
@@ -220,7 +220,7 @@ def last_n_weekdays(n: int = 5, today: date | None = None) -> list[date]:
 
 def fetch_daily_turnover_ranking(
     on_date: date,
-    top: int = 100,
+    top: int = 200,
     session: requests.Session | None = None,
     timeout: int = 20,
 ) -> tuple[list[RankedStock], str | None]:
@@ -1358,7 +1358,7 @@ def test_telegram() -> int:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="永豐 Shioaji 台股五分／十五分 MA240 Telegram 監控")
     p.add_argument("--tf", choices=("5m", "15m", "both"), default="both")
-    p.add_argument("--top", type=int, default=100)
+    p.add_argument("--top", type=int, default=200)
     p.add_argument("--max-price", type=float, default=500.0)
     p.add_argument("--test", action="store_true", help="只測 Telegram")
     p.add_argument("--once", action="store_true", help="抓歷史K掃一次就結束（可盤後）")

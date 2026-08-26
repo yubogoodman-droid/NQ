@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
         description="台股十五分K：MA5>MA10>MA20且往上、剛站上十五分MA240，回測近 N 個交易日"
     )
     p.add_argument("--days", type=int, default=10, help="回測交易日數（預設 10）")
-    p.add_argument("--top", type=int, default=100, help="成交額前 N 名（預設 100）")
+    p.add_argument("--top", type=int, default=200, help="成交額前 N 名（預設 200）")
     p.add_argument("--max-price", type=float, default=500.0, help="濾掉此價格以上（預設 500）")
     p.add_argument("--kline-range", default="1mo", help="Yahoo 五分K區間（預設 1mo）")
     p.add_argument("--include-etf", action="store_true", help="不過濾 ETF")
