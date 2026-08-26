@@ -71,6 +71,7 @@ python3 examples/watch_tw_5m_fade.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView：`pinescript/tw_5m_fade_ma_stack.pine`。
 
+近一週（2026-08-24→08-26 為主，成交額前 80、700 以上拿掉）：**26 筆、勝率 26.9%、−12.1%**。開盤缺口空排容易被停損；**陽明 08-26 09:05** 收 61.80 跌破 MA240 62.49，做到目標 **+4.50%**。
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-fade-short-9faf/docs/tw-5m-fade/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
