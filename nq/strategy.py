@@ -48,8 +48,8 @@ class NQWBottomStrategy:
     min_bars_between_lows: int = 8
     max_bars_between_lows: int = 24
     max_pattern_hours: float = 2.0
-    min_spring_pct: float = 0.0006
-    min_spring_points: float = 10.0
+    min_spring_pct: float = 0.001
+    min_spring_points: float = 25.0
     min_bounce_pct: float = 0.001
     max_reclaim_bars: int = 36
     max_breakout_bars: int = 36

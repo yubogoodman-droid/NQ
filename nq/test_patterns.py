@@ -160,3 +160,27 @@ def test_pattern_longer_than_two_hours_is_ignored() -> None:
     head, tail = rows[:18], rows[18:]
     df = _df(head + pad + tail)
     assert detect_w_bottoms(df) == []
+
+
+def test_shallow_l2_breakdown_is_ignored() -> None:
+    """L2 只略破 L1（約 20 點 / <0.10%）不算破底。"""
+    rows = _flat(8, 10040.0)
+    rows.append((10020, 10024, 10012, 10016))
+    rows.append((10016, 10018, 10000, 10008))  # L1
+    rows.append((10008, 10022, 10006, 10020))
+    rows.append((10020, 10032, 10016, 10030))
+    rows.append((10030, 10042, 10026, 10040))
+    rows.append((10040, 10052, 10036, 10048))
+    rows.append((10048, 10050, 10030, 10032))
+    rows.append((10032, 10034, 9985, 9990))  # 只破 15 點
+    rows.append((9990, 10012, 9982, 10008))
+    rows.append((10008, 10020, 10004, 10016))
+    rows.append((10016, 10022, 10006, 10010))
+    rows.append((10010, 10014, 10001, 10006))  # L3
+    rows.append((10006, 10018, 10004, 10016))
+    rows.append((10016, 10028, 10012, 10026))
+    rows.append((10026, 10038, 10022, 10036))
+    rows.append((10036, 10048, 10032, 10046))
+    rows.append((10046, 10060, 10044, 10056))
+    rows.extend(_flat(6, 10058.0, drift=1.0))
+    assert detect_w_bottoms(_df(rows)) == []

@@ -4,7 +4,8 @@ strategy("NQ 五分K 破底W底進場", overlay=true, default_qty_type=strategy.
 // L1 左、L2 破底、L3 右
 swingLen      = input.int(3, "轉折確認 K 數", minval=1)
 tolPct        = input.float(0.1, "L1/L3 價差容忍 (%)", minval=0.05, step=0.05) / 100
-minSpringPct  = input.float(0.06, "L2 低於 L1 最少 (%)", minval=0.02, step=0.01) / 100
+minSpringPct  = input.float(0.10, "L2 低於 L1 最少 (%)", minval=0.05, step=0.01) / 100
+minSpringPts  = input.float(25.0, "L2 低於 L1 最少點數", minval=0, step=1)
 minBouncePct  = input.float(0.10, "破底前最少反彈 (%)", minval=0.05, step=0.01) / 100
 minBars       = input.int(8, "L1 到 L3 最少間隔", minval=4)
 maxBars       = input.int(24, "L1 到 L3 最多間隔（2小時）", minval=10)
@@ -51,7 +52,7 @@ if not na(l1) and na(l3) and not na(pl)
     priceOk = math.abs(l1 - pl) / avgLow <= tolPct
     if gap >= minBars and gap <= maxBars and priceOk
         midLow = ta.lowest(low, gap)
-        if l1 - midLow >= l1 * minSpringPct and pl > midLow
+        if l1 - midLow >= math.max(l1 * minSpringPct, minSpringPts) and pl > midLow
             l2       := midLow
             l2Bar    := candBar - ta.barssince(low == midLow)
             l3       := pl
