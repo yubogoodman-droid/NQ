@@ -154,6 +154,8 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
         assert "<img src='img/" in text
         img_dir = path.parent / "img"
         assert any(img_dir.glob("t01_*.png")), "expected a static trade PNG"
+        assert any(img_dir.glob("t01_*_5m.png")), "expected a 5m reference PNG"
+        assert "五分K對照" in text
 
 
 def main() -> int:
