@@ -97,12 +97,13 @@ def detect_w_bottoms(
     min_bounce_pct: float = 0.001,
     max_reclaim_bars: int = 36,
     max_breakout_bars: int = 36,
-    require_neckline_break: bool = True,
+    require_neckline_break: bool = False,
 ) -> list[WBottomPattern]:
     """
     偵測三點破底 W 底。
 
     L2 取 L1 與 L3 之間的最低點。L1 到 L3 須在 2 小時內完成。
+    預設不要求頸線突破；進場由策略在 L3 收盤成交。
     """
     required = {"open", "high", "low", "close"}
     missing = required - set(df.columns)
@@ -167,15 +168,14 @@ def detect_w_bottoms(
                 continue
 
             breakout_idx: int | None = None
-            if require_neckline_break:
-                start_k = l3_idx + swing_lookback
-                end_k = min(l3_idx + max_breakout_bars, n - 1)
-                for k in range(start_k, end_k + 1):
-                    if closes[k] > neckline:
-                        breakout_idx = k
-                        break
-                if breakout_idx is None:
-                    continue
+            start_k = l3_idx + swing_lookback
+            end_k = min(l3_idx + max_breakout_bars, n - 1)
+            for k in range(start_k, end_k + 1):
+                if closes[k] > neckline:
+                    breakout_idx = k
+                    break
+            if require_neckline_break and breakout_idx is None:
+                continue
 
             patterns.append(
                 WBottomPattern(
@@ -192,16 +192,21 @@ def detect_w_bottoms(
                 )
             )
 
-    return _dedupe_patterns(patterns)
+    return _dedupe_patterns(patterns, by_l3=not require_neckline_break)
 
 
-def _dedupe_patterns(patterns: Iterable[WBottomPattern]) -> list[WBottomPattern]:
-    by_breakout: dict[int, WBottomPattern] = {}
+def _dedupe_patterns(
+    patterns: Iterable[WBottomPattern],
+    *,
+    by_l3: bool = True,
+) -> list[WBottomPattern]:
+    by_key: dict[int, WBottomPattern] = {}
     for p in patterns:
-        if p.breakout_idx is None:
+        key = p.l3_idx if by_l3 else p.breakout_idx
+        if key is None:
             continue
         depth = p.neckline - p.l2
-        existing = by_breakout.get(p.breakout_idx)
+        existing = by_key.get(key)
         if existing is None or depth > existing.neckline - existing.l2:
-            by_breakout[p.breakout_idx] = p
-    return sorted(by_breakout.values(), key=lambda p: p.breakout_idx or 0)
+            by_key[key] = p
+    return sorted(by_key.values(), key=lambda p: p.l3_idx)

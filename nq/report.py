@@ -259,7 +259,7 @@ def _render_trade_card(
         <span class="tag tag-info">破底W</span>
         <span class="tag tag-info">5m</span>
       </div>
-      <pre class="trade-detail">entry(頸線突破) {sig.entry:.2f}
+      <pre class="trade-detail">entry(L3收盤) {sig.entry:.2f}
 stop L3 {sig.stop_loss:.2f}
 TP 量度漲幅 = {sig.target:.2f}
 exit {trade.exit_price:.2f}
@@ -295,7 +295,7 @@ def build_report_html(
             img_href = _img_data_uri(png_path) if embed_images else f"img/{img_name}"
         cards_parts.append(_render_trade_card(df, trade, i, img_href=img_href))
     cards = "".join(cards_parts)
-    empty = '<div class="empty">今日未偵測到破底 W 底突破訊號</div>' if not results else ""
+    empty = '<div class="empty">今日未偵測到破底 W 底 L3 收盤進場</div>' if not results else ""
 
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -436,7 +436,7 @@ def build_report_html(
   <div class="page">
     <section class="summary">
       <h1>{html.escape(title)}</h1>
-      <p>{html.escape(symbol)} · 五分 K 破底W底 · L2 須破 ≥0.10%/25點 · L1–L3 2 小時內 · {html.escape(_report_date_range(df))}</p>
+      <p>{html.escape(symbol)} · 五分 K 破底W底 · L3 收盤進場 · L2 須破 ≥0.10%/25點 · L1–L3 2 小時內 · {html.escape(_report_date_range(df))}</p>
       <p style="margin-top:6px;color:#8b949e;font-size:12px;">產生 {html.escape(datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M"))} ET · 圖含 L1 / L2破底 / L3</p>
       <div class="total">
         {stats.get("trades", 0)} 筆 · 勝率 {stats.get("win_rate", 0) * 100:.0f}% ·

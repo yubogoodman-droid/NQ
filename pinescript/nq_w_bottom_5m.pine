@@ -1,7 +1,7 @@
 //@version=5
-strategy("NQ 五分K 破底W底進場", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
+strategy("NQ 五分K 破底W底進場", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, process_orders_on_close=true)
 
-// L1 左、L2 破底、L3 右
+// L1 左、L2 破底、L3 右；L3 收盤進場
 swingLen      = input.int(3, "轉折確認 K 數", minval=1)
 tolPct        = input.float(0.1, "L1/L3 價差容忍 (%)", minval=0.05, step=0.05) / 100
 minSpringPct  = input.float(0.10, "L2 低於 L1 最少 (%)", minval=0.05, step=0.01) / 100
@@ -10,7 +10,6 @@ minBouncePct  = input.float(0.10, "破底前最少反彈 (%)", minval=0.05, step
 minBars       = input.int(8, "L1 到 L3 最少間隔", minval=4)
 maxBars       = input.int(24, "L1 到 L3 最多間隔（2小時）", minval=10)
 maxReclaim    = input.int(12, "L2 後最多幾根須收復", minval=2)
-useCloseBreak = input.bool(true, "收盤突破頸線進場")
 
 pl = ta.pivotlow(low, swingLen, swingLen)
 
@@ -60,8 +59,7 @@ if not na(l1) and na(l3) and not na(pl)
             neckline := ta.highest(high, gap)
             wReady   := true
 
-breakPrice = useCloseBreak ? close : high
-longSignal = wReady and not na(neckline) and breakPrice > neckline and bar_index > l3Bar + swingLen
+longSignal = wReady and not na(l3)
 
 if longSignal
     strategy.entry("破底W做多", strategy.long)

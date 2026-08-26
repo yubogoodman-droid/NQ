@@ -74,7 +74,7 @@ def main() -> None:
 
     print("=== W 底進場訊號 ===")
     if not signals:
-        print("未偵測到 W 底突破訊號")
+        print("未偵測到 W 底 L3 收盤進場訊號")
     for sig in signals:
         print(
             f"{sig.timestamp} | 做多 @ {sig.entry:.2f} | "

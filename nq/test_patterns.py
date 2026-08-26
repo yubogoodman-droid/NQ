@@ -34,7 +34,7 @@ def _flat(n: int, price: float, drift: float = 0.0) -> list[tuple[float, float, 
 
 
 def _l1_l2_l3_rows() -> list[tuple[float, float, float, float]]:
-    """L1 左 → 頸線 → L2 破底 → 收復 → L3 右 → 突破。"""
+    """L1 左 → 頸線 → L2 破底 → 收復 → L3 右（L3 收盤進場）。"""
     rows: list[tuple[float, float, float, float]] = []
     rows.extend(_flat(8, 10040.0))
     rows.append((10020, 10024, 10012, 10016))
@@ -69,8 +69,6 @@ def test_detects_l1_l2_breakdown_l3() -> None:
     assert abs(p.l3 - p.l1) / p.l1 <= 0.001
     assert p.l3 > p.l2
     assert p.l1_idx < p.l2_idx < p.l3_idx
-    assert p.breakout_idx is not None
-    assert df["close"].iloc[p.breakout_idx] > p.neckline
     assert p.stop_loss == p.l3
 
 
@@ -142,14 +140,17 @@ def test_equal_double_bottom_without_l2_breakdown_is_ignored() -> None:
     assert detect_w_bottoms(_df(rows)) == []
 
 
-def test_strategy_emits_long_on_neckline_break() -> None:
+def test_strategy_enters_on_l3_close() -> None:
     df = _df(_l1_l2_l3_rows())
     signals = NQWBottomStrategy().generate_signals(df)
     assert len(signals) == 1
     sig = signals[0]
+    assert sig.bar_idx == sig.pattern.l3_idx
+    assert sig.entry == round(float(df["close"].iloc[sig.pattern.l3_idx]) / 0.25) * 0.25
     assert sig.pattern.l1_idx < sig.pattern.l2_idx < sig.pattern.l3_idx
     assert sig.pattern.l2 < sig.pattern.l1
     assert sig.entry > sig.stop_loss
+    assert sig.stop_loss == sig.pattern.l3
 
 
 def test_pattern_longer_than_two_hours_is_ignored() -> None:

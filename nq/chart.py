@@ -76,7 +76,7 @@ def build_chart(
             col=1,
         )
 
-        neck_x = [_marker_time(df.index[p.neckline_idx]), _marker_time(df.index[p.breakout_idx or p.second_low_idx])]
+        neck_x = [_marker_time(df.index[p.neckline_idx]), _marker_time(df.index[p.l3_idx])]
         fig.add_trace(
             go.Scatter(
                 x=neck_x,
