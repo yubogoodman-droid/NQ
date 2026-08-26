@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""台股 5 分 K：衝高回落後出現 5/10/20 空頭排列就推 Telegram。
+"""台股 5 分 K：5/10/20 空頭排列且收盤剛跌破 MA240 就推 Telegram。
 
-多頭破底反彈的鏡像：先急拉破近期高點，再 V 殺，等 5MA < 10MA < 20MA 第一次排好才通知。
+多方「站上 MA240」的鏡像。對齊券商圖 5/10/20/60/120/240：MA5 < MA10 < MA20
+且三條下彎，當根收盤從 MA240 上跌到下方，收盤也低於 5/10/20。開盤第一根也算。
+陽明 2609 2026-08-26 09:05 那種圖。
 
 用法:
-  python3 examples/watch_tw_5m_fade.py scan --symbols 2330 --range 5d --pages
-  python3 examples/watch_tw_5m_fade.py scan --limit 80 --range 5d --pages
+  python3 examples/watch_tw_5m_fade.py scan --symbols 2609 --range 7d --pages
+  python3 examples/watch_tw_5m_fade.py scan --limit 80 --range 7d --pages
   python3 examples/watch_tw_5m_fade.py alert --test
   python3 examples/watch_tw_5m_fade.py alert --dry-run --once
   python3 examples/watch_tw_5m_fade.py alert
@@ -79,10 +81,9 @@ class FadeSignal:
     entry_idx: int
     entry_price: float
     break_high: float
-    prior_high: float
-    window_low: float
-    rally_pct: float
-    fade_pct: float
+    ma240: float
+    prev_close: float
+    dist_pct: float
     ma5: float
     ma10: float
     ma20: float
@@ -176,74 +177,20 @@ def _finite(*vals: float) -> bool:
     return all(v is not None and not np.isnan(v) for v in vals)
 
 
-def peak_clear_of_mas(high_px: float, *ma_vals: float) -> bool:
-    """衝高那根的上方不能有任何均線。還沒算出來的長均（NaN）不算。"""
-    if high_px <= 0:
-        return False
-    for v in ma_vals:
-        if v is None or (isinstance(v, (float, np.floating)) and np.isnan(v)):
-            continue
-        if float(v) > high_px:
-            return False
-    return True
-
-
-def ma_flip_count(fast: np.ndarray, slow: np.ndarray, i: int, lookback: int) -> int:
-    """近 lookback 根裡 fast/slow 上下穿越的次數（糾結帶會很高）。"""
-    flips = 0
-    start = max(1, i - lookback + 1)
-    for k in range(start, i + 1):
-        if not _finite(fast[k], slow[k], fast[k - 1], slow[k - 1]):
-            continue
-        if (fast[k] > slow[k]) != (fast[k - 1] > slow[k - 1]):
-            flips += 1
-    return flips
-
-
-def stack_pretty(
+def ribbon_down(
     ma5: np.ndarray,
     ma10: np.ndarray,
     ma20: np.ndarray,
-    close: np.ndarray,
     i: int,
     *,
-    slope_bars: int = 3,
-    min_gap_5_10: float = 0.0015,
-    min_gap_10_20: float = 0.0012,
-    min_gap_5_20: float = 0.0030,
-    min_ma5_slope: float = 0.0020,
-    min_ma10_slope: float = 0.0015,
-    min_ma20_slope: float = 0.0005,
-    tangle_lookback: int = 8,
-    max_ma5_ma10_flips: int = 2,
+    require_falling: bool = True,
 ) -> bool:
-    """5/10/20 明顯分開、往下張開。黏在一起或橫盤穿越的糾結帶不算。"""
-    if i < max(slope_bars, 1):
+    """5/10/20 空頭排列；預設三條都要比前一根低。"""
+    if i < 1 or not _finite(ma5[i], ma10[i], ma20[i], ma5[i - 1], ma10[i - 1], ma20[i - 1]):
         return False
-    a5, a10, a20, px = float(ma5[i]), float(ma10[i]), float(ma20[i]), float(close[i])
-    if not _finite(a5, a10, a20, px) or px <= 0:
+    if not (ma5[i] < ma10[i] < ma20[i]):
         return False
-    if not (a5 < a10 < a20):
-        return False
-    gap5 = (a10 - a5) / px
-    gap10 = (a20 - a10) / px
-    gap20 = (a20 - a5) / px
-    if gap5 < min_gap_5_10 or gap10 < min_gap_10_20 or gap20 < min_gap_5_20:
-        return False
-    p5, p10, p20 = float(ma5[i - slope_bars]), float(ma10[i - slope_bars]), float(ma20[i - slope_bars])
-    if not _finite(p5, p10, p20):
-        return False
-    if (p5 - a5) / px < min_ma5_slope:
-        return False
-    if (p10 - a10) / px < min_ma10_slope:
-        return False
-    if (p20 - a20) / px < min_ma20_slope:
-        return False
-    if gap20 <= (p20 - p5) / px:
-        return False
-    if ma_flip_count(ma5, ma10, i, tangle_lookback) > max_ma5_ma10_flips:
-        return False
-    if px > a5:
+    if require_falling and not (ma5[i] < ma5[i - 1] and ma10[i] < ma10[i - 1] and ma20[i] < ma20[i - 1]):
         return False
     return True
 
@@ -251,143 +198,58 @@ def stack_pretty(
 def detect_signals(
     df: pd.DataFrame,
     *,
-    lookback: int = 48,
-    min_rally_pct: float = 0.02,
-    fade_bars: int = 24,
-    min_fade_pct: float = 0.01,
-    slope_bars: int = 3,
-    min_entry_gap: int = 12,
     vol_lookback: int = 20,
-    skip_before: tuple[int, int] = (9, 30),
+    skip_before: tuple[int, int] | None = None,
     require_pretty: bool = True,
 ) -> list[FadeSignal]:
-    """急拉破近期高點後，等 5<10<20 排漂亮（分開、下彎）才出訊號。"""
-    if df is None or len(df) < lookback + 20:
+    """5/10/20 空排（下彎）且收盤剛跌破 MA240、收也低於 5/10/20。開盤第一根也算。"""
+    if df is None or len(df) < 241:
         return []
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
-    low = df["Low"].to_numpy(float)
     volume = df["Volume"].to_numpy(float) if "Volume" in df.columns else np.zeros(len(df))
     ma5 = sma(close, 5)
     ma10 = sma(close, 10)
     ma20 = sma(close, 20)
-    ma60 = sma(close, 60)
-    ma120 = sma(close, 120)
     ma240 = sma(close, 240)
     n = len(close)
-    warmup = max(lookback, 20)
-    dates = np.array([ts.date() for ts in df.index])
-    sess0 = np.zeros(n, dtype=int)
-    start = 0
-    for i in range(n):
-        if i and dates[i] != dates[i - 1]:
-            start = i
-        sess0[i] = start
     signals: list[FadeSignal] = []
-    spike_from: int | None = None
-    peak_idx = 0
-    peak_high = 0.0
-    prior_resist = 0.0
-    spike_low = 0.0
-    last_entry = -(10**9)
 
-    def stacked_at(i: int) -> bool:
-        if i < 0 or np.isnan(ma5[i]) or np.isnan(ma10[i]) or np.isnan(ma20[i]):
-            return False
-        return bool(ma5[i] < ma10[i] < ma20[i])
-
-    def mark_spike(i: int, resist: float, floor: float) -> None:
-        nonlocal spike_from, peak_idx, peak_high, prior_resist, spike_low
-        px = float(high[i])
-        if spike_from is None:
-            spike_from = i
-            peak_idx = i
-            peak_high = px
-            prior_resist = resist
-            spike_low = floor
-        elif px > peak_high:
-            peak_idx = i
-            peak_high = px
-            spike_low = min(spike_low, floor)
-
-    for i in range(warmup, n):
-        if spike_from is not None and i - peak_idx > fade_bars:
-            spike_from = None
-
-        prior_high = float(np.max(high[i - lookback : i]))
-        win_low = float(np.min(low[i - lookback : i]))
-        if prior_high > 0 and win_low > 0 and high[i] > prior_high:
-            rally_pct = (float(high[i]) - win_low) / win_low
-            if rally_pct >= min_rally_pct:
-                mark_spike(i, prior_high, win_low)
-
-        # 今日急拉：即使沒破到昨天高點，盤中低點反彈夠猛也算衝高
-        s0 = int(sess0[i])
-        if i - s0 >= 8:
-            sess_high = float(np.max(high[s0:i]))
-            sess_low = float(np.min(low[s0:i]))
-            if sess_low > 0 and high[i] > sess_high:
-                sess_rally = (float(high[i]) - sess_low) / sess_low
-                if sess_rally >= min_rally_pct:
-                    mark_spike(i, sess_high, sess_low)
-
-        if spike_from is None or i <= peak_idx:
-            continue
+    for i in range(240, n):
         ts = df.index[i]
         if skip_before and (ts.hour, ts.minute) < skip_before:
             continue
-        if i - last_entry < min_entry_gap:
+        if not _finite(ma5[i], ma10[i], ma20[i], ma240[i], ma240[i - 1], close[i], close[i - 1]):
             continue
-        if require_pretty:
-            ready = stack_pretty(ma5, ma10, ma20, close, i, slope_bars=slope_bars)
-            was_ready = stack_pretty(ma5, ma10, ma20, close, i - 1, slope_bars=slope_bars)
-        else:
-            ready = stacked_at(i)
-            was_ready = stacked_at(i - 1)
-        if not ready or was_ready:
-            continue
-        if peak_high <= 0:
-            continue
-        if not peak_clear_of_mas(
-            peak_high,
-            ma5[peak_idx],
-            ma10[peak_idx],
-            ma20[peak_idx],
-            ma60[peak_idx],
-            ma120[peak_idx],
-            ma240[peak_idx],
-        ):
-            continue
-        fade = (peak_high - float(close[i])) / peak_high
-        if fade < min_fade_pct:
-            continue
-        if i >= slope_bars and not np.isnan(ma5[i - slope_bars]) and ma5[i] >= ma5[i - slope_bars]:
+        stacked = ribbon_down(ma5, ma10, ma20, i, require_falling=require_pretty)
+        crossed = float(close[i]) < float(ma240[i]) and float(close[i - 1]) >= float(ma240[i - 1])
+        below_all = (
+            float(close[i]) < float(ma5[i])
+            and float(close[i]) < float(ma10[i])
+            and float(close[i]) < float(ma20[i])
+            and float(close[i]) < float(ma240[i])
+        )
+        if not (stacked and crossed and below_all):
             continue
         vol_avg = float(np.mean(volume[max(0, i - vol_lookback) : i]) or 0.0)
         vol_ratio = float(volume[i] / vol_avg) if vol_avg > 0 else 0.0
-        s0 = int(sess0[peak_idx])
-        sess_floor = float(np.min(low[s0 : peak_idx + 1])) if peak_idx >= s0 else spike_low
-        floor = sess_floor if 0 < sess_floor < peak_high else spike_low
-        rally_pct = (peak_high - floor) / floor if floor > 0 else 0.0
-        spike_low = floor
+        m240 = float(ma240[i])
+        px = float(close[i])
         signals.append(
             FadeSignal(
-                break_idx=peak_idx,
+                break_idx=i,
                 entry_idx=i,
-                entry_price=float(close[i]),
-                break_high=peak_high,
-                prior_high=prior_resist,
-                window_low=spike_low,
-                rally_pct=rally_pct,
-                fade_pct=fade,
+                entry_price=px,
+                break_high=float(high[i]),
+                ma240=m240,
+                prev_close=float(close[i - 1]),
+                dist_pct=(m240 - px) / m240 if m240 else 0.0,
                 ma5=float(ma5[i]),
                 ma10=float(ma10[i]),
                 ma20=float(ma20[i]),
                 volume_ratio=vol_ratio,
             )
         )
-        last_entry = i
-        spike_from = None
     return signals
 
 
@@ -401,7 +263,7 @@ def simulate(df: pd.DataFrame, sigs: Sequence[FadeSignal]) -> list[FadeTrade]:
     trades: list[FadeTrade] = []
     for sig in sigs:
         entry = sig.entry_price
-        stop = sig.break_high * 1.003
+        stop = max(sig.break_high, sig.ma240) * 1.003
         risk = stop - entry
         if risk <= 0:
             continue
@@ -484,8 +346,8 @@ def draw_signal_png(
 
     _use_cjk_font()
     end = trade.exit_idx if trade is not None else sig.entry_idx
-    start = max(0, sig.break_idx - 30)
-    stop = min(len(df) - 1, end + 12)
+    start = max(0, sig.break_idx - 36)
+    stop = min(len(df) - 1, end + 16)
     window = df.iloc[start : stop + 1]
     xs = range(len(window))
     o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
@@ -525,14 +387,14 @@ def draw_signal_png(
 
     bx, ex = sig.break_idx - start, sig.entry_idx - start
     if 0 <= bx < len(window):
-        ax.scatter([bx], [sig.break_high], s=42, color="#facc15", zorder=6)
+        ax.scatter([bx], [sig.ma240], s=42, color="#f472b6", zorder=6)
         ax.annotate(
-            f"衝高 {sig.break_high:.1f}",
-            (bx, sig.break_high),
+            f"破MA240 {sig.ma240:.1f}",
+            (bx, sig.ma240),
             textcoords="offset points",
             xytext=(0, 10),
             ha="center",
-            color="#fde68a",
+            color="#f9a8d4",
             fontsize=8,
         )
     if 0 <= ex < len(window):
@@ -542,7 +404,7 @@ def draw_signal_png(
     ts = df.index[sig.entry_idx]
     ax.set_title(
         f"{title}  {ts.strftime('%m-%d %H:%M')}  "
-        f"衝 {sig.rally_pct*100:.1f}% → 回 {sig.fade_pct*100:.1f}%  5<10<20",
+        f"破 MA240 {sig.ma240:.1f} → {sig.entry_price:.1f}  5<10<20",
         color="#e8f0ea",
         fontsize=11,
     )
@@ -585,12 +447,12 @@ def write_html_report(
             "</header>"
             f"<div class='tags'><span class='tag tag-info'>{escape(row['symbol'])}</span>"
             f"<span class='tag'>5分K</span><span class='tag'>5&lt;10&lt;20</span>"
-            f"<span class='tag'>做空</span></div>"
+            f"<span class='tag'>破MA240</span></div>"
             "<pre class='trade-detail'>"
-            f"進場 {sig.entry_price:.2f}  衝高 {sig.break_high:.2f} @ {bt.strftime('%H:%M')}\n"
-            f"衝高 {sig.rally_pct*100:.1f}%  回落 {sig.fade_pct*100:.1f}%\n"
+            f"進場 {sig.entry_price:.2f}  破 MA240 {sig.ma240:.2f} @ {bt.strftime('%H:%M')}\n"
+            f"前收 {sig.prev_close:.2f}  距年線 {sig.dist_pct*100:.2f}%\n"
             f"MA5 {sig.ma5:.2f}  MA10 {sig.ma10:.2f}  MA20 {sig.ma20:.2f}"
-            f"  間隔 {(sig.ma20-sig.ma5)/sig.entry_price*100:.2f}%"
+            f"  MA240 {sig.ma240:.2f}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -600,7 +462,7 @@ def write_html_report(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>台股 5分K 衝高回落 · 5/10/20 空頭排列</title>
+<title>台股 5分K 空頭排列跌破 MA240</title>
 <style>
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -620,9 +482,9 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>台股 5分K 衝高回落 · 做空</h1>
+<h1>台股 5分K 空頭排列跌破 MA240</h1>
 <p class="muted">{escape(period)} · {len(universe)} 檔
-<br/>急拉破近 4 小時高點或今日高點（漲幅 ≥ 2%），且衝高那根上方不能有任何均線。24 根內 5MA &lt; 10MA &lt; 20MA 要明顯分開、往下張開才算；糾結黏帶不算。</p>
+<br/>5MA &lt; 10MA &lt; 20MA 且三條下彎，當根收盤剛跌破 MA240，收盤也低於 5/10/20。開盤第一根也算。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -630,7 +492,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <div class="card">標的<b>{len({h[0]['code'] for h in hits})}</b></div>
 </div>
 </section>
-{''.join(cards) or "<div class='empty'>這段期間沒有衝高後形成 5/10/20 空頭排列</div>"}
+{''.join(cards) or "<div class='empty'>這段期間沒有 5/10/20 空排跌破 MA240</div>"}
 </div></body></html>
 """
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -737,15 +599,14 @@ def fmt_alert(row: dict, df: pd.DataFrame, sig: FadeSignal) -> str:
     last = float(df["Close"].iloc[-1])
     name = row.get("name") or row["code"]
     return (
-        f"🟢 <b>衝高回落 · 5/10/20 空頭排列</b>\n"
+        f"🟢 <b>5/10/20 空頭排列跌破 MA240</b>\n"
         f"{escape(str(name))} <code>{escape(row['code'])}</code>\n"
         f"時間: <code>{et.strftime('%Y-%m-%d %H:%M')} 台北</code>\n"
         f"現價: <code>{sig.entry_price:.2f}</code>（最新 {last:.2f}）\n"
-        f"衝高: <code>{bt.strftime('%H:%M')}</code> high={sig.break_high:.2f}\n"
-        f"衝高: <b>{sig.rally_pct*100:.1f}%</b> → 回落 <b>{sig.fade_pct*100:.1f}%</b>\n"
-        f"MA5 {sig.ma5:.2f} &lt; MA10 {sig.ma10:.2f} &lt; MA20 {sig.ma20:.2f}"
-        f"（間隔 {(sig.ma20-sig.ma5)/sig.entry_price*100:.2f}%）\n"
-        f"#台股 #五分K #衝高回落 #做空 #{row['code']}"
+        f"破線: <code>{bt.strftime('%H:%M')}</code> MA240={sig.ma240:.2f}\n"
+        f"前收 {sig.prev_close:.2f} → 收 {sig.entry_price:.2f}（距年線 {sig.dist_pct*100:.2f}%）\n"
+        f"MA5 {sig.ma5:.2f} &lt; MA10 {sig.ma10:.2f} &lt; MA20 {sig.ma20:.2f}\n"
+        f"#台股 #五分K #空頭排列 #MA240 #{row['code']}"
     )
 
 
@@ -788,7 +649,7 @@ def hit_on_day(df: pd.DataFrame, sig: FadeSignal, day) -> bool:
 
 
 def hit_prices(row: dict, sig: FadeSignal, df: pd.DataFrame) -> list[float]:
-    out: list[float] = [float(sig.entry_price), float(sig.break_high)]
+    out: list[float] = [float(sig.entry_price), float(sig.break_high), float(sig.ma240)]
     if row.get("close") is not None:
         out.append(float(row["close"]))
     if df is None or not len(df):
@@ -854,7 +715,7 @@ def scan_symbol(
         meta["error"] = str(exc)[:80]
         return [], meta
     meta["bars"] = int(len(df))
-    if len(df) < 70:
+    if len(df) < 241:
         meta["error"] = "too_few_bars"
         return [], meta
     if row.get("close") is None and len(df):
@@ -906,7 +767,7 @@ def cmd_scan(args) -> int:
         extra = f" {trade.exit_reason} {trade.pnl_pct*100:+.2f}%" if trade else ""
         print(
             f"  [{i}] {row['code']} {row.get('name','')} {ts.strftime('%m-%d %H:%M')} "
-            f"rally {sig.rally_pct*100:.1f}% fade {sig.fade_pct*100:.1f}%{extra}"
+            f"MA240 {sig.ma240:.2f} dist {sig.dist_pct*100:.2f}%{extra}"
         )
 
     html_path = Path(args.html) if args.html else (PAGES if args.pages else None)
@@ -918,7 +779,7 @@ def cmd_scan(args) -> int:
         if args.max_price is not None:
             period += f" · 股價≤{args.max_price:g}"
         if pretty:
-            period += " · 均線不糾結"
+            period += " · 均線下彎"
         out = write_html_report(html_path, hits, universe, period)
         write_view_html(out)
         print(f"html={out}")
@@ -994,7 +855,7 @@ def cmd_alert(args) -> int:
         ok = tg_send(
             token,
             chat_id,
-            f"✅ 台股 5分K 衝高回落 bot 測試\n{datetime.now(TPE).strftime('%Y-%m-%d %H:%M:%S')} 台北",
+            f"✅ 台股 5分K 空排跌破 MA240 bot 測試\n{datetime.now(TPE).strftime('%Y-%m-%d %H:%M:%S')} 台北",
             dry_run=args.dry_run,
         )
         return 0 if ok else 1
@@ -1031,7 +892,7 @@ def cmd_alert(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="台股 5分K 衝高回落 → 5/10/20 空頭排列通知")
+    p = argparse.ArgumentParser(description="台股 5分K 空頭排列跌破 MA240 通知")
     sub = p.add_subparsers(dest="cmd")
 
     def add_universe(sp: argparse.ArgumentParser) -> None:
@@ -1041,12 +902,12 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--max-price", type=float, default=None)
         sp.add_argument("--symbols", default="", help="逗號分隔代號，例如 2330,2303")
         sp.add_argument("--also", default="", help="額外併入掃描的代號")
-        sp.add_argument("--range", dest="range_", default="5d")
+        sp.add_argument("--range", dest="range_", default="7d")
         sp.add_argument("--sleep", type=float, default=0.2)
         sp.add_argument(
             "--loose",
             action="store_true",
-            help="不擋均線糾結，第一次 5<10<20 就算",
+            help="不要求均線下彎，只要 5<10<20 且跌破 MA240",
         )
 
     s = sub.add_parser("scan", help="回看近幾日並可出 HTML")
