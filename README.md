@@ -60,6 +60,25 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
+## NQ 五分 K 急跌後站上 MA20
+
+台股那種急殺之後，**等收盤站上 MA20 才做多**（不再接刀）。  
+灌殺前均線黏帶、30 分內穿 MA20、放量；90 分內收紅站上 MA20 進場。  
+停損仍在急跌低下方，目標 1.5R。只做 RTH，09–10 不進。
+
+Yahoo 五分 60 天（2026-06-16 → 08-26）：**6 筆、勝率 16.7%、−155 點**。  
+漏斗：急跌放量 201 → 站上 MA20 很多，但停損太寬被擋 153，只剩 6 筆；其中 1 筆 +151，其餘停損／時間出場。  
+含 ETH／開盤 89 筆、勝率 37%、−1295。  
+結論：**沒料。** 站上 MA20 時離急跌低已經很遠，停損一次 70～90 點；假站上後續跌會把整段吐回去。接刀版（11 筆 −10）一樣不行。NQ 還是用破底翻。
+
+```bash
+python3 examples/nq_sharp_drop.py backtest --period 60d --html output/nq_sharp_drop.html
+python3 examples/nq_sharp_drop.py backtest --period 60d --pages
+python3 examples/test_nq_sharp_drop.py
+```
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-sharp-drop-2f6f/docs/nq-sharp-drop/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
