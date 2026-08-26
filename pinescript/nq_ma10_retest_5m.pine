@@ -1,0 +1,97 @@
+//@version=5
+strategy("NQ 五分K 破底回踩 MA10", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
+
+// 破底 → 站上 MA10 → 回踩 MA10 做多
+lookback     = input.int(24, "破底回看 K 數（5m×24≈2小時）", minval=5)
+minDepth     = input.float(20.0, "最少破底深度（點）", minval=1)
+reclaimBars  = input.int(18, "站上 MA10 最久等幾根", minval=2)
+pullbackBars = input.int(18, "回踩最久等幾根", minval=2)
+minAbove     = input.int(1, "回踩前至少幾根完全在 MA10 上", minval=0)
+maxPierce    = input.float(25.0, "回踩最多刺破 MA10（點）", minval=1)
+stopBuf      = input.float(12.0, "停損緩衝（點）", minval=0)
+targetR      = input.float(2.0, "目標 R 倍數", minval=0.5)
+maxRisk      = input.float(80.0, "最大風險（點）", minval=5)
+minRisk      = input.float(8.0, "最小風險（點）", minval=1)
+wideStop     = input.bool(false, "停損用破底低點（否則停在回踩 K / MA10 下）")
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, 20)
+ma30 = ta.sma(close, 30)
+ma60 = ta.sma(close, 60)
+
+priorLow = ta.lowest(low[1], lookback)
+brokeNow = not na(priorLow) and not na(ma10) and low < priorLow and (priorLow - low) >= minDepth and low < ma10
+
+var float breakLow   = na
+var int   breakBar   = na
+var int   reclaimBar = na
+var int   barsAbove  = 0
+var bool  reclaimed  = false
+
+resetSetup() =>
+    breakLow   := na
+    breakBar   := na
+    reclaimBar := na
+    barsAbove  := 0
+    reclaimed  := false
+
+if brokeNow
+    if na(breakBar) or low < breakLow
+        breakLow   := low
+        breakBar   := bar_index
+        reclaimBar := na
+        barsAbove  := 0
+        reclaimed  := false
+
+if not na(breakBar) and not reclaimed
+    if low < breakLow
+        breakLow := low
+        breakBar := bar_index
+    if bar_index > breakBar + reclaimBars
+        resetSetup()
+    else if close > ma10
+        reclaimed  := true
+        reclaimBar := bar_index
+        barsAbove  := low > ma10 ? 1 : 0
+
+longSignal = false
+entryPx = close
+stopPx  = close
+tgtPx   = close
+
+if reclaimed and not na(reclaimBar)
+    if low < breakLow
+        resetSetup()
+    else if close < ma10
+        resetSetup()
+    else if bar_index - reclaimBar > pullbackBars
+        resetSetup()
+    else
+        if low > ma10
+            barsAbove += 1
+        else if bar_index > reclaimBar
+            pierce = ma10 - low
+            if pierce > maxPierce
+                resetSetup()
+            else if barsAbove >= minAbove
+                entryPx := close
+                stopPx  := wideStop ? (breakLow - stopBuf) : (math.min(low, ma10) - stopBuf)
+                risk    = entryPx - stopPx
+                if risk >= minRisk and risk <= maxRisk
+                    tgtPx := entryPx + risk * targetR
+                    longSignal := true
+
+if longSignal
+    strategy.entry("回踩MA10", strategy.long)
+    strategy.exit("回踩出場", "回踩MA10", stop=stopPx, limit=tgtPx)
+    resetSetup()
+
+plot(ma5,  "MA5",  color=color.new(#ffa726, 0), linewidth=1)
+plot(ma10, "MA10", color=color.new(#4dd0e1, 0), linewidth=2)
+plot(ma20, "MA20", color=color.new(#ec407a, 0), linewidth=1)
+plot(ma30, "MA30", color=color.new(#42a5f5, 0), linewidth=1)
+plot(ma60, "MA60", color=color.new(#66bb6a, 0), linewidth=1)
+
+plotshape(brokeNow, title="破底", style=shape.circle, location=location.belowbar, color=color.new(#f472b6, 0), size=size.tiny)
+plotshape(longSignal, title="回踩進場", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
