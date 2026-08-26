@@ -25,10 +25,11 @@
 ## NQ 五分 K 打底後 5/10/20 多排
 
 五分鐘圖：急跌、低點短打底或急殺 V，然後 **MA5 > MA10 > MA20 散開上攻**才做多。  
-對齊三張截圖：08-25 22:20、07-22 19:50、07-28 11:05。
+對齊三張截圖：08-25 22:20、07-22 19:50、07-28 11:05。  
+收盤剛站上 MA30、這根低點還在線下的不進（06-23 那種貼著壓力）。
 
-近一個月 Yahoo 5m（07-23 → 08-26）：嚴格 **5 筆、勝率 100%、+386**（含 07-28 V 和 08-25 U；07-22 夜盤在 30 天窗外）。  
-近兩個月（06-16 → 08-26）：嚴格 **13 筆、勝率 61.5%、+645**。`--loose` 同區間 62 筆、勝率 34%、+265。
+近一個月 Yahoo 5m（07-23 → 08-26）：嚴格 **4 筆、勝率 100%、+327**（含 07-28 V 和 08-25 U；07-22 夜盤在 30 天窗外）。  
+近兩個月（06-16 → 08-26）：嚴格 **9 筆、勝率 77.8%、+747**。濾掉 06-23 / 06-28 / 07-17 / 07-30 四筆貼 MA30 的。
 
 ```bash
 python3 examples/nq_5m_base_stack.py backtest --period 30d --pages
@@ -38,7 +39,7 @@ python3 examples/nq_5m_base_stack.py alert --test
 python3 examples/nq_5m_base_stack.py alert --dry-run --once
 ```
 
-預覽（兩個月 13 筆，防快取新網址）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/two-month.html
+預覽（兩個月 9 筆，濾掉貼 MA30，新網址）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/no-ma30.html
 
 TradingView：`pinescript/nq_5m_base_stack.pine`
 

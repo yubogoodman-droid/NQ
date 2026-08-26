@@ -755,6 +755,10 @@ def write_html_report(
         q_bits.append(f"Q{q} {info['n']}筆 {info['pnl']:+.1f}")
     q_line = " · ".join(q_bits) if q_bits else "無品質分組"
     out = Path(path)
+    img_dir = out.parent / "img"
+    if img_dir.exists():
+        for old in img_dir.glob("*.png"):
+            old.unlink()
     cards = _render_trade_cards(df, trades, out)
     extra_html = ""
     if extra_trades is not None:
