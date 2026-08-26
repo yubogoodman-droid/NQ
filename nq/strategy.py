@@ -39,7 +39,7 @@ class NQWBottomStrategy:
     NQ 五分 K 破底 W 底做多。
 
     L1 左腳 → 反彈 → L2 中間破底 → 收復 → L3 右腳收盤進場
-    停損：L3
+    停損：L3 下方 20 點
     停利：頸線 + (頸線 − L2)
     """
 
@@ -53,6 +53,7 @@ class NQWBottomStrategy:
     min_bounce_pct: float = 0.001
     max_reclaim_bars: int = 36
     max_breakout_bars: int = 36
+    stop_below_l3_points: float = 20.0
     tick_size: float = 0.25
     point_value: float = 20.0
 
@@ -75,7 +76,7 @@ class NQWBottomStrategy:
         for pattern in patterns:
             idx = pattern.l3_idx
             entry = self._round_tick(float(df["close"].iloc[idx]))
-            stop = self._round_tick(pattern.stop_loss)
+            stop = self._round_tick(pattern.l3 - self.stop_below_l3_points)
             target = self._round_tick(pattern.target)
             if entry <= stop:
                 continue

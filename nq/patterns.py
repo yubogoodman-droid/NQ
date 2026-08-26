@@ -49,7 +49,7 @@ class WBottomPattern:
 
     @property
     def stop_loss(self) -> float:
-        """停損設於右腳 L3。"""
+        """結構低點（右腳 L3）；實際停損由策略在 L3 下方預留點數。"""
         return self.l3
 
     @property
@@ -77,13 +77,6 @@ def _elapsed_hours(index, start_idx: int, end_idx: int) -> float | None:
         return None
 
 
-def _is_right_trough(lows: Sequence[float], idx: int, lookback: int) -> bool:
-    n = len(lows)
-    if idx + lookback >= n:
-        return False
-    return lows[idx] == min(lows[idx : idx + lookback + 1])
-
-
 def detect_w_bottoms(
     df: pd.DataFrame,
     *,
@@ -103,6 +96,7 @@ def detect_w_bottoms(
     偵測三點破底 W 底。
 
     L2 取 L1 與 L3 之間的最低點。L1 到 L3 須在 2 小時內完成。
+    L3 在該根收盤當下判定（只看已走完的 K，不要求後面幾根守住）。
     預設不要求頸線突破；進場由策略在 L3 收盤成交。
     """
     required = {"open", "high", "low", "close"}
@@ -124,14 +118,12 @@ def detect_w_bottoms(
             continue
         min_spring = max(l1 * min_spring_pct, min_spring_points)
         min_bounce = l1 * min_bounce_pct
-        search_end = min(l1_idx + max_bars_between_lows, n - 1 - swing_lookback)
+        search_end = min(l1_idx + max_bars_between_lows, n - 1)
 
         for l3_idx in range(l1_idx + min_bars_between_lows, search_end + 1):
             hours = _elapsed_hours(df.index, l1_idx, l3_idx)
             if hours is not None and hours > max_pattern_hours:
                 break
-            if not _is_right_trough(lows, l3_idx, swing_lookback):
-                continue
 
             l3 = lows[l3_idx]
             avg = (l1 + l3) / 2
@@ -168,14 +160,15 @@ def detect_w_bottoms(
                 continue
 
             breakout_idx: int | None = None
-            start_k = l3_idx + swing_lookback
-            end_k = min(l3_idx + max_breakout_bars, n - 1)
-            for k in range(start_k, end_k + 1):
-                if closes[k] > neckline:
-                    breakout_idx = k
-                    break
-            if require_neckline_break and breakout_idx is None:
-                continue
+            if require_neckline_break:
+                start_k = l3_idx + 1
+                end_k = min(l3_idx + max_breakout_bars, n - 1)
+                for k in range(start_k, end_k + 1):
+                    if closes[k] > neckline:
+                        breakout_idx = k
+                        break
+                if breakout_idx is None:
+                    continue
 
             patterns.append(
                 WBottomPattern(

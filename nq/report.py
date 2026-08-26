@@ -260,7 +260,7 @@ def _render_trade_card(
         <span class="tag tag-info">5m</span>
       </div>
       <pre class="trade-detail">entry(L3收盤) {sig.entry:.2f}
-stop L3 {sig.stop_loss:.2f}
+stop L3-20點 {sig.stop_loss:.2f}
 TP 量度漲幅 = {sig.target:.2f}
 exit {trade.exit_price:.2f}
 L1 {p.l1:.2f} / L2破底 {p.l2:.2f} / L3 {p.l3:.2f}
@@ -436,7 +436,7 @@ def build_report_html(
   <div class="page">
     <section class="summary">
       <h1>{html.escape(title)}</h1>
-      <p>{html.escape(symbol)} · 五分 K 破底W底 · L3 收盤進場 · L2 須破 ≥0.10%/25點 · L1–L3 2 小時內 · {html.escape(_report_date_range(df))}</p>
+      <p>{html.escape(symbol)} · 五分 K 破底W底 · L3 收盤進場 · 停損 L3-20點 · L1–L3 2 小時內 · {html.escape(_report_date_range(df))}</p>
       <p style="margin-top:6px;color:#8b949e;font-size:12px;">產生 {html.escape(datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M"))} ET · 圖含 L1 / L2破底 / L3</p>
       <div class="total">
         {stats.get("trades", 0)} 筆 · 勝率 {stats.get("win_rate", 0) * 100:.0f}% ·
