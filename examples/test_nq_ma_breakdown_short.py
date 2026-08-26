@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nq.ma_breakdown_short import (  # noqa: E402
+    MA_PERIODS,
     TradeResult,
     detect_signals,
     quality_from_break,
@@ -91,6 +92,37 @@ def test_no_signal_if_only_ma5() -> None:
     assert not sigs, "a shallow dip under MA5 only should not short"
 
 
+def test_no_signal_if_mas_break_one_by_one() -> None:
+    """Uptrend ribbon, then grind down through MA5 first and MA120 last — not 同時."""
+    n = 220
+    close = 19000.0 + np.arange(n, dtype=float) * 4.0
+    i0 = 170
+    close[i0:] = close[i0 - 1] - np.arange(n - i0, dtype=float) * 6.0
+    open_ = close.copy()
+    open_[i0:] = close[i0:] + 4.0
+    high = np.maximum(open_, close) + 2.0
+    low = np.minimum(open_, close) - 2.0
+    idx = pd.date_range("2026-07-28 04:00", periods=n, freq="5min", tz=ET)
+    df = pd.DataFrame(
+        {"Open": open_, "High": high, "Low": low, "Close": close, "Volume": np.full(n, 80.0)},
+        index=idx,
+    )
+    mas = {p: sma(close, p) for p in MA_PERIODS}
+    first_all = None
+    for i in range(max(MA_PERIODS), n):
+        vals = [float(mas[p][i]) for p in MA_PERIODS]
+        if any(np.isnan(v) for v in vals):
+            continue
+        if all(close[i] < v for v in vals):
+            first_all = i
+            break
+    assert first_all is not None, "expected the grind to eventually close under all MAs"
+    prev = [float(mas[p][first_all - 1]) for p in MA_PERIODS]
+    assert not all(close[first_all - 1] >= v for v in prev), "precondition: prev bar already under some MAs"
+    sigs = detect_signals(df, session_start=None, session_end=None)
+    assert not sigs, "sequential ribbon breakdown must not count as 同時跌破"
+
+
 def test_simulate_short_hits_target() -> None:
     df = _make_break_bars(dump=True)
     sigs = detect_signals(df)
@@ -118,6 +150,7 @@ def main() -> int:
     test_summarize_trades()
     test_detect_simultaneous_breakdown()
     test_no_signal_if_only_ma5()
+    test_no_signal_if_mas_break_one_by_one()
     test_simulate_short_hits_target()
     test_demo_html()
     print("ok")

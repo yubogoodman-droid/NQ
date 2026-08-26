@@ -61,6 +61,10 @@ def _below_all(close: float, mas: Sequence[float]) -> bool:
     return all(close < m for m in mas)
 
 
+def _above_all(close: float, mas: Sequence[float]) -> bool:
+    return all(close >= m for m in mas)
+
+
 def quality_from_break(break_span: float, dist_ma120: float, bearish: bool) -> Tuple[int, str]:
     score = 0
     if break_span >= 40.0:
@@ -93,8 +97,8 @@ def detect_signals(
     """
     五分 K 做空：
 
-    本根收盤同時低於 MA5、MA10、MA20、MA30、MA60、MA120，
-    且上一根尚未同時低於這六條（第一根完成「同時跌破」）。
+    上一根收盤仍全部在 MA5/10/20/30/60/120 之上（含貼均），
+    本根收盤才一次全部低於這六條。已先掉在部分均線下、再補破其餘的不算。
     """
     close = df[_col(df, "close")].to_numpy(float)
     open_ = df[_col(df, "open")].to_numpy(float)
@@ -123,12 +127,12 @@ def detect_signals(
             continue
 
         now_below = _below_all(float(close[i]), cur)
-        was_below = _below_all(float(close[i - 1]), prev)
+        was_above = _above_all(float(close[i - 1]), prev)
         if not now_below:
             continue
         bump("below_all")
-        if was_below:
-            bump("already_below")
+        if not was_above:
+            bump("not_simultaneous")
             continue
         bump("fresh_break")
 

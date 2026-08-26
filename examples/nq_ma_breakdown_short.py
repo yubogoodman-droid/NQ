@@ -297,9 +297,9 @@ def write_html_report(
     funnel_line = ""
     if funnel:
         funnel_line = (
-            f"<p class='muted'>漏斗：同時低於六均 {funnel.get('below_all', 0)} → "
-            f"第一根跌破 {funnel.get('fresh_break', 0)} → 進場 {funnel.get('taken', 0)}"
-            f"（已在下方 {funnel.get('already_below', 0)} · 非陰線 {funnel.get('skip_not_bear', 0)} · "
+            f"<p class='muted'>漏斗：收在六均下 {funnel.get('below_all', 0)} → "
+            f"同一根同時跌破 {funnel.get('fresh_break', 0)} → 進場 {funnel.get('taken', 0)}"
+            f"（非同時 {funnel.get('not_simultaneous', 0)} · 非陰線 {funnel.get('skip_not_bear', 0)} · "
             f"太淺 {funnel.get('skip_thin', 0)} · "
             f"時段 {funnel.get('skip_session', 0)} · 風險 {funnel.get('skip_max_risk', 0)}）</p>"
         )
@@ -341,7 +341,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 五分K 跌破均線叢做空</h1>
-<p class="muted">收盤同時跌破 MA5/10/20/30/60/120 · {escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
+<p class="muted">上一根還在六均上、本根收盤才一次跌破 MA5/10/20/30/60/120 · {escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -389,8 +389,8 @@ def cmd_backtest(args) -> int:
     if funnel:
         print(
             "funnel "
-            f"below_all={funnel.get('below_all', 0)} fresh={funnel.get('fresh_break', 0)} "
-            f"taken={funnel.get('taken', 0)} already={funnel.get('already_below', 0)} "
+            f"below_all={funnel.get('below_all', 0)} simultaneous={funnel.get('fresh_break', 0)} "
+            f"taken={funnel.get('taken', 0)} not_simul={funnel.get('not_simultaneous', 0)} "
             f"thin={funnel.get('skip_thin', 0)} bear={funnel.get('skip_not_bear', 0)} "
             f"session={funnel.get('skip_session', 0)} risk={funnel.get('skip_max_risk', 0)}"
         )

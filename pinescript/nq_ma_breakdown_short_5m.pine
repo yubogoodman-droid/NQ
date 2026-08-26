@@ -20,9 +20,12 @@ ma120 = ta.sma(close, 120)
 belowAll(c, a5, a10, a20, a30, a60, a120) =>
     c < a5 and c < a10 and c < a20 and c < a30 and c < a60 and c < a120
 
+aboveAll(c, a5, a10, a20, a30, a60, a120) =>
+    c >= a5 and c >= a10 and c >= a20 and c >= a30 and c >= a60 and c >= a120
+
 nowBelow  = belowAll(close, ma5, ma10, ma20, ma30, ma60, ma120)
-wasBelow  = belowAll(close[1], ma5[1], ma10[1], ma20[1], ma30[1], ma60[1], ma120[1])
-fresh     = nowBelow and not wasBelow
+wasAbove  = aboveAll(close[1], ma5[1], ma10[1], ma20[1], ma30[1], ma60[1], ma120[1])
+fresh     = nowBelow and wasAbove
 bearOk    = not needBear or close < open
 inSess    = hour(time, "America/New_York") >= sessStart and hour(time, "America/New_York") < sessEnd
 
