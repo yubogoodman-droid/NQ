@@ -416,7 +416,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} 五分K 破底回踩 MA10</h1>
-<p class="muted">破底 → 站上 MA10 → 回踩 MA10 做多 · {escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
+<p class="muted">破底（4小時低點）→ 站上 MA10 → 回踩 MA10 做多 · {escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

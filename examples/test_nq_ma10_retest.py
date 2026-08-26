@@ -189,6 +189,13 @@ def test_simulate_hits_target() -> None:
     assert trades[0].pnl_points > 0
 
 
+def test_default_lookback_is_four_hours() -> None:
+    import inspect
+
+    default = inspect.signature(detect_signals).parameters["lookback_bars"].default
+    assert default == 48, "5m × 48 = 4 hours"
+
+
 def test_demo_bars_and_html(tmp_path: Path | None = None) -> None:
     df = make_demo_bars()
     sigs = detect_signals(df)
@@ -212,6 +219,7 @@ def main() -> int:
     test_no_entry_when_stand_is_lost()
     test_no_entry_when_price_runs_away()
     test_simulate_hits_target()
+    test_default_lookback_is_four_hours()
     test_demo_bars_and_html()
     print("ok")
     return 0

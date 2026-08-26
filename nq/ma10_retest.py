@@ -80,7 +80,7 @@ def _col(df: pd.DataFrame, name: str) -> str:
 def detect_signals(
     df: pd.DataFrame,
     *,
-    lookback_bars: int = 24,
+    lookback_bars: int = 48,
     min_break_depth: float = 40.0,
     reclaim_window: int = 18,
     pullback_window: int = 18,
@@ -107,7 +107,7 @@ def detect_signals(
     """
     五分 K 做多三步：
 
-    1. 破底：跌破近 lookback 根低點，深度 ≥ min_break_depth，且低點在 MA10 下方
+    1. 破底：跌破近 4 小時低點（5m × lookback_bars，預設 48 根），深度 ≥ min_break_depth，且低點在 MA10 下方
     2. 站上 MA10：破底後 reclaim_window 根內收盤站上 MA10（短暫刺破可再站上）
     3. 回踩 MA10：至少 min_hold_above 根低點完全在 MA10 上方後，低點回到均線 8 點內（可輕刺）且收盤仍站上
     """

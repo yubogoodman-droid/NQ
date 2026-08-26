@@ -2,7 +2,7 @@
 strategy("NQ 五分K 破底回踩 MA10", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
 
 // 破底 → 站上 MA10 → 回踩 MA10 做多
-lookback     = input.int(24, "破底回看 K 數（5m×24≈2小時）", minval=5)
+lookback     = input.int(48, "破底回看 K 數（5m×48≈4小時）", minval=5)
 minDepth     = input.float(40.0, "最少破底深度（點）", minval=1)
 reclaimBars  = input.int(18, "站上 MA10 最久等幾根", minval=2)
 pullbackBars = input.int(18, "回踩最久等幾根", minval=2)
