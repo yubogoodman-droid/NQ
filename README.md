@@ -25,14 +25,15 @@
 ## NQ 五分 K 打底後 5/10/20 多排
 
 五分鐘圖：急跌、低點短打底，然後 **MA5 > MA10 > MA20 散開上攻**才做多。  
-黏帶點一下、下跌中暫停、或橫很久才排好的都不算。對齊 08-26 截圖：21:35 低點 29096，**22:20** 進場 @ 29161.75。
+黏帶點一下、下跌中暫停、或橫很久才排好的都不算。對齊兩張截圖：08-25 22:20，以及 07-22 19:50（跌 238 後翻多排）。
 
-近 30 天 Yahoo 5m（07-23 → 08-26）：嚴格只留截圖那種 U，**1 筆**（08-25 22:20，+62）。  
-`--loose` 關掉散開門檻後 **14 筆、勝率 42.9%、+121 點**（跌夠 + 翻 5/10/20 就算），裡面會有黏帶、假打底，不是每張都像截圖。
+風險上限改成 **max(80, 跌幅 × 0.5)**：小跌仍最多 80 點，大跌（像 07-22）允許停損跟打底低，才抓得到。
+
+近 60 天 Yahoo 5m：嚴格會抓到 07-22 19:50 和 08-25 22:20。`--loose` 仍是「有跌、有翻 5/10/20」那批，筆數會比較多。
 
 ```bash
+python3 examples/nq_5m_base_stack.py backtest --period 60d --pages
 python3 examples/nq_5m_base_stack.py backtest --period 30d --pages --loose
-python3 examples/nq_5m_base_stack.py backtest --period 60d --html output/nq_5m_base_stack_60d.html
 python3 examples/nq_5m_base_stack.py alert --test
 python3 examples/nq_5m_base_stack.py alert --dry-run --once
 ```

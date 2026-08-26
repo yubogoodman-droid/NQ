@@ -8,7 +8,8 @@ minBase      = input.int(6, "打底最少 K 數")
 maxWait      = input.int(16, "等多排最長 K 數")
 stopBuf      = input.float(8.0, "停損緩衝點數")
 targetR      = input.float(2.0, "目標 R")
-maxRisk      = input.float(80.0, "單筆最大風險")
+maxRisk      = input.float(80.0, "單筆風險下限（點）")
+maxRiskFrac  = input.float(0.50, "單筆風險最多佔跌幅")
 minRibbon    = input.float(14.0, "MA5−MA20 最小帶寬")
 maxRibbon    = input.float(40.0, "MA5−MA20 最大帶寬")
 minGap5      = input.float(8.0, "MA5−MA10 最小")
@@ -64,7 +65,7 @@ if longSignal
     risk = close - (baseLow - stopBuf)
     upCount = (close >= open ? 1 : 0) + (close[1] >= open[1] ? 1 : 0) + (close[2] >= open[2] ? 1 : 0) + (close[3] >= open[3] ? 1 : 0) + (close[4] >= open[4] ? 1 : 0) + (close[5] >= open[5] ? 1 : 0)
     fan = ribbon >= minRibbon and ribbon <= maxRibbon and gap5 >= minGap5 and gap10 >= minGap10 and slope5 >= minSlope5 and upCount >= 4
-    ok = recover <= maxRecover and fan and risk > 0 and risk <= maxRisk
+    ok = recover <= maxRecover and fan and risk > 0 and risk <= math.max(maxRisk, maxRiskFrac * dropPts)
     if ok
         stopLevel = baseLow - stopBuf
         targetLevel = close + risk * targetR

@@ -54,13 +54,17 @@ def test_summarize_trades() -> None:
     assert stats["by_quality"]["A"]["n"] == 2
 
 
-def _make_base_stack_bars(n: int = 220, bounce: bool = True, *, slow: bool = False, knot: bool = False) -> pd.DataFrame:
+def _make_base_stack_bars(
+    n: int = 220, bounce: bool = True, *, slow: bool = False, knot: bool = False, deep: bool = False
+) -> pd.DataFrame:
     """Grind, dump, optional short base then lift until 5/10/20 fan."""
     close = np.zeros(n, dtype=float)
     close[0] = 20000.0
     for i in range(1, 90):
         close[i] = close[i - 1] + (0.35 if i % 2 == 0 else -0.15)
     peak = close[89]
+    dump_step = 16.0 if deep else 8.5
+    lift_after = 8.0 if deep else 5.0
     if slow:
         for k, i in enumerate(range(90, 130)):
             close[i] = peak - 3.2 * (k + 1)
@@ -74,7 +78,7 @@ def _make_base_stack_bars(n: int = 220, bounce: bool = True, *, slow: bool = Fal
             close[i] = close[i - 1] + (0.8 if bounce else -3.0)
     else:
         for k, i in enumerate(range(90, 106)):
-            close[i] = peak - 8.5 * (k + 1)
+            close[i] = peak - dump_step * (k + 1)
         floor = close[105]
         low_i = 108
         close[low_i] = floor - 8.0
@@ -82,10 +86,12 @@ def _make_base_stack_bars(n: int = 220, bounce: bool = True, *, slow: bool = Fal
         for i in range(106, low_i):
             close[i] = floor + (2.0 if i % 2 == 0 else -1.0)
         if bounce and not knot:
+            bounce_step = 9.0 if deep else 3.5
+            bounce_base = 15.0 if deep else 8.0
             for i in range(low_i + 1, 118):
-                close[i] = bottom + 8.0 + 3.5 * (i - low_i)
+                close[i] = bottom + bounce_base + bounce_step * (i - low_i)
             for i in range(118, n):
-                close[i] = min(peak + 20.0, close[i - 1] + 5.0)
+                close[i] = min(peak + 20.0, close[i - 1] + lift_after)
         elif bounce and knot:
             for i in range(low_i + 1, n):
                 close[i] = bottom + 10.0 + (1.2 if i % 2 == 0 else 0.4)
@@ -176,6 +182,18 @@ def test_ref_window_wider_than_zoom() -> None:
     assert (r1 - r0) > (z1 - z0)
 
 
+def test_deep_dump_risk_uses_half_drop() -> None:
+    """07-22 style: dump ~240, first fan is >80pts above the low — old 80-cap missed it."""
+    df = _make_base_stack_bars(bounce=True, deep=True)
+    blocked = detect_signals(df, max_risk=80.0, max_risk_frac=0.0)
+    assert not blocked, "hard 80-pt cap should still reject the deep bounce"
+    sigs = detect_signals(df)
+    assert sigs, "half-drop risk cap should take the 07-22-style fan"
+    risk = sigs[0].entry_price - sigs[0].stop_price
+    assert risk > 80.0
+    assert risk <= max(80.0, 0.50 * sigs[0].drop_pts)
+
+
 def test_no_signal_on_knot_stack() -> None:
     df = _make_base_stack_bars(bounce=True, knot=True)
     sigs = detect_signals(df)
@@ -221,6 +239,7 @@ def main() -> int:
     test_sma()
     test_summarize_trades()
     test_detect_base_then_stack()
+    test_deep_dump_risk_uses_half_drop()
     test_no_signal_on_continued_dump()
     test_no_signal_on_knot_stack()
     test_no_signal_on_slow_dump()

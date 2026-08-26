@@ -193,6 +193,7 @@ def detect_signals(
     stop_buffer: float = 8.0,
     target_r: float = 2.0,
     max_risk: float = 80.0,
+    max_risk_frac: float = 0.50,
     min_ribbon: float = 14.0,
     max_ribbon: float = 40.0,
     min_ma5_ma10: float = 8.0,
@@ -214,6 +215,7 @@ def detect_signals(
       2. 低點短打底：至少 6 根不破底，最多再等 16 根
       3. 第一次翻成 MA5>MA10>MA20 時必須散開上攻（不是三條黏在一起點一下）
       4. 進場前幾根多數收紅，像在墊高，不是區間裡翻排
+      5. 風險最多 max(80, 跌幅一半)，大跌打底才跟得上 07-22 那種反彈
     """
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
@@ -348,9 +350,13 @@ def detect_signals(
             if risk <= 0:
                 bump("skip_bad_risk")
                 break
-            if max_risk > 0 and risk > max_risk:
-                bump("skip_max_risk")
-                break
+            if max_risk > 0:
+                allowed = max_risk
+                if max_risk_frac > 0:
+                    allowed = max(max_risk, max_risk_frac * drop_pts)
+                if risk > allowed:
+                    bump("skip_max_risk")
+                    break
 
             q_score, q_grade = quality_from_setup(drop_pts, recover, ribbon, ma5_s5)
             target = entry + risk * target_r
