@@ -728,6 +728,8 @@ def _equity_svg(pnls: list[float], width: int = 720, height: int = 160) -> str:
 
 def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
     try:
+        import warnings
+
         import matplotlib
 
         matplotlib.use("Agg")
@@ -742,7 +744,7 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
     xs = np.arange(a1 - a0)
     o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
     fig, (ax, axv) = plt.subplots(
-        2, 1, figsize=(10.2, 5.4), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
+        2, 1, figsize=(9.4, 5.0), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
     )
     for a in (ax, axv):
         a.set_facecolor("#101814")
@@ -784,7 +786,9 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     fig.tight_layout(pad=0.45)
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=100, facecolor=fig.get_facecolor())
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fig.savefig(buf, format="png", dpi=90, facecolor=fig.get_facecolor())
     plt.close(fig)
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
@@ -849,7 +853,7 @@ def write_backtest_html(
     *,
     days: int,
     n_symbols: int,
-    chart_limit: int = 60,
+    chart_limit: int | None = None,
 ) -> Path:
     stats = summarize_trades(trades)
     start = datetime.fromtimestamp(trades[0]["t_signal"] / 1000, TZ).strftime("%Y-%m-%d %H:%M") if trades else ""
@@ -869,8 +873,12 @@ def write_backtest_html(
             fwd_bits.append(f"{lab} 勝率 {fs['win_rate']:.0f}% 均 {fs['avg']:+.2f}%")
     fwd_line = " · ".join(fwd_bits)
 
-    ranked = sorted(trades, key=lambda t: abs(t["pnl_pct"]), reverse=True)
-    chart_set = {id(t) for t in ranked[:chart_limit]}
+    if chart_limit is None:
+        chart_set = {id(t) for t in trades}
+    else:
+        ranked = sorted(trades, key=lambda t: abs(t["pnl_pct"]), reverse=True)
+        chart_set = {id(t) for t in ranked[:chart_limit]}
+    print(f"畫 {len(chart_set)} 張圖…", flush=True)
     cards = []
     for i, t in enumerate(trades, 1):
         cls = "pnl-win" if t["pnl_pct"] > 0 else ("pnl-flat" if t["pnl_pct"] == 0 else "pnl-loss")
@@ -885,6 +893,8 @@ def write_backtest_html(
                     f"<div class='mini-chart'><img src='data:image/png;base64,{b64}' "
                     f"alt='#{i} {escape(t['symbol'])}' style='width:100%;display:block;border-radius:10px'/></div>"
                 )
+            if i % 40 == 0:
+                print(f"  圖 {i}/{len(trades)}", flush=True)
         h1 = (t["fwd"].get(4) or 0) * 100
         h2 = (t["fwd"].get(8) or 0) * 100
         cards.append(
@@ -957,16 +967,13 @@ h1{{font-size:18px;margin:0 0 6px}}
 <p class="muted">{escape(kind_line) if kind_line else '無分組'}</p>
 <p class="muted">出場 {escape(reason_line) if reason_line else '—'}</p>
 <p class="muted">無停損續走 {escape(fwd_line) if fwd_line else '—'}</p>
-<p class="muted">等權重每筆 1 單位，不含手續費／資金費。圖只畫 |報酬| 最大的 {min(chart_limit, stats['count'])} 筆。</p>
+<p class="muted">等權重每筆 1 單位，不含手續費／資金費。下面 {stats['count']} 筆都有圖。</p>
 </section>
 {''.join(cards) if cards else "<div class='empty'>這週沒有訊號</div>"}
 </div></body></html>
 """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(html, encoding="utf-8")
-    view = path.parent / "view.html"
-    if path.name == "index.html":
-        view.write_text(html, encoding="utf-8")
     return path
 
 
@@ -998,7 +1005,7 @@ def cmd_backtest(args) -> int:
             f"{t['reason']} {t['pnl_pct']:+.2f}%"
         )
     html_path = args.html
-    if getattr(args, "pages", False):
+    if getattr(args, "pages", False) or not html_path:
         html_path = html_path or str(PAGES_HTML)
     if html_path:
         out = write_backtest_html(Path(html_path), trades, data, days=days, n_symbols=len(symbols))

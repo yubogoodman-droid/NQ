@@ -80,7 +80,7 @@ python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
 
 近一週（2026-08-20 → 08-27，261 檔永續，收緊後）：**228 筆、勝率 43.0%、等權重合計 +38%、均筆 +0.17%**。先前 7%／量比 1.5／3 小時去重會刷出 1075 筆，大多不是那四張圖。
 
-報告：`docs/binance/expansion-15m-7d/`
+報告：`docs/binance/expansion-15m-7d/index.html`（228 筆每筆都有圖）
 
 ## 幣安黏帶三幕 Telegram
 
