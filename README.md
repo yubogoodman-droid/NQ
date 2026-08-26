@@ -25,7 +25,10 @@
 ## NQ 五分 K 打底後 5/10/20 多排
 
 五分鐘圖：先跌一段、低點附近橫盤**打底**，第一次翻成 **MA5 > MA10 > MA20**（收盤站上 MA5）才做多。  
-對齊 08-26 截圖那種夜盤：21:35 低點 29096，22:20 多排進場。停損打底低下方，目標 2R。
+對齊 08-26 截圖那種夜盤：21:35 低點 29096，**22:20** 多排進場 @ 29161.75（不是 00:34 才追）。停損打底低下方，目標 2R。
+
+近 8 天 Yahoo 5m：**3 筆、勝率 33%、+57 點**（截圖那筆 timeout +106）。  
+60 天：**30 筆、勝率 27%、−402 點**。夜盤假打底容易被掃；截圖能抓到，樣本外常失敗。
 
 ```bash
 python3 examples/nq_5m_base_stack.py backtest --period 8d --pages
@@ -33,6 +36,8 @@ python3 examples/nq_5m_base_stack.py backtest --period 60d --html output/nq_5m_b
 python3 examples/nq_5m_base_stack.py alert --test
 python3 examples/nq_5m_base_stack.py alert --dry-run --once
 ```
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/view.html
 
 TradingView：`pinescript/nq_5m_base_stack.pine`
 
