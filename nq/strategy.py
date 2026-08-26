@@ -38,34 +38,34 @@ class Signal:
 @dataclass
 class NQWBottomStrategy:
     """
-    NQ（那斯達克期貨）五分 K 破底 W 底做多。
+    NQ 五分 K 破底 W 底做多。
 
-    進場：L1 → 反彈 → 破底掃停 → 收復 → L2 → 收盤突破頸線
-    停損：L2（右底）
-    停利：頸線 + (頸線 − 破底低點)
+    進場：L1 → 反彈出頸線 → L2 跌破 L1（破底）→ 收復 → 收盤突破頸線
+    停損：L2（破底）
+    停利：頸線 + (頸線 − L2)
     """
 
     swing_lookback: int = 3
-    low_tolerance_pct: float = 0.001
-    min_bars_between_lows: int = 8
-    max_bars_between_lows: int = 80
-    min_spring_pct: float = 0.0006
-    min_spring_points: float = 10.0
+    min_bars_between_lows: int = 5
+    max_bars_between_lows: int = 60
+    min_spring_pct: float = 0.0004
+    min_spring_points: float = 8.0
+    max_spring_pct: float = 0.004
     min_bounce_pct: float = 0.001
     max_reclaim_bars: int = 12
     max_breakout_bars: int = 36
     tick_size: float = 0.25
-    point_value: float = 20.0  # NQ 每點 $20
+    point_value: float = 20.0
 
     def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
         patterns = detect_w_bottoms(
             df,
             swing_lookback=self.swing_lookback,
-            low_tolerance_pct=self.low_tolerance_pct,
             min_bars_between_lows=self.min_bars_between_lows,
             max_bars_between_lows=self.max_bars_between_lows,
             min_spring_pct=self.min_spring_pct,
             min_spring_points=self.min_spring_points,
+            max_spring_pct=self.max_spring_pct,
             min_bounce_pct=self.min_bounce_pct,
             max_reclaim_bars=self.max_reclaim_bars,
             max_breakout_bars=self.max_breakout_bars,
@@ -80,10 +80,8 @@ class NQWBottomStrategy:
             entry = self._round_tick(df["close"].iloc[idx])
             stop = self._round_tick(pattern.stop_loss)
             target = self._round_tick(pattern.target)
-
             if entry <= stop:
                 continue
-
             signals.append(
                 Signal(
                     timestamp=df.index[idx],
@@ -95,7 +93,6 @@ class NQWBottomStrategy:
                     bar_idx=idx,
                 )
             )
-
         return signals
 
     def _round_tick(self, price: float) -> float:

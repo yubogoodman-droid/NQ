@@ -1,96 +1,68 @@
 //@version=5
 strategy("NQ 五分K 破底W底進場", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
 
-// === 參數 ===
+// 兩腳 W：L2 跌破 L1 後收復，再突破頸線
 swingLen      = input.int(3, "轉折確認 K 數", minval=1)
-tolPct        = input.float(0.1, "L1/L2 價差容忍 (%)", minval=0.05, step=0.05) / 100
-minSpringPct  = input.float(0.06, "破底最少深度 (%)", minval=0.02, step=0.01) / 100
-minBouncePct  = input.float(0.10, "破底前最少反彈 (%)", minval=0.05, step=0.01) / 100
-minBars       = input.int(8, "L1 到 L2 最少間隔", minval=4)
-maxBars       = input.int(80, "L1 到 L2 最多間隔", minval=10)
-maxReclaim    = input.int(12, "破底後最多幾根須收復", minval=2)
+minSpringPct  = input.float(0.04, "L2 低於 L1 最少 (%)", minval=0.02, step=0.01) / 100
+maxSpringPct  = input.float(0.40, "L2 低於 L1 上限 (%)", minval=0.10, step=0.05) / 100
+minBouncePct  = input.float(0.10, "頸線相對 L1 最少 (%)", minval=0.05, step=0.01) / 100
+minBars       = input.int(5, "L1 到 L2 最少間隔", minval=3)
+maxBars       = input.int(60, "L1 到 L2 最多間隔", minval=10)
+maxReclaim    = input.int(12, "L2 後最多幾根須收復", minval=2)
 useCloseBreak = input.bool(true, "收盤突破頸線進場")
 
-pivotLow(val, left, right) =>
-    ta.pivotlow(val, left, right)
-
-pl = pivotLow(low, swingLen, swingLen)
+pl = ta.pivotlow(low, swingLen, swingLen)
 
 var float firstLow     = na
 var int   firstLowBar  = na
-var float bounceHigh   = na
-var bool  bounced      = false
-var float springLow    = na
-var int   springBar    = na
-var int   reclaimBar   = na
 var float secondLow    = na
 var int   secondLowBar = na
+var int   reclaimBar   = na
 var float neckline     = na
 var bool  wReady       = false
 
 reset() =>
     firstLow     := na
     firstLowBar  := na
-    bounceHigh   := na
-    bounced      := false
-    springLow    := na
-    springBar    := na
-    reclaimBar   := na
     secondLow    := na
     secondLowBar := na
+    reclaimBar   := na
     neckline     := na
     wReady       := false
 
 if not na(pl) and na(firstLow)
     firstLow    := pl
     firstLowBar := bar_index - swingLen
-    bounceHigh  := high
-    bounced     := false
 
-if not na(firstLow) and na(springLow)
-    bounceHigh := math.max(nz(bounceHigh, high), high)
-    if bounceHigh - firstLow >= firstLow * minBouncePct
-        bounced := true
-    if bounced and firstLow - low >= firstLow * minSpringPct
-        springLow := low
-        springBar := bar_index
-        if close > firstLow
-            reclaimBar := bar_index
+if not na(pl) and not na(firstLow) and na(secondLow)
+    l2Bar = bar_index - swingLen
+    gap = l2Bar - firstLowBar
+    undercut = firstLow - pl
+    bounceOk = ta.highest(high, gap) - firstLow >= firstLow * minBouncePct
+    depthOk = undercut >= firstLow * minSpringPct and undercut <= firstLow * maxSpringPct
+    if gap >= minBars and gap <= maxBars and depthOk and bounceOk
+        secondLow    := pl
+        secondLowBar := l2Bar
+        neckline     := ta.highest(high, gap)
 
-if not na(springLow) and na(reclaimBar)
-    if low < springLow
-        springLow := low
-        springBar := bar_index
-    if bar_index - springBar > maxReclaim
+if not na(secondLow) and na(reclaimBar)
+    if bar_index - secondLowBar > maxReclaim
         reset()
     else if close > firstLow
         reclaimBar := bar_index
-
-if not na(reclaimBar) and na(secondLow) and not na(pl)
-    l2Bar = bar_index - swingLen
-    if l2Bar > reclaimBar
-        gap = l2Bar - firstLowBar
-        avgLow = (firstLow + pl) / 2
-        priceOk = math.abs(firstLow - pl) / avgLow <= tolPct
-        aboveSpring = pl > springLow
-        if gap >= minBars and gap <= maxBars and priceOk and aboveSpring
-            secondLow    := pl
-            secondLowBar := l2Bar
-            neckline     := ta.highest(high, bar_index - firstLowBar)
-            wReady       := true
+        wReady     := true
 
 breakPrice = useCloseBreak ? close : high
 longSignal = wReady and not na(neckline) and breakPrice > neckline and bar_index > secondLowBar + swingLen
 
 if longSignal
     stopLevel   = secondLow
-    depth       = neckline - springLow
-    targetLevel = neckline + depth
+    targetLevel = neckline + (neckline - secondLow)
     strategy.entry("破底W做多", strategy.long)
     strategy.exit("破底W出場", "破底W做多", stop=stopLevel, limit=targetLevel)
     reset()
 
 plotshape(longSignal, title="破底W進場", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
 plot(not na(neckline) ? neckline : na, "頸線", color=color.orange, linewidth=2, style=plot.style_linebr)
-plot(not na(springLow) ? springLow : na, "破底", color=color.fuchsia, linewidth=1, style=plot.style_circles)
-plot(not na(secondLow) ? secondLow : na, "L2", color=color.red, linewidth=1, style=plot.style_circles)
+plot(not na(secondLow) ? secondLow : na, "L2破底", color=color.fuchsia, linewidth=1, style=plot.style_circles)
+plot(not na(firstLow) ? firstLow : na, "L1", color=color.aqua, linewidth=1, style=plot.style_circles)
