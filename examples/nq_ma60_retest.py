@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """NQ 一分 K：破底後突破 MA60、回踩 MA60 進場。
 
-對齊截圖（1m NQmain）：
-  破底（低點靠近 1m MA60）→ 收盤突破 MA60 → 回踩踩住季線 → 進場做多
+對齊兩張 1m NQmain 截圖：
+  08-25 貼季線破底（約 34 點）→ 突破 → 回踩
+  07-22 稍遠破底（約 49 點）→ 翻上後立刻回踩，再 V 型拉升
 停損在回踩低點／MA60 下方；目標 2R。
 
 用法:
@@ -38,6 +39,11 @@ ROOT = Path(__file__).resolve().parent
 REPO_ROOT = ROOT.parent
 PAGES_HTML = REPO_ROOT / "docs" / "nq-ma60-retest" / "index.html"
 VIEW_BRANCH = "cursor/nq-1m-ma60-retest-8fa0"
+
+# 08-25 破底距 MA60 ≈ 34；07-22 ≈ 49。超過這個當瀑布底濾掉。
+MAX_BELOW_MA60 = 55.0
+MIN_RETEST_GAP = 5
+NEAR_MA60_PTS = 55.0
 
 
 # ---------------------------------------------------------------------------
@@ -82,13 +88,13 @@ class TradeResult:
 
 
 def quality_from_retest(slope60: float, bull_bar: bool, below_ma60: float) -> Tuple[int, str]:
-    """近 MA60 的破底加分（對齊截圖，不要離季線太遠）。"""
+    """近 MA60 的破底加分（08-25 ≈34、07-22 ≈49 都算近；瀑布底不加）。"""
     score = 0
     if slope60 >= 0:
         score += 1
     if bull_bar:
         score += 1
-    if 0 < below_ma60 <= 40.0:
+    if 0 < below_ma60 <= NEAR_MA60_PTS:
         score += 1
     if score >= 2:
         return score, "A"
@@ -102,10 +108,10 @@ def detect_signals(
     two_hour_bars: int = 120,
     min_break_depth: float = 10.0,
     min_below_ma60: float = 15.0,
-    max_below_ma60: float = 45.0,
+    max_below_ma60: float = MAX_BELOW_MA60,
     breakout_window: int = 60,
     retest_window: int = 30,
-    min_retest_gap: int = 5,
+    min_retest_gap: int = MIN_RETEST_GAP,
     min_extension: float = 8.0,
     min_clear_pts: float = 0.0,
     touch_pts: float = 15.0,
@@ -121,7 +127,7 @@ def detect_signals(
     require_bull: bool = False,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """破 2h 低且低點靠近 1m MA60 → 收盤站上 MA60 → 回踩季線進場。"""
+    """破 2h 低且低點距 1m MA60 不超過 55 點 → 收盤站上 MA60 → 回踩季線進場。"""
     close = df["Close"].to_numpy(float)
     open_ = df["Open"].to_numpy(float)
     high = df["High"].to_numpy(float)
@@ -899,7 +905,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底後回踩 MA60</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">1 分鐘：破 2h 低，低點距 1m MA60 不超過 45 點 → 收盤突破 MA60 → 回踩踩住 MA60 進場。停損在回踩低點／季線下方，目標 2R。</p>
+<p class="muted">1 分鐘：破 2h 低，低點距 1m MA60 不超過 {MAX_BELOW_MA60:.0f} 點（08-25 約 34、07-22 約 49）→ 收盤突破 MA60 → 回踩踩住 MA60 進場。停損在回踩低點／季線下方，目標 2R。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

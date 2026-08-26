@@ -13,6 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nq_ma60_retest import (  # noqa: E402
     ET,
+    MAX_BELOW_MA60,
+    MIN_RETEST_GAP,
     TradeResult,
     detect_signals,
     quality_from_retest,
@@ -24,6 +26,7 @@ from nq_ma_reclaim import sma  # noqa: E402
 
 def test_quality_from_retest() -> None:
     assert quality_from_retest(2.0, True, 34.0) == (3, "A")
+    assert quality_from_retest(2.0, True, 49.0) == (3, "A")
     assert quality_from_retest(2.0, True, 80.0) == (2, "A")
     assert quality_from_retest(-1.0, True, 34.0) == (2, "A")
     assert quality_from_retest(-1.0, False, 80.0) == (0, "C")
@@ -103,7 +106,37 @@ def _make_no_retest_bars(n: int = 340) -> pd.DataFrame:
     return _to_df(close, high, low)
 
 
+def _make_july22_bars(n: int = 360) -> pd.DataFrame:
+    """07-22：破底距 MA60 ≈49 點，翻上後很快回踩，再 V 型拉升。"""
+    close, high, low, base, break_i = _base_dump_recover(n)
+    close[break_i] = base - 49.0
+    low[break_i] = close[break_i] - 0.8
+    high[break_i] = close[break_i] + 1.0
+    # climb back through MA60 over ~20 bars
+    for i, px in enumerate((base - 36.0, base - 24.0, base - 12.0, base - 4.0, base + 2.0, base + 8.0)):
+        close[break_i + 1 + i] = px
+        high[break_i + 1 + i] = px + 1.2
+        low[break_i + 1 + i] = px - 1.2
+    ma60 = sma(close, 60)
+    retest_i = break_i + 10
+    for i in range(break_i + 7, retest_i):
+        if not np.isnan(ma60[i]):
+            close[i] = float(ma60[i]) + 10.0
+            high[i] = close[i] + 1.4
+            low[i] = float(ma60[i]) + 4.0
+    if retest_i < n and not np.isnan(ma60[retest_i]):
+        low[retest_i] = float(ma60[retest_i]) - 0.8
+        close[retest_i] = float(ma60[retest_i]) + 5.0
+        high[retest_i] = close[retest_i] + 1.5
+        for i in range(retest_i + 1, n):
+            close[i] = close[i - 1] + 2.4
+            high[i] = close[i] + 1.4
+            low[i] = close[i] - 0.6
+    return _to_df(close, high, low)
+
+
 def test_detect_and_simulate_retest() -> None:
+    """08-25：貼季線破底（約 34 點）再回踩。"""
     df = _make_retest_bars()
     funnel: dict[str, int] = {}
     sigs = detect_signals(df, funnel=funnel, skip_hour_start=None, skip_hour_end=None)
@@ -112,14 +145,27 @@ def test_detect_and_simulate_retest() -> None:
     assert sig.entry_idx > sig.breakout_idx > sig.break_idx
     assert sig.entry_price > sig.stop_price
     assert sig.quality in {"A", "B", "C"}
-    assert sig.entry_idx - sig.breakout_idx >= 5
+    assert sig.entry_idx - sig.breakout_idx >= MIN_RETEST_GAP
     assert sig.entry_idx - sig.break_idx <= 60
-    assert 0 < sig.below_ma60 <= 45.0
+    assert 0 < sig.below_ma60 <= MAX_BELOW_MA60
+    assert sig.below_ma60 <= 45.0
 
     trades = simulate(df, sigs, preopen_flat=False, exit_on_ma60_lose=False)
     assert trades
     assert isinstance(trades[0], TradeResult)
     assert trades[0].exit_idx >= trades[0].entry_idx
+
+
+def test_detect_july22_style_dump() -> None:
+    """07-22：破底約 49 點、翻上後立刻回踩，也要進場。"""
+    df = _make_july22_bars()
+    funnel: dict[str, int] = {}
+    sigs = detect_signals(df, funnel=funnel, skip_hour_start=None, skip_hour_end=None)
+    assert sigs, f"expected july22-style signal, funnel={funnel}"
+    sig = sigs[0]
+    assert 45.0 < sig.below_ma60 <= MAX_BELOW_MA60
+    assert sig.entry_idx > sig.breakout_idx > sig.break_idx
+    assert sig.entry_idx - sig.breakout_idx >= MIN_RETEST_GAP
 
 
 def test_no_signal_without_retest() -> None:
@@ -161,6 +207,7 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
 def main() -> int:
     test_quality_from_retest()
     test_detect_and_simulate_retest()
+    test_detect_july22_style_dump()
     test_no_signal_without_retest()
     test_reject_break_too_far_from_ma60()
     test_write_html_report()
