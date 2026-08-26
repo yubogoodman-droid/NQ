@@ -34,8 +34,9 @@ python3 examples/nq_ma_breakdown_short.py backtest --period 60d --pages
 
 TradingView：`pinescript/nq_ma_breakdown_short_5m.pine`
 
-近 60 天 Yahoo 5m（2026-06-16 → 08-26）：**139 筆、勝率 42.4%、約 +324 點**。  
-07-28 截圖那波急跌有抓到：09:25 收盤同時跌破六均做空，09:35 打到 2R（**+120 點**）。
+近 60 天 Yahoo 5m（2026-06-16 → 08-26）：**4 筆、勝率 25%、約 −143 點**。  
+漏斗：收在六均下 3017 → 上一根還全部在均線上 14 → 進場 4。  
+07-28 09:25 那波急跌**不算**：進場前已經掉在部分均線下，不是同一根一次全破。
 
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-ma10-retest-59b8/docs/nq-ma-breakdown-short/view.html
 
