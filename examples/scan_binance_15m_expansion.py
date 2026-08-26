@@ -770,7 +770,7 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
         if 0 <= x < len(c):
             ax.axvline(x, color=color, ls="--", lw=0.7)
             ax.scatter([x], [c[x] if mark != "^" else tr["entry"]], s=28, color=color, marker=mark, zorder=6)
-    tag = "連陽" if tr["kind"] == "vertical" else "墊高"
+    tag = "vertical" if tr["kind"] == "vertical" else "stair"
     ax.set_title(
         f"{sym}  15m  {tag}  {tr['reason']}  {tr['pnl_pct']:+.2f}%",
         color="#e8f0ea",
