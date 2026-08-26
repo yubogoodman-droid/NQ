@@ -72,6 +72,10 @@ python3 examples/watch_tw_5m_fade.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_fade_ma_stack.pine`。
 
+近一週（2026-08-19→08-26）成交額前 80、**700 以上拿掉**（實掃 45 檔）、均線糾結不算、衝高上方不能有均線： **51 筆**、勝率 51%、合計 −5.11%。  
+08-24 那波（華星光／南亞科／台虹）做空有賺；08-20 開盤缺口後空排容易被下午拉回停損。  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-fade-short-9faf/docs/tw-5m-fade/view.html
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash
