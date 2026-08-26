@@ -34,13 +34,62 @@ MA_COLORS = {
 
 
 def fetch_nq_1m(symbol: str = "NQ=F", period: str = "7d") -> pd.DataFrame:
+    """Yahoo 1m 單次最多約 7–8 天；超過改用 7 日切片（約可回看 30 天）。"""
+    import time
+    from datetime import datetime, timedelta, timezone
+
     import yfinance as yf
 
-    raw = yf.Ticker(symbol).history(period=period, interval="1m", auto_adjust=False)
-    if raw.empty:
-        raise RuntimeError(f"無法取得 {symbol} 一分 K")
-    df = raw.rename(columns=str.lower)[["open", "high", "low", "close", "volume"]].copy()
-    df.index = df.index.tz_convert("America/New_York")
+    def _clean(raw: pd.DataFrame) -> pd.DataFrame:
+        if raw.empty:
+            return raw
+        if isinstance(raw.columns, pd.MultiIndex):
+            raw = raw.copy()
+            raw.columns = raw.columns.get_level_values(0)
+        df = raw.rename(columns=str.lower)[["open", "high", "low", "close", "volume"]].copy()
+        idx = df.index
+        if idx.tz is None:
+            df.index = idx.tz_localize("UTC").tz_convert("America/New_York")
+        else:
+            df.index = idx.tz_convert("America/New_York")
+        return df
+
+    p = (period or "7d").strip().lower()
+    days: int | None = None
+    if p.endswith("d") and p[:-1].isdigit():
+        days = int(p[:-1])
+    elif p.endswith("w") and p[:-1].isdigit():
+        days = int(p[:-1]) * 7
+    elif p.endswith("mo") and p[:-2].isdigit():
+        days = int(p[:-2]) * 30
+
+    ticker = yf.Ticker(symbol)
+    parts: list[pd.DataFrame] = []
+    if days is not None and days > 8:
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=days)
+        cur = start
+        delta = timedelta(days=7)
+        while cur < end:
+            nxt = min(cur + delta, end)
+            raw = ticker.history(start=cur, end=nxt, interval="1m", auto_adjust=False)
+            chunk = _clean(raw)
+            if chunk.empty:
+                print(f"  {cur.date()} → {nxt.date()} 空", flush=True)
+            else:
+                parts.append(chunk)
+                print(f"  {cur.date()} → {nxt.date()} {len(chunk)} 根", flush=True)
+            cur = nxt
+            time.sleep(0.35)
+        if not parts:
+            raise RuntimeError(f"無法取得 {symbol} 一分 K（{period}）")
+        df = pd.concat(parts)
+    else:
+        raw = ticker.history(period=period, interval="1m", auto_adjust=False)
+        df = _clean(raw)
+        if df.empty:
+            raise RuntimeError(f"無法取得 {symbol} 一分 K")
+
     return df[~df.index.duplicated(keep="last")].sort_index()
 
 
@@ -227,12 +276,33 @@ def write_report(
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
     days = sorted({t.date() for t in df.index})
+    span = (days[-1] - days[0]).days + 1
+    pnls = [c.exit_event.pnl for _, c in ranked if c.exit_event]
+    wins = sum(1 for x in pnls if x > 0)
+    losses = sum(1 for x in pnls if x < 0)
+    total = sum(pnls) if pnls else 0.0
+    wr = f"{100.0 * wins / len(pnls):.0f}%" if pnls else "—"
+    rows = []
+    for tag, combo in ranked:
+        dump = combo.dump
+        entry = combo.short
+        ex = combo.exit_event
+        reason = EXIT_LABEL.get(ex.reason, ex.reason) if ex else "—"
+        rows.append(
+            f"<tr><td>{html.escape(tag)}</td><td>{_fmt(dump.timestamp)}</td>"
+            f"<td>{_fmt(entry.timestamp) if entry else '—'}</td>"
+            f"<td>{entry.entry:.2f}</td>"
+            f"<td>{_fmt(ex.timestamp) if ex else '—'}</td>"
+            f"<td>{ex.price:.2f}</td>"
+            f"<td>{html.escape(reason)}</td>"
+            f"<td>{_pt(ex.pnl if ex else None)}</td></tr>"
+        )
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>NQ 1m 急跌 + 均線排列 · 近一週</title>
+<title>NQ 1m 急跌 + 均線排列 · {span} 天</title>
 <style>
 body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
 .wrap{{max-width:1100px;margin:0 auto;padding:20px 14px 56px}}
@@ -253,16 +323,16 @@ th{{color:#8aa193;font-weight:600}}
 </style></head>
 <body>
 <div class="wrap">
-  <h1>NQ 一分 K 急跌 + 均線排列</h1>
+  <h1>NQ 一分 K 急跌 + 均線排列 · {span} 天</h1>
   <p class="sub">
     {html.escape(symbol)} · {days[0]} ~ {days[-1]} · {len(df)} 根 1m
     （{html.escape(start)} ~ {html.escape(end)} ET）。<br/>
     只畫急跌後 90 分鐘內不破低、再走出 MA5&gt;10&gt;20 的命中。綠圈進場、另一圈出場（停損急跌低、收盤跌破 MA20、或持滿 90 分）。
   </p>
   <div class="kpis">
-    <div class="kpi"><div class="k">嚴格命中</div><div class="v pos">{strict['short']}</div></div>
-    <div class="kpi"><div class="k">中等命中</div><div class="v">{mid['short']}</div></div>
-    <div class="kpi"><div class="k">圖上命中</div><div class="v pos">{len(cards)}</div></div>
+    <div class="kpi"><div class="k">命中</div><div class="v pos">{len(cards)}</div></div>
+    <div class="kpi"><div class="k">勝率</div><div class="v">{wr} · {wins}/{len(pnls) if pnls else 0}</div></div>
+    <div class="kpi"><div class="k">總點數</div><div class="v {'pos' if total >= 0 else 'neg'}">{total:+.1f}</div></div>
   </div>
   <div class="card">
     <h2>急跌 × 均線梯子</h2>
@@ -272,7 +342,14 @@ th{{color:#8aa193;font-weight:600}}
       <tr><td>中等</td><td>{mid['dumps']}</td><td>{mid['v']}</td><td>{mid['short']}</td><td>{mid['mid']}</td><td>{mid['full']}</td></tr>
       <tr><td>寬鬆</td><td>{loose['dumps']}</td><td>{loose['v']}</td><td>{loose['short']}</td><td>{loose['mid']}</td><td>{loose['full']}</td></tr>
     </table>
-    <p class="note">圖只列急跌+排列命中，去重後標最嚴那一檔。不畫純均線、也不畫砸了但沒排好的。</p>
+    <p class="note">圖只列急跌+排列命中，去重後標最嚴那一檔。</p>
+  </div>
+  <div class="card">
+    <h2>進出場</h2>
+    <table>
+      <tr><th>檔</th><th>急跌</th><th>進場</th><th>進場價</th><th>出場</th><th>出場價</th><th>原因</th><th>點數</th></tr>
+      {''.join(rows) if rows else '<tr><td colspan="8">沒有命中</td></tr>'}
+    </table>
   </div>
   <h1 id="hits" style="margin-top:8px">急跌 + 排列</h1>
   {''.join(cards) if cards else '<div class="card"><p class="note">這一窗沒有急跌後走出排列的訊號。</p></div>'}
@@ -304,9 +381,9 @@ def _print(name: str, ladder: dict) -> None:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="NQ 1m 急跌+均線排列近一週回測")
+    p = argparse.ArgumentParser(description="NQ 1m 急跌+均線排列回測")
     p.add_argument("--symbol", default="NQ=F")
-    p.add_argument("--period", default="7d")
+    p.add_argument("--period", default="30d")
     p.add_argument("--csv")
     p.add_argument("--out", default="docs/nq-1m-v")
     args = p.parse_args()
@@ -336,8 +413,19 @@ def main() -> int:
         out_dir=Path(args.out),
         symbol=args.symbol,
     )
+    uniq = []
+    seen: set[int] = set()
+    for c in strict["signals"] + mid["signals"] + loose["signals"]:
+        if c.dump.idx in seen:
+            continue
+        seen.add(c.dump.idx)
+        uniq.append(c)
+    pnls = [c.exit_event.pnl for c in uniq if c.exit_event]
     print(f"\n報告 {out.resolve()}")
-    print(f"急跌+短均排列（去重）：{len({c.dump.idx for c in strict['signals'] + mid['signals'] + loose['signals']})} 筆")
+    print(f"急跌+短均排列（去重）：{len(uniq)} 筆")
+    if pnls:
+        wins = sum(1 for x in pnls if x > 0)
+        print(f"勝 {wins} / 負 {sum(1 for x in pnls if x < 0)} · 勝率 {100*wins/len(pnls):.0f}% · 總點 {sum(pnls):+.1f}")
     return 0
 
 

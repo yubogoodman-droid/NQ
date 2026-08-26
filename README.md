@@ -44,7 +44,7 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 先有爆量急跌，90 分鐘內不破低，再走出 `MA5>10>20` 進場（綠圈）。出場（另一圈）：碰到急跌低點停損、收盤跌破 MA20，或持滿 90 分。
 
 ```bash
-python3 examples/run_v_recovery.py
+python3 examples/run_v_recovery.py --period 30d
 ```
 
 外網：https://yubogoodman-droid.github.io/NQ/nq-1m-v/
