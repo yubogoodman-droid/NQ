@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""NQ 一分 K：破底後突破 MA60、回踩 MA60 進場。
+"""NQ 一分 K：看圖做多。
 
-對齊兩張 1m NQmain 截圖：
-  08-25 貼季線破底（約 34 點）→ 突破 → 回踩
-  07-22 稍遠破底（約 49 點）→ 翻上後立刻回踩，再 V 型拉升
-停損在回踩低點／MA60 下方；目標 2R。
+兩張 1m 截圖是同一種結構：
+  綠線（MA60）下面先探一個底 → 收盤站回綠線上 → 綠線變成地板，回踩或貼著走就進。
+08-25 是翻上後回來坐在綠線上；07-22 是翻上當下就貼著綠線，然後一路走。
+停損在回踩那根下方；目標 2R。
 
 用法:
   python3 examples/nq_ma60_retest.py
@@ -29,7 +29,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nq_ma_reclaim import (  # noqa: E402
     ET,
     load_bars,
-    rolling_min_prev,
     sma,
     summarize_trades,
     to_et,
@@ -40,10 +39,11 @@ REPO_ROOT = ROOT.parent
 PAGES_HTML = REPO_ROOT / "docs" / "nq-ma60-retest" / "index.html"
 VIEW_BRANCH = "cursor/nq-1m-ma60-retest-8fa0"
 
-# 08-25 破底距 MA60 ≈ 34；07-22 ≈ 49。超過這個當瀑布底濾掉。
-MAX_BELOW_MA60 = 55.0
-MIN_RETEST_GAP = 5
-NEAR_MA60_PTS = 55.0
+# 回踩：低點碰到綠線（可稍微穿過，不能刺穿當失守）
+TOUCH_PTS = 20.0
+PIERCE_PTS = 12.0
+STOP_BUFFER = 12.0
+TARGET_R = 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -88,13 +88,12 @@ class TradeResult:
 
 
 def quality_from_retest(slope60: float, bull_bar: bool, below_ma60: float) -> Tuple[int, str]:
-    """近 MA60 的破底加分（08-25 ≈34、07-22 ≈49 都算近；瀑布底不加）。"""
     score = 0
     if slope60 >= 0:
         score += 1
     if bull_bar:
         score += 1
-    if 0 < below_ma60 <= NEAR_MA60_PTS:
+    if below_ma60 > 0:
         score += 1
     if score >= 2:
         return score, "A"
@@ -105,29 +104,18 @@ def quality_from_retest(slope60: float, bull_bar: bool, below_ma60: float) -> Tu
 
 def detect_signals(
     df: pd.DataFrame,
-    two_hour_bars: int = 120,
-    min_break_depth: float = 10.0,
-    min_below_ma60: float = 15.0,
-    max_below_ma60: float = MAX_BELOW_MA60,
-    breakout_window: int = 60,
-    retest_window: int = 30,
-    min_retest_gap: int = MIN_RETEST_GAP,
-    min_extension: float = 8.0,
-    min_clear_pts: float = 0.0,
-    touch_pts: float = 15.0,
-    pierce_pts: float = 10.0,
-    stop_buffer: float = 12.0,
-    target_r: float = 2.0,
-    max_risk: float = 60.0,
-    min_ma60_slope: float = -8.0,
-    ma60_slope_bars: int = 5,
-    cooldown: int = 25,
-    skip_hour_start: Optional[int] = 9,
-    skip_hour_end: Optional[int] = 10,
-    require_bull: bool = False,
+    touch_pts: float = TOUCH_PTS,
+    pierce_pts: float = PIERCE_PTS,
+    stop_buffer: float = STOP_BUFFER,
+    target_r: float = TARGET_R,
     funnel: Optional[Dict[str, int]] = None,
+    **_ignored: Any,
 ) -> List[Signal]:
-    """破 2h 低且低點距 1m MA60 不超過 55 點 → 收盤站上 MA60 → 回踩季線進場。"""
+    """綠線下探底 → 收盤站回 → 綠線當支撐進場。
+
+    不管 2 小時低、不管距離上下限、不等 5 根。圖上怎麼走就怎麼進。
+    `_ignored` 是舊參數名的相容（測試若還傳 skip_hour 不會炸）。
+    """
     close = df["Close"].to_numpy(float)
     open_ = df["Open"].to_numpy(float)
     high = df["High"].to_numpy(float)
@@ -138,159 +126,122 @@ def detect_signals(
     ma20 = sma(close, 20)
     ma60 = sma(close, 60)
     ma200 = sma(close, 200)
-    two_hr_low = rolling_min_prev(low, two_hour_bars)
 
     n = len(close)
     signals: List[Signal] = []
-    last_entry = -(10**9)
     fun = funnel if funnel is not None else {}
 
     def bump(key: str) -> None:
         fun[key] = fun.get(key, 0) + 1
 
-    warmup = max(200, two_hour_bars, 60) + 1
-    i = warmup
+    in_dip = False
+    dip_idx = -1
+    dip_low = 0.0
+    reclaim_idx: Optional[int] = None
+
+    i = 60
     while i < n - 1:
-        if np.isnan(two_hr_low[i]) or np.isnan(ma60[i]):
-            i += 1
-            continue
-        if low[i] >= float(two_hr_low[i]) or close[i] >= float(ma60[i]):
-            i += 1
-            continue
-        break_depth = float(two_hr_low[i]) - float(low[i])
-        if break_depth < min_break_depth:
-            i += 1
-            continue
-        below60 = float(ma60[i]) - float(low[i])
-        if below60 < min_below_ma60:
+        ma = ma60[i]
+        if np.isnan(ma):
             i += 1
             continue
 
-        bump("break")
-        break_idx = i
-        break_low = float(low[i])
-        support = float(two_hr_low[i])
-
-        breakout_idx: Optional[int] = None
-        end_bo = min(break_idx + breakout_window, n - 1)
-        j = break_idx + 1
-        while j <= end_bo:
-            if np.isnan(ma60[j]):
-                j += 1
-                continue
-            if float(low[j]) < break_low and float(close[j]) < float(ma60[j]):
-                break_idx = j
-                break_low = float(low[j])
-                below60 = float(ma60[j]) - break_low
-                end_bo = min(break_idx + breakout_window, n - 1)
-            if j > 0 and float(close[j - 1]) <= float(ma60[j - 1]) and float(close[j]) > float(ma60[j]):
-                breakout_idx = j
-                break
-            j += 1
-
-        if breakout_idx is None:
-            bump("no_breakout")
-            i = break_idx + 1
+        if float(close[i]) < ma:
+            if not in_dip:
+                in_dip = True
+                dip_idx = i
+                dip_low = float(low[i])
+                reclaim_idx = None
+                bump("break")
+            elif float(low[i]) < dip_low:
+                dip_idx = i
+                dip_low = float(low[i])
+            i += 1
             continue
-        below60 = float(ma60[break_idx]) - break_low
-        if below60 > max_below_ma60:
-            bump("too_far")
-            i = break_idx + 1
+
+        if in_dip:
+            crossed = i > 0 and not np.isnan(ma60[i - 1]) and float(close[i - 1]) <= float(ma60[i - 1])
+            if crossed or float(close[i]) > ma:
+                reclaim_idx = i
+                in_dip = False
+                bump("breakout")
+
+        if reclaim_idx is None:
+            i += 1
             continue
-        bump("breakout")
 
-        ext_high = float(high[breakout_idx])
-        cleared = float(low[breakout_idx]) >= float(ma60[breakout_idx]) + min_clear_pts
-        entered = False
-        lost = False
-        end_rt = min(breakout_idx + retest_window, n - 1)
-        for k in range(breakout_idx + 1, end_rt + 1):
-            if np.isnan(ma60[k]):
-                continue
-            ext_high = max(ext_high, float(high[k]))
-            ma = float(ma60[k])
-            if float(close[k]) < ma:
-                bump("lost_ma60")
-                lost = True
-                break
-            if float(low[k]) >= ma + min_clear_pts:
-                cleared = True
-            if k - breakout_idx < min_retest_gap:
-                continue
-            if not cleared or ext_high < ma + min_extension:
-                continue
-            if float(low[k]) > ma + touch_pts:
-                continue
-            if float(low[k]) < ma - pierce_pts:
-                bump("pierce_too_deep")
-                lost = True
-                break
-            bull_bar = float(close[k]) >= float(open_[k])
-            if require_bull and not bull_bar:
-                continue
-            if skip_hour_start is not None and skip_hour_end is not None:
-                hour = df.index[k].hour
-                if skip_hour_start <= hour < skip_hour_end:
-                    bump("skip_open_hour")
-                    continue
-            if k - last_entry < cooldown:
-                bump("skip_cooldown")
-                lost = True
-                break
-
-            slope60 = 0.0
-            if k >= ma60_slope_bars and not np.isnan(ma60[k - ma60_slope_bars]):
-                slope60 = float(ma60[k]) - float(ma60[k - ma60_slope_bars])
-            if slope60 < min_ma60_slope:
-                bump("skip_slope")
-                continue
-
-            entry = float(close[k])
-            stop = min(float(low[k]), ma) - stop_buffer
-            risk = entry - stop
-            if risk <= 0:
-                bump("skip_bad_risk")
-                continue
-            if max_risk > 0 and risk > max_risk:
-                bump("skip_max_risk")
-                continue
-
-            q_score, q_grade = quality_from_retest(slope60, bull_bar, below60)
-            bump("taken")
-            signals.append(
-                Signal(
-                    break_idx=break_idx,
-                    breakout_idx=breakout_idx,
-                    entry_idx=k,
-                    entry_price=entry,
-                    stop_price=stop,
-                    target_price=entry + risk * target_r,
-                    break_low=break_low,
-                    two_hr_low=support,
-                    ma5=float(ma5[k]) if not np.isnan(ma5[k]) else 0.0,
-                    ma10=float(ma10[k]) if not np.isnan(ma10[k]) else 0.0,
-                    ma20=float(ma20[k]) if not np.isnan(ma20[k]) else 0.0,
-                    ma60=ma,
-                    ma200=float(ma200[k]) if not np.isnan(ma200[k]) else 0.0,
-                    extension=float(ext_high - ma),
-                    slope60=slope60,
-                    below_ma60=float(below60),
-                    quality=q_grade,
-                    quality_score=q_score,
-                )
-            )
-            last_entry = k
-            entered = True
-            i = k + 1
-            break
-
-        if entered:
+        if float(close[i]) < ma:
+            bump("lost_ma60")
+            in_dip = True
+            dip_idx = i
+            dip_low = float(low[i])
+            reclaim_idx = None
+            bump("break")
+            i += 1
             continue
-        if lost:
-            i = breakout_idx + 1
-        else:
+
+        if i <= reclaim_idx:
+            i += 1
+            continue
+        if i - reclaim_idx > 45:
             bump("no_retest")
-            i = breakout_idx + 1
+            reclaim_idx = None
+            i += 1
+            continue
+
+        near = float(low[i]) <= ma + touch_pts
+        through = float(low[i]) < ma - pierce_pts
+        if through:
+            bump("pierce_too_deep")
+            in_dip = True
+            dip_idx = i
+            dip_low = float(low[i])
+            reclaim_idx = None
+            bump("break")
+            i += 1
+            continue
+        if not near:
+            i += 1
+            continue
+
+        bull_bar = float(close[i]) >= float(open_[i])
+        slope60 = 0.0
+        if i >= 5 and not np.isnan(ma60[i - 5]):
+            slope60 = float(ma60[i]) - float(ma60[i - 5])
+        entry = float(close[i])
+        stop = min(float(low[i]), ma) - stop_buffer
+        risk = entry - stop
+        if risk <= 0:
+            i += 1
+            continue
+        below60 = float(ma60[dip_idx]) - dip_low if dip_idx >= 0 and not np.isnan(ma60[dip_idx]) else 0.0
+        q_score, q_grade = quality_from_retest(slope60, bull_bar, below60)
+        bump("taken")
+        signals.append(
+            Signal(
+                break_idx=max(dip_idx, 0),
+                breakout_idx=reclaim_idx,
+                entry_idx=i,
+                entry_price=entry,
+                stop_price=stop,
+                target_price=entry + risk * target_r,
+                break_low=dip_low,
+                two_hr_low=dip_low,
+                ma5=float(ma5[i]) if not np.isnan(ma5[i]) else 0.0,
+                ma10=float(ma10[i]) if not np.isnan(ma10[i]) else 0.0,
+                ma20=float(ma20[i]) if not np.isnan(ma20[i]) else 0.0,
+                ma60=ma,
+                ma200=float(ma200[i]) if not np.isnan(ma200[i]) else 0.0,
+                extension=float(high[reclaim_idx: i + 1].max() - ma),
+                slope60=slope60,
+                below_ma60=float(below60),
+                quality=q_grade,
+                quality_score=q_score,
+            )
+        )
+        reclaim_idx = None
+        in_dip = False
+        i += 1
 
     return signals
 
@@ -859,12 +810,11 @@ def write_html_report(
     funnel_line = ""
     if funnel:
         funnel_line = (
-            f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → "
-            f"突破MA60 {funnel.get('breakout', 0)} → "
-            f"進場 {funnel.get('taken', 0)}"
-            f"（距MA60太遠 {funnel.get('too_far', 0)} · 沒回踩 {funnel.get('no_retest', 0)} · 失守 {funnel.get('lost_ma60', 0)} · "
-            f"刺太深 {funnel.get('pierce_too_deep', 0)} · 沒突破 {funnel.get('no_breakout', 0)} · "
-            f"斜率 {funnel.get('skip_slope', 0)} · 9點檔 {funnel.get('skip_open_hour', 0)}）</p>"
+            f"<p class='muted'>漏斗：綠線下探 {funnel.get('break', 0)} → "
+            f"站回 {funnel.get('breakout', 0)} → "
+            f"踩住進場 {funnel.get('taken', 0)}"
+            f"（沒踩到 {funnel.get('no_retest', 0)} · 又跌破 {funnel.get('lost_ma60', 0)} · "
+            f"刺穿 {funnel.get('pierce_too_deep', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
@@ -906,7 +856,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底後回踩 MA60</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">1 分鐘：破 2h 低，低點距 1m MA60 不超過 {MAX_BELOW_MA60:.0f} 點（08-25 約 34、07-22 約 49）→ 收盤突破 MA60 → 回踩踩住 MA60 進場。停損在回踩低點／季線下方，目標 2R。</p>
+<p class="muted">1 分鐘看圖：綠線（MA60）下面先探一個底，收盤站回綠線，之後綠線當地板——回踩或貼著走就進。停損在那根下方，目標 2R。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1027,12 +977,10 @@ def cmd_backtest(args) -> int:
     if funnel:
         print(
             "funnel "
-            f"break={funnel.get('break', 0)} breakout={funnel.get('breakout', 0)} "
-            f"taken={funnel.get('taken', 0)} too_far={funnel.get('too_far', 0)} "
+            f"dip={funnel.get('break', 0)} reclaim={funnel.get('breakout', 0)} "
+            f"taken={funnel.get('taken', 0)} "
             f"no_retest={funnel.get('no_retest', 0)} "
-            f"lost={funnel.get('lost_ma60', 0)} pierce={funnel.get('pierce_too_deep', 0)} "
-            f"no_bo={funnel.get('no_breakout', 0)} slope={funnel.get('skip_slope', 0)} "
-            f"hour={funnel.get('skip_open_hour', 0)}"
+            f"lost={funnel.get('lost_ma60', 0)} pierce={funnel.get('pierce_too_deep', 0)}"
         )
     for q, info in stats.get("by_quality", {}).items():
         print(f"  Q{q}: n={info['n']} wins={info['wins']} pnl={info['pnl']:+.1f}")
