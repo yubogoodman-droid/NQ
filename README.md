@@ -60,27 +60,27 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## 幣安 15m 壓縮後放量擴張
+## 幣安 15m 站上 MA200
 
-對齊那四張 15 分圖：**FIL / SNDK / CRCL** 是橫盤後連陽噴出，**PIPPIN** 是一段一段墊高。門檻是前面窄、後面 1.5～7 小時放量走完 ≥10%（墊高 ≥12%、量比 ≥3），收盤還靠近高點。同一檔 8 小時只算一次。
+那四張 15 分圖是噴完的樣子；進場要在還貼著 **MA200** 的時候。FIL / PIPPIN / SNDK / CRCL 都是前面在 200 線下方或黏著，這根放量收盤站上，離 200 仍 ≤2.5%。同一檔 8 小時只算一次。
 
 ```bash
-python3 examples/scan_binance_15m_expansion.py --verify   # 回放四張圖
+python3 examples/scan_binance_15m_expansion.py --verify   # 回放四張圖（站上 200 的那根）
 python3 examples/scan_binance_15m_expansion.py --once     # 掃剛收盤的 15m
 python3 examples/scan_binance_15m_expansion.py            # 每根 15m 收盤掃；可推 Telegram
 ```
 
 Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/test_scan_binance_15m_expansion.py`
 
-近一週回測（追價做多、等權重 %）：
+近一週回測（下一根開盤做多、停損在訊號 K 低點、2R 或 4 小時，等權重 %）：
 
 ```bash
 python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
 ```
 
-近一週（2026-08-20 → 08-27，261 檔永續，收緊後）：**228 筆、勝率 43.0%、等權重合計 +38%、均筆 +0.17%**。先前 7%／量比 1.5／3 小時去重會刷出 1075 筆，大多不是那四張圖。
+近一週（2026-08-20 → 08-27，260 檔永續）：**476 筆、勝率 30.0%、等權重合計 −135%、均筆 −0.28%**。四檔回放：FIL 01-01 19:45 離 200 +0.39%；PIPPIN 01-21 14:45 +1.18%；SNDK 07-30 19:30 +0.34%；CRCL 08-19 20:30 +0.09%。
 
-報告：`docs/binance/expansion-15m-7d/index.html`（228 筆每筆都有圖）
+報告：`docs/binance/expansion-15m-7d/index.html`（476 筆每筆都有圖）
 
 ## 幣安黏帶三幕 Telegram
 
