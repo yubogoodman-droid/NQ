@@ -60,27 +60,39 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## 幣安 15m 站上 MA200
+## 幣安 15m MA200 站穩三根
 
-那四張 15 分圖是噴完的樣子；進場要在還貼著 **MA200** 的時候。FIL / PIPPIN / SNDK / CRCL 都是前面在 200 線下方或黏著，這根放量收盤站上，離 200 仍 ≤2.5%。同一檔 8 小時只算一次。
+1. **記號**：MA7 > MA14 > MA25 多頭排列，且 15m 收盤站上 MA200。
+2. **進場**：記號之後連 **三根收盤都沒跌破 MA200**，第三根收完下一根開盤做多。
+3. 停損放在記號到確認那段的最低點（風險 0.4%–2%），2R 或 4 小時平。同一檔 8 小時只算一次。
 
 ```bash
-python3 examples/scan_binance_15m_expansion.py --verify   # 回放四張圖（站上 200 的那根）
+python3 examples/scan_binance_15m_expansion.py --verify   # 回放四張圖
 python3 examples/scan_binance_15m_expansion.py --once     # 掃剛收盤的 15m
 python3 examples/scan_binance_15m_expansion.py            # 每根 15m 收盤掃；可推 Telegram
 ```
 
 Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/test_scan_binance_15m_expansion.py`
 
-近一週回測（下一根開盤做多、停損在訊號 K 低點、2R 或 4 小時，等權重 %）：
+四張圖的記號與進場（台北時間，括號是離 MA200 多遠）：
+
+| 標的 | 記號 | 進場 |
+|---|---|---|
+| FIL | 01-01 19:45 (+0.39%) | 01-01 20:30 (+1.08%) |
+| PIPPIN | 01-21 14:45 (+1.18%) | 01-21 15:30 (+1.09%) |
+| SNDK | 07-30 19:30 (+0.34%) | 07-30 20:15 (+1.56%) |
+| CRCL | 08-19 20:30 (+0.09%) | 08-19 21:15 (+1.45%) |
+
+近一週回測：
 
 ```bash
 python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
 ```
 
-近一週（2026-08-20 → 08-27，260 檔永續）：**476 筆、勝率 30.0%、等權重合計 −135%、均筆 −0.28%**。四檔回放：FIL 01-01 19:45 離 200 +0.39%；PIPPIN 01-21 14:45 +1.18%；SNDK 07-30 19:30 +0.34%；CRCL 08-19 20:30 +0.09%。
+近一週（2026-08-20 → 08-27，260 檔永續）：**501 筆、勝率 40.1%、等權重合計 −13.0%、均筆 −0.03%**。不停損純續走的話 2 小時後勝率 56%、均 +0.20%，所以問題在 2R／停損這組出場參數，不在進場。
 
-先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-7d/view.html
+先看圖（501 筆每筆都有圖，黃菱形＝記號、藍圈＝第三根確認、綠三角＝進場、× ＝出場）：
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-7d/view.html
 
 ## 幣安黏帶三幕 Telegram
 

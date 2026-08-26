@@ -374,6 +374,30 @@ def telegram_send(text: str, photo: str | None = None) -> bool:
         return False
 
 
+CJK_FONTS = (
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/System/Library/Fonts/PingFang.ttc",
+)
+
+
+def use_cjk_font(plt) -> None:
+    """幣安有中文名的合約（幣安人生、龍蝦），標題要能畫出來。"""
+    import matplotlib.font_manager as fm
+
+    for path in CJK_FONTS:
+        if not Path(path).exists():
+            continue
+        try:
+            fm.fontManager.addfont(path)
+            name = fm.FontProperties(fname=path).get_name()
+        except Exception:
+            continue
+        plt.rcParams["font.sans-serif"] = [name, "DejaVu Sans"]
+        plt.rcParams["axes.unicode_minus"] = False
+        return
+
+
 def draw_chart(sym: str, d: dict, hit: dict, path: str) -> str | None:
     try:
         import matplotlib
@@ -383,6 +407,7 @@ def draw_chart(sym: str, d: dict, hit: dict, path: str) -> str | None:
         from matplotlib.patches import Rectangle
     except Exception:
         return None
+    use_cjk_font(plt)
     i = hit["i"]
     a0 = max(0, hit["start_i"] - PRE_BARS - 8)
     a1 = min(len(d["c"]), i + 4)
@@ -694,6 +719,7 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
         from matplotlib.patches import Rectangle
     except Exception:
         return None
+    use_cjk_font(plt)
     i = tr["signal_i"]
     a0 = max(0, i - 36)
     a1 = min(len(d["c"]), tr["exit_i"] + 6)
@@ -931,7 +957,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <p class="muted">{escape(kind_line) if kind_line else '無分組'}</p>
 <p class="muted">出場 {escape(reason_line) if reason_line else '—'}</p>
 <p class="muted">無停損續走 {escape(fwd_line) if fwd_line else '—'}</p>
-<p class="muted">等權重每筆 1 單位，不含手續費／資金費。下面 {stats['count']} 筆都有圖。</p>
+<p class="muted">等權重每筆 1 單位，不含手續費／資金費。下面 {stats['count']} 筆都有圖：黃菱形＝記號、藍圈＝第 {CONFIRM_BARS} 根確認、綠三角＝進場、× ＝出場。</p>
 </section>
 {''.join(cards) if cards else "<div class='empty'>這週沒有訊號</div>"}
 </div></body></html>
