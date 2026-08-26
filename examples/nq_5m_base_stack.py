@@ -837,8 +837,10 @@ h1{{font-size:18px;margin:0 0 6px}}
 
 def write_view_html(src: Path, branch: str = VIEW_BRANCH) -> Path:
     rel = src.parent.relative_to(REPO_ROOT).as_posix()
+    stamp = datetime.now(ET).strftime("%Y%m%d%H%M%S")
     base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
     text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    text = text.replace(".png'", f".png?v={stamp}'")
     out = src.with_name("view.html")
     out.write_text(text, encoding="utf-8")
     return out

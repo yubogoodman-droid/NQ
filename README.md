@@ -28,17 +28,17 @@
 對齊三張截圖：08-25 22:20、07-22 19:50、07-28 11:05。
 
 近一個月 Yahoo 5m（07-23 → 08-26）：嚴格 **5 筆、勝率 100%、+386**（含 07-28 V 和 08-25 U；07-22 夜盤在 30 天窗外）。  
-`--loose` 同區間 **30 筆、勝率 40%、+364**。
+近兩個月（06-16 → 08-26）：嚴格 **13 筆、勝率 61.5%、+645**。`--loose` 同區間 62 筆、勝率 34%、+265。
 
 ```bash
 python3 examples/nq_5m_base_stack.py backtest --period 30d --pages
+python3 examples/nq_5m_base_stack.py backtest --period 60d --pages
 python3 examples/nq_5m_base_stack.py backtest --period 30d --pages --loose
-python3 examples/nq_5m_base_stack.py backtest --period 60d --html output/nq_5m_base_stack_60d.html
 python3 examples/nq_5m_base_stack.py alert --test
 python3 examples/nq_5m_base_stack.py alert --dry-run --once
 ```
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/view.html
+預覽（兩個月 13 筆，防快取新網址）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/two-month.html
 
 TradingView：`pinescript/nq_5m_base_stack.pine`
 
