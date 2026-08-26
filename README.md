@@ -32,12 +32,7 @@ python3 examples/nq_ma60_retest.py backtest --period 8d --html output/nq_ma60_re
 python3 examples/nq_ma60_retest.py backtest --period 30d --pages
 ```
 
-近 8 天（2026-08-18 → 08-26）：**4 筆、勝率 25%、−9.6 點**，含 08-25 22:04 QA **+48**（破底距 MA60 34 點）。  
-近一個月 Yahoo 1m（2026-08-03 → 08-26）：**9 筆、勝率 44%、+8.9 點**。QA 4 筆 **+18.9**。  
-07-22 截圖 Yahoo 1m 已過期，用 2 分 K 還原：19:03 破底（距 MA60 **50 點**）→ 19:28 突破 → **19:33 回踩**，目標 **+64.6**。20:18 那張圖已在目標之後。  
-報告每筆附 **一分 K + 五分 K 對照**（5m MA60／季線，標 破底／突破／1m 進場），方便對結構，不是另跑一套 5 分策略。
-
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma60-retest-8fa0/docs/nq-ma60-retest/view.html
+報告每筆附一分 K + 五分 K 對照。預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma60-retest-8fa0/docs/nq-ma60-retest/view.html
 
 ## NQ 一分 K 破底翻 MA Reclaim
 

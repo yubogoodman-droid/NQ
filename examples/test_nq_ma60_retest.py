@@ -40,9 +40,12 @@ def _base_dump_recover(n: int = 340) -> tuple[np.ndarray, np.ndarray, np.ndarray
         close[i] = base + (1.2 if i % 2 == 0 else -0.8)
     break_i = 220
     close[break_i] = base - 28.0
-    for i, px in enumerate((base - 18.0, base - 8.0, base + 2.0, base + 14.0, base + 22.0)):
-        close[break_i + 1 + i] = px
-    for i in range(break_i + 6, n):
+    # stay under MA60 for a stretch (both screenshots are a real dip, not one bar)
+    for i in range(1, 12):
+        close[break_i + i] = base - 22.0 + i * 0.4
+    for i, px in enumerate((base - 8.0, base + 2.0, base + 14.0, base + 22.0)):
+        close[break_i + 12 + i] = px
+    for i in range(break_i + 16, n):
         close[i] = close[i - 1] + 1.6
     high = close + 1.4
     low = close - 1.4
@@ -72,8 +75,8 @@ def _make_retest_bars(n: int = 340) -> pd.DataFrame:
     """08-25 形：綠線下探底、翻上、再回來踩綠線。"""
     close, high, low, _base, break_i = _base_dump_recover(n)
     ma60 = sma(close, 60)
-    retest_i = break_i + 16
-    for i in range(break_i + 6, retest_i):
+    retest_i = break_i + 22
+    for i in range(break_i + 16, retest_i):
         if not np.isnan(ma60[i]):
             close[i] = float(ma60[i]) + 18.0
             high[i] = close[i] + 1.5
@@ -95,13 +98,17 @@ def _make_july22_bars(n: int = 360) -> pd.DataFrame:
     close[break_i] = base - 49.0
     low[break_i] = close[break_i] - 0.8
     high[break_i] = close[break_i] + 1.0
-    for i, px in enumerate((base - 36.0, base - 24.0, base - 12.0, base - 4.0, base + 2.0, base + 8.0)):
-        close[break_i + 1 + i] = px
-        high[break_i + 1 + i] = px + 1.2
-        low[break_i + 1 + i] = px - 1.2
+    for i in range(1, 12):
+        close[break_i + i] = base - 40.0 + i * 1.2
+        high[break_i + i] = close[break_i + i] + 1.2
+        low[break_i + i] = close[break_i + i] - 1.2
+    for i, px in enumerate((base - 12.0, base - 4.0, base + 2.0, base + 8.0)):
+        close[break_i + 12 + i] = px
+        high[break_i + 12 + i] = px + 1.2
+        low[break_i + 12 + i] = px - 1.2
     ma60 = sma(close, 60)
-    retest_i = break_i + 10
-    for i in range(break_i + 7, retest_i):
+    retest_i = break_i + 20
+    for i in range(break_i + 16, retest_i):
         if not np.isnan(ma60[i]):
             close[i] = float(ma60[i]) + 10.0
             high[i] = close[i] + 1.4
@@ -121,11 +128,11 @@ def _make_no_retest_bars(n: int = 340) -> pd.DataFrame:
     """翻上之後再也沒碰到綠線。"""
     close, high, low, _base, break_i = _base_dump_recover(n)
     ma60 = sma(close, 60)
-    for i in range(break_i + 4, n):
+    for i in range(break_i + 10, n):
         if np.isnan(ma60[i]):
             continue
-        close[i] = max(float(close[i]), float(ma60[i]) + 22.0)
-        low[i] = max(float(low[i]), float(ma60[i]) + 22.0)
+        close[i] = max(float(close[i]), float(ma60[i]) + 25.0)
+        low[i] = max(float(low[i]), float(ma60[i]) + 25.0)
         high[i] = max(float(high[i]), close[i] + 1.2)
     return _to_df(close, high, low)
 

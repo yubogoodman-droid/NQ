@@ -137,6 +137,7 @@ def detect_signals(
     in_dip = False
     dip_idx = -1
     dip_low = 0.0
+    dip_bars = 0
     reclaim_idx: Optional[int] = None
 
     i = 60
@@ -151,19 +152,31 @@ def detect_signals(
                 in_dip = True
                 dip_idx = i
                 dip_low = float(low[i])
+                dip_bars = 1
                 reclaim_idx = None
                 bump("break")
-            elif float(low[i]) < dip_low:
-                dip_idx = i
-                dip_low = float(low[i])
+            else:
+                dip_bars += 1
+                if float(low[i]) < dip_low:
+                    dip_idx = i
+                    dip_low = float(low[i])
             i += 1
             continue
 
         if in_dip:
             crossed = i > 0 and not np.isnan(ma60[i - 1]) and float(close[i - 1]) <= float(ma60[i - 1])
-            if crossed or float(close[i]) > ma:
+            dip_depth = (
+                float(ma60[dip_idx]) - dip_low if dip_idx >= 0 and not np.isnan(ma60[dip_idx]) else 0.0
+            )
+            # 兩張圖都是綠線下面走一截，不是刺一根就翻。
+            if dip_bars < 8 or dip_depth < 15.0:
+                in_dip = False
+                dip_bars = 0
+                reclaim_idx = None
+            elif crossed or float(close[i]) > ma:
                 reclaim_idx = i
                 in_dip = False
+                dip_bars = 0
                 bump("breakout")
 
         if reclaim_idx is None:
@@ -175,6 +188,7 @@ def detect_signals(
             in_dip = True
             dip_idx = i
             dip_low = float(low[i])
+            dip_bars = 1
             reclaim_idx = None
             bump("break")
             i += 1
@@ -196,6 +210,7 @@ def detect_signals(
             in_dip = True
             dip_idx = i
             dip_low = float(low[i])
+            dip_bars = 1
             reclaim_idx = None
             bump("break")
             i += 1
