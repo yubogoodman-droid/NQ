@@ -125,8 +125,7 @@ python3 examples/chart_today.py
 
 ## NQ 一分 K 站上季線
 
-1 分鐘圖：整理後收盤從 **SMA60（季線）** 下方站上、陽線、**MA5>MA10**、MACD 柱翻綠、放量。黏帶寬度只記在卡片上，不擋進場。  
-停損在進場 K 低點／季線下方；目標 2R。對應截圖那種「低點起來踩穩季線、短均轉多、放量走出去」。
+1 分鐘圖：對齊 HTML **#25（08-21 10:43 +95）**。先殺深，五分還在五分季線下至少 60 點，一分季線下至少 40 根，近 60 根回撤 ≥ 60 點，只做 **10:00–16:00 ET**。陽線站上 1 分 SMA60、MA5>MA10、MACD 柱翻綠、放量。
 
 ```bash
 python3 examples/nq_ma60_stand.py backtest --period 8d --html output/nq_ma60_stand.html

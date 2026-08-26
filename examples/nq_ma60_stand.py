@@ -47,9 +47,41 @@ STATE_PATH = ROOT / "tg_ma60_stand_state.json"
 PAGES_HTML = REPO_ROOT / "docs" / "nq-ma60-stand" / "index.html"
 
 
-# ---------------------------------------------------------------------------
-# Strategy
-# ---------------------------------------------------------------------------
+def _align_last_completed(series: pd.Series, index) -> np.ndarray:
+    """Map a higher-TF series onto 1m bars using only bars that have already closed."""
+    s = series.dropna()
+    out = np.full(len(index), np.nan, dtype=float)
+    if s.empty:
+        return out
+    idx = s.index
+    vals = s.to_numpy(float)
+    j = 0
+    for i, ts in enumerate(index):
+        while j + 1 < len(idx) and idx[j + 1] <= ts:
+            j += 1
+        if idx[j] <= ts:
+            out[i] = vals[j]
+    return out
+
+
+def build_m5_close_ma60(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
+    close = df["Close"].astype(float)
+    m5 = close.resample("5min", label="right", closed="right").last()
+    m5_ma60 = m5.rolling(60, min_periods=60).mean()
+    return _align_last_completed(m5, df.index), _align_last_completed(m5_ma60, df.index)
+
+
+# Tests / 合成資料關掉盤中殺深過濾
+SYNTH_DETECT = dict(
+    skip_hour_start=None,
+    skip_hour_end=None,
+    session_start=None,
+    session_end=None,
+    min_below_bars=8,
+    m5_max_dist=None,
+    min_drop_pts=0.0,
+    use_cluster=False,
+)
 
 
 @dataclass
@@ -125,7 +157,7 @@ def quality_from_stand(
 def detect_signals(
     df: pd.DataFrame,
     ma60_len: int = 60,
-    min_below_bars: int = 8,
+    min_below_bars: int = 40,
     max_stand_pts: float = 40.0,
     min_stand_pts: float = 1.0,
     cluster_pts: float = 40.0,
@@ -146,12 +178,18 @@ def detect_signals(
     max_risk: float = 80.0,
     skip_hour_start: Optional[int] = 9,
     skip_hour_end: Optional[int] = 10,
+    session_start: Optional[int] = 10,
+    session_end: Optional[int] = 16,
+    m5_max_dist: Optional[float] = -60.0,
+    min_drop_pts: float = 60.0,
+    drop_lookback: int = 60,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """一分收盤站上 SMA60（季線）。對齊截圖：整理後陽線踩上、MA5>MA10、MACD 柱翻綠、放量。黏帶只作品質，不當硬過濾。"""
+    """一分收盤站上 SMA60。對齊 #25：先殺深（五分仍遠低於五分季線），再踩上一分季線。"""
     close = df["Close"].to_numpy(float)
     open_ = df["Open"].to_numpy(float)
     low = df["Low"].to_numpy(float)
+    high = df["High"].to_numpy(float)
     volume = df["Volume"].to_numpy(float)
 
     ma5 = sma(close, 5)
@@ -162,6 +200,8 @@ def detect_signals(
     ma120 = sma(close, 120)
     dif, dea, hist = macd(close)
     vol_ma = sma(volume, vol_len)
+    m5_close, m5_ma60 = build_m5_close_ma60(df)
+    roll_high = pd.Series(high).rolling(drop_lookback, min_periods=max(10, drop_lookback // 3)).max().to_numpy(float)
 
     n = len(close)
     below = np.zeros(n, dtype=int)
@@ -247,6 +287,23 @@ def detect_signals(
             h = df.index[i].hour
             if skip_hour_start <= h < skip_hour_end:
                 bump("skip_open_hour")
+                continue
+        if session_start is not None and session_end is not None:
+            h = df.index[i].hour
+            if not (session_start <= h < session_end):
+                bump("skip_session")
+                continue
+        if min_drop_pts > 0:
+            drop = float(roll_high[i] - low[i]) if not np.isnan(roll_high[i]) else 0.0
+            if drop < min_drop_pts:
+                bump("skip_drop")
+                continue
+        if m5_max_dist is not None:
+            if np.isnan(m5_close[i]) or np.isnan(m5_ma60[i]):
+                bump("skip_m5")
+                continue
+            if float(m5_close[i] - m5_ma60[i]) > m5_max_dist:
+                bump("skip_m5")
                 continue
         if i - last_entry < cooldown:
             bump("skip_cooldown")
@@ -733,6 +790,8 @@ def write_html_report(
             f"（陰線 {funnel.get('skip_bear', 0)} · 距離 {funnel.get('skip_dist', 0)} · "
             f"沒踩到線 {funnel.get('skip_touch', 0)} · 季線帶 {funnel.get('skip_cluster', 0)} · "
             f"短均未轉 {funnel.get('skip_stack', 0)} · "
+            f"盤外 {funnel.get('skip_session', 0)} · 殺深不夠 {funnel.get('skip_drop', 0)} · "
+            f"五分未折夠 {funnel.get('skip_m5', 0)} · "
             f"下方不夠 {funnel.get('skip_below', 0)} · 斜率 {funnel.get('skip_slope', 0)} · "
             f"MACD {funnel.get('skip_macd', 0)} · 量能 {funnel.get('skip_vol', 0)} · "
             f"冷卻 {funnel.get('skip_cooldown', 0)}）</p>"
@@ -777,7 +836,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 一分K 站上季線</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">收盤從 SMA60（季線）下方站上、陽線、MA5&gt;MA10、MACD 柱翻綠、放量。黏帶寬度只記在卡片上，不擋進場。停損在低點／季線下方，目標 2R。每筆附一分K與五分K對照。</p>
+<p class="muted">對齊 HTML #25：先殺深（五分收盤仍低於五分季線 ≥60 點、近 60 根至少回撤 60 點、一分季線下至少 40 根），美股 10:00–16:00 ET 陽線站上 1 分季線，MA5&gt;MA10、MACD 柱翻綠、放量。每筆附一分K與五分K對照。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -980,6 +1039,8 @@ def cmd_backtest(args) -> int:
             f"bear={funnel.get('skip_bear', 0)} dist={funnel.get('skip_dist', 0)} "
             f"touch={funnel.get('skip_touch', 0)} cluster={funnel.get('skip_cluster', 0)} "
             f"stack={funnel.get('skip_stack', 0)} "
+            f"sess={funnel.get('skip_session', 0)} drop={funnel.get('skip_drop', 0)} "
+            f"m5={funnel.get('skip_m5', 0)} "
             f"below={funnel.get('skip_below', 0)} slope={funnel.get('skip_slope', 0)} "
             f"macd={funnel.get('skip_macd', 0)} vol={funnel.get('skip_vol', 0)} "
             f"cool={funnel.get('skip_cooldown', 0)}"

@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nq_ma60_stand import (  # noqa: E402
     ET,
+    SYNTH_DETECT,
     TradeResult,
     detect_signals,
     m5_context,
@@ -77,7 +78,7 @@ def _make_stand_bars(n: int = 220) -> pd.DataFrame:
 
 def test_detect_stand_on_ma60() -> None:
     df = _make_stand_bars()
-    sigs = detect_signals(df, skip_hour_start=None, skip_hour_end=None, use_cluster=False)
+    sigs = detect_signals(df, **SYNTH_DETECT)
     assert sigs, "expected a 站上季線 signal on the synthetic pop"
     sig = sigs[0]
     assert sig.entry_price > sig.ma60
@@ -95,13 +96,13 @@ def test_skip_bearish_cross() -> None:
     df = _make_stand_bars()
     i = 210
     df.iloc[i, df.columns.get_loc("Open")] = float(df["Close"].iloc[i]) + 6.0
-    sigs = detect_signals(df, skip_hour_start=None, skip_hour_end=None, use_cluster=False)
+    sigs = detect_signals(df, **SYNTH_DETECT)
     assert not any(s.entry_idx == i for s in sigs)
 
 
 def test_simulate_target_or_stop() -> None:
     df = _make_stand_bars()
-    sigs = detect_signals(df, skip_hour_start=None, skip_hour_end=None, use_cluster=False)
+    sigs = detect_signals(df, **SYNTH_DETECT)
     trades = simulate(df, sigs, preopen_flat=False)
     assert trades
     assert isinstance(trades[0], TradeResult)
@@ -121,7 +122,7 @@ def test_resample_m5() -> None:
 
 def test_write_html_report(tmp_path: Path | None = None) -> None:
     df = _make_stand_bars()
-    sigs = detect_signals(df, skip_hour_start=None, skip_hour_end=None, use_cluster=False)
+    sigs = detect_signals(df, **SYNTH_DETECT)
     trades = simulate(df, sigs, preopen_flat=False)
     out = Path("/tmp/nq_ma60_stand_test.html") if tmp_path is None else Path(tmp_path) / "r.html"
     path = write_html_report(out, df, trades, "NQ=F", "demo")

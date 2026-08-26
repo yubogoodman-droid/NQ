@@ -1,12 +1,11 @@
 //@version=5
 strategy("NQ 一分K 站上季線", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, pyramiding=0, calc_on_every_tick=false)
 
-// 季線 = 1 分圖 SMA60。進場：整理後陽線收盤站上季線，MA5>MA10，MACD 柱翻綠、放量。
-// 對應截圖那種從低點起來踩穩季線、短均轉多、量能放大的做多。
+// 季線 = 1 分圖 SMA60。對齊 HTML #25：先殺深，五分仍遠低於五分季線，再開盤時段陽線站上一分季線。
 
 // === 參數 ===
 ma60Len        = input.int(60, "季線週期", minval=10)
-minBelowBars   = input.int(8, "站上前至少在季線下方幾根", minval=1)
+minBelowBars   = input.int(40, "站上前至少在季線下方幾根", minval=1)
 maxStandPts    = input.float(40.0, "站上距離上限（點）", minval=1.0, step=1.0, tooltip="收盤超過季線太多視為追價，不進")
 minStandPts    = input.float(1.0, "最少站上距離（點）", minval=0.0, step=0.25)
 useCluster     = input.bool(false, "季線帶確認（MA60/100/120 黏在一起且收盤穿過帶）")
@@ -15,6 +14,11 @@ touchPts       = input.float(22.0, "低點須靠近季線（點）", minval=0.0,
 useStack       = input.bool(true, "短均轉多（MA5>MA10）")
 useMacd        = input.bool(true, "MACD 柱翻綠")
 useMacdCross   = input.bool(false, "還要 DIF>DEA")
+sessStart      = input.int(10, "只做 ET 幾點之後", minval=0, maxval=23)
+sessEnd        = input.int(16, "只做 ET 幾點之前", minval=1, maxval=24)
+m5MaxDist      = input.float(-60.0, "五分須低於五分季線（點）", step=5.0, tooltip="負值＝五分還在季線下多少點。設 999 可關掉")
+minDropPts     = input.float(60.0, "近 60 根最少回撤（點）")
+dropLookback   = input.int(60, "回撤回看根數", minval=10)
 macdFast       = input.int(12, "MACD 快線", minval=2)
 macdSlow       = input.int(26, "MACD 慢線", minval=5)
 macdSig        = input.int(9, "MACD 訊號", minval=2)
@@ -41,6 +45,10 @@ ma120 = ta.sma(close, 120)
 [dif, dea, hist] = ta.macd(close, macdFast, macdSlow, macdSig)
 volMa = ta.sma(volume, volLen)
 slope60 = ma60 - ma60[slopeBars]
+m5Close = request.security(syminfo.tickerid, "5", close, lookahead=barmerge.lookahead_off)
+m5Ma60  = request.security(syminfo.tickerid, "5", ta.sma(close, 60), lookahead=barmerge.lookahead_off)
+dropHigh = ta.highest(high, dropLookback)
+dropPts  = dropHigh - low
 
 // 連續在季線下方的根數（不含本根）
 var int belowRun = 0
@@ -63,13 +71,17 @@ stackOk   = not useStack or (ma5 > ma10)
 macdOk    = not useMacd or (not na(hist) and hist > 0)
 macdCrossOk = not useMacdCross or (not na(dif) and not na(dea) and dif > dea)
 volOk     = not useVol or (not na(volMa) and volMa > 0 and volume >= volMa * volMult)
+sessOk    = hour(time, "America/New_York") >= sessStart and hour(time, "America/New_York") < sessEnd
+dropOk    = minDropPts <= 0 or dropPts >= minDropPts
+m5Dist    = m5Close - m5Ma60
+m5Ok      = na(m5Ma60) ? false : m5Dist <= m5MaxDist
 slopeOk   = not useSlope or na(slope60) or slope60 >= minSlope
 var int lastExitBar = na
 if strategy.closedtrades > 0
     lastExitBar := strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1)
 cooled = strategy.position_size == 0 and (na(lastExitBar) or bar_index - lastExitBar >= cooldown)
 
-longSignal = stoodUp and bullBar and nearStand and touchOk and clusterOk and enoughBelow and stackOk and macdOk and macdCrossOk and volOk and slopeOk and cooled and strategy.position_size == 0
+longSignal = stoodUp and bullBar and nearStand and touchOk and clusterOk and enoughBelow and stackOk and macdOk and macdCrossOk and volOk and slopeOk and sessOk and dropOk and m5Ok and cooled and strategy.position_size == 0
 
 stopLevel = math.min(low, ma60) - stopBuffer
 risk      = close - stopLevel
