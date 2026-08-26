@@ -99,17 +99,17 @@ def detect_signals(
     df: pd.DataFrame,
     two_hour_bars: int = 120,
     min_break_depth: float = 10.0,
-    min_below_ma60: float = 15.0,
+    min_below_ma60: float = 25.0,
     breakout_window: int = 60,
     retest_window: int = 30,
-    min_retest_gap: int = 3,
+    min_retest_gap: int = 5,
     min_extension: float = 8.0,
-    min_clear_pts: float = 8.0,
+    min_clear_pts: float = 0.0,
     touch_pts: float = 15.0,
     pierce_pts: float = 10.0,
-    stop_buffer: float = 8.0,
+    stop_buffer: float = 12.0,
     target_r: float = 2.0,
-    max_risk: float = 50.0,
+    max_risk: float = 60.0,
     min_ma60_slope: float = -8.0,
     ma60_slope_bars: int = 5,
     cooldown: int = 25,
@@ -164,16 +164,20 @@ def detect_signals(
 
         breakout_idx: Optional[int] = None
         end_bo = min(break_idx + breakout_window, n - 1)
-        for j in range(break_idx + 1, end_bo + 1):
+        j = break_idx + 1
+        while j <= end_bo:
             if np.isnan(ma60[j]):
+                j += 1
                 continue
             if float(low[j]) < break_low and float(close[j]) < float(ma60[j]):
                 break_idx = j
                 break_low = float(low[j])
                 below60 = float(ma60[j]) - break_low
+                end_bo = min(break_idx + breakout_window, n - 1)
             if j > 0 and float(close[j - 1]) <= float(ma60[j - 1]) and float(close[j]) > float(ma60[j]):
                 breakout_idx = j
                 break
+            j += 1
 
         if breakout_idx is None:
             bump("no_breakout")
@@ -280,11 +284,11 @@ def simulate(
     df: pd.DataFrame,
     signals: List[Signal],
     max_hold: int = 90,
-    be_after_r: float = 0.70,
+    be_after_r: float = 0.0,
     trail_after_r: float = 1.5,
     trail_lock_r: float = 0.5,
     preopen_flat: bool = True,
-    exit_on_ma60_lose: bool = True,
+    exit_on_ma60_lose: bool = False,
 ) -> List[TradeResult]:
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
@@ -661,7 +665,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底後回踩 MA60</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">1 分鐘：破 2h 低且低於季線 → 收盤突破 MA60 → 回踩踩住 MA60 進場。停損在回踩低點／季線下，目標 2R；收盤跌回 MA60 下當失敗出場。</p>
+<p class="muted">1 分鐘：破 2h 低且低於季線 → 收盤突破 MA60 → 回踩踩住 MA60 進場。停損在回踩低點／季線下方，目標 2R。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

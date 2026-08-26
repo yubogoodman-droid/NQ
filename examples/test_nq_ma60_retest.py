@@ -97,8 +97,8 @@ def _make_no_retest_bars(n: int = 340) -> pd.DataFrame:
     for i in range(break_i + 4, n):
         if np.isnan(ma60[i]):
             continue
-        close[i] = max(float(close[i]), float(ma60[i]) + 16.0)
-        low[i] = max(float(low[i]), float(ma60[i]) + 10.0)
+        close[i] = max(float(close[i]), float(ma60[i]) + 22.0)
+        low[i] = max(float(low[i]), float(ma60[i]) + 18.0)
         high[i] = max(float(high[i]), close[i] + 1.2)
     return _to_df(close, high, low)
 
@@ -112,7 +112,7 @@ def test_detect_and_simulate_retest() -> None:
     assert sig.entry_idx > sig.breakout_idx > sig.break_idx
     assert sig.entry_price > sig.stop_price
     assert sig.quality in {"A", "B", "C"}
-    assert sig.entry_idx - sig.breakout_idx >= 3
+    assert sig.entry_idx - sig.breakout_idx >= 5
     assert sig.entry_idx - sig.break_idx <= 60
 
     trades = simulate(df, sigs, preopen_flat=False, exit_on_ma60_lose=False)
