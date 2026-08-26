@@ -65,7 +65,7 @@ def main() -> None:
             "docs/index.html" if args.pages else (f"output/nq_report_{days}d.html" if days else "output/nq_report.html")
         )
         if days:
-            title = f"NQ 破底W底回測 — 近 {days} 天"
+            title = f"NQ 破底W · L1L2L3 兩小時內 — 近 {days} 天"
         else:
             title = f"NQ 破底W底回測 — {today}"
         out = save_report_html(
