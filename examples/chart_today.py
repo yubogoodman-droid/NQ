@@ -21,8 +21,11 @@ def fetch_nq_5m(symbol: str = "NQ=F", *, period: str = "1d", days: int | None = 
     import pandas as pd
 
     if days is not None:
-        period = f"{days}d"
-    raw = yf.Ticker(symbol).history(period=period, interval="5m")
+        end = pd.Timestamp.now(tz="America/New_York")
+        start = end - pd.Timedelta(days=days)
+        raw = yf.Ticker(symbol).history(start=start, end=end, interval="5m")
+    else:
+        raw = yf.Ticker(symbol).history(period=period, interval="5m")
     if raw.empty:
         raise RuntimeError(f"無法取得 {symbol} 五分 K 資料")
 
@@ -65,7 +68,7 @@ def main() -> None:
             "docs/index.html" if args.pages else (f"output/nq_report_{days}d.html" if days else "output/nq_report.html")
         )
         if days:
-            title = f"NQ 破底W · L3收盤 · 停L3-20 — 近 {days} 天"
+            title = f"NQ 破底W · L3收盤 · 停L3-20 — 近一個月" if days >= 28 else f"NQ 破底W · L3收盤 · 停L3-20 — 近 {days} 天"
         else:
             title = f"NQ 破底W底回測 — {today}"
         out = save_report_html(
