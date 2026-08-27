@@ -44,6 +44,8 @@ PRE_BARS = 12
 CONFIRM_BARS = 3         # 記號之後要連 3 根收盤都沒跌破 MA200
 MIN_VOL_RATIO = 1.70     # 大賺單均量 2.7×，四張原圖 1.8～4.0×
 MAX_MARK_EXT = 0.02      # 記號時收盤離 MA200 仍 ≤2%
+MIN_STACK_7_14 = 0.001   # MA7 要比 MA14 真的張開；POL #5 只有 +0.004% 是假排列
+MIN_STACK_7_25 = 0.004   # 四張原圖 7/25 都 ≥0.57%
 SESSION_HOURS = range(8, 21)  # 台北 08–20；21–23 點近一週合計 −72%
 MIN_BARS = 220
 KLINE_LIMIT = 500
@@ -269,6 +271,10 @@ def _hit_at(d: dict, i: int) -> dict | None:
     if hour not in SESSION_HOURS:
         return None
     if not (m7[mark] > m14[mark] > m25[mark]):
+        return None
+    if float(m7[mark] / m14[mark] - 1.0) < MIN_STACK_7_14:
+        return None
+    if float(m7[mark] / m25[mark] - 1.0) < MIN_STACK_7_25:
         return None
     if c[mark] <= o[mark]:
         return None
@@ -948,7 +954,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 15m MA200 站穩 {CONFIRM_BARS} 根</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25</strong>、放量陽線收盤站上 MA200 做記號（量比 ≥{MIN_VOL_RATIO:.1f}×、離 200 ≤{MAX_MARK_EXT:.0%}、台北 08–20 點），連 {CONFIRM_BARS} 根收盤沒破 200 才進。下一根開盤做多，<strong>收盤跌破 MA200 出場</strong>，最多 4 小時。</p>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25 要張開</strong>（7 比 25 至少高 {MIN_STACK_7_25:.1%}），放量陽線收盤站上 MA200 做記號（量比 ≥{MIN_VOL_RATIO:.1f}×、離 200 ≤{MAX_MARK_EXT:.0%}、台北 08–20 點），連 {CONFIRM_BARS} 根收盤沒破 200 才進。下一根開盤做多，<strong>收盤跌破 MA200 出場</strong>，最多 4 小時。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

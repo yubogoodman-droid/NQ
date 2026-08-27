@@ -118,6 +118,17 @@ def test_mark_too_far_from_ma200_skips() -> None:
     assert detect_expansion(d) == []
 
 
+def test_glued_ma_stack_skips() -> None:
+    """MA7 只比 MA14 高一點點，看起來像多頭排列其實沒張開。"""
+    close = np.concatenate([np.full(250, 100.0), np.full(20, 99.85), np.array([100.15]), _held(100.15)])
+    vol = np.full(len(close), 1_000.0)
+    vol[270] = 4_000.0
+    d = indicators(_bars(len(close), close, vol))
+    for h in detect_expansion(d):
+        assert h["ma7"] / h["ma14"] - 1.0 >= 0.001
+        assert h["ma7"] / h["ma25"] - 1.0 >= 0.004
+
+
 def test_bear_stack_skips() -> None:
     """收盤站上 200，但短均是空頭排列（MA7 < MA25），不算。"""
     close = np.concatenate([np.full(240, 101.0), np.full(30, 99.4), np.array([100.2]), _held(100.2)])
@@ -200,6 +211,7 @@ def main() -> int:
     test_break_below_ma200_cancels()
     test_low_volume_skips()
     test_mark_too_far_from_ma200_skips()
+    test_glued_ma_stack_skips()
     test_bear_stack_skips()
     test_chop_does_not_hit()
     test_collapse_keeps_best_of_run()
