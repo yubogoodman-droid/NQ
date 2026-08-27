@@ -11,10 +11,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scan_binance_15m_expansion import (  # noqa: E402
     ALERT_BUCKET_MS,
+    CLUSTER_COOLDOWN_MS,
     CONFIRM_BARS,
     TZ,
     collapse_hits,
     detect_expansion,
+    drop_market_cluster,
     indicators,
     rsi_sma,
     select_alerts,
@@ -222,6 +224,21 @@ def test_summarize_empty() -> None:
     assert s["pnl"] == 0.0
 
 
+def test_market_cluster_drops_same_mark_and_laggards() -> None:
+    """08-25 那種：同一根記號很多檔，後面幾小時跟風也拿掉。"""
+    t0 = 1_000_000
+    pack = [{"t_mark": t0, "symbol": f"S{i}"} for i in range(4)]
+    lag = {"t_mark": t0 + CLUSTER_COOLDOWN_MS, "symbol": "LAG"}
+    later = {"t_mark": t0 + CLUSTER_COOLDOWN_MS + 1, "symbol": "LATER"}
+    out = drop_market_cluster(pack + [lag, later])
+    assert [x["symbol"] for x in out] == ["LATER"]
+
+
+def test_three_same_mark_kept() -> None:
+    pack = [{"t_mark": 1_000, "symbol": f"S{i}"} for i in range(3)]
+    assert drop_market_cluster(pack) == pack
+
+
 def main() -> int:
     test_sma()
     test_rsi_sma_all_up()
@@ -241,6 +258,8 @@ def main() -> int:
     test_simulate_stop_on_breakdown()
     test_simulate_target_or_time()
     test_summarize_empty()
+    test_market_cluster_drops_same_mark_and_laggards()
+    test_three_same_mark_kept()
     print("ok")
     return 0
 

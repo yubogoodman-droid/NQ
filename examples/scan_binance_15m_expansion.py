@@ -50,6 +50,10 @@ MAX_MARK_EXT = 0.02      # 記號時收盤離 MA200 仍 ≤2%
 MIN_STACK_7_14 = 0.001   # MA7 要比 MA14 真的張開；POL #5 只有 +0.004% 是假排列
 MIN_STACK_7_25 = 0.004   # 四張原圖 7/25 都 ≥0.57%
 SESSION_HOURS = range(8, 21)  # 台北 08–20；21–23 點近一週合計 −72%
+# 同一根 15m 記號 ≥4 檔 = 大盤一起過 200，不是 FIL/PIPPIN 那種個股擴張。
+# 7 日 #44–#52：08-25 10:15 一次 14 檔（FIL/SUI/GALA…），接著 WLFI、BEAMX 跟風。
+MAX_SAME_MARK = 4
+CLUSTER_COOLDOWN_MS = 3 * 3600 * 1000  # 集群之後 3 小時內的跟風也不算
 MIN_BARS = 220
 KLINE_LIMIT = 500
 ALERT_BUCKET_MS = 8 * 3600 * 1000
@@ -340,6 +344,39 @@ def detect_expansion(d: dict, *, last_bars: int | None = None) -> list[dict]:
     return hits
 
 
+def item_mark_ms(item: dict) -> int:
+    if "t_mark" in item:
+        return int(item["t_mark"])
+    hit = item["hit"]
+    mark_i = int(hit.get("mark_i", hit["i"] - CONFIRM_BARS))
+    return int(item["d"]["t"][mark_i])
+
+
+def crowded_mark_times(items: list[dict], extra: list[int] | None = None) -> list[int]:
+    counts: dict[int, int] = {}
+    for x in items:
+        t = item_mark_ms(x)
+        counts[t] = counts.get(t, 0) + 1
+    crowded = [t for t, n in counts.items() if n >= MAX_SAME_MARK]
+    if extra:
+        crowded.extend(int(t) for t in extra)
+    return sorted(set(crowded))
+
+
+def drop_market_cluster(items: list[dict], extra_crowded: list[int] | None = None) -> list[dict]:
+    """同一根 15m 記號太多檔就整批拿掉，之後 CLUSTER_COOLDOWN_MS 內的跟風也拿掉。"""
+    crowded = crowded_mark_times(items, extra_crowded)
+    if not crowded:
+        return items
+    kept = []
+    for x in items:
+        t = item_mark_ms(x)
+        if any(c <= t <= c + CLUSTER_COOLDOWN_MS for c in crowded):
+            continue
+        kept.append(x)
+    return kept
+
+
 def collapse_hits(hits: list[dict]) -> list[dict]:
     """連續命中合成一段，留分數最高的那根。"""
     if not hits:
@@ -510,7 +547,13 @@ def scan_symbol(sym: str, *, last_bars: int | None = 2) -> list[dict]:
     return [{"symbol": sym, "hit": hit, "d": d} for hit in hits]
 
 
-def scan_all(symbols: list[str], *, last_bars: int | None = 2) -> list[dict]:
+def scan_all(
+    symbols: list[str],
+    *,
+    last_bars: int | None = 2,
+    extra_crowded: list[int] | None = None,
+    crowded_out: list[int] | None = None,
+) -> list[dict]:
     events = []
     with ThreadPoolExecutor(8) as ex:
         futs = {ex.submit(scan_symbol, s, last_bars=last_bars): s for s in symbols}
@@ -520,7 +563,9 @@ def scan_all(symbols: list[str], *, last_bars: int | None = 2) -> list[dict]:
             except Exception as e:
                 print("err", futs[fut], e, flush=True)
     events.sort(key=lambda e: (-e["hit"]["score"], e["symbol"]))
-    return events
+    if crowded_out is not None:
+        crowded_out.extend(crowded_mark_times(events))
+    return drop_market_cluster(events, extra_crowded=extra_crowded)
 
 
 def notify(ev: dict) -> None:
@@ -841,6 +886,10 @@ def run_backtest(symbols: list[str], days: int = 7) -> tuple[list[dict], dict[st
             if done % 25 == 0 or done == len(symbols):
                 print(f"  {done}/{len(symbols)}  訊號 {len(trades)}", flush=True)
     trades.sort(key=lambda t: t["t_signal"])
+    before = len(trades)
+    trades = drop_market_cluster(trades)
+    if before != len(trades):
+        print(f"大盤集群濾掉 {before - len(trades)} 筆（同一根記號 ≥{MAX_SAME_MARK} 檔）", flush=True)
     return trades, data
 
 
@@ -960,7 +1009,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 15m MA200 站穩 {CONFIRM_BARS} 根</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25 要張開</strong>（7 比 25 至少高 {MIN_STACK_7_25:.1%}），放量陽線收盤站上 MA200 做記號（量比 ≥{MIN_VOL_RATIO:.1f}×、量大於前一根、離 200 ≤{MAX_MARK_EXT:.0%}、台北 08–20 點），連 {CONFIRM_BARS} 根收盤沒破 200 才進。下一根開盤做多，<strong>收盤跌破 MA200 出場</strong>，最多 4 小時。</p>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25 要張開</strong>（7 比 25 至少高 {MIN_STACK_7_25:.1%}），放量陽線收盤站上 MA200 做記號（量比 ≥{MIN_VOL_RATIO:.1f}×、量大於前一根、離 200 ≤{MAX_MARK_EXT:.0%}、台北 08–20 點），連 {CONFIRM_BARS} 根收盤沒破 200 才進。同一根 15m 記號 ≥{MAX_SAME_MARK} 檔視為大盤一起過線，之後 3 小時跟風也不算。下一根開盤做多，<strong>收盤跌破 MA200 出場</strong>，最多 4 小時。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1086,6 +1135,7 @@ def main() -> int:
         return cmd_backtest(args)
 
     seen = load_seen()
+    known_crowded: list[int] = []
     if args.symbols.strip():
         symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
         print(f"指定 {len(symbols)} 檔：{', '.join(symbols)}", flush=True)
@@ -1103,7 +1153,17 @@ def main() -> int:
             uni_ts = time.time()
             print(f"更新標的 {len(symbols)}", flush=True)
         t0 = time.time()
-        events = scan_all(symbols, last_bars=last_bars)
+        found: list[int] = []
+        events = scan_all(
+            symbols,
+            last_bars=last_bars,
+            extra_crowded=known_crowded,
+            crowded_out=found,
+        )
+        now_ms = int(time.time() * 1000)
+        known_crowded[:] = [
+            t for t in known_crowded + found if t >= now_ms - CLUSTER_COOLDOWN_MS
+        ]
         new = [e for e in events if key_of(e["symbol"], e["d"], e["hit"]) not in seen]
         print(
             f"[{datetime.now(TZ).strftime('%H:%M:%S')}] "
