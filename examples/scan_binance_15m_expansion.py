@@ -56,6 +56,9 @@ MAX_SAME_MARK = 4
 CLUSTER_COOLDOWN_MS = 3 * 3600 * 1000  # 集群之後 3 小時內的跟風也不算
 # 進場時 MA99、MA120 不能還在 MA200 上面：那是壓力，不是從 200 線頭頂起漲。
 # 四張原圖與 NIL／龙虾／RUNE 都是 200 在 99/120 之上（或黏在一起），價格打穿最高那條長均。
+# 200 還在直線往下砍、沒有走平：7 日 #15 INTW、#17 DOS。SNDK／PIPPIN 雖然下行但已彎頭走平。
+MAX_MA200_DOWN_20 = -0.007    # 近 20 根（5 小時）200 再跌超過 0.7%
+MIN_MA200_FLATTEN_12 = 0.0005  # 後 12 根斜率要比前 12 根走平至少 0.05%
 MIN_BARS = 220
 KLINE_LIMIT = 500
 ALERT_BUCKET_MS = 8 * 3600 * 1000
@@ -306,6 +309,17 @@ def _hit_at(d: dict, i: int) -> dict | None:
     # 進場前最後一根收盤：MA99 / MA120 不能還掛在 MA200 上面。
     if float(m99[i]) > float(m200[i]) or float(m120[i]) > float(m200[i]):
         return None
+    if mark < 24 or np.isnan([m200[mark - 24], m200[mark - 20], m200[mark - 12]]).any():
+        return None
+    if float(m200[mark - 20]) <= 0 or float(m200[mark - 12]) <= 0 or float(m200[mark - 24]) <= 0:
+        return None
+    slope20 = float(m200[mark] / m200[mark - 20] - 1.0)
+    flatten12 = float(
+        (m200[mark] / m200[mark - 12] - 1.0) - (m200[mark - 12] / m200[mark - 24] - 1.0)
+    )
+    # 還在快速下行且沒有走平 → 圖上 200 太彎／太斜，不要。
+    if slope20 < MAX_MA200_DOWN_20 and flatten12 < MIN_MA200_FLATTEN_12:
+        return None
     return {
         "i": i,
         "mark_i": mark,
@@ -329,6 +343,8 @@ def _hit_at(d: dict, i: int) -> dict | None:
         "ribbon": ribbon,
         "hour": hour,
         "stop_low": float(np.min(l[mark : i + 1])),
+        "ma200_slope20": slope20,
+        "ma200_flatten": flatten12,
         "score": float(vr + max(0.0, 0.05 - ext) * 100.0),
     }
 
@@ -1014,7 +1030,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 15m MA200 站穩 {CONFIRM_BARS} 根</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25 要張開</strong>（7 比 25 至少高 {MIN_STACK_7_25:.1%}），放量陽線收盤站上 MA200 做記號（量比 ≥{MIN_VOL_RATIO:.1f}×、量大於前一根、離 200 ≤{MAX_MARK_EXT:.0%}、台北 08–20 點），連 {CONFIRM_BARS} 根收盤沒破 200 才進。進場時 <strong>MA99、MA120 不能在 MA200 上面</strong>。同一根 15m 記號 ≥{MAX_SAME_MARK} 檔視為大盤一起過線，之後 3 小時跟風也不算。下一根開盤做多，<strong>收盤跌破 MA200 出場</strong>，最多 4 小時。</p>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25 要張開</strong>（7 比 25 至少高 {MIN_STACK_7_25:.1%}），放量陽線收盤站上 MA200 做記號（量比 ≥{MIN_VOL_RATIO:.1f}×、量大於前一根、離 200 ≤{MAX_MARK_EXT:.0%}、台北 08–20 點），連 {CONFIRM_BARS} 根收盤沒破 200 才進。進場時 <strong>MA99、MA120 不能在 MA200 上面</strong>。200 還在直線往下砍、沒有走平的不要。同一根 15m 記號 ≥{MAX_SAME_MARK} 檔視為大盤一起過線，之後 3 小時跟風也不算。下一根開盤做多，<strong>收盤跌破 MA200 出場</strong>，最多 4 小時。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

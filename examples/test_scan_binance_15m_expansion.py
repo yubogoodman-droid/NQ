@@ -259,6 +259,21 @@ def test_overhead_ma99_ma120_skips() -> None:
     assert detect_expansion(d) == []
 
 
+def test_diving_ma200_skips() -> None:
+    """INTW #15 / DOS #17：200 還在直線往下砍、沒有走平。"""
+    down = np.linspace(116, 100.8, 274)
+    curl = np.linspace(100.9, 101.7, 6)
+    close0 = np.concatenate([down, curl])
+    d0 = indicators(_bars(len(close0), close0))
+    mark = float(d0["m200"][-1]) * 1.008
+    holds = np.full(CONFIRM_BARS, mark * 1.003)
+    close = np.concatenate([close0, np.array([mark]), holds])
+    vol = np.full(len(close), 1_500.0)
+    vol[len(close0)] = 9_000.0
+    d = indicators(_bars(len(close), close, vol))
+    assert detect_expansion(d) == []
+
+
 def main() -> int:
     test_sma()
     test_rsi_sma_all_up()
@@ -281,6 +296,7 @@ def main() -> int:
     test_market_cluster_drops_same_mark_and_laggards()
     test_three_same_mark_kept()
     test_overhead_ma99_ma120_skips()
+    test_diving_ma200_skips()
     print("ok")
     return 0
 
