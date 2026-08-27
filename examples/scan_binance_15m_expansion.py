@@ -43,6 +43,9 @@ KEEP = {"FILUSDT", "PIPPINUSDT", "SNDKUSDT", "CRCLUSDT"}
 PRE_BARS = 12
 CONFIRM_BARS = 3         # 記號之後要連 3 根收盤都沒跌破 MA200
 MIN_VOL_RATIO = 1.70     # 大賺單均量 2.7×，四張原圖 1.8～4.0×
+# 記號根成交量必須大於前一根：進場是「開始擴張」，不是前一根已爆量、這根才穿越 200。
+# 7 日 #12 HOMEUSDT 08-23 13:30 是第二棒（13:15 已 2.3× / 區間 2.5%，還在 200 下）。
+MIN_MARK_VOL_VS_PREV = 1.0
 MAX_MARK_EXT = 0.02      # 記號時收盤離 MA200 仍 ≤2%
 MIN_STACK_7_14 = 0.001   # MA7 要比 MA14 真的張開；POL #5 只有 +0.004% 是假排列
 MIN_STACK_7_25 = 0.004   # 四張原圖 7/25 都 ≥0.57%
@@ -290,6 +293,9 @@ def _hit_at(d: dict, i: int) -> dict | None:
     ribbon = float(max(m99[i], m120[i], m200[i]) / min(m99[i], m120[i], m200[i]) - 1.0)
     vr = float(v[mark] / v20[mark]) if v20[mark] > 0 else 0.0
     if vr < MIN_VOL_RATIO:
+        return None
+    prev_vol = float(v[mark - 1])
+    if prev_vol > 0 and float(v[mark]) < prev_vol * MIN_MARK_VOL_VS_PREV:
         return None
     return {
         "i": i,
@@ -954,7 +960,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 15m MA200 站穩 {CONFIRM_BARS} 根</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25 要張開</strong>（7 比 25 至少高 {MIN_STACK_7_25:.1%}），放量陽線收盤站上 MA200 做記號（量比 ≥{MIN_VOL_RATIO:.1f}×、離 200 ≤{MAX_MARK_EXT:.0%}、台北 08–20 點），連 {CONFIRM_BARS} 根收盤沒破 200 才進。下一根開盤做多，<strong>收盤跌破 MA200 出場</strong>，最多 4 小時。</p>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>MA7 &gt; MA14 &gt; MA25 要張開</strong>（7 比 25 至少高 {MIN_STACK_7_25:.1%}），放量陽線收盤站上 MA200 做記號（量比 ≥{MIN_VOL_RATIO:.1f}×、量大於前一根、離 200 ≤{MAX_MARK_EXT:.0%}、台北 08–20 點），連 {CONFIRM_BARS} 根收盤沒破 200 才進。下一根開盤做多，<strong>收盤跌破 MA200 出場</strong>，最多 4 小時。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

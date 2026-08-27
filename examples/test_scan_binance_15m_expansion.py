@@ -113,6 +113,26 @@ def test_low_volume_skips() -> None:
     assert detect_expansion(d) == []
 
 
+def test_pre_pump_volume_skips() -> None:
+    """HOME #12：前一根已爆量，記號根只是第二棒穿越 200，不算開始擴張。"""
+    mark = 100.6
+    close = np.concatenate(
+        [
+            np.full(250, 100.0),
+            np.linspace(99.6, 97.0, 20),
+            np.linspace(97.4, 99.4, 10),
+            np.array([mark]),
+            _held(),
+        ]
+    )
+    vol = np.full(len(close), 1_000.0)
+    mark_i = 250 + 20 + 10
+    vol[mark_i - 1] = 4_500.0
+    vol[mark_i] = 4_000.0
+    d = indicators(_bars(len(close), close, vol))
+    assert detect_expansion(d) == []
+
+
 def test_mark_too_far_from_ma200_skips() -> None:
     d = _series(holds=_held(), mark=108.0)
     assert detect_expansion(d) == []
@@ -210,6 +230,7 @@ def main() -> int:
     test_two_holds_not_enough()
     test_break_below_ma200_cancels()
     test_low_volume_skips()
+    test_pre_pump_volume_skips()
     test_mark_too_far_from_ma200_skips()
     test_glued_ma_stack_skips()
     test_bear_stack_skips()
