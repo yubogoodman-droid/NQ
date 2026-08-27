@@ -91,9 +91,9 @@ Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/te
 python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
 ```
 
-近一週（2026-08-21 → 08-27，254 檔）：**46 筆、勝率 43.5%、等權合計 +34.7%、均筆 +0.75%**。2 小時純續走勝率 67.4%、均 +1.54%。上一輪沒濾大盤集群時 72 筆、+15.6%；拿掉 08-25 那排 14 檔一起過線之後比較乾淨。
+近一週（2026-08-21 → 08-27，247 檔）：**32 筆、勝率 43.8%、等權合計 +31.1%、均筆 +0.97%**。2 小時純續走勝率 71.9%、均 +1.98%。上一輪沒要求 99/120 在 200 下面時 46 筆、+34.7%。
 
-先看圖（46 筆每筆都有圖，黃菱形＝記號、藍圈＝第三根確認、綠三角＝進場、× ＝出場）：
+先看圖（32 筆每筆都有圖，黃菱形＝記號、藍圈＝第三根確認、綠三角＝進場、× ＝出場）：
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-7d/view.html
 
 ## 幣安黏帶三幕 Telegram
