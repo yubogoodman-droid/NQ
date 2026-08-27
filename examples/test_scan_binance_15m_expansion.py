@@ -239,6 +239,26 @@ def test_three_same_mark_kept() -> None:
     assert drop_market_cluster(pack) == pack
 
 
+def test_overhead_ma99_ma120_skips() -> None:
+    """先漲過一截，99/120 還在 200 上面，再跌破後站回 200：那是打進壓力，不算。"""
+    plat = np.full(210, 112.0)
+    rise = np.linspace(112, 116, 40)
+    drop = np.linspace(115.5, 109.0, 20)
+    base_low = np.full(10, 109.2)
+    curl = np.linspace(109.3, 110.8, 12)
+    close0 = np.concatenate([plat, rise, drop, base_low, curl])
+    mark = 113.514016
+    holds = np.full(CONFIRM_BARS, mark * 1.004)
+    close = np.concatenate([close0, np.array([mark]), holds])
+    vol = np.full(len(close), 1_500.0)
+    vol[len(close0)] = 9_000.0
+    d = indicators(_bars(len(close), close, vol))
+    i = len(close0) + CONFIRM_BARS
+    assert d["m99"][i] > d["m200"][i]
+    assert d["m120"][i] > d["m200"][i]
+    assert detect_expansion(d) == []
+
+
 def main() -> int:
     test_sma()
     test_rsi_sma_all_up()
@@ -260,6 +280,7 @@ def main() -> int:
     test_summarize_empty()
     test_market_cluster_drops_same_mark_and_laggards()
     test_three_same_mark_kept()
+    test_overhead_ma99_ma120_skips()
     print("ok")
     return 0
 
