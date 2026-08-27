@@ -33,6 +33,7 @@ SHIOAJI_API_KEY = ""
 SHIOAJI_SECRET_KEY = ""
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
+TURNOVER_TOP = 200  # 成交額前幾名（上市＋上櫃合併）
 
 HERE = Path(__file__).resolve().parent
 SEEN_PATH = HERE / "tw_shioaji_seen.json"
@@ -1244,7 +1245,11 @@ def run_watch(args: argparse.Namespace) -> int:
     tfs = ["5m", "15m"] if args.tf == "both" else [args.tf]
     seen = load_seen()
     candidates, label = load_universe(args.top, args.max_price)
-    print(f"{label} → 掃描 {len(candidates)} 檔  tf={'+'.join(tfs)}  多方", flush=True)
+    print(
+        f"成交額前 {args.top}（{label}）→ 掃描 {len(candidates)} 檔  "
+        f"tf={'+'.join(tfs)}  多方",
+        flush=True,
+    )
 
     api, sj = login_shioaji(simulation=args.sim)
     if args.once:
@@ -1358,7 +1363,7 @@ def test_telegram() -> int:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="永豐 Shioaji 台股五分／十五分 MA240 Telegram 監控")
     p.add_argument("--tf", choices=("5m", "15m", "both"), default="both")
-    p.add_argument("--top", type=int, default=200)
+    p.add_argument("--top", type=int, default=TURNOVER_TOP)
     p.add_argument("--max-price", type=float, default=500.0)
     p.add_argument("--test", action="store_true", help="只測 Telegram")
     p.add_argument("--once", action="store_true", help="抓歷史K掃一次就結束（可盤後）")

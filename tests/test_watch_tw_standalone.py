@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tests.test_tw_5m import _history_then_live
 from tests.test_tw_live import TAIPEI
@@ -43,6 +44,13 @@ class StandaloneWatcherTests(unittest.TestCase):
         self.assertEqual(len(watch_tw.alerts_on_closed_bar(df, bar, tf="5m", side="short")), 1)
         text = watch_tw.format_telegram("創見", "2451.TW", hits[0], "5m")
         self.assertIn("五分K 剛跌破 MA240", text)
+
+
+    def test_default_scan_pool_is_turnover_top_200(self) -> None:
+        self.assertEqual(watch_tw.TURNOVER_TOP, 200)
+        with patch("sys.argv", ["watch_tw.py"]):
+            args = watch_tw.parse_args()
+        self.assertEqual(args.top, 200)
 
 
 if __name__ == "__main__":
