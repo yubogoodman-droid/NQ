@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>回測 2026-08-27（週四）· 一分K站穩 MA240</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0e11;
+      --card: #161b22;
+      --line: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --up: #ff5c7a;
+      --ok: #7ee787;
+      --chip: #21262d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page { max-width: 760px; margin: 0 auto; padding: 16px 12px 40px; }
+    h1 { font-size: 1.2rem; margin: 0 0 6px; }
+    .lead { color: var(--muted); font-size: .9rem; line-height: 1.55; margin: 0 0 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip {
+      background: var(--chip); border: 1px solid var(--line); border-radius: 999px;
+      padding: 4px 10px; font-size: 12px; color: var(--muted);
+    }
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted);
+      margin: 0 0 12px;
+    }
+    .swatch { display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 4px; }
+    .summary {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 12px 14px; margin-bottom: 14px; font-size: .9rem; line-height: 1.65;
+      color: var(--muted);
+    }
+    .summary .ok { color: var(--ok); font-weight: 700; font-size: 1.05rem; }
+    .run {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 12px 14px; margin: 0 0 14px; font-size: .85rem; color: var(--muted);
+    }
+    .run b { color: var(--text); }
+    .run pre {
+      margin: 8px 0 0; overflow-x: auto; background: #0b0e11; border-radius: 8px;
+      padding: 10px 12px; color: var(--ok); white-space: pre-wrap; line-height: 1.55;
+    }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 14px 10px 10px; margin: 0 0 14px; color: inherit;
+    }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 0 6px; }
+    .name { font-weight: 700; font-size: 1.05rem; }
+    .sym a { color: var(--muted); font-weight: 500; margin-left: 6px; font-size: .9rem; text-decoration: none; }
+    .price { color: var(--up); font-weight: 700; white-space: nowrap; }
+    .row { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: .9rem; color: var(--muted); padding: 0 6px; }
+    .row b { color: var(--text); font-weight: 600; }
+    .chart { margin-top: 10px; }
+    .chart img { width: 100%; height: auto; display: block; border-radius: 8px; }
+    .chart-label {
+      font-size: 12px; color: var(--ok); font-weight: 700;
+      padding: 8px 6px 4px;
+    }
+    .empty { color: var(--muted); }
+    footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>回測 2026-08-27（週四）· 站穩 MA240</h1>
+    
+    <p class="lead">用 2026-08-27（週四）當天上市＋上櫃成交額前 200（盤後），濾掉 ETF、金融股與收盤價 650 以上。一分K MA5&gt;MA10&gt;MA20 且拉開（MA5−MA20 ≥ 0.4%），MA20 與 MA240 差距 0.4%～1.0%，從 240 下面穿上、連續兩根收盤站穩，時間 09:10 以後（開盤跳空不算）。含該根的五分K收盤也必須高於五分 MA240。K 棒漲紅跌綠。</p>
+    <div class="chips">
+      <span class="chip">不含 ETF</span>
+      <span class="chip">不含金融股</span>
+      <span class="chip">股價 &lt; 650</span>
+      <span class="chip">MA5 &gt; 10 &gt; 20 扇開</span>
+      <span class="chip">MA20/MA240 0.4%～1.0%</span>
+      <span class="chip">09:10 後從下穿上</span>
+      <span class="chip">五分收盤 &gt; MA240</span>
+    </div>
+    <div class="legend">
+      <span><i class="swatch" style="background:#ffa726"></i>MA5</span>
+      <span><i class="swatch" style="background:#ffeb3b"></i>MA10</span>
+      <span><i class="swatch" style="background:#66bb6a"></i>MA20</span>
+      <span><i class="swatch" style="background:#ce93d8"></i>MA240</span>
+    </div>
+    <div class="summary">
+      命中 <span class="ok">10</span> 檔<br/>
+      掃描時間 2026-08-28 06:46:57（台北）<br/>
+      排行時間 2026-08-27 盤後成交額<br/>
+      前 200 名 → 濾掉股價 57、ETF 14、金融 9 → 掃描 120 檔 → 均線糾結 0 → MA20/MA240不符 0 → 五分MA240底下 0
+    </div>
+    
+    <article class="card">
+      <div class="top">
+        <div class="name">1. 聯茂<span class="sym"><a href="https://tw.stock.yahoo.com/quote/6213.TW" target="_blank" rel="noopener">6213.TW</a></span></div>
+        <div class="price">563.00 -3.43%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>09:36</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>583.00 &gt; 579.48</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>580.00 &gt; 523.92（+10.7%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>579.80 &gt; 578.30 &gt; 576.75</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>576.75 / 579.48（差 0.5%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#11 · 207.81 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="聯茂 6213.TW 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/6213.TW-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="聯茂 6213.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/6213.TW-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">2. 金居<span class="sym"><a href="https://tw.stock.yahoo.com/quote/8358.TWO" target="_blank" rel="noopener">8358.TWO</a></span></div>
+        <div class="price">494.00 +9.90%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>12:36</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>453.50 &gt; 453.37</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>455.50 &gt; 431.50（+5.6%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>453.10 &gt; 451.75 &gt; 449.48</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>449.48 / 453.37（差 0.9%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#17 · 174.64 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="金居 8358.TWO 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/8358.TWO-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="金居 8358.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/8358.TWO-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">3. 富喬<span class="sym"><a href="https://tw.stock.yahoo.com/quote/1815.TWO" target="_blank" rel="noopener">1815.TWO</a></span></div>
+        <div class="price">116.50 -1.27%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>09:37</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>118.00 &gt; 117.70</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>118.00 &gt; 110.44（+6.8%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>117.70 &gt; 117.35 &gt; 117.12</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>117.12 / 117.70（差 0.5%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#35 · 87.49 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="富喬 1815.TWO 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/1815.TWO-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="富喬 1815.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/1815.TWO-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">4. 合晶<span class="sym"><a href="https://tw.stock.yahoo.com/quote/6182.TWO" target="_blank" rel="noopener">6182.TWO</a></span></div>
+        <div class="price">109.00 +1.87%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>09:33</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>109.00 &gt; 107.59</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>109.50 &gt; 108.13（+1.3%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>107.90 &gt; 107.65 &gt; 107.15</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>107.15 / 107.59（差 0.4%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#69 · 44.55 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="合晶 6182.TWO 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/6182.TWO-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="合晶 6182.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/6182.TWO-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">5. 尖點<span class="sym"><a href="https://tw.stock.yahoo.com/quote/8021.TW" target="_blank" rel="noopener">8021.TW</a></span></div>
+        <div class="price">422.50 +0.96%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>13:03</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>421.00 &gt; 420.16</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>421.50 &gt; 405.32（+4.0%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>420.20 &gt; 419.00 &gt; 418.40</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>418.40 / 420.16（差 0.4%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#107 · 21.56 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="尖點 8021.TW 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/8021.TW-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="尖點 8021.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/8021.TW-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">6. 中美晶<span class="sym"><a href="https://tw.stock.yahoo.com/quote/5483.TWO" target="_blank" rel="noopener">5483.TWO</a></span></div>
+        <div class="price">182.00 +1.11%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>09:28</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>181.00 &gt; 180.16</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>180.50 &gt; 179.77（+0.4%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>180.10 &gt; 179.70 &gt; 179.22</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>179.22 / 180.16（差 0.5%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#110 · 20.95 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="中美晶 5483.TWO 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/5483.TWO-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="中美晶 5483.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/5483.TWO-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">7. 汎銓<span class="sym"><a href="https://tw.stock.yahoo.com/quote/6830.TW" target="_blank" rel="noopener">6830.TW</a></span></div>
+        <div class="price">530.00 +0.76%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>13:11</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>529.00 &gt; 527.01</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>529.00 &gt; 491.69（+7.6%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>527.40 &gt; 526.30 &gt; 524.25</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>524.25 / 527.01（差 0.5%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#122 · 18.40 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="汎銓 6830.TW 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/6830.TW-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="汎銓 6830.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/6830.TW-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">8. 世界<span class="sym"><a href="https://tw.stock.yahoo.com/quote/5347.TWO" target="_blank" rel="noopener">5347.TWO</a></span></div>
+        <div class="price">151.00 -0.66%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>10:53</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>152.00 &gt; 151.83</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>151.50 &gt; 151.25（+0.2%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>151.70 &gt; 151.40 &gt; 151.07</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>151.07 / 151.83（差 0.5%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#132 · 16.29 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="世界 5347.TWO 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/5347.TWO-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="世界 5347.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/5347.TWO-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">9. 欣銓<span class="sym"><a href="https://tw.stock.yahoo.com/quote/3264.TWO" target="_blank" rel="noopener">3264.TWO</a></span></div>
+        <div class="price">219.50 +0.92%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>10:03</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>218.00 &gt; 217.82</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>218.50 &gt; 208.91（+4.6%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>217.60 &gt; 217.25 &gt; 216.62</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>216.62 / 217.82（差 0.5%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#154 · 13.33 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="欣銓 3264.TWO 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/3264.TWO-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="欣銓 3264.TWO 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/3264.TWO-5m.png"/></div>
+    </article>
+
+
+    <article class="card">
+      <div class="top">
+        <div class="name">10. 富采<span class="sym"><a href="https://tw.stock.yahoo.com/quote/3714.TW" target="_blank" rel="noopener">3714.TW</a></span></div>
+        <div class="price">63.50 +1.28%</div>
+      </div>
+      <div class="row"><span>1分站穩時間</span><b>09:38</b></div>
+      <div class="row"><span>1分收盤 / MA240</span><b>62.90 &gt; 62.63</b></div>
+      <div class="row"><span>五分收盤 / MA240</span><b>63.00 &gt; 58.95（+6.9%）</b></div>
+      <div class="row"><span>1分 MA5 / 10 / 20</span><b>62.66 &gt; 62.50 &gt; 62.24</b></div>
+      <div class="row"><span>MA20 與 MA240</span><b>62.24 / 62.63（差 0.6%）</b></div>
+      <div class="row"><span>成交額排名</span><b>#185 · 9.58 億</b></div>
+      <div class="chart-label">一分 K</div>
+      <div class="chart"><img alt="富采 3714.TW 一分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/3714.TW-1m.png"/></div>
+      <div class="chart-label">五分 K（對照）</div>
+      <div class="chart"><img alt="富采 3714.TW 五分K" src="https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/charts/backtest-2026-08-27/3714.TW-5m.png"/></div>
+    </article>
+
+    <footer>僅供研究，不構成投資建議。代號可開 Yahoo 報價。</footer>
+  </div>
+</body>
+</html>
