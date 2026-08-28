@@ -24,6 +24,7 @@ from watch_tw_5m_ma240 import (  # noqa: E402
     next_session_open,
     seconds_until_next_5m,
     seconds_until_next_scan,
+    pin_keep,
     session_dates_back,
     touch_band,
     tw_tick,
@@ -122,9 +123,9 @@ def test_only_first_touch_fires() -> None:
 def test_shallow_dip_not_retest() -> None:
     df = _extended_then(last_close=104.0, last_low=103.8)
     ma = float(df["MA240"].iloc[-1])
-    df.iloc[-1, df.columns.get_loc("Low")] = ma + 0.30
-    df.iloc[-1, df.columns.get_loc("Close")] = ma + 1.20
-    df.iloc[-1, df.columns.get_loc("High")] = ma + 1.40
+    df.iloc[-1, df.columns.get_loc("Low")] = ma + 1.20
+    df.iloc[-1, df.columns.get_loc("Close")] = ma + 1.50
+    df.iloc[-1, df.columns.get_loc("High")] = ma + 1.70
     assert detect_retests(df) == []
 
 
@@ -152,10 +153,37 @@ def test_skip_open_minutes() -> None:
     idx = list(df.index)
     idx[-1] = pd.Timestamp("2026-08-28 09:05", tz=TPE)
     df.index = pd.DatetimeIndex(idx)
-    assert detect_retests(df) == []
+    assert detect_retests(df, skip_open_minutes=15) == []
+    assert detect_retests(df) == [len(df) - 1]
     idx[-1] = pd.Timestamp("2026-08-28 09:20", tz=TPE)
     df.index = pd.DatetimeIndex(idx)
+    assert detect_retests(df, skip_open_minutes=15) == [len(df) - 1]
+
+
+def test_touch_then_bounce_still_counts() -> None:
+    df = _extended_then(last_close=101.2, last_low=100.4)
+    ma = float(df["MA240"].iloc[-1])
+    df.iloc[-1, df.columns.get_loc("Low")] = ma + 0.05
+    df.iloc[-1, df.columns.get_loc("Close")] = ma * 1.012
+    df.iloc[-1, df.columns.get_loc("High")] = ma * 1.015
+    idx = list(df.index)
+    idx[-1] = pd.Timestamp("2026-08-28 09:05", tz=TPE)
+    df.index = pd.DatetimeIndex(idx)
     assert detect_retests(df) == [len(df) - 1]
+
+
+def test_pin_keep_puts_1815_first() -> None:
+    rows = [
+        {"code": "2330", "name": "台積電", "market": "tse", "amount": 9, "close": 1, "symbol": "2330.TW", "rank": 1},
+        {"code": "1815", "name": "1815", "market": "otc", "amount": 8, "close": 1, "symbol": "1815.TWO", "rank": 2},
+    ]
+    out = pin_keep(rows, ["1815"])
+    assert out[0]["code"] == "1815"
+    assert out[0]["name"] == "富喬"
+    assert out[0]["pinned"] is True
+    missing = pin_keep([{"code": "2330", "name": "台積電"}], ["1815"])
+    assert missing[0]["code"] == "1815"
+    assert missing[0]["symbol"] == "1815.TWO"
 
 
 def test_hit_payload_and_message() -> None:
@@ -165,11 +193,11 @@ def test_hit_payload_and_message() -> None:
     df.iloc[-1, df.columns.get_loc("Close")] = ma + 0.3
     hits = detect_retests(df)
     assert hits
-    row = {"code": "1815", "name": "富僑", "symbol": "1815.TW", "rank": 12, "amount": 8_000_000_00}
+    row = {"code": "1815", "name": "富喬", "symbol": "1815.TWO", "rank": 20, "amount": 8_000_000_00}
     hit = hit_from_row(df, hits[-1], row)
     assert hit.code == "1815"
     assert hit.ma240 > 0
-    assert hit.key.startswith("1815.TW:")
+    assert hit.key.startswith("1815.TWO:")
     text = format_hit(hit)
     assert "1815" in text
     assert "240MA" in text
@@ -235,6 +263,8 @@ def main() -> int:
     test_shallow_dip_not_retest()
     test_cooldown_skips_nearby_retest()
     test_skip_open_minutes()
+    test_touch_then_bounce_still_counts()
+    test_pin_keep_puts_1815_first()
     test_hit_payload_and_message()
     test_market_session_hours()
     test_next_session_skips_weekend()

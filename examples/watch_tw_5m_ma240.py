@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """台股成交額前 200：五分 K 回測 240MA，Telegram 跳通知。
 
-對齊 XQ 五分圖的 5/10/20/60/120/240MA。價從均線上方拉開後，
-這根五分 K 的最低價碰到 240MA、收盤仍守住，就推一則（帶圖）。
+對齊 XQ 五分圖的 5/10/20/60/120/240MA。**1815 富喬預設必抓**。
+價從均線上方拉開後，這根五分 K 的最低價碰到 240MA、收盤仍守住，就推一則（帶圖）。
+開盤回測也抓。
 
 用法:
   python3 examples/watch_tw_5m_ma240.py --test
@@ -63,6 +64,9 @@ MA_COLORS = {
     120: "#7fd3f0",
     240: "#c084fc",
 }
+KEEP_DEFAULT = ("1815",)
+KNOWN_MARKET = {"1815": "otc"}
+KNOWN_NAME = {"1815": "富喬"}
 
 
 @dataclass
@@ -178,17 +182,24 @@ def fetch_yahoo_5m(symbol: str, range_: str = "1mo") -> tuple[pd.DataFrame, str]
 
 
 def fetch_symbol_5m(row: dict, range_: str = "1mo") -> pd.DataFrame:
-    symbol = str(row.get("symbol") or "")
+    code = str(row.get("code") or "")
+    market = str(row.get("market") or KNOWN_MARKET.get(code) or "tse")
+    symbol = str(row.get("symbol") or yahoo_symbol(code, market))
+    row["symbol"] = symbol
+    row["market"] = market
     df, name = fetch_yahoo_5m(symbol, range_)
-    if len(df) < 250 and symbol.endswith(".TW"):
-        alt = f"{row['code']}.TWO"
+    if len(df) < 250:
+        alt_mkt = "otc" if market == "tse" else "tse"
+        alt = yahoo_symbol(code, alt_mkt)
         df2, name2 = fetch_yahoo_5m(alt, range_)
         if len(df2) > len(df):
             row["symbol"] = alt
-            row["market"] = "otc"
+            row["market"] = alt_mkt
             df, name = df2, name2
     if name and (not row.get("name") or row.get("name") == row.get("code")):
-        row["name"] = name
+        row["name"] = KNOWN_NAME.get(code) or name
+    elif not row.get("name") or row.get("name") == code:
+        row["name"] = KNOWN_NAME.get(code, row.get("name") or code)
     return df
 
 
@@ -213,15 +224,15 @@ def detect_retests(
     max_close_above_pct: float = 0.0045,
     min_ma_slope_pct: float = -0.15,
     slope_bars: int = 12,
-    skip_open_minutes: int = 15,
+    skip_open_minutes: int = 0,
     cooldown_bars: int = 6,
     start: int | None = None,
 ) -> list[int]:
     """從上方回測 240MA：先拉開，這根低點碰到均線，收盤仍守住。
 
-    刺破收回：最低價跌破均線、收盤拉回。
-    貼到均線：低點在 1 檔內且收盤仍貼著，不是只從高處略為拉回。
-    黏著均線走、開盤前 15 分、或收盤明顯跌破，都不算。
+    開盤回測也算（富喬 1815 今天就是 09:05 刺破收回）。
+    刺破收回、或低點貼到均線後彈開，都算。
+    黏著均線走、或收盤明顯跌破，不算。
     """
     if df is None or len(df) < ma_n + away_lookback + 2:
         return []
@@ -257,8 +268,6 @@ def detect_retests(
         if close[i] < m * (1.0 - max_close_below_pct):
             continue
         pierced = bool(low[i] < m)
-        if not pierced and close[i] > m * (1.0 + max_close_above_pct):
-            continue
         if low[i - 1] <= prev + touch_band(prev, touch_pct, ticks=ticks):
             continue
         a0 = i - away_lookback
@@ -558,30 +567,66 @@ def seconds_until_next_scan(now: datetime | None = None) -> float:
     return max(1.0, (nxt - cur).total_seconds())
 
 
-def load_universe(limit: int, date: str = "", codes: Iterable[str] | None = None) -> tuple[str, list[dict]]:
+def stub_row(code: str) -> dict:
+    market = KNOWN_MARKET.get(code, "tse")
+    return {
+        "rank": 0,
+        "code": code,
+        "name": KNOWN_NAME.get(code, code),
+        "market": market,
+        "amount": 0,
+        "close": None,
+        "symbol": yahoo_symbol(code, market),
+        "pinned": True,
+    }
+
+
+def pin_keep(rows: list[dict], keep: Iterable[str]) -> list[dict]:
+    wanted = [c.strip() for c in keep if c.strip()]
+    if not wanted:
+        return rows
+    by_code = {r["code"]: r for r in rows}
+    pinned: list[dict] = []
+    for code in wanted:
+        if code in by_code:
+            row = by_code[code]
+            row["pinned"] = True
+            if not row.get("name") or row.get("name") == code:
+                row["name"] = KNOWN_NAME.get(code, row.get("name") or code)
+            pinned.append(row)
+        else:
+            pinned.append(stub_row(code))
+    rest = [r for r in rows if r["code"] not in set(wanted)]
+    return pinned + rest
+
+
+def load_universe(
+    limit: int,
+    date: str = "",
+    codes: Iterable[str] | None = None,
+    keep: Iterable[str] | None = None,
+) -> tuple[str, list[dict]]:
     ymd = resolve_twse_date(date or last_tw_session_yyyymmdd())
+    keep_codes = [c.strip() for c in (keep or KEEP_DEFAULT) if c.strip()]
     rows = fetch_top_turnover(ymd, max(limit, 200 if codes else limit))
     if codes:
         wanted = [c.strip() for c in codes if c.strip()]
+        for code in keep_codes:
+            if code not in wanted:
+                wanted = [code] + wanted
         by_code = {r["code"]: r for r in rows}
         picked: list[dict] = []
         for code in wanted:
             if code in by_code:
-                picked.append(by_code[code])
+                row = by_code[code]
+                row["pinned"] = code in keep_codes
+                if not row.get("name") or row.get("name") == code:
+                    row["name"] = KNOWN_NAME.get(code, row.get("name") or code)
+                picked.append(row)
             else:
-                picked.append(
-                    {
-                        "rank": 0,
-                        "code": code,
-                        "name": code,
-                        "market": "tse",
-                        "amount": 0,
-                        "close": None,
-                        "symbol": yahoo_symbol(code, "tse"),
-                    }
-                )
+                picked.append(stub_row(code))
         return ymd, picked
-    return ymd, rows[:limit]
+    return ymd, pin_keep(rows[:limit], keep_codes)
 
 
 def scan_row(
@@ -764,6 +809,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=200, help="成交額前 N（預設 200）")
     p.add_argument("--date", default="", help="YYYYMMDD 成交額基準日，預設上一個交易日")
     p.add_argument("--codes", default="", help="只看這些代號，逗號分隔，例如 1815,2330")
+    p.add_argument("--keep", default="1815", help="必抓代號，預設 1815 富喬")
     p.add_argument("--range", default="1mo", help="Yahoo 五分K 區間")
     p.add_argument("--ma", type=int, default=240)
     p.add_argument("--touch-pct", type=float, default=0.002, help="碰到 240MA 的百分比容忍（預設 0.20%%）")
@@ -774,7 +820,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-close-below-pct", type=float, default=0.002)
     p.add_argument("--max-close-above-pct", type=float, default=0.0045, help="未刺破時，收盤最多高於均線多少")
     p.add_argument("--min-ma-slope-pct", type=float, default=-0.15)
-    p.add_argument("--skip-open-minutes", type=int, default=15, help="開盤前幾分鐘不計（預設 15）")
+    p.add_argument("--skip-open-minutes", type=int, default=0, help="開盤前幾分鐘不計（預設 0，開盤回測也抓）")
     p.add_argument("--cooldown-bars", type=int, default=6, help="同一檔兩次回測至少間隔幾根五分K")
     p.add_argument("--lookback-bars", type=int, default=3, help="即時模式只看最近幾根已收K")
     p.add_argument("--workers", type=int, default=4)
@@ -806,12 +852,13 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     codes = [c.strip() for c in args.codes.split(",") if c.strip()] or None
+    keep = [c.strip() for c in args.keep.split(",") if c.strip()]
     print(
         f"universe limit={args.limit} range={args.range} ma={args.ma} "
-        f"touch={args.touch_pct:.3%} away={args.min_away_pct:.3%}",
+        f"touch={args.touch_pct:.3%} away={args.min_away_pct:.3%} keep={','.join(keep) or '-'}",
         flush=True,
     )
-    date, universe = load_universe(args.limit, args.date, codes)
+    date, universe = load_universe(args.limit, args.date, codes, keep=keep)
     if not universe:
         print("no universe", file=sys.stderr)
         return 1
@@ -846,7 +893,7 @@ def main(argv: list[str] | None = None) -> int:
             if not args.no_wait_session and not market_session():
                 continue
             if time.time() - uni_ts > 6 * 3600:
-                date, universe = load_universe(args.limit, args.date, codes)
+                date, universe = load_universe(args.limit, args.date, codes, keep=keep)
                 uni_ts = time.time()
                 print(f"更新標的 {len(universe)} date={date}", flush=True)
             try:
