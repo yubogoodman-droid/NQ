@@ -26,6 +26,8 @@ ma20Near      = input.float(45.0, "避開下彎 5m MA20/MA30 蓋頭（點，0=�
 ma60SlopeBars = input.int(6, "5m MA60 斜率回看（5分K根數）", minval=1)
 minEntryGap   = input.int(60, "距上一筆最少根數", minval=0)
 minPullback   = input.float(25.0, "右肩至少從高點拉回（點，0=關）", minval=0)
+maxDumpBody   = input.float(30.0, "進場棒大陰實體上限（點，0=關）", minval=0)
+maxPrevAbove  = input.float(45.0, "前一根收盤高於 MA20 上限（點，0=關）", minval=0)
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -99,11 +101,12 @@ if inSetup
                 leftRun := 0
             pierce = ma20 - low
             touch = leftOk and pulledOk and pierce >= -touchAbove and pierce <= maxPierce and close >= ma20
+            notDump = (maxDumpBody <= 0 or (open - close) < maxDumpBody) and (maxPrevAbove <= 0 or close[1] - ma20 < maxPrevAbove)
             risk = close - (breakLow - stopBuf)
             ma60FallingNear = ma60Near > 0 and not na(ma60_5) and not na(ma60_5_prev) and ma60_5 < ma60_5_prev and math.abs(close - ma60_5) <= ma60Near
             ma20_30FallingNear = ma20Near > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma30_5) and not na(ma30_5_prev) and not na(ma60_5) and not na(ma60_5_prev) and ma20_5 < ma20_5_prev and ma30_5 < ma30_5_prev and ma60_5 < ma60_5_prev and close < ma20_5 and close < ma30_5 and ma20_5 < ma30_5 and ma30_5 < ma60_5 and (ma20_5 - close) <= ma20Near and (ma30_5 - close) <= ma20Near
             gapOk = na(lastEntryBar) or (bar_index - lastEntryBar >= minEntryGap)
-            if touch and inRth() and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and strategy.position_size == 0 and gapOk
+            if touch and notDump and inRth() and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and strategy.position_size == 0 and gapOk
                 stopLevel = breakLow - stopBuf
                 tgt = close + risk * targetR
                 strategy.entry("破翻回踩", strategy.long)

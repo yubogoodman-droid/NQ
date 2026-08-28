@@ -643,13 +643,16 @@ def write_html_report(
             f"貼下彎5mMA60 {funnel.get('skip_ma60', 0)} · "
             f"貼下彎5mMA20/30蓋頭 {funnel.get('skip_ma20_30', 0)} · "
             f"間隔 {funnel.get('skip_gap', 0)} · "
+            f"追刀 {funnel.get('skip_dump', 0)} · "
             f"時段 {funnel.get('skip_session', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
     total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
     pullback_note = (
-        "右肩要先從反彈高點拉回至少 25 點再踩 MA20。" if interval == "1m" else ""
+        "右肩要先從反彈高點拉回至少 25 點再踩 MA20。進場不能是砸穿 MA20 的大陰線。"
+        if interval == "1m"
+        else ""
     )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
@@ -759,6 +762,7 @@ def cmd_backtest(args) -> int:
             f"ma60={funnel.get('skip_ma60', 0)} "
             f"ma20_30={funnel.get('skip_ma20_30', 0)} "
             f"gap={funnel.get('skip_gap', 0)} "
+            f"dump={funnel.get('skip_dump', 0)} "
             f"session={funnel.get('skip_session', 0)}"
         )
     for q, info in stats.get("by_quality", {}).items():

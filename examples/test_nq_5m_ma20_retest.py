@@ -258,10 +258,15 @@ def _1m_range_dump_reclaim_retest(n: int = 420) -> pd.DataFrame:
         high[i] = px + 10.0
         low[i] = px - 4.0
 
+    # 從離開均線慢慢走回 MA20，不要一根大陰線砸下去（那是 07-31 09:38 那種追刀）
     retest_i = 221
     close[retest_i] = 29095.0
     high[retest_i] = 29110.0
     low[retest_i] = 29078.0
+    # 前一根已靠近均線，進場棒本身是小實體
+    close[retest_i - 1] = 29108.0
+    high[retest_i - 1] = 29118.0
+    low[retest_i - 1] = 29100.0
 
     for i in range(retest_i + 1, n):
         close[i] = close[i - 1] + 1.2
@@ -342,6 +347,8 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["max_pierce"] == 20.0
     assert d1["max_risk"] == 300.0
     assert d1["min_pullback"] == 25.0
+    assert d1["max_dump_body"] == 30.0
+    assert d1["max_prev_above"] == 45.0
     assert d5["max_pierce"] == 12.0
     s1 = simulate_kwargs("1m")
     assert s1["ma_exit_after"] == 60
@@ -397,6 +404,39 @@ def test_skip_gap_keeps_later_shoulder() -> None:
     assert later[0].trough_idx == first.trough_idx
 
 
+def test_skips_waterfall_onto_ma20() -> None:
+    """07-31 09:38：大陰線從均線上方 60 點砸下來碰到 MA20，不是右肩。"""
+    df = _1m_range_dump_reclaim_retest()
+    close = df["Close"].to_numpy(copy=True)
+    high = df["High"].to_numpy(copy=True)
+    low = df["Low"].to_numpy(copy=True)
+    opn = df["Open"].to_numpy(copy=True)
+    tag = 221
+    m20 = float(pd.Series(close).rolling(20, min_periods=20).mean().iloc[tag])
+    opn[tag] = m20 + 60.0
+    high[tag] = opn[tag] + 3.0
+    close[tag] = m20 + 4.0
+    low[tag] = m20 - 4.0
+    close[tag - 1] = m20 + 60.0
+    high[tag - 1] = close[tag - 1] + 4.0
+    low[tag - 1] = close[tag - 1] - 4.0
+    for i in range(tag + 1, min(tag + 8, len(close))):
+        close[i] = close[i - 1] - 12.0
+        high[i] = close[i] + 4.0
+        low[i] = close[i] - 8.0
+        opn[i] = close[i - 1]
+    df = df.copy()
+    df["Close"] = close
+    df["High"] = high
+    df["Low"] = low
+    df["Open"] = opn
+    funnel: dict = {}
+    sigs = detect_signals(df, funnel=funnel, **detect_kwargs("1m", session="day"))
+    assert funnel.get("skip_dump", 0) >= 1
+    if sigs:
+        assert sigs[0].entry_idx != tag
+
+
 def main() -> int:
     test_parse_period_days()
     test_quality_at_entry()
@@ -413,6 +453,7 @@ def main() -> int:
     test_1m_preset_detects_retest()
     test_drop_open_end_trades()
     test_skip_gap_keeps_later_shoulder()
+    test_skips_waterfall_onto_ma20()
     print("ok")
     return 0
 

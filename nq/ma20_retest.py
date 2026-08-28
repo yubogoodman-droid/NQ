@@ -250,6 +250,8 @@ INTERVAL_DETECT = {
         ma60_5m_slope_bars=6,
         ma20_5m_near=45.0,
         min_pullback=25.0,
+        max_dump_body=30.0,
+        max_prev_above=45.0,
     ),
 }
 
@@ -299,6 +301,8 @@ def detect_signals(
     ma60_5m_slope_bars: int = 6,
     ma20_5m_near: float = 45.0,
     min_pullback: float = 0.0,
+    max_dump_body: float = 0.0,
+    max_prev_above: float = 0.0,
     funnel: Optional[Dict[str, int]] = None,
     last_entry_idx: int = -(10**9),
 ) -> List[Signal]:
@@ -310,6 +314,10 @@ def detect_signals(
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
     low = df["Low"].to_numpy(float)
+    if "Open" in df.columns:
+        open_ = df["Open"].to_numpy(float)
+    else:
+        open_ = np.r_[close[0], close[:-1]]
 
     ma5 = sma(close, 5)
     ma10 = sma(close, 10)
@@ -412,6 +420,16 @@ def detect_signals(
             if pierce < -touch_above or pierce > max_pierce:
                 continue
             if close[t] < m20:
+                continue
+
+            # 右肩是坐上 MA20，不是大陰線從天上砸下來碰到均線
+            # （07-31 09:38：開 28660 → 收 28604，H-MA +63；08-28 11:23 是小陽線回踩）。
+            dump_body = float(open_[t]) - float(close[t])
+            if max_dump_body > 0 and dump_body >= max_dump_body:
+                bump("skip_dump")
+                continue
+            if t > 0 and max_prev_above > 0 and float(close[t - 1]) - m20 >= max_prev_above:
+                bump("skip_dump")
                 continue
 
             # 右肩候選：過濾不通過就繼續掃同一波，不要整段放棄
