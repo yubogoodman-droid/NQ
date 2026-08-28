@@ -1,0 +1,93 @@
+//@version=5
+indicator("NQ 五分K V轉", overlay=true, max_labels_count=200)
+
+// 對齊 2026-08-27 那筆：12~28 根急跌、尖底、同速拉回 50% 標進場。
+// 套用至 NQ1! / MNQ1! / NQ=F 五分圖。
+
+dumpMin     = input.int(12, "Dump 最少 K", minval=8, maxval=20)
+dumpMax     = input.int(24, "Dump 視窗", minval=12, maxval=40)
+minDropPts  = input.float(80.0, "最小跌幅（點）", minval=20, step=5)
+minDropAtr  = input.float(2.2, "最小跌幅（ATR 倍）", minval=1.0, step=0.1)
+minRedFrac  = input.float(0.55, "紅 K 佔比", minval=0.4, maxval=0.9, step=0.05)
+leftHighPct = input.float(40.0, "高點須在左側（%）", minval=20, maxval=60)
+maxBaseBars = input.int(3, "底部盤整最多 K", minval=1, maxval=6)
+recoverFrac = input.float(0.50, "進場回補比例", minval=0.3, maxval=1.0, step=0.05)
+minSpeed    = input.float(0.70, "收復/急跌 速度比", minval=0.3, step=0.05)
+stopBuf     = input.float(8.0, "停損緩衝（點）", minval=0, step=1)
+tgtMult     = input.float(1.5, "目標 = V底 + dump×", minval=1.0, step=0.1)
+
+atr14 = ta.atr(14)
+ma5   = ta.sma(close, 5)
+
+f_reds(len) =>
+    cnt = 0
+    for k = 0 to len - 1
+        if close[k] < open[k]
+            cnt += 1
+    cnt
+
+f_base(len, dumpLow, drop) =>
+    near = math.max(8.0, 0.08 * drop)
+    cnt = 0
+    for k = 0 to len - 1
+        if low[k] <= dumpLow + near
+            cnt += 1
+    cnt
+
+dumpLen = dumpMax
+hb = -ta.highestbars(high, dumpLen)
+lb = -ta.lowestbars(low, dumpLen)
+dumpHigh = ta.highest(high, dumpLen)
+dumpLow  = ta.lowest(low, dumpLen)
+drop = dumpHigh - dumpLow
+thresh = math.max(minDropPts, minDropAtr * atr14)
+reds = f_reds(dumpLen)
+baseN = f_base(dumpLen, dumpLow, drop)
+leftCap = math.round(dumpLen * leftHighPct / 100.0)
+
+isDump = lb == 0 and hb >= dumpLen - leftCap and hb <= dumpLen - dumpMin and drop >= thresh and reds >= minRedFrac * dumpLen and baseN <= maxBaseBars and not na(atr14)
+
+var float vHigh = na
+var float vLow = na
+var float vDrop = na
+var int   vBar = na
+var int   vLen = na
+var bool  vReady = false
+var bool  vTaken = false
+
+if isDump
+    vHigh := dumpHigh
+    vLow := dumpLow
+    vDrop := drop
+    vBar := bar_index
+    vLen := dumpLen
+    vReady := true
+    vTaken := false
+
+newLowBreak = vReady and not vTaken and not na(vLow) and low < vLow
+if newLowBreak
+    vReady := false
+
+barsSince = vReady ? bar_index - vBar : 0
+rec = (not na(vDrop) and vDrop > 0) ? (close - vLow) / vDrop : 0.0
+speed = (barsSince > 0 and vLen > 0 and vDrop > 0) ? (close - vLow) / barsSince / (vDrop / vLen) : 0.0
+
+longSignal = vReady and not vTaken and barsSince > 0 and barsSince <= vLen and rec >= recoverFrac and speed >= minSpeed and close >= open and close > ma5 and not newLowBreak
+
+if longSignal
+    vTaken := true
+    vReady := false
+
+stopLevel = vLow - stopBuf
+tgtLevel  = vLow + vDrop * tgtMult
+
+plotshape(longSignal, title="V轉進場", style=shape.triangleup, location=location.belowbar, color=color.new(#00e676, 0), size=size.small, text="V")
+plotshape(isDump and not longSignal, title="V底", style=shape.diamond, location=location.belowbar, color=color.new(#facc15, 0), size=size.tiny)
+
+plot(vReady and not na(vLow) ? vLow : na, "V底", color=color.new(#facc15, 0), linewidth=1, style=plot.style_circles)
+plot(longSignal ? close : na, "進場", color=color.new(#00e676, 0), linewidth=2, style=plot.style_circles)
+plot(longSignal ? stopLevel : na, "停損", color=color.new(#ef5350, 0), style=plot.style_cross)
+plot(longSignal ? tgtLevel : na, "目標", color=color.new(#66bb6a, 0), style=plot.style_cross)
+
+alertcondition(longSignal, "NQ V轉進場", "NQ 5m V-turn long")
+alertcondition(isDump, "NQ V底", "NQ 5m V-turn pivot")

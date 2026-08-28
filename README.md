@@ -22,6 +22,22 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 五分 K V轉
+
+圖上那種 **急跌 → 尖底 → 幾乎原速拉回**（2026-08-27 ETH：29401.75 → 29662）。  
+12~28 根內從左側高點灌到右側低點（≥80 點），底部不盤；之後同速收復 dump 的 50%、收紅站上 MA5 做多。  
+停損 V 低下方，目標量度 1.5× dump。含盤外；09:30–10:00 不進。
+
+```bash
+python3 examples/nq_v_turn.py backtest --period 5d
+python3 examples/nq_v_turn.py backtest --period 60d --pages
+python3 examples/test_nq_v_turn.py
+```
+
+TradingView：`pinescript/nq_v_turn_5m.pine` 貼到 NQ1! / MNQ1! 五分圖。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-v-turn-4941/docs/nq-v-turn/view.html
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
