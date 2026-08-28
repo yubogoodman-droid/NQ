@@ -11,15 +11,19 @@
   python3 examples/watch_tw_5m_ma240.py --scan --dry-run --limit 200 --days 10 --pages
   python3 examples/watch_tw_5m_ma240.py              # 每根五分收盤掃一次
 
+預設濾掉股價 >700。HTML 圖用 data URI 嵌進去，htmlpreview 才看得到。
+
 Telegram 憑證放 tg_config.env（勿提交）。
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import sys
+import tempfile
 import time
 import traceback
 import urllib.error
@@ -46,6 +50,7 @@ from scan_tw_ma_reclaim import (  # noqa: E402
     UA,
     _chart_payload_to_df,
     fetch_top_turnover,
+    filter_by_max_price,
     last_tw_session_yyyymmdd,
     resolve_twse_date,
     yahoo_symbol,
@@ -539,17 +544,6 @@ def draw_chart(
     return path
 
 
-def current_branch() -> str:
-    head = REPO / ".git" / "HEAD"
-    try:
-        text = head.read_text(encoding="utf-8").strip()
-    except Exception:
-        return "main"
-    if text.startswith("ref:"):
-        return text.rsplit("/", 1)[-1]
-    return "main"
-
-
 def want_chart(hit: RetestHit, mode: str) -> bool:
     if mode in {"none", "off"}:
         return False
@@ -562,7 +556,11 @@ def want_chart(hit: RetestHit, mode: str) -> bool:
     return True
 
 
-def hit_card_html(hit: RetestHit, n: int, img_name: str | None) -> str:
+def png_to_data_uri(path: Path) -> str:
+    return f"data:image/png;base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+
+
+def hit_card_html(hit: RetestHit, n: int, img_src: str | None) -> str:
     ts = hit.ts
     if getattr(ts, "tzinfo", None) is not None:
         ts = ts.tz_convert(TPE)
@@ -574,9 +572,9 @@ def hit_card_html(hit: RetestHit, n: int, img_name: str | None) -> str:
     vol = f"{hit.volume:,.0f}" if hit.volume else "--"
     mas = "  ".join(f"{nma}MA {_fmt_px(hit.mas[nma])}" for nma in MA_PERIODS)
     img = ""
-    if img_name:
+    if img_src:
         img = (
-            f"<div class='mini-chart'><img src='img/{escape(img_name)}' "
+            f"<div class='mini-chart'><img src='{escape(img_src, quote=True)}' "
             f"alt='{escape(hit.code)} {escape(hit.name)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
         )
@@ -611,12 +609,17 @@ def write_html_report(
     date: str,
     *,
     chart_mode: str = "pierce",
+    max_price: float | None = 700.0,
 ) -> Path:
     path = Path(path)
     img_dir = path.parent / "img"
-    img_dir.mkdir(parents=True, exist_ok=True)
-    for old in img_dir.glob("*.png"):
-        old.unlink()
+    if img_dir.is_dir():
+        for old in img_dir.glob("*.png"):
+            old.unlink()
+        try:
+            img_dir.rmdir()
+        except OSError:
+            pass
 
     pierce = sum(1 for h in hits if h.pierced)
     fuqiao = [h for h in hits if h.code == "1815"]
@@ -632,19 +635,18 @@ def write_html_report(
     def emit(hit: RetestHit) -> str:
         nonlocal n, charted
         n += 1
-        img_name = None
+        img_src = None
         df = getattr(hit, "_df", None)
         if df is not None and want_chart(hit, chart_mode):
-            kind = "pierce" if hit.pierced else "hug"
-            ts = hit.ts
-            if getattr(ts, "tzinfo", None) is not None:
-                ts = ts.tz_convert(TPE)
-            img_name = f"{ts.strftime('%m%d_%H%M')}_{hit.code}_{kind}.png"
-            if draw_chart(df, hit, str(img_dir / img_name)):
-                charted += 1
-            else:
-                img_name = None
-        return hit_card_html(hit, n, img_name)
+            fd, tmp = tempfile.mkstemp(suffix=".png")
+            os.close(fd)
+            try:
+                if draw_chart(df, hit, tmp):
+                    img_src = png_to_data_uri(Path(tmp))
+                    charted += 1
+            finally:
+                Path(tmp).unlink(missing_ok=True)
+        return hit_card_html(hit, n, img_src)
 
     if fuqiao:
         cards_fuqiao.append("<h2>富喬 1815</h2>")
@@ -659,6 +661,7 @@ def write_html_report(
             cards_days.append(emit(h))
 
     cutoff = universe[-1]["amount"] / 1e8 if universe else 0
+    px_note = f" · 股價≤{max_price:g}" if max_price else ""
     day_nav = " ".join(
         f"<a href='#d{d}'>{d[5:]} {len(by_day[d])}</a>" for d in sorted(by_day)
     )
@@ -692,8 +695,8 @@ h1{{font-size:18px;margin:0 0 6px}} h2{{font-size:15px;margin:18px 0 10px;color:
 <div class="page">
 <section class="summary">
 <h1>台股 5分 回測 240MA · {escape(period)}</h1>
-<p class="muted">基準日 {escape(date)} · 成交額前 {len(universe)} · 末名約 {cutoff:.1f} 億 · 1815 富喬必抓
-<br/>從 240MA 上方拉開後回測碰到、收盤守住。開盤也算。圖：富喬 + 刺破收回。</p>
+<p class="muted">基準日 {escape(date)} · 成交額前 {len(universe)} · 末名約 {cutoff:.1f} 億{px_note} · 1815 富喬必抓
+<br/>從 240MA 上方拉開後回測碰到、收盤守住。開盤也算。圖嵌在頁面裡（富喬 + 刺破收回）。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">標的<b>{len({h.code for h in hits})}</b></div>
@@ -714,15 +717,8 @@ h1{{font-size:18px;margin:0 0 6px}} h2{{font-size:15px;margin:18px 0 10px;color:
 
 def write_view_html(src: Path) -> Path:
     src = Path(src)
-    try:
-        rel = src.parent.relative_to(REPO).as_posix()
-        branch = current_branch()
-        base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
-        text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
-    except ValueError:
-        text = src.read_text(encoding="utf-8")
     out = src.with_name("view.html")
-    out.write_text(text, encoding="utf-8")
+    out.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
     return out
 
 
@@ -796,15 +792,31 @@ def pin_keep(rows: list[dict], keep: Iterable[str]) -> list[dict]:
     return pinned + rest
 
 
+def select_universe(
+    rows: list[dict],
+    limit: int,
+    keep: Iterable[str] | None = None,
+    max_price: float | None = 700.0,
+) -> tuple[list[dict], list[dict]]:
+    kept, dropped = filter_by_max_price(rows, max_price, limit)
+    keep_codes = [c.strip() for c in (keep or KEEP_DEFAULT) if c.strip()]
+    return pin_keep(kept, keep_codes), dropped
+
+
 def load_universe(
     limit: int,
     date: str = "",
     codes: Iterable[str] | None = None,
     keep: Iterable[str] | None = None,
+    max_price: float | None = 700.0,
+    pool: int = 400,
 ) -> tuple[str, list[dict]]:
     ymd = resolve_twse_date(date or last_tw_session_yyyymmdd())
     keep_codes = [c.strip() for c in (keep or KEEP_DEFAULT) if c.strip()]
-    rows = fetch_top_turnover(ymd, max(limit, 200 if codes else limit))
+    fetch_n = max(limit, pool if max_price else limit)
+    if codes:
+        fetch_n = max(fetch_n, 200)
+    rows = fetch_top_turnover(ymd, fetch_n)
     if codes:
         wanted = [c.strip() for c in codes if c.strip()]
         for code in keep_codes:
@@ -822,7 +834,14 @@ def load_universe(
             else:
                 picked.append(stub_row(code))
         return ymd, picked
-    return ymd, pin_keep(rows[:limit], keep_codes)
+    universe, dropped = select_universe(rows, limit, keep_codes, max_price)
+    if dropped:
+        preview = ", ".join(
+            f"{r['code']} {r.get('close')}" for r in dropped[:12]
+        )
+        extra = " …" if len(dropped) > 12 else ""
+        print(f"drop price>{max_price}: {preview}{extra}", flush=True)
+    return ymd, universe
 
 
 def scan_row(
@@ -994,6 +1013,7 @@ def round_once(
                 period,
                 getattr(args, "universe_date", "") or "",
                 chart_mode=getattr(args, "chart_mode", "pierce") or "pierce",
+                max_price=getattr(args, "max_price", 700) or None,
             )
             write_view_html(html_path)
             print(f"view={html_path.with_name('view.html')}", flush=True)
@@ -1021,6 +1041,8 @@ def cmd_test(dry_run: bool) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="台股成交額前200 五分K 回測240MA 跳通知")
     p.add_argument("--limit", type=int, default=200, help="成交額前 N（預設 200）")
+    p.add_argument("--pool", type=int, default=400, help="先取成交額前 N 再套股價過濾")
+    p.add_argument("--max-price", type=float, default=700, help="收盤價超過此值剔除（預設 700；0=不過濾）")
     p.add_argument("--date", default="", help="YYYYMMDD 成交額基準日，預設上一個交易日")
     p.add_argument("--codes", default="", help="只看這些代號，逗號分隔，例如 1815,2330")
     p.add_argument("--keep", default="1815", help="必抓代號，預設 1815 富喬")
@@ -1070,13 +1092,18 @@ def main(argv: list[str] | None = None) -> int:
 
     codes = [c.strip() for c in args.codes.split(",") if c.strip()] or None
     keep = [c.strip() for c in args.keep.split(",") if c.strip()]
+    max_price = args.max_price if args.max_price else None
     print(
-        f"universe limit={args.limit} range={args.range} ma={args.ma} "
+        f"universe limit={args.limit} pool={args.pool} max_price={max_price} "
+        f"range={args.range} ma={args.ma} "
         f"touch={args.touch_pct:.3%} away={args.min_away_pct:.3%} keep={','.join(keep) or '-'}",
         flush=True,
     )
-    date, universe = load_universe(args.limit, args.date, codes, keep=keep)
+    date, universe = load_universe(
+        args.limit, args.date, codes, keep=keep, max_price=max_price, pool=args.pool
+    )
     args.universe_date = date
+    args.max_price = max_price
     if not universe:
         print("no universe", file=sys.stderr)
         return 1
@@ -1111,7 +1138,9 @@ def main(argv: list[str] | None = None) -> int:
             if not args.no_wait_session and not market_session():
                 continue
             if time.time() - uni_ts > 6 * 3600:
-                date, universe = load_universe(args.limit, args.date, codes, keep=keep)
+                date, universe = load_universe(
+                    args.limit, args.date, codes, keep=keep, max_price=max_price, pool=args.pool
+                )
                 uni_ts = time.time()
                 print(f"更新標的 {len(universe)} date={date}", flush=True)
             try:

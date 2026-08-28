@@ -172,6 +172,34 @@ def test_touch_then_bounce_still_counts() -> None:
     assert detect_retests(df) == [len(df) - 1]
 
 
+def test_select_universe_drops_price_over_700() -> None:
+    from watch_tw_5m_ma240 import select_universe
+
+    rows = [
+        {"code": "2330", "name": "台積電", "close": 1400.0, "amount": 9, "rank": 1, "market": "tse", "symbol": "2330.TW"},
+        {"code": "1815", "name": "1815", "close": 125.0, "amount": 8, "rank": 2, "market": "otc", "symbol": "1815.TWO"},
+        {"code": "2303", "name": "聯電", "close": 55.0, "amount": 7, "rank": 3, "market": "tse", "symbol": "2303.TW"},
+        {"code": "2454", "name": "聯發科", "close": 4100.0, "amount": 6, "rank": 4, "market": "tse", "symbol": "2454.TW"},
+    ]
+    kept, dropped = select_universe(rows, limit=200, keep=["1815"], max_price=700)
+    assert [r["code"] for r in kept] == ["1815", "2303"]
+    assert {r["code"] for r in dropped} == {"2330", "2454"}
+    assert kept[0]["name"] == "富喬"
+    none, dropped0 = select_universe(rows, limit=2, keep=["1815"], max_price=None)
+    assert [r["code"] for r in none[:2]] == ["1815", "2330"]
+    assert dropped0 == []
+
+
+def test_cli_max_price_default() -> None:
+    from watch_tw_5m_ma240 import build_parser
+
+    args = build_parser().parse_args([])
+    assert args.max_price == 700
+    assert args.pool == 400
+    args0 = build_parser().parse_args(["--max-price", "0"])
+    assert args0.max_price == 0
+
+
 def test_pin_keep_puts_1815_first() -> None:
     rows = [
         {"code": "2330", "name": "台積電", "market": "tse", "amount": 9, "close": 1, "symbol": "2330.TW", "rank": 1},
@@ -265,6 +293,7 @@ def test_write_html_report() -> None:
     row = {"code": "1815", "name": "富喬", "symbol": "1815.TWO", "rank": 20, "amount": 1}
     hit = hit_from_row(df, hits_i[-1], row)
     hit.ts = pd.Timestamp("2026-08-28 09:05", tz=TPE)
+    hit._df = df  # type: ignore[attr-defined]
     out_dir = Path("/tmp/tw-ma240-html-test")
     out_dir.mkdir(parents=True, exist_ok=True)
     path = write_html_report(
@@ -273,14 +302,19 @@ def test_write_html_report() -> None:
         [row],
         "近10個交易日",
         "20260828",
-        chart_mode="none",
+        chart_mode="pierce",
+        max_price=700,
     )
     text = path.read_text(encoding="utf-8")
     assert "1815" in text
     assert "富喬" in text
     assert "回測 240MA" in text
+    assert "股價≤700" in text
+    assert "data:image/png;base64," in text
+    assert "src='img/" not in text
     view = write_view_html(path)
-    assert view.exists()
+    assert "data:image/png;base64," in view.read_text(encoding="utf-8")
+    assert not (out_dir / "img").exists()
 
 
 def main() -> int:
@@ -295,6 +329,8 @@ def main() -> int:
     test_skip_open_minutes()
     test_touch_then_bounce_still_counts()
     test_pin_keep_puts_1815_first()
+    test_select_universe_drops_price_over_700()
+    test_cli_max_price_default()
     test_hit_payload_and_message()
     test_market_session_hours()
     test_next_session_skips_weekend()
