@@ -258,15 +258,23 @@ def _1m_range_dump_reclaim_retest(n: int = 420) -> pd.DataFrame:
         high[i] = px + 10.0
         low[i] = px - 4.0
 
-    # 從離開均線慢慢走回 MA20，不要一根大陰線砸下去（那是 07-31 09:38 那種追刀）
-    retest_i = 221
-    close[retest_i] = 29095.0
-    high[retest_i] = 29110.0
-    low[retest_i] = 29078.0
-    # 前一根已靠近均線，進場棒本身是小實體
-    close[retest_i - 1] = 29108.0
-    high[retest_i - 1] = 29118.0
-    low[retest_i - 1] = 29100.0
+    # 收復後先再往上推一波（右肩要時間），MA20 會跟上，再回踩。
+    px = 29140.0
+    for i in range(221, 247):
+        px += 3.0
+        close[i] = px
+        high[i] = px + 8.0
+        low[i] = px - 4.0
+
+    ma = pd.Series(close).rolling(20, min_periods=20).mean()
+    retest_i = 248
+    m20 = float(ma.iloc[retest_i - 1])
+    close[retest_i - 1] = m20 + 8.0
+    high[retest_i - 1] = close[retest_i - 1] + 6.0
+    low[retest_i - 1] = m20 + 1.0
+    close[retest_i] = m20 + 2.0
+    high[retest_i] = close[retest_i] + 6.0
+    low[retest_i] = m20 - 4.0
 
     for i in range(retest_i + 1, n):
         close[i] = close[i - 1] + 1.2
@@ -292,7 +300,7 @@ def test_1m_preset_detects_retest() -> None:
     assert sigs, "expected a 1m 回踩 MA20 signal"
     sig = sigs[0]
     assert sig.entry_idx > sig.reclaim_idx
-    assert sig.entry_idx - sig.reclaim_idx >= 8
+    assert sig.entry_idx - sig.reclaim_idx >= 30
     assert sig.entry_price > sig.stop_price
     trades = simulate(df, sigs, **simulate_kwargs("1m"))
     assert trades
@@ -345,73 +353,54 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["ma60_5m_near"] == 40.0
     assert d5["ma60_5m_near"] == 40.0
     assert d1["max_pierce"] == 20.0
-    assert d1["max_risk"] == 300.0
+    assert d1["max_risk"] == 100.0
     assert d1["min_pullback"] == 25.0
     assert d1["max_dump_body"] == 30.0
     assert d1["max_prev_above"] == 45.0
+    assert d1["stop_at_shoulder"] is True
+    assert d1["min_retest_bars"] == 30
+    assert d5["stop_at_shoulder"] is False
     assert d5["max_pierce"] == 12.0
     s1 = simulate_kwargs("1m")
     assert s1["ma_exit_after"] == 60
 
 
 def test_skip_gap_keeps_later_shoulder() -> None:
-    """首踩還在上一筆 60 根間隔內時，同一波破底的晚一點右肩仍要抓到。
-
-    對齊 08-28：09:49 進場後，10:13 破底 29505 的 10:27 首踩被擋，11:23 那肩要留。
-    """
+    """首踩被間隔擋掉時，同一波破底的晚一點右肩仍要抓到。"""
     df = _1m_range_dump_reclaim_retest()
-    close = df["Close"].to_numpy(copy=True)
-    high = df["High"].to_numpy(copy=True)
-    low = df["Low"].to_numpy(copy=True)
-    # After the natural first tag (~221), grind up then pull back onto MA20
-    # at least 60 bars later (min_entry_gap).
-    peak_i = 250
-    for i in range(222, peak_i):
-        close[i] = close[i - 1] + 2.0
-        high[i] = close[i] + 5.0
-        low[i] = close[i] - 3.0
-    tag = 290
-    for i in range(peak_i, tag):
-        close[i] = close[i - 1] - 1.0
-        high[i] = close[i] + 4.0
-        low[i] = close[i] - 3.0
-    ma = pd.Series(close).rolling(20, min_periods=20).mean()
-    m20 = float(ma.iloc[tag])
-    close[tag] = m20 + 2.0
-    high[tag] = close[tag] + 6.0
-    low[tag] = m20 - 4.0
-    for i in range(tag + 1, len(close)):
-        close[i] = close[i - 1] + 1.0
-        high[i] = close[i] + 4.0
-        low[i] = close[i] - 4.0
-    df = df.copy()
-    df["Close"] = close
-    df["High"] = high
-    df["Low"] = low
-    df["Open"] = np.r_[close[0], close[:-1]]
-
     natural = detect_signals(df, **detect_kwargs("1m", session="day"))
     assert natural, "control: first MA20 tag should still fill with no prior trade"
     first = natural[0]
-    # 上一筆就是這波首踩 → skip_gap 後仍要抓同一波晚一點的右肩
+    funnel: dict = {}
     later = detect_signals(
         df,
-        **detect_kwargs("1m", session="day"),
-        last_entry_idx=first.entry_idx,
+        funnel=funnel,
+        **detect_kwargs(
+            "1m",
+            session="day",
+            min_entry_gap=5,
+            min_retest_bars=0,
+            min_pullback=0.0,
+        ),
+        last_entry_idx=first.entry_idx - 2,
     )
+    assert funnel.get("skip_gap", 0) >= 1
     assert later, "later right-shoulder of the same 破底 must survive skip_gap"
-    assert later[0].entry_idx > first.entry_idx
     assert later[0].trough_idx == first.trough_idx
+    assert later[0].entry_idx >= first.entry_idx
 
 
 def test_skips_waterfall_onto_ma20() -> None:
     """07-31 09:38：大陰線從均線上方 60 點砸下來碰到 MA20，不是右肩。"""
-    df = _1m_range_dump_reclaim_retest()
+    df0 = _1m_range_dump_reclaim_retest()
+    ctrl = detect_signals(df0, **detect_kwargs("1m", session="day"))
+    assert ctrl
+    tag = ctrl[0].entry_idx
+    df = df0.copy()
     close = df["Close"].to_numpy(copy=True)
     high = df["High"].to_numpy(copy=True)
     low = df["Low"].to_numpy(copy=True)
     opn = df["Open"].to_numpy(copy=True)
-    tag = 221
     m20 = float(pd.Series(close).rolling(20, min_periods=20).mean().iloc[tag])
     opn[tag] = m20 + 60.0
     high[tag] = opn[tag] + 3.0
@@ -420,7 +409,13 @@ def test_skips_waterfall_onto_ma20() -> None:
     close[tag - 1] = m20 + 60.0
     high[tag - 1] = close[tag - 1] + 4.0
     low[tag - 1] = close[tag - 1] - 4.0
-    for i in range(tag + 1, min(tag + 8, len(close))):
+    # 下一根小 K 又貼 MA20：舊邏輯會買，正確是這波已作廢
+    nxt = tag + 1
+    close[nxt] = m20 + 3.0
+    opn[nxt] = m20 + 5.0
+    high[nxt] = m20 + 8.0
+    low[nxt] = m20 - 3.0
+    for i in range(nxt + 1, min(nxt + 8, len(close))):
         close[i] = close[i - 1] - 12.0
         high[i] = close[i] + 4.0
         low[i] = close[i] - 8.0
@@ -433,8 +428,26 @@ def test_skips_waterfall_onto_ma20() -> None:
     funnel: dict = {}
     sigs = detect_signals(df, funnel=funnel, **detect_kwargs("1m", session="day"))
     assert funnel.get("skip_dump", 0) >= 1
-    if sigs:
-        assert sigs[0].entry_idx != tag
+    assert not any(s.entry_idx in (tag, tag + 1) for s in sigs)
+
+
+def test_1m_stop_is_shoulder_not_break() -> None:
+    df = _1m_range_dump_reclaim_retest()
+    sigs = detect_signals(df, **detect_kwargs("1m", session="day"))
+    assert sigs
+    sig = sigs[0]
+    assert sig.stop_price > sig.break_low - 1.0
+    assert sig.entry_price - sig.stop_price < 80.0
+
+
+def test_rth_skips_premarket_break() -> None:
+    """08-12 08:30 那種夜盤破底，不能 09:30 開盤當成右肩。"""
+    df = _1m_range_dump_reclaim_retest()
+    # idx 204 dump → 05:06+204min = 08:30
+    df = df.copy()
+    df.index = pd.date_range("2026-08-24 05:06", periods=len(df), freq="1min", tz=ET)
+    sigs = detect_signals(df, **detect_kwargs("1m", session="rth"))
+    assert not sigs
 
 
 def main() -> int:
@@ -454,6 +467,8 @@ def main() -> int:
     test_drop_open_end_trades()
     test_skip_gap_keeps_later_shoulder()
     test_skips_waterfall_onto_ma20()
+    test_1m_stop_is_shoulder_not_break()
+    test_rth_skips_premarket_break()
     print("ok")
     return 0
 

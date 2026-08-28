@@ -229,6 +229,7 @@ INTERVAL_DETECT = {
         ma60_5m_near=40.0,
         ma60_5m_slope_bars=6,
         ma20_5m_near=0.0,  # 五分圖進場本就貼 MA20；蓋頭濾只給一分用
+        stop_at_shoulder=False,
     ),
     "1m": dict(
         lookback=120,
@@ -242,7 +243,7 @@ INTERVAL_DETECT = {
         fail_below=40.0,
         stop_buffer=10.0,
         target_r=1.5,
-        max_risk=300.0,
+        max_risk=100.0,
         min_risk=20.0,
         min_entry_gap=60,
         ma20_slope_bars=20,
@@ -252,6 +253,8 @@ INTERVAL_DETECT = {
         min_pullback=25.0,
         max_dump_body=30.0,
         max_prev_above=45.0,
+        min_retest_bars=30,
+        stop_at_shoulder=True,
     ),
 }
 
@@ -303,6 +306,8 @@ def detect_signals(
     min_pullback: float = 0.0,
     max_dump_body: float = 0.0,
     max_prev_above: float = 0.0,
+    min_retest_bars: int = 0,
+    stop_at_shoulder: bool = False,
     funnel: Optional[Dict[str, int]] = None,
     last_entry_idx: int = -(10**9),
 ) -> List[Signal]:
@@ -345,6 +350,12 @@ def detect_signals(
         if low[i] >= float(floor[i]):
             i += 1
             continue
+        # 日盤策略：夜盤破底不當 破底翻（08-12 08:30 / 08-20 08:36 那種，
+        # 09:30 一開盤就當成右肩，其實只是隔夜彈完）。
+        if not _in_session(df.index[i], session):
+            bump("skip_session")
+            i += 1
+            continue
 
         support = float(floor[i])
         break_low = float(low[i])
@@ -385,6 +396,7 @@ def detect_signals(
         left_run = 0
         left_ok = False
         peak = float(high[reclaim_idx])
+        peak_idx = int(reclaim_idx)
         entry_idx: Optional[int] = None
         dead = False
         for t in range(reclaim_idx + 1, retest_end + 1):
@@ -400,7 +412,9 @@ def detect_signals(
                 dead = True
                 break
 
-            peak = max(peak, float(high[t]))
+            if float(high[t]) >= peak:
+                peak = float(high[t])
+                peak_idx = t
 
             if float(low[t]) > m20 + leave_buffer:
                 left_run += 1
@@ -425,11 +439,18 @@ def detect_signals(
             # 右肩是坐上 MA20，不是大陰線從天上砸下來碰到均線
             # （07-31 09:38：開 28660 → 收 28604，H-MA +63；08-28 11:23 是小陽線回踩）。
             dump_body = float(open_[t]) - float(close[t])
+            prev_above = float(close[t - 1]) - m20 if t > 0 else 0.0
+            # 大陰線砸上 MA20 = 這肩失敗（07-31 09:38、08-28 09:49）。
+            # 不能只 skip 再買下一根；但 V 後第一個小回踩（08-28 10:27 實體 29 點）
+            # 不能整波作廢，否則 11:23 那肩也沒了。
             if max_dump_body > 0 and dump_body >= max_dump_body:
                 bump("skip_dump")
-                continue
-            if t > 0 and max_prev_above > 0 and float(close[t - 1]) - m20 >= max_prev_above:
+                dead = True
+                break
+            if max_prev_above > 0 and prev_above >= max_prev_above:
                 bump("skip_dump")
+                continue
+            if min_retest_bars > 0 and t - reclaim_idx < min_retest_bars:
                 continue
 
             # 右肩候選：過濾不通過就繼續掃同一波，不要整段放棄
@@ -444,7 +465,11 @@ def detect_signals(
                 continue
 
             entry = float(close[t])
-            stop = break_low - stop_buffer
+            if stop_at_shoulder:
+                shoulder_low = float(np.min(low[peak_idx : t + 1]))
+                stop = shoulder_low - stop_buffer
+            else:
+                stop = break_low - stop_buffer
             risk = entry - stop
             if risk < min_risk:
                 bump("skip_tiny_risk")
@@ -486,7 +511,11 @@ def detect_signals(
             continue
 
         entry = float(close[entry_idx])
-        stop = break_low - stop_buffer
+        if stop_at_shoulder:
+            shoulder_low = float(np.min(low[peak_idx : entry_idx + 1]))
+            stop = shoulder_low - stop_buffer
+        else:
+            stop = break_low - stop_buffer
         risk = entry - stop
         m60_5 = float(ma60_5m[entry_idx]) if not np.isnan(ma60_5m[entry_idx]) else float("nan")
         m60_5_s = (

@@ -576,7 +576,7 @@ def _render_trade_cards(
             + "</div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}  （右肩踩 {escape(interval)} MA20 {t.signal.ma20:.2f}）\n"
-            f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts，破底下方）\n"
+            f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts，{'右肩低點下方' if interval == '1m' else '破底下方'}）\n"
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {br.strftime('%m-%d %H:%M')} low {t.signal.break_low:.2f} / 2h低 {t.signal.support:.2f}\n"
@@ -650,7 +650,7 @@ def write_html_report(
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
     total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
     pullback_note = (
-        "右肩要先從反彈高點拉回至少 25 點再踩 MA20。進場不能是砸穿 MA20 的大陰線。"
+        "右肩要先從反彈高點拉回至少 25 點，收復後至少再過 30 根。大陰線砸上 MA20 這波作廢。只做日盤破底。"
         if interval == "1m"
         else ""
     )
@@ -690,7 +690,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} {escape(interval)} 破底翻 · 右肩在 MA20 上</h1>
-<p class="muted">只做日盤 09:30–15:45 ET。破底翻 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後右肩踩回 MA20 進場。停損在破底下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內），或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下（45 點內），則略過。{pullback_note}{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
+<p class="muted">只做日盤 09:30–15:45 ET。破底翻 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後右肩踩回 MA20 進場。停損在{'右肩低點' if interval == '1m' else '破底'}下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內），或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下（45 點內），則略過。{pullback_note}{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
