@@ -1,7 +1,7 @@
 //@version=5
 indicator("NQ 五分K V轉", overlay=true, max_labels_count=200)
 
-// 對齊 2026-08-27 那筆：16~28 根急跌（≥120 點）、尖底、至少 3 根同速拉回 50%。
+// 頸線 = 起跌高點。右腿回到頸線，且右腿時間為左腿的 0.65~1.40 倍。
 // 套用至 NQ1! / MNQ1! / NQ=F 五分圖。
 
 dumpMin     = input.int(16, "Dump 最少 K", minval=8, maxval=20)
@@ -11,8 +11,10 @@ minDropAtr  = input.float(4.0, "最小跌幅（ATR 倍）", minval=1.0, step=0.1
 minRedFrac  = input.float(0.55, "紅 K 佔比", minval=0.4, maxval=0.9, step=0.05)
 leftHighPct = input.float(40.0, "高點須在左側（%）", minval=20, maxval=60)
 maxBaseBars = input.int(3, "底部盤整最多 K", minval=1, maxval=6)
-recoverFrac = input.float(0.50, "進場回補比例", minval=0.3, maxval=1.0, step=0.05)
-minSpeed    = input.float(0.70, "收復/急跌 速度比", minval=0.3, step=0.05)
+recoverFrac = input.float(0.98, "回到頸線（回補比例）", minval=0.5, maxval=1.0, step=0.01)
+minTimeRatio = input.float(0.65, "右腿/左腿 時間下限", minval=0.3, step=0.05)
+maxTimeRatio = input.float(1.40, "右腿/左腿 時間上限", minval=0.8, step=0.05)
+minSpeed    = input.float(0.60, "收復/急跌 速度比", minval=0.3, step=0.05)
 stopBuf     = input.float(8.0, "停損緩衝（點）", minval=0, step=1)
 tgtMult     = input.float(1.5, "目標 = V底 + dump×", minval=1.0, step=0.1)
 
@@ -52,6 +54,7 @@ var float vLow = na
 var float vDrop = na
 var int   vBar = na
 var int   vLen = na
+var int   vTouch = na
 var bool  vReady = false
 var bool  vTaken = false
 
@@ -61,6 +64,7 @@ if isDump
     vDrop := drop
     vBar := bar_index
     vLen := dumpLen
+    vTouch := na
     vReady := true
     vTaken := false
 
@@ -71,8 +75,16 @@ if newLowBreak
 barsSince = vReady ? bar_index - vBar : 0
 rec = (not na(vDrop) and vDrop > 0) ? (close - vLow) / vDrop : 0.0
 speed = (barsSince > 0 and vLen > 0 and vDrop > 0) ? (close - vLow) / barsSince / (vDrop / vLen) : 0.0
+if vReady and not vTaken and rec >= recoverFrac and na(vTouch)
+    vTouch := bar_index
+timeRatio = (vLen > 0 and not na(vTouch)) ? (vTouch - vBar) / vLen : 0.0
 
-longSignal = vReady and not vTaken and barsSince >= 3 and barsSince <= vLen and rec >= recoverFrac and speed >= minSpeed and close >= open and close > ma5 and not newLowBreak
+if vReady and not vTaken and not na(vTouch) and timeRatio < minTimeRatio
+    vReady := false
+if vReady and not vTaken and barsSince / vLen > maxTimeRatio
+    vReady := false
+
+longSignal = vReady and not vTaken and not na(vTouch) and timeRatio >= minTimeRatio and timeRatio <= maxTimeRatio and rec >= recoverFrac and speed >= minSpeed and close >= open and close > ma5 and not newLowBreak
 
 if longSignal
     vTaken := true
@@ -84,10 +96,11 @@ tgtLevel  = vLow + vDrop * tgtMult
 plotshape(longSignal, title="V轉進場", style=shape.triangleup, location=location.belowbar, color=color.new(#00e676, 0), size=size.small, text="V")
 plotshape(isDump and not longSignal, title="V底", style=shape.diamond, location=location.belowbar, color=color.new(#facc15, 0), size=size.tiny)
 
+plot(vReady and not na(vHigh) ? vHigh : na, "頸線", color=color.new(#79c0ff, 0), linewidth=1, style=plot.style_linebr)
 plot(vReady and not na(vLow) ? vLow : na, "V底", color=color.new(#facc15, 0), linewidth=1, style=plot.style_circles)
 plot(longSignal ? close : na, "進場", color=color.new(#00e676, 0), linewidth=2, style=plot.style_circles)
 plot(longSignal ? stopLevel : na, "停損", color=color.new(#ef5350, 0), style=plot.style_cross)
 plot(longSignal ? tgtLevel : na, "目標", color=color.new(#66bb6a, 0), style=plot.style_cross)
 
-alertcondition(longSignal, "NQ V轉進場", "NQ 5m V-turn long")
+alertcondition(longSignal, "NQ V轉進場", "NQ 5m V-turn long (symmetric neckline)")
 alertcondition(isDump, "NQ V底", "NQ 5m V-turn pivot")

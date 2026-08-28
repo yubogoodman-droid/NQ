@@ -40,8 +40,14 @@ def test_summarize_trades() -> None:
     assert abs(stats["total_points"] - 12.0) < 1e-9
 
 
-def _make_v_bars(*, bounce: bool = True, u_base: bool = False, n: int = 220) -> pd.DataFrame:
-    """Rebuild the 08-27 geometry: ~24-bar 150pt dump, sharp pivot, fast snap-back."""
+def _make_v_bars(
+    *,
+    bounce: bool = True,
+    u_base: bool = False,
+    fast_recover: bool = False,
+    n: int = 220,
+) -> pd.DataFrame:
+    """~24-bar 150pt dump, sharp pivot, then a matching-length climb back to the neckline."""
     close = np.zeros(n, dtype=float)
     close[0] = 29540.0
     for i in range(1, 90):
@@ -49,9 +55,10 @@ def _make_v_bars(*, bounce: bool = True, u_base: bool = False, n: int = 220) -> 
 
     dump_start = 100
     dump_end = 123
-    high_level = close[dump_start - 1]
+    high_level = float(close[dump_start - 1])
+    dump_len = dump_end - dump_start + 1
     for i in range(dump_start, dump_end + 1):
-        frac = (i - dump_start + 1) / (dump_end - dump_start + 1)
+        frac = (i - dump_start + 1) / dump_len
         close[i] = high_level - 150.0 * frac
 
     if u_base:
@@ -60,16 +67,23 @@ def _make_v_bars(*, bounce: bool = True, u_base: bool = False, n: int = 220) -> 
         )
         tail = dump_end + 9
     else:
-        tail = dump_end + 1
+        tail = dump_end
 
+    pivot = float(close[dump_end])
     if bounce:
-        close[tail] = close[dump_end] + 30.0
-        for i in range(tail + 1, min(tail + 16, n)):
-            close[i] = close[i - 1] + 12.0
-        for i in range(min(tail + 16, n), n):
+        rec_len = 5 if fast_recover else dump_len
+        for k in range(1, rec_len + 1):
+            i = tail + k
+            if i >= n:
+                break
+            close[i] = pivot + (high_level - pivot) * (k / rec_len)
+        last = tail + rec_len
+        if last < n:
+            close[last] = high_level + 10.0
+        for i in range(last + 1, n):
             close[i] = close[i - 1] + 0.4
     else:
-        for i in range(tail, n):
+        for i in range(tail + 1, n):
             close[i] = close[i - 1] - 6.0
 
     high = close + 2.0
@@ -83,9 +97,15 @@ def _make_v_bars(*, bounce: bool = True, u_base: bool = False, n: int = 220) -> 
     if bounce and not u_base:
         open_[dump_end] = close[dump_end] + 4.0
         low[dump_end] = close[dump_end] - 1.5
-        high[dump_end] = close[dump_end] + 28.0
-        close[dump_end] = close[dump_end] + 22.0
-        open_[dump_end] = close[dump_end] - 20.0
+        high[dump_end] = close[dump_end] + 8.0
+        rec_len = 5 if fast_recover else dump_len
+        for k in range(1, rec_len + 1):
+            i = tail + k
+            if i >= n:
+                break
+            open_[i] = close[i] - 4.0
+            high[i] = close[i] + 3.0
+            low[i] = min(close[i] - 2.0, open_[i] - 1.0)
 
     vol = np.full(n, 90.0)
     vol[dump_start : dump_end + 6] = 240.0
@@ -105,11 +125,10 @@ def test_detect_v_bounce() -> None:
     assert sig.entry_idx > sig.dump_idx
     assert sig.dump_low < sig.dump_high
     assert sig.drop_pts >= 120
-    assert sig.recover_frac >= 0.50
+    assert sig.recover_frac >= 0.98
+    assert 0.65 <= sig.time_ratio <= 1.40
     assert sig.entry_price > sig.stop_price
     assert sig.entry_price > sig.ma5
-    risk = sig.entry_price - sig.stop_price
-    assert risk > 0
     assert sig.target_price > sig.entry_price
 
 
@@ -125,6 +144,12 @@ def test_no_signal_on_u_base() -> None:
     assert not sigs, "rounded U-base should not count as a V"
 
 
+def test_no_signal_on_asymmetric_spike() -> None:
+    df = _make_v_bars(bounce=True, fast_recover=True)
+    sigs = detect_signals(df, skip_rth_open=False)
+    assert not sigs, "5-bar spike back is not a symmetric neckline V"
+
+
 def test_simulate_and_html(tmp_path: Path | None = None) -> None:
     df = _make_v_bars(bounce=True)
     sigs = detect_signals(df, skip_rth_open=False)
@@ -135,6 +160,7 @@ def test_simulate_and_html(tmp_path: Path | None = None) -> None:
     path = write_html_report(out, df, trades, "NQ=F", "demo")
     text = path.read_text(encoding="utf-8")
     assert "V轉" in text
+    assert "頸線" in text
     if trades:
         assert "<img src='img/" in text
         img_dir = path.parent / "img"
@@ -147,6 +173,7 @@ def main() -> int:
     test_detect_v_bounce()
     test_no_signal_on_continued_dump()
     test_no_signal_on_u_base()
+    test_no_signal_on_asymmetric_spike()
     test_simulate_and_html()
     print("ok")
     return 0

@@ -4,9 +4,8 @@
 對齊 2026-08-27 那筆（ETH 02:10 低 29401.75 → 04:50 高 29662）：
   1. 16~28 根內從左側高點灌到右側低點，深度 ≥ max(120 點, 4 ATR)
   2. 底部不盤（靠近低點的 K ≤ 3 根）—— V 不是 U、不是 W
-  3. 之後至少 3 根、且 ≤ dump 根數內收復 50% 跌幅，收紅且站上 MA5 做多
-  4. 收復斜率 ≥ dump 斜率的 70%
-  5. 停損 V 低下方，目標量度 1.5× dump（約回到起跌點再延伸半段）
+  3. 頸線 = 起跌高點；右腿第一次回到頸線（回補 ≥ 98%）時，右腿 K 數須為左腿的 0.65~1.40 倍
+  4. 收紅站上 MA5 做多。停損用右腿回撤低，目標頸線再延伸 0.5× dump
 
 含 ETH（那筆 V 在凌晨）；RTH 09:30–10:00 開盤噪音不進。
 
@@ -107,6 +106,7 @@ class Signal:
     recover_frac: float
     recover_bars: int
     recover_speed: float
+    time_ratio: float
     vol_mult: float
     ma5: float
     ma20: float
@@ -143,6 +143,14 @@ def true_range(high, low, close) -> np.ndarray:
 
 def atr(high, low, close, n: int = 14) -> np.ndarray:
     return sma(true_range(high, low, close), n)
+
+
+def _right_wing_stop(low: np.ndarray, dump_idx: int, entry_idx: int, stop_buffer: float) -> float:
+    """停損放右腿回撤，不用 V 底（回到頸線時離 V 底太遠）。"""
+    rec_bars = entry_idx - dump_idx
+    skip = max(1, rec_bars // 3)
+    start = min(dump_idx + skip, entry_idx)
+    return float(np.min(low[start : entry_idx + 1])) - stop_buffer
 
 
 def quality_from_v(drop_atr: float, recover_speed: float, vol_mult: float) -> Tuple[int, str]:
@@ -232,9 +240,11 @@ def detect_signals(
     df,
     min_dump_bars: int = 16,
     max_dump_bars: int = 28,
-    recover_frac: float = 0.50,
+    recover_frac: float = 0.98,
     min_recover_bars: int = 3,
-    min_recover_speed: float = 0.70,
+    min_recover_speed: float = 0.60,
+    min_time_ratio: float = 0.65,
+    max_time_ratio: float = 1.40,
     atr_len: int = 14,
     min_drop_pts: float = 120.0,
     min_drop_atr: float = 4.0,
@@ -251,7 +261,7 @@ def detect_signals(
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """
-    V 轉：左側高、右側尖底、同速拉回 50% 進場。
+    V 轉：頸線（起跌高）兩邊要差不多——右腿回到頸線，時間也接近左腿。
     """
     close = df["Close"].to_numpy(float)
     open_ = df["Open"].to_numpy(float)
@@ -304,9 +314,10 @@ def detect_signals(
         dump_vol = float(np.mean(volume[dump_start : dump_idx + 1]))
         vmult = dump_vol / vol_avg if vol_avg > 0 else 0.0
 
-        recover_window = dump_bars
+        recover_window = max(dump_bars, int(dump_bars * max_time_ratio) + 1)
         entered = False
         invalidated = False
+        first_touch: int | None = None
 
         for j in range(dump_idx + 1, min(dump_idx + recover_window + 1, n)):
             if low[j] < dump_low - 1e-9:
@@ -314,11 +325,22 @@ def detect_signals(
                 invalidated = True
                 break
             rec = (float(close[j]) - dump_low) / drop if drop else 0.0
+            rec_bars = j - dump_idx
+            if rec_bars / dump_bars > max_time_ratio:
+                bump("skip_asym")
+                invalidated = True
+                break
             if rec < recover_frac:
                 continue
+            if first_touch is None:
+                first_touch = j
+            time_ratio = (first_touch - dump_idx) / dump_bars
             bump("recover")
+            if time_ratio < min_time_ratio:
+                bump("skip_early")
+                invalidated = True
+                break
 
-            rec_bars = j - dump_idx
             rec_pts = float(close[j]) - dump_low
             rec_speed = (rec_pts / rec_bars / dump_speed) if rec_bars and dump_speed else 0.0
             if rec_bars < min_recover_bars:
@@ -341,18 +363,17 @@ def detect_signals(
                 break
 
             entry = float(close[j])
-            stop = dump_low - stop_buffer
+            stop = _right_wing_stop(low, dump_idx, j, stop_buffer)
             risk = entry - stop
             if risk <= 0:
                 bump("skip_bad_risk")
-                invalidated = True
-                break
+                continue
             if max_risk > 0 and risk > max_risk:
                 bump("skip_max_risk")
                 continue
 
             measured = dump_low + drop * target_dump_mult
-            target = max(measured, entry + risk * 1.0)
+            target = measured if measured > entry else entry + risk
             if target <= entry:
                 bump("skip_bad_target")
                 continue
@@ -376,6 +397,7 @@ def detect_signals(
                     recover_frac=rec,
                     recover_bars=rec_bars,
                     recover_speed=rec_speed,
+                    time_ratio=time_ratio,
                     vol_mult=vmult,
                     ma5=float(ma5[j]),
                     ma20=float(ma20[j]) if not np.isnan(ma20[j]) else 0.0,
@@ -548,6 +570,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
 
     ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
     ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
+    ax.axhline(sig.dump_high, color="#79c0ff", ls="--", lw=1.05, alpha=0.85)
 
     hx, vx, ex, xx = (
         sig.dump_high_idx - start,
@@ -560,7 +583,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         v_x.append(hx)
         v_y.append(sig.dump_high)
         ax.scatter([hx], [sig.dump_high], s=36, color="#79c0ff", zorder=5)
-        ax.annotate("起跌", (hx, sig.dump_high), textcoords="offset points", xytext=(0, 8),
+        ax.annotate("起跌/頸線", (hx, sig.dump_high), textcoords="offset points", xytext=(0, 8),
                     ha="center", color="#79c0ff", fontsize=8)
     if 0 <= vx < len(window):
         v_x.append(vx)
@@ -649,8 +672,10 @@ def _render_trade_cards(
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"V底 {vt.strftime('%m-%d %H:%M')}  {t.signal.dump_low:.2f}\n"
+            f"頸線 {t.signal.dump_high:.2f}  兩邊 {t.signal.time_ratio:.2f}× 時間 / "
+            f"{t.signal.recover_frac * 100:.0f}% 高度\n"
             f"dump {t.signal.drop_pts:.0f}pt / {t.signal.drop_atr:.1f}ATR  "
-            f"回補 {t.signal.recover_frac * 100:.0f}% in {t.signal.recover_bars} 根\n"
+            f"右腿 {t.signal.recover_bars} 根\n"
             f"速度 {t.signal.recover_speed:.2f}×  量 {t.signal.vol_mult:.1f}×\n"
             f"MA5 {t.signal.ma5:.1f} / MA20 {t.signal.ma20:.1f}"
             "</pre>"
@@ -685,9 +710,10 @@ def write_html_report(
     if funnel:
         funnel_line = (
             f"<p class='muted'>漏斗：急跌 {funnel.get('dump', 0)} → "
-            f"回補50% {funnel.get('recover', 0)} → "
+            f"回補頸線 {funnel.get('recover', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
-            f"（新低打斷 {funnel.get('skip_new_low', 0)} · 太慢 {funnel.get('skip_slow', 0)} · "
+            f"（新低打斷 {funnel.get('skip_new_low', 0)} · 太早 {funnel.get('skip_early', 0)} · "
+            f"不對稱 {funnel.get('skip_asym', 0)} · 太慢 {funnel.get('skip_slow', 0)} · "
             f"紅K {funnel.get('skip_red_entry', 0)} · MA5 {funnel.get('skip_ma5', 0)} · "
             f"開盤 {funnel.get('skip_open', 0)} · 風險 {funnel.get('skip_max_risk', 0)}）</p>"
         )
@@ -732,7 +758,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 五分 K V轉</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">16~28 根急跌（≥120 點 / 4 ATR）、尖底不盤，之後至少 3 根同速收復 50% 做多。停損 V 低下方，目標 1.5× dump。含 ETH，09:30–10:00 不進。</p>
+<p class="muted">16~28 根急跌（≥120 點 / 4 ATR）、尖底不盤。頸線=起跌高，右腿第一次回到頸線（≥98%）且時間為左腿的 0.65~1.40 倍。停損右腿回撤，目標頸線再延伸 0.5× dump。含 ETH，09:30–10:00 不進。</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -777,7 +803,7 @@ def _print_trades(df, trades, tag: str = "") -> None:
             f"-> {df.index[t.exit_idx].strftime('%m-%d %H:%M')} "
             f"{t.exit_reason} {t.pnl_points:+.1f}  "
             f"dump={t.signal.drop_pts:.0f}pt/{t.signal.drop_atr:.1f}ATR "
-            f"回補{t.signal.recover_frac * 100:.0f}%/{t.signal.recover_bars}根"
+            f"頸線兩邊 {t.signal.time_ratio:.2f}×/{t.signal.recover_frac * 100:.0f}%"
         )
 
 
@@ -803,7 +829,7 @@ def cmd_backtest(args) -> int:
     if stats["count"] == 0:
         verdict = "這段樣本沒抓到 V 轉。多數急跌要嘛底部盤成 U，要嘛回補太慢。"
     elif stats["total_points"] > 50 and stats["win_rate"] >= 45:
-        verdict = "有料：尖底 V 比接刀清楚。假 V（回補 50% 後再破底）仍會一次吐回去。"
+        verdict = "有料：頸線兩邊對稱的 V 比接刀清楚。假 V（回到頸線後再破底）仍會一次吐回去。"
     elif abs(stats["total_points"]) <= 50:
         verdict = "抓得到 08-27 那種 V，但樣本交易優勢接近零。真 V 的量度被假 V 破底吃掉。"
     elif stats["total_points"] > 0:
