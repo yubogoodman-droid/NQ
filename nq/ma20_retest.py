@@ -254,6 +254,7 @@ INTERVAL_DETECT = {
         max_dump_body=30.0,
         max_prev_above=45.0,
         min_retest_bars=30,
+        max_close_above=8.0,
         stop_at_shoulder=True,
     ),
 }
@@ -307,6 +308,7 @@ def detect_signals(
     max_dump_body: float = 0.0,
     max_prev_above: float = 0.0,
     min_retest_bars: int = 0,
+    max_close_above: float = 0.0,
     stop_at_shoulder: bool = False,
     funnel: Optional[Dict[str, int]] = None,
     last_entry_idx: int = -(10**9),
@@ -434,6 +436,10 @@ def detect_signals(
             if pierce < -touch_above or pierce > max_pierce:
                 continue
             if close[t] < m20:
+                continue
+            # 進場價要坐在 MA20 上：低點掃到但收在均線上方 30 點
+            # （08-03 10:05 entry 28572 vs MA20 28541）那是彈走，不是回踩。
+            if max_close_above > 0 and float(close[t]) - m20 > max_close_above:
                 continue
 
             # 右肩是坐上 MA20，不是大陰線從天上砸下來碰到均線

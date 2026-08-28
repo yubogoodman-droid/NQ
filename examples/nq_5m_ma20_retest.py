@@ -650,7 +650,9 @@ def write_html_report(
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
     total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
     pullback_note = (
-        "右肩要先從反彈高點拉回至少 25 點，收復後至少再過 30 根。大陰線砸上 MA20 這波作廢。只做日盤破底。"
+        "右肩要先從反彈高點拉回至少 25 點，收復後至少再過 30 根。"
+        "進場收盤須貼著 1m MA20（高於不超過 8 點）；影線掃到但收盤彈走不算回踩，再等下一腳。"
+        "大陰線砸上 MA20 這波作廢。只做日盤破底。"
         if interval == "1m"
         else ""
     )

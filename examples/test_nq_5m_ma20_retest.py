@@ -302,6 +302,7 @@ def test_1m_preset_detects_retest() -> None:
     assert sig.entry_idx > sig.reclaim_idx
     assert sig.entry_idx - sig.reclaim_idx >= 30
     assert sig.entry_price > sig.stop_price
+    assert sig.entry_price - sig.ma20 <= 8.0 + 1e-6
     trades = simulate(df, sigs, **simulate_kwargs("1m"))
     assert trades
     assert trades[0].exit_idx >= trades[0].entry_idx
@@ -359,6 +360,7 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["max_prev_above"] == 45.0
     assert d1["stop_at_shoulder"] is True
     assert d1["min_retest_bars"] == 30
+    assert d1["max_close_above"] == 8.0
     assert d5["stop_at_shoulder"] is False
     assert d5["max_pierce"] == 12.0
     s1 = simulate_kwargs("1m")
@@ -440,6 +442,45 @@ def test_1m_stop_is_shoulder_not_break() -> None:
     assert sig.entry_price - sig.stop_price < 80.0
 
 
+def test_skips_close_far_above_ma20() -> None:
+    """08-03 10:05：低點碰到 MA20 但收在均線上方 31 點，不是回踩；應等真正坐上均線的那根。"""
+    df0 = _1m_range_dump_reclaim_retest()
+    ctrl = detect_signals(df0, **detect_kwargs("1m", session="day"))
+    assert ctrl
+    tag = ctrl[0].entry_idx
+    df = df0.copy()
+    close = df["Close"].to_numpy(copy=True)
+    high = df["High"].to_numpy(copy=True)
+    low = df["Low"].to_numpy(copy=True)
+    opn = df["Open"].to_numpy(copy=True)
+    m20 = float(pd.Series(close).rolling(20, min_periods=20).mean().iloc[tag])
+    # 彈走那根：影線掃 MA20，收盤卻在上方 31 點
+    opn[tag] = m20 + 2.0
+    low[tag] = m20 - 2.0
+    close[tag] = m20 + 31.0
+    high[tag] = close[tag] + 2.0
+    # 下一根仍懸在均線上方，還沒回踩
+    close[tag + 1] = m20 + 20.0
+    opn[tag + 1] = close[tag]
+    high[tag + 1] = close[tag + 1] + 4.0
+    low[tag + 1] = m20 + 12.0
+    # 再下一根才真正坐上 MA20（留足右肩停損空間）
+    sit = tag + 2
+    close[sit] = m20 + 4.0
+    opn[sit] = m20 + 8.0
+    high[sit] = close[sit] + 4.0
+    low[sit] = m20 - 16.0
+    df = df.copy()
+    df["Close"] = close
+    df["High"] = high
+    df["Low"] = low
+    df["Open"] = opn
+    sigs = detect_signals(df, **detect_kwargs("1m", session="day"))
+    assert sigs, "later sit on MA20 must still fill"
+    assert sigs[0].entry_idx > tag, "bounce close 31 pts above MA20 is not a retest"
+    assert sigs[0].entry_price - sigs[0].ma20 <= 8.0 + 1e-6
+
+
 def test_rth_skips_premarket_break() -> None:
     """08-12 08:30 那種夜盤破底，不能 09:30 開盤當成右肩。"""
     df = _1m_range_dump_reclaim_retest()
@@ -468,6 +509,7 @@ def main() -> int:
     test_skip_gap_keeps_later_shoulder()
     test_skips_waterfall_onto_ma20()
     test_1m_stop_is_shoulder_not_break()
+    test_skips_close_far_above_ma20()
     test_rth_skips_premarket_break()
     print("ok")
     return 0
