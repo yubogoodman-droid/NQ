@@ -60,6 +60,23 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
+## 幣安 1 小時 MA25 下破底再站上
+
+1 小時圖：收盤跌破 MA25，在下面至少 4 小時、深度 ≥ 1.8% 做出低點（V / W），再收盤站回 MA25。  
+進場用站回收盤；停損在破底低點；目標 2R；連兩根又掉回 MA25 下出場。
+
+```bash
+# 先對截圖那兩檔（AVGO / ONDS）
+python3 examples/binance_1h_ma25_reclaim.py --symbols AVGOUSDT,ONDSUSDT --days 45
+
+# 流動 U 本位永續 + 手機版 HTML
+python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 30 --pages
+```
+
+TradingView：`pinescript/binance_1h_ma25_reclaim.pine` 貼到 1 小時圖。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  

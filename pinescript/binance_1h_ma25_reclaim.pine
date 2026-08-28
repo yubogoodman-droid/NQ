@@ -1,0 +1,31 @@
+//@version=5
+indicator("1h MA25 下破底再站上", overlay=true, max_labels_count=50)
+
+// 一小時圖：收盤跌破 MA25，在下面做出低點，再收盤站回 MA25。
+maLen        = input.int(25, "均線", minval=5)
+minBelow     = input.int(4, "在均線下至少幾根", minval=2)
+maxBelow     = input.int(36, "在均線下最多幾根", minval=6)
+minDepthPct  = input.float(1.8, "破底最低深度 %", minval=0.3, step=0.1) / 100
+
+ma25 = ta.sma(close, maLen)
+plot(ma25, "MA25", color=color.new(#d28cff, 0), linewidth=2)
+
+below = close < ma25
+barsBelow = 0
+for i = 0 to maxBelow
+    if below[i]
+        barsBelow += 1
+    else
+        break
+
+crossedUp = close > ma25 and close[1] <= ma25[1]
+episodeLow = ta.lowest(low, math.max(barsBelow, 1))
+depthOk = ma25 > 0 and (ma25 - episodeLow) / ma25 >= minDepthPct
+barsOk = barsBelow >= minBelow and barsBelow <= maxBelow
+
+reclaim = crossedUp and barsOk and depthOk
+
+plotshape(reclaim, title="站上 MA25", style=shape.triangleup, location=location.belowbar, color=color.new(#00e676, 0), size=size.small)
+bgcolor(below and barsBelow >= minBelow ? color.new(#d28cff, 92) : na)
+
+alertcondition(reclaim, title="1h MA25 重新站上", message="1h 已從 MA25 下方破底後重新站上")
