@@ -61,6 +61,7 @@ MAX_MA200_DOWN_20 = -0.007    # 近 20 根（5 小時）200 再跌超過 0.7%
 MIN_MA200_FLATTEN_12 = 0.0005  # 後 12 根斜率要比前 12 根走平至少 0.05%
 MIN_BARS = 220
 KLINE_LIMIT = 500
+BAR_MS = {"1m": 60_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000}
 ALERT_BUCKET_MS = 8 * 3600 * 1000
 HOLD_BARS = 16         # 最多抱 4 小時
 TARGET_R = 2.0
@@ -195,6 +196,7 @@ def fetch_klines(
     end_ms: int | None = None,
     drop_unclosed: bool = True,
     interval: str = "15m",
+    min_bars: int | None = None,
 ) -> dict | None:
     params: dict = {"symbol": sym, "interval": interval, "limit": min(limit, 1500)}
     if start_ms is not None:
@@ -202,13 +204,14 @@ def fetch_klines(
     if end_ms is not None:
         params["endTime"] = int(end_ms)
     raw = get_json("/fapi/v1/klines", params=params)
-    if not raw or len(raw) < MIN_BARS:
+    need = MIN_BARS if min_bars is None else int(min_bars)
+    if not raw or len(raw) < need:
         return None
-    bar_ms = 15 * 60 * 1000 if interval == "15m" else 60_000
+    bar_ms = BAR_MS.get(interval, 900_000)
     now_ms = int(time.time() * 1000)
     if drop_unclosed and int(raw[-1][0]) + bar_ms > now_ms:
         raw = raw[:-1]
-    if len(raw) < MIN_BARS:
+    if len(raw) < need:
         return None
     return bars_from_raw(raw)
 
@@ -790,7 +793,30 @@ def _equity_svg(pnls: list[float], width: int = 720, height: int = 160) -> str:
     )
 
 
-def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
+def bar_index_at(d: dict, ts_ms: int) -> int | None:
+    """時間戳落在哪一根 K（開盤時間 ≤ ts 的最後一根）。"""
+    t = d["t"]
+    if len(t) == 0:
+        return None
+    i = int(np.searchsorted(t, int(ts_ms), side="right") - 1)
+    if i < 0 or i >= len(t):
+        return None
+    return i
+
+
+def _render_ohlc_b64(
+    sym: str,
+    d: dict,
+    tr: dict,
+    *,
+    title: str,
+    a0: int,
+    a1: int,
+    mark_i: int,
+    signal_i: int,
+    entry_i: int,
+    exit_i: int,
+) -> str | None:
     try:
         import warnings
 
@@ -801,10 +827,9 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
         from matplotlib.patches import Rectangle
     except Exception:
         return None
+    if a1 - a0 < 4:
+        return None
     use_cjk_font(plt)
-    i = tr["signal_i"]
-    a0 = max(0, i - 36)
-    a1 = min(len(d["c"]), tr["exit_i"] + 6)
     sl = slice(a0, a1)
     xs = np.arange(a1 - a0)
     o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
@@ -833,20 +858,16 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
     ax.axhline(tr["entry"], color="#e8f0ea", ls=":", lw=0.7)
     ax.axhline(tr["stop"], color="#e35d5d", ls="--", lw=0.7)
     for idx, color, mark in (
-        (tr.get("mark_i", tr["signal_i"]), "#c9a227", "D"),
-        (tr["signal_i"], "#8ab4f8", "o"),
-        (tr["entry_i"], "#3dba7a", "^"),
-        (tr["exit_i"], "#e35d5d" if tr["pnl_pct"] < 0 else "#3dba7a", "x"),
+        (mark_i, "#c9a227", "D"),
+        (signal_i, "#8ab4f8", "o"),
+        (entry_i, "#3dba7a", "^"),
+        (exit_i, "#e35d5d" if tr["pnl_pct"] < 0 else "#3dba7a", "x"),
     ):
         x = idx - a0
         if 0 <= x < len(c):
             ax.axvline(x, color=color, ls="--", lw=0.7)
             ax.scatter([x], [c[x] if mark != "^" else tr["entry"]], s=28, color=color, marker=mark, zorder=6)
-    ax.set_title(
-        f"{sym}  15m  MA200 站穩{CONFIRM_BARS}根  {tr['reason']}  {tr['pnl_pct']:+.2f}%",
-        color="#e8f0ea",
-        fontsize=11,
-    )
+    ax.set_title(title, color="#e8f0ea", fontsize=11)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     fig.tight_layout(pad=0.45)
     buf = io.BytesIO()
@@ -855,6 +876,91 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
         fig.savefig(buf, format="png", dpi=90, facecolor=fig.get_facecolor())
     plt.close(fig)
     return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
+    i = tr["signal_i"]
+    a0 = max(0, i - 36)
+    a1 = min(len(d["c"]), tr["exit_i"] + 6)
+    return _render_ohlc_b64(
+        sym,
+        d,
+        tr,
+        title=f"{sym}  15m  MA200 站穩{CONFIRM_BARS}根  {tr['reason']}  {tr['pnl_pct']:+.2f}%",
+        a0=a0,
+        a1=a1,
+        mark_i=int(tr.get("mark_i", tr["signal_i"])),
+        signal_i=int(tr["signal_i"]),
+        entry_i=int(tr["entry_i"]),
+        exit_i=int(tr["exit_i"]),
+    )
+
+
+def draw_1h_b64(sym: str, d1h: dict, tr: dict) -> str | None:
+    mark_i = bar_index_at(d1h, tr["t_mark"])
+    signal_i = bar_index_at(d1h, tr["t_signal"])
+    entry_i = bar_index_at(d1h, tr["t_entry"])
+    exit_i = bar_index_at(d1h, tr["t_exit"])
+    if mark_i is None or exit_i is None:
+        return None
+    if signal_i is None:
+        signal_i = mark_i
+    if entry_i is None:
+        entry_i = signal_i
+    a0 = max(0, mark_i - 48)
+    a1 = min(len(d1h["c"]), exit_i + 10)
+    return _render_ohlc_b64(
+        sym,
+        d1h,
+        tr,
+        title=f"{sym}  1h  對照  {tr['reason']}  {tr['pnl_pct']:+.2f}%",
+        a0=a0,
+        a1=a1,
+        mark_i=mark_i,
+        signal_i=signal_i,
+        entry_i=entry_i,
+        exit_i=exit_i,
+    )
+
+
+def fetch_1h_for_trades(trades: list[dict]) -> dict[str, dict]:
+    """只抓有成交的標的小時 K，給報告對照圖。"""
+    if not trades:
+        return {}
+    by_sym: dict[str, list[dict]] = {}
+    for t in trades:
+        by_sym.setdefault(t["symbol"], []).append(t)
+
+    def one(sym: str) -> tuple[str, dict | None]:
+        rows = by_sym[sym]
+        t0 = min(int(r["t_mark"]) for r in rows) - 16 * 24 * 3600 * 1000
+        t1 = max(int(r["t_exit"]) for r in rows) + 18 * 3600 * 1000
+        d0 = fetch_klines(
+            sym,
+            limit=1500,
+            start_ms=t0,
+            end_ms=t1,
+            interval="1h",
+            drop_unclosed=True,
+            min_bars=80,
+        )
+        if d0 is None:
+            return sym, None
+        return sym, indicators(d0)
+
+    out: dict[str, dict] = {}
+    with ThreadPoolExecutor(6) as ex:
+        futs = [ex.submit(one, s) for s in by_sym]
+        for fut in as_completed(futs):
+            try:
+                sym, d = fut.result()
+            except Exception as e:
+                print("1h err", e, flush=True)
+                continue
+            if d is not None:
+                out[sym] = d
+    print(f"小時 K {len(out)}/{len(by_sym)} 檔", flush=True)
+    return out
 
 
 def backtest_symbol(sym: str, start_ms: int, end_ms: int, warmup_days: int = 4) -> tuple[str, dict | None, list[dict]]:
@@ -947,6 +1053,7 @@ def write_backtest_html(
         ranked = sorted(trades, key=lambda t: abs(t["pnl_pct"]), reverse=True)
         chart_set = {id(t) for t in ranked[:chart_limit]}
     print(f"畫 {len(chart_set)} 張圖…", flush=True)
+    data_1h = fetch_1h_for_trades([t for t in trades if id(t) in chart_set])
     img_dir = path.parent / "img"
     if img_dir.exists():
         for old in img_dir.glob("*.png"):
@@ -964,9 +1071,20 @@ def write_backtest_html(
             if b64:
                 png_name = f"{i:03d}.png"
                 (img_dir / png_name).write_bytes(base64.b64decode(b64))
-                img = (
-                    f"<div class='mini-chart'><img src='img/{png_name}' loading='lazy' "
-                    f"alt='#{i} {escape(t['symbol'])}' style='width:100%;display:block;border-radius:10px'/></div>"
+                img += (
+                    f"<div class='mini-chart'><div class='chart-label'>15m</div>"
+                    f"<img src='img/{png_name}' loading='lazy' "
+                    f"alt='#{i} {escape(t['symbol'])} 15m' style='width:100%;display:block'/></div>"
+                )
+            d1h = data_1h.get(t["symbol"])
+            b64h = draw_1h_b64(t["symbol"], d1h, t) if d1h else None
+            if b64h:
+                png_1h = f"{i:03d}-1h.png"
+                (img_dir / png_1h).write_bytes(base64.b64decode(b64h))
+                img += (
+                    f"<div class='mini-chart'><div class='chart-label'>1h 對照</div>"
+                    f"<img src='img/{png_1h}' loading='lazy' "
+                    f"alt='#{i} {escape(t['symbol'])} 1h' style='width:100%;display:block'/></div>"
                 )
             if i % 40 == 0:
                 print(f"  圖 {i}/{len(trades)}", flush=True)
@@ -1024,7 +1142,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
-.mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+.mini-chart{{margin:0 -6px 8px;border-radius:10px;overflow:hidden;background:#0c1210}}
+.mini-chart:last-child{{margin-bottom:-4px}}
+.chart-label{{font-size:11px;font-weight:600;color:#8b949e;padding:8px 12px 0}}
 .empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
 </style></head><body>
 <div class="page">
@@ -1042,7 +1162,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <p class="muted">{escape(kind_line) if kind_line else '無分組'}</p>
 <p class="muted">出場 {escape(reason_line) if reason_line else '—'}</p>
 <p class="muted">無停損續走 {escape(fwd_line) if fwd_line else '—'}</p>
-<p class="muted">等權重每筆 1 單位，不含手續費／資金費。下面 {stats['count']} 筆都有圖：黃菱形＝記號、藍圈＝第 {CONFIRM_BARS} 根確認、綠三角＝進場、× ＝出場。</p>
+<p class="muted">等權重每筆 1 單位，不含手續費／資金費。下面 {stats['count']} 筆都有圖：上面 15m、下面 1h 對照。黃菱形＝記號、藍圈＝第 {CONFIRM_BARS} 根確認、綠三角＝進場、× ＝出場。</p>
 </section>
 {''.join(cards) if cards else "<div class='empty'>這週沒有訊號</div>"}
 </div></body></html>

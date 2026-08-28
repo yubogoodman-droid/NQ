@@ -14,6 +14,7 @@ from scan_binance_15m_expansion import (  # noqa: E402
     CLUSTER_COOLDOWN_MS,
     CONFIRM_BARS,
     TZ,
+    bar_index_at,
     collapse_hits,
     detect_expansion,
     drop_market_cluster,
@@ -274,6 +275,15 @@ def test_diving_ma200_skips() -> None:
     assert detect_expansion(d) == []
 
 
+def test_bar_index_at() -> None:
+    d = _bars(10, np.linspace(1, 10, 10))
+    ts = int(d["t"][3])
+    assert bar_index_at(d, ts) == 3
+    assert bar_index_at(d, ts + 1) == 3
+    assert bar_index_at(d, ts + 899_999) == 3
+    assert bar_index_at(d, int(d["t"][0]) - 1) is None
+
+
 def main() -> int:
     test_sma()
     test_rsi_sma_all_up()
@@ -297,6 +307,7 @@ def main() -> int:
     test_three_same_mark_kept()
     test_overhead_ma99_ma120_skips()
     test_diving_ma200_skips()
+    test_bar_index_at()
     print("ok")
     return 0
 
