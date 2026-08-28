@@ -15,10 +15,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nq.patterns import detect_m_heads  # noqa: E402
 from nq_m_head import (  # noqa: E402
     ET,
+    TF_PRESETS,
     TradeResult,
     generate_signals,
+    overlay_m5_ma60,
     parse_period_days,
     run_backtest,
+    run_tf_backtest,
     sma,
     summarize,
     write_html_report,
@@ -166,6 +169,33 @@ def test_no_signal_without_ma60_break() -> None:
     assert not sigs, f"should not enter without MA60 break, got {len(sigs)} funnel={funnel}"
 
 
+def test_tf_presets() -> None:
+    assert TF_PRESETS["5m"]["min_bars_between_highs"] == 4
+    assert TF_PRESETS["5m"]["high_level_lookback"] == 24
+    assert TF_PRESETS["1m"]["swing_lookback"] == 7
+
+
+def test_overlay_m5_ma60() -> None:
+    df = _make_m_head_bars()
+    m5 = (
+        df.resample("5min")
+        .agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"})
+        .dropna()
+    )
+    out = overlay_m5_ma60(df, m5)
+    assert "ma60_5m" in out.columns
+    assert out["ma60_5m"].notna().sum() > 0
+    # 未收盤的 5 分 K 不該提前出現在 1m 上：shift(1) 後開頭會是 NaN
+    assert pd.isna(out["ma60_5m"].iloc[0])
+
+
+def test_5m_preset_still_fires() -> None:
+    df = _make_m_head_bars()
+    _, trades, funnel = run_tf_backtest(df, "5m")
+    assert trades, f"5m preset should still catch the synthetic dump, funnel={funnel}"
+    assert trades[0].signal.timeframe == "5m"
+
+
 def test_write_html_report() -> None:
     df = _make_m_head_bars()
     sigs = generate_signals(df)
@@ -188,6 +218,9 @@ def main() -> int:
     test_detect_and_simulate_short()
     test_reject_higher_high()
     test_no_signal_without_ma60_break()
+    test_tf_presets()
+    test_overlay_m5_ma60()
+    test_5m_preset_still_fires()
     test_write_html_report()
     print("ok")
     return 0

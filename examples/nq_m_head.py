@@ -46,6 +46,26 @@ MA_COLORS = {
     200: "#ab47bc",
 }
 
+# 1m / 5m 同一套邏輯，K 數換成大約相同的鐘面時間
+TF_PRESETS = {
+    "1m": {
+        "swing_lookback": 7,
+        "min_bars_between_highs": 20,
+        "max_bars_between_highs": 75,
+        "high_level_lookback": 120,
+        "entry_window": 35,
+        "max_bars_hold": 120,
+    },
+    "5m": {
+        "swing_lookback": 3,  # 15 分鐘確認
+        "min_bars_between_highs": 4,  # 20 分鐘，對得上今日 11:01–11:26 那組
+        "max_bars_between_highs": 48,  # 4 小時
+        "high_level_lookback": 24,  # 2 小時
+        "entry_window": 16,  # 80 分鐘
+        "max_bars_hold": 48,  # 4 小時
+    },
+}
+
 
 # ---------------------------------------------------------------------------
 # Data
@@ -151,6 +171,29 @@ def sma(arr, n: int) -> np.ndarray:
     return s.rolling(n, min_periods=n).mean().to_numpy(float)
 
 
+def overlay_m5_ma60(df_1m: pd.DataFrame, df_5m: pd.DataFrame) -> pd.DataFrame:
+    """把已收盤的 5m MA60 對齊到 1m（不偷看當根未收的 5 分 K）。"""
+    out = df_1m.copy()
+    out["ma60_5m"] = np.nan
+    if df_5m is None or df_5m.empty:
+        return out
+    ma = df_5m["close"].astype(float).rolling(60, min_periods=60).mean().shift(1)
+    out["ma60_5m"] = ma.reindex(out.index, method="ffill")
+    return out
+
+
+def m5_snapshot(df: pd.DataFrame, bar_idx: int) -> str:
+    if "ma60_5m" not in df.columns:
+        return ""
+    ma = df["ma60_5m"].iloc[bar_idx]
+    if pd.isna(ma):
+        return "5m MA60 n/a"
+    close = float(df["close"].iloc[bar_idx])
+    diff = close - float(ma)
+    side = "低於" if diff < 0 else "高於"
+    return f"5m MA60 {float(ma):.2f}  收盤{side} {diff:+.1f}"
+
+
 # ---------------------------------------------------------------------------
 # Strategy
 # ---------------------------------------------------------------------------
@@ -167,6 +210,7 @@ class Signal:
     ma60: float
     ma20: float
     ma5: float
+    timeframe: str = "1m"
 
     @property
     def risk(self) -> float:
@@ -239,6 +283,7 @@ def generate_signals(
     session_end: Optional[int] = None,
     target_r: float = 2.0,
     use_measured_target: bool = False,
+    timeframe: str = "1m",
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """高檔 M 頭確認後，收盤跌破 MA60 做空。"""
@@ -349,10 +394,30 @@ def generate_signals(
                 ma60=float(ma60[entry_idx]),
                 ma20=float(ma20[entry_idx]) if not np.isnan(ma20[entry_idx]) else 0.0,
                 ma5=float(ma5[entry_idx]) if not np.isnan(ma5[entry_idx]) else 0.0,
+                timeframe=timeframe,
             )
         )
 
     return sorted(signals, key=lambda s: s.bar_idx)
+
+
+def apply_preset(timeframe: str) -> dict:
+    if timeframe not in TF_PRESETS:
+        raise ValueError(f"unknown timeframe {timeframe}")
+    return dict(TF_PRESETS[timeframe])
+
+
+def run_tf_backtest(
+    df: pd.DataFrame,
+    timeframe: str,
+    extra: Optional[dict] = None,
+) -> tuple[list[Signal], list[TradeResult], dict]:
+    preset = apply_preset(timeframe)
+    hold = preset.pop("max_bars_hold")
+    funnel: Dict[str, int] = {}
+    sigs = generate_signals(df, funnel=funnel, timeframe=timeframe, **preset, **(extra or {}))
+    trades = run_backtest(df, sigs, max_bars_hold=hold)
+    return sigs, trades, funnel
 
 
 def run_backtest(
@@ -480,11 +545,11 @@ def _chart_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     return start, end
 
 
-def _trade_img_name(trade: TradeResult, trade_no: int) -> str:
+def _trade_img_name(trade: TradeResult, trade_no: int, prefix: str = "m") -> str:
     ts = trade.signal.timestamp
     if getattr(ts, "tzinfo", None):
         ts = ts.tz_convert(ET)
-    return f"m{trade_no:02d}_{ts.strftime('%m%d_%H%M')}.png"
+    return f"{prefix}{trade_no:02d}_{ts.strftime('%m%d_%H%M')}.png"
 
 
 def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
@@ -550,6 +615,10 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             continue
         lw = 1.85 if period == 60 else (1.35 if period <= 20 else 1.05)
         ax.plot(list(xs), ma, color=MA_COLORS[period], lw=lw, label=f"MA{period}")
+    if "ma60_5m" in df.columns:
+        m5 = df["ma60_5m"].iloc[start : end + 1]
+        if m5.notna().sum():
+            ax.plot(list(xs), m5, color="#f48fb1", lw=1.6, ls="--", label="5mMA60")
 
     neck_start = p.first_high_idx - start
     neck_end = sig.bar_idx - start
@@ -591,9 +660,10 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     pad = max((y_max - y_min) * 0.06, 2.0)
     ax.set_ylim(y_min - pad, y_max + pad)
 
+    tf = getattr(sig, "timeframe", "1m")
     sign = "+" if trade.pnl_points >= 0 else ""
     ax.set_title(
-        f"#{trade_no}  高檔M頭空  {_fmt_time(sig.timestamp)} → {_fmt_time(trade.exit_time)}  "
+        f"#{trade_no}  {tf} 高檔M頭空  {_fmt_time(sig.timestamp)} → {_fmt_time(trade.exit_time)}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
         color="#e8f0ea",
         fontsize=11,
@@ -636,6 +706,9 @@ def _render_trade_card(
     avg = (p.first_high + p.second_high) / 2
     gap_pct = gap / avg * 100 if avg else 0
     risk = sig.risk
+    tf = getattr(sig, "timeframe", "1m")
+    m5_line = m5_snapshot(df, sig.bar_idx)
+    extra_ma = f"\n{m5_line}" if m5_line else ""
     return (
         "<article class='trade-card'>"
         "<header class='card-header'>"
@@ -646,11 +719,11 @@ def _render_trade_card(
         "<div class='tags'>"
         f"<span class='tag {tag_class}'>{escape(trade.exit_reason)}</span>"
         "<span class='tag tag-info'>M頭</span>"
-        "<span class='tag tag-info'>1m 空</span>"
+        f"<span class='tag tag-info'>{escape(tf)} 空</span>"
         "</div>"
         "<pre class='trade-detail'>"
         f"entry(跌破MA60+頸線) {sig.entry:.2f}\n"
-        f"MA60 {sig.ma60:.2f} / MA20 {sig.ma20:.2f} / MA5 {sig.ma5:.2f}\n"
+        f"MA60 {sig.ma60:.2f} / MA20 {sig.ma20:.2f} / MA5 {sig.ma5:.2f}{extra_ma}\n"
         f"stop H高點+緩衝 {sig.stop_loss:.2f}  (風險 {risk:.1f})\n"
         f"TP {sig.target:.2f}\n"
         f"exit {trade.exit_price:.2f}  {trade.exit_reason}\n"
@@ -665,6 +738,52 @@ def _render_trade_card(
     )
 
 
+def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
+    if not funnel:
+        return ""
+    return (
+        f"<p class='muted'>漏斗：M頭 {funnel.get('m_heads', 0)} → "
+        f"高檔 {funnel.get('high_level', 0)} → "
+        f"進場 {funnel.get('taken', 0)}"
+        f"（非高檔 {funnel.get('skip_not_high', 0)} · "
+        f"伸幅不足 {funnel.get('skip_thin_ext', 0)} · "
+        f"未破MA60 {funnel.get('skip_no_ma60', 0)} · "
+        f"破高失效 {funnel.get('skip_invalidated', 0)} · "
+        f"風險過窄 {funnel.get('skip_tiny_risk', 0)} · "
+        f"風險過寬 {funnel.get('skip_wide_risk', 0)}）</p>"
+    )
+
+
+def _stats_cards(stats: dict) -> str:
+    total_cls = "pnl-win" if stats["total_pnl_points"] >= 0 else "pnl-loss"
+    return (
+        '<div class="cards">'
+        f'<div class="card">筆數<b>{stats["trades"]}</b></div>'
+        f'<div class="card">勝率<b>{stats["win_rate"] * 100:.1f}%</b></div>'
+        f'<div class="card">總點數<b class="{total_cls}">{stats["total_pnl_points"]:+.1f}</b></div>'
+        f'<div class="card">勝/負<b>{stats["wins"]}/{stats["losses"]}</b></div>'
+        "</div>"
+        f'<p class="muted">均損益 {stats["avg_pnl_points"]:+.1f} 點 · ${stats["total_pnl_dollars"]:+,.0f}（NQ×1）</p>'
+    )
+
+
+def _render_cards(
+    df: pd.DataFrame,
+    trades: List[TradeResult],
+    img_dir: Path,
+    *,
+    prefix: str,
+    embed_images: bool,
+) -> str:
+    cards: List[str] = []
+    for i, trade in enumerate(trades, 1):
+        img_name = _trade_img_name(trade, i, prefix=prefix)
+        png = draw_trade_png(df, trade, img_dir / img_name, i)
+        href = _img_data_uri(png) if embed_images else f"img/{img_name}"
+        cards.append(_render_trade_card(df, trade, i, href))
+    return "".join(cards) or "<div class='empty'>未偵測到高檔M頭跌破MA60訊號</div>"
+
+
 def write_html_report(
     path: str | Path,
     df: pd.DataFrame,
@@ -675,40 +794,51 @@ def write_html_report(
     *,
     embed_images: bool = False,
     note: str = "",
+    m5_df: pd.DataFrame | None = None,
+    m5_trades: List[TradeResult] | None = None,
+    m5_funnel: Optional[Dict[str, int]] = None,
 ) -> Path:
     stats = summarize(trades)
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     img_dir = out.parent / "img"
-    cards: List[str] = []
-    for i, trade in enumerate(trades, 1):
-        img_name = _trade_img_name(trade, i)
-        png = draw_trade_png(df, trade, img_dir / img_name, i)
-        href = _img_data_uri(png) if embed_images else f"img/{img_name}"
-        cards.append(_render_trade_card(df, trade, i, href))
-
+    cards = _render_cards(df, trades, img_dir, prefix="m", embed_images=embed_images)
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
-    total_cls = "pnl-win" if stats["total_pnl_points"] >= 0 else "pnl-loss"
-    funnel_line = ""
-    if funnel:
-        funnel_line = (
-            f"<p class='muted'>漏斗：M頭 {funnel.get('m_heads', 0)} → "
-            f"高檔 {funnel.get('high_level', 0)} → "
-            f"進場 {funnel.get('taken', 0)}"
-            f"（非高檔 {funnel.get('skip_not_high', 0)} · "
-            f"伸幅不足 {funnel.get('skip_thin_ext', 0)} · "
-            f"未破MA60 {funnel.get('skip_no_ma60', 0)} · "
-            f"破高失效 {funnel.get('skip_invalidated', 0)} · "
-            f"風險過窄 {funnel.get('skip_tiny_risk', 0)} · "
-            f"風險過寬 {funnel.get('skip_wide_risk', 0)}）</p>"
-        )
     note_line = f"<p class='muted'>{escape(note)}</p>" if note else ""
+
+    m5_block = ""
+    compare_line = ""
+    if m5_df is not None and m5_trades is not None:
+        m5_stats = summarize(m5_trades)
+        m5_start = m5_df.index[0].strftime("%Y-%m-%d %H:%M")
+        m5_end = m5_df.index[-1].strftime("%Y-%m-%d %H:%M")
+        m5_cls = "pnl-win" if m5_stats["total_pnl_points"] >= 0 else "pnl-loss"
+        compare_line = (
+            f"<p class='muted'>對照：1m {stats['trades']} 筆 {stats['total_pnl_points']:+.1f} 點 · "
+            f"5m {m5_stats['trades']} 筆 {m5_stats['total_pnl_points']:+.1f} 點"
+            f"（規則相同，K 數換成約略同一鐘面時間）</p>"
+        )
+        m5_cards = _render_cards(m5_df, m5_trades, img_dir, prefix="f", embed_images=embed_images)
+        m5_block = f"""
+<section class="summary">
+<h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
+<p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。</p>
+{_stats_cards(m5_stats)}
+{_funnel_html(m5_funnel)}
+<div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
+</section>
+{m5_cards}
+"""
+        # silence unused
+        _ = m5_cls
+
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>{escape(symbol)} 一分K 高檔M頭跌破MA60做空</title>
+<title>{escape(symbol)} 高檔M頭跌破MA60 · 1m / 5m</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -741,17 +871,13 @@ h1{{font-size:18px;margin:0 0 6px}}
 <h1>{escape(symbol)} 一分K 高檔M頭 · 跌破MA60做空</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 {note_line}
-<div class="cards">
-<div class="card">筆數<b>{stats['trades']}</b></div>
-<div class="card">勝率<b>{stats['win_rate'] * 100:.1f}%</b></div>
-<div class="card">總點數<b class="{total_cls}">{stats['total_pnl_points']:+.1f}</b></div>
-<div class="card">勝/負<b>{stats['wins']}/{stats['losses']}</b></div>
-</div>
-<p class="muted">均損益 {stats['avg_pnl_points']:+.1f} 點 · ${stats['total_pnl_dollars']:+,.0f}（NQ×1）</p>
-{funnel_line}
+{compare_line}
+{_stats_cards(stats)}
+{_funnel_html(funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in trades])}</div>
 </section>
-{''.join(cards) or "<div class='empty'>未偵測到高檔M頭跌破MA60訊號</div>"}
+{cards}
+{m5_block}
 </div>
 </body></html>
 """
@@ -765,25 +891,28 @@ h1{{font-size:18px;margin:0 0 6px}}
 
 
 def cmd_backtest(args) -> int:
-    df = to_et(load_bars(args.symbol, "1m", args.period))
-    if df.empty:
-        print("no data", file=sys.stderr)
-        return 1
-    funnel: Dict[str, int] = {}
     extra = {}
     if getattr(args, "rth", False):
         extra["session_start"] = 9 * 60 + 30
         extra["session_end"] = 16 * 60
-    sigs = generate_signals(df, funnel=funnel, **extra)
-    trades = run_backtest(df, sigs)
+
+    df = to_et(load_bars(args.symbol, "1m", args.period))
+    if df.empty:
+        print("no data", file=sys.stderr)
+        return 1
+    df5 = to_et(load_bars(args.symbol, "5m", args.period))
+    if not df5.empty:
+        df = overlay_m5_ma60(df, df5)
+
+    _, trades, funnel = run_tf_backtest(df, "1m", extra)
     stats = summarize(trades)
-    print(f"{args.symbol} {args.period} bars={len(df)} {df.index[0]} -> {df.index[-1]}")
+    print(f"{args.symbol} 1m {args.period} bars={len(df)} {df.index[0]} -> {df.index[-1]}")
     print(
-        f"trades={stats['trades']} WR={stats['win_rate'] * 100:.1f}% "
+        f"1m trades={stats['trades']} WR={stats['win_rate'] * 100:.1f}% "
         f"pnl={stats['total_pnl_points']:+.1f} ${stats['total_pnl_dollars']:+,.0f}"
     )
     print(
-        "funnel "
+        "1m funnel "
         f"m={funnel.get('m_heads', 0)} high={funnel.get('high_level', 0)} "
         f"taken={funnel.get('taken', 0)} "
         f"not_high={funnel.get('skip_not_high', 0)} "
@@ -794,17 +923,52 @@ def cmd_backtest(args) -> int:
         f"wide={funnel.get('skip_wide_risk', 0)}"
     )
     for i, t in enumerate(trades, 1):
+        snap = m5_snapshot(df, t.signal.bar_idx)
+        extra_s = f"  {snap}" if snap else ""
         print(
-            f"[{i}] {_fmt_time(t.signal.timestamp)} -> {_fmt_time(t.exit_time)} "
+            f"  [1m {i}] {_fmt_time(t.signal.timestamp)} -> {_fmt_time(t.exit_time)} "
             f"{t.exit_reason} {t.pnl_points:+.1f}  "
             f"entry={t.signal.entry:.2f} stop={t.signal.stop_loss:.2f} tp={t.signal.target:.2f}"
+            f"{extra_s}"
         )
+
+    m5_trades: List[TradeResult] = []
+    m5_funnel: Dict[str, int] = {}
+    if not df5.empty:
+        _, m5_trades, m5_funnel = run_tf_backtest(df5, "5m", extra)
+        m5_stats = summarize(m5_trades)
+        print(f"{args.symbol} 5m {args.period} bars={len(df5)} {df5.index[0]} -> {df5.index[-1]}")
+        print(
+            f"5m trades={m5_stats['trades']} WR={m5_stats['win_rate'] * 100:.1f}% "
+            f"pnl={m5_stats['total_pnl_points']:+.1f} ${m5_stats['total_pnl_dollars']:+,.0f}"
+        )
+        print(
+            "5m funnel "
+            f"m={m5_funnel.get('m_heads', 0)} high={m5_funnel.get('high_level', 0)} "
+            f"taken={m5_funnel.get('taken', 0)} "
+            f"not_high={m5_funnel.get('skip_not_high', 0)} "
+            f"thin={m5_funnel.get('skip_thin_ext', 0)} "
+            f"no_ma60={m5_funnel.get('skip_no_ma60', 0)} "
+            f"invalid={m5_funnel.get('skip_invalidated', 0)}"
+        )
+        for i, t in enumerate(m5_trades, 1):
+            print(
+                f"  [5m {i}] {_fmt_time(t.signal.timestamp)} -> {_fmt_time(t.exit_time)} "
+                f"{t.exit_reason} {t.pnl_points:+.1f}  "
+                f"entry={t.signal.entry:.2f} stop={t.signal.stop_loss:.2f} tp={t.signal.target:.2f}"
+            )
 
     html_path = args.html
     if args.pages:
         html_path = html_path or str(PAGES_HTML)
     if html_path:
-        out = write_html_report(html_path, df, trades, args.symbol, args.period, funnel=funnel)
+        kw = dict(
+            funnel=funnel,
+            m5_df=df5 if not df5.empty else None,
+            m5_trades=m5_trades if not df5.empty else None,
+            m5_funnel=m5_funnel if not df5.empty else None,
+        )
+        out = write_html_report(html_path, df, trades, args.symbol, args.period, **kw)
         view = Path(html_path).with_name("view.html")
         if args.pages or Path(html_path).name == "index.html":
             write_html_report(
@@ -813,9 +977,9 @@ def cmd_backtest(args) -> int:
                 trades,
                 args.symbol,
                 args.period,
-                funnel=funnel,
                 embed_images=True,
-                note="圖已內嵌，手機請往下捲。",
+                note="圖已內嵌，手機請往下捲。粉紅虛線是 5m MA60。",
+                **kw,
             )
             print(f"view={view}")
         print(f"html={out}")
