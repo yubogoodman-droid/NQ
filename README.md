@@ -40,7 +40,7 @@ TradingView：`pinescript/nq_v_turn_5m.pine` 貼到 NQ1! / MNQ1! 五分圖。
 時間窗從 0.65~1.40 放到 0.50~1.60 後，從 3 筆變成 9 筆；08-27 仍是 02:10 V底 → 04:00 進場、目標 **+86.5**（0.95×）。  
 多出來的 6 筆多半是右腿偏快（0.50~0.62×）：3 筆打到目標／時間出場為正，2 筆時間／停損為負。再鬆回補比例或 dump 深度會讓 08-27 提前進場。
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-v-turn-4941/docs/nq-v-turn/view.html
+預覽（圖嵌在 HTML 裡，htmlpreview 才不會掛）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-v-turn-4941/docs/nq-v-turn/view.html
 
 ## NQ 一分 K 破底翻 MA Reclaim
 
