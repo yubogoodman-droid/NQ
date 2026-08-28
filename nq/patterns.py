@@ -205,11 +205,11 @@ def _dedupe_patterns(patterns: Iterable[WBottomPattern]) -> list[WBottomPattern]
 def detect_m_heads(
     df: pd.DataFrame,
     *,
-    swing_lookback: int = 5,
+    swing_lookback: int = 7,
     high_tolerance_pct: float = 0.0012,
-    min_bars_between_highs: int = 12,
-    max_bars_between_highs: int = 90,
-    min_depth_pct: float = 0.0008,
+    min_bars_between_highs: int = 20,
+    max_bars_between_highs: int = 75,
+    min_depth_pct: float = 0.0015,
 ) -> list[MHeadPattern]:
     """
     在 OHLCV DataFrame 上偵測 M 頭（雙頂）型態。

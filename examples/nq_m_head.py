@@ -121,6 +121,11 @@ def load_bars(symbol: str, interval: str, period: str) -> pd.DataFrame:
     if days is not None and days > 8:
         end = datetime.now(timezone.utc)
         start = end - timedelta(days=days)
+        if interval == "1m":
+            # Yahoo 1m 實際只能回看約 30 天，起點再早會整段空掉
+            min_start = end - timedelta(days=29, hours=18)
+            if start < min_start:
+                start = min_start
         df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=7)
         if not df.empty:
             return df
@@ -211,17 +216,21 @@ def _is_high_level(
 def generate_signals(
     df: pd.DataFrame,
     *,
-    swing_lookback: int = 5,
+    swing_lookback: int = 7,
     high_tolerance_pct: float = 0.0012,
-    min_bars_between_highs: int = 12,
-    max_bars_between_highs: int = 90,
-    min_depth_pct: float = 0.0008,
+    min_bars_between_highs: int = 20,
+    max_bars_between_highs: int = 75,
+    min_depth_pct: float = 0.0015,
     high_level_lookback: int = 120,
-    high_level_pct: float = 0.002,
-    entry_window: int = 90,
+    high_level_pct: float = 0.0015,
+    entry_window: int = 35,
     stop_buffer: float = 8.0,
-    min_risk: float = 12.0,
-    max_risk: float = 120.0,
+    min_risk: float = 50.0,
+    max_risk: float = 220.0,
+    min_h2_extension: float = 30.0,
+    min_break_pts: float = 1.0,
+    session_start: Optional[int] = None,
+    session_end: Optional[int] = None,
     target_r: float = 1.5,
     use_measured_target: bool = True,
     funnel: Optional[Dict[str, int]] = None,
@@ -261,6 +270,10 @@ def generate_signals(
         ):
             bump("skip_not_high")
             continue
+        h2_ma = float(ma60[p.second_high_idx])
+        if float(df["close"].iloc[p.second_high_idx]) - h2_ma < min_h2_extension:
+            bump("skip_thin_ext")
+            continue
         bump("high_level")
 
         end = min(n - 1, confirm + entry_window)
@@ -274,8 +287,9 @@ def generate_signals(
                 continue
             prev_close = close[k - 1] if k > 0 else close[k]
             prev_ma = ma60[k - 1] if k > 0 and not np.isnan(ma60[k - 1]) else ma60[k]
-            crossed = close[k] < ma60[k] and prev_close >= prev_ma
-            already_under = k == confirm and close[k] < ma60[k]
+            under = close[k] <= ma60[k] - min_break_pts
+            crossed = under and prev_close >= prev_ma
+            already_under = k == confirm and under
             if crossed or already_under:
                 entry_idx = k
                 break
@@ -285,6 +299,14 @@ def generate_signals(
         if entry_idx is None:
             bump("skip_no_ma60")
             continue
+        if session_start is not None and session_end is not None:
+            ts = df.index[entry_idx]
+            if getattr(ts, "tzinfo", None):
+                ts = ts.tz_convert(ET)
+            minutes = int(ts.hour) * 60 + int(ts.minute)
+            if not (session_start <= minutes < session_end):
+                bump("skip_session")
+                continue
         if entry_idx in used_entry:
             bump("skip_dup_entry")
             continue
@@ -670,8 +692,10 @@ def write_html_report(
             f"高檔 {funnel.get('high_level', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
             f"（非高檔 {funnel.get('skip_not_high', 0)} · "
+            f"伸幅不足 {funnel.get('skip_thin_ext', 0)} · "
             f"未破MA60 {funnel.get('skip_no_ma60', 0)} · "
             f"破高失效 {funnel.get('skip_invalidated', 0)} · "
+            f"風險過窄 {funnel.get('skip_tiny_risk', 0)} · "
             f"風險過寬 {funnel.get('skip_wide_risk', 0)}）</p>"
         )
     note_line = f"<p class='muted'>{escape(note)}</p>" if note else ""
@@ -741,7 +765,11 @@ def cmd_backtest(args) -> int:
         print("no data", file=sys.stderr)
         return 1
     funnel: Dict[str, int] = {}
-    sigs = generate_signals(df, funnel=funnel)
+    extra = {}
+    if getattr(args, "rth", False):
+        extra["session_start"] = 9 * 60 + 30
+        extra["session_end"] = 16 * 60
+    sigs = generate_signals(df, funnel=funnel, **extra)
     trades = run_backtest(df, sigs)
     stats = summarize(trades)
     print(f"{args.symbol} {args.period} bars={len(df)} {df.index[0]} -> {df.index[-1]}")
@@ -754,8 +782,10 @@ def cmd_backtest(args) -> int:
         f"m={funnel.get('m_heads', 0)} high={funnel.get('high_level', 0)} "
         f"taken={funnel.get('taken', 0)} "
         f"not_high={funnel.get('skip_not_high', 0)} "
+        f"thin={funnel.get('skip_thin_ext', 0)} "
         f"no_ma60={funnel.get('skip_no_ma60', 0)} "
         f"invalid={funnel.get('skip_invalidated', 0)} "
+        f"tiny={funnel.get('skip_tiny_risk', 0)} "
         f"wide={funnel.get('skip_wide_risk', 0)}"
     )
     for i, t in enumerate(trades, 1):
@@ -793,6 +823,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--period", default="30d")
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true", help="寫到 docs/nq-m-head/index.html")
+    p.add_argument("--rth", action="store_true", help="只做 09:30–16:00 ET")
     return p
 
 

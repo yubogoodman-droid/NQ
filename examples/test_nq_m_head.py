@@ -53,18 +53,18 @@ def test_summarize_short_pnl() -> None:
 
 
 def _make_m_head_bars(n: int = 320) -> pd.DataFrame:
-    """慢漲後在高檔做出雙頂，再快速跌破 MA60。"""
+    """慢漲後末端急拉，在高檔做出夠深的雙頂，再快速跌破 MA60。"""
     close = np.zeros(n, dtype=float)
     close[0] = 20000.0
     h1, valley, h2 = 200, 218, 236
 
-    for i in range(1, 170):
-        close[i] = close[i - 1] + 0.40
-    for i in range(170, h1):
-        close[i] = close[i - 1] + 2.20  # 末端拉升，讓高峰明顯高於 MA60
-    peak = close[h1 - 1] + 6.0
+    for i in range(1, 165):
+        close[i] = close[i - 1] + 0.35
+    for i in range(165, h1):
+        close[i] = close[i - 1] + 3.40  # 末端拉升，高峰明顯高於 MA60
+    peak = close[h1 - 1] + 8.0
     close[h1] = peak
-    drop = 18.0
+    drop = 42.0
     steps_down = valley - h1
     for i in range(h1 + 1, valley + 1):
         close[i] = peak - drop * (i - h1) / steps_down
@@ -73,20 +73,20 @@ def _make_m_head_bars(n: int = 320) -> pd.DataFrame:
         close[i] = close[valley] + (peak - close[valley]) * (i - valley) / steps_up
     close[h2] = peak
     for i in range(h2 + 1, n):
-        close[i] = close[i - 1] - 5.0
+        close[i] = close[i - 1] - 8.0
 
     high = close + 1.0
     low = close - 1.0
     peak_high = peak + 4.0
     high[h1] = peak_high
     high[h2] = peak_high
-    for i in list(range(h1 - 6, h1)) + list(range(h1 + 1, h1 + 7)):
+    for i in list(range(h1 - 8, h1)) + list(range(h1 + 1, h1 + 9)):
         if 0 <= i < n:
-            high[i] = min(float(high[i]), peak_high - 6.0)
-    for i in list(range(h2 - 6, h2)) + list(range(h2 + 1, h2 + 7)):
+            high[i] = min(float(high[i]), peak_high - 8.0)
+    for i in list(range(h2 - 8, h2)) + list(range(h2 + 1, h2 + 9)):
         if 0 <= i < n:
-            high[i] = min(float(high[i]), peak_high - 6.0)
-    low[valley] = close[valley] - 2.5
+            high[i] = min(float(high[i]), peak_high - 8.0)
+    low[valley] = close[valley] - 3.0
 
     idx = pd.date_range("2026-08-17 09:30", periods=n, freq="1min", tz=ET)
     return pd.DataFrame(
