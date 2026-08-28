@@ -55,6 +55,7 @@ TF_PRESETS = {
         "high_level_lookback": 120,
         "entry_window": 35,
         "max_bars_hold": 120,
+        "min_ribbon_spread": 28.0,
     },
     "5m": {
         "swing_lookback": 3,  # 15 分鐘確認
@@ -63,6 +64,7 @@ TF_PRESETS = {
         "high_level_lookback": 24,  # 2 小時
         "entry_window": 16,  # 80 分鐘
         "max_bars_hold": 48,  # 4 小時
+        "min_ribbon_spread": 28.0,
     },
 }
 
@@ -171,6 +173,20 @@ def sma(arr, n: int) -> np.ndarray:
     return s.rolling(n, min_periods=n).mean().to_numpy(float)
 
 
+def ribbon_spread(*values: float) -> float:
+    """MA5/10/20/30/60 帶寬：max − min。任一缺值回傳 nan。"""
+    arr = np.asarray(values, dtype=float)
+    if arr.size == 0 or np.any(np.isnan(arr)):
+        return float("nan")
+    return float(arr.max() - arr.min())
+
+
+def ribbon_tangled(*values: float, min_spread: float) -> bool:
+    """均線糾結：帶寬太窄，或算不出帶寬。"""
+    spread = ribbon_spread(*values)
+    return bool(np.isnan(spread) or spread < min_spread)
+
+
 def overlay_m5_ma60(df_1m: pd.DataFrame, df_5m: pd.DataFrame) -> pd.DataFrame:
     """把已收盤的 5m MA60 對齊到 1m（不偷看當根未收的 5 分 K）。"""
     out = df_1m.copy()
@@ -211,6 +227,7 @@ class Signal:
     ma20: float
     ma5: float
     timeframe: str = "1m"
+    ribbon_spread: float = 0.0
 
     @property
     def risk(self) -> float:
@@ -284,9 +301,10 @@ def generate_signals(
     target_r: float = 2.0,
     use_measured_target: bool = False,
     timeframe: str = "1m",
+    min_ribbon_spread: float = 28.0,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """高檔 M 頭確認後，收盤跌破 MA60 做空。"""
+    """高檔 M 頭確認後，收盤跌破 MA60 做空；均線還糾結就先等打開。"""
     fun = funnel if funnel is not None else {}
 
     def bump(key: str) -> None:
@@ -305,7 +323,9 @@ def generate_signals(
     close = df["close"].to_numpy(float)
     high = df["high"].to_numpy(float)
     ma5 = sma(close, 5)
+    ma10 = sma(close, 10)
     ma20 = sma(close, 20)
+    ma30 = sma(close, 30)
     ma60 = sma(close, 60)
     n = len(df)
     signals: List[Signal] = []
@@ -330,24 +350,37 @@ def generate_signals(
         end = min(n - 1, confirm + entry_window)
         invalidated = False
         entry_idx: int | None = None
+        broke_structure = False
         for k in range(confirm, end + 1):
             if high[k] > p.peak:
                 invalidated = True
                 break
-            if np.isnan(ma60[k]):
+            if np.isnan(ma60[k]) or np.isnan(ma5[k]) or np.isnan(ma10[k]) or np.isnan(ma20[k]) or np.isnan(ma30[k]):
                 continue
             # 真跌破：收盤同時低於 MA60（不是 1 點吻線）與 M 頸線。
             # 排除「價格橫盤、MA60 往上追上」——那種收盤仍在頸線之上。
             under_ma = close[k] <= ma60[k] - min_break_pts
             under_neck = close[k] < p.neckline
-            if under_ma and under_neck:
-                entry_idx = k
-                break
+            if not (under_ma and under_neck):
+                continue
+            broke_structure = True
+            # 11:00 那種 MA5/10/20/30/60 黏成一團先不進，等到帶寬打開。
+            if ribbon_tangled(
+                float(ma5[k]),
+                float(ma10[k]),
+                float(ma20[k]),
+                float(ma30[k]),
+                float(ma60[k]),
+                min_spread=min_ribbon_spread,
+            ):
+                continue
+            entry_idx = k
+            break
         if invalidated:
             bump("skip_invalidated")
             continue
         if entry_idx is None:
-            bump("skip_no_ma60")
+            bump("skip_tangled" if broke_structure else "skip_no_ma60")
             continue
         if session_start is not None and session_end is not None:
             ts = df.index[entry_idx]
@@ -395,6 +428,13 @@ def generate_signals(
                 ma20=float(ma20[entry_idx]) if not np.isnan(ma20[entry_idx]) else 0.0,
                 ma5=float(ma5[entry_idx]) if not np.isnan(ma5[entry_idx]) else 0.0,
                 timeframe=timeframe,
+                ribbon_spread=ribbon_spread(
+                    float(ma5[entry_idx]),
+                    float(ma10[entry_idx]),
+                    float(ma20[entry_idx]),
+                    float(ma30[entry_idx]),
+                    float(ma60[entry_idx]),
+                ),
             )
         )
 
@@ -724,6 +764,7 @@ def _render_trade_card(
         "<pre class='trade-detail'>"
         f"entry(跌破MA60+頸線) {sig.entry:.2f}\n"
         f"MA60 {sig.ma60:.2f} / MA20 {sig.ma20:.2f} / MA5 {sig.ma5:.2f}{extra_ma}\n"
+        f"均線帶寬 {getattr(sig, 'ribbon_spread', 0.0):.1f}（≥28 才進，糾結濾掉）\n"
         f"stop H高點+緩衝 {sig.stop_loss:.2f}  (風險 {risk:.1f})\n"
         f"TP {sig.target:.2f}\n"
         f"exit {trade.exit_price:.2f}  {trade.exit_reason}\n"
@@ -748,6 +789,7 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"（非高檔 {funnel.get('skip_not_high', 0)} · "
         f"伸幅不足 {funnel.get('skip_thin_ext', 0)} · "
         f"未破MA60 {funnel.get('skip_no_ma60', 0)} · "
+        f"均線糾結 {funnel.get('skip_tangled', 0)} · "
         f"破高失效 {funnel.get('skip_invalidated', 0)} · "
         f"風險過窄 {funnel.get('skip_tiny_risk', 0)} · "
         f"風險過寬 {funnel.get('skip_wide_risk', 0)}）</p>"
@@ -824,7 +866,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。MA5/10/20/30/60 帶寬未滿 28 點視為糾結，不進。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
@@ -870,6 +912,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 一分K 高檔M頭 · 跌破MA60做空</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
+<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開，不在糾結裡進場。</p>
 {note_line}
 {compare_line}
 {_stats_cards(stats)}
@@ -918,6 +961,7 @@ def cmd_backtest(args) -> int:
         f"not_high={funnel.get('skip_not_high', 0)} "
         f"thin={funnel.get('skip_thin_ext', 0)} "
         f"no_ma60={funnel.get('skip_no_ma60', 0)} "
+        f"tangled={funnel.get('skip_tangled', 0)} "
         f"invalid={funnel.get('skip_invalidated', 0)} "
         f"tiny={funnel.get('skip_tiny_risk', 0)} "
         f"wide={funnel.get('skip_wide_risk', 0)}"
@@ -925,10 +969,12 @@ def cmd_backtest(args) -> int:
     for i, t in enumerate(trades, 1):
         snap = m5_snapshot(df, t.signal.bar_idx)
         extra_s = f"  {snap}" if snap else ""
+        ribbon = getattr(t.signal, "ribbon_spread", 0.0)
         print(
             f"  [1m {i}] {_fmt_time(t.signal.timestamp)} -> {_fmt_time(t.exit_time)} "
             f"{t.exit_reason} {t.pnl_points:+.1f}  "
-            f"entry={t.signal.entry:.2f} stop={t.signal.stop_loss:.2f} tp={t.signal.target:.2f}"
+            f"entry={t.signal.entry:.2f} stop={t.signal.stop_loss:.2f} tp={t.signal.target:.2f} "
+            f"ribbon={ribbon:.1f}"
             f"{extra_s}"
         )
 
@@ -949,13 +995,16 @@ def cmd_backtest(args) -> int:
             f"not_high={m5_funnel.get('skip_not_high', 0)} "
             f"thin={m5_funnel.get('skip_thin_ext', 0)} "
             f"no_ma60={m5_funnel.get('skip_no_ma60', 0)} "
+            f"tangled={m5_funnel.get('skip_tangled', 0)} "
             f"invalid={m5_funnel.get('skip_invalidated', 0)}"
         )
         for i, t in enumerate(m5_trades, 1):
+            ribbon = getattr(t.signal, "ribbon_spread", 0.0)
             print(
                 f"  [5m {i}] {_fmt_time(t.signal.timestamp)} -> {_fmt_time(t.exit_time)} "
                 f"{t.exit_reason} {t.pnl_points:+.1f}  "
-                f"entry={t.signal.entry:.2f} stop={t.signal.stop_loss:.2f} tp={t.signal.target:.2f}"
+                f"entry={t.signal.entry:.2f} stop={t.signal.stop_loss:.2f} tp={t.signal.target:.2f} "
+                f"ribbon={ribbon:.1f}"
             )
 
     html_path = args.html

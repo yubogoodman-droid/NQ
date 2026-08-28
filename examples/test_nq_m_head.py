@@ -20,6 +20,8 @@ from nq_m_head import (  # noqa: E402
     generate_signals,
     overlay_m5_ma60,
     parse_period_days,
+    ribbon_spread,
+    ribbon_tangled,
     run_backtest,
     run_tf_backtest,
     sma,
@@ -41,6 +43,13 @@ def test_sma() -> None:
     assert np.isnan(out[1])
     assert abs(out[2] - 2.0) < 1e-9
     assert abs(out[4] - 4.0) < 1e-9
+
+
+def test_ribbon_helpers() -> None:
+    assert abs(ribbon_spread(10.0, 12.0, 11.0, 13.0, 9.0) - 4.0) < 1e-9
+    assert ribbon_tangled(29750.0, 29755.0, 29752.0, 29758.0, 29760.0, min_spread=28.0)
+    assert not ribbon_tangled(29720.0, 29740.0, 29750.0, 29760.0, 29780.0, min_spread=28.0)
+    assert ribbon_tangled(float("nan"), 1.0, 2.0, 3.0, 4.0, min_spread=1.0)
 
 
 def test_summarize_short_pnl() -> None:
@@ -126,6 +135,7 @@ def test_detect_and_simulate_short() -> None:
     assert sig.entry < sig.ma60 + 1e-9
     assert sig.entry < sig.pattern.neckline
     assert sig.bar_idx > sig.pattern.second_high_idx
+    assert sig.ribbon_spread >= 28.0
 
     trades = run_backtest(df, sigs, max_bars_hold=80)
     assert trades
@@ -169,10 +179,21 @@ def test_no_signal_without_ma60_break() -> None:
     assert not sigs, f"should not enter without MA60 break, got {len(sigs)} funnel={funnel}"
 
 
+def test_skip_tangled_ribbon() -> None:
+    """跌破結構後若均線帶寬一直打不開，整筆濾掉。"""
+    df = _make_m_head_bars()
+    funnel: dict = {}
+    sigs = generate_signals(df, funnel=funnel, min_ribbon_spread=10_000.0)
+    assert not sigs, f"impossible spread should skip, got {len(sigs)} funnel={funnel}"
+    assert funnel.get("skip_tangled", 0) >= 1
+
+
 def test_tf_presets() -> None:
     assert TF_PRESETS["5m"]["min_bars_between_highs"] == 4
     assert TF_PRESETS["5m"]["high_level_lookback"] == 24
     assert TF_PRESETS["1m"]["swing_lookback"] == 7
+    assert TF_PRESETS["1m"]["min_ribbon_spread"] == 28.0
+    assert TF_PRESETS["5m"]["min_ribbon_spread"] == 28.0
 
 
 def test_overlay_m5_ma60() -> None:
@@ -213,11 +234,13 @@ def test_write_html_report() -> None:
 def main() -> int:
     test_parse_period_days()
     test_sma()
+    test_ribbon_helpers()
     test_summarize_short_pnl()
     test_detect_m_heads_geometry()
     test_detect_and_simulate_short()
     test_reject_higher_high()
     test_no_signal_without_ma60_break()
+    test_skip_tangled_ribbon()
     test_tf_presets()
     test_overlay_m5_ma60()
     test_5m_preset_still_fires()
