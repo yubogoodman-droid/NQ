@@ -253,6 +253,36 @@ def test_wait_helpers() -> None:
     assert wait2 > 3600
 
 
+def test_write_html_report() -> None:
+    from watch_tw_5m_ma240 import write_html_report, write_view_html
+
+    df = _extended_then(last_close=101.2, last_low=100.4)
+    ma = float(df["MA240"].iloc[-1])
+    df.iloc[-1, df.columns.get_loc("Low")] = ma - 0.05
+    df.iloc[-1, df.columns.get_loc("Close")] = ma + 0.25
+    hits_i = detect_retests(df)
+    assert hits_i
+    row = {"code": "1815", "name": "富喬", "symbol": "1815.TWO", "rank": 20, "amount": 1}
+    hit = hit_from_row(df, hits_i[-1], row)
+    hit.ts = pd.Timestamp("2026-08-28 09:05", tz=TPE)
+    out_dir = Path("/tmp/tw-ma240-html-test")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = write_html_report(
+        out_dir / "index.html",
+        [hit],
+        [row],
+        "近10個交易日",
+        "20260828",
+        chart_mode="none",
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "1815" in text
+    assert "富喬" in text
+    assert "回測 240MA" in text
+    view = write_view_html(path)
+    assert view.exists()
+
+
 def main() -> int:
     test_tw_tick()
     test_touch_band_uses_ticks()
@@ -271,6 +301,7 @@ def main() -> int:
     test_wait_helpers()
     test_session_dates_back()
     test_filter_hits_days()
+    test_write_html_report()
     print("ok")
     return 0
 

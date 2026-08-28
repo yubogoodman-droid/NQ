@@ -8,7 +8,7 @@
 用法:
   python3 examples/watch_tw_5m_ma240.py --test
   python3 examples/watch_tw_5m_ma240.py --dry-run --once --limit 30
-  python3 examples/watch_tw_5m_ma240.py --scan --limit 50
+  python3 examples/watch_tw_5m_ma240.py --scan --dry-run --limit 200 --days 10 --pages
   python3 examples/watch_tw_5m_ma240.py              # 每根五分收盤掃一次
 
 Telegram 憑證放 tg_config.env（勿提交）。
@@ -27,6 +27,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from html import escape
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -55,6 +56,7 @@ CONFIG_ENV = REPO / "tg_config.env"
 if not CONFIG_ENV.exists():
     CONFIG_ENV = Path(__file__).resolve().parent / "tg_config.env"
 SEEN_PATH = REPO / "output" / "tw_ma240_seen.json"
+PAGES = REPO / "docs" / "tw-5m-ma240" / "index.html"
 MA_PERIODS = (5, 10, 20, 60, 120, 240)
 MA_COLORS = {
     5: "#4ea3ff",
@@ -470,7 +472,14 @@ def _setup_cjk_font(plt) -> None:
             return
 
 
-def draw_chart(df: pd.DataFrame, hit: RetestHit, path: str) -> str | None:
+def draw_chart(
+    df: pd.DataFrame,
+    hit: RetestHit,
+    path: str,
+    *,
+    figsize: tuple[float, float] = (8.8, 4.8),
+    dpi: int = 90,
+) -> str | None:
     try:
         import matplotlib
 
@@ -493,7 +502,7 @@ def draw_chart(df: pd.DataFrame, hit: RetestHit, path: str) -> str | None:
     fig, (ax, axv) = plt.subplots(
         2,
         1,
-        figsize=(10.6, 5.9),
+        figsize=figsize,
         sharex=True,
         gridspec_kw={"height_ratios": [3.2, 1]},
         facecolor="#0b0e11",
@@ -525,9 +534,196 @@ def draw_chart(df: pd.DataFrame, hit: RetestHit, path: str) -> str | None:
     axv.set_ylabel("量", color="#8b949e", fontsize=8)
     fig.tight_layout(pad=0.55)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    fig.savefig(path, dpi=dpi, facecolor=fig.get_facecolor())
     plt.close(fig)
     return path
+
+
+def current_branch() -> str:
+    head = REPO / ".git" / "HEAD"
+    try:
+        text = head.read_text(encoding="utf-8").strip()
+    except Exception:
+        return "main"
+    if text.startswith("ref:"):
+        return text.rsplit("/", 1)[-1]
+    return "main"
+
+
+def want_chart(hit: RetestHit, mode: str) -> bool:
+    if mode in {"none", "off"}:
+        return False
+    if hit.code == "1815":
+        return True
+    if mode in {"fuqiao", "1815"}:
+        return False
+    if mode in {"pierce", "auto", ""}:
+        return bool(hit.pierced)
+    return True
+
+
+def hit_card_html(hit: RetestHit, n: int, img_name: str | None) -> str:
+    ts = hit.ts
+    if getattr(ts, "tzinfo", None) is not None:
+        ts = ts.tz_convert(TPE)
+    kind = "刺破收回" if hit.pierced else "貼到均線"
+    cls = "pierce" if hit.pierced else "hug"
+    pin = " pin" if hit.code == "1815" else ""
+    rank = f"成交額第 {hit.rank}" if hit.rank else ""
+    amt = f"{hit.amount / 1e8:.1f} 億" if hit.amount else ""
+    vol = f"{hit.volume:,.0f}" if hit.volume else "--"
+    mas = "  ".join(f"{nma}MA {_fmt_px(hit.mas[nma])}" for nma in MA_PERIODS)
+    img = ""
+    if img_name:
+        img = (
+            f"<div class='mini-chart'><img src='img/{escape(img_name)}' "
+            f"alt='{escape(hit.code)} {escape(hit.name)}' "
+            "style='width:100%;display:block;border-radius:10px'/></div>"
+        )
+    return (
+        f"<article class='trade-card{pin}' id='h{n}'>"
+        "<header class='card-header'>"
+        "<div class='card-title'>"
+        f"<span class='trade-no'>#{n} · {escape(hit.code)} {escape(hit.name)} · {kind}</span>"
+        f"<span class='trade-time'>{escape(ts.strftime('%Y-%m-%d %H:%M'))}  五分K</span>"
+        "</div>"
+        f"<div class='card-pnl {cls}'>低點 {hit.touch_pct:+.2f}%</div>"
+        "</header>"
+        "<div class='tags'>"
+        f"<span class='tag tag-info'>{escape(hit.symbol)}</span>"
+        f"<span class='tag {cls}'>{kind}</span>"
+        f"<span class='tag'>收 {hit.dist_pct:+.2f}%</span>"
+        "</div>"
+        "<pre class='trade-detail'>"
+        f"現價 {_fmt_px(hit.close)}  240MA {_fmt_px(hit.ma240)}  最低 {_fmt_px(hit.low)}\n"
+        f"回測前拉開 {hit.ext_pct:+.2f}%\n{escape(mas)}\n"
+        f"這根量 {vol}  {rank}  {amt}"
+        "</pre>"
+        f"{img}</article>"
+    )
+
+
+def write_html_report(
+    path: Path,
+    hits: list[RetestHit],
+    universe: list[dict],
+    period: str,
+    date: str,
+    *,
+    chart_mode: str = "pierce",
+) -> Path:
+    path = Path(path)
+    img_dir = path.parent / "img"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    for old in img_dir.glob("*.png"):
+        old.unlink()
+
+    pierce = sum(1 for h in hits if h.pierced)
+    fuqiao = [h for h in hits if h.code == "1815"]
+    by_day: dict[str, list[RetestHit]] = {}
+    for h in hits:
+        by_day.setdefault(str(hit_session_date(h)), []).append(h)
+
+    cards_fuqiao = []
+    cards_days = []
+    n = 0
+    charted = 0
+
+    def emit(hit: RetestHit) -> str:
+        nonlocal n, charted
+        n += 1
+        img_name = None
+        df = getattr(hit, "_df", None)
+        if df is not None and want_chart(hit, chart_mode):
+            kind = "pierce" if hit.pierced else "hug"
+            ts = hit.ts
+            if getattr(ts, "tzinfo", None) is not None:
+                ts = ts.tz_convert(TPE)
+            img_name = f"{ts.strftime('%m%d_%H%M')}_{hit.code}_{kind}.png"
+            if draw_chart(df, hit, str(img_dir / img_name)):
+                charted += 1
+            else:
+                img_name = None
+        return hit_card_html(hit, n, img_name)
+
+    if fuqiao:
+        cards_fuqiao.append("<h2>富喬 1815</h2>")
+        for h in fuqiao:
+            cards_fuqiao.append(emit(h))
+    for day in sorted(by_day):
+        day_hits = by_day[day]
+        cards_days.append(
+            f"<h2 id='d{day}'>{escape(day)} · {len(day_hits)} 筆</h2>"
+        )
+        for h in day_hits:
+            cards_days.append(emit(h))
+
+    cutoff = universe[-1]["amount"] / 1e8 if universe else 0
+    day_nav = " ".join(
+        f"<a href='#d{d}'>{d[5:]} {len(by_day[d])}</a>" for d in sorted(by_day)
+    )
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>台股五分K 回測240MA · {escape(period)}</title>
+<style>
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}}
+.page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
+h1{{font-size:18px;margin:0 0 6px}} h2{{font-size:15px;margin:18px 0 10px;color:#c084fc}}
+.muted{{color:#8b949e;font-size:13px;line-height:1.5}}
+.cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
+.card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}}
+.card b{{display:block;font-size:20px;margin-top:4px}}
+.day-nav{{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}}
+.day-nav a{{font-size:12px;color:#79c0ff;text-decoration:none;border:1px solid #30363d;border-radius:999px;padding:4px 10px}}
+.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}}
+.trade-card.pin{{border-color:#c084fc}}
+.card-header{{display:flex;justify-content:space-between;gap:10px}}
+.trade-no{{font-weight:700}} .trade-time{{font-size:12px;color:#8b949e}}
+.card-pnl{{font-weight:700;white-space:nowrap}} .pierce{{color:#c084fc}} .hug{{color:#7fd3f0}}
+.tags{{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}}
+.tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#79c0ff}}
+.tag.pierce{{color:#c084fc;border-color:#6e4a8a}} .tag.hug{{color:#7fd3f0}}
+.trade-detail{{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}}
+.empty{{text-align:center;color:#8b949e;padding:40px 12px;border:1px solid #30363d;border-radius:14px}}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>台股 5分 回測 240MA · {escape(period)}</h1>
+<p class="muted">基準日 {escape(date)} · 成交額前 {len(universe)} · 末名約 {cutoff:.1f} 億 · 1815 富喬必抓
+<br/>從 240MA 上方拉開後回測碰到、收盤守住。開盤也算。圖：富喬 + 刺破收回。</p>
+<div class="cards">
+<div class="card">筆數<b>{len(hits)}</b></div>
+<div class="card">標的<b>{len({h.code for h in hits})}</b></div>
+<div class="card">刺破收回<b>{pierce}</b></div>
+<div class="card">富喬<b>{len(fuqiao)}</b></div>
+</div>
+<div class="day-nav">{day_nav}</div>
+</section>
+{''.join(cards_fuqiao)}
+{''.join(cards_days) or "<div class='empty'>這段期間沒有回測 240MA 訊號</div>"}
+</div></body></html>
+"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    print(f"html={path} charts={charted}", flush=True)
+    return path
+
+
+def write_view_html(src: Path) -> Path:
+    src = Path(src)
+    try:
+        rel = src.parent.relative_to(REPO).as_posix()
+        branch = current_branch()
+        base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
+        text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    except ValueError:
+        text = src.read_text(encoding="utf-8")
+    out = src.with_name("view.html")
+    out.write_text(text, encoding="utf-8")
+    return out
 
 
 def market_session(now: datetime | None = None) -> bool:
@@ -782,7 +978,25 @@ def round_once(
                     flush=True,
                 )
         for h in hits:
-            print(format_hit_line(h))
+            if h.code == "1815" or not (getattr(args, "pages", False) or getattr(args, "html", "")):
+                print(format_hit_line(h), flush=True)
+        html_path = None
+        if getattr(args, "pages", False):
+            html_path = PAGES
+        elif getattr(args, "html", ""):
+            html_path = Path(args.html)
+        if html_path:
+            period = f"近{args.days}個交易日" if args.days else str(args.range)
+            write_html_report(
+                html_path,
+                hits,
+                universe,
+                period,
+                getattr(args, "universe_date", "") or "",
+                chart_mode=getattr(args, "chart_mode", "pierce") or "pierce",
+            )
+            write_view_html(html_path)
+            print(f"view={html_path.with_name('view.html')}", flush=True)
         return seen
     for h in new:
         if notify(h, dry_run=args.dry_run, with_chart=not args.dry_run):
@@ -827,7 +1041,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--sleep", type=float, default=0.08)
     p.add_argument("--once", action="store_true", help="只掃一輪")
     p.add_argument("--scan", action="store_true", help="掃完整段五分K（近一個月回測清單）")
-    p.add_argument("--days", type=int, default=0, help="--scan 只列最近幾個交易日，例如 3")
+    p.add_argument("--days", type=int, default=0, help="--scan 只列最近幾個交易日，例如 10=兩週")
+    p.add_argument("--html", default="", help="寫 HTML 報告路徑")
+    p.add_argument("--pages", action="store_true", help="寫到 docs/tw-5m-ma240/index.html")
+    p.add_argument("--chart-mode", default="pierce", help="圖：pierce=富喬+刺破 / all / fuqiao / none")
     p.add_argument("--dry-run", action="store_true", help="只印、不推 Telegram")
     p.add_argument("--test", action="store_true", help="只測 Telegram")
     p.add_argument("--seed", action="store_true", help="第一次就把已出現的回測推出去")
@@ -859,6 +1076,7 @@ def main(argv: list[str] | None = None) -> int:
         flush=True,
     )
     date, universe = load_universe(args.limit, args.date, codes, keep=keep)
+    args.universe_date = date
     if not universe:
         print("no universe", file=sys.stderr)
         return 1
