@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+"""Synthetic tests for 台股五分K 回測 240MA (no network)."""
+
+from __future__ import annotations
+
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from watch_tw_5m_ma240 import (  # noqa: E402
+    TPE,
+    add_mas,
+    detect_retests,
+    format_hit,
+    format_hit_line,
+    hit_from_row,
+    market_session,
+    next_session_open,
+    seconds_until_next_5m,
+    seconds_until_next_scan,
+    touch_band,
+    tw_tick,
+)
+
+
+def _bars(close: np.ndarray, *, low_at: dict[int, float] | None = None) -> pd.DataFrame:
+    n = len(close)
+    idx = pd.date_range("2026-08-03 09:00", periods=n, freq="5min", tz=TPE)
+    low = close - 0.15
+    high = close + 0.15
+    if low_at:
+        for i, val in low_at.items():
+            low[i] = val
+            high[i] = max(high[i], close[i], val)
+    return pd.DataFrame(
+        {
+            "Open": close,
+            "High": high,
+            "Low": low,
+            "Close": close,
+            "Volume": np.full(n, 1000.0),
+        },
+        index=idx,
+    )
+
+
+def _extended_then(last_close: float, last_low: float, n: int = 280) -> pd.DataFrame:
+    """前 240 根在 100，接著拉開到 104，最後一根自行指定。"""
+    close = np.empty(n, dtype=float)
+    close[:240] = 100.0
+    close[240:-1] = np.linspace(102.0, 104.5, n - 241)
+    close[-1] = last_close
+    df = _bars(close, low_at={n - 1: last_low, n - 2: 103.8})
+    return add_mas(df)
+
+
+def test_tw_tick() -> None:
+    assert tw_tick(9.9) == 0.01
+    assert tw_tick(25) == 0.05
+    assert tw_tick(80) == 0.1
+    assert tw_tick(124.5) == 0.5
+    assert tw_tick(600) == 1.0
+    assert tw_tick(1400) == 5.0
+
+
+def test_touch_band_uses_ticks() -> None:
+    # 124 附近 0.35% ≈ 0.43，兩檔 0.5*2=1.0 比較大
+    band = touch_band(124.0, 0.0035, ticks=2)
+    assert abs(band - 1.0) < 1e-9
+    cheap = touch_band(20.0, 0.0035, ticks=2)
+    assert cheap >= 20.0 * 0.0035
+
+
+def test_detect_pullback_to_ma240() -> None:
+    df = _extended_then(last_close=101.2, last_low=100.4)
+    ma = float(df["MA240"].iloc[-1])
+    assert ma > 99
+    df.iloc[-1, df.columns.get_loc("Low")] = ma - 0.05
+    df.iloc[-1, df.columns.get_loc("Close")] = ma + 0.25
+    df.iloc[-1, df.columns.get_loc("High")] = ma + 0.40
+    hits = detect_retests(df)
+    assert hits == [len(df) - 1], hits
+
+
+def test_hug_ma_does_not_fire() -> None:
+    n = 280
+    close = np.full(n, 100.2)
+    df = add_mas(_bars(close))
+    assert detect_retests(df) == []
+
+
+def test_close_breakdown_is_not_retest() -> None:
+    df = _extended_then(last_close=98.0, last_low=97.5)
+    ma = float(df["MA240"].iloc[-1])
+    df.iloc[-1, df.columns.get_loc("Low")] = ma - 2.0
+    df.iloc[-1, df.columns.get_loc("Close")] = ma * 0.98
+    df.iloc[-1, df.columns.get_loc("High")] = ma - 0.4
+    assert detect_retests(df) == []
+
+
+def test_only_first_touch_fires() -> None:
+    df = _extended_then(last_close=101.0, last_low=100.5, n=282)
+    ma_a = float(df["MA240"].iloc[-2])
+    ma_b = float(df["MA240"].iloc[-1])
+    df.iloc[-2, df.columns.get_loc("Low")] = ma_a - 0.05
+    df.iloc[-2, df.columns.get_loc("Close")] = ma_a + 0.2
+    df.iloc[-2, df.columns.get_loc("High")] = ma_a + 0.4
+    df.iloc[-1, df.columns.get_loc("Low")] = ma_b - 0.05
+    df.iloc[-1, df.columns.get_loc("Close")] = ma_b + 0.2
+    df.iloc[-1, df.columns.get_loc("High")] = ma_b + 0.4
+    hits = detect_retests(df)
+    assert hits == [len(df) - 2], hits
+
+
+def test_shallow_dip_not_retest() -> None:
+    df = _extended_then(last_close=104.0, last_low=103.8)
+    ma = float(df["MA240"].iloc[-1])
+    df.iloc[-1, df.columns.get_loc("Low")] = ma + 0.30
+    df.iloc[-1, df.columns.get_loc("Close")] = ma + 1.20
+    df.iloc[-1, df.columns.get_loc("High")] = ma + 1.40
+    assert detect_retests(df) == []
+
+
+def test_cooldown_skips_nearby_retest() -> None:
+    df = _extended_then(last_close=101.2, last_low=100.4, n=286)
+    # 兩根都刺到 240MA，但只隔 3 根
+    for j in (-4, -1):
+        ma = float(df["MA240"].iloc[j])
+        df.iloc[j, df.columns.get_loc("Low")] = ma - 0.05
+        df.iloc[j, df.columns.get_loc("Close")] = ma + 0.20
+        df.iloc[j, df.columns.get_loc("High")] = ma + 0.40
+        df.iloc[j - 1, df.columns.get_loc("Low")] = ma + 1.5
+    hits = detect_retests(df, cooldown_bars=6)
+    assert hits == [len(df) - 4], hits
+    hits2 = detect_retests(df, cooldown_bars=1)
+    assert hits2 == [len(df) - 4, len(df) - 1], hits2
+
+
+def test_skip_open_minutes() -> None:
+    df = _extended_then(last_close=101.2, last_low=100.4)
+    ma = float(df["MA240"].iloc[-1])
+    df.iloc[-1, df.columns.get_loc("Low")] = ma - 0.05
+    df.iloc[-1, df.columns.get_loc("Close")] = ma + 0.25
+    df.iloc[-1, df.columns.get_loc("High")] = ma + 0.40
+    idx = list(df.index)
+    idx[-1] = pd.Timestamp("2026-08-28 09:05", tz=TPE)
+    df.index = pd.DatetimeIndex(idx)
+    assert detect_retests(df) == []
+    idx[-1] = pd.Timestamp("2026-08-28 09:20", tz=TPE)
+    df.index = pd.DatetimeIndex(idx)
+    assert detect_retests(df) == [len(df) - 1]
+
+
+def test_hit_payload_and_message() -> None:
+    df = _extended_then(last_close=101.2, last_low=100.4)
+    ma = float(df["MA240"].iloc[-1])
+    df.iloc[-1, df.columns.get_loc("Low")] = ma
+    df.iloc[-1, df.columns.get_loc("Close")] = ma + 0.3
+    hits = detect_retests(df)
+    assert hits
+    row = {"code": "1815", "name": "富僑", "symbol": "1815.TW", "rank": 12, "amount": 8_000_000_00}
+    hit = hit_from_row(df, hits[-1], row)
+    assert hit.code == "1815"
+    assert hit.ma240 > 0
+    assert hit.key.startswith("1815.TW:")
+    text = format_hit(hit)
+    assert "1815" in text
+    assert "240MA" in text
+    assert "五分" in text
+    line = format_hit_line(hit)
+    assert "1815" in line
+    assert "240MA" in line
+
+
+def test_market_session_hours() -> None:
+    assert market_session(datetime(2026, 8, 28, 10, 0, tzinfo=TPE))
+    assert market_session(datetime(2026, 8, 28, 13, 30, tzinfo=TPE))
+    assert not market_session(datetime(2026, 8, 28, 13, 40, tzinfo=TPE))
+    assert not market_session(datetime(2026, 8, 29, 10, 0, tzinfo=TPE))  # Saturday
+
+
+def test_next_session_skips_weekend() -> None:
+    friday_close = datetime(2026, 8, 28, 15, 0, tzinfo=TPE)
+    nxt = next_session_open(friday_close)
+    assert nxt.date().isoformat() == "2026-08-31"
+    assert nxt.hour == 9
+
+
+def test_wait_helpers() -> None:
+    noon = datetime(2026, 8, 28, 10, 1, 0, tzinfo=TPE)
+    wait = seconds_until_next_5m(noon, extra=8)
+    assert 60 < wait < 5 * 60
+    after = datetime(2026, 8, 28, 14, 0, tzinfo=TPE)
+    wait2 = seconds_until_next_scan(after)
+    assert wait2 > 3600
+
+
+def main() -> int:
+    test_tw_tick()
+    test_touch_band_uses_ticks()
+    test_detect_pullback_to_ma240()
+    test_hug_ma_does_not_fire()
+    test_close_breakdown_is_not_retest()
+    test_only_first_touch_fires()
+    test_shallow_dip_not_retest()
+    test_cooldown_skips_nearby_retest()
+    test_skip_open_minutes()
+    test_hit_payload_and_message()
+    test_market_session_hours()
+    test_next_session_skips_weekend()
+    test_wait_helpers()
+    print("ok")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

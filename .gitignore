@@ -8,3 +8,4 @@ tg_config.env
 tg_alert_state.json
 examples/tg_alert_state.json
 examples/tg_config.env
+output/tw_ma240_seen.json
