@@ -198,7 +198,7 @@ def test_session_dates_back() -> None:
 
 
 def test_write_html_report() -> None:
-    from watch_tw_1h_ma60 import write_html_report, write_view_html
+    from watch_tw_1h_ma60 import write_html_report
 
     close = np.full(80, 100.0)
     close[-1] = 102.0
@@ -225,8 +225,7 @@ def test_write_html_report() -> None:
     assert "60MA" in text
     assert "data:image/png;base64," in text
     assert "src='img/" not in text
-    view = write_view_html(path)
-    assert "data:image/png;base64," in view.read_text(encoding="utf-8")
+    assert (out_dir / "index.html").exists()
 
 
 def main() -> int:

@@ -436,8 +436,8 @@ def draw_chart(
     hit: StandHit,
     path: str,
     *,
-    figsize: tuple[float, float] = (8.8, 4.8),
-    dpi: int = 90,
+    figsize: tuple[float, float] = (7.2, 4.0),
+    dpi: int = 72,
 ) -> str | None:
     try:
         import matplotlib
@@ -560,6 +560,7 @@ def write_html_report(
     *,
     chart_mode: str = "all",
     max_price: float | None = 700.0,
+    max_charts: int = 80,
 ) -> Path:
     path = Path(path)
     img_dir = path.parent / "img"
@@ -586,7 +587,7 @@ def write_html_report(
         n += 1
         img_src = None
         df = getattr(hit, "_df", None)
-        if df is not None and want_chart(hit, chart_mode):
+        if df is not None and want_chart(hit, chart_mode) and charted < max_charts:
             fd, tmp = tempfile.mkstemp(suffix=".png")
             os.close(fd)
             try:
@@ -601,7 +602,7 @@ def write_html_report(
         cards_fuqiao.append("\n<h2>富喬 1815</h2>\n")
         for h in fuqiao:
             cards_fuqiao.append(emit(h))
-    for day in sorted(by_day):
+    for day in sorted(by_day, reverse=True):
         day_hits = by_day[day]
         cards_days.append(f"\n<h2 id='d{day}'>{escape(day)} · {len(day_hits)} 筆</h2>\n")
         for h in day_hits:
@@ -612,7 +613,7 @@ def write_html_report(
     cutoff = universe[-1]["amount"] / 1e8 if universe else 0
     px_note = f" · 股價≤{max_price:g}" if max_price else ""
     day_nav = " ".join(
-        f"<a href='#d{d}'>{d[5:]} {len(by_day[d])}</a>" for d in sorted(by_day)
+        f"<a href='#d{d}'>{d[5:]} {len(by_day[d])}</a>" for d in sorted(by_day, reverse=True)
     )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
@@ -645,7 +646,7 @@ h1{{font-size:18px;margin:0 0 6px}} h2{{font-size:15px;margin:18px 0 10px;color:
 <section class="summary">
 <h1>台股 1小時 站上 60MA · {escape(period)}</h1>
 <p class="muted">基準日 {escape(date)} · 成交額前 {len(universe)} · 末名約 {cutoff:.1f} 億{px_note} · 1815 富喬必抓
-<br/>上一根收在 60MA 下，這根一小時 K 收盤站上。圖嵌在頁面裡。</p>
+<br/>上一根收在 60MA 下，這根一小時 K 收盤站上。圖嵌最新 80 筆。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">標的<b>{len({h.code for h in hits})}</b></div>
@@ -945,6 +946,8 @@ def round_once(
         for h in hits:
             if h.code == "1815" or not (getattr(args, "pages", False) or getattr(args, "html", "")):
                 print(format_hit_line(h), flush=True)
+        if not any(h.code == "1815" for h in hits):
+            print("1815 富喬：這段期間沒有從 60MA 下方收盤站上（多半已在均線上）", flush=True)
         html_path = None
         if getattr(args, "pages", False):
             html_path = PAGES
@@ -961,8 +964,7 @@ def round_once(
                 chart_mode=getattr(args, "chart_mode", "all") or "all",
                 max_price=getattr(args, "max_price", 700) or None,
             )
-            write_view_html(html_path)
-            print(f"view={html_path.with_name('view.html')}", flush=True)
+            print(f"html={html_path}", flush=True)
         return seen
     for h in new:
         if notify(h, dry_run=args.dry_run, with_chart=not args.dry_run):

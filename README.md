@@ -78,7 +78,7 @@ python3 examples/watch_tw_1h_ma60.py --scan --dry-run --limit 200 --days 10 --pa
 python3 examples/watch_tw_1h_ma60.py
 ```
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma240-alert-61bd/docs/tw-1h-ma60/view.html
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma240-alert-61bd/docs/tw-1h-ma60/index.html
 
 憑證放 `tg_config.env`（同 NQ 破底翻）。`--codes 1815,2330` 可改成只看指定股票。
 
