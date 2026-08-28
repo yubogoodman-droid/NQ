@@ -2,6 +2,28 @@
 
 那斯達克期貨（NQ）五分鐘 K 線的 **W 底（雙底）** 做多進場策略。
 
+## NQ 一分 K 破底翻 · 右肩在 MA20 上
+
+對齊手機 1 分圖：先 **破底翻**（跌破近 2 小時低點後快速收復），反彈離開粉紅 **MA20** 後，**右肩踩回 MA20** 才做多，不在收復當根追。
+
+```
+破底（近 2 小時低點） → 收復 MA20 → 連續 8 根低點離開均線 → 右肩回踩 MA20 進場
+停損：破底低點下方 10 點
+停利：1.5R；滿 60 根若收盤跌破 MA20 出場
+過濾：進場貼著下彎的 5m MA60（40 點內），或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下（45 點內），則略過
+```
+
+只做日盤 09:30–15:45 ET。1m MA20 約 20 分鐘，比 5m MA20（約 100 分鐘）更貼價格。
+
+```bash
+python3 examples/nq_5m_ma20_retest.py --interval 1m --period 30d --pages
+python3 examples/test_nq_5m_ma20_retest.py
+```
+
+報告每筆附 **進場當下的五分 K**（粉紅線是 5m MA20）。TradingView：`pinescript/nq_1m_ma20_retest.pine`。
+
+現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest/view.html
+
 ## 型態定義
 
 ```
@@ -125,7 +147,9 @@ python3 examples/chart_today.py
 
 ## TradingView
 
-`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
+`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
+`pinescript/nq_1m_ma20_retest.pine` 是一分 K 破底翻右肩踩 MA20。  
+`pinescript/nq_5m_ma20_retest.pine` 是同一套五分 K 版。
 
 ## 參數調整
 
