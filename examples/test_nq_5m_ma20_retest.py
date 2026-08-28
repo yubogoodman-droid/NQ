@@ -17,6 +17,7 @@ from nq.ma20_retest import (  # noqa: E402
     detect_kwargs,
     detect_signals,
     drop_open_end_trades,
+    far_below_falling_5m_ma20,
     near_falling_5m_ma20_ma30,
     near_falling_5m_ma60,
     quality_at_entry,
@@ -77,6 +78,20 @@ def test_near_falling_5m_ma20_ma30() -> None:
     assert not near_falling_5m_ma20_ma30(
         29651.0, 29676.7, -19.9, 29691.4, -22.8, 0.0, 29715.0, -11.0
     )
+
+
+def test_far_below_falling_5m_ma20() -> None:
+    # 08-28 #12：進場在下彎 5m MA20 下方 79 點，不是破底翻
+    assert far_below_falling_5m_ma20(29517.25, 29596.5, -80.3, 45.0)
+    # 08-28 10:27 圈：只低 23 點，要留
+    assert not far_below_falling_5m_ma20(29614.25, 29637.1, -10.8, 45.0)
+    # 08-18 贏的那筆低 25 點，要留
+    assert not far_below_falling_5m_ma20(29577.75, 29602.6, -38.8, 45.0)
+    # 08-24 在 5m MA20 上方，要留
+    assert not far_below_falling_5m_ma20(29061.0, 29035.4, -35.1, 45.0)
+    # 5m MA20 上彎，即使在下方也留
+    assert not far_below_falling_5m_ma20(29517.25, 29596.5, 8.0, 45.0)
+    assert not far_below_falling_5m_ma20(29517.25, 29596.5, -80.3, 0.0)
 
 
 def test_skips_hug_falling_5m_ma60() -> None:
@@ -361,6 +376,7 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["stop_at_shoulder"] is True
     assert d1["min_retest_bars"] == 8
     assert d1["max_close_above"] == 20.0
+    assert d1["ma20_5m_below"] == 45.0
     assert d5["stop_at_shoulder"] is False
     assert d5["max_pierce"] == 12.0
     s1 = simulate_kwargs("1m")
@@ -521,7 +537,7 @@ def test_1m_fills_early_right_shoulder() -> None:
     df["High"] = high
     df["Low"] = low
     df["Open"] = opn
-    sigs = detect_signals(df, **detect_kwargs("1m", session="day"))
+    sigs = detect_signals(df, **detect_kwargs("1m", session="day", ma20_5m_below=0.0))
     assert sigs, "08-28 10:27-style right shoulder must fill"
     assert sigs[0].entry_idx == sit
     assert 0.0 <= sigs[0].entry_price - sigs[0].ma20 <= 20.0 + 1e-6
@@ -542,6 +558,7 @@ def main() -> int:
     test_quality_at_entry()
     test_near_falling_5m_ma60()
     test_near_falling_5m_ma20_ma30()
+    test_far_below_falling_5m_ma20()
     test_skips_hug_falling_5m_ma60()
     test_sma()
     test_summarize_trades()

@@ -154,6 +154,18 @@ def near_falling_5m_ma20_ma30(
     ) <= float(near)
 
 
+def far_below_falling_5m_ma20(
+    entry: float,
+    ma20_5m: float,
+    slope20: float,
+    max_below: float,
+) -> bool:
+    """瀑布後還在下彎 5m MA20 下方很遠（08-28 #12：−79 點）→ 不是破底翻。"""
+    if max_below <= 0 or np.isnan(ma20_5m) or np.isnan(slope20):
+        return False
+    return float(slope20) < 0.0 and (float(ma20_5m) - float(entry)) > float(max_below)
+
+
 def quality_at_entry(ma5: float, ma10: float, ma20: float, ma20_slope: float) -> Tuple[int, str]:
     """A：MA20 上彎且短均多頭；B：收在 MA20 之上且 MA5>MA20；C：其餘。"""
     score = 0
@@ -250,6 +262,7 @@ INTERVAL_DETECT = {
         ma60_5m_near=40.0,
         ma60_5m_slope_bars=6,
         ma20_5m_near=45.0,
+        ma20_5m_below=45.0,
         min_pullback=25.0,
         max_dump_body=30.0,
         max_prev_above=50.0,
@@ -304,6 +317,7 @@ def detect_signals(
     ma60_5m_near: float = 40.0,
     ma60_5m_slope_bars: int = 6,
     ma20_5m_near: float = 45.0,
+    ma20_5m_below: float = 0.0,
     min_pullback: float = 0.0,
     max_dump_body: float = 0.0,
     max_prev_above: float = 0.0,
@@ -503,6 +517,11 @@ def detect_signals(
                 entry, m20_5, m20_5_s, m30_5, m30_5_s, ma20_5m_near, m60_5, m60_5_s
             ):
                 bump("skip_ma20_30")
+                continue
+            # 08-28 12:57：11 點瀑布後再創新低，1m MA20 當右肩，
+            # 但其實還在下彎 5m MA20 下方 79 點，不是破底翻。
+            if far_below_falling_5m_ma20(entry, m20_5, m20_5_s, ma20_5m_below):
+                bump("skip_below_5m")
                 continue
 
             entry_idx = t
