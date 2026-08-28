@@ -642,11 +642,15 @@ def write_html_report(
             f"沒守住 {funnel.get('fail_hold', 0)} · 風險 {funnel.get('skip_max_risk', 0)} · "
             f"貼下彎5mMA60 {funnel.get('skip_ma60', 0)} · "
             f"貼下彎5mMA20/30蓋頭 {funnel.get('skip_ma20_30', 0)} · "
+            f"間隔 {funnel.get('skip_gap', 0)} · "
             f"時段 {funnel.get('skip_session', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
     total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
+    pullback_note = (
+        "右肩要先從反彈高點拉回至少 25 點再踩 MA20。" if interval == "1m" else ""
+    )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -683,7 +687,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} {escape(interval)} 破底翻 · 右肩在 MA20 上</h1>
-<p class="muted">只做日盤 09:30–15:45 ET。破底翻 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後右肩踩回 MA20 進場。停損在破底下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內），或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下（45 點內），則略過。{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
+<p class="muted">只做日盤 09:30–15:45 ET。破底翻 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後右肩踩回 MA20 進場。停損在破底下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內），或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下（45 點內），則略過。{pullback_note}{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -754,6 +758,7 @@ def cmd_backtest(args) -> int:
             f"fail={funnel.get('fail_hold', 0)} risk={funnel.get('skip_max_risk', 0)} "
             f"ma60={funnel.get('skip_ma60', 0)} "
             f"ma20_30={funnel.get('skip_ma20_30', 0)} "
+            f"gap={funnel.get('skip_gap', 0)} "
             f"session={funnel.get('skip_session', 0)}"
         )
     for q, info in stats.get("by_quality", {}).items():

@@ -253,14 +253,14 @@ def _1m_range_dump_reclaim_retest(n: int = 420) -> pd.DataFrame:
 
     for j in range(8):
         i = 213 + j
-        px = 29110.0
+        px = 29140.0
         close[i] = px
-        high[i] = px + 8.0
+        high[i] = px + 10.0
         low[i] = px - 4.0
 
     retest_i = 221
     close[retest_i] = 29095.0
-    high[retest_i] = 29105.0
+    high[retest_i] = 29110.0
     low[retest_i] = 29078.0
 
     for i in range(retest_i + 1, n):
@@ -339,10 +339,62 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["fail_below"] == 40.0
     assert d1["ma60_5m_near"] == 40.0
     assert d5["ma60_5m_near"] == 40.0
-    assert d1["ma20_5m_near"] == 45.0
-    assert d5["ma20_5m_near"] == 0.0
+    assert d1["max_pierce"] == 20.0
+    assert d1["max_risk"] == 300.0
+    assert d1["min_pullback"] == 25.0
+    assert d5["max_pierce"] == 12.0
     s1 = simulate_kwargs("1m")
     assert s1["ma_exit_after"] == 60
+
+
+def test_skip_gap_keeps_later_shoulder() -> None:
+    """首踩還在上一筆 60 根間隔內時，同一波破底的晚一點右肩仍要抓到。
+
+    對齊 08-28：09:49 進場後，10:13 破底 29505 的 10:27 首踩被擋，11:23 那肩要留。
+    """
+    df = _1m_range_dump_reclaim_retest()
+    close = df["Close"].to_numpy(copy=True)
+    high = df["High"].to_numpy(copy=True)
+    low = df["Low"].to_numpy(copy=True)
+    # After the natural first tag (~221), grind up then pull back onto MA20
+    # at least 60 bars later (min_entry_gap).
+    peak_i = 250
+    for i in range(222, peak_i):
+        close[i] = close[i - 1] + 2.0
+        high[i] = close[i] + 5.0
+        low[i] = close[i] - 3.0
+    tag = 290
+    for i in range(peak_i, tag):
+        close[i] = close[i - 1] - 1.0
+        high[i] = close[i] + 4.0
+        low[i] = close[i] - 3.0
+    ma = pd.Series(close).rolling(20, min_periods=20).mean()
+    m20 = float(ma.iloc[tag])
+    close[tag] = m20 + 2.0
+    high[tag] = close[tag] + 6.0
+    low[tag] = m20 - 4.0
+    for i in range(tag + 1, len(close)):
+        close[i] = close[i - 1] + 1.0
+        high[i] = close[i] + 4.0
+        low[i] = close[i] - 4.0
+    df = df.copy()
+    df["Close"] = close
+    df["High"] = high
+    df["Low"] = low
+    df["Open"] = np.r_[close[0], close[:-1]]
+
+    natural = detect_signals(df, **detect_kwargs("1m", session="day"))
+    assert natural, "control: first MA20 tag should still fill with no prior trade"
+    first = natural[0]
+    # 上一筆就是這波首踩 → skip_gap 後仍要抓同一波晚一點的右肩
+    later = detect_signals(
+        df,
+        **detect_kwargs("1m", session="day"),
+        last_entry_idx=first.entry_idx,
+    )
+    assert later, "later right-shoulder of the same 破底 must survive skip_gap"
+    assert later[0].entry_idx > first.entry_idx
+    assert later[0].trough_idx == first.trough_idx
 
 
 def main() -> int:
@@ -360,6 +412,7 @@ def main() -> int:
     test_detect_kwargs_intervals()
     test_1m_preset_detects_retest()
     test_drop_open_end_trades()
+    test_skip_gap_keeps_later_shoulder()
     print("ok")
     return 0
 

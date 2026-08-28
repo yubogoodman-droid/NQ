@@ -238,17 +238,18 @@ INTERVAL_DETECT = {
         leave_bars=8,
         leave_buffer=6.0,
         touch_above=8.0,
-        max_pierce=12.0,
+        max_pierce=20.0,
         fail_below=40.0,
         stop_buffer=10.0,
         target_r=1.5,
-        max_risk=180.0,
+        max_risk=300.0,
         min_risk=20.0,
         min_entry_gap=60,
         ma20_slope_bars=20,
         ma60_5m_near=40.0,
         ma60_5m_slope_bars=6,
         ma20_5m_near=45.0,
+        min_pullback=25.0,
     ),
 }
 
@@ -297,7 +298,9 @@ def detect_signals(
     ma60_5m_near: float = 40.0,
     ma60_5m_slope_bars: int = 6,
     ma20_5m_near: float = 45.0,
+    min_pullback: float = 0.0,
     funnel: Optional[Dict[str, int]] = None,
+    last_entry_idx: int = -(10**9),
 ) -> List[Signal]:
     """
     破底 → 反彈收復 MA20 → 先離開均線 → 回踩 MA20 進場。
@@ -320,7 +323,7 @@ def detect_signals(
     n = len(close)
     warmup = max(lookback, 60, ma20_len)
     signals: List[Signal] = []
-    last_entry = -(10**9)
+    last_entry = int(last_entry_idx)
     i = warmup
     fun = funnel if funnel is not None else {}
 
@@ -373,6 +376,7 @@ def detect_signals(
         retest_end = min(n - 1, reclaim_idx + retest_window)
         left_run = 0
         left_ok = False
+        peak = float(high[reclaim_idx])
         entry_idx: Optional[int] = None
         dead = False
         for t in range(reclaim_idx + 1, retest_end + 1):
@@ -388,6 +392,8 @@ def detect_signals(
                 dead = True
                 break
 
+            peak = max(peak, float(high[t]))
+
             if float(low[t]) > m20 + leave_buffer:
                 left_run += 1
                 if left_run >= leave_bars:
@@ -397,12 +403,60 @@ def detect_signals(
 
             if not left_ok:
                 continue
+            # 右肩：現價相對這波反彈高點至少拉回 min_pullback（08-28 圖 11:01 高點
+            # 29811 → 11:22 踩 MA20；不能用稍早小回檔把 pulled 黏死，否則 11:06 高點就進）。
+            if min_pullback > 0 and peak - float(close[t]) < min_pullback:
+                continue
 
             pierce = m20 - float(low[t])
             if pierce < -touch_above or pierce > max_pierce:
                 continue
             if close[t] < m20:
                 continue
+
+            # 右肩候選：過濾不通過就繼續掃同一波，不要整段放棄
+            # （08-28 10:13 破底 29505，09:49 那筆的 60 根間隔擋掉 10:27 首踩，
+            #  11:23 才是圖上那肩；舊邏輯 skip_gap 後從 10:28 重找破底，右肩就沒了。）
+            ts = df.index[t]
+            if not _in_session(ts, session):
+                bump("skip_session")
+                continue
+            if t - last_entry < min_entry_gap:
+                bump("skip_gap")
+                continue
+
+            entry = float(close[t])
+            stop = break_low - stop_buffer
+            risk = entry - stop
+            if risk < min_risk:
+                bump("skip_tiny_risk")
+                continue
+            if max_risk > 0 and risk > max_risk:
+                bump("skip_max_risk")
+                continue
+
+            m60_5 = float(ma60_5m[t]) if not np.isnan(ma60_5m[t]) else float("nan")
+            m60_5_s = (
+                float(ma60_5m_slope[t]) if not np.isnan(ma60_5m_slope[t]) else float("nan")
+            )
+            if near_falling_5m_ma60(entry, m60_5, m60_5_s, ma60_5m_near):
+                bump("skip_ma60")
+                continue
+
+            m20_5 = float(ma20_5m[t]) if not np.isnan(ma20_5m[t]) else float("nan")
+            m20_5_s = (
+                float(ma20_5m_slope[t]) if not np.isnan(ma20_5m_slope[t]) else float("nan")
+            )
+            m30_5 = float(ma30_5m[t]) if not np.isnan(ma30_5m[t]) else float("nan")
+            m30_5_s = (
+                float(ma30_5m_slope[t]) if not np.isnan(ma30_5m_slope[t]) else float("nan")
+            )
+            if near_falling_5m_ma20_ma30(
+                entry, m20_5, m20_5_s, m30_5, m30_5_s, ma20_5m_near, m60_5, m60_5_s
+            ):
+                bump("skip_ma20_30")
+                continue
+
             entry_idx = t
             bump("retest")
             break
@@ -413,39 +467,15 @@ def detect_signals(
             i = (reclaim_idx if reclaim_idx is not None else trough_idx) + 1
             continue
 
-        ts = df.index[entry_idx]
-        if not _in_session(ts, session):
-            bump("skip_session")
-            i = entry_idx + 1
-            continue
-        if entry_idx - last_entry < min_entry_gap:
-            bump("skip_gap")
-            i = entry_idx + 1
-            continue
-
         entry = float(close[entry_idx])
         stop = break_low - stop_buffer
         risk = entry - stop
-        if risk < min_risk:
-            bump("skip_tiny_risk")
-            i = entry_idx + 1
-            continue
-        if max_risk > 0 and risk > max_risk:
-            bump("skip_max_risk")
-            i = entry_idx + 1
-            continue
-
         m60_5 = float(ma60_5m[entry_idx]) if not np.isnan(ma60_5m[entry_idx]) else float("nan")
         m60_5_s = (
             float(ma60_5m_slope[entry_idx])
             if not np.isnan(ma60_5m_slope[entry_idx])
             else float("nan")
         )
-        if near_falling_5m_ma60(entry, m60_5, m60_5_s, ma60_5m_near):
-            bump("skip_ma60")
-            i = entry_idx + 1
-            continue
-
         m20_5 = float(ma20_5m[entry_idx]) if not np.isnan(ma20_5m[entry_idx]) else float("nan")
         m20_5_s = (
             float(ma20_5m_slope[entry_idx])
@@ -458,13 +488,6 @@ def detect_signals(
             if not np.isnan(ma30_5m_slope[entry_idx])
             else float("nan")
         )
-        if near_falling_5m_ma20_ma30(
-            entry, m20_5, m20_5_s, m30_5, m30_5_s, ma20_5m_near, m60_5, m60_5_s
-        ):
-            bump("skip_ma20_30")
-            i = entry_idx + 1
-            continue
-
         slope = 0.0
         if entry_idx >= ma20_slope_bars and not np.isnan(ma20[entry_idx - ma20_slope_bars]):
             slope = float(ma20[entry_idx] - ma20[entry_idx - ma20_slope_bars])

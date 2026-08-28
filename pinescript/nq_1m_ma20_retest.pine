@@ -11,11 +11,11 @@ retestWin     = input.int(90, "回踩時限（根）", minval=10)
 leaveBars     = input.int(8, "離開 MA20 連續根數", minval=1)
 leaveBuf      = input.float(6.0, "離開緩衝（點）", minval=0)
 touchAbove    = input.float(8.0, "回踩允許高於 MA20（點）", minval=0)
-maxPierce     = input.float(12.0, "回踩允許刺穿 MA20（點）", minval=0)
+maxPierce     = input.float(20.0, "回踩允許刺穿 MA20（點）", minval=0)
 failBelow     = input.float(40.0, "收盤跌破 MA20 則作廢（點）", minval=0)
 stopBuf       = input.float(10.0, "停損在破底下方（點）", minval=0)
 targetR       = input.float(1.5, "停利 R", minval=0.5, step=0.1)
-maxRisk       = input.float(180.0, "最大風險（點）", minval=10)
+maxRisk       = input.float(300.0, "最大風險（點）", minval=10)
 minRisk       = input.float(20.0, "最小風險（點）", minval=1)
 maLen         = input.int(20, "回踩均線", minval=5)
 rthOnly       = input.bool(true, "只做 09:30–15:45 ET")
@@ -24,6 +24,8 @@ maxHold       = input.int(180, "最長持有根數", minval=10)
 ma60Near      = input.float(40.0, "避開下彎 5m MA60（點，0=關）", minval=0)
 ma20Near      = input.float(45.0, "避開下彎 5m MA20/MA30 蓋頭（點，0=關）", minval=0)
 ma60SlopeBars = input.int(6, "5m MA60 斜率回看（5分K根數）", minval=1)
+minEntryGap   = input.int(60, "距上一筆最少根數", minval=0)
+minPullback   = input.float(25.0, "右肩至少從高點拉回（點，0=關）", minval=0)
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -47,6 +49,9 @@ var int   reclaimBar = na
 var int   leftRun = 0
 var bool  leftOk = false
 var bool  inSetup = false
+var int   lastEntryBar = na
+var float bounceHigh = na
+var bool  pulledOk = false
 
 newBreak = not inSetup and not na(floor) and low < floor and (floor - low) >= minDepth
 
@@ -58,6 +63,8 @@ if newBreak and strategy.position_size == 0
     reclaimBar := na
     leftRun := 0
     leftOk := false
+    bounceHigh := na
+    pulledOk := false
 
 if inSetup
     if low < breakLow
@@ -66,18 +73,24 @@ if inSetup
         reclaimBar := na
         leftRun := 0
         leftOk := false
+        bounceHigh := na
+        pulledOk := false
     if na(reclaimBar)
         expired = bar_index - troughBar > reclaimWin
         if expired
             inSetup := false
         else if close > ma20 and breakLow < ma20
             reclaimBar := bar_index
+            bounceHigh := high
+            pulledOk := minPullback <= 0
     else
         expiredRetest = bar_index - reclaimBar > retestWin
         failed = close < ma20 - failBelow
         if expiredRetest or failed
             inSetup := false
         else if bar_index > reclaimBar
+            bounceHigh := math.max(nz(bounceHigh, high), high)
+            pulledOk := minPullback <= 0 or bounceHigh - close >= minPullback
             if low > ma20 + leaveBuf
                 leftRun += 1
                 if leftRun >= leaveBars
@@ -85,15 +98,17 @@ if inSetup
             else
                 leftRun := 0
             pierce = ma20 - low
-            touch = leftOk and pierce >= -touchAbove and pierce <= maxPierce and close >= ma20
+            touch = leftOk and pulledOk and pierce >= -touchAbove and pierce <= maxPierce and close >= ma20
             risk = close - (breakLow - stopBuf)
             ma60FallingNear = ma60Near > 0 and not na(ma60_5) and not na(ma60_5_prev) and ma60_5 < ma60_5_prev and math.abs(close - ma60_5) <= ma60Near
             ma20_30FallingNear = ma20Near > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma30_5) and not na(ma30_5_prev) and not na(ma60_5) and not na(ma60_5_prev) and ma20_5 < ma20_5_prev and ma30_5 < ma30_5_prev and ma60_5 < ma60_5_prev and close < ma20_5 and close < ma30_5 and ma20_5 < ma30_5 and ma30_5 < ma60_5 and (ma20_5 - close) <= ma20Near and (ma30_5 - close) <= ma20Near
-            if touch and inRth() and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and strategy.position_size == 0
+            gapOk = na(lastEntryBar) or (bar_index - lastEntryBar >= minEntryGap)
+            if touch and inRth() and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and strategy.position_size == 0 and gapOk
                 stopLevel = breakLow - stopBuf
                 tgt = close + risk * targetR
                 strategy.entry("破翻回踩", strategy.long)
                 strategy.exit("破翻出場", "破翻回踩", stop=stopLevel, limit=tgt)
+                lastEntryBar := bar_index
                 inSetup := false
 
 if strategy.position_size > 0
