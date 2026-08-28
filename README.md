@@ -62,7 +62,7 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 ## 幣安 1 小時 MA25 下破底再站上
 
-1 小時圖：收盤跌破 MA25，在下面至少 4 小時、深度 ≥ 1.8% 做出低點（V / W），再收盤站回 MA25。  
+1 小時圖：收盤跌破 MA25，在下面至少 10 小時、深度 ≥ 2.8% 做出低點（V / W，低點須是近 16 根最低），再收盤站回 MA25。  
 進場用站回收盤；停損在破底低點；目標 2R；連兩根又掉回 MA25 下出場。
 
 ```bash
@@ -70,7 +70,7 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 python3 examples/binance_1h_ma25_reclaim.py --symbols AVGOUSDT,ONDSUSDT --days 45
 
 # 流動 U 本位永續 + 手機版 HTML
-python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 30 --pages
+python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 14 --pages
 ```
 
 TradingView：`pinescript/binance_1h_ma25_reclaim.pine` 貼到 1 小時圖。

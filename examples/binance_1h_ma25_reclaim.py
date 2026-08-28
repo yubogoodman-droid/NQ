@@ -235,17 +235,45 @@ def quality_of(depth_pct: float, vol_ratio: float, shape: str, stacked: bool) ->
     return score, "C"
 
 
+def _extend_below_run(close: np.ndarray, ma25: np.ndarray, start: int, allow_above: int = 2) -> int:
+    """Stay in the dip while mostly below MA25. A 1–2 bar W-bounce above does not end it."""
+    n = len(close)
+    end = start
+    i = start
+    while i + 1 < n and not np.isnan(ma25[i + 1]):
+        if close[i + 1] < ma25[i + 1]:
+            i += 1
+            end = i
+            continue
+        k = 1
+        while (
+            k <= allow_above
+            and i + 1 + k < n
+            and not np.isnan(ma25[i + 1 + k])
+            and close[i + 1 + k] >= ma25[i + 1 + k]
+        ):
+            k += 1
+        nxt = i + 1 + k
+        if k <= allow_above and nxt < n and not np.isnan(ma25[nxt]) and close[nxt] < ma25[nxt]:
+            i = nxt
+            end = i
+            continue
+        break
+    return end
+
+
 def detect_signals(
     df: pd.DataFrame,
     *,
     ma_period: int = 25,
-    min_bars_below: int = 4,
+    min_bars_below: int = 10,
     max_bars_below: int = 36,
-    min_depth_pct: float = 0.018,
+    min_depth_pct: float = 0.028,
     stop_buffer_pct: float = 0.003,
     target_r: float = 2.0,
-    min_entry_gap: int = 6,
+    min_entry_gap: int = 8,
     vol_lookback: int = 20,
+    break_lookback: int = 16,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """1h close 跌破 MA25 → 在下面做出低點 → 收盤重新站上 MA25。"""
@@ -280,10 +308,7 @@ def detect_signals(
 
         bump("cross_down")
         start = i
-        end = start
-        while end + 1 < n and not np.isnan(ma25[end + 1]) and close[end + 1] < ma25[end + 1]:
-            end += 1
-
+        end = _extend_below_run(close, ma25, start)
         bars_below = end - start + 1
         reclaim = end + 1
         if reclaim >= n or np.isnan(ma25[reclaim]) or close[reclaim] <= ma25[reclaim]:
@@ -303,13 +328,19 @@ def detect_signals(
         bottom_rel = int(np.argmin(low[start : end + 1]))
         bottom_idx = start + bottom_rel
         bottom = float(low[bottom_idx])
-        ma_at_low = float(ma25[bottom_idx])
-        if ma_at_low <= 0:
+        ref_ma = float(np.nanmax(ma25[start : bottom_idx + 1]))
+        if ref_ma <= 0:
             i = reclaim
             continue
-        depth_pct = (ma_at_low - bottom) / ma_at_low
+        depth_pct = (ref_ma - bottom) / ref_ma
         if depth_pct < min_depth_pct:
             bump("shallow")
+            i = reclaim
+            continue
+
+        left = max(0, bottom_idx - break_lookback + 1)
+        if bottom > float(np.min(low[left : bottom_idx + 1])) + 1e-12:
+            bump("not_break")
             i = reclaim
             continue
 
@@ -603,6 +634,34 @@ def _equity_svg(pnls: List[float], width: int = 720, height: int = 180) -> str:
     )
 
 
+def select_card_hits(
+    hits: List[Hit],
+    *,
+    recent_hours: int = 72,
+    keep_symbols: Sequence[str] = (),
+    max_cards: int = 48,
+) -> List[Hit]:
+    """Keep example symbols plus the latest tape so the phone report stays short."""
+    now = datetime.now(TPE)
+    keep = {s.upper() for s in keep_symbols}
+    picked: List[Hit] = []
+    for hit in hits:
+        ts = hit.df.index[hit.trade.entry_idx]
+        if getattr(ts, "tzinfo", None) is not None:
+            ts = ts.tz_convert(TPE)
+        else:
+            ts = ts.replace(tzinfo=TPE)
+        if hit.symbol.upper() in keep or now - ts <= timedelta(hours=recent_hours):
+            picked.append(hit)
+    if len(picked) > max_cards:
+        keep_hits = [h for h in picked if h.symbol.upper() in keep]
+        rest = [h for h in picked if h.symbol.upper() not in keep]
+        rest.sort(key=lambda h: h.df.index[h.trade.entry_idx], reverse=True)
+        picked = keep_hits + rest[: max(0, max_cards - len(keep_hits))]
+        picked.sort(key=lambda h: h.df.index[h.trade.entry_idx])
+    return picked
+
+
 def write_html_report(
     path: Path,
     hits: List[Hit],
@@ -611,8 +670,10 @@ def write_html_report(
     scanned: int,
     funnel: Optional[Dict[str, int]] = None,
     recent_hours: int = 0,
+    all_stats: Optional[dict] = None,
+    card_note: str = "",
 ) -> Path:
-    stats = summarize_trades([h.trade for h in hits])
+    stats = all_stats or summarize_trades([h.trade for h in hits])
     cards: List[str] = []
     now = datetime.now(TPE)
     for i, hit in enumerate(hits, 1):
@@ -704,7 +765,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 粉線 MA25<br/>
-價先收在 MA25 下至少 4 小時、深度 ≥ 1.8%，再收盤站回。停損破底低點，目標 2R，連兩根掉回 MA25 下出場。</p>
+價先收在 MA25 下至少 10 小時、深度 ≥ 2.8%（對照波段內最高 MA25），低點須是近 16 根最低。W 中間 1–2 根假站上不算結束。停損破底低點，目標 2R，連兩根掉回 MA25 下出場。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -852,13 +913,23 @@ def cmd_run(args) -> int:
     if html_path is None and args.pages:
         html_path = PAGES
     if html_path:
+        extras = [s.strip().upper() for s in (args.symbols or "").split(",") if s.strip()]
+        keep_for_cards = set(KEEP) | set(extras)
+        cards = select_card_hits(hits, recent_hours=max(args.recent, 72), keep_symbols=keep_for_cards)
+        card_note = (
+            f"<br/>卡片 {len(cards)} 筆：AVGO/ONDS 等樣本 + 近 {max(args.recent, 72)} 小時。"
+            if len(cards) != len(hits)
+            else ""
+        )
         out = write_html_report(
             html_path,
-            hits,
+            cards,
             days=args.days,
             scanned=len(symbols),
             funnel=funnel,
             recent_hours=args.recent,
+            all_stats=stats,
+            card_note=card_note,
         )
         view = write_view_html(out)
         print(f"html={out}")
@@ -874,9 +945,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-quote", type=float, default=8_000_000)
     p.add_argument("--days", type=int, default=30)
     p.add_argument("--workers", type=int, default=8)
-    p.add_argument("--min-bars", type=int, default=4, help="在 MA25 下至少幾根 1h")
+    p.add_argument("--min-bars", type=int, default=10, help="在 MA25 下至少幾根 1h")
     p.add_argument("--max-bars", type=int, default=36, help="在 MA25 下最多幾根 1h")
-    p.add_argument("--min-depth", type=float, default=1.8, help="破底相對 MA25 最低深度 %")
+    p.add_argument("--min-depth", type=float, default=2.8, help="破底相對 MA25 最低深度 %")
     p.add_argument("--target-r", type=float, default=2.0)
     p.add_argument("--recent", type=int, default=48, help="報告裡標近幾小時的新訊號")
     p.add_argument("--html", default="")

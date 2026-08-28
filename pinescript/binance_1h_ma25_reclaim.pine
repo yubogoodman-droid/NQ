@@ -3,9 +3,9 @@ indicator("1h MA25 下破底再站上", overlay=true, max_labels_count=50)
 
 // 一小時圖：收盤跌破 MA25，在下面做出低點，再收盤站回 MA25。
 maLen        = input.int(25, "均線", minval=5)
-minBelow     = input.int(4, "在均線下至少幾根", minval=2)
+minBelow     = input.int(10, "在均線下至少幾根", minval=2)
 maxBelow     = input.int(36, "在均線下最多幾根", minval=6)
-minDepthPct  = input.float(1.8, "破底最低深度 %", minval=0.3, step=0.1) / 100
+minDepthPct  = input.float(2.8, "破底最低深度 %", minval=0.3, step=0.1) / 100
 
 ma25 = ta.sma(close, maLen)
 plot(ma25, "MA25", color=color.new(#d28cff, 0), linewidth=2)
