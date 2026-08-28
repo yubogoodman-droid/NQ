@@ -581,3 +581,23 @@ def simulate(
             )
         )
     return results
+
+
+def drop_open_end_trades(
+    df: pd.DataFrame,
+    trades: Sequence[TradeResult],
+    max_hold: int,
+) -> Tuple[List[TradeResult], List[TradeResult]]:
+    """樣本最後一根若還在持倉，不算進回測成績。"""
+    if not trades or len(df) == 0:
+        return list(trades), []
+    last = len(df) - 1
+    kept: List[TradeResult] = []
+    open_trades: List[TradeResult] = []
+    for t in trades:
+        held = t.exit_idx - t.entry_idx
+        if t.exit_idx >= last and t.exit_reason == "timeout" and held < max_hold:
+            open_trades.append(t)
+        else:
+            kept.append(t)
+    return kept, open_trades

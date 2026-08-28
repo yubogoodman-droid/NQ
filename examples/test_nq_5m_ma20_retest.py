@@ -16,6 +16,7 @@ from nq.ma20_retest import (  # noqa: E402
     TradeResult,
     detect_kwargs,
     detect_signals,
+    drop_open_end_trades,
     near_falling_5m_ma20_ma30,
     near_falling_5m_ma60,
     quality_at_entry,
@@ -301,6 +302,32 @@ def test_1m_preset_detects_retest() -> None:
     assert any((path.parent / "img").glob("t5m*.png")), "expected a 5m comparison PNG"
 
 
+def test_drop_open_end_trades() -> None:
+    df = _range_then_dump_reclaim_retest()
+    sigs = detect_signals(df, session="day")
+    trades = simulate(df, sigs)
+    assert trades
+    last = trades[-1]
+    open_last = TradeResult(
+        signal=last.signal,
+        entry_idx=len(df) - 2,
+        exit_idx=len(df) - 1,
+        entry_price=last.entry_price,
+        exit_price=last.exit_price,
+        stop_price=last.stop_price,
+        target_price=last.target_price,
+        pnl_points=1.0,
+        exit_reason="timeout",
+        quality=last.quality,
+    )
+    kept, opened = drop_open_end_trades(df, [open_last], max_hold=36)
+    assert kept == []
+    assert opened == [open_last]
+    kept2, opened2 = drop_open_end_trades(df, trades, max_hold=36)
+    assert len(kept2) == len(trades)
+    assert opened2 == []
+
+
 def test_detect_kwargs_intervals() -> None:
     d1 = detect_kwargs("1m")
     d5 = detect_kwargs("5m")
@@ -332,6 +359,7 @@ def main() -> int:
     test_write_html_report()
     test_detect_kwargs_intervals()
     test_1m_preset_detects_retest()
+    test_drop_open_end_trades()
     print("ok")
     return 0
 

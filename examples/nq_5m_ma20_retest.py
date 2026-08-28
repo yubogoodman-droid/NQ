@@ -32,6 +32,7 @@ from nq.ma20_retest import (  # noqa: E402
     TradeResult,
     detect_kwargs,
     detect_signals,
+    drop_open_end_trades,
     simulate_kwargs,
     summarize_trades,
     simulate,
@@ -737,9 +738,12 @@ def cmd_backtest(args) -> int:
     funnel: Dict[str, int] = {}
     sigs = detect_signals(df, funnel=funnel, **dkw)
     trades = simulate(df, sigs, **skw)
+    trades, open_trades = drop_open_end_trades(df, trades, skw["max_hold"])
     stats = summarize_trades(trades)
     print(f"{args.symbol} {interval} {args.period} bars={len(df)} {df.index[0]} -> {df.index[-1]}")
     print(f"trades={stats['count']} WR={stats['win_rate']:.1f}% pnl={stats['total_points']:+.1f}")
+    if open_trades:
+        print(f"open={len(open_trades)} (sample ended, excluded)")
     if funnel:
         print(
             "funnel "
@@ -762,6 +766,11 @@ def cmd_backtest(args) -> int:
             f"entry {t.entry_price:.2f} stop {t.stop_price:.2f} "
             f"破底 {df.index[t.signal.trough_idx].strftime('%H:%M')}@{t.signal.break_low:.2f} "
             f"收復 {df.index[t.signal.reclaim_idx].strftime('%H:%M')}"
+        )
+    for i, t in enumerate(open_trades, 1):
+        print(
+            f"[open {i}] Q{t.quality} {df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
+            f"entry {t.entry_price:.2f} 仍持倉（樣本結束）"
         )
 
     html_path = args.html
