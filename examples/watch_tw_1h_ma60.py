@@ -10,7 +10,7 @@
   python3 examples/watch_tw_1h_ma60.py --scan --dry-run --limit 200 --days 10 --pages
   python3 examples/watch_tw_1h_ma60.py              # 每根一小時收盤掃一次
 
-預設濾掉股價 >700。HTML 圖用 data URI 嵌進去，htmlpreview 才看得到。
+預設濾掉股價 >700 與金融股。HTML 圖用 data URI 嵌進去，htmlpreview 才看得到。
 
 Telegram 憑證放 tg_config.env（勿提交）。
 """
@@ -95,13 +95,6 @@ FIN_NAME_SUFFIXES = (
     "期貨",
     "票券",
     "保經",
-    "金",
-    "銀",
-    "證",
-    "保",
-    "期",
-    "票",
-    "產",
 )
 # 台股 1H：09–10、10–11、11–12、12–13、13–13:30
 HOUR_CLOSE = ((10, 0), (11, 0), (12, 0), (13, 0), (13, 30))
@@ -759,9 +752,14 @@ def stub_row(code: str) -> dict:
     }
 
 
-def finance_name(name: str) -> bool:
+def finance_name(name: str, code: str = "") -> bool:
     n = (name or "").replace(" ", "").replace("*", "")
-    return any(n.endswith(s) for s in FIN_NAME_SUFFIXES)
+    if any(n.endswith(s) for s in FIN_NAME_SUFFIXES):
+        return True
+    # 28xx 多為金控/銀行/保險；避免誤殺「上銀」「精金」「金像電」
+    if code.startswith("28") and n.endswith(("金", "銀", "保", "證", "票", "產")):
+        return True
+    return False
 
 
 def fetch_listed_finance_codes(date: str) -> set[str]:
@@ -793,7 +791,7 @@ def is_financial(row: dict, listed_codes: set[str] | None = None) -> bool:
         return True
     if code in OTC_FINANCE_CODES:
         return True
-    return finance_name(str(row.get("name") or ""))
+    return finance_name(str(row.get("name") or ""), code)
 
 
 def filter_financials(

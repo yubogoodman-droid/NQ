@@ -140,7 +140,11 @@ def test_is_financial_drops_banks_and_brokers() -> None:
     assert is_financial({"code": "2881", "name": "富邦金"}, listed)
     assert is_financial({"code": "2884", "name": "玉山金"}, listed)
     assert is_financial({"code": "6015", "name": "宏遠證"}, set())
-    assert is_financial({"code": "9999", "name": "台中銀"}, set())
+    assert is_financial({"code": "9999", "name": "台中銀"}, set()) is False
+    assert is_financial({"code": "2812", "name": "台中銀"}, set())
+    assert is_financial({"code": "2897", "name": "王道銀行"}, set())
+    assert not is_financial({"code": "2049", "name": "上銀"}, set())
+    assert not is_financial({"code": "3049", "name": "精金"}, set())
     assert not is_financial({"code": "1815", "name": "富喬"}, listed)
     assert not is_financial({"code": "2303", "name": "聯電"}, listed)
     assert not is_financial({"code": "2368", "name": "金像電"}, listed)
