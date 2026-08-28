@@ -2,7 +2,7 @@
 """台股成交額前 200：一小時 K 收盤站上 MA60，Telegram 跳通知。
 
 **1815 富喬預設必抓**。上一根 1H 收在 60MA 下方（或貼著），這根收盤站上，就推一則（帶圖）。
-盤中在 10:00 / 11:00 / 12:00 / 13:00 / 13:30 收完後掃。
+預設濾掉股價 >700 與金融股。盤中在 10:00 / 11:00 / 12:00 / 13:00 / 13:30 收完後掃。
 
 用法:
   python3 examples/watch_tw_1h_ma60.py --test
@@ -48,6 +48,8 @@ from scan_tw_ma_reclaim import (  # noqa: E402
     TPE,
     UA,
     _chart_payload_to_df,
+    _get_json,
+    _is_stock_code,
     fetch_top_turnover,
     filter_by_max_price,
     last_tw_session_yyyymmdd,
@@ -71,6 +73,36 @@ MA_COLORS = {
 KEEP_DEFAULT = ("1815",)
 KNOWN_MARKET = {"1815": "otc"}
 KNOWN_NAME = {"1815": "富喬"}
+# 上櫃金融保險（產業別 17）；上市另抓 TWSE type=17
+OTC_FINANCE_CODES = {
+    "5864",
+    "5878",
+    "6015",
+    "6016",
+    "6020",
+    "6021",
+    "6023",
+    "6026",
+    "6028",
+}
+FIN_NAME_SUFFIXES = (
+    "金控",
+    "銀行",
+    "人壽",
+    "產險",
+    "再保",
+    "證券",
+    "期貨",
+    "票券",
+    "保經",
+    "金",
+    "銀",
+    "證",
+    "保",
+    "期",
+    "票",
+    "產",
+)
 # 台股 1H：09–10、10–11、11–12、12–13、13–13:30
 HOUR_CLOSE = ((10, 0), (11, 0), (12, 0), (13, 0), (13, 30))
 
@@ -645,7 +677,7 @@ h1{{font-size:18px;margin:0 0 6px}} h2{{font-size:15px;margin:18px 0 10px;color:
 <div class="page">
 <section class="summary">
 <h1>台股 1小時 站上 60MA · {escape(period)}</h1>
-<p class="muted">基準日 {escape(date)} · 成交額前 {len(universe)} · 末名約 {cutoff:.1f} 億{px_note} · 1815 富喬必抓
+<p class="muted">基準日 {escape(date)} · 成交額前 {len(universe)} · 末名約 {cutoff:.1f} 億{px_note} · 不含金融股 · 1815 富喬必抓
 <br/>上一根收在 60MA 下，這根一小時 K 收盤站上。圖嵌最新 80 筆。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
@@ -727,6 +759,56 @@ def stub_row(code: str) -> dict:
     }
 
 
+def finance_name(name: str) -> bool:
+    n = (name or "").replace(" ", "").replace("*", "")
+    return any(n.endswith(s) for s in FIN_NAME_SUFFIXES)
+
+
+def fetch_listed_finance_codes(date: str) -> set[str]:
+    """上市金融保險普通股（TWSE MI_INDEX type=17）。"""
+    url = (
+        f"https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX"
+        f"?date={date}&type=17&response=json"
+    )
+    try:
+        payload = _get_json(url)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[finance] skip listed list: {exc}", file=sys.stderr)
+        return set()
+    codes: set[str] = set()
+    for table in payload.get("tables") or []:
+        title = str(table.get("title") or "")
+        if "金融保險" not in title:
+            continue
+        for rec in table.get("data") or []:
+            code = str(rec[0]).strip()
+            if _is_stock_code(code):
+                codes.add(code)
+    return codes
+
+
+def is_financial(row: dict, listed_codes: set[str] | None = None) -> bool:
+    code = str(row.get("code") or "")
+    if listed_codes and code in listed_codes:
+        return True
+    if code in OTC_FINANCE_CODES:
+        return True
+    return finance_name(str(row.get("name") or ""))
+
+
+def filter_financials(
+    rows: list[dict], listed_codes: set[str] | None
+) -> tuple[list[dict], list[dict]]:
+    kept: list[dict] = []
+    dropped: list[dict] = []
+    for row in rows:
+        if is_financial(row, listed_codes):
+            dropped.append(row)
+        else:
+            kept.append(row)
+    return kept, dropped
+
+
 def pin_keep(rows: list[dict], keep: Iterable[str]) -> list[dict]:
     wanted = [c.strip() for c in keep if c.strip()]
     if not wanted:
@@ -751,10 +833,16 @@ def select_universe(
     limit: int,
     keep: Iterable[str] | None = None,
     max_price: float | None = 700.0,
-) -> tuple[list[dict], list[dict]]:
-    kept, dropped = filter_by_max_price(rows, max_price, limit)
+    drop_finance: bool = True,
+    finance_codes: set[str] | None = None,
+) -> tuple[list[dict], list[dict], list[dict]]:
+    work = rows
+    fin_dropped: list[dict] = []
+    if drop_finance:
+        work, fin_dropped = filter_financials(work, finance_codes)
+    kept, px_dropped = filter_by_max_price(work, max_price, limit)
     keep_codes = [c.strip() for c in (keep or KEEP_DEFAULT) if c.strip()]
-    return pin_keep(kept, keep_codes), dropped
+    return pin_keep(kept, keep_codes), fin_dropped, px_dropped
 
 
 def load_universe(
@@ -764,10 +852,11 @@ def load_universe(
     keep: Iterable[str] | None = None,
     max_price: float | None = 700.0,
     pool: int = 400,
+    drop_finance: bool = True,
 ) -> tuple[str, list[dict]]:
     ymd = resolve_twse_date(date or last_tw_session_yyyymmdd())
     keep_codes = [c.strip() for c in (keep or KEEP_DEFAULT) if c.strip()]
-    fetch_n = max(limit, pool if max_price else limit)
+    fetch_n = max(limit, pool if (max_price or drop_finance) else limit)
     if codes:
         fetch_n = max(fetch_n, 200)
     rows = fetch_top_turnover(ymd, fetch_n)
@@ -788,10 +877,22 @@ def load_universe(
             else:
                 picked.append(stub_row(code))
         return ymd, picked
-    universe, dropped = select_universe(rows, limit, keep_codes, max_price)
-    if dropped:
-        preview = ", ".join(f"{r['code']} {r.get('close')}" for r in dropped[:12])
-        extra = " …" if len(dropped) > 12 else ""
+    finance_codes = fetch_listed_finance_codes(ymd) if drop_finance else set()
+    universe, fin_dropped, px_dropped = select_universe(
+        rows,
+        limit,
+        keep_codes,
+        max_price,
+        drop_finance=drop_finance,
+        finance_codes=finance_codes,
+    )
+    if fin_dropped:
+        preview = ", ".join(f"{r['code']} {r.get('name')}" for r in fin_dropped[:12])
+        extra = " …" if len(fin_dropped) > 12 else ""
+        print(f"drop finance {len(fin_dropped)}: {preview}{extra}", flush=True)
+    if px_dropped:
+        preview = ", ".join(f"{r['code']} {r.get('close')}" for r in px_dropped[:12])
+        extra = " …" if len(px_dropped) > 12 else ""
         print(f"drop price>{max_price}: {preview}{extra}", flush=True)
     return ymd, universe
 
@@ -991,6 +1092,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=200, help="成交額前 N（預設 200）")
     p.add_argument("--pool", type=int, default=400, help="先取成交額前 N 再套股價過濾")
     p.add_argument("--max-price", type=float, default=700, help="收盤價超過此值剔除（預設 700；0=不過濾）")
+    p.add_argument("--keep-finance", action="store_true", help="不過濾金融股（預設會去掉金控/銀行/保險/證券）")
     p.add_argument("--date", default="", help="YYYYMMDD 成交額基準日，預設上一個交易日")
     p.add_argument("--codes", default="", help="只看這些代號，逗號分隔，例如 1815,2330")
     p.add_argument("--keep", default="1815", help="必抓代號，預設 1815 富喬")
@@ -1037,13 +1139,21 @@ def main(argv: list[str] | None = None) -> int:
     codes = [c.strip() for c in args.codes.split(",") if c.strip()] or None
     keep = [c.strip() for c in args.keep.split(",") if c.strip()]
     max_price = args.max_price if args.max_price else None
+    drop_finance = not args.keep_finance
     print(
         f"universe limit={args.limit} pool={args.pool} max_price={max_price} "
-        f"range={args.range} ma={args.ma} keep={','.join(keep) or '-'}",
+        f"drop_finance={drop_finance} range={args.range} ma={args.ma} "
+        f"keep={','.join(keep) or '-'}",
         flush=True,
     )
     date, universe = load_universe(
-        args.limit, args.date, codes, keep=keep, max_price=max_price, pool=args.pool
+        args.limit,
+        args.date,
+        codes,
+        keep=keep,
+        max_price=max_price,
+        pool=args.pool,
+        drop_finance=drop_finance,
     )
     args.universe_date = date
     args.max_price = max_price
@@ -1082,7 +1192,13 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             if time.time() - uni_ts > 6 * 3600:
                 date, universe = load_universe(
-                    args.limit, args.date, codes, keep=keep, max_price=max_price, pool=args.pool
+                    args.limit,
+                    args.date,
+                    codes,
+                    keep=keep,
+                    max_price=max_price,
+                    pool=args.pool,
+                    drop_finance=drop_finance,
                 )
                 uni_ts = time.time()
                 print(f"更新標的 {len(universe)} date={date}", flush=True)

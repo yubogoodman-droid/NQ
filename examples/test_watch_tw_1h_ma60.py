@@ -133,18 +133,36 @@ def test_pin_keep_puts_1815_first() -> None:
     assert missing[0]["symbol"] == "1815.TWO"
 
 
+def test_is_financial_drops_banks_and_brokers() -> None:
+    from watch_tw_1h_ma60 import is_financial
+
+    listed = {"2881", "2884", "2801"}
+    assert is_financial({"code": "2881", "name": "富邦金"}, listed)
+    assert is_financial({"code": "2884", "name": "玉山金"}, listed)
+    assert is_financial({"code": "6015", "name": "宏遠證"}, set())
+    assert is_financial({"code": "9999", "name": "台中銀"}, set())
+    assert not is_financial({"code": "1815", "name": "富喬"}, listed)
+    assert not is_financial({"code": "2303", "name": "聯電"}, listed)
+    assert not is_financial({"code": "2368", "name": "金像電"}, listed)
+    assert not is_financial({"code": "2312", "name": "金寶"}, listed)
+
+
 def test_select_universe_drops_price_over_700() -> None:
     from watch_tw_1h_ma60 import select_universe
 
     rows = [
         {"code": "2330", "name": "台積電", "close": 1400.0, "amount": 9, "rank": 1, "market": "tse", "symbol": "2330.TW"},
         {"code": "1815", "name": "1815", "close": 125.0, "amount": 8, "rank": 2, "market": "otc", "symbol": "1815.TWO"},
-        {"code": "2303", "name": "聯電", "close": 55.0, "amount": 7, "rank": 3, "market": "tse", "symbol": "2303.TW"},
-        {"code": "2454", "name": "聯發科", "close": 4100.0, "amount": 6, "rank": 4, "market": "tse", "symbol": "2454.TW"},
+        {"code": "2881", "name": "富邦金", "close": 80.0, "amount": 7.5, "rank": 3, "market": "tse", "symbol": "2881.TW"},
+        {"code": "2303", "name": "聯電", "close": 55.0, "amount": 7, "rank": 4, "market": "tse", "symbol": "2303.TW"},
+        {"code": "2454", "name": "聯發科", "close": 4100.0, "amount": 6, "rank": 5, "market": "tse", "symbol": "2454.TW"},
     ]
-    kept, dropped = select_universe(rows, limit=200, keep=["1815"], max_price=700)
+    kept, fin, px = select_universe(
+        rows, limit=200, keep=["1815"], max_price=700, drop_finance=True, finance_codes={"2881"}
+    )
     assert [r["code"] for r in kept] == ["1815", "2303"]
-    assert {r["code"] for r in dropped} == {"2330", "2454"}
+    assert {r["code"] for r in fin} == {"2881"}
+    assert {r["code"] for r in px} == {"2330", "2454"}
 
 
 def test_cli_defaults() -> None:
@@ -222,7 +240,7 @@ def test_write_html_report() -> None:
     text = path.read_text(encoding="utf-8")
     assert "1815" in text
     assert "站上" in text
-    assert "60MA" in text
+    assert "不含金融股" in text
     assert "data:image/png;base64," in text
     assert "src='img/" not in text
     assert (out_dir / "index.html").exists()
@@ -236,6 +254,7 @@ def main() -> int:
     test_drop_1330_print()
     test_hour_bar_close_and_completed()
     test_pin_keep_puts_1815_first()
+    test_is_financial_drops_banks_and_brokers()
     test_select_universe_drops_price_over_700()
     test_cli_defaults()
     test_market_session_hours()
