@@ -126,7 +126,7 @@ def test_detect_v_bounce() -> None:
     assert sig.dump_low < sig.dump_high
     assert sig.drop_pts >= 120
     assert sig.recover_frac >= 0.98
-    assert 0.65 <= sig.time_ratio <= 1.40
+    assert 0.50 <= sig.time_ratio <= 1.60
     assert sig.entry_price > sig.stop_price
     assert sig.entry_price > sig.ma5
     assert sig.target_price > sig.entry_price

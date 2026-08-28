@@ -1,7 +1,7 @@
 //@version=5
 indicator("NQ 五分K V轉", overlay=true, max_labels_count=200)
 
-// 頸線 = 起跌高點。右腿回到頸線，且右腿時間為左腿的 0.65~1.40 倍。
+// 頸線 = 起跌高點。右腿回到頸線，且右腿時間為左腿的 0.50~1.60 倍。
 // 套用至 NQ1! / MNQ1! / NQ=F 五分圖。
 
 dumpMin     = input.int(16, "Dump 最少 K", minval=8, maxval=20)
@@ -12,8 +12,8 @@ minRedFrac  = input.float(0.55, "紅 K 佔比", minval=0.4, maxval=0.9, step=0.0
 leftHighPct = input.float(40.0, "高點須在左側（%）", minval=20, maxval=60)
 maxBaseBars = input.int(3, "底部盤整最多 K", minval=1, maxval=6)
 recoverFrac = input.float(0.98, "回到頸線（回補比例）", minval=0.5, maxval=1.0, step=0.01)
-minTimeRatio = input.float(0.65, "右腿/左腿 時間下限", minval=0.3, step=0.05)
-maxTimeRatio = input.float(1.40, "右腿/左腿 時間上限", minval=0.8, step=0.05)
+minTimeRatio = input.float(0.50, "右腿/左腿 時間下限", minval=0.3, step=0.05)
+maxTimeRatio = input.float(1.60, "右腿/左腿 時間上限", minval=0.8, step=0.05)
 minSpeed    = input.float(0.60, "收復/急跌 速度比", minval=0.3, step=0.05)
 stopBuf     = input.float(8.0, "停損緩衝（點）", minval=0, step=1)
 tgtMult     = input.float(1.7, "目標 = V底 + dump×", minval=1.0, step=0.1)
