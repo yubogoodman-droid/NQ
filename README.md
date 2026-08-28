@@ -60,27 +60,25 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## 台股成交額前 200 · 五分 K 回測 240MA
+## 台股成交額前 200 · 一小時 K 站上 MA60
 
-監看成交額前 200 檔（**股價 >700 濾掉**），**1815 富喬預設必抓**。五分圖（5/10/20/60/120/240MA，對齊 XQ）若從 240MA **上方拉開後回測碰到、收盤仍守住**，Telegram 跳通知（帶 K 線圖）。
-
-規則：先拉開至少 1%，這根五分 K 低點碰到 240MA（約 1 檔或 0.2%）。開盤回測也算（富喬 8/28 是 09:05 刺破收回）。刺破後彈開、或貼均後彈開都算。黏著均線走、收盤明顯跌破，不推。
+監看成交額前 200 檔（**股價 >700 濾掉**），**1815 富喬預設必抓**。一小時 K 若**上一根收在 60MA 下方、這根收盤站上**，Telegram 跳通知（帶 K 線圖）。盤中在 10:00 / 11:00 / 12:00 / 13:00 / 13:30 收完後掃。
 
 ```bash
 # 先測 Telegram
-python3 examples/watch_tw_5m_ma240.py --test
+python3 examples/watch_tw_1h_ma60.py --test
 
 # 只掃一輪、印在終端（不必開 Telegram）
-python3 examples/watch_tw_5m_ma240.py --dry-run --once --limit 200
+python3 examples/watch_tw_1h_ma60.py --dry-run --once --limit 200
 
-# 近兩週 HTML（富喬置頂，刺破收回附圖；圖嵌進 HTML，htmlpreview 才看得到）
-python3 examples/watch_tw_5m_ma240.py --scan --dry-run --limit 200 --days 10 --pages
+# 近兩週 HTML（富喬置頂，圖嵌進 HTML）
+python3 examples/watch_tw_1h_ma60.py --scan --dry-run --limit 200 --days 10 --pages
 
-# 盤中監看：每根五分收盤掃一次
-python3 examples/watch_tw_5m_ma240.py
+# 盤中監看：每根一小時收盤掃一次
+python3 examples/watch_tw_1h_ma60.py
 ```
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma240-alert-61bd/docs/tw-5m-ma240/view.html
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma240-alert-61bd/docs/tw-1h-ma60/view.html
 
 憑證放 `tg_config.env`（同 NQ 破底翻）。`--codes 1815,2330` 可改成只看指定股票。
 
