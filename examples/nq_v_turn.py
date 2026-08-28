@@ -11,8 +11,8 @@
 
 用法:
   python3 examples/nq_v_turn.py
+  python3 examples/nq_v_turn.py backtest --period 30d --pages
   python3 examples/nq_v_turn.py backtest --period 5d
-  python3 examples/nq_v_turn.py backtest --period 60d --pages
   python3 examples/test_nq_v_turn.py
 """
 
@@ -865,14 +865,14 @@ def build_parser() -> argparse.ArgumentParser:
     b = sub.add_parser("backtest", help="Yahoo 5m 回測")
     b.add_argument("--symbol", default="NQ=F")
     b.add_argument("--interval", default="5m")
-    b.add_argument("--period", default="60d")
+    b.add_argument("--period", default="30d")
     b.add_argument("--html", default="")
     b.add_argument("--pages", action="store_true", help="寫到 docs/nq-v-turn/index.html")
     b.set_defaults(func=cmd_backtest)
 
     p.add_argument("--symbol", default="NQ=F")
     p.add_argument("--interval", default="5m")
-    p.add_argument("--period", default="60d")
+    p.add_argument("--period", default="30d")
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true")
     return p

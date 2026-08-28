@@ -29,15 +29,16 @@
 停損右腿回撤低，目標頸線再延伸 0.5× dump。含盤外；09:30–10:00 不進。
 
 ```bash
+python3 examples/nq_v_turn.py backtest --period 30d --pages
 python3 examples/nq_v_turn.py backtest --period 5d
-python3 examples/nq_v_turn.py backtest --period 60d --pages
 python3 examples/test_nq_v_turn.py
 ```
 
 TradingView：`pinescript/nq_v_turn_5m.pine` 貼到 NQ1! / MNQ1! 五分圖。
 
-近 5 天（含 08-27 那筆）：**2 筆、勝率 100%、+118 點**。08-27 02:10 V底 → 04:00 回到頸線進場，目標 **+56.5**（兩邊時間 0.95×）。  
-Yahoo 五分 60 天（2026-06-18 → 08-28）：**4 筆、勝率 75%、+69 點**。
+近一個月 Yahoo 五分（2026-07-26 → 08-28）：**3 筆、勝率 100%、+179.5 點**，全部打到目標。  
+08-27 02:10 V底 → 04:00 回到頸線進場，目標 **+56.5**（兩邊時間 0.95×）。  
+60 天多一筆 06-22 停損 −110.5，變成 **4 筆、勝率 75%、+69 點**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-v-turn-4941/docs/nq-v-turn/view.html
 
