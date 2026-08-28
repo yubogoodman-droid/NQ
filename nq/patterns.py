@@ -1,4 +1,4 @@
-"""W 底（雙底）型態偵測。"""
+"""W 底（雙底）與 M 頭（雙頂）型態偵測。"""
 
 from __future__ import annotations
 
@@ -48,8 +48,42 @@ def _is_swing_high(highs: Sequence[float], idx: int, lookback: int) -> bool:
     return pivot == max(window) and window.count(pivot) == 1
 
 
+@dataclass(frozen=True)
+class MHeadPattern:
+    """已確認的 M 頭（雙頂）型態。"""
+
+    first_high_idx: int
+    second_high_idx: int
+    neckline_idx: int
+    first_high: float
+    second_high: float
+    neckline: float
+
+    @property
+    def peak(self) -> float:
+        return max(self.first_high, self.second_high)
+
+    @property
+    def depth(self) -> float:
+        return self.peak - self.neckline
+
+    @property
+    def stop_loss(self) -> float:
+        """停損設於較高的那個頭頂上方。"""
+        return self.peak
+
+    @property
+    def target(self) -> float:
+        """量度跌幅：頸線 − (最高點 − 頸線)。"""
+        return self.neckline - self.depth
+
+
 def _find_swing_lows(lows: Sequence[float], lookback: int) -> list[int]:
     return [i for i in range(len(lows)) if _is_swing_low(lows, i, lookback)]
+
+
+def _find_swing_highs(highs: Sequence[float], lookback: int) -> list[int]:
+    return [i for i in range(len(highs)) if _is_swing_high(highs, i, lookback)]
 
 
 def detect_w_bottoms(
@@ -166,3 +200,87 @@ def _dedupe_patterns(patterns: Iterable[WBottomPattern]) -> list[WBottomPattern]
         if rr > ex_rr:
             by_breakout[p.breakout_idx] = p
     return sorted(by_breakout.values(), key=lambda p: p.breakout_idx or 0)
+
+
+def detect_m_heads(
+    df: pd.DataFrame,
+    *,
+    swing_lookback: int = 5,
+    high_tolerance_pct: float = 0.0012,
+    min_bars_between_highs: int = 12,
+    max_bars_between_highs: int = 90,
+    min_depth_pct: float = 0.0008,
+) -> list[MHeadPattern]:
+    """
+    在 OHLCV DataFrame 上偵測 M 頭（雙頂）型態。
+
+    條件：
+    1. 兩個相近的波段高點（價差在 high_tolerance_pct 內）
+    2. 兩高點之間有明確的頸線低點
+    3. 頭部相對頸線有足夠深度（min_depth_pct）
+
+    進場（收盤跌破 MA60）由策略層處理，這裡只負責幾何型態。
+    """
+    required = {"open", "high", "low", "close"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"DataFrame 缺少欄位: {missing}")
+
+    lows = df["low"].tolist()
+    highs = df["high"].tolist()
+
+    swing_highs = _find_swing_highs(highs, swing_lookback)
+    patterns: list[MHeadPattern] = []
+
+    for i, first_idx in enumerate(swing_highs):
+        for second_idx in swing_highs[i + 1 :]:
+            gap = second_idx - first_idx
+            if gap < min_bars_between_highs:
+                continue
+            if gap > max_bars_between_highs:
+                break
+
+            first_high = highs[first_idx]
+            second_high = highs[second_idx]
+            avg_high = (first_high + second_high) / 2
+            if avg_high == 0:
+                continue
+            if abs(first_high - second_high) / avg_high > high_tolerance_pct:
+                continue
+
+            # 頸線：兩高峰之間的最低點（不必再等轉折確認，1 分 K 較穩）
+            lo_slice = lows[first_idx + 1 : second_idx]
+            if not lo_slice:
+                continue
+            neckline_price = min(lo_slice)
+            neckline_idx = first_idx + 1 + lo_slice.index(neckline_price)
+
+            peak = max(first_high, second_high)
+            if peak <= 0:
+                continue
+            depth = peak - neckline_price
+            if depth / peak < min_depth_pct:
+                continue
+
+            patterns.append(
+                MHeadPattern(
+                    first_high_idx=first_idx,
+                    second_high_idx=second_idx,
+                    neckline_idx=neckline_idx,
+                    first_high=first_high,
+                    second_high=second_high,
+                    neckline=neckline_price,
+                )
+            )
+
+    return _dedupe_m_heads(patterns)
+
+
+def _dedupe_m_heads(patterns: Iterable[MHeadPattern]) -> list[MHeadPattern]:
+    """同一第二高點只保留深度最大的 M 頭。"""
+    by_h2: dict[int, MHeadPattern] = {}
+    for p in patterns:
+        existing = by_h2.get(p.second_high_idx)
+        if existing is None or p.depth > existing.depth:
+            by_h2[p.second_high_idx] = p
+    return sorted(by_h2.values(), key=lambda p: p.second_high_idx)

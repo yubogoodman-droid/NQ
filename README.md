@@ -22,6 +22,19 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 一分 K 高檔 M 頭跌破 MA60 做空
+
+1 分鐘圖：高檔做出雙頂（兩高峰價差 ≤ 0.12%，頸線仍在 MA60 上方），第二頭確認後**收盤跌破 MA60** 做空。  
+停損在較高頭頂上方；目標取量度跌幅與 1.5R 較近者。持倉最多 120 根，不重疊。
+
+```bash
+python3 examples/nq_m_head.py --period 30d --pages
+python3 examples/nq_m_head.py --period 8d --html output/nq_m_head.html
+python3 examples/test_nq_m_head.py
+```
+
+報告：`docs/nq-m-head/`（GitHub Pages）／`view.html`（內嵌圖，給 htmlpreview）。
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
