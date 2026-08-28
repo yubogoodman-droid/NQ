@@ -47,6 +47,8 @@ def test_near_falling_5m_ma60() -> None:
     assert not near_falling_5m_ma60(29060.0, 29080.0, 8.0, 40.0)
     assert not near_falling_5m_ma60(29060.0, 29180.0, -8.0, 40.0)
     assert not near_falling_5m_ma60(29060.0, 29080.0, -8.0, 0.0)
+    # 08-03 09:50：5m MA20 已上彎，綠線還在頭上也不算蓋頭
+    assert not near_falling_5m_ma60(28470.0, 28494.8, -6.8, 40.0, 7.8)
 
 
 def test_near_falling_5m_ma20_ma30() -> None:

@@ -113,12 +113,12 @@ if inSetup
             pierce = ma20 - low
             // 08-28 10:27 收盤高 17 點仍算回踩；高 31 點那種彈走再等
             touch = leftOk and pulledOk and pierce >= -touchAbove and pierce <= maxPierce and close >= ma20 and (close - ma20) <= maxCloseAbove
-            dumpKill = maxDumpBody > 0 and (open - close) >= maxDumpBody
+            dumpKill = maxDumpBody > 0 and (open - close) >= maxDumpBody and (na(ma20_5) or na(ma20_5_prev) or ma20_5 < ma20_5_prev)
             nearPrev = maxPrevAbove <= 0 or close[1] - ma20 < maxPrevAbove
             oldEnough = minRetestBars <= 0 or (bar_index - reclaimBar >= minRetestBars)
             stopLevel = nz(shoulderLow, low) - stopBuf
             risk = close - stopLevel
-            ma60FallingNear = ma60Near > 0 and not na(ma60_5) and not na(ma60_5_prev) and ma60_5 < ma60_5_prev and math.abs(close - ma60_5) <= ma60Near
+            ma60FallingNear = ma60Near > 0 and not na(ma60_5) and not na(ma60_5_prev) and ma60_5 < ma60_5_prev and math.abs(close - ma60_5) <= ma60Near and (na(ma20_5) or na(ma20_5_prev) or ma20_5 < ma20_5_prev)
             ma20_30FallingNear = ma20Near > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma30_5) and not na(ma30_5_prev) and not na(ma60_5) and not na(ma60_5_prev) and ma20_5 < ma20_5_prev and ma30_5 < ma30_5_prev and ma60_5 < ma60_5_prev and close < ma20_5 and close < ma30_5 and ma20_5 < ma30_5 and ma30_5 < ma60_5 and (ma20_5 - close) <= ma20Near and (ma30_5 - close) <= ma20Near
             farBelow5mMa20 = ma20Below > 0 and not na(ma20_5) and not na(ma20_5_prev) and ma20_5 < ma20_5_prev and (ma20_5 - close) > ma20Below
             gapOk = na(lastEntryBar) or (bar_index - lastEntryBar >= minEntryGap)

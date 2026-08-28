@@ -116,9 +116,15 @@ def near_falling_5m_ma60(
     ma60_5m: float,
     slope: float,
     near: float,
+    ma20_5m_slope: float = float("nan"),
 ) -> bool:
-    """進場價貼著下彎的 5m MA60（綠線）→ 濾掉。"""
+    """進場價貼著下彎的 5m MA60（綠線）→ 濾掉。
+
+    5m MA20 已經上彎時不算蓋頭（08-03 09:50 右肩，綠線還在頭上但粉紅已翻）。
+    """
     if near <= 0 or np.isnan(ma60_5m) or np.isnan(slope):
+        return False
+    if not np.isnan(ma20_5m_slope) and float(ma20_5m_slope) >= 0.0:
         return False
     return float(slope) < 0.0 and abs(float(entry) - float(ma60_5m)) <= float(near)
 
@@ -464,12 +470,17 @@ def detect_signals(
             # 不能整波作廢，否則圈裡 09:43 那腳也沒了。
             if min_retest_bars > 0 and t - reclaim_idx < min_retest_bars:
                 continue
+            m20_5_s_now = (
+                float(ma20_5m_slope[t]) if not np.isnan(ma20_5m_slope[t]) else float("nan")
+            )
             # 大陰線砸上 MA20 = 這肩失敗（07-31 09:38、08-28 09:49 實體 39 點）。
-            # 08-28 圈在 10:27：實體 29 點、前一根高 46 點，是右肩回踩不是砸盤。
+            # 08-03 09:46 是右肩回踩（5m MA20 已上彎），只跳過這根，不能整波作廢。
             if max_dump_body > 0 and dump_body >= max_dump_body:
                 bump("skip_dump")
-                dead = True
-                break
+                if np.isnan(m20_5_s_now) or m20_5_s_now < 0.0:
+                    dead = True
+                    break
+                continue
             if max_prev_above > 0 and prev_above >= max_prev_above:
                 bump("skip_dump")
                 continue
@@ -503,7 +514,7 @@ def detect_signals(
             m60_5_s = (
                 float(ma60_5m_slope[t]) if not np.isnan(ma60_5m_slope[t]) else float("nan")
             )
-            if near_falling_5m_ma60(entry, m60_5, m60_5_s, ma60_5m_near):
+            if near_falling_5m_ma60(entry, m60_5, m60_5_s, ma60_5m_near, m20_5_s_now):
                 bump("skip_ma60")
                 continue
 
