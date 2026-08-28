@@ -60,6 +60,28 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
+## 台股成交額前 200 · 一小時 K 站上 MA60
+
+監看成交額前 200 檔（**股價 >700、金融股濾掉**），**1815 富喬預設必抓**。一小時 K 若**上一根收在 60MA 下方、這根收盤站上**，Telegram 跳通知（帶 K 線圖）。盤中在 10:00 / 11:00 / 12:00 / 13:00 / 13:30 收完後掃。
+
+```bash
+# 先測 Telegram
+python3 examples/watch_tw_1h_ma60.py --test
+
+# 只掃一輪、印在終端（不必開 Telegram）
+python3 examples/watch_tw_1h_ma60.py --dry-run --once --limit 200
+
+# 近兩週 HTML（富喬置頂，圖嵌進 HTML）
+python3 examples/watch_tw_1h_ma60.py --scan --dry-run --limit 200 --days 10 --pages
+
+# 盤中監看：每根一小時收盤掃一次
+python3 examples/watch_tw_1h_ma60.py
+```
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma240-alert-61bd/docs/tw-1h-ma60/index.html
+
+憑證放 `tg_config.env`（同 NQ 破底翻）。`--codes 1815,2330` 可改成只看指定股票。
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
