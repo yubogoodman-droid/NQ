@@ -196,15 +196,21 @@ def _is_high_level(
     lookback: int = 120,
     near_pct: float = 0.002,
 ) -> bool:
-    """高峰需接近近 lookback 根高點，且兩頭頂在 MA60 上方。"""
+    """高峰需接近近 lookback 根高點；M 頭坐在 MA60 上方（頸線當下仍高於 MA60）。"""
     h2 = pattern.second_high_idx
-    if h2 >= len(ma60) or np.isnan(ma60[pattern.first_high_idx]) or np.isnan(ma60[h2]):
+    neck_i = pattern.neckline_idx
+    if h2 >= len(ma60) or neck_i >= len(ma60):
+        return False
+    if np.isnan(ma60[pattern.first_high_idx]) or np.isnan(ma60[h2]) or np.isnan(ma60[neck_i]):
         return False
     if pattern.first_high < float(ma60[pattern.first_high_idx]):
         return False
     if pattern.second_high < float(ma60[h2]):
         return False
     if float(df["close"].iloc[h2]) < float(ma60[h2]):
+        return False
+    # 用頸線那根的 MA60，避免盤整時均線追上頸線而被誤殺
+    if pattern.neckline < float(ma60[neck_i]):
         return False
     start = max(0, h2 - lookback)
     window_high = float(df["high"].iloc[start : h2 + 1].max())
@@ -228,11 +234,11 @@ def generate_signals(
     min_risk: float = 50.0,
     max_risk: float = 220.0,
     min_h2_extension: float = 30.0,
-    min_break_pts: float = 1.0,
+    min_break_pts: float = 8.0,
     session_start: Optional[int] = None,
     session_end: Optional[int] = None,
-    target_r: float = 1.5,
-    use_measured_target: bool = True,
+    target_r: float = 2.0,
+    use_measured_target: bool = False,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """高檔 M 頭確認後，收盤跌破 MA60 做空。"""
@@ -285,12 +291,11 @@ def generate_signals(
                 break
             if np.isnan(ma60[k]):
                 continue
-            prev_close = close[k - 1] if k > 0 else close[k]
-            prev_ma = ma60[k - 1] if k > 0 and not np.isnan(ma60[k - 1]) else ma60[k]
-            under = close[k] <= ma60[k] - min_break_pts
-            crossed = under and prev_close >= prev_ma
-            already_under = k == confirm and under
-            if crossed or already_under:
+            # 真跌破：收盤同時低於 MA60（不是 1 點吻線）與 M 頸線。
+            # 排除「價格橫盤、MA60 往上追上」——那種收盤仍在頸線之上。
+            under_ma = close[k] <= ma60[k] - min_break_pts
+            under_neck = close[k] < p.neckline
+            if under_ma and under_neck:
                 entry_idx = k
                 break
         if invalidated:
@@ -644,7 +649,7 @@ def _render_trade_card(
         "<span class='tag tag-info'>1m 空</span>"
         "</div>"
         "<pre class='trade-detail'>"
-        f"entry(跌破MA60) {sig.entry:.2f}\n"
+        f"entry(跌破MA60+頸線) {sig.entry:.2f}\n"
         f"MA60 {sig.ma60:.2f} / MA20 {sig.ma20:.2f} / MA5 {sig.ma5:.2f}\n"
         f"stop H高點+緩衝 {sig.stop_loss:.2f}  (風險 {risk:.1f})\n"
         f"TP {sig.target:.2f}\n"

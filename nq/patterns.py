@@ -215,11 +215,11 @@ def detect_m_heads(
     在 OHLCV DataFrame 上偵測 M 頭（雙頂）型態。
 
     條件：
-    1. 兩個相近的波段高點（價差在 high_tolerance_pct 內）
+    1. 左峰為頭，右峰等高或略低（價差在 high_tolerance_pct 內）
     2. 兩高點之間有明確的頸線低點
     3. 頭部相對頸線有足夠深度（min_depth_pct）
 
-    進場（收盤跌破 MA60）由策略層處理，這裡只負責幾何型態。
+    進場（收盤同時跌破頸線與 MA60）由策略層處理，這裡只負責幾何型態。
     """
     required = {"open", "high", "low", "close"}
     missing = required - set(df.columns)
@@ -245,7 +245,10 @@ def detect_m_heads(
             avg_high = (first_high + second_high) / 2
             if avg_high == 0:
                 continue
-            if abs(first_high - second_high) / avg_high > high_tolerance_pct:
+            # 經典 M：左峰為頭，右峰等高或略低；右峰再創高是上漲中繼，不是高檔雙頂
+            if second_high > first_high + 0.25:
+                continue
+            if (first_high - second_high) / avg_high > high_tolerance_pct:
                 continue
 
             # 頸線：兩高峰之間的最低點（不必再等轉折確認，1 分 K 較穩）

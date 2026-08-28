@@ -107,6 +107,7 @@ def test_detect_m_heads_geometry() -> None:
     assert patterns, "synthetic M-head should be detected"
     p = patterns[0]
     assert p.first_high_idx < p.second_high_idx
+    assert p.second_high <= p.first_high + 0.25
     assert abs(p.first_high - p.second_high) / p.peak < 0.002
     assert p.neckline < min(p.first_high, p.second_high)
 
@@ -120,6 +121,7 @@ def test_detect_and_simulate_short() -> None:
     assert sig.entry < sig.stop_loss
     assert sig.target < sig.entry
     assert sig.entry < sig.ma60 + 1e-9
+    assert sig.entry < sig.pattern.neckline
     assert sig.bar_idx > sig.pattern.second_high_idx
 
     trades = run_backtest(df, sigs, max_bars_hold=80)
@@ -128,6 +130,18 @@ def test_detect_and_simulate_short() -> None:
     # 做空：價格續跌應為正損益或至少有出場
     assert trades[0].exit_idx >= trades[0].signal.bar_idx
     assert trades[0].pnl_points == trades[0].signal.entry - trades[0].exit_price
+
+
+def test_reject_higher_high() -> None:
+    """右峰再創高是上漲中繼，不該當成高檔 M 頭。"""
+    df = _make_m_head_bars()
+    high = df["high"].to_numpy(copy=True)
+    h2 = 236
+    high[h2] = float(high[200]) + 8.0
+    df = df.copy()
+    df["high"] = high
+    patterns = detect_m_heads(df)
+    assert all(p.second_high_idx != h2 for p in patterns)
 
 
 def test_no_signal_without_ma60_break() -> None:
@@ -172,6 +186,7 @@ def main() -> int:
     test_summarize_short_pnl()
     test_detect_m_heads_geometry()
     test_detect_and_simulate_short()
+    test_reject_higher_high()
     test_no_signal_without_ma60_break()
     test_write_html_report()
     print("ok")
