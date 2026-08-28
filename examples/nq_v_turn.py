@@ -2,9 +2,9 @@
 """NQ 五分 K V 轉：急跌後幾乎不盤整、同速拉回。
 
 對齊 2026-08-27 那筆（ETH 02:10 低 29401.75 → 04:50 高 29662）：
-  1. 12~28 根內從左側高點灌到右側低點，深度 ≥ max(80 點, 2.2 ATR)
+  1. 16~28 根內從左側高點灌到右側低點，深度 ≥ max(120 點, 4 ATR)
   2. 底部不盤（靠近低點的 K ≤ 3 根）—— V 不是 U、不是 W
-  3. 之後 ≤ dump 根數內收復 50% 跌幅，收紅且站上 MA5 做多
+  3. 之後至少 3 根、且 ≤ dump 根數內收復 50% 跌幅，收紅且站上 MA5 做多
   4. 收復斜率 ≥ dump 斜率的 70%
   5. 停損 V 低下方，目標量度 1.5× dump（約回到起跌點再延伸半段）
 
@@ -230,13 +230,14 @@ def _best_dump_ending_here(
 
 def detect_signals(
     df,
-    min_dump_bars: int = 12,
+    min_dump_bars: int = 16,
     max_dump_bars: int = 28,
     recover_frac: float = 0.50,
+    min_recover_bars: int = 3,
     min_recover_speed: float = 0.70,
     atr_len: int = 14,
-    min_drop_pts: float = 80.0,
-    min_drop_atr: float = 2.2,
+    min_drop_pts: float = 120.0,
+    min_drop_atr: float = 4.0,
     min_drop_pct: float = 0.0025,
     min_red_frac: float = 0.55,
     max_base_bars: int = 3,
@@ -320,6 +321,8 @@ def detect_signals(
             rec_bars = j - dump_idx
             rec_pts = float(close[j]) - dump_low
             rec_speed = (rec_pts / rec_bars / dump_speed) if rec_bars and dump_speed else 0.0
+            if rec_bars < min_recover_bars:
+                continue
             if rec_speed < min_recover_speed:
                 bump("skip_slow")
                 continue
@@ -729,7 +732,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 五分 K V轉</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">12~28 根急跌、尖底不盤，之後同速收復 50% 做多。停損 V 低下方，目標 1.5× dump。含 ETH，09:30–10:00 不進。</p>
+<p class="muted">16~28 根急跌（≥120 點 / 4 ATR）、尖底不盤，之後至少 3 根同速收復 50% 做多。停損 V 低下方，目標 1.5× dump。含 ETH，09:30–10:00 不進。</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -799,8 +802,10 @@ def cmd_backtest(args) -> int:
 
     if stats["count"] == 0:
         verdict = "這段樣本沒抓到 V 轉。多數急跌要嘛底部盤成 U，要嘛回補太慢。"
-    elif stats["total_points"] > 0 and stats["win_rate"] >= 45:
+    elif stats["total_points"] > 50 and stats["win_rate"] >= 45:
         verdict = "有料：尖底 V 比接刀清楚。假 V（回補 50% 後再破底）仍會一次吐回去。"
+    elif abs(stats["total_points"]) <= 50:
+        verdict = "抓得到 08-27 那種 V，但樣本交易優勢接近零。真 V 的量度被假 V 破底吃掉。"
     elif stats["total_points"] > 0:
         verdict = "邊緣：總點數正，但勝率不高，還不算穩的優勢。"
     else:
