@@ -3,11 +3,11 @@
 
 對齊 2026-08-27 那筆（ETH 02:10 低 29401.75 → 04:50 高 29662）：
   1. 16~28 根內從左側高點灌到右側低點，深度 ≥ max(120 點, 4 ATR)
-  2. 底部不盤（靠近低點的 K ≤ 3 根）—— V 不是 U、不是 W
+  2. 底部不盤（靠近低點的 K ≤ 3 根），dump 中途不能出現大陽反包—— V 不是 U、不是 W
   3. 頸線 = 起跌高點；右腿第一次回到頸線（回補 ≥ 98%）時，右腿 K 數須為左腿的 0.50~1.60 倍
   4. 收紅站上 MA5 做多。停損用右腿回撤低，目標頸線再延伸 0.7× dump
 
-含 ETH（那筆 V 在凌晨）；RTH 09:30–10:00 開盤噪音不進。
+含 ETH（那筆 V 在凌晨）；RTH 09:00–10:00 開盤噪音不進。
 
 用法:
   python3 examples/nq_v_turn.py
@@ -171,9 +171,9 @@ def quality_from_v(drop_atr: float, recover_speed: float, vol_mult: float) -> Tu
 
 
 def _is_rth_open_noise(ts) -> bool:
-    """09:30–10:00 ET 開盤區間，V 很容易被假跌破洗掉。"""
+    """09:00–10:00 ET 接近開盤，假 V 很容易被 09:30 瀑布洗掉。"""
     mins = ts.hour * 60 + ts.minute
-    return 9 * 60 + 30 <= mins < 10 * 60
+    return 9 * 60 <= mins < 10 * 60
 
 
 def _best_dump_ending_here(
@@ -192,6 +192,7 @@ def _best_dump_ending_here(
     min_red_frac: float,
     max_base_bars: int,
     left_high_frac: float,
+    max_dump_green_frac: float,
 ) -> Optional[Tuple[int, int, int, float, float, float]]:
     """若 i 是某段急跌的右側低點，回傳最佳 dump 視窗。"""
     a = float(atr14[i])
@@ -231,6 +232,14 @@ def _best_dump_ending_here(
         if base > max_base_bars:
             continue
 
+        max_green = 0.0
+        for k in range(win0, i):
+            body = float(close[k]) - float(open_[k])
+            if body > max_green:
+                max_green = body
+        if drop > 0 and max_green / drop > max_dump_green_frac:
+            continue
+
         if drop > best_drop:
             best_drop = drop
             best = (win0, win0 + hi_off, i, dump_high, dump_low, drop)
@@ -254,6 +263,7 @@ def detect_signals(
     min_red_frac: float = 0.55,
     max_base_bars: int = 3,
     left_high_frac: float = 0.40,
+    max_dump_green_frac: float = 0.30,
     vol_lookback: int = 20,
     stop_buffer: float = 8.0,
     target_dump_mult: float = 1.7,
@@ -301,6 +311,7 @@ def detect_signals(
             min_red_frac=min_red_frac,
             max_base_bars=max_base_bars,
             left_high_frac=left_high_frac,
+            max_dump_green_frac=max_dump_green_frac,
         )
         if dump is None:
             i += 1
@@ -784,7 +795,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 五分 K V轉</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">16~28 根急跌（≥120 點 / 4 ATR）、尖底不盤。頸線=起跌高，右腿第一次回到頸線（≥98%）且時間為左腿的 0.50~1.60 倍。停損右腿回撤，目標頸線再延伸 0.7× dump。含 ETH，09:30–10:00 不進。</p>
+<p class="muted">16~28 根急跌（≥120 點 / 4 ATR）、尖底不盤、dump 中途不能大陽反包。頸線=起跌高，右腿第一次回到頸線（≥98%）且時間為左腿的 0.50~1.60 倍。停損右腿回撤，目標頸線再延伸 0.7× dump。含 ETH，09:00–10:00 不進。</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>

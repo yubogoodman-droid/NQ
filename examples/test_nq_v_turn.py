@@ -45,6 +45,7 @@ def _make_v_bars(
     bounce: bool = True,
     u_base: bool = False,
     fast_recover: bool = False,
+    mid_dump_bounce: bool = False,
     n: int = 220,
 ) -> pd.DataFrame:
     """~24-bar 150pt dump, sharp pivot, then a matching-length climb back to the neckline."""
@@ -106,6 +107,12 @@ def _make_v_bars(
             open_[i] = close[i] - 4.0
             high[i] = close[i] + 3.0
             low[i] = min(close[i] - 2.0, open_[i] - 1.0)
+    if mid_dump_bounce:
+        mid = dump_start + dump_len // 2
+        open_[mid] = close[mid] - 4.0
+        close[mid] = close[mid] + 70.0
+        high[mid] = close[mid] + 2.0
+        low[mid] = open_[mid] - 1.0
 
     vol = np.full(n, 90.0)
     vol[dump_start : dump_end + 6] = 240.0
@@ -151,6 +158,12 @@ def test_no_signal_on_asymmetric_spike() -> None:
     assert not sigs, "5-bar spike back is not a symmetric neckline V"
 
 
+def test_no_signal_on_w_inside_dump() -> None:
+    df = _make_v_bars(bounce=True, mid_dump_bounce=True)
+    sigs = detect_signals(df, skip_rth_open=False)
+    assert not sigs, "a fat green mid-dump bar is a W, not a V"
+
+
 def test_simulate_and_html(tmp_path: Path | None = None) -> None:
     df = _make_v_bars(bounce=True)
     sigs = detect_signals(df, skip_rth_open=False)
@@ -175,6 +188,7 @@ def main() -> int:
     test_no_signal_on_continued_dump()
     test_no_signal_on_u_base()
     test_no_signal_on_asymmetric_spike()
+    test_no_signal_on_w_inside_dump()
     test_simulate_and_html()
     print("ok")
     return 0
