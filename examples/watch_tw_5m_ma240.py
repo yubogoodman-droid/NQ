@@ -409,6 +409,33 @@ def format_hit(hit: RetestHit, *, live: bool = False) -> str:
     )
 
 
+def session_dates_back(n: int, now: datetime | None = None) -> set:
+    """最近 n 個台股交易日（週一到週五，不含國定假日）。"""
+    cur = (now or datetime.now(TPE)).astimezone(TPE).date()
+    out = []
+    guard = 0
+    while len(out) < max(0, n) and guard < 21:
+        if cur.weekday() < 5:
+            out.append(cur)
+        cur -= timedelta(days=1)
+        guard += 1
+    return set(out)
+
+
+def hit_session_date(hit: RetestHit):
+    ts = hit.ts
+    if getattr(ts, "tzinfo", None) is not None:
+        ts = ts.tz_convert(TPE)
+    return pd.Timestamp(ts).date()
+
+
+def filter_hits_days(hits: list[RetestHit], days: int, now: datetime | None = None) -> list[RetestHit]:
+    if not days or days <= 0:
+        return hits
+    keep = session_dates_back(days, now)
+    return [h for h in hits if hit_session_date(h) in keep]
+
+
 def format_hit_line(hit: RetestHit) -> str:
     ts = hit.ts
     if getattr(ts, "tzinfo", None) is not None:
@@ -673,6 +700,8 @@ def round_once(
         sleep=args.sleep,
         **detect_kwargs(args),
     )
+    if args.scan and getattr(args, "days", 0):
+        hits = filter_hits_days(hits, args.days)
     errors = sum(1 for m in metas if m.get("error"))
     new = [h for h in hits if h.key not in seen]
     now = datetime.now(TPE)
@@ -688,6 +717,25 @@ def round_once(
         save_seen(seen)
         return seen
     if args.scan:
+        if getattr(args, "days", 0):
+            hits = filter_hits_days(hits, args.days)
+            dates = sorted(session_dates_back(args.days))
+            by_day: dict[str, int] = {}
+            for h in hits:
+                key = str(hit_session_date(h))
+                by_day[key] = by_day.get(key, 0) + 1
+            pierce = sum(1 for h in hits if h.pierced)
+            print(
+                f"近 {args.days} 個交易日 {dates[0]}→{dates[-1]}  "
+                f"訊號 {len(hits)} 筆、{len({h.code for h in hits})} 檔"
+                f"（刺破收回 {pierce}、貼到均線 {len(hits) - pierce}）",
+                flush=True,
+            )
+            if by_day:
+                print(
+                    "分日 " + "  ".join(f"{d[5:]} {by_day[d]}" for d in sorted(by_day)),
+                    flush=True,
+                )
         for h in hits:
             print(format_hit_line(h))
         return seen
@@ -733,6 +781,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--sleep", type=float, default=0.08)
     p.add_argument("--once", action="store_true", help="只掃一輪")
     p.add_argument("--scan", action="store_true", help="掃完整段五分K（近一個月回測清單）")
+    p.add_argument("--days", type=int, default=0, help="--scan 只列最近幾個交易日，例如 3")
     p.add_argument("--dry-run", action="store_true", help="只印、不推 Telegram")
     p.add_argument("--test", action="store_true", help="只測 Telegram")
     p.add_argument("--seed", action="store_true", help="第一次就把已出現的回測推出去")

@@ -16,6 +16,7 @@ from watch_tw_5m_ma240 import (  # noqa: E402
     TPE,
     add_mas,
     detect_retests,
+    filter_hits_days,
     format_hit,
     format_hit_line,
     hit_from_row,
@@ -23,6 +24,7 @@ from watch_tw_5m_ma240 import (  # noqa: E402
     next_session_open,
     seconds_until_next_5m,
     seconds_until_next_scan,
+    session_dates_back,
     touch_band,
     tw_tick,
 )
@@ -191,6 +193,29 @@ def test_next_session_skips_weekend() -> None:
     assert nxt.hour == 9
 
 
+def test_session_dates_back() -> None:
+    friday = datetime(2026, 8, 28, 16, 0, tzinfo=TPE)
+    got = {d.isoformat() for d in session_dates_back(3, friday)}
+    assert got == {"2026-08-26", "2026-08-27", "2026-08-28"}
+    monday = datetime(2026, 8, 31, 10, 0, tzinfo=TPE)
+    got2 = {d.isoformat() for d in session_dates_back(3, monday)}
+    assert got2 == {"2026-08-31", "2026-08-28", "2026-08-27"}
+
+
+def test_filter_hits_days() -> None:
+    df = _extended_then(last_close=101.2, last_low=100.4)
+    ma = float(df["MA240"].iloc[-1])
+    df.iloc[-1, df.columns.get_loc("Low")] = ma
+    df.iloc[-1, df.columns.get_loc("Close")] = ma + 0.3
+    row = {"code": "2330", "name": "台積電", "symbol": "2330.TW", "rank": 1, "amount": 1}
+    old = hit_from_row(df, len(df) - 1, row)
+    old.ts = pd.Timestamp("2026-08-20 11:00", tz=TPE)
+    new = hit_from_row(df, len(df) - 1, row)
+    new.ts = pd.Timestamp("2026-08-27 11:00", tz=TPE)
+    kept = filter_hits_days([old, new], 3, datetime(2026, 8, 28, 16, 0, tzinfo=TPE))
+    assert [h.ts.day for h in kept] == [27]
+
+
 def test_wait_helpers() -> None:
     noon = datetime(2026, 8, 28, 10, 1, 0, tzinfo=TPE)
     wait = seconds_until_next_5m(noon, extra=8)
@@ -214,6 +239,8 @@ def main() -> int:
     test_market_session_hours()
     test_next_session_skips_weekend()
     test_wait_helpers()
+    test_session_dates_back()
+    test_filter_hits_days()
     print("ok")
     return 0
 

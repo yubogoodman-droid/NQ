@@ -75,6 +75,7 @@ python3 examples/watch_tw_5m_ma240.py --dry-run --once --limit 200
 
 # 近一個月回測清單
 python3 examples/watch_tw_5m_ma240.py --scan --dry-run --limit 50
+python3 examples/watch_tw_5m_ma240.py --scan --dry-run --limit 200 --days 3
 
 # 盤中監看：每根五分收盤掃一次
 python3 examples/watch_tw_5m_ma240.py
