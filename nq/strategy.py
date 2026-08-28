@@ -41,6 +41,7 @@ class NQWBottomStrategy:
     L1 左腳 → 反彈 → L2 中間破底 → 收復 → L3 右腳收盤進場
     停損：L3 下方 20 點
     停利：頸線 + (頸線 − L2)
+    均線糾結（MA5/10/20/60/120/200 高低差過小）不進場
     """
 
     swing_lookback: int = 3
@@ -54,6 +55,8 @@ class NQWBottomStrategy:
     max_reclaim_bars: int = 36
     max_breakout_bars: int = 36
     stop_below_l3_points: float = 20.0
+    min_ma_span_points: float = 40.0
+    ma_periods: tuple[int, ...] = (5, 10, 20, 60, 120, 200)
     tick_size: float = 0.25
     point_value: float = 20.0
 
@@ -80,6 +83,8 @@ class NQWBottomStrategy:
             target = self._round_tick(pattern.target)
             if entry <= stop:
                 continue
+            if self._mas_tangled(df, idx):
+                continue
             signals.append(
                 Signal(
                     timestamp=df.index[idx],
@@ -92,6 +97,18 @@ class NQWBottomStrategy:
                 )
             )
         return signals
+
+    def _mas_tangled(self, df: pd.DataFrame, idx: int) -> bool:
+        """六條均線高低差過小 = 糾結盤整，不進場。K 數不夠算 MA60 時不濾。"""
+        close = df["close"].astype(float)
+        vals: list[float] = []
+        for period in self.ma_periods:
+            if idx + 1 < period:
+                continue
+            vals.append(float(close.iloc[idx - period + 1 : idx + 1].mean()))
+        if len(vals) < 4:
+            return False
+        return max(vals) - min(vals) < self.min_ma_span_points
 
     def _round_tick(self, price: float) -> float:
         return round(price / self.tick_size) * self.tick_size

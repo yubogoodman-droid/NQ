@@ -153,6 +153,13 @@ def test_strategy_enters_on_l3_close() -> None:
     assert sig.stop_loss == round((sig.pattern.l3 - 20.0) / 0.25) * 0.25
 
 
+def test_tangled_moving_averages_are_skipped() -> None:
+    """進場時 MA5/10/20/60 擠在一起則跳過。"""
+    # 先走 80 根橫盤，讓均線黏在一起，再接標準 W
+    rows = _flat(80, 10040.0) + _l1_l2_l3_rows()
+    assert NQWBottomStrategy().generate_signals(_df(rows)) == []
+
+
 def test_pattern_longer_than_two_hours_is_ignored() -> None:
     rows = _l1_l2_l3_rows()
     # 在 L3 前插入超過 2 小時的空白 K
