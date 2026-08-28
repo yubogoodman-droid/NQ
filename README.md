@@ -36,7 +36,8 @@ python3 examples/test_nq_v_turn.py
 
 TradingView：`pinescript/nq_v_turn_5m.pine` 貼到 NQ1! / MNQ1! 五分圖。
 
-近一個月 Yahoo 五分（2026-07-26 → 08-28）：時間窗放到 0.50~1.60 後曾到 9 筆；07-28 那筆 dump 中間有一根 +77 點大陽（W 不是 V），又在 09:05 接刀後被 09:30 開盤瀑布洗掉，已濾掉。  
+近一個月 Yahoo 五分（2026-07-26 → 08-28）：**8 筆、勝率 75%、+436.0 點**（均筆 +54.5）。  
+時間窗放到 0.50~1.60 後曾混進 07-28：dump 中間一根 +77 點大陽（W 不是 V），09:05 進場後被 09:30 開盤瀑布洗掉 −76.8，已濾掉。  
 08-27 仍是 02:10 V底 → 04:00 進場、目標 **+86.5**（0.95×）。
 
 預覽（圖嵌在 HTML 裡，htmlpreview 才不會掛）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-v-turn-4941/docs/nq-v-turn/view.html
