@@ -5,7 +5,7 @@
   1. 16~28 根內從左側高點灌到右側低點，深度 ≥ max(120 點, 4 ATR)
   2. 底部不盤（靠近低點的 K ≤ 3 根）—— V 不是 U、不是 W
   3. 頸線 = 起跌高點；右腿第一次回到頸線（回補 ≥ 98%）時，右腿 K 數須為左腿的 0.65~1.40 倍
-  4. 收紅站上 MA5 做多。停損用右腿回撤低，目標頸線再延伸 0.5× dump
+  4. 收紅站上 MA5 做多。停損用右腿回撤低，目標頸線再延伸 0.7× dump
 
 含 ETH（那筆 V 在凌晨）；RTH 09:30–10:00 開盤噪音不進。
 
@@ -254,7 +254,7 @@ def detect_signals(
     left_high_frac: float = 0.40,
     vol_lookback: int = 20,
     stop_buffer: float = 8.0,
-    target_dump_mult: float = 1.5,
+    target_dump_mult: float = 1.7,
     max_risk: float = 120.0,
     min_entry_gap: int = 24,
     skip_rth_open: bool = True,
@@ -758,7 +758,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 五分 K V轉</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">16~28 根急跌（≥120 點 / 4 ATR）、尖底不盤。頸線=起跌高，右腿第一次回到頸線（≥98%）且時間為左腿的 0.65~1.40 倍。停損右腿回撤，目標頸線再延伸 0.5× dump。含 ETH，09:30–10:00 不進。</p>
+<p class="muted">16~28 根急跌（≥120 點 / 4 ATR）、尖底不盤。頸線=起跌高，右腿第一次回到頸線（≥98%）且時間為左腿的 0.65~1.40 倍。停損右腿回撤，目標頸線再延伸 0.7× dump。含 ETH，09:30–10:00 不進。</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>

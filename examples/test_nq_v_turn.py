@@ -130,6 +130,7 @@ def test_detect_v_bounce() -> None:
     assert sig.entry_price > sig.stop_price
     assert sig.entry_price > sig.ma5
     assert sig.target_price > sig.entry_price
+    assert abs(sig.target_price - (sig.dump_low + 1.7 * sig.drop_pts)) < 1.0
 
 
 def test_no_signal_on_continued_dump() -> None:
