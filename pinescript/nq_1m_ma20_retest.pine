@@ -10,7 +10,8 @@ reclaimWin    = input.int(120, "收復 MA20 時限（根）", minval=10)
 retestWin     = input.int(90, "回踩時限（根）", minval=10)
 leaveBars     = input.int(8, "離開 MA20 連續根數", minval=1)
 leaveBuf      = input.float(6.0, "離開緩衝（點）", minval=0)
-touchAbove    = input.float(8.0, "回踩允許收盤高於 MA20（點）", minval=0)
+touchAbove    = input.float(8.0, "回踩允許低點高於 MA20（點）", minval=0)
+maxCloseAbove = input.float(20.0, "回踩允許收盤高於 MA20（點）", minval=0)
 maxPierce     = input.float(20.0, "回踩允許刺穿 MA20（點）", minval=0)
 failBelow     = input.float(40.0, "收盤跌破 MA20 則作廢（點）", minval=0)
 stopBuf       = input.float(10.0, "停損在破底下方（點）", minval=0)
@@ -27,8 +28,8 @@ ma60SlopeBars = input.int(6, "5m MA60 斜率回看（5分K根數）", minval=1)
 minEntryGap   = input.int(60, "距上一筆最少根數", minval=0)
 minPullback   = input.float(25.0, "右肩至少從高點拉回（點，0=關）", minval=0)
 maxDumpBody   = input.float(30.0, "進場棒大陰實體上限（點，0=關）", minval=0)
-maxPrevAbove  = input.float(45.0, "前一根收盤高於 MA20 上限（點，0=關）", minval=0)
-minRetestBars = input.int(30, "收復後至少再過 N 根才進", minval=0)
+maxPrevAbove  = input.float(50.0, "前一根收盤高於 MA20 上限（點，0=關）", minval=0)
+minRetestBars = input.int(8, "收復後至少再過 N 根才進", minval=0)
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -109,8 +110,8 @@ if inSetup
             else
                 leftRun := 0
             pierce = ma20 - low
-            // 收盤也要貼 MA20：低點掃到但收在均線上方 30 點那種是彈走，再等回踩
-            touch = leftOk and pulledOk and pierce >= -touchAbove and pierce <= maxPierce and close >= ma20 and (close - ma20) <= touchAbove
+            // 08-28 10:27 收盤高 17 點仍算回踩；高 31 點那種彈走再等
+            touch = leftOk and pulledOk and pierce >= -touchAbove and pierce <= maxPierce and close >= ma20 and (close - ma20) <= maxCloseAbove
             dumpKill = maxDumpBody > 0 and (open - close) >= maxDumpBody
             nearPrev = maxPrevAbove <= 0 or close[1] - ma20 < maxPrevAbove
             oldEnough = minRetestBars <= 0 or (bar_index - reclaimBar >= minRetestBars)

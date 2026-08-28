@@ -252,9 +252,9 @@ INTERVAL_DETECT = {
         ma20_5m_near=45.0,
         min_pullback=25.0,
         max_dump_body=30.0,
-        max_prev_above=45.0,
-        min_retest_bars=30,
-        max_close_above=8.0,
+        max_prev_above=50.0,
+        min_retest_bars=8,
+        max_close_above=20.0,
         stop_at_shoulder=True,
     ),
 }
@@ -427,8 +427,8 @@ def detect_signals(
 
             if not left_ok:
                 continue
-            # 右肩：現價相對這波反彈高點至少拉回 min_pullback（08-28 圖 11:01 高點
-            # 29811 → 11:22 踩 MA20；不能用稍早小回檔把 pulled 黏死，否則 11:06 高點就進）。
+            # 右肩：現價相對這波反彈高點至少拉回 min_pullback
+            # （08-28 圈在 10:30：10:22 高 29676 → 10:27 回踩；不能用更早的小回檔進場）。
             if min_pullback > 0 and peak - float(close[t]) < min_pullback:
                 continue
 
@@ -437,8 +437,8 @@ def detect_signals(
                 continue
             if close[t] < m20:
                 continue
-            # 進場價要坐在 MA20 上：低點掃到但收在均線上方 30 點
-            # （08-03 10:05 entry 28572 vs MA20 28541）那是彈走，不是回踩。
+            # 進場價要坐在 MA20 上：08-28 10:27 收盤高 17 點仍算回踩；
+            # 08-03 10:05 收盤高 31 點是彈走，再等下一腳。
             if max_close_above > 0 and float(close[t]) - m20 > max_close_above:
                 continue
 
@@ -446,9 +446,8 @@ def detect_signals(
             # （07-31 09:38：開 28660 → 收 28604，H-MA +63；08-28 11:23 是小陽線回踩）。
             dump_body = float(open_[t]) - float(close[t])
             prev_above = float(close[t - 1]) - m20 if t > 0 else 0.0
-            # 大陰線砸上 MA20 = 這肩失敗（07-31 09:38、08-28 09:49）。
-            # 不能只 skip 再買下一根；但 V 後第一個小回踩（08-28 10:27 實體 29 點）
-            # 不能整波作廢，否則 11:23 那肩也沒了。
+            # 大陰線砸上 MA20 = 這肩失敗（07-31 09:38、08-28 09:49 實體 39 點）。
+            # 08-28 圈在 10:27：實體 29 點、前一根高 46 點，是右肩回踩不是砸盤。
             if max_dump_body > 0 and dump_body >= max_dump_body:
                 bump("skip_dump")
                 dead = True
