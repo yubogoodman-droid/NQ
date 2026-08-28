@@ -19,9 +19,11 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from dataclasses import dataclass
 from html import escape
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 from zoneinfo import ZoneInfo
@@ -510,7 +512,29 @@ def _equity_svg(pnls: List[float], width: int = 720, height: int = 180) -> str:
     )
 
 
-def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
+def _inline_mpl_svg(fig, prefix: str) -> str:
+    """Turn a matplotlib figure into inline SVG that survives htmlpreview / GitHub raw CSP."""
+    buf = BytesIO()
+    fig.savefig(buf, format="svg", facecolor=fig.get_facecolor())
+    raw = buf.getvalue().decode("utf-8")
+    raw = re.sub(r"<\?xml[^>]*>", "", raw)
+    raw = re.sub(r"<!DOCTYPE[^>]*>", "", raw, flags=re.IGNORECASE)
+    raw = re.sub(r'\bid="([^"]+)"', lambda m: f'id="{prefix}{m.group(1)}"', raw)
+    raw = re.sub(r"url\(#([^)]+)\)", lambda m: f"url(#{prefix}{m.group(1)})", raw)
+    raw = re.sub(
+        r'(href|xlink:href)="#([^"]+)"',
+        lambda m: f'{m.group(1)}="#{prefix}{m.group(2)}"',
+        raw,
+    )
+    raw = raw.replace(
+        "<svg ",
+        '<svg style="width:100%;height:auto;display:block;background:#0c1210" ',
+        1,
+    )
+    return raw.strip()
+
+
+def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> str:
     import matplotlib
 
     matplotlib.use("Agg")
@@ -518,6 +542,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     from matplotlib import font_manager
     from matplotlib.patches import Rectangle
 
+    plt.rcParams["svg.fonttype"] = "path"
     for fp in (
         "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
         "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
@@ -626,8 +651,9 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    svg = _inline_mpl_svg(fig, f"t{trade_no:02d}_")
     plt.close(fig)
-    return path
+    return svg
 
 
 def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int, prefix: str = "t") -> str:
@@ -648,8 +674,8 @@ def _render_trade_cards(
         r_mult = (t.target_price - t.entry_price) / risk if risk > 0 else 0
         reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
         img_name = _trade_img_name(df, t, i, prefix=prefix)
-        draw_trade_png(df, t, html_path.parent / "img" / img_name, i)
-        chart = (
+        svg = draw_trade_png(df, t, html_path.parent / "img" / img_name, i)
+        chart = svg or (
             f"<img src='img/{escape(img_name)}' alt='#{i} Q{escape(t.quality)}' "
             "style='width:100%;display:block;border-radius:10px'/>"
         )
@@ -780,11 +806,10 @@ h1{{font-size:18px;margin:0 0 6px}}
 
 
 def write_view_html(src: Path, branch: str = VIEW_BRANCH) -> Path:
-    rel = src.parent.relative_to(REPO_ROOT).as_posix()
-    base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
-    text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    # Charts are inline SVG, so a straight copy survives htmlpreview and GitHub raw CSP.
+    del branch
     out = src.with_name("view.html")
-    out.write_text(text, encoding="utf-8")
+    out.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
     return out
 
 

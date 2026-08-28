@@ -163,7 +163,7 @@ def test_simulate_and_html(tmp_path: Path | None = None) -> None:
     assert "V轉" in text
     assert "頸線" in text
     if trades:
-        assert "<img src='img/" in text
+        assert "<svg" in text, "trade charts should be inline SVG so previews do not depend on GitHub raw images"
         img_dir = path.parent / "img"
         assert any(img_dir.glob("t01_*.png")), "expected a static trade PNG"
 
