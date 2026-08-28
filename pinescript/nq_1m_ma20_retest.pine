@@ -2,13 +2,13 @@
 strategy("NQ 一分K 破翻回踩MA20", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, pyramiding=0, calc_on_every_tick=false)
 
 // 與五分版同一套：破底 → 收復 MA20 → 連續離開 → 回踩 MA20 做多
-// 1m 根數：2 小時=120 根；離開 8 根。1m MA20 ≈ 20 分鐘，比 5m 更貼，故 failBelow 較寬。
+// 1m 根數：2 小時=120 根；離開 3 根即可回踩。1m MA20 ≈ 20 分鐘，比 5m 更貼，故 failBelow 較寬。
 
 lookback      = input.int(120, "破底回看 K 數（1m×120≈2小時）", minval=20)
 minDepth      = input.float(10.0, "最小破底深度（點）", minval=5)
 reclaimWin    = input.int(120, "收復 MA20 時限（根）", minval=10)
 retestWin     = input.int(90, "回踩時限（根）", minval=10)
-leaveBars     = input.int(8, "離開 MA20 連續根數", minval=1)
+leaveBars     = input.int(3, "離開 MA20 連續根數", minval=1)
 leaveBuf      = input.float(6.0, "離開緩衝（點）", minval=0)
 touchAbove    = input.float(8.0, "回踩允許低點高於 MA20（點）", minval=0)
 maxCloseAbove = input.float(20.0, "回踩允許收盤高於 MA20（點）", minval=0)
@@ -122,7 +122,7 @@ if inSetup
             ma20_30FallingNear = ma20Near > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma30_5) and not na(ma30_5_prev) and not na(ma60_5) and not na(ma60_5_prev) and ma20_5 < ma20_5_prev and ma30_5 < ma30_5_prev and ma60_5 < ma60_5_prev and close < ma20_5 and close < ma30_5 and ma20_5 < ma30_5 and ma30_5 < ma60_5 and (ma20_5 - close) <= ma20Near and (ma30_5 - close) <= ma20Near
             farBelow5mMa20 = ma20Below > 0 and not na(ma20_5) and not na(ma20_5_prev) and ma20_5 < ma20_5_prev and (ma20_5 - close) > ma20Below
             gapOk = na(lastEntryBar) or (bar_index - lastEntryBar >= minEntryGap)
-            if touch and dumpKill
+            if touch and dumpKill and oldEnough
                 inSetup := false
             else if touch and nearPrev and oldEnough and inRth() and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and not farBelow5mMa20 and strategy.position_size == 0 and gapOk
                 tgt = close + risk * targetR

@@ -362,7 +362,7 @@ def test_detect_kwargs_intervals() -> None:
     d5 = detect_kwargs("5m")
     assert d1["lookback"] == 120
     assert d5["lookback"] == 24
-    assert d1["leave_bars"] == 8
+    assert d1["leave_bars"] == 3
     assert d5["leave_bars"] == 3
     assert d1["min_break_depth"] == 10.0
     assert d1["fail_below"] == 40.0

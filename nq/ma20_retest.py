@@ -248,7 +248,7 @@ INTERVAL_DETECT = {
         min_break_depth=10.0,
         reclaim_window=120,
         retest_window=90,
-        leave_bars=8,
+        leave_bars=3,
         leave_buffer=6.0,
         touch_above=8.0,
         max_pierce=20.0,
@@ -460,6 +460,10 @@ def detect_signals(
             # （07-31 09:38：開 28660 → 收 28604，H-MA +63；08-28 11:23 是小陽線回踩）。
             dump_body = float(open_[t]) - float(close[t])
             prev_above = float(close[t - 1]) - m20 if t > 0 else 0.0
+            # 收復後還沒滿 min_retest_bars 的大陰線（08-03 09:42）只是右肩還沒成形，
+            # 不能整波作廢，否則圈裡 09:43 那腳也沒了。
+            if min_retest_bars > 0 and t - reclaim_idx < min_retest_bars:
+                continue
             # 大陰線砸上 MA20 = 這肩失敗（07-31 09:38、08-28 09:49 實體 39 點）。
             # 08-28 圈在 10:27：實體 29 點、前一根高 46 點，是右肩回踩不是砸盤。
             if max_dump_body > 0 and dump_body >= max_dump_body:
@@ -468,8 +472,6 @@ def detect_signals(
                 break
             if max_prev_above > 0 and prev_above >= max_prev_above:
                 bump("skip_dump")
-                continue
-            if min_retest_bars > 0 and t - reclaim_idx < min_retest_bars:
                 continue
 
             # 右肩候選：過濾不通過就繼續掃同一波，不要整段放棄
