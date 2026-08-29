@@ -30,6 +30,7 @@ TZ = ZoneInfo("Asia/Taipei")
 REPO = Path(__file__).resolve().parents[1]
 PAGES = REPO / "docs" / "binance-15m-ma-short" / "index.html"
 PAGES_30D = REPO / "docs" / "binance-15m-ma-short-30d" / "index.html"
+PAGES_60D = REPO / "docs" / "binance-15m-ma-short-60d" / "index.html"
 BRANCH_VIEW = "cursor/15m-ma-break-short-9d44"
 
 INTERVAL = "15m"
@@ -124,6 +125,15 @@ def kline_limit_needed(days: int, interval: str = INTERVAL) -> int:
     """回測窗口 + 均線暖身。15m 一天 96 根，1h 一天 24 根。"""
     per_day = 24 if interval == "1h" else 96
     return days * per_day + WARMUP + 48
+
+
+def pages_html_path(days: int) -> Path:
+    """週報 / 月報 / 兩個月報分開寫，避免互相覆蓋。"""
+    if days >= 50:
+        return PAGES_60D
+    if days >= 28:
+        return PAGES_30D
+    return PAGES
 
 
 def _fetch_klines_page(
@@ -566,6 +576,27 @@ def simulate(df: pd.DataFrame, signals: list[Signal], *, max_hold: int = MAX_HOL
             )
         )
     return results
+
+
+def sequential_equity(
+    trades: list[TradeResult],
+    *,
+    start: float = 100.0,
+    leverage: float = 3.0,
+) -> tuple[float, list[TradeResult], list[TradeResult]]:
+    """全押槓桿、同時只能一單、平倉後才接下一個，複利滾權益。"""
+    eq = start
+    busy_until: pd.Timestamp | None = None
+    taken: list[TradeResult] = []
+    skipped: list[TradeResult] = []
+    for t in sorted(trades, key=lambda x: (x.signal.timestamp, x.signal.symbol)):
+        if busy_until is not None and t.signal.timestamp < busy_until:
+            skipped.append(t)
+            continue
+        eq *= 1.0 + leverage * t.pnl_pct / 100.0
+        taken.append(t)
+        busy_until = t.exit_time
+    return eq, taken, skipped
 
 
 def summarize(trades: list[TradeResult]) -> dict[str, float | int]:
@@ -1121,6 +1152,12 @@ def print_summary(label: str, trades: list[TradeResult], funnel: dict[str, int] 
             f"  [{i}] {t.signal.symbol} {et.strftime('%m-%d %H:%M')} → {xt.strftime('%m-%d %H:%M')} "
             f"{t.exit_reason} {t.pnl_pct:+.2f}%"
         )
+    if trades:
+        eq, taken, skipped = sequential_equity(trades)
+        print(
+            f"  100 USDT × 3x 不能同時持倉：做 {len(taken)} 筆、略過 {len(skipped)} → "
+            f"{eq:.2f} USDT ({eq - 100.0:+.2f})"
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1131,7 +1168,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--min-qv", type=float, default=MIN_QV)
     p.add_argument("--workers", type=int, default=10)
     p.add_argument("--html", default="")
-    p.add_argument("--pages", action="store_true", help="寫到 docs/binance-15m-ma-short/（--days 28 以上寫 30d）")
+    p.add_argument(
+        "--pages",
+        action="store_true",
+        help="寫到 docs/binance-15m-ma-short/（28–49 日寫 30d，50 日以上寫 60d）",
+    )
     p.add_argument("--embed", action="store_true", help="圖用 base64 嵌進 HTML")
     args = p.parse_args(argv)
 
@@ -1159,7 +1200,7 @@ def main(argv: list[str] | None = None) -> int:
 
     html_path = Path(args.html) if args.html else None
     if args.pages:
-        html_path = PAGES_30D if args.days >= 28 else PAGES
+        html_path = pages_html_path(args.days)
     if html_path:
         now = datetime.now(TZ)
         start = eval_start_ts(args.days, now)

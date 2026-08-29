@@ -19,6 +19,8 @@ from binance_15m_ma_break_short import (  # noqa: E402
     filter_signals_1h,
     hourly_snapshot,
     kline_limit_needed,
+    pages_html_path,
+    sequential_equity,
     last_closed_1h_idx,
     resample_1h,
     simulate,
@@ -238,6 +240,36 @@ def test_kline_limit_covers_month() -> None:
     assert kline_limit_needed(7, "15m") >= 7 * 96 + 200
     assert kline_limit_needed(30, "15m") >= 30 * 96 + 200
     assert kline_limit_needed(30, "1h") >= 30 * 24 + 200
+    assert kline_limit_needed(60, "15m") >= 60 * 96 + 200
+    assert kline_limit_needed(60, "1h") >= 60 * 24 + 200
+    assert "30d" in pages_html_path(30).as_posix()
+    assert "60d" in pages_html_path(60).as_posix()
+    assert pages_html_path(7) != pages_html_path(30) != pages_html_path(60)
+
+
+def test_sequential_equity_skips_overlap() -> None:
+    class Sig:
+        def __init__(self, ts: str, sym: str) -> None:
+            self.timestamp = pd.Timestamp(ts, tz=TZ)
+            self.symbol = sym
+
+    class T:
+        def __init__(self, ts: str, end: str, pnl: float, sym: str) -> None:
+            self.signal = Sig(ts, sym)
+            self.exit_time = pd.Timestamp(end, tz=TZ)
+            self.pnl_pct = pnl
+
+    eq, taken, skipped = sequential_equity(
+        [
+            T("2026-08-24 08:00", "2026-08-24 11:00", 3.44, "NBISUSDT"),
+            T("2026-08-24 08:00", "2026-08-24 16:00", 3.33, "SAMSUNGUSDT"),
+            T("2026-08-26 20:30", "2026-08-26 23:00", 2.16, "COINUSDT"),
+        ]
+    )
+    assert [t.signal.symbol for t in taken] == ["NBISUSDT", "COINUSDT"]
+    assert [t.signal.symbol for t in skipped] == ["SAMSUNGUSDT"]
+    expect = 100.0 * (1 + 3 * 3.44 / 100) * (1 + 3 * 2.16 / 100)
+    assert abs(eq - expect) < 1e-9
 
 
 def test_summarize() -> None:
@@ -264,6 +296,7 @@ def main() -> int:
     test_rejects_weaving_before_break()
     test_skips_mid_hour_and_us_session()
     test_kline_limit_covers_month()
+    test_sequential_equity_skips_overlap()
     test_summarize()
     print("ok")
     return 0
