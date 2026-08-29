@@ -17,12 +17,15 @@ from binance_15m_ma_break_short import (  # noqa: E402
     detect_signals,
     draw_trade_png,
     filter_signals_1h,
+    filter_signals_4h,
     hourly_snapshot,
     kline_limit_needed,
+    last_closed_htf_idx,
     pages_html_path,
+    resample_1h,
+    resample_htf,
     sequential_equity,
     last_closed_1h_idx,
-    resample_1h,
     simulate,
     summarize,
 )
@@ -150,8 +153,8 @@ def test_resample_1h_and_snapshot() -> None:
 def test_draw_trade_png_has_hourly(tmp_path: Path | None = None) -> None:
     df = add_mas(_breakdown_series(after="down"))
     trades = simulate(df, detect_signals(df, "TESTUSDT"))
-    out = Path("/tmp/ma_break_short_15m_1h.png")
-    draw_trade_png(df, trades[0], out, 1, df_1h=resample_1h(df))
+    out = Path("/tmp/ma_break_short_15m_1h_4h.png")
+    draw_trade_png(df, trades[0], out, 1, df_1h=resample_1h(df), df_4h=resample_htf(df, 4))
     assert out.exists() and out.stat().st_size > 8000
 
 
@@ -193,6 +196,41 @@ def test_1h_first_break_keeps_and_rejects() -> None:
     assert filter_signals_1h([sig], bull) == []
 
 
+def test_4h_first_break_keeps_and_rejects() -> None:
+    df = add_mas(_breakdown_series(after="down"))
+    trades = simulate(df, detect_signals(df, "TESTUSDT"))
+    assert trades
+    sig = trades[0].signal
+    fourh = resample_htf(df, 4)
+    h = fourh.copy()
+    if "ma99" not in h.columns:
+        h = add_mas(h)
+    pos = last_closed_htf_idx(h, sig.timestamp, 4)
+    assert pos >= 0
+    h.loc[h.index[pos], "close"] = sig.entry * 1.02
+    h.loc[h.index[pos], "ma99"] = sig.entry * 1.01
+    h.loc[h.index[pos], "ma7"] = sig.entry * 1.012
+    h.loc[h.index[pos], "ma14"] = sig.entry * 1.008
+    h.loc[h.index[pos], "ma25"] = sig.entry * 1.004
+    assert len(filter_signals_4h([sig], h)) == 1
+
+    late = h.copy()
+    late.loc[late.index[pos], "close"] = sig.entry * 0.99
+    late.loc[late.index[pos], "ma99"] = sig.entry * 1.01
+    assert filter_signals_4h([sig], late) == []
+
+    shallow = h.copy()
+    shallow.loc[shallow.index[pos], "close"] = sig.entry * 1.05
+    shallow.loc[shallow.index[pos], "ma99"] = sig.entry * 0.99
+    assert filter_signals_4h([sig], shallow) == []
+
+    bull = h.copy()
+    bull.loc[bull.index[pos], "ma7"] = sig.entry * 1.04
+    bull.loc[bull.index[pos], "ma14"] = sig.entry * 1.02
+    bull.loc[bull.index[pos], "ma25"] = sig.entry * 1.00
+    assert filter_signals_4h([sig], bull) == []
+
+
 def test_rejects_glued_short_mas_without_volume() -> None:
     df = add_mas(_breakdown_series(after="down"))
     i = 230
@@ -228,6 +266,7 @@ def test_kline_limit_covers_month() -> None:
     assert kline_limit_needed(30, "1h") >= 30 * 24 + 200
     assert kline_limit_needed(60, "15m") >= 60 * 96 + 200
     assert kline_limit_needed(60, "1h") >= 60 * 24 + 200
+    assert kline_limit_needed(60, "4h") >= 60 * 6 + 200
     assert "30d" in pages_html_path(30).as_posix()
     assert "60d" in pages_html_path(60).as_posix()
     assert pages_html_path(7) != pages_html_path(30) != pages_html_path(60)
@@ -278,6 +317,7 @@ def main() -> int:
     test_resample_1h_and_snapshot()
     test_draw_trade_png_has_hourly()
     test_1h_first_break_keeps_and_rejects()
+    test_4h_first_break_keeps_and_rejects()
     test_rejects_glued_short_mas_without_volume()
     test_rejects_weaving_before_break()
     test_kline_limit_covers_month()

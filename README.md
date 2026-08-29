@@ -62,7 +62,7 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 ## 幣安 15 分 K 同時跌破 99/120/200 做空
 
-一根 15 分 K **從 MA99/120/200 之上一次打穿到三條之下**，且 **MA7 < MA14 < MA25 空頭排列**，進場做空。短均幾乎黏住時要放量，否則當成橫盤輕觸。進場前 8 根裡至少 4 根還收在長均之上，否則當成在帶裡穿梭或已經破了再追。再加 **小時確認**：上一根已收盤 1h 還在 MA99 之上，這根 15m 第一次打穿 1h MA99；上根小時若仍明顯 7>14>25，當成漲勢回檔濾掉。報告每筆上圖 15m、下圖 1h。
+一根 15 分 K **從 MA99/120/200 之上一次打穿到三條之下**，且 **MA7 < MA14 < MA25 空頭排列**，進場做空。短均幾乎黏住時要放量，否則當成橫盤輕觸。進場前 8 根裡至少 4 根還收在長均之上，否則當成在帶裡穿梭或已經破了再追。再加 **1h／4h 確認**：上一根已收盤還在該週期 MA99 之上，這根 15m 第一次打穿；上根若仍明顯 7>14>25，當成漲勢回檔濾掉。報告每筆上圖 15m、中圖 1h、下圖 4h。
 
 停損在破位 K 高點上方 0.1%；停利 2R；收復 MA99 或持倉 32 根（8 小時）平倉。預設掃流動 USDT 永續一週。
 
@@ -76,7 +76,7 @@ python3 examples/binance_15m_ma_break_short.py --symbol MUBARAKUSDT
 近一週（2026-08-22 → 08-29，248 檔 USDT 永續）：**14 筆、勝率 85.7%、單筆加總 +41.5%、平均 +2.96%**。  
 近一個月（2026-07-30 → 08-29，248 檔）：**34 筆、勝率 70.6%、單筆加總 +60.1%、平均 +1.77%**。  
 近兩個月（2026-06-30 → 08-29，248 檔）：**65 筆、勝率 55.4%、單筆加總 +56.8%、平均 +0.87%**。100 USDT × 3 倍、同時只能一單，兩個月約 **98 USDT**。  
-截圖那檔 **MUBARAK 08-25 16:00** 仍在，**+12.14%**。每筆上圖 15m、下圖 1h。
+截圖那檔 **MUBARAK 08-25 16:00** 仍在，**+12.14%**。每筆上圖 15m、中圖 1h、下圖 4h。報告正在依 4h 確認重跑。
 
 週報：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/view.html  
 月報：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-30d/view.html  

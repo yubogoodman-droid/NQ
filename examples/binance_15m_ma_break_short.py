@@ -34,7 +34,7 @@ PAGES_60D = REPO / "docs" / "binance-15m-ma-short-60d" / "index.html"
 BRANCH_VIEW = "cursor/15m-ma-break-short-9d44"
 
 INTERVAL = "15m"
-BAR_MS = {"1m": 60_000, "15m": 15 * 60 * 1000, "1h": 60 * 60 * 1000}
+BAR_MS = {"1m": 60_000, "15m": 15 * 60 * 1000, "1h": 60 * 60 * 1000, "4h": 4 * 60 * 60 * 1000}
 MA_SHORT = (7, 14, 25)
 MA_LONG = (99, 120, 200)
 WARMUP = 200
@@ -120,8 +120,8 @@ def _klines_to_df(raw: list) -> pd.DataFrame:
 
 
 def kline_limit_needed(days: int, interval: str = INTERVAL) -> int:
-    """回測窗口 + 均線暖身。15m 一天 96 根，1h 一天 24 根。"""
-    per_day = 24 if interval == "1h" else 96
+    """回測窗口 + 均線暖身。15m 一天 96 根，1h 一天 24 根，4h 一天 6 根。"""
+    per_day = {"1h": 24, "4h": 6, "15m": 96}.get(interval, 96)
     return days * per_day + WARMUP + 48
 
 
@@ -202,8 +202,8 @@ def fetch_klines(
     return out
 
 
-def resample_1h(df: pd.DataFrame) -> pd.DataFrame:
-    """把 15m 合成 UTC 對齊的 1h（抓不到小時線時的備援）。"""
+def resample_htf(df: pd.DataFrame, hours: int) -> pd.DataFrame:
+    """把 15m 合成 UTC 對齊的 1h / 4h（抓不到高週期線時的備援）。"""
     if df.empty:
         return df
     cols = ["open", "high", "low", "close"] + (["volume"] if "volume" in df.columns else [])
@@ -212,10 +212,14 @@ def resample_1h(df: pd.DataFrame) -> pd.DataFrame:
     agg = {"open": "first", "high": "max", "low": "min", "close": "last"}
     if "volume" in src.columns:
         agg["volume"] = "sum"
-    hourly = utc.resample("1h", label="left", closed="left").agg(agg).dropna(subset=["open", "close"])
-    if hourly.index.tz is not None:
-        hourly = hourly.tz_convert(TZ)
-    return add_mas(hourly)
+    out = utc.resample(f"{hours}h", label="left", closed="left").agg(agg).dropna(subset=["open", "close"])
+    if out.index.tz is not None:
+        out = out.tz_convert(TZ)
+    return add_mas(out)
+
+
+def resample_1h(df: pd.DataFrame) -> pd.DataFrame:
+    return resample_htf(df, 1)
 
 
 def _bar_index(df: pd.DataFrame, ts: pd.Timestamp) -> int:
@@ -228,32 +232,41 @@ def _bar_index(df: pd.DataFrame, ts: pd.Timestamp) -> int:
     return max(0, min(pos, len(df) - 1))
 
 
-def last_closed_1h_idx(df_1h: pd.DataFrame, ts: pd.Timestamp) -> int:
-    """進場當下還沒收盤的那根 1h 不能用，退回上一根已收盤小時 K。"""
-    if df_1h is None or df_1h.empty:
+def last_closed_htf_idx(df_htf: pd.DataFrame, ts: pd.Timestamp, hours: int) -> int:
+    """進場當下還沒收盤的高週期 K 不能用，退回上一根已收盤。"""
+    if df_htf is None or df_htf.empty:
         return -1
     mark = ts.tz_convert("UTC") if getattr(ts, "tzinfo", None) else pd.Timestamp(ts, tz="UTC")
-    closed_open = mark.floor("1h") - pd.Timedelta(hours=1)
-    if df_1h.index.tz is not None:
-        closed_open = closed_open.tz_convert(df_1h.index.tz)
-    pos = int(df_1h.index.searchsorted(closed_open, side="right") - 1)
-    return pos
+    closed_open = mark.floor(f"{hours}h") - pd.Timedelta(hours=hours)
+    if df_htf.index.tz is not None:
+        closed_open = closed_open.tz_convert(df_htf.index.tz)
+    return int(df_htf.index.searchsorted(closed_open, side="right") - 1)
 
 
-def filter_signals_1h(
+def last_closed_1h_idx(df_1h: pd.DataFrame, ts: pd.Timestamp) -> int:
+    return last_closed_htf_idx(df_1h, ts, 1)
+
+
+def filter_signals_htf(
     signals: list[Signal],
-    df_1h: pd.DataFrame,
+    df_htf: pd.DataFrame,
+    hours: int,
     funnel: dict[str, int] | None = None,
+    *,
+    tag: str,
 ) -> list[Signal]:
-    """小時確認：上一根已收盤 1h 還在 MA99 之上，這根 15m 收盤第一次打穿 1h MA99。
+    """高週期確認：上一根已收盤還在 MA99 之上，這根 15m 收盤第一次打穿該週期 MA99。
 
-    回測裡「1h 已經跌破 MA99 再追空」勝率明顯較差；太晚。
-    15m 大陰線若沒打到小時 MA99，多半只是 15m 均線自己的回抽。
-    上根小時若仍明顯 7>14>25，比較像漲勢回檔，不像瀑布。
+    已經跌破再追空勝率較差；15m 大陰線若沒打到高週期 MA99，多半只是 15m 自己的回抽。
+    上根若仍明顯 7>14>25，比較像漲勢回檔，不像瀑布。
     """
     if not signals:
         return []
-    work = add_mas(df_1h) if df_1h is not None and not df_1h.empty and "ma99" not in df_1h.columns else df_1h
+    work = (
+        add_mas(df_htf)
+        if df_htf is not None and not df_htf.empty and "ma99" not in df_htf.columns
+        else df_htf
+    )
 
     def bump(key: str) -> None:
         if funnel is not None:
@@ -262,24 +275,24 @@ def filter_signals_1h(
     kept: list[Signal] = []
     for sig in signals:
         if work is None or work.empty:
-            bump("skip_1h_data")
+            bump(f"skip_{tag}_data")
             continue
-        pos = last_closed_1h_idx(work, sig.timestamp)
+        pos = last_closed_htf_idx(work, sig.timestamp, hours)
         if pos < 0:
-            bump("skip_1h_data")
+            bump(f"skip_{tag}_data")
             continue
         row = work.iloc[pos]
         m99 = row.get("ma99")
         if m99 is None or pd.isna(m99):
-            bump("skip_1h_data")
+            bump(f"skip_{tag}_data")
             continue
         m99 = float(m99)
         prev_close = float(row["close"])
         if prev_close < m99:
-            bump("skip_1h_late")
+            bump(f"skip_{tag}_late")
             continue
         if sig.entry >= m99:
-            bump("skip_1h_shallow")
+            bump(f"skip_{tag}_shallow")
             continue
         m7, m14, m25 = row.get("ma7"), row.get("ma14"), row.get("ma25")
         if (
@@ -292,11 +305,55 @@ def filter_signals_1h(
             if m7 > m14 > m25 and m25 > 0:
                 h_fan = (m7 / m25 - 1.0) * 100.0
                 if h_fan >= MAX_1H_BULL_FAN_PCT:
-                    bump("skip_1h_bull")
+                    bump(f"skip_{tag}_bull")
                     continue
-        bump("taken_1h")
+        bump(f"taken_{tag}")
         kept.append(sig)
     return kept
+
+
+def filter_signals_1h(
+    signals: list[Signal],
+    df_1h: pd.DataFrame,
+    funnel: dict[str, int] | None = None,
+) -> list[Signal]:
+    return filter_signals_htf(signals, df_1h, 1, funnel, tag="1h")
+
+
+def filter_signals_4h(
+    signals: list[Signal],
+    df_4h: pd.DataFrame,
+    funnel: dict[str, int] | None = None,
+) -> list[Signal]:
+    return filter_signals_htf(signals, df_4h, 4, funnel, tag="4h")
+
+
+def load_htf_frames(
+    symbols: list[str],
+    frames_15m: dict[str, pd.DataFrame],
+    *,
+    interval: str,
+    limit: int = 1000,
+    workers: int = 8,
+) -> dict[str, pd.DataFrame]:
+    out: dict[str, pd.DataFrame] = {}
+    uniq = [s for s in dict.fromkeys(symbols) if s]
+    hours = 4 if interval == "4h" else 1
+
+    def one(sym: str) -> tuple[str, pd.DataFrame]:
+        try:
+            return sym, add_mas(fetch_klines(sym, limit=limit, interval=interval))
+        except Exception:
+            src = frames_15m.get(sym)
+            return sym, resample_htf(src, hours) if src is not None else pd.DataFrame()
+
+    if not uniq:
+        return out
+    with ThreadPoolExecutor(min(workers, len(uniq))) as ex:
+        for fut in as_completed([ex.submit(one, s) for s in uniq]):
+            name, df = fut.result()
+            out[name] = df
+    return out
 
 
 def load_1h_frames(
@@ -306,23 +363,7 @@ def load_1h_frames(
     *,
     limit: int = 1000,
 ) -> dict[str, pd.DataFrame]:
-    out: dict[str, pd.DataFrame] = {}
-    uniq = [s for s in dict.fromkeys(symbols) if s]
-
-    def one(sym: str) -> tuple[str, pd.DataFrame]:
-        try:
-            return sym, add_mas(fetch_klines(sym, limit=limit, interval="1h"))
-        except Exception:
-            src = frames_15m.get(sym)
-            return sym, resample_1h(src) if src is not None else pd.DataFrame()
-
-    if not uniq:
-        return out
-    with ThreadPoolExecutor(min(workers, len(uniq))) as ex:
-        for fut in as_completed([ex.submit(one, s) for s in uniq]):
-            name, df = fut.result()
-            out[name] = df
-    return out
+    return load_htf_frames(symbols, frames_15m, interval="1h", limit=limit, workers=workers)
 
 
 def universe(min_qv: float = MIN_QV) -> list[str]:
@@ -719,12 +760,45 @@ def hourly_snapshot(df_1h: pd.DataFrame, ts: pd.Timestamp) -> dict[str, float | 
     return out
 
 
+def _paint_htf_panel(
+    ax: Any,
+    axv: Any,
+    frame: pd.DataFrame,
+    trade: TradeResult,
+    title: str,
+    lookback: int,
+) -> None:
+    sig = trade.signal
+    hi = _bar_index(frame, sig.timestamp)
+    hx = _bar_index(frame, trade.exit_time)
+    h0 = max(0, hi - lookback)
+    h1 = min(len(frame) - 1, max(hx + 12, hi + 16))
+    _paint_ohlcv(
+        ax,
+        axv,
+        frame,
+        h0,
+        h1,
+        entry_idx=hi,
+        exit_idx=hx,
+        entry_price=sig.entry,
+        exit_price=trade.exit_price,
+        stop=sig.stop,
+        target=sig.target,
+        mark_entry=True,
+        pnl_pct=trade.pnl_pct,
+    )
+    ax.set_title(title, color="#e8f0ea", fontsize=11)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+
+
 def draw_trade_png(
     df: pd.DataFrame,
     trade: TradeResult,
     path: Path,
     trade_no: int,
     df_1h: pd.DataFrame | None = None,
+    df_4h: pd.DataFrame | None = None,
 ) -> Path:
     import matplotlib
 
@@ -733,10 +807,23 @@ def draw_trade_png(
 
     _setup_font()
     sig = trade.signal
-    hourly = df_1h if df_1h is not None and not df_1h.empty else resample_1h(df)
+    hourly = df_1h if df_1h is not None and not df_1h.empty else resample_htf(df, 1)
+    fourh = df_4h if df_4h is not None and not df_4h.empty else resample_htf(df, 4)
     have_1h = hourly is not None and not hourly.empty
+    have_4h = fourh is not None and not fourh.empty
+    extra = int(have_1h) + int(have_4h)
 
-    if have_1h:
+    if extra == 2:
+        fig, axes = plt.subplots(
+            6,
+            1,
+            figsize=(10.4, 13.0),
+            gridspec_kw={"height_ratios": [3.0, 0.72, 2.55, 0.64, 2.55, 0.64]},
+            facecolor="#0c1210",
+        )
+        ax, axv, axh, axhv, ax4, ax4v = axes
+        _style_axes(axes)
+    elif extra == 1:
         fig, (ax, axv, axh, axhv) = plt.subplots(
             4,
             1,
@@ -745,6 +832,11 @@ def draw_trade_png(
             facecolor="#0c1210",
         )
         _style_axes((ax, axv, axh, axhv))
+        ax4 = axhv if have_4h and not have_1h else None
+        ax4v = None
+        if have_4h and not have_1h:
+            ax4, ax4v = axh, axhv
+            axh = axhv = None  # type: ignore[assignment]
     else:
         fig, (ax, axv) = plt.subplots(
             2,
@@ -755,6 +847,7 @@ def draw_trade_png(
             facecolor="#0c1210",
         )
         _style_axes((ax, axv))
+        axh = axhv = ax4 = ax4v = None
 
     start = max(0, sig.bar_idx - 36)
     end = min(len(df) - 1, max(trade.exit_idx + 10, sig.bar_idx + 16))
@@ -788,28 +881,10 @@ def draw_trade_png(
     )
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
 
-    if have_1h:
-        hi = _bar_index(hourly, sig.timestamp)
-        hx = _bar_index(hourly, trade.exit_time)
-        h0 = max(0, hi - 48)
-        h1 = min(len(hourly) - 1, max(hx + 12, hi + 16))
-        _paint_ohlcv(
-            axh,
-            axhv,
-            hourly,
-            h0,
-            h1,
-            entry_idx=hi,
-            exit_idx=hx,
-            entry_price=sig.entry,
-            exit_price=trade.exit_price,
-            stop=sig.stop,
-            target=sig.target,
-            mark_entry=True,
-            pnl_pct=trade.pnl_pct,
-        )
-        axh.set_title("1h 對照（同一進出場時刻）", color="#e8f0ea", fontsize=11)
-        axh.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    if have_1h and axh is not None and axhv is not None:
+        _paint_htf_panel(axh, axhv, hourly, trade, "1h 對照（同一進出場時刻）", 48)
+    if have_4h and ax4 is not None and ax4v is not None:
+        _paint_htf_panel(ax4, ax4v, fourh, trade, "4h 對照（同一進出場時刻）", 36)
 
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -854,6 +929,22 @@ def _fmt_px(px: float) -> str:
     return f"{px:.6f}".rstrip("0").rstrip(".")
 
 
+def _htf_detail_block(label: str, snap: dict[str, float | str]) -> str:
+    if not snap:
+        return ""
+
+    def _ma_line(periods: tuple[int, ...]) -> str:
+        bits = [f"MA{n} {_fmt_px(float(snap[f'ma{n}']))}" for n in periods if f"ma{n}" in snap]
+        return f"{label} {' / '.join(bits)}" if bits else ""
+
+    short = _ma_line(MA_SHORT)
+    if snap.get("stack"):
+        short = f"{short}  {snap['stack']}".strip()
+    long = _ma_line(MA_LONG)
+    body = "\n".join(x for x in (short, long) if x)
+    return f"\n{label} {snap.get('time', '')}\n{body}" if body else ""
+
+
 def _render_cards(
     trades: list[TradeResult],
     frames: dict[str, pd.DataFrame],
@@ -862,14 +953,17 @@ def _render_cards(
     embed: bool,
     prefix: str = "t",
     frames_1h: dict[str, pd.DataFrame] | None = None,
+    frames_4h: dict[str, pd.DataFrame] | None = None,
 ) -> str:
     cards: list[str] = []
     img_dir = html_path.parent / "img"
     hourly_map = frames_1h or {}
+    fourh_map = frames_4h or {}
     for i, t in enumerate(trades, 1):
         sig = t.signal
         df = frames[sig.symbol]
         df_1h = hourly_map.get(sig.symbol)
+        df_4h = fourh_map.get(sig.symbol)
         et = sig.timestamp.tz_convert(TZ) if getattr(sig.timestamp, "tzinfo", None) else sig.timestamp
         xt = t.exit_time.tz_convert(TZ) if getattr(t.exit_time, "tzinfo", None) else t.exit_time
         cls = "pnl-win" if t.pnl_pct > 0 else ("pnl-flat" if t.pnl_pct == 0 else "pnl-loss")
@@ -882,26 +976,17 @@ def _render_cards(
         img_name = f"{prefix}{i:02d}_{sig.symbol}_{et.strftime('%m%d_%H%M')}.png"
         chart_html = ""
         if i <= MAX_CHARTS:
-            png = draw_trade_png(df, t, img_dir / img_name, i, df_1h=df_1h)
+            png = draw_trade_png(df, t, img_dir / img_name, i, df_1h=df_1h, df_4h=df_4h)
             src = _img_data_uri(png) if embed else f"img/{img_name}"
             chart_html = (
-                f"<div class='mini-chart'><img src='{escape(src)}' alt='#{i} {escape(sig.symbol)} 15m+1h' "
+                f"<div class='mini-chart'><img src='{escape(src)}' alt='#{i} {escape(sig.symbol)} 15m+1h+4h' "
                 "style='width:100%;display:block;border-radius:10px'/></div>"
             )
         risk_pct = (sig.stop - sig.entry) / sig.entry * 100.0
-        snap = hourly_snapshot(df_1h if df_1h is not None else resample_1h(df), sig.timestamp)
-        h_line = ""
-        if snap:
-            def _ma_line(periods: tuple[int, ...], prefix: str) -> str:
-                bits = [f"MA{n} {_fmt_px(float(snap[f'ma{n}']))}" for n in periods if f"ma{n}" in snap]
-                return f"{prefix} {' / '.join(bits)}" if bits else ""
-
-            h_short = _ma_line(MA_SHORT, "1h")
-            if snap.get("stack"):
-                h_short = f"{h_short}  {snap['stack']}".strip()
-            h_long = _ma_line(MA_LONG, "1h")
-            body = "\n".join(x for x in (h_short, h_long) if x)
-            h_line = f"\n1h {snap.get('time', '')}\n{body}" if body else ""
+        snap_1h = hourly_snapshot(df_1h if df_1h is not None else resample_htf(df, 1), sig.timestamp)
+        snap_4h = hourly_snapshot(df_4h if df_4h is not None else resample_htf(df, 4), sig.timestamp)
+        h_line = _htf_detail_block("1h", snap_1h)
+        h4_line = _htf_detail_block("4h", snap_4h)
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -914,6 +999,7 @@ def _render_cards(
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
             "<span class='tag tag-info'>15m 做空</span>"
             "<span class='tag tag-info'>1h 對照</span>"
+            "<span class='tag tag-info'>4h 對照</span>"
             f"<span class='tag tag-info'>量比 {sig.vol_ratio:.1f}x</span>"
             "</div>"
             "<pre class='trade-detail'>"
@@ -925,7 +1011,9 @@ def _render_cards(
             f"15m MA7 {_fmt_px(sig.ma7)} < MA14 {_fmt_px(sig.ma14)} < MA25 {_fmt_px(sig.ma25)}  張開 {sig.fan_pct:.2f}%\n"
             f"15m MA99 {_fmt_px(sig.ma99)} / MA120 {_fmt_px(sig.ma120)} / MA200 {_fmt_px(sig.ma200)}\n"
             "1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99"
-            f"{h_line}"
+            f"{h_line}\n"
+            "4h 確認：上根 4h 收盤仍在 MA99 上，本 15m 第一次打穿 4h MA99"
+            f"{h4_line}"
             "</pre>"
             f"{chart_html}"
             "</article>"
@@ -944,6 +1032,7 @@ def write_html_report(
     embed: bool = False,
     mubarak_trades: list[TradeResult] | None = None,
     frames_1h: dict[str, pd.DataFrame] | None = None,
+    frames_4h: dict[str, pd.DataFrame] | None = None,
 ) -> Path:
     stats = summarize(trades)
     total_cls = "pnl-win" if float(stats["total_pnl"]) >= 0 else "pnl-loss"
@@ -952,13 +1041,17 @@ def write_html_report(
         funnel_line = (
             f"<p class='muted'>漏斗：從三條之上一次打穿　{funnel.get('break', 0)} → "
             f"7&lt;14&lt;25　{funnel.get('taken', 0)} → "
-            f"1h 首次打穿 MA99　{funnel.get('taken_1h', 0)}"
+            f"1h 首次打穿 MA99　{funnel.get('taken_1h', 0)} → "
+            f"4h 首次打穿 MA99　{funnel.get('taken_4h', 0)}"
             f"（淺破 {funnel.get('skip_shallow', 0)} · 短均未排列 {funnel.get('skip_stack', 0)} · "
             f"橫盤輕觸 {funnel.get('skip_chop', 0)} · 沒騎在黏帶上 {funnel.get('skip_weave', 0)} · "
             f"風險過大 {funnel.get('skip_risk', 0)} · "
             f"1h 已破 MA99 太晚 {funnel.get('skip_1h_late', 0)} · "
             f"15m 沒打到 1h MA99 {funnel.get('skip_1h_shallow', 0)} · "
-            f"1h 仍多頭張開 {funnel.get('skip_1h_bull', 0)}）</p>"
+            f"1h 仍多頭張開 {funnel.get('skip_1h_bull', 0)} · "
+            f"4h 已破 MA99 太晚 {funnel.get('skip_4h_late', 0)} · "
+            f"15m 沒打到 4h MA99 {funnel.get('skip_4h_shallow', 0)} · "
+            f"4h 仍多頭張開 {funnel.get('skip_4h_bull', 0)}）</p>"
         )
     extra = ""
     if mubarak_trades is not None:
@@ -974,12 +1067,12 @@ def write_html_report(
             f"<div class='equity'>{_equity_svg([t.pnl_pct for t in mubarak_trades])}</div></section>"
             + (
                 _render_cards(
-                    mubarak_trades, frames, path, embed=embed, prefix="m", frames_1h=frames_1h
+                    mubarak_trades, frames, path, embed=embed, prefix="m", frames_1h=frames_1h, frames_4h=frames_4h
                 )
                 or "<div class='empty'>這一週 MUBARAK 沒打出同時跌破＋空頭排列</div>"
             )
         )
-    cards = _render_cards(trades, frames, path, embed=embed, prefix="t", frames_1h=frames_1h)
+    cards = _render_cards(trades, frames, path, embed=embed, prefix="t", frames_1h=frames_1h, frames_4h=frames_4h)
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -1022,7 +1115,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">總報酬<b class="{total_cls}">{stats['total_pnl']:+.2f}%</b></div>
 <div class="card">勝/負<b>{stats['wins']}/{stats['losses']}</b></div>
 </div>
-<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。濾掉短均幾乎黏住又沒放量的橫盤輕觸、進場前沒騎在黏帶上的穿梭／追空，以及上根小時仍明顯 7&gt;14&gt;25 的漲勢回檔。小時過濾：上根已收盤 1h 還在 MA99 之上，這根 15m 收盤第一次跌破 1h MA99。上圖 15m、下圖 1h。報酬是單筆價格百分比，未計資金費。</p>
+<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。濾掉短均幾乎黏住又沒放量的橫盤輕觸、進場前沒騎在黏帶上的穿梭／追空，以及上根 1h／4h 仍明顯 7&gt;14&gt;25 的漲勢回檔。高週期過濾：上根已收盤 1h／4h 還在 MA99 之上，這根 15m 收盤第一次跌破該週期 MA99。上圖 15m、中圖 1h、下圖 4h。報酬是單筆價格百分比，未計資金費。</p>
 {funnel_line}
 <div class="equity">{_equity_svg([t.pnl_pct for t in trades])}</div>
 </section>
@@ -1074,8 +1167,14 @@ def scan_symbol(sym: str, *, days: int, limit: int) -> tuple[str, pd.DataFrame, 
         try:
             df_1h = add_mas(fetch_klines(sym, limit=kline_limit_needed(days, "1h"), interval="1h"))
         except Exception:
-            df_1h = resample_1h(df)
+            df_1h = resample_htf(df, 1)
         sigs = filter_signals_1h(sigs, df_1h, funnel)
+    if sigs:
+        try:
+            df_4h = add_mas(fetch_klines(sym, limit=kline_limit_needed(days, "4h"), interval="4h"))
+        except Exception:
+            df_4h = resample_htf(df, 4)
+        sigs = filter_signals_4h(sigs, df_4h, funnel)
     trades = simulate(df, sigs)
     return sym, df, trades, funnel
 
@@ -1111,14 +1210,17 @@ def print_summary(label: str, trades: list[TradeResult], funnel: dict[str, int] 
     if funnel:
         print(
             f"  funnel break={funnel.get('break', 0)} taken={funnel.get('taken', 0)} "
-            f"1h={funnel.get('taken_1h', 0)} "
+            f"1h={funnel.get('taken_1h', 0)} 4h={funnel.get('taken_4h', 0)} "
             f"skip_shallow={funnel.get('skip_shallow', 0)} "
             f"skip_stack={funnel.get('skip_stack', 0)} skip_risk={funnel.get('skip_risk', 0)} "
             f"skip_chop={funnel.get('skip_chop', 0)} "
             f"skip_weave={funnel.get('skip_weave', 0)} "
             f"skip_1h_late={funnel.get('skip_1h_late', 0)} "
             f"skip_1h_shallow={funnel.get('skip_1h_shallow', 0)} "
-            f"skip_1h_bull={funnel.get('skip_1h_bull', 0)}"
+            f"skip_1h_bull={funnel.get('skip_1h_bull', 0)} "
+            f"skip_4h_late={funnel.get('skip_4h_late', 0)} "
+            f"skip_4h_shallow={funnel.get('skip_4h_shallow', 0)} "
+            f"skip_4h_bull={funnel.get('skip_4h_bull', 0)}"
         )
     for i, t in enumerate(trades, 1):
         et = t.signal.timestamp.tz_convert(TZ) if getattr(t.signal.timestamp, "tzinfo", None) else t.signal.timestamp
@@ -1183,14 +1285,17 @@ def main(argv: list[str] | None = None) -> int:
         subtitle = (
             f"{args.days} 日 · {start.strftime('%Y-%m-%d %H:%M')} → {now.strftime('%Y-%m-%d %H:%M')} 台北 · "
             f"{result.symbols} 檔 15m · 進場＝15m 同時跌破 99/120/200 且 7<14<25，"
-            f"短均黏住要放量、進場前多數還在長均之上，再加 1h：上根小時收盤仍在 MA99 上、本 15m 第一次打穿 1h MA99，"
-            f"且上根小時不是明顯 7>14>25"
+            f"短均黏住要放量、進場前多數還在長均之上，再加 1h／4h：上根已收盤仍在 MA99 上、本 15m 第一次打穿該週期 MA99，"
+            f"且上根不是明顯 7>14>25"
         )
         show_mubarak = not args.symbol or "MUBARAK" in args.symbol.upper()
-        need_1h = sorted({t.signal.symbol for t in result.trades} | ({"MUBARAKUSDT"} if show_mubarak else set()))
-        print(f"抓 1h 對照 {len(need_1h)} 檔…", flush=True)
-        frames_1h = load_1h_frames(
-            need_1h, result.frames, limit=kline_limit_needed(args.days, "1h")
+        need_htf = sorted({t.signal.symbol for t in result.trades} | ({"MUBARAKUSDT"} if show_mubarak else set()))
+        print(f"抓 1h／4h 對照 {len(need_htf)} 檔…", flush=True)
+        frames_1h = load_htf_frames(
+            need_htf, result.frames, interval="1h", limit=kline_limit_needed(args.days, "1h")
+        )
+        frames_4h = load_htf_frames(
+            need_htf, result.frames, interval="4h", limit=kline_limit_needed(args.days, "4h")
         )
         write_html_report(
             html_path,
@@ -1202,6 +1307,7 @@ def main(argv: list[str] | None = None) -> int:
             embed=args.embed,
             mubarak_trades=mubarak if show_mubarak and not args.symbol else None,
             frames_1h=frames_1h,
+            frames_4h=frames_4h,
         )
         view = write_view_html(html_path)
         print(f"html={html_path}")
