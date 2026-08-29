@@ -190,7 +190,7 @@ def test_skip_tangled_ribbon() -> None:
 
 
 def test_trail_locks_after_waterfall() -> None:
-    """浮盈見過 1.5R 後鎖 1.2R；回補打到鎖利就出場，不再吐光。"""
+    """浮盈見過 1.6R 後鎖 1.2R；回補打到鎖利就出場，不再吐光。"""
     n = 24
     entry_idx = 6
     entry, risk = 10000.0, 100.0

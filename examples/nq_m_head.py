@@ -46,8 +46,8 @@ MA_COLORS = {
     200: "#ab47bc",
 }
 
-# 浮盈見過 1.5R 後鎖 1.2R，避免瀑布走完又吐光（5m #7 那種）
-TRAIL_ARM_R = 1.5
+# 浮盈見過 1.6R 後鎖 1.2R。1.5 會把今日 1m #2 砍在瀑布中間；1.6 仍抓得住 5m #7。
+TRAIL_ARM_R = 1.6
 TRAIL_LOCK_R = 1.2
 
 # 1m / 5m 同一套邏輯，K 數換成大約相同的鐘面時間
@@ -886,7 +886,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。浮盈 1.5R 後鎖 1.2R。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。浮盈 1.6R 後鎖 1.2R。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
@@ -933,7 +933,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 一分K 高檔M頭 · 跌破MA60做空</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。浮盈見過 1.5R 後鎖 1.2R，瀑布走完不吐光。</p>
+<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。浮盈見過 1.6R 後鎖 1.2R，瀑布走完不吐光。</p>
 {note_line}
 {compare_line}
 {_stats_cards(stats)}
