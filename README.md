@@ -75,7 +75,7 @@ python3 examples/binance_15m_ma_break_short.py --symbol MUBARAKUSDT
 
 近一週（2026-08-22 → 08-29，253 檔 USDT 永續）：**6 筆、勝率 100%、單筆加總 +27.1%、平均 +4.52%**。  
 近一個月（2026-07-30 → 08-29，253 檔）：**11 筆、勝率 100%、單筆加總 +49.9%、平均 +4.54%**。  
-近兩個月（掃描中，報告寫 `docs/binance-15m-ma-short-60d/`）。  
+近兩個月（2026-06-30 → 08-29，250 檔）：**26 筆、勝率 50%、單筆加總 +29.1%、平均 +1.12%**。七月 15 筆勝率 13%、八月 11 筆勝率 100%。100 USDT × 3 倍、同時只能一單，兩個月滾到約 **134 USDT**。  
 截圖那檔 **MUBARAK 08-25 16:00** 仍在，**+12.14%**。每筆上圖 15m、下圖 1h。
 
 週報：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/view.html  
