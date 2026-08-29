@@ -52,7 +52,8 @@ MA_COLORS = {
 TRAIL_ARM_R = 1.6
 TRAIL_LOCK_R = 1.2
 TRAIL_STEPS_1M = ((1.6, 1.2),)
-TRAIL_STEPS_5M = ((1.0, 0.7), (1.6, 1.2))
+# 5m 停損較寬，同一檔 1.0R 會變遠；多一層 0.8 / 1.2 才鎖得住 #2、#7
+TRAIL_STEPS_5M = ((0.8, 0.5), (1.2, 0.9), (1.6, 1.2))
 
 # 1m / 5m 同一套邏輯，K 數換成大約相同的鐘面時間
 TF_PRESETS = {
@@ -75,6 +76,7 @@ TF_PRESETS = {
         "max_bars_hold": 48,  # 4 小時
         "min_ribbon_spread": 28.0,
         "trail_steps": TRAIL_STEPS_5M,
+        "stop_buffer": 36.0,  # 避開 #6 那種頭頂 +8 被軋空掃掉
     },
 }
 
@@ -919,7 +921,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。浮盈 1.0R 鎖 0.7R、1.6R 鎖 1.2R（下一根生效）。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。停損頭頂 +36（少被軋空掃）。鎖利 0.8R→0.5R、1.2R→0.9R、1.6R→1.2R（下一根生效）。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
@@ -966,7 +968,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 一分K 高檔M頭 · 跌破MA60做空</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。1m 浮盈 1.6R 鎖 1.2R；5m 多一檔 1.0R 鎖 0.7R。鎖利下一根才生效。</p>
+<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。1m 停損頭頂 +8、1.6R 鎖 1.2R；5m 停損 +36，鎖利 0.8 / 1.2 / 1.6R。鎖利下一根才生效。</p>
 {note_line}
 {compare_line}
 {_stats_cards(stats)}

@@ -268,7 +268,7 @@ def test_trail_does_not_block_two_r() -> None:
 
 
 def test_five_m_locks_one_r_giveback() -> None:
-    """5m：浮盈見過 1.0R 後下一根鎖 0.7R，回補就出場（#2 那種）。"""
+    """5m：浮盈見過 0.8R 後下一根鎖 0.5R，回補就出場（#2 那種）。"""
     n = 20
     entry_idx = 4
     entry, risk = 10000.0, 100.0
@@ -281,7 +281,7 @@ def test_five_m_locks_one_r_giveback() -> None:
     high[entry_idx + 1] = entry - 90.0  # 同一根高點仍低於 0.7R，不該出場
     close[entry_idx + 2] = entry - 50.0
     low[entry_idx + 2] = entry - 80.0
-    high[entry_idx + 2] = entry - 40.0  # 穿過 0.7R=9930
+    high[entry_idx + 2] = entry - 40.0  # 穿過 0.5R=9950
     idx = pd.date_range("2026-08-05 03:30", periods=n, freq="5min", tz=ET)
     df = pd.DataFrame(
         {"open": close, "high": high, "low": low, "close": close, "volume": 50.0},
@@ -302,7 +302,7 @@ def test_five_m_locks_one_r_giveback() -> None:
     )
     trades = run_backtest(df, [sig], max_bars_hold=10, trail_steps=TRAIL_STEPS_5M)
     assert trades[0].exit_reason == "trail_stop"
-    assert abs(trades[0].pnl_points - 70.0) < 0.26
+    assert abs(trades[0].pnl_points - 50.0) < 0.26
 
 
 def test_tf_presets() -> None:
@@ -312,7 +312,8 @@ def test_tf_presets() -> None:
     assert TF_PRESETS["1m"]["min_ribbon_spread"] == 28.0
     assert TF_PRESETS["5m"]["min_ribbon_spread"] == 28.0
     assert TF_PRESETS["1m"]["trail_steps"][0] == (1.6, 1.2)
-    assert TF_PRESETS["5m"]["trail_steps"][0] == (1.0, 0.7)
+    assert TF_PRESETS["5m"]["trail_steps"][0] == (0.8, 0.5)
+    assert TF_PRESETS["5m"]["stop_buffer"] == 36.0
 
 
 def test_overlay_m5_ma60() -> None:
