@@ -41,6 +41,9 @@ MAX_HOLD = 32  # 8 小時
 RR = 2.0
 STOP_BUFFER = 0.001  # 停損在破位 K 高點上方 0.1%
 MIN_BREAK_PCT = 0.8  # 收盤至少低於長均上沿 0.8%，濾掉輕觸
+MIN_SHORT_FAN_PCT = 0.30  # 7/14/25 張開不到這個，要靠放量才算瀑布
+MIN_VOL_IF_TIGHT_FAN = 3.2  # 短均幾乎黏住時，量比至少這麼多
+MAX_1H_BULL_FAN_PCT = 2.0  # 上根小時仍 7>14>25 且張開≥2%，多半是漲勢回檔
 MIN_QV = 5_000_000
 KEEP = ("MUBARAKUSDT",)
 MAX_CHARTS = 80
@@ -189,6 +192,7 @@ def filter_signals_1h(
 
     回測裡「1h 已經跌破 MA99 再追空」勝率明顯較差；太晚。
     15m 大陰線若沒打到小時 MA99，多半只是 15m 均線自己的回抽。
+    上根小時若仍明顯 7>14>25，比較像漲勢回檔，不像瀑布。
     """
     if not signals:
         return []
@@ -220,6 +224,19 @@ def filter_signals_1h(
         if sig.entry >= m99:
             bump("skip_1h_shallow")
             continue
+        m7, m14, m25 = row.get("ma7"), row.get("ma14"), row.get("ma25")
+        if (
+            m7 is not None
+            and m14 is not None
+            and m25 is not None
+            and not (pd.isna(m7) or pd.isna(m14) or pd.isna(m25))
+        ):
+            m7, m14, m25 = float(m7), float(m14), float(m25)
+            if m7 > m14 > m25 and m25 > 0:
+                h_fan = (m7 / m25 - 1.0) * 100.0
+                if h_fan >= MAX_1H_BULL_FAN_PCT:
+                    bump("skip_1h_bull")
+                    continue
         bump("taken_1h")
         kept.append(sig)
     return kept
@@ -312,6 +329,7 @@ class Signal:
     cluster_lo: float
     vol_ratio: float
     break_pct: float
+    fan_pct: float
 
 
 @dataclass
@@ -383,9 +401,14 @@ def detect_signals(
         if risk <= 0 or risk / entry > 0.18:
             bump("skip_risk")
             continue
+        vr = float(vol[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
+        fan_pct = (m25[i] / m7[i] - 1.0) * 100.0
+        # 短均黏成一條又沒放量：橫盤輕觸，不像瀑布陰線
+        if fan_pct < MIN_SHORT_FAN_PCT and vr < MIN_VOL_IF_TIGHT_FAN:
+            bump("skip_chop")
+            continue
         bump("taken")
         target = entry - RR * risk
-        vr = float(vol[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
         signals.append(
             Signal(
                 symbol=symbol,
@@ -404,6 +427,7 @@ def detect_signals(
                 cluster_lo=float(cluster_lo),
                 vol_ratio=vr,
                 break_pct=(cluster_hi - entry) / cluster_hi * 100.0,
+                fan_pct=float(fan_pct),
             )
         )
     return signals
@@ -805,7 +829,7 @@ def _render_cards(
             f"target {_fmt_px(sig.target)}  ({RR:.1f}R)\n"
             f"exit  {_fmt_px(t.exit_price)}  {t.exit_reason}\n"
             f"打穿長均 {sig.break_pct:.2f}%  cluster {_fmt_px(sig.cluster_lo)}–{_fmt_px(sig.cluster_hi)}\n"
-            f"15m MA7 {_fmt_px(sig.ma7)} < MA14 {_fmt_px(sig.ma14)} < MA25 {_fmt_px(sig.ma25)}\n"
+            f"15m MA7 {_fmt_px(sig.ma7)} < MA14 {_fmt_px(sig.ma14)} < MA25 {_fmt_px(sig.ma25)}  張開 {sig.fan_pct:.2f}%\n"
             f"15m MA99 {_fmt_px(sig.ma99)} / MA120 {_fmt_px(sig.ma120)} / MA200 {_fmt_px(sig.ma200)}\n"
             "1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99"
             f"{h_line}"
@@ -837,9 +861,10 @@ def write_html_report(
             f"7&lt;14&lt;25　{funnel.get('taken', 0)} → "
             f"1h 首次打穿 MA99　{funnel.get('taken_1h', 0)}"
             f"（淺破 {funnel.get('skip_shallow', 0)} · 短均未排列 {funnel.get('skip_stack', 0)} · "
-            f"風險過大 {funnel.get('skip_risk', 0)} · "
+            f"橫盤輕觸 {funnel.get('skip_chop', 0)} · 風險過大 {funnel.get('skip_risk', 0)} · "
             f"1h 已破 MA99 太晚 {funnel.get('skip_1h_late', 0)} · "
-            f"15m 沒打到 1h MA99 {funnel.get('skip_1h_shallow', 0)}）</p>"
+            f"15m 沒打到 1h MA99 {funnel.get('skip_1h_shallow', 0)} · "
+            f"1h 仍多頭張開 {funnel.get('skip_1h_bull', 0)}）</p>"
         )
     extra = ""
     if mubarak_trades is not None:
@@ -903,7 +928,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">總報酬<b class="{total_cls}">{stats['total_pnl']:+.2f}%</b></div>
 <div class="card">勝/負<b>{stats['wins']}/{stats['losses']}</b></div>
 </div>
-<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。小時過濾：上根已收盤 1h 還在 MA99 之上，這根 15m 收盤第一次跌破 1h MA99（已破再追空勝率較差）。上圖 15m、下圖 1h。報酬是單筆價格百分比，未計資金費。</p>
+<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。濾掉短均幾乎黏住又沒放量的橫盤輕觸，以及上根小時仍明顯 7&gt;14&gt;25 的漲勢回檔。小時過濾：上根已收盤 1h 還在 MA99 之上，這根 15m 收盤第一次跌破 1h MA99。上圖 15m、下圖 1h。報酬是單筆價格百分比，未計資金費。</p>
 {funnel_line}
 <div class="equity">{_equity_svg([t.pnl_pct for t in trades])}</div>
 </section>
@@ -995,8 +1020,10 @@ def print_summary(label: str, trades: list[TradeResult], funnel: dict[str, int] 
             f"1h={funnel.get('taken_1h', 0)} "
             f"skip_shallow={funnel.get('skip_shallow', 0)} "
             f"skip_stack={funnel.get('skip_stack', 0)} skip_risk={funnel.get('skip_risk', 0)} "
+            f"skip_chop={funnel.get('skip_chop', 0)} "
             f"skip_1h_late={funnel.get('skip_1h_late', 0)} "
-            f"skip_1h_shallow={funnel.get('skip_1h_shallow', 0)}"
+            f"skip_1h_shallow={funnel.get('skip_1h_shallow', 0)} "
+            f"skip_1h_bull={funnel.get('skip_1h_bull', 0)}"
         )
     for i, t in enumerate(trades, 1):
         et = t.signal.timestamp.tz_convert(TZ) if getattr(t.signal.timestamp, "tzinfo", None) else t.signal.timestamp
@@ -1050,7 +1077,8 @@ def main(argv: list[str] | None = None) -> int:
         subtitle = (
             f"{args.days} 日 · {start.strftime('%Y-%m-%d %H:%M')} → {now.strftime('%Y-%m-%d %H:%M')} 台北 · "
             f"{result.symbols} 檔 15m · 進場＝15m 同時跌破 99/120/200 且 7<14<25，"
-            f"再加 1h：上根小時收盤仍在 MA99 上、本 15m 第一次打穿 1h MA99"
+            f"短均黏住要放量，再加 1h：上根小時收盤仍在 MA99 上、本 15m 第一次打穿 1h MA99，"
+            f"且上根小時不是明顯 7>14>25"
         )
         show_mubarak = not args.symbol or "MUBARAK" in args.symbol.upper()
         need_1h = sorted({t.signal.symbol for t in result.trades} | ({"MUBARAKUSDT"} if show_mubarak else set()))

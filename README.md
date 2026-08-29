@@ -62,7 +62,7 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 ## 幣安 15 分 K 同時跌破 99/120/200 做空
 
-一根 15 分 K **從 MA99/120/200 之上一次打穿到三條之下**，且 **MA7 < MA14 < MA25 空頭排列**，進場做空。再加 **小時確認**：上一根已收盤 1h 還在 MA99 之上，這根 15m 第一次打穿 1h MA99（小時線已經破了再追空，勝率較差）。報告每筆上圖 15m、下圖 1h。
+一根 15 分 K **從 MA99/120/200 之上一次打穿到三條之下**，且 **MA7 < MA14 < MA25 空頭排列**，進場做空。短均幾乎黏住時要放量，否則當成橫盤輕觸。再加 **小時確認**：上一根已收盤 1h 還在 MA99 之上，這根 15m 第一次打穿 1h MA99；上根小時若仍明顯 7>14>25，當成漲勢回檔濾掉。報告每筆上圖 15m、下圖 1h。
 
 停損在破位 K 高點上方 0.1%；停利 2R；收復 MA99 或持倉 32 根（8 小時）平倉。預設掃流動 USDT 永續一週。
 
@@ -71,7 +71,7 @@ python3 examples/binance_15m_ma_break_short.py --pages
 python3 examples/binance_15m_ma_break_short.py --symbol MUBARAKUSDT
 ```
 
-近一週（2026-08-22 → 08-29，257 檔 USDT 永續）：只看 15m 是 68 筆、勝率 44%；加上 **1h 首次打穿 MA99** 後變成 **26 筆、勝率 61.5%、單筆加總 +30.6%**。  
+近一週（2026-08-22 → 08-29，257 檔 USDT 永續）：只看 15m 是 68 筆、勝率 44%；加上 **1h 首次打穿 MA99** 後是 26 筆、勝率 61.5%。再濾掉短均黏帶輕觸、以及 1h 仍明顯多頭張開的回檔後，數字會再收斂（見報告）。  
 截圖那檔 **MUBARAK 08-25 16:00** 仍在，**+12.14%**。每筆上圖 15m、下圖 1h。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/view.html
