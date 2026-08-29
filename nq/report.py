@@ -191,18 +191,20 @@ def _draw_trade_png(
     entry_rel = sig.bar_idx - start
     exit_rel = trade.exit_idx - start
     if 0 <= entry_rel < len(window):
-        ax.axvline(entry_rel, color="#3dba7a", ls="--", lw=0.9)
-        ax.scatter([entry_rel], [sig.entry], s=72, color="#00e676", marker="^", zorder=7,
-                   edgecolors="white", linewidths=0.6)
+        ax.axvline(entry_rel, color="#3dba7a", ls="--", lw=0.9, alpha=0.7)
+        ax.scatter([entry_rel], [sig.entry], s=420, facecolors="none", edgecolors="#00e676",
+                   linewidths=2.4, zorder=8)
+        ax.scatter([entry_rel], [sig.entry], s=48, color="#00e676", zorder=9)
         ax.annotate(f"進 {sig.entry:.2f}", (entry_rel, sig.entry), textcoords="offset points",
-                    xytext=(0, 11), ha="center", color="#00e676", fontsize=8)
+                    xytext=(0, 16), ha="center", color="#00e676", fontsize=8)
     if 0 <= exit_rel < len(window):
-        ax.axvline(exit_rel, color="#f0c14b", ls=":", lw=0.9)
+        ax.axvline(exit_rel, color="#f0c14b", ls=":", lw=0.9, alpha=0.7)
         exit_color = "#00c805" if trade.pnl_points > 0 else "#ff5252"
-        ax.scatter([exit_rel], [trade.exit_price], s=70, color=exit_color, marker="x", zorder=7,
-                   linewidths=1.8)
+        ax.scatter([exit_rel], [trade.exit_price], s=420, facecolors="none", edgecolors=exit_color,
+                   linewidths=2.4, zorder=8)
+        ax.scatter([exit_rel], [trade.exit_price], s=48, color=exit_color, zorder=9)
         ax.annotate(f"出 {trade.exit_price:.2f}", (exit_rel, trade.exit_price), textcoords="offset points",
-                    xytext=(0, 11), ha="center", color=exit_color, fontsize=8)
+                    xytext=(0, 16), ha="center", color=exit_color, fontsize=8)
     if 0 <= entry_rel < len(window) and 0 <= exit_rel < len(window):
         ax.plot([entry_rel, exit_rel], [sig.entry, trade.exit_price], color="#f0c14b",
                 ls="--", lw=0.9, alpha=0.75, zorder=4)
@@ -446,7 +448,7 @@ def build_report_html(
     <section class="summary">
       <h1>{html.escape(title)}</h1>
       <p>{html.escape(symbol)} · 五分 K 破底W底 · L3 收盤進場 · 停損 L3-20點 · 均線差≥40點 · L1–L3 2 小時內 · {html.escape(_report_date_range(df))}</p>
-      <p style="margin-top:6px;color:#8b949e;font-size:12px;">產生 {html.escape(datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M"))} ET · 圖標 L1 / L2破底 / L3 / 進 / 出</p>
+      <p style="margin-top:6px;color:#8b949e;font-size:12px;">產生 {html.escape(datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M"))} ET · 綠圈進場 / 綠或紅圈出場</p>
       <div class="total">
         {stats.get("trades", 0)} 筆 · 勝率 {stats.get("win_rate", 0) * 100:.0f}% ·
         總計 {stats.get("total_pnl_points", 0):+.1f} 點 (${stats.get("total_pnl_dollars", 0):+,.0f})
