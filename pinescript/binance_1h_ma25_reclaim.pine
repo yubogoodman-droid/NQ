@@ -5,7 +5,10 @@ indicator("1h MA25 下破底再站上", overlay=true, max_labels_count=50)
 maLen        = input.int(25, "均線", minval=5)
 minBelow     = input.int(10, "在均線下至少幾根", minval=2)
 maxBelow     = input.int(36, "在均線下最多幾根", minval=6)
-minDepthPct  = input.float(2.8, "破底最低深度 %", minval=0.3, step=0.1) / 100
+minDepthPct  = input.float(2.8, "相對 MA25 最低深度 %", minval=0.3, step=0.1) / 100
+minImpulse   = input.float(2.3, "4 根急殺 %", minval=0.5, step=0.1) / 100
+minUndercut  = input.float(1.4, "破前低 %", minval=0.3, step=0.1) / 100
+minAtrMult   = input.float(2.8, "急殺 ATR 倍數", minval=1.0, step=0.1)
 
 ma25 = ta.sma(close, maLen)
 plot(ma25, "MA25", color=color.new(#d28cff, 0), linewidth=2)
@@ -23,7 +26,16 @@ episodeLow = ta.lowest(low, math.max(barsBelow, 1))
 depthOk = ma25 > 0 and (ma25 - episodeLow) / ma25 >= minDepthPct
 barsOk = barsBelow >= minBelow and barsBelow <= maxBelow
 
-reclaim = crossedUp and barsOk and depthOk
+flushHigh = ta.highest(high, 4)
+flushLow  = ta.lowest(low, 4)
+impulse   = flushHigh > 0 ? (flushHigh - flushLow) / flushHigh : 0
+atrVal    = ta.atr(14)
+flushAtr  = atrVal > 0 ? (flushHigh - flushLow) / atrVal : 0
+priorLow  = ta.lowest(low[4], 12)
+undercut  = priorLow > 0 ? (priorLow - flushLow) / priorLow : 0
+flushOk   = impulse >= minImpulse and flushAtr >= minAtrMult and undercut >= minUndercut
+
+reclaim = crossedUp and barsOk and depthOk and flushOk
 
 plotshape(reclaim, title="站上 MA25", style=shape.triangleup, location=location.belowbar, color=color.new(#00e676, 0), size=size.small)
 bgcolor(below and barsBelow >= minBelow ? color.new(#d28cff, 92) : na)

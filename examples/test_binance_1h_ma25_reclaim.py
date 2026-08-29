@@ -13,8 +13,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from binance_1h_ma25_reclaim import (  # noqa: E402
     TradeResult,
+    atr,
     classify_shape,
     detect_signals,
+    flush_metrics,
     quality_of,
     simulate,
     sma,
@@ -56,26 +58,39 @@ def _base_index(n: int) -> pd.DatetimeIndex:
     return pd.date_range("2026-08-01 00:00", periods=n, freq="1h", tz="Asia/Taipei")
 
 
-def _make_reclaim_bars(n: int = 80, *, depth: float = 0.04, below: int = 14) -> pd.DataFrame:
-    """Ride above MA25, dump below it, print a bottom, then close back above."""
+def _make_reclaim_bars(n: int = 80, *, depth: float = 0.055, below: int = 14, sharp: bool = True) -> pd.DataFrame:
+    """Ride above MA25, sit under it, then a 4-bar washout like the screenshots."""
     close = np.zeros(n, dtype=float)
     close[0] = 100.0
     for i in range(1, 40):
         close[i] = close[i - 1] + 0.12
     dump = 40
-    floor = close[dump - 1] * (1.0 - depth)
+    base = close[dump - 1]
+    floor = base * (1.0 - depth)
+    hang = base * 0.978  # 明確掛在 MA25 下，但還沒急殺
     for i in range(dump, dump + below):
-        # grind down to the floor then lift toward MA
-        t = (i - dump) / max(below - 1, 1)
-        close[i] = close[dump - 1] + (floor - close[dump - 1]) * min(1.0, t * 1.4 if t < 0.55 else (1.4 - t))
-    close[dump + below - 1] = close[dump - 1] * 0.985
-    close[dump + below] = close[dump - 1] + 0.80
+        close[i] = hang
+    if sharp:
+        flush_at = dump + max(below - 6, 4)
+        close[flush_at] = hang * 0.997
+        close[flush_at + 1] = hang * 0.985
+        close[flush_at + 2] = floor * 1.004
+        close[flush_at + 3] = floor * 1.012
+        close[dump + below - 1] = hang
+    else:
+        for i in range(dump, dump + below):
+            t = (i - dump) / max(below - 1, 1)
+            close[i] = base + (floor - base) * t
+        close[dump + below - 1] = base * 0.985
+    close[dump + below] = base + 0.80
     for i in range(dump + below + 1, n):
         close[i] = close[i - 1] + 0.25
     high = close + 0.35
     low = close - 0.35
-    low[dump + 4] = floor
-    high[dump + 4] = close[dump + 4] + 0.15
+    if sharp:
+        flush_at = dump + max(below - 6, 4)
+        low[flush_at + 2] = floor
+        high[flush_at + 2] = close[flush_at + 2] + 0.10
     return pd.DataFrame(
         {
             "Open": np.r_[close[0], close[:-1]],
@@ -102,14 +117,37 @@ def test_detect_reclaim() -> None:
     assert df["Close"].iloc[sig.entry_idx] > sig.ma25
 
 
+def test_flush_metrics_avgo_like() -> None:
+    n = 20
+    high = np.full(n, 358.0)
+    low = np.full(n, 356.5)
+    close = np.full(n, 357.2)
+    high[16:20] = [359.70, 357.00, 354.00, 353.00]
+    low[16:20] = [356.00, 354.00, 350.39, 351.20]
+    close[16:20] = [357.10, 352.80, 351.70, 352.10]
+    a = atr(high, low, close)
+    imp, flush_atr, under = flush_metrics(high, low, 18, 350.39, a)
+    assert abs(imp - (359.70 - 350.39) / 359.70) < 1e-9
+    assert under >= 0.014
+    assert flush_atr >= 2.8
+
+
 def test_shallow_rejected() -> None:
     df = _make_reclaim_bars(depth=0.006, below=8)
     sigs = detect_signals(df, min_depth_pct=0.028)
     assert not sigs, "0.6% poke should not count as 破底"
 
 
+def test_slow_grind_rejected() -> None:
+    df = _make_reclaim_bars(depth=0.055, below=16, sharp=False)
+    funnel: dict = {}
+    sigs = detect_signals(df, funnel=funnel)
+    assert not sigs, f"slow grind should fail flush, funnel={funnel}"
+    assert funnel.get("weak_flush", 0) >= 1 or funnel.get("shallow", 0) >= 1 or funnel.get("too_short", 0) >= 1
+
+
 def test_one_bar_pop_keeps_episode() -> None:
-    df = _make_reclaim_bars(depth=0.045, below=16)
+    df = _make_reclaim_bars(depth=0.055, below=16)
     close = df["Close"].to_numpy(float)
     # W 中間兩根假站上，然後再破底
     df.iloc[44, df.columns.get_loc("Close")] = close[39] + 0.4
@@ -189,7 +227,9 @@ def main() -> int:
     test_quality_of()
     test_classify_v_and_w()
     test_detect_reclaim()
+    test_flush_metrics_avgo_like()
     test_shallow_rejected()
+    test_slow_grind_rejected()
     test_still_below_no_signal()
     test_simulate_target()
     test_summarize()

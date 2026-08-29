@@ -65,6 +65,9 @@ class Signal:
     bars_below: int
     shape: str
     vol_ratio: float
+    impulse_pct: float = 0.0
+    undercut_pct: float = 0.0
+    flush_atr: float = 0.0
     quality: str = "C"
     quality_score: int = 0
     ma7: float = 0.0
@@ -102,6 +105,39 @@ class Hit:
 def sma(arr, n: int) -> np.ndarray:
     s = pd.Series(arr, dtype=float)
     return s.rolling(n, min_periods=n).mean().to_numpy(float)
+
+
+def atr(high, low, close, n: int = 14) -> np.ndarray:
+    prev = np.r_[close[0], close[:-1]]
+    tr = np.maximum(high - low, np.maximum(np.abs(high - prev), np.abs(low - prev)))
+    return sma(tr, n)
+
+
+def flush_metrics(
+    high: np.ndarray,
+    low: np.ndarray,
+    bottom_idx: int,
+    bottom: float,
+    atr14: np.ndarray,
+    *,
+    flush_bars: int = 4,
+    base_bars: int = 12,
+) -> Tuple[float, float, float]:
+    """4 根急殺：幅度、ATR 倍數、相對急殺前平台低點的破底。"""
+    left = max(0, bottom_idx - flush_bars + 1)
+    peak = float(np.max(high[left : bottom_idx + 1]))
+    if peak <= 0:
+        return 0.0, 0.0, 0.0
+    impulse = (peak - bottom) / peak
+    atr_v = float(atr14[bottom_idx]) if bottom_idx < len(atr14) and not np.isnan(atr14[bottom_idx]) else 0.0
+    flush_atr = (peak - bottom) / atr_v if atr_v > 0 else 0.0
+    base_right = left
+    base_left = max(0, base_right - base_bars)
+    if base_right <= base_left:
+        return float(impulse), float(flush_atr), 0.0
+    prior = float(np.min(low[base_left:base_right]))
+    undercut = (prior - bottom) / prior if prior > 0 else 0.0
+    return float(impulse), float(flush_atr), float(undercut)
 
 
 def get_json(path: str, params=None, retries: int = 6) -> Any:
@@ -269,6 +305,10 @@ def detect_signals(
     min_bars_below: int = 10,
     max_bars_below: int = 36,
     min_depth_pct: float = 0.028,
+    min_impulse_pct: float = 0.023,
+    min_undercut_pct: float = 0.014,
+    min_flush_atr: float = 2.8,
+    flush_bars: int = 4,
     stop_buffer_pct: float = 0.003,
     target_r: float = 2.0,
     min_entry_gap: int = 8,
@@ -285,6 +325,7 @@ def detect_signals(
     high = df["High"].to_numpy(float)
     volume = df["Volume"].to_numpy(float) if "Volume" in df.columns else np.ones(len(df))
     ma25 = sma(close, ma_period)
+    atr14 = atr(high, low, close, 14)
     ma7 = sma(close, 7)
     ma99 = sma(close, 99)
     ma200 = sma(close, 200)
@@ -338,6 +379,14 @@ def detect_signals(
             i = reclaim
             continue
 
+        impulse_pct, flush_atr, undercut_pct = flush_metrics(
+            high, low, bottom_idx, bottom, atr14, flush_bars=flush_bars
+        )
+        if impulse_pct < min_impulse_pct or flush_atr < min_flush_atr or undercut_pct < min_undercut_pct:
+            bump("weak_flush")
+            i = reclaim
+            continue
+
         left = max(0, bottom_idx - break_lookback + 1)
         if bottom > float(np.min(low[left : bottom_idx + 1])) + 1e-12:
             bump("not_break")
@@ -377,6 +426,9 @@ def detect_signals(
                 bars_below=int(bars_below),
                 shape=shape,
                 vol_ratio=float(vol_ratio),
+                impulse_pct=float(impulse_pct),
+                undercut_pct=float(undercut_pct),
+                flush_atr=float(flush_atr),
                 quality=q_grade,
                 quality_score=q_score,
                 ma7=float(ma7[reclaim]) if not np.isnan(ma7[reclaim]) else 0.0,
@@ -711,6 +763,7 @@ def write_html_report(
             f"target {t.target_price:.6g}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.6g}  {t.exit_reason}\n"
             f"破底 {t.signal.bottom:.6g}  深度 {t.signal.depth_pct * 100:.2f}%  在下 {t.signal.bars_below}h\n"
+            f"急殺 {t.signal.impulse_pct * 100:.1f}% / {t.signal.flush_atr:.1f}ATR  破前低 {t.signal.undercut_pct * 100:.1f}%\n"
             f"量比 {t.signal.vol_ratio:.2f}x  MA25 {t.signal.ma25:.6g}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i} {escape(hit.symbol)}' "
@@ -724,7 +777,8 @@ def write_html_report(
             f"<p class='muted'>漏斗：跌破 {funnel.get('cross_down', 0)} → "
             f"站回 {funnel.get('reclaim', 0)} → 進場 {funnel.get('taken', 0)}"
             f"（太短 {funnel.get('too_short', 0)} · 太長 {funnel.get('too_long', 0)} · "
-            f"太淺 {funnel.get('shallow', 0)} · 未站回 {funnel.get('no_reclaim', 0)}）</p>"
+            f"太淺 {funnel.get('shallow', 0)} · 急殺不夠 {funnel.get('weak_flush', 0)} · "
+            f"未站回 {funnel.get('no_reclaim', 0)}）</p>"
         )
     q_bits = [f"Q{q} {info['n']}筆 {info['pnl']:+.2f}%" for q, info in stats.get("by_quality", {}).items()]
     total_cls = "pnl-win" if stats["total_pct"] >= 0 else "pnl-loss"
@@ -765,7 +819,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 粉線 MA25<br/>
-價先收在 MA25 下至少 10 小時、深度 ≥ 2.8%（對照波段內最高 MA25），低點須是近 16 根最低。W 中間 1–2 根假站上不算結束。停損破底低點，目標 2R，連兩根掉回 MA25 下出場。{card_note}</p>
+價先收在 MA25 下，再出現跟截圖差不多的急殺：4 根內至少 2.3%、≥ 2.8 ATR，並跌破急殺前平台低點 1.4%。之後收盤站回 MA25。停損破底低點，目標 2R。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -828,6 +882,9 @@ def detect_kwargs(args) -> dict:
         min_bars_below=args.min_bars,
         max_bars_below=args.max_bars,
         min_depth_pct=args.min_depth / 100.0,
+        min_impulse_pct=args.min_impulse / 100.0,
+        min_undercut_pct=args.min_undercut / 100.0,
+        min_flush_atr=args.min_atr,
         target_r=args.target_r,
     )
 
@@ -895,7 +952,7 @@ def cmd_run(args) -> int:
             f"down={funnel.get('cross_down', 0)} reclaim={funnel.get('reclaim', 0)} "
             f"taken={funnel.get('taken', 0)} short={funnel.get('too_short', 0)} "
             f"long={funnel.get('too_long', 0)} shallow={funnel.get('shallow', 0)} "
-            f"noreclaim={funnel.get('no_reclaim', 0)}"
+            f"weak={funnel.get('weak_flush', 0)} noreclaim={funnel.get('no_reclaim', 0)}"
         )
     now = datetime.now(TPE)
     for i, hit in enumerate(hits, 1):
@@ -906,7 +963,8 @@ def cmd_run(args) -> int:
         print(
             f"  [{i}] {hit.symbol} Q{t.quality} {t.signal.shape} "
             f"{ts.strftime('%m-%d %H:%M')} {t.exit_reason} {t.pnl_pct:+.2f}% "
-            f"depth={t.signal.depth_pct*100:.1f}% below={t.signal.bars_below}h{mark}"
+            f"depth={t.signal.depth_pct*100:.1f}% flush={t.signal.impulse_pct*100:.1f}%/"
+            f"{t.signal.flush_atr:.1f}atr under={t.signal.undercut_pct*100:.1f}%{mark}"
         )
 
     html_path = Path(args.html) if args.html else None
@@ -947,7 +1005,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--min-bars", type=int, default=10, help="在 MA25 下至少幾根 1h")
     p.add_argument("--max-bars", type=int, default=36, help="在 MA25 下最多幾根 1h")
-    p.add_argument("--min-depth", type=float, default=2.8, help="破底相對 MA25 最低深度 %")
+    p.add_argument("--min-depth", type=float, default=2.8, help="相對 MA25 最低深度 %")
+    p.add_argument("--min-impulse", type=float, default=2.3, help="4 根急殺最低幅度 %")
+    p.add_argument("--min-undercut", type=float, default=1.4, help="跌破急殺前平台低點 %")
+    p.add_argument("--min-atr", type=float, default=2.8, help="急殺至少幾個 ATR")
     p.add_argument("--target-r", type=float, default=2.0)
     p.add_argument("--recent", type=int, default=48, help="報告裡標近幾小時的新訊號")
     p.add_argument("--html", default="")
