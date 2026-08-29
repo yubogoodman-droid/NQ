@@ -172,6 +172,28 @@ def far_below_falling_5m_ma20(
     return float(slope20) < 0.0 and (float(ma20_5m) - float(entry)) > float(max_below)
 
 
+def falling_5m_ma20_bad_location(
+    entry: float,
+    ma20_5m: float,
+    slope20: float,
+    *,
+    chase_above: float,
+    lid_slope: float,
+) -> bool:
+    """五分 MA20 下跌時：追太高、或壓在陡降均線下，勝率差。
+
+    圈起來的三筆都過：08-03 五分 MA20 往上；08-24 只高 26 點；
+    08-28 在均線下 10 點但斜率只有 −11，還不到蓋子。
+    """
+    if np.isnan(ma20_5m) or np.isnan(slope20) or float(slope20) >= 0.0:
+        return False
+    if chase_above > 0 and (float(entry) - float(ma20_5m)) > float(chase_above):
+        return True
+    if lid_slope < 0 and float(slope20) < float(lid_slope) and float(entry) < float(ma20_5m):
+        return True
+    return False
+
+
 def choose_target_r(base: float, slope_5m: float, up: float) -> float:
     """5m MA20 上彎用較大 R（08-03 那種真破底翻）；否則維持 1.5R。"""
     if up > 0 and not np.isnan(slope_5m) and float(slope_5m) > 0.0:
@@ -276,6 +298,8 @@ INTERVAL_DETECT = {
         ma60_5m_slope_bars=6,
         ma20_5m_near=45.0,
         ma20_5m_below=45.0,
+        ma20_5m_chase=35.0,
+        ma20_5m_lid_slope=-15.0,
         min_pullback=25.0,
         max_dump_body=30.0,
         dump_skip_body=20.0,
@@ -334,6 +358,8 @@ def detect_signals(
     ma60_5m_slope_bars: int = 6,
     ma20_5m_near: float = 45.0,
     ma20_5m_below: float = 0.0,
+    ma20_5m_chase: float = 0.0,
+    ma20_5m_lid_slope: float = 0.0,
     min_pullback: float = 0.0,
     max_dump_body: float = 0.0,
     dump_skip_body: float = 0.0,
@@ -574,6 +600,17 @@ def detect_signals(
             # 但其實還在下彎 5m MA20 下方 79 點，不是破底翻。
             if far_below_falling_5m_ma20(entry, m20_5, m20_5_s, ma20_5m_below):
                 bump("skip_below_5m")
+                continue
+            # 五分 MA20 下跌：追在它上方太高（08-19），或壓在陡降蓋子下
+            # （08-05 / 08-07 / 08-11）。08-28 斜率只有 −11，不算蓋子。
+            if falling_5m_ma20_bad_location(
+                entry,
+                m20_5,
+                m20_5_s,
+                chase_above=ma20_5m_chase,
+                lid_slope=ma20_5m_lid_slope,
+            ):
+                bump("skip_5m")
                 continue
 
             entry_idx = t

@@ -643,6 +643,7 @@ def write_html_report(
             f"貼下彎5mMA60 {funnel.get('skip_ma60', 0)} · "
             f"貼下彎5mMA20/30蓋頭 {funnel.get('skip_ma20_30', 0)} · "
             f"遠低下彎5mMA20 {funnel.get('skip_below_5m', 0)} · "
+            f"下跌5m位置 {funnel.get('skip_5m', 0)} · "
             f"間隔 {funnel.get('skip_gap', 0)} · "
             f"追刀 {funnel.get('skip_dump', 0)} · "
             f"午後 {funnel.get('skip_late', 0)} · "
@@ -656,6 +657,7 @@ def write_html_report(
         "進場收盤須貼著 1m MA20（高於不超過 20 點）；影線掃到但收盤彈走 30 點那種再等下一腳。"
         "大陰線砸上 MA20 不進，等下一根小 K 確認；實體超過 30 點且 5m MA20 下彎則這波作廢。"
         "13:00 後不進（午餐後／尾盤假右肩）。5m MA20 上彎時目標 2R，否則 1.5R。"
+        "五分 MA20 下跌時：追在它上方超過 35 點、或壓在斜率比 −15 更負的蓋子下，不進。"
         "只做日盤破底。"
         if interval == "1m"
         else ""
@@ -696,7 +698,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} {escape(interval)} 破底翻 · 右肩在 MA20 上</h1>
-<p class="muted">只做日盤 09:30–15:45 ET。破底翻 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後右肩踩回 MA20 進場。停損在{'右肩低點' if interval == '1m' else '破底'}下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內），或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下（45 點內），或遠低於下彎的 5m MA20（超過 45 點），則略過。{pullback_note}{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
+<p class="muted">只做日盤 09:30–15:45 ET。破底翻 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後右肩踩回 MA20 進場。停損在{'右肩低點' if interval == '1m' else '破底'}下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內），或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下（45 點內），或遠低於下彎的 5m MA20（超過 45 點），則略過。五分 MA20 下跌時，追在它上方超過 35 點、或壓在斜率比 −15 更負的蓋子下，也不進。{pullback_note}{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -768,6 +770,7 @@ def cmd_backtest(args) -> int:
             f"ma60={funnel.get('skip_ma60', 0)} "
             f"ma20_30={funnel.get('skip_ma20_30', 0)} "
             f"below5m={funnel.get('skip_below_5m', 0)} "
+            f"loc5m={funnel.get('skip_5m', 0)} "
             f"gap={funnel.get('skip_gap', 0)} "
             f"dump={funnel.get('skip_dump', 0)} "
             f"late={funnel.get('skip_late', 0)} "

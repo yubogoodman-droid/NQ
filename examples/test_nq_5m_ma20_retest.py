@@ -19,6 +19,7 @@ from nq.ma20_retest import (  # noqa: E402
     detect_kwargs,
     detect_signals,
     drop_open_end_trades,
+    falling_5m_ma20_bad_location,
     far_below_falling_5m_ma20,
     near_falling_5m_ma20_ma30,
     near_falling_5m_ma60,
@@ -96,6 +97,35 @@ def test_far_below_falling_5m_ma20() -> None:
     # 5m MA20 上彎，即使在下方也留
     assert not far_below_falling_5m_ma20(29517.25, 29596.5, 8.0, 45.0)
     assert not far_below_falling_5m_ma20(29517.25, 29596.5, -80.3, 0.0)
+
+
+def test_falling_5m_ma20_keeps_circled_and_drops_chase_or_lid() -> None:
+    # 08-03 #1：五分 MA20 往上，不擋
+    assert not falling_5m_ma20_bad_location(
+        28470.00, 28455.7, 7.8, chase_above=35.0, lid_slope=-15.0
+    )
+    # 08-24：高 26 點，還沒到追價 35
+    assert not falling_5m_ma20_bad_location(
+        29061.00, 29035.4, -35.1, chase_above=35.0, lid_slope=-15.0
+    )
+    # 08-28 10:28：在均線下 10 點，斜率 −11，還不到蓋子
+    assert not falling_5m_ma20_bad_location(
+        29627.50, 29637.1, -10.8, chase_above=35.0, lid_slope=-15.0
+    )
+    # 08-19：追在下跌五分 MA20 上 64 點
+    assert falling_5m_ma20_bad_location(
+        29596.50, 29532.4, -41.9, chase_above=35.0, lid_slope=-15.0
+    )
+    # 08-05 / 08-07 / 08-18：壓在陡降五分 MA20 下
+    assert falling_5m_ma20_bad_location(
+        29795.25, 29803.8, -35.9, chase_above=35.0, lid_slope=-15.0
+    )
+    assert falling_5m_ma20_bad_location(
+        29731.00, 29736.6, -25.1, chase_above=35.0, lid_slope=-15.0
+    )
+    assert falling_5m_ma20_bad_location(
+        29577.75, 29602.6, -38.8, chase_above=35.0, lid_slope=-15.0
+    )
 
 
 def test_skips_hug_falling_5m_ma60() -> None:
@@ -382,6 +412,8 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["min_retest_bars"] == 8
     assert d1["max_close_above"] == 20.0
     assert d1["ma20_5m_below"] == 45.0
+    assert d1["ma20_5m_chase"] == 35.0
+    assert d1["ma20_5m_lid_slope"] == -15.0
     assert d1["entry_until"] == 13 * 60
     assert d1["target_r_up"] == 2.0
     assert d5["stop_at_shoulder"] is False
@@ -498,7 +530,15 @@ def test_skips_close_far_above_ma20() -> None:
     df["High"] = high
     df["Low"] = low
     df["Open"] = opn
-    sigs = detect_signals(df, **detect_kwargs("1m", session="day"))
+    sigs = detect_signals(
+        df,
+        **detect_kwargs(
+            "1m",
+            session="day",
+            ma20_5m_chase=0.0,
+            ma20_5m_lid_slope=0.0,
+        ),
+    )
     assert sigs, "later sit on MA20 must still fill"
     assert sigs[0].entry_idx > tag, "bounce close 31 pts above MA20 is not a retest"
     assert sigs[0].entry_price - sigs[0].ma20 <= 20.0 + 1e-6
@@ -547,7 +587,16 @@ def test_1m_fills_early_right_shoulder() -> None:
     df["High"] = high
     df["Low"] = low
     df["Open"] = opn
-    sigs = detect_signals(df, **detect_kwargs("1m", session="day", ma20_5m_below=0.0))
+    sigs = detect_signals(
+        df,
+        **detect_kwargs(
+            "1m",
+            session="day",
+            ma20_5m_below=0.0,
+            ma20_5m_chase=0.0,
+            ma20_5m_lid_slope=0.0,
+        ),
+    )
     assert sigs, "08-28 10:28-style right shoulder must fill after skipping the dump"
     assert sigs[0].entry_idx == sit
     assert 0.0 <= sigs[0].entry_price - sigs[0].ma20 <= 32.0 + 1e-6
@@ -641,6 +690,7 @@ def main() -> int:
     test_near_falling_5m_ma60()
     test_near_falling_5m_ma20_ma30()
     test_far_below_falling_5m_ma20()
+    test_falling_5m_ma20_keeps_circled_and_drops_chase_or_lid()
     test_skips_hug_falling_5m_ma60()
     test_sma()
     test_summarize_trades()
