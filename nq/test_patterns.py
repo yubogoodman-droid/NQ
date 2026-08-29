@@ -160,6 +160,31 @@ def test_tangled_moving_averages_are_skipped() -> None:
     assert NQWBottomStrategy().generate_signals(_df(rows)) == []
 
 
+def test_blocked_ny_open_session_is_skipped() -> None:
+    df = _df(_l1_l2_l3_rows())
+    df.index = pd.date_range("2026-08-03 08:00", periods=len(df), freq="5min", tz="America/New_York")
+    assert NQWBottomStrategy().generate_signals(df) == []
+
+
+def test_close_well_below_l1_is_skipped() -> None:
+    df = _df(_l1_l2_l3_rows())
+    idx = NQWBottomStrategy().generate_signals(df)[0].bar_idx
+    df.iat[idx, df.columns.get_loc("close")] = 9985.0
+    assert NQWBottomStrategy().generate_signals(df) == []
+
+
+def test_entry_already_at_neckline_is_skipped() -> None:
+    df = _df(_l1_l2_l3_rows())
+    sig = NQWBottomStrategy().generate_signals(df)[0]
+    df.iat[sig.bar_idx, df.columns.get_loc("close")] = sig.pattern.neckline - 5.0
+    assert NQWBottomStrategy().generate_signals(df) == []
+
+
+def test_stretched_above_ma200_is_skipped() -> None:
+    rows = _flat(220, 9800.0) + _l1_l2_l3_rows()
+    assert NQWBottomStrategy(blocked_sessions=()).generate_signals(_df(rows)) == []
+
+
 def test_pattern_longer_than_two_hours_is_ignored() -> None:
     rows = _l1_l2_l3_rows()
     # 在 L3 前插入超過 2 小時的空白 K

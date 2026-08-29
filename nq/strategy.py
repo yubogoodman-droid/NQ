@@ -42,6 +42,8 @@ class NQWBottomStrategy:
     停損：L3 下方 20 點
     停利：頸線 + (頸線 − L2)
     均線糾結（MA5/10/20/60/120/200 高低差過小）不進場
+    濾虧損、保留近月贏家：避開 04:00–10:30 與 14:00–15:00 ET、
+    不在 MA200 上方追太遠、L3 收盤須站回 L1 附近、進場距頸線要有空間
     """
 
     swing_lookback: int = 3
@@ -50,12 +52,16 @@ class NQWBottomStrategy:
     max_bars_between_lows: int = 24
     max_pattern_hours: float = 2.0
     min_spring_pct: float = 0.001
-    min_spring_points: float = 25.0
+    min_spring_points: float = 30.0
     min_bounce_pct: float = 0.001
     max_reclaim_bars: int = 36
     max_breakout_bars: int = 36
     stop_below_l3_points: float = 20.0
     min_ma_span_points: float = 40.0
+    max_dist_above_ma200: float = 120.0
+    max_close_below_l1: float = 10.0
+    min_room_to_neckline: float = 20.0
+    blocked_sessions: tuple[tuple[float, float], ...] = ((4.0, 10.5), (14.0, 15.0))
     ma_periods: tuple[int, ...] = (5, 10, 20, 60, 120, 200)
     tick_size: float = 0.25
     point_value: float = 20.0
@@ -85,6 +91,14 @@ class NQWBottomStrategy:
                 continue
             if self._mas_tangled(df, idx):
                 continue
+            if self._in_blocked_session(df.index[idx]):
+                continue
+            if self._too_far_above_ma200(df, idx, entry):
+                continue
+            if entry < pattern.l1 - self.max_close_below_l1:
+                continue
+            if pattern.neckline - entry < self.min_room_to_neckline:
+                continue
             signals.append(
                 Signal(
                     timestamp=df.index[idx],
@@ -109,6 +123,20 @@ class NQWBottomStrategy:
         if len(vals) < 4:
             return False
         return max(vals) - min(vals) < self.min_ma_span_points
+
+    def _in_blocked_session(self, ts: pd.Timestamp) -> bool:
+        """倫敦尾盤～美股開盤、以及現金盤尾盤前一小時，近月虧損集中、贏家不在此時段。"""
+        t = ts.tz_convert("America/New_York") if getattr(ts, "tzinfo", None) else ts
+        hour = t.hour + t.minute / 60.0
+        return any(start <= hour < end for start, end in self.blocked_sessions)
+
+    def _too_far_above_ma200(self, df: pd.DataFrame, idx: int, entry: float) -> bool:
+        """已在 MA200 上方拉開過多 = 追高，不進。K 數不夠算 MA200 時不濾。"""
+        if idx + 1 < 200:
+            return False
+        close = df["close"].astype(float)
+        ma200 = float(close.iloc[idx - 199 : idx + 1].mean())
+        return entry - ma200 > self.max_dist_above_ma200
 
     def _round_tick(self, price: float) -> float:
         return round(price / self.tick_size) * self.tick_size
