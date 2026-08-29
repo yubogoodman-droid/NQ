@@ -946,7 +946,7 @@ def one_at_a_time_path(
         else:
             et = et.tz_convert(TPE)
             xt = xt.tz_convert(TPE)
-        rows.append((et, xt, h.symbol, h.trade))
+        rows.append((et, xt, h.symbol, h.trade, h))
     rows.sort(key=lambda x: (x[0], x[2]))
     eq = float(start)
     peak = float(start)
@@ -955,7 +955,7 @@ def one_at_a_time_path(
     dd_peak_i = dd_trough_i = -1
     taken: List[dict] = []
     busy = None
-    for et, xt, sym, t in rows:
+    for et, xt, sym, t, hit in rows:
         if busy is not None and et < busy:
             continue
         ret = lev * (t.pnl_pct / 100.0)
@@ -965,6 +965,7 @@ def one_at_a_time_path(
             "xt": xt,
             "symbol": sym,
             "trade": t,
+            "hit": hit,
             "before": eq,
             "after": nxt,
             "ret": ret,
@@ -1032,6 +1033,8 @@ def write_seq_html(
     lev: float = 3.0,
     scanned: int = 80,
     pool: int = 0,
+    featured_html: str = "",
+    more_k_href: str = "",
 ) -> Path:
     if not taken:
         html = "<p>no trades</p>"
@@ -1085,6 +1088,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 .card b{{display:block;font-size:20px;margin-top:4px}}
 .equity{{margin:10px 0 4px}}
 .pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}}
+.mini-chart{{margin:8px -6px 0;border-radius:10px;overflow:hidden}}
+.k-block{{margin:14px 0 0}}
+.k-block h2{{font-size:15px;margin:0 0 6px}}
 table{{width:100%;border-collapse:collapse;font-size:12px}}
 th,td{{text-align:left;padding:6px 4px;border-bottom:1px solid #21262d}}
 th{{color:#8b949e;font-weight:600}}
@@ -1101,11 +1107,13 @@ th{{color:#8b949e;font-weight:600}}
 <div class="card">最大回撤<b class="pnl-loss">{max_dd*100:.1f}%</b></div>
 </div>
 <div class="equity">{_compound_equity_svg(taken)}</div>
-<p class="muted">整段線性圖。後面漲到 {final:.0f}，前面 158→60 看起來會扁，回撤放大見下圖。</p>
+<p class="muted">整段線性圖。後面漲到 {final:.0f}，前面 {peak['after']:.0f}→{trough['after']:.0f} 看起來會扁，回撤放大見下圖。</p>
 <div class="equity">{_compound_equity_svg(zoom)}</div>
 <p class="muted">高點 {escape(peak['et'].strftime('%m-%d %H:%M'))} {escape(peak['symbol'])} 後 {peak['after']:.2f} USDT<br/>
 谷底 {escape(trough['et'].strftime('%m-%d %H:%M'))} {escape(trough['symbol'])} 後 {trough['after']:.2f} USDT<br/>
 最痛單筆 {escape(worst['et'].strftime('%m-%d %H:%M'))} {escape(worst['symbol'])} 價格 {worst['trade'].pnl_pct:+.2f}%（帳戶 {worst['ret']*100:+.2f}%）</p>
+{featured_html}
+{f"<p class='muted'><a href='{escape(more_k_href)}' style='color:#79c0ff'>全部做成單的 K 棒圖</a></p>" if more_k_href else ""}
 </section>
 <section class="summary">
 <h1>高點 → 谷底這段</h1>
@@ -1126,12 +1134,81 @@ th{{color:#8b949e;font-weight:600}}
     return path
 
 
-def write_view_html(src: Path, branch: str = BRANCH) -> Path:
+def draw_seq_pngs(taken: Sequence[dict], img_dir: Path) -> Sequence[dict]:
+    img_dir = Path(img_dir)
+    img_dir.mkdir(parents=True, exist_ok=True)
+    for i, rec in enumerate(taken, 1):
+        hit = rec.get("hit")
+        if hit is None:
+            continue
+        name = f"s{i:02d}_{hit.symbol}_{rec['et'].strftime('%m%d_%H%M')}.png"
+        draw_trade_png(hit.df, rec["trade"], img_dir / name, i, title_extra=hit.symbol)
+        rec["img"] = name
+    return taken
+
+
+def write_seq_k_html(
+    path: Path,
+    taken: Sequence[dict],
+    *,
+    img_src_prefix: str = "seq-img/",
+    days: int = 60,
+) -> Path:
+    cards: List[str] = []
+    for i, rec in enumerate(taken, 1):
+        t = rec["trade"]
+        img = rec.get("img")
+        if not img:
+            continue
+        cls = "pnl-win" if t.pnl_pct > 0 else "pnl-loss"
+        cards.append(
+            "<article class='summary' style='margin-bottom:14px'>"
+            f"<h1>#{i} · {escape(rec['symbol'])} · {escape(t.exit_reason)}</h1>"
+            f"<p class='muted'>{escape(rec['et'].strftime('%Y-%m-%d %H:%M'))} → "
+            f"{escape(rec['xt'].strftime('%m-%d %H:%M'))} · "
+            f"價格 {t.pnl_pct:+.2f}% · 帳戶 {rec['ret']*100:+.2f}% · "
+            f"{rec['before']:.2f} → {rec['after']:.2f} USDT</p>"
+            f"<div class='mini-chart'><img src='{img_src_prefix}{escape(img)}' alt='#{i} {escape(rec['symbol'])}' "
+            "style='width:100%;display:block;border-radius:10px'/></div>"
+            "</article>"
+        )
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>一次一單 K 棒 · {days} 天</title>
+<style>
+*{{box-sizing:border-box}}
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
+.page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
+h1{{font-size:16px;margin:0 0 6px}}
+.muted{{color:#8b949e;font-size:13px;line-height:1.5}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px}}
+.mini-chart{{margin:8px -6px 0;border-radius:10px;overflow:hidden}}
+.pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}}
+</style></head><body>
+<div class="page">
+<section class="summary" style="margin-bottom:14px">
+<h1>做成的 {len(cards)} 筆 K 棒</h1>
+<p class="muted">100 USDT ×3 · 一次一單 · 近 {days} 天。圖大，手機預覽可能慢。</p>
+</section>
+{''.join(cards)}
+</div>
+</body></html>
+"""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    return path
+
+
+def write_view_html(src: Path, branch: str = BRANCH, out_name: str = "view.html") -> Path:
     src = Path(src).resolve()
     rel = src.parent.relative_to(REPO.resolve()).as_posix()
     base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
     text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
-    out = src.with_name("view.html")
+    text = text.replace("src='seq-img/", f"src='{base}seq-img/")
+    out = src.with_name(out_name)
     out.write_text(text, encoding="utf-8")
     return out
 
