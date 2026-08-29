@@ -1,20 +1,17 @@
 //@version=5
-indicator("1h MA25 筆畫 W 再站上", overlay=true, max_labels_count=50, max_lines_count=200)
+indicator("1h MA25 下破底再站上", overlay=true, max_labels_count=50)
 
-// 對齊 Python 嚴格版：先一腳、吻 MA25、再破底，收盤站回 MA25 進場。
-// 預設寬鬆：跌破至少 4 根、深度 1.8%，再站回。勾「截圖急殺」+「筆畫 W」= --strict。
+// 預設寬鬆：跌破 MA25 至少 4 根、深度 1.8%，再站回。
+// 勾「截圖急殺」才加上 4 根急殺 / ATR / 破前低。
+// 筆畫那種 W（先一腳、吻 MA25、再破底）以 Python 嚴格版為準。
 maLen        = input.int(25, "均線", minval=5)
 minBelow     = input.int(4, "在均線下至少幾根", minval=2)
 maxBelow     = input.int(36, "在均線下最多幾根", minval=6)
 minDepthPct  = input.float(1.8, "相對 MA25 最低深度 %", minval=0.3, step=0.1) / 100
 useFlush     = input.bool(false, "截圖急殺（嚴）")
-useDrawnW    = input.bool(false, "筆畫 W（先一腳、吻 MA25、再破底）")
 minImpulse   = input.float(2.3, "4 根急殺 %", minval=0.5, step=0.1) / 100
 minUndercut  = input.float(1.4, "破前低 %", minval=0.3, step=0.1) / 100
 minAtrMult   = input.float(2.8, "急殺 ATR 倍數", minval=1.0, step=0.1)
-minSep       = input.int(6, "W 兩谷最少間隔", minval=3)
-minBounce    = input.float(0.6, "中間反彈 %", minval=0.2, step=0.1) / 100
-neckBand     = input.float(1.5, "吻 MA25 容許 %", minval=0.3, step=0.1) / 100
 
 ma7   = ta.sma(close, 7)
 ma14  = ta.sma(close, 14)
@@ -51,63 +48,13 @@ priorLow  = ta.lowest(low[4], 12)
 undercut  = priorLow > 0 ? (priorLow - flushLow) / priorLow : 0
 flushOk   = not useFlush or (impulse >= minImpulse and flushAtr >= minAtrMult and undercut >= minUndercut)
 
-f_swingLow(off) =>
-    off >= 2 and low[off] <= low[off - 1] and low[off] <= low[off + 1] and low[off] <= low[off - 2] and low[off] <= low[off + 2]
+reclaim = crossedUp and barsOk and depthOk and flushOk
+aligned = close > ma7 and ma7 > ma14 and ma14 > ma25
+firstAlign = aligned and not aligned[1]
+sinceReclaim = ta.barssince(reclaim)
+stackIn = firstAlign and not na(sinceReclaim) and sinceReclaim >= 0 and sinceReclaim <= 36
 
-wStartOff = 0
-wLeftOff = 0
-wPeakOff = 0
-wRightOff = 0
-wOk = false
-if crossedUp and barsOk and barsBelow >= minSep + 4
-    rightOff = 1
-    rightLow = low[1]
-    for i = 1 to barsBelow
-        if low[i] <= rightLow
-            rightLow := low[i]
-            rightOff := i
-    leftOff = na
-    leftLow = 10e10
-    if rightOff + minSep <= barsBelow
-        for i = rightOff + minSep to barsBelow
-            if f_swingLow(i) and low[i] < leftLow
-                leftLow := low[i]
-                leftOff := i
-    if not na(leftOff) and leftLow > 0 and rightLow < leftLow
-        peakOff = leftOff
-        peakH = high[leftOff]
-        for i = rightOff to leftOff
-            if high[i] >= peakH
-                peakH := high[i]
-                peakOff := i
-        maNeck = ma25[peakOff]
-        dist = maNeck > 0 ? (peakH - maNeck) / maNeck : 99
-        bounce = (peakH - leftLow) / leftLow
-        if peakOff < leftOff and peakOff > rightOff and dist >= -neckBand and dist <= neckBand and bounce >= minBounce
-            startOff = leftOff
-            startH = high[leftOff]
-            for i = leftOff to barsBelow
-                if high[i] >= startH
-                    startH := high[i]
-                    startOff := i
-            if startOff <= leftOff
-                startOff := math.min(barsBelow, leftOff + 1)
-            wOk := true
-            wStartOff := startOff
-            wLeftOff := leftOff
-            wPeakOff := peakOff
-            wRightOff := rightOff
-
-wRequiredOk = not useDrawnW or wOk
-reclaimIn = crossedUp and barsOk and depthOk and flushOk and wRequiredOk
-
-plotshape(reclaimIn, title="站回 MA25", style=shape.triangleup, location=location.belowbar, color=color.new(#00c853, 0), size=size.small)
+plotshape(stackIn, title="7/14/25 多頭排列", style=shape.triangleup, location=location.belowbar, color=color.new(#00e676, 0), size=size.small)
 bgcolor(below and barsBelow >= minBelow ? color.new(#d28cff, 92) : na)
 
-if reclaimIn and wOk
-    line.new(bar_index - wStartOff, high[wStartOff], bar_index - wLeftOff, low[wLeftOff], color=color.new(#1e88e5, 0), width=3)
-    line.new(bar_index - wLeftOff, low[wLeftOff], bar_index - wPeakOff, high[wPeakOff], color=color.new(#1e88e5, 0), width=3)
-    line.new(bar_index - wPeakOff, high[wPeakOff], bar_index - wRightOff, low[wRightOff], color=color.new(#1e88e5, 0), width=3)
-    line.new(bar_index - wRightOff, low[wRightOff], bar_index, high, color=color.new(#1e88e5, 0), width=3)
-
-alertcondition(reclaimIn, title="1h 筆畫 W 站回 MA25", message="1h 破底後收盤站回 MA25")
+alertcondition(stackIn, title="1h 破底後 7/14/25 多頭", message="1h 破底後 MA7>MA14>MA25 多頭排列")

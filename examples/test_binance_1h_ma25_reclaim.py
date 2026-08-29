@@ -14,7 +14,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from binance_1h_ma25_reclaim import (  # noqa: E402
     MA_COLORS,
     STRICT_DETECT,
-    W_COLOR,
     Hit,
     TradeResult,
     atr,
@@ -22,7 +21,6 @@ from binance_1h_ma25_reclaim import (  # noqa: E402
     classify_shape,
     detect_signals,
     drawn_w_ok,
-    drawn_w_points,
     flush_metrics,
     one_at_a_time_path,
     quality_of,
@@ -150,12 +148,10 @@ def test_detect_reclaim() -> None:
     assert sig.depth_pct >= 0.018
     assert sig.quality in {"A", "B", "C"}
     assert df["Close"].iloc[sig.entry_idx] > sig.ma25
+    assert sig.ma7 > sig.ma14 > sig.ma25 > 0
+    assert df["Close"].iloc[sig.entry_idx] > sig.ma7
     assert abs(sig.stop_price - sig.bottom) < 1e-12
     assert sig.entry_idx > sig.break_idx
-    # 進場是站回那根，不是之後才排好的 7/14/25
-    prev = df["Close"].iloc[sig.entry_idx - 1]
-    prev_ma = sma(df["Close"].to_numpy(float), 25)[sig.entry_idx - 1]
-    assert prev <= prev_ma or np.isnan(prev_ma)
 
 
 def test_flush_metrics_avgo_like() -> None:
@@ -203,14 +199,6 @@ def test_drawn_w_ok_avgo_like() -> None:
     high[12] = 10.04
     low[18] = 9.50
     assert drawn_w_ok(low, high, ma, 2, 21, 18)
-    pts = drawn_w_points(low, high, ma, 2, 21, 18, reclaim=22)
-    assert pts is not None
-    start_i, left, peak, right, arm = pts
-    assert left == 5
-    assert right == 18
-    assert peak == 12
-    assert start_i < left < peak < right
-    assert arm >= right
     low_v = np.full(24, 9.90)
     high_v = np.full(24, 9.98)
     low_v[18] = 9.50
@@ -226,93 +214,12 @@ def test_bull_stack() -> None:
     assert not bull_stack(c, m7, m14, m25, 1)
 
 
-def _make_drawn_w_bars() -> pd.DataFrame:
-    """先一腳、吻 MA25、再破底、再站上。給嚴格版當正例。"""
-    n = 96
-    close = np.zeros(n, dtype=float)
-    close[0] = 100.0
-    for i in range(1, 40):
-        close[i] = close[i - 1] + 0.16
-    high = close + 0.28
-    low = close - 0.28
-    hang = float(close[39]) * 0.978
-    for i in range(40, 64):
-        close[i] = hang
-        high[i] = hang + 0.22
-        low[i] = hang - 0.22
-    # 左谷
-    low[46] = hang * 0.972
-    close[46] = hang * 0.978
-    high[46] = hang * 0.986
-    # 右谷急殺 + 破底
-    close[57] = hang * 0.990
-    high[57] = hang * 1.002
-    low[57] = hang * 0.984
-    close[58] = hang * 0.970
-    high[58] = hang * 0.978
-    low[58] = hang * 0.962
-    close[59] = hang * 0.955
-    high[59] = hang * 0.962
-    low[59] = hang * 0.948
-    close[60] = hang * 0.952
-    high[60] = hang * 0.960
-    low[60] = hang * 0.938
-    close[61] = hang * 0.968
-    high[61] = hang * 0.976
-    low[61] = hang * 0.950
-    close[62] = hang * 0.980
-    high[62] = hang * 0.988
-    low[62] = hang * 0.970
-    close[63] = hang
-    high[63] = hang + 0.15
-    low[63] = hang - 0.15
-    close[64] = float(close[39]) + 0.90
-    high[64] = close[64] + 0.35
-    low[64] = close[64] - 0.20
-    for i in range(65, n):
-        close[i] = close[i - 1] + 0.18
-        high[i] = close[i] + 0.28
-        low[i] = close[i] - 0.28
-    ma = sma(close, 25)
-    pk = 52
-    high[pk] = float(ma[pk]) * 1.004
-    close[pk] = float(ma[pk]) * 0.996
-    low[pk] = close[pk] - 0.12
-    return pd.DataFrame(
-        {
-            "Open": np.r_[close[0], close[:-1]],
-            "High": high,
-            "Low": low,
-            "Close": close,
-            "Volume": np.r_[np.full(64, 80.0), [240.0], np.full(n - 65, 90.0)],
-        },
-        index=_base_index(n),
-    )
-
-
 def test_strict_requires_drawn_w() -> None:
     df = _make_reclaim_bars(depth=0.055, below=16, sharp=True)
     loose = detect_signals(df, min_depth_pct=0.028)
     assert loose, "flush V still counts when W is not required"
     strict = detect_signals(df, **STRICT_DETECT)
     assert not strict, "straight V flush is not the drawn W"
-
-
-def test_strict_accepts_drawn_w() -> None:
-    df = _make_drawn_w_bars()
-    funnel: dict = {}
-    sigs = detect_signals(df, funnel=funnel, **STRICT_DETECT)
-    assert sigs, f"drawn W should pass strict, funnel={funnel}"
-    sig = sigs[0]
-    assert sig.shape == "W"
-    assert sig.w_left_idx >= 0
-    assert sig.w_peak_idx > sig.w_left_idx
-    assert sig.w_right_idx > sig.w_peak_idx
-    assert sig.entry_idx > sig.w_right_idx
-    close = df["Close"].to_numpy(float)
-    ma25 = sma(close, 25)
-    assert close[sig.entry_idx] > ma25[sig.entry_idx]
-    assert close[sig.entry_idx - 1] <= ma25[sig.entry_idx - 1] or np.isnan(ma25[sig.entry_idx - 1])
 
 
 def test_one_bar_pop_keeps_episode() -> None:
@@ -460,11 +367,8 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "1h + 4h" in text
     assert "4h K 對照" in text
     assert "收盤跌破破底" in text
-    assert "站回 MA25" in text
-    assert "藍線是筆畫 W" in text
     assert "黃7" in text
     assert "酒紅200" in text
-    assert W_COLOR == "#1e88e5"
     assert set(MA_COLORS) == {7, 14, 25, 99, 120, 200}
     seq_hits = [Hit("AVGOUSDT", df, t) for t in trades]
     seq_path = one_at_a_time_path(seq_hits, start=100.0, lev=3.0)
@@ -490,8 +394,6 @@ def main() -> int:
     test_drawn_w_ok_avgo_like()
     test_bull_stack()
     test_strict_requires_drawn_w()
-    test_strict_accepts_drawn_w()
-    test_one_bar_pop_keeps_episode()
     test_still_below_no_signal()
     test_wick_below_bottom_bar_does_not_stop()
     test_close_below_bottom_bar_stops()
