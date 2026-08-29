@@ -71,7 +71,7 @@ python3 examples/binance_15m_ma_break_short.py --pages
 python3 examples/binance_15m_ma_break_short.py --symbol MUBARAKUSDT
 ```
 
-近一週（2026-08-22 → 08-29，255 檔 USDT 永續）：15m 打穿＋空頭排列 59 筆；加上 **1h 首次打穿 MA99**，再濾掉黏帶輕觸與 1h 仍明顯 7>14>25 的回檔後，剩下 **18 筆、勝率 77.8%、單筆加總 +38.0%、平均 +2.11%**。  
+近一週（2026-08-22 → 08-29，254 檔 USDT 永續）：15m 打穿＋空頭排列後，加上 **1h 首次打穿 MA99**，並濾掉黏帶輕觸、沒騎在黏帶上的穿梭／追空、1h 仍明顯 7>14>25 的回檔，剩下 **15 筆、勝率 86.7%、單筆加總 +44.9%、平均 +3.00%**。  
 截圖那檔 **MUBARAK 08-25 16:00** 仍在，**+12.14%**。每筆上圖 15m、下圖 1h。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/view.html
