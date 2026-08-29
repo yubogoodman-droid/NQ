@@ -12,17 +12,20 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from binance_1h_ma25_reclaim import (  # noqa: E402
+    Hit,
     TradeResult,
     atr,
     classify_shape,
     detect_signals,
     flush_metrics,
+    one_at_a_time_path,
     quality_of,
     resample_4h,
     simulate,
     sma,
     summarize_trades,
     write_html_report,
+    write_seq_html,
 )
 
 
@@ -286,6 +289,31 @@ def test_select_card_hits() -> None:
     assert [h.symbol for h in picked] == ["AVGOUSDT"]
 
 
+def test_one_at_a_time_skips_overlap() -> None:
+    df = _make_reclaim_bars()
+    sigs = detect_signals(df)
+    trades = simulate(df, sigs, max_hold=40)
+    assert trades
+    t = trades[0]
+    later = TradeResult(
+        signal=t.signal,
+        entry_idx=min(t.entry_idx + 1, len(df) - 2),
+        exit_idx=min(t.exit_idx + 1, len(df) - 1),
+        entry_price=t.entry_price,
+        exit_price=t.exit_price,
+        stop_price=t.stop_price,
+        target_price=t.target_price,
+        pnl_pct=10.0,
+        exit_reason="target",
+        quality=t.quality,
+    )
+    hits = [Hit("AAAUSDT", df, t), Hit("BBBUSDT", df, later)]
+    path = one_at_a_time_path(hits, start=100.0, lev=3.0)
+    assert len(path) == 1
+    assert path[0]["symbol"] == "AAAUSDT"
+    assert abs(path[0]["after"] - 100.0 * (1.0 + 3.0 * t.pnl_pct / 100.0)) < 1e-6
+
+
 def test_write_html(tmp_path: Path | None = None) -> None:
     df = _make_reclaim_bars()
     sigs = detect_signals(df)
@@ -301,6 +329,13 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "1h + 4h" in text
     assert "4h K 對照" in text
     assert "收盤跌破破底" in text
+    seq_hits = [Hit("AVGOUSDT", df, t) for t in trades]
+    seq_path = one_at_a_time_path(seq_hits, start=100.0, lev=3.0)
+    seq = Path("/tmp/ma25_seq_test.html") if tmp_path is None else Path(tmp_path) / "seq.html"
+    write_seq_html(seq, seq_path, days=7, start=100.0, lev=3.0, scanned=1, pool=len(seq_hits))
+    seq_text = seq.read_text(encoding="utf-8")
+    assert "一次一單" in seq_text
+    assert "<svg" in seq_text
     if trades:
         assert "<img src='img/" in text
         assert any((path.parent / "img").glob("t01_*.png"))
@@ -321,6 +356,7 @@ def main() -> int:
     test_simulate_target()
     test_summarize()
     test_select_card_hits()
+    test_one_at_a_time_skips_overlap()
     test_write_html()
     print("ok")
     return 0

@@ -929,8 +929,206 @@ h1{{font-size:18px;margin:0 0 6px}}
     return path
 
 
+def one_at_a_time_path(
+    hits: Sequence[Hit],
+    *,
+    start: float = 100.0,
+    lev: float = 3.0,
+) -> List[dict]:
+    """Compound equity: all-in each time, one open position globally."""
+    rows: List[tuple] = []
+    for h in hits:
+        et = h.df.index[h.trade.entry_idx]
+        xt = h.df.index[h.trade.exit_idx]
+        if getattr(et, "tzinfo", None) is None:
+            et = et.replace(tzinfo=TPE)
+            xt = xt.replace(tzinfo=TPE)
+        else:
+            et = et.tz_convert(TPE)
+            xt = xt.tz_convert(TPE)
+        rows.append((et, xt, h.symbol, h.trade))
+    rows.sort(key=lambda x: (x[0], x[2]))
+    eq = float(start)
+    peak = float(start)
+    peak_i = -1
+    max_dd = 0.0
+    dd_peak_i = dd_trough_i = -1
+    taken: List[dict] = []
+    busy = None
+    for et, xt, sym, t in rows:
+        if busy is not None and et < busy:
+            continue
+        ret = lev * (t.pnl_pct / 100.0)
+        nxt = max(0.0, eq * (1.0 + ret))
+        rec = {
+            "et": et,
+            "xt": xt,
+            "symbol": sym,
+            "trade": t,
+            "before": eq,
+            "after": nxt,
+            "ret": ret,
+        }
+        taken.append(rec)
+        i = len(taken) - 1
+        if nxt >= peak:
+            peak, peak_i = nxt, i
+        dd = (peak - nxt) / peak if peak else 0.0
+        if dd > max_dd:
+            max_dd, dd_peak_i, dd_trough_i = dd, peak_i, i
+        eq = nxt
+        busy = xt
+        if eq <= 0:
+            break
+    for rec in taken:
+        rec["max_dd"] = max_dd
+        rec["dd_peak_i"] = dd_peak_i
+        rec["dd_trough_i"] = dd_trough_i
+    return taken
+
+
+def _compound_equity_svg(taken: Sequence[dict], width: int = 720, height: int = 220) -> str:
+    if not taken:
+        return "<p class='muted'>no trades</p>"
+    ys = [float(taken[0]["before"])] + [float(x["after"]) for x in taken]
+    xs = np.linspace(0, width, len(ys))
+    ymin, ymax = float(min(ys)), float(max(ys))
+    pad = max(4.0, (ymax - ymin) * 0.12)
+    ymin -= pad
+    ymax += pad
+    span = ymax - ymin or 1.0
+
+    def yv(v: float) -> float:
+        return height - (v - ymin) / span * height
+
+    pts = " ".join(f"{xs[i]:.1f},{yv(ys[i]):.1f}" for i in range(len(ys)))
+    start_y = yv(float(taken[0]["before"]))
+    color = "#16a34a" if ys[-1] >= ys[0] else "#dc2626"
+    peak_i = int(taken[0]["dd_peak_i"])
+    trough_i = int(taken[0]["dd_trough_i"])
+    # ys[0] is start; trade i ends at ys[i+1]
+    px, py = xs[peak_i + 1], yv(ys[peak_i + 1])
+    tx, ty = xs[trough_i + 1], yv(ys[trough_i + 1])
+    peak_lbl = f"{taken[peak_i]['symbol']} {taken[peak_i]['et'].strftime('%m-%d')}"
+    trough_lbl = f"{taken[trough_i]['symbol']} {taken[trough_i]['et'].strftime('%m-%d')}"
+    return (
+        f'<svg viewBox="0 0 {width} {height}" width="100%" style="background:#0f172a;border-radius:8px">'
+        f'<line x1="0" y1="{start_y:.1f}" x2="{width}" y2="{start_y:.1f}" stroke="#334155" stroke-dasharray="4 4"/>'
+        f'<polyline fill="none" stroke="{color}" stroke-width="2.2" points="{pts}"/>'
+        f'<circle cx="{px:.1f}" cy="{py:.1f}" r="4" fill="#f0c14b"/>'
+        f'<circle cx="{tx:.1f}" cy="{ty:.1f}" r="4" fill="#ff7b72"/>'
+        f'<text x="{min(px + 6, width - 120):.1f}" y="{max(14, py - 8):.1f}" fill="#f0c14b" font-size="11">{escape(peak_lbl)} 高點</text>'
+        f'<text x="{min(tx + 6, width - 140):.1f}" y="{min(height - 8, ty + 16):.1f}" fill="#ff7b72" font-size="11">{escape(trough_lbl)} 谷底</text>'
+        f"</svg>"
+    )
+
+
+def write_seq_html(
+    path: Path,
+    taken: Sequence[dict],
+    *,
+    days: int,
+    start: float = 100.0,
+    lev: float = 3.0,
+    scanned: int = 80,
+    pool: int = 0,
+) -> Path:
+    if not taken:
+        html = "<p>no trades</p>"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(html, encoding="utf-8")
+        return path
+    final = float(taken[-1]["after"])
+    max_dd = float(taken[0]["max_dd"])
+    peak_i = int(taken[0]["dd_peak_i"])
+    trough_i = int(taken[0]["dd_trough_i"])
+    peak, trough = taken[peak_i], taken[trough_i]
+    wins = sum(1 for x in taken if x["trade"].pnl_pct > 0)
+    stretch = taken[peak_i : trough_i + 1]
+    worst = min(stretch[1:], key=lambda x: x["trade"].pnl_pct) if len(stretch) > 1 else trough
+    zoom = [dict(x) for x in stretch]
+    for z in zoom:
+        z["dd_peak_i"] = 0
+        z["dd_trough_i"] = len(zoom) - 1
+    rows = []
+    for x in stretch:
+        cls = "pnl-win" if x["trade"].pnl_pct > 0 else "pnl-loss"
+        mark = ""
+        if x is peak:
+            mark = " 高點"
+        if x is trough:
+            mark = " 谷底"
+        if x is worst:
+            mark += " 最痛"
+        rows.append(
+            f"<tr><td>{escape(x['et'].strftime('%m-%d %H:%M'))}</td>"
+            f"<td>{escape(x['symbol'])}{mark}</td>"
+            f"<td>{escape(x['trade'].exit_reason)}</td>"
+            f"<td class='{cls}'>{x['trade'].pnl_pct:+.2f}%</td>"
+            f"<td class='{cls}'>{x['ret']*100:+.2f}%</td>"
+            f"<td>{x['after']:.2f}</td></tr>"
+        )
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>100 USDT ×{lev:.0f} 一次一單 · {days} 天</title>
+<style>
+*{{box-sizing:border-box}}
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
+.page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
+h1{{font-size:18px;margin:0 0 6px}}
+.muted{{color:#8b949e;font-size:13px;line-height:1.5}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
+.cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
+.card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}}
+.card b{{display:block;font-size:20px;margin-top:4px}}
+.equity{{margin:10px 0 4px}}
+.pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}}
+table{{width:100%;border-collapse:collapse;font-size:12px}}
+th,td{{text-align:left;padding:6px 4px;border-bottom:1px solid #21262d}}
+th{{color:#8b949e;font-weight:600}}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>100 USDT · {lev:.0f} 倍 · 一次一單</h1>
+<p class="muted">近 {days} 天 · {scanned} 檔訊號池 {pool} 筆 · 做成 {len(taken)} 單<br/>
+全部本金開倉，平了才能開下一筆。不計資金費。黃點高點、紅點谷底。</p>
+<div class="cards">
+<div class="card">做成<b>{len(taken)}</b></div>
+<div class="card">勝率<b>{100.0 * wins / len(taken):.1f}%</b></div>
+<div class="card">最後<b class="{'pnl-win' if final >= start else 'pnl-loss'}">{final:.0f}</b></div>
+<div class="card">最大回撤<b class="pnl-loss">{max_dd*100:.1f}%</b></div>
+</div>
+<div class="equity">{_compound_equity_svg(taken)}</div>
+<p class="muted">整段線性圖。後面漲到 {final:.0f}，前面 158→60 看起來會扁，回撤放大見下圖。</p>
+<div class="equity">{_compound_equity_svg(zoom)}</div>
+<p class="muted">高點 {escape(peak['et'].strftime('%m-%d %H:%M'))} {escape(peak['symbol'])} 後 {peak['after']:.2f} USDT<br/>
+谷底 {escape(trough['et'].strftime('%m-%d %H:%M'))} {escape(trough['symbol'])} 後 {trough['after']:.2f} USDT<br/>
+最痛單筆 {escape(worst['et'].strftime('%m-%d %H:%M'))} {escape(worst['symbol'])} 價格 {worst['trade'].pnl_pct:+.2f}%（帳戶 {worst['ret']*100:+.2f}%）</p>
+</section>
+<section class="summary">
+<h1>高點 → 谷底這段</h1>
+<p class="muted">{escape(peak['et'].strftime('%m-%d'))} 到 {escape(trough['et'].strftime('%m-%d'))} · {len(stretch)} 單 · {peak['after']:.0f} → {trough['after']:.0f}</p>
+<table>
+<thead><tr><th>進場</th><th>標的</th><th>出場</th><th>價格</th><th>帳戶</th><th>餘額</th></tr></thead>
+<tbody>
+{''.join(rows)}
+</tbody>
+</table>
+</section>
+</div>
+</body></html>
+"""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    return path
+
+
 def write_view_html(src: Path, branch: str = BRANCH) -> Path:
-    rel = src.parent.relative_to(REPO).as_posix()
+    src = Path(src).resolve()
+    rel = src.parent.relative_to(REPO.resolve()).as_posix()
     base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
     text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
     out = src.with_name("view.html")
