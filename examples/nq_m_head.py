@@ -77,6 +77,7 @@ TF_PRESETS = {
         "min_ribbon_spread": 28.0,
         "trail_steps": TRAIL_STEPS_5M,
         "stop_buffer": 36.0,  # 避開 #6 那種頭頂 +8 被軋空掃掉
+        "skip_before_minutes": 3 * 60,  # 03:00 前亞洲深夜不空（#4 00:35 那種）
     },
 }
 
@@ -310,6 +311,7 @@ def generate_signals(
     min_break_pts: float = 8.0,
     session_start: Optional[int] = None,
     session_end: Optional[int] = None,
+    skip_before_minutes: Optional[int] = None,
     target_r: float = 2.0,
     use_measured_target: bool = False,
     timeframe: str = "1m",
@@ -401,6 +403,14 @@ def generate_signals(
             minutes = int(ts.hour) * 60 + int(ts.minute)
             if not (session_start <= minutes < session_end):
                 bump("skip_session")
+                continue
+        if skip_before_minutes is not None:
+            ts = df.index[entry_idx]
+            if getattr(ts, "tzinfo", None):
+                ts = ts.tz_convert(ET)
+            minutes = int(ts.hour) * 60 + int(ts.minute)
+            if minutes < skip_before_minutes:
+                bump("skip_overnight")
                 continue
         if entry_idx in used_entry:
             bump("skip_dup_entry")
@@ -845,6 +855,7 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"伸幅不足 {funnel.get('skip_thin_ext', 0)} · "
         f"未破MA60 {funnel.get('skip_no_ma60', 0)} · "
         f"均線糾結 {funnel.get('skip_tangled', 0)} · "
+        f"深夜 {funnel.get('skip_overnight', 0)} · "
         f"破高失效 {funnel.get('skip_invalidated', 0)} · "
         f"風險過窄 {funnel.get('skip_tiny_risk', 0)} · "
         f"風險過寬 {funnel.get('skip_wide_risk', 0)}）</p>"
@@ -921,7 +932,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。停損頭頂 +36（少被軋空掃）。鎖利 0.8R→0.5R、1.2R→0.9R、1.6R→1.2R（下一根生效）。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。03:00 ET 前不空。停損頭頂 +36。鎖利 0.8 / 1.2 / 1.6R（下一根生效）。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
@@ -1052,6 +1063,7 @@ def cmd_backtest(args) -> int:
             f"thin={m5_funnel.get('skip_thin_ext', 0)} "
             f"no_ma60={m5_funnel.get('skip_no_ma60', 0)} "
             f"tangled={m5_funnel.get('skip_tangled', 0)} "
+            f"overnight={m5_funnel.get('skip_overnight', 0)} "
             f"invalid={m5_funnel.get('skip_invalidated', 0)}"
         )
         for i, t in enumerate(m5_trades, 1):
