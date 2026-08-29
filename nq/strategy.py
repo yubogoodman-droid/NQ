@@ -42,6 +42,7 @@ class NQWBottomStrategy:
     停損：L3 下方 20 點
     停利：頸線 + (頸線 − L2)
     均線糾結（MA5/10/20/60/120/200 高低差過小）不進場
+    MA200 下彎時，進場不能離 MA200 太遠
     """
 
     swing_lookback: int = 3
@@ -57,6 +58,8 @@ class NQWBottomStrategy:
     stop_below_l3_points: float = 20.0
     min_ma_span_points: float = 40.0
     ma_periods: tuple[int, ...] = (5, 10, 20, 60, 120, 200)
+    ma200_slope_bars: int = 12
+    max_dist_falling_ma200: float = 60.0
     tick_size: float = 0.25
     point_value: float = 20.0
 
@@ -85,6 +88,8 @@ class NQWBottomStrategy:
                 continue
             if self._mas_tangled(df, idx):
                 continue
+            if self._too_far_from_falling_ma200(df, idx, entry):
+                continue
             signals.append(
                 Signal(
                     timestamp=df.index[idx],
@@ -109,6 +114,19 @@ class NQWBottomStrategy:
         if len(vals) < 4:
             return False
         return max(vals) - min(vals) < self.min_ma_span_points
+
+    def _too_far_from_falling_ma200(self, df: pd.DataFrame, idx: int, entry: float) -> bool:
+        """MA200 下彎時，進場價離 MA200 過遠則跳過。"""
+        need = 200 + self.ma200_slope_bars
+        if idx + 1 < need:
+            return False
+        close = df["close"].astype(float)
+        ma_now = float(close.iloc[idx - 199 : idx + 1].mean())
+        prev = idx - self.ma200_slope_bars
+        ma_prev = float(close.iloc[prev - 199 : prev + 1].mean())
+        if ma_now >= ma_prev:
+            return False
+        return abs(entry - ma_now) > self.max_dist_falling_ma200
 
     def _round_tick(self, price: float) -> float:
         return round(price / self.tick_size) * self.tick_size
