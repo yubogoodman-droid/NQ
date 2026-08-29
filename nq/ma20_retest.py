@@ -172,6 +172,31 @@ def far_below_falling_5m_ma20(
     return float(slope20) < 0.0 and (float(ma20_5m) - float(entry)) > float(max_below)
 
 
+def falling_5m_ma20_location(
+    entry: float,
+    ma20_5m: float,
+    slope20: float,
+    *,
+    chase_above: float,
+    lid_slope: float,
+) -> str:
+    """五分 MA20 下跌時的位置：'' / chase / lid。
+
+    chase：收盤高均線太多，這根不進，同一波還可以等真正坐上的右肩。
+    lid：壓在陡降均線下，這波破底翻作廢（否則 4 分鐘後又買到更差的肩）。
+
+    圈起來的三筆都是 ''：08-03 五分 MA20 往上；08-24 只高 26 點；
+    08-28 在均線下 10 點但斜率只有 −11，還不到蓋子。
+    """
+    if np.isnan(ma20_5m) or np.isnan(slope20) or float(slope20) >= 0.0:
+        return ""
+    if chase_above > 0 and (float(entry) - float(ma20_5m)) > float(chase_above):
+        return "chase"
+    if lid_slope < 0 and float(slope20) < float(lid_slope) and float(entry) < float(ma20_5m):
+        return "lid"
+    return ""
+
+
 def falling_5m_ma20_bad_location(
     entry: float,
     ma20_5m: float,
@@ -180,18 +205,15 @@ def falling_5m_ma20_bad_location(
     chase_above: float,
     lid_slope: float,
 ) -> bool:
-    """五分 MA20 下跌時：追太高、或壓在陡降均線下，勝率差。
-
-    圈起來的三筆都過：08-03 五分 MA20 往上；08-24 只高 26 點；
-    08-28 在均線下 10 點但斜率只有 −11，還不到蓋子。
-    """
-    if np.isnan(ma20_5m) or np.isnan(slope20) or float(slope20) >= 0.0:
-        return False
-    if chase_above > 0 and (float(entry) - float(ma20_5m)) > float(chase_above):
-        return True
-    if lid_slope < 0 and float(slope20) < float(lid_slope) and float(entry) < float(ma20_5m):
-        return True
-    return False
+    return bool(
+        falling_5m_ma20_location(
+            entry,
+            ma20_5m,
+            slope20,
+            chase_above=chase_above,
+            lid_slope=lid_slope,
+        )
+    )
 
 
 def choose_target_r(base: float, slope_5m: float, up: float) -> float:
@@ -603,13 +625,19 @@ def detect_signals(
                 continue
             # 五分 MA20 下跌：追在它上方太高（08-19），或壓在陡降蓋子下
             # （08-05 / 08-07 / 08-11）。08-28 斜率只有 −11，不算蓋子。
-            if falling_5m_ma20_bad_location(
+            loc5 = falling_5m_ma20_location(
                 entry,
                 m20_5,
                 m20_5_s,
                 chase_above=ma20_5m_chase,
                 lid_slope=ma20_5m_lid_slope,
-            ):
+            )
+            if loc5 == "lid":
+                # 08-05 12:34 蓋子若只跳過當根，12:38 又買到 −45。
+                bump("skip_5m")
+                dead = True
+                break
+            if loc5 == "chase":
                 bump("skip_5m")
                 continue
 
