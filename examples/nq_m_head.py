@@ -151,7 +151,7 @@ def load_yahoo_intraday(
 
 
 def load_bars(symbol: str, interval: str, period: str) -> pd.DataFrame:
-    """Yahoo 1m period= 最多約 7–8 天；超過改用 7 日切片（約可回看 30 天）。"""
+    """Yahoo 1m 超過 8 天改 7 日切片，最多約 30 天；5m 可回看約 60 天。"""
     days = parse_period_days(period)
     if days is not None and days > 8:
         end = datetime.now(timezone.utc)
@@ -940,10 +940,17 @@ def write_html_report(
         m5_start = m5_df.index[0].strftime("%Y-%m-%d %H:%M")
         m5_end = m5_df.index[-1].strftime("%Y-%m-%d %H:%M")
         m5_cls = "pnl-win" if m5_stats["total_pnl_points"] >= 0 else "pnl-loss"
+        d1 = (df.index[-1] - df.index[0]).total_seconds() / 86400
+        d5 = (m5_df.index[-1] - m5_df.index[0]).total_seconds() / 86400
+        window_note = ""
+        if d5 - d1 >= 7:
+            window_note = (
+                f" Yahoo 1m 只能回看約 {d1:.0f} 天；五分K 這次是 {d5:.0f} 天。"
+            )
         compare_line = (
             f"<p class='muted'>對照：1m {stats['trades']} 筆 {stats['total_pnl_points']:+.1f} 點 · "
             f"5m {m5_stats['trades']} 筆 {m5_stats['total_pnl_points']:+.1f} 點"
-            f"（規則相同，K 數換成約略同一鐘面時間）</p>"
+            f"（規則相同，K 數換成約略同一鐘面時間）{window_note}</p>"
         )
         m5_cards = _render_cards(m5_df, m5_trades, img_dir, prefix="f", embed_images=embed_images)
         m5_block = f"""

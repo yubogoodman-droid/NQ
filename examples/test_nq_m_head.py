@@ -37,6 +37,7 @@ def test_parse_period_days() -> None:
     assert parse_period_days("8d") == 8
     assert parse_period_days("30d") == 30
     assert parse_period_days("1mo") == 30
+    assert parse_period_days("2mo") == 60
     assert parse_period_days("4w") == 28
 
 
