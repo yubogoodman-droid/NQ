@@ -1436,10 +1436,11 @@ def cmd_run(args) -> int:
         if args.days >= 30:
             taken = one_at_a_time_path(hits, start=100.0, lev=3.0)
             draw_seq_pngs(taken, html_path.parent / "seq-img")
+            rel = html_path.resolve().parent.relative_to(REPO.resolve()).as_posix()
             more_k = (
                 "https://htmlpreview.github.io/?"
                 f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{BRANCH}/"
-                f"{html_path.parent.relative_to(REPO).as_posix()}/seq-k.html"
+                f"{rel}/seq-k.html"
             )
             write_seq_html(
                 html_path.parent / "seq.html",
