@@ -76,7 +76,8 @@ python3 examples/binance_1h_ma25_reclaim.py --strict --limit 80 --days 14 --page
 
 TradingView：`pinescript/binance_1h_ma25_reclaim.pine` 貼到 1 小時圖。
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25/view.html
+預覽（近 7 天）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25/view.html  
+兩個月：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/view.html
 
 ## 幣安黏帶三幕 Telegram
 

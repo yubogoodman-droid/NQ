@@ -206,19 +206,30 @@ def _klines_to_df(raw: list) -> pd.DataFrame:
 
 
 def fetch_klines(symbol: str, interval: str = "1h", days: int = 45, drop_forming: bool = True) -> pd.DataFrame:
-    """Pull 1h klines. One request covers ~62 days (limit 1500)."""
-    limit = min(1500, max(80, int(days) * 24 + 40))
-    raw = get_json(
-        "/fapi/v1/klines",
-        params={"symbol": symbol, "interval": interval, "limit": limit},
-    )
+    """Pull 1h klines. Paginates past Binance's 1500-bar cap (~62 days)."""
+    need = max(80, int(days) * 24 + 40)
+    raw: list = []
+    end_ms: Optional[int] = None
+    now_ms = int(time.time() * 1000)
+    while len(raw) < need:
+        params: Dict[str, Any] = {
+            "symbol": symbol,
+            "interval": interval,
+            "limit": min(1500, need - len(raw)),
+        }
+        if end_ms is not None:
+            params["endTime"] = end_ms
+        chunk = get_json("/fapi/v1/klines", params=params)
+        if not chunk:
+            break
+        raw = list(chunk) + raw
+        end_ms = int(chunk[0][0]) - 1
+        if len(chunk) < int(params["limit"]):
+            break
     if not raw:
         return _klines_to_df([])
-    if drop_forming:
-        now_ms = int(time.time() * 1000)
-        # 1h bar is open for 3_600_000 ms
-        if int(raw[-1][0]) + 3_600_000 > now_ms:
-            raw = raw[:-1]
+    if drop_forming and int(raw[-1][0]) + 3_600_000 > now_ms:
+        raw = raw[:-1]
     df = _klines_to_df(raw)
     if df.empty:
         return df

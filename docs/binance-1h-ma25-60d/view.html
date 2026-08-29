@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>幣安 1h MA25 下破底再站上</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}
+.page{max-width:560px;margin:0 auto;padding:14px 12px 32px}
+h1{font-size:18px;margin:0 0 6px}
+.muted{color:#8b949e;font-size:13px;line-height:1.5}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.equity{margin:10px 0 4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}
+.trade-no{font-size:15px;font-weight:700}
+.trade-time{font-size:12px;color:#8b949e}
+.card-pnl{font-size:16px;font-weight:700;white-space:nowrap}
+.pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}
+.tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
+.tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
+.tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.tag-info{background:rgba(210,140,255,0.12);color:#e2b6ff;border-color:rgba(210,140,255,0.28)}
+.tag-fresh{background:rgba(88,166,255,0.16);color:#79c0ff;border-color:rgba(88,166,255,0.35)}
+.trade-detail{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}
+.mini-chart{margin:0 -6px -4px;border-radius:10px;overflow:hidden}
+.empty{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安 1h · MA25 下破底再站上（寬鬆）</h1>
+<p class="muted">近 60 天 · 掃 80 檔 U 本位永續 · 粉線 MA25<br/>
+寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。<br/>卡片 75 筆：AVGO/ONDS 等樣本 + 近 72 小時。兩個月加總見上方數字。</p>
+<div class="cards">
+<div class="card">筆數<b>1132</b></div>
+<div class="card">勝率<b>43.4%</b></div>
+<div class="card">加總<b class="pnl-win">+1455.69%</b></div>
+<div class="card">均筆<b>+1.29%</b></div>
+</div>
+<p class="muted">QA 286筆 +337.35% · QB 562筆 +650.82% · QC 284筆 +467.52%</p>
+<p class='muted'>漏斗：跌破 4184 → 站回 1338 → 進場 1338（太短 1148 · 太長 528 · 太淺 996 · 急殺不夠 119 · 未站回 54）</p>
+<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="148.8" x2="720" y2="148.8" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,148.8 9.6,150.1 19.2,130.1 28.8,133.9 38.4,135.8 48.0,137.7 57.6,137.5 67.2,138.6 76.8,142.3 86.4,145.7 96.0,148.3 105.6,150.8 115.2,152.9 124.8,162.6 134.4,151.0 144.0,150.5 153.6,151.2 163.2,140.9 172.8,140.2 182.4,146.3 192.0,145.3 201.6,148.3 211.2,133.4 220.8,124.6 230.4,116.2 240.0,103.4 249.6,106.2 259.2,90.8 268.8,107.9 278.4,103.7 288.0,106.4 297.6,101.1 307.2,106.0 316.8,105.0 326.4,107.1 336.0,111.6 345.6,113.7 355.2,114.3 364.8,118.8 374.4,120.8 384.0,123.7 393.6,105.6 403.2,90.4 412.8,91.2 422.4,92.0 432.0,98.2 441.6,101.6 451.2,105.5 460.8,105.3 470.4,105.1 480.0,108.0 489.6,83.6 499.2,87.3 508.8,78.8 518.4,82.2 528.0,86.5 537.6,89.5 547.2,90.9 556.8,97.1 566.4,97.3 576.0,98.3 585.6,101.5 595.2,96.8 604.8,92.6 614.4,84.0 624.0,85.9 633.6,81.1 643.2,82.7 652.8,83.9 662.4,87.0 672.0,92.0 681.6,78.3 691.2,55.7 700.8,42.5 710.4,27.3 720.0,17.4"/></svg></div>
+</section>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · ONDSUSDT · QC · V</span><span class='trade-time'>2026-07-01 03:00 → 07-01 11:00</span></div><div class='card-pnl pnl-loss'>-0.36%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 8.27
+stop  8.03  收盤跌破破底K  (−2.90%)
+target 8.75  (2.0R)
+exit  8.24  lost_ma25
+破底 8.03  深度 2.17%  在下 5h
+急殺 7.8% / 3.7ATR  破前低 1.1%
+量比 0.66x  MA25 8.25</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t01_ONDSUSDT_0701_0300_qc.png' alt='#1 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · SOLUSDT · QA · W</span><span class='trade-time'>2026-07-01 09:00 → 07-02 00:00</span></div><div class='card-pnl pnl-win'>+5.60%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 73.92
+stop  71.85  收盤跌破破底K  (−2.80%)
+target 78.06  (2.0R)
+exit  78.06  target
+破底 71.85  深度 3.30%  在下 18h
+急殺 2.7% / 2.9ATR  破前低 2.0%
+量比 2.32x  MA25 73.618</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t02_SOLUSDT_0701_0900_qa.png' alt='#2 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · ETHUSDT · QB · W</span><span class='trade-time'>2026-07-01 10:00 → 07-01 19:00</span></div><div class='card-pnl pnl-loss'>-1.05%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 1585.71
+stop  1549.16  收盤跌破破底K  (−2.30%)
+target 1658.81  (2.0R)
+exit  1569.02  lost_ma25
+破底 1549.16  深度 2.81%  在下 24h
+急殺 2.3% / 3.2ATR  破前低 1.9%
+量比 1.17x  MA25 1577.46</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t03_ETHUSDT_0701_1000_qb.png' alt='#3 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · BTCUSDT · QB · W</span><span class='trade-time'>2026-07-01 10:00 → 07-01 15:00</span></div><div class='card-pnl pnl-loss'>-0.54%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 59063.3
+stop  57758.6  收盤跌破破底K  (−2.21%)
+target 61672.7  (2.0R)
+exit  58744.4  lost_ma25
+破底 57758.6  深度 3.74%  在下 26h
+急殺 2.1% / 2.5ATR  破前低 0.7%
+量比 1.28x  MA25 58954.4</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t04_BTCUSDT_0701_1000_qb.png' alt='#4 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · BNBUSDT · QB · W</span><span class='trade-time'>2026-07-01 10:00 → 07-01 15:00</span></div><div class='card-pnl pnl-loss'>-0.54%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 550.11
+stop  540.05  收盤跌破破底K  (−1.83%)
+target 570.23  (2.0R)
+exit  547.15  lost_ma25
+破底 540.05  深度 2.86%  在下 23h
+急殺 1.8% / 2.7ATR  破前低 0.7%
+量比 0.76x  MA25 549.056</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t05_BNBUSDT_0701_1000_qb.png' alt='#5 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · BNBUSDT · QC · V</span><span class='trade-time'>2026-07-01 21:00 → 07-02 15:00</span></div><div class='card-pnl pnl-win'>+0.05%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 549.48
+stop  537.31  收盤跌破破底K  (−2.21%)
+target 573.82  (2.0R)
+exit  549.75  lost_ma25
+破底 537.31  深度 2.01%  在下 7h
+急殺 2.0% / 2.8ATR  破前低 0.5%
+量比 2.91x  MA25 547.128</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t06_BNBUSDT_0701_2100_qc.png' alt='#6 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · SOLUSDT · QB · W</span><span class='trade-time'>2026-07-06 03:00 → 07-06 12:00</span></div><div class='card-pnl pnl-loss'>-0.30%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 81.01
+stop  79.62  收盤跌破破底K  (−1.72%)
+target 83.79  (2.0R)
+exit  80.77  lost_ma25
+破底 79.62  深度 3.22%  在下 34h
+急殺 1.5% / 2.3ATR  破前低 0.7%
+量比 0.55x  MA25 80.9812</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t07_SOLUSDT_0706_0300_qb.png' alt='#7 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · ONDSUSDT · QB · V</span><span class='trade-time'>2026-07-06 21:00 → 07-07 21:00</span></div><div class='card-pnl pnl-loss'>-1.04%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 7.7
+stop  7.39  收盤跌破破底K  (−4.03%)
+target 8.32  (2.0R)
+exit  7.62  lost_ma25
+破底 7.39  深度 3.58%  在下 13h
+急殺 4.0% / 3.6ATR  破前低 1.1%
+量比 9.33x  MA25 7.6196</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t08_ONDSUSDT_0706_2100_qb.png' alt='#8 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · ETHUSDT · QB · V</span><span class='trade-time'>2026-07-06 23:00 → 07-07 11:00</span></div><div class='card-pnl pnl-loss'>-0.95%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 1787.72
+stop  1728.3  收盤跌破破底K  (−3.32%)
+target 1906.56  (2.0R)
+exit  1770.7  lost_ma25
+破底 1728.3  深度 2.62%  在下 10h
+急殺 2.6% / 3.1ATR  破前低 1.5%
+量比 2.69x  MA25 1773.1</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t09_ETHUSDT_0706_2300_qb.png' alt='#9 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · BTCUSDT · QB · V</span><span class='trade-time'>2026-07-06 23:00 → 07-07 12:00</span></div><div class='card-pnl pnl-loss'>-0.71%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 63523.1
+stop  61297  收盤跌破破底K  (−3.50%)
+target 67975.3  (2.0R)
+exit  63069  lost_ma25
+破底 61297  深度 2.70%  在下 9h
+急殺 2.7% / 4.3ATR  破前低 2.1%
+量比 3.16x  MA25 62908.1</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t10_BTCUSDT_0706_2300_qb.png' alt='#10 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · SOLUSDT · QB · W</span><span class='trade-time'>2026-07-06 23:00 → 07-07 12:00</span></div><div class='card-pnl pnl-loss'>-0.70%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 81.45
+stop  79.19  收盤跌破破底K  (−2.77%)
+target 85.97  (2.0R)
+exit  80.88  lost_ma25
+破底 79.19  深度 2.22%  在下 12h
+急殺 2.2% / 2.2ATR  破前低 1.0%
+量比 2.09x  MA25 80.8776</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t11_SOLUSDT_0706_2300_qb.png' alt='#11 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · BNBUSDT · QB · W</span><span class='trade-time'>2026-07-07 02:00 → 07-07 10:00</span></div><div class='card-pnl pnl-loss'>-0.60%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 584.87
+stop  570.48  收盤跌破破底K  (−2.46%)
+target 613.65  (2.0R)
+exit  581.36  lost_ma25
+破底 570.48  深度 2.59%  在下 13h
+急殺 1.9% / 2.9ATR  破前低 1.0%
+量比 0.31x  MA25 584.308</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t12_BNBUSDT_0707_0200_qb.png' alt='#12 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · AVGOUSDT · QA · W</span><span class='trade-time'>2026-07-08 08:00 → 07-08 17:00</span></div><div class='card-pnl pnl-loss'>-2.71%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 372.64
+stop  361.69  收盤跌破破底K  (−2.94%)
+target 394.54  (2.0R)
+exit  362.56  lost_ma25
+破底 361.69  深度 2.85%  在下 22h
+急殺 2.4% / 3.1ATR  破前低 1.1%
+量比 0.33x  MA25 368.742</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t13_AVGOUSDT_0708_0800_qa.png' alt='#13 AVGOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · ONDSUSDT · QA · W</span><span class='trade-time'>2026-07-08 20:00 → 07-10 08:00</span></div><div class='card-pnl pnl-win'>+3.25%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 7.39
+stop  7.04  收盤跌破破底K  (−4.74%)
+target 8.09  (2.0R)
+exit  7.63  timeout
+破底 7.04  深度 9.78%  在下 24h
+急殺 4.6% / 4.6ATR  破前低 3.6%
+量比 3.57x  MA25 7.3808</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t14_ONDSUSDT_0708_2000_qa.png' alt='#14 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · BNBUSDT · QB · W</span><span class='trade-time'>2026-07-09 06:00 → 07-10 07:00</span></div><div class='card-pnl pnl-win'>+0.13%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 568.33
+stop  560.58  收盤跌破破底K  (−1.36%)
+target 583.83  (2.0R)
+exit  569.05  lost_ma25
+破底 560.58  深度 3.75%  在下 26h
+急殺 1.5% / 2.2ATR  破前低 1.2%
+量比 0.42x  MA25 568.01</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t15_BNBUSDT_0709_0600_qb.png' alt='#15 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · ETHUSDT · QB · W</span><span class='trade-time'>2026-07-09 12:00 → 07-10 00:00</span></div><div class='card-pnl pnl-loss'>-0.20%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 1741.69
+stop  1712.45  收盤跌破破底K  (−1.68%)
+target 1800.17  (2.0R)
+exit  1738.2  lost_ma25
+破底 1712.45  深度 4.13%  在下 34h
+急殺 2.2% / 2.6ATR  破前低 0.7%
+量比 0.58x  MA25 1738.61</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t16_ETHUSDT_0709_1200_qb.png' alt='#16 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · BTCUSDT · QB · W</span><span class='trade-time'>2026-07-09 12:00 → 07-10 16:00</span></div><div class='card-pnl pnl-win'>+2.88%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 62420.4
+stop  61520  收盤跌破破底K  (−1.44%)
+target 64221.2  (2.0R)
+exit  64221.2  target
+破底 61520  深度 3.22%  在下 31h
+急殺 1.4% / 2.0ATR  破前低 0.3%
+量比 0.75x  MA25 62167.4</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t17_BTCUSDT_0709_1200_qb.png' alt='#17 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · SOLUSDT · QA · W</span><span class='trade-time'>2026-07-09 12:00 → 07-10 23:00</span></div><div class='card-pnl pnl-win'>+0.21%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 77.95
+stop  76.24  收盤跌破破底K  (−2.19%)
+target 81.37  (2.0R)
+exit  78.11  lost_ma25
+破底 76.24  深度 6.63%  在下 34h
+急殺 1.8% / 1.9ATR  破前低 0.8%
+量比 0.63x  MA25 77.4524</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t18_SOLUSDT_0709_1200_qa.png' alt='#18 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · SOLUSDT · QC · W</span><span class='trade-time'>2026-07-11 19:00 → 07-12 07:00</span></div><div class='card-pnl pnl-loss'>-1.70%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 78.07
+stop  77.03  收盤跌破破底K  (−1.33%)
+target 80.15  (2.0R)
+exit  76.74  stop
+破底 77.03  深度 1.90%  在下 21h
+急殺 3.1% / 3.9ATR  破前低 0.9%
+量比 0.42x  MA25 78.012</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t19_SOLUSDT_0711_1900_qc.png' alt='#19 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · ONDSUSDT · QC · V</span><span class='trade-time'>2026-07-11 21:00 → 07-12 21:00</span></div><div class='card-pnl pnl-win'>+0.27%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 7.32
+stop  7.23  收盤跌破破底K  (−1.23%)
+target 7.5  (2.0R)
+exit  7.34  lost_ma25
+破底 7.23  深度 6.00%  在下 24h
+急殺 2.3% / 1.6ATR  破前低 0.1%
+量比 0.35x  MA25 7.2948</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t20_ONDSUSDT_0711_2100_qc.png' alt='#20 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · SOLUSDT · QB · W</span><span class='trade-time'>2026-07-12 22:00 → 07-13 07:00</span></div><div class='card-pnl pnl-loss'>-0.84%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 77.51
+stop  75.6  收盤跌破破底K  (−2.46%)
+target 81.33  (2.0R)
+exit  76.86  lost_ma25
+破底 75.6  深度 3.06%  在下 16h
+急殺 3.4% / 5.0ATR  破前低 2.6%
+量比 1.26x  MA25 77.2368</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t21_SOLUSDT_0712_2200_qb.png' alt='#21 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · ETHUSDT · QB · W</span><span class='trade-time'>2026-07-14 08:00 → 07-14 20:00</span></div><div class='card-pnl pnl-win'>+4.17%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 1785.24
+stop  1748  收盤跌破破底K  (−2.09%)
+target 1859.72  (2.0R)
+exit  1859.72  target
+破底 1748  深度 3.38%  在下 26h
+急殺 2.1% / 2.9ATR  破前低 0.8%
+量比 1.13x  MA25 1779.14</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t22_ETHUSDT_0714_0800_qb.png' alt='#22 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · BNBUSDT · QB · W</span><span class='trade-time'>2026-07-14 08:00 → 07-14 23:00</span></div><div class='card-pnl pnl-win'>+2.46%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 569.52
+stop  562.52  收盤跌破破底K  (−1.23%)
+target 583.52  (2.0R)
+exit  583.52  target
+破底 562.52  深度 2.57%  在下 27h
+急殺 1.7% / 3.5ATR  破前低 0.7%
+量比 1.16x  MA25 568.779</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t23_BNBUSDT_0714_0800_qb.png' alt='#23 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#24 · BTCUSDT · QB · W</span><span class='trade-time'>2026-07-14 11:00 → 07-14 21:00</span></div><div class='card-pnl pnl-win'>+2.34%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 62538.2
+stop  61806  收盤跌破破底K  (−1.17%)
+target 64002.6  (2.0R)
+exit  64002.6  target
+破底 61806  深度 3.46%  在下 30h
+急殺 1.8% / 3.0ATR  破前低 0.4%
+量比 0.48x  MA25 62521.7</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t24_BTCUSDT_0714_1100_qb.png' alt='#24 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#25 · SOLUSDT · QB · W</span><span class='trade-time'>2026-07-14 18:00 → 07-15 12:00</span></div><div class='card-pnl pnl-win'>+3.61%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 75.42
+stop  74.06  收盤跌破破底K  (−1.80%)
+target 78.14  (2.0R)
+exit  78.14  target
+破底 74.06  深度 3.79%  在下 36h
+急殺 1.7% / 2.0ATR  破前低 0.5%
+量比 0.89x  MA25 75.2324</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t25_SOLUSDT_0714_1800_qb.png' alt='#25 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#26 · AVGOUSDT · QB · W</span><span class='trade-time'>2026-07-17 23:00 → 07-18 15:00</span></div><div class='card-pnl pnl-loss'>-0.80%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 372.79
+stop  358.32  收盤跌破破底K  (−3.88%)
+target 401.73  (2.0R)
+exit  369.81  lost_ma25
+破底 358.32  深度 8.97%  在下 33h
+急殺 3.3% / 3.3ATR  破前低 1.4%
+量比 1.05x  MA25 371.85</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t26_AVGOUSDT_0717_2300_qb.png' alt='#26 AVGOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#27 · AVGOUSDT · QC · V</span><span class='trade-time'>2026-07-22 21:00 → 07-23 05:00</span></div><div class='card-pnl pnl-win'>+4.31%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 386.31
+stop  377.98  收盤跌破破底K  (−2.16%)
+target 402.97  (2.0R)
+exit  402.97  target
+破底 377.98  深度 2.00%  在下 14h
+急殺 0.9% / 2.1ATR  破前低 0.2%
+量比 7.13x  MA25 383.503</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t27_AVGOUSDT_0722_2100_qc.png' alt='#27 AVGOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#28 · ONDSUSDT · QB · W</span><span class='trade-time'>2026-07-24 18:00 → 07-24 21:00</span></div><div class='card-pnl pnl-loss'>-4.77%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 7.96
+stop  7.71  收盤跌破破底K  (−3.14%)
+target 8.46  (2.0R)
+exit  7.58  stop
+破底 7.71  深度 4.70%  在下 23h
+急殺 6.4% / 3.7ATR  破前低 3.3%
+量比 0.03x  MA25 7.9564</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t28_ONDSUSDT_0724_1800_qb.png' alt='#28 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#29 · BNBUSDT · QC · V</span><span class='trade-time'>2026-07-25 10:00 → 07-26 22:00</span></div><div class='card-pnl pnl-win'>+1.17%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 566.5
+stop  556.12  收盤跌破破底K  (−1.83%)
+target 587.26  (2.0R)
+exit  573.14  timeout
+破底 556.12  深度 2.11%  在下 16h
+急殺 2.3% / 5.0ATR  破前低 1.8%
+量比 0.42x  MA25 565.463</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t29_BNBUSDT_0725_1000_qc.png' alt='#29 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#30 · ONDSUSDT · QC · V</span><span class='trade-time'>2026-07-25 10:00 → 07-25 18:00</span></div><div class='card-pnl pnl-loss'>-0.76%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 7.91
+stop  7.5  收盤跌破破底K  (−5.18%)
+target 8.73  (2.0R)
+exit  7.85  lost_ma25
+破底 7.5  深度 5.55%  在下 13h
+急殺 6.7% / 5.2ATR  破前低 4.1%
+量比 0.02x  MA25 7.89</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t30_ONDSUSDT_0725_1000_qc.png' alt='#30 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#31 · BTCUSDT · QC · W</span><span class='trade-time'>2026-07-25 21:00 → 07-27 06:00</span></div><div class='card-pnl pnl-win'>+1.47%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 64136.9
+stop  63666  收盤跌破破底K  (−0.73%)
+target 65078.7  (2.0R)
+exit  65078.7  target
+破底 63666  深度 2.27%  在下 28h
+急殺 2.2% / 4.2ATR  破前低 1.6%
+量比 1.31x  MA25 64064.5</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t31_BTCUSDT_0725_2100_qc.png' alt='#31 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#32 · ONDSUSDT · QC · V</span><span class='trade-time'>2026-07-28 03:00 → 07-28 09:00</span></div><div class='card-pnl pnl-loss'>-1.37%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 8.04
+stop  7.64  收盤跌破破底K  (−4.98%)
+target 8.84  (2.0R)
+exit  7.93  lost_ma25
+破底 7.64  深度 3.89%  在下 5h
+急殺 3.9% / 1.9ATR  破前低 0.1%
+量比 0.97x  MA25 7.9492</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t32_ONDSUSDT_0728_0300_qc.png' alt='#32 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#33 · BNBUSDT · QB · W</span><span class='trade-time'>2026-07-28 22:00 → 07-29 21:00</span></div><div class='card-pnl pnl-win'>+0.28%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 568.96
+stop  562.49  收盤跌破破底K  (−1.14%)
+target 581.9  (2.0R)
+exit  570.54  lost_ma25
+破底 562.49  深度 1.94%  在下 16h
+急殺 2.1% / 3.1ATR  破前低 0.6%
+量比 1.85x  MA25 568.552</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t33_BNBUSDT_0728_2200_qb.png' alt='#33 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#34 · ETHUSDT · QB · V</span><span class='trade-time'>2026-07-28 23:00 → 07-29 21:00</span></div><div class='card-pnl pnl-loss'>-0.57%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 1919.28
+stop  1855.82  收盤跌破破底K  (−3.31%)
+target 2046.2  (2.0R)
+exit  1908.41  lost_ma25
+破底 1855.82  深度 4.81%  在下 25h
+急殺 2.1% / 3.0ATR  破前低 0.5%
+量比 3.59x  MA25 1899.55</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t34_ETHUSDT_0728_2300_qb.png' alt='#34 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#35 · AVGOUSDT · QB · V</span><span class='trade-time'>2026-07-28 23:00 → 07-29 10:00</span></div><div class='card-pnl pnl-loss'>-1.27%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 383.74
+stop  367.81  收盤跌破破底K  (−4.15%)
+target 415.6  (2.0R)
+exit  378.86  lost_ma25
+破底 367.81  深度 5.42%  在下 26h
+急殺 3.1% / 3.5ATR  破前低 2.1%
+量比 3.72x  MA25 379.605</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t35_AVGOUSDT_0728_2300_qb.png' alt='#35 AVGOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#36 · SOLUSDT · QB · W</span><span class='trade-time'>2026-07-29 02:00 → 07-29 12:00</span></div><div class='card-pnl pnl-loss'>-0.60%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 73.85
+stop  72.3  收盤跌破破底K  (−2.10%)
+target 76.95  (2.0R)
+exit  73.41  lost_ma25
+破底 72.3  深度 5.14%  在下 28h
+急殺 1.5% / 2.5ATR  破前低 0.7%
+量比 0.35x  MA25 73.8408</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t36_SOLUSDT_0729_0200_qb.png' alt='#36 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#37 · BTCUSDT · QB · W</span><span class='trade-time'>2026-07-29 03:00 → 07-30 00:00</span></div><div class='card-pnl pnl-loss'>-0.15%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 63882.4
+stop  62660.1  收盤跌破破底K  (−1.91%)
+target 66327  (2.0R)
+exit  63786.6  lost_ma25
+破底 62660.1  深度 3.73%  在下 29h
+急殺 1.4% / 3.1ATR  破前低 0.6%
+量比 0.38x  MA25 63676.1</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t37_BTCUSDT_0729_0300_qb.png' alt='#37 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#38 · ONDSUSDT · QB · W</span><span class='trade-time'>2026-07-29 03:00 → 07-29 10:00</span></div><div class='card-pnl pnl-loss'>-1.27%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 7.9
+stop  7.37  收盤跌破破底K  (−6.71%)
+target 8.96  (2.0R)
+exit  7.8  lost_ma25
+破底 7.37  深度 7.69%  在下 19h
+急殺 6.2% / 4.3ATR  破前低 5.6%
+量比 0.68x  MA25 7.8652</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t38_ONDSUSDT_0729_0300_qb.png' alt='#38 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#39 · ETHUSDT · QC · W</span><span class='trade-time'>2026-07-30 09:00 → 07-30 13:00</span></div><div class='card-pnl pnl-loss'>-0.56%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 1916.28
+stop  1870.26  收盤跌破破底K  (−2.40%)
+target 2008.32  (2.0R)
+exit  1905.53  lost_ma25
+破底 1870.26  深度 2.17%  在下 13h
+急殺 3.3% / 3.4ATR  破前低 0.8%
+量比 1.25x  MA25 1906.17</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t39_ETHUSDT_0730_0900_qc.png' alt='#39 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#40 · SOLUSDT · QC · W</span><span class='trade-time'>2026-07-30 09:00 → 07-30 15:00</span></div><div class='card-pnl pnl-loss'>-0.81%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 73.99
+stop  72.26  收盤跌破破底K  (−2.34%)
+target 77.45  (2.0R)
+exit  73.39  lost_ma25
+破底 72.26  深度 2.06%  在下 13h
+急殺 3.0% / 3.3ATR  破前低 0.9%
+量比 0.91x  MA25 73.5524</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t40_SOLUSDT_0730_0900_qc.png' alt='#40 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#41 · AVGOUSDT · QB · W</span><span class='trade-time'>2026-07-30 18:00 → 07-31 14:00</span></div><div class='card-pnl pnl-win'>+5.07%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 374.97
+stop  365.46  收盤跌破破底K  (−2.54%)
+target 393.99  (2.0R)
+exit  393.99  target
+破底 365.46  深度 3.93%  在下 21h
+急殺 5.4% / 3.8ATR  破前低 1.3%
+量比 0.40x  MA25 374.642</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t41_AVGOUSDT_0730_1800_qb.png' alt='#41 AVGOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#42 · ONDSUSDT · QB · W</span><span class='trade-time'>2026-07-30 19:00 → 07-31 22:00</span></div><div class='card-pnl pnl-win'>+4.23%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 7.09
+stop  6.57  收盤跌破破底K  (−7.33%)
+target 8.13  (2.0R)
+exit  7.39  lost_ma25
+破底 6.57  深度 15.56%  在下 23h
+急殺 11.6% / 4.3ATR  破前低 7.5%
+量比 0.67x  MA25 7.0552</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t42_ONDSUSDT_0730_1900_qb.png' alt='#42 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#43 · AVGOUSDT · QC · W</span><span class='trade-time'>2026-08-01 15:00 → 08-02 01:00</span></div><div class='card-pnl pnl-loss'>-0.21%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 389.59
+stop  380.45  收盤跌破破底K  (−2.35%)
+target 407.87  (2.0R)
+exit  388.79  lost_ma25
+破底 380.45  深度 2.42%  在下 18h
+急殺 4.9% / 4.8ATR  破前低 2.1%
+量比 0.03x  MA25 389.529</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t43_AVGOUSDT_0801_1500_qc.png' alt='#43 AVGOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#44 · BTCUSDT · QB · W</span><span class='trade-time'>2026-08-01 19:00 → 08-02 00:00</span></div><div class='card-pnl pnl-loss'>-0.23%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 63045.1
+stop  62410.5  收盤跌破破底K  (−1.01%)
+target 64314.3  (2.0R)
+exit  62899.9  lost_ma25
+破底 62410.5  深度 3.34%  在下 33h
+急殺 2.5% / 4.1ATR  破前低 1.8%
+量比 0.28x  MA25 63041.1</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t44_BTCUSDT_0801_1900_qb.png' alt='#44 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#45 · ETHUSDT · QA · W</span><span class='trade-time'>2026-08-01 20:00 → 08-02 02:00</span></div><div class='card-pnl pnl-loss'>-1.74%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 1868.35
+stop  1847.28  收盤跌破破底K  (−1.13%)
+target 1910.49  (2.0R)
+exit  1835.75  stop
+破底 1847.28  深度 3.56%  在下 35h
+急殺 2.2% / 3.1ATR  破前低 1.6%
+量比 0.76x  MA25 1866.68</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t45_ETHUSDT_0801_2000_qa.png' alt='#45 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#46 · ONDSUSDT · QC · V</span><span class='trade-time'>2026-08-01 20:00 → 08-02 01:00</span></div><div class='card-pnl pnl-loss'>-0.94%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 7.42
+stop  7.13  收盤跌破破底K  (−3.91%)
+target 8  (2.0R)
+exit  7.35  lost_ma25
+破底 7.13  深度 5.43%  在下 23h
+急殺 9.4% / 5.4ATR  破前低 5.2%
+量比 0.01x  MA25 7.4112</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t46_ONDSUSDT_0801_2000_qc.png' alt='#46 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#47 · ETHUSDT · QC · V</span><span class='trade-time'>2026-08-02 10:00 → 08-02 20:00</span></div><div class='card-pnl pnl-loss'>-1.08%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 1876.2
+stop  1820.61  收盤跌破破底K  (−2.96%)
+target 1987.38  (2.0R)
+exit  1855.98  lost_ma25
+破底 1820.61  深度 2.49%  在下 9h
+急殺 2.9% / 7.0ATR  破前低 2.2%
+量比 4.13x  MA25 1860.46</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t47_ETHUSDT_0802_1000_qc.png' alt='#47 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#48 · BNBUSDT · QB · W</span><span class='trade-time'>2026-08-02 11:00 → 08-03 12:00</span></div><div class='card-pnl pnl-win'>+0.04%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 582.64
+stop  573.7  收盤跌破破底K  (−1.53%)
+target 600.52  (2.0R)
+exit  582.88  lost_ma25
+破底 573.7  深度 2.70%  在下 19h
+急殺 1.0% / 2.2ATR  破前低 0.8%
+量比 1.18x  MA25 581.309</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t48_BNBUSDT_0802_1100_qb.png' alt='#48 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#49 · SOLUSDT · QB · W</span><span class='trade-time'>2026-08-03 21:00 → 08-04 17:00</span></div><div class='card-pnl pnl-win'>+0.05%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 73.22
+stop  71.87  收盤跌破破底K  (−1.84%)
+target 75.92  (2.0R)
+exit  73.26  lost_ma25
+破底 71.87  深度 1.94%  在下 13h
+急殺 1.6% / 3.0ATR  破前低 1.0%
+量比 2.85x  MA25 73.0292</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t49_SOLUSDT_0803_2100_qb.png' alt='#49 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#50 · ETHUSDT · QB · W</span><span class='trade-time'>2026-08-03 22:00 → 08-04 17:00</span></div><div class='card-pnl pnl-loss'>-0.80%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 1872.82
+stop  1827.18  收盤跌破破底K  (−2.44%)
+target 1964.1  (2.0R)
+exit  1857.92  lost_ma25
+破底 1827.18  深度 2.33%  在下 13h
+急殺 1.8% / 2.8ATR  破前低 1.2%
+量比 2.64x  MA25 1861.98</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t50_ETHUSDT_0803_2200_qb.png' alt='#50 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#51 · AVGOUSDT · QC · V</span><span class='trade-time'>2026-08-04 03:00 → 08-05 15:00</span></div><div class='card-pnl pnl-win'>+6.82%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 392.77
+stop  375.41  收盤跌破破底K  (−4.42%)
+target 427.49  (2.0R)
+exit  419.56  timeout
+破底 375.41  深度 4.73%  在下 13h
+急殺 4.0% / 4.6ATR  破前低 3.6%
+量比 0.53x  MA25 391.957</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t51_AVGOUSDT_0804_0300_qc.png' alt='#51 AVGOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#52 · AVGOUSDT · QB · V</span><span class='trade-time'>2026-08-06 22:00 → 08-07 12:00</span></div><div class='card-pnl pnl-loss'>-1.03%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 425.73
+stop  411.38  收盤跌破破底K  (−3.37%)
+target 454.43  (2.0R)
+exit  421.35  lost_ma25
+破底 411.38  深度 2.13%  在下 8h
+急殺 2.6% / 3.5ATR  破前低 1.3%
+量比 4.63x  MA25 420.478</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t52_AVGOUSDT_0806_2200_qb.png' alt='#52 AVGOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#53 · SOLUSDT · QC · W</span><span class='trade-time'>2026-08-07 16:00 → 08-08 11:00</span></div><div class='card-pnl pnl-win'>+2.38%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 73.16
+stop  72.29  收盤跌破破底K  (−1.19%)
+target 74.9  (2.0R)
+exit  74.9  target
+破底 72.29  深度 2.36%  在下 34h
+急殺 0.9% / 1.8ATR  破前低 0.3%
+量比 0.98x  MA25 72.9928</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t53_SOLUSDT_0807_1600_qc.png' alt='#53 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#54 · ONDSUSDT · QB · V</span><span class='trade-time'>2026-08-11 03:00 → 08-11 17:00</span></div><div class='card-pnl pnl-loss'>-0.97%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 9.32
+stop  9.06  收盤跌破破底K  (−2.79%)
+target 9.84  (2.0R)
+exit  9.23  lost_ma25
+破底 9.06  深度 2.59%  在下 5h
+急殺 5.9% / 3.6ATR  破前低 1.4%
+量比 0.68x  MA25 9.2952</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t54_ONDSUSDT_0811_0300_qb.png' alt='#54 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#55 · ETHUSDT · QC · V</span><span class='trade-time'>2026-08-11 17:00 → 08-11 23:00</span></div><div class='card-pnl pnl-loss'>-1.21%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 1884.78
+stop  1866.14  收盤跌破破底K  (−0.99%)
+target 1922.06  (2.0R)
+exit  1862  stop
+破底 1866.14  深度 2.83%  在下 24h
+急殺 2.3% / 4.0ATR  破前低 2.0%
+量比 0.63x  MA25 1883.49</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t55_ETHUSDT_0811_1700_qc.png' alt='#55 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#56 · BTCUSDT · QC · V</span><span class='trade-time'>2026-08-11 17:00 → 08-11 22:00</span></div><div class='card-pnl pnl-loss'>-0.83%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 64281
+stop  63788  收盤跌破破底K  (−0.77%)
+target 65267  (2.0R)
+exit  63747  stop
+破底 63788  深度 2.00%  在下 24h
+急殺 1.4% / 3.2ATR  破前低 1.1%
+量比 0.74x  MA25 64218.2</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t56_BTCUSDT_0811_1700_qc.png' alt='#56 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#57 · SOLUSDT · QA · W</span><span class='trade-time'>2026-08-12 04:00 → 08-12 23:00</span></div><div class='card-pnl pnl-loss'>-0.39%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 76.01
+stop  74.57  收盤跌破破底K  (−1.89%)
+target 78.89  (2.0R)
+exit  75.71  lost_ma25
+破底 74.57  深度 2.99%  在下 35h
+急殺 2.2% / 3.9ATR  破前低 1.0%
+量比 2.05x  MA25 75.7792</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t57_SOLUSDT_0812_0400_qa.png' alt='#57 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#58 · ONDSUSDT · QA · W</span><span class='trade-time'>2026-08-14 19:00 → 08-15 02:00</span></div><div class='card-pnl pnl-loss'>-1.73%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 9.27
+stop  8.74  收盤跌破破底K  (−5.72%)
+target 10.33  (2.0R)
+exit  9.11  lost_ma25
+破底 8.74  深度 12.84%  在下 23h
+急殺 18.4% / 7.1ATR  破前低 11.6%
+量比 0.55x  MA25 9.1424</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t58_ONDSUSDT_0814_1900_qa.png' alt='#58 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#59 · SOLUSDT · QC · W</span><span class='trade-time'>2026-08-15 20:00 → 08-16 14:00</span></div><div class='card-pnl pnl-loss'>-0.05%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 75.37
+stop  74.61  收盤跌破破底K  (−1.01%)
+target 76.89  (2.0R)
+exit  75.33  lost_ma25
+破底 74.61  深度 1.93%  在下 34h
+急殺 1.4% / 2.9ATR  破前低 0.5%
+量比 0.43x  MA25 75.2816</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t59_SOLUSDT_0815_2000_qc.png' alt='#59 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#60 · SOLUSDT · QB · W</span><span class='trade-time'>2026-08-17 10:00 → 08-18 10:00</span></div><div class='card-pnl pnl-loss'>-0.28%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 75.45
+stop  74  收盤跌破破底K  (−1.92%)
+target 78.35  (2.0R)
+exit  75.24  lost_ma25
+破底 74  深度 1.88%  在下 21h
+急殺 1.8% / 5.0ATR  破前低 1.5%
+量比 1.83x  MA25 75.1824</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t60_SOLUSDT_0817_1000_qb.png' alt='#60 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#61 · ONDSUSDT · QB · W</span><span class='trade-time'>2026-08-20 11:00 → 08-20 16:00</span></div><div class='card-pnl pnl-loss'>-0.90%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 8.92
+stop  8.63  收盤跌破破底K  (−3.25%)
+target 9.5  (2.0R)
+exit  8.84  lost_ma25
+破底 8.63  深度 3.65%  在下 17h
+急殺 4.7% / 4.1ATR  破前低 2.7%
+量比 0.33x  MA25 8.9168</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t61_ONDSUSDT_0820_1100_qb.png' alt='#61 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#62 · ONDSUSDT · QA · W</span><span class='trade-time'>2026-08-21 18:00 → 08-22 14:00</span></div><div class='card-pnl pnl-win'>+1.31%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 8.42
+stop  8.16  收盤跌破破底K  (−3.09%)
+target 8.94  (2.0R)
+exit  8.53  lost_ma25
+破底 8.16  深度 8.48%  在下 27h
+急殺 8.7% / 7.3ATR  破前低 7.4%
+量比 1.42x  MA25 8.4144</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t62_ONDSUSDT_0821_1800_qa.png' alt='#62 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#63 · ONDSUSDT · QC · V</span><span class='trade-time'>2026-08-23 01:00 → 08-24 10:00</span></div><div class='card-pnl pnl-win'>+1.16%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 8.61
+stop  8.44  收盤跌破破底K  (−1.97%)
+target 8.95  (2.0R)
+exit  8.71  lost_ma25
+破底 8.44  深度 2.03%  在下 12h
+急殺 1.2% / 2.3ATR  破前低 0.8%
+量比 1.49x  MA25 8.5992</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t63_ONDSUSDT_0823_0100_qc.png' alt='#63 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#64 · ETHUSDT · QB · W</span><span class='trade-time'>2026-08-23 18:00 → 08-25 06:00</span></div><div class='card-pnl pnl-win'>+2.43%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 2414.8
+stop  2355.38  收盤跌破破底K  (−2.46%)
+target 2533.64  (2.0R)
+exit  2473.38  timeout
+破底 2355.38  深度 4.06%  在下 28h
+急殺 2.8% / 3.3ATR  破前低 1.9%
+量比 0.60x  MA25 2413.92</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t64_ETHUSDT_0823_1800_qb.png' alt='#64 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#65 · BTCUSDT · QA · W</span><span class='trade-time'>2026-08-23 19:00 → 08-24 12:00</span></div><div class='card-pnl pnl-loss'>-0.53%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 77296
+stop  75588  收盤跌破破底K  (−2.21%)
+target 80712  (2.0R)
+exit  76889.9  lost_ma25
+破底 75588  深度 2.74%  在下 30h
+急殺 2.1% / 4.0ATR  破前低 1.5%
+量比 1.90x  MA25 76950</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t65_BTCUSDT_0823_1900_qa.png' alt='#65 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#66 · BNBUSDT · QB · W</span><span class='trade-time'>2026-08-23 19:00 → 08-25 07:00</span></div><div class='card-pnl pnl-win'>+1.33%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 695.39
+stop  677.29  收盤跌破破底K  (−2.60%)
+target 731.59  (2.0R)
+exit  704.67  timeout
+破底 677.29  深度 3.18%  在下 14h
+急殺 3.1% / 3.6ATR  破前低 1.7%
+量比 0.95x  MA25 692.976</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t66_BNBUSDT_0823_1900_qb.png' alt='#66 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#67 · SOLUSDT · QC · V</span><span class='trade-time'>2026-08-23 19:00 → 08-24 12:00</span></div><div class='card-pnl pnl-loss'>-0.44%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 94.62
+stop  91.57  收盤跌破破底K  (−3.22%)
+target 100.72  (2.0R)
+exit  94.2  lost_ma25
+破底 91.57  深度 3.03%  在下 8h
+急殺 6.9% / 3.7ATR  破前低 1.1%
+量比 0.87x  MA25 93.8152</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t67_SOLUSDT_0823_1900_qc.png' alt='#67 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#68 · AVGOUSDT · QB · W</span><span class='trade-time'>2026-08-25 15:00 → 08-25 22:00</span></div><div class='card-pnl pnl-loss'>-0.35%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 361.69
+stop  357.52  收盤跌破破底K  (−1.15%)
+target 370.03  (2.0R)
+exit  360.42  lost_ma25
+破底 357.52  深度 3.24%  在下 33h
+急殺 0.7% / 1.2ATR  破前低 0.3%
+量比 0.54x  MA25 361.658</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t68_AVGOUSDT_0825_1500_qb.png' alt='#68 AVGOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#69 · ONDSUSDT · QB · W</span><span class='trade-time'>2026-08-25 16:00 → 08-25 22:00</span></div><div class='card-pnl pnl-loss'>-0.87%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 8.348
+stop  8.202  收盤跌破破底K  (−1.75%)
+target 8.64  (2.0R)
+exit  8.275  lost_ma25
+破底 8.202  深度 6.02%  在下 31h
+急殺 4.9% / 4.7ATR  破前低 3.7%
+量比 0.66x  MA25 8.3324</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t69_ONDSUSDT_0825_1600_qb.png' alt='#69 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#70 · BNBUSDT · QA · W</span><span class='trade-time'>2026-08-26 18:00 → 08-26 23:00</span></div><div class='card-pnl pnl-loss'>-1.40%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近72h</span></div><pre class='trade-detail'>entry 707.31
+stop  688.15  收盤跌破破底K  (−2.71%)
+target 745.63  (2.0R)
+exit  697.42  lost_ma25
+破底 688.15  深度 2.59%  在下 26h
+急殺 2.0% / 2.8ATR  破前低 0.4%
+量比 3.12x  MA25 697.475</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t70_BNBUSDT_0826_1800_qa.png' alt='#70 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#71 · ETHUSDT · QB · W</span><span class='trade-time'>2026-08-27 01:00 → 08-27 17:00</span></div><div class='card-pnl pnl-win'>+3.84%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近72h</span></div><pre class='trade-detail'>entry 2459.94
+stop  2412.69  收盤跌破破底K  (−1.92%)
+target 2554.44  (2.0R)
+exit  2554.44  target
+破底 2412.69  深度 3.01%  在下 34h
+急殺 2.5% / 2.7ATR  破前低 1.1%
+量比 1.13x  MA25 2454.76</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t71_ETHUSDT_0827_0100_qb.png' alt='#71 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#72 · ONDSUSDT · QB · W</span><span class='trade-time'>2026-08-27 03:00 → 08-28 00:00</span></div><div class='card-pnl pnl-win'>+6.33%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近72h</span></div><pre class='trade-detail'>entry 8.22
+stop  7.96  收盤跌破破底K  (−3.16%)
+target 8.74  (2.0R)
+exit  8.74  target
+破底 7.96  深度 3.94%  在下 30h
+急殺 3.4% / 4.1ATR  破前低 2.9%
+量比 1.19x  MA25 8.2132</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t72_ONDSUSDT_0827_0300_qb.png' alt='#72 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#73 · AVGOUSDT · QB · W</span><span class='trade-time'>2026-08-27 04:00 → 08-28 01:00</span></div><div class='card-pnl pnl-win'>+3.71%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近72h</span></div><pre class='trade-detail'>entry 357.01
+stop  350.39  收盤跌破破底K  (−1.85%)
+target 370.25  (2.0R)
+exit  370.25  target
+破底 350.39  深度 2.98%  在下 31h
+急殺 2.6% / 4.5ATR  破前低 1.7%
+量比 0.99x  MA25 356.903</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t73_AVGOUSDT_0827_0400_qb.png' alt='#73 AVGOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#74 · SOLUSDT · QB · W</span><span class='trade-time'>2026-08-27 04:00 → 08-27 06:00</span></div><div class='card-pnl pnl-win'>+4.25%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近72h</span></div><pre class='trade-detail'>entry 96.88
+stop  94.82  收盤跌破破底K  (−2.13%)
+target 101  (2.0R)
+exit  101  target
+破底 94.82  深度 4.40%  在下 31h
+急殺 2.8% / 2.5ATR  破前低 1.0%
+量比 0.58x  MA25 96.7176</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t74_SOLUSDT_0827_0400_qb.png' alt='#74 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#75 · BTCUSDT · QC · W</span><span class='trade-time'>2026-08-27 05:00 → 08-28 09:00</span></div><div class='card-pnl pnl-win'>+2.75%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span> <span class='tag tag-fresh'>近72h</span></div><pre class='trade-detail'>entry 78682.9
+stop  77600  收盤跌破破底K  (−1.38%)
+target 80848.7  (2.0R)
+exit  80848.7  target
+破底 77600  深度 2.32%  在下 36h
+急殺 1.4% / 2.0ATR  破前低 0.8%
+量比 0.84x  MA25 78560.9</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/img/t75_BTCUSDT_0827_0500_qc.png' alt='#75 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div>
+</body></html>
