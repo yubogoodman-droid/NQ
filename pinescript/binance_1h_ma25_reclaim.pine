@@ -12,12 +12,18 @@ minImpulse   = input.float(2.3, "4 根急殺 %", minval=0.5, step=0.1) / 100
 minUndercut  = input.float(1.4, "破前低 %", minval=0.3, step=0.1) / 100
 minAtrMult   = input.float(2.8, "急殺 ATR 倍數", minval=1.0, step=0.1)
 
-ma7  = ta.sma(close, 7)
-ma25 = ta.sma(close, maLen)
-ma99 = ta.sma(close, 99)
+ma7   = ta.sma(close, 7)
+ma14  = ta.sma(close, 14)
+ma25  = ta.sma(close, maLen)
+ma99  = ta.sma(close, 99)
+ma120 = ta.sma(close, 120)
+ma200 = ta.sma(close, 200)
 plot(ma7, "MA7", color=color.new(#f0b90b, 0), linewidth=1)
+plot(ma14, "MA14", color=color.new(#4dd0e1, 0), linewidth=1)
 plot(ma25, "MA25", color=color.new(#d28cff, 0), linewidth=2)
-plot(ma99, "MA99", color=color.new(#3b82f6, 0), linewidth=1)
+plot(ma99, "MA99", color=color.new(#7e57c2, 0), linewidth=1)
+plot(ma120, "MA120", color=color.new(#66bb6a, 0), linewidth=1)
+plot(ma200, "MA200", color=color.new(#c62828, 0), linewidth=1)
 
 below = close < ma25
 barsBelow = 0

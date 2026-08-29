@@ -37,12 +37,17 @@ KEEP = {"AVGOUSDT", "ONDSUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"}
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": UA, "Clienttype": "web", "Accept": "application/json"})
 
-# 對齊幣安 App 預設均線：黃 MA7、粉 MA25、藍 MA99
+# 對齊你一開始那兩張幣安手機圖的均線帶：
+# 黃 MA7 / 青 MA14 / 粉 MA25 / 紫 MA99 / 綠 MA120 / 酒紅 MA200
 MA_COLORS = {
     7: "#f0b90b",
+    14: "#4dd0e1",
     25: "#d28cff",
-    99: "#3b82f6",
+    99: "#7e57c2",
+    120: "#66bb6a",
+    200: "#c62828",
 }
+MA_WIDTH = {7: 1.15, 14: 1.05, 25: 2.15, 99: 1.25, 120: 1.15, 200: 1.25}
 
 
 # ---------------------------------------------------------------------------
@@ -572,9 +577,9 @@ def _setup_cjk() -> None:
 
 
 def _trade_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
-    # 多留左側，讓 MA25 / MA99 曲線跟幣安 1h 手機圖一樣看得出長相
-    start = max(0, min(trade.signal.break_idx, trade.entry_idx) - 64)
-    end = min(len(df) - 1, max(trade.exit_idx, trade.entry_idx) + 14)
+    # 手機圖大概 80～90 根：破底前約兩天，出場後再留半天
+    start = max(0, min(trade.signal.break_idx, trade.entry_idx) - 52)
+    end = min(len(df) - 1, max(trade.exit_idx, trade.entry_idx) + 12)
     return start, end
 
 
@@ -590,10 +595,28 @@ def _loc_on_tf(index: pd.DatetimeIndex, ts) -> Optional[int]:
 
 
 def _style_ax(ax) -> None:
-    ax.set_facecolor("#101814")
-    ax.tick_params(colors="#8aa193", labelsize=8)
+    # 幣安 App 淺色主題，才跟你那兩張手機截圖同一種均線長相
+    ax.set_facecolor("#ffffff")
+    ax.tick_params(colors="#6b7280", labelsize=8)
     for sp in ax.spines.values():
-        sp.set_color("#2a3a33")
+        sp.set_color("#e5e7eb")
+    ax.grid(True, color="#f0f0f0", lw=0.6, axis="y", zorder=0)
+    ax.yaxis.tick_right()
+    ax.yaxis.set_label_position("right")
+
+
+def _plot_mas(ax, close_full: pd.Series, start: int, end: int, xs) -> None:
+    for n, col in MA_COLORS.items():
+        ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
+        ax.plot(
+            list(xs),
+            ma,
+            color=col,
+            lw=MA_WIDTH.get(n, 1.1),
+            label=f"MA{n}",
+            solid_capstyle="round",
+            zorder=3,
+        )
 
 
 def _paint_candles(ax, xs, o, h, l, c):
@@ -630,9 +653,9 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     fig, (ax, axv, ax4) = plt.subplots(
         3,
         1,
-        figsize=(10.4, 8.0),
-        gridspec_kw={"height_ratios": [3.0, 0.75, 2.15]},
-        facecolor="#0c1210",
+        figsize=(10.4, 8.2),
+        gridspec_kw={"height_ratios": [3.35, 0.7, 1.95]},
+        facecolor="#ffffff",
     )
     ax.sharex(axv)
     for a in (ax, axv, ax4):
@@ -640,15 +663,24 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
 
     colors_v = _paint_candles(ax, xs, o, h, l, c)
     if vol is not None:
-        axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
+        axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0, zorder=2)
 
-    for n, col in MA_COLORS.items():
+    _plot_mas(ax, close_full, start, end, xs)
+
+    # 停損／目標不拉 Y 軸，否則均線帶會被壓扁，跟手機圖不像
+    y_lo = float(np.nanmin(l.to_numpy(float)))
+    y_hi = float(np.nanmax(h.to_numpy(float)))
+    for n in MA_COLORS:
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
-        lw = 2.35 if n == 25 else (1.45 if n == 7 else 1.25)
-        ax.plot(list(xs), ma, color=col, lw=lw, label=f"MA{n}")
-
-    ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
-    ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
+        if ma.notna().any():
+            y_lo = min(y_lo, float(np.nanmin(ma.to_numpy(float))))
+            y_hi = max(y_hi, float(np.nanmax(ma.to_numpy(float))))
+    pad = max((y_hi - y_lo) * 0.045, abs(y_hi) * 1e-4)
+    ax.set_ylim(y_lo - pad, y_hi + pad)
+    if y_lo - pad <= trade.stop_price <= y_hi + pad:
+        ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.75)
+    if y_lo - pad <= trade.target_price <= y_hi + pad:
+        ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.7)
 
     bx, ex, xx = sig.break_idx - start, trade.entry_idx - start, trade.exit_idx - start
     if 0 <= bx < len(window):
@@ -693,14 +725,14 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         f"#{trade_no}  {extra}Q{trade.quality} {sig.shape}  1h  "
         f"{et.strftime('%m-%d %H:%M')} → {xt.strftime('%m-%d %H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_pct:.2f}%",
-        color="#e8f0ea",
+        color="#1e2329",
         fontsize=11,
     )
-    ax.legend(loc="upper left", fontsize=8, frameon=False, labelcolor="#c8d5cc", ncol=3)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#4b5563", ncol=6)
     step = max(1, len(window) // 6)
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
-    axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+    axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#6b7280")
 
     h4 = resample_4h(df)
     if len(h4) >= 2:
@@ -711,10 +743,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         xs4 = range(len(w4))
         _paint_candles(ax4, xs4, w4["Open"], w4["High"], w4["Low"], w4["Close"])
         close4 = h4["Close"].astype(float)
-        for n, col in MA_COLORS.items():
-            ma = close4.rolling(n, min_periods=n).mean().iloc[s4 : e4 + 1]
-            lw = 2.35 if n == 25 else (1.35 if n == 7 else 1.2)
-            ax4.plot(list(xs4), ma, color=col, lw=lw, label=f"MA{n}")
+        _plot_mas(ax4, close4, s4, e4, xs4)
         for ts, col, mark in (
             (df.index[sig.break_idx], "#f472b6", "破底"),
             (et, "#00e676", "站上"),
@@ -730,15 +759,15 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             0.92,
             "4h 對照",
             transform=ax4.transAxes,
-            color="#c8d5cc",
+            color="#4b5563",
             fontsize=9,
             va="top",
         )
-        ax4.legend(loc="upper right", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=3)
+        ax4.legend(loc="upper right", fontsize=6, frameon=False, labelcolor="#4b5563", ncol=6)
         step4 = max(1, len(w4) // 6)
         ticks4 = list(range(0, len(w4), step4))
         ax4.set_xticks(ticks4)
-        ax4.set_xticklabels([w4.index[i].strftime("%m-%d %H:%M") for i in ticks4], color="#8aa193")
+        ax4.set_xticklabels([w4.index[i].strftime("%m-%d %H:%M") for i in ticks4], color="#6b7280")
     else:
         ax4.set_visible(False)
 
@@ -853,7 +882,8 @@ def write_html_report(
             f"exit  {t.exit_price:.6g}  {t.exit_reason}\n"
             f"破底 {t.signal.bottom:.6g}  深度 {t.signal.depth_pct * 100:.2f}%  在下 {t.signal.bars_below}h\n"
             f"急殺 {t.signal.impulse_pct * 100:.1f}% / {t.signal.flush_atr:.1f}ATR  破前低 {t.signal.undercut_pct * 100:.1f}%\n"
-            f"量比 {t.signal.vol_ratio:.2f}x  MA25 {t.signal.ma25:.6g}"
+            f"量比 {t.signal.vol_ratio:.2f}x  MA25 {t.signal.ma25:.6g}\n"
+            f"均線 MA7 {t.signal.ma7:.6g}  MA99 {t.signal.ma99:.6g}  MA200 {t.signal.ma200:.6g}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i} {escape(hit.symbol)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -907,7 +937,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上（寬鬆）</h1>
-<p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 黃 MA7 / 粉 MA25 / 藍 MA99（幣安預設）<br/>
+<p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 均線對齊你那兩張手機圖：黃7 / 青14 / 粉25 / 紫99 / 綠120 / 酒紅200<br/>
 寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -1133,6 +1163,35 @@ th{{color:#8b949e;font-weight:600}}
     return path
 
 
+def _featured_k_html(taken: Sequence[dict], img_prefix: str = "seq-img/") -> str:
+    if not taken:
+        return ""
+    peak_i = int(taken[0]["dd_peak_i"])
+    trough_i = int(taken[0]["dd_trough_i"])
+    peak, trough = taken[peak_i], taken[trough_i]
+    stretch = taken[peak_i : trough_i + 1]
+    worst = min(stretch[1:], key=lambda x: x["trade"].pnl_pct) if len(stretch) > 1 else trough
+    blocks = []
+    for rec, title in (
+        (peak, "高點 · 回撤開始前"),
+        (worst, "最痛單筆"),
+        (trough, "谷底 · 回撤結束"),
+    ):
+        img = rec.get("img")
+        if not img:
+            continue
+        t = rec["trade"]
+        blocks.append(
+            f"<div class='k-block'><h2 style='font-size:15px;margin:16px 0 6px'>{title}</h2>"
+            f"<p class='muted'>{escape(rec['symbol'])} {escape(rec['et'].strftime('%m-%d %H:%M'))} · "
+            f"{escape(t.exit_reason)} · 價格 {t.pnl_pct:+.2f}% · "
+            f"{rec['before']:.2f} → {rec['after']:.2f} USDT</p>"
+            f"<div class='mini-chart'><img src='{img_prefix}{escape(img)}' alt='{escape(title)}' "
+            "style='width:100%;display:block;border-radius:10px'/></div></div>"
+        )
+    return "".join(blocks)
+
+
 def draw_seq_pngs(taken: Sequence[dict], img_dir: Path) -> Sequence[dict]:
     img_dir = Path(img_dir)
     img_dir.mkdir(parents=True, exist_ok=True)
@@ -1220,7 +1279,7 @@ def write_view_html(src: Path, branch: str = BRANCH, out_name: str = "view.html"
 def scan_symbol(symbol: str, days: int, detect_kw: dict) -> tuple[List[Hit], dict]:
     meta = {"symbol": symbol, "bars": 0, "error": "", "n_trade": 0}
     try:
-        df = fetch_klines(symbol, days=days + 24)
+        df = fetch_klines(symbol, days=days + 40)
     except Exception as exc:  # noqa: BLE001
         meta["error"] = str(exc)[:80]
         return [], meta
@@ -1374,6 +1433,27 @@ def cmd_run(args) -> int:
         view = write_view_html(out)
         print(f"html={out}")
         print(f"view={view}")
+        if args.days >= 30:
+            taken = one_at_a_time_path(hits, start=100.0, lev=3.0)
+            draw_seq_pngs(taken, html_path.parent / "seq-img")
+            more_k = (
+                "https://htmlpreview.github.io/?"
+                f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{BRANCH}/"
+                f"{html_path.parent.relative_to(REPO).as_posix()}/seq-k.html"
+            )
+            write_seq_html(
+                html_path.parent / "seq.html",
+                taken,
+                days=args.days,
+                scanned=len(symbols),
+                pool=len(hits),
+                featured_html=_featured_k_html(taken),
+                more_k_href=more_k,
+            )
+            write_seq_k_html(html_path.parent / "seq-k.html", taken, days=args.days)
+            write_view_html(html_path.parent / "seq.html", out_name="seq.html")
+            write_view_html(html_path.parent / "seq-k.html", out_name="seq-k.html")
+            print(f"seq={html_path.parent / 'seq.html'}")
     return 0
 
 

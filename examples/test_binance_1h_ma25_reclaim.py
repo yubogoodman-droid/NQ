@@ -12,6 +12,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from binance_1h_ma25_reclaim import (  # noqa: E402
+    MA_COLORS,
     Hit,
     TradeResult,
     atr,
@@ -329,6 +330,9 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "1h + 4h" in text
     assert "4h K 對照" in text
     assert "收盤跌破破底" in text
+    assert "黃7" in text
+    assert "酒紅200" in text
+    assert set(MA_COLORS) == {7, 14, 25, 99, 120, 200}
     seq_hits = [Hit("AVGOUSDT", df, t) for t in trades]
     seq_path = one_at_a_time_path(seq_hits, start=100.0, lev=3.0)
     seq = Path("/tmp/ma25_seq_test.html") if tmp_path is None else Path(tmp_path) / "seq.html"
