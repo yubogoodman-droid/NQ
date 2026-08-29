@@ -302,12 +302,12 @@ def detect_signals(
     df: pd.DataFrame,
     *,
     ma_period: int = 25,
-    min_bars_below: int = 10,
+    min_bars_below: int = 4,
     max_bars_below: int = 36,
-    min_depth_pct: float = 0.028,
-    min_impulse_pct: float = 0.023,
-    min_undercut_pct: float = 0.014,
-    min_flush_atr: float = 2.8,
+    min_depth_pct: float = 0.018,
+    min_impulse_pct: float = 0.0,
+    min_undercut_pct: float = 0.0,
+    min_flush_atr: float = 0.0,
     flush_bars: int = 4,
     stop_buffer_pct: float = 0.003,
     target_r: float = 2.0,
@@ -817,9 +817,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安 1h · MA25 下破底再站上</h1>
+<h1>幣安 1h · MA25 下破底再站上（寬鬆）</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 粉線 MA25<br/>
-價先收在 MA25 下，再出現跟截圖差不多的急殺：4 根內至少 2.3%、≥ 2.8 ATR，並跌破急殺前平台低點 1.4%。之後收盤站回 MA25。停損破底低點，目標 2R。{card_note}</p>
+寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。停損破底低點，目標 2R。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -877,7 +877,19 @@ def merge_funnels(acc: Dict[str, int], part: Dict[str, int]) -> None:
         acc[k] = acc.get(k, 0) + int(v)
 
 
+STRICT_DETECT = dict(
+    min_bars_below=10,
+    max_bars_below=36,
+    min_depth_pct=0.028,
+    min_impulse_pct=0.023,
+    min_undercut_pct=0.014,
+    min_flush_atr=2.8,
+)
+
+
 def detect_kwargs(args) -> dict:
+    if getattr(args, "strict", False):
+        return dict(STRICT_DETECT, target_r=args.target_r)
     return dict(
         min_bars_below=args.min_bars,
         max_bars_below=args.max_bars,
@@ -973,12 +985,16 @@ def cmd_run(args) -> int:
     if html_path:
         extras = [s.strip().upper() for s in (args.symbols or "").split(",") if s.strip()]
         keep_for_cards = set(KEEP) | set(extras)
-        cards = select_card_hits(hits, recent_hours=max(args.recent, 72), keep_symbols=keep_for_cards)
-        card_note = (
-            f"<br/>卡片 {len(cards)} 筆：AVGO/ONDS 等樣本 + 近 {max(args.recent, 72)} 小時。"
-            if len(cards) != len(hits)
-            else ""
-        )
+        if args.days <= 8:
+            cards = hits
+            card_note = ""
+        else:
+            cards = select_card_hits(hits, recent_hours=max(args.recent, 72), keep_symbols=keep_for_cards)
+            card_note = (
+                f"<br/>卡片 {len(cards)} 筆：AVGO/ONDS 等樣本 + 近 {max(args.recent, 72)} 小時。"
+                if len(cards) != len(hits)
+                else ""
+            )
         out = write_html_report(
             html_path,
             cards,
@@ -1001,14 +1017,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--universe", action="store_true", help="即使指定 --symbols 也掃流動永續")
     p.add_argument("--limit", type=int, default=80, help="流動永續最多幾檔（成交額由高到低）")
     p.add_argument("--min-quote", type=float, default=8_000_000)
-    p.add_argument("--days", type=int, default=30)
+    p.add_argument("--days", type=int, default=7)
     p.add_argument("--workers", type=int, default=8)
-    p.add_argument("--min-bars", type=int, default=10, help="在 MA25 下至少幾根 1h")
+    p.add_argument("--min-bars", type=int, default=4, help="在 MA25 下至少幾根 1h")
     p.add_argument("--max-bars", type=int, default=36, help="在 MA25 下最多幾根 1h")
-    p.add_argument("--min-depth", type=float, default=2.8, help="相對 MA25 最低深度 %")
-    p.add_argument("--min-impulse", type=float, default=2.3, help="4 根急殺最低幅度 %")
-    p.add_argument("--min-undercut", type=float, default=1.4, help="跌破急殺前平台低點 %")
-    p.add_argument("--min-atr", type=float, default=2.8, help="急殺至少幾個 ATR")
+    p.add_argument("--min-depth", type=float, default=1.8, help="相對 MA25 最低深度 %")
+    p.add_argument("--min-impulse", type=float, default=0.0, help="4 根急殺最低幅度 %（0=寬鬆）")
+    p.add_argument("--min-undercut", type=float, default=0.0, help="跌破急殺前平台低點 %（0=寬鬆）")
+    p.add_argument("--min-atr", type=float, default=0.0, help="急殺至少幾個 ATR（0=寬鬆）")
+    p.add_argument("--strict", action="store_true", help="改用截圖急殺門檻")
     p.add_argument("--target-r", type=float, default=2.0)
     p.add_argument("--recent", type=int, default=48, help="報告裡標近幾小時的新訊號")
     p.add_argument("--html", default="")

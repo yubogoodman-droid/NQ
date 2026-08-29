@@ -141,7 +141,15 @@ def test_shallow_rejected() -> None:
 def test_slow_grind_rejected() -> None:
     df = _make_reclaim_bars(depth=0.055, below=16, sharp=False)
     funnel: dict = {}
-    sigs = detect_signals(df, funnel=funnel)
+    sigs = detect_signals(
+        df,
+        funnel=funnel,
+        min_bars_below=10,
+        min_depth_pct=0.028,
+        min_impulse_pct=0.023,
+        min_undercut_pct=0.014,
+        min_flush_atr=2.8,
+    )
     assert not sigs, f"slow grind should fail flush, funnel={funnel}"
     assert funnel.get("weak_flush", 0) >= 1 or funnel.get("shallow", 0) >= 1 or funnel.get("too_short", 0) >= 1
 

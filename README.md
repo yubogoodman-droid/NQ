@@ -62,15 +62,16 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 ## 幣安 1 小時 MA25 下破底再站上
 
-1 小時圖：先跌到 MA25 下，再出現跟 AVGO / ONDS 截圖差不多的急殺（4 根內 ≥ 2.3%、≥ 2.8 ATR，並跌破前低 1.4%），然後收盤站回 MA25。  
-進場用站回收盤；停損在破底低點；目標 2R；連兩根又掉回 MA25 下出場。
+1 小時圖寬鬆版：收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。  
+進場用站回收盤；停損在破底低點；目標 2R；連兩根又掉回 MA25 下出場。  
+要截圖那種急殺再加 `--strict`。
 
 ```bash
-# 先對截圖那兩檔（AVGO / ONDS）
-python3 examples/binance_1h_ma25_reclaim.py --symbols AVGOUSDT,ONDSUSDT --days 45
+# 寬鬆 · 近一週
+python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 7 --pages
 
-# 流動 U 本位永續 + 手機版 HTML
-python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 14 --pages
+# 截圖急殺
+python3 examples/binance_1h_ma25_reclaim.py --strict --limit 80 --days 14 --pages
 ```
 
 TradingView：`pinescript/binance_1h_ma25_reclaim.pine` 貼到 1 小時圖。
