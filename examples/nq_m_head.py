@@ -78,7 +78,7 @@ TF_PRESETS = {
         "trail_steps": TRAIL_STEPS_5M,
         "stop_buffer": 36.0,  # 避開 #6 那種頭頂 +8 被軋空掃掉
         "skip_slow_sandwich": True,  # 收盤夾在 MA120/MA200 中間不空（#4 假跌破）
-        "max_above_ma200": 150.0,  # #5/#6：慢均還在下面太遠不空
+        "max_above_ma200": 150.0,  # #5：MA200 還在下面太遠，且 1h 已破
         "untested_htf_gap": 200.0,  # #8：破 MA200 但 1h 還沒測到、MA60 仍往上
         "ma60_slope_bars": 6,  # 5m 30 分鐘看 MA60 有沒有轉
     },
@@ -223,11 +223,19 @@ def slow_ma_sandwich(close: float, ma120: float, ma200: float) -> bool:
     return bool(lo < close < hi)
 
 
-def far_above_ma200(close: float, ma200: float, max_gap: float) -> bool:
-    """收盤還在 MA200 上方太遠：慢均沒測到，高檔不夠。"""
-    if max_gap <= 0 or np.isnan(close) or np.isnan(ma200):
+def far_above_ma200(
+    close: float,
+    ma200: float,
+    max_gap: float,
+    htf_ma: float = float("nan"),
+    min_break_pts: float = 8.0,
+) -> bool:
+    """MA200 還在下面太遠，且 1h 已經跌破：假跌破（#5）。1h 沒破（#6）放過。"""
+    if max_gap <= 0 or np.isnan(close) or np.isnan(ma200) or np.isnan(htf_ma):
         return False
-    return bool(close >= ma200 + max_gap)
+    if close < ma200 + max_gap:
+        return False
+    return bool(close <= htf_ma - min_break_pts)
 
 
 def untested_htf_support(
@@ -468,7 +476,8 @@ def generate_signals(
                     continue
                 if saw_sandwich and close[k] > lo_slow - min_break_pts:
                     continue
-            if far_above_ma200(float(close[k]), float(ma200[k]), max_above_ma200):
+            htv = float(htf_col[k]) if htf_col is not None else float("nan")
+            if far_above_ma200(float(close[k]), float(ma200[k]), max_above_ma200, htv, min_break_pts):
                 saw_far_ma200 = True
                 break
             if untested_htf_gap > 0 and htf_col is not None and k >= ma60_slope_bars:
@@ -1042,7 +1051,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間不空。收盤還在 MA200 上方超過 150 點不空。已破 MA200 但 1h MA60 還在下面超過 200 點、且 MA60 仍往上，也不空。停損頭頂 +36。0.8R 鎖 0.5R、1.2R 鎖 0.9R、1.6R 鎖 1.2R。鎖利下一根生效。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間不空。收盤還在 MA200 上方超過 150 點且 1h 已破，不空。已破 MA200 但 1h MA60 還在下面超過 200 點、且 MA60 仍往上，也不空。停損頭頂 +36。0.8R 鎖 0.5R、1.2R 鎖 0.9R、1.6R 鎖 1.2R。鎖利下一根生效。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>

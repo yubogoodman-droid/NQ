@@ -317,11 +317,14 @@ def test_slow_ma_sandwich() -> None:
 
 
 def test_far_above_ma200() -> None:
-    assert far_above_ma200(29896.75, 29730.0, 150.0)
-    assert far_above_ma200(29449.0, 29278.0, 150.0)
-    assert not far_above_ma200(29900.5, 29824.0, 150.0)  # 08-05 只高 76
-    assert not far_above_ma200(29469.0, 29388.0, 150.0)  # 08-21 只高 81
-    assert not far_above_ma200(29818.0, 29862.0, 150.0)  # 已破 MA200
+    # #5：MA200 遠、1h 已破 → 擋
+    assert far_above_ma200(29449.0, 29278.0, 150.0, 29550.0)
+    # #6：MA200 也遠，但 1h 沒破 → 加回來
+    assert not far_above_ma200(29896.75, 29730.0, 150.0, 29495.0)
+    assert not far_above_ma200(29896.75, 29730.0, 150.0)  # 沒有 1h 不擋
+    assert not far_above_ma200(29900.5, 29824.0, 150.0, 29069.0)  # 08-05 只高 76
+    assert not far_above_ma200(29469.0, 29388.0, 150.0, 29491.0)  # 08-21 只高 81
+    assert not far_above_ma200(29818.0, 29862.0, 150.0, 29599.0)  # 已破 MA200
 
 
 def test_untested_htf_support() -> None:
