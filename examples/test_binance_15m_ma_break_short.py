@@ -207,6 +207,18 @@ def test_rejects_glued_short_mas_without_volume() -> None:
     assert kept and kept[0].vol_ratio >= 3.2
 
 
+def test_rejects_weaving_before_break() -> None:
+    df = add_mas(_breakdown_series(after="down"))
+    i = 230
+    # 前 7 根已經穿進長均之下，只留前收在線上：CAP / BTW 那種追空
+    for j in range(i - 8, i - 1):
+        lo = min(float(df.iloc[j]["ma99"]), float(df.iloc[j]["ma120"]), float(df.iloc[j]["ma200"]))
+        df.iloc[j, df.columns.get_loc("close")] = lo * 0.995
+    funnel: dict[str, int] = {}
+    assert detect_signals(df, "WEAVEUSDT", funnel=funnel) == []
+    assert funnel.get("skip_weave", 0) >= 1
+
+
 def test_summarize() -> None:
     class T:
         def __init__(self, pnl: float) -> None:
@@ -228,6 +240,7 @@ def main() -> int:
     test_draw_trade_png_has_hourly()
     test_1h_first_break_keeps_and_rejects()
     test_rejects_glued_short_mas_without_volume()
+    test_rejects_weaving_before_break()
     test_summarize()
     print("ok")
     return 0
