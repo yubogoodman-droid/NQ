@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""幣安 1 小時 K：MA25 下破底，再重新站上 MA25。
+"""幣安 1 小時 K：MA25 下破底，等 MA7>MA14>MA25 多頭排列再進。
 
 對齊手機圖那種走法：價先跌破 MA25、在下面做出低點（V / W），
-收盤再站回 MA25。進場用站回那根收盤；停損等收盤跌破破底那根 K。
+破底後等 1h 短均多頭排列。進場用排列那根收盤；停損等收盤跌破破底那根 K。
 
 用法:
   python3 examples/binance_1h_ma25_reclaim.py --symbols AVGOUSDT,ONDSUSDT --days 45
@@ -74,6 +74,7 @@ class Signal:
     quality: str = "C"
     quality_score: int = 0
     ma7: float = 0.0
+    ma14: float = 0.0
     ma99: float = 0.0
     ma200: float = 0.0
 
@@ -330,6 +331,29 @@ def drawn_w_ok(
     return True
 
 
+def bull_stack(close: np.ndarray, ma7: np.ndarray, ma14: np.ndarray, ma25: np.ndarray, i: int) -> bool:
+    """1h MA7 > MA14 > MA25，收盤在三條之上。"""
+    if i < 0 or i >= len(close):
+        return False
+    if np.isnan(ma7[i]) or np.isnan(ma14[i]) or np.isnan(ma25[i]):
+        return False
+    return float(close[i]) > float(ma7[i]) > float(ma14[i]) > float(ma25[i])
+
+
+def first_bull_stack(
+    close: np.ndarray,
+    ma7: np.ndarray,
+    ma14: np.ndarray,
+    ma25: np.ndarray,
+    start_i: int,
+    end_i: int,
+) -> Optional[int]:
+    for k in range(start_i, min(end_i, len(close) - 1) + 1):
+        if bull_stack(close, ma7, ma14, ma25, k):
+            return k
+    return None
+
+
 def quality_of(depth_pct: float, vol_ratio: float, shape: str, stacked: bool) -> Tuple[int, str]:
     score = 0
     if depth_pct >= 0.025:
@@ -390,9 +414,10 @@ def detect_signals(
     vol_lookback: int = 20,
     break_lookback: int = 16,
     require_drawn_w: bool = False,
+    max_stack_wait: int = 36,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """1h close 跌破 MA25 → 在下面做出低點 → 收盤重新站上 MA25。"""
+    """1h 跌破 MA25 破底後，等 MA7>MA14>MA25 多頭排列再進。"""
     if df is None or len(df) < ma_period + min_bars_below + 5:
         return []
 
@@ -403,6 +428,7 @@ def detect_signals(
     ma25 = sma(close, ma_period)
     atr14 = atr(high, low, close, 14)
     ma7 = sma(close, 7)
+    ma14 = sma(close, 14)
     ma99 = sma(close, 99)
     ma200 = sma(close, 200)
     n = len(close)
@@ -475,12 +501,19 @@ def detect_signals(
             continue
 
         bump("reclaim")
-        if reclaim - last_entry < min_entry_gap:
+        stack_from = bottom_idx + 1
+        stack_to = min(n - 1, bottom_idx + max_stack_wait)
+        entry_idx = first_bull_stack(close, ma7, ma14, ma25, stack_from, stack_to)
+        if entry_idx is None:
+            bump("no_stack")
+            i = reclaim
+            continue
+        if entry_idx - last_entry < min_entry_gap:
             bump("gap")
             i = reclaim
             continue
 
-        entry = float(close[reclaim])
+        entry = float(close[entry_idx])
         stop = bottom  # 破底那根 K 的低點；回測要收盤跌破才出
         risk = entry - stop
         if risk <= 0:
@@ -488,21 +521,21 @@ def detect_signals(
             i = reclaim
             continue
 
-        vol_avg = float(np.mean(volume[max(0, reclaim - vol_lookback) : reclaim]) or 1.0)
-        vol_ratio = float(volume[reclaim] / vol_avg) if vol_avg > 0 else 1.0
+        vol_avg = float(np.mean(volume[max(0, entry_idx - vol_lookback) : entry_idx]) or 1.0)
+        vol_ratio = float(volume[entry_idx] / vol_avg) if vol_avg > 0 else 1.0
         shape = classify_shape(low, high, start, end)
-        stacked = (not np.isnan(ma7[reclaim])) and entry > float(ma7[reclaim]) > float(ma25[reclaim])
+        stacked = True
         q_score, q_grade = quality_of(depth_pct, vol_ratio, shape, stacked)
 
         signals.append(
             Signal(
                 break_idx=bottom_idx,
-                entry_idx=reclaim,
+                entry_idx=entry_idx,
                 entry_price=entry,
                 stop_price=float(stop),
                 target_price=float(entry + risk * target_r),
                 bottom=bottom,
-                ma25=float(ma25[reclaim]),
+                ma25=float(ma25[entry_idx]),
                 depth_pct=float(depth_pct),
                 bars_below=int(bars_below),
                 shape=shape,
@@ -512,14 +545,15 @@ def detect_signals(
                 flush_atr=float(flush_atr),
                 quality=q_grade,
                 quality_score=q_score,
-                ma7=float(ma7[reclaim]) if not np.isnan(ma7[reclaim]) else 0.0,
-                ma99=float(ma99[reclaim]) if not np.isnan(ma99[reclaim]) else 0.0,
-                ma200=float(ma200[reclaim]) if not np.isnan(ma200[reclaim]) else 0.0,
+                ma7=float(ma7[entry_idx]) if not np.isnan(ma7[entry_idx]) else 0.0,
+                ma14=float(ma14[entry_idx]) if not np.isnan(ma14[entry_idx]) else 0.0,
+                ma99=float(ma99[entry_idx]) if not np.isnan(ma99[entry_idx]) else 0.0,
+                ma200=float(ma200[entry_idx]) if not np.isnan(ma200[entry_idx]) else 0.0,
             )
         )
-        last_entry = reclaim
+        last_entry = entry_idx
         bump("taken")
-        i = reclaim + 1
+        i = entry_idx + 1
 
     return signals
 
@@ -748,7 +782,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([ex], [trade.entry_price], s=46, color="#00e676", marker="^", zorder=6)
         ax.annotate(
-            "站上",
+            "排列",
             (ex, trade.entry_price),
             textcoords="offset points",
             xytext=(0, 10),
@@ -796,7 +830,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         _plot_mas(ax4, close4, s4, e4, xs4)
         for ts, col, mark in (
             (df.index[sig.break_idx], "#f472b6", "破底"),
-            (et, "#00e676", "站上"),
+            (et, "#00e676", "排列"),
             (xt, "#f0c14b", None),
         ):
             px = _loc_on_tf(w4.index, ts)
@@ -934,7 +968,7 @@ def write_html_report(
             f"破底 {t.signal.bottom:.6g}  深度 {t.signal.depth_pct * 100:.2f}%  在下 {t.signal.bars_below}h\n"
             f"急殺 {t.signal.impulse_pct * 100:.1f}% / {t.signal.flush_atr:.1f}ATR  破前低 {t.signal.undercut_pct * 100:.1f}%\n"
             f"量比 {t.signal.vol_ratio:.2f}x  MA25 {t.signal.ma25:.6g}\n"
-            f"均線 MA7 {t.signal.ma7:.6g}  MA99 {t.signal.ma99:.6g}  MA200 {t.signal.ma200:.6g}"
+            f"進場 1h MA7>MA14>MA25  MA7 {t.signal.ma7:.6g}  MA14 {t.signal.ma14:.6g}  MA25 {t.signal.ma25:.6g}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i} {escape(hit.symbol)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -989,7 +1023,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上（{'嚴格 · 筆畫 W' if strict else '寬鬆'}）</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 均線對齊你那兩張手機圖：黃7 / 青14 / 粉25 / 紫99 / 綠120 / 酒紅200<br/>
-{'嚴格版 · 在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底、再站上。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。'}停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
+{'嚴格版 · 在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%。'}破底後等 1h MA7&gt;MA14&gt;MA25 多頭排列才進場。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1442,7 +1476,7 @@ def cmd_run(args) -> int:
             f"taken={funnel.get('taken', 0)} short={funnel.get('too_short', 0)} "
             f"long={funnel.get('too_long', 0)} shallow={funnel.get('shallow', 0)} "
             f"weak={funnel.get('weak_flush', 0)} notw={funnel.get('not_w', 0)} "
-            f"noreclaim={funnel.get('no_reclaim', 0)}"
+            f"nostack={funnel.get('no_stack', 0)} noreclaim={funnel.get('no_reclaim', 0)}"
         )
     now = datetime.now(TPE)
     for i, hit in enumerate(hits, 1):

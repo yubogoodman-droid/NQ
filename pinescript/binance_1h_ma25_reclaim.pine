@@ -49,8 +49,12 @@ undercut  = priorLow > 0 ? (priorLow - flushLow) / priorLow : 0
 flushOk   = not useFlush or (impulse >= minImpulse and flushAtr >= minAtrMult and undercut >= minUndercut)
 
 reclaim = crossedUp and barsOk and depthOk and flushOk
+aligned = close > ma7 and ma7 > ma14 and ma14 > ma25
+firstAlign = aligned and not aligned[1]
+sinceReclaim = ta.barssince(reclaim)
+stackIn = firstAlign and not na(sinceReclaim) and sinceReclaim >= 0 and sinceReclaim <= 36
 
-plotshape(reclaim, title="站上 MA25", style=shape.triangleup, location=location.belowbar, color=color.new(#00e676, 0), size=size.small)
+plotshape(stackIn, title="7/14/25 多頭排列", style=shape.triangleup, location=location.belowbar, color=color.new(#00e676, 0), size=size.small)
 bgcolor(below and barsBelow >= minBelow ? color.new(#d28cff, 92) : na)
 
-alertcondition(reclaim, title="1h MA25 重新站上", message="1h 已從 MA25 下方破底後重新站上")
+alertcondition(stackIn, title="1h 破底後 7/14/25 多頭", message="1h 破底後 MA7>MA14>MA25 多頭排列")

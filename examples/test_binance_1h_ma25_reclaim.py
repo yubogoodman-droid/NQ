@@ -17,6 +17,7 @@ from binance_1h_ma25_reclaim import (  # noqa: E402
     Hit,
     TradeResult,
     atr,
+    bull_stack,
     classify_shape,
     detect_signals,
     drawn_w_ok,
@@ -147,7 +148,10 @@ def test_detect_reclaim() -> None:
     assert sig.depth_pct >= 0.018
     assert sig.quality in {"A", "B", "C"}
     assert df["Close"].iloc[sig.entry_idx] > sig.ma25
+    assert sig.ma7 > sig.ma14 > sig.ma25 > 0
+    assert df["Close"].iloc[sig.entry_idx] > sig.ma7
     assert abs(sig.stop_price - sig.bottom) < 1e-12
+    assert sig.entry_idx > sig.break_idx
 
 
 def test_flush_metrics_avgo_like() -> None:
@@ -199,6 +203,15 @@ def test_drawn_w_ok_avgo_like() -> None:
     high_v = np.full(24, 9.98)
     low_v[18] = 9.50
     assert not drawn_w_ok(low_v, high_v, ma, 2, 21, 18)
+
+
+def test_bull_stack() -> None:
+    c = np.array([10.5, 10.2])
+    m7 = np.array([10.3, 10.1])
+    m14 = np.array([10.1, 10.0])
+    m25 = np.array([10.0, 10.2])
+    assert bull_stack(c, m7, m14, m25, 0)
+    assert not bull_stack(c, m7, m14, m25, 1)
 
 
 def test_strict_requires_drawn_w() -> None:
@@ -379,6 +392,7 @@ def main() -> int:
     test_shallow_rejected()
     test_slow_grind_rejected()
     test_drawn_w_ok_avgo_like()
+    test_bull_stack()
     test_strict_requires_drawn_w()
     test_still_below_no_signal()
     test_wick_below_bottom_bar_does_not_stop()
