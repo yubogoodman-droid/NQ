@@ -40,6 +40,7 @@ EVAL_DAYS = 7
 MAX_HOLD = 32  # 8 小時
 RR = 2.0
 STOP_BUFFER = 0.001  # 停損在破位 K 高點上方 0.1%
+MIN_BREAK_PCT = 0.8  # 收盤至少低於長均上沿 0.8%，濾掉輕觸
 MIN_QV = 5_000_000
 KEEP = ("MUBARAKUSDT",)
 MAX_CHARTS = 80
@@ -220,8 +221,9 @@ def detect_signals(
     *,
     eval_start: pd.Timestamp | None = None,
     funnel: dict[str, int] | None = None,
+    min_break_pct: float = MIN_BREAK_PCT,
 ) -> list[Signal]:
-    """一根 15m 同時打穿 MA99/120/200，且 MA7<MA14<MA25。"""
+    """一根 15m 從長均黏帶之上同時打穿 MA99/120/200，且 MA7<MA14<MA25。"""
     if len(df) < WARMUP + 2:
         return []
     work = add_mas(df) if "ma200" not in df.columns else df
@@ -250,19 +252,21 @@ def detect_signals(
 
         cluster_hi = max(m99[i], m120[i], m200[i])
         cluster_lo = min(m99[i], m120[i], m200[i])
-        prev_lo = min(m99[i - 1], m120[i - 1], m200[i - 1])
+        prev_hi = max(m99[i - 1], m120[i - 1], m200[i - 1])
         now_below = c[i] < m99[i] and c[i] < m120[i] and c[i] < m200[i]
-        prev_not_below = c[i - 1] >= prev_lo
-        # 這根有碰到長均帶（含跳空：前收還在帶上）
-        pierced = h[i] >= cluster_lo or c[i - 1] >= prev_lo
-        if not (now_below and prev_not_below and pierced):
+        # 同時跌破：前收還在三條長均之上，本根一次收到三條之下
+        prev_above_all = c[i - 1] > prev_hi
+        if not (now_below and prev_above_all):
+            continue
+        break_pct = (cluster_hi - c[i]) / cluster_hi * 100.0
+        if break_pct < min_break_pct:
+            bump("skip_shallow")
             continue
         bump("break")
 
         if not (m7[i] < m14[i] < m25[i]):
             bump("skip_stack")
             continue
-        bump("taken")
 
         entry = float(c[i])
         stop = float(h[i]) * (1.0 + STOP_BUFFER)
@@ -270,6 +274,7 @@ def detect_signals(
         if risk <= 0 or risk / entry > 0.18:
             bump("skip_risk")
             continue
+        bump("taken")
         target = entry - RR * risk
         vr = float(vol[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
         signals.append(
@@ -588,9 +593,10 @@ def write_html_report(
     funnel_line = ""
     if funnel:
         funnel_line = (
-            f"<p class='muted'>漏斗：同時跌破 99/120/200　{funnel.get('break', 0)} → "
+            f"<p class='muted'>漏斗：從三條之上一次打穿　{funnel.get('break', 0)} → "
             f"7&lt;14&lt;25 進場 {funnel.get('taken', 0)}"
-            f"（短均未排列 {funnel.get('skip_stack', 0)} · 風險過大 {funnel.get('skip_risk', 0)}）</p>"
+            f"（淺破 {funnel.get('skip_shallow', 0)} · 短均未排列 {funnel.get('skip_stack', 0)} · "
+            f"風險過大 {funnel.get('skip_risk', 0)}）</p>"
         )
     extra = ""
     if mubarak_trades is not None:
@@ -735,6 +741,7 @@ def print_summary(label: str, trades: list[TradeResult], funnel: dict[str, int] 
     if funnel:
         print(
             f"  funnel break={funnel.get('break', 0)} taken={funnel.get('taken', 0)} "
+            f"skip_shallow={funnel.get('skip_shallow', 0)} "
             f"skip_stack={funnel.get('skip_stack', 0)} skip_risk={funnel.get('skip_risk', 0)}"
         )
     for i, t in enumerate(trades, 1):
@@ -788,7 +795,7 @@ def main(argv: list[str] | None = None) -> int:
         title = "15m 同時跌破 99/120/200 做空"
         subtitle = (
             f"{args.days} 日 · {start.strftime('%Y-%m-%d %H:%M')} → {now.strftime('%Y-%m-%d %H:%M')} 台北 · "
-            f"{result.symbols} 檔 15m · 進場＝一根 K 打穿 MA99/120/200 且 7<14<25"
+            f"{result.symbols} 檔 15m · 進場＝前收在 MA99/120/200 之上、本根一次收在三條之下，且 7<14<25"
         )
         show_mubarak = not args.symbol or "MUBARAK" in args.symbol.upper()
         write_html_report(

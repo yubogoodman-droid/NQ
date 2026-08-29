@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>15m 同時跌破 99/120/200 做空</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}
+.page{max-width:560px;margin:0 auto;padding:14px 12px 32px}
+h1{font-size:18px;margin:0 0 6px}
+.muted{color:#8b949e;font-size:13px;line-height:1.55}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.equity{margin:10px 0 4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}
+.trade-no{font-size:15px;font-weight:700}
+.trade-time{font-size:12px;color:#8b949e}
+.card-pnl{font-size:16px;font-weight:700;white-space:nowrap}
+.pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}
+.tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
+.tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
+.tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.tag-info{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}
+.trade-detail{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}
+.mini-chart{margin:0 -6px -4px;border-radius:10px;overflow:hidden}
+.empty{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>15m 同時跌破 99/120/200 做空</h1>
+<p class="muted">7 日 · 2026-08-22 12:03 → 2026-08-29 12:03 台北 · 256 檔 15m · 進場＝前收在 MA99/120/200 之上、本根一次收在三條之下，且 7&lt;14&lt;25</p>
+<div class="cards">
+<div class="card">筆數<b>69</b></div>
+<div class="card">勝率<b>44.9%</b></div>
+<div class="card">總報酬<b class="pnl-win">+41.43%</b></div>
+<div class="card">勝/負<b>31/38</b></div>
+</div>
+<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 32 根（8h）平倉。報酬是單筆價格百分比，未計資金費。</p>
+<p class='muted'>漏斗：從三條之上一次打穿　256 → 7&lt;14&lt;25 進場 71（淺破 386 · 短均未排列 185 · 風險過大 2）</p>
+<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="162.1" x2="720" y2="162.1" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,162.1 10.4,160.7 20.9,164.0 31.3,134.7 41.7,137.1 52.2,137.8 62.6,126.7 73.0,127.1 83.5,133.3 93.9,121.7 104.3,128.2 114.8,117.7 125.2,136.0 135.7,136.2 146.1,126.0 156.5,130.4 167.0,123.4 177.4,114.2 187.8,99.6 198.3,87.1 208.7,76.4 219.1,85.5 229.6,88.9 240.0,92.2 250.4,99.1 260.9,98.4 271.3,103.1 281.7,89.2 292.2,91.5 302.6,82.7 313.0,72.9 323.5,76.1 333.9,79.6 344.3,83.5 354.8,46.3 365.2,52.1 375.7,42.5 386.1,37.5 396.5,21.6 407.0,16.0 417.4,17.6 427.8,39.3 438.3,30.8 448.7,35.5 459.1,38.2 469.6,45.6 480.0,63.4 490.4,68.5 500.9,69.3 511.3,62.7 521.7,67.7 532.2,70.9 542.6,70.2 553.0,64.1 563.5,58.3 573.9,46.7 584.3,54.6 594.8,56.5 605.2,61.6 615.7,71.7 626.1,71.8 636.5,64.7 647.0,68.7 657.4,73.4 667.8,36.8 678.3,31.5 688.7,25.9 699.1,30.0 709.6,36.6 720.0,35.3"/></svg></div>
+</section>
+<section class='summary'><h1>MUBARAKUSDT（截圖標的）</h1><p class='muted'>同一套規則，只看圖上那檔。</p><div class='cards'><div class='card'>筆數<b>1</b></div><div class='card'>勝率<b>100.0%</b></div><div class='card'>總報酬<b class='pnl-win'>+12.14%</b></div><div class='card'>勝/負<b>1/0</b></div></div><div class='equity'><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="164.0" x2="720" y2="164.0" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,164.0 720.0,16.0"/></svg></div></section><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · MUBARAKUSDT</span><span class='trade-time'>2026-08-25 16:00 → 08-26 00:00 台北</span></div><div class='card-pnl pnl-win'>+12.14%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 8.2x</span></div><pre class='trade-detail'>entry 0.02257
+stop  0.024024  (風險 6.44%)
+target 0.019662  (2.0R)
+exit  0.01983  time_stop
+打穿長均 4.95%  cluster 0.023716–0.023747
+MA7 0.024006 < MA14 0.024065 < MA25 0.024098
+MA99 0.023727 / MA120 0.023716 / MA200 0.023747</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/m01_MUBARAKUSDT_0825_1600.png' alt='#1 MUBARAKUSDT' style='width:100%;display:block;border-radius:10px'/></div></article>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · BANKUSDT</span><span class='trade-time'>2026-08-22 13:00 → 08-22 21:00 台北</span></div><div class='card-pnl pnl-win'>+0.44%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 6.6x</span></div><pre class='trade-detail'>entry 0.03664
+stop  0.039119  (風險 6.77%)
+target 0.031682  (2.0R)
+exit  0.03648  time_stop
+打穿長均 2.01%  cluster 0.036688–0.037392
+MA7 0.038389 < MA14 0.038542 < MA25 0.038553
+MA99 0.037392 / MA120 0.037117 / MA200 0.036688</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t01_BANKUSDT_0822_1300.png' alt='#1 BANKUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · DELLUSDT</span><span class='trade-time'>2026-08-22 13:00 → 08-22 19:30 台北</span></div><div class='card-pnl pnl-loss'>-1.07%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 5.1x</span></div><pre class='trade-detail'>entry 435.19
+stop  440.86  (風險 1.30%)
+target 423.85  (2.0R)
+exit  439.83  reclaim_ma99
+打穿長均 1.03%  cluster 438.76–439.72
+MA7 440.17 < MA14 441.94 < MA25 441.98
+MA99 439.72 / MA120 439.17 / MA200 438.76</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t02_DELLUSDT_0822_1300.png' alt='#2 DELLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · SKYAIUSDT</span><span class='trade-time'>2026-08-22 13:00 → 08-22 21:00 台北</span></div><div class='card-pnl pnl-win'>+9.58%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 5.6x</span></div><pre class='trade-detail'>entry 0.07658
+stop  0.081371  (風險 6.26%)
+target 0.066997  (2.0R)
+exit  0.06924  time_stop
+打穿長均 1.52%  cluster 0.076594–0.07776
+MA7 0.07976 < MA14 0.081744 < MA25 0.082304
+MA99 0.07776 / MA120 0.077322 / MA200 0.076594</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t03_SKYAIUSDT_0822_1300.png' alt='#3 SKYAIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · SPCXUSDT</span><span class='trade-time'>2026-08-22 13:00 → 08-22 21:00 台北</span></div><div class='card-pnl pnl-loss'>-0.80%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 10.8x</span></div><pre class='trade-detail'>entry 134.48
+stop  136.21  (風險 1.28%)
+target 131.03  (2.0R)
+exit  135.55  time_stop
+打穿長均 0.87%  cluster 135.40–135.66
+MA7 135.81 < MA14 135.92 < MA25 136.13
+MA99 135.66 / MA120 135.40 / MA200 135.56</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t04_SPCXUSDT_0822_1300.png' alt='#4 SPCXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · TQQQUSDT</span><span class='trade-time'>2026-08-22 13:00 → 08-22 21:00 台北</span></div><div class='card-pnl pnl-loss'>-0.23%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 6.8x</span></div><pre class='trade-detail'>entry 70.6100
+stop  71.4814  (風險 1.23%)
+target 68.8672  (2.0R)
+exit  70.7700  time_stop
+打穿長均 1.04%  cluster 71.2767–71.3533
+MA7 71.2986 < MA14 71.3957 < MA25 71.4076
+MA99 71.3533 / MA120 71.2767 / MA200 71.3516</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t05_TQQQUSDT_0822_1300.png' alt='#5 TQQQUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · TRIAUSDT</span><span class='trade-time'>2026-08-22 13:30 → 08-22 21:30 台北</span></div><div class='card-pnl pnl-win'>+3.61%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 1.3x</span></div><pre class='trade-detail'>entry 0.007452
+stop  0.007744  (風險 3.91%)
+target 0.006869  (2.0R)
+exit  0.007183  time_stop
+打穿長均 2.34%  cluster 0.007558–0.00763
+MA7 0.007684 < MA14 0.00775 < MA25 0.007788
+MA99 0.00763 / MA120 0.007563 / MA200 0.007558</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t06_TRIAUSDT_0822_1330.png' alt='#6 TRIAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · 我踏马来了USDT</span><span class='trade-time'>2026-08-22 17:45 → 08-23 01:45 台北</span></div><div class='card-pnl pnl-loss'>-0.10%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 0.7x</span></div><pre class='trade-detail'>entry 0.009771
+stop  0.009994  (風險 2.28%)
+target 0.009325  (2.0R)
+exit  0.009781  time_stop
+打穿長均 1.98%  cluster 0.009807–0.009968
+MA7 0.009929 < MA14 0.009999 < MA25 0.010112
+MA99 0.009964 / MA120 0.009968 / MA200 0.009807</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t07_我踏马来了USDT_0822_1745.png' alt='#7 我踏马来了USDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · XMRUSDT</span><span class='trade-time'>2026-08-22 18:00 → 08-22 18:30 台北</span></div><div class='card-pnl pnl-loss'>-2.03%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.1x</span></div><pre class='trade-detail'>entry 417.18
+stop  429.66  (風險 2.99%)
+target 392.22  (2.0R)
+exit  425.66  reclaim_ma99
+打穿長均 0.84%  cluster 418.87–420.71
+MA7 426.57 < MA14 433.02 < MA25 437.01
+MA99 420.71 / MA120 419.92 / MA200 418.87</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t08_XMRUSDT_0822_1800.png' alt='#8 XMRUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · 龙虾USDT</span><span class='trade-time'>2026-08-23 00:30 → 08-23 05:45 台北</span></div><div class='card-pnl pnl-win'>+3.78%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 4.7x</span></div><pre class='trade-detail'>entry 0.022375
+stop  0.022798  (風險 1.89%)
+target 0.021529  (2.0R)
+exit  0.021529  take_profit
+打穿長均 1.62%  cluster 0.022501–0.022743
+MA7 0.0226 < MA14 0.022672 < MA25 0.022772
+MA99 0.022501 / MA120 0.022609 / MA200 0.022743</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t09_龙虾USDT_0823_0030.png' alt='#9 龙虾USDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · ACEUSDT</span><span class='trade-time'>2026-08-23 04:45 → 08-23 05:15 台北</span></div><div class='card-pnl pnl-loss'>-2.13%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 0.9x</span></div><pre class='trade-detail'>entry 0.23813
+stop  0.243213  (風險 2.13%)
+target 0.227964  (2.0R)
+exit  0.243213  stop_loss
+打穿長均 1.02%  cluster 0.239053–0.240578
+MA7 0.242067 < MA14 0.243754 < MA25 0.243966
+MA99 0.240578 / MA120 0.239053 / MA200 0.240058</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t10_ACEUSDT_0823_0445.png' alt='#10 ACEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · NBISUSDT</span><span class='trade-time'>2026-08-24 08:00 → 08-24 11:00 台北</span></div><div class='card-pnl pnl-win'>+3.44%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 10.0x</span></div><pre class='trade-detail'>entry 219.73
+stop  223.51  (風險 1.72%)
+target 212.16  (2.0R)
+exit  212.16  take_profit
+打穿長均 1.28%  cluster 221.00–222.59
+MA7 222.98 < MA14 223.37 < MA25 223.56
+MA99 222.59 / MA120 222.08 / MA200 221.00</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t11_NBISUSDT_0824_0800.png' alt='#11 NBISUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · PROMUSDT</span><span class='trade-time'>2026-08-24 08:00 → 08-24 09:30 台北</span></div><div class='card-pnl pnl-loss'>-5.96%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 13.3x</span></div><pre class='trade-detail'>entry 2.7340
+stop  2.9570  (風險 8.15%)
+target 2.2881  (2.0R)
+exit  2.8970  reclaim_ma99
+打穿長均 1.87%  cluster 2.7477–2.7862
+MA7 2.8519 < MA14 2.8691 < MA25 2.8750
+MA99 2.7862 / MA120 2.7676 / MA200 2.7477</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t12_PROMUSDT_0824_0800.png' alt='#12 PROMUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · PYPLUSDT</span><span class='trade-time'>2026-08-24 08:00 → 08-24 16:00 台北</span></div><div class='card-pnl pnl-loss'>-0.07%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 16.2x</span></div><pre class='trade-detail'>entry 61.5200
+stop  62.4123  (風險 1.45%)
+target 59.7353  (2.0R)
+exit  61.5600  time_stop
+打穿長均 0.84%  cluster 61.9556–62.0387
+MA7 62.3029 < MA14 62.3921 < MA25 62.4100
+MA99 62.0387 / MA120 61.9742 / MA200 61.9556</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t13_PYPLUSDT_0824_0800.png' alt='#13 PYPLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · SAMSUNGUSDT</span><span class='trade-time'>2026-08-24 08:00 → 08-24 16:00 台北</span></div><div class='card-pnl pnl-win'>+3.33%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 9.3x</span></div><pre class='trade-detail'>entry 192.49
+stop  196.39  (風險 2.02%)
+target 184.70  (2.0R)
+exit  186.08  time_stop
+打穿長均 1.61%  cluster 194.69–195.63
+MA7 196.35 < MA14 196.94 < MA25 197.32
+MA99 195.63 / MA120 195.26 / MA200 194.69</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t14_SAMSUNGUSDT_0824_0800.png' alt='#14 SAMSUNGUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · DRAMUSDT</span><span class='trade-time'>2026-08-24 08:15 → 08-24 08:45 台北</span></div><div class='card-pnl pnl-loss'>-1.45%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.7x</span></div><pre class='trade-detail'>entry 57.3100
+stop  58.2682  (風險 1.67%)
+target 55.3936  (2.0R)
+exit  58.1400  reclaim_ma99
+打穿長均 1.36%  cluster 57.8385–58.1028
+MA7 58.3857 < MA14 58.4421 < MA25 58.5888
+MA99 58.1028 / MA120 57.9995 / MA200 57.8385</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t15_DRAMUSDT_0824_0815.png' alt='#15 DRAMUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · GLWUSDT</span><span class='trade-time'>2026-08-24 08:15 → 08-24 11:30 台北</span></div><div class='card-pnl pnl-win'>+2.29%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 5.6x</span></div><pre class='trade-detail'>entry 148.78
+stop  150.48  (風險 1.14%)
+target 145.38  (2.0R)
+exit  145.38  take_profit
+打穿長均 0.82%  cluster 149.92–150.01
+MA7 150.48 < MA14 150.52 < MA25 150.56
+MA99 149.98 / MA120 149.92 / MA200 150.01</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t16_GLWUSDT_0824_0815.png' alt='#16 GLWUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · LITEUSDT</span><span class='trade-time'>2026-08-24 08:15 → 08-24 14:00 台北</span></div><div class='card-pnl pnl-win'>+3.00%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 6.2x</span></div><pre class='trade-detail'>entry 854.10
+stop  866.93  (風險 1.50%)
+target 828.45  (2.0R)
+exit  828.45  take_profit
+打穿長均 0.93%  cluster 858.82–862.14
+MA7 865.31 < MA14 866.11 < MA25 867.42
+MA99 862.14 / MA120 860.91 / MA200 858.82</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t17_LITEUSDT_0824_0815.png' alt='#17 LITEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · MUUUSDT</span><span class='trade-time'>2026-08-24 08:15 → 08-24 16:00 台北</span></div><div class='card-pnl pnl-win'>+4.76%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 4.7x</span></div><pre class='trade-detail'>entry 30.7500
+stop  31.4814  (風險 2.38%)
+target 29.2871  (2.0R)
+exit  29.2871  take_profit
+打穿長均 2.10%  cluster 31.2930–31.4104
+MA7 31.4014 < MA14 31.4136 < MA25 31.5488
+MA99 31.4104 / MA120 31.3533 / MA200 31.2930</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t18_MUUUSDT_0824_0815.png' alt='#18 MUUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · SNXXUSDT</span><span class='trade-time'>2026-08-24 08:15 → 08-24 10:45 台北</span></div><div class='card-pnl pnl-win'>+4.10%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 4.1x</span></div><pre class='trade-detail'>entry 14.8700
+stop  15.1752  (風險 2.05%)
+target 14.2597  (2.0R)
+exit  14.2597  take_profit
+打穿長均 1.50%  cluster 15.0474–15.0968
+MA7 15.3271 < MA14 15.3386 < MA25 15.3648
+MA99 15.0968 / MA120 15.0749 / MA200 15.0474</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t19_SNXXUSDT_0824_0815.png' alt='#19 SNXXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · MINIMAXUSDT</span><span class='trade-time'>2026-08-24 09:30 → 08-24 17:30 台北</span></div><div class='card-pnl pnl-win'>+3.48%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 14.3x</span></div><pre class='trade-detail'>entry 41.4200
+stop  43.2632  (風險 4.45%)
+target 37.7336  (2.0R)
+exit  39.9800  time_stop
+打穿長均 2.96%  cluster 42.1956–42.6846
+MA7 42.9514 < MA14 42.9621 < MA25 42.9972
+MA99 42.6846 / MA120 42.5556 / MA200 42.1956</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t20_MINIMAXUSDT_0824_0930.png' alt='#20 MINIMAXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · TRUMPUSDT</span><span class='trade-time'>2026-08-24 09:30 → 08-24 10:30 台北</span></div><div class='card-pnl pnl-loss'>-2.96%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.7x</span></div><pre class='trade-detail'>entry 2.4880
+stop  2.5616  (風險 2.96%)
+target 2.3409  (2.0R)
+exit  2.5616  stop_loss
+打穿長均 2.68%  cluster 2.5274–2.5564
+MA7 2.5581 < MA14 2.6156 < MA25 2.6495
+MA99 2.5564 / MA120 2.5284 / MA200 2.5274</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t21_TRUMPUSDT_0824_0930.png' alt='#21 TRUMPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · HYPEUSDT</span><span class='trade-time'>2026-08-24 11:15 → 08-24 12:15 台北</span></div><div class='card-pnl pnl-loss'>-1.13%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 1.1x</span></div><pre class='trade-detail'>entry 79.3680
+stop  80.3743  (風險 1.27%)
+target 77.3554  (2.0R)
+exit  80.2630  reclaim_ma99
+打穿長均 0.84%  cluster 79.4319–80.0437
+MA7 80.4979 < MA14 80.7481 < MA25 81.4060
+MA99 80.0437 / MA120 79.9411 / MA200 79.4319</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t22_HYPEUSDT_0824_1115.png' alt='#22 HYPEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · CRWDUSDT</span><span class='trade-time'>2026-08-24 22:00 → 08-24 22:15 台北</span></div><div class='card-pnl pnl-loss'>-1.06%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.7x</span></div><pre class='trade-detail'>entry 189.20
+stop  192.06  (風險 1.51%)
+target 183.48  (2.0R)
+exit  191.21  reclaim_ma99
+打穿長均 1.03%  cluster 191.02–191.16
+MA7 190.84 < MA14 190.97 < MA25 191.00
+MA99 191.13 / MA120 191.16 / MA200 191.02</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t23_CRWDUSDT_0824_2200.png' alt='#23 CRWDUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#24 · BCHUSDT</span><span class='trade-time'>2026-08-25 01:15 → 08-25 08:00 台北</span></div><div class='card-pnl pnl-loss'>-2.27%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.8x</span></div><pre class='trade-detail'>entry 265.96
+stop  275.69  (風險 3.66%)
+target 246.51  (2.0R)
+exit  271.99  reclaim_ma99
+打穿長均 2.86%  cluster 272.91–273.80
+MA7 274.37 < MA14 275.76 < MA25 276.13
+MA99 272.91 / MA120 273.25 / MA200 273.80</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t24_BCHUSDT_0825_0115.png' alt='#24 BCHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#25 · CAPUSDT</span><span class='trade-time'>2026-08-25 09:00 → 08-25 17:00 台北</span></div><div class='card-pnl pnl-win'>+0.23%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 1.8x</span></div><pre class='trade-detail'>entry 0.06866
+stop  0.06965  (風險 1.44%)
+target 0.066681  (2.0R)
+exit  0.0685  time_stop
+打穿長均 0.87%  cluster 0.069062–0.069262
+MA7 0.068984 < MA14 0.069055 < MA25 0.069242
+MA99 0.069062 / MA120 0.069199 / MA200 0.069262</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t25_CAPUSDT_0825_0900.png' alt='#25 CAPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#26 · BABAUSDT</span><span class='trade-time'>2026-08-25 09:30 → 08-25 17:15 台北</span></div><div class='card-pnl pnl-loss'>-1.52%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 9.7x</span></div><pre class='trade-detail'>entry 115.98
+stop  117.95  (風險 1.70%)
+target 112.04  (2.0R)
+exit  117.74  reclaim_ma99
+打穿長均 0.81%  cluster 116.78–116.93
+MA7 117.88 < MA14 118.20 < MA25 118.44
+MA99 116.92 / MA120 116.78 / MA200 116.93</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t26_BABAUSDT_0825_0930.png' alt='#26 BABAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#27 · MELANIAUSDT</span><span class='trade-time'>2026-08-25 13:45 → 08-25 14:30 台北</span></div><div class='card-pnl pnl-win'>+4.54%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.0x</span></div><pre class='trade-detail'>entry 0.10644
+stop  0.108859  (風險 2.27%)
+target 0.101603  (2.0R)
+exit  0.101603  take_profit
+打穿長均 1.65%  cluster 0.107716–0.108228
+MA7 0.110279 < MA14 0.110944 < MA25 0.111682
+MA99 0.108228 / MA120 0.107716 / MA200 0.108081</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t27_MELANIAUSDT_0825_1345.png' alt='#27 MELANIAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#28 · 1000BONKUSDT</span><span class='trade-time'>2026-08-25 15:45 → 08-25 16:15 台北</span></div><div class='card-pnl pnl-loss'>-0.75%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 3.5x</span></div><pre class='trade-detail'>entry 0.003204
+stop  0.003268  (風險 2.01%)
+target 0.003075  (2.0R)
+exit  0.003228  reclaim_ma99
+打穿長均 0.83%  cluster 0.003218–0.003231
+MA7 0.003257 < MA14 0.003295 < MA25 0.003311
+MA99 0.003225 / MA120 0.003218 / MA200 0.003231</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t28_1000BONKUSDT_0825_1545.png' alt='#28 1000BONKUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#29 · 1000FLOKIUSDT</span><span class='trade-time'>2026-08-25 15:45 → 08-25 21:45 台北</span></div><div class='card-pnl pnl-win'>+2.87%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.9x</span></div><pre class='trade-detail'>entry 0.02699
+stop  0.027377  (風險 1.44%)
+target 0.026215  (2.0R)
+exit  0.026215  take_profit
+打穿長均 1.12%  cluster 0.02717–0.027297
+MA7 0.027447 < MA14 0.027654 < MA25 0.027663
+MA99 0.027297 / MA120 0.027226 / MA200 0.02717</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t29_1000FLOKIUSDT_0825_1545.png' alt='#29 1000FLOKIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#30 · ADAUSDT</span><span class='trade-time'>2026-08-25 15:45 → 08-25 21:45 台北</span></div><div class='card-pnl pnl-win'>+3.19%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 4.4x</span></div><pre class='trade-detail'>entry 0.2207
+stop  0.224224  (風險 1.60%)
+target 0.213652  (2.0R)
+exit  0.213652  take_profit
+打穿長均 0.87%  cluster 0.221973–0.222634
+MA7 0.224171 < MA14 0.225314 < MA25 0.225816
+MA99 0.222414 / MA120 0.221973 / MA200 0.222634</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t30_ADAUSDT_0825_1545.png' alt='#30 ADAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#31 · PNUTUSDT</span><span class='trade-time'>2026-08-25 15:45 → 08-25 16:15 台北</span></div><div class='card-pnl pnl-loss'>-1.05%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 3.9x</span></div><pre class='trade-detail'>entry 0.05163
+stop  0.052953  (風險 2.56%)
+target 0.048984  (2.0R)
+exit  0.05217  reclaim_ma99
+打穿長均 1.47%  cluster 0.052154–0.052403
+MA7 0.05291 < MA14 0.053333 < MA25 0.053478
+MA99 0.052154 / MA120 0.052157 / MA200 0.052403</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t31_PNUTUSDT_0825_1545.png' alt='#31 PNUTUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#32 · TIAUSDT</span><span class='trade-time'>2026-08-25 15:45 → 08-25 16:15 台北</span></div><div class='card-pnl pnl-loss'>-1.13%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 3.0x</span></div><pre class='trade-detail'>entry 0.3715
+stop  0.377978  (風險 1.74%)
+target 0.358545  (2.0R)
+exit  0.3757  reclaim_ma99
+打穿長均 1.07%  cluster 0.373982–0.375503
+MA7 0.376843 < MA14 0.379136 < MA25 0.3794
+MA99 0.374121 / MA120 0.373982 / MA200 0.375503</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t32_TIAUSDT_0825_1545.png' alt='#32 TIAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#33 · UNIUSDT</span><span class='trade-time'>2026-08-25 15:45 → 08-25 16:15 台北</span></div><div class='card-pnl pnl-loss'>-1.28%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 4.1x</span></div><pre class='trade-detail'>entry 4.3130
+stop  4.3964  (風險 1.93%)
+target 4.1462  (2.0R)
+exit  4.3680  reclaim_ma99
+打穿長均 1.77%  cluster 4.3466–4.3907
+MA7 4.3767 < MA14 4.3936 < MA25 4.3954
+MA99 4.3466 / MA120 4.3671 / MA200 4.3907</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t33_UNIUSDT_0825_1545.png' alt='#33 UNIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#34 · MUBARAKUSDT</span><span class='trade-time'>2026-08-25 16:00 → 08-26 00:00 台北</span></div><div class='card-pnl pnl-win'>+12.14%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 8.2x</span></div><pre class='trade-detail'>entry 0.02257
+stop  0.024024  (風險 6.44%)
+target 0.019662  (2.0R)
+exit  0.01983  time_stop
+打穿長均 4.95%  cluster 0.023716–0.023747
+MA7 0.024006 < MA14 0.024065 < MA25 0.024098
+MA99 0.023727 / MA120 0.023716 / MA200 0.023747</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t34_MUBARAKUSDT_0825_1600.png' alt='#34 MUBARAKUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#35 · FARTCOINUSDT</span><span class='trade-time'>2026-08-25 17:45 → 08-25 22:15 台北</span></div><div class='card-pnl pnl-loss'>-1.91%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.1x</span></div><pre class='trade-detail'>entry 0.1784
+stop  0.182983  (風險 2.57%)
+target 0.169234  (2.0R)
+exit  0.1818  reclaim_ma99
+打穿長均 1.40%  cluster 0.180182–0.180931
+MA7 0.1817 < MA14 0.182957 < MA25 0.184636
+MA99 0.180931 / MA120 0.180182 / MA200 0.180236</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t35_FARTCOINUSDT_0825_1745.png' alt='#35 FARTCOINUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#36 · ONDOUSDT</span><span class='trade-time'>2026-08-25 17:45 → 08-25 21:45 台北</span></div><div class='card-pnl pnl-win'>+3.15%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.4x</span></div><pre class='trade-detail'>entry 0.3794
+stop  0.385385  (風險 1.58%)
+target 0.36743  (2.0R)
+exit  0.36743  take_profit
+打穿長均 1.22%  cluster 0.37989–0.384096
+MA7 0.383657 < MA14 0.385543 < MA25 0.388944
+MA99 0.384096 / MA120 0.382142 / MA200 0.37989</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t36_ONDOUSDT_0825_1745.png' alt='#36 ONDOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#37 · WLDUSDT</span><span class='trade-time'>2026-08-25 17:45 → 08-26 01:45 台北</span></div><div class='card-pnl pnl-win'>+1.62%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.9x</span></div><pre class='trade-detail'>entry 0.4004
+stop  0.409509  (風險 2.27%)
+target 0.382182  (2.0R)
+exit  0.3939  time_stop
+打穿長均 1.33%  cluster 0.40198–0.405781
+MA7 0.407071 < MA14 0.409714 < MA25 0.411844
+MA99 0.405781 / MA120 0.404321 / MA200 0.40198</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t37_WLDUSDT_0825_1745.png' alt='#37 WLDUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#38 · ZECUSDT</span><span class='trade-time'>2026-08-25 21:00 → 08-26 03:30 台北</span></div><div class='card-pnl pnl-win'>+5.19%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.2x</span></div><pre class='trade-detail'>entry 824.18
+stop  845.57  (風險 2.60%)
+target 781.39  (2.0R)
+exit  781.39  take_profit
+打穿長均 1.97%  cluster 837.95–840.74
+MA7 834.97 < MA14 837.44 < MA25 843.55
+MA99 838.23 / MA120 837.95 / MA200 840.74</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t38_ZECUSDT_0825_2100.png' alt='#38 ZECUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#39 · GPSUSDT</span><span class='trade-time'>2026-08-25 22:15 → 08-26 06:15 台北</span></div><div class='card-pnl pnl-win'>+1.84%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 13.3x</span></div><pre class='trade-detail'>entry 0.01132
+stop  0.012357  (風險 9.16%)
+target 0.009245  (2.0R)
+exit  0.011112  time_stop
+打穿長均 5.73%  cluster 0.011912–0.012008
+MA7 0.012107 < MA14 0.01214 < MA25 0.012151
+MA99 0.011955 / MA120 0.012008 / MA200 0.011912</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t39_GPSUSDT_0825_2215.png' alt='#39 GPSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#40 · SKRUSDT</span><span class='trade-time'>2026-08-25 23:00 → 08-25 23:45 台北</span></div><div class='card-pnl pnl-loss'>-0.53%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 0.2x</span></div><pre class='trade-detail'>entry 0.007856
+stop  0.007936  (風險 1.02%)
+target 0.007696  (2.0R)
+exit  0.007898  reclaim_ma99
+打穿長均 0.81%  cluster 0.007877–0.00792
+MA7 0.007892 < MA14 0.007902 < MA25 0.007965
+MA99 0.007877 / MA120 0.007892 / MA200 0.00792</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t40_SKRUSDT_0825_2300.png' alt='#40 SKRUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#41 · BTWUSDT</span><span class='trade-time'>2026-08-26 01:00 → 08-26 04:00 台北</span></div><div class='card-pnl pnl-loss'>-7.08%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 5.1x</span></div><pre class='trade-detail'>entry 0.41699
+stop  0.465155  (風險 11.55%)
+target 0.320661  (2.0R)
+exit  0.4465  reclaim_ma99
+打穿長均 7.60%  cluster 0.437567–0.451282
+MA7 0.445066 < MA14 0.445541 < MA25 0.446977
+MA99 0.451282 / MA120 0.445688 / MA200 0.437567</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t41_BTWUSDT_0826_0100.png' alt='#41 BTWUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#42 · BASUSDT</span><span class='trade-time'>2026-08-26 01:15 → 08-26 09:15 台北</span></div><div class='card-pnl pnl-win'>+2.77%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 19.3x</span></div><pre class='trade-detail'>entry 0.021233
+stop  0.02463  (風險 16.00%)
+target 0.01444  (2.0R)
+exit  0.020645  time_stop
+打穿長均 13.31%  cluster 0.024277–0.024492
+MA7 0.024215 < MA14 0.024496 < MA25 0.024572
+MA99 0.024492 / MA120 0.024457 / MA200 0.024277</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t42_BASUSDT_0826_0115.png' alt='#42 BASUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#43 · BLUAIUSDT</span><span class='trade-time'>2026-08-26 01:45 → 08-26 03:00 台北</span></div><div class='card-pnl pnl-loss'>-1.53%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 3.5x</span></div><pre class='trade-detail'>entry 0.012956
+stop  0.013154  (風險 1.53%)
+target 0.01256  (2.0R)
+exit  0.013154  stop_loss
+打穿長均 1.10%  cluster 0.013013–0.0131
+MA7 0.013111 < MA14 0.013123 < MA25 0.013167
+MA99 0.0131 / MA120 0.013084 / MA200 0.013013</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t43_BLUAIUSDT_0826_0145.png' alt='#43 BLUAIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#44 · EPICUSDT</span><span class='trade-time'>2026-08-26 04:30 → 08-26 05:15 台北</span></div><div class='card-pnl pnl-loss'>-0.89%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 1.8x</span></div><pre class='trade-detail'>entry 0.3359
+stop  0.34014  (風險 1.26%)
+target 0.32742  (2.0R)
+exit  0.3389  reclaim_ma99
+打穿長均 0.83%  cluster 0.337253–0.338695
+MA7 0.338986 < MA14 0.340393 < MA25 0.340592
+MA99 0.33761 / MA120 0.337253 / MA200 0.338695</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t44_EPICUSDT_0826_0430.png' alt='#44 EPICUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#45 · UNITREEUSDT</span><span class='trade-time'>2026-08-26 09:30 → 08-26 10:00 台北</span></div><div class='card-pnl pnl-loss'>-2.40%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 9.6x</span></div><pre class='trade-detail'>entry 87.4200
+stop  89.5194  (風險 2.40%)
+target 83.2211  (2.0R)
+exit  89.5194  stop_loss
+打穿長均 1.85%  cluster 88.3752–89.0648
+MA7 89.0671 < MA14 89.5357 < MA25 89.9208
+MA99 89.0648 / MA120 88.3752 / MA200 88.6056</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t45_UNITREEUSDT_0826_0930.png' alt='#45 UNITREEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#46 · LIGHTUSDT</span><span class='trade-time'>2026-08-26 13:30 → 08-26 14:00 台北</span></div><div class='card-pnl pnl-loss'>-5.83%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 10.7x</span></div><pre class='trade-detail'>entry 0.1503
+stop  0.159059  (風險 5.83%)
+target 0.132782  (2.0R)
+exit  0.159059  stop_loss
+打穿長均 1.46%  cluster 0.150421–0.152531
+MA7 0.1564 < MA14 0.156886 < MA25 0.158
+MA99 0.152531 / MA120 0.151573 / MA200 0.150421</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t46_LIGHTUSDT_0826_1330.png' alt='#46 LIGHTUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#47 · HEIUSDT</span><span class='trade-time'>2026-08-26 17:00 → 08-26 17:15 台北</span></div><div class='card-pnl pnl-loss'>-1.68%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 0.4x</span></div><pre class='trade-detail'>entry 0.13025
+stop  0.132432  (風險 1.68%)
+target 0.125885  (2.0R)
+exit  0.132432  stop_loss
+打穿長均 1.23%  cluster 0.130744–0.131874
+MA7 0.133651 < MA14 0.136761 < MA25 0.136779
+MA99 0.131874 / MA120 0.131138 / MA200 0.130744</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t47_HEIUSDT_0826_1700.png' alt='#47 HEIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#48 · LABUSDT</span><span class='trade-time'>2026-08-26 18:45 → 08-26 21:30 台北</span></div><div class='card-pnl pnl-loss'>-0.25%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 0.7x</span></div><pre class='trade-detail'>entry 0.0685
+stop  0.069239  (風險 1.08%)
+target 0.067022  (2.0R)
+exit  0.06867  reclaim_ma99
+打穿長均 0.82%  cluster 0.068727–0.069067
+MA7 0.068884 < MA14 0.068956 < MA25 0.069298
+MA99 0.068727 / MA120 0.068781 / MA200 0.069067</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t48_LABUSDT_0826_1845.png' alt='#48 LABUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#49 · COINUSDT</span><span class='trade-time'>2026-08-26 20:30 → 08-26 23:00 台北</span></div><div class='card-pnl pnl-win'>+2.16%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.6x</span></div><pre class='trade-detail'>entry 184.07
+stop  186.06  (風險 1.08%)
+target 180.10  (2.0R)
+exit  180.10  take_profit
+打穿長均 0.97%  cluster 184.58–185.88
+MA7 185.15 < MA14 185.17 < MA25 185.75
+MA99 185.88 / MA120 185.22 / MA200 184.58</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t49_COINUSDT_0826_2030.png' alt='#49 COINUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#50 · AAOIUSDT</span><span class='trade-time'>2026-08-26 22:00 → 08-27 01:00 台北</span></div><div class='card-pnl pnl-loss'>-1.62%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 1.9x</span></div><pre class='trade-detail'>entry 111.09
+stop  113.11  (風險 1.82%)
+target 107.04  (2.0R)
+exit  112.89  reclaim_ma99
+打穿長均 1.32%  cluster 111.39–112.58
+MA7 111.46 < MA14 111.96 < MA25 112.05
+MA99 112.47 / MA120 112.58 / MA200 111.39</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t50_AAOIUSDT_0826_2200.png' alt='#50 AAOIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#51 · SPCXUSDT</span><span class='trade-time'>2026-08-26 22:00 → 08-27 01:15 台北</span></div><div class='card-pnl pnl-loss'>-1.07%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.9x</span></div><pre class='trade-detail'>entry 136.68
+stop  139.07  (風險 1.75%)
+target 131.90  (2.0R)
+exit  138.14  reclaim_ma99
+打穿長均 0.93%  cluster 136.91–137.96
+MA7 137.19 < MA14 137.48 < MA25 137.72
+MA99 137.96 / MA120 137.83 / MA200 136.91</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t51_SPCXUSDT_0826_2200.png' alt='#51 SPCXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#52 · AMATUSDT</span><span class='trade-time'>2026-08-27 21:15 → 08-28 05:15 台北</span></div><div class='card-pnl pnl-win'>+0.25%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 6.3x</span></div><pre class='trade-detail'>entry 481.59
+stop  489.30  (風險 1.60%)
+target 466.17  (2.0R)
+exit  480.41  time_stop
+打穿長均 0.83%  cluster 483.26–485.64
+MA7 488.00 < MA14 489.53 < MA25 490.57
+MA99 485.64 / MA120 484.56 / MA200 483.26</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t52_AMATUSDT_0827_2115.png' alt='#52 AMATUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#53 · CRWVUSDT</span><span class='trade-time'>2026-08-27 21:30 → 08-28 05:30 台北</span></div><div class='card-pnl pnl-win'>+1.99%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 8.0x</span></div><pre class='trade-detail'>entry 88.0800
+stop  91.9519  (風險 4.40%)
+target 80.3363  (2.0R)
+exit  86.3300  time_stop
+打穿長均 2.85%  cluster 89.5087–90.6616
+MA7 90.9514 < MA14 91.5821 < MA25 92.0352
+MA99 90.6616 / MA120 90.1824 / MA200 89.5087</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t53_CRWVUSDT_0827_2130.png' alt='#53 CRWVUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#54 · MUUSDT</span><span class='trade-time'>2026-08-27 21:30 → 08-28 05:30 台北</span></div><div class='card-pnl pnl-win'>+1.89%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 12.3x</span></div><pre class='trade-detail'>entry 940.18
+stop  970.48  (風險 3.22%)
+target 879.58  (2.0R)
+exit  922.39  time_stop
+打穿長均 2.16%  cluster 945.38–960.90
+MA7 969.67 < MA14 973.74 < MA25 975.62
+MA99 960.90 / MA120 955.12 / MA200 945.38</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t54_MUUSDT_0827_2130.png' alt='#54 MUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#55 · MUUUSDT</span><span class='trade-time'>2026-08-27 21:30 → 08-28 05:30 台北</span></div><div class='card-pnl pnl-win'>+3.78%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 11.8x</span></div><pre class='trade-detail'>entry 29.6500
+stop  31.5515  (風險 6.41%)
+target 25.8470  (2.0R)
+exit  28.5300  time_stop
+打穿長均 4.27%  cluster 29.9928–30.9739
+MA7 31.5314 < MA14 31.7864 < MA25 31.9156
+MA99 30.9739 / MA120 30.6044 / MA200 29.9928</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t55_MUUUSDT_0827_2130.png' alt='#55 MUUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#56 · CBRSUSDT</span><span class='trade-time'>2026-08-27 21:45 → 08-27 22:15 台北</span></div><div class='card-pnl pnl-loss'>-2.55%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 4.8x</span></div><pre class='trade-detail'>entry 181.44
+stop  187.80  (風險 3.50%)
+target 168.72  (2.0R)
+exit  186.07  reclaim_ma99
+打穿長均 2.33%  cluster 185.17–185.78
+MA7 186.71 < MA14 187.98 < MA25 188.85
+MA99 185.78 / MA120 185.49 / MA200 185.17</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t56_CBRSUSDT_0827_2145.png' alt='#56 CBRSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#57 · EWYUSDT</span><span class='trade-time'>2026-08-27 21:45 → 08-28 05:45 台北</span></div><div class='card-pnl pnl-loss'>-0.63%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 4.5x</span></div><pre class='trade-detail'>entry 180.03
+stop  182.43  (風險 1.33%)
+target 175.23  (2.0R)
+exit  181.16  time_stop
+打穿長均 1.15%  cluster 180.85–182.13
+MA7 182.44 < MA14 182.82 < MA25 183.00
+MA99 182.13 / MA120 181.67 / MA200 180.85</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t57_EWYUSDT_0827_2145.png' alt='#57 EWYUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#58 · KORUUSDT</span><span class='trade-time'>2026-08-27 21:45 → 08-28 05:45 台北</span></div><div class='card-pnl pnl-loss'>-1.69%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 4.9x</span></div><pre class='trade-detail'>entry 20.7600
+stop  21.5315  (風險 3.72%)
+target 19.2170  (2.0R)
+exit  21.1100  time_stop
+打穿長均 3.31%  cluster 21.0454–21.4705
+MA7 21.5657 < MA14 21.6979 < MA25 21.7604
+MA99 21.4705 / MA120 21.3162 / MA200 21.0454</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t58_KORUUSDT_0827_2145.png' alt='#58 KORUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#59 · NBISUSDT</span><span class='trade-time'>2026-08-27 21:45 → 08-27 22:00 台北</span></div><div class='card-pnl pnl-loss'>-3.27%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 5.7x</span></div><pre class='trade-detail'>entry 218.34
+stop  225.49  (風險 3.27%)
+target 204.05  (2.0R)
+exit  225.49  stop_loss
+打穿長均 2.25%  cluster 221.73–223.36
+MA7 224.85 < MA14 226.27 < MA25 227.62
+MA99 223.36 / MA120 222.69 / MA200 221.73</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t59_NBISUSDT_0827_2145.png' alt='#59 NBISUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#60 · SKHYUSDT</span><span class='trade-time'>2026-08-27 21:45 → 08-28 05:45 台北</span></div><div class='card-pnl pnl-loss'>-0.04%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 4.9x</span></div><pre class='trade-detail'>entry 160.67
+stop  164.50  (風險 2.39%)
+target 153.00  (2.0R)
+exit  160.73  time_stop
+打穿長均 1.24%  cluster 160.88–162.69
+MA7 163.86 < MA14 164.33 < MA25 164.56
+MA99 162.69 / MA120 161.98 / MA200 160.88</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t60_SKHYUSDT_0827_2145.png' alt='#60 SKHYUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#61 · NBISUSDT</span><span class='trade-time'>2026-08-27 22:45 → 08-28 06:45 台北</span></div><div class='card-pnl pnl-win'>+2.31%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 1.3x</span></div><pre class='trade-detail'>entry 221.28
+stop  225.64  (風險 1.97%)
+target 212.57  (2.0R)
+exit  216.16  time_stop
+打穿長均 1.02%  cluster 221.80–223.55
+MA7 222.97 < MA14 225.05 < MA25 226.70
+MA99 223.55 / MA120 222.83 / MA200 221.80</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t61_NBISUSDT_0827_2245.png' alt='#61 NBISUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#62 · FILUSDT</span><span class='trade-time'>2026-08-28 05:15 → 08-28 09:15 台北</span></div><div class='card-pnl pnl-loss'>-1.30%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 3.4x</span></div><pre class='trade-detail'>entry 0.7074
+stop  0.717216  (風險 1.39%)
+target 0.687767  (2.0R)
+exit  0.7166  reclaim_ma99
+打穿長均 0.94%  cluster 0.711118–0.714112
+MA7 0.719 < MA14 0.7203 < MA25 0.721784
+MA99 0.714112 / MA120 0.711118 / MA200 0.712772</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t62_FILUSDT_0828_0515.png' alt='#62 FILUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#63 · PNUTUSDT</span><span class='trade-time'>2026-08-28 10:15 → 08-28 16:15 台北</span></div><div class='card-pnl pnl-loss'>-1.55%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.3x</span></div><pre class='trade-detail'>entry 0.05115
+stop  0.051942  (風險 1.55%)
+target 0.049566  (2.0R)
+exit  0.051942  stop_loss
+打穿長均 1.07%  cluster 0.051347–0.051702
+MA7 0.052256 < MA14 0.052274 < MA25 0.052346
+MA99 0.051702 / MA120 0.051613 / MA200 0.051347</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t63_PNUTUSDT_0828_1015.png' alt='#63 PNUTUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#64 · HUMAUSDT</span><span class='trade-time'>2026-08-28 22:00 → 08-29 05:15 台北</span></div><div class='card-pnl pnl-win'>+11.98%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 2.0x</span></div><pre class='trade-detail'>entry 0.025279
+stop  0.026793  (風險 5.99%)
+target 0.022251  (2.0R)
+exit  0.022251  take_profit
+打穿長均 4.43%  cluster 0.025377–0.02645
+MA7 0.026395 < MA14 0.027151 < MA25 0.027365
+MA99 0.02645 / MA120 0.02626 / MA200 0.025377</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t64_HUMAUSDT_0828_2200.png' alt='#64 HUMAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#65 · PAXGUSDT</span><span class='trade-time'>2026-08-28 22:00 → 08-29 06:00 台北</span></div><div class='card-pnl pnl-win'>+1.71%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 11.6x</span></div><pre class='trade-detail'>entry 4538.46
+stop  4627.27  (風險 1.96%)
+target 4360.83  (2.0R)
+exit  4460.80  time_stop
+打穿長均 1.19%  cluster 4587.09–4593.17
+MA7 4584.23 < MA14 4586.30 < MA25 4590.74
+MA99 4587.72 / MA120 4587.09 / MA200 4593.17</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t65_PAXGUSDT_0828_2200.png' alt='#65 PAXGUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#66 · XAUUSDT</span><span class='trade-time'>2026-08-28 22:00 → 08-29 06:00 台北</span></div><div class='card-pnl pnl-win'>+1.82%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 11.3x</span></div><pre class='trade-detail'>entry 4549.97
+stop  4638.20  (風險 1.94%)
+target 4373.50  (2.0R)
+exit  4466.95  time_stop
+打穿長均 1.18%  cluster 4598.39–4604.19
+MA7 4595.93 < MA14 4597.88 < MA25 4602.13
+MA99 4599.30 / MA120 4598.39 / MA200 4604.19</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t66_XAUUSDT_0828_2200.png' alt='#66 XAUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#67 · EPICUSDT</span><span class='trade-time'>2026-08-29 00:00 → 08-29 01:00 台北</span></div><div class='card-pnl pnl-loss'>-1.34%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 3.0x</span></div><pre class='trade-detail'>entry 0.3381
+stop  0.342642  (風險 1.34%)
+target 0.329015  (2.0R)
+exit  0.342642  stop_loss
+打穿長均 1.12%  cluster 0.341634–0.341938
+MA7 0.342857 < MA14 0.343014 < MA25 0.343488
+MA99 0.341634 / MA120 0.341718 / MA200 0.341938</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t67_EPICUSDT_0829_0000.png' alt='#67 EPICUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#68 · STXUSDT</span><span class='trade-time'>2026-08-29 00:00 → 08-29 07:15 台北</span></div><div class='card-pnl pnl-loss'>-2.14%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 3.6x</span></div><pre class='trade-detail'>entry 0.2572
+stop  0.264664  (風險 2.90%)
+target 0.242271  (2.0R)
+exit  0.2627  reclaim_ma99
+打穿長均 1.89%  cluster 0.260648–0.262145
+MA7 0.264886 < MA14 0.266771 < MA25 0.268452
+MA99 0.261398 / MA120 0.260648 / MA200 0.262145</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t68_STXUSDT_0829_0000.png' alt='#68 STXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#69 · BTWUSDT</span><span class='trade-time'>2026-08-29 08:00 → 08-29 11:45 台北</span></div><div class='card-pnl pnl-win'>+0.43%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>量比 4.0x</span></div><pre class='trade-detail'>entry 0.402
+stop  0.423513  (風險 5.35%)
+target 0.358974  (2.0R)
+exit  0.40027  time_stop
+打穿長均 1.54%  cluster 0.403993–0.408306
+MA7 0.417861 < MA14 0.419406 < MA25 0.420276
+MA99 0.408306 / MA120 0.406715 / MA200 0.403993</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/img/t69_BTWUSDT_0829_0800.png' alt='#69 BTWUSDT' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div>
+</body></html>

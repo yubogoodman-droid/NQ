@@ -33,36 +33,35 @@ def _bars(close: np.ndarray) -> pd.DataFrame:
     )
 
 
-def _breakdown_series(n: int = 280, crash: float = 0.65, after: str = "down") -> pd.DataFrame:
-    """先緩漲讓長均黏在高位，再回落讓 7<14<25，最後一根大陰線打穿 99/120/200。"""
+def _breakdown_series(n: int = 280, crash: float = 0.90, after: str = "down") -> pd.DataFrame:
+    """長均黏在價下，短均先轉空，再一根大陰線從三條之上打穿到三條之下。"""
     close = np.zeros(n, dtype=float)
     close[0] = 20.0
-    for i in range(1, 200):
-        close[i] = close[i - 1] + 0.012
-    peak = close[199]
-    for i in range(200, 230):
-        close[i] = peak - (i - 199) * 0.018
+    for i in range(1, 210):
+        close[i] = 20.0 + 0.008 * i + 0.03 * np.sin(i / 7.0)
+    # 淺回讓 7<14<25，但價仍在三條長均之上
+    for i in range(210, 230):
+        close[i] = close[i - 1] - 0.006
     break_i = 230
     close[break_i] = close[break_i - 1] - crash
     if after == "down":
         for i in range(break_i + 1, n):
-            close[i] = close[i - 1] - 0.10
+            close[i] = close[i - 1] - 0.12
     else:
-        close[break_i + 1] = close[break_i - 1] + 0.40
+        close[break_i + 1] = close[break_i - 1] + 0.35
         for i in range(break_i + 2, n):
-            close[i] = close[i - 1] + 0.05
+            close[i] = close[i - 1] + 0.04
         df = _bars(close)
-        df.iloc[break_i, df.columns.get_loc("high")] = close[break_i - 1] + 0.25
+        df.iloc[break_i, df.columns.get_loc("high")] = close[break_i - 1] + 0.08
         df.iloc[break_i, df.columns.get_loc("open")] = close[break_i - 1]
-        df.iloc[break_i, df.columns.get_loc("low")] = close[break_i] - 0.08
-        df.iloc[break_i + 1, df.columns.get_loc("high")] = close[break_i + 1] + 0.05
+        df.iloc[break_i, df.columns.get_loc("low")] = close[break_i] - 0.06
+        df.iloc[break_i + 1, df.columns.get_loc("high")] = close[break_i + 1] + 0.06
         df.iloc[break_i + 1, df.columns.get_loc("low")] = close[break_i] - 0.02
         return df
     df = _bars(close)
-    # 破位那根：高點蓋過長均黏帶上沿，收在三條之下
-    df.iloc[break_i, df.columns.get_loc("high")] = close[break_i - 1] + 0.25
+    df.iloc[break_i, df.columns.get_loc("high")] = close[break_i - 1] + 0.08
     df.iloc[break_i, df.columns.get_loc("open")] = close[break_i - 1]
-    df.iloc[break_i, df.columns.get_loc("low")] = close[break_i] - 0.08
+    df.iloc[break_i, df.columns.get_loc("low")] = close[break_i] - 0.06
     return df
 
 
@@ -109,16 +108,15 @@ def test_short_stop_loss() -> None:
 
 
 def test_no_overlap_positions() -> None:
-    df = add_mas(_breakdown_series(n=360, crash=0.65, after="down"))
-    # 複製第二次破位：先拉回長均之上再打穿
+    df = add_mas(_breakdown_series(n=360, crash=0.90, after="down"))
     close = df["close"].to_numpy(copy=True)
-    close[280:300] = close[229] + 0.4
-    close[300] = close[229] - 0.70
+    close[280:300] = close[229] + 0.35
+    close[300] = close[229] - 0.90
     for i in range(301, len(close)):
-        close[i] = close[i - 1] - 0.10
+        close[i] = close[i - 1] - 0.12
     df = add_mas(_bars(close))
-    df.iloc[230, df.columns.get_loc("high")] = close[229] + 0.25
-    df.iloc[300, df.columns.get_loc("high")] = close[299] + 0.25
+    df.iloc[230, df.columns.get_loc("high")] = close[229] + 0.08
+    df.iloc[300, df.columns.get_loc("high")] = close[299] + 0.08
     sigs = detect_signals(df, "TESTUSDT")
     trades = simulate(df, sigs)
     for a, b in zip(trades, trades[1:]):
