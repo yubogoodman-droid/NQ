@@ -16,6 +16,7 @@ from nq.patterns import MHeadPattern, detect_m_heads  # noqa: E402
 from nq_m_head import (  # noqa: E402
     ET,
     TF_PRESETS,
+    TRAIL_STEPS_5M,
     Signal,
     TradeResult,
     generate_signals,
@@ -266,12 +267,52 @@ def test_trail_does_not_block_two_r() -> None:
     assert abs(trades[0].pnl_points - 200.0) < 1e-9
 
 
+def test_five_m_locks_one_r_giveback() -> None:
+    """5m：浮盈見過 1.0R 後下一根鎖 0.7R，回補就出場（#2 那種）。"""
+    n = 20
+    entry_idx = 4
+    entry, risk = 10000.0, 100.0
+    stop, target = 10100.0, 9800.0
+    close = np.full(n, entry)
+    high = close + 2.0
+    low = close - 2.0
+    close[entry_idx + 1] = entry - 105.0
+    low[entry_idx + 1] = entry - 105.0
+    high[entry_idx + 1] = entry - 90.0  # 同一根高點仍低於 0.7R，不該出場
+    close[entry_idx + 2] = entry - 50.0
+    low[entry_idx + 2] = entry - 80.0
+    high[entry_idx + 2] = entry - 40.0  # 穿過 0.7R=9930
+    idx = pd.date_range("2026-08-05 03:30", periods=n, freq="5min", tz=ET)
+    df = pd.DataFrame(
+        {"open": close, "high": high, "low": low, "close": close, "volume": 50.0},
+        index=idx,
+    )
+    pattern = MHeadPattern(1, 2, 1, stop - 8.0, stop - 8.0, entry + 20.0)
+    sig = Signal(
+        timestamp=df.index[entry_idx],
+        entry=entry,
+        stop_loss=stop,
+        target=target,
+        pattern=pattern,
+        bar_idx=entry_idx,
+        ma60=entry + 30.0,
+        ma20=entry + 15.0,
+        ma5=entry + 5.0,
+        timeframe="5m",
+    )
+    trades = run_backtest(df, [sig], max_bars_hold=10, trail_steps=TRAIL_STEPS_5M)
+    assert trades[0].exit_reason == "trail_stop"
+    assert abs(trades[0].pnl_points - 70.0) < 0.26
+
+
 def test_tf_presets() -> None:
     assert TF_PRESETS["5m"]["min_bars_between_highs"] == 4
     assert TF_PRESETS["5m"]["high_level_lookback"] == 24
     assert TF_PRESETS["1m"]["swing_lookback"] == 7
     assert TF_PRESETS["1m"]["min_ribbon_spread"] == 28.0
     assert TF_PRESETS["5m"]["min_ribbon_spread"] == 28.0
+    assert TF_PRESETS["1m"]["trail_steps"][0] == (1.6, 1.2)
+    assert TF_PRESETS["5m"]["trail_steps"][0] == (1.0, 0.7)
 
 
 def test_overlay_m5_ma60() -> None:
@@ -321,6 +362,7 @@ def main() -> int:
     test_skip_tangled_ribbon()
     test_trail_locks_after_waterfall()
     test_trail_does_not_block_two_r()
+    test_five_m_locks_one_r_giveback()
     test_tf_presets()
     test_overlay_m5_ma60()
     test_5m_preset_still_fires()

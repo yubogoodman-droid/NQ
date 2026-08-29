@@ -46,9 +46,13 @@ MA_COLORS = {
     200: "#ab47bc",
 }
 
-# 浮盈見過 1.6R 後鎖 1.2R。1.5 會把今日 1m #2 砍在瀑布中間；1.6 仍抓得住 5m #7。
+# 鎖利下一根才生效，避免同一根長影線誤砍 2R。
+# 1m：1.6R 鎖 1.2R（今日瀑布還在走，不要 1.0 就砍）
+# 5m：多一檔 1.0R 鎖 0.7R（#2 那種砸完回補）
 TRAIL_ARM_R = 1.6
 TRAIL_LOCK_R = 1.2
+TRAIL_STEPS_1M = ((1.6, 1.2),)
+TRAIL_STEPS_5M = ((1.0, 0.7), (1.6, 1.2))
 
 # 1m / 5m 同一套邏輯，K 數換成大約相同的鐘面時間
 TF_PRESETS = {
@@ -60,6 +64,7 @@ TF_PRESETS = {
         "entry_window": 35,
         "max_bars_hold": 120,
         "min_ribbon_spread": 28.0,
+        "trail_steps": TRAIL_STEPS_1M,
     },
     "5m": {
         "swing_lookback": 3,  # 15 分鐘確認
@@ -69,6 +74,7 @@ TF_PRESETS = {
         "entry_window": 16,  # 80 分鐘
         "max_bars_hold": 48,  # 4 小時
         "min_ribbon_spread": 28.0,
+        "trail_steps": TRAIL_STEPS_5M,
     },
 }
 
@@ -458,10 +464,30 @@ def run_tf_backtest(
 ) -> tuple[list[Signal], list[TradeResult], dict]:
     preset = apply_preset(timeframe)
     hold = preset.pop("max_bars_hold")
+    trail_steps = preset.pop("trail_steps", TRAIL_STEPS_1M)
     funnel: Dict[str, int] = {}
     sigs = generate_signals(df, funnel=funnel, timeframe=timeframe, **preset, **(extra or {}))
-    trades = run_backtest(df, sigs, max_bars_hold=hold)
+    trades = run_backtest(df, sigs, max_bars_hold=hold, trail_steps=trail_steps)
     return sigs, trades, funnel
+
+
+def _trail_lock_price(
+    entry: float,
+    risk: float,
+    mfe: float,
+    steps: Sequence[tuple[float, float]],
+) -> float | None:
+    """依最大浮盈 R 取最緊的鎖利價（做空：價越低鎖越多）。"""
+    if risk <= 0 or not steps:
+        return None
+    r_seen = mfe / risk
+    lock_r = None
+    for arm_r, keep_r in steps:
+        if r_seen >= arm_r:
+            lock_r = keep_r if lock_r is None else max(lock_r, keep_r)
+    if lock_r is None:
+        return None
+    return round_tick(entry - lock_r * risk)
 
 
 def run_backtest(
@@ -469,12 +495,14 @@ def run_backtest(
     signals: Sequence[Signal] | None = None,
     *,
     max_bars_hold: int = 120,
+    trail_steps: Sequence[tuple[float, float]] | None = None,
     trail_arm_r: float = TRAIL_ARM_R,
     trail_lock_r: float = TRAIL_LOCK_R,
 ) -> List[TradeResult]:
-    """做空：先硬停損、再 2R 停利；浮盈見過 trail_arm_r 後鎖 trail_lock_r。逾時收盤。不重疊。"""
+    """做空：先硬停損、再 2R 停利；鎖利下一根才生效。逾時收盤。不重疊。"""
     if signals is None:
         signals = generate_signals(df)
+    steps = list(trail_steps) if trail_steps is not None else [(trail_arm_r, trail_lock_r)]
     results: List[TradeResult] = []
     position_open_until = -1
 
@@ -489,12 +517,16 @@ def run_backtest(
         exit_idx = end_idx
         orig_stop = sig.stop_loss
         trail_stop = orig_stop
+        pending_lock: float | None = None
         mfe = 0.0
         risk = sig.risk
 
         for i in range(entry_idx + 1, end_idx + 1):
             lo = float(df["low"].iloc[i])
             hi = float(df["high"].iloc[i])
+            if pending_lock is not None:
+                trail_stop = min(trail_stop, pending_lock)
+                pending_lock = None
             if hi >= orig_stop:
                 exit_price = orig_stop
                 exit_time = df.index[i]
@@ -507,15 +539,16 @@ def run_backtest(
                 exit_reason = "take_profit"
                 exit_idx = i
                 break
-            mfe = max(mfe, sig.entry - lo)
-            if trail_arm_r > 0 and risk > 0 and mfe / risk >= trail_arm_r:
-                trail_stop = min(trail_stop, round_tick(sig.entry - trail_lock_r * risk))
             if trail_stop < orig_stop - 1e-9 and hi >= trail_stop:
                 exit_price = trail_stop
                 exit_time = df.index[i]
                 exit_reason = "trail_stop"
                 exit_idx = i
                 break
+            mfe = max(mfe, sig.entry - lo)
+            locked = _trail_lock_price(sig.entry, risk, mfe, steps)
+            if locked is not None:
+                pending_lock = locked if pending_lock is None else min(pending_lock, locked)
 
         position_open_until = exit_idx
         pnl_points = sig.entry - exit_price
@@ -886,7 +919,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。浮盈 1.6R 後鎖 1.2R。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。浮盈 1.0R 鎖 0.7R、1.6R 鎖 1.2R（下一根生效）。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
@@ -933,7 +966,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 一分K 高檔M頭 · 跌破MA60做空</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。浮盈見過 1.6R 後鎖 1.2R，瀑布走完不吐光。</p>
+<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。1m 浮盈 1.6R 鎖 1.2R；5m 多一檔 1.0R 鎖 0.7R。鎖利下一根才生效。</p>
 {note_line}
 {compare_line}
 {_stats_cards(stats)}
