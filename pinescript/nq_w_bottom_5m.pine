@@ -9,10 +9,11 @@ minSpringPts  = input.float(30.0, "L2 低於 L1 最少點數", minval=0, step=1)
 minBouncePct  = input.float(0.10, "破底前最少反彈 (%)", minval=0.05, step=0.01) / 100
 minBars       = input.int(8, "L1 到 L3 最少間隔", minval=4)
 maxBars       = input.int(24, "L1 到 L3 最多間隔（2小時）", minval=10)
-maxReclaim    = input.int(12, "L2 後最多幾根須收復", minval=2)
+maxReclaim    = input.int(4, "L2 後最多幾根須收復", minval=2)
 stopPts       = input.float(20.0, "停損在 L3 下方點數", minval=0, step=1)
 minMaSpan     = input.float(40.0, "均線高低差最少點數", minval=0, step=1)
 maxAbove200   = input.float(120.0, "高於MA200最遠點數", minval=0, step=1)
+maxBelow60    = input.float(80.0, "低於MA60最遠點數", minval=0, step=1)
 maxBelowL1    = input.float(10.0, "收盤低於L1最多點數", minval=0, step=1)
 minNeckRoom   = input.float(20.0, "進場距頸線最少點數", minval=0, step=1)
 
@@ -25,8 +26,6 @@ ma200 = ta.sma(close, 200)
 maHi = math.max(ma5, math.max(ma10, math.max(ma20, math.max(ma60, math.max(ma120, ma200)))))
 maLo = math.min(ma5, math.min(ma10, math.min(ma20, math.min(ma60, math.min(ma120, ma200)))))
 maOk = not na(ma200) and (maHi - maLo) >= minMaSpan
-nyHour = hour(time, "America/New_York") + minute(time, "America/New_York") / 60.0
-sessionOk = not (nyHour >= 4 and nyHour < 10.5) and not (nyHour >= 14 and nyHour < 15)
 
 pl = ta.pivotlow(low, swingLen, swingLen)
 
@@ -77,9 +76,10 @@ if not na(l1) and na(l3) and not na(pl)
             wReady   := true
 
 stretchOk = na(ma200) or (close - ma200) <= maxAbove200
+ma60Ok = na(ma60) or (ma60 - close) <= maxBelow60
 l1CloseOk = na(l1) or close >= l1 - maxBelowL1
 neckOk = na(neckline) or (neckline - close) >= minNeckRoom
-longSignal = wReady and not na(l3) and maOk and sessionOk and stretchOk and l1CloseOk and neckOk
+longSignal = wReady and not na(l3) and maOk and stretchOk and ma60Ok and l1CloseOk and neckOk
 
 if longSignal
     strategy.entry("破底W做多", strategy.long)

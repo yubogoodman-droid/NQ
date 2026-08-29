@@ -160,12 +160,6 @@ def test_tangled_moving_averages_are_skipped() -> None:
     assert NQWBottomStrategy().generate_signals(_df(rows)) == []
 
 
-def test_blocked_ny_open_session_is_skipped() -> None:
-    df = _df(_l1_l2_l3_rows())
-    df.index = pd.date_range("2026-08-03 08:00", periods=len(df), freq="5min", tz="America/New_York")
-    assert NQWBottomStrategy().generate_signals(df) == []
-
-
 def test_close_well_below_l1_is_skipped() -> None:
     df = _df(_l1_l2_l3_rows())
     idx = NQWBottomStrategy().generate_signals(df)[0].bar_idx
@@ -182,7 +176,12 @@ def test_entry_already_at_neckline_is_skipped() -> None:
 
 def test_stretched_above_ma200_is_skipped() -> None:
     rows = _flat(220, 9800.0) + _l1_l2_l3_rows()
-    assert NQWBottomStrategy(blocked_sessions=()).generate_signals(_df(rows)) == []
+    assert NQWBottomStrategy().generate_signals(_df(rows)) == []
+
+
+def test_far_below_ma60_is_skipped() -> None:
+    rows = _flat(80, 10200.0) + _l1_l2_l3_rows()
+    assert NQWBottomStrategy().generate_signals(_df(rows)) == []
 
 
 def test_pattern_longer_than_two_hours_is_ignored() -> None:
