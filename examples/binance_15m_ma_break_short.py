@@ -32,7 +32,7 @@ PAGES = REPO / "docs" / "binance-15m-ma-short" / "index.html"
 BRANCH_VIEW = "cursor/15m-ma-break-short-9d44"
 
 INTERVAL = "15m"
-BAR_MS = 15 * 60 * 1000
+BAR_MS = {"1m": 60_000, "15m": 15 * 60 * 1000, "1h": 60 * 60 * 1000}
 MA_SHORT = (7, 14, 25)
 MA_LONG = (99, 120, 200)
 WARMUP = 200
@@ -111,7 +111,13 @@ def _klines_to_df(raw: list) -> pd.DataFrame:
     return df[~df.index.duplicated(keep="last")].sort_index()
 
 
-def fetch_klines(symbol: str, limit: int = 1000, *, futures: bool = True) -> pd.DataFrame:
+def fetch_klines(
+    symbol: str,
+    limit: int = 1000,
+    *,
+    interval: str = INTERVAL,
+    futures: bool = True,
+) -> pd.DataFrame:
     hosts = FAPI if futures else SPOT
     path = "/fapi/v1/klines" if futures else "/api/v3/klines"
     last: Exception | None = None
@@ -119,21 +125,67 @@ def fetch_klines(symbol: str, limit: int = 1000, *, futures: bool = True) -> pd.
         try:
             raw = get_json(
                 host + path,
-                {"symbol": symbol, "interval": INTERVAL, "limit": limit},
+                {"symbol": symbol, "interval": interval, "limit": limit},
             )
             df = _klines_to_df(raw)
             if df.empty:
                 continue
             now_ms = int(time.time() * 1000)
             last_open = int(df.index[-1].tz_convert("UTC").timestamp() * 1000)
-            if last_open + BAR_MS > now_ms:
+            if last_open + BAR_MS[interval] > now_ms:
                 df = df.iloc[:-1]
             return df
         except Exception as exc:  # noqa: BLE001
             last = exc
     if futures:
-        return fetch_klines(symbol, limit=limit, futures=False)
-    raise RuntimeError(f"klines {symbol}: {last}")
+        return fetch_klines(symbol, limit=limit, interval=interval, futures=False)
+    raise RuntimeError(f"klines {symbol} {interval}: {last}")
+
+
+def resample_1h(df: pd.DataFrame) -> pd.DataFrame:
+    """把 15m 合成 UTC 對齊的 1h（抓不到小時線時的備援）。"""
+    if df.empty:
+        return df
+    cols = ["open", "high", "low", "close"] + (["volume"] if "volume" in df.columns else [])
+    src = df[cols]
+    utc = src.tz_convert("UTC") if src.index.tz is not None else src
+    agg = {"open": "first", "high": "max", "low": "min", "close": "last"}
+    if "volume" in src.columns:
+        agg["volume"] = "sum"
+    hourly = utc.resample("1h", label="left", closed="left").agg(agg).dropna(subset=["open", "close"])
+    if hourly.index.tz is not None:
+        hourly = hourly.tz_convert(TZ)
+    return add_mas(hourly)
+
+
+def _bar_index(df: pd.DataFrame, ts: pd.Timestamp) -> int:
+    if df.empty:
+        return 0
+    mark = ts
+    if getattr(mark, "tzinfo", None) is not None and df.index.tz is not None:
+        mark = mark.tz_convert(df.index.tz)
+    pos = int(df.index.searchsorted(mark, side="right") - 1)
+    return max(0, min(pos, len(df) - 1))
+
+
+def load_1h_frames(symbols: list[str], frames_15m: dict[str, pd.DataFrame], workers: int = 8) -> dict[str, pd.DataFrame]:
+    out: dict[str, pd.DataFrame] = {}
+    uniq = [s for s in dict.fromkeys(symbols) if s]
+
+    def one(sym: str) -> tuple[str, pd.DataFrame]:
+        try:
+            return sym, add_mas(fetch_klines(sym, limit=500, interval="1h"))
+        except Exception:
+            src = frames_15m.get(sym)
+            return sym, resample_1h(src) if src is not None else pd.DataFrame()
+
+    if not uniq:
+        return out
+    with ThreadPoolExecutor(min(workers, len(uniq))) as ex:
+        for fut in as_completed([ex.submit(one, s) for s in uniq]):
+            name, df = fut.result()
+            out[name] = df
+    return out
 
 
 def universe(min_qv: float = MIN_QV) -> list[str]:
@@ -389,37 +441,39 @@ def _setup_font() -> None:
             break
 
 
-def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import Rectangle
-
-    _setup_font()
-    sig = trade.signal
-    start = max(0, sig.bar_idx - 36)
-    end = min(len(df) - 1, max(trade.exit_idx + 10, sig.bar_idx + 16))
-    window = df.iloc[start : end + 1]
-    xs = range(len(window))
-    o, h, l, c = window["open"], window["high"], window["low"], window["close"]
-    vol = window["volume"] if "volume" in window.columns else None
-    close_full = df["close"].astype(float)
-
-    fig, (ax, axv) = plt.subplots(
-        2,
-        1,
-        figsize=(10.4, 5.6),
-        sharex=True,
-        gridspec_kw={"height_ratios": [3.2, 1]},
-        facecolor="#0c1210",
-    )
-    for a in (ax, axv):
+def _style_axes(axes) -> None:
+    for a in axes:
         a.set_facecolor("#101814")
         a.tick_params(colors="#8aa193", labelsize=8)
         for sp in a.spines.values():
             sp.set_color("#2a3a33")
 
+
+def _paint_ohlcv(
+    ax,
+    axv,
+    df: pd.DataFrame,
+    start: int,
+    end: int,
+    *,
+    entry_idx: int | None = None,
+    exit_idx: int | None = None,
+    entry_price: float | None = None,
+    exit_price: float | None = None,
+    stop: float | None = None,
+    target: float | None = None,
+    mark_entry: bool = False,
+    pnl_pct: float = 0.0,
+) -> None:
+    from matplotlib.patches import Rectangle
+
+    window = df.iloc[start : end + 1]
+    if window.empty:
+        return
+    xs = range(len(window))
+    o, h, l, c = window["open"], window["high"], window["low"], window["close"]
+    vol = window["volume"] if "volume" in window.columns else None
+    close_full = df["close"].astype(float)
     colors_v = []
     for k in range(len(window)):
         up = float(c.iloc[k]) >= float(o.iloc[k])
@@ -432,30 +486,119 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         colors_v.append("#3dba7a99" if up else "#e35d5d99")
     if vol is not None:
         axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
-
     for n, col in MA_COLORS.items():
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
         ax.plot(list(xs), ma, color=col, lw=1.35 if n <= 25 else 1.05, label=f"MA{n}")
+    if stop is not None:
+        ax.axhline(stop, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
+    if target is not None:
+        ax.axhline(target, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
+    if entry_idx is not None:
+        ex = entry_idx - start
+        if 0 <= ex < len(window):
+            ax.axvline(ex, color="#e35d5d", ls="--", lw=0.9)
+            if entry_price is not None:
+                ax.scatter([ex], [entry_price], s=42, color="#ff5252", marker="v", zorder=6)
+            if mark_entry:
+                ax.annotate(
+                    "做空",
+                    (ex, entry_price if entry_price is not None else float(c.iloc[ex])),
+                    textcoords="offset points",
+                    xytext=(0, 10),
+                    ha="center",
+                    color="#ff8a80",
+                    fontsize=8,
+                )
+    if exit_idx is not None:
+        xx = exit_idx - start
+        if 0 <= xx < len(window):
+            ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
+            if exit_price is not None:
+                ax.scatter(
+                    [xx],
+                    [exit_price],
+                    s=40,
+                    color="#00c805" if pnl_pct > 0 else "#ff5252",
+                    marker="x",
+                    zorder=6,
+                )
+    step = max(1, len(window) // 6)
+    ticks = list(range(0, len(window), step))
+    axv.set_xticks(ticks)
+    axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
 
-    ax.axhline(trade.signal.stop, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
-    ax.axhline(trade.signal.target, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
 
-    ex, xx = sig.bar_idx - start, trade.exit_idx - start
-    if 0 <= ex < len(window):
-        ax.axvline(ex, color="#e35d5d", ls="--", lw=0.9)
-        ax.scatter([ex], [sig.entry], s=42, color="#ff5252", marker="v", zorder=6)
-        ax.annotate("做空", (ex, sig.entry), textcoords="offset points", xytext=(0, 10),
-                    ha="center", color="#ff8a80", fontsize=8)
-    if 0 <= xx < len(window):
-        ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
-        ax.scatter(
-            [xx],
-            [trade.exit_price],
-            s=40,
-            color="#00c805" if trade.pnl_pct > 0 else "#ff5252",
-            marker="x",
-            zorder=6,
+def hourly_snapshot(df_1h: pd.DataFrame, ts: pd.Timestamp) -> dict[str, float | str]:
+    if df_1h is None or df_1h.empty:
+        return {}
+    work = add_mas(df_1h) if "ma200" not in df_1h.columns else df_1h
+    i = _bar_index(work, ts)
+    row = work.iloc[i]
+    out: dict[str, float | str] = {"time": work.index[i].strftime("%m-%d %H:%M")}
+    for n in MA_SHORT + MA_LONG:
+        val = row.get(f"ma{n}")
+        if val is not None and not pd.isna(val):
+            out[f"ma{n}"] = float(val)
+    m7, m14, m25 = out.get("ma7"), out.get("ma14"), out.get("ma25")
+    if isinstance(m7, float) and isinstance(m14, float) and isinstance(m25, float):
+        out["stack"] = "7<14<25" if m7 < m14 < m25 else "短均未空頭"
+    return out
+
+
+def draw_trade_png(
+    df: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+    df_1h: pd.DataFrame | None = None,
+) -> Path:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    _setup_font()
+    sig = trade.signal
+    hourly = df_1h if df_1h is not None and not df_1h.empty else resample_1h(df)
+    have_1h = hourly is not None and not hourly.empty
+
+    if have_1h:
+        fig, (ax, axv, axh, axhv) = plt.subplots(
+            4,
+            1,
+            figsize=(10.4, 9.5),
+            gridspec_kw={"height_ratios": [3.05, 0.82, 3.05, 0.82]},
+            facecolor="#0c1210",
         )
+        _style_axes((ax, axv, axh, axhv))
+    else:
+        fig, (ax, axv) = plt.subplots(
+            2,
+            1,
+            figsize=(10.4, 5.6),
+            sharex=True,
+            gridspec_kw={"height_ratios": [3.2, 1]},
+            facecolor="#0c1210",
+        )
+        _style_axes((ax, axv))
+
+    start = max(0, sig.bar_idx - 36)
+    end = min(len(df) - 1, max(trade.exit_idx + 10, sig.bar_idx + 16))
+    _paint_ohlcv(
+        ax,
+        axv,
+        df,
+        start,
+        end,
+        entry_idx=sig.bar_idx,
+        exit_idx=trade.exit_idx,
+        entry_price=sig.entry,
+        exit_price=trade.exit_price,
+        stop=sig.stop,
+        target=sig.target,
+        mark_entry=True,
+        pnl_pct=trade.pnl_pct,
+    )
 
     et = sig.timestamp
     xt = trade.exit_time
@@ -464,16 +607,36 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         xt = xt.tz_convert(TZ)
     sign = "+" if trade.pnl_pct >= 0 else ""
     ax.set_title(
-        f"#{trade_no}  {sig.symbol}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%m-%d %H:%M')}  "
+        f"#{trade_no}  {sig.symbol}  15m  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%m-%d %H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_pct:.2f}%",
         color="#e8f0ea",
         fontsize=11,
     )
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
-    step = max(1, len(window) // 6)
-    ticks = list(range(0, len(window), step))
-    axv.set_xticks(ticks)
-    axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+
+    if have_1h:
+        hi = _bar_index(hourly, sig.timestamp)
+        hx = _bar_index(hourly, trade.exit_time)
+        h0 = max(0, hi - 48)
+        h1 = min(len(hourly) - 1, max(hx + 12, hi + 16))
+        _paint_ohlcv(
+            axh,
+            axhv,
+            hourly,
+            h0,
+            h1,
+            entry_idx=hi,
+            exit_idx=hx,
+            entry_price=sig.entry,
+            exit_price=trade.exit_price,
+            stop=sig.stop,
+            target=sig.target,
+            mark_entry=True,
+            pnl_pct=trade.pnl_pct,
+        )
+        axh.set_title("1h 對照（同一進出場時刻）", color="#e8f0ea", fontsize=11)
+        axh.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -524,12 +687,15 @@ def _render_cards(
     *,
     embed: bool,
     prefix: str = "t",
+    frames_1h: dict[str, pd.DataFrame] | None = None,
 ) -> str:
     cards: list[str] = []
     img_dir = html_path.parent / "img"
+    hourly_map = frames_1h or {}
     for i, t in enumerate(trades, 1):
         sig = t.signal
         df = frames[sig.symbol]
+        df_1h = hourly_map.get(sig.symbol)
         et = sig.timestamp.tz_convert(TZ) if getattr(sig.timestamp, "tzinfo", None) else sig.timestamp
         xt = t.exit_time.tz_convert(TZ) if getattr(t.exit_time, "tzinfo", None) else t.exit_time
         cls = "pnl-win" if t.pnl_pct > 0 else ("pnl-flat" if t.pnl_pct == 0 else "pnl-loss")
@@ -542,13 +708,26 @@ def _render_cards(
         img_name = f"{prefix}{i:02d}_{sig.symbol}_{et.strftime('%m%d_%H%M')}.png"
         chart_html = ""
         if i <= MAX_CHARTS:
-            png = draw_trade_png(df, t, img_dir / img_name, i)
+            png = draw_trade_png(df, t, img_dir / img_name, i, df_1h=df_1h)
             src = _img_data_uri(png) if embed else f"img/{img_name}"
             chart_html = (
-                f"<div class='mini-chart'><img src='{escape(src)}' alt='#{i} {escape(sig.symbol)}' "
+                f"<div class='mini-chart'><img src='{escape(src)}' alt='#{i} {escape(sig.symbol)} 15m+1h' "
                 "style='width:100%;display:block;border-radius:10px'/></div>"
             )
         risk_pct = (sig.stop - sig.entry) / sig.entry * 100.0
+        snap = hourly_snapshot(df_1h if df_1h is not None else resample_1h(df), sig.timestamp)
+        h_line = ""
+        if snap:
+            def _ma_line(periods: tuple[int, ...], prefix: str) -> str:
+                bits = [f"MA{n} {_fmt_px(float(snap[f'ma{n}']))}" for n in periods if f"ma{n}" in snap]
+                return f"{prefix} {' / '.join(bits)}" if bits else ""
+
+            h_short = _ma_line(MA_SHORT, "1h")
+            if snap.get("stack"):
+                h_short = f"{h_short}  {snap['stack']}".strip()
+            h_long = _ma_line(MA_LONG, "1h")
+            body = "\n".join(x for x in (h_short, h_long) if x)
+            h_line = f"\n1h {snap.get('time', '')}\n{body}" if body else ""
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -560,6 +739,7 @@ def _render_cards(
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
             "<span class='tag tag-info'>15m 做空</span>"
+            "<span class='tag tag-info'>1h 對照</span>"
             f"<span class='tag tag-info'>量比 {sig.vol_ratio:.1f}x</span>"
             "</div>"
             "<pre class='trade-detail'>"
@@ -568,8 +748,9 @@ def _render_cards(
             f"target {_fmt_px(sig.target)}  ({RR:.1f}R)\n"
             f"exit  {_fmt_px(t.exit_price)}  {t.exit_reason}\n"
             f"打穿長均 {sig.break_pct:.2f}%  cluster {_fmt_px(sig.cluster_lo)}–{_fmt_px(sig.cluster_hi)}\n"
-            f"MA7 {_fmt_px(sig.ma7)} < MA14 {_fmt_px(sig.ma14)} < MA25 {_fmt_px(sig.ma25)}\n"
-            f"MA99 {_fmt_px(sig.ma99)} / MA120 {_fmt_px(sig.ma120)} / MA200 {_fmt_px(sig.ma200)}"
+            f"15m MA7 {_fmt_px(sig.ma7)} < MA14 {_fmt_px(sig.ma14)} < MA25 {_fmt_px(sig.ma25)}\n"
+            f"15m MA99 {_fmt_px(sig.ma99)} / MA120 {_fmt_px(sig.ma120)} / MA200 {_fmt_px(sig.ma200)}"
+            f"{h_line}"
             "</pre>"
             f"{chart_html}"
             "</article>"
@@ -587,6 +768,7 @@ def write_html_report(
     funnel: dict[str, int] | None = None,
     embed: bool = False,
     mubarak_trades: list[TradeResult] | None = None,
+    frames_1h: dict[str, pd.DataFrame] | None = None,
 ) -> Path:
     stats = summarize(trades)
     total_cls = "pnl-win" if float(stats["total_pnl"]) >= 0 else "pnl-loss"
@@ -611,11 +793,13 @@ def write_html_report(
             f"<div class='card'>勝/負<b>{ms['wins']}/{ms['losses']}</b></div></div>"
             f"<div class='equity'>{_equity_svg([t.pnl_pct for t in mubarak_trades])}</div></section>"
             + (
-                _render_cards(mubarak_trades, frames, path, embed=embed, prefix="m")
+                _render_cards(
+                    mubarak_trades, frames, path, embed=embed, prefix="m", frames_1h=frames_1h
+                )
                 or "<div class='empty'>這一週 MUBARAK 沒打出同時跌破＋空頭排列</div>"
             )
         )
-    cards = _render_cards(trades, frames, path, embed=embed, prefix="t")
+    cards = _render_cards(trades, frames, path, embed=embed, prefix="t", frames_1h=frames_1h)
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -658,7 +842,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">總報酬<b class="{total_cls}">{stats['total_pnl']:+.2f}%</b></div>
 <div class="card">勝/負<b>{stats['wins']}/{stats['losses']}</b></div>
 </div>
-<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。報酬是單筆價格百分比，未計資金費。</p>
+<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。上圖 15m 進場，下圖同一時刻的 1h 對照。報酬是單筆價格百分比，未計資金費。</p>
 {funnel_line}
 <div class="equity">{_equity_svg([t.pnl_pct for t in trades])}</div>
 </section>
@@ -798,6 +982,9 @@ def main(argv: list[str] | None = None) -> int:
             f"{result.symbols} 檔 15m · 進場＝前收在 MA99/120/200 之上、本根一次收在三條之下，且 7<14<25"
         )
         show_mubarak = not args.symbol or "MUBARAK" in args.symbol.upper()
+        need_1h = sorted({t.signal.symbol for t in result.trades} | ({"MUBARAKUSDT"} if show_mubarak else set()))
+        print(f"抓 1h 對照 {len(need_1h)} 檔…", flush=True)
+        frames_1h = load_1h_frames(need_1h, result.frames)
         write_html_report(
             html_path,
             result.trades,
@@ -807,6 +994,7 @@ def main(argv: list[str] | None = None) -> int:
             funnel=result.funnel,
             embed=args.embed,
             mubarak_trades=mubarak if show_mubarak and not args.symbol else None,
+            frames_1h=frames_1h,
         )
         view = write_view_html(html_path)
         print(f"html={html_path}")

@@ -15,6 +15,9 @@ from binance_15m_ma_break_short import (  # noqa: E402
     TZ,
     add_mas,
     detect_signals,
+    draw_trade_png,
+    hourly_snapshot,
+    resample_1h,
     simulate,
     summarize,
 )
@@ -123,6 +126,26 @@ def test_no_overlap_positions() -> None:
         assert a.exit_idx < b.signal.bar_idx
 
 
+def test_resample_1h_and_snapshot() -> None:
+    df = add_mas(_breakdown_series(n=280, after="down"))
+    hourly = resample_1h(df)
+    assert 68 <= len(hourly) <= 71
+    assert "ma7" in hourly.columns
+    trades = simulate(df, detect_signals(df, "TESTUSDT"))
+    assert trades
+    snap = hourly_snapshot(hourly, trades[0].signal.timestamp)
+    assert "time" in snap
+    assert "ma7" in snap
+
+
+def test_draw_trade_png_has_hourly(tmp_path: Path | None = None) -> None:
+    df = add_mas(_breakdown_series(after="down"))
+    trades = simulate(df, detect_signals(df, "TESTUSDT"))
+    out = Path("/tmp/ma_break_short_15m_1h.png")
+    draw_trade_png(df, trades[0], out, 1, df_1h=resample_1h(df))
+    assert out.exists() and out.stat().st_size > 8000
+
+
 def test_summarize() -> None:
     class T:
         def __init__(self, pnl: float) -> None:
@@ -140,6 +163,8 @@ def main() -> int:
     test_short_take_profit()
     test_short_stop_loss()
     test_no_overlap_positions()
+    test_resample_1h_and_snapshot()
+    test_draw_trade_png_has_hourly()
     test_summarize()
     print("ok")
     return 0
