@@ -21,6 +21,14 @@ class WBottomPattern:
     breakout_idx: int | None = None
 
     @property
+    def trough(self) -> float:
+        return min(self.first_low, self.second_low)
+
+    @property
+    def depth(self) -> float:
+        return self.neckline - self.trough
+
+    @property
     def stop_loss(self) -> float:
         """停損設於第二個低點下方。"""
         return self.second_low
@@ -28,8 +36,7 @@ class WBottomPattern:
     @property
     def target(self) -> float:
         """量度目標：頸線 + (頸線 - 最低點)。"""
-        depth = self.neckline - min(self.first_low, self.second_low)
-        return self.neckline + depth
+        return self.neckline + self.depth
 
 
 def _is_swing_low(lows: Sequence[float], idx: int, lookback: int) -> bool:
@@ -179,6 +186,90 @@ def detect_w_bottoms(
             )
 
     return _dedupe_patterns(patterns)
+
+
+def detect_classic_w_bottoms(
+    df: pd.DataFrame,
+    *,
+    swing_lookback: int = 7,
+    low_tolerance_pct: float = 0.0012,
+    min_bars_between_lows: int = 20,
+    max_bars_between_lows: int = 75,
+    min_depth_pct: float = 0.0015,
+) -> list[WBottomPattern]:
+    """
+    與 detect_m_heads 對稱的經典 W 底（幾何型態，不含進場）。
+
+    條件：
+    1. 左低為底，右低等高或略高（不得再破底超過 0.25 點）
+    2. 兩低點之間有明確頸線（區間最高價）
+    3. 頸線相對谷底有足夠深度
+    """
+    required = {"open", "high", "low", "close"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"DataFrame 缺少欄位: {missing}")
+
+    lows = df["low"].tolist()
+    highs = df["high"].tolist()
+
+    swing_lows = _find_swing_lows(lows, swing_lookback)
+    patterns: list[WBottomPattern] = []
+
+    for i, first_idx in enumerate(swing_lows):
+        for second_idx in swing_lows[i + 1 :]:
+            gap = second_idx - first_idx
+            if gap < min_bars_between_lows:
+                continue
+            if gap > max_bars_between_lows:
+                break
+
+            first_low = lows[first_idx]
+            second_low = lows[second_idx]
+            avg_low = (first_low + second_low) / 2
+            if avg_low == 0:
+                continue
+            # 經典 W：左低為底，右低等高或略高；右低再破底是下跌中繼
+            if second_low < first_low - 0.25:
+                continue
+            if (second_low - first_low) / avg_low > low_tolerance_pct:
+                continue
+
+            hi_slice = highs[first_idx + 1 : second_idx]
+            if not hi_slice:
+                continue
+            neckline_price = max(hi_slice)
+            neckline_idx = first_idx + 1 + hi_slice.index(neckline_price)
+
+            trough = min(first_low, second_low)
+            if trough <= 0:
+                continue
+            depth = neckline_price - trough
+            if depth / trough < min_depth_pct:
+                continue
+
+            patterns.append(
+                WBottomPattern(
+                    first_low_idx=first_idx,
+                    second_low_idx=second_idx,
+                    neckline_idx=neckline_idx,
+                    first_low=first_low,
+                    second_low=second_low,
+                    neckline=neckline_price,
+                )
+            )
+
+    return _dedupe_classic_w_bottoms(patterns)
+
+
+def _dedupe_classic_w_bottoms(patterns: Iterable[WBottomPattern]) -> list[WBottomPattern]:
+    """同一第二低點只保留深度最大的 W 底。"""
+    by_l2: dict[int, WBottomPattern] = {}
+    for p in patterns:
+        existing = by_l2.get(p.second_low_idx)
+        if existing is None or p.depth > existing.depth:
+            by_l2[p.second_low_idx] = p
+    return sorted(by_l2.values(), key=lambda p: p.second_low_idx)
 
 
 def _dedupe_patterns(patterns: Iterable[WBottomPattern]) -> list[WBottomPattern]:
