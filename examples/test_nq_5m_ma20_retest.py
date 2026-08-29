@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nq.ma20_retest import (  # noqa: E402
+    Signal,
     TradeResult,
     detect_kwargs,
     detect_signals,
@@ -545,6 +546,57 @@ def test_1m_fills_early_right_shoulder() -> None:
     assert 0.0 <= sigs[0].entry_price - sigs[0].ma20 <= 20.0 + 1e-6
 
 
+def test_same_bar_wick_does_not_arm_be_stop() -> None:
+    """08-28 #15：10:28 同一根先低後高，不能用這根高點把停損拉到進場再出場。"""
+    idx = pd.date_range("2026-08-28 10:27", periods=8, freq="1min", tz=ET)
+    entry = 29614.25
+    stop = 29594.00
+    risk = entry - stop
+    target = entry + 1.5 * risk
+    open_ = np.full(8, entry)
+    high = np.full(8, entry + 4.0)
+    low = np.full(8, entry + 2.0)
+    close = np.full(8, entry + 3.0)
+    close[0] = entry
+    high[0] = 29645.75
+    low[0] = 29604.00
+    open_[0] = 29643.00
+    # 10:28：低點仍在原始停損上方，高點剛好夠 0.8R / 近 1.2R
+    open_[1] = 29613.75
+    high[1] = 29638.50
+    low[1] = 29611.25
+    close[1] = 29627.50
+    # 10:29 打到 1.5R，低點沒回到進場價
+    open_[2] = 29626.00
+    high[2] = 29654.00
+    low[2] = 29615.75
+    close[2] = 29652.75
+    df = pd.DataFrame(
+        {"Open": open_, "High": high, "Low": low, "Close": close, "Volume": 1.0},
+        index=idx,
+    )
+    sig = Signal(
+        break_idx=0,
+        trough_idx=0,
+        reclaim_idx=0,
+        entry_idx=0,
+        entry_price=entry,
+        stop_price=stop,
+        target_price=target,
+        break_low=29505.0,
+        support=29559.0,
+        ma5=entry,
+        ma10=entry,
+        ma20=entry,
+        ma60=entry,
+    )
+    trades = simulate(df, [sig], max_hold=6, ma_exit_after=60, be_after_r=0.8)
+    assert len(trades) == 1
+    assert trades[0].exit_reason == "target"
+    assert trades[0].exit_idx == 2
+    assert abs(trades[0].pnl_points - 1.5 * risk) < 1e-6
+
+
 def test_rth_skips_premarket_break() -> None:
     """08-12 08:30 那種夜盤破底，不能 09:30 開盤當成右肩。"""
     df = _1m_range_dump_reclaim_retest()
@@ -576,6 +628,7 @@ def main() -> int:
     test_1m_stop_is_shoulder_not_break()
     test_skips_close_far_above_ma20()
     test_1m_fills_early_right_shoulder()
+    test_same_bar_wick_does_not_arm_be_stop()
     test_rth_skips_premarket_break()
     print("ok")
     return 0

@@ -649,12 +649,9 @@ def simulate(
         exit_reason = "timeout"
 
         for k in range(entry_idx + 1, limit + 1):
-            mfe = max(mfe, float(high[k] - entry))
-            if be_after_r > 0 and mfe / risk >= be_after_r:
-                cur_stop = max(cur_stop, entry)
-            if trail_after_r > 0 and mfe / risk >= trail_after_r:
-                cur_stop = max(cur_stop, entry + trail_lock_r * risk)
-
+            # 先用「這根開盤時已經生效」的停損／目標。
+            # 08-28 10:28：開 29613、低 29611（還沒碰到右肩停損），高 29638
+            # 才剛夠 0.8R；同一根高低不能先拉保本再掃進場價，否則圈裡那筆變 0。
             if low[k] <= cur_stop:
                 reason = "be_stop" if cur_stop > stop + 1e-9 else "stop"
                 exit_idx, exit_price, exit_reason = k, float(cur_stop), reason
@@ -670,6 +667,12 @@ def simulate(
             ):
                 exit_idx, exit_price, exit_reason = k, float(close[k]), "ma20"
                 break
+
+            mfe = max(mfe, float(high[k] - entry))
+            if be_after_r > 0 and mfe / risk >= be_after_r:
+                cur_stop = max(cur_stop, entry)
+            if trail_after_r > 0 and mfe / risk >= trail_after_r:
+                cur_stop = max(cur_stop, entry + trail_lock_r * risk)
 
         busy_until = exit_idx
         pnl = exit_price - entry
