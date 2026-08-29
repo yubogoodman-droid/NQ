@@ -37,13 +37,11 @@ KEEP = {"AVGOUSDT", "ONDSUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"}
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": UA, "Clienttype": "web", "Accept": "application/json"})
 
+# 對齊幣安 App 預設均線：黃 MA7、粉 MA25、藍 MA99
 MA_COLORS = {
-    7: "#f0c14a",
-    14: "#26a69a",
+    7: "#f0b90b",
     25: "#d28cff",
-    99: "#42a5f5",
-    120: "#26c6da",
-    200: "#ef9a9a",
+    99: "#3b82f6",
 }
 
 
@@ -574,8 +572,9 @@ def _setup_cjk() -> None:
 
 
 def _trade_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
-    start = max(0, min(trade.signal.break_idx, trade.entry_idx) - 18)
-    end = min(len(df) - 1, max(trade.exit_idx, trade.entry_idx) + 10)
+    # 多留左側，讓 MA25 / MA99 曲線跟幣安 1h 手機圖一樣看得出長相
+    start = max(0, min(trade.signal.break_idx, trade.entry_idx) - 64)
+    end = min(len(df) - 1, max(trade.exit_idx, trade.entry_idx) + 14)
     return start, end
 
 
@@ -603,13 +602,13 @@ def _paint_candles(ax, xs, o, h, l, c):
 
     for k in range(len(xs)):
         up = float(c.iloc[k]) >= float(o.iloc[k])
-        col = "#3dba7a" if up else "#e35d5d"
-        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.65)
+        col = "#0ecb81" if up else "#f6465d"
+        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.7)
         y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
         if y1 == y0:
             y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
         ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
-        colors.append("#3dba7a99" if up else "#e35d5d99")
+        colors.append("#0ecb8199" if up else "#f6465d99")
     return colors
 
 
@@ -645,7 +644,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
 
     for n, col in MA_COLORS.items():
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
-        lw = 2.15 if n == 25 else (1.25 if n <= 14 else 1.0)
+        lw = 2.35 if n == 25 else (1.45 if n == 7 else 1.25)
         ax.plot(list(xs), ma, color=col, lw=lw, label=f"MA{n}")
 
     ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
@@ -697,7 +696,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         color="#e8f0ea",
         fontsize=11,
     )
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    ax.legend(loc="upper left", fontsize=8, frameon=False, labelcolor="#c8d5cc", ncol=3)
     step = max(1, len(window) // 6)
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
@@ -706,15 +705,15 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     h4 = resample_4h(df)
     if len(h4) >= 2:
         i4 = _loc_on_tf(h4.index, et) or max(0, len(h4) - 1)
-        s4 = max(0, i4 - 28)
-        e4 = min(len(h4) - 1, max(i4 + 6, (_loc_on_tf(h4.index, xt) or i4) + 3))
+        s4 = max(0, i4 - 42)
+        e4 = min(len(h4) - 1, max(i4 + 8, (_loc_on_tf(h4.index, xt) or i4) + 4))
         w4 = h4.iloc[s4 : e4 + 1]
         xs4 = range(len(w4))
         _paint_candles(ax4, xs4, w4["Open"], w4["High"], w4["Low"], w4["Close"])
         close4 = h4["Close"].astype(float)
         for n, col in MA_COLORS.items():
             ma = close4.rolling(n, min_periods=n).mean().iloc[s4 : e4 + 1]
-            lw = 2.15 if n == 25 else (1.15 if n <= 14 else 0.95)
+            lw = 2.35 if n == 25 else (1.35 if n == 7 else 1.2)
             ax4.plot(list(xs4), ma, color=col, lw=lw, label=f"MA{n}")
         for ts, col, mark in (
             (df.index[sig.break_idx], "#f472b6", "破底"),
@@ -735,7 +734,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             fontsize=9,
             va="top",
         )
-        ax4.legend(loc="upper right", fontsize=6, frameon=False, labelcolor="#c8d5cc", ncol=6)
+        ax4.legend(loc="upper right", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=3)
         step4 = max(1, len(w4) // 6)
         ticks4 = list(range(0, len(w4), step4))
         ax4.set_xticks(ticks4)
@@ -908,7 +907,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上（寬鬆）</h1>
-<p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 粉線 MA25<br/>
+<p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 黃 MA7 / 粉 MA25 / 藍 MA99（幣安預設）<br/>
 寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -1221,7 +1220,7 @@ def write_view_html(src: Path, branch: str = BRANCH, out_name: str = "view.html"
 def scan_symbol(symbol: str, days: int, detect_kw: dict) -> tuple[List[Hit], dict]:
     meta = {"symbol": symbol, "bars": 0, "error": "", "n_trade": 0}
     try:
-        df = fetch_klines(symbol, days=days + 12)
+        df = fetch_klines(symbol, days=days + 24)
     except Exception as exc:  # noqa: BLE001
         meta["error"] = str(exc)[:80]
         return [], meta
