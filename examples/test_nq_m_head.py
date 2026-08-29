@@ -26,6 +26,8 @@ from nq_m_head import (  # noqa: E402
     ribbon_spread,
     ribbon_tangled,
     slow_ma_sandwich,
+    far_above_ma200,
+    untested_htf_support,
     run_backtest,
     run_tf_backtest,
     sma,
@@ -314,6 +316,25 @@ def test_slow_ma_sandwich() -> None:
     assert not slow_ma_sandwich(29155.0, 29256.0, 29310.0)
 
 
+def test_far_above_ma200() -> None:
+    assert far_above_ma200(29896.75, 29730.0, 150.0)
+    assert far_above_ma200(29449.0, 29278.0, 150.0)
+    assert not far_above_ma200(29900.5, 29824.0, 150.0)  # 08-05 只高 76
+    assert not far_above_ma200(29469.0, 29388.0, 150.0)  # 08-21 只高 81
+    assert not far_above_ma200(29818.0, 29862.0, 150.0)  # 已破 MA200
+
+
+def test_untested_htf_support() -> None:
+    # #8：破 MA200、1h 還在下面 219、MA60 仍往上
+    assert untested_htf_support(29818.0, 29854.0, 29849.0, 29862.0, 29599.0, 200.0)
+    # #7：1h 也遠，但 MA60 已往下，放過
+    assert not untested_htf_support(29873.0, 29890.0, 29895.0, 29880.0, 29536.0, 200.0)
+    # 08-28：1h 只低 152，不到 200
+    assert not untested_htf_support(29634.0, 29650.0, 29638.0, 29641.0, 29481.0, 200.0)
+    # 還在 MA200 上方走第一條，不走這條
+    assert not untested_htf_support(29896.0, 29920.0, 29910.0, 29730.0, 29495.0, 200.0)
+
+
 def test_skip_slow_sandwich_still_allows_dump() -> None:
     """直落會跌出 MA120/200 夾心，5m 這條過濾不該誤殺真瀑布。"""
     df = _make_m_head_bars()
@@ -333,6 +354,8 @@ def test_tf_presets() -> None:
     assert TF_PRESETS["5m"]["trail_steps"][1] == (1.2, 0.9)
     assert TF_PRESETS["5m"]["stop_buffer"] == 36.0
     assert TF_PRESETS["5m"]["skip_slow_sandwich"] is True
+    assert TF_PRESETS["5m"]["max_above_ma200"] == 150.0
+    assert TF_PRESETS["5m"]["untested_htf_gap"] == 200.0
     assert "reclaim_htf" not in TF_PRESETS["5m"]
     assert "skip_before_minutes" not in TF_PRESETS["5m"]
     assert TF_PRESETS["1h"]["swing_lookback"] == 2
@@ -439,6 +462,8 @@ def main() -> int:
     test_trail_does_not_block_two_r()
     test_five_m_locks_one_r_giveback()
     test_slow_ma_sandwich()
+    test_far_above_ma200()
+    test_untested_htf_support()
     test_skip_slow_sandwich_still_allows_dump()
     test_tf_presets()
     test_overlay_m5_ma60()
