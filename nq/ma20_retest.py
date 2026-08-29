@@ -271,6 +271,7 @@ INTERVAL_DETECT = {
         ma20_5m_below=45.0,
         min_pullback=25.0,
         max_dump_body=30.0,
+        dump_skip_body=20.0,
         max_prev_above=50.0,
         min_retest_bars=8,
         max_close_above=20.0,
@@ -326,6 +327,7 @@ def detect_signals(
     ma20_5m_below: float = 0.0,
     min_pullback: float = 0.0,
     max_dump_body: float = 0.0,
+    dump_skip_body: float = 0.0,
     max_prev_above: float = 0.0,
     min_retest_bars: int = 0,
     max_close_above: float = 0.0,
@@ -452,14 +454,32 @@ def detect_signals(
             if min_pullback > 0 and peak - float(close[t]) < min_pullback:
                 continue
 
+            # 前一根大陰線已經踩到 MA20：這一根小陽線確認，收盤／低點可稍鬆
+            # （08-28 10:27 砸上均線不進，10:28 綠K 才是右肩）。
+            prev_m20 = float(ma20[t - 1]) if t > 0 and not np.isnan(ma20[t - 1]) else m20
+            prev_dump_sit = (
+                dump_skip_body > 0
+                and t > 0
+                and (float(open_[t - 1]) - float(close[t - 1])) >= dump_skip_body
+                and float(close[t - 1]) >= prev_m20
+                and (prev_m20 - float(low[t - 1])) >= -touch_above
+                and (prev_m20 - float(low[t - 1])) <= max_pierce
+            )
+            touch_lim = touch_above + (8.0 if prev_dump_sit else 0.0)
+            close_lim = (
+                max_close_above + (12.0 if prev_dump_sit else 0.0)
+                if max_close_above > 0
+                else 0.0
+            )
+
             pierce = m20 - float(low[t])
-            if pierce < -touch_above or pierce > max_pierce:
+            if pierce < -touch_lim or pierce > max_pierce:
                 continue
             if close[t] < m20:
                 continue
             # 進場價要坐在 MA20 上：08-28 10:27 收盤高 17 點仍算回踩；
             # 08-03 10:05 收盤高 31 點是彈走，再等下一腳。
-            if max_close_above > 0 and float(close[t]) - m20 > max_close_above:
+            if close_lim > 0 and float(close[t]) - m20 > close_lim:
                 continue
 
             # 右肩是坐上 MA20，不是大陰線從天上砸下來碰到均線
@@ -480,6 +500,10 @@ def detect_signals(
                 if np.isnan(m20_5_s_now) or m20_5_s_now < 0.0:
                     dead = True
                     break
+                continue
+            # 08-28 10:27 實體 29 點：砸上均線不是右肩小 K，等下一根確認。
+            if dump_skip_body > 0 and dump_body >= dump_skip_body:
+                bump("skip_dump")
                 continue
             if max_prev_above > 0 and prev_above >= max_prev_above:
                 bump("skip_dump")

@@ -375,6 +375,7 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["max_risk"] == 100.0
     assert d1["min_pullback"] == 25.0
     assert d1["max_dump_body"] == 30.0
+    assert d1["dump_skip_body"] == 20.0
     assert d1["max_prev_above"] == 50.0
     assert d1["stop_at_shoulder"] is True
     assert d1["min_retest_bars"] == 8
@@ -501,35 +502,38 @@ def test_skips_close_far_above_ma20() -> None:
 
 
 def test_1m_fills_early_right_shoulder() -> None:
-    """08-28 圈在 10:30：收復後約 9 根、收盤高 MA20 17 點、前一根高 46 點，應進場。"""
+    """08-28 圈在 10:30：10:27 大陰線砸上 MA20 不進，下一根小陽線才是右肩。"""
     df0 = _1m_range_dump_reclaim_retest()
     ctrl = detect_signals(df0, **detect_kwargs("1m", session="day"))
     assert ctrl
     reclaim = ctrl[0].reclaim_idx
-    sit = reclaim + 9
+    dump = reclaim + 9
+    sit = dump + 1
     df = df0.copy()
     close = df["Close"].to_numpy(copy=True)
     high = df["High"].to_numpy(copy=True)
     low = df["Low"].to_numpy(copy=True)
     opn = df["Open"].to_numpy(copy=True)
-    # 先把收復後推離均線，讓 leave_ok 成立
-    for t in range(reclaim + 1, sit):
+    for t in range(reclaim + 1, dump):
         close[t] = close[t - 1] + 8.0
         high[t] = close[t] + 6.0
         low[t] = close[t] - 3.0
         opn[t] = close[t - 1]
-    # 對齊當根 MA20：收盤高 17、低點高 6、前一根高 46（08-28 10:27）
     for _ in range(6):
-        m20 = float(pd.Series(close).rolling(20, min_periods=20).mean().iloc[sit])
-        close[sit - 1] = m20 + 46.0
-        high[sit - 1] = close[sit - 1] + 4.0
-        low[sit - 1] = m20 + 20.0
-        opn[sit - 1] = close[sit - 1]
-        close[sit] = m20 + 17.0
-        opn[sit] = m20 + 46.0
-        high[sit] = opn[sit] + 2.0
-        low[sit] = m20 + 6.0
-    # 後面抬走，避免晚一點的 11:23 式回踩搶進場
+        m20 = float(pd.Series(close).rolling(20, min_periods=20).mean().iloc[dump])
+        close[dump - 1] = m20 + 46.0
+        high[dump - 1] = close[dump - 1] + 4.0
+        low[dump - 1] = m20 + 20.0
+        opn[dump - 1] = close[dump - 1]
+        close[dump] = m20 + 17.0
+        opn[dump] = m20 + 46.0
+        high[dump] = opn[dump] + 2.0
+        low[dump] = m20 + 6.0
+        m20_sit = float(pd.Series(close).rolling(20, min_periods=20).mean().iloc[sit])
+        close[sit] = m20_sit + 12.0
+        opn[sit] = m20_sit + 4.0
+        high[sit] = close[sit] + 6.0
+        low[sit] = m20_sit - 2.0
     for t in range(sit + 1, min(sit + 40, len(close))):
         close[t] = close[t - 1] + 4.0
         high[t] = close[t] + 4.0
@@ -541,9 +545,9 @@ def test_1m_fills_early_right_shoulder() -> None:
     df["Low"] = low
     df["Open"] = opn
     sigs = detect_signals(df, **detect_kwargs("1m", session="day", ma20_5m_below=0.0))
-    assert sigs, "08-28 10:27-style right shoulder must fill"
+    assert sigs, "08-28 10:28-style right shoulder must fill after skipping the dump"
     assert sigs[0].entry_idx == sit
-    assert 0.0 <= sigs[0].entry_price - sigs[0].ma20 <= 20.0 + 1e-6
+    assert 0.0 <= sigs[0].entry_price - sigs[0].ma20 <= 32.0 + 1e-6
 
 
 def test_same_bar_wick_does_not_arm_be_stop() -> None:

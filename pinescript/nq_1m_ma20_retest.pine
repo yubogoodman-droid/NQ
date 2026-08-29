@@ -28,7 +28,8 @@ ma20Below     = input.float(45.0, "避開遠低於下彎 5m MA20（點，0=關�
 ma60SlopeBars = input.int(6, "5m MA60 斜率回看（5分K根數）", minval=1)
 minEntryGap   = input.int(60, "距上一筆最少根數", minval=0)
 minPullback   = input.float(25.0, "右肩至少從高點拉回（點，0=關）", minval=0)
-maxDumpBody   = input.float(30.0, "進場棒大陰實體上限（點，0=關）", minval=0)
+maxDumpBody   = input.float(30.0, "進場棒大陰實體上限（點，0=關；達標且 5m MA20 下彎則作廢）", minval=0)
+dumpSkipBody  = input.float(20.0, "大陰線踩 MA20 不進、等下一根（點，0=關）", minval=0)
 maxPrevAbove  = input.float(50.0, "前一根收盤高於 MA20 上限（點，0=關）", minval=0)
 minRetestBars = input.int(8, "收復後至少再過 N 根才進", minval=0)
 
@@ -111,9 +112,13 @@ if inSetup
             else
                 leftRun := 0
             pierce = ma20 - low
-            // 08-28 10:27 收盤高 17 點仍算回踩；高 31 點那種彈走再等
-            touch = leftOk and pulledOk and pierce >= -touchAbove and pierce <= maxPierce and close >= ma20 and (close - ma20) <= maxCloseAbove
+            prevDumpSit = dumpSkipBody > 0 and (open[1] - close[1]) >= dumpSkipBody and close[1] >= ma20[1] and (ma20[1] - low[1]) >= -touchAbove and (ma20[1] - low[1]) <= maxPierce
+            closeLim = maxCloseAbove + (prevDumpSit ? 12.0 : 0.0)
+            touchLim = touchAbove + (prevDumpSit ? 8.0 : 0.0)
+            // 08-28 10:27 大陰線不進；10:28 綠K 確認。高 31 點那種彈走再等
+            touch = leftOk and pulledOk and pierce >= -touchLim and pierce <= maxPierce and close >= ma20 and (close - ma20) <= closeLim
             dumpKill = maxDumpBody > 0 and (open - close) >= maxDumpBody and (na(ma20_5) or na(ma20_5_prev) or ma20_5 < ma20_5_prev)
+            dumpSkip = dumpSkipBody > 0 and (open - close) >= dumpSkipBody
             nearPrev = maxPrevAbove <= 0 or close[1] - ma20 < maxPrevAbove
             oldEnough = minRetestBars <= 0 or (bar_index - reclaimBar >= minRetestBars)
             stopLevel = nz(shoulderLow, low) - stopBuf
@@ -124,6 +129,9 @@ if inSetup
             gapOk = na(lastEntryBar) or (bar_index - lastEntryBar >= minEntryGap)
             if touch and dumpKill and oldEnough
                 inSetup := false
+            else if touch and dumpSkip
+                // 砸上均線的大陰線不進，留在這波等下一根
+                inSetup := true
             else if touch and nearPrev and oldEnough and inRth() and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and not farBelow5mMa20 and strategy.position_size == 0 and gapOk
                 tgt = close + risk * targetR
                 strategy.entry("破翻回踩", strategy.long)

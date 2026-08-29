@@ -315,7 +315,7 @@ def draw_trade_png(
         ell_h = max(yspan * 0.08, 22.0)
         ax.add_patch(
             Ellipse(
-                (ex, float(window["Low"].iloc[ex])),
+                (ex, trade.entry_price),
                 width=3.2,
                 height=ell_h,
                 fill=False,
@@ -653,7 +653,8 @@ def write_html_report(
     pullback_note = (
         "右肩要先從反彈高點拉回至少 25 點，離開均線 3 根後即可回踩。"
         "進場收盤須貼著 1m MA20（高於不超過 20 點）；影線掃到但收盤彈走 30 點那種再等下一腳。"
-        "大陰線砸上 MA20 這波作廢。只做日盤破底。"
+        "大陰線砸上 MA20 不進，等下一根小 K 確認；實體超過 30 點且 5m MA20 下彎則這波作廢。"
+        "只做日盤破底。"
         if interval == "1m"
         else ""
     )
