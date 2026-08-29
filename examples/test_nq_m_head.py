@@ -24,6 +24,7 @@ from nq_m_head import (  # noqa: E402
     parse_period_days,
     ribbon_spread,
     ribbon_tangled,
+    slow_ma_sandwich,
     run_backtest,
     run_tf_backtest,
     sma,
@@ -305,15 +306,18 @@ def test_five_m_locks_one_r_giveback() -> None:
     assert abs(trades[0].pnl_points - 50.0) < 0.26
 
 
-def test_skip_overnight_5m() -> None:
-    """5m 03:00 ET 前不空，擋住 00:35 那種亞洲深夜假跌破。"""
+def test_slow_ma_sandwich() -> None:
+    assert slow_ma_sandwich(29326.0, 29318.0, 29334.0)
+    assert not slow_ma_sandwich(29900.0, 29874.0, 29824.0)
+    assert not slow_ma_sandwich(29155.0, 29256.0, 29310.0)
+
+
+def test_skip_slow_sandwich_still_allows_dump() -> None:
+    """直落會跌出 MA120/200 夾心，5m 這條過濾不該誤殺真瀑布。"""
     df = _make_m_head_bars()
-    df = df.copy()
-    df.index = pd.date_range("2026-08-20 20:00", periods=len(df), freq="1min", tz=ET)
     funnel: dict = {}
-    sigs = generate_signals(df, funnel=funnel, skip_before_minutes=3 * 60)
-    assert not sigs, f"midnight break should skip, funnel={funnel}"
-    assert funnel.get("skip_overnight", 0) >= 1
+    sigs = generate_signals(df, funnel=funnel, skip_slow_sandwich=True)
+    assert sigs, f"clean dump should still enter, funnel={funnel}"
 
 
 def test_tf_presets() -> None:
@@ -325,7 +329,8 @@ def test_tf_presets() -> None:
     assert TF_PRESETS["1m"]["trail_steps"][0] == (1.6, 1.2)
     assert TF_PRESETS["5m"]["trail_steps"][0] == (0.8, 0.5)
     assert TF_PRESETS["5m"]["stop_buffer"] == 36.0
-    assert TF_PRESETS["5m"]["skip_before_minutes"] == 180
+    assert TF_PRESETS["5m"]["skip_slow_sandwich"] is True
+    assert "skip_before_minutes" not in TF_PRESETS["5m"]
 
 
 def test_overlay_m5_ma60() -> None:
@@ -376,7 +381,8 @@ def main() -> int:
     test_trail_locks_after_waterfall()
     test_trail_does_not_block_two_r()
     test_five_m_locks_one_r_giveback()
-    test_skip_overnight_5m()
+    test_slow_ma_sandwich()
+    test_skip_slow_sandwich_still_allows_dump()
     test_tf_presets()
     test_overlay_m5_ma60()
     test_5m_preset_still_fires()

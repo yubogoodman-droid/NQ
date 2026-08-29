@@ -77,7 +77,7 @@ TF_PRESETS = {
         "min_ribbon_spread": 28.0,
         "trail_steps": TRAIL_STEPS_5M,
         "stop_buffer": 36.0,  # 避開 #6 那種頭頂 +8 被軋空掃掉
-        "skip_before_minutes": 3 * 60,  # 03:00 前亞洲深夜不空（#4 00:35 那種）
+        "skip_slow_sandwich": True,  # 收盤夾在 MA120/MA200 中間不空（#4 假跌破）
     },
 }
 
@@ -200,6 +200,14 @@ def ribbon_tangled(*values: float, min_spread: float) -> bool:
     return bool(np.isnan(spread) or spread < min_spread)
 
 
+def slow_ma_sandwich(close: float, ma120: float, ma200: float) -> bool:
+    """收盤夾在 MA120 與 MA200 之間：慢均還在托，MA60 常是假跌破。"""
+    if np.isnan(close) or np.isnan(ma120) or np.isnan(ma200):
+        return False
+    lo, hi = (ma120, ma200) if ma120 <= ma200 else (ma200, ma120)
+    return bool(lo < close < hi)
+
+
 def overlay_m5_ma60(df_1m: pd.DataFrame, df_5m: pd.DataFrame) -> pd.DataFrame:
     """把已收盤的 5m MA60 對齊到 1m（不偷看當根未收的 5 分 K）。"""
     out = df_1m.copy()
@@ -311,11 +319,11 @@ def generate_signals(
     min_break_pts: float = 8.0,
     session_start: Optional[int] = None,
     session_end: Optional[int] = None,
-    skip_before_minutes: Optional[int] = None,
     target_r: float = 2.0,
     use_measured_target: bool = False,
     timeframe: str = "1m",
     min_ribbon_spread: float = 28.0,
+    skip_slow_sandwich: bool = False,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """高檔 M 頭確認後，收盤跌破 MA60 做空；均線還糾結就先等打開。"""
@@ -341,6 +349,8 @@ def generate_signals(
     ma20 = sma(close, 20)
     ma30 = sma(close, 30)
     ma60 = sma(close, 60)
+    ma120 = sma(close, 120)
+    ma200 = sma(close, 200)
     n = len(df)
     signals: List[Signal] = []
     used_entry: set[int] = set()
@@ -365,6 +375,7 @@ def generate_signals(
         invalidated = False
         entry_idx: int | None = None
         broke_structure = False
+        saw_sandwich = False
         for k in range(confirm, end + 1):
             if high[k] > p.peak:
                 invalidated = True
@@ -388,13 +399,24 @@ def generate_signals(
                 min_spread=min_ribbon_spread,
             ):
                 continue
+            # 夾在 MA120/MA200 中間＝慢均還托著，只破 MA60 當假跌破。
+            if skip_slow_sandwich and slow_ma_sandwich(
+                float(close[k]), float(ma120[k]), float(ma200[k])
+            ):
+                saw_sandwich = True
+                continue
             entry_idx = k
             break
         if invalidated:
             bump("skip_invalidated")
             continue
         if entry_idx is None:
-            bump("skip_tangled" if broke_structure else "skip_no_ma60")
+            if saw_sandwich:
+                bump("skip_sandwich")
+            elif broke_structure:
+                bump("skip_tangled")
+            else:
+                bump("skip_no_ma60")
             continue
         if session_start is not None and session_end is not None:
             ts = df.index[entry_idx]
@@ -403,14 +425,6 @@ def generate_signals(
             minutes = int(ts.hour) * 60 + int(ts.minute)
             if not (session_start <= minutes < session_end):
                 bump("skip_session")
-                continue
-        if skip_before_minutes is not None:
-            ts = df.index[entry_idx]
-            if getattr(ts, "tzinfo", None):
-                ts = ts.tz_convert(ET)
-            minutes = int(ts.hour) * 60 + int(ts.minute)
-            if minutes < skip_before_minutes:
-                bump("skip_overnight")
                 continue
         if entry_idx in used_entry:
             bump("skip_dup_entry")
@@ -855,7 +869,7 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"伸幅不足 {funnel.get('skip_thin_ext', 0)} · "
         f"未破MA60 {funnel.get('skip_no_ma60', 0)} · "
         f"均線糾結 {funnel.get('skip_tangled', 0)} · "
-        f"深夜 {funnel.get('skip_overnight', 0)} · "
+        f"慢均夾心 {funnel.get('skip_sandwich', 0)} · "
         f"破高失效 {funnel.get('skip_invalidated', 0)} · "
         f"風險過窄 {funnel.get('skip_tiny_risk', 0)} · "
         f"風險過寬 {funnel.get('skip_wide_risk', 0)}）</p>"
@@ -932,7 +946,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。03:00 ET 前不空。停損頭頂 +36。鎖利 0.8 / 1.2 / 1.6R（下一根生效）。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間不空。停損頭頂 +36。鎖利 0.8 / 1.2 / 1.6R（下一根生效）。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
@@ -979,7 +993,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 一分K 高檔M頭 · 跌破MA60做空</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。1m 停損頭頂 +8、1.6R 鎖 1.2R；5m 停損 +36，鎖利 0.8 / 1.2 / 1.6R。鎖利下一根才生效。</p>
+<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。1m 停損頭頂 +8、1.6R 鎖 1.2R；5m 停損 +36，收盤夾在 MA120/MA200 中間不空。鎖利下一根才生效。</p>
 {note_line}
 {compare_line}
 {_stats_cards(stats)}
@@ -1063,7 +1077,7 @@ def cmd_backtest(args) -> int:
             f"thin={m5_funnel.get('skip_thin_ext', 0)} "
             f"no_ma60={m5_funnel.get('skip_no_ma60', 0)} "
             f"tangled={m5_funnel.get('skip_tangled', 0)} "
-            f"overnight={m5_funnel.get('skip_overnight', 0)} "
+            f"sandwich={m5_funnel.get('skip_sandwich', 0)} "
             f"invalid={m5_funnel.get('skip_invalidated', 0)}"
         )
         for i, t in enumerate(m5_trades, 1):
