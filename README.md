@@ -68,6 +68,7 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 ```bash
 python3 examples/binance_15m_ma_break_short.py --pages
+python3 examples/binance_15m_ma_break_short.py --pages --days 30
 python3 examples/binance_15m_ma_break_short.py --symbol MUBARAKUSDT
 ```
 

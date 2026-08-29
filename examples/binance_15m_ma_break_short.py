@@ -29,6 +29,7 @@ import requests
 TZ = ZoneInfo("Asia/Taipei")
 REPO = Path(__file__).resolve().parents[1]
 PAGES = REPO / "docs" / "binance-15m-ma-short" / "index.html"
+PAGES_30D = REPO / "docs" / "binance-15m-ma-short-30d" / "index.html"
 BRANCH_VIEW = "cursor/15m-ma-break-short-9d44"
 
 INTERVAL = "15m"
@@ -48,7 +49,8 @@ APPROACH_BARS = 8  # 進場前幾根要多數還在長均之上
 MIN_APPROACH_ABOVE = 4  # 少於這個＝在帶裡穿梭或已經破了再追
 MIN_QV = 5_000_000
 KEEP = ("MUBARAKUSDT",)
-MAX_CHARTS = 80
+MAX_CHARTS = 150
+KLINE_PAGE = 1500
 
 SESSION = requests.Session()
 SESSION.headers.update(
@@ -116,6 +118,36 @@ def _klines_to_df(raw: list) -> pd.DataFrame:
     return df[~df.index.duplicated(keep="last")].sort_index()
 
 
+def kline_limit_needed(days: int, interval: str = INTERVAL) -> int:
+    """回測窗口 + 均線暖身。15m 一天 96 根，1h 一天 24 根。"""
+    per_day = 24 if interval == "1h" else 96
+    return days * per_day + WARMUP + 48
+
+
+def _fetch_klines_page(
+    symbol: str,
+    limit: int,
+    *,
+    interval: str,
+    futures: bool,
+    end_time_ms: int | None,
+) -> pd.DataFrame:
+    hosts = FAPI if futures else SPOT
+    path = "/fapi/v1/klines" if futures else "/api/v3/klines"
+    page = min(limit, 1000 if not futures else KLINE_PAGE)
+    last: Exception | None = None
+    for host in hosts:
+        try:
+            params: dict[str, Any] = {"symbol": symbol, "interval": interval, "limit": page}
+            if end_time_ms is not None:
+                params["endTime"] = end_time_ms
+            raw = get_json(host + path, params)
+            return _klines_to_df(raw)
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+    raise RuntimeError(f"klines page {symbol} {interval}: {last}")
+
+
 def fetch_klines(
     symbol: str,
     limit: int = 1000,
@@ -123,28 +155,41 @@ def fetch_klines(
     interval: str = INTERVAL,
     futures: bool = True,
 ) -> pd.DataFrame:
-    hosts = FAPI if futures else SPOT
-    path = "/fapi/v1/klines" if futures else "/api/v3/klines"
-    last: Exception | None = None
-    for host in hosts:
+    """往回抓夠多根 K。幣安單次最多 1500，超過就分頁。"""
+    parts: list[pd.DataFrame] = []
+    got = 0
+    end_time_ms: int | None = None
+    last_err: Exception | None = None
+    while got < limit:
+        batch = min(KLINE_PAGE if futures else 1000, limit - got)
         try:
-            raw = get_json(
-                host + path,
-                {"symbol": symbol, "interval": interval, "limit": limit},
+            df = _fetch_klines_page(
+                symbol, batch, interval=interval, futures=futures, end_time_ms=end_time_ms
             )
-            df = _klines_to_df(raw)
-            if df.empty:
-                continue
-            now_ms = int(time.time() * 1000)
-            last_open = int(df.index[-1].tz_convert("UTC").timestamp() * 1000)
-            if last_open + BAR_MS[interval] > now_ms:
-                df = df.iloc[:-1]
-            return df
         except Exception as exc:  # noqa: BLE001
-            last = exc
-    if futures:
-        return fetch_klines(symbol, limit=limit, interval=interval, futures=False)
-    raise RuntimeError(f"klines {symbol} {interval}: {last}")
+            last_err = exc
+            break
+        if df.empty:
+            break
+        parts.append(df)
+        got += len(df)
+        first_open = int(df.index[0].tz_convert("UTC").timestamp() * 1000)
+        end_time_ms = first_open - 1
+        if len(df) < batch:
+            break
+    if not parts:
+        if futures:
+            return fetch_klines(symbol, limit=limit, interval=interval, futures=False)
+        raise RuntimeError(f"klines {symbol} {interval}: {last_err}")
+    out = pd.concat(parts)
+    out = out[~out.index.duplicated(keep="last")].sort_index()
+    now_ms = int(time.time() * 1000)
+    last_open = int(out.index[-1].tz_convert("UTC").timestamp() * 1000)
+    if last_open + BAR_MS[interval] > now_ms:
+        out = out.iloc[:-1]
+    if len(out) > limit:
+        out = out.iloc[-limit:]
+    return out
 
 
 def resample_1h(df: pd.DataFrame) -> pd.DataFrame:
@@ -244,13 +289,19 @@ def filter_signals_1h(
     return kept
 
 
-def load_1h_frames(symbols: list[str], frames_15m: dict[str, pd.DataFrame], workers: int = 8) -> dict[str, pd.DataFrame]:
+def load_1h_frames(
+    symbols: list[str],
+    frames_15m: dict[str, pd.DataFrame],
+    workers: int = 8,
+    *,
+    limit: int = 1000,
+) -> dict[str, pd.DataFrame]:
     out: dict[str, pd.DataFrame] = {}
     uniq = [s for s in dict.fromkeys(symbols) if s]
 
     def one(sym: str) -> tuple[str, pd.DataFrame]:
         try:
-            return sym, add_mas(fetch_klines(sym, limit=500, interval="1h"))
+            return sym, add_mas(fetch_klines(sym, limit=limit, interval="1h"))
         except Exception:
             src = frames_15m.get(sym)
             return sym, resample_1h(src) if src is not None else pd.DataFrame()
@@ -990,7 +1041,7 @@ def scan_symbol(sym: str, *, days: int, limit: int) -> tuple[str, pd.DataFrame, 
     sigs = detect_signals(df, sym, eval_start=start, funnel=funnel)
     if sigs:
         try:
-            df_1h = add_mas(fetch_klines(sym, limit=500, interval="1h"))
+            df_1h = add_mas(fetch_klines(sym, limit=kline_limit_needed(days, "1h"), interval="1h"))
         except Exception:
             df_1h = resample_1h(df)
         sigs = filter_signals_1h(sigs, df_1h, funnel)
@@ -1055,7 +1106,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--min-qv", type=float, default=MIN_QV)
     p.add_argument("--workers", type=int, default=10)
     p.add_argument("--html", default="")
-    p.add_argument("--pages", action="store_true", help="寫到 docs/binance-15m-ma-short/")
+    p.add_argument("--pages", action="store_true", help="寫到 docs/binance-15m-ma-short/（--days 28 以上寫 30d）")
     p.add_argument("--embed", action="store_true", help="圖用 base64 嵌進 HTML")
     args = p.parse_args(argv)
 
@@ -1068,8 +1119,9 @@ def main(argv: list[str] | None = None) -> int:
         symbols = universe(args.min_qv)
         print(f"掃描 {len(symbols)} 個 USDT 永續（含 {', '.join(KEEP)}）", flush=True)
 
+    limit = max(args.limit, kline_limit_needed(args.days, "15m"))
     t0 = time.time()
-    result = scan_many(symbols, days=args.days, limit=args.limit, workers=args.workers)
+    result = scan_many(symbols, days=args.days, limit=limit, workers=args.workers)
     print(f"掃完 {result.symbols} 檔 用 {time.time() - t0:.1f}s  失敗 {result.errors}", flush=True)
     print_summary("全市場", result.trades, result.funnel)
 
@@ -1082,7 +1134,7 @@ def main(argv: list[str] | None = None) -> int:
 
     html_path = Path(args.html) if args.html else None
     if args.pages:
-        html_path = PAGES
+        html_path = PAGES_30D if args.days >= 28 else PAGES
     if html_path:
         now = datetime.now(TZ)
         start = eval_start_ts(args.days, now)
@@ -1096,7 +1148,9 @@ def main(argv: list[str] | None = None) -> int:
         show_mubarak = not args.symbol or "MUBARAK" in args.symbol.upper()
         need_1h = sorted({t.signal.symbol for t in result.trades} | ({"MUBARAKUSDT"} if show_mubarak else set()))
         print(f"抓 1h 對照 {len(need_1h)} 檔…", flush=True)
-        frames_1h = load_1h_frames(need_1h, result.frames)
+        frames_1h = load_1h_frames(
+            need_1h, result.frames, limit=kline_limit_needed(args.days, "1h")
+        )
         write_html_report(
             html_path,
             result.trades,

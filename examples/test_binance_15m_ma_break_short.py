@@ -18,6 +18,7 @@ from binance_15m_ma_break_short import (  # noqa: E402
     draw_trade_png,
     filter_signals_1h,
     hourly_snapshot,
+    kline_limit_needed,
     last_closed_1h_idx,
     resample_1h,
     simulate,
@@ -219,6 +220,12 @@ def test_rejects_weaving_before_break() -> None:
     assert funnel.get("skip_weave", 0) >= 1
 
 
+def test_kline_limit_covers_month() -> None:
+    assert kline_limit_needed(7, "15m") >= 7 * 96 + 200
+    assert kline_limit_needed(30, "15m") >= 30 * 96 + 200
+    assert kline_limit_needed(30, "1h") >= 30 * 24 + 200
+
+
 def test_summarize() -> None:
     class T:
         def __init__(self, pnl: float) -> None:
@@ -241,6 +248,7 @@ def main() -> int:
     test_1h_first_break_keeps_and_rejects()
     test_rejects_glued_short_mas_without_volume()
     test_rejects_weaving_before_break()
+    test_kline_limit_covers_month()
     test_summarize()
     print("ok")
     return 0
