@@ -226,6 +226,24 @@ def fetch_klines(symbol: str, interval: str = "1h", days: int = 45, drop_forming
     return df.loc[df.index >= cutoff].copy()
 
 
+def resample_4h(df: pd.DataFrame) -> pd.DataFrame:
+    """1h → 4h，對齊幣安 UTC 整點開盤。"""
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+    utc = df.copy()
+    if utc.index.tz is None:
+        utc.index = utc.index.tz_localize("UTC")
+    else:
+        utc.index = utc.index.tz_convert("UTC")
+    agg = {"Open": "first", "High": "max", "Low": "min", "Close": "last"}
+    if "Volume" in utc.columns:
+        agg["Volume"] = "sum"
+    out = utc.resample("4h", label="left", closed="left").agg(agg).dropna(subset=["Open", "High", "Low", "Close"])
+    if out.empty:
+        return out
+    return out.tz_convert(TPE)
+
+
 # ---------------------------------------------------------------------------
 # Pattern
 # ---------------------------------------------------------------------------
@@ -551,12 +569,45 @@ def _trade_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     return start, end
 
 
+def _loc_on_tf(index: pd.DatetimeIndex, ts) -> Optional[int]:
+    if ts is None or len(index) == 0:
+        return None
+    if getattr(ts, "tzinfo", None) is not None and index.tz is not None:
+        ts = ts.tz_convert(index.tz)
+    pos = int(index.searchsorted(ts, side="right") - 1)
+    if 0 <= pos < len(index):
+        return pos
+    return None
+
+
+def _style_ax(ax) -> None:
+    ax.set_facecolor("#101814")
+    ax.tick_params(colors="#8aa193", labelsize=8)
+    for sp in ax.spines.values():
+        sp.set_color("#2a3a33")
+
+
+def _paint_candles(ax, xs, o, h, l, c):
+    colors = []
+    from matplotlib.patches import Rectangle
+
+    for k in range(len(xs)):
+        up = float(c.iloc[k]) >= float(o.iloc[k])
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.65)
+        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
+        if y1 == y0:
+            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+        colors.append("#3dba7a99" if up else "#e35d5d99")
+    return colors
+
+
 def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int, title_extra: str = "") -> Path:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.patches import Rectangle
 
     _setup_cjk()
     sig = trade.signal
@@ -567,30 +618,18 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     vol = window["Volume"] if "Volume" in window.columns else None
     close_full = df["Close"].astype(float)
 
-    fig, (ax, axv) = plt.subplots(
-        2,
+    fig, (ax, axv, ax4) = plt.subplots(
+        3,
         1,
-        figsize=(10.4, 5.6),
-        sharex=True,
-        gridspec_kw={"height_ratios": [3.2, 1]},
+        figsize=(10.4, 8.0),
+        gridspec_kw={"height_ratios": [3.0, 0.75, 2.15]},
         facecolor="#0c1210",
     )
-    for a in (ax, axv):
-        a.set_facecolor("#101814")
-        a.tick_params(colors="#8aa193", labelsize=8)
-        for sp in a.spines.values():
-            sp.set_color("#2a3a33")
+    ax.sharex(axv)
+    for a in (ax, axv, ax4):
+        _style_ax(a)
 
-    colors_v = []
-    for k in range(len(window)):
-        up = float(c.iloc[k]) >= float(o.iloc[k])
-        col = "#3dba7a" if up else "#e35d5d"
-        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.65)
-        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
-        if y1 == y0:
-            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
-        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
-        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    colors_v = _paint_candles(ax, xs, o, h, l, c)
     if vol is not None:
         axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
 
@@ -642,7 +681,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     sign = "+" if trade.pnl_pct >= 0 else ""
     extra = f"{title_extra}  " if title_extra else ""
     ax.set_title(
-        f"#{trade_no}  {extra}Q{trade.quality} {sig.shape}  "
+        f"#{trade_no}  {extra}Q{trade.quality} {sig.shape}  1h  "
         f"{et.strftime('%m-%d %H:%M')} → {xt.strftime('%m-%d %H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_pct:.2f}%",
         color="#e8f0ea",
@@ -653,6 +692,47 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
     axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+
+    h4 = resample_4h(df)
+    if len(h4) >= 2:
+        i4 = _loc_on_tf(h4.index, et) or max(0, len(h4) - 1)
+        s4 = max(0, i4 - 28)
+        e4 = min(len(h4) - 1, max(i4 + 6, (_loc_on_tf(h4.index, xt) or i4) + 3))
+        w4 = h4.iloc[s4 : e4 + 1]
+        xs4 = range(len(w4))
+        _paint_candles(ax4, xs4, w4["Open"], w4["High"], w4["Low"], w4["Close"])
+        close4 = h4["Close"].astype(float)
+        for n, col in MA_COLORS.items():
+            ma = close4.rolling(n, min_periods=n).mean().iloc[s4 : e4 + 1]
+            lw = 2.15 if n == 25 else (1.15 if n <= 14 else 0.95)
+            ax4.plot(list(xs4), ma, color=col, lw=lw, label=f"MA{n}")
+        for ts, col, mark in (
+            (df.index[sig.break_idx], "#f472b6", "破底"),
+            (et, "#00e676", "站上"),
+            (xt, "#f0c14b", None),
+        ):
+            px = _loc_on_tf(w4.index, ts)
+            if px is not None:
+                ax4.axvline(px, color=col, ls="--", lw=0.85, alpha=0.85)
+                if mark:
+                    ax4.scatter([px], [float(w4["Close"].iloc[px])], s=28, color=col, zorder=5)
+        ax4.text(
+            0.01,
+            0.92,
+            "4h 對照",
+            transform=ax4.transAxes,
+            color="#c8d5cc",
+            fontsize=9,
+            va="top",
+        )
+        ax4.legend(loc="upper right", fontsize=6, frameon=False, labelcolor="#c8d5cc", ncol=6)
+        step4 = max(1, len(w4) // 6)
+        ticks4 = list(range(0, len(w4), step4))
+        ax4.set_xticks(ticks4)
+        ax4.set_xticklabels([w4.index[i].strftime("%m-%d %H:%M") for i in ticks4], color="#8aa193")
+    else:
+        ax4.set_visible(False)
+
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -753,7 +833,7 @@ def write_html_report(
             "</header>"
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            f"<span class='tag tag-info'>1h MA25</span>"
+            f"<span class='tag tag-info'>1h + 4h</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
             f"{fresh}"
             "</div>"
@@ -819,7 +899,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上（寬鬆）</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 粉線 MA25<br/>
-寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。停損破底低點，目標 2R。{card_note}</p>
+寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。停損破底低點，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -856,7 +936,7 @@ def write_view_html(src: Path, branch: str = BRANCH) -> Path:
 def scan_symbol(symbol: str, days: int, detect_kw: dict) -> tuple[List[Hit], dict]:
     meta = {"symbol": symbol, "bars": 0, "error": "", "n_trade": 0}
     try:
-        df = fetch_klines(symbol, days=days)
+        df = fetch_klines(symbol, days=days + 12)
     except Exception as exc:  # noqa: BLE001
         meta["error"] = str(exc)[:80]
         return [], meta
@@ -867,9 +947,11 @@ def scan_symbol(symbol: str, days: int, detect_kw: dict) -> tuple[List[Hit], dic
     funnel: Dict[str, int] = {}
     sigs = detect_signals(df, funnel=funnel, **detect_kw)
     trades = simulate(df, sigs)
-    meta["n_trade"] = len(trades)
+    cutoff = datetime.now(TPE) - timedelta(days=days)
+    hits = [Hit(symbol, df, t) for t in trades if df.index[t.entry_idx] >= cutoff]
+    meta["n_trade"] = len(hits)
     meta["funnel"] = funnel
-    return [Hit(symbol, df, t) for t in trades], meta
+    return hits, meta
 
 
 def merge_funnels(acc: Dict[str, int], part: Dict[str, int]) -> None:

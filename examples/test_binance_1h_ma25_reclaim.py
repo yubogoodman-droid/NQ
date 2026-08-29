@@ -18,11 +18,37 @@ from binance_1h_ma25_reclaim import (  # noqa: E402
     detect_signals,
     flush_metrics,
     quality_of,
+    resample_4h,
     simulate,
     sma,
     summarize_trades,
     write_html_report,
 )
+
+
+def test_resample_4h() -> None:
+    start = pd.Timestamp("2026-08-27 08:00", tz="Asia/Taipei")  # 00:00 UTC
+    times = [start + pd.Timedelta(hours=i) for i in range(8)]
+    df = pd.DataFrame(
+        {
+            "Open": [100, 101, 102, 99, 98, 97, 96, 100],
+            "High": [101, 103, 104, 100, 99, 98, 97, 105],
+            "Low": [99, 100, 98, 95, 96, 94, 93, 99],
+            "Close": [101, 102, 99, 98, 97, 96, 100, 104],
+            "Volume": [1, 2, 3, 4, 5, 6, 7, 8],
+        },
+        index=times,
+    )
+    out = resample_4h(df)
+    assert len(out) == 2
+    first = out.iloc[0]
+    assert first["Open"] == 100
+    assert first["High"] == 104
+    assert first["Low"] == 95
+    assert first["Close"] == 98
+    assert first["Volume"] == 10
+    assert out.index[0] == start
+    assert out.index[1] == start + pd.Timedelta(hours=4)
 
 
 def test_sma() -> None:
@@ -225,12 +251,15 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     text = path.read_text(encoding="utf-8")
     assert "MA25" in text
     assert "下破底" in text
+    assert "1h + 4h" in text
+    assert "4h K 對照" in text
     if trades:
         assert "<img src='img/" in text
         assert any((path.parent / "img").glob("t01_*.png"))
 
 
 def main() -> int:
+    test_resample_4h()
     test_sma()
     test_quality_of()
     test_classify_v_and_w()
