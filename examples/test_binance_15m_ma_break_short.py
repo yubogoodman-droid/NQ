@@ -22,6 +22,7 @@ from binance_15m_ma_break_short import (  # noqa: E402
     last_closed_1h_idx,
     resample_1h,
     simulate,
+    skip_noisy_tod,
     summarize,
 )
 
@@ -220,6 +221,19 @@ def test_rejects_weaving_before_break() -> None:
     assert funnel.get("skip_weave", 0) >= 1
 
 
+def test_skips_mid_hour_and_us_session() -> None:
+    assert skip_noisy_tod(pd.Timestamp("2026-08-25 16:00", tz=TZ)) is None
+    assert skip_noisy_tod(pd.Timestamp("2026-08-25 16:15", tz=TZ)) == "skip_minute"
+    assert skip_noisy_tod(pd.Timestamp("2026-08-25 21:30", tz=TZ)) == "skip_hour"
+    df = add_mas(_breakdown_series(after="down"))
+    # 230 根從 00:00 起是 09:30；往前挪 15 分讓破位落在 :15
+    df = df.copy()
+    df.index = df.index - pd.Timedelta(minutes=15)
+    funnel: dict[str, int] = {}
+    assert detect_signals(df, "TODUSDT", funnel=funnel) == []
+    assert funnel.get("skip_minute", 0) >= 1
+
+
 def test_kline_limit_covers_month() -> None:
     assert kline_limit_needed(7, "15m") >= 7 * 96 + 200
     assert kline_limit_needed(30, "15m") >= 30 * 96 + 200
@@ -248,6 +262,7 @@ def main() -> int:
     test_1h_first_break_keeps_and_rejects()
     test_rejects_glued_short_mas_without_volume()
     test_rejects_weaving_before_break()
+    test_skips_mid_hour_and_us_session()
     test_kline_limit_covers_month()
     test_summarize()
     print("ok")
