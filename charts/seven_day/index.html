@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>7日結構訊號 · 一訊一圖</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg0:#0c1210; --bg1:#14201b; --ink:#e8f0ea; --muted:#8aa193; --line:rgba(232,240,234,0.12);
+    --long:#3dba7a; --short:#e35d5d; --accent:#c9a227; }
+  body { margin:0; font-family:"IBM Plex Sans",sans-serif; color:var(--ink);
+    background: radial-gradient(900px 500px at 10% -10%, rgba(201,162,39,.18), transparent 55%), linear-gradient(165deg,var(--bg0),var(--bg1)); min-height:100vh; }
+  .wrap { max-width:1100px; margin:0 auto; padding:40px 20px 64px; }
+  h1 { font-family:"IBM Plex Serif",serif; font-size:clamp(1.8rem,3.5vw,2.4rem); margin:0 0 8px; }
+  .sub { color:var(--muted); max-width:44rem; line-height:1.55; margin-bottom:22px; }
+  .stats { display:flex; flex-wrap:wrap; gap:14px 22px; margin-bottom:22px; color:var(--muted); font-size:.9rem; }
+  .stats b { color:var(--ink); font-family:"JetBrains Mono",monospace; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+  a.card { display:block; text-decoration:none; color:inherit; border:1px solid var(--line); padding:16px;
+    background:linear-gradient(180deg, rgba(255,255,255,.04), transparent 55%), rgba(20,32,27,.65);
+    transition: border-color .15s, transform .15s; }
+  a.card:hover { border-color:rgba(201,162,39,.55); transform:translateY(-2px); }
+  .name { font-family:"IBM Plex Serif",serif; font-size:1.15rem; margin-bottom:10px; }
+  .row { display:flex; justify-content:space-between; gap:10px; font-size:.86rem; color:var(--muted); margin-top:6px; }
+  .row b { color:var(--ink); font-family:"JetBrains Mono",monospace; font-size:.8rem; }
+  .pills { display:flex; justify-content:space-between; gap:6px; margin-top:12px; font-size:.72rem; color:var(--muted); }
+  .pills b { font-family:"JetBrains Mono",monospace; font-size:.78rem; }
+  .pos { color:var(--long); } .neg { color:var(--short); } .na { color:var(--muted); }
+  .mono { font-family:"JetBrains Mono",monospace; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="stats" style="margin-bottom:18px"><a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · <a href="../seven_day.html" style="color:#8aa193;text-decoration:none">7日摘要</a> · <a href="../ten_day.html" style="color:#8aa193;text-decoration:none">10日摘要</a> · <a href="../thirty_day.html" style="color:#8aa193;text-decoration:none">30日摘要</a> · <a href="./index.html" style="color:#8aa193;text-decoration:none">一訊一圖</a></div>
+    <h1>7日結構訊號 · 一訊一圖</h1>
+    <p class="sub">2026-08-22 → 2026-08-28 UTC · 滾動24h Top10 · 結構（收盤確認、跨度≥9、乖離≤65%、距SMA200≤40%、不破 MA99）· 不看量 · 一訊一圖（±18h）。</p>
+    <div class="stats">
+      <span>訊號總數 <b>22</b></span>
+      <span>幣種 <b>13</b></span>
+    </div>
+    <div class="grid">
+      
+        <a class="card" href="./MAGMAUSDT_20260828_1340.html">
+          <div class="name">MAGMA/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-28 13:40</b></div>
+          <div class="row"><span>乖離</span><b>15.4%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-1.30%</b></span>
+            <span>4h <b class="neg">-15.97%</b></span>
+            <span>8h <b class="neg">-22.56%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./MERLUSDT_20260827_2330.html">
+          <div class="name">MERL/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-27 23:30</b></div>
+          <div class="row"><span>乖離</span><b>13.6%</b></div>
+          <div class="pills">
+            <span>1h <b class="pos">+0.68%</b></span>
+            <span>4h <b class="pos">+3.03%</b></span>
+            <span>8h <b class="pos">+5.50%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./MERLUSDT_20260827_2300.html">
+          <div class="name">MERL/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-27 23:00</b></div>
+          <div class="row"><span>乖離</span><b>13.6%</b></div>
+          <div class="pills">
+            <span>1h <b class="pos">+4.63%</b></span>
+            <span>4h <b class="pos">+4.50%</b></span>
+            <span>8h <b class="pos">+7.11%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./TUTUSDT_20260827_0715.html">
+          <div class="name">TUT/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-27 07:15</b></div>
+          <div class="row"><span>乖離</span><b>13.9%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-3.46%</b></span>
+            <span>4h <b class="neg">-4.92%</b></span>
+            <span>8h <b class="neg">-3.75%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./TACUSDT_20260826_1920.html">
+          <div class="name">TAC/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-26 19:20</b></div>
+          <div class="row"><span>乖離</span><b>31.2%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-1.71%</b></span>
+            <span>4h <b class="neg">-3.14%</b></span>
+            <span>8h <b class="pos">+5.72%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./TACUSDT_20260826_1230.html">
+          <div class="name">TAC/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-26 12:30</b></div>
+          <div class="row"><span>乖離</span><b>45.4%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-10.71%</b></span>
+            <span>4h <b class="neg">-28.58%</b></span>
+            <span>8h <b class="neg">-26.73%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./TACUSDT_20260826_1200.html">
+          <div class="name">TAC/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-26 12:00</b></div>
+          <div class="row"><span>乖離</span><b>45.4%</b></div>
+          <div class="pills">
+            <span>1h <b class="pos">+2.55%</b></span>
+            <span>4h <b class="neg">-14.67%</b></span>
+            <span>8h <b class="neg">-14.52%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./TACUSDT_20260825_0500.html">
+          <div class="name">TAC/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-25 05:00</b></div>
+          <div class="row"><span>乖離</span><b>38.6%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-4.00%</b></span>
+            <span>4h <b class="pos">+5.18%</b></span>
+            <span>8h <b class="pos">+6.28%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./SWARMSUSDT_20260825_0435.html">
+          <div class="name">SWARMS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-25 04:35</b></div>
+          <div class="row"><span>乖離</span><b>9.2%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-0.20%</b></span>
+            <span>4h <b class="pos">+0.39%</b></span>
+            <span>8h <b class="pos">+3.28%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./SUPERUSDT_20260824_1520.html">
+          <div class="name">SUPER/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-24 15:20</b></div>
+          <div class="row"><span>乖離</span><b>22.6%</b></div>
+          <div class="pills">
+            <span>1h <b class="pos">+0.40%</b></span>
+            <span>4h <b class="pos">+7.48%</b></span>
+            <span>8h <b class="pos">+7.66%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./LITUSDT_20260824_0355.html">
+          <div class="name">LIT/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-24 03:55</b></div>
+          <div class="row"><span>乖離</span><b>12.9%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-4.92%</b></span>
+            <span>4h <b class="neg">-1.12%</b></span>
+            <span>8h <b class="pos">+1.06%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./LITUSDT_20260824_0325.html">
+          <div class="name">LIT/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-24 03:25</b></div>
+          <div class="row"><span>乖離</span><b>12.9%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-3.17%</b></span>
+            <span>4h <b class="neg">-0.17%</b></span>
+            <span>8h <b class="pos">+3.29%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./ENAUSDT_20260823_1150.html">
+          <div class="name">ENA/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-23 11:50</b></div>
+          <div class="row"><span>乖離</span><b>16.4%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-0.42%</b></span>
+            <span>4h <b class="pos">+2.59%</b></span>
+            <span>8h <b class="pos">+5.82%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./ZROUSDT_20260823_1005.html">
+          <div class="name">ZRO/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-23 10:05</b></div>
+          <div class="row"><span>乖離</span><b>10.4%</b></div>
+          <div class="pills">
+            <span>1h <b class="pos">+0.33%</b></span>
+            <span>4h <b class="neg">-4.75%</b></span>
+            <span>8h <b class="neg">-1.24%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./PUMPUSDT_20260823_0800.html">
+          <div class="name">PUMP/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-23 08:00</b></div>
+          <div class="row"><span>乖離</span><b>11.8%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-1.85%</b></span>
+            <span>4h <b class="neg">-3.13%</b></span>
+            <span>8h <b class="pos">+0.68%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./STXUSDT_20260822_2210.html">
+          <div class="name">STX/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-22 22:10</b></div>
+          <div class="row"><span>乖離</span><b>15.0%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-1.01%</b></span>
+            <span>4h <b class="pos">+3.29%</b></span>
+            <span>8h <b class="pos">+3.34%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./STXUSDT_20260822_2135.html">
+          <div class="name">STX/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-22 21:35</b></div>
+          <div class="row"><span>乖離</span><b>15.0%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-0.23%</b></span>
+            <span>4h <b class="neg">-0.05%</b></span>
+            <span>8h <b class="pos">+5.26%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./ENAUSDT_20260822_1400.html">
+          <div class="name">ENA/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-22 14:00</b></div>
+          <div class="row"><span>乖離</span><b>8.0%</b></div>
+          <div class="pills">
+            <span>1h <b class="pos">+4.13%</b></span>
+            <span>4h <b class="pos">+3.84%</b></span>
+            <span>8h <b class="neg">-0.10%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./ZECUSDT_20260822_0525.html">
+          <div class="name">ZEC/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-22 05:25</b></div>
+          <div class="row"><span>乖離</span><b>22.4%</b></div>
+          <div class="pills">
+            <span>1h <b class="pos">+0.80%</b></span>
+            <span>4h <b class="pos">+0.29%</b></span>
+            <span>8h <b class="pos">+0.70%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./ZECUSDT_20260822_0455.html">
+          <div class="name">ZEC/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-22 04:55</b></div>
+          <div class="row"><span>乖離</span><b>22.4%</b></div>
+          <div class="pills">
+            <span>1h <b class="pos">+3.61%</b></span>
+            <span>4h <b class="pos">+3.70%</b></span>
+            <span>8h <b class="pos">+3.05%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./ENSUSDT_20260822_0220.html">
+          <div class="name">ENS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-22 02:20</b></div>
+          <div class="row"><span>乖離</span><b>23.1%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-1.99%</b></span>
+            <span>4h <b class="pos">+3.02%</b></span>
+            <span>8h <b class="pos">+10.44%</b></span>
+          </div>
+        </a>
+
+        <a class="card" href="./ENSUSDT_20260822_0150.html">
+          <div class="name">ENS/USDT</div>
+          <div class="row"><span>時間</span><b class="mono">08-22 01:50</b></div>
+          <div class="row"><span>乖離</span><b>23.1%</b></div>
+          <div class="pills">
+            <span>1h <b class="neg">-1.41%</b></span>
+            <span>4h <b class="pos">+2.10%</b></span>
+            <span>8h <b class="pos">+6.92%</b></span>
+          </div>
+        </a>
+    </div>
+  </div>
+</body>
+</html>
