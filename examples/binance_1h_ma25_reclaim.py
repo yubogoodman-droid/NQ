@@ -1463,7 +1463,7 @@ def cmd_run(args) -> int:
     if html_path:
         extras = [s.strip().upper() for s in (args.symbols or "").split(",") if s.strip()]
         keep_for_cards = set(KEEP) | set(extras)
-        if args.days <= 8:
+        if args.days <= 8 or len(hits) <= 80:
             cards = hits
             card_note = ""
         else:
