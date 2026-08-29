@@ -114,7 +114,7 @@ def test_falling_5m_ma20_keeps_circled_and_drops_chase_or_lid() -> None:
     assert not falling_5m_ma20_bad_location(
         29627.50, 29637.1, -10.8, chase_above=35.0, lid_slope=-15.0
     )
-    # 08-19：追在下跌五分 MA20 上 64 點 → 等下一肩，不作廢
+    # 08-19：追在下跌五分 MA20 上 64 點 → 這波作廢，不再拖到 11:44
     assert (
         falling_5m_ma20_location(
             29596.50, 29532.4, -41.9, chase_above=35.0, lid_slope=-15.0

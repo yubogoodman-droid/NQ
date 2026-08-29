@@ -152,8 +152,8 @@ if inSetup
                 // 砸上均線的大陰線不進，留在這波等下一根
                 inSetup := true
             else if touch and chase5
-                // 追在下跌五分 MA20 上太高，等真正坐上的右肩
-                inSetup := true
+                // 追在下跌五分 MA20 上太高：這波作廢，不要再拖到均線翻
+                inSetup := false
             else if touch and nearPrev and oldEnough and inRth() and notLate and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and not farBelow5mMa20 and not chase5 and not lid5 and not tangle5 and strategy.position_size == 0 and gapOk
                 tgt = close + risk * tgtR
                 strategy.entry("破翻回踩", strategy.long)
