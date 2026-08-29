@@ -12,10 +12,11 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from nq.patterns import detect_m_heads  # noqa: E402
+from nq.patterns import MHeadPattern, detect_m_heads  # noqa: E402
 from nq_m_head import (  # noqa: E402
     ET,
     TF_PRESETS,
+    Signal,
     TradeResult,
     generate_signals,
     overlay_m5_ma60,
@@ -188,6 +189,83 @@ def test_skip_tangled_ribbon() -> None:
     assert funnel.get("skip_tangled", 0) >= 1
 
 
+def test_trail_locks_after_waterfall() -> None:
+    """浮盈見過 1.5R 後鎖 1.2R；回補打到鎖利就出場，不再吐光。"""
+    n = 24
+    entry_idx = 6
+    entry, risk = 10000.0, 100.0
+    stop, target = 10100.0, 9800.0
+    close = np.full(n, entry)
+    high = close + 2.0
+    low = close - 2.0
+    # 先砸到 1.6R，再回補穿過 1.2R 鎖利
+    close[entry_idx + 1] = entry - 80.0
+    low[entry_idx + 1] = entry - 80.0
+    high[entry_idx + 1] = entry - 60.0
+    close[entry_idx + 2] = entry - 160.0
+    low[entry_idx + 2] = entry - 160.0
+    high[entry_idx + 2] = entry - 150.0
+    close[entry_idx + 3] = entry - 110.0
+    low[entry_idx + 3] = entry - 130.0
+    high[entry_idx + 3] = entry - 105.0  # 穿過 1.2R=9880
+    idx = pd.date_range("2026-08-25 19:00", periods=n, freq="5min", tz=ET)
+    df = pd.DataFrame(
+        {"open": close, "high": high, "low": low, "close": close, "volume": 50.0},
+        index=idx,
+    )
+    pattern = MHeadPattern(1, 3, 2, stop - 8.0, stop - 8.0, entry + 20.0)
+    sig = Signal(
+        timestamp=df.index[entry_idx],
+        entry=entry,
+        stop_loss=stop,
+        target=target,
+        pattern=pattern,
+        bar_idx=entry_idx,
+        ma60=entry + 30.0,
+        ma20=entry + 15.0,
+        ma5=entry + 5.0,
+    )
+    trades = run_backtest(df, [sig], max_bars_hold=12)
+    assert trades
+    t = trades[0]
+    assert t.exit_reason == "trail_stop", t
+    assert abs(t.pnl_points - 120.0) < 0.26  # 1.2R
+
+
+def test_trail_does_not_block_two_r() -> None:
+    """直落 2R 仍走停利，不會被鎖利搶先。"""
+    n = 20
+    entry_idx = 4
+    entry, risk = 10000.0, 100.0
+    stop, target = 10100.0, 9800.0
+    close = np.full(n, entry)
+    high = close + 1.0
+    low = close - 1.0
+    close[entry_idx + 1] = entry - 210.0
+    low[entry_idx + 1] = entry - 210.0
+    high[entry_idx + 1] = entry - 190.0
+    idx = pd.date_range("2026-08-21 09:00", periods=n, freq="5min", tz=ET)
+    df = pd.DataFrame(
+        {"open": close, "high": high, "low": low, "close": close, "volume": 50.0},
+        index=idx,
+    )
+    pattern = MHeadPattern(1, 2, 1, stop - 8.0, stop - 8.0, entry + 20.0)
+    sig = Signal(
+        timestamp=df.index[entry_idx],
+        entry=entry,
+        stop_loss=stop,
+        target=target,
+        pattern=pattern,
+        bar_idx=entry_idx,
+        ma60=entry + 30.0,
+        ma20=entry + 15.0,
+        ma5=entry + 5.0,
+    )
+    trades = run_backtest(df, [sig], max_bars_hold=10)
+    assert trades[0].exit_reason == "take_profit"
+    assert abs(trades[0].pnl_points - 200.0) < 1e-9
+
+
 def test_tf_presets() -> None:
     assert TF_PRESETS["5m"]["min_bars_between_highs"] == 4
     assert TF_PRESETS["5m"]["high_level_lookback"] == 24
@@ -241,6 +319,8 @@ def main() -> int:
     test_reject_higher_high()
     test_no_signal_without_ma60_break()
     test_skip_tangled_ribbon()
+    test_trail_locks_after_waterfall()
+    test_trail_does_not_block_two_r()
     test_tf_presets()
     test_overlay_m5_ma60()
     test_5m_preset_still_fires()

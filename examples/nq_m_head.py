@@ -46,6 +46,10 @@ MA_COLORS = {
     200: "#ab47bc",
 }
 
+# 浮盈見過 1.5R 後鎖 1.2R，避免瀑布走完又吐光（5m #7 那種）
+TRAIL_ARM_R = 1.5
+TRAIL_LOCK_R = 1.2
+
 # 1m / 5m 同一套邏輯，K 數換成大約相同的鐘面時間
 TF_PRESETS = {
     "1m": {
@@ -465,8 +469,10 @@ def run_backtest(
     signals: Sequence[Signal] | None = None,
     *,
     max_bars_hold: int = 120,
+    trail_arm_r: float = TRAIL_ARM_R,
+    trail_lock_r: float = TRAIL_LOCK_R,
 ) -> List[TradeResult]:
-    """做空：先停損、再停利、逾時以收盤平倉。持倉中不重疊新單。"""
+    """做空：先硬停損、再 2R 停利；浮盈見過 trail_arm_r 後鎖 trail_lock_r。逾時收盤。不重疊。"""
     if signals is None:
         signals = generate_signals(df)
     results: List[TradeResult] = []
@@ -481,12 +487,16 @@ def run_backtest(
         exit_time = df.index[end_idx]
         exit_reason = "time_stop"
         exit_idx = end_idx
+        orig_stop = sig.stop_loss
+        trail_stop = orig_stop
+        mfe = 0.0
+        risk = sig.risk
 
         for i in range(entry_idx + 1, end_idx + 1):
             lo = float(df["low"].iloc[i])
             hi = float(df["high"].iloc[i])
-            if hi >= sig.stop_loss:
-                exit_price = sig.stop_loss
+            if hi >= orig_stop:
+                exit_price = orig_stop
                 exit_time = df.index[i]
                 exit_reason = "stop_loss"
                 exit_idx = i
@@ -495,6 +505,15 @@ def run_backtest(
                 exit_price = sig.target
                 exit_time = df.index[i]
                 exit_reason = "take_profit"
+                exit_idx = i
+                break
+            mfe = max(mfe, sig.entry - lo)
+            if trail_arm_r > 0 and risk > 0 and mfe / risk >= trail_arm_r:
+                trail_stop = min(trail_stop, round_tick(sig.entry - trail_lock_r * risk))
+            if trail_stop < orig_stop - 1e-9 and hi >= trail_stop:
+                exit_price = trail_stop
+                exit_time = df.index[i]
+                exit_reason = "trail_stop"
                 exit_idx = i
                 break
 
@@ -741,6 +760,7 @@ def _render_trade_card(
     tag_class = {
         "take_profit": "tag-tp",
         "stop_loss": "tag-sl",
+        "trail_stop": "tag-trail",
     }.get(trade.exit_reason, "tag-time")
     gap = abs(p.first_high - p.second_high)
     avg = (p.first_high + p.second_high) / 2
@@ -866,7 +886,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。MA5/10/20/30/60 帶寬未滿 28 點視為糾結，不進。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。浮盈 1.5R 後鎖 1.2R。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
@@ -903,6 +923,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-tp{{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}}
 .tag-sl{{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}}
 .tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
+.tag-trail{{background:rgba(0,200,180,0.14);color:#5eead4;border-color:rgba(0,200,180,0.35)}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
 .mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
@@ -912,7 +933,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 一分K 高檔M頭 · 跌破MA60做空</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開，不在糾結裡進場。</p>
+<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。浮盈見過 1.5R 後鎖 1.2R，瀑布走完不吐光。</p>
 {note_line}
 {compare_line}
 {_stats_cards(stats)}
