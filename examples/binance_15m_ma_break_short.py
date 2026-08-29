@@ -48,8 +48,6 @@ MIN_VOL_IF_TIGHT_FAN = 3.2  # 短均幾乎黏住時，量比至少這麼多
 MAX_1H_BULL_FAN_PCT = 2.0  # 上根小時仍 7>14>25 且張開≥2%，多半是漲勢回檔
 APPROACH_BARS = 8  # 進場前幾根要多數還在長均之上
 MIN_APPROACH_ABOVE = 4  # 少於這個＝在帶裡穿梭或已經破了再追
-SKIP_MINUTES = frozenset({15})  # 整點後第 15 分＝小時中段，假跌破多
-SKIP_HOURS = frozenset({17, 18, 21, 22, 23})  # 台北：美股盤前／開盤，股指永續容易假破
 MIN_QV = 5_000_000
 KEEP = ("MUBARAKUSDT",)
 MAX_CHARTS = 150
@@ -407,22 +405,6 @@ class TradeResult:
     pnl_pct: float
 
 
-def bar_local(ts: pd.Timestamp) -> pd.Timestamp:
-    if getattr(ts, "tzinfo", None) is not None:
-        return ts.tz_convert(TZ)
-    return pd.Timestamp(ts, tz=TZ)
-
-
-def skip_noisy_tod(ts: pd.Timestamp) -> str | None:
-    """回傳要濾掉的原因；好時段回 None。"""
-    local = bar_local(ts)
-    if int(local.minute) in SKIP_MINUTES:
-        return "skip_minute"
-    if int(local.hour) in SKIP_HOURS:
-        return "skip_hour"
-    return None
-
-
 def detect_signals(
     df: pd.DataFrame,
     symbol: str = "",
@@ -496,10 +478,6 @@ def detect_signals(
         # 進場前沒騎在黏帶上：橫盤穿梭或已經破了再追，不像瀑布
         if above < MIN_APPROACH_ABOVE:
             bump("skip_weave")
-            continue
-        why = skip_noisy_tod(work.index[i])
-        if why:
-            bump(why)
             continue
         bump("taken")
         target = entry - RR * risk
@@ -977,7 +955,6 @@ def write_html_report(
             f"1h 首次打穿 MA99　{funnel.get('taken_1h', 0)}"
             f"（淺破 {funnel.get('skip_shallow', 0)} · 短均未排列 {funnel.get('skip_stack', 0)} · "
             f"橫盤輕觸 {funnel.get('skip_chop', 0)} · 沒騎在黏帶上 {funnel.get('skip_weave', 0)} · "
-            f"小時中段 :15 {funnel.get('skip_minute', 0)} · 美股時段 {funnel.get('skip_hour', 0)} · "
             f"風險過大 {funnel.get('skip_risk', 0)} · "
             f"1h 已破 MA99 太晚 {funnel.get('skip_1h_late', 0)} · "
             f"15m 沒打到 1h MA99 {funnel.get('skip_1h_shallow', 0)} · "
@@ -1045,7 +1022,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">總報酬<b class="{total_cls}">{stats['total_pnl']:+.2f}%</b></div>
 <div class="card">勝/負<b>{stats['wins']}/{stats['losses']}</b></div>
 </div>
-<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。濾掉短均幾乎黏住又沒放量的橫盤輕觸、進場前沒騎在黏帶上的穿梭／追空、整點後第 15 分（小時中段雜訊）、台北 17–18／21–23 點（美股盤前後假跌破），以及上根小時仍明顯 7&gt;14&gt;25 的漲勢回檔。小時過濾：上根已收盤 1h 還在 MA99 之上，這根 15m 收盤第一次跌破 1h MA99。上圖 15m、下圖 1h。報酬是單筆價格百分比，未計資金費。</p>
+<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。濾掉短均幾乎黏住又沒放量的橫盤輕觸、進場前沒騎在黏帶上的穿梭／追空，以及上根小時仍明顯 7&gt;14&gt;25 的漲勢回檔。小時過濾：上根已收盤 1h 還在 MA99 之上，這根 15m 收盤第一次跌破 1h MA99。上圖 15m、下圖 1h。報酬是單筆價格百分比，未計資金費。</p>
 {funnel_line}
 <div class="equity">{_equity_svg([t.pnl_pct for t in trades])}</div>
 </section>
@@ -1139,8 +1116,6 @@ def print_summary(label: str, trades: list[TradeResult], funnel: dict[str, int] 
             f"skip_stack={funnel.get('skip_stack', 0)} skip_risk={funnel.get('skip_risk', 0)} "
             f"skip_chop={funnel.get('skip_chop', 0)} "
             f"skip_weave={funnel.get('skip_weave', 0)} "
-            f"skip_minute={funnel.get('skip_minute', 0)} "
-            f"skip_hour={funnel.get('skip_hour', 0)} "
             f"skip_1h_late={funnel.get('skip_1h_late', 0)} "
             f"skip_1h_shallow={funnel.get('skip_1h_shallow', 0)} "
             f"skip_1h_bull={funnel.get('skip_1h_bull', 0)}"
@@ -1208,7 +1183,7 @@ def main(argv: list[str] | None = None) -> int:
         subtitle = (
             f"{args.days} 日 · {start.strftime('%Y-%m-%d %H:%M')} → {now.strftime('%Y-%m-%d %H:%M')} 台北 · "
             f"{result.symbols} 檔 15m · 進場＝15m 同時跌破 99/120/200 且 7<14<25，"
-            f"短均黏住要放量、進場前多數還在長均之上、避開 :15 與美股時段，再加 1h：上根小時收盤仍在 MA99 上、本 15m 第一次打穿 1h MA99，"
+            f"短均黏住要放量、進場前多數還在長均之上，再加 1h：上根小時收盤仍在 MA99 上、本 15m 第一次打穿 1h MA99，"
             f"且上根小時不是明顯 7>14>25"
         )
         show_mubarak = not args.symbol or "MUBARAK" in args.symbol.upper()
