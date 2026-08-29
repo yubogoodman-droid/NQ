@@ -160,12 +160,6 @@ def test_tangled_moving_averages_are_skipped() -> None:
     assert NQWBottomStrategy().generate_signals(_df(rows)) == []
 
 
-def test_entry_far_from_falling_ma200_is_skipped() -> None:
-    """MA200 下彎且進場離均線超過 60 點則跳過。"""
-    rows = _flat(220, 10300.0, drift=-1.0) + _l1_l2_l3_rows()
-    assert NQWBottomStrategy().generate_signals(_df(rows)) == []
-
-
 def test_pattern_longer_than_two_hours_is_ignored() -> None:
     rows = _l1_l2_l3_rows()
     # 在 L3 前插入超過 2 小時的空白 K

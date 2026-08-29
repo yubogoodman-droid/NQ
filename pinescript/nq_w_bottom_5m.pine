@@ -12,7 +12,6 @@ maxBars       = input.int(24, "L1 到 L3 最多間隔（2小時）", minval=10)
 maxReclaim    = input.int(12, "L2 後最多幾根須收復", minval=2)
 stopPts       = input.float(20.0, "停損在 L3 下方點數", minval=0, step=1)
 minMaSpan     = input.float(40.0, "均線高低差最少點數", minval=0, step=1)
-maxDistFallMa = input.float(60.0, "下彎MA200最遠距離", minval=0, step=1)
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -23,8 +22,6 @@ ma200 = ta.sma(close, 200)
 maHi = math.max(ma5, math.max(ma10, math.max(ma20, math.max(ma60, math.max(ma120, ma200)))))
 maLo = math.min(ma5, math.min(ma10, math.min(ma20, math.min(ma60, math.min(ma120, ma200)))))
 maOk = not na(ma200) and (maHi - maLo) >= minMaSpan
-ma200Falling = not na(ma200) and ma200 < ma200[12]
-ma200Ok = not ma200Falling or math.abs(close - ma200) <= maxDistFallMa
 
 pl = ta.pivotlow(low, swingLen, swingLen)
 
@@ -74,7 +71,7 @@ if not na(l1) and na(l3) and not na(pl)
             neckline := ta.highest(high, gap)
             wReady   := true
 
-longSignal = wReady and not na(l3) and maOk and ma200Ok
+longSignal = wReady and not na(l3) and maOk
 
 if longSignal
     strategy.entry("破底W做多", strategy.long)

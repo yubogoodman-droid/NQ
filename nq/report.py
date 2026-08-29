@@ -447,7 +447,7 @@ def build_report_html(
   <div class="page">
     <section class="summary">
       <h1>{html.escape(title)}</h1>
-      <p>{html.escape(symbol)} · 五分 K 破底W底 · L3 收盤進場 · 停損 L3-20點 · 均線差≥40點 · 下彎MA200≤60點 · L1–L3 2 小時內 · {html.escape(_report_date_range(df))}</p>
+      <p>{html.escape(symbol)} · 五分 K 破底W底 · L3 收盤進場 · 停損 L3-20點 · 均線差≥40點 · L1–L3 2 小時內 · {html.escape(_report_date_range(df))}</p>
       <p style="margin-top:6px;color:#8b949e;font-size:12px;">產生 {html.escape(datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M"))} ET · 綠圈進場 / 綠或紅圈出場</p>
       <div class="total">
         {stats.get("trades", 0)} 筆 · 勝率 {stats.get("win_rate", 0) * 100:.0f}% ·
