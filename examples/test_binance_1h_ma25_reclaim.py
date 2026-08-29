@@ -141,6 +141,7 @@ def test_detect_reclaim() -> None:
     assert sig.depth_pct >= 0.018
     assert sig.quality in {"A", "B", "C"}
     assert df["Close"].iloc[sig.entry_idx] > sig.ma25
+    assert abs(sig.stop_price - sig.bottom) < 1e-12
 
 
 def test_flush_metrics_avgo_like() -> None:
@@ -205,6 +206,52 @@ def test_still_below_no_signal() -> None:
     assert not sigs
 
 
+def _flatten_after_entry(df: pd.DataFrame, sig, bars: int = 8) -> None:
+    """Hold near entry so later bars don't hit 2R or MA25 exit by accident."""
+    px = float(sig.entry_price)
+    end = min(sig.entry_idx + bars, len(df) - 1)
+    for i in range(sig.entry_idx + 1, end + 1):
+        df.iloc[i, df.columns.get_loc("Open")] = px
+        df.iloc[i, df.columns.get_loc("High")] = px + 0.15
+        df.iloc[i, df.columns.get_loc("Low")] = px - 0.15
+        df.iloc[i, df.columns.get_loc("Close")] = px + 0.05
+
+
+def test_wick_below_bottom_bar_does_not_stop() -> None:
+    df = _make_reclaim_bars()
+    sigs = detect_signals(df)
+    assert sigs
+    sig = sigs[0]
+    _flatten_after_entry(df, sig)
+    i = sig.entry_idx + 1
+    df.iloc[i, df.columns.get_loc("Low")] = sig.bottom - 2.0
+    df.iloc[i, df.columns.get_loc("Close")] = sig.entry_price
+    df.iloc[i, df.columns.get_loc("Open")] = sig.entry_price
+    df.iloc[i, df.columns.get_loc("High")] = sig.entry_price + 0.15
+    trades = simulate(df, [sig], max_hold=6)
+    assert trades
+    assert trades[0].exit_reason != "stop", "影線掃破底K低點不該停損"
+
+
+def test_close_below_bottom_bar_stops() -> None:
+    df = _make_reclaim_bars()
+    sigs = detect_signals(df)
+    assert sigs
+    sig = sigs[0]
+    _flatten_after_entry(df, sig)
+    i = sig.entry_idx + 2
+    fill = sig.bottom - 0.40
+    df.iloc[i, df.columns.get_loc("Open")] = sig.entry_price
+    df.iloc[i, df.columns.get_loc("High")] = sig.entry_price
+    df.iloc[i, df.columns.get_loc("Low")] = fill - 0.10
+    df.iloc[i, df.columns.get_loc("Close")] = fill
+    trades = simulate(df, [sig], max_hold=6)
+    assert trades
+    assert trades[0].exit_reason == "stop"
+    assert trades[0].exit_idx == i
+    assert abs(trades[0].exit_price - fill) < 1e-9
+
+
 def test_simulate_target() -> None:
     df = _make_reclaim_bars()
     sigs = detect_signals(df)
@@ -253,6 +300,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "下破底" in text
     assert "1h + 4h" in text
     assert "4h K 對照" in text
+    assert "收盤跌破破底" in text
     if trades:
         assert "<img src='img/" in text
         assert any((path.parent / "img").glob("t01_*.png"))
@@ -268,6 +316,8 @@ def main() -> int:
     test_shallow_rejected()
     test_slow_grind_rejected()
     test_still_below_no_signal()
+    test_wick_below_bottom_bar_does_not_stop()
+    test_close_below_bottom_bar_stops()
     test_simulate_target()
     test_summarize()
     test_select_card_hits()

@@ -2,7 +2,7 @@
 """幣安 1 小時 K：MA25 下破底，再重新站上 MA25。
 
 對齊手機圖那種走法：價先跌破 MA25、在下面做出低點（V / W），
-收盤再站回 MA25。進場用站回那根收盤；停損在破底低點。
+收盤再站回 MA25。進場用站回那根收盤；停損等收盤跌破破底那根 K。
 
 用法:
   python3 examples/binance_1h_ma25_reclaim.py --symbols AVGOUSDT,ONDSUSDT --days 45
@@ -327,7 +327,6 @@ def detect_signals(
     min_undercut_pct: float = 0.0,
     min_flush_atr: float = 0.0,
     flush_bars: int = 4,
-    stop_buffer_pct: float = 0.003,
     target_r: float = 2.0,
     min_entry_gap: int = 8,
     vol_lookback: int = 20,
@@ -418,7 +417,7 @@ def detect_signals(
             continue
 
         entry = float(close[reclaim])
-        stop = bottom * (1.0 - stop_buffer_pct)
+        stop = bottom  # 破底那根 K 的低點；回測要收盤跌破才出
         risk = entry - stop
         if risk <= 0:
             bump("bad_risk")
@@ -470,7 +469,6 @@ def simulate(
 ) -> List[TradeResult]:
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
-    low = df["Low"].to_numpy(float)
     ma25 = sma(close, 25)
     results: List[TradeResult] = []
 
@@ -488,8 +486,9 @@ def simulate(
         below_streak = 0
 
         for k in range(entry_idx + 1, limit + 1):
-            if low[k] <= stop:
-                exit_idx, exit_price, exit_reason = k, float(stop), "stop"
+            # 跌破破底那根 K：收盤低於破底棒低點，用該根收盤出場
+            if close[k] < stop:
+                exit_idx, exit_price, exit_reason = k, float(close[k]), "stop"
                 break
             if high[k] >= target:
                 exit_idx, exit_price, exit_reason = k, float(target), "target"
@@ -839,7 +838,7 @@ def write_html_report(
             "</div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.6g}\n"
-            f"stop  {t.stop_price:.6g}  (−{(risk / t.entry_price) * 100:.2f}%)\n"
+            f"stop  {t.stop_price:.6g}  收盤跌破破底K  (−{(risk / t.entry_price) * 100:.2f}%)\n"
             f"target {t.target_price:.6g}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.6g}  {t.exit_reason}\n"
             f"破底 {t.signal.bottom:.6g}  深度 {t.signal.depth_pct * 100:.2f}%  在下 {t.signal.bars_below}h\n"
@@ -899,7 +898,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上（寬鬆）</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 粉線 MA25<br/>
-寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。停損破底低點，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
+寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
