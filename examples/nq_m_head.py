@@ -470,7 +470,7 @@ def generate_signals(
                     continue
             if far_above_ma200(float(close[k]), float(ma200[k]), max_above_ma200):
                 saw_far_ma200 = True
-                continue
+                break
             if untested_htf_gap > 0 and htf_col is not None and k >= ma60_slope_bars:
                 if untested_htf_support(
                     float(close[k]),
@@ -481,7 +481,7 @@ def generate_signals(
                     untested_htf_gap,
                 ):
                     saw_htf_gap = True
-                    continue
+                    break
             entry_idx = k
             break
         if invalidated:
