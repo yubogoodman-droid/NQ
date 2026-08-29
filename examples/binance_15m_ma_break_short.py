@@ -168,6 +168,63 @@ def _bar_index(df: pd.DataFrame, ts: pd.Timestamp) -> int:
     return max(0, min(pos, len(df) - 1))
 
 
+def last_closed_1h_idx(df_1h: pd.DataFrame, ts: pd.Timestamp) -> int:
+    """進場當下還沒收盤的那根 1h 不能用，退回上一根已收盤小時 K。"""
+    if df_1h is None or df_1h.empty:
+        return -1
+    mark = ts.tz_convert("UTC") if getattr(ts, "tzinfo", None) else pd.Timestamp(ts, tz="UTC")
+    closed_open = mark.floor("1h") - pd.Timedelta(hours=1)
+    if df_1h.index.tz is not None:
+        closed_open = closed_open.tz_convert(df_1h.index.tz)
+    pos = int(df_1h.index.searchsorted(closed_open, side="right") - 1)
+    return pos
+
+
+def filter_signals_1h(
+    signals: list[Signal],
+    df_1h: pd.DataFrame,
+    funnel: dict[str, int] | None = None,
+) -> list[Signal]:
+    """小時確認：上一根已收盤 1h 還在 MA99 之上，這根 15m 收盤第一次打穿 1h MA99。
+
+    回測裡「1h 已經跌破 MA99 再追空」勝率明顯較差；太晚。
+    15m 大陰線若沒打到小時 MA99，多半只是 15m 均線自己的回抽。
+    """
+    if not signals:
+        return []
+    work = add_mas(df_1h) if df_1h is not None and not df_1h.empty and "ma99" not in df_1h.columns else df_1h
+
+    def bump(key: str) -> None:
+        if funnel is not None:
+            funnel[key] = funnel.get(key, 0) + 1
+
+    kept: list[Signal] = []
+    for sig in signals:
+        if work is None or work.empty:
+            bump("skip_1h_data")
+            continue
+        pos = last_closed_1h_idx(work, sig.timestamp)
+        if pos < 0:
+            bump("skip_1h_data")
+            continue
+        row = work.iloc[pos]
+        m99 = row.get("ma99")
+        if m99 is None or pd.isna(m99):
+            bump("skip_1h_data")
+            continue
+        m99 = float(m99)
+        prev_close = float(row["close"])
+        if prev_close < m99:
+            bump("skip_1h_late")
+            continue
+        if sig.entry >= m99:
+            bump("skip_1h_shallow")
+            continue
+        bump("taken_1h")
+        kept.append(sig)
+    return kept
+
+
 def load_1h_frames(symbols: list[str], frames_15m: dict[str, pd.DataFrame], workers: int = 8) -> dict[str, pd.DataFrame]:
     out: dict[str, pd.DataFrame] = {}
     uniq = [s for s in dict.fromkeys(symbols) if s]
@@ -749,7 +806,8 @@ def _render_cards(
             f"exit  {_fmt_px(t.exit_price)}  {t.exit_reason}\n"
             f"打穿長均 {sig.break_pct:.2f}%  cluster {_fmt_px(sig.cluster_lo)}–{_fmt_px(sig.cluster_hi)}\n"
             f"15m MA7 {_fmt_px(sig.ma7)} < MA14 {_fmt_px(sig.ma14)} < MA25 {_fmt_px(sig.ma25)}\n"
-            f"15m MA99 {_fmt_px(sig.ma99)} / MA120 {_fmt_px(sig.ma120)} / MA200 {_fmt_px(sig.ma200)}"
+            f"15m MA99 {_fmt_px(sig.ma99)} / MA120 {_fmt_px(sig.ma120)} / MA200 {_fmt_px(sig.ma200)}\n"
+            "1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99"
             f"{h_line}"
             "</pre>"
             f"{chart_html}"
@@ -776,9 +834,12 @@ def write_html_report(
     if funnel:
         funnel_line = (
             f"<p class='muted'>漏斗：從三條之上一次打穿　{funnel.get('break', 0)} → "
-            f"7&lt;14&lt;25 進場 {funnel.get('taken', 0)}"
+            f"7&lt;14&lt;25　{funnel.get('taken', 0)} → "
+            f"1h 首次打穿 MA99　{funnel.get('taken_1h', 0)}"
             f"（淺破 {funnel.get('skip_shallow', 0)} · 短均未排列 {funnel.get('skip_stack', 0)} · "
-            f"風險過大 {funnel.get('skip_risk', 0)}）</p>"
+            f"風險過大 {funnel.get('skip_risk', 0)} · "
+            f"1h 已破 MA99 太晚 {funnel.get('skip_1h_late', 0)} · "
+            f"15m 沒打到 1h MA99 {funnel.get('skip_1h_shallow', 0)}）</p>"
         )
     extra = ""
     if mubarak_trades is not None:
@@ -842,7 +903,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">總報酬<b class="{total_cls}">{stats['total_pnl']:+.2f}%</b></div>
 <div class="card">勝/負<b>{stats['wins']}/{stats['losses']}</b></div>
 </div>
-<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。上圖 15m 進場，下圖同一時刻的 1h 對照。報酬是單筆價格百分比，未計資金費。</p>
+<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。小時過濾：上根已收盤 1h 還在 MA99 之上，這根 15m 收盤第一次跌破 1h MA99（已破再追空勝率較差）。上圖 15m、下圖 1h。報酬是單筆價格百分比，未計資金費。</p>
 {funnel_line}
 <div class="equity">{_equity_svg([t.pnl_pct for t in trades])}</div>
 </section>
@@ -890,6 +951,12 @@ def scan_symbol(sym: str, *, days: int, limit: int) -> tuple[str, pd.DataFrame, 
     funnel: dict[str, int] = {}
     start = eval_start_ts(days)
     sigs = detect_signals(df, sym, eval_start=start, funnel=funnel)
+    if sigs:
+        try:
+            df_1h = add_mas(fetch_klines(sym, limit=500, interval="1h"))
+        except Exception:
+            df_1h = resample_1h(df)
+        sigs = filter_signals_1h(sigs, df_1h, funnel)
     trades = simulate(df, sigs)
     return sym, df, trades, funnel
 
@@ -925,8 +992,11 @@ def print_summary(label: str, trades: list[TradeResult], funnel: dict[str, int] 
     if funnel:
         print(
             f"  funnel break={funnel.get('break', 0)} taken={funnel.get('taken', 0)} "
+            f"1h={funnel.get('taken_1h', 0)} "
             f"skip_shallow={funnel.get('skip_shallow', 0)} "
-            f"skip_stack={funnel.get('skip_stack', 0)} skip_risk={funnel.get('skip_risk', 0)}"
+            f"skip_stack={funnel.get('skip_stack', 0)} skip_risk={funnel.get('skip_risk', 0)} "
+            f"skip_1h_late={funnel.get('skip_1h_late', 0)} "
+            f"skip_1h_shallow={funnel.get('skip_1h_shallow', 0)}"
         )
     for i, t in enumerate(trades, 1):
         et = t.signal.timestamp.tz_convert(TZ) if getattr(t.signal.timestamp, "tzinfo", None) else t.signal.timestamp
@@ -979,7 +1049,8 @@ def main(argv: list[str] | None = None) -> int:
         title = "15m 同時跌破 99/120/200 做空"
         subtitle = (
             f"{args.days} 日 · {start.strftime('%Y-%m-%d %H:%M')} → {now.strftime('%Y-%m-%d %H:%M')} 台北 · "
-            f"{result.symbols} 檔 15m · 進場＝前收在 MA99/120/200 之上、本根一次收在三條之下，且 7<14<25"
+            f"{result.symbols} 檔 15m · 進場＝15m 同時跌破 99/120/200 且 7<14<25，"
+            f"再加 1h：上根小時收盤仍在 MA99 上、本 15m 第一次打穿 1h MA99"
         )
         show_mubarak = not args.symbol or "MUBARAK" in args.symbol.upper()
         need_1h = sorted({t.signal.symbol for t in result.trades} | ({"MUBARAKUSDT"} if show_mubarak else set()))

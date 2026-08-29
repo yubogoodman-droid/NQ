@@ -16,7 +16,9 @@ from binance_15m_ma_break_short import (  # noqa: E402
     add_mas,
     detect_signals,
     draw_trade_png,
+    filter_signals_1h,
     hourly_snapshot,
+    last_closed_1h_idx,
     resample_1h,
     simulate,
     summarize,
@@ -146,6 +148,34 @@ def test_draw_trade_png_has_hourly(tmp_path: Path | None = None) -> None:
     assert out.exists() and out.stat().st_size > 8000
 
 
+def test_1h_first_break_keeps_and_rejects() -> None:
+    df = add_mas(_breakdown_series(after="down"))
+    trades = simulate(df, detect_signals(df, "TESTUSDT"))
+    assert trades
+    sig = trades[0].signal
+    hourly = resample_1h(df)
+    # 做一條夠長的 1h MA99，讓上根收在線上、進場價在線下
+    h = hourly.copy()
+    if "ma99" not in h.columns:
+        h = add_mas(h)
+    pos = last_closed_1h_idx(h, sig.timestamp)
+    assert pos >= 0
+    h.loc[h.index[pos], "close"] = sig.entry * 1.02
+    h.loc[h.index[pos], "ma99"] = sig.entry * 1.01
+    kept = filter_signals_1h([sig], h)
+    assert len(kept) == 1
+
+    late = h.copy()
+    late.loc[late.index[pos], "close"] = sig.entry * 0.99
+    late.loc[late.index[pos], "ma99"] = sig.entry * 1.01
+    assert filter_signals_1h([sig], late) == []
+
+    shallow = h.copy()
+    shallow.loc[shallow.index[pos], "close"] = sig.entry * 1.05
+    shallow.loc[shallow.index[pos], "ma99"] = sig.entry * 0.99
+    assert filter_signals_1h([sig], shallow) == []
+
+
 def test_summarize() -> None:
     class T:
         def __init__(self, pnl: float) -> None:
@@ -165,6 +195,7 @@ def main() -> int:
     test_no_overlap_positions()
     test_resample_1h_and_snapshot()
     test_draw_trade_png_has_hourly()
+    test_1h_first_break_keeps_and_rejects()
     test_summarize()
     print("ok")
     return 0
