@@ -197,6 +197,33 @@ def falling_5m_ma20_location(
     return ""
 
 
+def tangled_5m_ma20_ma60(
+    entry: float,
+    ma20_5m: float,
+    slope20: float,
+    ma60_5m: float,
+    slope60: float,
+    *,
+    max_spread: float,
+) -> bool:
+    """五分粉紅剛上彎、綠線還下彎，兩條又纏在一起，價已穿到綠線上 → 糾結。
+
+    08-27 #8：MA20/MA60 只差 18 點、方向相反，進場在綠線上 22 點。
+    08-03 #1：綠線還在頭上 25 點，是破底翻，要留。
+    08-28：粉紅還下彎，不算這種交叉糾結。
+    """
+    if max_spread <= 0:
+        return False
+    vals = (ma20_5m, slope20, ma60_5m, slope60)
+    if any(np.isnan(x) for x in vals):
+        return False
+    if float(slope20) <= 0.0 or float(slope60) >= 0.0:
+        return False
+    if abs(float(ma60_5m) - float(ma20_5m)) > float(max_spread):
+        return False
+    return float(entry) >= float(ma60_5m)
+
+
 def falling_5m_ma20_bad_location(
     entry: float,
     ma20_5m: float,
@@ -322,6 +349,7 @@ INTERVAL_DETECT = {
         ma20_5m_below=45.0,
         ma20_5m_chase=35.0,
         ma20_5m_lid_slope=-15.0,
+        ma20_5m_tangle=25.0,
         min_pullback=25.0,
         max_dump_body=30.0,
         dump_skip_body=20.0,
@@ -382,6 +410,7 @@ def detect_signals(
     ma20_5m_below: float = 0.0,
     ma20_5m_chase: float = 0.0,
     ma20_5m_lid_slope: float = 0.0,
+    ma20_5m_tangle: float = 0.0,
     min_pullback: float = 0.0,
     max_dump_body: float = 0.0,
     dump_skip_body: float = 0.0,
@@ -640,6 +669,14 @@ def detect_signals(
             if loc5 == "chase":
                 bump("skip_5m")
                 continue
+            # 08-27 10:36：粉紅剛翻、綠線還下彎，兩條纏在 18 點內，
+            # 價已穿到綠線上，五分均線糾結，不是破底翻。
+            if tangled_5m_ma20_ma60(
+                entry, m20_5, m20_5_s, m60_5, m60_5_s, max_spread=ma20_5m_tangle
+            ):
+                bump("skip_tangle")
+                dead = True
+                break
 
             entry_idx = t
             bump("retest")

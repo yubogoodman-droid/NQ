@@ -22,6 +22,7 @@ from nq.ma20_retest import (  # noqa: E402
     falling_5m_ma20_bad_location,
     falling_5m_ma20_location,
     far_below_falling_5m_ma20,
+    tangled_5m_ma20_ma60,
     near_falling_5m_ma20_ma30,
     near_falling_5m_ma60,
     quality_at_entry,
@@ -132,6 +133,28 @@ def test_falling_5m_ma20_keeps_circled_and_drops_chase_or_lid() -> None:
     )
     assert falling_5m_ma20_bad_location(
         29577.75, 29602.6, -38.8, chase_above=35.0, lid_slope=-15.0
+    )
+
+
+def test_tangled_5m_drops_0827_keeps_circled() -> None:
+    # 08-27 #8：粉紅上彎、綠線下彎，只差 18 點，進場已在綠線上
+    assert tangled_5m_ma20_ma60(
+        29592.50, 29552.1, 9.7, 29570.3, -1.9, max_spread=25.0
+    )
+    # 08-03 #1：綠線還在頭上，是破底翻
+    assert not tangled_5m_ma20_ma60(
+        28470.00, 28455.7, 7.8, 28494.8, -6.8, max_spread=25.0
+    )
+    # 08-24 / 08-28：粉紅還下彎
+    assert not tangled_5m_ma20_ma60(
+        29061.00, 29035.4, -35.1, 29150.3, -16.6, max_spread=25.0
+    )
+    assert not tangled_5m_ma20_ma60(
+        29627.50, 29637.1, -10.8, 29624.0, 0.0, max_spread=25.0
+    )
+    # 08-06：兩條差 38 點，還沒纏死
+    assert not tangled_5m_ma20_ma60(
+        29518.50, 29416.9, 11.3, 29454.6, -3.7, max_spread=25.0
     )
 
 
@@ -421,6 +444,7 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["ma20_5m_below"] == 45.0
     assert d1["ma20_5m_chase"] == 35.0
     assert d1["ma20_5m_lid_slope"] == -15.0
+    assert d1["ma20_5m_tangle"] == 25.0
     assert d1["entry_until"] == 13 * 60
     assert d1["target_r_up"] == 2.0
     assert d5["stop_at_shoulder"] is False
@@ -698,6 +722,7 @@ def main() -> int:
     test_near_falling_5m_ma20_ma30()
     test_far_below_falling_5m_ma20()
     test_falling_5m_ma20_keeps_circled_and_drops_chase_or_lid()
+    test_tangled_5m_drops_0827_keeps_circled()
     test_skips_hug_falling_5m_ma60()
     test_sma()
     test_summarize_trades()

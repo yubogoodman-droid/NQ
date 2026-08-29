@@ -29,6 +29,7 @@ ma20Near      = input.float(45.0, "避開下彎 5m MA20/MA30 蓋頭（點，0=�
 ma20Below     = input.float(45.0, "避開遠低於下彎 5m MA20（點，0=關）", minval=0)
 ma20Chase     = input.float(35.0, "5m MA20 下跌時，收盤高它這麼多 → 追價跳過", minval=0)
 ma20LidSlope  = input.float(-15.0, "5m MA20 斜率比這更負、且收盤在它下 → 蓋子跳過")
+ma20Tangle    = input.float(25.0, "5m MA20 上彎、MA60 下彎且兩條差這麼近、收盤已在綠線上 → 糾結跳過", minval=0)
 ma60SlopeBars = input.int(6, "5m MA60 斜率回看（5分K根數）", minval=1)
 minEntryGap   = input.int(60, "距上一筆最少根數", minval=0)
 minPullback   = input.float(25.0, "右肩至少從高點拉回（點，0=關）", minval=0)
@@ -133,6 +134,7 @@ if inSetup
             falling5 = not na(ma20_5) and not na(ma20_5_prev) and ma20_5 < ma20_5_prev
             chase5 = ma20Chase > 0 and falling5 and (close - ma20_5) > ma20Chase
             lid5 = ma20LidSlope < 0 and falling5 and (ma20_5 - ma20_5_prev) < ma20LidSlope and close < ma20_5
+            tangle5 = ma20Tangle > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma60_5) and not na(ma60_5_prev) and ma20_5 > ma20_5_prev and ma60_5 < ma60_5_prev and math.abs(ma60_5 - ma20_5) <= ma20Tangle and close >= ma60_5
             gapOk = na(lastEntryBar) or (bar_index - lastEntryBar >= minEntryGap)
             nyHour = hour(time, "America/New_York")
             nyMinute = minute(time, "America/New_York")
@@ -143,13 +145,16 @@ if inSetup
             else if touch and lid5 and oldEnough
                 // 壓在陡降五分 MA20 下：這波作廢，不要 4 分鐘後又買
                 inSetup := false
+            else if touch and tangle5 and oldEnough
+                // 粉紅剛翻、綠線還下彎又纏在一起，價已在綠線上：糾結作廢
+                inSetup := false
             else if touch and dumpSkip
                 // 砸上均線的大陰線不進，留在這波等下一根
                 inSetup := true
             else if touch and chase5
                 // 追在下跌五分 MA20 上太高，等真正坐上的右肩
                 inSetup := true
-            else if touch and nearPrev and oldEnough and inRth() and notLate and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and not farBelow5mMa20 and not chase5 and not lid5 and strategy.position_size == 0 and gapOk
+            else if touch and nearPrev and oldEnough and inRth() and notLate and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and not farBelow5mMa20 and not chase5 and not lid5 and not tangle5 and strategy.position_size == 0 and gapOk
                 tgt = close + risk * tgtR
                 strategy.entry("破翻回踩", strategy.long)
                 strategy.exit("破翻出場", "破翻回踩", stop=stopLevel, limit=tgt)
