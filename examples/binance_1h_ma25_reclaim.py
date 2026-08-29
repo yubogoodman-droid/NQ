@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""幣安 1 小時 K：MA25 下破底，等 MA7>MA14>MA25 多頭排列再進。
+"""幣安 1 小時 K：MA25 下做出筆畫 W，站回再進。
 
-對齊手機圖那種走法：價先跌破 MA25、在下面做出低點（V / W），
-破底後等 1h 短均多頭排列。進場用排列那根收盤；停損等收盤跌破破底那根 K。
+對齊手機手畫那種走法：先一腳下跌 → 反彈吻 MA25 → 第二腳破前低 →
+急拉收盤站回 MA25。進場用站上那根收盤；停損等收盤跌破破底那根 K。
 
 用法:
   python3 examples/binance_1h_ma25_reclaim.py --symbols AVGOUSDT,ONDSUSDT --days 45
-  python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 30 --pages
+  python3 examples/binance_1h_ma25_reclaim.py --strict --limit 80 --days 30 --pages
   python3 examples/binance_1h_ma25_reclaim.py --recent 48
 """
 
@@ -48,6 +48,7 @@ MA_COLORS = {
     200: "#c62828",
 }
 MA_WIDTH = {7: 1.15, 14: 1.05, 25: 2.15, 99: 1.25, 120: 1.15, 200: 1.25}
+W_COLOR = "#1e88e5"
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +78,11 @@ class Signal:
     ma14: float = 0.0
     ma99: float = 0.0
     ma200: float = 0.0
+    w_start_idx: int = -1
+    w_left_idx: int = -1
+    w_peak_idx: int = -1
+    w_right_idx: int = -1
+    w_arm_idx: int = -1
 
 
 @dataclass
@@ -292,6 +298,56 @@ def classify_shape(low: np.ndarray, high: np.ndarray, start: int, end: int) -> s
     return "W"
 
 
+def drawn_w_points(
+    low: np.ndarray,
+    high: np.ndarray,
+    ma25: np.ndarray,
+    start: int,
+    end: int,
+    bottom_idx: int,
+    *,
+    reclaim: Optional[int] = None,
+    min_sep: int = 6,
+    min_bounce: float = 0.006,
+    neck_below: float = 0.015,
+    neck_above: float = 0.015,
+    arm_bars: int = 10,
+) -> Optional[Tuple[int, int, int, int, int]]:
+    """筆畫 W 五點：下跌起點、左谷、吻 MA25、右谷破底、右臂急拉。"""
+    if bottom_idx <= start or bottom_idx > end:
+        return None
+    lefts = [i for i in _swing_lows(low, start, end) if i <= bottom_idx - min_sep]
+    if not lefts:
+        return None
+    left = min(lefts, key=lambda i: float(low[i]))
+    first = float(low[left])
+    bot = float(low[bottom_idx])
+    if first <= 0 or bot >= first:
+        return None
+    pk = left + int(np.argmax(high[left : bottom_idx + 1]))
+    if pk <= left or pk >= bottom_idx:
+        return None
+    peak = float(high[pk])
+    ma = float(ma25[pk])
+    if np.isnan(ma) or ma <= 0:
+        return None
+    dist = (peak - ma) / ma
+    if dist < -neck_below or dist > neck_above:
+        return None
+    if (peak - first) / first < min_bounce:
+        return None
+    drop_from = start + int(np.argmax(high[start : left + 1])) if left > start else start
+    if drop_from >= left:
+        drop_from = max(start, left - 1)
+    rec = reclaim if reclaim is not None else min(end + 1, len(high) - 1)
+    rec = max(bottom_idx, min(int(rec), len(high) - 1))
+    arm_to = min(len(high) - 1, max(rec + arm_bars, bottom_idx + 8))
+    arm = bottom_idx + int(np.argmax(high[bottom_idx : arm_to + 1]))
+    if arm <= bottom_idx:
+        arm = rec
+    return drop_from, left, pk, bottom_idx, arm
+
+
 def drawn_w_ok(
     low: np.ndarray,
     high: np.ndarray,
@@ -306,29 +362,21 @@ def drawn_w_ok(
     neck_above: float = 0.015,
 ) -> bool:
     """對齊你筆畫的 AVGO：先做一腳、反彈吻到 MA25 附近、再破底。"""
-    if bottom_idx <= start or bottom_idx > end:
-        return False
-    lefts = [i for i in _swing_lows(low, start, end) if i <= bottom_idx - min_sep]
-    if not lefts:
-        return False
-    left = min(lefts, key=lambda i: float(low[i]))
-    first = float(low[left])
-    bot = float(low[bottom_idx])
-    if first <= 0 or bot >= first:
-        return False
-    pk = left + int(np.argmax(high[left : bottom_idx + 1]))
-    if pk <= left or pk >= bottom_idx:
-        return False
-    peak = float(high[pk])
-    ma = float(ma25[pk])
-    if np.isnan(ma) or ma <= 0:
-        return False
-    dist = (peak - ma) / ma
-    if dist < -neck_below or dist > neck_above:
-        return False
-    if (peak - first) / first < min_bounce:
-        return False
-    return True
+    return (
+        drawn_w_points(
+            low,
+            high,
+            ma25,
+            start,
+            end,
+            bottom_idx,
+            min_sep=min_sep,
+            min_bounce=min_bounce,
+            neck_below=neck_below,
+            neck_above=neck_above,
+        )
+        is not None
+    )
 
 
 def bull_stack(close: np.ndarray, ma7: np.ndarray, ma14: np.ndarray, ma25: np.ndarray, i: int) -> bool:
@@ -417,7 +465,7 @@ def detect_signals(
     max_stack_wait: int = 36,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """1h 跌破 MA25 破底後，等 MA7>MA14>MA25 多頭排列再進。"""
+    """1h 跌破 MA25，做出 W 後收盤站回再進。max_stack_wait 只留給舊呼叫，不再當進場條件。"""
     if df is None or len(df) < ma_period + min_bars_below + 5:
         return []
 
@@ -495,19 +543,14 @@ def detect_signals(
             i = reclaim
             continue
 
-        if require_drawn_w and not drawn_w_ok(low, high, ma25, start, end, bottom_idx):
+        w_pts = drawn_w_points(low, high, ma25, start, end, bottom_idx, reclaim=reclaim)
+        if require_drawn_w and w_pts is None:
             bump("not_w")
             i = reclaim
             continue
 
         bump("reclaim")
-        stack_from = bottom_idx + 1
-        stack_to = min(n - 1, bottom_idx + max_stack_wait)
-        entry_idx = first_bull_stack(close, ma7, ma14, ma25, stack_from, stack_to)
-        if entry_idx is None:
-            bump("no_stack")
-            i = reclaim
-            continue
+        entry_idx = reclaim
         if entry_idx - last_entry < min_entry_gap:
             bump("gap")
             i = reclaim
@@ -524,8 +567,13 @@ def detect_signals(
         vol_avg = float(np.mean(volume[max(0, entry_idx - vol_lookback) : entry_idx]) or 1.0)
         vol_ratio = float(volume[entry_idx] / vol_avg) if vol_avg > 0 else 1.0
         shape = classify_shape(low, high, start, end)
-        stacked = True
+        if w_pts is not None:
+            shape = "W"
+        stacked = bull_stack(close, ma7, ma14, ma25, entry_idx)
         q_score, q_grade = quality_of(depth_pct, vol_ratio, shape, stacked)
+        w_start = w_left = w_peak = w_right = w_arm = -1
+        if w_pts is not None:
+            w_start, w_left, w_peak, w_right, w_arm = w_pts
 
         signals.append(
             Signal(
@@ -549,6 +597,11 @@ def detect_signals(
                 ma14=float(ma14[entry_idx]) if not np.isnan(ma14[entry_idx]) else 0.0,
                 ma99=float(ma99[entry_idx]) if not np.isnan(ma99[entry_idx]) else 0.0,
                 ma200=float(ma200[entry_idx]) if not np.isnan(ma200[entry_idx]) else 0.0,
+                w_start_idx=int(w_start),
+                w_left_idx=int(w_left),
+                w_peak_idx=int(w_peak),
+                w_right_idx=int(w_right),
+                w_arm_idx=int(w_arm),
             )
         )
         last_entry = entry_idx
@@ -661,10 +714,64 @@ def _setup_cjk() -> None:
 
 
 def _trade_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
-    # 手機圖大概 80～90 根：破底前約兩天，出場後再留半天
-    start = max(0, min(trade.signal.break_idx, trade.entry_idx) - 52)
-    end = min(len(df) - 1, max(trade.exit_idx, trade.entry_idx) + 12)
+    # 手機圖大概 80～90 根：W 起點前留一天，出場後再留半天
+    sig = trade.signal
+    anchors = [sig.break_idx, trade.entry_idx]
+    if sig.w_start_idx >= 0:
+        anchors.append(sig.w_start_idx)
+    right = [trade.exit_idx, trade.entry_idx]
+    if sig.w_arm_idx >= 0:
+        right.append(sig.w_arm_idx)
+    start = max(0, min(anchors) - 28)
+    end = min(len(df) - 1, max(right) + 12)
     return start, end
+
+
+def _w_xy(
+    sig: Signal,
+    high: np.ndarray,
+    low: np.ndarray,
+    win_start: int,
+    n_win: int,
+) -> Optional[Tuple[List[float], List[float]]]:
+    idxs = [sig.w_start_idx, sig.w_left_idx, sig.w_peak_idx, sig.w_right_idx, sig.w_arm_idx]
+    if any(i < 0 or i >= len(high) for i in idxs):
+        return None
+    ys = [
+        float(high[idxs[0]]),
+        float(low[idxs[1]]),
+        float(high[idxs[2]]),
+        float(low[idxs[3]]),
+        float(high[idxs[4]]),
+    ]
+    xs = [float(i - win_start) for i in idxs]
+    keep_x: List[float] = []
+    keep_y: List[float] = []
+    for x, y in zip(xs, ys):
+        if -0.5 <= x <= n_win - 0.5:
+            keep_x.append(x)
+            keep_y.append(y)
+    if len(keep_x) < 3:
+        return None
+    return keep_x, keep_y
+
+
+def _draw_w_overlay(ax, sig: Signal, high: np.ndarray, low: np.ndarray, win_start: int, n_win: int) -> None:
+    xy = _w_xy(sig, high, low, win_start, n_win)
+    if xy is None:
+        return
+    xs, ys = xy
+    ax.plot(
+        xs,
+        ys,
+        color=W_COLOR,
+        lw=2.55,
+        solid_capstyle="round",
+        solid_joinstyle="round",
+        zorder=7,
+        label="_nolegend_",
+    )
+    ax.scatter(xs, ys, s=26, color=W_COLOR, zorder=8, linewidths=0)
 
 
 def _loc_on_tf(index: pd.DatetimeIndex, ts) -> Optional[int]:
@@ -750,6 +857,14 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0, zorder=2)
 
     _plot_mas(ax, close_full, start, end, xs)
+    _draw_w_overlay(
+        ax,
+        sig,
+        df["High"].to_numpy(float),
+        df["Low"].to_numpy(float),
+        start,
+        len(window),
+    )
 
     # 停損／目標不拉 Y 軸，否則均線帶會被壓扁，跟手機圖不像
     y_lo = float(np.nanmin(l.to_numpy(float)))
@@ -775,19 +890,19 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             textcoords="offset points",
             xytext=(0, -13),
             ha="center",
-            color="#f9a8d4",
+            color="#c2185b",
             fontsize=8,
         )
     if 0 <= ex < len(window):
         ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
-        ax.scatter([ex], [trade.entry_price], s=46, color="#00e676", marker="^", zorder=6)
+        ax.scatter([ex], [trade.entry_price], s=46, color="#00c853", marker="^", zorder=6)
         ax.annotate(
-            "排列",
+            "站回",
             (ex, trade.entry_price),
             textcoords="offset points",
             xytext=(0, 10),
             ha="center",
-            color="#86efac",
+            color="#2e7d32",
             fontsize=8,
         )
     if 0 <= xx < len(window):
@@ -828,9 +943,27 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         _paint_candles(ax4, xs4, w4["Open"], w4["High"], w4["Low"], w4["Close"])
         close4 = h4["Close"].astype(float)
         _plot_mas(ax4, close4, s4, e4, xs4)
+        if sig.w_left_idx >= 0:
+            w4x: List[float] = []
+            w4y: List[float] = []
+            for i, price in (
+                (sig.w_start_idx, float(df["High"].iloc[sig.w_start_idx])),
+                (sig.w_left_idx, float(df["Low"].iloc[sig.w_left_idx])),
+                (sig.w_peak_idx, float(df["High"].iloc[sig.w_peak_idx])),
+                (sig.w_right_idx, float(df["Low"].iloc[sig.w_right_idx])),
+                (sig.w_arm_idx, float(df["High"].iloc[sig.w_arm_idx])),
+            ):
+                if i < 0:
+                    continue
+                px = _loc_on_tf(w4.index, df.index[i])
+                if px is not None:
+                    w4x.append(float(px))
+                    w4y.append(price)
+            if len(w4x) >= 3:
+                ax4.plot(w4x, w4y, color=W_COLOR, lw=2.1, solid_capstyle="round", zorder=6)
         for ts, col, mark in (
             (df.index[sig.break_idx], "#f472b6", "破底"),
-            (et, "#00e676", "排列"),
+            (et, "#00c853", "站回"),
             (xt, "#f0c14b", None),
         ):
             px = _loc_on_tf(w4.index, ts)
@@ -947,6 +1080,16 @@ def write_html_report(
         reason_cls = {"target": "tag-tp", "stop": "tag-sl", "lost_ma25": "tag-sl"}.get(t.exit_reason, "tag-time")
         img_name = f"t{i:02d}_{hit.symbol}_{et.strftime('%m%d_%H%M')}_q{t.quality.lower()}.png"
         draw_trade_png(df, t, path.parent / "img" / img_name, i, title_extra=hit.symbol)
+        if t.signal.w_left_idx >= 0:
+            left_px = float(df["Low"].iloc[t.signal.w_left_idx])
+            peak_px = float(df["High"].iloc[t.signal.w_peak_idx])
+            entry_line = (
+                f"進場 站回 MA25  筆畫W 左谷 {left_px:.6g}  吻 {peak_px:.6g}  破底 {t.signal.bottom:.6g}"
+            )
+        else:
+            entry_line = (
+                f"進場 站回 MA25  MA7 {t.signal.ma7:.6g}  MA14 {t.signal.ma14:.6g}  MA25 {t.signal.ma25:.6g}"
+            )
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -968,7 +1111,7 @@ def write_html_report(
             f"破底 {t.signal.bottom:.6g}  深度 {t.signal.depth_pct * 100:.2f}%  在下 {t.signal.bars_below}h\n"
             f"急殺 {t.signal.impulse_pct * 100:.1f}% / {t.signal.flush_atr:.1f}ATR  破前低 {t.signal.undercut_pct * 100:.1f}%\n"
             f"量比 {t.signal.vol_ratio:.2f}x  MA25 {t.signal.ma25:.6g}\n"
-            f"進場 1h MA7>MA14>MA25  MA7 {t.signal.ma7:.6g}  MA14 {t.signal.ma14:.6g}  MA25 {t.signal.ma25:.6g}"
+            f"{entry_line}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i} {escape(hit.symbol)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -1023,7 +1166,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上（{'嚴格 · 筆畫 W' if strict else '寬鬆'}）</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 均線對齊你那兩張手機圖：黃7 / 青14 / 粉25 / 紫99 / 綠120 / 酒紅200<br/>
-{'嚴格版 · 在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%。'}破底後等 1h MA7&gt;MA14&gt;MA25 多頭排列才進場。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
+{'嚴格版 · 在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%。'}破底後第一根收盤站回 MA25 進場。圖上藍線是筆畫 W。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1547,7 +1690,7 @@ def cmd_run(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="幣安 1h MA25 下破底再站上")
+    p = argparse.ArgumentParser(description="幣安 1h MA25 筆畫 W，站回再進")
     p.add_argument("--symbols", default="", help="只掃這些，逗號分隔，例如 AVGOUSDT,ONDSUSDT")
     p.add_argument("--universe", action="store_true", help="即使指定 --symbols 也掃流動永續")
     p.add_argument("--limit", type=int, default=80, help="流動永續最多幾檔（成交額由高到低）")

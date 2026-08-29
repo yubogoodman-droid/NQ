@@ -60,13 +60,13 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## 幣安 1 小時 MA25 下破底再站上
+## 幣安 1 小時 MA25 筆畫 W 再站上
 
 1 小時圖寬鬆版：收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。  
-圖卡均線對齊一開始那兩張手機圖：黃 MA7、青 MA14、粉 MA25、紫 MA99、綠 MA120、酒紅 MA200。  
-破底後等 1h MA7>MA14>MA25 多頭排列才進場；停損等收盤跌破破底那根 K；目標 2R；連兩根又掉回 MA25 下出場。  
-報告每張卡底下附 4h K 對照。  
-`--strict` 才是你筆畫那種：在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底，然後等 1h MA7>MA14>MA25 多頭排列。
+圖卡均線對齊手機圖：黃 MA7、青 MA14、粉 MA25、紫 MA99、綠 MA120、酒紅 MA200。  
+`--strict` 才是你筆畫那種 W：先一腳下跌、反彈吻到粉 MA25、第二腳破前低，再收盤站回 MA25 進場。圖上畫藍 W。  
+停損等收盤跌破破底那根 K；目標 2R；連兩根又掉回 MA25 下出場。  
+報告每張卡底下附 4h K 對照。
 
 ```bash
 # 寬鬆 · 近一週
