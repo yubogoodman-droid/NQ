@@ -382,6 +382,8 @@ def generate_signals(
                 break
             if np.isnan(ma60[k]) or np.isnan(ma5[k]) or np.isnan(ma10[k]) or np.isnan(ma20[k]) or np.isnan(ma30[k]):
                 continue
+            if skip_slow_sandwich and (np.isnan(ma120[k]) or np.isnan(ma200[k])):
+                continue
             # 真跌破：收盤同時低於 MA60（不是 1 點吻線）與 M 頸線。
             # 排除「價格橫盤、MA60 往上追上」——那種收盤仍在頸線之上。
             under_ma = close[k] <= ma60[k] - min_break_pts
@@ -399,12 +401,14 @@ def generate_signals(
                 min_spread=min_ribbon_spread,
             ):
                 continue
-            # 夾在 MA120/MA200 中間＝慢均還托著，只破 MA60 當假跌破。
-            if skip_slow_sandwich and slow_ma_sandwich(
-                float(close[k]), float(ma120[k]), float(ma200[k])
-            ):
-                saw_sandwich = True
-                continue
+            # 夾在 MA120/MA200 中間先不進；一旦進過夾心，必須收盤跌出慢均下方才算真破。
+            if skip_slow_sandwich:
+                lo_slow = min(float(ma120[k]), float(ma200[k]))
+                if slow_ma_sandwich(float(close[k]), float(ma120[k]), float(ma200[k])):
+                    saw_sandwich = True
+                    continue
+                if saw_sandwich and close[k] > lo_slow - min_break_pts:
+                    continue
             entry_idx = k
             break
         if invalidated:
