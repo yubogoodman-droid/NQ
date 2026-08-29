@@ -263,15 +263,20 @@ def resample_4h(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def classify_shape(low: np.ndarray, high: np.ndarray, start: int, end: int) -> str:
-    """V if one clear trough; W if two swing lows with a bounce in between."""
-    if end - start < 6:
-        return "V"
+def _swing_lows(low: np.ndarray, start: int, end: int) -> List[int]:
     mins: List[int] = []
     for i in range(start + 2, end - 1):
         window = low[i - 2 : i + 3]
         if float(low[i]) <= float(np.min(window)) + 1e-12 and int(np.sum(np.isclose(window, low[i]))) == 1:
             mins.append(i)
+    return mins
+
+
+def classify_shape(low: np.ndarray, high: np.ndarray, start: int, end: int) -> str:
+    """V if one clear trough; W if two swing lows with a bounce in between."""
+    if end - start < 6:
+        return "V"
+    mins = _swing_lows(low, start, end)
     if len(mins) < 2:
         return "V"
     left, right = mins[0], mins[-1]
@@ -284,6 +289,45 @@ def classify_shape(low: np.ndarray, high: np.ndarray, start: int, end: int) -> s
     if (peak / trough - 1.0) < 0.008:
         return "V"
     return "W"
+
+
+def drawn_w_ok(
+    low: np.ndarray,
+    high: np.ndarray,
+    ma25: np.ndarray,
+    start: int,
+    end: int,
+    bottom_idx: int,
+    *,
+    min_sep: int = 6,
+    min_bounce: float = 0.006,
+    neck_below: float = 0.015,
+    neck_above: float = 0.015,
+) -> bool:
+    """對齊你筆畫的 AVGO：先做一腳、反彈吻到 MA25 附近、再破底。"""
+    if bottom_idx <= start or bottom_idx > end:
+        return False
+    lefts = [i for i in _swing_lows(low, start, end) if i <= bottom_idx - min_sep]
+    if not lefts:
+        return False
+    left = min(lefts, key=lambda i: float(low[i]))
+    first = float(low[left])
+    bot = float(low[bottom_idx])
+    if first <= 0 or bot >= first:
+        return False
+    pk = left + int(np.argmax(high[left : bottom_idx + 1]))
+    if pk <= left or pk >= bottom_idx:
+        return False
+    peak = float(high[pk])
+    ma = float(ma25[pk])
+    if np.isnan(ma) or ma <= 0:
+        return False
+    dist = (peak - ma) / ma
+    if dist < -neck_below or dist > neck_above:
+        return False
+    if (peak - first) / first < min_bounce:
+        return False
+    return True
 
 
 def quality_of(depth_pct: float, vol_ratio: float, shape: str, stacked: bool) -> Tuple[int, str]:
@@ -345,6 +389,7 @@ def detect_signals(
     min_entry_gap: int = 8,
     vol_lookback: int = 20,
     break_lookback: int = 16,
+    require_drawn_w: bool = False,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """1h close 跌破 MA25 → 在下面做出低點 → 收盤重新站上 MA25。"""
@@ -421,6 +466,11 @@ def detect_signals(
         left = max(0, bottom_idx - break_lookback + 1)
         if bottom > float(np.min(low[left : bottom_idx + 1])) + 1e-12:
             bump("not_break")
+            i = reclaim
+            continue
+
+        if require_drawn_w and not drawn_w_ok(low, high, ma25, start, end, bottom_idx):
+            bump("not_w")
             i = reclaim
             continue
 
@@ -842,6 +892,7 @@ def write_html_report(
     recent_hours: int = 0,
     all_stats: Optional[dict] = None,
     card_note: str = "",
+    strict: bool = False,
 ) -> Path:
     stats = all_stats or summarize_trades([h.trade for h in hits])
     cards: List[str] = []
@@ -936,9 +987,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安 1h · MA25 下破底再站上（寬鬆）</h1>
+<h1>幣安 1h · MA25 下破底再站上（{'嚴格 · 筆畫 W' if strict else '寬鬆'}）</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 均線對齊你那兩張手機圖：黃7 / 青14 / 粉25 / 紫99 / 綠120 / 酒紅200<br/>
-寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
+{'嚴格版 · 在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底、再站上。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。不停急殺門檻。'}停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1309,6 +1360,7 @@ STRICT_DETECT = dict(
     min_impulse_pct=0.023,
     min_undercut_pct=0.014,
     min_flush_atr=2.8,
+    require_drawn_w=True,
 )
 
 
@@ -1389,7 +1441,8 @@ def cmd_run(args) -> int:
             f"down={funnel.get('cross_down', 0)} reclaim={funnel.get('reclaim', 0)} "
             f"taken={funnel.get('taken', 0)} short={funnel.get('too_short', 0)} "
             f"long={funnel.get('too_long', 0)} shallow={funnel.get('shallow', 0)} "
-            f"weak={funnel.get('weak_flush', 0)} noreclaim={funnel.get('no_reclaim', 0)}"
+            f"weak={funnel.get('weak_flush', 0)} notw={funnel.get('not_w', 0)} "
+            f"noreclaim={funnel.get('no_reclaim', 0)}"
         )
     now = datetime.now(TPE)
     for i, hit in enumerate(hits, 1):
@@ -1429,6 +1482,7 @@ def cmd_run(args) -> int:
             recent_hours=args.recent,
             all_stats=stats,
             card_note=card_note,
+            strict=bool(args.strict),
         )
         view = write_view_html(out)
         print(f"html={out}")
@@ -1472,7 +1526,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-impulse", type=float, default=0.0, help="4 根急殺最低幅度 %（0=寬鬆）")
     p.add_argument("--min-undercut", type=float, default=0.0, help="跌破急殺前平台低點 %（0=寬鬆）")
     p.add_argument("--min-atr", type=float, default=0.0, help="急殺至少幾個 ATR（0=寬鬆）")
-    p.add_argument("--strict", action="store_true", help="改用截圖急殺門檻")
+    p.add_argument("--strict", action="store_true", help="筆畫那種 W：急殺破底 + 先做一腳再吻回 MA25")
     p.add_argument("--target-r", type=float, default=2.0)
     p.add_argument("--recent", type=int, default=48, help="報告裡標近幾小時的新訊號")
     p.add_argument("--html", default="")

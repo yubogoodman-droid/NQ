@@ -65,7 +65,8 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 1 小時圖寬鬆版：收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。  
 圖卡均線對齊一開始那兩張手機圖：黃 MA7、青 MA14、粉 MA25、紫 MA99、綠 MA120、酒紅 MA200。  
 進場用站回收盤；停損等收盤跌破破底那根 K；目標 2R；連兩根又掉回 MA25 下出場。  
-報告每張卡底下附 4h K 對照。要截圖那種急殺再加 `--strict`。
+報告每張卡底下附 4h K 對照。  
+`--strict` 才是你筆畫那種：在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底、再站上。
 
 ```bash
 # 寬鬆 · 近一週
@@ -74,8 +75,8 @@ python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 7 --pages
 # 寬鬆 · 兩個月
 python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 60 --html docs/binance-1h-ma25-60d/index.html
 
-# 截圖急殺
-python3 examples/binance_1h_ma25_reclaim.py --strict --limit 80 --days 14 --pages
+# 筆畫那種 W · 近一個月
+python3 examples/binance_1h_ma25_reclaim.py --strict --limit 80 --days 30 --html docs/binance-1h-ma25-strict-30d/index.html
 ```
 
 TradingView：`pinescript/binance_1h_ma25_reclaim.pine` 貼到 1 小時圖。

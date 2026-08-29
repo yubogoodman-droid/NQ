@@ -13,11 +13,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from binance_1h_ma25_reclaim import (  # noqa: E402
     MA_COLORS,
+    STRICT_DETECT,
     Hit,
     TradeResult,
     atr,
     classify_shape,
     detect_signals,
+    drawn_w_ok,
     flush_metrics,
     one_at_a_time_path,
     quality_of,
@@ -183,6 +185,28 @@ def test_slow_grind_rejected() -> None:
     )
     assert not sigs, f"slow grind should fail flush, funnel={funnel}"
     assert funnel.get("weak_flush", 0) >= 1 or funnel.get("shallow", 0) >= 1 or funnel.get("too_short", 0) >= 1
+
+
+def test_drawn_w_ok_avgo_like() -> None:
+    low = np.full(24, 9.90)
+    high = np.full(24, 9.98)
+    ma = np.full(24, 10.0)
+    low[5] = 9.70
+    high[12] = 10.04
+    low[18] = 9.50
+    assert drawn_w_ok(low, high, ma, 2, 21, 18)
+    low_v = np.full(24, 9.90)
+    high_v = np.full(24, 9.98)
+    low_v[18] = 9.50
+    assert not drawn_w_ok(low_v, high_v, ma, 2, 21, 18)
+
+
+def test_strict_requires_drawn_w() -> None:
+    df = _make_reclaim_bars(depth=0.055, below=16, sharp=True)
+    loose = detect_signals(df, min_depth_pct=0.028)
+    assert loose, "flush V still counts when W is not required"
+    strict = detect_signals(df, **STRICT_DETECT)
+    assert not strict, "straight V flush is not the drawn W"
 
 
 def test_one_bar_pop_keeps_episode() -> None:
@@ -354,6 +378,8 @@ def main() -> int:
     test_flush_metrics_avgo_like()
     test_shallow_rejected()
     test_slow_grind_rejected()
+    test_drawn_w_ok_avgo_like()
+    test_strict_requires_drawn_w()
     test_still_below_no_signal()
     test_wick_below_bottom_bar_does_not_stop()
     test_close_below_bottom_bar_stops()
