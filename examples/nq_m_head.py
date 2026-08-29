@@ -53,8 +53,7 @@ TRAIL_ARM_R = 1.6
 TRAIL_LOCK_R = 1.2
 TRAIL_STEPS_1M = ((1.6, 1.2),)
 # 5m 停損較寬，同一檔 1.0R 會變遠；多一層 0.8 / 1.2 才鎖得住 #2、#7
-# 0.6R 先鎖進場價：07-13 那種走過 0.6R 再吐到停損，應該保本跑。
-TRAIL_STEPS_5M = ((0.6, 0.0), (0.8, 0.5), (1.2, 0.9), (1.6, 1.2))
+TRAIL_STEPS_5M = ((0.8, 0.5), (1.2, 0.9), (1.6, 1.2))
 
 # 1m / 5m / 1h 同一套邏輯，K 數換成大約相同的鐘面時間
 TF_PRESETS = {
@@ -79,7 +78,6 @@ TF_PRESETS = {
         "trail_steps": TRAIL_STEPS_5M,
         "stop_buffer": 36.0,  # 避開 #6 那種頭頂 +8 被軋空掃掉
         "skip_slow_sandwich": True,  # 收盤夾在 MA120/MA200 中間不空（#4 假跌破）
-        "reclaim_htf": True,  # 1h 沒破就收回 5m MA60 出場；1h 破了就等收回 1h MA60
     },
     "1h": {
         "swing_lookback": 2,  # 2 小時確認
@@ -518,12 +516,9 @@ def run_tf_backtest(
     preset = apply_preset(timeframe)
     hold = preset.pop("max_bars_hold")
     trail_steps = preset.pop("trail_steps", TRAIL_STEPS_1M)
-    reclaim_htf = preset.pop("reclaim_htf", False)
     funnel: Dict[str, int] = {}
     sigs = generate_signals(df, funnel=funnel, timeframe=timeframe, **preset, **(extra or {}))
-    trades = run_backtest(
-        df, sigs, max_bars_hold=hold, trail_steps=trail_steps, reclaim_htf=reclaim_htf
-    )
+    trades = run_backtest(df, sigs, max_bars_hold=hold, trail_steps=trail_steps)
     return sigs, trades, funnel
 
 
@@ -554,22 +549,13 @@ def run_backtest(
     trail_steps: Sequence[tuple[float, float]] | None = None,
     trail_arm_r: float = TRAIL_ARM_R,
     trail_lock_r: float = TRAIL_LOCK_R,
-    reclaim_htf: bool = False,
-    min_break_pts: float = 8.0,
 ) -> List[TradeResult]:
-    """做空：先硬停損、再 2R 停利；鎖利下一根才生效。逾時收盤。不重疊。
-
-    reclaim_htf：1h 沒確認跌破時，收盤收回 5m MA60 就出場（假跌破）。
-    1h 進場時已破，則等收盤收回 1h MA60 才當失敗。
-    """
+    """做空：先硬停損、再 2R 停利；鎖利下一根才生效。逾時收盤。不重疊。"""
     if signals is None:
         signals = generate_signals(df)
     steps = list(trail_steps) if trail_steps is not None else [(trail_arm_r, trail_lock_r)]
     results: List[TradeResult] = []
     position_open_until = -1
-    close_arr = df["close"].to_numpy(float)
-    ma60_arr = sma(close_arr, 60)
-    htf_arr = df["ma60_1h"].to_numpy(float) if "ma60_1h" in df.columns else None
 
     for sig in signals:
         entry_idx = sig.bar_idx
@@ -585,16 +571,10 @@ def run_backtest(
         pending_lock: float | None = None
         mfe = 0.0
         risk = sig.risk
-        htf_broken = False
-        if reclaim_htf and htf_arr is not None:
-            hv = float(htf_arr[entry_idx])
-            if not np.isnan(hv):
-                htf_broken = sig.entry <= hv - min_break_pts
 
         for i in range(entry_idx + 1, end_idx + 1):
             lo = float(df["low"].iloc[i])
             hi = float(df["high"].iloc[i])
-            cl = float(close_arr[i])
             if pending_lock is not None:
                 trail_stop = min(trail_stop, pending_lock)
                 pending_lock = None
@@ -616,20 +596,6 @@ def run_backtest(
                 exit_reason = "trail_stop"
                 exit_idx = i
                 break
-            if reclaim_htf:
-                if not htf_broken:
-                    if not np.isnan(ma60_arr[i]) and cl >= float(ma60_arr[i]) + min_break_pts:
-                        exit_price = cl
-                        exit_time = df.index[i]
-                        exit_reason = "ma_reclaim"
-                        exit_idx = i
-                        break
-                elif htf_arr is not None and not np.isnan(htf_arr[i]) and cl >= float(htf_arr[i]):
-                    exit_price = cl
-                    exit_time = df.index[i]
-                    exit_reason = "htf_reclaim"
-                    exit_idx = i
-                    break
             mfe = max(mfe, sig.entry - lo)
             locked = _trail_lock_price(sig.entry, risk, mfe, steps)
             if locked is not None:
@@ -1018,7 +984,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間不空。停損頭頂 +36。走過 0.6R 鎖進場價；再 0.8 / 1.2 / 1.6R。1h 沒破時收回 5m MA60 出場，1h 破了就等收回 1h MA60。鎖利下一根生效。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間不空。停損頭頂 +36。0.8R 鎖 0.5R、1.2R 鎖 0.9R、1.6R 鎖 1.2R。鎖利下一根生效。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
@@ -1091,7 +1057,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 一分K 高檔M頭 · 跌破MA60做空</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。1m 停損頭頂 +8、1.6R 鎖 1.2R；5m 停損 +36，走過 0.6R 鎖進場價。1h 沒破時收回 5m MA60 就出場。鎖利下一根才生效。</p>
+<p class="muted">高檔雙頂確認後，收盤同時跌破頸線與 MA60（≥8 點）。MA5/10/20/30/60 還黏成一團（帶寬 &lt; 28）先等打開。1m 停損頭頂 +8、1.6R 鎖 1.2R；5m 停損 +36，0.8 / 1.2 / 1.6R 鎖利。鎖利下一根才生效。</p>
 {note_line}
 {compare_line}
 {_stats_cards(stats)}

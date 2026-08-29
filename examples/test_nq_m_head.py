@@ -329,11 +329,11 @@ def test_tf_presets() -> None:
     assert TF_PRESETS["1m"]["min_ribbon_spread"] == 28.0
     assert TF_PRESETS["5m"]["min_ribbon_spread"] == 28.0
     assert TF_PRESETS["1m"]["trail_steps"][0] == (1.6, 1.2)
-    assert TF_PRESETS["5m"]["trail_steps"][0] == (0.6, 0.0)
-    assert TF_PRESETS["5m"]["trail_steps"][1] == (0.8, 0.5)
+    assert TF_PRESETS["5m"]["trail_steps"][0] == (0.8, 0.5)
+    assert TF_PRESETS["5m"]["trail_steps"][1] == (1.2, 0.9)
     assert TF_PRESETS["5m"]["stop_buffer"] == 36.0
     assert TF_PRESETS["5m"]["skip_slow_sandwich"] is True
-    assert TF_PRESETS["5m"]["reclaim_htf"] is True
+    assert "reclaim_htf" not in TF_PRESETS["5m"]
     assert "skip_before_minutes" not in TF_PRESETS["5m"]
     assert TF_PRESETS["1h"]["swing_lookback"] == 2
     assert TF_PRESETS["1h"]["stop_buffer"] == 50.0
@@ -366,106 +366,8 @@ def test_overlay_htf_ma60_no_peek() -> None:
     assert pd.isna(out["ma60_1h"].iloc[0])
 
 
-def _flat_short_frame(n: int = 80, freq: str = "5min") -> pd.DataFrame:
-    close = np.full(n, 10000.0)
-    idx = pd.date_range("2026-08-10 09:00", periods=n, freq=freq, tz=ET)
-    return pd.DataFrame(
-        {"open": close, "high": close + 2.0, "low": close - 2.0, "close": close, "volume": 50.0},
-        index=idx,
-    )
-
-
-def test_reclaim_exits_when_1h_not_broken() -> None:
-    """1h 還在上方時，收盤收回 5m MA60 就保本／少虧出場。"""
-    df = _flat_short_frame()
-    df["ma60_1h"] = 9800.0  # 進場 10000，1h 沒破
-    k = 65
-    df.loc[df.index[k], ["high", "low", "close"]] = (9990.0, 9920.0, 9930.0)
-    df.loc[df.index[k + 1], ["high", "low", "close"]] = (10030.0, 9990.0, 10020.0)
-    pattern = MHeadPattern(1, 3, 2, 10120.0, 10120.0, 10040.0)
-    sig = Signal(
-        timestamp=df.index[k - 1],
-        entry=10000.0,
-        stop_loss=10120.0,
-        target=9760.0,
-        pattern=pattern,
-        bar_idx=k - 1,
-        ma60=10008.0,
-        ma20=10004.0,
-        ma5=10002.0,
-        timeframe="5m",
-    )
-    trades = run_backtest(df, [sig], max_bars_hold=12, reclaim_htf=True)
-    assert trades
-    assert trades[0].exit_reason == "ma_reclaim", trades[0]
-    assert trades[0].pnl_points < 0  # 收回出場，小虧
-    assert trades[0].pnl_points > -80
-
-
-def test_no_5m_reclaim_when_1h_already_broken() -> None:
-    """1h 已破時，5m 軋回 MA60 不該出場（08-24 那種）。"""
-    df = _flat_short_frame()
-    df["ma60_1h"] = 10200.0  # 進場 10000，1h 已破
-    k = 65
-    df.loc[df.index[k], ["high", "low", "close"]] = (10040.0, 9980.0, 10030.0)
-    df.loc[df.index[k + 1], ["high", "low", "close"]] = (9990.0, 9800.0, 9820.0)
-    pattern = MHeadPattern(1, 3, 2, 10120.0, 10120.0, 10040.0)
-    sig = Signal(
-        timestamp=df.index[k - 1],
-        entry=10000.0,
-        stop_loss=10120.0,
-        target=9760.0,
-        pattern=pattern,
-        bar_idx=k - 1,
-        ma60=10008.0,
-        ma20=10004.0,
-        ma5=10002.0,
-        timeframe="5m",
-    )
-    trades = run_backtest(df, [sig], max_bars_hold=12, reclaim_htf=True)
-    assert trades[0].exit_reason != "ma_reclaim", trades[0]
-
-
-def test_be_locks_after_point_six_r() -> None:
-    """5m：見過 0.6R 後下一根鎖進場價，回補就保本。"""
-    n = 20
-    entry_idx = 4
-    entry, risk = 10000.0, 100.0
-    stop, target = 10100.0, 9800.0
-    close = np.full(n, entry)
-    high = close + 2.0
-    low = close - 2.0
-    close[entry_idx + 1] = entry - 70.0
-    low[entry_idx + 1] = entry - 70.0
-    high[entry_idx + 1] = entry - 50.0
-    close[entry_idx + 2] = entry + 5.0
-    low[entry_idx + 2] = entry - 20.0
-    high[entry_idx + 2] = entry + 8.0
-    idx = pd.date_range("2026-07-13 22:10", periods=n, freq="5min", tz=ET)
-    df = pd.DataFrame(
-        {"open": close, "high": high, "low": low, "close": close, "volume": 50.0},
-        index=idx,
-    )
-    pattern = MHeadPattern(1, 2, 1, stop - 8.0, stop - 8.0, entry + 20.0)
-    sig = Signal(
-        timestamp=df.index[entry_idx],
-        entry=entry,
-        stop_loss=stop,
-        target=target,
-        pattern=pattern,
-        bar_idx=entry_idx,
-        ma60=entry + 30.0,
-        ma20=entry + 15.0,
-        ma5=entry + 5.0,
-        timeframe="5m",
-    )
-    trades = run_backtest(df, [sig], max_bars_hold=10, trail_steps=TRAIL_STEPS_5M)
-    assert trades[0].exit_reason == "trail_stop"
-    assert abs(trades[0].pnl_points) < 0.26
-
-
-def test_point_six_be_does_not_block_two_r() -> None:
-    """0.48R 的軋空不該先鎖保本；同一根砸到 2R 仍走停利。"""
+def test_squeeze_then_two_r() -> None:
+    """0.48R 的軋空不該先鎖利；下一根砸到 2R 仍走停利。"""
     n = 20
     entry_idx = 4
     entry, risk = 10000.0, 100.0
@@ -541,10 +443,7 @@ def main() -> int:
     test_tf_presets()
     test_overlay_m5_ma60()
     test_overlay_htf_ma60_no_peek()
-    test_reclaim_exits_when_1h_not_broken()
-    test_no_5m_reclaim_when_1h_already_broken()
-    test_be_locks_after_point_six_r()
-    test_point_six_be_does_not_block_two_r()
+    test_squeeze_then_two_r()
     test_5m_preset_still_fires()
     test_write_html_report()
     print("ok")
