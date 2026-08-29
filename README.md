@@ -60,6 +60,19 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
+## 幣安 15 分 K 同時跌破 99/120/200 做空
+
+一根 15 分 K **同時打穿 MA99、MA120、MA200**（高點蓋過長均黏帶上沿、收在三條之下），且 **MA7 < MA14 < MA25 空頭排列**，進場做空。對齊 MUBARAK/USDT 那種從長均黏帶一刀跌破的圖。
+
+停損在破位 K 高點上方 0.1%；停利 2R；收復 MA99 或持倉 32 根（8 小時）平倉。預設掃流動 USDT 永續一週。
+
+```bash
+python3 examples/binance_15m_ma_break_short.py --pages
+python3 examples/binance_15m_ma_break_short.py --symbol MUBARAKUSDT
+```
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
