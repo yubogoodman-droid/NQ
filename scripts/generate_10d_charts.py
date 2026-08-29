@@ -236,6 +236,7 @@ def main():
     nav = (
         '<div class="stats" style="margin-bottom:18px">'
         '<a href="../index.html" style="color:#c9a227;text-decoration:none">← 回總覽</a> · '
+        '<a href="../seven_day.html" style="color:#8aa193;text-decoration:none">7日摘要</a> · '
         '<a href="../ten_day.html" style="color:#8aa193;text-decoration:none">10日摘要</a> · '
         '<a href="../thirty_day.html" style="color:#8aa193;text-decoration:none">30日摘要</a> · '
         '<a href="./index.html" style="color:#8aa193;text-decoration:none">一訊一圖</a>'
