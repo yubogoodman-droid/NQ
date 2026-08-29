@@ -172,6 +172,13 @@ def far_below_falling_5m_ma20(
     return float(slope20) < 0.0 and (float(ma20_5m) - float(entry)) > float(max_below)
 
 
+def choose_target_r(base: float, slope_5m: float, up: float) -> float:
+    """5m MA20 上彎用較大 R（08-03 那種真破底翻）；否則維持 1.5R。"""
+    if up > 0 and not np.isnan(slope_5m) and float(slope_5m) > 0.0:
+        return float(up)
+    return float(base)
+
+
 def quality_at_entry(ma5: float, ma10: float, ma20: float, ma20_slope: float) -> Tuple[int, str]:
     """A：MA20 上彎且短均多頭；B：收在 MA20 之上且 MA5>MA20；C：其餘。"""
     score = 0
@@ -275,6 +282,8 @@ INTERVAL_DETECT = {
         max_prev_above=50.0,
         min_retest_bars=8,
         max_close_above=20.0,
+        entry_until=13 * 60,  # 13:00 ET；午餐後／尾盤假右肩不接
+        target_r_up=2.0,  # 5m MA20 上彎用 2R
         stop_at_shoulder=True,
     ),
 }
@@ -331,6 +340,8 @@ def detect_signals(
     max_prev_above: float = 0.0,
     min_retest_bars: int = 0,
     max_close_above: float = 0.0,
+    entry_until: int = 0,
+    target_r_up: float = 0.0,
     stop_at_shoulder: bool = False,
     funnel: Optional[Dict[str, int]] = None,
     last_entry_idx: int = -(10**9),
@@ -516,6 +527,10 @@ def detect_signals(
             if not _in_session(ts, session):
                 bump("skip_session")
                 continue
+            # 08-06 13:10 / 08-28 14:31：收復後拖到午後，貼著下彎長均的假右肩。
+            if entry_until > 0 and (int(ts.hour) * 60 + int(ts.minute)) >= int(entry_until):
+                bump("skip_late")
+                continue
             if t - last_entry < min_entry_gap:
                 bump("skip_gap")
                 continue
@@ -614,7 +629,7 @@ def detect_signals(
                 entry_idx=entry_idx,
                 entry_price=entry,
                 stop_price=stop,
-                target_price=entry + risk * target_r,
+                target_price=entry + risk * choose_target_r(target_r, m20_5_s, target_r_up),
                 break_low=break_low,
                 support=support,
                 ma5=float(ma5[entry_idx]),

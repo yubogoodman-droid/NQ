@@ -16,6 +16,8 @@ maxPierce     = input.float(20.0, "回踩允許刺穿 MA20（點）", minval=0)
 failBelow     = input.float(40.0, "收盤跌破 MA20 則作廢（點）", minval=0)
 stopBuf       = input.float(10.0, "停損在破底下方（點）", minval=0)
 targetR       = input.float(1.5, "停利 R", minval=0.5, step=0.1)
+targetRUp     = input.float(2.0, "5m MA20 上彎時停利 R（0=關）", minval=0, step=0.1)
+entryUntil    = input.int(1300, "最晚進場 HHMM（0=關，1300=13:00 ET）", minval=0)
 maxRisk       = input.float(100.0, "最大風險（點）", minval=10)
 minRisk       = input.float(20.0, "最小風險（點）", minval=1)
 maLen         = input.int(20, "回踩均線", minval=5)
@@ -127,13 +129,17 @@ if inSetup
             ma20_30FallingNear = ma20Near > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma30_5) and not na(ma30_5_prev) and not na(ma60_5) and not na(ma60_5_prev) and ma20_5 < ma20_5_prev and ma30_5 < ma30_5_prev and ma60_5 < ma60_5_prev and close < ma20_5 and close < ma30_5 and ma20_5 < ma30_5 and ma30_5 < ma60_5 and (ma20_5 - close) <= ma20Near and (ma30_5 - close) <= ma20Near
             farBelow5mMa20 = ma20Below > 0 and not na(ma20_5) and not na(ma20_5_prev) and ma20_5 < ma20_5_prev and (ma20_5 - close) > ma20Below
             gapOk = na(lastEntryBar) or (bar_index - lastEntryBar >= minEntryGap)
+            nyHour = hour(time, "America/New_York")
+            nyMinute = minute(time, "America/New_York")
+            notLate = entryUntil <= 0 or (nyHour * 100 + nyMinute) < entryUntil
+            tgtR = targetRUp > 0 and not na(ma20_5) and not na(ma20_5_prev) and ma20_5 > ma20_5_prev ? targetRUp : targetR
             if touch and dumpKill and oldEnough
                 inSetup := false
             else if touch and dumpSkip
                 // 砸上均線的大陰線不進，留在這波等下一根
                 inSetup := true
-            else if touch and nearPrev and oldEnough and inRth() and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and not farBelow5mMa20 and strategy.position_size == 0 and gapOk
-                tgt = close + risk * targetR
+            else if touch and nearPrev and oldEnough and inRth() and notLate and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and not farBelow5mMa20 and strategy.position_size == 0 and gapOk
+                tgt = close + risk * tgtR
                 strategy.entry("破翻回踩", strategy.long)
                 strategy.exit("破翻出場", "破翻回踩", stop=stopLevel, limit=tgt)
                 lastEntryBar := bar_index

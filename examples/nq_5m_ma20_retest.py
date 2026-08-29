@@ -645,6 +645,7 @@ def write_html_report(
             f"遠低下彎5mMA20 {funnel.get('skip_below_5m', 0)} · "
             f"間隔 {funnel.get('skip_gap', 0)} · "
             f"追刀 {funnel.get('skip_dump', 0)} · "
+            f"午後 {funnel.get('skip_late', 0)} · "
             f"時段 {funnel.get('skip_session', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -654,6 +655,7 @@ def write_html_report(
         "右肩要先從反彈高點拉回至少 25 點，離開均線 3 根後即可回踩。"
         "進場收盤須貼著 1m MA20（高於不超過 20 點）；影線掃到但收盤彈走 30 點那種再等下一腳。"
         "大陰線砸上 MA20 不進，等下一根小 K 確認；實體超過 30 點且 5m MA20 下彎則這波作廢。"
+        "13:00 後不進（午餐後／尾盤假右肩）。5m MA20 上彎時目標 2R，否則 1.5R。"
         "只做日盤破底。"
         if interval == "1m"
         else ""
@@ -768,6 +770,7 @@ def cmd_backtest(args) -> int:
             f"below5m={funnel.get('skip_below_5m', 0)} "
             f"gap={funnel.get('skip_gap', 0)} "
             f"dump={funnel.get('skip_dump', 0)} "
+            f"late={funnel.get('skip_late', 0)} "
             f"session={funnel.get('skip_session', 0)}"
         )
     for q, info in stats.get("by_quality", {}).items():

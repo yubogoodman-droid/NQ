@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nq.ma20_retest import (  # noqa: E402
     Signal,
     TradeResult,
+    choose_target_r,
     detect_kwargs,
     detect_signals,
     drop_open_end_trades,
@@ -381,6 +382,8 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["min_retest_bars"] == 8
     assert d1["max_close_above"] == 20.0
     assert d1["ma20_5m_below"] == 45.0
+    assert d1["entry_until"] == 13 * 60
+    assert d1["target_r_up"] == 2.0
     assert d5["stop_at_shoulder"] is False
     assert d5["max_pierce"] == 12.0
     s1 = simulate_kwargs("1m")
@@ -601,6 +604,27 @@ def test_same_bar_wick_does_not_arm_be_stop() -> None:
     assert abs(trades[0].pnl_points - 1.5 * risk) < 1e-6
 
 
+def test_choose_target_r() -> None:
+    assert choose_target_r(1.5, 7.8, 2.0) == 2.0
+    assert choose_target_r(1.5, -10.8, 2.0) == 1.5
+    assert choose_target_r(1.5, 7.8, 0.0) == 1.5
+    assert choose_target_r(1.5, float("nan"), 2.0) == 1.5
+
+
+def test_skips_afternoon_right_shoulder() -> None:
+    """08-28 14:31 / 08-06 13:10：13:00 後的假右肩不接。"""
+    df = _1m_range_dump_reclaim_retest()
+    morning = detect_signals(df, **detect_kwargs("1m", session="day"))
+    assert morning, "control: same setup before 13:00 must still fill"
+    df = df.copy()
+    # 11:00 起跳：破底約 14:24，仍在日盤，但已過 13:00
+    df.index = pd.date_range("2026-08-28 11:00", periods=len(df), freq="1min", tz=ET)
+    funnel: dict = {}
+    late = detect_signals(df, funnel=funnel, **detect_kwargs("1m", session="day"))
+    assert not late
+    assert funnel.get("skip_late", 0) >= 1
+
+
 def test_rth_skips_premarket_break() -> None:
     """08-12 08:30 那種夜盤破底，不能 09:30 開盤當成右肩。"""
     df = _1m_range_dump_reclaim_retest()
@@ -633,6 +657,8 @@ def main() -> int:
     test_skips_close_far_above_ma20()
     test_1m_fills_early_right_shoulder()
     test_same_bar_wick_does_not_arm_be_stop()
+    test_choose_target_r()
+    test_skips_afternoon_right_shoulder()
     test_rth_skips_premarket_break()
     print("ok")
     return 0
