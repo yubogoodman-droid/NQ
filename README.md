@@ -42,12 +42,17 @@ python3 examples/nq_ma_reclaim.py alert
 近一個月 Yahoo 1m（2026-07-29 → 08-28）：**預設 9 筆、勝率 77.8%、約 +670 點**。  
 允許 09–10、風險上限 130。含 08-27 02:19 QB ma20 +84.8。hug 仍擋 08-11 12:39。
 
+同一窗口改五分 K：**沒料**。根數照搬 4 筆 25% −211；時間對齊 15 分收復 0 筆。預設仍 1m。
+
 ```bash
 python3 examples/nq_ma_reclaim.py backtest --period 30d --pages
 python3 examples/nq_ma_reclaim.py backtest --period 30d --strict --pages
+python3 examples/research_nq_5m.py --period 30d --pages
 ```
 
 預設圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim/view.html
+
+五分 K 對照：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim/m5-view.html
 
 07-16 23:20 那張原規則抓不到（破底在 22:15，15 分鐘窗內沒收復；22:55 只再破 1 點）：  
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim/jul16-view.html

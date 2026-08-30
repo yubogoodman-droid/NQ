@@ -25,6 +25,7 @@ from nq_ma_reclaim import (  # noqa: E402
     sma,
     summarize_trades,
     write_html_report,
+    write_view_html,
 )
 
 
@@ -159,6 +160,24 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
         assert any(img_dir.glob("t01_*.png")), "expected a static trade PNG"
 
 
+def test_write_view_html_custom_name() -> None:
+    from nq_ma_reclaim import ROOT
+
+    src = ROOT / "_tmp_view_src.html"
+    dest = ROOT / "_tmp_view_out.html"
+    src.write_text("<img src='img/x.png'/>", encoding="utf-8")
+    try:
+        out = write_view_html(src, dest_name="_tmp_view_out.html")
+        assert out == dest
+        text = dest.read_text(encoding="utf-8")
+        assert "raw.githubusercontent.com" in text
+        assert "img/x.png" in text
+        assert not (ROOT / "view.html").exists()
+    finally:
+        src.unlink(missing_ok=True)
+        dest.unlink(missing_ok=True)
+
+
 def main() -> int:
     test_detect_kwargs_allow_open_hour()
     test_parse_period_days()
@@ -169,6 +188,7 @@ def main() -> int:
     test_trace_records_taken()
     test_draw_event_png()
     test_write_html_report()
+    test_write_view_html_custom_name()
     print("ok")
     return 0
 

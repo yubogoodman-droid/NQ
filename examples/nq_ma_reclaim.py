@@ -1000,6 +1000,7 @@ def _render_trade_cards(
     html_path: Path,
     *,
     prefix: str = "t",
+    timeframe: str = "1m",
 ) -> str:
     cards: List[str] = []
     for i, t in enumerate(trades, 1):
@@ -1033,7 +1034,7 @@ def _render_trade_cards(
             "</header>"
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            f"<span class='tag tag-info'>1m</span>"
+            f"<span class='tag tag-info'>{escape(timeframe)}</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
             f"{extra_tag}"
             "</div>"
@@ -1051,11 +1052,15 @@ def _render_trade_cards(
     return "".join(cards)
 
 
-def write_view_html(src: Path, branch: str = "cursor/nq-30d-ablation-2484") -> Path:
+def write_view_html(
+    src: Path,
+    branch: str = "cursor/nq-30d-ablation-2484",
+    dest_name: str = "view.html",
+) -> Path:
     rel = src.parent.relative_to(REPO_ROOT).as_posix()
     base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
     text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
-    out = src.with_name("view.html")
+    out = src.with_name(dest_name)
     out.write_text(text, encoding="utf-8")
     return out
 
@@ -1070,6 +1075,8 @@ def write_html_report(
     extra_trades: Optional[List[TradeResult]] = None,
     extra_title: str = "",
     note: str = "",
+    timeframe: str = "1m",
+    prefix: str = "t",
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -1078,7 +1085,7 @@ def write_html_report(
         q_bits.append(f"Q{q} {info['n']}筆 {info['pnl']:+.1f}")
     q_line = " · ".join(q_bits) if q_bits else "無品質分組"
     out = Path(path)
-    cards = _render_trade_cards(df, trades, out, prefix="t")
+    cards = _render_trade_cards(df, trades, out, prefix=prefix, timeframe=timeframe)
     extra_html = ""
     if extra_trades:
         extra_stats = summarize_trades(extra_trades)
