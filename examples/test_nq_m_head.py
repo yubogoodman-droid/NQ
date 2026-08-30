@@ -27,6 +27,8 @@ from nq_m_head import (  # noqa: E402
     ribbon_tangled,
     slow_ma_sandwich,
     far_above_ma200,
+    hug_declining_ma20,
+    reclaim_stack_ok,
     untested_htf_support,
     run_backtest,
     run_tf_backtest,
@@ -359,6 +361,8 @@ def test_tf_presets() -> None:
     assert TF_PRESETS["5m"]["skip_slow_sandwich"] is True
     assert TF_PRESETS["5m"]["max_above_ma200"] == 150.0
     assert TF_PRESETS["5m"]["untested_htf_gap"] == 200.0
+    assert TF_PRESETS["5m"]["reclaim_exit"] is True
+    assert "reclaim_exit" not in TF_PRESETS["1m"]
     assert "reclaim_htf" not in TF_PRESETS["5m"]
     assert "skip_before_minutes" not in TF_PRESETS["5m"]
     assert TF_PRESETS["1h"]["swing_lookback"] == 2
@@ -430,6 +434,90 @@ def test_squeeze_then_two_r() -> None:
     assert abs(trades[0].pnl_points - 200.0) < 1e-9
 
 
+def test_reclaim_stack_and_hug() -> None:
+    assert reclaim_stack_ok(100.0, 99.0, 98.0, 97.0, 96.0)
+    assert not reclaim_stack_ok(100.0, 97.0, 98.0, 97.0, 96.0)  # MA5 沒排好
+    assert not reclaim_stack_ok(96.5, 99.0, 98.0, 97.0, 96.0)  # 沒收復 MA20
+    assert hug_declining_ma20(100.0, 99.0, 99.8, 16.0, 0.5)  # 貼著、MA20 下彎
+    assert not hug_declining_ma20(120.0, 99.0, 99.8, 16.0, 0.5)  # 離開 MA20 夠遠
+
+
+def test_breakdown_reclaim_flattens_short() -> None:
+    """破 2h 低之後，15 根內收復 MA20/30 + 多頭排列 → 收盤平空。"""
+    n = 80
+    close = np.full(n, 10000.0)
+    high = close + 2.0
+    low = close - 2.0
+    # 先走出一段平台低，再破底，再拉回站上均線
+    low[30] = 9980.0
+    close[30] = 9985.0
+    high[30] = 9990.0
+    low[50] = 9965.0  # 破近 2h 低超過 10 點
+    close[50] = 9970.0
+    high[50] = 9975.0
+    for j, px in enumerate((10040.0, 10080.0, 10120.0)):
+        k = 52 + j
+        close[k] = px
+        low[k] = px - 8.0
+        high[k] = px + 4.0
+    idx = pd.date_range("2026-07-13 20:00", periods=n, freq="5min", tz=ET)
+    df = pd.DataFrame(
+        {"open": close, "high": high, "low": low, "close": close, "volume": 50.0},
+        index=idx,
+    )
+    pattern = MHeadPattern(1, 2, 1, 10120.0, 10120.0, 10040.0)
+    sig = Signal(
+        timestamp=df.index[40],
+        entry=10000.0,
+        stop_loss=10153.0,
+        target=9694.0,
+        pattern=pattern,
+        bar_idx=40,
+        ma60=10008.0,
+        ma20=10004.0,
+        ma5=10002.0,
+        timeframe="5m",
+    )
+    trades = run_backtest(df, [sig], max_bars_hold=30, reclaim_exit=True, reclaim_lookback=24)
+    assert trades[0].exit_reason == "breakdown_reclaim", trades[0]
+    assert trades[0].exit_idx < 70
+    assert trades[0].exit_price >= 10040.0
+
+
+def test_swing_reclaim_without_stack_is_not_enough() -> None:
+    """只翻回波段低、均線沒收回＋排列，不平。"""
+    n = 80
+    close = np.full(n, 10000.0)
+    high = close + 2.0
+    low = close - 2.0
+    low[50] = 9965.0
+    close[50] = 9970.0
+    high[50] = 9975.0
+    close[52] = 9988.0  # 翻回前低附近，但仍在均線下
+    low[52] = 9975.0
+    high[52] = 9990.0
+    idx = pd.date_range("2026-07-13 20:00", periods=n, freq="5min", tz=ET)
+    df = pd.DataFrame(
+        {"open": close, "high": high, "low": low, "close": close, "volume": 50.0},
+        index=idx,
+    )
+    pattern = MHeadPattern(1, 2, 1, 10120.0, 10120.0, 10040.0)
+    sig = Signal(
+        timestamp=df.index[40],
+        entry=10000.0,
+        stop_loss=10153.0,
+        target=9694.0,
+        pattern=pattern,
+        bar_idx=40,
+        ma60=10008.0,
+        ma20=10004.0,
+        ma5=10002.0,
+        timeframe="5m",
+    )
+    trades = run_backtest(df, [sig], max_bars_hold=20, reclaim_exit=True, reclaim_lookback=24)
+    assert trades[0].exit_reason != "breakdown_reclaim", trades[0]
+
+
 def test_5m_preset_still_fires() -> None:
     df = _make_m_head_bars()
     _, trades, funnel = run_tf_backtest(df, "5m")
@@ -472,6 +560,9 @@ def main() -> int:
     test_overlay_m5_ma60()
     test_overlay_htf_ma60_no_peek()
     test_squeeze_then_two_r()
+    test_reclaim_stack_and_hug()
+    test_breakdown_reclaim_flattens_short()
+    test_swing_reclaim_without_stack_is_not_enough()
     test_5m_preset_still_fires()
     test_write_html_report()
     print("ok")

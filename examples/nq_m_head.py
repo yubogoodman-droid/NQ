@@ -81,6 +81,13 @@ TF_PRESETS = {
         "max_above_ma200": 150.0,  # #5：MA200 還在下面太遠，且 1h 已破
         "untested_htf_gap": 200.0,  # #8：破 MA200 但 1h 還沒測到、MA60 仍往上
         "ma60_slope_bars": 6,  # 5m 30 分鐘看 MA60 有沒有轉
+        "reclaim_exit": True,  # 持倉後 STRICT 破底翻平空；1m 不加
+        "reclaim_window": 15,  # 15 根 5m
+        "reclaim_lookback": 24,  # 2 小時低點
+        "reclaim_min_depth": 10.0,
+        "hug_ma20_pts": 16.0,
+        "hug_ma20_max_slope": 0.5,
+        "ma20_slope_bars": 5,
     },
     "1h": {
         "swing_lookback": 2,  # 2 小時確認
@@ -199,6 +206,31 @@ def round_tick(price: float) -> float:
 def sma(arr, n: int) -> np.ndarray:
     s = pd.Series(arr, dtype=float)
     return s.rolling(n, min_periods=n).mean().to_numpy(float)
+
+
+def rolling_min_prev(arr, n: int) -> np.ndarray:
+    """不含當根的近 n 根最低（與破底翻做多同一寫法）。"""
+    s = pd.Series(arr, dtype=float)
+    return s.shift(1).rolling(n, min_periods=n).min().to_numpy(float)
+
+
+def reclaim_stack_ok(close: float, ma5: float, ma10: float, ma20: float, ma30: float) -> bool:
+    if any(np.isnan(v) for v in (close, ma5, ma10, ma20, ma30)):
+        return False
+    return bool(close > ma20 and close > ma30 and ma5 > ma10 > ma20)
+
+
+def hug_declining_ma20(
+    close: float,
+    ma20: float,
+    ma20_prev: float,
+    hug_pts: float = 16.0,
+    max_slope: float = 0.5,
+) -> bool:
+    """收盤貼著仍下彎／走平的 MA20：與做多破底翻同一條 hug。"""
+    if hug_pts <= 0 or np.isnan(close) or np.isnan(ma20) or np.isnan(ma20_prev):
+        return False
+    return bool((close - ma20) < hug_pts and (ma20 - ma20_prev) <= max_slope)
 
 
 def ribbon_spread(*values: float) -> float:
@@ -581,9 +613,18 @@ def run_tf_backtest(
     preset = apply_preset(timeframe)
     hold = preset.pop("max_bars_hold")
     trail_steps = preset.pop("trail_steps", TRAIL_STEPS_1M)
+    reclaim_kw = {
+        "reclaim_exit": preset.pop("reclaim_exit", False),
+        "reclaim_window": preset.pop("reclaim_window", 15),
+        "reclaim_lookback": preset.pop("reclaim_lookback", 24),
+        "reclaim_min_depth": preset.pop("reclaim_min_depth", 10.0),
+        "hug_ma20_pts": preset.pop("hug_ma20_pts", 16.0),
+        "hug_ma20_max_slope": preset.pop("hug_ma20_max_slope", 0.5),
+        "ma20_slope_bars": preset.pop("ma20_slope_bars", 5),
+    }
     funnel: Dict[str, int] = {}
     sigs = generate_signals(df, funnel=funnel, timeframe=timeframe, **preset, **(extra or {}))
-    trades = run_backtest(df, sigs, max_bars_hold=hold, trail_steps=trail_steps)
+    trades = run_backtest(df, sigs, max_bars_hold=hold, trail_steps=trail_steps, **reclaim_kw)
     return sigs, trades, funnel
 
 
@@ -614,13 +655,31 @@ def run_backtest(
     trail_steps: Sequence[tuple[float, float]] | None = None,
     trail_arm_r: float = TRAIL_ARM_R,
     trail_lock_r: float = TRAIL_LOCK_R,
+    reclaim_exit: bool = False,
+    reclaim_window: int = 15,
+    reclaim_lookback: int = 24,
+    reclaim_min_depth: float = 10.0,
+    hug_ma20_pts: float = 16.0,
+    hug_ma20_max_slope: float = 0.5,
+    ma20_slope_bars: int = 5,
 ) -> List[TradeResult]:
-    """做空：先硬停損、再 2R 停利；鎖利下一根才生效。逾時收盤。不重疊。"""
+    """做空：先硬停損、再 2R 停利；鎖利下一根才生效。逾時收盤。不重疊。
+
+    reclaim_exit（只給 5m）：持倉後先破近 2 小時低，再 15 根內收盤收回 MA20+MA30
+    且 MA5>MA10>MA20；貼著下彎 MA20 不平。單靠破底翻 W 不夠。
+    """
     if signals is None:
         signals = generate_signals(df)
     steps = list(trail_steps) if trail_steps is not None else [(trail_arm_r, trail_lock_r)]
     results: List[TradeResult] = []
     position_open_until = -1
+    close_arr = df["close"].to_numpy(float)
+    low_arr = df["low"].to_numpy(float)
+    ma5_arr = sma(close_arr, 5)
+    ma10_arr = sma(close_arr, 10)
+    ma20_arr = sma(close_arr, 20)
+    ma30_arr = sma(close_arr, 30)
+    two_hr_low = rolling_min_prev(low_arr, reclaim_lookback) if reclaim_exit else None
 
     for sig in signals:
         entry_idx = sig.bar_idx
@@ -636,6 +695,8 @@ def run_backtest(
         pending_lock: float | None = None
         mfe = 0.0
         risk = sig.risk
+        pending_break: int | None = None
+        pending_until = -1
 
         for i in range(entry_idx + 1, end_idx + 1):
             lo = float(df["low"].iloc[i])
@@ -661,6 +722,42 @@ def run_backtest(
                 exit_reason = "trail_stop"
                 exit_idx = i
                 break
+            if reclaim_exit and two_hr_low is not None:
+                support = float(two_hr_low[i])
+                if not np.isnan(support) and lo < support and (support - lo) >= reclaim_min_depth:
+                    pending_break = i
+                    pending_until = i + reclaim_window
+                elif (
+                    pending_break is not None
+                    and pending_break < i <= pending_until
+                    and reclaim_stack_ok(
+                        float(close_arr[i]),
+                        float(ma5_arr[i]),
+                        float(ma10_arr[i]),
+                        float(ma20_arr[i]),
+                        float(ma30_arr[i]),
+                    )
+                ):
+                    ma20_prev = (
+                        float(ma20_arr[i - ma20_slope_bars])
+                        if i >= ma20_slope_bars
+                        else float("nan")
+                    )
+                    if hug_declining_ma20(
+                        float(close_arr[i]),
+                        float(ma20_arr[i]),
+                        ma20_prev,
+                        hug_ma20_pts,
+                        hug_ma20_max_slope,
+                    ):
+                        pending_break = None
+                        pending_until = -1
+                    else:
+                        exit_price = float(close_arr[i])
+                        exit_time = df.index[i]
+                        exit_reason = "breakdown_reclaim"
+                        exit_idx = i
+                        break
             mfe = max(mfe, sig.entry - lo)
             locked = _trail_lock_price(sig.entry, risk, mfe, steps)
             if locked is not None:
@@ -916,6 +1013,7 @@ def _render_trade_card(
         "trail_stop": "tag-trail",
         "ma_reclaim": "tag-reclaim",
         "htf_reclaim": "tag-reclaim",
+        "breakdown_reclaim": "tag-reclaim",
     }.get(trade.exit_reason, "tag-time")
     gap = abs(p.first_high - p.second_high)
     avg = (p.first_high + p.second_high) / 2
@@ -1051,7 +1149,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間不空。收盤還在 MA200 上方超過 150 點且 1h 已破，不空。已破 MA200 但 1h MA60 還在下面超過 200 點、且 MA60 仍往上，也不空。停損頭頂 +36。0.8R 鎖 0.5R、1.2R 鎖 0.9R、1.6R 鎖 1.2R。鎖利下一根生效。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間不空。收盤還在 MA200 上方超過 150 點且 1h 已破，不空。已破 MA200 但 1h MA60 還在下面超過 200 點、且 MA60 仍往上，也不空。停損頭頂 +36。0.8R 鎖 0.5R、1.2R 鎖 0.9R、1.6R 鎖 1.2R。持倉後 STRICT 破底翻平空：先破近 2 小時低，15 根內收盤收回 MA20+MA30 且 MA5&gt;MA10&gt;MA20；貼下彎 MA20 不平。單靠翻回波段低不夠。鎖利下一根生效。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
