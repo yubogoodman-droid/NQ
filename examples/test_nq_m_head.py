@@ -27,9 +27,6 @@ from nq_m_head import (  # noqa: E402
     ribbon_tangled,
     slow_ma_sandwich,
     far_above_ma200,
-    is_swing_low_at,
-    ma20_already_up,
-    reclaim_stack_ok,
     untested_htf_support,
     run_backtest,
     run_tf_backtest,
@@ -276,7 +273,7 @@ def test_trail_does_not_block_two_r() -> None:
 
 
 def test_five_m_locks_one_r_giveback() -> None:
-    """5m：浮盈見過 0.8R 後下一根鎖 0.5R，回補就出場（#2 那種）。"""
+    """5m：浮盈見過 0.75R 後下一根鎖 0.5R，回補就出場。"""
     n = 20
     entry_idx = 4
     entry, risk = 10000.0, 100.0
@@ -356,15 +353,14 @@ def test_tf_presets() -> None:
     assert TF_PRESETS["1m"]["min_ribbon_spread"] == 28.0
     assert TF_PRESETS["5m"]["min_ribbon_spread"] == 28.0
     assert TF_PRESETS["1m"]["trail_steps"][0] == (1.6, 1.2)
-    assert TF_PRESETS["5m"]["trail_steps"][0] == (0.8, 0.5)
+    assert TF_PRESETS["5m"]["trail_steps"][0] == (0.75, 0.5)
     assert TF_PRESETS["5m"]["trail_steps"][1] == (1.2, 0.9)
+    assert TF_PRESETS["5m"]["trail_steps"][2] == (1.6, 1.2)
     assert TF_PRESETS["5m"]["stop_buffer"] == 36.0
     assert TF_PRESETS["5m"]["skip_slow_sandwich"] is True
     assert TF_PRESETS["5m"]["max_above_ma200"] == 150.0
     assert TF_PRESETS["5m"]["untested_htf_gap"] == 200.0
-    assert TF_PRESETS["5m"]["reclaim_exit"] is True
-    assert TF_PRESETS["5m"]["reclaim_swing"] == 3
-    assert TF_PRESETS["5m"]["ma20_slope_bars"] == 3
+    assert "reclaim_exit" not in TF_PRESETS["5m"]
     assert "hard_stop_pts" not in TF_PRESETS["5m"]
     assert "reclaim_exit" not in TF_PRESETS["1m"]
     assert "skip_before_minutes" not in TF_PRESETS["5m"]
@@ -437,127 +433,48 @@ def test_squeeze_then_two_r() -> None:
     assert abs(trades[0].pnl_points - 200.0) < 1e-9
 
 
-def test_reclaim_helpers() -> None:
-    assert reclaim_stack_ok(100.0, 99.0, 98.0, 97.0, 96.0)
-    assert not reclaim_stack_ok(100.0, 97.0, 98.0, 97.0, 96.0)
-    assert not reclaim_stack_ok(96.5, 99.0, 98.0, 97.0, 96.0)
-    assert ma20_already_up(100.0, 98.0)
-    assert not ma20_already_up(98.0, 100.0)
-    lows = np.array([10.0, 9.0, 8.0, 7.0, 8.0, 9.0, 10.0])
-    assert is_swing_low_at(lows, 3, 3)
-    assert not is_swing_low_at(lows, 2, 3)
+def test_five_m_075r_arms_but_074_does_not() -> None:
+    """0.74R 不鎖；0.75R 下一根鎖 0.5R。"""
+    n = 16
+    entry_idx = 3
+    entry, risk = 10000.0, 100.0
+    stop, target = 10100.0, 9800.0
 
+    def _run(mfe: float):
+        close = np.full(n, entry)
+        high = close + 1.0
+        low = close - 1.0
+        close[entry_idx + 1] = entry - mfe
+        low[entry_idx + 1] = entry - mfe
+        high[entry_idx + 1] = entry - mfe + 5.0
+        close[entry_idx + 2] = entry - 20.0
+        low[entry_idx + 2] = entry - 30.0
+        high[entry_idx + 2] = entry - 10.0
+        idx = pd.date_range("2026-07-13 22:10", periods=n, freq="5min", tz=ET)
+        df = pd.DataFrame(
+            {"open": close, "high": high, "low": low, "close": close, "volume": 50.0},
+            index=idx,
+        )
+        pattern = MHeadPattern(1, 2, 1, stop - 36.0, stop - 36.0, entry + 20.0)
+        sig = Signal(
+            timestamp=df.index[entry_idx],
+            entry=entry,
+            stop_loss=stop,
+            target=target,
+            pattern=pattern,
+            bar_idx=entry_idx,
+            ma60=entry + 30.0,
+            ma20=entry + 15.0,
+            ma5=entry + 5.0,
+            timeframe="5m",
+        )
+        return run_backtest(df, [sig], max_bars_hold=8, trail_steps=TRAIL_STEPS_5M)[0]
 
-def _flat_sig_df(n: int, start: str) -> tuple[pd.DataFrame, Signal]:
-    close = np.full(n, 10000.0)
-    high = close + 4.0
-    low = close - 4.0
-    idx = pd.date_range(start, periods=n, freq="5min", tz=ET)
-    df = pd.DataFrame(
-        {"open": close, "high": high, "low": low, "close": close, "volume": 50.0},
-        index=idx,
-    )
-    pattern = MHeadPattern(1, 2, 1, 10120.0, 10120.0, 10040.0)
-    sig = Signal(
-        timestamp=df.index[40],
-        entry=10000.0,
-        stop_loss=10153.0,
-        target=9694.0,
-        pattern=pattern,
-        bar_idx=40,
-        ma60=10008.0,
-        ma20=10004.0,
-        ma5=10002.0,
-        timeframe="5m",
-    )
-    return df, sig
-
-
-def test_breakdown_reclaim_needs_new_swing_break() -> None:
-    """進場後擺動低 → 再破那個低 → MA20 已上 + 堆疊 → 平空。"""
-    df, sig = _flat_sig_df(90, "2026-07-13 20:00")
-    close = df["close"].to_numpy(copy=True)
-    high = df["high"].to_numpy(copy=True)
-    low = df["low"].to_numpy(copy=True)
-    # 45 做出場後低 9960，右側反彈確認；58 再破 9945；62+ 拉回翻多
-    for j, lv in enumerate((9990.0, 9980.0, 9970.0, 9960.0, 9975.0, 10010.0, 10020.0)):
-        k = 45 + j
-        low[k] = lv
-        close[k] = lv + 8.0
-        high[k] = max(lv + 16.0, 10008.0)  # 右側要回到進場價之上才算 W
-    low[58] = 9945.0
-    close[58] = 9955.0
-    high[58] = 9965.0
-    for j, px in enumerate((10040.0, 10080.0, 10120.0, 10150.0)):
-        k = 62 + j
-        close[k] = px
-        low[k] = px - 8.0
-        high[k] = px + 4.0
-    df = df.copy()
-    df["close"], df["high"], df["low"] = close, high, low
-    trades = run_backtest(df, [sig], max_bars_hold=40, reclaim_exit=True, reclaim_swing=3)
-    assert trades[0].exit_reason == "breakdown_reclaim", trades[0]
-
-
-def test_cascade_lower_low_without_entry_bounce_is_not_w() -> None:
-    """瀑布中小反彈後再破前低，但沒回到進場價 → 不是 W。"""
-    df, sig = _flat_sig_df(80, "2026-07-22 22:10")
-    close = df["close"].to_numpy(copy=True)
-    high = df["high"].to_numpy(copy=True)
-    low = df["low"].to_numpy(copy=True)
-    # 45 低 9960，右側只反到 9980（低於 10000），58 再破 9945，之後收回
-    for j, lv in enumerate((9990.0, 9980.0, 9970.0, 9960.0, 9970.0, 9975.0, 9980.0)):
-        k = 45 + j
-        low[k] = lv
-        close[k] = lv + 6.0
-        high[k] = lv + 12.0
-    low[58] = 9945.0
-    close[58] = 9955.0
-    high[58] = 9965.0
-    for j, px in enumerate((10040.0, 10080.0, 10120.0, 10150.0)):
-        k = 62 + j
-        close[k] = px
-        low[k] = px - 8.0
-        high[k] = px + 4.0
-    df = df.copy()
-    df["close"], df["high"], df["low"] = close, high, low
-    trades = run_backtest(df, [sig], max_bars_hold=35, reclaim_exit=True, reclaim_swing=3)
-    assert trades[0].exit_reason != "breakdown_reclaim", trades[0]
-
-
-def test_entry_cascade_bounce_is_not_reclaim() -> None:
-    """進場連跌再回補，沒有先確認擺動低再破底 → 不平。"""
-    df, sig = _flat_sig_df(80, "2026-07-07 14:50")
-    close = df["close"].to_numpy(copy=True)
-    high = df["high"].to_numpy(copy=True)
-    low = df["low"].to_numpy(copy=True)
-    for j, lv in enumerate((9980.0, 9960.0, 9940.0, 9960.0, 9990.0, 10020.0, 10050.0, 10080.0)):
-        k = 42 + j
-        low[k] = lv
-        close[k] = lv + 10.0
-        high[k] = lv + 20.0
-    df = df.copy()
-    df["close"], df["high"], df["low"] = close, high, low
-    trades = run_backtest(df, [sig], max_bars_hold=25, reclaim_exit=True, reclaim_swing=3)
-    assert trades[0].exit_reason != "breakdown_reclaim", trades[0]
-
-
-def test_swing_reclaim_without_stack_is_not_enough() -> None:
-    """只翻回波段低、均線沒收回＋排列，不平。"""
-    df, sig = _flat_sig_df(80, "2026-07-13 20:00")
-    close = df["close"].to_numpy(copy=True)
-    high = df["high"].to_numpy(copy=True)
-    low = df["low"].to_numpy(copy=True)
-    low[50] = 9965.0
-    close[50] = 9970.0
-    high[50] = 9975.0
-    close[52] = 9988.0
-    low[52] = 9975.0
-    high[52] = 9990.0
-    df = df.copy()
-    df["close"], df["high"], df["low"] = close, high, low
-    trades = run_backtest(df, [sig], max_bars_hold=20, reclaim_exit=True, reclaim_swing=3)
-    assert trades[0].exit_reason != "breakdown_reclaim", trades[0]
+    miss = _run(74.0)
+    assert miss.exit_reason != "trail_stop", miss
+    hit = _run(75.0)
+    assert hit.exit_reason == "trail_stop", hit
+    assert abs(hit.pnl_points - 50.0) < 0.26
 
 
 def test_5m_preset_still_fires() -> None:
@@ -602,11 +519,7 @@ def main() -> int:
     test_overlay_m5_ma60()
     test_overlay_htf_ma60_no_peek()
     test_squeeze_then_two_r()
-    test_reclaim_helpers()
-    test_breakdown_reclaim_needs_new_swing_break()
-    test_cascade_lower_low_without_entry_bounce_is_not_w()
-    test_entry_cascade_bounce_is_not_reclaim()
-    test_swing_reclaim_without_stack_is_not_enough()
+    test_five_m_075r_arms_but_074_does_not()
     test_5m_preset_still_fires()
     test_write_html_report()
     print("ok")
