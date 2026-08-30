@@ -83,11 +83,11 @@ TF_PRESETS = {
         "ma60_slope_bars": 6,  # 5m 30 分鐘看 MA60 有沒有轉
         "reclaim_exit": True,  # 持倉後 STRICT 破底翻平空；1m 不加
         "reclaim_window": 15,  # 15 根 5m
-        "reclaim_lookback": 24,  # 2 小時低點
+        "reclaim_swing": 3,  # 進場後先做出擺動低（15 分確認），再破那個低
         "reclaim_min_depth": 10.0,
         "hug_ma20_pts": 16.0,
         "hug_ma20_max_slope": 0.5,
-        "ma20_slope_bars": 5,
+        "ma20_slope_bars": 3,  # 最近 3 根 MA20 已往上才算收復
     },
     "1h": {
         "swing_lookback": 2,  # 2 小時確認
@@ -231,6 +231,24 @@ def hug_declining_ma20(
     if hug_pts <= 0 or np.isnan(close) or np.isnan(ma20) or np.isnan(ma20_prev):
         return False
     return bool((close - ma20) < hug_pts and (ma20 - ma20_prev) <= max_slope)
+
+
+def ma20_already_up(ma20_now: float, ma20_prev: float, ma20_prev2: float) -> bool:
+    """最近 3 個 MA20 已往上。下彎中回補不算破底翻。"""
+    if any(np.isnan(v) for v in (ma20_now, ma20_prev, ma20_prev2)):
+        return False
+    return bool(ma20_now > ma20_prev > ma20_prev2)
+
+
+def is_swing_low_at(low: np.ndarray, j: int, lookback: int) -> bool:
+    """左右各 lookback 根確認的擺動低。"""
+    if lookback <= 0 or j < lookback or j + lookback >= len(low):
+        return False
+    lv = float(low[j])
+    for k in range(1, lookback + 1):
+        if float(low[j - k]) < lv - 1e-12 or float(low[j + k]) < lv - 1e-12:
+            return False
+    return True
 
 
 def ribbon_spread(*values: float) -> float:
@@ -616,11 +634,11 @@ def run_tf_backtest(
     reclaim_kw = {
         "reclaim_exit": preset.pop("reclaim_exit", False),
         "reclaim_window": preset.pop("reclaim_window", 15),
-        "reclaim_lookback": preset.pop("reclaim_lookback", 24),
+        "reclaim_swing": preset.pop("reclaim_swing", 3),
         "reclaim_min_depth": preset.pop("reclaim_min_depth", 10.0),
         "hug_ma20_pts": preset.pop("hug_ma20_pts", 16.0),
         "hug_ma20_max_slope": preset.pop("hug_ma20_max_slope", 0.5),
-        "ma20_slope_bars": preset.pop("ma20_slope_bars", 5),
+        "ma20_slope_bars": preset.pop("ma20_slope_bars", 3),
     }
     funnel: Dict[str, int] = {}
     sigs = generate_signals(df, funnel=funnel, timeframe=timeframe, **preset, **(extra or {}))
@@ -658,15 +676,17 @@ def run_backtest(
     reclaim_exit: bool = False,
     reclaim_window: int = 15,
     reclaim_lookback: int = 24,
+    reclaim_swing: int = 3,
     reclaim_min_depth: float = 10.0,
     hug_ma20_pts: float = 16.0,
     hug_ma20_max_slope: float = 0.5,
-    ma20_slope_bars: int = 5,
+    ma20_slope_bars: int = 3,
 ) -> List[TradeResult]:
     """做空：先硬停損、再 2R 停利；鎖利下一根才生效。逾時收盤。不重疊。
 
-    reclaim_exit（只給 5m）：持倉後先破近 2 小時低，再 15 根內收盤收回 MA20+MA30
-    且 MA5>MA10>MA20；貼著下彎 MA20 不平。單靠破底翻 W 不夠。
+    reclaim_exit（只給 5m）：進場瀑布本身不算破底。先做出場後擺動低，
+    再破那個低，再 15 根內收盤收回 MA20+MA30 且 MA5>MA10>MA20，
+    且最近 3 根 MA20 已往上；貼著下彎 MA20 不平。
     """
     if signals is None:
         signals = generate_signals(df)
@@ -679,7 +699,6 @@ def run_backtest(
     ma10_arr = sma(close_arr, 10)
     ma20_arr = sma(close_arr, 20)
     ma30_arr = sma(close_arr, 30)
-    two_hr_low = rolling_min_prev(low_arr, reclaim_lookback) if reclaim_exit else None
 
     for sig in signals:
         entry_idx = sig.bar_idx
@@ -695,6 +714,7 @@ def run_backtest(
         pending_lock: float | None = None
         mfe = 0.0
         risk = sig.risk
+        armed_swing: float | None = None
         pending_break: int | None = None
         pending_until = -1
 
@@ -722,9 +742,15 @@ def run_backtest(
                 exit_reason = "trail_stop"
                 exit_idx = i
                 break
-            if reclaim_exit and two_hr_low is not None:
-                support = float(two_hr_low[i])
-                if not np.isnan(support) and lo < support and (support - lo) >= reclaim_min_depth:
+            if reclaim_exit:
+                confirm_j = i - reclaim_swing
+                if confirm_j > entry_idx and is_swing_low_at(low_arr, confirm_j, reclaim_swing):
+                    armed_swing = float(low_arr[confirm_j])
+                if (
+                    armed_swing is not None
+                    and lo <= armed_swing - reclaim_min_depth
+                    and confirm_j != i
+                ):
                     pending_break = i
                     pending_until = i + reclaim_window
                 elif (
@@ -737,12 +763,14 @@ def run_backtest(
                         float(ma20_arr[i]),
                         float(ma30_arr[i]),
                     )
-                ):
-                    ma20_prev = (
-                        float(ma20_arr[i - ma20_slope_bars])
-                        if i >= ma20_slope_bars
-                        else float("nan")
+                    and i >= 2
+                    and ma20_already_up(
+                        float(ma20_arr[i]),
+                        float(ma20_arr[i - 1]),
+                        float(ma20_arr[i - 2]),
                     )
+                ):
+                    ma20_prev = float(ma20_arr[i - 1])
                     if hug_declining_ma20(
                         float(close_arr[i]),
                         float(ma20_arr[i]),
@@ -1149,7 +1177,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間不空。收盤還在 MA200 上方超過 150 點且 1h 已破，不空。已破 MA200 但 1h MA60 還在下面超過 200 點、且 MA60 仍往上，也不空。停損頭頂 +36。0.8R 鎖 0.5R、1.2R 鎖 0.9R、1.6R 鎖 1.2R。持倉後 STRICT 破底翻平空：先破近 2 小時低，15 根內收盤收回 MA20+MA30 且 MA5&gt;MA10&gt;MA20；貼下彎 MA20 不平。單靠翻回波段低不夠。鎖利下一根生效。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間不空。收盤還在 MA200 上方超過 150 點且 1h 已破，不空。已破 MA200 但 1h MA60 還在下面超過 200 點、且 MA60 仍往上，也不空。停損頭頂 +36。0.8R 鎖 0.5R、1.2R 鎖 0.9R、1.6R 鎖 1.2R。持倉後 STRICT 破底翻平空：進場瀑布不算破底；先做出場後擺動低，再破那個低，15 根內收盤收回 MA20+MA30 且 MA5&gt;MA10&gt;MA20，且 MA20 已往上；貼下彎 MA20 不平。鎖利下一根生效。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>

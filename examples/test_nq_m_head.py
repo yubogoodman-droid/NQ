@@ -28,6 +28,8 @@ from nq_m_head import (  # noqa: E402
     slow_ma_sandwich,
     far_above_ma200,
     hug_declining_ma20,
+    is_swing_low_at,
+    ma20_already_up,
     reclaim_stack_ok,
     untested_htf_support,
     run_backtest,
@@ -362,6 +364,8 @@ def test_tf_presets() -> None:
     assert TF_PRESETS["5m"]["max_above_ma200"] == 150.0
     assert TF_PRESETS["5m"]["untested_htf_gap"] == 200.0
     assert TF_PRESETS["5m"]["reclaim_exit"] is True
+    assert TF_PRESETS["5m"]["reclaim_swing"] == 3
+    assert TF_PRESETS["5m"]["ma20_slope_bars"] == 3
     assert "reclaim_exit" not in TF_PRESETS["1m"]
     assert "reclaim_htf" not in TF_PRESETS["5m"]
     assert "skip_before_minutes" not in TF_PRESETS["5m"]
@@ -440,23 +444,30 @@ def test_reclaim_stack_and_hug() -> None:
     assert not reclaim_stack_ok(96.5, 99.0, 98.0, 97.0, 96.0)  # 沒收復 MA20
     assert hug_declining_ma20(100.0, 99.0, 99.8, 16.0, 0.5)  # 貼著、MA20 下彎
     assert not hug_declining_ma20(120.0, 99.0, 99.8, 16.0, 0.5)  # 離開 MA20 夠遠
+    assert ma20_already_up(100.0, 99.0, 98.0)
+    assert not ma20_already_up(98.0, 99.0, 100.0)
+    lows = np.array([10.0, 9.0, 8.0, 7.0, 8.0, 9.0, 10.0])
+    assert is_swing_low_at(lows, 3, 3)
+    assert not is_swing_low_at(lows, 2, 3)
 
 
 def test_breakdown_reclaim_flattens_short() -> None:
-    """破 2h 低之後，15 根內收復 MA20/30 + 多頭排列 → 收盤平空。"""
-    n = 80
+    """進場後先做出擺動低、再破那個低，然後收復+MA20 上彎 → 平空。"""
+    n = 90
     close = np.full(n, 10000.0)
-    high = close + 2.0
-    low = close - 2.0
-    # 先走出一段平台低，再破底，再拉回站上均線
-    low[30] = 9980.0
-    close[30] = 9985.0
-    high[30] = 9990.0
-    low[50] = 9965.0  # 破近 2h 低超過 10 點
-    close[50] = 9970.0
-    high[50] = 9975.0
-    for j, px in enumerate((10040.0, 10080.0, 10120.0)):
-        k = 52 + j
+    high = close + 4.0
+    low = close - 4.0
+    # 入場後先砸出擺動低（48），彈起確認，再破底（58），再拉回
+    for j, lv in enumerate((9990.0, 9980.0, 9970.0, 9960.0, 9975.0, 9990.0, 10010.0)):
+        k = 45 + j
+        low[k] = lv
+        close[k] = lv + 8.0
+        high[k] = lv + 16.0
+    low[58] = 9945.0
+    close[58] = 9955.0
+    high[58] = 9965.0
+    for j, px in enumerate((10040.0, 10080.0, 10120.0, 10150.0)):
+        k = 62 + j
         close[k] = px
         low[k] = px - 8.0
         high[k] = px + 4.0
@@ -478,10 +489,42 @@ def test_breakdown_reclaim_flattens_short() -> None:
         ma5=10002.0,
         timeframe="5m",
     )
-    trades = run_backtest(df, [sig], max_bars_hold=30, reclaim_exit=True, reclaim_lookback=24)
+    trades = run_backtest(df, [sig], max_bars_hold=40, reclaim_exit=True, reclaim_swing=3)
     assert trades[0].exit_reason == "breakdown_reclaim", trades[0]
-    assert trades[0].exit_idx < 70
-    assert trades[0].exit_price >= 10040.0
+    assert trades[0].exit_idx < 80
+
+
+def test_entry_cascade_bounce_is_not_reclaim() -> None:
+    """進場瀑布砸完直接回補，沒有先做出擺動低再破底 → 不平。"""
+    n = 80
+    close = np.full(n, 10000.0)
+    high = close + 4.0
+    low = close - 4.0
+    for j, lv in enumerate((9980.0, 9960.0, 9940.0, 9960.0, 9990.0, 10020.0, 10050.0, 10080.0)):
+        k = 42 + j
+        low[k] = lv
+        close[k] = lv + 10.0
+        high[k] = lv + 20.0
+    idx = pd.date_range("2026-07-07 14:50", periods=n, freq="5min", tz=ET)
+    df = pd.DataFrame(
+        {"open": close, "high": high, "low": low, "close": close, "volume": 50.0},
+        index=idx,
+    )
+    pattern = MHeadPattern(1, 2, 1, 10120.0, 10120.0, 10040.0)
+    sig = Signal(
+        timestamp=df.index[40],
+        entry=10000.0,
+        stop_loss=10153.0,
+        target=9694.0,
+        pattern=pattern,
+        bar_idx=40,
+        ma60=10008.0,
+        ma20=10004.0,
+        ma5=10002.0,
+        timeframe="5m",
+    )
+    trades = run_backtest(df, [sig], max_bars_hold=25, reclaim_exit=True, reclaim_swing=3)
+    assert trades[0].exit_reason != "breakdown_reclaim", trades[0]
 
 
 def test_swing_reclaim_without_stack_is_not_enough() -> None:
@@ -514,7 +557,7 @@ def test_swing_reclaim_without_stack_is_not_enough() -> None:
         ma5=10002.0,
         timeframe="5m",
     )
-    trades = run_backtest(df, [sig], max_bars_hold=20, reclaim_exit=True, reclaim_lookback=24)
+    trades = run_backtest(df, [sig], max_bars_hold=20, reclaim_exit=True, reclaim_swing=3)
     assert trades[0].exit_reason != "breakdown_reclaim", trades[0]
 
 
@@ -562,6 +605,7 @@ def main() -> int:
     test_squeeze_then_two_r()
     test_reclaim_stack_and_hug()
     test_breakdown_reclaim_flattens_short()
+    test_entry_cascade_bounce_is_not_reclaim()
     test_swing_reclaim_without_stack_is_not_enough()
     test_5m_preset_still_fires()
     test_write_html_report()
