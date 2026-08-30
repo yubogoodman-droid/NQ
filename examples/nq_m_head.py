@@ -176,6 +176,11 @@ def load_bars(symbol: str, interval: str, period: str) -> pd.DataFrame:
             min_start = end - timedelta(days=29, hours=18)
             if start < min_start:
                 start = min_start
+        elif interval == "5m":
+            # Yahoo 5m 剛好 60 天會把第一週整段空掉
+            min_start = end - timedelta(days=59, hours=20)
+            if start < min_start:
+                start = min_start
         df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=7)
         if not df.empty:
             return df
