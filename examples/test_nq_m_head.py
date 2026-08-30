@@ -480,11 +480,11 @@ def test_breakdown_reclaim_needs_new_swing_break() -> None:
     high = df["high"].to_numpy(copy=True)
     low = df["low"].to_numpy(copy=True)
     # 45 做出場後低 9960，右側反彈確認；58 再破 9945；62+ 拉回翻多
-    for j, lv in enumerate((9990.0, 9980.0, 9970.0, 9960.0, 9975.0, 9990.0, 10010.0)):
+    for j, lv in enumerate((9990.0, 9980.0, 9970.0, 9960.0, 9975.0, 10010.0, 10020.0)):
         k = 45 + j
         low[k] = lv
         close[k] = lv + 8.0
-        high[k] = lv + 16.0
+        high[k] = max(lv + 16.0, 10008.0)  # 右側要回到進場價之上才算 W
     low[58] = 9945.0
     close[58] = 9955.0
     high[58] = 9965.0
@@ -497,6 +497,32 @@ def test_breakdown_reclaim_needs_new_swing_break() -> None:
     df["close"], df["high"], df["low"] = close, high, low
     trades = run_backtest(df, [sig], max_bars_hold=40, reclaim_exit=True, reclaim_swing=3)
     assert trades[0].exit_reason == "breakdown_reclaim", trades[0]
+
+
+def test_cascade_lower_low_without_entry_bounce_is_not_w() -> None:
+    """瀑布中小反彈後再破前低，但沒回到進場價 → 不是 W。"""
+    df, sig = _flat_sig_df(80, "2026-07-22 22:10")
+    close = df["close"].to_numpy(copy=True)
+    high = df["high"].to_numpy(copy=True)
+    low = df["low"].to_numpy(copy=True)
+    # 45 低 9960，右側只反到 9980（低於 10000），58 再破 9945，之後收回
+    for j, lv in enumerate((9990.0, 9980.0, 9970.0, 9960.0, 9970.0, 9975.0, 9980.0)):
+        k = 45 + j
+        low[k] = lv
+        close[k] = lv + 6.0
+        high[k] = lv + 12.0
+    low[58] = 9945.0
+    close[58] = 9955.0
+    high[58] = 9965.0
+    for j, px in enumerate((10040.0, 10080.0, 10120.0, 10150.0)):
+        k = 62 + j
+        close[k] = px
+        low[k] = px - 8.0
+        high[k] = px + 4.0
+    df = df.copy()
+    df["close"], df["high"], df["low"] = close, high, low
+    trades = run_backtest(df, [sig], max_bars_hold=35, reclaim_exit=True, reclaim_swing=3)
+    assert trades[0].exit_reason != "breakdown_reclaim", trades[0]
 
 
 def test_entry_cascade_bounce_is_not_reclaim() -> None:
@@ -578,6 +604,7 @@ def main() -> int:
     test_squeeze_then_two_r()
     test_reclaim_helpers()
     test_breakdown_reclaim_needs_new_swing_break()
+    test_cascade_lower_low_without_entry_bounce_is_not_w()
     test_entry_cascade_bounce_is_not_reclaim()
     test_swing_reclaim_without_stack_is_not_enough()
     test_5m_preset_still_fires()

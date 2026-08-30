@@ -659,9 +659,9 @@ def run_backtest(
 ) -> List[TradeResult]:
     """做空：結構停損 → 2R → 鎖利（下一根）→ 進場後新 W 破底翻平空（若開）→ 逾時。
 
-    破底翻只認：進場後先做出擺動低（右側反彈確認），再破那個低，
-    再在 window 內收盤收回 MA20+MA30 且 MA5>MA10>MA20，且近 3 根 MA20 已往上。
-    進場瀑布本身不是破底；下彎 MA20 的回補不平。
+    破底翻只認：進場後先做出擺動低，右側反彈回到進場價之上，
+    再破那個低，再在 window 內收盤收回 MA20+MA30 且 MA5>MA10>MA20，
+    且近 3 根 MA20 已往上。進場瀑布本身不是破底；下彎 MA20 的回補不平。
     """
     if signals is None:
         signals = generate_signals(df)
@@ -725,7 +725,12 @@ def run_backtest(
                     and is_swing_low_at(low_arr, confirm_j, reclaim_swing)
                 ):
                     slv = float(low_arr[confirm_j])
-                    if slv <= sig.entry - reclaim_min_depth:
+                    # 右側反彈必須回到進場價之上，才算 W；瀑布續跌的小反彈不算。
+                    right_hi = max(
+                        float(df["high"].iloc[j])
+                        for j in range(confirm_j + 1, confirm_j + reclaim_swing + 1)
+                    )
+                    if slv <= sig.entry - reclaim_min_depth and right_hi > sig.entry:
                         armed_swing = slv
                 if (
                     armed_swing is not None
