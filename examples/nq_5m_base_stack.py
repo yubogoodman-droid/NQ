@@ -571,7 +571,7 @@ def _mark_trade(ax, trade: TradeResult, start: int, n_bars: int, *, annotate_bas
         ax.scatter([bx], [sig.base_low], s=38, color="#facc15", zorder=5)
         if annotate_base:
             ax.annotate(
-                "打底",
+                getattr(sig, "mark_label", "打底"),
                 (bx, sig.base_low),
                 textcoords="offset points",
                 xytext=(0, -12),

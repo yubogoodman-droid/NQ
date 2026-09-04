@@ -47,6 +47,24 @@ python3 examples/nq_5m_base_stack.py alert --dry-run --once
 
 TradingView：`pinescript/nq_5m_base_stack.pine`
 
+## NQ 五分 K 破兩小時低後 30 分內站回 5/10/20
+
+五分鐘圖：跌破近 **2 小時低點**後，**30 分鐘內**（6 根）收盤站回 MA5、MA10、MA20 做多。  
+停損破底低下方 −8；目標 2R（與打底多排同一套出場：保本 / 移動 / 12 根後跌破 MA20）。
+
+近一週 Yahoo 5m（08-28 → 09-04）：**10 筆、勝率 30%、−86、均 −9**。  
+破底 109 → 夠深 24 → 站回並進場 10。最大虧 08-28 停損 −96。  
+若再要求 MA5>MA10>MA20：只剩 1 筆、+40。
+
+```bash
+python3 examples/nq_5m_reclaim.py backtest --period 7d --pages
+python3 examples/nq_5m_reclaim.py backtest --period 7d --stack
+```
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-week.html
+
+TradingView：`pinescript/nq_5m_reclaim.pine`
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
