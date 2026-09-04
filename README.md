@@ -35,6 +35,7 @@
 5. 美東 9:30–10:00 不進
 6. 紅 K 長上影跳過
 7. 停損 MA200−10，停利 +100
+8. 五分K MA5–60 帶寬 < 28 當糾結（第一張那種黏成一束）濾掉
 
 ```bash
 python3 examples/nq_ma200_stand.py backtest --period 30d --pages

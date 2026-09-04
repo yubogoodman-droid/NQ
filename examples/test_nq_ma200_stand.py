@@ -19,6 +19,8 @@ from nq_ma200_stand import (  # noqa: E402
     is_red_long_upper,
     parse_period_days,
     resample_5m,
+    ribbon_spread,
+    ribbon_tangled,
     simulate,
     sma,
     summarize_trades,
@@ -123,7 +125,7 @@ def _make_setup_bars(
 
 def test_detect_happy_path() -> None:
     df = _make_setup_bars()
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, min_5m_ribbon=0.0)
     assert sigs, "expected a stand-on-MA200 signal after the 2h dump"
     sig = sigs[0]
     assert sig.entry_idx > sig.break_idx
@@ -137,7 +139,7 @@ def test_detect_happy_path() -> None:
 
 def test_skip_red_long_wick() -> None:
     df = _make_setup_bars(red_long_wick_on_entry=True)
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, min_5m_ribbon=0.0)
     assert not sigs, "red long-upper-wick reclaim bars should be skipped"
 
 
@@ -149,20 +151,20 @@ def test_skip_open_hour() -> None:
     # 03:00 + 370 min = 09:10 break; reclaim ~09:13–09:20 still before 9:30.
     # Shift later: 03:20 + 370 = 09:30.
     df = _make_setup_bars(start="2026-08-17 03:22")
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, min_5m_ribbon=0.0)
     for sig in sigs:
         assert not in_open_skip(df.index[sig.entry_idx])
 
 
 def test_skip_no_under_wash() -> None:
     df = _make_setup_bars(skip_under_wash=True)
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, min_5m_ribbon=0.0)
     assert not sigs, "without 15 bars under MA200 there should be no entry"
 
 
 def test_simulate_target_and_stop() -> None:
     df = _make_setup_bars()
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, min_5m_ribbon=0.0)
     assert sigs
     trades = simulate(df, sigs)
     assert trades
@@ -185,7 +187,7 @@ def test_simulate_target_and_stop() -> None:
 
 def test_write_html(tmp_path: Path | None = None) -> None:
     df = _make_setup_bars()
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, min_5m_ribbon=0.0)
     trades = simulate(df, sigs)
     out = Path("/tmp/nq_ma200_stand_test.html") if tmp_path is None else Path(tmp_path) / "r.html"
     path = write_html_report(out, df, trades, "NQ=F", "demo")
@@ -216,6 +218,19 @@ def test_resample_5m() -> None:
     assert {"Open", "High", "Low", "Close"}.issubset(m5.columns)
 
 
+def test_ribbon_helpers() -> None:
+    assert abs(ribbon_spread(100.0, 110.0, 105.0, 108.0, 102.0) - 10.0) < 1e-9
+    assert ribbon_tangled(100.0, 110.0, 105.0, 108.0, 102.0, min_spread=28.0) is True
+    assert ribbon_tangled(100.0, 140.0, 120.0, 130.0, 110.0, min_spread=28.0) is False
+
+
+def test_skip_5m_tangle() -> None:
+    df = _make_setup_bars()
+    open_sigs = detect_signals(df, min_5m_ribbon=0.0)
+    assert open_sigs, "control: without 5m ribbon filter the synthetic still fires"
+    assert not detect_signals(df), "tight 5m MA5–60 coil like trade #1 should be skipped"
+
+
 def test_summarize() -> None:
     class T:
         def __init__(self, pnl: float):
@@ -239,6 +254,8 @@ def main() -> int:
     test_simulate_target_and_stop()
     test_write_html()
     test_resample_5m()
+    test_ribbon_helpers()
+    test_skip_5m_tangle()
     test_summarize()
     print("ok")
     return 0

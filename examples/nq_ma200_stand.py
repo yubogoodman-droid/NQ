@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """NQ 一分 K：破兩小時低後站上 MA200。
 
-現行規則（無五分 MA60）：
+現行規則（無五分 MA60 斜率）：
   1. MA5>10>20>30>60
   2. 站上 MA200 連 ≥3，且距離 ≤30
   3. 破兩小時低後 1 小時內
@@ -9,6 +9,7 @@
   5. 美東 9:30–10:00 不進
   6. 紅 K 長上影跳過
   7. 停損 MA200−10，停利 +100
+  8. 五分K MA5–60 帶寬 < 28 當糾結，濾掉（第一張那種黏成一束）
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -45,6 +46,7 @@ MAX_DIST_MA200 = 30.0
 STOP_BELOW_MA200 = 10.0
 TAKE_PROFIT = 100.0
 MIN_UPPER_WICK = 8.0
+MIN_5M_RIBBON = 28.0  # 五分 MA5/10/20/30/60 帶寬，低於這當糾結
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +165,7 @@ class Signal:
     ma200: float
     dist_ma200: float
     under_streak: int
+    m5_ribbon: float = 0.0
 
 
 @dataclass
@@ -245,6 +248,7 @@ def detect_signals(
     stop_below_ma200: float = STOP_BELOW_MA200,
     take_profit: float = TAKE_PROFIT,
     min_upper_wick: float = MIN_UPPER_WICK,
+    min_5m_ribbon: float = MIN_5M_RIBBON,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     close = df["Close"].to_numpy(float)
@@ -258,6 +262,7 @@ def detect_signals(
     ma60 = sma(close, 60)
     ma200 = sma(close, 200)
     two_hr_low = rolling_min_prev(low, two_hour_bars)
+    m5_ribbon = overlay_5m_ribbon(df) if min_5m_ribbon > 0 else np.full(len(df), np.inf)
 
     fun = funnel if funnel is not None else {}
 
@@ -305,6 +310,10 @@ def detect_signals(
             if is_red_long_upper(float(opn[j]), float(high[j]), float(low[j]), float(close[j]), min_upper_wick):
                 bump("skip_wick")
                 continue
+            ribbon = float(m5_ribbon[j])
+            if min_5m_ribbon > 0 and (np.isnan(ribbon) or ribbon < min_5m_ribbon):
+                bump("skip_5m_tangle")
+                continue
             stop = float(ma200[j]) - stop_below_ma200
             entry = float(close[j])
             if entry <= stop:
@@ -328,6 +337,7 @@ def detect_signals(
                     ma200=float(ma200[j]),
                     dist_ma200=dist,
                     under_streak=streak,
+                    m5_ribbon=0.0 if (np.isnan(ribbon) or np.isinf(ribbon)) else ribbon,
                 )
             )
             entered = True
@@ -432,6 +442,44 @@ def _equity_svg(pnls: List[float], width: int = 720, height: int = 180) -> str:
         f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{pts}"/>'
         f"</svg>"
     )
+
+
+def ribbon_spread(*values: float) -> float:
+    """MA5/10/20/30/60 帶寬：max − min。缺值回 nan。"""
+    arr = np.asarray(values, dtype=float)
+    if arr.size == 0 or np.any(np.isnan(arr)):
+        return float("nan")
+    return float(arr.max() - arr.min())
+
+
+def ribbon_tangled(*values: float, min_spread: float) -> bool:
+    spread = ribbon_spread(*values)
+    return bool(np.isnan(spread) or spread < min_spread)
+
+
+def align_htf(df_1m: pd.DataFrame, series_htf: pd.Series) -> np.ndarray:
+    """把已收盤的高週期序列對齊到 1m（不偷看未收的那根）。"""
+    idx = series_htf.index
+    vals = series_htf.to_numpy(float)
+    out = np.full(len(df_1m), np.nan, dtype=float)
+    j = 0
+    for i, ts in enumerate(df_1m.index):
+        while j + 1 < len(idx) and idx[j + 1] <= ts:
+            j += 1
+        if j < len(idx) and idx[j] <= ts:
+            out[i] = vals[j]
+    return out
+
+
+def overlay_5m_ribbon(df_1m: pd.DataFrame) -> np.ndarray:
+    df5 = resample_5m(df_1m)
+    close5 = df5["Close"].astype(float)
+    mas = [align_htf(df_1m, close5.rolling(n, min_periods=n).mean()) for n in (5, 10, 20, 30, 60)]
+    stacked = np.vstack(mas)
+    with np.errstate(invalid="ignore"):
+        spread = stacked.max(axis=0) - stacked.min(axis=0)
+    spread[np.isnan(stacked).any(axis=0)] = np.nan
+    return spread
 
 
 def resample_5m(df: pd.DataFrame) -> pd.DataFrame:
@@ -670,6 +718,7 @@ def write_html_report(
             "<span class='tag tag-info'>1m</span>"
             "<span class='tag tag-info'>5m 對照</span>"
             f"<span class='tag tag-info'>距MA200 {t.signal.dist_ma200:.1f}</span>"
+            f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
             "</div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}\n"
@@ -679,7 +728,8 @@ def write_html_report(
             f"破底 {t.signal.break_low:.2f} / 2h低 {t.signal.two_hr_low:.2f}\n"
             f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f} "
             f"> MA30 {t.signal.ma30:.1f} > MA60 {t.signal.ma60:.1f}\n"
-            f"MA200 {t.signal.ma200:.1f}  先前連{t.signal.under_streak}根在下"
+            f"MA200 {t.signal.ma200:.1f}  先前連{t.signal.under_streak}根在下\n"
+            f"5m MA5–60 帶寬 {t.signal.m5_ribbon:.1f}"
             "</pre>"
             f"{charts}"
             "</article>"
@@ -691,7 +741,8 @@ def write_html_report(
             f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → 進場 {funnel.get('taken', 0)}"
             f"（排列 {funnel.get('skip_stack', 0)} · 未連3 {funnel.get('skip_above3', 0)} · "
             f"距離 {funnel.get('skip_dist', 0)} · 未洗15 {funnel.get('skip_under', 0)} · "
-            f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)}）</p>"
+            f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)} · "
+            f"5m糾結 {funnel.get('skip_5m_tangle', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
@@ -734,7 +785,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 無五分MA60</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 五分MA5–60帶寬&lt;28濾掉糾結</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -778,7 +829,8 @@ def cmd_backtest(args) -> int:
         f"break={funnel.get('break', 0)} taken={funnel.get('taken', 0)} "
         f"stack={funnel.get('skip_stack', 0)} above3={funnel.get('skip_above3', 0)} "
         f"dist={funnel.get('skip_dist', 0)} under={funnel.get('skip_under', 0)} "
-        f"open={funnel.get('skip_open', 0)} wick={funnel.get('skip_wick', 0)}"
+        f"open={funnel.get('skip_open', 0)} wick={funnel.get('skip_wick', 0)} "
+        f"tangle5={funnel.get('skip_5m_tangle', 0)}"
     )
     for i, t in enumerate(trades, 1):
         print(
