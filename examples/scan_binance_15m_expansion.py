@@ -1088,6 +1088,8 @@ def write_backtest_html(
                 )
             if i % 40 == 0:
                 print(f"  圖 {i}/{len(trades)}", flush=True)
+            if i == 1 and not img:
+                print("畫圖失敗（檢查有沒有裝 matplotlib）", flush=True)
         h1 = (t["fwd"].get(4) or 0) * 100
         h2 = (t["fwd"].get(8) or 0) * 100
         cards.append(
