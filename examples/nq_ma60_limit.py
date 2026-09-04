@@ -689,7 +689,7 @@ def cmd_alert(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="NQ 破 2h 低後掛單 MA60 五分鐘")
+    p = argparse.ArgumentParser(description="NQ 破 2h 低後，五根後回踩 MA60")
     sub = p.add_subparsers(dest="cmd")
 
     b = sub.add_parser("backtest", help="Yahoo 1m 回測")
