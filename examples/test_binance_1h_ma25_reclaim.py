@@ -31,6 +31,13 @@ from binance_1h_ma25_reclaim import (  # noqa: E402
     write_html_report,
     write_seq_html,
 )
+from watch_binance_1h_ma25 import (  # noqa: E402
+    entry_key,
+    fmt_entry,
+    fmt_exit,
+    open_trade,
+    telegram_send,
+)
 
 
 def test_resample_4h() -> None:
@@ -352,6 +359,28 @@ def test_one_at_a_time_skips_overlap() -> None:
     assert abs(path[0]["after"] - 100.0 * (1.0 + 3.0 * t.pnl_pct / 100.0)) < 1e-6
 
 
+def test_watch_telegram_text() -> None:
+    df = _make_reclaim_bars()
+    sigs = detect_signals(df)
+    assert sigs
+    sig = sigs[0]
+    text = fmt_entry("AVGOUSDT", df, sig)
+    assert "AVGOUSDT" in text
+    assert "多頭排列" in text
+    assert "停損" in text
+    assert "2.0R" in text or "2R" in text
+    assert entry_key("AVGOUSDT", sig, df).startswith("AVGOUSDT|")
+    assert entry_key("AVGOUSDT", sig, df) == entry_key("AVGOUSDT", sig, df)
+    tr = simulate(df, sigs, max_hold=40)[0]
+    xt = fmt_exit("AVGOUSDT", df, tr)
+    assert "出場" in xt
+    assert tr.exit_reason in xt
+    ot = open_trade(sig)
+    assert ot.exit_reason == "open"
+    assert ot.entry_idx == sig.entry_idx
+    assert telegram_send("測試", dry_run=True) is True
+
+
 def test_write_html(tmp_path: Path | None = None) -> None:
     df = _make_reclaim_bars()
     sigs = detect_signals(df)
@@ -401,6 +430,7 @@ def main() -> int:
     test_summarize()
     test_select_card_hits()
     test_one_at_a_time_skips_overlap()
+    test_watch_telegram_text()
     test_write_html()
     print("ok")
     return 0

@@ -77,6 +77,11 @@ python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 60 --html docs/bin
 
 # 筆畫那種 W · 近一個月
 python3 examples/binance_1h_ma25_reclaim.py --strict --limit 80 --days 30 --html docs/binance-1h-ma25-strict-30d/index.html
+
+# Telegram：破底後 7/14/25 多頭排列就推（憑證放 tg_config.env）
+python3 examples/watch_binance_1h_ma25.py --test
+python3 examples/watch_binance_1h_ma25.py --dry-run --once
+python3 examples/watch_binance_1h_ma25.py
 ```
 
 TradingView：`pinescript/binance_1h_ma25_reclaim.pine` 貼到 1 小時圖。
