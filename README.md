@@ -24,7 +24,8 @@
 
 ## NQ 一分 K 破底站上 MA200
 
-1 分鐘圖，無五分 MA60。基準（一個月）約 **55 筆 / +1301**。
+1 分鐘圖，無五分 MA60。你的基準一個月 **55 筆 / 約 +1301**。  
+這次 Yahoo 1m（2026-08-05 → 09-04）：**58 筆、勝率 32.8%、+1026**（18 筆打到 +100，1 筆未平 +22）。
 
 1. MA5>10>20>30>60
 2. 站上 MA200 連 ≥3，且距離 ≤30
@@ -38,6 +39,8 @@
 python3 examples/nq_ma200_stand.py backtest --period 30d --pages
 python3 examples/nq_ma200_stand.py backtest --period 8d --html output/nq_ma200_stand.html
 ```
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma200-stand-1bd0/docs/nq-ma200-stand/view.html
 
 Pine / Telegram Alert 之後再掛。
 
