@@ -862,11 +862,47 @@ def draw_trade_png(
         ax.axhline(limit_px, color="#42a5f5", ls="-.", lw=0.9, alpha=0.7)
     if 0 <= ex < len(window):
         ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
-        ax.scatter([ex], [trade.entry_price], s=42, color="#00e676", marker="^", zorder=6)
+        ax.scatter(
+            [ex],
+            [trade.entry_price],
+            s=320,
+            facecolors="none",
+            edgecolors="#00e676",
+            linewidths=2.2,
+            zorder=7,
+        )
+        ax.scatter([ex], [trade.entry_price], s=46, color="#00e676", marker="o", zorder=8)
+        ax.annotate(
+            "進場",
+            (ex, trade.entry_price),
+            textcoords="offset points",
+            xytext=(10, 8),
+            ha="left",
+            color="#69f0ae",
+            fontsize=9,
+        )
     if 0 <= xx < len(window):
+        exit_col = "#00c805" if trade.pnl_points > 0 else "#ff5252"
         ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
-        ax.scatter([xx], [trade.exit_price], s=40, color="#00c805" if trade.pnl_points > 0 else "#ff5252",
-                   marker="x", zorder=6)
+        ax.scatter(
+            [xx],
+            [trade.exit_price],
+            s=320,
+            facecolors="none",
+            edgecolors=exit_col,
+            linewidths=2.2,
+            zorder=7,
+        )
+        ax.scatter([xx], [trade.exit_price], s=46, color=exit_col, marker="o", zorder=8)
+        ax.annotate(
+            "出場",
+            (xx, trade.exit_price),
+            textcoords="offset points",
+            xytext=(10, -12),
+            ha="left",
+            color=exit_col,
+            fontsize=9,
+        )
 
     et = df.index[trade.entry_idx]
     xt = df.index[trade.exit_idx]
