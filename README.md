@@ -57,6 +57,10 @@ python3 examples/nq_linear_short.py --period 7d --pages
 
 TradingView：`pinescript/nq_linear_short_1m.pine` 貼到 NQ1! / MNQ1! 一分圖。
 
+Yahoo 1m（2026-08-28 00:09 → 09-04 13:37 ET，7657 根）：**10 筆、勝率 50%、+178 點**。  
+漏斗：創 4H 高 42 → 回測 MA10 42 → 破 MA20 25 → 進場 10（距不夠 15 · 再創高取消 17）。  
+出場：MA200 3 筆 +262.5 · 長下影 2 筆 +104.2 · 停損 5 筆 −188.8。
+
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/linear-short-1w-84e8/docs/nq-linear-short/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
