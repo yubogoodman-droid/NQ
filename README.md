@@ -60,6 +60,37 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
+## 幣安 15m 從 MA200 爆量擴張
+
+基準是你那張 ETH 15m：**09-03 22:45 那根長陽要進**（收 2488，離 200 約 +3.45%），下一根 23:00 開盤做多。不是 21:30 那根較早的緩推。
+
+1. **記號**：近 4 小時內曾經貼過／跌破 MA200，然後一根放量長陽——實體 ≥0.7%、振幅 ≥2.5×ATR、量比 ≥2.5×、收在棒子上方 78%、創 20 根新高、MA7>MA14>MA25。離 200 最多 5%（蓋得住 ETH 那根）。
+2. **進場**：擴張棒收完，下一根開盤做多。同一檔 8 小時只算一次。
+3. **出場**：收盤跌破 MA200，或 4 小時到期。
+
+```bash
+python3 examples/scan_binance_15m_expansion.py --verify   # ETH 22:45 必須 PASS
+python3 examples/scan_binance_15m_expansion.py --once
+python3 examples/scan_binance_15m_expansion.py
+```
+
+Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/test_scan_binance_15m_expansion.py`
+
+| 標的 | 記號 | 進場 |
+|---|---|---|
+| ETH | 09-03 22:45（+3.45%，實體 +1.32%） | 09-03 23:00 |
+
+近一週回測：
+
+```bash
+python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
+```
+
+近一週（2026-08-29 → 09-05，271 檔）：**126 筆、勝率 47.6%、等權合計 +61.0%、均筆 +0.48%**。ETH 22:45 那筆 23:00 進、+0.80%。2 小時純續走勝率 56%、均 +0.41%。
+
+先看圖：
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-7d/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
