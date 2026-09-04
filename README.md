@@ -54,6 +54,12 @@ python3 examples/nq_ma60_limit.py alert --dry-run --once
 
 TradingView：`pinescript/nq_ma60_limit_1m.pine` 套用至 NQ1! / MNQ1! 一分圖。
 
+Yahoo 1m（2026-08-12 → 09-04，約 23 個交易日）：**29 筆、勝率 51.7%、+252.8 點**。  
+漏斗：破底 1007 → 深度≥10點 150 → 5/20+破MA60 37 → 成交 29（逾時取消 8）。  
+近 8 天：10 筆、勝率 40%、+124.2 點。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-ma60-limit-63a8/docs/nq-ma60-limit/view.html
+
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
