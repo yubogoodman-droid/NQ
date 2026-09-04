@@ -22,6 +22,52 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 起漲點 · 糾結後連兩根剛站上 MA200
+
+模板是 **08-19 08:15** 那種：下跌後短均線收成一束，近 12 根還在窄箱，收盤剛站上 MA200。
+
+訊號只在 **1 分鐘** 上抓：
+
+| 條件 | 門檻 |
+|------|------|
+| 短均排列 | MA5>MA10>MA20>MA30 |
+| 站穩 | 連續兩根收盤站上 MA200；第一根還不進 |
+| 剛站上 | 收盤高出 MA200 ≤ 15 點 |
+| 短均收束 | MA5–MA60 帶寬 ≤ 20 |
+| 窄箱 | 近 12 根修剪高低 10–40 點 |
+| 不追 | 進場 K 實體絕對值 ≤ 20 |
+| 長均 | MA100 與 MA120 都要在 MA200 下面 |
+| 5 分當時 | 站上 5分 MA20 與 MA30；不能比 5分 MA200 低超過 25 點 |
+
+**07:33 / 11:30 / 開盤追價** 那種箱子太寬、帶太散，不進。5 分大空反彈也不接。
+
+停損在進場前 20 根修剪低點下方 5 點；目標 2R。走到 **1R 後停損移到 +0.3R**。連續 2 根 1 分收回到進場時 MA200 下，當成站上失敗、用收盤離場。
+
+```bash
+# 08-19 08:15 那張理想圖
+python3 examples/nq_coil_breakout.py --demo
+
+# Yahoo 1m 回測，每筆附當時 5分K + 手機版 HTML
+python3 examples/nq_coil_breakout.py backtest --period 10d --html output/nq_coil.html
+python3 examples/nq_coil_breakout.py backtest --period 10d --pages
+python3 examples/nq_coil_breakout.py backtest --period 30d --pages
+
+# Telegram 輪詢（憑證放 tg_config.env）
+python3 examples/nq_coil_breakout.py alert --dry-run --once
+```
+
+| 區間 | 筆數 | 勝率 | 加總 |
+|------|------|------|------|
+| 10 天 | （回測中） | — | — |
+| 30 天 | （回測中） | — | — |
+
+樣本很小，回測不是保證。
+
+TradingView：把 `pinescript/nq_ma_coil_breakout_1m.pine` 貼進 Pine Editor，套用到 NQ1! / MNQ1! 一分圖，可設「NQ 起漲點」警示。
+
+預覽（10 天）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/view.html  
+預覽（30 天）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout-30d/view.html
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
@@ -143,7 +189,8 @@ python3 examples/chart_today.py
 
 ## TradingView
 
-`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
+- `pinescript/nq_w_bottom_5m.pine` — NQ 五分 K W 底，套用至 NQ1! / MNQ1! 五分圖。
+- `pinescript/nq_ma_coil_breakout_1m.pine` — NQ 一分 K：5>10>20>30 連兩根站上 MA200。
 
 ## 參數調整
 

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>NQ=F 起漲點（糾結後連兩根剛站上MA200）</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}
+.page{max-width:560px;margin:0 auto;padding:14px 12px 32px}
+h1{font-size:18px;margin:0 0 6px}
+.muted{color:#8b949e;font-size:13px;line-height:1.5}
+.chart-cap{color:#8b949e;font-size:12px;margin:12px 0 6px}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.equity{margin:10px 0 4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}
+.trade-no{font-size:15px;font-weight:700}
+.trade-time{font-size:12px;color:#8b949e}
+.card-pnl{font-size:16px;font-weight:700;white-space:nowrap}
+.pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}
+.tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
+.tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
+.tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.tag-fail{background:rgba(163,113,247,0.15);color:#d2a8ff;border-color:rgba(163,113,247,0.35)}
+.tag-info{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}
+.tag-tf1{background:rgba(88,166,255,0.18);color:#79c0ff;border-color:rgba(88,166,255,0.4)}
+.tag-tf5{background:rgba(163,113,247,0.18);color:#d2a8ff;border-color:rgba(163,113,247,0.4)}
+.trade-detail{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}
+.mini-chart{margin:0 -6px 8px;border-radius:10px;overflow:hidden}
+.empty{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}
+a{color:#79c0ff}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>NQ=F 起漲點（糾結後連兩根剛站上MA200）</h1>
+<p class="muted">模板是 08-19 08:15：下跌後短均線收成一束（MA5–MA60 ≤ 20），近 12 根箱子 10–40 點，收盤剛站上 MA200（高出 ≤ 15）。MA5&gt;MA10&gt;MA20&gt;MA30，連續兩根收在 MA200 上才進；第一根還不進。MA200 上頭不能再掛 MA100 或 MA120。當時 5 分要站上 MA20 與 MA30，且不能比 5 分 MA200 低超過 25 點（大空反彈不接）。開盤追價、急殺後寬箱（07:33 / 11:30 那種）不進。停損＝進場前 20 根修剪低點 − 5 點，停利 2R；走到 1R 後停損移到 +0.3R。連續 2 根收回進場時 MA200 下方視為站上失敗、收盤離場。</p>
+<p class="muted">30d · 2026-07-27 06:57 → 2026-08-26 06:46 · 1分 bars=29967</p>
+<div class="cards">
+<div class="card">筆數<b>15</b></div>
+<div class="card">勝率<b>20.0%</b></div>
+<div class="card">總點數<b class="pnl-win">+78.8</b></div>
+<div class="card">勝/負<b>3/12</b></div>
+</div>
+<p class="muted">QA 1筆 -3.2 · QB 14筆 +82.0</p>
+<p class='muted'>漏斗：檢查 29107 → 5/10/20/30排列 7095 → 站上MA200 15347 → 連續兩根站穩 4686 → 靠近MA200 16815 → 窄箱 16281 → 短均收束 12962 → MA200仍跌 29107 → 先跌一段 29107 → 先在200下 29107 → 貼著200 29107 → 100與120在200下 12894 → 5分站上MA20 15270 → 5分站上MA30 15272 → 5分未深跌200 17661 → 進場 15</p>
+<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="111.8" x2="720" y2="111.8" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,111.8 48.0,129.7 96.0,135.2 144.0,142.9 192.0,145.9 240.0,145.9 288.0,148.8 336.0,156.2 384.0,162.6 432.0,133.9 480.0,44.6 528.0,58.6 576.0,17.4 624.0,34.3 672.0,34.3 720.0,42.8"/></svg></div>
+</section>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · QB</span><span class='trade-time'>2026-08-04 19:55 → 08-04 20:48</span></div><div class='card-pnl pnl-loss'>-20.5 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29844.50
+stop  29798.00  (−46.5 pts)
+target 29937.50  (2.0R)
+exit  29824.00  fail
+回看低 29803.00  進場MA200 29835.91
+帶寬 11.9  高出MA200 8.6  量能 0.76x  實體 6.2
+1分MA 29842.0>29841.3>29835.0>29830.2  100 29827.6 / 120 29825.7 &lt; 200 29835.9
+5分當時 C 29844.5  MA20 29829.2  MA30 29821.6</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t01_0804_1955_qb.png' alt='1分K #1' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-04 19:55  已收完
+當時 O 29842.50  H 29848.50  L 29830.00  C 29844.50  實體 2.0
+5分MA 29837.7&gt;29835.4&gt;29829.2&gt;29821.6  200 29484.9
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 是</pre><div class='mini-chart'><img src='img/m5_t01_0804_1955_qb.png' alt='5分當時 #1' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · QB</span><span class='trade-time'>2026-08-05 06:35 → 08-05 06:37</span></div><div class='card-pnl pnl-loss'>-6.2 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29868.75
+stop  29831.25  (−37.5 pts)
+target 29943.75  (2.0R)
+exit  29862.50  fail
+回看低 29836.25  進場MA200 29865.20
+帶寬 13.0  高出MA200 3.5  量能 0.41x  實體 2.0
+1分MA 29866.5>29862.0>29856.2>29853.5  100 29855.2 / 120 29849.7 &lt; 200 29865.2
+5分當時 C 29868.8  MA20 29856.2  MA30 29849.6</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t02_0805_0635_qb.png' alt='1分K #2' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-05 06:35  已收完
+當時 O 29854.25  H 29871.25  L 29850.00  C 29868.75  實體 14.5
+5分MA 29853.7&gt;29857.2&gt;29856.2&gt;29849.6  200 29868.9
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t02_0805_0635_qb.png' alt='5分當時 #2' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · QB</span><span class='trade-time'>2026-08-06 23:02 → 08-06 23:13</span></div><div class='card-pnl pnl-loss'>-8.8 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29538.75
+stop  29470.50  (−68.2 pts)
+target 29675.25  (2.0R)
+exit  29530.00  fail
+回看低 29475.50  進場MA200 29537.60
+帶寬 17.8  高出MA200 1.2  量能 0.76x  實體 -7.5
+1分MA 29534.5>29531.6>29525.4>29516.7  100 29523.0 / 120 29524.8 &lt; 200 29537.6
+5分當時 C 29538.8  MA20 29521.8  MA30 29524.4</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t03_0806_2302_qb.png' alt='1分K #3' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-06 23:05  未收完
+當時 O 29531.25  H 29548.00  L 29531.25  C 29538.75  實體 7.5
+這根後來收到 29545.25  H 29548.00 / L 29531.25
+5分MA 29525.5&gt;29518.9&gt;29521.8&gt;29524.4  200 29518.7
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t03_0806_2302_qb.png' alt='5分當時 #3' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · QB</span><span class='trade-time'>2026-08-13 05:45 → 08-13 05:48</span></div><div class='card-pnl pnl-loss'>-3.5 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29862.50
+stop  29830.75  (−31.8 pts)
+target 29926.00  (2.0R)
+exit  29859.00  fail
+回看低 29835.75  進場MA200 29859.50
+帶寬 11.9  高出MA200 3.0  量能 0.91x  實體 2.0
+1分MA 29858.7>29855.5>29850.2>29846.7  100 29851.0 / 120 29852.7 &lt; 200 29859.5
+5分當時 C 29862.5  MA20 29851.6  MA30 29856.0</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t04_0813_0545_qb.png' alt='1分K #4' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-13 05:45  已收完
+當時 O 29851.50  H 29863.00  L 29851.50  C 29862.50  實體 11.0
+5分MA 29851.8&gt;29849.4&gt;29851.6&gt;29856.0  200 29861.6
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t04_0813_0545_qb.png' alt='5分當時 #4' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · QB</span><span class='trade-time'>2026-08-13 08:52 → 08-13 09:31</span></div><div class='card-pnl pnl-flat'>+0.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29872.00
+stop  29815.50  (−56.5 pts)
+target 29985.00  (2.0R)
+exit  29872.00  stop
+回看低 29820.50  進場MA200 29865.05
+帶寬 14.2  高出MA200 7.0  量能 3.88x  實體 1.8
+1分MA 29859.8>29853.8>29851.5>29845.6  100 29857.4 / 120 29861.4 &lt; 200 29865.0
+5分當時 C 29872.0  MA20 29856.5  MA30 29863.3</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t05_0813_0852_qb.png' alt='1分K #5' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-13 08:55  未收完
+當時 O 29855.50  H 29876.50  L 29854.50  C 29872.00  實體 16.5
+這根後來收到 29877.25  H 29879.50 / L 29854.50
+5分MA 29854.2&gt;29844.1&gt;29856.5&gt;29863.3  200 29855.1
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t05_0813_0852_qb.png' alt='5分當時 #5' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · QA</span><span class='trade-time'>2026-08-13 19:10 → 08-13 19:21</span></div><div class='card-pnl pnl-loss'>-3.2 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QA</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 30214.75
+stop  30194.00  (−20.8 pts)
+target 30256.25  (2.0R)
+exit  30211.50  fail
+回看低 30199.00  進場MA200 30211.85
+帶寬 9.1  高出MA200 2.9  量能 4.60x  實體 1.5
+1分MA 30211.5>30207.4>30205.1>30204.6  100 30204.5 / 120 30204.3 &lt; 200 30211.9
+5分當時 C 30214.8  MA20 30204.8  MA30 30203.4</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t06_0813_1910_qa.png' alt='1分K #6' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-13 19:10  已收完
+當時 O 30205.25  H 30219.00  L 30204.50  C 30214.75  實體 9.5
+5分MA 30205.9&gt;30204.5&gt;30204.8&gt;30203.4  200 30042.4
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t06_0813_1910_qa.png' alt='5分當時 #6' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · QB</span><span class='trade-time'>2026-08-13 22:36 → 08-13 22:43</span></div><div class='card-pnl pnl-loss'>-8.5 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 30179.00
+stop  30150.75  (−28.2 pts)
+target 30235.50  (2.0R)
+exit  30170.50  fail
+回看低 30155.75  進場MA200 30176.56
+帶寬 12.0  高出MA200 2.4  量能 1.54x  實體 2.5
+1分MA 30175.3>30171.0>30167.4>30167.0  100 30156.8 / 120 30160.8 &lt; 200 30176.6
+5分當時 C 30179.0  MA20 30157.5  MA30 30165.0</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t07_0813_2236_qb.png' alt='1分K #7' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-13 22:40  未收完
+當時 O 30176.50  H 30181.00  L 30175.75  C 30179.00  實體 2.5
+這根後來收到 30174.50  H 30181.50 / L 30174.00
+5分MA 30171.4&gt;30166.8&gt;30157.5&gt;30165.0  200 30106.8
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t07_0813_2236_qb.png' alt='5分當時 #7' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · QB</span><span class='trade-time'>2026-08-14 01:36 → 08-14 02:08</span></div><div class='card-pnl pnl-loss'>-7.2 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 30162.00
+stop  30133.25  (−28.8 pts)
+target 30219.50  (2.0R)
+exit  30154.75  fail
+回看低 30138.25  進場MA200 30157.84
+帶寬 9.9  高出MA200 4.2  量能 0.78x  實體 -0.8
+1分MA 30155.4>30152.0>30149.4>30145.5  100 30150.9 / 120 30153.8 &lt; 200 30157.8
+5分當時 C 30162.0  MA20 30150.6  MA30 30155.3</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t08_0814_0136_qb.png' alt='1分K #8' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-14 01:40  未收完
+當時 O 30162.75  H 30163.50  L 30161.25  C 30162.00  實體 -0.8
+這根後來收到 30155.75  H 30164.00 / L 30152.50
+5分MA 30152.4&gt;30147.2&gt;30150.6&gt;30155.3  200 30157.2
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t08_0814_0136_qb.png' alt='5分當時 #8' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · QB</span><span class='trade-time'>2026-08-16 22:22 → 08-16 23:57</span></div><div class='card-pnl pnl-win'>+32.8 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-time'>timeout</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 30213.00
+stop  30180.25  (−32.8 pts)
+target 30278.50  (2.0R)
+exit  30245.75  timeout
+回看低 30185.25  進場MA200 30204.46
+帶寬 10.9  高出MA200 8.5  量能 2.03x  實體 -0.8
+1分MA 30207.0>30203.6>30198.0>30196.0  100 30203.9 / 120 30202.7 &lt; 200 30204.5
+5分當時 C 30213.0  MA20 30207.0  MA30 30205.6</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t09_0816_2222_qb.png' alt='1分K #9' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-16 22:25  未收完
+當時 O 30202.50  H 30216.50  L 30202.00  C 30213.00  實體 10.5
+這根後來收到 30215.00  H 30222.25 / L 30202.00
+5分MA 30199.6&gt;30198.5&gt;30207.0&gt;30205.6  200 30173.1
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t09_0816_2222_qb.png' alt='5分當時 #9' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · QB</span><span class='trade-time'>2026-08-19 08:15 → 08-19 08:37</span></div><div class='card-pnl pnl-win'>+102.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-tp'>target</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29557.50
+stop  29506.50  (−51.0 pts)
+target 29659.50  (2.0R)
+exit  29659.50  target
+回看低 29511.50  進場MA200 29550.96
+帶寬 15.4  高出MA200 6.5  量能 1.56x  實體 4.5
+1分MA 29549.2>29549.2>29541.3>29533.9  100 29539.2 / 120 29537.7 &lt; 200 29551.0
+5分當時 C 29557.5  MA20 29538.2  MA30 29536.9</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t10_0819_0815_qb.png' alt='1分K #10' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-19 08:15  已收完
+當時 O 29549.25  H 29558.75  L 29533.50  C 29557.50  實體 8.2
+5分MA 29535.1&gt;29529.9&gt;29538.2&gt;29536.9  200 29547.8
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t10_0819_0815_qb.png' alt='5分當時 #10' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · QB</span><span class='trade-time'>2026-08-19 15:20 → 08-19 15:22</span></div><div class='card-pnl pnl-loss'>-16.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29572.25
+stop  29524.50  (−47.8 pts)
+target 29667.75  (2.0R)
+exit  29556.25  fail
+回看低 29529.50  進場MA200 29563.08
+帶寬 15.1  高出MA200 9.2  量能 1.16x  實體 7.0
+1分MA 29560.3>29554.7>29549.0>29546.5  100 29541.7 / 120 29539.3 &lt; 200 29563.1
+5分當時 C 29572.2  MA20 29543.7  MA30 29543.7</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t11_0819_1520_qb.png' alt='1分K #11' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-19 15:20  已收完
+當時 O 29552.00  H 29572.75  L 29543.75  C 29572.25  實體 20.2
+5分MA 29552.4&gt;29551.5&gt;29543.7&gt;29543.7  200 29556.0
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t11_0819_1520_qb.png' alt='5分當時 #11' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · QB</span><span class='trade-time'>2026-08-19 16:48 → 08-19 18:02</span></div><div class='card-pnl pnl-win'>+47.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-tp'>target</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29538.50
+stop  29515.00  (−23.5 pts)
+target 29585.50  (2.0R)
+exit  29585.50  target
+回看低 29520.00  進場MA200 29536.36
+帶寬 12.7  高出MA200 2.1  量能 0.22x  實體 0.8
+1分MA 29534.7>29529.5>29528.1>29525.6  100 29534.0 / 120 29535.4 &lt; 200 29536.4
+5分當時 C 29538.5  MA20 29533.2  MA30 29538.0</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t12_0819_1648_qb.png' alt='1分K #12' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-19 16:50  未收完
+當時 O 29531.50  H 29540.00  L 29530.50  C 29538.50  實體 7.0
+這根後來收到 29546.25  H 29547.00 / L 29530.50
+5分MA 29529.5&gt;29525.8&gt;29533.2&gt;29538.0  200 29555.7
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t12_0819_1648_qb.png' alt='5分當時 #12' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · QB</span><span class='trade-time'>2026-08-25 12:15 → 08-25 12:44</span></div><div class='card-pnl pnl-loss'>-19.2 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29284.50
+stop  29249.75  (−34.8 pts)
+target 29354.00  (2.0R)
+exit  29265.25  fail
+回看低 29254.75  進場MA200 29275.74
+帶寬 14.0  高出MA200 8.8  量能 0.79x  實體 5.5
+1分MA 29275.9>29274.7>29272.8>29262.8  100 29247.3 / 120 29244.8 &lt; 200 29275.7
+5分當時 C 29284.5  MA20 29249.0  MA30 29255.9</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t13_0825_1215_qb.png' alt='1分K #13' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-25 12:15  已收完
+當時 O 29279.00  H 29284.75  L 29263.25  C 29284.50  實體 5.5
+5分MA 29272.5&gt;29267.1&gt;29249.0&gt;29255.9  200 29241.4
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t13_0825_1215_qb.png' alt='5分當時 #13' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · QB</span><span class='trade-time'>2026-08-26 02:41 → 08-26 02:53</span></div><div class='card-pnl pnl-flat'>+0.0 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29243.50
+stop  29198.75  (−44.8 pts)
+target 29333.00  (2.0R)
+exit  29243.50  stop
+回看低 29203.75  進場MA200 29240.42
+帶寬 16.9  高出MA200 3.1  量能 0.89x  實體 0.2
+1分MA 29238.2>29233.5>29225.2>29221.3  100 29234.2 / 120 29235.5 &lt; 200 29240.4
+5分當時 C 29243.5  MA20 29234.5  MA30 29241.7</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t14_0826_0241_qb.png' alt='1分K #14' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-26 02:45  未收完
+當時 O 29243.25  H 29246.25  L 29242.00  C 29243.50  實體 0.2
+這根後來收到 29266.00  H 29267.50 / L 29241.50
+5分MA 29231.6&gt;29225.8&gt;29234.5&gt;29241.7  200 29239.9
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t14_0826_0241_qb.png' alt='5分當時 #14' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · QB</span><span class='trade-time'>2026-08-26 05:50 → 08-26 06:03</span></div><div class='card-pnl pnl-loss'>-9.8 pts</div></header><div class='tags'><span class='tag tag-tf1'>1分K</span><span class='tag tag-fail'>fail</span><span class='tag tag-info'>起漲</span><span class='tag tag-info'>QB</span><span class='tag tag-tf5'>5分當時</span></div><pre class='trade-detail'>entry 29226.75
+stop  29193.50  (−33.2 pts)
+target 29293.25  (2.0R)
+exit  29217.00  fail
+回看低 29198.50  進場MA200 29220.85
+帶寬 12.6  高出MA200 5.9  量能 1.66x  實體 1.2
+1分MA 29222.0>29217.6>29213.2>29209.3  100 29217.8 / 120 29217.4 &lt; 200 29220.9
+5分當時 C 29226.8  MA20 29217.0  MA30 29214.2</pre><p class='chart-cap'>1分K</p><div class='mini-chart'><img src='img/m1_t15_0826_0550_qb.png' alt='1分K #15' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>5分K 當時（1分條件成立那一刻，黃框是當根，虛線=還沒收完）</p><pre class='trade-detail'>5分當根 08-26 05:50  已收完
+當時 O 29216.00  H 29227.50  L 29215.75  C 29226.75  實體 10.8
+5分MA 29211.4&gt;29213.2&gt;29217.0&gt;29214.2  200 29229.9
+當時站上5分MA20 是  站上5分MA30 是  5&gt;10&gt;20&gt;30 否</pre><div class='mini-chart'><img src='img/m5_t15_0826_0550_qb.png' alt='5分當時 #15' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div>
+</body></html>
