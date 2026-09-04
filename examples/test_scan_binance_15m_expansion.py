@@ -42,7 +42,7 @@ def _bars(n: int, close: np.ndarray, vol: np.ndarray | None = None) -> dict:
 
 def _series(
     *,
-    rocket: float = 101.9,
+    rocket: float = 102.9,
     vol_signal: float = 4_000.0,
     grind: bool = True,
     tail: np.ndarray | None = None,
@@ -80,15 +80,14 @@ def test_rsi_sma_all_up() -> None:
 
 
 def test_expansion_after_coil_hits() -> None:
-    d = _series(tail=np.full(4, 102.2))
+    d = _series(tail=np.full(4, 103.2))
     hits = detect_expansion(d)
-    assert hits, "盤整後在 MA200 附近的放量陽線應該命中"
+    assert hits, "ETH 那種從 200 盤整後的放量長陽應該命中"
     h = hits[-1]
     assert h["kind"] == "expand"
     assert h["mark_i"] == h["i"]
-    assert h["mark_ext"] <= 0.02
-    assert h["body"] >= 0.004
-    assert h["vol_ratio"] >= 1.7
+    assert h["body"] >= 0.007
+    assert h["vol_ratio"] >= 2.5
     assert h["ma7"] > h["ma14"] > h["ma25"]
 
 
@@ -116,8 +115,8 @@ def test_no_grind_skips() -> None:
 
 
 def test_too_far_from_ma200_skips() -> None:
-    """已經離開 MA200 超過 2%，不算在 200 附近進。"""
-    d = _series(rocket=103.5, tail=np.full(3, 103.6))
+    """離 MA200 超過 5%，連 ETH 22:45 那種都過了，不再追。"""
+    d = _series(rocket=106.0, tail=np.full(3, 106.2))
     assert detect_expansion(d) == []
 
 
@@ -141,7 +140,7 @@ def test_collapse_keeps_best_of_run() -> None:
 
 
 def test_select_alerts_debounce() -> None:
-    d = _series(tail=np.full(8, 102.2))
+    d = _series(tail=np.full(8, 103.2))
     alerts = select_alerts(d, int(d["t"][0]), int(d["t"][-1]))
     assert alerts, "合成擴張應有訊號"
     buckets = {int(d["t"][h["i"]]) // ALERT_BUCKET_MS for h in alerts}
@@ -149,7 +148,7 @@ def test_select_alerts_debounce() -> None:
 
 
 def test_stop_is_ma200() -> None:
-    d = _series(tail=np.full(6, 102.2))
+    d = _series(tail=np.full(6, 103.2))
     hits = detect_expansion(d)
     assert hits
     h = hits[0]
@@ -171,7 +170,7 @@ def test_simulate_stop_on_ma_break() -> None:
 
 
 def test_simulate_target_or_time() -> None:
-    d = _series(tail=102.2 * (1.004 ** np.arange(1, 18)))
+    d = _series(tail=103.2 * (1.004 ** np.arange(1, 18)))
     hits = detect_expansion(d)
     assert hits
     tr = simulate_trade(d, hits[0])

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""幣安 15m 在 MA200 附近的爆量擴張。
+"""幣安 15m 從 MA200 爆量擴張：ETH 2026-09-03 22:45 那根要進。
 
-  記號：均線先黏，放量陽線收盤站上 MA200，且離 200 仍 ≤2%（不要追已經跑遠的大陽）。
-  進場：記號收完，下一根開盤做多。
+  記號：價格先在 MA200 附近盤整，然後一根放量長陽（ETH 22:45 那種）。
+  進場：擴張棒收完，下一根開盤做多。
   出場：收盤跌破 MA200，或 4 小時到期。
 
 用法:
@@ -38,26 +38,28 @@ REPO = Path(__file__).resolve().parents[1]
 SEEN_PATH = REPO / "output" / "binance_15m_expansion_seen.json"
 CONFIG_ENV = REPO / "tg_config.env"
 
-# 基準圖與四張從 200 起漲的圖一定進宇宙
+# 基準圖一定進宇宙
 KEEP = {"ETHUSDT", "FILUSDT", "PIPPINUSDT", "SNDKUSDT", "CRCLUSDT"}
 
 PRE_BARS = 12
-CONFIRM_BARS = 0         # 貼著 200 的擴張棒本身就是訊號，下一根開盤進
-MIN_VOL_RATIO = 1.70     # FIL 3.5×、CRCL 4.0×、ETH 21:30 3.3×、SNDK 1.8×
+CONFIRM_BARS = 0         # 擴張棒本身就是訊號，下一根開盤進
+MIN_VOL_RATIO = 2.50     # ETH 22:45 約 3.7×；21:30 那根較早但不是基準圖
 MIN_MARK_VOL_VS_PREV = 1.0
-MIN_BODY = 0.004         # 實體 ≥0.4%；SNDK 記號 0.48%、ETH 21:30 0.62%（不是 22:45 那根 +1.32%）
-MIN_RANGE_ATR = 1.50     # PIPPIN 1.53×、ETH 21:30 2.38×
-MIN_CLOSE_POS = 0.65     # 收在棒子上方；SNDK 0.67、FIL 0.79
+MIN_BODY = 0.007         # ETH 22:45 +1.32%；FIL 19:45 +0.77%；ETH 21:30 +0.62% 不夠
+MIN_RANGE_ATR = 2.50     # ETH 22:45 約 3.5×；21:30 約 2.38× 不夠
+MIN_CLOSE_POS = 0.78     # ETH 22:45 0.98；FIL 0.79
 LOOKBACK_BREAK = 20      # 收盤創近 20 根新高
-MAX_MARK_EXT = 0.02      # 離 MA200 ≤2%，才叫在 200 附近進
-MAX_PRIOR_ATR_PCT = 0.012  # PIPPIN／SNDK 起漲時 ATR 約 1.1%
+MAX_MARK_EXT = 0.05      # 允許 ETH 22:45 那種離開 200 約 +3.45% 的長陽
+NEAR_200_LOOKBACK = 16   # 近 4 小時內必須曾經貼過／跌破 200（從 200 起漲，不是天上掉下來）
+NEAR_200_BAND = 0.01
+MAX_PRIOR_ATR_PCT = 0.012
 SQUEEZE_LOOKBACK = 24
-MAX_SQUEEZE_RIBBON = 0.05  # 允許 200 還帶一點寬度；PIPPIN 約 4.7%
+MAX_SQUEEZE_RIBBON = 0.05
 MIN_STACK_7_14 = 0.001
 MIN_STACK_7_25 = 0.004
 SESSION_HOURS = range(0, 24)
-# 同一根 15m 很多檔一起過 200 = 大盤彈，拿掉。
-MAX_SAME_MARK = 4
+# ETH 22:45 當晚會有一堆標的一起噴，不能整批丟掉。
+MAX_SAME_MARK = 99
 CLUSTER_COOLDOWN_MS = 3 * 3600 * 1000
 MIN_BARS = 220
 KLINE_LIMIT = 500
@@ -70,15 +72,15 @@ MIN_RISK = 0.004
 FWD_BARS = (1, 4, 8, 16)
 PAGES_HTML = REPO / "docs" / "binance" / "expansion-15m-7d" / "index.html"
 
-# --verify：在 MA200 附近起漲（ETH 要抓 21:30 那根，不是 22:45 已離開 3% 的大陽）
+# --verify：ETH 那張 22:45 長陽一定要進
 VERIFY_CASES = [
     {
         "symbol": "ETHUSDT",
-        "title": "ETH 在 MA200 附近起漲",
+        "title": "ETH 22:45 爆量擴張（要進）",
         "fetch_start": "2026-08-28 00:00",
         "fetch_end": "2026-09-04 08:00",
-        "expect_start": "2026-09-03 21:15",
-        "expect_end": "2026-09-03 21:45",
+        "expect_start": "2026-09-03 22:30",
+        "expect_end": "2026-09-03 23:15",
     },
     {
         "symbol": "FILUSDT",
@@ -87,22 +89,6 @@ VERIFY_CASES = [
         "fetch_end": "2026-01-02 08:00",
         "expect_start": "2026-01-01 19:30",
         "expect_end": "2026-01-01 20:15",
-    },
-    {
-        "symbol": "PIPPINUSDT",
-        "title": "PIPPIN 站上 MA200",
-        "fetch_start": "2026-01-17 00:00",
-        "fetch_end": "2026-01-22 02:00",
-        "expect_start": "2026-01-21 14:30",
-        "expect_end": "2026-01-21 15:15",
-    },
-    {
-        "symbol": "SNDKUSDT",
-        "title": "SNDK 站上 MA200",
-        "fetch_start": "2026-07-26 00:00",
-        "fetch_end": "2026-07-31 08:00",
-        "expect_start": "2026-07-30 19:15",
-        "expect_end": "2026-07-30 20:00",
     },
     {
         "symbol": "CRCLUSDT",
@@ -283,7 +269,7 @@ def indicators(d: dict) -> dict:
 
 
 def _hit_at(d: dict, i: int) -> dict | None:
-    """i 是貼著 MA200 的擴張棒（離 200 ≤2%）。"""
+    """i 是從 MA200 附近打出來的擴張棒（ETH 22:45 那種）。"""
     o, h, l, c, v = d["o"], d["h"], d["l"], d["c"], d["v"]
     m7, m14, m25 = d["m7"], d["m14"], d["m25"]
     m99, m120, m200 = d["m99"], d["m120"], d["m200"]
@@ -347,6 +333,16 @@ def _hit_at(d: dict, i: int) -> dict | None:
         return None
     ext = float(c[i] / m200[i] - 1.0)
     if ext > MAX_MARK_EXT:
+        return None
+    near_200 = False
+    lo = max(0, i - NEAR_200_LOOKBACK)
+    for j in range(lo, i):
+        if np.isnan(m200[j]) or float(m200[j]) <= 0:
+            continue
+        if float(c[j]) <= float(m200[j]) * (1.0 + NEAR_200_BAND):
+            near_200 = True
+            break
+    if not near_200:
         return None
     ribbon = float(max(m99[i], m120[i], m200[i]) / min(m99[i], m120[i], m200[i]) - 1.0)
     return {
@@ -575,7 +571,7 @@ def format_hit(sym: str, d: dict, hit: dict) -> str:
         f"實體 {hit.get('body', hit.get('move', 0))*100:+.2f}%　量比 {hit['vol_ratio']:.1f}×\n"
         f"現價 {hit['close']:g}　MA200 {hit.get('ma200', 0):g}　{hit.get('hour', 0):02d} 點\n"
         f"MA7 {hit['ma7']:g} &gt; MA14 {hit.get('ma14', 0):g} &gt; MA25 {hit['ma25']:g}\n"
-        f"<i>放量陽線站上 200 且還貼著（≤2%）；下一根開盤做多，收盤破 200 出場。</i>"
+        f"<i>從 MA200 附近盤整後放量長陽（ETH 22:45 那種要進）；下一根開盤做多，收盤破 200 出場。</i>"
     )
 
 
@@ -1178,7 +1174,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 15m MA200 附近擴張</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>在 MA200 附近進</strong>：放量陽線收盤站上 200，離 200 仍 ≤{MAX_MARK_EXT:.0%}（不要追已經跑遠的大陽）。實體 ≥{MIN_BODY:.1%}、振幅 ≥{MIN_RANGE_ATR:.1f}×ATR、量比 ≥{MIN_VOL_RATIO:.1f}×、收在棒子上方 {MIN_CLOSE_POS:.0%}、創 20 根新高、MA7 &gt; MA14 &gt; MA25。下一根開盤做多，<strong>收盤跌破 MA200</strong> 出場，最多 4 小時。同一根 15m ≥{MAX_SAME_MARK} 檔視為大盤一起過線。</p>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。基準是 ETH 09-03 <strong>22:45 那根長陽要進</strong>：先在 MA200 附近盤整，再放量長陽（實體 ≥{MIN_BODY:.1%}、振幅 ≥{MIN_RANGE_ATR:.1f}×ATR、量比 ≥{MIN_VOL_RATIO:.1f}×、收在棒子上方 {MIN_CLOSE_POS:.0%}、創 20 根新高）。離 200 可以到 {MAX_MARK_EXT:.0%}（ETH 那根約 +3.5%）。下一根開盤做多，<strong>收盤跌破 MA200</strong> 出場，最多 4 小時。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1289,7 +1285,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description="幣安 15m 在 MA200 附近的爆量擴張")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的 15m，然後結束")
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
-    p.add_argument("--verify", action="store_true", help="回放 ETH/FIL/PIPPIN/SNDK/CRCL，確認都在 200 附近抓到")
+    p.add_argument("--verify", action="store_true", help="回放 ETH 22:45，確認那根會進")
     p.add_argument("--backtest", action="store_true", help="回測近 N 天（預設 7）")
     p.add_argument("--days", type=int, default=7, help="回測天數")
     p.add_argument("--html", default="", help="回測 HTML 路徑")

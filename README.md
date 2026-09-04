@@ -60,31 +60,25 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## 幣安 15m MA200 附近擴張
+## 幣安 15m 從 MA200 爆量擴張
 
-要在 **MA200 附近進**，不追已經離開 200 的大陽。ETH 那張 22:45 收在 2488、200 在 2405（+3.45%）不會進；改抓同波 **21:30**（離 200 +1.18%）那種剛站上的擴張棒。
+基準是你那張 ETH 15m：**09-03 22:45 那根長陽要進**（收 2488，離 200 約 +3.45%），下一根 23:00 開盤做多。不是 21:30 那根較早的緩推。
 
-1. **記號**：放量陽線收盤站上 MA200，離 200 仍 ≤2%。實體 ≥0.4%、振幅 ≥1.5×ATR、量比 ≥1.7× 且大於前一根、收在棒子上方 65%、創 20 根新高、MA7 > MA14 > MA25。同一根 15m ≥4 檔視為大盤一起過線。
-2. **進場**：記號收完，下一根開盤做多。同一檔 8 小時只算一次。
+1. **記號**：近 4 小時內曾經貼過／跌破 MA200，然後一根放量長陽——實體 ≥0.7%、振幅 ≥2.5×ATR、量比 ≥2.5×、收在棒子上方 78%、創 20 根新高、MA7>MA14>MA25。離 200 最多 5%（蓋得住 ETH 那根）。
+2. **進場**：擴張棒收完，下一根開盤做多。同一檔 8 小時只算一次。
 3. **出場**：收盤跌破 MA200，或 4 小時到期。
 
 ```bash
-python3 examples/scan_binance_15m_expansion.py --verify   # 回放 ETH/FIL/PIPPIN/SNDK/CRCL
-python3 examples/scan_binance_15m_expansion.py --once     # 掃剛收盤的 15m
-python3 examples/scan_binance_15m_expansion.py            # 每根 15m 收盤掃；可推 Telegram
+python3 examples/scan_binance_15m_expansion.py --verify   # ETH 22:45 必須 PASS
+python3 examples/scan_binance_15m_expansion.py --once
+python3 examples/scan_binance_15m_expansion.py
 ```
 
 Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/test_scan_binance_15m_expansion.py`
 
-記號與進場（台北時間，括號是離 MA200）：
-
 | 標的 | 記號 | 進場 |
 |---|---|---|
-| ETH | 09-03 21:30（+1.18%） | 09-03 21:45 |
-| FIL | 01-01 19:45（+0.39%） | 01-01 20:00 |
-| PIPPIN | 01-21 14:45（+1.18%） | 01-21 15:00 |
-| SNDK | 07-30 19:30（+0.34%） | 07-30 19:45 |
-| CRCL | 08-19 20:30（+0.09%） | 08-19 20:45 |
+| ETH | 09-03 22:45（+3.45%，實體 +1.32%） | 09-03 23:00 |
 
 近一週回測：
 
@@ -92,9 +86,9 @@ Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/te
 python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
 ```
 
-近一週（2026-08-28 → 09-04，260 檔）：**128 筆、勝率 28.1%、等權合計 −8.6%、均筆 −0.07%**。大盤集群濾掉 65 筆。2 小時純續走勝率 46%、均 +0.09%。大賺含 CRCL +12.4%、TWT +8.6%、AZTEC +8.4%。
+（數字以最新 `--pages` 報告為準。）
 
-先看圖（每筆 15m + 1h；黃菱形＝在 200 附近的擴張棒、綠三角＝進場、×＝出場）：
+先看圖：
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-7d/view.html
 
 ## 幣安黏帶三幕 Telegram
