@@ -22,7 +22,7 @@ MAX_MA7_VS_200 = 0.012  # 突破前 MA7 仍黏著 200
 MAX_MA200_ABOVE_BOX = 0.012  # 200 可以略高於箱頂，但不能遠在天上
 MIN_BARS_AT_OR_BELOW = 4
 
-MIN_VOL_RATIO = 2.40  # 截圖第一根約 3.7×
+MIN_VOL_RATIO = 3.00  # 濾掉 ETH 8/28 那種 2.6× 假突破；截圖 9/3 約 3.7×
 MIN_RANGE_EXPAND = 2.00
 MAX_ENTRY_EXT = 0.015  # 進場收盤仍 ≤ 1.5% 高於 200
 MIN_BODY_FRAC = 0.35

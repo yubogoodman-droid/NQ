@@ -91,7 +91,7 @@ def test_coil_break_near_200_hits() -> None:
     assert h.close > h.ma200
     assert h.ext <= MAX_ENTRY_EXT
     assert h.ribbon <= 0.008
-    assert h.vol_ratio >= 2.4
+    assert h.vol_ratio >= 3.0
     assert 99.0 < h.ma200 < 101.5
 
 
@@ -104,6 +104,12 @@ def test_too_far_from_200_skips() -> None:
 
 def test_low_volume_skips() -> None:
     d = _coil_then_break(vol_signal=1050.0)
+    assert detect_signals(d) == []
+
+
+def test_eth_aug28_weak_pop_skips() -> None:
+    """ETH 8/28 第一筆：量只有 2.6×，坐在 200 上面的假突破。"""
+    d = _coil_then_break(vol_signal=2600.0)
     assert detect_signals(d) == []
 
 
