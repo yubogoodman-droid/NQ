@@ -25,7 +25,8 @@
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
-停損在破底低點下方；目標 2R（MA20 上彎時 3R）。品質看 1m MA5 / 1m MA60 / 5m MA60 斜率。
+停損在破底低點下方；目標 2R（MA20 上彎時 3R）。品質看 1m MA5 / 1m MA60 / 5m MA60 斜率。  
+預設已放寬：允許美東 09–10，風險上限 130。hug / MA60 特例 / MA20 斜率 −5 仍在。
 
 ```bash
 # 近 8 天 / 近一個月回測 + 手機版 HTML（每筆一張圖）
@@ -38,9 +39,23 @@ python3 examples/nq_ma_reclaim.py alert --dry-run --once
 python3 examples/nq_ma_reclaim.py alert
 ```
 
-近一個月 Yahoo 1m（2026-07-24 → 08-21）：**嚴格 8 筆、勝率 62.5%、約 +614 點**。  
-漏斗：破底 1197 → 深度≥10點 293 → 收復+排列後還被 hug/MA60/9–10點/風險擋掉，只剩 8。  
-關掉 hug／MA60 特例後（核心）變成 **25 筆、+815 點**，但會多出幾筆 −50 停損（含原本要擋的 08-11 12:39）。
+近一個月 Yahoo 1m（2026-07-29 → 08-28）：**預設 9 筆、勝率 77.8%、約 +670 點**。  
+允許 09–10、風險上限 130。含 08-27 02:19 QB ma20 +84.8。hug 仍擋 08-11 12:39。
+
+同一窗口改五分 K：**沒料**。根數照搬 4 筆 25% −211；時間對齊 15 分收復 0 筆。預設仍 1m。
+
+```bash
+python3 examples/nq_ma_reclaim.py backtest --period 30d --pages
+python3 examples/nq_ma_reclaim.py backtest --period 30d --strict --pages
+python3 examples/research_nq_5m.py --period 30d --pages
+```
+
+預設圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim/view.html
+
+五分 K 對照：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim/m5-view.html
+
+07-16 23:20 那張原規則抓不到（破底在 22:15，15 分鐘窗內沒收復；22:55 只再破 1 點）：  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim/jul16-view.html
 
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html

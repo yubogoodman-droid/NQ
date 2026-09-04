@@ -114,12 +114,12 @@ def load_yahoo_intraday(
 
 
 def load_bars(symbol: str, interval: str, period: str) -> pd.DataFrame:
-    """Yahoo 1m period= 最多約 7–8 天；超過改用 7 日切片（約可回看 30 天）。"""
+    """Yahoo 1m period= 最多約 7–8 天；超過改用 3 日切片（約可回看 30 天）。"""
     days = parse_period_days(period)
     if days is not None and days > 8:
         end = datetime.now(timezone.utc)
         start = end - timedelta(days=days)
-        df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=7)
+        df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=3)
         if not df.empty:
             return df
         print(f"[data] chunked {period} empty, fallback period download", file=sys.stderr)
@@ -287,14 +287,15 @@ def detect_signals(
     min_break_depth: float = 10.0,
     max_entry_vol: float = 2.5,
     min_ma20_slope: float = -5.0,
-    # ⑯ 貼著仍下彎/走平的 1m MA20 不進（擋 08-11 12:39）
+    # ⑯ 貼著走平／下彎的 1m MA20 不進（擋 08-11 12:39）
     hug_ma20_pts: float = 16.0,
+    hug_ma20_min_slope: Optional[float] = None,
     hug_ma20_max_slope: float = 0.5,
-    max_risk: float = 100.0,
+    max_risk: float = 130.0,
     # ⑮：風險偏大時只准 QA（擋 08-05 型寬停損弱品質全損）
     max_risk_non_qa: float = 85.0,
-    skip_hour_start: Optional[int] = 9,
-    skip_hour_end: Optional[int] = 10,
+    skip_hour_start: Optional[int] = None,
+    skip_hour_end: Optional[int] = None,
     ma200_buffer: float = 40.0,
     ma60_buffer: float = 10.0,
     ma60_min_below: float = 6.0,
@@ -308,14 +309,20 @@ def detect_signals(
     use_ma20_up_target: bool = True,
     ma20_up_target_r: float = 3.0,
     use_ma60_skip: bool = True,
+    require_ma30: bool = True,
+    require_stack: bool = True,
     funnel: Optional[Dict[str, int]] = None,
+    trace: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Signal]:
     s = float(pt_scale) if pt_scale and pt_scale > 0 else 1.0
     stop_buffer *= s
     min_break_depth *= s
     min_ma20_slope *= s
     hug_ma20_pts *= s
+    if hug_ma20_min_slope is not None:
+        hug_ma20_min_slope = float(hug_ma20_min_slope) * s
     hug_ma20_max_slope *= s
+    hug_lo = float("-inf") if hug_ma20_min_slope is None else float(hug_ma20_min_slope)
     max_risk *= s
     max_risk_non_qa *= s
     ma200_buffer *= s
@@ -346,6 +353,21 @@ def detect_signals(
 
     def bump(key: str) -> None:
         fun[key] = fun.get(key, 0) + 1
+
+    def mark(j: int, reason: str, **extra: Any) -> None:
+        if trace is None:
+            return
+        row = {
+            "idx": int(j),
+            "break_idx": int(break_idx),
+            "reason": reason,
+            "close": float(close[j]),
+            "ma20": float(ma20[j]),
+            "ma30": float(ma30[j]),
+            "above_ma30": bool(close[j] > ma30[j]),
+        }
+        row.update(extra)
+        trace.append(row)
 
     while i < n - 1:
         if np.isnan(two_hr_low[i]) or np.isnan(ma30[i]):
@@ -379,22 +401,29 @@ def detect_signals(
         for j in range(break_idx + 1, min(break_idx + reclaim_window + 1, n)):
             if np.isnan(ma30[j]):
                 continue
-            reclaimed = close[j] > ma20[j] and close[j] > ma30[j]
-            bull_stack = ma5[j] > ma10[j] > ma20[j]
+            reclaimed = close[j] > ma20[j] and (not require_ma30 or close[j] > ma30[j])
+            bull_stack = (not require_stack) or (ma5[j] > ma10[j] > ma20[j])
             if not (reclaimed and bull_stack):
                 continue
             bump("reclaim_stack")
             vol_avg = np.mean(volume[max(0, j - vol_lookback) : j]) or 1.0
             if volume[j] / vol_avg > max_entry_vol:
                 bump("skip_vol")
+                mark(j, "skip_vol")
                 continue
             if j >= ma20_slope_bars and (ma20[j] - ma20[j - ma20_slope_bars]) < min_ma20_slope:
                 bump("skip_ma20_slope")
+                mark(j, "skip_ma20_slope")
                 continue
             # ⑯ 收盤貼著 1m MA20，且 MA20 仍下彎/走平 → 放棄這波破底
             ma20_s5 = float(ma20[j] - ma20[j - ma20_slope_bars]) if j >= ma20_slope_bars else 0.0
-            if hug_ma20_pts > 0 and (close[j] - ma20[j]) < hug_ma20_pts and ma20_s5 <= hug_ma20_max_slope:
+            if (
+                hug_ma20_pts > 0
+                and (close[j] - ma20[j]) < hug_ma20_pts
+                and hug_lo <= ma20_s5 <= hug_ma20_max_slope
+            ):
                 bump("skip_hug_ma20")
+                mark(j, "skip_hug_ma20")
                 abandon_break = True
                 last_entry = j
                 break
@@ -402,23 +431,28 @@ def detect_signals(
                 h = df.index[j].hour
                 if skip_hour_start <= h < skip_hour_end:
                     bump("skip_open_hour")
+                    mark(j, "skip_open_hour")
                     continue
             if j - last_entry < min_entry_gap:
                 bump("skip_entry_gap")
+                mark(j, "skip_entry_gap")
                 break
             entry = float(close[j])
             stop = break_low - stop_buffer
             risk = entry - stop
             if risk <= 0:
                 bump("skip_bad_risk")
+                mark(j, "skip_bad_risk")
                 break
             if max_risk > 0 and risk > max_risk:
                 bump("skip_max_risk")
+                mark(j, "skip_max_risk", risk=risk)
                 continue
             if not np.isnan(ma200[j]):
                 dist_ma200 = entry - float(ma200[j])
                 if dist_ma200 <= 0 and dist_ma200 > -ma200_buffer:
                     bump("skip_ma200_hug")
+                    mark(j, "skip_ma200_hug")
                     continue
             slope5 = 0.0
             if j >= ma60_slope_bars and not np.isnan(ma60[j]) and not np.isnan(ma60[j - ma60_slope_bars]):
@@ -510,6 +544,7 @@ def detect_signals(
                     hard_skip_break = True
                 if skip_ma60:
                     bump("skip_ma60")
+                    mark(j, "skip_ma60")
                     if hard_skip_break:
                         abandon_break = True
                         break
@@ -527,8 +562,10 @@ def detect_signals(
             # ⑮ 寬停損只做 QA
             if max_risk_non_qa > 0 and risk > max_risk_non_qa and q_score < 2:
                 bump("skip_wide_risk")
+                mark(j, "skip_wide_risk", risk=risk)
                 continue
             bump("taken")
+            mark(j, "taken")
             signals.append(
                 Signal(
                     break_idx,
@@ -878,6 +915,80 @@ def draw_trade_png(
     return path
 
 
+def draw_event_png(
+    df: pd.DataFrame,
+    event_idx: int,
+    path: Path,
+    title: str,
+    break_idx: int | None = None,
+) -> Path:
+    """Mark one 1m bar (filtered reclaim) on a short candle window."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+    from matplotlib.patches import Rectangle
+
+    for fp in (
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ):
+        if Path(fp).exists():
+            font_manager.fontManager.addfont(fp)
+            plt.rcParams["font.sans-serif"] = [font_manager.FontProperties(fname=fp).get_name(), "DejaVu Sans"]
+            plt.rcParams["axes.unicode_minus"] = False
+            break
+
+    left = break_idx if break_idx is not None else event_idx
+    start = max(0, int(left) - 25)
+    end = min(len(df) - 1, int(event_idx) + 20)
+    window = df.iloc[start : end + 1]
+    xs = range(len(window))
+    o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
+    close_full = df["Close"].astype(float)
+
+    fig, ax = plt.subplots(figsize=(10.4, 4.6), facecolor="#0c1210")
+    ax.set_facecolor("#101814")
+    ax.tick_params(colors="#8aa193", labelsize=8)
+    for sp in ax.spines.values():
+        sp.set_color("#2a3a33")
+
+    for k in range(len(window)):
+        up = float(c.iloc[k]) >= float(o.iloc[k])
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.65)
+        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
+        if y1 == y0:
+            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+
+    for n, col in MA_COLORS.items():
+        ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
+        ax.plot(list(xs), ma, color=col, lw=1.35 if n <= 20 else 1.05, label=f"MA{n}")
+
+    ex = int(event_idx) - start
+    if 0 <= ex < len(window):
+        ax.axvline(ex, color="#f0c14b", ls="--", lw=0.95)
+        ax.scatter([ex], [float(df["Close"].iloc[event_idx])], s=46, color="#f0c14b", marker="o", zorder=6)
+    if break_idx is not None:
+        bx = int(break_idx) - start
+        if 0 <= bx < len(window):
+            ax.scatter([bx], [float(df["Low"].iloc[break_idx])], s=34, color="#f472b6", zorder=5)
+
+    ax.set_title(title, color="#e8f0ea", fontsize=11)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    step = max(1, len(window) // 6)
+    ticks = list(range(0, len(window), step))
+    ax.set_xticks(ticks)
+    ax.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
 def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int, prefix: str = "t") -> str:
     et = df.index[trade.entry_idx]
     return f"{prefix}{trade_no:02d}_{et.strftime('%m%d_%H%M')}_q{trade.quality.lower()}.png"
@@ -889,6 +1000,7 @@ def _render_trade_cards(
     html_path: Path,
     *,
     prefix: str = "t",
+    timeframe: str = "1m",
 ) -> str:
     cards: List[str] = []
     for i, t in enumerate(trades, 1):
@@ -910,6 +1022,9 @@ def _render_trade_cards(
             f"<img src='img/{escape(img_name)}' alt='#{i} Q{escape(t.quality)}' "
             "style='width:100%;display:block;border-radius:10px'/>"
         )
+        extra_tag = ""
+        if 9 <= et.hour < 10:
+            extra_tag = "<span class='tag tag-tp'>09–10 才放進來</span>"
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -919,8 +1034,9 @@ def _render_trade_cards(
             "</header>"
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            f"<span class='tag tag-info'>1m</span>"
+            f"<span class='tag tag-info'>{escape(timeframe)}</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
+            f"{extra_tag}"
             "</div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}\n"
@@ -936,6 +1052,19 @@ def _render_trade_cards(
     return "".join(cards)
 
 
+def write_view_html(
+    src: Path,
+    branch: str = "cursor/nq-30d-ablation-2484",
+    dest_name: str = "view.html",
+) -> Path:
+    rel = src.parent.relative_to(REPO_ROOT).as_posix()
+    base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
+    text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    out = src.with_name(dest_name)
+    out.write_text(text, encoding="utf-8")
+    return out
+
+
 def write_html_report(
     path: str | Path,
     df: pd.DataFrame,
@@ -945,6 +1074,9 @@ def write_html_report(
     funnel: Optional[Dict[str, int]] = None,
     extra_trades: Optional[List[TradeResult]] = None,
     extra_title: str = "",
+    note: str = "",
+    timeframe: str = "1m",
+    prefix: str = "t",
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -953,7 +1085,7 @@ def write_html_report(
         q_bits.append(f"Q{q} {info['n']}筆 {info['pnl']:+.1f}")
     q_line = " · ".join(q_bits) if q_bits else "無品質分組"
     out = Path(path)
-    cards = _render_trade_cards(df, trades, out, prefix="t")
+    cards = _render_trade_cards(df, trades, out, prefix=prefix, timeframe=timeframe)
     extra_html = ""
     if extra_trades:
         extra_stats = summarize_trades(extra_trades)
@@ -1019,6 +1151,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底翻 MA Reclaim</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
+{f'<p class="muted">{escape(note)}</p>' if note else ''}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1240,12 +1373,21 @@ def scan_once(
 
 
 CORE_DETECT = dict(hug_ma20_pts=0.0, use_ma60_skip=False, max_risk_non_qa=0.0)
+STRICT_DETECT = dict(skip_hour_start=9, skip_hour_end=10, max_risk=100.0)
 
 
 def detect_kwargs(args) -> dict:
+    kw: Dict[str, Any] = {}
+    if getattr(args, "strict", False):
+        kw.update(STRICT_DETECT)
     if getattr(args, "loose", False):
-        return dict(CORE_DETECT)
-    return {}
+        kw.update(CORE_DETECT)
+    if getattr(args, "allow_open_hour", False):
+        kw["skip_hour_start"] = None
+        kw["skip_hour_end"] = None
+    if getattr(args, "reclaim_ma20_only", False):
+        kw["require_ma30"] = False
+    return kw
 
 
 def cmd_backtest(args) -> int:
@@ -1279,37 +1421,57 @@ def cmd_backtest(args) -> int:
 
     extra_trades: List[TradeResult] = []
     extra_funnel: Dict[str, int] = {}
-    if getattr(args, "pages", False) and not getattr(args, "loose", False):
-        core_sigs = detect_signals(df, funnel=extra_funnel, **CORE_DETECT)
-        extra_trades = simulate(df, core_sigs)
-        extra_stats = summarize_trades(extra_trades)
-        print(
-            f"core  trades={extra_stats['count']} WR={extra_stats['win_rate']:.1f}% "
-            f"pnl={extra_stats['total_points']:+.1f}  "
-            f"(no hug / no MA60 specials / no wide-risk QA gate)"
-        )
-        for i, t in enumerate(extra_trades, 1):
-            print(
-                f"  [core {i}] Q{t.quality} {df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
-                f"-> {df.index[t.exit_idx].strftime('%m-%d %H:%M')} "
-                f"{t.exit_reason} {t.pnl_points:+.1f}"
-            )
+    allow_open = bool(getattr(args, "allow_open_hour", False))
+    ma20_only = bool(getattr(args, "reclaim_ma20_only", False))
+    # 預設頁只出這組進場圖，不再附核心 30 筆對照
 
     html_path = args.html
     if getattr(args, "pages", False):
-        html_path = html_path or str(PAGES_HTML)
+        if allow_open:
+            html_path = html_path or str(REPO_ROOT / "docs" / "nq-ma-reclaim-0910" / "index.html")
+        elif ma20_only:
+            html_path = html_path or str(REPO_ROOT / "docs" / "nq-ma-reclaim-ma20" / "index.html")
+        else:
+            html_path = html_path or str(PAGES_HTML)
+    period_label = args.period
+    note = ""
+    if getattr(args, "strict", False):
+        period_label = f"{args.period} · 最嚴（09–10 不進、風險 100）"
+        note = "最嚴版：美東 09–10 不進，風險 >100 全擋。hug / MA60 / 斜率仍在。"
+    elif not getattr(args, "loose", False) and not allow_open and not ma20_only:
+        note = (
+            "比最嚴版放寬兩道：允許美東 09–10，風險上限 100→130。"
+            "hug、MA60 特例、MA20 斜率 −5 仍在。"
+        )
+    if allow_open:
+        period_label = f"{args.period} · 允許美東 09–10 進場"
+        note = (
+            "預設美東 09:00–10:00 不進。這頁只關掉那一道，hug / MA60 / 風險上限仍在。"
+            "多出來、標了「09–10 才放進來」的就是被這道檔掉的單。"
+        )
+    elif ma20_only:
+        period_label = f"{args.period} · 只要收復 MA20"
+        note = (
+            "收復條件改成收盤站上 MA20 即可，不再要求同時站上 MA30。"
+            "MA5>MA10>MA20、hug、09–10、風險上限都還在。"
+            "這個月通過的單與嚴格模式相同（8 筆 +614）。"
+        )
     if html_path:
         out = write_html_report(
             html_path,
             df,
             trades,
             args.symbol,
-            args.period,
+            period_label,
             funnel=funnel,
             extra_trades=extra_trades,
             extra_title="核心（關掉 hug / MA60 特例 / 寬停損 QA 門檻）",
+            note=note,
         )
         print(f"html={out}")
+        if getattr(args, "pages", False) or allow_open or ma20_only:
+            view = write_view_html(out)
+            print(f"view={view}")
     return 0
 
 
@@ -1364,6 +1526,17 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--html", default="")
     b.add_argument("--pages", action="store_true", help="寫到 docs/nq-ma-reclaim/index.html")
     b.add_argument("--loose", action="store_true", help="關掉 hug / MA60 特例 / 寬停損 QA，只留核心破底翻")
+    b.add_argument("--strict", action="store_true", help="最嚴：09–10 不進、風險上限 100")
+    b.add_argument(
+        "--allow-open-hour",
+        action="store_true",
+        help="允許美東 09–10 進場（現已是預設）",
+    )
+    b.add_argument(
+        "--reclaim-ma20-only",
+        action="store_true",
+        help="收復只要求站上 MA20，不要求同時站上 MA30",
+    )
     b.set_defaults(func=cmd_backtest)
 
     a = sub.add_parser("alert", help="Telegram 輪詢")
@@ -1383,6 +1556,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true", help="寫到 docs/nq-ma-reclaim/index.html")
     p.add_argument("--loose", action="store_true", help="關掉 hug / MA60 特例 / 寬停損 QA，只留核心破底翻")
+    p.add_argument("--strict", action="store_true", help="最嚴：09–10 不進、風險上限 100")
+    p.add_argument(
+        "--allow-open-hour",
+        action="store_true",
+        help="允許美東 09–10 進場（現已是預設）",
+    )
+    p.add_argument(
+        "--reclaim-ma20-only",
+        action="store_true",
+        help="收復只要求站上 MA20，不要求同時站上 MA30",
+    )
     return p
 
 
