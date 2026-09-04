@@ -11,8 +11,8 @@
 
 用法:
   python3 examples/nq_v_turn.py
+  python3 examples/nq_v_turn.py backtest --period 7d --pages
   python3 examples/nq_v_turn.py backtest --period 30d --pages
-  python3 examples/nq_v_turn.py backtest --period 5d
   python3 examples/test_nq_v_turn.py
 """
 
@@ -863,7 +863,14 @@ def cmd_backtest(args) -> int:
     _print_trades(df, trades)
 
     if stats["count"] == 0:
-        verdict = "這段樣本沒抓到 V 轉。多數急跌要嘛底部盤成 U，要嘛回補太慢。"
+        rec = funnel.get("recover", 0)
+        risk = funnel.get("skip_max_risk", 0)
+        if rec and risk >= rec / 2:
+            verdict = (
+                "這段樣本有回到頸線的急跌，但右腿回撤太深，停損距離超過上限，沒進場。"
+            )
+        else:
+            verdict = "這段樣本沒抓到 V 轉。多數急跌要嘛底部盤成 U，要嘛回補太慢。"
     elif stats["total_points"] > 50 and stats["win_rate"] >= 45:
         verdict = "有料：頸線兩邊對稱的 V 比接刀清楚。假 V（回到頸線後再破底）仍會一次吐回去。"
     elif abs(stats["total_points"]) <= 50:

@@ -29,16 +29,15 @@
 停損右腿回撤低，目標頸線再延伸 0.7× dump。含盤外；09:00–10:00 不進。
 
 ```bash
+python3 examples/nq_v_turn.py backtest --period 7d --pages
 python3 examples/nq_v_turn.py backtest --period 30d --pages
-python3 examples/nq_v_turn.py backtest --period 5d
 python3 examples/test_nq_v_turn.py
 ```
 
 TradingView：`pinescript/nq_v_turn_5m.pine` 貼到 NQ1! / MNQ1! 五分圖。
 
-近一個月 Yahoo 五分（2026-07-26 → 08-28）：**8 筆、勝率 75%、+436.0 點**（均筆 +54.5）。  
-時間窗放到 0.50~1.60 後曾混進 07-28：dump 中間一根 +77 點大陽（W 不是 V），09:05 進場後被 09:30 開盤瀑布洗掉 −76.8，已濾掉。  
-08-27 仍是 02:10 V底 → 04:00 進場、目標 **+86.5**（0.95×）。
+近一週 Yahoo 五分（2026-08-28 → 09-04）：**0 筆**。急跌 53 → 回補頸線 8，全是 09-01 同一段（09:40 V底 → 10:45 回到頸線 0.52×），停損距離 143~170 點超過上限 120。  
+近一個月（2026-07-26 → 08-28）：**8 筆、勝率 75%、+436.0 點**（均筆 +54.5）。08-27 仍是 02:10 V底 → 04:00 進場、目標 **+86.5**（0.95×）。
 
 預覽（圖嵌在 HTML 裡，htmlpreview 才不會掛）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-v-turn-4941/docs/nq-v-turn/view.html
 
