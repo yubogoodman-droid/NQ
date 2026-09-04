@@ -45,6 +45,20 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## NQ 一分 K 線性空
+
+1 分鐘圖：多頭排列（MA5>10>20>30>60>120>200）創四小時高（240 根）→ 回測 MA10 不過高 → 收盤跌破 MA20，且峰距 MA200 ≥ 100 點，做空。  
+停損在四小時高；停利碰到 MA200，或靠近 MA200（15 點內）出現長下影。
+
+```bash
+# 近一週 Yahoo 1m 回測 + 手機版 HTML（每筆一張圖）
+python3 examples/nq_linear_short.py --period 7d --pages
+```
+
+TradingView：`pinescript/nq_linear_short_1m.pine` 貼到 NQ1! / MNQ1! 一分圖。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/linear-short-1w-84e8/docs/nq-linear-short/view.html
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash
@@ -125,7 +139,8 @@ python3 examples/chart_today.py
 
 ## TradingView
 
-`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
+`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
+`pinescript/nq_linear_short_1m.pine` 是一分圖線性空。
 
 ## 參數調整
 
