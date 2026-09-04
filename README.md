@@ -29,9 +29,11 @@
 收盤剛站上 MA30、這根低點還在線下的不進（06-23 那種貼著壓力）。
 
 近一個月 Yahoo 5m（07-23 → 08-26）：嚴格 **4 筆、勝率 100%、+327**（含 07-28 V 和 08-25 U；07-22 夜盤在 30 天窗外）。  
-近兩個月（06-16 → 08-26）：嚴格 **9 筆、勝率 77.8%、+747**。濾掉 06-23 / 06-28 / 07-17 / 07-30 四筆貼 MA30 的。
+近兩個月（06-16 → 08-26）：嚴格 **9 筆、勝率 77.8%、+747**。濾掉 06-23 / 06-28 / 07-17 / 07-30 四筆貼 MA30 的。  
+近一週（08-28 → 09-04）：嚴格 **0 筆**。放寬版 2 筆、勝率 0%、−76。09-03 07:20 有一筆散開但貼 MA30，濾掉的話是 −39。
 
 ```bash
+python3 examples/nq_5m_base_stack.py backtest --period 7d --pages
 python3 examples/nq_5m_base_stack.py backtest --period 30d --pages
 python3 examples/nq_5m_base_stack.py backtest --period 60d --pages
 python3 examples/nq_5m_base_stack.py backtest --period 30d --pages --loose
@@ -39,7 +41,9 @@ python3 examples/nq_5m_base_stack.py alert --test
 python3 examples/nq_5m_base_stack.py alert --dry-run --once
 ```
 
-預覽（兩個月 9 筆，濾掉貼 MA30，新網址）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/no-ma30.html
+預覽（近一週）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/one-week.html
+
+預覽（兩個月 9 筆，濾掉貼 MA30）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/no-ma30.html
 
 TradingView：`pinescript/nq_5m_base_stack.pine`
 

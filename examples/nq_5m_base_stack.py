@@ -755,10 +755,6 @@ def write_html_report(
         q_bits.append(f"Q{q} {info['n']}筆 {info['pnl']:+.1f}")
     q_line = " · ".join(q_bits) if q_bits else "無品質分組"
     out = Path(path)
-    img_dir = out.parent / "img"
-    if img_dir.exists():
-        for old in img_dir.glob("*.png"):
-            old.unlink()
     cards = _render_trade_cards(df, trades, out)
     extra_html = ""
     if extra_trades is not None:
@@ -852,15 +848,17 @@ h1{{font-size:18px;margin:0 0 6px}}
     return out
 
 
-def write_view_html(src: Path, branch: str = VIEW_BRANCH, extra_name: str = "") -> Path:
+def write_view_html(
+    src: Path, branch: str = VIEW_BRANCH, extra_name: str = "", dest_name: str = "view.html"
+) -> Path:
     rel = src.parent.relative_to(REPO_ROOT).as_posix()
     stamp = datetime.now(ET).strftime("%Y%m%d%H%M%S")
     base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
     text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
     text = text.replace(".png'", f".png?v={stamp}'")
-    out = src.with_name("view.html")
+    out = src.with_name(dest_name)
     out.write_text(text, encoding="utf-8")
-    if extra_name:
+    if extra_name and extra_name != dest_name:
         extra = src.with_name(extra_name)
         extra.write_text(text, encoding="utf-8")
     return out
@@ -1140,13 +1138,26 @@ def cmd_backtest(args) -> int:
                 f"pnl={extra_stats['total_points']:+.1f}"
             )
             _print_trades(df, extra_trades, "QA")
+        elif str(getattr(args, "period", "")).startswith("7"):
+            extra_trades = simulate(df, detect_signals(df, **LOOSE_DETECT))
+            extra_stats = summarize_trades(extra_trades)
+            extra_title = "放寬版（這週）"
+            extra_blurb = "跌夠 + 打底後翻 5/10/20 就算，不是截圖那種散開 U。嚴格這週 0 筆。"
+            print(
+                f"loose  trades={extra_stats['count']} WR={extra_stats['win_rate']:.1f}% "
+                f"pnl={extra_stats['total_points']:+.1f}"
+            )
+            _print_trades(df, extra_trades, "loose")
 
     verdict = _verdict(stats, loose=loose)
     print(f"verdict: {verdict}")
 
     html_path = args.html
     if getattr(args, "pages", False):
-        html_path = html_path or str(PAGES_HTML)
+        if str(getattr(args, "period", "")).startswith("7"):
+            html_path = html_path or str(PAGES_HTML.with_name("one-week.html"))
+        else:
+            html_path = html_path or str(PAGES_HTML)
     if html_path:
         out = write_html_report(
             html_path,
@@ -1163,11 +1174,17 @@ def cmd_backtest(args) -> int:
         )
         print(f"html={out}")
         if getattr(args, "pages", False):
-            extra = "no-ma30.html" if str(getattr(args, "period", "")).startswith("60") else ""
-            view = write_view_html(out, extra_name=extra)
-            print(f"view={view}")
-            if extra:
-                print(f"preview={out.with_name(extra)}")
+            period = str(getattr(args, "period", ""))
+            if period.startswith("60"):
+                view = write_view_html(out, extra_name="no-ma30.html")
+                print(f"view={view}")
+                print(f"preview={out.with_name('no-ma30.html')}")
+            elif period.startswith("7"):
+                view = write_view_html(out, dest_name="one-week.html")
+                print(f"preview={view}")
+            else:
+                view = write_view_html(out)
+                print(f"view={view}")
     return 0
 
 
