@@ -486,13 +486,21 @@ def overlay_5m_ribbon(df_1m: pd.DataFrame) -> np.ndarray:
     return spread
 
 
-def resample_5m(df: pd.DataFrame) -> pd.DataFrame:
-    """1m → 5m OHLC（右標、右閉，不偷看未收的 5 分 K）。"""
+def resample_htf(df: pd.DataFrame, minutes: int) -> pd.DataFrame:
+    """1m → N 分 OHLC（右標、右閉，不偷看未收的那根）。"""
     agg = {"Open": "first", "High": "max", "Low": "min", "Close": "last"}
     if "Volume" in df.columns:
         agg["Volume"] = "sum"
-    out = df.resample("5min", label="right", closed="right").agg(agg)
+    out = df.resample(f"{int(minutes)}min", label="right", closed="right").agg(agg)
     return out.dropna(subset=["Open", "High", "Low", "Close"])
+
+
+def resample_5m(df: pd.DataFrame) -> pd.DataFrame:
+    return resample_htf(df, 5)
+
+
+def resample_15m(df: pd.DataFrame) -> pd.DataFrame:
+    return resample_htf(df, 15)
 
 
 def bar_index_at(df: pd.DataFrame, ts) -> Optional[int]:
@@ -630,26 +638,30 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     return path
 
 
-def draw_5m_png(
+def draw_htf_png(
     df_1m: pd.DataFrame,
-    df_5m: pd.DataFrame,
+    df_htf: pd.DataFrame,
     trade: TradeResult,
     path: Path,
     trade_no: int,
+    *,
+    label: str,
+    lookback: int,
+    lookforward: int,
 ) -> Optional[Path]:
-    if df_5m.empty:
+    if df_htf.empty:
         return None
     plt = _setup_mpl()
-    br = bar_index_at(df_5m, df_1m.index[trade.signal.break_idx])
-    en = bar_index_at(df_5m, df_1m.index[trade.entry_idx])
-    ex = bar_index_at(df_5m, df_1m.index[trade.exit_idx])
+    br = bar_index_at(df_htf, df_1m.index[trade.signal.break_idx])
+    en = bar_index_at(df_htf, df_1m.index[trade.entry_idx])
+    ex = bar_index_at(df_htf, df_1m.index[trade.exit_idx])
     if en is None:
         return None
-    start = max(0, (br if br is not None else en) - 48)
-    end = min(len(df_5m) - 1, (ex if ex is not None else en) + 8)
+    start = max(0, (br if br is not None else en) - lookback)
+    end = min(len(df_htf) - 1, (ex if ex is not None else en) + lookforward)
     if end <= start:
         return None
-    window = df_5m.iloc[start : end + 1]
+    window = df_htf.iloc[start : end + 1]
     et = df_1m.index[trade.entry_idx]
     xt = df_1m.index[trade.exit_idx]
     sign = "+" if trade.pnl_points >= 0 else ""
@@ -657,7 +669,7 @@ def draw_5m_png(
     _paint_ohlc(
         ax,
         window,
-        df_5m["Close"].astype(float),
+        df_htf["Close"].astype(float),
         start,
         end,
         trade,
@@ -666,7 +678,7 @@ def draw_5m_png(
             "entry": en - start,
             "exit": None if ex is None else ex - start,
         },
-        f"#{trade_no}  5m 對照  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"#{trade_no}  {label}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
     )
     fig.tight_layout(pad=0.45)
@@ -674,6 +686,26 @@ def draw_5m_png(
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
     plt.close(fig)
     return path
+
+
+def draw_5m_png(
+    df_1m: pd.DataFrame,
+    df_5m: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+) -> Optional[Path]:
+    return draw_htf_png(df_1m, df_5m, trade, path, trade_no, label="5m 對照", lookback=48, lookforward=8)
+
+
+def draw_15m_png(
+    df_1m: pd.DataFrame,
+    df_15m: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+) -> Optional[Path]:
+    return draw_htf_png(df_1m, df_15m, trade, path, trade_no, label="15m 對照", lookback=32, lookforward=6)
 
 
 def write_html_report(
@@ -688,6 +720,7 @@ def write_html_report(
     pnls = [t.pnl_points for t in trades]
     out = Path(path)
     df5 = resample_5m(df)
+    df15 = resample_15m(df)
     cards: List[str] = []
     for i, t in enumerate(trades, 1):
         et = df.index[t.entry_idx]
@@ -696,8 +729,10 @@ def write_html_report(
         reason_cls = "tag-tp" if t.exit_reason == "target" else ("tag-sl" if t.exit_reason == "stop" else "tag-time")
         img_name = f"t{i:02d}_{et.strftime('%m%d_%H%M')}.png"
         img5_name = f"t{i:02d}_{et.strftime('%m%d_%H%M')}_5m.png"
+        img15_name = f"t{i:02d}_{et.strftime('%m%d_%H%M')}_15m.png"
         draw_trade_png(df, t, out.parent / "img" / img_name, i)
         png5 = draw_5m_png(df, df5, t, out.parent / "img" / img5_name, i)
+        png15 = draw_15m_png(df, df15, t, out.parent / "img" / img15_name, i)
         charts = (
             f"<div class='mini-chart'><div class='chart-label'>1m</div>"
             f"<img src='img/{escape(img_name)}' alt='#{i} 1m' "
@@ -707,6 +742,12 @@ def write_html_report(
             charts += (
                 f"<div class='mini-chart'><div class='chart-label'>5m 對照</div>"
                 f"<img src='img/{escape(img5_name)}' alt='#{i} 5m' "
+                "style='width:100%;display:block;border-radius:10px'/></div>"
+            )
+        if png15 is not None:
+            charts += (
+                f"<div class='mini-chart'><div class='chart-label'>15m 對照</div>"
+                f"<img src='img/{escape(img15_name)}' alt='#{i} 15m' "
                 "style='width:100%;display:block;border-radius:10px'/></div>"
             )
         risk = t.entry_price - t.stop_price
@@ -721,6 +762,7 @@ def write_html_report(
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
             "<span class='tag tag-info'>1m</span>"
             "<span class='tag tag-info'>5m 對照</span>"
+            "<span class='tag tag-info'>15m 對照</span>"
             f"<span class='tag tag-info'>距MA200 {t.signal.dist_ma200:.1f}</span>"
             f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
@@ -789,7 +831,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 五分圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 5m / 15m 圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

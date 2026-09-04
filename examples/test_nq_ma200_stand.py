@@ -19,6 +19,7 @@ from nq_ma200_stand import (  # noqa: E402
     is_red_long_upper,
     parse_period_days,
     resample_5m,
+    resample_15m,
     ribbon_spread,
     ribbon_tangled,
     simulate,
@@ -196,26 +197,31 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     if trades:
         assert "<img src='img/" in text
         assert "5m 對照" in text
+        assert "15m 對照" in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
+        assert any((path.parent / "img").glob("t01_*_15m.png"))
 
 
 def test_resample_5m() -> None:
-    idx = pd.date_range("2026-08-17 11:00", periods=10, freq="1min", tz=ET)
-    close = np.arange(10, dtype=float) + 100.0
+    idx = pd.date_range("2026-08-17 11:00", periods=30, freq="1min", tz=ET)
+    close = np.arange(30, dtype=float) + 100.0
     df = pd.DataFrame(
         {
             "Open": close,
             "High": close + 1,
             "Low": close - 1,
             "Close": close,
-            "Volume": np.ones(10),
+            "Volume": np.ones(30),
         },
         index=idx,
     )
     m5 = resample_5m(df)
+    m15 = resample_15m(df)
     assert len(m5) >= 1
+    assert len(m15) >= 1
     assert {"Open", "High", "Low", "Close"}.issubset(m5.columns)
+    assert {"Open", "High", "Low", "Close"}.issubset(m15.columns)
 
 
 def test_ribbon_helpers() -> None:
