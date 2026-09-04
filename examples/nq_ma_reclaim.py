@@ -188,6 +188,8 @@ class Signal:
     m1_ma5_slope5: float = 0.0
     m1_ma60_slope5: float = 0.0
     m5_ma60_slope5: float = 0.0
+    setup_idx: int = 0
+    limit_price: float = 0.0
 
 
 @dataclass
@@ -848,6 +850,16 @@ def draw_trade_png(
         ax.scatter([bx], [sig.break_low], s=38, color="#f472b6", zorder=5)
         ax.annotate("破底", (bx, sig.break_low), textcoords="offset points", xytext=(0, -12),
                     ha="center", color="#f9a8d4", fontsize=8)
+    setup_idx = int(getattr(sig, "setup_idx", 0) or 0)
+    sx = setup_idx - start
+    if setup_idx and 0 <= sx < len(window):
+        setup_px = float(getattr(sig, "ma60", 0.0) or 0.0) or float(c.iloc[sx])
+        ax.scatter([sx], [setup_px], s=36, color="#42a5f5", marker="D", zorder=5)
+        ax.annotate("破MA60", (sx, setup_px), textcoords="offset points", xytext=(0, 10),
+                    ha="center", color="#90caf9", fontsize=8)
+    limit_px = float(getattr(sig, "limit_price", 0.0) or 0.0)
+    if limit_px:
+        ax.axhline(limit_px, color="#42a5f5", ls="-.", lw=0.9, alpha=0.7)
     if 0 <= ex < len(window):
         ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([ex], [trade.entry_price], s=42, color="#00e676", marker="^", zorder=6)
@@ -929,7 +941,12 @@ def _render_trade_cards(
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {t.signal.break_low:.2f} / 2h低 {t.signal.two_hr_low:.2f}\n"
             f"MA5 {t.signal.ma5:.1f} / MA20 {t.signal.ma20:.1f} / MA60 {t.signal.ma60:.1f} / MA200 {t.signal.ma200:.1f}"
-            "</pre>"
+            + (
+                f"\n掛單 MA60 {t.signal.limit_price:.2f}"
+                if getattr(t.signal, "limit_price", 0)
+                else ""
+            )
+            + "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
             "</article>"
         )
@@ -945,6 +962,8 @@ def write_html_report(
     funnel: Optional[Dict[str, int]] = None,
     extra_trades: Optional[List[TradeResult]] = None,
     extra_title: str = "",
+    title: str = "破底翻 MA Reclaim",
+    rules: str = "",
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -970,14 +989,30 @@ def write_html_report(
         )
     funnel_line = ""
     if funnel:
+        mid_key = "setup" if "setup" in funnel else "reclaim_stack"
+        mid_label = "5/20+破MA60" if mid_key == "setup" else "收復+排列"
+        extra_bits = []
+        if mid_key == "setup":
+            extra_bits.append(f"逾時 {funnel.get('expired', 0)}")
+            extra_bits.append(f"掛單中 {funnel.get('pending', 0)}")
+        else:
+            extra_bits.extend(
+                [
+                    f"hug {funnel.get('skip_hug_ma20', 0)}",
+                    f"MA60 {funnel.get('skip_ma60', 0)}",
+                    f"9點檔 {funnel.get('skip_open_hour', 0)}",
+                    f"量能 {funnel.get('skip_vol', 0)}",
+                    f"風險 {funnel.get('skip_max_risk', 0)}",
+                    f"寬停損 {funnel.get('skip_wide_risk', 0)}",
+                ]
+            )
+        extra = " · ".join(extra_bits)
         funnel_line = (
             f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → "
             f"深度夠 {funnel.get('deep_break', 0)} → "
-            f"收復+排列 {funnel.get('reclaim_stack', 0)} → "
+            f"{mid_label} {funnel.get(mid_key, 0)} → "
             f"進場 {funnel.get('taken', 0)}"
-            f"（hug {funnel.get('skip_hug_ma20', 0)} · MA60 {funnel.get('skip_ma60', 0)} · "
-            f"9點檔 {funnel.get('skip_open_hour', 0)} · 量能 {funnel.get('skip_vol', 0)} · "
-            f"風險 {funnel.get('skip_max_risk', 0)} · 寬停損 {funnel.get('skip_wide_risk', 0)}）</p>"
+            f"（{extra}）</p>"
         )
 
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -987,7 +1022,7 @@ def write_html_report(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>{escape(symbol)} 破底翻 MA Reclaim</title>
+<title>{escape(symbol)} {escape(title)}</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -1017,8 +1052,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{escape(symbol)} 破底翻 MA Reclaim</h1>
+<h1>{escape(symbol)} {escape(title)}</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
+{f'<p class="muted">{escape(rules)}</p>' if rules else ''}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
