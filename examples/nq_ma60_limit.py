@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""NQ 一分 K：破 2h 低後，半小時內 5/20 多頭排列突破 MA60，掛單 MA60 五分鐘做多。
+"""NQ 一分 K：破 2h 低後，半小時內 5/20 多頭排列突破 MA60，回踩 MA60 做多。
 
 規則:
   1. 跌破近兩小時低點
   2. 之後 30 根 1m 內：MA5 > MA20，且收盤突破 1m MA60
-  3. 在突破當下的 MA60 掛限價買單，只掛 5 分鐘
-  4. 5 分鐘內回踩成交才進場；逾時取消
+  3. 突破後前 5 根回踩不算；第 6 根起才掛 MA60 限價，再留 5 分鐘
+  4. 逾時取消
   5. 停損在破底低點；目標 2R
 
 用法:
@@ -56,7 +56,10 @@ REPO_ROOT = ROOT.parent
 PAGES_HTML = REPO_ROOT / "docs" / "nq-ma60-limit" / "index.html"
 VIEW_BRANCH = "cursor/nq-ma60-limit-63a8"
 STATE_PATH = ROOT / "tg_ma60_limit_state.json"
-RULES = "破 2h 低後 30 分鐘內：MA5>MA20 且 1m 收盤突破 MA60，再把限價單掛在 MA60，只留 5 分鐘；逾時不進。停損在破底低點，不用 MA60 上移停損。進場時 MA5/10/20/30 糾結（帶寬<12點）不掛。"
+RULES = "破 2h 低後 30 分鐘內：MA5>MA20 且 1m 收盤突破 MA60。突破後前 5 根回踩不算，第 6 根起才掛 MA60，再留 5 分鐘。停損在破底低點。短均糾結（帶寬<12點）不掛。"
+
+LIMIT_DELAY = 5
+LIMIT_BARS = 5
 
 TANGLE_PTS = 12.0
 
@@ -96,7 +99,8 @@ class PendingOrder:
 def detect_signals(
     df: pd.DataFrame,
     setup_window: int = 30,
-    limit_bars: int = 5,
+    limit_delay_bars: int = LIMIT_DELAY,
+    limit_bars: int = LIMIT_BARS,
     two_hour_bars: int = 120,
     target_r: float = 2.0,
     min_break_depth: float = 10.0,
@@ -106,7 +110,7 @@ def detect_signals(
     pending: Optional[List[PendingOrder]] = None,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """破 2h 低 → 半小時內 5/20 多頭 + 收盤破 MA60 → 掛單 MA60 五分鐘。"""
+    """破 2h 低 → 半小時內 5/20 多頭 + 收盤破 MA60 → 等 5 根後回踩 MA60。"""
     close = df["Close"].to_numpy(float)
     open_ = df["Open"].to_numpy(float)
     low = df["Low"].to_numpy(float)
@@ -183,11 +187,14 @@ def detect_signals(
 
             bump("setup")
             limit = float(ma60[j])
-            window_end = j + limit_bars
+            fill_start = j + limit_delay_bars + 1
+            window_end = j + limit_delay_bars + limit_bars
+            if fill_start <= n - 1 and any(float(low[k]) <= limit for k in range(j + 1, min(fill_start, n))):
+                bump("skip_early")
             scan_end = min(window_end, n - 1)
             filled = False
 
-            for k in range(j + 1, scan_end + 1):
+            for k in range(fill_start, scan_end + 1):
                 if float(low[k]) > limit:
                     continue
                 if k - last_entry < min_entry_gap:
@@ -252,7 +259,7 @@ def detect_signals(
                         PendingOrder(
                             break_idx=break_idx,
                             setup_idx=j,
-                            expire_idx=j + limit_bars,
+                            expire_idx=j + limit_delay_bars + limit_bars,
                             limit_price=limit,
                             break_low=break_low,
                             two_hr_low=support,
@@ -282,7 +289,7 @@ def write_view_html(src: Path, branch: str = VIEW_BRANCH) -> Path:
             1,
         )
     text = text.replace("src='img/", f"src='{base}img/")
-    text = text.replace(".png'", ".png?v=circled'")
+    text = text.replace(".png'", ".png?v=retest5'")
     out = src.with_name("view.html")
     out.write_text(text, encoding="utf-8")
     return out
@@ -337,7 +344,7 @@ def fmt_setup(df, pending: PendingOrder) -> str:
         f"📌 <b>掛單 MA60 做多</b>\n"
         f"時間: <code>{ts.strftime('%Y-%m-%d %H:%M')} ET</code>\n"
         f"限價: <code>{pending.limit_price:.2f}</code>\n"
-        f"有效: <b>{left} 分鐘</b>（逾時取消）\n"
+        f"有效: 先等 5 根再掛，之後 <b>{left} 分鐘</b>（逾時取消）\n"
         f"破底: <code>{br.strftime('%H:%M')}</code> low={pending.break_low:.2f}\n"
         f"MA5 {pending.ma5:.1f} &gt; MA20 {pending.ma20:.1f}\n"
         f"現價: <code>{last:.2f}</code>\n"
@@ -390,7 +397,12 @@ def fmt_exit(df, tr: TradeResult) -> str:
     )
 
 
-def _collect_expired(df, setup_window: int = 30, limit_bars: int = 5) -> List[PendingOrder]:
+def _collect_expired(
+    df,
+    setup_window: int = 30,
+    limit_delay_bars: int = LIMIT_DELAY,
+    limit_bars: int = LIMIT_BARS,
+) -> List[PendingOrder]:
     """Replay setups that already expired (for Telegram 取消通知)."""
     close = df["Close"].to_numpy(float)
     low = df["Low"].to_numpy(float)
@@ -420,11 +432,12 @@ def _collect_expired(df, setup_window: int = 30, limit_bars: int = 5) -> List[Pe
                 continue
             if is_tangled(float(ma5[j]), float(ma10[j]), float(ma20[j]), float(ma30[j])):
                 continue
-            window_end = j + limit_bars
+            fill_start = j + limit_delay_bars + 1
+            window_end = j + limit_delay_bars + limit_bars
             if window_end > n - 1:
                 break
             limit = float(ma60[j])
-            touched = any(float(low[k]) <= limit for k in range(j + 1, window_end + 1))
+            touched = any(float(low[k]) <= limit for k in range(fill_start, window_end + 1))
             if not touched:
                 out.append(
                     PendingOrder(
@@ -592,7 +605,7 @@ def cmd_backtest(args) -> int:
             f"break={funnel.get('break', 0)} deep={funnel.get('deep_break', 0)} "
             f"setup={funnel.get('setup', 0)} taken={funnel.get('taken', 0)} "
             f"expired={funnel.get('expired', 0)} pending={funnel.get('pending', 0)} "
-            f"tangle={funnel.get('skip_tangle', 0)}"
+            f"tangle={funnel.get('skip_tangle', 0)} early={funnel.get('skip_early', 0)}"
         )
     for q, info in stats.get("by_quality", {}).items():
         print(f"  Q{q}: n={info['n']} wins={info['wins']} pnl={info['pnl']:+.1f}")

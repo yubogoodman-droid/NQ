@@ -127,7 +127,7 @@ def _make_fill_bars(n: int = 320) -> pd.DataFrame:
     setup = _first_setup(close, break_i)
     assert setup is not None, "synthetic bounce must break MA60 with MA5>MA20"
     ma60 = sma(close, 60)
-    fill_i = setup + 2
+    fill_i = setup + 7
     limit = float(ma60[setup])
     for i in range(setup + 1, fill_i):
         close[i] = limit + 12.0
@@ -184,7 +184,8 @@ def test_fill_within_five_minutes() -> None:
     sig = sigs[0]
     assert sig.setup_idx > sig.break_idx
     assert sig.entry_idx > sig.setup_idx
-    assert sig.entry_idx - sig.setup_idx <= 5
+    assert sig.entry_idx - sig.setup_idx > 5
+    assert sig.entry_idx - sig.setup_idx <= 10
     assert sig.limit_price > 0
     assert abs(sig.entry_price - sig.limit_price) < 2.0 or sig.entry_price <= sig.limit_price
     assert abs(sig.stop_price - sig.break_low) < 1e-9
@@ -195,12 +196,44 @@ def test_fill_within_five_minutes() -> None:
     assert all(t.exit_reason != "ma60_stop" for t in trades)
 
 
+def _make_early_only_bars(n: int = 320) -> pd.DataFrame:
+    """回踩只發生在突破後 2 根 — 五根內，應不算。"""
+    close, high, low, base, break_i = _base_dump(n)
+    _paint_bounce(close, high, low, base, break_i)
+    setup = _first_setup(close, break_i)
+    assert setup is not None
+    ma60 = sma(close, 60)
+    limit = float(ma60[setup])
+    early = setup + 2
+    for i in range(setup + 1, early):
+        close[i] = limit + 10.0
+        high[i] = close[i] + 1.0
+        low[i] = limit + 8.0
+    close[early] = limit + 2.0
+    high[early] = close[early] + 1.0
+    low[early] = limit - 1.0
+    for i in range(early + 1, n):
+        close[i] = limit + 18.0
+        high[i] = close[i] + 1.2
+        low[i] = limit + 14.0
+    return _to_df(close, high, low)
+
+
+def test_early_retest_ignored() -> None:
+    df = _make_early_only_bars()
+    funnel: dict[str, int] = {}
+    sigs = detect_signals(df, funnel=funnel)
+    assert not sigs, f"retest inside 5 bars must not fill, funnel={funnel}"
+    assert funnel.get("skip_early", 0) >= 1
+    assert funnel.get("taken", 0) == 0
+
+
 def test_expire_if_no_retest() -> None:
     df = _make_expire_bars()
     funnel: dict[str, int] = {}
     pending: list[PendingOrder] = []
     sigs = detect_signals(df, funnel=funnel, pending=pending)
-    assert not sigs, f"no pullback within 5m should not fill, funnel={funnel}"
+    assert not sigs, f"no pullback after the 5-bar wait should not fill, funnel={funnel}"
     assert funnel.get("setup", 0) >= 1
     assert funnel.get("expired", 0) >= 1
     assert not pending
@@ -242,7 +275,7 @@ def test_pending_at_end_of_data() -> None:
     df = _make_fill_bars()
     setup_guess = None
     close = df["Close"].to_numpy(float)
-    # cut the series just after the MA60 break so the 5-minute window is still open
+    # cut during the 5-bar wait so the order is still pending
     ma5 = sma(close, 5)
     ma20 = sma(close, 20)
     ma60 = sma(close, 60)
@@ -260,7 +293,7 @@ def test_pending_at_end_of_data() -> None:
     assert not sigs
     assert pending, f"expected a live 掛單, funnel={funnel}"
     assert pending[0].setup_idx == setup_guess
-    assert pending[0].expire_idx == setup_guess + 5
+    assert pending[0].expire_idx == setup_guess + 10
 
 
 def test_write_html_report(tmp_path: Path | None = None) -> None:
@@ -287,6 +320,7 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
 
 def main() -> int:
     test_fill_within_five_minutes()
+    test_early_retest_ignored()
     test_expire_if_no_retest()
     test_late_ma60_break_ignored()
     test_skip_tangled_mas()

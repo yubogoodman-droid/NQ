@@ -1032,6 +1032,7 @@ def write_html_report(
             extra_bits.append(f"逾時 {funnel.get('expired', 0)}")
             extra_bits.append(f"掛單中 {funnel.get('pending', 0)}")
             extra_bits.append(f"糾結 {funnel.get('skip_tangle', 0)}")
+            extra_bits.append(f"五根內 {funnel.get('skip_early', 0)}")
         else:
             extra_bits.extend(
                 [

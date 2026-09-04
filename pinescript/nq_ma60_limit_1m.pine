@@ -1,10 +1,11 @@
 //@version=5
-strategy("NQ 破2h低 掛單MA60五分鐘", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, pyramiding=0)
+strategy("NQ 破2h低 回踩MA60", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, pyramiding=0)
 
 // === 參數 ===
 twoHourBars   = input.int(120, "兩小時視窗（1m）", minval=30)
 setupWindow   = input.int(30, "破底後有效分鐘", minval=5)
-limitBars     = input.int(5, "掛單有效分鐘", minval=1)
+delayBars     = input.int(5, "突破後等待根數（之內不算）", minval=1)
+limitBars     = input.int(5, "等待後掛單分鐘", minval=1)
 minDepth      = input.float(10.0, "最少破底深度（點）", minval=0)
 tanglePts     = input.float(12.0, "短均糾結帶寬（點）", minval=0)
 targetR       = input.float(2.0, "目標 R", minval=0.5, step=0.5)
@@ -22,6 +23,7 @@ var int   setupBar   = na
 var float limitPx    = na
 var float stopPx     = na
 var float targetPx   = na
+var bool  waiting    = false
 var bool  orderLive  = false
 
 brokeNow = not na(twoHrLow) and low < twoHrLow and (twoHrLow - low) >= minDepth
@@ -31,6 +33,7 @@ if brokeNow
     breakLow := low
     setupBar := na
     limitPx  := na
+    waiting := false
     orderLive := false
     strategy.cancel("MA60限價")
 
@@ -39,7 +42,7 @@ bullStack = ma5 > ma20
 crossedMa60 = ta.crossover(close, ma60)
 ribbon = math.max(ma5, math.max(ma10, math.max(ma20, ma30))) - math.min(ma5, math.min(ma10, math.min(ma20, ma30)))
 tangled = ribbon < tanglePts
-setupNow = inWindow and bullStack and crossedMa60 and not tangled and not orderLive and na(setupBar)
+setupNow = inWindow and bullStack and crossedMa60 and not tangled and not waiting and not orderLive and na(setupBar)
 
 if setupNow
     setupBar := bar_index
@@ -47,11 +50,15 @@ if setupNow
     stopPx   := breakLow
     risk     = limitPx - stopPx
     targetPx := risk > 0 ? limitPx + risk * targetR : na
-    if risk > 0
-        strategy.order("MA60限價", strategy.long, limit=limitPx)
-        orderLive := true
+    waiting := risk > 0
 
-if orderLive and not na(setupBar) and bar_index > setupBar + limitBars and strategy.position_size == 0
+// 五根後才掛限價，避免突破當下立刻回踩
+if waiting and not na(setupBar) and bar_index == setupBar + delayBars
+    strategy.order("MA60限價", strategy.long, limit=limitPx)
+    waiting := false
+    orderLive := true
+
+if orderLive and not na(setupBar) and bar_index > setupBar + delayBars + limitBars and strategy.position_size == 0
     strategy.cancel("MA60限價")
     orderLive := false
     setupBar := na
@@ -64,6 +71,7 @@ if strategy.position_size > 0 and orderLive
 if not na(breakBar) and bar_index > breakBar + setupWindow and strategy.position_size == 0
     if orderLive
         strategy.cancel("MA60限價")
+    waiting := false
     orderLive := false
     breakBar := na
     setupBar := na
@@ -74,5 +82,5 @@ plot(ma60, "MA60", color=color.new(color.aqua, 0), linewidth=2)
 plot(twoHrLow, "2h低", color=color.new(color.gray, 30), style=plot.style_linebr)
 
 plotshape(brokeNow, title="破2h低", style=shape.triangledown, location=location.abovebar, color=color.fuchsia, size=size.tiny)
-plotshape(setupNow, title="破MA60掛單", style=shape.diamond, location=location.belowbar, color=color.aqua, size=size.small)
-plot(orderLive and not na(limitPx) ? limitPx : na, "掛單價", color=color.aqua, style=plot.style_circles, linewidth=2)
+plotshape(setupNow, title="破MA60", style=shape.diamond, location=location.belowbar, color=color.aqua, size=size.small)
+plot((waiting or orderLive) and not na(limitPx) ? limitPx : na, "掛單價", color=color.aqua, style=plot.style_circles, linewidth=2)
