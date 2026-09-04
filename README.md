@@ -86,7 +86,7 @@ Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/te
 python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
 ```
 
-（數字以最新 `--pages` 報告為準。）
+近一週（2026-08-29 → 09-05，271 檔）：**126 筆、勝率 47.6%、等權合計 +61.0%、均筆 +0.48%**。ETH 22:45 那筆 23:00 進、+0.80%。2 小時純續走勝率 56%、均 +0.41%。
 
 先看圖：
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-7d/view.html
