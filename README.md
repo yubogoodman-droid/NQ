@@ -44,7 +44,7 @@ python3 examples/nq_ma_reclaim.py alert
 
 ## NQ 一分 K：破 2h 低後掛單 MA60 五分鐘
 
-1 分鐘圖：跌破近兩小時低點後，**半小時內**出現 MA5>MA20 多頭排列，且 1 分 K **收盤突破 MA60**，就在當時的 MA60 掛限價買單，**只掛 5 分鐘**。回踩成交才進場；超過五分鐘沒碰到就取消。停損在破底低點，目標 2R。
+1 分鐘圖：跌破近兩小時低點後，**半小時內**出現 MA5>MA20 多頭排列，且 1 分 K **收盤突破 MA60**，就在當時的 MA60 掛限價買單，**只掛 5 分鐘**。回踩成交才進場；超過五分鐘沒碰到就取消。停損在破底低點（不把停損上移到 MA60），目標 2R。
 
 ```bash
 python3 examples/nq_ma60_limit.py backtest --period 8d --html output/nq_ma60_limit.html
@@ -54,9 +54,9 @@ python3 examples/nq_ma60_limit.py alert --dry-run --once
 
 TradingView：`pinescript/nq_ma60_limit_1m.pine` 套用至 NQ1! / MNQ1! 一分圖。
 
-Yahoo 1m（2026-08-12 → 09-04，約 23 個交易日）：**29 筆、勝率 51.7%、+252.8 點**。  
+Yahoo 1m（2026-08-12 → 09-04，約 23 個交易日）：**29 筆、勝率 44.8%、+300.3 點**。  
 漏斗：破底 1007 → 深度≥10點 150 → 5/20+破MA60 37 → 成交 29（逾時取消 8）。  
-近 8 天：10 筆、勝率 40%、+124.2 點。
+近 8 天：10 筆、勝率 40%、+176.5 點。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-ma60-limit-63a8/docs/nq-ma60-limit/view.html
 

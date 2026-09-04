@@ -6,6 +6,7 @@
   2. 之後 30 根 1m 內：MA5 > MA20，且收盤突破 1m MA60
   3. 在突破當下的 MA60 掛限價買單，只掛 5 分鐘
   4. 5 分鐘內回踩成交才進場；逾時取消
+  5. 停損在破底低點；目標 2R
 
 用法:
   python3 examples/nq_ma60_limit.py backtest --period 8d --html output/nq_ma60_limit.html
@@ -42,7 +43,7 @@ from nq_ma_reclaim import (  # noqa: E402
     load_yfinance,
     quality_from_slopes,
     rolling_min_prev,
-    simulate,
+    simulate as _simulate_reclaim,
     sma,
     summarize_trades,
     tg_send,
@@ -55,7 +56,13 @@ REPO_ROOT = ROOT.parent
 PAGES_HTML = REPO_ROOT / "docs" / "nq-ma60-limit" / "index.html"
 VIEW_BRANCH = "cursor/nq-ma60-limit-63a8"
 STATE_PATH = ROOT / "tg_ma60_limit_state.json"
-RULES = "破 2h 低後 30 分鐘內：MA5>MA20 且 1m 收盤突破 MA60，再把限價單掛在 MA60，只留 5 分鐘；逾時不進。停損在破底低點。"
+RULES = "破 2h 低後 30 分鐘內：MA5>MA20 且 1m 收盤突破 MA60，再把限價單掛在 MA60，只留 5 分鐘；逾時不進。停損在破底低點，不用 MA60 上移停損。"
+
+
+def simulate(df, signals, **kwargs):
+    """Same exits as MA Reclaim, but never trail the stop up to MA60."""
+    kwargs["use_ma60_up_stop"] = False
+    return _simulate_reclaim(df, signals, **kwargs)
 
 
 @dataclass

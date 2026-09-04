@@ -15,10 +15,10 @@ from nq_ma60_limit import (  # noqa: E402
     ET,
     PendingOrder,
     detect_signals,
+    simulate,
 )
 from nq_ma_reclaim import (  # noqa: E402
     TradeResult,
-    simulate,
     sma,
     write_html_report,
 )
@@ -176,6 +176,7 @@ def test_fill_within_five_minutes() -> None:
     trades = simulate(df, sigs, preopen_flat=False, stop_on_m5_close=False)
     assert trades
     assert isinstance(trades[0], TradeResult)
+    assert all(t.exit_reason != "ma60_stop" for t in trades)
 
 
 def test_expire_if_no_retest() -> None:
