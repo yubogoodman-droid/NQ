@@ -56,7 +56,22 @@ REPO_ROOT = ROOT.parent
 PAGES_HTML = REPO_ROOT / "docs" / "nq-ma60-limit" / "index.html"
 VIEW_BRANCH = "cursor/nq-ma60-limit-63a8"
 STATE_PATH = ROOT / "tg_ma60_limit_state.json"
-RULES = "破 2h 低後 30 分鐘內：MA5>MA20 且 1m 收盤突破 MA60，再把限價單掛在 MA60，只留 5 分鐘；逾時不進。停損在破底低點，不用 MA60 上移停損。"
+RULES = "破 2h 低後 30 分鐘內：MA5>MA20 且 1m 收盤突破 MA60，再把限價單掛在 MA60，只留 5 分鐘；逾時不進。停損在破底低點，不用 MA60 上移停損。進場時 MA5/10/20/30 糾結（帶寬<12點）不掛。"
+
+TANGLE_PTS = 12.0
+
+
+def ribbon_width(ma5: float, ma10: float, ma20: float, ma30: float) -> float:
+    vals = (ma5, ma10, ma20, ma30)
+    if any(np.isnan(v) for v in vals):
+        return float("nan")
+    return float(max(vals) - min(vals))
+
+
+def is_tangled(ma5: float, ma10: float, ma20: float, ma30: float, tangle_pts: float = TANGLE_PTS) -> bool:
+    """圖一那種：短均黏在一起，看不出排列。"""
+    width = ribbon_width(ma5, ma10, ma20, ma30)
+    return not np.isnan(width) and width < tangle_pts
 
 
 def simulate(df, signals, **kwargs):
@@ -87,6 +102,7 @@ def detect_signals(
     min_break_depth: float = 10.0,
     min_entry_gap: int = 15,
     ma60_slope_bars: int = 5,
+    tangle_pts: float = TANGLE_PTS,
     pending: Optional[List[PendingOrder]] = None,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
@@ -140,7 +156,9 @@ def detect_signals(
             if (
                 j < 1
                 or np.isnan(ma5[j])
+                or np.isnan(ma10[j])
                 or np.isnan(ma20[j])
+                or np.isnan(ma30[j])
                 or np.isnan(ma60[j])
                 or np.isnan(ma60[j - 1])
             ):
@@ -150,6 +168,16 @@ def detect_signals(
             bull_stack = float(ma5[j]) > float(ma20[j])
             crossed = float(close[j]) > float(ma60[j]) and float(close[j - 1]) <= float(ma60[j - 1])
             if not (bull_stack and crossed):
+                j += 1
+                continue
+            if is_tangled(
+                float(ma5[j]),
+                float(ma10[j]),
+                float(ma20[j]),
+                float(ma30[j]),
+                tangle_pts,
+            ):
+                bump("skip_tangle")
                 j += 1
                 continue
 
@@ -366,7 +394,9 @@ def _collect_expired(df, setup_window: int = 30, limit_bars: int = 5) -> List[Pe
     close = df["Close"].to_numpy(float)
     low = df["Low"].to_numpy(float)
     ma5 = sma(close, 5)
+    ma10 = sma(close, 10)
     ma20 = sma(close, 20)
+    ma30 = sma(close, 30)
     ma60 = sma(close, 60)
     two_hr_low = rolling_min_prev(low, 120)
     n = len(close)
@@ -386,6 +416,8 @@ def _collect_expired(df, setup_window: int = 30, limit_bars: int = 5) -> List[Pe
             if not (float(ma5[j]) > float(ma20[j])):
                 continue
             if not (float(close[j]) > float(ma60[j]) and float(close[j - 1]) <= float(ma60[j - 1])):
+                continue
+            if is_tangled(float(ma5[j]), float(ma10[j]), float(ma20[j]), float(ma30[j])):
                 continue
             window_end = j + limit_bars
             if window_end > n - 1:
@@ -558,7 +590,8 @@ def cmd_backtest(args) -> int:
             "funnel "
             f"break={funnel.get('break', 0)} deep={funnel.get('deep_break', 0)} "
             f"setup={funnel.get('setup', 0)} taken={funnel.get('taken', 0)} "
-            f"expired={funnel.get('expired', 0)} pending={funnel.get('pending', 0)}"
+            f"expired={funnel.get('expired', 0)} pending={funnel.get('pending', 0)} "
+            f"tangle={funnel.get('skip_tangle', 0)}"
         )
     for q, info in stats.get("by_quality", {}).items():
         print(f"  Q{q}: n={info['n']} wins={info['wins']} pnl={info['pnl']:+.1f}")

@@ -6,10 +6,13 @@ twoHourBars   = input.int(120, "兩小時視窗（1m）", minval=30)
 setupWindow   = input.int(30, "破底後有效分鐘", minval=5)
 limitBars     = input.int(5, "掛單有效分鐘", minval=1)
 minDepth      = input.float(10.0, "最少破底深度（點）", minval=0)
+tanglePts     = input.float(12.0, "短均糾結帶寬（點）", minval=0)
 targetR       = input.float(2.0, "目標 R", minval=0.5, step=0.5)
 
 ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
 ma20 = ta.sma(close, 20)
+ma30 = ta.sma(close, 30)
 ma60 = ta.sma(close, 60)
 twoHrLow = ta.lowest(low, twoHourBars)[1]
 
@@ -34,7 +37,9 @@ if brokeNow
 inWindow = not na(breakBar) and bar_index > breakBar and bar_index <= breakBar + setupWindow
 bullStack = ma5 > ma20
 crossedMa60 = ta.crossover(close, ma60)
-setupNow = inWindow and bullStack and crossedMa60 and not orderLive and na(setupBar)
+ribbon = math.max(ma5, math.max(ma10, math.max(ma20, ma30))) - math.min(ma5, math.min(ma10, math.min(ma20, ma30)))
+tangled = ribbon < tanglePts
+setupNow = inWindow and bullStack and crossedMa60 and not tangled and not orderLive and na(setupBar)
 
 if setupNow
     setupBar := bar_index

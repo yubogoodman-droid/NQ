@@ -15,6 +15,7 @@ from nq_ma60_limit import (  # noqa: E402
     ET,
     PendingOrder,
     detect_signals,
+    is_tangled,
     simulate,
 )
 from nq_ma_reclaim import (  # noqa: E402
@@ -62,28 +63,43 @@ def _base_dump(n: int = 320) -> tuple[np.ndarray, np.ndarray, np.ndarray, float,
     return close, high, low, base, break_i
 
 
-def _paint_bounce(close, high, low, base: float, break_i: int, *, delay: int = 1, hold: int = 12) -> None:
-    """Stay under MA60 long enough for MA20 to sag, then reclaim so MA5>MA20 as close breaks MA60."""
-    under = 10
+def _paint_bounce(
+    close,
+    high,
+    low,
+    base: float,
+    break_i: int,
+    *,
+    delay: int = 1,
+    hold: int = 12,
+    under: int = 16,
+    dump: float = 36.0,
+    tangle: bool = False,
+) -> None:
+    """Stay under MA60, then reclaim. `tangle=True` keeps short MAs glued (圖一)."""
+    if tangle:
+        under, dump = 6, 18.0
     for i in range(delay, delay + under):
         j = break_i + i
         if j >= len(close):
             return
-        close[j] = base - 22.0 + i * 0.4
+        close[j] = base - dump + i * 0.35
         high[j] = close[j] + 0.8
         low[j] = close[j] - 0.8
-    # park just under MA60 so MA5 can recross MA20 before the break
-    park = (base - 8.0, base - 6.0, base - 4.0, base - 3.0)
-    climb = (base + 2.0, base + 10.0, base + 18.0)
     start = break_i + delay + under
-    for i, px in enumerate(park + climb):
+    if tangle:
+        steps = (base - 6.0, base - 4.0, base - 2.0, base + 2.0, base + 8.0, base + 14.0)
+    else:
+        # hold below MA60 so MA5 lifts off MA20/30, then punch through
+        steps = (base - 18.0, base - 16.0, base - 14.0, base - 12.0, base - 10.0, base + 6.0, base + 16.0)
+    for i, px in enumerate(steps):
         j = start + i
         if j >= len(close):
             return
         close[j] = px
         high[j] = px + 1.2
         low[j] = px - 1.2
-    rest = start + len(park) + len(climb)
+    rest = start + len(steps)
     for i in range(rest, len(close)):
         close[i] = close[i - 1] + (1.6 if i - rest < hold else 0.8)
         high[i] = close[i] + 1.0
@@ -197,6 +213,31 @@ def test_late_ma60_break_ignored() -> None:
     assert not sigs, f"setup after 30m must be ignored, funnel={funnel} sigs={sigs}"
 
 
+def _make_tangle_bars(n: int = 320) -> pd.DataFrame:
+    """MA60 break while MA5/10/20/30 are still glued — 圖一。"""
+    close, high, low, base, break_i = _base_dump(n)
+    _paint_bounce(close, high, low, base, break_i, tangle=True)
+    setup = _first_setup(close, break_i)
+    assert setup is not None, "need an MA60 cross to test the tangle skip"
+    ma60 = sma(close, 60)
+    fill_i = setup + 2
+    limit = float(ma60[setup])
+    close[fill_i] = limit + 2.0
+    high[fill_i] = close[fill_i] + 1.0
+    low[fill_i] = limit - 1.0
+    return _to_df(close, high, low)
+
+
+def test_skip_tangled_mas() -> None:
+    assert is_tangled(100.0, 101.0, 99.5, 100.5, 12.0)
+    assert not is_tangled(100.0, 108.0, 92.0, 95.0, 12.0)
+    df = _make_tangle_bars()
+    funnel: dict[str, int] = {}
+    sigs = detect_signals(df, funnel=funnel)
+    assert not sigs, f"tangled short MAs must not fill, funnel={funnel}"
+    assert funnel.get("skip_tangle", 0) >= 1
+
+
 def test_pending_at_end_of_data() -> None:
     df = _make_fill_bars()
     setup_guess = None
@@ -248,6 +289,7 @@ def main() -> int:
     test_fill_within_five_minutes()
     test_expire_if_no_retest()
     test_late_ma60_break_ignored()
+    test_skip_tangled_mas()
     test_pending_at_end_of_data()
     test_write_html_report()
     print("ok")
