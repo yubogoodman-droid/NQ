@@ -387,21 +387,27 @@ def _equity_svg(pnls: list[float], width: int = 720, height: int = 160) -> str:
     )
 
 
-def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_cards: int = 24) -> Path:
+def _lookalike_rank(r: dict) -> tuple:
+    """越像 ETH 截圖越好：緊黏帶、離 200 近、放量。"""
+    s = r["sig"]
+    q = {"A": 0, "B": 1, "C": 2}.get(s.quality, 3)
+    eth = 0 if r["symbol"] == "ETHUSDT" else 1
+    return (eth, q, s.ext, s.ribbon, -s.vol_ratio)
+
+
+def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_cards: int = 36) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     img_dir = path.parent / "img"
     img_dir.mkdir(parents=True, exist_ok=True)
+    all_trades = [r["trade"] for r in rows if r.get("trade")]
+    stats = summarize_trades(all_trades) if all_trades else {
+        "count": len(rows), "wins": 0, "losses": 0, "win_rate": 0.0,
+        "pnl_pct": 0.0, "avg_pct": 0.0, "by_quality": {},
+    }
     if len(rows) > max_cards:
-        def _rank(r):
-            s = r["sig"]
-            q = {"A": 0, "B": 1, "C": 2}.get(s.quality, 3)
-            eth = 0 if r["symbol"] == "ETHUSDT" else 1
-            return (eth, q, -s.vol_ratio, s.ribbon)
-
-        rows = sorted(rows, key=_rank)[:max_cards]
+        rows = sorted(rows, key=_lookalike_rank)[:max_cards]
         rows = sorted(rows, key=lambda r: int(r["d"]["t"][r["sig"].idx]))
     trades = [r["trade"] for r in rows if r.get("trade")]
-    stats = summarize_trades(trades) if trades else {"count": len(rows), "wins": 0, "losses": 0, "win_rate": 0.0, "pnl_pct": 0.0, "avg_pct": 0.0, "by_quality": {}}
     cards = []
     for n, row in enumerate(rows, 1):
         sig, d, sym = row["sig"], row["d"], row["symbol"]
@@ -477,7 +483,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">均筆<b>{stats.get('avg_pct', 0):+.2f}%</b></div>
 </div>
 <p class="muted">{escape(qline) if qline else "均線黏在 200 附近、放量打出箱頂、收盤離 200 ≤ 1.5% 才進。"}</p>
-<div class="equity">{_equity_svg([t.pnl_pct for t in trades])}</div>
+<div class="equity">{_equity_svg([t.pnl_pct for t in all_trades])}</div>
 </section>
 {''.join(cards) if cards else "<div class='empty'>這段期間沒抓到黏帶擠壓。</div>"}
 </div></body></html>
@@ -536,7 +542,11 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             rows,
             out,
             title="15m 黏帶擠壓 · 200MA 附近進場",
-            subtitle=f"{days}d · {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')} · {len(symbols)} 檔 · 抱最多 {HOLD_BARS} 根",
+            subtitle=(
+                f"{days}d · {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')} · "
+                f"{len(symbols)} 檔 · 抱最多 {HOLD_BARS} 根。"
+                " 圖卡依「像不像 ETH 9/3」排序：緊黏帶、離 200 近、放量。"
+            ),
         )
         print(f"HTML {out}")
     return 0

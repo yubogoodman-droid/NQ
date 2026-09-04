@@ -133,8 +133,8 @@ python3 examples/chart_today.py
 # 單檔（ETH）近兩週
 python3 examples/scan_binance_15m_ma200.py --symbol ETHUSDT --days 14
 
-# 流動永續 7 日回測 + 手機版 HTML
-python3 examples/scan_binance_15m_ma200.py --backtest --days 7 --pages
+# 流動永續 5 日回測 + 手機版 HTML（全市場找類似 ETH 9/3 的）
+python3 examples/scan_binance_15m_ma200.py --backtest --days 5 --pages --html docs/binance/ma200-squeeze-15m-5d/index.html
 
 # Telegram：剛收盤掃一次 / 持續監看
 python3 examples/scan_binance_15m_ma200.py --once
@@ -142,6 +142,10 @@ python3 examples/scan_binance_15m_ma200.py --watch
 ```
 
 ETH 近兩週圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m/view.html
+
+全市場 5 日（270 檔、52 筆、勝率 51.9%、+22.37%）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-5d/view.html
+
+跟 ETH 9/3 最像的幾筆：BTC 9/3 10:30（離 200 +0.26%、黏度 0.47%、3.7×）、SOXS 8/31 05:00（+0.27% / 0.43% / 3.8×）、MSFT 9/3 19:00（+0.17% / 0.27% / 3.1× 打到目標 +2.10%）、NVDA 9/2 21:30（8.5× 打到 +3.49%）。很多是美股永續在美盤開盤黏帶後放量。
 
 ## TradingView
 
