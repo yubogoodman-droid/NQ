@@ -67,14 +67,14 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 回測出場（方便看兩個禮拜成績）：停在破底低、目標 2R、或 20 根時間停。
 
 ```bash
-# 成交額前 100、近兩個禮拜（預設寬鬆，不要加 --strict）
+# 成交額前 100、近兩個禮拜；預設寬鬆、股價 1000 以上刪掉
 python3 examples/tw_1h_reclaim.py --limit 100 --days 14 --range 2mo --pages
 
 # 單元測試（不打網路）
 python3 examples/test_tw_1h_reclaim.py
 ```
 
-2026-08-21 → 09-04、成交額前 100（末名約 18 億）：**112 筆、80 檔**。已平 91 筆勝率 **69.2%**，平均 **+4.01%**（停在破底低 / 2R / 20 根）。出場：2R 32、停損 14、時間 45、未平 21。訊號收盤後再抱 +1d / +3d / +5d 平均 +0.8% / +3.5% / +6.5%。
+2026-08-21 → 09-04、成交額前 100 且**股價 < 1000**（聯發科／台積電／大立光等已濾；末名約 11.9 億）：**109 筆、73 檔**。已平 89 筆勝率 **68.5%**，平均 **+3.84%**。進場價 ≥ 1000 的 2 筆（欣興 1135、環球晶 1000）也拿掉。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim/view.html
 

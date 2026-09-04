@@ -670,6 +670,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <p class="muted">漏斗：跌破 {fun.get('cross_below', 0)} → 成波 {fun.get('wave_ok', 0)} → 進場 {fun.get('entry', 0)}
 · 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 非破底 {fun.get('not_16h_low', 0)}
 · 假站過多 {fun.get('too_many_fakes', 0)} · 逾時 {fun.get('timeout', 0)} · 沒站上均線 {fun.get('entry_timeout', 0)}
+· 進場價過高 {fun.get('price_cap', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}</p>
 <div class="cards">
@@ -698,6 +699,7 @@ def scan_symbol(
     params: ReclaimParams,
     days: int,
     funnel: Optional[Dict[str, int]] = None,
+    max_price: Optional[float] = None,
 ) -> tuple[List[TwHit], dict]:
     meta = {**row, "bars": 0, "error": "", "n_sig": 0, "n_trade": 0}
     try:
@@ -715,6 +717,11 @@ def scan_symbol(
         for k, v in local_fun.items():
             funnel[k] = funnel.get(k, 0) + v
     sigs = filter_entry_window(df, sigs, days)
+    if max_price is not None:
+        n_hi = sum(1 for s in sigs if s.entry_price >= max_price)
+        if n_hi and funnel is not None:
+            funnel["price_cap"] = funnel.get("price_cap", 0) + n_hi
+        sigs = [s for s in sigs if s.entry_price < max_price]
     trades = simulate(df, sigs, params)
     meta["n_sig"] = len(sigs)
     meta["n_trade"] = len(trades)
@@ -765,7 +772,7 @@ def main(argv=None) -> int:
     p.add_argument("--date", default="", help="YYYYMMDD，預設上一個交易日")
     p.add_argument("--limit", type=int, default=100)
     p.add_argument("--pool", type=int, default=200)
-    p.add_argument("--max-price", type=float, default=None)
+    p.add_argument("--max-price", type=float, default=1000, help="股價達此值以上剔除，預設 1000；0 不過濾")
     p.add_argument("--days", type=int, default=14, help="只統計進場落在最近 N 日的訊號")
     p.add_argument("--range", dest="range_", default="2mo", help="Yahoo 1h 下載區間")
     p.add_argument("--sleep", type=float, default=0.18)
@@ -783,10 +790,14 @@ def main(argv=None) -> int:
         f"strict={args.strict} max_price={args.max_price}"
     )
     raw = fetch_top_turnover(date, pool)
-    universe, dropped = filter_by_max_price(raw, args.max_price, args.limit)
+    # 預設刪 1000 以上（含 1000）。共用 helper 是「> 才刪」，所以 cap 往下壓一點。
+    price_cap = None if args.max_price is None or args.max_price <= 0 else float(args.max_price)
+    helper_cap = None if price_cap is None else price_cap - 1e-9
+    universe, dropped = filter_by_max_price(raw, helper_cap, args.limit)
+    args.max_price = price_cap
     if dropped:
         print(
-            "drop price>"
+            "drop price>="
             + str(args.max_price)
             + ": "
             + ", ".join(f"{r['code']} {r['close']}" for r in dropped[:12])
@@ -806,7 +817,9 @@ def main(argv=None) -> int:
     errors = 0
     scanned = 0
     for i, row in enumerate(universe, 1):
-        stock_hits, meta = scan_symbol(row, args.range_, params, args.days, funnel=funnel)
+        stock_hits, meta = scan_symbol(
+            row, args.range_, params, args.days, funnel=funnel, max_price=price_cap
+        )
         scanned += 1
         if meta["error"]:
             errors += 1
@@ -836,6 +849,7 @@ def main(argv=None) -> int:
         "strict": args.strict,
         "range": args.range_,
         "limit": args.limit,
+        "max_price": args.max_price,
         "generated": datetime.now(TPE).isoformat(timespec="seconds"),
     }
     html_path = Path(args.html) if args.html else None
@@ -844,7 +858,7 @@ def main(argv=None) -> int:
     if html_path:
         period_label = f"{args.days}d · Yahoo {args.range_} 1h"
         if args.max_price is not None:
-            period_label += f" · 股價≤{args.max_price:g}"
+            period_label += f" · 股價<{args.max_price:g}"
         out = write_tw_html(html_path, hits, universe, period_label, date, funnel=funnel, strict=args.strict)
         write_view_html(out)
         print(f"html={out}")

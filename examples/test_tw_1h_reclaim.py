@@ -227,6 +227,15 @@ def test_filter_entry_window() -> None:
     assert filter_entry_window(df, sigs, 0) == list(sigs)
 
 
+def test_price_cap_keeps_cheap_entry() -> None:
+    closes, lows = valid_closes()
+    df = ohlc_from_close(closes, lows=lows)
+    sigs = detect_signals(df, loose_params())
+    assert sigs
+    assert all(s.entry_price < 1000 for s in sigs)
+    assert [s for s in sigs if s.entry_price >= 50] == sigs
+
+
 def test_summarize() -> None:
     stats = summarize_trades([])
     assert stats["count"] == 0
@@ -245,6 +254,7 @@ def main() -> int:
     test_strict_rejects_fake_stand()
     test_simulate_stop_and_target()
     test_filter_entry_window()
+    test_price_cap_keeps_cheap_entry()
     test_summarize()
     print("ok")
     return 0
