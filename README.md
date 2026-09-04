@@ -60,30 +60,27 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## 幣安 15m MA200 站穩三根
+## 幣安 15m 盤整後爆量擴張
 
-1. **記號**：MA7 > MA14 > MA25 **張開**（7 比 25 至少高 0.4%），15m **放量陽線**收盤站上 MA200（量比 ≥1.7×、量大於前一根、離 200 ≤2%、台北 08–20 點）。同一根 15m 記號 ≥4 檔視為大盤一起過線，之後 3 小時跟風也不算。
-2. **進場**：記號之後連 **三根收盤都沒跌破 MA200**，第三根收完下一根開盤做多。進場時 **MA99、MA120 不能在 MA200 上面**。200 還在直線往下砍、沒有走平的不要。
-3. **出場**：收盤跌破 MA200，或 4 小時到期。同一檔 8 小時只算一次。
+基準圖是 ETH/USDT 15m（2026-09-03 22:45）：均線先黏在一起、ATR 壓著，然後一根放量長陽收在高位。
 
-近一週大賺單的共同點（相對 501 筆未篩選）：記號均量 **2.7×**（輸家 1.9×）、亞洲／歐洲盤明顯較好（08–19 合計 +78%，21–23 合計 −72%）、真的跑得動的單 MFE 常 5%+。另外 **MA7/14/25 要真的張開**：像 POL 08-20 那筆 MA7 只比 MA14 高 0.004%，一根尖兵就把排列湊出來，看起來很怪。**記號根量要大於前一根**：像 HOME 08-23 13:30 是第二棒（13:15 已爆量還在 200 下），不算開始擴張。**同一根 15m 不要一堆標的一起過 200**：像 08-25 10:15 一次 14 檔（報告 #44–#50 的 FIL/SUI 那排），那是大盤一起彈，後面 WLFI／BEAMX 跟風也不算。**進場時 99/120 不能壓在 200 上面**：那是打進長均壓力，不是從 200 線頭頂起漲。**200 不能還在直線往下砍**：像 INTW／DOS 那種斜率太彎、還沒走平；SNDK／PIPPIN 雖然下行但已經彎頭走平。所以量能、離 200 距離、日盤、排列張開都要過，出場也不再用 2R／三根低點把跑動砍掉。
+1. **記號**：近 24 根均線曾黏過（7/14/25/99/120/200 波幅 ≤1.2%），前一根 ATR ≤0.55%。這根必須是陽線、實體 ≥0.8%、振幅 ≥2.5×ATR、量比 ≥2.5× 且大於前一根、收在棒子上方 80%、收盤創 20 根新高、MA7 > MA14 > MA25。
+2. **進場**：擴張棒收完，下一根開盤做多。同一檔 8 小時只算一次。
+3. **出場**：收盤跌破擴張棒低點，或 4 小時到期。
 
 ```bash
-python3 examples/scan_binance_15m_expansion.py --verify   # 回放四張圖
+python3 examples/scan_binance_15m_expansion.py --verify   # 回放 ETH 基準圖
 python3 examples/scan_binance_15m_expansion.py --once     # 掃剛收盤的 15m
 python3 examples/scan_binance_15m_expansion.py            # 每根 15m 收盤掃；可推 Telegram
 ```
 
 Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/test_scan_binance_15m_expansion.py`
 
-四張圖的記號與進場（台北時間，括號是離 MA200 多遠）：
+基準圖（台北時間）：
 
-| 標的 | 記號 | 進場 |
+| 標的 | 擴張 | 進場 |
 |---|---|---|
-| FIL | 01-01 19:45 (+0.39%) | 01-01 20:30 (+1.08%) |
-| PIPPIN | 01-21 14:45 (+1.18%) | 01-21 15:30 (+1.09%) |
-| SNDK | 07-30 19:30 (+0.34%) | 07-30 20:15 (+1.56%) |
-| CRCL | 08-19 20:30 (+0.09%) | 08-19 21:15 (+1.45%) |
+| ETH | 09-03 22:45（實體 +1.32%、3.5×ATR、量 3.7×） | 09-03 23:00 |
 
 近一週回測：
 
@@ -91,9 +88,9 @@ Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/te
 python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
 ```
 
-近一週（2026-08-28 → 09-04，265 檔）：**50 筆、勝率 26.0%、等權合計 −13.1%、均筆 −0.26%**。2 小時純續走勝率 46%、均 +0.07%。每筆上面 15m、下面 1h 對照。
+（數字以最新 `--pages` 報告為準。）
 
-先看圖（50 筆每筆 15m + 1h，黃菱形＝記號、藍圈＝第三根確認、綠三角＝進場、× ＝出場）：
+先看圖（每筆上面 15m、下面 1h；黃菱形＝擴張棒、綠三角＝進場、×＝出場）：
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-7d/view.html
 
 ## 幣安黏帶三幕 Telegram

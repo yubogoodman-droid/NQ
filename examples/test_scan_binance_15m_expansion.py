@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""15m MA200 站穩三根：合成 K 線測試（不連網）。"""
+"""15m 盤整後爆量擴張：合成 K 線測試（不連網）。"""
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from scan_binance_15m_expansion import (  # noqa: E402
     ALERT_BUCKET_MS,
     CLUSTER_COOLDOWN_MS,
-    CONFIRM_BARS,
+    MAX_SAME_MARK,
     TZ,
     bar_index_at,
     collapse_hits,
@@ -25,7 +26,6 @@ from scan_binance_15m_expansion import (  # noqa: E402
     sma,
     summarize_trades,
 )
-from datetime import datetime
 
 
 def _bars(n: int, close: np.ndarray, vol: np.ndarray | None = None) -> dict:
@@ -42,31 +42,28 @@ def _bars(n: int, close: np.ndarray, vol: np.ndarray | None = None) -> dict:
 
 def _series(
     *,
-    holds: np.ndarray | None = None,
-    tail: np.ndarray | None = None,
-    mark: float = 100.6,
+    rocket: float = 102.9,
     vol_signal: float = 4_000.0,
+    grind: bool = True,
+    tail: np.ndarray | None = None,
+    prev_vol: float | None = None,
 ) -> dict:
-    """先跌破 200 線、再在線下翹頭（做出 MA7>MA14>MA25），然後一根收盤站上。
-
-    holds 是記號之後那幾根收盤，tail 接在確認棒後面。
-    """
-    base = np.full(250, 100.0)
-    dip = np.linspace(99.6, 97.0, 20)
-    curl = np.linspace(97.4, 99.4, 10)
-    parts = [base, dip, curl, np.array([mark])]
-    if holds is not None:
-        parts.append(np.asarray(holds, float))
+    """長盤整（均線黏、ATR 小）→ 幾根緩推 → 一根爆量長陽。"""
+    n_coil = 270
+    coil = 100.0 * (1.0 + 0.0008 * np.sin(np.arange(n_coil) / 4.0))
+    grind_px = np.array([100.25, 100.55, 100.85, 101.10, 101.30, 101.50]) if grind else np.array([])
+    parts = [coil, grind_px, np.array([rocket])]
     if tail is not None:
         parts.append(np.asarray(tail, float))
     close = np.concatenate(parts)
     vol = np.full(len(close), 1_000.0)
-    vol[250 + 20 + 10] = vol_signal
+    rocket_i = n_coil + len(grind_px)
+    if grind:
+        vol[n_coil:rocket_i] = 1_600.0
+    vol[rocket_i] = vol_signal
+    if prev_vol is not None:
+        vol[rocket_i - 1] = prev_vol
     return indicators(_bars(len(close), close, vol))
-
-
-def _held(n: int = CONFIRM_BARS, px: float = 100.6, step: float = 0.004) -> np.ndarray:
-    return px * (1.0 + step * np.arange(1, n + 1))
 
 
 def test_sma() -> None:
@@ -82,82 +79,39 @@ def test_rsi_sma_all_up() -> None:
     assert r[-1] > 90
 
 
-def test_enters_after_three_holds() -> None:
-    d = _series(holds=_held())
+def test_expansion_after_coil_hits() -> None:
+    d = _series(tail=np.full(4, 103.1))
     hits = detect_expansion(d)
-    assert hits, "多頭排列站上 200 並站穩三根應該命中"
+    assert hits, "盤整後爆量長陽應該命中"
     h = hits[-1]
-    assert h["kind"] == "hold3"
-    assert h["i"] - h["mark_i"] == CONFIRM_BARS
-    assert h["close"] > h["ma200"]
+    assert h["kind"] == "expand"
+    assert h["mark_i"] == h["i"]
+    assert h["body"] >= 0.008
+    assert h["vol_ratio"] >= 2.5
     assert h["ma7"] > h["ma14"] > h["ma25"]
 
 
-def test_mark_bar_alone_is_not_entry() -> None:
-    """只有記號那根，還沒站滿三根，不能進。"""
-    d = _series(holds=None)
-    assert detect_expansion(d) == []
-
-
-def test_two_holds_not_enough() -> None:
-    d = _series(holds=_held(n=CONFIRM_BARS - 1))
-    assert detect_expansion(d) == []
-
-
-def test_break_below_ma200_cancels() -> None:
-    """第二根收盤跌回 200 線下方，整個記號作廢。"""
-    holds = np.array([100.4, 96.0, 100.6])
-    d = _series(holds=holds)
+def test_tiny_body_skips() -> None:
+    """實體太小，不像 ETH 那根長陽。"""
+    d = _series(rocket=101.7, tail=np.full(3, 101.8))
     assert detect_expansion(d) == []
 
 
 def test_low_volume_skips() -> None:
-    d = _series(holds=_held(), vol_signal=1_050.0)
+    d = _series(vol_signal=1_050.0, tail=np.full(3, 103.1))
     assert detect_expansion(d) == []
 
 
 def test_pre_pump_volume_skips() -> None:
-    """HOME #12：前一根已爆量，記號根只是第二棒穿越 200，不算開始擴張。"""
-    mark = 100.6
-    close = np.concatenate(
-        [
-            np.full(250, 100.0),
-            np.linspace(99.6, 97.0, 20),
-            np.linspace(97.4, 99.4, 10),
-            np.array([mark]),
-            _held(),
-        ]
-    )
-    vol = np.full(len(close), 1_000.0)
-    mark_i = 250 + 20 + 10
-    vol[mark_i - 1] = 4_500.0
-    vol[mark_i] = 4_000.0
-    d = indicators(_bars(len(close), close, vol))
+    """前一根已經比擴張棒還大聲，不算開始噴。"""
+    d = _series(vol_signal=4_000.0, prev_vol=5_000.0, tail=np.full(3, 103.1))
     assert detect_expansion(d) == []
 
 
-def test_mark_too_far_from_ma200_skips() -> None:
-    d = _series(holds=_held(), mark=108.0)
+def test_no_grind_skips() -> None:
+    """沒有緩推、短均還沒張開，一根尖兵不夠。"""
+    d = _series(grind=False, tail=np.full(3, 103.1))
     assert detect_expansion(d) == []
-
-
-def test_glued_ma_stack_skips() -> None:
-    """MA7 只比 MA14 高一點點，看起來像多頭排列其實沒張開。"""
-    close = np.concatenate([np.full(250, 100.0), np.full(20, 99.85), np.array([100.15]), _held(100.15)])
-    vol = np.full(len(close), 1_000.0)
-    vol[270] = 4_000.0
-    d = indicators(_bars(len(close), close, vol))
-    for h in detect_expansion(d):
-        assert h["ma7"] / h["ma14"] - 1.0 >= 0.001
-        assert h["ma7"] / h["ma25"] - 1.0 >= 0.004
-
-
-def test_bear_stack_skips() -> None:
-    """收盤站上 200，但短均是空頭排列（MA7 < MA25），不算。"""
-    close = np.concatenate([np.full(240, 101.0), np.full(30, 99.4), np.array([100.2]), _held(100.2)])
-    d = indicators(_bars(len(close), close, np.full(len(close), 2_000.0)))
-    for h in detect_expansion(d):
-        assert h["ma7"] > h["ma14"] > h["ma25"]
 
 
 def test_chop_does_not_hit() -> None:
@@ -180,43 +134,43 @@ def test_collapse_keeps_best_of_run() -> None:
 
 
 def test_select_alerts_debounce() -> None:
-    d = _series(holds=_held(), tail=np.full(8, 101.6))
+    d = _series(tail=np.full(8, 103.2))
     alerts = select_alerts(d, int(d["t"][0]), int(d["t"][-1]))
-    assert alerts, "合成站穩三根應有訊號"
+    assert alerts, "合成擴張應有訊號"
     buckets = {int(d["t"][h["i"]]) // ALERT_BUCKET_MS for h in alerts}
     assert len(buckets) == len(alerts)
 
 
-def test_stop_sits_under_the_hold_window() -> None:
-    d = _series(holds=_held(), tail=np.full(6, 101.6))
+def test_stop_is_expansion_low() -> None:
+    d = _series(tail=np.full(6, 103.2))
     hits = detect_expansion(d)
     assert hits
     h = hits[0]
     tr = simulate_trade(d, h)
     assert tr is not None
+    assert tr["stop"] == h["stop_low"]
     assert tr["stop"] < tr["entry"]
     assert tr["mark_i"] == h["mark_i"]
-    assert tr["t_mark"] == int(d["t"][h["mark_i"]])
 
 
-def test_simulate_stop_on_breakdown() -> None:
-    d = _series(holds=_held(), tail=np.array([96.0, 95.0, 94.5]))
+def test_simulate_stop_on_broke_low() -> None:
+    d = _series(tail=np.array([99.0, 98.5, 98.0]))
     hits = detect_expansion(d)
     assert hits
     tr = simulate_trade(d, hits[0])
     assert tr is not None
-    assert tr["reason"] == "ma_break"
+    assert tr["reason"] == "broke_low"
     assert tr["pnl_pct"] < 0
 
 
 def test_simulate_target_or_time() -> None:
-    d = _series(holds=_held(), tail=101.2 * (1.012 ** np.arange(1, 18)))
+    d = _series(tail=103.2 * (1.004 ** np.arange(1, 18)))
     hits = detect_expansion(d)
     assert hits
     tr = simulate_trade(d, hits[0])
     assert tr is not None
     assert tr["entry"] > 0
-    assert tr["reason"] in {"ma_break", "time", "eod"}
+    assert tr["reason"] in {"broke_low", "time", "eod"}
 
 
 def test_summarize_empty() -> None:
@@ -225,54 +179,18 @@ def test_summarize_empty() -> None:
     assert s["pnl"] == 0.0
 
 
-def test_market_cluster_drops_same_mark_and_laggards() -> None:
-    """08-25 那種：同一根記號很多檔，後面幾小時跟風也拿掉。"""
+def test_market_cluster_drops_huge_pack() -> None:
     t0 = 1_000_000
-    pack = [{"t_mark": t0, "symbol": f"S{i}"} for i in range(4)]
+    pack = [{"t_mark": t0, "symbol": f"S{i}"} for i in range(MAX_SAME_MARK)]
     lag = {"t_mark": t0 + CLUSTER_COOLDOWN_MS, "symbol": "LAG"}
     later = {"t_mark": t0 + CLUSTER_COOLDOWN_MS + 1, "symbol": "LATER"}
     out = drop_market_cluster(pack + [lag, later])
     assert [x["symbol"] for x in out] == ["LATER"]
 
 
-def test_three_same_mark_kept() -> None:
-    pack = [{"t_mark": 1_000, "symbol": f"S{i}"} for i in range(3)]
+def test_small_pack_kept() -> None:
+    pack = [{"t_mark": 1_000, "symbol": f"S{i}"} for i in range(4)]
     assert drop_market_cluster(pack) == pack
-
-
-def test_overhead_ma99_ma120_skips() -> None:
-    """先漲過一截，99/120 還在 200 上面，再跌破後站回 200：那是打進壓力，不算。"""
-    plat = np.full(210, 112.0)
-    rise = np.linspace(112, 116, 40)
-    drop = np.linspace(115.5, 109.0, 20)
-    base_low = np.full(10, 109.2)
-    curl = np.linspace(109.3, 110.8, 12)
-    close0 = np.concatenate([plat, rise, drop, base_low, curl])
-    mark = 113.514016
-    holds = np.full(CONFIRM_BARS, mark * 1.004)
-    close = np.concatenate([close0, np.array([mark]), holds])
-    vol = np.full(len(close), 1_500.0)
-    vol[len(close0)] = 9_000.0
-    d = indicators(_bars(len(close), close, vol))
-    i = len(close0) + CONFIRM_BARS
-    assert d["m99"][i] > d["m200"][i]
-    assert d["m120"][i] > d["m200"][i]
-    assert detect_expansion(d) == []
-
-
-def test_diving_ma200_skips() -> None:
-    """INTW #15 / DOS #17：200 還在直線往下砍、沒有走平。"""
-    down = np.linspace(116, 100.8, 274)
-    curl = np.linspace(100.9, 101.7, 6)
-    close0 = np.concatenate([down, curl])
-    d0 = indicators(_bars(len(close0), close0))
-    mark = float(d0["m200"][-1]) * 1.008
-    holds = np.full(CONFIRM_BARS, mark * 1.003)
-    close = np.concatenate([close0, np.array([mark]), holds])
-    vol = np.full(len(close), 1_500.0)
-    vol[len(close0)] = 9_000.0
-    d = indicators(_bars(len(close), close, vol))
-    assert detect_expansion(d) == []
 
 
 def test_bar_index_at() -> None:
@@ -287,26 +205,20 @@ def test_bar_index_at() -> None:
 def main() -> int:
     test_sma()
     test_rsi_sma_all_up()
-    test_enters_after_three_holds()
-    test_mark_bar_alone_is_not_entry()
-    test_two_holds_not_enough()
-    test_break_below_ma200_cancels()
+    test_expansion_after_coil_hits()
+    test_tiny_body_skips()
     test_low_volume_skips()
     test_pre_pump_volume_skips()
-    test_mark_too_far_from_ma200_skips()
-    test_glued_ma_stack_skips()
-    test_bear_stack_skips()
+    test_no_grind_skips()
     test_chop_does_not_hit()
     test_collapse_keeps_best_of_run()
     test_select_alerts_debounce()
-    test_stop_sits_under_the_hold_window()
-    test_simulate_stop_on_breakdown()
+    test_stop_is_expansion_low()
+    test_simulate_stop_on_broke_low()
     test_simulate_target_or_time()
     test_summarize_empty()
-    test_market_cluster_drops_same_mark_and_laggards()
-    test_three_same_mark_kept()
-    test_overhead_ma99_ma120_skips()
-    test_diving_ma200_skips()
+    test_market_cluster_drops_huge_pack()
+    test_small_pack_kept()
     test_bar_index_at()
     print("ok")
     return 0
