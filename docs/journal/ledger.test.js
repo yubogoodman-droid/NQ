@@ -1,11 +1,13 @@
-const { buildBooks, positionsFrom, calcFee, calcTax } = require("./ledger.js");
+const { buildBooks, positionsFrom, calcFee, calcTax, pointValue } = require("./ledger.js");
 
 const settings = {
   feeRate: 0.001425,
   feeDiscount: 0.6,
   minFee: 20,
   taxRate: 0.003,
-  autoFee: true
+  autoFee: true,
+  cryptoFeeRate: 0.001,
+  nqFeePerContract: 0.62
 };
 
 function assert(cond, msg) {
@@ -59,5 +61,34 @@ const shorts = buildBooks([
 const shortPos = positionsFrom(shorts.books, {})[0];
 almost(shortPos.qty, 0, 1e-6, "covered short");
 almost(shorts.realizedByTrade.s2, (200 - 0.6 - 180) * 1000, 0.02, "short cover pnl");
+
+assert(pointValue("NQ", "NQ") === 20, "NQ point");
+assert(pointValue("NQ", "MNQ") === 2, "MNQ point");
+assert(pointValue("NQ", "MNQ1!") === 2, "MNQ1 point");
+assert(pointValue("CRYPTO", "BTC") === 1, "crypto point");
+
+const btcFeeIn = calcFee(65000, 0.1, "CRYPTO", settings);
+const btcFeeOut = calcFee(70000, 0.1, "CRYPTO", settings);
+almost(btcFeeIn, 6.5, 0.001, "btc fee in");
+almost(btcFeeOut, 7, 0.001, "btc fee out");
+const btc = buildBooks([
+  { id: "b1", date: "2026-02-01", time: "08:00", market: "CRYPTO", symbol: "BTC", name: "比特幣", side: "buy", price: 65000, qty: 0.1, fee: btcFeeIn, tax: 0 },
+  { id: "b2", date: "2026-02-10", time: "08:00", market: "CRYPTO", symbol: "BTC", name: "比特幣", side: "sell", price: 70000, qty: 0.1, fee: btcFeeOut, tax: 0 }
+]);
+almost(btc.realizedByTrade.b2, (70000 - btcFeeOut / 0.1 - 65000 - btcFeeIn / 0.1) * 0.1, 0.02, "btc realized");
+
+const mnqFee = calcFee(19200, 2, "NQ", settings);
+almost(mnqFee, 1.24, 0.001, "mnq fee");
+const mnq = buildBooks([
+  { id: "n1", date: "2026-03-01", time: "21:00", market: "NQ", symbol: "MNQ", name: "納斯達克微台", side: "buy", price: 19200, qty: 2, fee: mnqFee, tax: 0 },
+  { id: "n2", date: "2026-03-02", time: "22:00", market: "NQ", symbol: "MNQ", name: "納斯達克微台", side: "sell", price: 19450, qty: 2, fee: mnqFee, tax: 0 }
+]);
+almost(mnq.realizedByTrade.n2, 250 * 2 * 2 - mnqFee - mnqFee, 0.05, "mnq realized uses $2 point");
+const mnqOpen = buildBooks([
+  { id: "n3", date: "2026-03-01", time: "21:00", market: "NQ", symbol: "NQ", name: "納斯達克小台", side: "buy", price: 20000, qty: 1, fee: 0, tax: 0 }
+]);
+const nqPos = positionsFrom(mnqOpen.books, { "NQ:NQ": { price: 20100 } })[0];
+almost(nqPos.unrealized, 100 * 20, 0.02, "NQ unrealized uses $20 point");
+almost(nqPos.marketValue, 20100 * 20, 0.02, "NQ notional");
 
 console.log("ledger tests passed");
