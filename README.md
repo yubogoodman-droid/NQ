@@ -53,14 +53,17 @@ TradingView：`pinescript/nq_5m_base_stack.pine`
 停損破底低下方 −8；目標 2R（保本 / 移動 / 12 根後跌破 MA20）。
 
 近一週 Yahoo 5m（08-28 → 09-04）：**1 筆、勝率 100%、+40**（09-02 07:10）。  
-破底夠深 23 → 站上均線但還沒多排 22 → 進場 1。  
-只站上三條、不要多排的話是 10 筆、勝率 30%、−86。
+近一個月（08-02 → 09-04）：**2 筆、勝率 50%、+22**。多出來的是 08-10 −18。  
+破底夠深 119 → 站回但沒多排 90 → 風險太大 12 → 進場 2。
 
 ```bash
 python3 examples/nq_5m_reclaim.py backtest --period 7d --pages
+python3 examples/nq_5m_reclaim.py backtest --period 30d --pages
 ```
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-week-stack.html
+預覽（一個月）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-month-stack.html
+
+預覽（一週）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-week-stack.html
 
 TradingView：`pinescript/nq_5m_reclaim.pine`
 

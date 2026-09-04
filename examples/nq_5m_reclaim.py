@@ -345,10 +345,10 @@ def _print_trades(df, trades) -> None:
 
 def _verdict(stats: dict) -> str:
     if stats["count"] == 0:
-        return "這週沒打到「破兩小時低、30 分內站回且 5/10/20 多排」。"
+        return "這段沒打到「破兩小時低、30 分內站回且 5/10/20 多排」。"
     if stats["total_points"] > 0:
-        return "有抓到破底翻，但樣本只有一週，單筆停損仍在破底低下方。"
-    return "一週是虧的。破底後要在 30 分內站回且 5/10/20 多排才進。"
+        return "有抓到破底後多排，筆數少，單筆停損仍在破底低下方。"
+    return "這段是虧的。破底後要在 30 分內站回且 5/10/20 多排才進。"
 
 
 def cmd_backtest(args) -> int:
@@ -379,7 +379,11 @@ def cmd_backtest(args) -> int:
         print(f"html={out}")
         if getattr(args, "pages", False):
             period = str(getattr(args, "period", ""))
-            dest = "one-week-stack.html" if period.startswith("7") else "view.html"
+            dest = "view.html"
+            if period.startswith("7"):
+                dest = "one-week-stack.html"
+            elif period.startswith("30"):
+                dest = "one-month-stack.html"
             view = write_view_html(out, branch=VIEW_BRANCH, dest_name=dest)
             print(f"preview={view}")
     return 0
