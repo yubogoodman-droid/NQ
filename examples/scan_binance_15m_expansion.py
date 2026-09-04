@@ -1240,7 +1240,7 @@ def cmd_backtest(args) -> int:
 
 def verify_four() -> int:
     """回放 ETH 那張 15m 擴張圖，時間窗內要命中。"""
-    print("回放 ETH 擴張圖…", flush=True)
+    print("回放 MA200 附近擴張圖…", flush=True)
     failed = []
     for case in VERIFY_CASES:
         sym = case["symbol"]
