@@ -54,9 +54,9 @@ python3 examples/nq_ma60_limit.py alert --dry-run --once
 
 TradingView：`pinescript/nq_ma60_limit_1m.pine` 套用至 NQ1! / MNQ1! 一分圖。
 
-Yahoo 1m（2026-08-05 → 09-04）：**44 筆、勝率 38.6%、+246.5 點**。  
-漏斗：破底 1218 → 深度≥10點 201 → 5/20+破MA60 60 → 成交 44（逾時取消 16）。  
-近 8 天：10 筆、勝率 40%、+176.5 點（與拿掉 MA60 上移停損前相同，只是標籤不再出現 `ma60_stop`）。
+Yahoo 1m（2026-08-05 → 09-04）：**35 筆、勝率 48.6%、+500.4 點**。  
+漏斗：破底 1224 → 深度≥10點 202 → 5/20+破MA60 49 → 成交 35（逾時 14 · 糾結濾掉 21）。  
+近 8 天：6 筆、勝率 66.7%、+275.9 點。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-ma60-limit-63a8/docs/nq-ma60-limit/view.html
 
