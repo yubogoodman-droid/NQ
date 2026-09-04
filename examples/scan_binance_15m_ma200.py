@@ -135,6 +135,7 @@ def fetch_klines(
     start_ms: int | None = None,
     end_ms: int | None = None,
     drop_unclosed: bool = True,
+    min_bars: int = MIN_BARS,
 ) -> dict | None:
     params: dict = {"symbol": sym, "interval": "15m", "limit": min(limit, 1500)}
     if start_ms is not None:
@@ -142,12 +143,12 @@ def fetch_klines(
     if end_ms is not None:
         params["endTime"] = int(end_ms)
     raw = get_json("/fapi/v1/klines", params=params)
-    if not raw or len(raw) < MIN_BARS:
+    if not raw or len(raw) < min_bars:
         return None
     now_ms = int(time.time() * 1000)
     if drop_unclosed and int(raw[-1][0]) + BAR_MS > now_ms:
         raw = raw[:-1]
-    if len(raw) < MIN_BARS:
+    if len(raw) < min_bars:
         return None
     return bars_from_raw(raw)
 
@@ -163,6 +164,7 @@ def fetch_range(sym: str, start: datetime, end: datetime) -> dict | None:
             start_ms=int(cur.timestamp() * 1000),
             end_ms=int(nxt.timestamp() * 1000),
             drop_unclosed=False,
+            min_bars=2,
         )
         if part is not None:
             chunks.append(part)
@@ -385,10 +387,19 @@ def _equity_svg(pnls: list[float], width: int = 720, height: int = 160) -> str:
     )
 
 
-def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str) -> Path:
+def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_cards: int = 24) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     img_dir = path.parent / "img"
     img_dir.mkdir(parents=True, exist_ok=True)
+    if len(rows) > max_cards:
+        def _rank(r):
+            s = r["sig"]
+            q = {"A": 0, "B": 1, "C": 2}.get(s.quality, 3)
+            eth = 0 if r["symbol"] == "ETHUSDT" else 1
+            return (eth, q, -s.vol_ratio, s.ribbon)
+
+        rows = sorted(rows, key=_rank)[:max_cards]
+        rows = sorted(rows, key=lambda r: int(r["d"]["t"][r["sig"].idx]))
     trades = [r["trade"] for r in rows if r.get("trade")]
     stats = summarize_trades(trades) if trades else {"count": len(rows), "wins": 0, "losses": 0, "win_rate": 0.0, "pnl_pct": 0.0, "avg_pct": 0.0, "by_quality": {}}
     cards = []

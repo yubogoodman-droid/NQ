@@ -13,7 +13,7 @@ import numpy as np
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
 
 LOOKBACK = 24  # 盤整回看：24 根 15m ≈ 6 小時
-MAX_RIBBON = 0.012  # 六條均線寬度 ≤ 1.2%
+MAX_RIBBON = 0.008  # 六條均線寬度 ≤ 0.8%（截圖那波突破前約 0.51%）
 MAX_BOX = 0.030  # 箱體高低差 ≤ 3.0%
 MAX_MA200_SLOPE = 0.008  # 近 20 根 MA200 斜率絕對值 ≤ 0.8%
 NEAR_200 = 0.015  # 收盤離 200 ≤ 1.5% 算「靠近」
@@ -22,8 +22,8 @@ MAX_MA7_VS_200 = 0.012  # 突破前 MA7 仍黏著 200
 MAX_MA200_ABOVE_BOX = 0.012  # 200 可以略高於箱頂，但不能遠在天上
 MIN_BARS_AT_OR_BELOW = 4
 
-MIN_VOL_RATIO = 1.60
-MIN_RANGE_EXPAND = 1.50
+MIN_VOL_RATIO = 2.40  # 截圖第一根約 3.7×
+MIN_RANGE_EXPAND = 2.00
 MAX_ENTRY_EXT = 0.015  # 進場收盤仍 ≤ 1.5% 高於 200
 MIN_BODY_FRAC = 0.35
 MIN_RISK = 0.004
@@ -78,9 +78,9 @@ class SqueezeSignal:
 
     @property
     def quality(self) -> str:
-        if self.ribbon <= 0.006 and self.ext <= 0.010 and self.vol_ratio >= 2.0:
+        if self.ribbon <= 0.006 and self.ext <= 0.008 and self.vol_ratio >= 3.0:
             return "A"
-        if self.ribbon <= 0.010 and self.ext <= 0.013:
+        if self.ribbon <= 0.008 and self.ext <= 0.012:
             return "B"
         return "C"
 
@@ -128,6 +128,7 @@ def signal_at(d: dict, i: int) -> SqueezeSignal | None:
 
     box_hi = float(h[w0:w1].max())
     box_lo = float(l[w0:w1].min())
+    close_hi = float(c[w0:w1].max())
     mid = (box_hi + box_lo) / 2.0
     if mid <= 0:
         return None
@@ -159,7 +160,10 @@ def signal_at(d: dict, i: int) -> SqueezeSignal | None:
         return None
     if c[i] <= m200[i]:
         return None
-    if c[i] <= box_hi:
+    # 突破看收盤箱頂，不讓舊影線把第一根靠近 200 的放量陽線擋掉
+    if c[i] <= close_hi:
+        return None
+    if c[i] <= hi_m:
         return None
 
     ext = float(c[i] / m200[i] - 1.0)
@@ -181,8 +185,8 @@ def signal_at(d: dict, i: int) -> SqueezeSignal | None:
     if this_rng <= 0 or body / this_rng < MIN_BODY_FRAC:
         return None
 
-    # 只吃第一根突破：前一根已經打出箱頂且站上 200，這根就是追價
-    if c[prev] > box_hi and c[prev] > m200[prev]:
+    # 只吃第一根突破：前一根已經收過收盤箱頂且站上 200，這根就是追價
+    if c[prev] > close_hi and c[prev] > m200[prev] and c[prev] > hi_m:
         return None
 
     entry = float(c[i])

@@ -125,7 +125,7 @@ python3 examples/chart_today.py
 
 ## 幣安 15m 黏帶擠壓 · 200MA 附近進場
 
-線型：MA7/14/25/99/120/200 黏成一條，價格在 200 附近橫盤，放量陽線打出箱頂，**收盤離 200 仍 ≤ 1.5%** 才進——不追已經直豎的那一段。
+線型：MA7/14/25/99/120/200 黏成一條（寬度 ≤ 0.8%），價格在 200 附近橫盤，放量（≥ 2.4×）陽線打出收盤箱頂，**收盤離 200 仍 ≤ 1.5%** 才進——不追已經直豎的那一段。ETH 9/3 20:30 那波（截圖漲到 2488 之前）進場在 2412，離 200 只有 +0.27%。
 
 ```bash
 # TradingView：pinescript/ma200_squeeze_15m.pine 貼到 Pine Editor，套 15 分圖
@@ -140,6 +140,8 @@ python3 examples/scan_binance_15m_ma200.py --backtest --days 7 --pages
 python3 examples/scan_binance_15m_ma200.py --once
 python3 examples/scan_binance_15m_ma200.py --watch
 ```
+
+ETH 近兩週圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m/view.html
 
 ## TradingView
 

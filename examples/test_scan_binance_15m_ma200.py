@@ -90,8 +90,8 @@ def test_coil_break_near_200_hits() -> None:
     h = hits[0]
     assert h.close > h.ma200
     assert h.ext <= MAX_ENTRY_EXT
-    assert h.ribbon <= 0.012
-    assert h.vol_ratio >= 1.6
+    assert h.ribbon <= 0.008
+    assert h.vol_ratio >= 2.4
     assert 99.0 < h.ma200 < 101.5
 
 
@@ -130,6 +130,18 @@ def test_chop_without_expansion_skips() -> None:
     close = 100.0 + 0.25 * rng.standard_normal(300)
     d = add_indicators(_bars(close, np.full(300, 2000.0), noise=0.0006))
     assert detect_signals(d) == []
+
+
+def test_old_wick_does_not_block_close_break() -> None:
+    """舊影線高於第一根放量收盤時，仍應以收盤箱頂判定突破（ETH 9/3 20:30）。"""
+    d = _coil_then_break(break_close=101.05)
+    i = 260
+    d["h"][i - 8] = 101.40  # 盤整中一根長上影
+    d["c"][i - 8] = 100.10
+    hits = detect_signals(d)
+    assert hits, "不該被舊影線擋住靠近 200 的第一根放量陽線"
+    assert hits[0].idx == i
+    assert hits[0].ribbon <= 0.008
 
 
 def test_second_bar_chase_skips() -> None:
