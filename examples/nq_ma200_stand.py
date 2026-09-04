@@ -46,9 +46,7 @@ MAX_DIST_MA200 = 30.0
 STOP_BELOW_MA200 = 10.0
 TAKE_PROFIT = 100.0
 MIN_UPPER_WICK = 8.0
-MIN_5M_RIBBON = 15.0  # 五分 MA5/10/20/30；第一張短均黏成一束約 13
-NEAR_5M_RIBBON = 17.0  # 第6張那種五分還黏（16.5）
-MIN_1M_RIBBON = 15.0  # 且一分 MA5–60 也黏（第6張 13.7）
+MIN_5M_RIBBON = 17.0  # 五分 MA5/10/20/30；第一張約 13、第6張約 16.4
 
 
 # ---------------------------------------------------------------------------
@@ -252,8 +250,6 @@ def detect_signals(
     take_profit: float = TAKE_PROFIT,
     min_upper_wick: float = MIN_UPPER_WICK,
     min_5m_ribbon: float = MIN_5M_RIBBON,
-    near_5m_ribbon: float = NEAR_5M_RIBBON,
-    min_1m_ribbon: float = MIN_1M_RIBBON,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     close = df["Close"].to_numpy(float)
@@ -317,13 +313,7 @@ def detect_signals(
                 continue
             ribbon = float(m5_ribbon[j])
             ribbon_1m = float(ma5[j] - ma60[j])
-            if is_ma_tangle(
-                ribbon,
-                ribbon_1m,
-                min_5m_ribbon=min_5m_ribbon,
-                near_5m_ribbon=near_5m_ribbon,
-                min_1m_ribbon=min_1m_ribbon,
-            ):
+            if min_5m_ribbon > 0 and (np.isnan(ribbon) or ribbon < min_5m_ribbon):
                 bump("skip_5m_tangle")
                 continue
             stop = float(ma200[j]) - stop_below_ma200
@@ -468,28 +458,6 @@ def ribbon_spread(*values: float) -> float:
 def ribbon_tangled(*values: float, min_spread: float) -> bool:
     spread = ribbon_spread(*values)
     return bool(np.isnan(spread) or spread < min_spread)
-
-
-def is_ma_tangle(
-    m5_ribbon: float,
-    m1_ribbon: float,
-    *,
-    min_5m_ribbon: float = MIN_5M_RIBBON,
-    near_5m_ribbon: float = NEAR_5M_RIBBON,
-    min_1m_ribbon: float = MIN_1M_RIBBON,
-) -> bool:
-    """五分短均黏成一束，或五分仍偏窄且一分 MA5–60 也黏（第6張）。"""
-    if min_5m_ribbon <= 0:
-        return False
-    if np.isnan(m5_ribbon) or m5_ribbon < min_5m_ribbon:
-        return True
-    if (
-        near_5m_ribbon > min_5m_ribbon
-        and m5_ribbon < near_5m_ribbon
-        and (np.isnan(m1_ribbon) or m1_ribbon < min_1m_ribbon)
-    ):
-        return True
-    return False
 
 
 def align_htf(df_1m: pd.DataFrame, series_htf: pd.Series) -> np.ndarray:
@@ -822,7 +790,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 五分MA5–30帶寬&lt;15濾掉 · 五分仍偏窄（&lt;17）且一分MA5–60也黏（&lt;15）也濾</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 五分MA5–30帶寬&lt;17濾掉糾結</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

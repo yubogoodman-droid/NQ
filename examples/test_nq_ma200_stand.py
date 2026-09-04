@@ -16,7 +16,6 @@ from nq_ma200_stand import (  # noqa: E402
     TradeResult,
     detect_signals,
     in_open_skip,
-    is_ma_tangle,
     is_red_long_upper,
     parse_period_days,
     resample_5m,
@@ -221,20 +220,16 @@ def test_resample_5m() -> None:
 
 def test_ribbon_helpers() -> None:
     assert abs(ribbon_spread(100.0, 110.0, 105.0, 108.0, 102.0) - 10.0) < 1e-9
-    assert ribbon_tangled(100.0, 110.0, 105.0, 108.0, min_spread=15.0) is True
-    assert ribbon_tangled(100.0, 140.0, 120.0, 130.0, min_spread=15.0) is False
-    assert is_ma_tangle(12.7, 40.0) is True  # 第一張：五分短均黏
-    assert is_ma_tangle(16.5, 13.7) is True  # 第6張：五分還黏且一分也黏
-    assert is_ma_tangle(16.1, 24.8) is False  # 五分偏窄但一分已打開
-    assert is_ma_tangle(17.5, 7.1) is False  # 五分已拉開
-    assert is_ma_tangle(16.5, 13.7, min_5m_ribbon=0.0) is False
+    assert ribbon_tangled(100.0, 110.0, 105.0, 108.0, min_spread=17.0) is True
+    assert ribbon_tangled(100.0, 140.0, 120.0, 130.0, min_spread=17.0) is False
+    assert ribbon_tangled(100.0, 116.4, 108.0, 110.0, min_spread=17.0) is True  # 第6張 16.4
 
 
 def test_skip_5m_tangle() -> None:
     df = _make_setup_bars()
     open_sigs = detect_signals(df, min_5m_ribbon=0.0)
     assert open_sigs, "control: without 5m ribbon filter the synthetic still fires"
-    assert not detect_signals(df), "tight 5m MA5–30 coil like trade #1 should be skipped"
+    assert not detect_signals(df), "tight 5m MA5–30 coil like trades #1/#6 should be skipped"
 
 
 def test_summarize() -> None:
