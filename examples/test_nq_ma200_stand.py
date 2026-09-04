@@ -220,8 +220,8 @@ def test_resample_5m() -> None:
 
 def test_ribbon_helpers() -> None:
     assert abs(ribbon_spread(100.0, 110.0, 105.0, 108.0, 102.0) - 10.0) < 1e-9
-    assert ribbon_tangled(100.0, 110.0, 105.0, 108.0, 102.0, min_spread=28.0) is True
-    assert ribbon_tangled(100.0, 140.0, 120.0, 130.0, 110.0, min_spread=28.0) is False
+    assert ribbon_tangled(100.0, 110.0, 105.0, 108.0, min_spread=15.0) is True
+    assert ribbon_tangled(100.0, 140.0, 120.0, 130.0, min_spread=15.0) is False
 
 
 def test_skip_5m_tangle() -> None:

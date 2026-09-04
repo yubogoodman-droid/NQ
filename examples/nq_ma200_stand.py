@@ -9,7 +9,7 @@
   5. 美東 9:30–10:00 不進
   6. 紅 K 長上影跳過
   7. 停損 MA200−10，停利 +100
-  8. 五分K MA5–60 帶寬 < 28 當糾結，濾掉（第一張那種黏成一束）
+  8. 五分K MA5–30 帶寬 < 15 當糾結，濾掉（第一張那種短均黏成一束）
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -46,7 +46,7 @@ MAX_DIST_MA200 = 30.0
 STOP_BELOW_MA200 = 10.0
 TAKE_PROFIT = 100.0
 MIN_UPPER_WICK = 8.0
-MIN_5M_RIBBON = 28.0  # 五分 MA5/10/20/30/60 帶寬，低於這當糾結
+MIN_5M_RIBBON = 15.0  # 五分 MA5/10/20/30 帶寬；第一張那種短均黏成一束約 13
 
 
 # ---------------------------------------------------------------------------
@@ -472,9 +472,10 @@ def align_htf(df_1m: pd.DataFrame, series_htf: pd.Series) -> np.ndarray:
 
 
 def overlay_5m_ribbon(df_1m: pd.DataFrame) -> np.ndarray:
+    """已收盤五分 MA5/10/20/30 帶寬。不把 MA60 算進去：第一張短均只差 13，MA60 會把帶寬撐到 40。"""
     df5 = resample_5m(df_1m)
     close5 = df5["Close"].astype(float)
-    mas = [align_htf(df_1m, close5.rolling(n, min_periods=n).mean()) for n in (5, 10, 20, 30, 60)]
+    mas = [align_htf(df_1m, close5.rolling(n, min_periods=n).mean()) for n in (5, 10, 20, 30)]
     stacked = np.vstack(mas)
     with np.errstate(invalid="ignore"):
         spread = stacked.max(axis=0) - stacked.min(axis=0)
@@ -729,7 +730,7 @@ def write_html_report(
             f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f} "
             f"> MA30 {t.signal.ma30:.1f} > MA60 {t.signal.ma60:.1f}\n"
             f"MA200 {t.signal.ma200:.1f}  先前連{t.signal.under_streak}根在下\n"
-            f"5m MA5–60 帶寬 {t.signal.m5_ribbon:.1f}"
+            f"5m MA5–30 帶寬 {t.signal.m5_ribbon:.1f}"
             "</pre>"
             f"{charts}"
             "</article>"
@@ -785,7 +786,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 五分MA5–60帶寬&lt;28濾掉糾結</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 五分MA5–30帶寬&lt;15濾掉糾結</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
