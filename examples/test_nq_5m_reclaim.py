@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic tests for NQ 5m 破底後 30 分內 5/10/20 多排。"""
+"""Synthetic tests for NQ 5m 破底後 1 小時內 5/10/20 多排。"""
 
 from __future__ import annotations
 
@@ -40,16 +40,16 @@ def _bars(*, lift_delay: int = 1, n: int = 90) -> pd.DataFrame:
 def test_reclaim_stack_within_30m() -> None:
     df = _bars(lift_delay=1)
     sigs = detect_signals(df)
-    assert sigs, "should take a 5/10/20 stack reclaim inside 30 minutes"
-    assert sigs[0].entry_idx - sigs[0].dump_idx <= 6
+    assert sigs, "should take a 5/10/20 stack reclaim inside 1 hour"
+    assert sigs[0].entry_idx - sigs[0].dump_idx <= 12
     assert sigs[0].entry_price > sigs[0].ma5
     assert sigs[0].ma5 > sigs[0].ma10 > sigs[0].ma20
     assert simulate(df, sigs)
 
 
 def test_late_reclaim_rejected() -> None:
-    df = _bars(lift_delay=10)
-    assert not detect_signals(df), "reclaim after 30 minutes should not fill"
+    df = _bars(lift_delay=16)
+    assert not detect_signals(df), "reclaim after 1 hour should not fill"
 
 
 def test_close_above_mas_without_stack_rejected() -> None:

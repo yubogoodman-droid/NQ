@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NQ 五分 K：破兩小時低點後，30 分鐘內站回且 5/10/20 多排做多。
+"""NQ 五分 K：破兩小時低點後，1 小時內站回且 5/10/20 多排做多。
 
 用法:
   python3 examples/nq_5m_reclaim.py backtest --period 7d --pages
@@ -36,7 +36,7 @@ from nq_5m_base_stack import (  # noqa: E402
 
 PAGES_HTML = REPO_ROOT / "docs" / "nq-5m-reclaim" / "index.html"
 BLURB = (
-    "五分 K 跌破近 2 小時低點後，30 分鐘內（6 根）收盤站回且 MA5>MA10>MA20 多排才做多。"
+    "五分 K 跌破近 2 小時低點後，1 小時內（12 根）收盤站回且 MA5>MA10>MA20 多排才做多。"
     "停損在破底低下方，目標 2R。"
 )
 
@@ -72,7 +72,7 @@ def rolling_min_prev(arr, n: int) -> np.ndarray:
 def detect_signals(
     df,
     two_hour_bars: int = 24,
-    reclaim_window: int = 6,
+    reclaim_window: int = 12,
     min_break_depth: float = 12.0,
     stop_buffer: float = 8.0,
     target_r: float = 2.0,
@@ -269,7 +269,7 @@ def write_html_report(
             f"夠深 {funnel.get('deep_break', 0)} → "
             f"站回 {funnel.get('reclaim', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
-            f"（太淺 {funnel.get('skip_shallow', 0)} · 30分內沒站回 {funnel.get('skip_no_reclaim', 0)} · "
+            f"（太淺 {funnel.get('skip_shallow', 0)} · 1小時內沒站回 {funnel.get('skip_no_reclaim', 0)} · "
             f"風險 {funnel.get('skip_max_risk', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -310,7 +310,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{escape(symbol)} 五分破底後 30 分內 5/10/20 多排</h1>
+<h1>{escape(symbol)} 五分破底後 1 小時內 5/10/20 多排</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)} · 五分 K</p>
 <p class="muted">{escape(blurb or BLURB)}</p>
 {verdict_html}
@@ -345,10 +345,10 @@ def _print_trades(df, trades) -> None:
 
 def _verdict(stats: dict) -> str:
     if stats["count"] == 0:
-        return "這段沒打到「破兩小時低、30 分內站回且 5/10/20 多排」。"
+        return "這段沒打到「破兩小時低、1 小時內站回且 5/10/20 多排」。"
     if stats["total_points"] > 0:
         return "有抓到破底後多排，筆數少，單筆停損仍在破底低下方。"
-    return "這段是虧的。破底後要在 30 分內站回且 5/10/20 多排才進。"
+    return "這段是虧的。破底後要在 1 小時內站回且 5/10/20 多排才進。"
 
 
 def cmd_backtest(args) -> int:
@@ -381,16 +381,16 @@ def cmd_backtest(args) -> int:
             period = str(getattr(args, "period", ""))
             dest = "view.html"
             if period.startswith("7"):
-                dest = "one-week-stack.html"
+                dest = "one-week-1h.html"
             elif period.startswith("30"):
-                dest = "one-month-stack.html"
+                dest = "one-month-1h.html"
             view = write_view_html(out, branch=VIEW_BRANCH, dest_name=dest)
             print(f"preview={view}")
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="NQ 五分破底後 30 分內站回 5/10/20")
+    p = argparse.ArgumentParser(description="NQ 五分破底後 1 小時內 5/10/20 多排")
     sub = p.add_subparsers(dest="cmd")
     b = sub.add_parser("backtest")
     b.add_argument("--symbol", default="NQ=F")

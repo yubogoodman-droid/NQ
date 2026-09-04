@@ -2,7 +2,7 @@
 strategy("NQ 五分破底站回 5/10/20", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
 
 twoHourBars  = input.int(24, "兩小時回看 K 數（5m）", minval=6)
-reclaimBars  = input.int(6, "站回時限（根）= 30 分鐘", minval=1)
+reclaimBars  = input.int(12, "站回時限（根）= 1 小時", minval=1)
 minDepth     = input.float(12.0, "最少破底點數")
 stopBuf      = input.float(8.0, "停損緩衝")
 targetR      = input.float(2.0, "目標 R")
