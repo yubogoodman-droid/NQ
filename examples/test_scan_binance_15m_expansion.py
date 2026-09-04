@@ -42,7 +42,7 @@ def _bars(n: int, close: np.ndarray, vol: np.ndarray | None = None) -> dict:
 
 def _series(
     *,
-    rocket: float = 102.9,
+    rocket: float = 101.9,
     vol_signal: float = 4_000.0,
     grind: bool = True,
     tail: np.ndarray | None = None,
@@ -51,7 +51,7 @@ def _series(
     """長盤整（均線黏、ATR 小）→ 幾根緩推 → 一根爆量長陽。"""
     n_coil = 270
     coil = 100.0 * (1.0 + 0.0008 * np.sin(np.arange(n_coil) / 4.0))
-    grind_px = np.array([100.25, 100.55, 100.85, 101.10, 101.30, 101.50]) if grind else np.array([])
+    grind_px = np.array([100.2, 100.4, 100.6, 100.75, 100.9, 101.05]) if grind else np.array([])
     parts = [coil, grind_px, np.array([rocket])]
     if tail is not None:
         parts.append(np.asarray(tail, float))
@@ -80,37 +80,44 @@ def test_rsi_sma_all_up() -> None:
 
 
 def test_expansion_after_coil_hits() -> None:
-    d = _series(tail=np.full(4, 103.1))
+    d = _series(tail=np.full(4, 102.2))
     hits = detect_expansion(d)
-    assert hits, "盤整後爆量長陽應該命中"
+    assert hits, "盤整後在 MA200 附近的放量陽線應該命中"
     h = hits[-1]
     assert h["kind"] == "expand"
     assert h["mark_i"] == h["i"]
-    assert h["body"] >= 0.008
-    assert h["vol_ratio"] >= 2.5
+    assert h["mark_ext"] <= 0.02
+    assert h["body"] >= 0.004
+    assert h["vol_ratio"] >= 1.7
     assert h["ma7"] > h["ma14"] > h["ma25"]
 
 
 def test_tiny_body_skips() -> None:
     """實體太小，不像 ETH 那根長陽。"""
-    d = _series(rocket=101.7, tail=np.full(3, 101.8))
+    d = _series(rocket=101.25, tail=np.full(3, 101.3))
     assert detect_expansion(d) == []
 
 
 def test_low_volume_skips() -> None:
-    d = _series(vol_signal=1_050.0, tail=np.full(3, 103.1))
+    d = _series(vol_signal=1_050.0, tail=np.full(3, 102.2))
     assert detect_expansion(d) == []
 
 
 def test_pre_pump_volume_skips() -> None:
     """前一根已經比擴張棒還大聲，不算開始噴。"""
-    d = _series(vol_signal=4_000.0, prev_vol=5_000.0, tail=np.full(3, 103.1))
+    d = _series(vol_signal=4_000.0, prev_vol=5_000.0, tail=np.full(3, 102.2))
     assert detect_expansion(d) == []
 
 
 def test_no_grind_skips() -> None:
     """沒有緩推、短均還沒張開，一根尖兵不夠。"""
-    d = _series(grind=False, tail=np.full(3, 103.1))
+    d = _series(grind=False, tail=np.full(3, 102.2))
+    assert detect_expansion(d) == []
+
+
+def test_too_far_from_ma200_skips() -> None:
+    """已經離開 MA200 超過 2%，不算在 200 附近進。"""
+    d = _series(rocket=103.5, tail=np.full(3, 103.6))
     assert detect_expansion(d) == []
 
 
@@ -134,43 +141,43 @@ def test_collapse_keeps_best_of_run() -> None:
 
 
 def test_select_alerts_debounce() -> None:
-    d = _series(tail=np.full(8, 103.2))
+    d = _series(tail=np.full(8, 102.2))
     alerts = select_alerts(d, int(d["t"][0]), int(d["t"][-1]))
     assert alerts, "合成擴張應有訊號"
     buckets = {int(d["t"][h["i"]]) // ALERT_BUCKET_MS for h in alerts}
     assert len(buckets) == len(alerts)
 
 
-def test_stop_is_expansion_low() -> None:
-    d = _series(tail=np.full(6, 103.2))
+def test_stop_is_ma200() -> None:
+    d = _series(tail=np.full(6, 102.2))
     hits = detect_expansion(d)
     assert hits
     h = hits[0]
     tr = simulate_trade(d, h)
     assert tr is not None
-    assert tr["stop"] == h["stop_low"]
+    assert abs(tr["stop"] - h["ma200"]) < 1e-9
     assert tr["stop"] < tr["entry"]
     assert tr["mark_i"] == h["mark_i"]
 
 
-def test_simulate_stop_on_broke_low() -> None:
+def test_simulate_stop_on_ma_break() -> None:
     d = _series(tail=np.array([99.0, 98.5, 98.0]))
     hits = detect_expansion(d)
     assert hits
     tr = simulate_trade(d, hits[0])
     assert tr is not None
-    assert tr["reason"] == "broke_low"
+    assert tr["reason"] == "ma_break"
     assert tr["pnl_pct"] < 0
 
 
 def test_simulate_target_or_time() -> None:
-    d = _series(tail=103.2 * (1.004 ** np.arange(1, 18)))
+    d = _series(tail=102.2 * (1.004 ** np.arange(1, 18)))
     hits = detect_expansion(d)
     assert hits
     tr = simulate_trade(d, hits[0])
     assert tr is not None
     assert tr["entry"] > 0
-    assert tr["reason"] in {"broke_low", "time", "eod"}
+    assert tr["reason"] in {"ma_break", "time", "eod"}
 
 
 def test_summarize_empty() -> None:
@@ -189,7 +196,7 @@ def test_market_cluster_drops_huge_pack() -> None:
 
 
 def test_small_pack_kept() -> None:
-    pack = [{"t_mark": 1_000, "symbol": f"S{i}"} for i in range(4)]
+    pack = [{"t_mark": 1_000, "symbol": f"S{i}"} for i in range(3)]
     assert drop_market_cluster(pack) == pack
 
 
@@ -210,11 +217,12 @@ def main() -> int:
     test_low_volume_skips()
     test_pre_pump_volume_skips()
     test_no_grind_skips()
+    test_too_far_from_ma200_skips()
     test_chop_does_not_hit()
     test_collapse_keeps_best_of_run()
     test_select_alerts_debounce()
-    test_stop_is_expansion_low()
-    test_simulate_stop_on_broke_low()
+    test_stop_is_ma200()
+    test_simulate_stop_on_ma_break()
     test_simulate_target_or_time()
     test_summarize_empty()
     test_market_cluster_drops_huge_pack()

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""幣安 15m 盤整後爆量擴張：ETH 2026-09-03 22:45 那種。
+"""幣安 15m 在 MA200 附近的爆量擴張。
 
-  記號：均線先黏在一起、ATR 壓著，然後一根放量長陽收在高位、收盤創近 20 根新高。
-  進場：擴張棒收完，下一根開盤做多。
-  出場：收盤跌破擴張棒低點，或 4 小時到期。
+  記號：均線先黏，放量陽線收盤站上 MA200，且離 200 仍 ≤2%（不要追已經跑遠的大陽）。
+  進場：記號收完，下一根開盤做多。
+  出場：收盤跌破 MA200，或 4 小時到期。
 
 用法:
   python3 examples/scan_binance_15m_expansion.py --verify
@@ -38,26 +38,26 @@ REPO = Path(__file__).resolve().parents[1]
 SEEN_PATH = REPO / "output" / "binance_15m_expansion_seen.json"
 CONFIG_ENV = REPO / "tg_config.env"
 
-# 基準圖一定進宇宙
-KEEP = {"ETHUSDT"}
+# 基準圖與四張從 200 起漲的圖一定進宇宙
+KEEP = {"ETHUSDT", "FILUSDT", "PIPPINUSDT", "SNDKUSDT", "CRCLUSDT"}
 
 PRE_BARS = 12
-CONFIRM_BARS = 0         # 擴張棒本身就是訊號，下一根開盤進
-MIN_VOL_RATIO = 2.50     # ETH 09-03 22:45 約 3.7×
-# 擴張棒成交量必須大於前一根：開始噴，不是前一根已經噴完。
+CONFIRM_BARS = 0         # 貼著 200 的擴張棒本身就是訊號，下一根開盤進
+MIN_VOL_RATIO = 1.70     # FIL 3.5×、CRCL 4.0×、ETH 21:30 3.3×、SNDK 1.8×
 MIN_MARK_VOL_VS_PREV = 1.0
-MIN_BODY = 0.008         # 實體至少 +0.8%；ETH 那根 +1.32%
-MIN_RANGE_ATR = 2.50     # 振幅 ≥ 前一根 ATR20 的 2.5 倍；ETH 約 3.5×
-MIN_CLOSE_POS = 0.80     # 收在棒子上方 80%；ETH 0.98
+MIN_BODY = 0.004         # 實體 ≥0.4%；SNDK 記號 0.48%、ETH 21:30 0.62%（不是 22:45 那根 +1.32%）
+MIN_RANGE_ATR = 1.50     # PIPPIN 1.53×、ETH 21:30 2.38×
+MIN_CLOSE_POS = 0.65     # 收在棒子上方；SNDK 0.67、FIL 0.79
 LOOKBACK_BREAK = 20      # 收盤創近 20 根新高
-MAX_PRIOR_ATR_PCT = 0.0055  # 擴張前 ATR 要壓著；ETH 前一根約 0.39%
+MAX_MARK_EXT = 0.02      # 離 MA200 ≤2%，才叫在 200 附近進
+MAX_PRIOR_ATR_PCT = 0.012  # PIPPIN／SNDK 起漲時 ATR 約 1.1%
 SQUEEZE_LOOKBACK = 24
-MAX_SQUEEZE_RIBBON = 0.012  # 近 24 根裡 7/14/25/99/120/200 曾黏在 1.2% 內
+MAX_SQUEEZE_RIBBON = 0.05  # 允許 200 還帶一點寬度；PIPPIN 約 4.7%
 MIN_STACK_7_14 = 0.001
-MIN_STACK_7_25 = 0.004   # ETH 擴張棒 7/25 約 +1.25%
-SESSION_HOURS = range(0, 24)  # 基準圖是台北 22:45
-# ETH 這種擴張常跟著大盤一起出現，不再用「同一根 ≥4 檔」整批丟掉。
-MAX_SAME_MARK = 99
+MIN_STACK_7_25 = 0.004
+SESSION_HOURS = range(0, 24)
+# 同一根 15m 很多檔一起過 200 = 大盤彈，拿掉。
+MAX_SAME_MARK = 4
 CLUSTER_COOLDOWN_MS = 3 * 3600 * 1000
 MIN_BARS = 220
 KLINE_LIMIT = 500
@@ -70,15 +70,47 @@ MIN_RISK = 0.004
 FWD_BARS = (1, 4, 8, 16)
 PAGES_HTML = REPO / "docs" / "binance" / "expansion-15m-7d" / "index.html"
 
-# --verify 對齊 ETH 那張 15m 擴張圖（台北時間）
+# --verify：在 MA200 附近起漲（ETH 要抓 21:30 那根，不是 22:45 已離開 3% 的大陽）
 VERIFY_CASES = [
     {
         "symbol": "ETHUSDT",
-        "title": "ETH 盤整後爆量擴張",
+        "title": "ETH 在 MA200 附近起漲",
         "fetch_start": "2026-08-28 00:00",
         "fetch_end": "2026-09-04 08:00",
-        "expect_start": "2026-09-03 22:30",
-        "expect_end": "2026-09-03 23:15",
+        "expect_start": "2026-09-03 21:15",
+        "expect_end": "2026-09-03 21:45",
+    },
+    {
+        "symbol": "FILUSDT",
+        "title": "FIL 站上 MA200",
+        "fetch_start": "2025-12-28 00:00",
+        "fetch_end": "2026-01-02 08:00",
+        "expect_start": "2026-01-01 19:30",
+        "expect_end": "2026-01-01 20:15",
+    },
+    {
+        "symbol": "PIPPINUSDT",
+        "title": "PIPPIN 站上 MA200",
+        "fetch_start": "2026-01-17 00:00",
+        "fetch_end": "2026-01-22 02:00",
+        "expect_start": "2026-01-21 14:30",
+        "expect_end": "2026-01-21 15:15",
+    },
+    {
+        "symbol": "SNDKUSDT",
+        "title": "SNDK 站上 MA200",
+        "fetch_start": "2026-07-26 00:00",
+        "fetch_end": "2026-07-31 08:00",
+        "expect_start": "2026-07-30 19:15",
+        "expect_end": "2026-07-30 20:00",
+    },
+    {
+        "symbol": "CRCLUSDT",
+        "title": "CRCL 站上 MA200",
+        "fetch_start": "2026-08-15 00:00",
+        "fetch_end": "2026-08-20 08:00",
+        "expect_start": "2026-08-19 20:15",
+        "expect_end": "2026-08-19 21:00",
     },
 ]
 
@@ -251,7 +283,7 @@ def indicators(d: dict) -> dict:
 
 
 def _hit_at(d: dict, i: int) -> dict | None:
-    """i 是擴張棒（ETH 那種盤整後爆量長陽）。"""
+    """i 是貼著 MA200 的擴張棒（離 200 ≤2%）。"""
     o, h, l, c, v = d["o"], d["h"], d["l"], d["c"], d["v"]
     m7, m14, m25 = d["m7"], d["m14"], d["m25"]
     m99, m120, m200 = d["m99"], d["m120"], d["m200"]
@@ -311,7 +343,11 @@ def _hit_at(d: dict, i: int) -> dict | None:
         ribbons.append(float(max(xs) / min(xs) - 1.0))
     if not ribbons or min(ribbons) > MAX_SQUEEZE_RIBBON:
         return None
+    if float(c[i]) <= float(m200[i]):
+        return None
     ext = float(c[i] / m200[i] - 1.0)
+    if ext > MAX_MARK_EXT:
+        return None
     ribbon = float(max(m99[i], m120[i], m200[i]) / min(m99[i], m120[i], m200[i]) - 1.0)
     return {
         "i": i,
@@ -335,11 +371,11 @@ def _hit_at(d: dict, i: int) -> dict | None:
         "mark_ext": ext,
         "ribbon": ribbon,
         "hour": hour,
-        "stop_low": float(l[i]),
+        "stop_low": float(m200[i]),
         "body": body,
         "range_atr": float(range_atr),
         "close_pos": close_pos,
-        "score": float(vr + body * 100.0),
+        "score": float(vr + max(0.0, MAX_MARK_EXT - ext) * 200.0),
     }
 
 
@@ -522,7 +558,7 @@ def draw_chart(sym: str, d: dict, hit: dict, path: str) -> str | None:
     if 0 <= x0 < len(c):
         ax.axvline(x0, color="#c9a227", ls=":", lw=0.9)
         ax.scatter([x0], [c[x0]], s=28, color="#c9a227", marker="D", zorder=5)
-    tag = "盤整後爆量擴張"
+    tag = "MA200 附近擴張"
     ax.set_title(f"{sym}  15m  {tag}", color="#e8f0ea", fontsize=12)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     fig.tight_layout(pad=0.5)
@@ -534,12 +570,12 @@ def draw_chart(sym: str, d: dict, hit: dict, path: str) -> str | None:
 def format_hit(sym: str, d: dict, hit: dict) -> str:
     mark_ts = hm(int(d["t"][hit.get("mark_i", hit["i"])]))
     return (
-        f"<b>15m 爆量擴張</b>  {sym}\n"
-        f"擴張 {mark_ts}　實體 {hit.get('body', hit.get('move', 0))*100:+.2f}%　"
-        f"{hit.get('range_atr', 0):.1f}×ATR　量比 {hit['vol_ratio']:.1f}×\n"
-        f"現價 {hit['close']:g}　離 200 {hit['ext']*100:+.2f}%　{hit.get('hour', 0):02d} 點\n"
+        f"<b>15m MA200 附近擴張</b>  {sym}\n"
+        f"記號 {mark_ts}　離 200 {hit.get('mark_ext', 0)*100:+.2f}%　"
+        f"實體 {hit.get('body', hit.get('move', 0))*100:+.2f}%　量比 {hit['vol_ratio']:.1f}×\n"
+        f"現價 {hit['close']:g}　MA200 {hit.get('ma200', 0):g}　{hit.get('hour', 0):02d} 點\n"
         f"MA7 {hit['ma7']:g} &gt; MA14 {hit.get('ma14', 0):g} &gt; MA25 {hit['ma25']:g}\n"
-        f"<i>均線先黏、ATR 壓著，放量長陽收在高位並創 20 根新高；下一根開盤做多，收盤跌破這根低點出場。</i>"
+        f"<i>放量陽線站上 200 且還貼著（≤2%）；下一根開盤做多，收盤破 200 出場。</i>"
     )
 
 
@@ -613,7 +649,7 @@ def wait_next_close() -> None:
 
 def test_telegram() -> int:
     apply_keys()
-    ok = telegram_send("15m 盤整後爆量擴張監看測試\n如果你看到這則，Telegram 已通。")
+    ok = telegram_send("15m MA200 附近擴張監看測試\n如果你看到這則，Telegram 已通。")
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
     return 0 if ok else 1
 
@@ -642,16 +678,17 @@ def _fwd_pct(d: dict, entry_i: int, entry: float, bars: int) -> float | None:
 
 
 def simulate_trade(d: dict, hit: dict) -> dict | None:
-    """擴張棒收完下一根開盤做多。收盤跌破擴張棒低點出場；最多 HOLD_BARS 根。"""
+    """記號收完下一根開盤做多。收盤跌破 MA200 出場；最多 HOLD_BARS 根。"""
     i = hit["i"]
     o, h, l, c = d["o"], d["h"], d["l"], d["c"]
+    m200 = d["m200"]
     if i + 1 >= len(c):
         return None
     entry_i = i + 1
     entry = float(o[entry_i])
     if entry <= 0:
         return None
-    exp_low = float(hit.get("stop_low", l[i]))
+    stop = float(hit.get("stop_low", m200[i]))
     last = min(entry_i + HOLD_BARS, len(c) - 1)
     exit_i = last
     exit_px = float(c[last])
@@ -660,18 +697,18 @@ def simulate_trade(d: dict, hit: dict) -> dict | None:
     for k in range(entry_i, last + 1):
         mfe = max(mfe, float(h[k]) / entry - 1.0)
         mae = min(mae, float(l[k]) / entry - 1.0)
-        if float(c[k]) < exp_low:
-            exit_i, exit_px, reason = k, float(c[k]), "broke_low"
+        if not np.isnan(m200[k]) and float(c[k]) < float(m200[k]):
+            exit_i, exit_px, reason = k, float(c[k]), "ma_break"
             break
     pnl_pct = (exit_px / entry - 1.0) * 100.0
-    risk = max(entry - exp_low, entry * MIN_RISK, 1e-12)
+    risk = max(entry - stop, entry * MIN_RISK, 1e-12)
     fwd = {n: _fwd_pct(d, entry_i, entry, n) for n in FWD_BARS}
     return {
         "signal_i": i,
         "entry_i": entry_i,
         "exit_i": exit_i,
         "entry": entry,
-        "stop": exp_low,
+        "stop": stop,
         "target": entry * 1.0,
         "exit": exit_px,
         "reason": reason,
@@ -875,7 +912,7 @@ def draw_trade_b64(sym: str, d: dict, tr: dict) -> str | None:
         sym,
         d,
         tr,
-        title=f"{sym}  15m  爆量擴張  {tr['reason']}  {tr['pnl_pct']:+.2f}%",
+        title=f"{sym}  15m  MA200附近擴張  {tr['reason']}  {tr['pnl_pct']:+.2f}%",
         a0=a0,
         a1=a1,
         mark_i=int(tr.get("mark_i", tr["signal_i"])),
@@ -1052,7 +1089,7 @@ def write_backtest_html(
     for i, t in enumerate(trades, 1):
         cls = "pnl-win" if t["pnl_pct"] > 0 else ("pnl-flat" if t["pnl_pct"] == 0 else "pnl-loss")
         reason_cls = {"broke_low": "tag-sl", "ma_break": "tag-sl", "time": "tag-time", "eod": "tag-time"}.get(t["reason"], "tag-info")
-        tag = "盤整後爆量擴張"
+        tag = "MA200 附近擴張"
         img = ""
         if id(t) in chart_set:
             d = data.get(t["symbol"])
@@ -1094,9 +1131,9 @@ def write_backtest_html(
             f"<span class='tag tag-info'>記號 {escape(hm(t.get('t_mark', t['t_signal'])))}</span>"
             "</div>"
             "<pre class='trade-detail'>"
-            f"entry {t['entry']:g}  擴張低 {t['stop']:g}\n"
+            f"entry {t['entry']:g}  MA200 {t['stop']:g}\n"
             f"exit  {t['exit']:g}  {t['reason']}\n"
-            f"實體 {t.get('body', t.get('move', 0))*100:+.2f}%  {t.get('range_atr', 0):.1f}×ATR  量比 {t['vol_ratio']:.1f}×  離200 {t.get('ext', t['move'])*100:+.2f}%\n"
+            f"離200 {t.get('mark_ext', 0)*100:+.2f}%  實體 {t.get('body', t.get('move', 0))*100:+.2f}%  {t.get('range_atr', 0):.1f}×ATR  量比 {t['vol_ratio']:.1f}×\n"
             f"MFE {t['mfe_pct']:+.2f}%  MAE {t['mae_pct']:+.2f}%\n"
             f"無停損 1h {h1:+.2f}%  2h {h2:+.2f}%"
             "</pre>"
@@ -1108,7 +1145,7 @@ def write_backtest_html(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>幣安 15m 盤整後爆量擴張 · 近 {days} 天</title>
+<title>幣安 15m MA200 附近擴張 · 近 {days} 天</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -1140,8 +1177,8 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安 15m 盤整後爆量擴張</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。基準是 ETH 09-03 22:45 那張：<strong>均線先黏、ATR 壓著</strong>，然後一根放量長陽（實體 ≥{MIN_BODY:.1%}、振幅 ≥{MIN_RANGE_ATR:.1f}×ATR、量比 ≥{MIN_VOL_RATIO:.1f}×、收在棒子上方 {MIN_CLOSE_POS:.0%}、收盤創 20 根新高、MA7 &gt; MA14 &gt; MA25）。擴張棒收完下一根開盤做多，<strong>收盤跌破這根低點</strong>出場，最多 4 小時。</p>
+<h1>幣安 15m MA200 附近擴張</h1>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。<strong>在 MA200 附近進</strong>：放量陽線收盤站上 200，離 200 仍 ≤{MAX_MARK_EXT:.0%}（不要追已經跑遠的大陽）。實體 ≥{MIN_BODY:.1%}、振幅 ≥{MIN_RANGE_ATR:.1f}×ATR、量比 ≥{MIN_VOL_RATIO:.1f}×、收在棒子上方 {MIN_CLOSE_POS:.0%}、創 20 根新高、MA7 &gt; MA14 &gt; MA25。下一根開盤做多，<strong>收盤跌破 MA200</strong> 出場，最多 4 小時。同一根 15m ≥{MAX_SAME_MARK} 檔視為大盤一起過線。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1153,7 +1190,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <p class="muted">{escape(kind_line) if kind_line else '無分組'}</p>
 <p class="muted">出場 {escape(reason_line) if reason_line else '—'}</p>
 <p class="muted">無停損續走 {escape(fwd_line) if fwd_line else '—'}</p>
-<p class="muted">等權重每筆 1 單位，不含手續費／資金費。下面 {stats['count']} 筆都有圖：上面 15m、下面 1h 對照。黃菱形＝擴張棒、綠三角＝進場、× ＝出場。</p>
+<p class="muted">等權重每筆 1 單位，不含手續費／資金費。下面 {stats['count']} 筆都有圖：上面 15m、下面 1h 對照。黃菱形＝在 200 附近的擴張棒、綠三角＝進場、× ＝出場。</p>
 </section>
 {''.join(cards) if cards else "<div class='empty'>這週沒有訊號</div>"}
 </div></body></html>
@@ -1242,17 +1279,17 @@ def verify_four() -> int:
     if failed:
         print("沒過：", ", ".join(failed))
         return 1
-    print("基準圖抓到了。")
+    print("都在 MA200 附近抓到了。")
     return 0
 
 
 def main() -> int:
     import argparse
 
-    p = argparse.ArgumentParser(description="幣安 15m 盤整後爆量擴張（ETH 09-03 22:45）")
+    p = argparse.ArgumentParser(description="幣安 15m 在 MA200 附近的爆量擴張")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的 15m，然後結束")
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
-    p.add_argument("--verify", action="store_true", help="回放 ETH 基準圖，確認抓得到")
+    p.add_argument("--verify", action="store_true", help="回放 ETH/FIL/PIPPIN/SNDK/CRCL，確認都在 200 附近抓到")
     p.add_argument("--backtest", action="store_true", help="回測近 N 天（預設 7）")
     p.add_argument("--days", type=int, default=7, help="回測天數")
     p.add_argument("--html", default="", help="回測 HTML 路徑")
