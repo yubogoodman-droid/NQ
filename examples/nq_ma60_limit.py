@@ -282,6 +282,7 @@ def write_view_html(src: Path, branch: str = VIEW_BRANCH) -> Path:
             1,
         )
     text = text.replace("src='img/", f"src='{base}img/")
+    text = text.replace(".png'", ".png?v=circled'")
     out = src.with_name("view.html")
     out.write_text(text, encoding="utf-8")
     return out
