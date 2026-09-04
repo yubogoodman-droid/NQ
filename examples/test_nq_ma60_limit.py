@@ -171,6 +171,7 @@ def test_fill_within_five_minutes() -> None:
     assert sig.entry_idx - sig.setup_idx <= 5
     assert sig.limit_price > 0
     assert abs(sig.entry_price - sig.limit_price) < 2.0 or sig.entry_price <= sig.limit_price
+    assert abs(sig.stop_price - sig.break_low) < 1e-9
     assert sig.entry_price > sig.stop_price
     trades = simulate(df, sigs, preopen_flat=False, stop_on_m5_close=False)
     assert trades

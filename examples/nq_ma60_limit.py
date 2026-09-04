@@ -55,7 +55,7 @@ REPO_ROOT = ROOT.parent
 PAGES_HTML = REPO_ROOT / "docs" / "nq-ma60-limit" / "index.html"
 VIEW_BRANCH = "cursor/nq-ma60-limit-63a8"
 STATE_PATH = ROOT / "tg_ma60_limit_state.json"
-RULES = "破 2h 低後 30 分鐘內：MA5>MA20 且 1m 收盤突破 MA60，再把限價單掛在 MA60，只留 5 分鐘；逾時不進。"
+RULES = "破 2h 低後 30 分鐘內：MA5>MA20 且 1m 收盤突破 MA60，再把限價單掛在 MA60，只留 5 分鐘；逾時不進。停損在破底低點。"
 
 
 @dataclass
@@ -76,7 +76,6 @@ def detect_signals(
     setup_window: int = 30,
     limit_bars: int = 5,
     two_hour_bars: int = 120,
-    stop_buffer: float = 15.0,
     target_r: float = 2.0,
     min_break_depth: float = 10.0,
     min_entry_gap: int = 15,
@@ -160,7 +159,7 @@ def detect_signals(
                     bump("skip_entry_gap")
                     continue
                 fill = float(open_[k]) if float(open_[k]) <= limit else limit
-                stop = break_low - stop_buffer
+                stop = break_low
                 risk = fill - stop
                 if risk <= 0:
                     bump("skip_bad_risk")

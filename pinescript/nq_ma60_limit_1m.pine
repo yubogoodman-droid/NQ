@@ -6,7 +6,6 @@ twoHourBars   = input.int(120, "兩小時視窗（1m）", minval=30)
 setupWindow   = input.int(30, "破底後有效分鐘", minval=5)
 limitBars     = input.int(5, "掛單有效分鐘", minval=1)
 minDepth      = input.float(10.0, "最少破底深度（點）", minval=0)
-stopBuffer    = input.float(15.0, "停損緩衝（點）", minval=0)
 targetR       = input.float(2.0, "目標 R", minval=0.5, step=0.5)
 
 ma5  = ta.sma(close, 5)
@@ -40,7 +39,7 @@ setupNow = inWindow and bullStack and crossedMa60 and not orderLive and na(setup
 if setupNow
     setupBar := bar_index
     limitPx  := ma60
-    stopPx   := breakLow - stopBuffer
+    stopPx   := breakLow
     risk     = limitPx - stopPx
     targetPx := risk > 0 ? limitPx + risk * targetR : na
     if risk > 0

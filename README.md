@@ -44,7 +44,7 @@ python3 examples/nq_ma_reclaim.py alert
 
 ## NQ 一分 K：破 2h 低後掛單 MA60 五分鐘
 
-1 分鐘圖：跌破近兩小時低點後，**半小時內**出現 MA5>MA20 多頭排列，且 1 分 K **收盤突破 MA60**，就在當時的 MA60 掛限價買單，**只掛 5 分鐘**。回踩成交才進場；超過五分鐘沒碰到就取消。停損在破底低點下方，目標 2R。
+1 分鐘圖：跌破近兩小時低點後，**半小時內**出現 MA5>MA20 多頭排列，且 1 分 K **收盤突破 MA60**，就在當時的 MA60 掛限價買單，**只掛 5 分鐘**。回踩成交才進場；超過五分鐘沒碰到就取消。停損在破底低點，目標 2R。
 
 ```bash
 python3 examples/nq_ma60_limit.py backtest --period 8d --html output/nq_ma60_limit.html
