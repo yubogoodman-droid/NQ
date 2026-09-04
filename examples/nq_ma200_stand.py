@@ -434,19 +434,36 @@ def _equity_svg(pnls: List[float], width: int = 720, height: int = 180) -> str:
     )
 
 
+def resample_5m(df: pd.DataFrame) -> pd.DataFrame:
+    """1m → 5m OHLC（右標、右閉，不偷看未收的 5 分 K）。"""
+    agg = {"Open": "first", "High": "max", "Low": "min", "Close": "last"}
+    if "Volume" in df.columns:
+        agg["Volume"] = "sum"
+    out = df.resample("5min", label="right", closed="right").agg(agg)
+    return out.dropna(subset=["Open", "High", "Low", "Close"])
+
+
+def bar_index_at(df: pd.DataFrame, ts) -> Optional[int]:
+    if df.empty:
+        return None
+    pos = int(df.index.searchsorted(ts, side="left"))
+    if pos >= len(df):
+        return len(df) - 1
+    return pos
+
+
 def _trade_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     start = max(0, trade.signal.break_idx - 40)
     end = min(len(df) - 1, trade.exit_idx + 20)
     return start, end
 
 
-def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
+def _setup_mpl():
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib import font_manager
-    from matplotlib.patches import Rectangle
 
     for fp in (
         "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
@@ -457,15 +474,23 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             plt.rcParams["font.sans-serif"] = [font_manager.FontProperties(fname=fp).get_name(), "DejaVu Sans"]
             plt.rcParams["axes.unicode_minus"] = False
             break
+    return plt
 
-    sig = trade.signal
-    start, end = _trade_window(df, trade)
-    window = df.iloc[start : end + 1]
+
+def _paint_ohlc(
+    ax,
+    window: pd.DataFrame,
+    close_full: pd.Series,
+    start: int,
+    end: int,
+    trade: TradeResult,
+    marks: dict,
+    title: str,
+) -> None:
+    from matplotlib.patches import Rectangle
+
     xs = range(len(window))
     o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
-    close_full = df["Close"].astype(float)
-
-    fig, ax = plt.subplots(figsize=(10.4, 4.8), facecolor="#0c1210")
     ax.set_facecolor("#101814")
     ax.tick_params(colors="#8aa193", labelsize=8)
     for sp in ax.spines.values():
@@ -486,24 +511,26 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
 
     ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
     ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
-    ax.axhline(sig.two_hr_low, color="#8aa193", ls="--", lw=0.85, alpha=0.55)
+    ax.axhline(trade.signal.two_hr_low, color="#8aa193", ls="--", lw=0.85, alpha=0.55)
 
-    bx, ex, xx = sig.break_idx - start, trade.entry_idx - start, trade.exit_idx - start
-    if 0 <= bx < len(window):
-        ax.scatter([bx], [sig.break_low], s=38, color="#f472b6", zorder=5)
+    bx = marks.get("break")
+    ex = marks.get("entry")
+    xx = marks.get("exit")
+    if bx is not None and 0 <= bx < len(window):
+        ax.scatter([bx], [trade.signal.break_low], s=38, color="#f472b6", zorder=5)
         ax.annotate(
             "破底",
-            (bx, sig.break_low),
+            (bx, trade.signal.break_low),
             textcoords="offset points",
             xytext=(0, -12),
             ha="center",
             color="#f9a8d4",
             fontsize=8,
         )
-    if 0 <= ex < len(window):
+    if ex is not None and 0 <= ex < len(window):
         ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([ex], [trade.entry_price], s=42, color="#00e676", marker="^", zorder=6)
-    if 0 <= xx < len(window):
+    if xx is not None and 0 <= xx < len(window):
         ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
         ax.scatter(
             [xx],
@@ -513,21 +540,83 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             marker="x",
             zorder=6,
         )
-
-    et = df.index[trade.entry_idx]
-    xt = df.index[trade.exit_idx]
-    sign = "+" if trade.pnl_points >= 0 else ""
-    ax.set_title(
-        f"#{trade_no}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
-        f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
-        color="#e8f0ea",
-        fontsize=11,
-    )
+    ax.set_title(title, color="#e8f0ea", fontsize=11)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     step = max(1, len(window) // 6)
     ticks = list(range(0, len(window), step))
     ax.set_xticks(ticks)
     ax.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+
+
+def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
+    plt = _setup_mpl()
+    start, end = _trade_window(df, trade)
+    window = df.iloc[start : end + 1]
+    et = df.index[trade.entry_idx]
+    xt = df.index[trade.exit_idx]
+    sign = "+" if trade.pnl_points >= 0 else ""
+    fig, ax = plt.subplots(figsize=(10.4, 4.8), facecolor="#0c1210")
+    _paint_ohlc(
+        ax,
+        window,
+        df["Close"].astype(float),
+        start,
+        end,
+        trade,
+        {
+            "break": trade.signal.break_idx - start,
+            "entry": trade.entry_idx - start,
+            "exit": trade.exit_idx - start,
+        },
+        f"#{trade_no}  1m  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
+    )
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
+def draw_5m_png(
+    df_1m: pd.DataFrame,
+    df_5m: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+) -> Optional[Path]:
+    if df_5m.empty:
+        return None
+    plt = _setup_mpl()
+    br = bar_index_at(df_5m, df_1m.index[trade.signal.break_idx])
+    en = bar_index_at(df_5m, df_1m.index[trade.entry_idx])
+    ex = bar_index_at(df_5m, df_1m.index[trade.exit_idx])
+    if en is None:
+        return None
+    start = max(0, (br if br is not None else en) - 48)
+    end = min(len(df_5m) - 1, (ex if ex is not None else en) + 8)
+    if end <= start:
+        return None
+    window = df_5m.iloc[start : end + 1]
+    et = df_1m.index[trade.entry_idx]
+    xt = df_1m.index[trade.exit_idx]
+    sign = "+" if trade.pnl_points >= 0 else ""
+    fig, ax = plt.subplots(figsize=(10.4, 4.8), facecolor="#0c1210")
+    _paint_ohlc(
+        ax,
+        window,
+        df_5m["Close"].astype(float),
+        start,
+        end,
+        trade,
+        {
+            "break": None if br is None else br - start,
+            "entry": en - start,
+            "exit": None if ex is None else ex - start,
+        },
+        f"#{trade_no}  5m 對照  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
+    )
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -546,6 +635,7 @@ def write_html_report(
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
     out = Path(path)
+    df5 = resample_5m(df)
     cards: List[str] = []
     for i, t in enumerate(trades, 1):
         et = df.index[t.entry_idx]
@@ -553,7 +643,20 @@ def write_html_report(
         cls = "pnl-win" if t.pnl_points > 0 else ("pnl-flat" if t.pnl_points == 0 else "pnl-loss")
         reason_cls = "tag-tp" if t.exit_reason == "target" else ("tag-sl" if t.exit_reason == "stop" else "tag-time")
         img_name = f"t{i:02d}_{et.strftime('%m%d_%H%M')}.png"
+        img5_name = f"t{i:02d}_{et.strftime('%m%d_%H%M')}_5m.png"
         draw_trade_png(df, t, out.parent / "img" / img_name, i)
+        png5 = draw_5m_png(df, df5, t, out.parent / "img" / img5_name, i)
+        charts = (
+            f"<div class='mini-chart'><div class='chart-label'>1m</div>"
+            f"<img src='img/{escape(img_name)}' alt='#{i} 1m' "
+            "style='width:100%;display:block;border-radius:10px'/></div>"
+        )
+        if png5 is not None:
+            charts += (
+                f"<div class='mini-chart'><div class='chart-label'>5m 對照</div>"
+                f"<img src='img/{escape(img5_name)}' alt='#{i} 5m' "
+                "style='width:100%;display:block;border-radius:10px'/></div>"
+            )
         risk = t.entry_price - t.stop_price
         cards.append(
             "<article class='trade-card'>"
@@ -565,6 +668,7 @@ def write_html_report(
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
             "<span class='tag tag-info'>1m</span>"
+            "<span class='tag tag-info'>5m 對照</span>"
             f"<span class='tag tag-info'>距MA200 {t.signal.dist_ma200:.1f}</span>"
             "</div>"
             "<pre class='trade-detail'>"
@@ -577,8 +681,7 @@ def write_html_report(
             f"> MA30 {t.signal.ma30:.1f} > MA60 {t.signal.ma60:.1f}\n"
             f"MA200 {t.signal.ma200:.1f}  先前連{t.signal.under_streak}根在下"
             "</pre>"
-            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i}' "
-            "style='width:100%;display:block;border-radius:10px'/></div>"
+            f"{charts}"
             "</article>"
         )
 
@@ -622,7 +725,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
-.mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+.mini-chart{{margin:0 -6px 8px;border-radius:10px;overflow:hidden}}
+.mini-chart:last-child{{margin-bottom:-4px}}
+.chart-label{{font-size:11px;color:#8b949e;font-weight:600;padding:8px 10px 4px}}
 .empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
 </style></head><body>
 <div class="page">

@@ -18,6 +18,7 @@ from nq_ma200_stand import (  # noqa: E402
     in_open_skip,
     is_red_long_upper,
     parse_period_days,
+    resample_5m,
     simulate,
     sma,
     summarize_trades,
@@ -192,7 +193,27 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "破底站上 MA200" in text
     if trades:
         assert "<img src='img/" in text
+        assert "5m 對照" in text
         assert any((path.parent / "img").glob("t01_*.png"))
+        assert any((path.parent / "img").glob("t01_*_5m.png"))
+
+
+def test_resample_5m() -> None:
+    idx = pd.date_range("2026-08-17 11:00", periods=10, freq="1min", tz=ET)
+    close = np.arange(10, dtype=float) + 100.0
+    df = pd.DataFrame(
+        {
+            "Open": close,
+            "High": close + 1,
+            "Low": close - 1,
+            "Close": close,
+            "Volume": np.ones(10),
+        },
+        index=idx,
+    )
+    m5 = resample_5m(df)
+    assert len(m5) >= 1
+    assert {"Open", "High", "Low", "Close"}.issubset(m5.columns)
 
 
 def test_summarize() -> None:
@@ -217,6 +238,7 @@ def main() -> int:
     test_skip_no_under_wash()
     test_simulate_target_and_stop()
     test_write_html()
+    test_resample_5m()
     test_summarize()
     print("ok")
     return 0
