@@ -22,6 +22,25 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 一分 K 破底站上 MA200
+
+1 分鐘圖，無五分 MA60。基準（一個月）約 **55 筆 / +1301**。
+
+1. MA5>10>20>30>60
+2. 站上 MA200 連 ≥3，且距離 ≤30
+3. 破兩小時低後 1 小時內
+4. 進場前 1 小時曾連續 ≥15 根在 MA200 下
+5. 美東 9:30–10:00 不進
+6. 紅 K 長上影跳過
+7. 停損 MA200−10，停利 +100
+
+```bash
+python3 examples/nq_ma200_stand.py backtest --period 30d --pages
+python3 examples/nq_ma200_stand.py backtest --period 8d --html output/nq_ma200_stand.html
+```
+
+Pine / Telegram Alert 之後再掛。
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
