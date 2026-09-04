@@ -123,9 +123,28 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
+## 幣安 15m 黏帶擠壓 · 200MA 附近進場
+
+線型：MA7/14/25/99/120/200 黏成一條，價格在 200 附近橫盤，放量陽線打出箱頂，**收盤離 200 仍 ≤ 1.5%** 才進——不追已經直豎的那一段。
+
+```bash
+# TradingView：pinescript/ma200_squeeze_15m.pine 貼到 Pine Editor，套 15 分圖
+
+# 單檔（ETH）近兩週
+python3 examples/scan_binance_15m_ma200.py --symbol ETHUSDT --days 14
+
+# 流動永續 7 日回測 + 手機版 HTML
+python3 examples/scan_binance_15m_ma200.py --backtest --days 7 --pages
+
+# Telegram：剛收盤掃一次 / 持續監看
+python3 examples/scan_binance_15m_ma200.py --once
+python3 examples/scan_binance_15m_ma200.py --watch
+```
+
 ## TradingView
 
-`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
+`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
+`pinescript/ma200_squeeze_15m.pine` 套用至 ETHUSDT.P 或其他 U 本位 15 分圖。
 
 ## 參數調整
 
