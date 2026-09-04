@@ -28,14 +28,19 @@
 08-24 同一波：11:18 進場，1.5R **+43**（10:50 那腳只拉回 20 點，之後還破，不是右肩）。  
 追在下跌五分 MA20 上太高（08-19 11:05）整波作廢，不再拖到 11:44。
 
+近一週 Yahoo 1m（2026-08-28 → 09-04，日盤）：**2 筆、勝率 50%、+50.2 點**。  
+08-28 10:28 圈裡那筆 +50.2（與 30 天最後一天重疊）；**09-01 10:05 保本 0**（這週新的一筆）。08-31 / 09-02 / 09-03 沒進場。09-04 日盤尚未走完。
+
 ```bash
 python3 examples/nq_5m_ma20_retest.py --interval 1m --period 30d --pages
+python3 examples/nq_5m_ma20_retest.py --interval 1m --period 7d --html docs/nq-1m-ma20-retest-7d/index.html
 python3 examples/test_nq_5m_ma20_retest.py
 ```
 
 報告每筆附 **進場當下的五分 K**（粉紅線是 5m MA20）。TradingView：`pinescript/nq_1m_ma20_retest.pine`。
 
-現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest/view.html
+現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest/view.html  
+近一週：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest-7d/view.html
 
 ## 型態定義
 
