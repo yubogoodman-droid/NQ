@@ -32,7 +32,8 @@ if late
     armed := false
 
 stood = close > ma5 and close > ma10 and close > ma20
-longSignal = armed and stood and not na(breakLow)
+stacked = ma5 > ma10 and ma10 > ma20
+longSignal = armed and stood and stacked and not na(breakLow)
 if longSignal
     risk = close - (breakLow - stopBuf)
     if risk > 0 and risk <= maxRisk

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NQ 五分 K：破兩小時低點後，30 分鐘內站回 MA5/MA10/MA20 做多。
+"""NQ 五分 K：破兩小時低點後，30 分鐘內站回且 5/10/20 多排做多。
 
 用法:
   python3 examples/nq_5m_reclaim.py backtest --period 7d --pages
@@ -36,7 +36,7 @@ from nq_5m_base_stack import (  # noqa: E402
 
 PAGES_HTML = REPO_ROOT / "docs" / "nq-5m-reclaim" / "index.html"
 BLURB = (
-    "五分 K 跌破近 2 小時低點後，30 分鐘內（6 根）收盤站回 MA5、MA10、MA20 才做多。"
+    "五分 K 跌破近 2 小時低點後，30 分鐘內（6 根）收盤站回且 MA5>MA10>MA20 多排才做多。"
     "停損在破底低下方，目標 2R。"
 )
 
@@ -78,10 +78,10 @@ def detect_signals(
     target_r: float = 2.0,
     max_risk: float = 150.0,
     min_entry_gap: int = 6,
-    require_stack: bool = False,
+    require_stack: bool = True,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """破近 2 小時低點後，reclaim_window 根內收盤站上 MA5/10/20。"""
+    """破近 2 小時低點後，reclaim_window 根內收盤站上 MA5/10/20 且多排。"""
     close = df["Close"].to_numpy(float)
     low = df["Low"].to_numpy(float)
     ma5 = sma(close, 5)
@@ -237,8 +237,8 @@ def _render_trade_cards(df, trades, html_path: Path, prefix: str = "t") -> str:
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {t.signal.base_low:.2f} ← 兩小時低 {t.signal.two_hr_low:.2f}  (−{t.signal.drop_pts:.1f})\n"
-            f"{wait} 根後站回 MA5/10/20\n"
-            f"MA5 {t.signal.ma5:.1f} · MA10 {t.signal.ma10:.1f} · MA20 {t.signal.ma20:.1f}"
+            f"{wait} 根後站回且 5/10/20 多排\n"
+            f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -310,7 +310,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{escape(symbol)} 五分破底後 30 分內站回 5/10/20</h1>
+<h1>{escape(symbol)} 五分破底後 30 分內 5/10/20 多排</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)} · 五分 K</p>
 <p class="muted">{escape(blurb or BLURB)}</p>
 {verdict_html}
@@ -345,10 +345,10 @@ def _print_trades(df, trades) -> None:
 
 def _verdict(stats: dict) -> str:
     if stats["count"] == 0:
-        return "這週沒打到「破兩小時低、30 分內站回 5/10/20」。"
+        return "這週沒打到「破兩小時低、30 分內站回且 5/10/20 多排」。"
     if stats["total_points"] > 0:
         return "有抓到破底翻，但樣本只有一週，單筆停損仍在破底低下方。"
-    return "一週是虧的。規則很鬆，破底後急拉站上三條均線就進。"
+    return "一週是虧的。破底後要在 30 分內站回且 5/10/20 多排才進。"
 
 
 def cmd_backtest(args) -> int:
@@ -359,7 +359,7 @@ def cmd_backtest(args) -> int:
         return 1
     print(f"bars={len(df)} {df.index[0]} → {df.index[-1]}", file=sys.stderr)
     funnel: Dict[str, int] = {}
-    sigs = detect_signals(df, funnel=funnel, require_stack=bool(getattr(args, "stack", False)))
+    sigs = detect_signals(df, funnel=funnel, require_stack=not bool(getattr(args, "no_stack", False)))
     trades = simulate(df, sigs)
     stats = summarize_trades(trades)
     print(
@@ -379,7 +379,7 @@ def cmd_backtest(args) -> int:
         print(f"html={out}")
         if getattr(args, "pages", False):
             period = str(getattr(args, "period", ""))
-            dest = "one-week.html" if period.startswith("7") else "view.html"
+            dest = "one-week-stack.html" if period.startswith("7") else "view.html"
             view = write_view_html(out, branch=VIEW_BRANCH, dest_name=dest)
             print(f"preview={view}")
     return 0
@@ -393,13 +393,13 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--period", default="7d")
     b.add_argument("--html", default="")
     b.add_argument("--pages", action="store_true")
-    b.add_argument("--stack", action="store_true", help="另外要求 MA5>MA10>MA20")
+    b.add_argument("--no-stack", action="store_true", help="不要求 MA5>MA10>MA20（只站上三條）")
     b.set_defaults(func=cmd_backtest)
     p.add_argument("--symbol", default="NQ=F")
     p.add_argument("--period", default="7d")
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true")
-    p.add_argument("--stack", action="store_true")
+    p.add_argument("--no-stack", action="store_true")
     return p
 
 
