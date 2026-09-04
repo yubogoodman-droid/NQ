@@ -15,6 +15,7 @@ from nq_ma200_stand import (  # noqa: E402
     ET,
     TradeResult,
     detect_signals,
+    display_trades,
     in_open_skip,
     is_red_long_upper,
     parse_period_days,
@@ -204,6 +205,18 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert any((path.parent / "img").glob("t01_*_5m.png"))
         assert any((path.parent / "img").glob("t01_*_15m.png"))
         assert any((path.parent / "img").glob("t01_*_1h.png"))
+        if any(t.pnl_points > 0 for t in trades) and any(t.pnl_points <= 0 for t in trades):
+            assert text.find("賺錢") < text.find("賠錢")
+
+
+def test_display_trades_wins_first() -> None:
+    class T:
+        def __init__(self, pnl: float, entry_idx: int):
+            self.pnl_points = pnl
+            self.entry_idx = entry_idx
+
+    ordered = display_trades([T(-10, 1), T(100, 5), T(-20, 3), T(100, 2)])  # type: ignore[list-item]
+    assert [t.entry_idx for t in ordered] == [2, 5, 1, 3]
 
 
 def test_resample_5m() -> None:
@@ -263,6 +276,7 @@ def main() -> int:
     test_skip_no_under_wash()
     test_simulate_target_and_stop()
     test_write_html()
+    test_display_trades_wins_first()
     test_resample_5m()
     test_ribbon_helpers()
     test_default_has_no_5m_tangle_filter()

@@ -722,6 +722,11 @@ def draw_1h_png(
     return draw_htf_png(df_1m, df_1h, trade, path, trade_no, label="1h 對照", lookback=36, lookforward=4)
 
 
+def display_trades(trades: Sequence[TradeResult]) -> List[TradeResult]:
+    """報告排版：賺錢在前，賠錢在後；同組內照進場時間。"""
+    return sorted(trades, key=lambda t: (t.pnl_points <= 0, t.entry_idx))
+
+
 def write_html_report(
     path: str | Path,
     df: pd.DataFrame,
@@ -737,7 +742,15 @@ def write_html_report(
     df15 = resample_15m(df)
     df1h = resample_1h(df)
     cards: List[str] = []
-    for i, t in enumerate(trades, 1):
+    shown_loss = False
+    n_win = sum(1 for t in trades if t.pnl_points > 0)
+    n_loss = sum(1 for t in trades if t.pnl_points <= 0)
+    for i, t in enumerate(display_trades(trades), 1):
+        if i == 1 and n_win:
+            cards.append("<h2 class='section'>賺錢</h2>")
+        if t.pnl_points <= 0 and not shown_loss and n_loss:
+            cards.append("<h2 class='section'>賠錢</h2>")
+            shown_loss = True
         et = df.index[t.entry_idx]
         xt = df.index[t.exit_idx]
         cls = "pnl-win" if t.pnl_points > 0 else ("pnl-flat" if t.pnl_points == 0 else "pnl-loss")
@@ -850,6 +863,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 .mini-chart:last-child{{margin-bottom:-4px}}
 .chart-label{{font-size:11px;color:#8b949e;font-weight:600;padding:8px 10px 4px}}
 .empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
+h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 </style></head><body>
 <div class="page">
 <section class="summary">
