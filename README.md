@@ -60,6 +60,24 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
+## 台股 1 小時 K 破底翻（寬鬆版）
+
+1 小時圖：收盤從 MA20 上方跌到下方後，在下面待 4～36 根（中間 1～2 根假站上不算結束），相對過程中最高 MA20 深度 ≥ 1.8%，且最低點是近 16 根新低；再站回 MA20 這波才算。破底後 36 根內，第一根收盤同時大於 MA5 / MA10 / MA20 進場。不要求急殺、ATR、也不要求先做一腳再吻回的 W。
+
+回測出場（方便看兩個禮拜成績）：停在破底低、目標 2R、或 20 根時間停。
+
+```bash
+# 成交額前 100、近兩個禮拜（預設寬鬆，不要加 --strict）
+python3 examples/tw_1h_reclaim.py --limit 100 --days 14 --range 2mo --pages
+
+# 單元測試（不打網路）
+python3 examples/test_tw_1h_reclaim.py
+```
+
+2026-08-21 → 09-04、成交額前 100（末名約 18 億）：**112 筆、80 檔**。已平 91 筆勝率 **69.2%**，平均 **+4.01%**（停在破底低 / 2R / 20 根）。出場：2R 32、停損 14、時間 45、未平 21。訊號收盤後再抱 +1d / +3d / +5d 平均 +0.8% / +3.5% / +6.5%。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
