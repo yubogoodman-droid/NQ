@@ -46,7 +46,7 @@ MAX_DIST_MA200 = 30.0
 STOP_BELOW_MA200 = 10.0
 TAKE_PROFIT = 100.0
 MIN_UPPER_WICK = 8.0
-MIN_5M_RIBBON = 17.0  # 五分 MA5/10/20/30；第一張約 13、第6張約 16.4
+MIN_5M_RIBBON = 0.0  # 關閉；五分圖只對照，不當進場條件
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ def detect_signals(
     ma60 = sma(close, 60)
     ma200 = sma(close, 200)
     two_hr_low = rolling_min_prev(low, two_hour_bars)
-    m5_ribbon = overlay_5m_ribbon(df) if min_5m_ribbon > 0 else np.full(len(df), np.inf)
+    m5_ribbon = overlay_5m_ribbon(df)
 
     fun = funnel if funnel is not None else {}
 
@@ -746,8 +746,7 @@ def write_html_report(
             f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → 進場 {funnel.get('taken', 0)}"
             f"（排列 {funnel.get('skip_stack', 0)} · 未連3 {funnel.get('skip_above3', 0)} · "
             f"距離 {funnel.get('skip_dist', 0)} · 未洗15 {funnel.get('skip_under', 0)} · "
-            f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)} · "
-            f"5m糾結 {funnel.get('skip_5m_tangle', 0)}）</p>"
+            f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
@@ -790,7 +789,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 五分MA5–30帶寬&lt;17濾掉糾結</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 五分圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -834,8 +833,7 @@ def cmd_backtest(args) -> int:
         f"break={funnel.get('break', 0)} taken={funnel.get('taken', 0)} "
         f"stack={funnel.get('skip_stack', 0)} above3={funnel.get('skip_above3', 0)} "
         f"dist={funnel.get('skip_dist', 0)} under={funnel.get('skip_under', 0)} "
-        f"open={funnel.get('skip_open', 0)} wick={funnel.get('skip_wick', 0)} "
-        f"tangle5={funnel.get('skip_5m_tangle', 0)}"
+        f"open={funnel.get('skip_open', 0)} wick={funnel.get('skip_wick', 0)}"
     )
     for i, t in enumerate(trades, 1):
         print(
