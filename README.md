@@ -60,6 +60,38 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
+## 幣安 1 小時 MA25 下破底再站上
+
+1 小時圖寬鬆版：收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%，再收盤站回。  
+圖卡均線對齊一開始那兩張手機圖：黃 MA7、青 MA14、粉 MA25、紫 MA99、綠 MA120、酒紅 MA200。  
+破底後等 1h MA7>MA14>MA25 多頭排列才進場；停損等收盤跌破破底那根 K；目標 2R；連兩根又掉回 MA25 下出場。  
+報告每張卡底下附 4h K 對照。  
+`--strict` 才是你筆畫那種：在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底，然後等 1h MA7>MA14>MA25 多頭排列。
+
+```bash
+# 寬鬆 · 近一週
+python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 7 --pages
+
+# 寬鬆 · 兩個月
+python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 60 --html docs/binance-1h-ma25-60d/index.html
+
+# 筆畫那種 W · 近一個月
+python3 examples/binance_1h_ma25_reclaim.py --strict --limit 80 --days 30 --html docs/binance-1h-ma25-strict-30d/index.html
+
+# Telegram：破底後 7/14/25 多頭排列就推（憑證放 tg_config.env）
+python3 examples/watch_binance_1h_ma25.py --test
+python3 examples/watch_binance_1h_ma25.py --dry-run --once
+python3 examples/watch_binance_1h_ma25.py
+```
+
+TradingView：`pinescript/binance_1h_ma25_reclaim.pine` 貼到 1 小時圖。
+
+預覽（近 7 天寬鬆）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25/view.html  
+一個月嚴格筆畫 W：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-strict-30d/view.html  
+兩個月權益 + 重點 K 棒：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/seq.html  
+兩個月做成單全部 K 棒：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/seq-k.html  
+兩個月圖卡（較重）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
