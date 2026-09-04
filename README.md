@@ -103,11 +103,11 @@ python examples/chart_spring_top50.py                                  # 1 分 K
 python examples/chart_spring_week.py                                   # 近一週訊號圖
 ```
 
-報告：`docs/spring_top50_20260814.html`、`docs/spring_week_20260820_26.md`
+報告：`docs/spring_top50_20260814.html`、`docs/spring_week_20260820_26.md`、`docs/spring_week_20260831_0904.md`
 
 外網直接開（手機可）：  
 https://yubogoodman-droid.github.io/NQ/spring/?v=overnight  
-近一週圖：https://yubogoodman-droid.github.io/NQ/spring/week/?v=week
+近一週圖：https://yubogoodman-droid.github.io/NQ/spring/week/?v=20260904
 
 ## TradingView
 

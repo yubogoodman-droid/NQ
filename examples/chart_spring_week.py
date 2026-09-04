@@ -24,11 +24,12 @@ def _local(ts):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="近一週假跌破訊號圖")
-    parser.add_argument("--json", default="output/spring_scan_week_20260820_26.json")
+    parser.add_argument("--json", default="output/spring_scan_week_20260831_0904.json")
     parser.add_argument("--pages-html", default="docs/spring/week/index.html")
     parser.add_argument("--png-dir", default="output/spring_charts/week")
     parser.add_argument("--yahoo-range", default="8d")
     parser.add_argument("--sleep", type=float, default=0.15)
+    parser.add_argument("--title", default="假跌破 · 近一週 1分K（底下 5分K）")
     args = parser.parse_args()
 
     data = json.loads(Path(args.json).read_text(encoding="utf-8"))
@@ -106,18 +107,26 @@ def main() -> None:
                     ),
                     "png1": png_name,
                     "png5": png5_name if png5 is not None else "",
-                    "feature": (code == "2489" and trade is not None and trade.exit_reason == "take_profit")
-                    or code in {"4979", "4991"},
+                    "feature": trade is not None and trade.exit_reason == "take_profit",
                 }
             )
 
     gallery.sort(key=lambda item: (not item["feature"], item["sort"]))
+    dates = data.get("dates") or []
+    stats = data.get("summary") or {}
+    span = f"{dates[0]}～{dates[-1]}" if dates else ""
+    summary = (
+        f"{span} 每日成交額前 100、收盤 > 700 剔除。"
+        f"{stats.get('signals', len(gallery))} 筆：TP {stats.get('tp', 0)} / SL {stats.get('sl', 0)} / TIME {stats.get('time', 0)}"
+        f"，合計 {stats.get('pnl_sum', 0):+.2f} 點、{stats.get('r_sum', 0):+.2f}R。"
+        "上面 1 分 K，下面同一段 5 分 K。"
+    )
     pages = Path(args.pages_html)
     pages.write_text(
         render_pages_html(
             gallery,
-            title="假跌破 · 近一週 1分K（底下 5分K）",
-            summary="2026-08-20～08-26 每日成交額前 100、收盤 > 700 剔除。24 筆：TP 1 / SL 5 / TIME 18，合計 -6.05 點、+1.28R。上面 1 分 K，下面同一段 5 分 K。",
+            title=args.title,
+            summary=summary,
         ),
         encoding="utf-8",
     )
