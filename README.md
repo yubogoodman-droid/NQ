@@ -96,6 +96,11 @@ python3 examples/watch_binance_5m_align.py --backtest --days 3 --pages
 python3 examples/test_watch_binance_5m_align.py
 ```
 
+近三天（2026-09-02 21:17 → 09-05 21:17）流動永續 245 檔：**3480 筆 / 218 檔**。  
+5m 新排列 5918 → 小時過濾後 3480。持有 60 分鐘勝率 **49.5%、平均 +0.17%**；120 分鐘 **52.0%、平均 +0.29%**。訊號很密，幾乎是丟銅板略偏正。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-align-7d44/docs/binance-5m-align/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  

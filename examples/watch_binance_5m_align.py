@@ -327,7 +327,8 @@ def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4) -> str |
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         from matplotlib.patches import Rectangle
-    except Exception:
+    except Exception as e:
+        print("chart skip", sym, e, flush=True)
         return None
     a0 = max(0, i - 80)
     a1 = min(len(d["c"]), i + max(4, ahead))
@@ -360,7 +361,7 @@ def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4) -> str |
     if 0 <= x < len(c):
         ax.axvline(x, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([x], [c[x]], s=36, color="#3dba7a", zorder=5)
-    ax.set_title(f"{sym}  5m  多頭排列", color="#e8f0ea", fontsize=12)
+    ax.set_title(f"{sym}  5m align", color="#e8f0ea", fontsize=12)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
     fig.tight_layout(pad=0.5)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -538,7 +539,6 @@ def pick_chart_hits(hits: list[dict], limit: int) -> list[dict]:
         if key not in seen and h.get("60m") is not None:
             chosen.append(h)
             seen.add(key)
-    chosen.sort(key=lambda h: (h["t"], h["symbol"]))
     return chosen
 
 
@@ -552,8 +552,14 @@ def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period
     cards = []
     for n, h in enumerate(chart_hits, 1):
         img_name = f"t{n:02d}_{h['symbol']}_{hm(h['t']).replace(' ', '_').replace(':', '')}.png"
-        draw_chart(h["symbol"], h["d5"], h["i"], str(img_dir / img_name), ahead=24)
+        drawn = draw_chart(h["symbol"], h["d5"], h["i"], str(img_dir / img_name), ahead=24)
         ext = (h["close"] / h["m200"] - 1) * 100
+        img_html = (
+            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(h['symbol'])}' "
+            "style='width:100%;display:block;border-radius:10px'/></div>"
+            if drawn
+            else ""
+        )
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -570,8 +576,7 @@ def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period
             f"站上 MA200 {h['m200']:g}（{ext:+.2f}%）\n"
             f"1h {h['h_close']:g} > MA99 {h['h_m99']:g} / MA200 {h['h_m200']:g}"
             "</pre>"
-            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(h['symbol'])}' "
-            "style='width:100%;display:block;border-radius:10px'/></div>"
+            f"{img_html}"
             "</article>"
         )
 
