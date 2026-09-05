@@ -142,6 +142,17 @@ def sma(arr, n: int) -> np.ndarray:
     return pd.Series(arr, dtype=float).rolling(n, min_periods=n).mean().to_numpy(float)
 
 
+def ema(arr, n: int) -> np.ndarray:
+    return pd.Series(arr, dtype=float).ewm(span=n, adjust=False, min_periods=n).mean().to_numpy(float)
+
+
+def macd(close, fast: int = 12, slow: int = 26, signal: int = 9) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """標準 MACD(12,26,9)：線、訊號、柱。"""
+    line = ema(close, fast) - ema(close, slow)
+    sig = ema(line, signal)
+    return line, sig, line - sig
+
+
 def rolling_min_prev(arr, n: int) -> np.ndarray:
     return pd.Series(arr, dtype=float).shift(1).rolling(n, min_periods=n).min().to_numpy(float)
 
@@ -796,6 +807,22 @@ def _setup_mpl():
     return plt
 
 
+def _style_panel(ax) -> None:
+    ax.set_facecolor("#101814")
+    ax.tick_params(colors="#8aa193", labelsize=8)
+    for sp in ax.spines.values():
+        sp.set_color("#2a3a33")
+
+
+def _event_vlines(ax, marks: dict, n: int) -> None:
+    ex = marks.get("entry")
+    xx = marks.get("exit")
+    if ex is not None and 0 <= ex < n:
+        ax.axvline(ex, color="#3dba7a", ls="--", lw=0.8, alpha=0.7)
+    if xx is not None and 0 <= xx < n:
+        ax.axvline(xx, color="#f0c14b", ls=":", lw=0.8, alpha=0.7)
+
+
 def _paint_ohlc(
     ax,
     window: pd.DataFrame,
@@ -805,15 +832,14 @@ def _paint_ohlc(
     trade: TradeResult,
     marks: dict,
     title: str,
+    *,
+    show_xticks: bool = True,
 ) -> None:
     from matplotlib.patches import Rectangle
 
     xs = range(len(window))
     o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
-    ax.set_facecolor("#101814")
-    ax.tick_params(colors="#8aa193", labelsize=8)
-    for sp in ax.spines.values():
-        sp.set_color("#2a3a33")
+    _style_panel(ax)
 
     for k in range(len(window)):
         up = float(c.iloc[k]) >= float(o.iloc[k])
@@ -954,22 +980,108 @@ def _paint_ohlc(
             )
     ax.set_title(title, color="#e8f0ea", fontsize=11)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
-    step = max(1, len(window) // 6)
-    ticks = list(range(0, len(window), step))
+    if show_xticks:
+        step = max(1, len(window) // 6)
+        ticks = list(range(0, len(window), step))
+        ax.set_xticks(ticks)
+        ax.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+    else:
+        ax.tick_params(labelbottom=False)
+
+
+def _paint_volume(ax, window: pd.DataFrame, marks: dict) -> None:
+    from matplotlib.patches import Rectangle
+
+    _style_panel(ax)
+    n = len(window)
+    xs = range(n)
+    _event_vlines(ax, marks, n)
+    if "Volume" not in window.columns:
+        ax.text(0.5, 0.5, "無成交量", transform=ax.transAxes, ha="center", va="center", color="#8aa193", fontsize=9)
+        ax.set_ylabel("量", color="#8aa193", fontsize=8)
+        ax.tick_params(labelbottom=False)
+        return
+    vol = window["Volume"].astype(float)
+    o, c = window["Open"], window["Close"]
+    for k in range(n):
+        up = float(c.iloc[k]) >= float(o.iloc[k])
+        col = "#3dba7a" if up else "#e35d5d"
+        v = float(vol.iloc[k])
+        if v <= 0 or np.isnan(v):
+            continue
+        ax.add_patch(Rectangle((xs[k] - 0.35, 0.0), 0.7, v, facecolor=col, edgecolor=col, lw=0.2, alpha=0.85))
+    vmax = float(np.nanmax(vol.to_numpy(float))) if len(vol) else 0.0
+    if vmax > 0:
+        ax.set_ylim(0.0, vmax * 1.15)
+        vma = vol.rolling(20, min_periods=1).mean()
+        ax.plot(list(xs), vma, color="#f0c14b", lw=0.9, alpha=0.85)
+    ax.set_ylabel("量", color="#8aa193", fontsize=8)
+    ax.tick_params(labelbottom=False)
+
+
+def _paint_macd(ax, close_full: pd.Series, start: int, end: int, window: pd.DataFrame, marks: dict) -> None:
+    _style_panel(ax)
+    n = len(window)
+    xs = list(range(n))
+    _event_vlines(ax, marks, n)
+    line, sig, hist = macd(close_full.to_numpy(float))
+    line_w = line[start : end + 1]
+    sig_w = sig[start : end + 1]
+    hist_w = hist[start : end + 1]
+    for k, hv in enumerate(hist_w):
+        if np.isnan(hv):
+            continue
+        col = "#3dba7a" if hv >= 0 else "#e35d5d"
+        ax.vlines(k, 0.0, float(hv), color=col, lw=1.4, alpha=0.85)
+    ax.plot(xs, line_w, color="#79c0ff", lw=1.15, label="MACD")
+    ax.plot(xs, sig_w, color="#ff8a65", lw=1.05, label="訊號")
+    ax.axhline(0.0, color="#2a3a33", lw=0.8)
+    ax.set_ylabel("MACD", color="#8aa193", fontsize=8)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=2)
+    step = max(1, n // 6)
+    ticks = list(range(0, n, step))
     ax.set_xticks(ticks)
     ax.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
 
 
-def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
+def _render_chart(
+    path: Path,
+    window: pd.DataFrame,
+    close_full: pd.Series,
+    start: int,
+    end: int,
+    trade: TradeResult,
+    marks: dict,
+    title: str,
+) -> Path:
     plt = _setup_mpl()
+    fig, axes = plt.subplots(
+        3,
+        1,
+        figsize=(10.4, 7.4),
+        facecolor="#0c1210",
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.4, 0.9, 1.2], "hspace": 0.08},
+    )
+    ax_px, ax_vol, ax_macd = axes
+    _paint_ohlc(ax_px, window, close_full, start, end, trade, marks, title, show_xticks=False)
+    _paint_volume(ax_vol, window, marks)
+    _paint_macd(ax_macd, close_full, start, end, window, marks)
+    fig.subplots_adjust(left=0.07, right=0.985, top=0.94, bottom=0.07, hspace=0.08)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
+def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
     start, end = _trade_window(df, trade)
     window = df.iloc[start : end + 1]
     et = df.index[trade.entry_idx]
     xt = df.index[trade.exit_idx]
     sign = "+" if trade.pnl_points >= 0 else ""
-    fig, ax = plt.subplots(figsize=(10.4, 4.8), facecolor="#0c1210")
-    _paint_ohlc(
-        ax,
+    return _render_chart(
+        path,
         window,
         df["Close"].astype(float),
         start,
@@ -980,11 +1092,6 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         f"{'再進  ' if getattr(trade.signal, 'entry_kind', 'primary') == 'reentry' else ''}"
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
     )
-    fig.tight_layout(pad=0.45)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
-    plt.close(fig)
-    return path
 
 
 def draw_htf_png(
@@ -1000,7 +1107,6 @@ def draw_htf_png(
 ) -> Optional[Path]:
     if df_htf.empty:
         return None
-    plt = _setup_mpl()
     br = bar_index_at(df_htf, df_1m.index[trade.signal.break_idx])
     en = bar_index_at(df_htf, df_1m.index[trade.entry_idx])
     ex = bar_index_at(df_htf, df_1m.index[trade.exit_idx])
@@ -1017,9 +1123,8 @@ def draw_htf_png(
     dist_note = ""
     if label.startswith("15m"):
         dist_note = f"  距15mMA200 {_fmt_signed(trade.signal.dist_15m_ma200)}"
-    fig, ax = plt.subplots(figsize=(10.4, 4.8), facecolor="#0c1210")
-    _paint_ohlc(
-        ax,
+    return _render_chart(
+        path,
         window,
         df_htf["Close"].astype(float),
         start,
@@ -1040,11 +1145,6 @@ def draw_htf_png(
         f"{'再進  ' if getattr(trade.signal, 'entry_kind', 'primary') == 'reentry' else ''}"
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt{dist_note}",
     )
-    fig.tight_layout(pad=0.45)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
-    plt.close(fig)
-    return path
 
 
 def draw_5m_png(
@@ -1152,25 +1252,25 @@ def write_html_report(
         png15 = draw_15m_png(df, df15, t, out.parent / "img" / img15_name, i)
         png1h = draw_1h_png(df, df1h, t, out.parent / "img" / img1h_name, i)
         charts = (
-            f"<div class='mini-chart'><div class='chart-label'>1m</div>"
+            f"<div class='mini-chart'><div class='chart-label'>1m · 量 · MACD</div>"
             f"<img src='img/{escape(img_name)}' alt='#{i} 1m' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
         )
         if png5 is not None:
             charts += (
-                f"<div class='mini-chart'><div class='chart-label'>5m 對照</div>"
+                f"<div class='mini-chart'><div class='chart-label'>5m 對照 · 量 · MACD</div>"
                 f"<img src='img/{escape(img5_name)}' alt='#{i} 5m' "
                 "style='width:100%;display:block;border-radius:10px'/></div>"
             )
         if png15 is not None:
             charts += (
-                f"<div class='mini-chart'><div class='chart-label'>15m 對照</div>"
+                f"<div class='mini-chart'><div class='chart-label'>15m 對照 · 量 · MACD</div>"
                 f"<img src='img/{escape(img15_name)}' alt='#{i} 15m' "
                 "style='width:100%;display:block;border-radius:10px'/></div>"
             )
         if png1h is not None:
             charts += (
-                f"<div class='mini-chart'><div class='chart-label'>1h 對照</div>"
+                f"<div class='mini-chart'><div class='chart-label'>1h 對照 · 量 · MACD</div>"
                 f"<img src='img/{escape(img1h_name)}' alt='#{i} 1h' "
                 "style='width:100%;display:block;border-radius:10px'/></div>"
             )
@@ -1270,7 +1370,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次 · 5m / 15m / 1h 圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次 · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

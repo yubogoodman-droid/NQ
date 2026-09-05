@@ -20,6 +20,7 @@ from nq_ma200_stand import (  # noqa: E402
     in_open_skip,
     is_red_long_upper,
     make_reclaim_reentry,
+    macd,
     overlay_15m_ma200,
     overlay_5m_ribbon,
     parse_period_days,
@@ -46,6 +47,15 @@ def test_sma() -> None:
     out = sma(arr, 3)
     assert np.isnan(out[1])
     assert abs(out[2] - 2.0) < 1e-9
+
+
+def test_macd() -> None:
+    close = np.linspace(100.0, 130.0, 80)
+    line, sig, hist = macd(close)
+    assert len(line) == 80
+    assert np.isnan(line[24])
+    assert not np.isnan(line[25])
+    assert abs(hist[40] - (line[40] - sig[40])) < 1e-9
 
 
 def test_in_open_skip() -> None:
@@ -221,6 +231,8 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "5m 對照" in text
         assert "15m 對照" in text
         assert "1h 對照" in text
+        assert "量 · MACD" in text
+        assert "成交量、MACD" in text
         assert "距200日" not in text
         assert "距15mMA200" in text
         assert "進場距 15m MA200" in text
@@ -475,6 +487,7 @@ def test_summarize() -> None:
 def main() -> int:
     test_parse_period_days()
     test_sma()
+    test_macd()
     test_in_open_skip()
     test_red_long_upper()
     test_detect_happy_path()
