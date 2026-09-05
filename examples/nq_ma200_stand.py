@@ -8,7 +8,7 @@
   4. 進場前 1 小時曾連續 ≥15 根在 MA200 下
   5. 美東 9:30–10:00 不進
   6. 紅 K 長上影跳過
-  7. 停損破底低點，停利 +100
+  7. 停損 MA200−10，停利 +100
   8. 浮盈先到 +60 後，停損提到進場價（保本）
   9. 進場在 15m MA200 上被停損後，30 分鐘內站回原進場價再進一次。只再進一次，停損同上。
 
@@ -335,7 +335,7 @@ def detect_signals(
                 bump("skip_5m_tangle")
                 continue
             entry = float(close[j])
-            stop = float(break_low)
+            stop = float(ma200[j]) - stop_below_ma200
             if entry <= stop:
                 bump("skip_bad_stop")
                 continue
@@ -412,7 +412,7 @@ def make_reclaim_reentry(
         if float(close[j]) <= float(ma60[j]):
             continue
         entry = float(close[j])
-        stop = float(parent.break_low)
+        stop = float(ma200[j]) - stop_below_ma200
         if entry <= stop:
             continue
         ribbon = float(m5_ribbon[j])
@@ -1191,7 +1191,7 @@ def write_html_report(
             "<span class='tag tag-info'>1h 對照</span>"
             f"<span class='tag tag-info'>距MA200 {t.signal.dist_ma200:.1f}</span>"
             f"<span class='tag tag-info'>距15mMA200 {_fmt_signed(t.signal.dist_15m_ma200)}</span>"
-            f"<span class='tag tag-info'>停損 破底</span>"
+            f"<span class='tag tag-info'>停損 MA200−10</span>"
             f"<span class='tag tag-info'>收&gt;MA60</span>"
             f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
@@ -1201,7 +1201,7 @@ def write_html_report(
             f"（15m MA200 {_fmt_price(t.signal.ma200_15m)}）\n"
             f"entry {t.entry_price:.2f}\n"
             f"stop  {t.signal.stop_price:.2f}  (−{risk:.1f} pts, "
-            f"破底低點；浮盈+60改保本"
+            f"MA200−10；浮盈+60改保本"
             f"{'；15mMA200上停損後站回進場點再進' if retry else ''}）\n"
             f"target {t.target_price:.2f}  (+100)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
@@ -1270,7 +1270,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=破底低點 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次 · 5m / 15m / 1h 圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次 · 5m / 15m / 1h 圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
