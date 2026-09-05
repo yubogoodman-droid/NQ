@@ -14,9 +14,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+from html import escape
 from pathlib import Path
 
 import numpy as np
@@ -39,6 +41,8 @@ if not CONFIG_ENV.exists():
 KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT"}
 MS_5M = 5 * 60_000
 MS_1H = 60 * 60_000
+HORIZONS = (("15m", 3), ("30m", 6), ("60m", 12), ("120m", 24))
+PAGES = ROOT / "docs" / "binance-5m-align" / "index.html"
 
 
 def load_dotenv(path: Path = CONFIG_ENV) -> None:
@@ -114,25 +118,109 @@ def hour_above_ok(h: dict, i: int) -> bool:
     return h["c"][i] > m99 and h["c"][i] > m200
 
 
-def detect_new_align(d5: dict, i: int, h1: dict, hi: int) -> dict | None:
-    """剛收的 5m 第一次同時滿足多頭排列 + 小時站上 99/200。"""
-    if not five_align_ok(d5, i) or not hour_above_ok(h1, hi):
+def hour_index_at(h: dict, t_ms: int) -> int:
+    """已開出、且開盤時間 ≤ t_ms 的最後一根小時 K。"""
+    if len(h["t"]) == 0:
+        return -1
+    return int(np.searchsorted(h["t"], t_ms, side="right") - 1)
+
+
+def hour_mas_at(h: dict, t_ms: int, px: float) -> tuple[float, float] | None:
+    """用當下價格當形成中小時 K 的收盤，算 MA99/200，不看這根之後的收盤。"""
+    hi = hour_index_at(h, t_ms)
+    if hi < 199:
         return None
+    m99 = float(np.mean(np.append(h["c"][hi - 98 : hi], px)))
+    m200 = float(np.mean(np.append(h["c"][hi - 199 : hi], px)))
+    return m99, m200
+
+
+def hour_above_at(h: dict, t_ms: int, px: float) -> bool:
+    mas = hour_mas_at(h, t_ms, px)
+    return bool(mas and px > mas[0] and px > mas[1])
+
+
+def detect_new_align(d5: dict, i: int, h1: dict, hi: int | None = None) -> dict | None:
+    """剛收的 5m 第一次同時滿足多頭排列 + 小時站上 99/200。"""
+    if not five_align_ok(d5, i):
+        return None
+    px = float(d5["c"][i])
+    t = int(d5["t"][i])
+    if hi is None:
+        mas = hour_mas_at(h1, t, px)
+        if mas is None or not (px > mas[0] and px > mas[1]):
+            return None
+        h_close, h_m99, h_m200 = px, mas[0], mas[1]
+        hi_used = hour_index_at(h1, t)
+    else:
+        if not hour_above_ok(h1, hi):
+            return None
+        h_close = float(h1["c"][hi])
+        h_m99 = float(h1["m99"][hi])
+        h_m200 = float(h1["m200"][hi])
+        hi_used = hi
     if five_align_ok(d5, i - 1):
         return None
     return {
         "i": i,
-        "hi": hi,
-        "close": float(d5["c"][i]),
+        "hi": hi_used,
+        "close": px,
         "m7": float(d5["m7"][i]),
         "m14": float(d5["m14"][i]),
         "m25": float(d5["m25"][i]),
         "m200": float(d5["m200"][i]),
-        "h_close": float(h1["c"][hi]),
-        "h_m99": float(h1["m99"][hi]),
-        "h_m200": float(h1["m200"][hi]),
-        "t": int(d5["t"][i]),
+        "h_close": h_close,
+        "h_m99": h_m99,
+        "h_m200": h_m200,
+        "t": t,
     }
+
+
+def collect_signals(d5: dict, h1: dict, start_ms: int, end_ms: int) -> list[dict]:
+    out = []
+    for i in range(len(d5["c"])):
+        t = int(d5["t"][i])
+        if t < start_ms or t > end_ms:
+            continue
+        sig = detect_new_align(d5, i, h1)
+        if sig:
+            out.append(sig)
+    return out
+
+
+def forward_pct(d5: dict, i: int, bars: int) -> float | None:
+    j = i + bars
+    if j >= len(d5["c"]) or d5["c"][i] == 0:
+        return None
+    return (float(d5["c"][j]) / float(d5["c"][i]) - 1) * 100
+
+
+def attach_forwards(d5: dict, sig: dict) -> dict:
+    row = dict(sig)
+    for name, bars in HORIZONS:
+        row[name] = forward_pct(d5, sig["i"], bars)
+    return row
+
+
+def summarize_hits(hits: list[dict]) -> dict:
+    stats: dict = {
+        "count": len(hits),
+        "symbols": len({h["symbol"] for h in hits}),
+        "five_only": sum(int(h.get("five_only", 0)) for h in hits),
+    }
+    for name, _bars in HORIZONS:
+        vals = [float(h[name]) for h in hits if h.get(name) is not None]
+        n = len(vals)
+        wins = sum(1 for v in vals if v > 0)
+        stats[name] = {
+            "n": n,
+            "wins": wins,
+            "win_rate": (100.0 * wins / n) if n else 0.0,
+            "avg": float(np.mean(vals)) if vals else 0.0,
+            "med": float(np.median(vals)) if vals else 0.0,
+            "sum": float(np.sum(vals)) if vals else 0.0,
+        }
+    return stats
 
 
 def get_json(path: str, params=None, retries: int = 5):
@@ -232,7 +320,7 @@ def telegram_send(text: str, photo: str | None = None) -> bool:
         return False
 
 
-def draw_chart(sym: str, d: dict, i: int, path: str) -> str | None:
+def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4) -> str | None:
     try:
         import matplotlib
 
@@ -242,7 +330,7 @@ def draw_chart(sym: str, d: dict, i: int, path: str) -> str | None:
     except Exception:
         return None
     a0 = max(0, i - 80)
-    a1 = min(len(d["c"]), i + 4)
+    a1 = min(len(d["c"]), i + max(4, ahead))
     sl = slice(a0, a1)
     xs = np.arange(a1 - a0)
     o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
@@ -287,10 +375,10 @@ def scan_symbol(sym: str) -> list[dict]:
         return []
     d5 = add_mas(raw5, (7, 14, 25, 200))
     h1 = add_mas(raw1, (99, 200))
-    last5, last1 = len(d5["c"]) - 1, len(h1["c"]) - 1
+    last5 = len(d5["c"]) - 1
     events = []
     for closed in (last5, last5 - 1):
-        sig = detect_new_align(d5, closed, h1, last1)
+        sig = detect_new_align(d5, closed, h1)
         if not sig:
             continue
         events.append({"symbol": sym, "sig": sig, "d5": d5, "h1": h1})
@@ -347,6 +435,292 @@ def notify(ev: dict, *, dry_run: bool = False) -> None:
         print("  → Telegram 送出失敗，檢查 token 與 chat id", flush=True)
 
 
+def scan_history_symbol(sym: str, start_ms: int, end_ms: int) -> tuple[list[dict], dict]:
+    meta = {"symbol": sym, "five_new": 0, "hits": 0, "error": ""}
+    raw5 = fetch_klines(sym, "5m", 1500, MS_5M, keep_forming=False)
+    raw1 = fetch_klines(sym, "1h", 500, MS_1H, keep_forming=True)
+    if raw5 is None or raw1 is None:
+        meta["error"] = "too_few_bars"
+        return [], meta
+    d5 = add_mas(raw5, (7, 14, 25, 200))
+    h1 = add_mas(raw1, (99, 200))
+    hits = []
+    for i in range(len(d5["c"])):
+        t = int(d5["t"][i])
+        if t < start_ms or t > end_ms:
+            continue
+        if five_align_ok(d5, i) and not five_align_ok(d5, i - 1):
+            meta["five_new"] += 1
+            sig = detect_new_align(d5, i, h1)
+            if sig:
+                row = attach_forwards(d5, sig)
+                row["symbol"] = sym
+                row["d5"] = d5
+                hits.append(row)
+    meta["hits"] = len(hits)
+    return hits, meta
+
+
+def backtest_all(symbols: list[str], start_ms: int, end_ms: int) -> tuple[list[dict], dict]:
+    hits: list[dict] = []
+    funnel = {"symbols": len(symbols), "ok": 0, "five_new": 0, "hits": 0, "errors": 0}
+    with ThreadPoolExecutor(8) as ex:
+        futs = {ex.submit(scan_history_symbol, s, start_ms, end_ms): s for s in symbols}
+        done = 0
+        for fut in as_completed(futs):
+            done += 1
+            try:
+                rows, meta = fut.result()
+            except Exception as e:
+                funnel["errors"] += 1
+                print("err", futs[fut], e, flush=True)
+                continue
+            funnel["ok"] += 1
+            funnel["five_new"] += meta["five_new"]
+            funnel["hits"] += meta["hits"]
+            hits.extend(rows)
+            if done % 40 == 0 or done == len(symbols):
+                print(f"  回測進度 {done}/{len(symbols)}　已中 {funnel['hits']}", flush=True)
+    hits.sort(key=lambda h: (h["t"], h["symbol"]))
+    return hits, funnel
+
+
+def _git_branch() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=ROOT, text=True).strip() or "main"
+    except Exception:
+        return "main"
+
+
+def _fmt(v: float | None) -> str:
+    return "—" if v is None else f"{v:+.2f}%"
+
+
+def _pnl_cls(v: float | None) -> str:
+    if v is None or v == 0:
+        return "pnl-flat"
+    return "pnl-win" if v > 0 else "pnl-loss"
+
+
+def _equity_svg(pcts: list[float], width: int = 720, height: int = 160) -> str:
+    if not pcts:
+        return ""
+    eq = np.cumsum(pcts)
+    lo, hi = float(min(0.0, eq.min())), float(max(0.0, eq.max()))
+    span = hi - lo or 1.0
+    pad = 8
+    ys = [pad + (1 - (v - lo) / span) * (height - 2 * pad) for v in eq]
+    xs = [i * width / max(1, len(eq) - 1) for i in range(len(eq))]
+    zero_y = pad + (1 - (0 - lo) / span) * (height - 2 * pad)
+    pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys))
+    color = "#16a34a" if eq[-1] >= 0 else "#e35d5d"
+    return (
+        f'<svg viewBox="0 0 {width} {height}" width="100%" style="background:#0d1117;border-radius:8px">'
+        f'<line x1="0" y1="{zero_y:.1f}" x2="{width}" y2="{zero_y:.1f}" stroke="#334155" stroke-dasharray="4 4"/>'
+        f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{pts}"/>'
+        f"</svg>"
+    )
+
+
+def pick_chart_hits(hits: list[dict], limit: int) -> list[dict]:
+    scored = [h for h in hits if h.get("60m") is not None]
+    scored.sort(key=lambda h: float(h["60m"]), reverse=True)
+    if len(scored) <= limit:
+        return scored
+    half = max(1, limit // 2)
+    chosen = scored[:half] + scored[-half:]
+    seen = {(h["symbol"], h["t"]) for h in chosen}
+    # 不夠時用時間補
+    for h in reversed(hits):
+        if len(chosen) >= limit:
+            break
+        key = (h["symbol"], h["t"])
+        if key not in seen and h.get("60m") is not None:
+            chosen.append(h)
+            seen.add(key)
+    chosen.sort(key=lambda h: (h["t"], h["symbol"]))
+    return chosen
+
+
+def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period: str, chart_limit: int) -> Path:
+    img_dir = path.parent / "img"
+    if img_dir.exists():
+        for old in img_dir.glob("*.png"):
+            old.unlink()
+    img_dir.mkdir(parents=True, exist_ok=True)
+    chart_hits = pick_chart_hits(hits, chart_limit)
+    cards = []
+    for n, h in enumerate(chart_hits, 1):
+        img_name = f"t{n:02d}_{h['symbol']}_{hm(h['t']).replace(' ', '_').replace(':', '')}.png"
+        draw_chart(h["symbol"], h["d5"], h["i"], str(img_dir / img_name), ahead=24)
+        ext = (h["close"] / h["m200"] - 1) * 100
+        cards.append(
+            "<article class='trade-card'>"
+            "<header class='card-header'>"
+            f"<div class='card-title'><span class='trade-no'>#{n} · {escape(h['symbol'])}</span>"
+            f"<span class='trade-time'>{escape(hm(h['t']))}</span></div>"
+            f"<div class='card-pnl {_pnl_cls(h.get('60m'))}'>60m {_fmt(h.get('60m'))}</div>"
+            "</header>"
+            "<div class='tags'>"
+            f"<span class='tag'>15m {_fmt(h.get('15m'))}</span>"
+            f"<span class='tag'>30m {_fmt(h.get('30m'))}</span>"
+            f"<span class='tag'>120m {_fmt(h.get('120m'))}</span></div>"
+            "<pre class='trade-detail'>"
+            f"收盤 {h['close']:g}  MA7 {h['m7']:g} > MA14 {h['m14']:g} > MA25 {h['m25']:g}\n"
+            f"站上 MA200 {h['m200']:g}（{ext:+.2f}%）\n"
+            f"1h {h['h_close']:g} > MA99 {h['h_m99']:g} / MA200 {h['h_m200']:g}"
+            "</pre>"
+            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(h['symbol'])}' "
+            "style='width:100%;display:block;border-radius:10px'/></div>"
+            "</article>"
+        )
+
+    rows = []
+    for i, h in enumerate(hits, 1):
+        rows.append(
+            "<tr>"
+            f"<td>{i}</td><td>{escape(h['symbol'])}</td><td>{escape(hm(h['t']))}</td>"
+            f"<td class='{_pnl_cls(h.get('15m'))}'>{_fmt(h.get('15m'))}</td>"
+            f"<td class='{_pnl_cls(h.get('30m'))}'>{_fmt(h.get('30m'))}</td>"
+            f"<td class='{_pnl_cls(h.get('60m'))}'>{_fmt(h.get('60m'))}</td>"
+            f"<td class='{_pnl_cls(h.get('120m'))}'>{_fmt(h.get('120m'))}</td>"
+            "</tr>"
+        )
+
+    s60 = stats["60m"]
+    eq = _equity_svg([float(h["60m"]) for h in hits if h.get("60m") is not None])
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>幣安 5m 多頭排列 · {escape(period)}</title>
+<style>
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,sans-serif}}
+.page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
+h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-height:1.55}}
+.cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
+.card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}}
+.card b{{display:block;font-size:20px;margin-top:4px}}
+.equity{{margin:8px 0 4px}}
+.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}}
+.card-header{{display:flex;justify-content:space-between;gap:10px}}
+.trade-no{{font-weight:700}} .trade-time{{font-size:12px;color:#8b949e}}
+.card-pnl{{font-weight:700}} .pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}} .pnl-flat{{color:#8b949e}}
+.tags{{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}}
+.tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#79c0ff}}
+.trade-detail{{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}}
+table{{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}}
+th,td{{padding:6px 4px;border-bottom:1px solid #21262d;text-align:right}}
+th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left}}
+.empty{{text-align:center;color:#8b949e;padding:40px 12px;border:1px solid #30363d;border-radius:14px}}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安 5m 多頭排列 · {escape(period)}</h1>
+<p class="muted">流動 USDT 永續 {funnel.get('symbols', 0)} 檔。
+5m <b>MA7&gt;MA14&gt;MA25</b> 且收盤站上 MA200，同時 1h 收盤在 MA99 / MA200 之上。
+只計剛成立的那根。報酬從訊號收盤算到之後 15/30/60/120 分鐘收盤，不是進出場建議。</p>
+<p class="muted">漏斗：5m 新排列 {funnel.get('five_new', 0)} → 加上小時過濾 {funnel.get('hits', 0)}
+· 讀檔失敗 {funnel.get('errors', 0)}</p>
+<p class="muted">15m 勝率 {stats['15m']['win_rate']:.1f}% 均 {_fmt(stats['15m']['avg'])}
+· 30m {stats['30m']['win_rate']:.1f}% 均 {_fmt(stats['30m']['avg'])}
+· 60m {stats['60m']['win_rate']:.1f}% 均 {_fmt(stats['60m']['avg'])}
+· 120m {stats['120m']['win_rate']:.1f}% 均 {_fmt(stats['120m']['avg'])}</p>
+<div class="cards">
+<div class="card">筆數<b>{stats['count']}</b></div>
+<div class="card">標的<b>{stats['symbols']}</b></div>
+<div class="card">60m 勝率<b>{s60['win_rate']:.1f}%</b></div>
+<div class="card">60m 平均<b class="{_pnl_cls(s60['avg'])}">{_fmt(s60['avg'])}</b></div>
+</div>
+<div class="equity">{eq}</div>
+<p class="muted">下圖累積的是各筆 60 分鐘報酬相加，不是組合複利。圖卡只放 60m 最好/最差各一部分。</p>
+</section>
+{''.join(cards) or "<div class='empty'>這三天沒有符合的訊號</div>"}
+<section class="summary">
+<h1>全部訊號</h1>
+<table>
+<thead><tr><th>#</th><th>標的</th><th>時間</th><th>15m</th><th>30m</th><th>60m</th><th>120m</th></tr></thead>
+<tbody>
+{''.join(rows) or "<tr><td colspan='7'>無</td></tr>"}
+</tbody>
+</table>
+</section>
+</div></body></html>
+"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    return path
+
+
+def write_view_html(src: Path) -> Path:
+    rel = src.parent.relative_to(ROOT).as_posix()
+    base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{_git_branch()}/{rel}/"
+    text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    out = src.with_name("view.html")
+    out.write_text(text, encoding="utf-8")
+    return out
+
+
+def dump_hits_json(path: Path, hits: list[dict], stats: dict, funnel: dict, period: str) -> Path:
+    slim = []
+    for h in hits:
+        slim.append(
+            {
+                "symbol": h["symbol"],
+                "t": h["t"],
+                "time": hm(h["t"]),
+                "close": h["close"],
+                "m7": h["m7"],
+                "m14": h["m14"],
+                "m25": h["m25"],
+                "m200": h["m200"],
+                "h_m99": h["h_m99"],
+                "h_m200": h["h_m200"],
+                "15m": h.get("15m"),
+                "30m": h.get("30m"),
+                "60m": h.get("60m"),
+                "120m": h.get("120m"),
+            }
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"period": period, "stats": stats, "funnel": funnel, "hits": slim}, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def cmd_backtest(args) -> int:
+    days = max(1, int(args.days))
+    now = datetime.now(TZ)
+    end_ms = int(now.timestamp() * 1000)
+    start_ms = end_ms - days * 24 * 60 * 60 * 1000
+    period = f"{datetime.fromtimestamp(start_ms / 1000, TZ).strftime('%Y-%m-%d %H:%M')} → {now.strftime('%Y-%m-%d %H:%M')} ({days}d)"
+    if args.symbol:
+        symbols = [s.strip().upper() for s in args.symbol]
+        print(f"回測指定 {len(symbols)} 個：{', '.join(symbols)}", flush=True)
+    else:
+        print("載入標的…", flush=True)
+        symbols = universe()
+        print(f"回測 {len(symbols)} 個流動永續 · {period}", flush=True)
+    t0 = time.time()
+    hits, funnel = backtest_all(symbols, start_ms, end_ms)
+    stats = summarize_hits(hits)
+    print(
+        f"完成 {time.time()-t0:.1f}s　5m 新排列 {funnel['five_new']} → 訊號 {stats['count']} / {stats['symbols']} 檔\n"
+        f"15m {stats['15m']['win_rate']:.1f}% 均 {stats['15m']['avg']:+.2f}%　"
+        f"30m {stats['30m']['win_rate']:.1f}% 均 {stats['30m']['avg']:+.2f}%　"
+        f"60m {stats['60m']['win_rate']:.1f}% 均 {stats['60m']['avg']:+.2f}%　"
+        f"120m {stats['120m']['win_rate']:.1f}% 均 {stats['120m']['avg']:+.2f}%",
+        flush=True,
+    )
+    html_path = Path(args.html) if args.html else (PAGES if args.pages else ROOT / "output" / "binance_5m_align.html")
+    write_report(html_path, hits, stats, funnel, period, chart_limit=args.chart_limit)
+    dump_hits_json(html_path.parent / "hits.json", hits, stats, funnel, period)
+    if args.pages or html_path.parent == PAGES.parent:
+        write_view_html(html_path)
+    print(f"報告 {html_path}", flush=True)
+    return 0
+
+
 def wait_next_5m_close() -> None:
     now = time.time()
     nxt = (int(now) // 300 + 1) * 300 + 2
@@ -366,10 +740,17 @@ def main() -> int:
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
     p.add_argument("--dry-run", action="store_true", help="有訊號只印、不送 Telegram")
     p.add_argument("--symbol", action="append", default=[], help="只掃這些合約，可重複")
+    p.add_argument("--backtest", action="store_true", help="回測近 N 天並出報告")
+    p.add_argument("--days", type=int, default=3, help="回測天數（預設 3）")
+    p.add_argument("--pages", action="store_true", help="寫入 docs/binance-5m-align/")
+    p.add_argument("--html", default="", help="回測 HTML 路徑")
+    p.add_argument("--chart-limit", type=int, default=30, help="報告圖卡最多幾張")
     args = p.parse_args()
     apply_keys()
     if args.test:
         return test_telegram()
+    if args.backtest:
+        return cmd_backtest(args)
 
     seen = load_seen()
     if args.symbol:

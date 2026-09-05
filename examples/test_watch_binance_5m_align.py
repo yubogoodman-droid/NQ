@@ -12,14 +12,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from watch_binance_5m_align import (  # noqa: E402
     add_mas,
+    attach_forwards,
+    collect_signals,
     detect_new_align,
     drop_unclosed,
     five_align_ok,
     format_alert,
+    forward_pct,
+    hour_above_at,
     hour_above_ok,
+    hour_mas_at,
     key_of,
     parse_klines,
+    pick_chart_hits,
     sma,
+    summarize_hits,
 )
 
 
@@ -111,6 +118,53 @@ def test_detect_just_formed_align() -> None:
     assert five_align_ok(d5, hits[0])
     assert not five_align_ok(d5, hits[0] - 1)
     assert all(detect_new_align(d5, i, h1, 230) is None for i in hits[1:])
+
+
+def test_hour_mas_no_lookahead() -> None:
+    h_c = rising(240, 50.0, 0.4)
+    h_c[-1] = 10.0
+    h = add_mas(_bars(h_c, step=3_600_000), (99, 200))
+    px = float(h_c[-2])
+    t = int(h["t"][-1])
+    mas = hour_mas_at(h, t, px)
+    assert mas is not None
+    assert px > mas[0] and px > mas[1]
+    assert hour_above_at(h, t, px)
+    assert not hour_above_ok(h, 239)
+
+
+def test_collect_signals_first_bar_only() -> None:
+    t0 = 1_700_000_000_000
+    d5 = add_mas(_bars(rising(240), t0=t0 + 220 * 3_600_000), (7, 14, 25, 200))
+    h1 = add_mas(_bars(np.full(240, 80.0), t0=t0, step=3_600_000), (99, 200))
+    start, end = int(d5["t"][0]), int(d5["t"][-1])
+    hits = collect_signals(d5, h1, start, end)
+    assert len(hits) == 1
+    assert five_align_ok(d5, hits[0]["i"])
+    assert not five_align_ok(d5, hits[0]["i"] - 1)
+
+
+def test_forward_and_summary() -> None:
+    closes = rising(240)
+    d5 = add_mas(_bars(closes), (7, 14, 25, 200))
+    i = 200
+    pct = forward_pct(d5, i, 12)
+    expect = (closes[212] / closes[200] - 1) * 100
+    assert pct is not None and abs(pct - expect) < 1e-9
+    assert forward_pct(d5, 230, 20) is None
+    sig = {"i": i, "t": int(d5["t"][i]), "close": float(closes[i]), "symbol": "AAAUSDT"}
+    row = attach_forwards(d5, sig)
+    assert row["15m"] is not None
+    hits = [
+        {**row, "symbol": "AAAUSDT"},
+        {**row, "symbol": "BBBUSDT", "60m": -1.0, "15m": 0.5, "30m": None, "120m": 2.0},
+    ]
+    stats = summarize_hits(hits)
+    assert stats["count"] == 2
+    assert stats["symbols"] == 2
+    assert stats["60m"]["n"] == 2
+    picked = pick_chart_hits(hits, 2)
+    assert len(picked) == 2
 
 
 def test_format_and_key() -> None:

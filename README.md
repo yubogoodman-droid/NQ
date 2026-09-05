@@ -89,6 +89,9 @@ python3 examples/watch_binance_5m_align.py --test
 python3 examples/watch_binance_5m_align.py --once --dry-run
 python3 examples/watch_binance_5m_align.py
 
+# 近三天回測（流動永續，15/30/60/120 分鐘報酬）
+python3 examples/watch_binance_5m_align.py --backtest --days 3 --pages
+
 # 單元測試（不打幣安）
 python3 examples/test_watch_binance_5m_align.py
 ```
