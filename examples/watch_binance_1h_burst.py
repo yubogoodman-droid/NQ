@@ -6,6 +6,7 @@
   收盤成交量 > 前一根 × 2
   收盤在 MA25 上方、且離 MA25 ≤ 1.5%（像 BNB 貼著走，不追已噴飛的）
   收漲陽線（收盤 > 開盤）
+  短均有點發散：MA7/MA25 在 0.20%～0.80%，且比 6 根前更散（BNB 當時 +0.39%）
 
 用法:
   python3 examples/watch_binance_1h_burst.py --test     # 測 Telegram
@@ -39,6 +40,15 @@ INTERVAL_MS = 3_600_000
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
 VOL_MULT = 2.0
 MAX_EXT_MA25 = 0.015  # 收盤最多比 MA25 高 1.5%（BNB 當時約 +1.1%）
+MIN_SHORT_FAN = 0.0020  # MA7/MA25：有點散，BNB 約 +0.39%
+MAX_SHORT_FAN = 0.0080
+MIN_GAP_7_14 = 0.0008
+MIN_GAP_14_25 = 0.0006
+FAN_LOOKBACK = 6
+MIN_FAN_DELTA = 0.0010  # 比 6 根前再散至少 0.10%
+MAX_LONG_FAN = 0.020  # MA99/120/200 還不能炸開（BNB 約 0.61%）
+MIN_MID_GAP = 0.004  # MA25 相對 MA99
+MAX_MID_GAP = 0.040
 MIN_QUOTE_VOL = 5_000_000
 KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT"}
 
@@ -169,6 +179,7 @@ def burst_at(
     vol_mult: float = VOL_MULT,
     green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
+    require_fan: bool = True,
 ) -> dict | None:
     """剛收盤的第 i 根是否符合多頭爆發。"""
     if i < 1 or i >= len(d["c"]):
@@ -184,12 +195,32 @@ def burst_at(
     open_ = float(d["o"][i])
     if green_only and close <= open_:
         return None
-    m25 = float(d["m25"][i])
-    if m25 <= 0:
+    m7, m14, m25 = float(d["m7"][i]), float(d["m14"][i]), float(d["m25"][i])
+    m99, m120, m200 = float(d["m99"][i]), float(d["m120"][i]), float(d["m200"][i])
+    if m25 <= 0 or m99 <= 0:
         return None
     ext_ma25 = close / m25 - 1.0
     if max_ext_ma25 is not None and max_ext_ma25 > 0:
         if ext_ma25 < 0 or ext_ma25 > max_ext_ma25:
+            return None
+    short_fan = m7 / m25 - 1.0
+    long_fan = max(m99, m120, m200) / min(m99, m120, m200) - 1.0
+    mid_gap = m25 / m99 - 1.0
+    fan_delta = None
+    if require_fan:
+        if not (MIN_SHORT_FAN <= short_fan <= MAX_SHORT_FAN):
+            return None
+        if m7 / m14 - 1.0 < MIN_GAP_7_14 or m14 / m25 - 1.0 < MIN_GAP_14_25:
+            return None
+        if i < FAN_LOOKBACK:
+            return None
+        prev_fan = float(d["m7"][i - FAN_LOOKBACK]) / float(d["m25"][i - FAN_LOOKBACK]) - 1.0
+        if np.isnan(prev_fan) or short_fan < prev_fan + MIN_FAN_DELTA:
+            return None
+        fan_delta = short_fan - prev_fan
+        if long_fan > MAX_LONG_FAN:
+            return None
+        if not (MIN_MID_GAP <= mid_gap <= MAX_MID_GAP):
             return None
     return {
         "i": i,
@@ -202,6 +233,10 @@ def burst_at(
         "high": float(d["h"][i]),
         "low": float(d["l"][i]),
         "ext_ma25": ext_ma25,
+        "short_fan": short_fan,
+        "long_fan": long_fan,
+        "mid_gap": mid_gap,
+        "fan_delta": fan_delta,
     }
 
 
@@ -310,12 +345,20 @@ def find_bursts(
     vol_mult: float = VOL_MULT,
     green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
+    require_fan: bool = True,
 ) -> list[dict]:
     hits = []
     lo = max(1, start)
     hi = min(end, len(d["c"]) - 1)
     for i in range(lo, hi + 1):
-        hit = burst_at(d, i, vol_mult=vol_mult, green_only=green_only, max_ext_ma25=max_ext_ma25)
+        hit = burst_at(
+            d,
+            i,
+            vol_mult=vol_mult,
+            green_only=green_only,
+            max_ext_ma25=max_ext_ma25,
+            require_fan=require_fan,
+        )
         if hit:
             hits.append(hit)
     return hits
@@ -327,6 +370,7 @@ def scan_symbol(
     vol_mult: float = VOL_MULT,
     green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
+    require_fan: bool = True,
 ) -> list[dict]:
     raw = fetch_klines(sym)
     if raw is None:
@@ -336,7 +380,7 @@ def scan_symbol(
     start = max(MA_PERIODS[-1], last - lookback + 1)
     return [
         {"symbol": sym, "d": d, **hit}
-        for hit in find_bursts(d, start, last, vol_mult, green_only, max_ext_ma25)
+        for hit in find_bursts(d, start, last, vol_mult, green_only, max_ext_ma25, require_fan)
     ]
 
 
@@ -352,6 +396,9 @@ def format_burst(ev: dict) -> str:
         f"現價 {ev['close']:g}　OHLC {ev['open']:g} / {ev['high']:g} / {ev['low']:g} / {ev['close']:g}\n"
         f"成交量 {ev['vol']:.4g}　前一根 {ev['prev_vol']:.4g}　放大 {ev['vol_ratio']:.2f}×\n"
         f"離 MA25 {ev.get('ext_ma25', 0) * 100:+.2f}%\n"
+        f"短均發散 MA7/MA25 {ev.get('short_fan', 0) * 100:+.2f}%"
+        + (f"（6根再散 {ev['fan_delta'] * 100:+.2f}%）" if ev.get("fan_delta") is not None else "")
+        + "\n"
         f"多頭排列  {ma_txt}"
     )
 
@@ -366,11 +413,13 @@ def scan_all(
     vol_mult: float,
     green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
+    require_fan: bool = True,
 ) -> list[dict]:
     events = []
     with ThreadPoolExecutor(8) as ex:
         futs = {
-            ex.submit(scan_symbol, s, lookback, vol_mult, green_only, max_ext_ma25): s for s in symbols
+            ex.submit(scan_symbol, s, lookback, vol_mult, green_only, max_ext_ma25, require_fan): s
+            for s in symbols
         }
         for fut in as_completed(futs):
             try:
@@ -435,6 +484,7 @@ def main() -> int:
         default=MAX_EXT_MA25,
         help="收盤最多比 MA25 高多少（預設 0.015 = 1.5%，像 BNB；0 關閉）",
     )
+    p.add_argument("--no-fan", action="store_true", help="不要求短均發散（預設要像 BNB 那樣有點散開）")
     p.add_argument("--symbols", nargs="*", help="只掃這些代號，例如 BTCUSDT ETHUSDT")
     args = p.parse_args()
     apply_keys()
@@ -447,7 +497,8 @@ def main() -> int:
     print(
         f"監看 {len(symbols)} 個 1h：MA7>14>25>99>120>200 且量 > 前一根 × {args.vol_mult:g}"
         + (f" 且離 MA25 ≤ {args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else "")
-        + (" 只要收漲陽線" if not args.allow_red else ""),
+        + (" 只要收漲陽線" if not args.allow_red else "")
+        + (" 且短均發散" if not args.no_fan else ""),
         flush=True,
     )
     uni_ts = time.time()
@@ -465,6 +516,7 @@ def main() -> int:
             vol_mult=args.vol_mult,
             green_only=not args.allow_red,
             max_ext_ma25=args.max_ext_ma25,
+            require_fan=not args.no_fan,
         )
         new = [e for e in events if key_of(e) not in seen]
         print(

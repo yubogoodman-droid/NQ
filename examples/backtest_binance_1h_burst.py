@@ -24,6 +24,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from watch_binance_1h_burst import (  # noqa: E402
     MA_PERIODS,
     MAX_EXT_MA25,
+    MAX_SHORT_FAN,
+    MIN_SHORT_FAN,
     REPO,
     TZ,
     VOL_MULT,
@@ -54,6 +56,7 @@ class Trade:
     reason: str
     vol_ratio: float
     ext_ma25: float
+    short_fan: float
     green: bool
     fwd_1h: Optional[float]
     fwd_4h: Optional[float]
@@ -113,6 +116,7 @@ def simulate_trade(
         reason=reason,
         vol_ratio=float(hit["vol_ratio"]),
         ext_ma25=float(hit.get("ext_ma25") or 0.0),
+        short_fan=float(hit.get("short_fan") or 0.0),
         green=float(hit["close"]) >= float(hit["open"]),
         fwd_1h=_fwd(close, i, 1),
         fwd_4h=_fwd(close, i, 4),
@@ -175,6 +179,7 @@ def backtest_symbol(
     target_r: float,
     allow_overlap: bool,
     max_ext_ma25: float | None = MAX_EXT_MA25,
+    require_fan: bool = True,
 ) -> tuple[list[Trade], int]:
     need = 200 + days * 24 + time_bars + 30
     raw = fetch_klines(sym, limit=max(280, need))
@@ -184,7 +189,13 @@ def backtest_symbol(
     last = len(d["c"]) - 1
     start = max(MA_PERIODS[-1], last - days * 24 + 1)
     hits = find_bursts(
-        d, start, last, vol_mult=vol_mult, green_only=green_only, max_ext_ma25=max_ext_ma25
+        d,
+        start,
+        last,
+        vol_mult=vol_mult,
+        green_only=green_only,
+        max_ext_ma25=max_ext_ma25,
+        require_fan=require_fan,
     )
     trades = [simulate_trade(d, hit, target_r=target_r, time_bars=time_bars) for hit in hits]
     for t in trades:
@@ -314,7 +325,8 @@ def write_html(path: Path, trades: list[Trade], stats: dict, extra: dict, max_ch
             f"<div class='tags'><span class='tag tag-info'>{escape(t.reason)}</span>"
             f"<span class='tag'>{side}</span>"
             f"<span class='tag'>量 {t.vol_ratio:.2f}×</span>"
-            f"<span class='tag'>離MA25 {t.ext_ma25*100:+.2f}%</span></div>"
+            f"<span class='tag'>離MA25 {t.ext_ma25*100:+.2f}%</span>"
+            f"<span class='tag'>短均散 {t.short_fan*100:+.2f}%</span></div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry:g}  stop {t.stop:g}  target {t.target:g}\n"
             f"exit {t.exit:g} {t.reason}  {t.pnl_pct * 100:+.2f}%\n"
@@ -354,6 +366,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <p class="muted">USDT 永續 · MA7&gt;14&gt;25&gt;99&gt;120&gt;200 且收盤量 &gt; 前一根 × {extra['vol_mult']:g}
 · 收盤在 MA25 上方且離 MA25 ≤ {extra['max_ext_ma25']*100:g}%（像 BNB）
 · 只要收漲陽線（收盤 &gt; 開盤）
+· 短均有點發散：MA7/MA25 {extra.get('min_short_fan', MIN_SHORT_FAN)*100:.2f}%～{extra.get('max_short_fan', MAX_SHORT_FAN)*100:.2f}%，且比 6 根前更散
 <br/>收盤進場；停在訊號 K 低（太窄則 0.5%）、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。
 同標的重疊訊號預設不重做。加總％是各筆相加，不是組合複利。
 <br/>掃 {extra['scanned']} 檔 · 原始訊號 {extra['raw_hits']} · 進場 {stats['count']}
@@ -392,6 +405,7 @@ def dump_hits(path: Path, trades: list[Trade], stats: dict, extra: dict) -> Path
                 "reason": t.reason,
                 "vol_ratio": t.vol_ratio,
                 "ext_ma25": t.ext_ma25,
+                "short_fan": t.short_fan,
                 "green": t.green,
                 "fwd_1h": t.fwd_1h,
                 "fwd_4h": t.fwd_4h,
@@ -412,6 +426,7 @@ def main(argv=None) -> int:
     p.add_argument("--days", type=int, default=3)
     p.add_argument("--vol-mult", type=float, default=VOL_MULT)
     p.add_argument("--allow-red", action="store_true", help="連陰線也做（預設只要收漲陽線）")
+    p.add_argument("--no-fan", action="store_true", help="不要求短均發散")
     p.add_argument("--overlap", action="store_true", help="同標的重疊訊號也做")
     p.add_argument("--time-bars", type=int, default=TIME_BARS)
     p.add_argument("--target-r", type=float, default=TARGET_R)
@@ -434,7 +449,8 @@ def main(argv=None) -> int:
         f"回測 {len(symbols)} 檔 · {args.days}d 1h · 量>{args.vol_mult:g}× · "
         f"{args.time_bars} 根 / {args.target_r:g}R"
         + (f" · 離MA25≤{args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else "")
-        + (" · 只要收漲陽線" if not args.allow_red else ""),
+        + (" · 只要收漲陽線" if not args.allow_red else "")
+        + (" · 短均發散" if not args.no_fan else ""),
         flush=True,
     )
     trades: list[Trade] = []
@@ -452,6 +468,7 @@ def main(argv=None) -> int:
                 args.target_r,
                 args.overlap,
                 args.max_ext_ma25,
+                not args.no_fan,
             ): s
             for s in symbols
         }
@@ -481,7 +498,7 @@ def main(argv=None) -> int:
         print(
             f"  [{i:3d}] {t.symbol:16s} {hm(int(t.d['t'][t.entry_idx]))}  "
             f"{t.reason:6s} {t.pnl_pct*100:+6.2f}%  {t.vol_ratio:.2f}×  "
-            f"MA25{t.ext_ma25*100:+.2f}%",
+            f"MA25{t.ext_ma25*100:+.2f}%  fan{t.short_fan*100:+.2f}%",
             flush=True,
         )
 
@@ -493,6 +510,9 @@ def main(argv=None) -> int:
         "time_bars": args.time_bars,
         "target_r": args.target_r,
         "max_ext_ma25": args.max_ext_ma25,
+        "require_fan": not args.no_fan,
+        "min_short_fan": MIN_SHORT_FAN,
+        "max_short_fan": MAX_SHORT_FAN,
         "scanned": len(symbols),
         "raw_hits": raw_hits,
         "generated": datetime.now(TZ).isoformat(timespec="seconds"),

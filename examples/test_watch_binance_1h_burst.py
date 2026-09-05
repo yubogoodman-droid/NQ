@@ -60,7 +60,7 @@ def test_burst_hits_on_double_volume() -> None:
     raw["v"][-2] = 80.0
     raw["v"][-1] = 161.0  # 2.0125×
     d = indicators(raw)
-    hit = burst_at(d, len(d["c"]) - 1)
+    hit = burst_at(d, len(d["c"]) - 1, require_fan=False)
     assert hit is not None
     assert hit["vol_ratio"] > 2.0
     assert hit["close"] == raw["c"][-1]
@@ -109,7 +109,7 @@ def test_rejects_far_from_ma25() -> None:
     d = indicators(raw)
     i = len(d["c"]) - 1
     assert burst_at(d, i) is None
-    assert burst_at(d, i, max_ext_ma25=0.08) is not None
+    assert burst_at(d, i, max_ext_ma25=0.08, require_fan=False) is not None
     assert burst_at(d, i) is None or d["c"][i] / d["m25"][i] - 1 > 0.015
 
 
@@ -118,9 +118,45 @@ def test_accepts_bnb_like_ma25() -> None:
     raw["v"][-1] = 250.0
     d = indicators(raw)
     i = len(d["c"]) - 1
-    hit = burst_at(d, i)
+    hit = burst_at(d, i, require_fan=False)
     assert hit is not None
     assert 0 <= hit["ext_ma25"] <= 0.015
+
+
+def _fan_bars(n: int = 240, grind: float = 1.00015, accel: float = 1.0012, acc_bars: int = 10) -> dict:
+    """Slow grind then accelerate so short MAs open like BNB."""
+    c = np.empty(n, dtype=float)
+    c[0] = 100.0
+    for i in range(1, n - acc_bars):
+        c[i] = c[i - 1] * grind
+    for i in range(n - acc_bars, n):
+        c[i] = c[i - 1] * accel
+    o = c - 0.05
+    return {
+        "t": np.arange(n, dtype=np.int64) * 3_600_000,
+        "o": o,
+        "h": c + 0.08,
+        "l": c - 0.08,
+        "c": c,
+        "v": np.full(n, 100.0),
+    }
+
+
+def test_bnb_style_fan_passes() -> None:
+    raw = _fan_bars()
+    raw["v"][-1] = 250.0
+    d = indicators(raw)
+    hit = burst_at(d, len(d["c"]) - 1)
+    assert hit is not None
+    assert 0.002 <= hit["short_fan"] <= 0.008
+    assert hit["fan_delta"] is not None and hit["fan_delta"] >= 0.001
+
+
+def test_tight_stack_not_fan() -> None:
+    raw = _uptrend(step=0.02)
+    raw["v"][-1] = 250.0
+    d = indicators(raw)
+    assert burst_at(d, len(d["c"]) - 1) is None
 
 
 def test_rejects_red_bar() -> None:
@@ -130,7 +166,7 @@ def test_rejects_red_bar() -> None:
     d = indicators(raw)
     i = len(d["c"]) - 1
     assert burst_at(d, i) is None
-    assert burst_at(d, i, green_only=False) is not None
+    assert burst_at(d, i, green_only=False, require_fan=False) is not None
 
 
 def test_burst_rejects_early_bar() -> None:
@@ -161,7 +197,7 @@ def test_find_bursts_window() -> None:
     raw["v"][-1] = 90.0
     d = indicators(raw)
     n = len(d["c"])
-    hits = find_bursts(d, n - 3, n - 1)
+    hits = find_bursts(d, n - 3, n - 1, require_fan=False)
     assert len(hits) == 1
     assert hits[0]["i"] == n - 2
 
@@ -172,7 +208,7 @@ def test_simulate_hits_target() -> None:
     raw["v"][-19] = 200.0
     d = indicators(raw)
     i = len(d["c"]) - 19
-    hit = burst_at(d, i)
+    hit = burst_at(d, i, require_fan=False)
     assert hit is not None
     # next bars keep climbing; force a wide stop so 2R is reachable
     d["l"][i] = d["c"][i] * 0.99
@@ -187,7 +223,7 @@ def test_simulate_hits_stop() -> None:
     raw["v"][-11] = 200.0
     d = indicators(raw)
     i = len(d["c"]) - 11
-    hit = burst_at(d, i)
+    hit = burst_at(d, i, require_fan=False)
     assert hit is not None
     d["l"][i] = d["c"][i] * 0.99
     d["l"][i + 1] = d["c"][i] * 0.98
@@ -226,7 +262,7 @@ def test_key_and_format() -> None:
     raw = _uptrend()
     raw["v"][-1] = 250.0
     d = indicators(raw)
-    hit = burst_at(d, len(d["c"]) - 1)
+    hit = burst_at(d, len(d["c"]) - 1, require_fan=False)
     ev = {"symbol": "BTCUSDT", "d": d, **hit}
     assert key_of(ev) == f"BTCUSDT:{int(d['t'][-1])}"
     msg = format_burst(ev)
@@ -247,6 +283,8 @@ def main() -> int:
         test_burst_rejects_zero_prev_volume,
         test_rejects_far_from_ma25,
         test_accepts_bnb_like_ma25,
+        test_bnb_style_fan_passes,
+        test_tight_stack_not_fan,
         test_rejects_red_bar,
         test_burst_rejects_early_bar,
         test_drop_unclosed,
