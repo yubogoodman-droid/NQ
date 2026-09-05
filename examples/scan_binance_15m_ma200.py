@@ -105,10 +105,10 @@ def universe() -> list[str]:
             continue
         if s.get("status") != "TRADING":
             continue
-        # 只掃幣圈永續；美股 / 商品 TradFi 開盤跳空不像 ETH 那波
-        if s.get("contractType") != "PERPETUAL":
+        if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
             continue
-        if s.get("underlyingType") != "COIN":
+        # 幣 + 股票；原油 / 指數跳空先不掃
+        if s.get("underlyingType") not in ("COIN", "EQUITY", "HK_EQUITY"):
             continue
         sym = s["symbol"]
         qv = float((tickers.get(sym) or {}).get("quoteVolume") or 0)
@@ -546,7 +546,7 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             subtitle=(
                 f"{days}d · {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')} · "
                 f"{len(symbols)} 檔 · 抱最多 {HOLD_BARS} 根。"
-                " 圖卡依「像不像 ETH 9/3」排序：緊黏帶、離 200 近、放量。"
+                " 幣+股。條件對齊 ETH 9/3：黏度 ≤ 0.6%、離 200 ≤ 0.8%、量 3～8×、振幅 2～6×。"
             ),
         )
         print(f"HTML {out}")
