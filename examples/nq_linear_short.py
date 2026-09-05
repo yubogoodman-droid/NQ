@@ -609,9 +609,10 @@ def _paint_candles(ax, axv, window: pd.DataFrame, min_slots: int = 36) -> None:
         axv.bar(list(xs), vol.astype(float), width=0.7, color=colors_v, linewidth=0)
     span = max(n, min_slots)
     extra = span - n
-    ax.set_xlim(-0.7, n - 0.3 + extra)
+    left_pad = extra * 0.35
+    ax.set_xlim(-0.7 - left_pad, n - 0.3 + extra - left_pad)
     if axv is not None:
-        axv.set_xlim(-0.7, n - 0.3 + extra)
+        axv.set_xlim(-0.7 - left_pad, n - 0.3 + extra - left_pad)
 
 
 def _htf_index(window: pd.DataFrame, ts) -> int:
@@ -623,18 +624,39 @@ def _htf_index(window: pd.DataFrame, ts) -> int:
     return i
 
 
-def _m5_window(df_5m: pd.DataFrame, entry_ts, exit_ts) -> pd.DataFrame:
+def _m5_window(df_5m: pd.DataFrame, peak_ts, entry_ts, exit_ts) -> pd.DataFrame:
+    """只切這筆結構附近，不要把盤前扁平 K 跟遠處均線一起拉進來。"""
     if df_5m.empty:
         return df_5m
-    start = entry_ts - pd.Timedelta(minutes=200)
-    end = exit_ts + pd.Timedelta(minutes=50)
-    w = df_5m.loc[(df_5m.index >= start) & (df_5m.index <= end)]
-    if len(w) < 28:
+    left = min(peak_ts, entry_ts) - pd.Timedelta(minutes=170)
+    right = exit_ts + pd.Timedelta(minutes=30)
+    w = df_5m.loc[(df_5m.index >= left) & (df_5m.index <= right)]
+    if len(w) < 24:
         w = df_5m.loc[
-            (df_5m.index >= entry_ts - pd.Timedelta(hours=5))
-            & (df_5m.index <= exit_ts + pd.Timedelta(hours=1))
+            (df_5m.index >= entry_ts - pd.Timedelta(hours=3))
+            & (df_5m.index <= exit_ts + pd.Timedelta(minutes=40))
         ]
     return w
+
+
+def _fit_price_ylim(ax, window: pd.DataFrame, extra: Sequence[float] = ()) -> tuple[float, float]:
+    lo = float(window["Low"].min())
+    hi = float(window["High"].max())
+    for v in extra:
+        if v is None:
+            continue
+        try:
+            fv = float(v)
+        except (TypeError, ValueError):
+            continue
+        if np.isnan(fv):
+            continue
+        if lo - 90 <= fv <= hi + 90:
+            lo = min(lo, fv)
+            hi = max(hi, fv)
+    pad = max(3.0, (hi - lo) * 0.10)
+    ax.set_ylim(lo - pad, hi + pad)
+    return lo - pad, hi + pad
 
 
 def _plot_h1_segments(ax, xs, values, label: str = "1H") -> None:
@@ -677,7 +699,13 @@ def _plot_h1_segments(ax, xs, values, label: str = "1H") -> None:
         flush(float(list(xs)[-1]) + 1.0)
 
 
-def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
+def draw_trade_png(
+    df: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+    df_5m: pd.DataFrame | None = None,
+) -> Path:
     _setup_mpl()
     import matplotlib.pyplot as plt
 
@@ -686,30 +714,17 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     window = df.iloc[start : end + 1]
     close_full = df["Close"].astype(float)
     df_1h = add_mas(resample_1h(df))
-    df_5m = add_mas(resample_5m(df))
     h1_on_1m = map_closed_1h(df, df_1h, "Close")
 
-    have_5m = len(df_5m) >= 8
-    if have_5m:
-        fig, (ax, axv, ax5, ax5v) = plt.subplots(
-            4,
-            1,
-            figsize=(10.4, 9.2),
-            gridspec_kw={"height_ratios": [3.15, 0.72, 2.85, 0.68]},
-            facecolor="#0c1210",
-        )
-        _style_axes((ax, axv, ax5, ax5v))
-    else:
-        fig, (ax, axv) = plt.subplots(
-            2,
-            1,
-            figsize=(10.4, 5.6),
-            sharex=True,
-            gridspec_kw={"height_ratios": [3.2, 1]},
-            facecolor="#0c1210",
-        )
-        _style_axes((ax, axv))
-        ax5 = ax5v = None
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.6),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    _style_axes((ax, axv))
 
     _paint_candles(ax, axv, window, min_slots=48)
     xs = range(len(window))
@@ -723,6 +738,11 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
 
     ax.axhline(trade.stop_price, color="#7f1d1d", ls=":", lw=1.1, alpha=0.9)
     ax.axhline(sig.peak_ma200, color="#264653", ls="--", lw=0.8, alpha=0.45)
+    _fit_price_ylim(
+        ax,
+        window,
+        extra=(trade.stop_price, trade.entry_price, trade.exit_price, sig.peak_high, sig.h1_close),
+    )
 
     px, rx, ex, xx = sig.peak_idx - start, sig.retest_idx - start, trade.entry_idx - start, trade.exit_idx - start
     if 0 <= px < len(window):
@@ -751,7 +771,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     xt = df.index[trade.exit_idx]
     sign = "+" if trade.pnl_points >= 0 else ""
     ax.set_title(
-        f"#{trade_no}  1m  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"#{trade_no}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt  峰距{sig.peak_dist:.0f}",
         color="#e8f0ea",
         fontsize=11,
@@ -761,41 +781,6 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
     axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
-
-    if have_5m and ax5 is not None and ax5v is not None:
-        w5 = _m5_window(df_5m, et, xt)
-        _paint_candles(ax5, ax5v, w5, min_slots=40)
-        x5 = range(len(w5))
-        for n, col in ((5, "#f0b429"), (10, "#ff7a00"), (20, "#e63946"), (60, "#9b5de5"), (200, "#264653")):
-            colname = f"ma{n}"
-            if colname in w5.columns and w5[colname].notna().any():
-                ax5.plot(list(x5), w5[colname], color=col, lw=1.35 if n in (20, 200) else 1.0, label=f"5m MA{n}")
-        h1_on_5m = map_closed_1h(w5, df_1h, "Close") if len(w5) else np.array([])
-        if len(h1_on_5m) and not np.all(np.isnan(h1_on_5m)):
-            _plot_h1_segments(ax5, list(x5), h1_on_5m, label="1H")
-        ei = _htf_index(w5, et)
-        xi = _htf_index(w5, xt)
-        if 0 <= ei < len(w5):
-            ax5.axvline(ei, color="#ef4444", ls="--", lw=0.9)
-            ax5.scatter([ei], [trade.entry_price], s=42, color="#ef4444", marker="v", zorder=6)
-        if 0 <= xi < len(w5):
-            ax5.axvline(xi, color="#f0c14b", ls=":", lw=0.9)
-            ax5.scatter(
-                [xi],
-                [trade.exit_price],
-                s=36,
-                color="#00c805" if trade.pnl_points > 0 else "#ff5252",
-                marker="x",
-                zorder=6,
-            )
-        ax5.axhline(trade.stop_price, color="#7f1d1d", ls=":", lw=1.0, alpha=0.85)
-        ax5.set_title("5m 對照（同一進出場時刻）", color="#e8f0ea", fontsize=10)
-        ax5.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
-        step5 = max(1, len(w5) // 6) if len(w5) else 1
-        ticks5 = list(range(0, len(w5), step5))
-        ax5v.set_xticks(ticks5)
-        if len(w5):
-            ax5v.set_xticklabels([w5.index[i].strftime("%m-%d %H:%M") for i in ticks5], color="#8aa193")
 
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -823,6 +808,7 @@ def write_html_report(
     period: str,
     funnel: Optional[Dict[str, int]] = None,
     embed_images: bool = False,
+    df_5m: pd.DataFrame | None = None,
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -847,7 +833,7 @@ def write_html_report(
             "stop": "tag-sl",
         }.get(t.exit_reason, "tag-time")
         img_name = _trade_img_name(df, t, i)
-        png = draw_trade_png(df, t, img_dir / img_name, i)
+        png = draw_trade_png(df, t, img_dir / img_name, i, df_5m=df_5m)
         src = _img_data_uri(png) if embed_images else f"img/{escape(img_name)}"
         chart = (
             f"<img src='{src}' alt='#{i}' "
@@ -867,7 +853,6 @@ def write_html_report(
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
             f"<span class='tag tag-info'>1m</span>"
-            f"<span class='tag tag-info'>5m</span>"
             f"<span class='tag tag-info'>峰距 {t.signal.peak_dist:.0f}</span>"
             "</div>"
             "<pre class='trade-detail'>"
@@ -900,7 +885,7 @@ def write_html_report(
     end = df.index[-1].strftime("%Y-%m-%d %H:%M") if len(df) else ""
     total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
     dollars = stats["total_points"] * POINT_VALUE - stats["count"] * COMMISSION_RT
-    note = "<p class='muted'>上圖 1m、下圖 5m。灰線是已收盤小時線（只畫水平段）。手機請往下捲。</p>" if embed_images else ""
+    note = "<p class='muted'>圖是靜態 1m K 線。灰線是已收盤小時線。手機請往下捲。</p>" if embed_images else ""
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>

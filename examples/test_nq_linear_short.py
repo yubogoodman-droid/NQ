@@ -245,7 +245,7 @@ def test_write_html_report() -> None:
     assert "線性空" in text
     if trades:
         assert "<img src='img/" in text
-        assert "5m" in text
+        assert "1m" in text
         assert any((path.parent / "img").glob("t01_*.png"))
 
 
