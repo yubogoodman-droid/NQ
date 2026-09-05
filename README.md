@@ -110,6 +110,12 @@ python3 examples/backtest_binance_1h_burst.py --days 3 --pages        # 近三�
 python3 examples/test_watch_binance_1h_burst.py                      # 單元測試（不打網路）
 ```
 
+近三天（2026-09-02 23:00 → 09-05 22:00 台北）：231 檔、原始訊號 **317**、進場 **223**（90 檔，同標的重疊不重做）。  
+已平 197 筆勝率 **40.6%**，平均 **+0.25%**。出場：2R 54 · 停損 100 · 時間 43 · 未平 26。  
+收盤後拿著：+1h +0.02% · +4h +0.78% · +8h +1.04% · **+24h +3.84%**（緊停損容易被洗，隔日方向比較明顯）。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-1h-bull-burst-ee86/docs/binance-1h-burst/view.html
+
 ## 快速開始
 
 ```bash

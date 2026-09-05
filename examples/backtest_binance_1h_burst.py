@@ -218,7 +218,8 @@ def _draw_trade(t: Trade, path: Path, trade_no: int) -> None:
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         from matplotlib.patches import Rectangle
-    except Exception:
+    except Exception as e:
+        print("chart import failed:", e, flush=True)
         return
     i, x = t.entry_idx, t.exit_idx
     a0 = max(0, i - 36)
