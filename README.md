@@ -35,6 +35,10 @@ python3 examples/test_nq_w_ma20.py
 
 TradingView：`pinescript/nq_w_ma20_5m.pine` 貼到 NQ1! / MNQ1! 五分圖。
 
+近一週 Yahoo 五分（2026-08-28 → 09-04）：**29 筆、勝率 24.1%、−365.5 點**（均筆 −12.6）。  
+漏斗：左腳 173 → W底 231 → 進場 43（沒站上 63 · 新低 58 · 間隔 117 · 風險 8），持倉不重疊後 29 筆。  
+近兩月（2026-06-26 → 09-04）：**196 筆、勝率 32.1%、−1198 點**。右側剛站上離兩低點已遠，下跌裡假 W 一次吐完。
+
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-w-ma20-26e0/docs/nq-w-ma20/view.html
 
 ## NQ 一分 K 破底翻 MA Reclaim
