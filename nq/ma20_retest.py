@@ -1,0 +1,858 @@
+"""NQ 破底翻：反彈收復 MA20 後，右肩回踩 MA20 做多（5m / 1m）。"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Sequence, Tuple
+
+import numpy as np
+import pandas as pd
+
+
+@dataclass
+class Signal:
+    break_idx: int
+    trough_idx: int
+    reclaim_idx: int
+    entry_idx: int
+    entry_price: float
+    stop_price: float
+    target_price: float
+    break_low: float
+    support: float
+    ma5: float
+    ma10: float
+    ma20: float
+    ma60: float
+    ma60_5m: float = 0.0
+    ma60_5m_slope: float = 0.0
+    ma20_5m: float = 0.0
+    ma20_5m_slope: float = 0.0
+    ma30_5m: float = 0.0
+    ma30_5m_slope: float = 0.0
+    quality: str = "C"
+    quality_score: int = 0
+
+
+@dataclass
+class TradeResult:
+    signal: Signal
+    entry_idx: int
+    exit_idx: int
+    entry_price: float
+    exit_price: float
+    stop_price: float
+    target_price: float
+    pnl_points: float
+    exit_reason: str
+    quality: str
+
+
+def sma(arr, n: int) -> np.ndarray:
+    s = pd.Series(arr, dtype=float)
+    return s.rolling(n, min_periods=n).mean().to_numpy(float)
+
+
+def rolling_min_prev(arr, n: int) -> np.ndarray:
+    s = pd.Series(arr, dtype=float)
+    return s.shift(1).rolling(n, min_periods=n).min().to_numpy(float)
+
+
+def align_5m_ma(
+    df: pd.DataFrame,
+    *,
+    ma_len: int = 60,
+    slope_bars: int = 6,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """5 分均線與斜率，對齊 df.index，不用未來 1m。
+
+    一分圖用已收盤的 5 分 K（與 TradingView lookahead_off 相同）：
+    10:51–10:54 仍用 10:50 收完的那根 5 分均線。
+    """
+    close = df["Close"].astype(float)
+    idx = df.index
+    n = len(df)
+    if n == 0:
+        return np.array([], dtype=float), np.array([], dtype=float)
+
+    bar_min = 5.0
+    if n >= 2:
+        bar_min = max((idx[1] - idx[0]).total_seconds() / 60.0, 0.5)
+
+    if bar_min >= 4.0:
+        ma = close.rolling(ma_len, min_periods=ma_len).mean()
+        slope = ma - ma.shift(slope_bars)
+        return ma.to_numpy(float), slope.to_numpy(float)
+
+    m5 = close.resample("5min", label="right", closed="right").last().dropna()
+    ma5 = m5.rolling(ma_len, min_periods=ma_len).mean()
+    slope5 = ma5 - ma5.shift(slope_bars)
+    ma_out = np.full(n, np.nan, dtype=float)
+    slope_out = np.full(n, np.nan, dtype=float)
+    m5_idx = ma5.index
+    ma_vals = ma5.to_numpy(float)
+    sl_vals = slope5.to_numpy(float)
+    j = 0
+    for i, ts in enumerate(idx):
+        while j + 1 < len(m5_idx) and m5_idx[j + 1] <= ts:
+            j += 1
+        if j < len(m5_idx) and m5_idx[j] <= ts:
+            ma_out[i] = ma_vals[j]
+            slope_out[i] = sl_vals[j]
+    return ma_out, slope_out
+
+
+def align_5m_ma60(
+    df: pd.DataFrame,
+    *,
+    ma_len: int = 60,
+    slope_bars: int = 6,
+) -> Tuple[np.ndarray, np.ndarray]:
+    return align_5m_ma(df, ma_len=ma_len, slope_bars=slope_bars)
+
+
+def near_falling_5m_ma60(
+    entry: float,
+    ma60_5m: float,
+    slope: float,
+    near: float,
+    ma20_5m_slope: float = float("nan"),
+) -> bool:
+    """進場價貼著下彎的 5m MA60（綠線）→ 濾掉。
+
+    5m MA20 已經上彎時不算蓋頭（08-03 09:50 右肩，綠線還在頭上但粉紅已翻）。
+    """
+    if near <= 0 or np.isnan(ma60_5m) or np.isnan(slope):
+        return False
+    if not np.isnan(ma20_5m_slope) and float(ma20_5m_slope) >= 0.0:
+        return False
+    return float(slope) < 0.0 and abs(float(entry) - float(ma60_5m)) <= float(near)
+
+
+def near_falling_5m_ma20_ma30(
+    entry: float,
+    ma20_5m: float,
+    slope20: float,
+    ma30_5m: float,
+    slope30: float,
+    near: float,
+    ma60_5m: float = float("nan"),
+    slope60: float = float("nan"),
+) -> bool:
+    """進場夾在下彎 5m MA20 / MA30 蓋頭底下（空頭排列）→ 濾掉。
+
+    要粉紅 < 藍 < 綠（MA20 < MA30 < MA60）且三條都下彎。
+    08-18 10:34 是蓋頭；08-24 07:27 均線纏在一起、綠線還在藍線下面，會留。
+    """
+    if near <= 0:
+        return False
+    vals = (ma20_5m, slope20, ma30_5m, slope30, ma60_5m, slope60)
+    if any(np.isnan(x) for x in vals):
+        return False
+    if float(slope20) >= 0.0 or float(slope30) >= 0.0 or float(slope60) >= 0.0:
+        return False
+    if not (float(entry) < float(ma20_5m) and float(entry) < float(ma30_5m)):
+        return False
+    if not (float(ma20_5m) < float(ma30_5m) < float(ma60_5m)):
+        return False
+    return (float(ma20_5m) - float(entry)) <= float(near) and (
+        float(ma30_5m) - float(entry)
+    ) <= float(near)
+
+
+def far_below_falling_5m_ma20(
+    entry: float,
+    ma20_5m: float,
+    slope20: float,
+    max_below: float,
+) -> bool:
+    """瀑布後還在下彎 5m MA20 下方很遠（08-28 #12：−79 點）→ 不是破底翻。"""
+    if max_below <= 0 or np.isnan(ma20_5m) or np.isnan(slope20):
+        return False
+    return float(slope20) < 0.0 and (float(ma20_5m) - float(entry)) > float(max_below)
+
+
+def falling_5m_ma20_location(
+    entry: float,
+    ma20_5m: float,
+    slope20: float,
+    *,
+    chase_above: float,
+    lid_slope: float,
+) -> str:
+    """五分 MA20 下跌時的位置：'' / chase / lid。
+
+    chase：收盤高均線太多。這波作廢，不要再拖 80 分鐘等五分均線翻過來
+    （08-19 11:05 追價，11:44 才進，不是右肩）。
+    lid：壓在陡降均線下，這波破底翻作廢（否則 4 分鐘後又買到更差的肩）。
+
+    圈起來的三筆都是 ''：08-03 五分 MA20 往上；08-24 只高 26 點；
+    08-28 在均線下 10 點但斜率只有 −11，還不到蓋子。
+    """
+    if np.isnan(ma20_5m) or np.isnan(slope20) or float(slope20) >= 0.0:
+        return ""
+    if chase_above > 0 and (float(entry) - float(ma20_5m)) > float(chase_above):
+        return "chase"
+    if lid_slope < 0 and float(slope20) < float(lid_slope) and float(entry) < float(ma20_5m):
+        return "lid"
+    return ""
+
+
+def tangled_5m_ma20_ma60(
+    entry: float,
+    ma20_5m: float,
+    slope20: float,
+    ma60_5m: float,
+    slope60: float,
+    *,
+    max_spread: float,
+) -> bool:
+    """五分粉紅剛上彎、綠線還下彎，兩條又纏在一起，價已穿到綠線上 → 糾結。
+
+    08-27 #8：MA20/MA60 只差 18 點、方向相反，進場在綠線上 22 點。
+    08-03 #1：綠線還在頭上 25 點，是破底翻，要留。
+    08-28：粉紅還下彎，不算這種交叉糾結。
+    """
+    if max_spread <= 0:
+        return False
+    vals = (ma20_5m, slope20, ma60_5m, slope60)
+    if any(np.isnan(x) for x in vals):
+        return False
+    if float(slope20) <= 0.0 or float(slope60) >= 0.0:
+        return False
+    if abs(float(ma60_5m) - float(ma20_5m)) > float(max_spread):
+        return False
+    return float(entry) >= float(ma60_5m)
+
+
+def falling_5m_ma20_bad_location(
+    entry: float,
+    ma20_5m: float,
+    slope20: float,
+    *,
+    chase_above: float,
+    lid_slope: float,
+) -> bool:
+    return bool(
+        falling_5m_ma20_location(
+            entry,
+            ma20_5m,
+            slope20,
+            chase_above=chase_above,
+            lid_slope=lid_slope,
+        )
+    )
+
+
+def choose_target_r(base: float, slope_5m: float, up: float) -> float:
+    """5m MA20 上彎用較大 R（08-03 那種真破底翻）；否則維持 1.5R。"""
+    if up > 0 and not np.isnan(slope_5m) and float(slope_5m) > 0.0:
+        return float(up)
+    return float(base)
+
+
+def quality_at_entry(ma5: float, ma10: float, ma20: float, ma20_slope: float) -> Tuple[int, str]:
+    """A：MA20 上彎且短均多頭；B：收在 MA20 之上且 MA5>MA20；C：其餘。"""
+    score = 0
+    if ma20_slope > 0:
+        score += 1
+    if ma5 > ma10:
+        score += 1
+    if ma5 > ma20:
+        score += 1
+    if score >= 2:
+        return score, "A"
+    if score == 1:
+        return score, "B"
+    return score, "C"
+
+
+def summarize_trades(trades: Sequence) -> dict:
+    pnls = [float(getattr(t, "pnl_points", 0.0)) for t in trades]
+    n = len(pnls)
+    wins = sum(1 for p in pnls if p > 0)
+    by_q: Dict[str, List[float]] = {}
+    for t in trades:
+        by_q.setdefault(getattr(t, "quality", "?"), []).append(float(getattr(t, "pnl_points", 0.0)))
+    return {
+        "count": n,
+        "wins": wins,
+        "win_rate": 100.0 * wins / n if n else 0.0,
+        "total_points": float(sum(pnls)),
+        "pnl": float(sum(pnls)),
+        "n": n,
+        "by_quality": {
+            q: {
+                "n": len(v),
+                "wins": sum(1 for p in v if p > 0),
+                "pnl": float(sum(v)),
+            }
+            for q, v in sorted(by_q.items())
+        },
+    }
+
+
+def _in_session(ts, session: str) -> bool:
+    if session == "all":
+        return True
+    h, m = ts.hour, ts.minute
+    minutes = h * 60 + m
+    if session == "rth":
+        return (9 * 60 + 30) <= minutes <= (15 * 60 + 45)
+    if session == "day":
+        return (8 * 60) <= minutes <= (16 * 60)
+    return True
+
+
+# 同一套破翻回踩；只把「時間」換成根數。點數門檻（深度／刺穿／風險）不變。
+# 5m MA20 ≈ 100 分鐘；1m MA20 ≈ 20 分鐘，均線更貼、訊號會比較密。
+INTERVAL_DETECT = {
+    "5m": dict(
+        lookback=24,
+        min_break_depth=25.0,
+        reclaim_window=24,
+        retest_window=18,
+        leave_bars=3,
+        leave_buffer=10.0,
+        touch_above=8.0,
+        max_pierce=12.0,
+        fail_below=8.0,
+        stop_buffer=10.0,
+        target_r=1.5,
+        max_risk=180.0,
+        min_risk=20.0,
+        min_entry_gap=12,
+        ma20_slope_bars=4,
+        ma60_5m_near=40.0,
+        ma60_5m_slope_bars=6,
+        ma20_5m_near=0.0,  # 五分圖進場本就貼 MA20；蓋頭濾只給一分用
+        stop_at_shoulder=False,
+    ),
+    "1m": dict(
+        lookback=120,
+        min_break_depth=10.0,
+        reclaim_window=120,
+        retest_window=90,
+        leave_bars=3,
+        leave_buffer=6.0,
+        touch_above=8.0,
+        max_pierce=20.0,
+        fail_below=40.0,
+        stop_buffer=10.0,
+        target_r=1.5,
+        max_risk=100.0,
+        min_risk=20.0,
+        min_entry_gap=60,
+        ma20_slope_bars=20,
+        ma60_5m_near=40.0,
+        ma60_5m_slope_bars=6,
+        ma20_5m_near=45.0,
+        ma20_5m_below=45.0,
+        ma20_5m_chase=35.0,
+        ma20_5m_lid_slope=-15.0,
+        ma20_5m_tangle=25.0,
+        min_pullback=25.0,
+        max_dump_body=30.0,
+        dump_skip_body=20.0,
+        max_prev_above=50.0,
+        min_retest_bars=8,
+        max_close_above=20.0,
+        entry_until=13 * 60,  # 13:00 ET；午餐後／尾盤假右肩不接
+        target_r_up=2.0,  # 5m MA20 上彎用 2R
+        stop_at_shoulder=True,
+    ),
+}
+
+INTERVAL_SIMULATE = {
+    "5m": dict(max_hold=36, ma_exit_after=12),
+    "1m": dict(max_hold=180, ma_exit_after=60),
+}
+
+
+def detect_kwargs(interval: str, **overrides) -> dict:
+    if interval not in INTERVAL_DETECT:
+        raise ValueError(f"unsupported interval {interval!r}, expected {tuple(INTERVAL_DETECT)}")
+    kw = dict(INTERVAL_DETECT[interval])
+    kw.update({k: v for k, v in overrides.items() if v is not None})
+    return kw
+
+
+def simulate_kwargs(interval: str, **overrides) -> dict:
+    if interval not in INTERVAL_SIMULATE:
+        raise ValueError(f"unsupported interval {interval!r}, expected {tuple(INTERVAL_SIMULATE)}")
+    kw = dict(INTERVAL_SIMULATE[interval])
+    kw.update({k: v for k, v in overrides.items() if v is not None})
+    return kw
+
+
+def detect_signals(
+    df: pd.DataFrame,
+    *,
+    lookback: int = 24,
+    min_break_depth: float = 25.0,
+    reclaim_window: int = 24,
+    retest_window: int = 18,
+    leave_bars: int = 3,
+    leave_buffer: float = 10.0,
+    touch_above: float = 8.0,
+    max_pierce: float = 12.0,
+    fail_below: float = 8.0,
+    stop_buffer: float = 10.0,
+    target_r: float = 1.5,
+    max_risk: float = 180.0,
+    min_risk: float = 20.0,
+    min_entry_gap: int = 12,
+    session: str = "rth",
+    ma20_len: int = 20,
+    ma20_slope_bars: int = 4,
+    ma60_5m_near: float = 40.0,
+    ma60_5m_slope_bars: int = 6,
+    ma20_5m_near: float = 45.0,
+    ma20_5m_below: float = 0.0,
+    ma20_5m_chase: float = 0.0,
+    ma20_5m_lid_slope: float = 0.0,
+    ma20_5m_tangle: float = 0.0,
+    min_pullback: float = 0.0,
+    max_dump_body: float = 0.0,
+    dump_skip_body: float = 0.0,
+    max_prev_above: float = 0.0,
+    min_retest_bars: int = 0,
+    max_close_above: float = 0.0,
+    entry_until: int = 0,
+    target_r_up: float = 0.0,
+    stop_at_shoulder: bool = False,
+    funnel: Optional[Dict[str, int]] = None,
+    last_entry_idx: int = -(10**9),
+) -> List[Signal]:
+    """
+    破底 → 反彈收復 MA20 → 先離開均線 → 回踩 MA20 進場。
+
+    對齊 2026-08-24 藍圈：09:50 低點 28946.75，10:35 收復，11:00–11:20 回踩。
+    """
+    close = df["Close"].to_numpy(float)
+    high = df["High"].to_numpy(float)
+    low = df["Low"].to_numpy(float)
+    if "Open" in df.columns:
+        open_ = df["Open"].to_numpy(float)
+    else:
+        open_ = np.r_[close[0], close[:-1]]
+
+    ma5 = sma(close, 5)
+    ma10 = sma(close, 10)
+    ma20 = sma(close, ma20_len)
+    ma60 = sma(close, 60)
+    ma20_5m, ma20_5m_slope = align_5m_ma(df, ma_len=20, slope_bars=ma60_5m_slope_bars)
+    ma30_5m, ma30_5m_slope = align_5m_ma(df, ma_len=30, slope_bars=ma60_5m_slope_bars)
+    ma60_5m, ma60_5m_slope = align_5m_ma(df, ma_len=60, slope_bars=ma60_5m_slope_bars)
+    floor = rolling_min_prev(low, lookback)
+
+    n = len(close)
+    warmup = max(lookback, 60, ma20_len)
+    signals: List[Signal] = []
+    last_entry = int(last_entry_idx)
+    i = warmup
+    fun = funnel if funnel is not None else {}
+
+    def bump(key: str) -> None:
+        fun[key] = fun.get(key, 0) + 1
+
+    while i < n - 1:
+        if np.isnan(floor[i]) or np.isnan(ma20[i]):
+            i += 1
+            continue
+        if low[i] >= float(floor[i]):
+            i += 1
+            continue
+        # 日盤策略：夜盤破底不當 破底翻（08-12 08:30 / 08-20 08:36 那種，
+        # 09:30 一開盤就當成右肩，其實只是隔夜彈完）。
+        if not _in_session(df.index[i], session):
+            bump("skip_session")
+            i += 1
+            continue
+
+        support = float(floor[i])
+        break_low = float(low[i])
+        depth = support - break_low
+        bump("break")
+        if depth < min_break_depth:
+            bump("shallow")
+            i += 1
+            continue
+        bump("deep_break")
+
+        break_idx = i
+        trough_idx = i
+        end_scan = min(n - 1, break_idx + reclaim_window)
+        reclaim_idx: Optional[int] = None
+        k = break_idx + 1
+        while k <= end_scan:
+            if low[k] < break_low:
+                break_low = float(low[k])
+                trough_idx = k
+                end_scan = min(n - 1, k + reclaim_window)
+            if (
+                not np.isnan(ma20[k])
+                and close[k] > float(ma20[k])
+                and break_low < float(ma20[k])
+            ):
+                reclaim_idx = k
+                bump("reclaim")
+                break
+            k += 1
+
+        if reclaim_idx is None:
+            bump("no_reclaim")
+            i = trough_idx + 1
+            continue
+
+        retest_end = min(n - 1, reclaim_idx + retest_window)
+        left_run = 0
+        left_ok = False
+        peak = float(high[reclaim_idx])
+        peak_idx = int(reclaim_idx)
+        entry_idx: Optional[int] = None
+        dead = False
+        for t in range(reclaim_idx + 1, retest_end + 1):
+            if np.isnan(ma20[t]):
+                continue
+            m20 = float(ma20[t])
+            if low[t] < break_low:
+                bump("new_low")
+                dead = True
+                break
+            if close[t] < m20 - fail_below:
+                bump("fail_hold")
+                dead = True
+                break
+
+            if float(high[t]) >= peak:
+                peak = float(high[t])
+                peak_idx = t
+
+            if float(low[t]) > m20 + leave_buffer:
+                left_run += 1
+                if left_run >= leave_bars:
+                    left_ok = True
+            else:
+                left_run = 0
+
+            if not left_ok:
+                continue
+            # 右肩：現價相對這波反彈高點至少拉回 min_pullback
+            # （08-28 圈在 10:30：10:22 高 29676 → 10:27 回踩；不能用更早的小回檔進場）。
+            if min_pullback > 0 and peak - float(close[t]) < min_pullback:
+                continue
+
+            # 前一根大陰線已經踩到 MA20：這一根小陽線確認，收盤／低點可稍鬆
+            # （08-28 10:27 砸上均線不進，10:28 綠K 才是右肩）。
+            prev_m20 = float(ma20[t - 1]) if t > 0 and not np.isnan(ma20[t - 1]) else m20
+            prev_dump_sit = (
+                dump_skip_body > 0
+                and t > 0
+                and (float(open_[t - 1]) - float(close[t - 1])) >= dump_skip_body
+                and float(close[t - 1]) >= prev_m20
+                and (prev_m20 - float(low[t - 1])) >= -touch_above
+                and (prev_m20 - float(low[t - 1])) <= max_pierce
+            )
+            touch_lim = touch_above + (8.0 if prev_dump_sit else 0.0)
+            close_lim = (
+                max_close_above + (12.0 if prev_dump_sit else 0.0)
+                if max_close_above > 0
+                else 0.0
+            )
+
+            pierce = m20 - float(low[t])
+            if pierce < -touch_lim or pierce > max_pierce:
+                continue
+            if close[t] < m20:
+                continue
+            # 進場價要坐在 MA20 上：08-28 10:27 收盤高 17 點仍算回踩；
+            # 08-03 10:05 收盤高 31 點是彈走，再等下一腳。
+            if close_lim > 0 and float(close[t]) - m20 > close_lim:
+                continue
+
+            # 右肩是坐上 MA20，不是大陰線從天上砸下來碰到均線
+            # （07-31 09:38：開 28660 → 收 28604，H-MA +63；08-28 11:23 是小陽線回踩）。
+            dump_body = float(open_[t]) - float(close[t])
+            prev_above = float(close[t - 1]) - m20 if t > 0 else 0.0
+            # 收復後還沒滿 min_retest_bars 的大陰線（08-03 09:42）只是右肩還沒成形，
+            # 不能整波作廢，否則圈裡 09:43 那腳也沒了。
+            if min_retest_bars > 0 and t - reclaim_idx < min_retest_bars:
+                continue
+            m20_5_s_now = (
+                float(ma20_5m_slope[t]) if not np.isnan(ma20_5m_slope[t]) else float("nan")
+            )
+            # 大陰線砸上 MA20 = 這肩失敗（07-31 09:38、08-28 09:49 實體 39 點）。
+            # 08-03 09:46 是右肩回踩（5m MA20 已上彎），只跳過這根，不能整波作廢。
+            if max_dump_body > 0 and dump_body >= max_dump_body:
+                bump("skip_dump")
+                if np.isnan(m20_5_s_now) or m20_5_s_now < 0.0:
+                    dead = True
+                    break
+                continue
+            # 08-28 10:27 實體 29 點：砸上均線不是右肩小 K，等下一根確認。
+            if dump_skip_body > 0 and dump_body >= dump_skip_body:
+                bump("skip_dump")
+                continue
+            if max_prev_above > 0 and prev_above >= max_prev_above:
+                bump("skip_dump")
+                continue
+
+            # 右肩候選：過濾不通過就繼續掃同一波，不要整段放棄
+            # （08-28 10:13 破底 29505，09:49 那筆的 60 根間隔擋掉 10:27 首踩，
+            #  11:23 才是圖上那肩；舊邏輯 skip_gap 後從 10:28 重找破底，右肩就沒了。）
+            ts = df.index[t]
+            if not _in_session(ts, session):
+                bump("skip_session")
+                continue
+            # 08-06 13:10 / 08-28 14:31：收復後拖到午後，貼著下彎長均的假右肩。
+            if entry_until > 0 and (int(ts.hour) * 60 + int(ts.minute)) >= int(entry_until):
+                bump("skip_late")
+                continue
+            if t - last_entry < min_entry_gap:
+                bump("skip_gap")
+                continue
+
+            entry = float(close[t])
+            if stop_at_shoulder:
+                shoulder_low = float(np.min(low[peak_idx : t + 1]))
+                stop = shoulder_low - stop_buffer
+            else:
+                stop = break_low - stop_buffer
+            risk = entry - stop
+            if risk < min_risk:
+                bump("skip_tiny_risk")
+                continue
+            if max_risk > 0 and risk > max_risk:
+                bump("skip_max_risk")
+                continue
+
+            m60_5 = float(ma60_5m[t]) if not np.isnan(ma60_5m[t]) else float("nan")
+            m60_5_s = (
+                float(ma60_5m_slope[t]) if not np.isnan(ma60_5m_slope[t]) else float("nan")
+            )
+            if near_falling_5m_ma60(entry, m60_5, m60_5_s, ma60_5m_near, m20_5_s_now):
+                bump("skip_ma60")
+                continue
+
+            m20_5 = float(ma20_5m[t]) if not np.isnan(ma20_5m[t]) else float("nan")
+            m20_5_s = (
+                float(ma20_5m_slope[t]) if not np.isnan(ma20_5m_slope[t]) else float("nan")
+            )
+            m30_5 = float(ma30_5m[t]) if not np.isnan(ma30_5m[t]) else float("nan")
+            m30_5_s = (
+                float(ma30_5m_slope[t]) if not np.isnan(ma30_5m_slope[t]) else float("nan")
+            )
+            if near_falling_5m_ma20_ma30(
+                entry, m20_5, m20_5_s, m30_5, m30_5_s, ma20_5m_near, m60_5, m60_5_s
+            ):
+                bump("skip_ma20_30")
+                continue
+            # 08-28 12:57：11 點瀑布後再創新低，1m MA20 當右肩，
+            # 但其實還在下彎 5m MA20 下方 79 點，不是破底翻。
+            if far_below_falling_5m_ma20(entry, m20_5, m20_5_s, ma20_5m_below):
+                bump("skip_below_5m")
+                continue
+            # 五分 MA20 下跌：追在它上方太高（08-19），或壓在陡降蓋子下
+            # （08-05 / 08-07 / 08-11）。08-28 斜率只有 −11，不算蓋子。
+            loc5 = falling_5m_ma20_location(
+                entry,
+                m20_5,
+                m20_5_s,
+                chase_above=ma20_5m_chase,
+                lid_slope=ma20_5m_lid_slope,
+            )
+            if loc5 == "lid":
+                # 08-05 12:34 蓋子若只跳過當根，12:38 又買到 −45。
+                bump("skip_5m")
+                dead = True
+                break
+            if loc5 == "chase":
+                # 08-19 11:05 追在下跌五分 MA20 上 64 點；若只跳過當根，
+                # 會拖到 11:44 五分均線翻了才進，不是破底翻右肩。
+                bump("skip_5m")
+                dead = True
+                break
+            # 08-27 10:36：粉紅剛翻、綠線還下彎，兩條纏在 18 點內，
+            # 價已穿到綠線上，五分均線糾結，不是破底翻。
+            if tangled_5m_ma20_ma60(
+                entry, m20_5, m20_5_s, m60_5, m60_5_s, max_spread=ma20_5m_tangle
+            ):
+                bump("skip_tangle")
+                dead = True
+                break
+
+            entry_idx = t
+            bump("retest")
+            break
+
+        if dead or entry_idx is None:
+            if entry_idx is None and not dead:
+                bump("no_retest")
+            i = (reclaim_idx if reclaim_idx is not None else trough_idx) + 1
+            continue
+
+        entry = float(close[entry_idx])
+        if stop_at_shoulder:
+            shoulder_low = float(np.min(low[peak_idx : entry_idx + 1]))
+            stop = shoulder_low - stop_buffer
+        else:
+            stop = break_low - stop_buffer
+        risk = entry - stop
+        m60_5 = float(ma60_5m[entry_idx]) if not np.isnan(ma60_5m[entry_idx]) else float("nan")
+        m60_5_s = (
+            float(ma60_5m_slope[entry_idx])
+            if not np.isnan(ma60_5m_slope[entry_idx])
+            else float("nan")
+        )
+        m20_5 = float(ma20_5m[entry_idx]) if not np.isnan(ma20_5m[entry_idx]) else float("nan")
+        m20_5_s = (
+            float(ma20_5m_slope[entry_idx])
+            if not np.isnan(ma20_5m_slope[entry_idx])
+            else float("nan")
+        )
+        m30_5 = float(ma30_5m[entry_idx]) if not np.isnan(ma30_5m[entry_idx]) else float("nan")
+        m30_5_s = (
+            float(ma30_5m_slope[entry_idx])
+            if not np.isnan(ma30_5m_slope[entry_idx])
+            else float("nan")
+        )
+        slope = 0.0
+        if entry_idx >= ma20_slope_bars and not np.isnan(ma20[entry_idx - ma20_slope_bars]):
+            slope = float(ma20[entry_idx] - ma20[entry_idx - ma20_slope_bars])
+        q_score, q_grade = quality_at_entry(
+            float(ma5[entry_idx]),
+            float(ma10[entry_idx]),
+            float(ma20[entry_idx]),
+            slope,
+        )
+        bump("taken")
+        signals.append(
+            Signal(
+                break_idx=break_idx,
+                trough_idx=trough_idx,
+                reclaim_idx=reclaim_idx,
+                entry_idx=entry_idx,
+                entry_price=entry,
+                stop_price=stop,
+                target_price=entry + risk * choose_target_r(target_r, m20_5_s, target_r_up),
+                break_low=break_low,
+                support=support,
+                ma5=float(ma5[entry_idx]),
+                ma10=float(ma10[entry_idx]),
+                ma20=float(ma20[entry_idx]),
+                ma60=float(ma60[entry_idx]) if not np.isnan(ma60[entry_idx]) else 0.0,
+                ma60_5m=m60_5 if not np.isnan(m60_5) else 0.0,
+                ma60_5m_slope=m60_5_s if not np.isnan(m60_5_s) else 0.0,
+                ma20_5m=m20_5 if not np.isnan(m20_5) else 0.0,
+                ma20_5m_slope=m20_5_s if not np.isnan(m20_5_s) else 0.0,
+                ma30_5m=m30_5 if not np.isnan(m30_5) else 0.0,
+                ma30_5m_slope=m30_5_s if not np.isnan(m30_5_s) else 0.0,
+                quality=q_grade,
+                quality_score=q_score,
+            )
+        )
+        last_entry = entry_idx
+        i = entry_idx + 1
+
+    return signals
+
+
+def simulate(
+    df: pd.DataFrame,
+    signals: List[Signal],
+    *,
+    max_hold: int = 36,
+    ma_exit_after: int = 12,
+    be_after_r: float = 0.8,
+    trail_after_r: float = 1.2,
+    trail_lock_r: float = 0.4,
+    ma_exit_period: int = 20,
+) -> List[TradeResult]:
+    close = df["Close"].to_numpy(float)
+    high = df["High"].to_numpy(float)
+    low = df["Low"].to_numpy(float)
+    ma_exit = sma(close, ma_exit_period)
+    results: List[TradeResult] = []
+    busy_until = -1
+
+    for sig in signals:
+        entry_idx = sig.entry_idx
+        if entry_idx <= busy_until:
+            continue
+        entry = sig.entry_price
+        stop = sig.stop_price
+        target = sig.target_price
+        risk = entry - stop
+        if risk <= 0:
+            continue
+        cur_stop = stop
+        mfe = 0.0
+        limit = min(entry_idx + max_hold, len(df) - 1)
+        exit_idx = limit
+        exit_price = float(close[exit_idx])
+        exit_reason = "timeout"
+
+        for k in range(entry_idx + 1, limit + 1):
+            # 先用「這根開盤時已經生效」的停損／目標。
+            # 08-28 10:28：開 29613、低 29611（還沒碰到右肩停損），高 29638
+            # 才剛夠 0.8R；同一根高低不能先拉保本再掃進場價，否則圈裡那筆變 0。
+            if low[k] <= cur_stop:
+                reason = "be_stop" if cur_stop > stop + 1e-9 else "stop"
+                exit_idx, exit_price, exit_reason = k, float(cur_stop), reason
+                break
+            if high[k] >= target:
+                exit_idx, exit_price, exit_reason = k, float(target), "target"
+                break
+            held = k - entry_idx
+            if (
+                held >= ma_exit_after
+                and not np.isnan(ma_exit[k])
+                and float(close[k]) < float(ma_exit[k])
+            ):
+                exit_idx, exit_price, exit_reason = k, float(close[k]), "ma20"
+                break
+
+            mfe = max(mfe, float(high[k] - entry))
+            if be_after_r > 0 and mfe / risk >= be_after_r:
+                cur_stop = max(cur_stop, entry)
+            if trail_after_r > 0 and mfe / risk >= trail_after_r:
+                cur_stop = max(cur_stop, entry + trail_lock_r * risk)
+
+        busy_until = exit_idx
+        pnl = exit_price - entry
+        results.append(
+            TradeResult(
+                signal=sig,
+                entry_idx=entry_idx,
+                exit_idx=exit_idx,
+                entry_price=entry,
+                exit_price=exit_price,
+                stop_price=stop,
+                target_price=target,
+                pnl_points=float(pnl),
+                exit_reason=exit_reason,
+                quality=sig.quality,
+            )
+        )
+    return results
+
+
+def drop_open_end_trades(
+    df: pd.DataFrame,
+    trades: Sequence[TradeResult],
+    max_hold: int,
+) -> Tuple[List[TradeResult], List[TradeResult]]:
+    """樣本最後一根若還在持倉，不算進回測成績。"""
+    if not trades or len(df) == 0:
+        return list(trades), []
+    last = len(df) - 1
+    kept: List[TradeResult] = []
+    open_trades: List[TradeResult] = []
+    for t in trades:
+        held = t.exit_idx - t.entry_idx
+        if t.exit_idx >= last and t.exit_reason == "timeout" and held < max_hold:
+            open_trades.append(t)
+        else:
+            kept.append(t)
+    return kept, open_trades
