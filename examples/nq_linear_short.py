@@ -734,6 +734,12 @@ def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
     return f"t{trade_no:02d}_{et.strftime('%m%d_%H%M')}.png"
 
 
+def _fmt_h1(val: float) -> str:
+    if val is None or (isinstance(val, float) and np.isnan(val)):
+        return "—"
+    return f"{float(val):.2f}"
+
+
 def write_html_report(
     path: str | Path,
     df: pd.DataFrame,
@@ -797,7 +803,7 @@ def write_html_report(
             f"回測MA10 @ {retest_t}\n"
             f"進場 MA5 {t.signal.ma5:.1f} / MA10 {t.signal.ma10:.1f} / MA20 {t.signal.ma20:.1f}\n"
             f"MA60 {t.signal.ma60:.1f} / MA200 {t.signal.ma200:.1f}\n"
-            f"1H {t.signal.h1_close:.2f}  /  1H MA20 {t.signal.h1_ma20:.2f}"
+            f"1H {_fmt_h1(t.signal.h1_close)}  /  1H MA20 {_fmt_h1(t.signal.h1_ma20)}"
             "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
             "</article>"
