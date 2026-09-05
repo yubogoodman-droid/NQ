@@ -17,7 +17,6 @@ from nq_ma200_stand import (  # noqa: E402
     detect_signals,
     display_trades,
     in_open_skip,
-    initial_stop,
     is_red_long_upper,
     overlay_15m_ma200,
     parse_period_days,
@@ -28,6 +27,7 @@ from nq_ma200_stand import (  # noqa: E402
     ribbon_tangled,
     simulate,
     sma,
+    stands_on_5m_stack,
     summarize_trades,
     write_html_report,
 )
@@ -139,51 +139,15 @@ def test_detect_happy_path() -> None:
     assert 0 < sig.dist_ma200 <= 30
     assert sig.under_streak >= 15
     assert abs(sig.stop_price - (sig.ma200 - 10)) < 1e-6
-    assert sig.stop_kind == "ma200"
+    assert sig.entry_kind == "primary"
     assert abs(sig.target_price - (sig.entry_price + 100)) < 1e-6
 
 
-def test_initial_stop() -> None:
-    stop, kind = initial_stop(20000.0, 19950.0, 12.0)
-    assert kind == "m15"
-    assert abs(stop - 19950.0) < 1e-9
-    stop, kind = initial_stop(20000.0, 19950.0, -5.0)
-    assert kind == "ma200"
-    assert abs(stop - 19990.0) < 1e-9
-    stop, kind = initial_stop(20000.0, 19950.0, float("nan"))
-    assert kind == "ma200"
-
-
-def test_stop_15m_ma200_when_above() -> None:
-    df = _make_setup_bars()
-    idx_15 = pd.date_range(df.index[0] - pd.Timedelta(days=3), periods=220, freq="15min", tz=ET)
-    close_15 = np.full(220, 19000.0)
-    df_15 = pd.DataFrame(
-        {"Open": close_15, "High": close_15 + 1, "Low": close_15 - 1, "Close": close_15},
-        index=idx_15,
-    )
-    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
-    assert sigs
-    sig = sigs[0]
-    assert sig.dist_15m_ma200 > 0
-    assert sig.stop_kind == "m15"
-    assert abs(sig.stop_price - sig.ma200_15m) < 1e-6
-
-
-def test_stop_stays_ma200_when_below_15m_ma200() -> None:
-    df = _make_setup_bars()
-    idx_15 = pd.date_range(df.index[0] - pd.Timedelta(days=3), periods=220, freq="15min", tz=ET)
-    close_15 = np.full(220, 21000.0)
-    df_15 = pd.DataFrame(
-        {"Open": close_15, "High": close_15 + 1, "Low": close_15 - 1, "Close": close_15},
-        index=idx_15,
-    )
-    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
-    assert sigs
-    sig = sigs[0]
-    assert sig.dist_15m_ma200 < 0
-    assert sig.stop_kind == "ma200"
-    assert abs(sig.stop_price - (sig.ma200 - 10)) < 1e-6
+def test_stands_on_5m_stack() -> None:
+    assert stands_on_5m_stack(101.0, 100.0, 99.0, 98.0, 97.0) is True
+    assert stands_on_5m_stack(100.0, 100.0, 99.0, 98.0, 97.0) is False
+    assert stands_on_5m_stack(101.0, 100.0, 102.0, 98.0, 97.0) is False
+    assert stands_on_5m_stack(101.0, 100.0, 99.0, 98.0, float("nan")) is False
 
 
 def test_skip_red_long_wick() -> None:
@@ -230,7 +194,7 @@ def test_simulate_target_and_stop() -> None:
 
     df3 = df.copy()
     df3.iloc[j + 2, df3.columns.get_loc("Low")] = sigs[0].stop_price - 1
-    trades3 = simulate(df3, sigs)
+    trades3 = simulate(df3, sigs, allow_reentry=False)
     assert trades3[0].exit_reason == "stop"
 
 
@@ -266,24 +230,9 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "距15mMA200" in text
         assert "進場距 15m MA200" in text
         assert "停損 MA200−10" in text
+        assert "停損後30分內五分K站回" in text
         assert "5m連2根收在破底下" not in text
-        df_15 = pd.DataFrame(
-            {
-                "Open": np.full(220, 19000.0),
-                "High": np.full(220, 19001.0),
-                "Low": np.full(220, 18999.0),
-                "Close": np.full(220, 19000.0),
-            },
-            index=pd.date_range(df.index[0] - pd.Timedelta(days=3), periods=220, freq="15min", tz=ET),
-        )
-        sigs15 = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
-        trades15 = simulate(df, sigs15)
-        out15 = path.parent / "r15.html"
-        text15 = write_html_report(out15, df, trades15, "NQ=F", "demo", df_15m=df_15).read_text(
-            encoding="utf-8"
-        )
-        assert "停損 破15mMA200" in text15
-        assert "進場在15mMA200上則破15mMA200" in text15
+        assert "破15mMA200" not in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
         assert any((path.parent / "img").glob("t01_*_15m.png"))
@@ -366,6 +315,67 @@ def test_ribbon_helpers() -> None:
     assert ribbon_tangled(100.0, 140.0, 120.0, 130.0, min_spread=17.0) is False
 
 
+def _ramp_after(df: pd.DataFrame, start: int, step: float) -> None:
+    for k in range(start, len(df)):
+        prev = float(df.iloc[k - 1]["Close"])
+        close = prev + step
+        df.iloc[k, df.columns.get_loc("Close")] = close
+        df.iloc[k, df.columns.get_loc("Open")] = prev
+        df.iloc[k, df.columns.get_loc("High")] = max(prev, close) + 0.4
+        df.iloc[k, df.columns.get_loc("Low")] = min(prev, close) - 0.4
+
+
+def test_reentry_after_stop() -> None:
+    df = _make_setup_bars(n=520)
+    sigs = detect_signals(df, min_5m_ribbon=0.0)
+    assert sigs
+    j = sigs[0].entry_idx
+    df2 = df.copy()
+    df2.iloc[j + 1, df2.columns.get_loc("Low")] = sigs[0].stop_price - 2
+    df2.iloc[j + 1, df2.columns.get_loc("Close")] = sigs[0].stop_price - 1
+    _ramp_after(df2, j + 2, 6.0)
+    trades = simulate(df2, sigs)
+    assert trades[0].exit_reason == "stop"
+    retries = [t for t in trades if t.signal.entry_kind == "reentry"]
+    assert len(retries) == 1
+    retry = retries[0]
+    assert 0 < retry.entry_idx - trades[0].exit_idx <= 30
+    assert abs(retry.signal.stop_price - (retry.signal.ma200 - 10)) < 1e-6
+    assert abs(retry.signal.target_price - (retry.entry_price + 100)) < 1e-6
+
+
+def test_reentry_only_once() -> None:
+    df = _make_setup_bars(n=520)
+    sigs = detect_signals(df, min_5m_ribbon=0.0)
+    assert sigs
+    j = sigs[0].entry_idx
+    df2 = df.copy()
+    df2.iloc[j + 1, df2.columns.get_loc("Low")] = sigs[0].stop_price - 2
+    _ramp_after(df2, j + 2, 6.0)
+    trades = simulate(df2, sigs)
+    retries = [t for t in trades if t.signal.entry_kind == "reentry"]
+    assert len(retries) == 1
+    r = retries[0]
+    df3 = df2.copy()
+    df3.iloc[r.entry_idx + 1, df3.columns.get_loc("Low")] = r.signal.stop_price - 2
+    _ramp_after(df3, r.entry_idx + 2, 6.0)
+    trades3 = simulate(df3, sigs)
+    assert sum(1 for t in trades3 if t.signal.entry_kind == "reentry") == 1
+
+
+def test_no_reentry_if_5m_stays_broken() -> None:
+    df = _make_setup_bars(n=520)
+    sigs = detect_signals(df, min_5m_ribbon=0.0)
+    assert sigs
+    j = sigs[0].entry_idx
+    df2 = df.copy()
+    df2.iloc[j + 1, df2.columns.get_loc("Low")] = sigs[0].stop_price - 2
+    _ramp_after(df2, j + 2, -8.0)
+    trades = simulate(df2, sigs)
+    assert trades[0].exit_reason == "stop"
+    assert all(t.signal.entry_kind != "reentry" for t in trades)
+
+
 def test_default_has_no_5m_tangle_filter() -> None:
     df = _make_setup_bars()
     assert detect_signals(df), "default is the original 7 rules; 5m ribbon is display-only"
@@ -388,9 +398,7 @@ def main() -> int:
     test_in_open_skip()
     test_red_long_upper()
     test_detect_happy_path()
-    test_initial_stop()
-    test_stop_15m_ma200_when_above()
-    test_stop_stays_ma200_when_below_15m_ma200()
+    test_stands_on_5m_stack()
     test_skip_red_long_wick()
     test_skip_open_hour()
     test_skip_no_under_wash()
@@ -402,6 +410,9 @@ def main() -> int:
     test_overlay_15m_ma200()
     test_overlay_15m_ma200_uses_long_history()
     test_ribbon_helpers()
+    test_reentry_after_stop()
+    test_reentry_only_once()
+    test_no_reentry_if_5m_stays_broken()
     test_default_has_no_5m_tangle_filter()
     test_summarize()
     print("ok")

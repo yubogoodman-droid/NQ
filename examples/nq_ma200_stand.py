@@ -8,8 +8,9 @@
   4. 進場前 1 小時曾連續 ≥15 根在 MA200 下
   5. 美東 9:30–10:00 不進
   6. 紅 K 長上影跳過
-  7. 停損 MA200−10；進場在 15m MA200 上則改破 15m MA200。停利 +100
+  7. 停損 MA200−10，停利 +100
   8. 浮盈先到 +60 後，停損提到進場價（保本）
+  9. 停損後 30 分鐘內，五分 K 站回 MA5>10>20>60 再進一次；停損設定同上。只再進一次。
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -48,6 +49,7 @@ TAKE_PROFIT = 100.0
 MIN_UPPER_WICK = 8.0
 MIN_5M_RIBBON = 0.0  # 關閉；五分圖只對照，不當進場條件
 BREAKEVEN_AFTER = 60.0
+REENTRY_MINUTES = 30
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +172,8 @@ class Signal:
     m1_ribbon: float = 0.0
     ma200_15m: float = float("nan")
     dist_15m_ma200: float = float("nan")
-    stop_kind: str = "ma200"  # ma200 = 1m MA200−10；m15 = 破 15m MA200
+    stop_kind: str = "ma200"
+    entry_kind: str = "primary"  # primary | reentry
 
 
 @dataclass
@@ -232,17 +235,12 @@ def max_under_streak(close: np.ndarray, ma200: np.ndarray, end_idx: int, lookbac
     return best
 
 
-def initial_stop(
-    ma200: float,
-    ma200_15m: float,
-    dist_15m: float,
-    *,
-    stop_below_ma200: float = STOP_BELOW_MA200,
-) -> tuple[float, str]:
-    """進場在 15m MA200 上：停損改破 15m MA200；否則 1m MA200−10。"""
-    if np.isfinite(dist_15m) and dist_15m > 0 and np.isfinite(ma200_15m):
-        return float(ma200_15m), "m15"
-    return float(ma200) - stop_below_ma200, "ma200"
+def stands_on_5m_stack(close: float, ma5: float, ma10: float, ma20: float, ma60: float) -> bool:
+    """五分 K 收盤站上 MA5>10>20>60。"""
+    vals = (close, ma5, ma10, ma20, ma60)
+    if any(not np.isfinite(v) for v in vals):
+        return False
+    return close > ma5 > ma10 > ma20 > ma60
 
 
 def above_ma200_streak(close: np.ndarray, ma200: np.ndarray, j: int, need: int) -> bool:
@@ -338,12 +336,7 @@ def detect_signals(
                 bump("skip_5m_tangle")
                 continue
             entry = float(close[j])
-            stop, stop_kind = initial_stop(
-                float(ma200[j]),
-                m15_200,
-                dist_15,
-                stop_below_ma200=stop_below_ma200,
-            )
+            stop = float(ma200[j]) - stop_below_ma200
             if entry <= stop:
                 bump("skip_bad_stop")
                 continue
@@ -369,7 +362,8 @@ def detect_signals(
                     m1_ribbon=0.0 if np.isnan(ribbon_1m) else ribbon_1m,
                     ma200_15m=m15_200,
                     dist_15m_ma200=dist_15,
-                    stop_kind=stop_kind,
+                    stop_kind="ma200",
+                    entry_kind="primary",
                 )
             )
             entered = True
@@ -380,73 +374,223 @@ def detect_signals(
     return signals
 
 
+def overlay_5m_mas(
+    df_1m: pd.DataFrame,
+    periods: Sequence[int] = (5, 10, 20, 60),
+) -> Dict[int, np.ndarray]:
+    """已收盤五分 MA，對齊到 1m。"""
+    df5 = resample_5m(df_1m)
+    close5 = df5["Close"].astype(float)
+    return {n: align_htf(df_1m, close5.rolling(n, min_periods=n).mean()) for n in periods}
+
+
+def make_reentry_signal(
+    df: pd.DataFrame,
+    parent: Signal,
+    exit_idx: int,
+    *,
+    ma5: np.ndarray,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma30: np.ndarray,
+    ma60: np.ndarray,
+    ma200: np.ndarray,
+    m5_mas: Dict[int, np.ndarray],
+    close_5m_mask: np.ndarray,
+    ma200_15m: np.ndarray,
+    m5_ribbon: np.ndarray,
+    stop_below_ma200: float = STOP_BELOW_MA200,
+    take_profit: float = TAKE_PROFIT,
+    window_minutes: int = REENTRY_MINUTES,
+) -> Optional[Signal]:
+    """停損後 window_minutes 內，五分 K 站回 MA5>10>20>60 則再進一次。"""
+    close = df["Close"].to_numpy(float)
+    n = len(close)
+    stop_ts = df.index[exit_idx]
+    deadline = stop_ts + pd.Timedelta(minutes=int(window_minutes))
+    for j in range(exit_idx + 1, n - 1):
+        ts = df.index[j]
+        if ts > deadline:
+            break
+        if not close_5m_mask[j]:
+            continue
+        if in_open_skip(ts):
+            continue
+        if not stands_on_5m_stack(
+            float(close[j]),
+            float(m5_mas[5][j]),
+            float(m5_mas[10][j]),
+            float(m5_mas[20][j]),
+            float(m5_mas[60][j]),
+        ):
+            continue
+        if np.isnan(ma200[j]) or np.isnan(ma5[j]) or np.isnan(ma60[j]):
+            continue
+        entry = float(close[j])
+        stop = float(ma200[j]) - stop_below_ma200
+        if entry <= stop:
+            continue
+        ribbon = float(m5_ribbon[j])
+        ribbon_1m = float(ma5[j] - ma60[j])
+        m15_200 = float(ma200_15m[j])
+        dist_15 = float("nan") if np.isnan(m15_200) else entry - m15_200
+        return Signal(
+            break_idx=parent.break_idx,
+            entry_idx=j,
+            entry_price=entry,
+            stop_price=stop,
+            target_price=entry + take_profit,
+            break_low=parent.break_low,
+            two_hr_low=parent.two_hr_low,
+            ma5=float(ma5[j]),
+            ma10=float(ma10[j]),
+            ma20=float(ma20[j]),
+            ma30=float(ma30[j]),
+            ma60=float(ma60[j]),
+            ma200=float(ma200[j]),
+            dist_ma200=entry - float(ma200[j]),
+            under_streak=parent.under_streak,
+            m5_ribbon=0.0 if (np.isnan(ribbon) or np.isinf(ribbon)) else ribbon,
+            m1_ribbon=0.0 if np.isnan(ribbon_1m) else ribbon_1m,
+            ma200_15m=m15_200,
+            dist_15m_ma200=dist_15,
+            stop_kind="ma200",
+            entry_kind="reentry",
+        )
+    return None
+
+
+def _simulate_one(
+    df: pd.DataFrame,
+    sig: Signal,
+    *,
+    high: np.ndarray,
+    low: np.ndarray,
+    opn: np.ndarray,
+    close: np.ndarray,
+    breakeven_after: float,
+) -> Optional[TradeResult]:
+    n = len(close)
+    if sig.entry_idx >= n - 1:
+        return None
+    hard_stop = sig.stop_price
+    stop = hard_stop
+    target = sig.target_price
+    entry = sig.entry_price
+    armed = False
+    exit_idx = n - 1
+    exit_price = float(close[-1])
+    exit_reason = "eod"
+    for k in range(sig.entry_idx + 1, n):
+        o, h, l = float(opn[k]), float(high[k]), float(low[k])
+        if o <= stop:
+            exit_idx, exit_price, exit_reason = k, o, ("trail" if armed and stop > hard_stop + 1e-9 else "stop")
+            break
+        if o >= target:
+            exit_idx, exit_price, exit_reason = k, o, "target"
+            break
+        if (not armed) and breakeven_after > 0 and h >= entry + breakeven_after:
+            armed = True
+            stop = max(stop, entry)
+        hit_hard = l <= hard_stop
+        hit_trail = armed and l <= stop
+        hit_tp = h >= target
+        if hit_hard and hit_tp:
+            exit_idx, exit_price, exit_reason = k, hard_stop, "stop"
+            break
+        if hit_hard:
+            exit_idx, exit_price, exit_reason = k, hard_stop, "stop"
+            break
+        if hit_tp:
+            exit_idx, exit_price, exit_reason = k, target, "target"
+            break
+        if hit_trail:
+            exit_idx, exit_price, exit_reason = k, stop, "trail"
+            break
+    return TradeResult(
+        signal=sig,
+        entry_idx=sig.entry_idx,
+        exit_idx=exit_idx,
+        entry_price=sig.entry_price,
+        exit_price=exit_price,
+        stop_price=stop,
+        target_price=target,
+        pnl_points=float(exit_price - sig.entry_price),
+        exit_reason=exit_reason,
+    )
+
+
 def simulate(
     df: pd.DataFrame,
     signals: Sequence[Signal],
     *,
     breakeven_after: float = BREAKEVEN_AFTER,
+    allow_reentry: bool = True,
+    stop_below_ma200: float = STOP_BELOW_MA200,
+    take_profit: float = TAKE_PROFIT,
+    reentry_minutes: int = REENTRY_MINUTES,
+    df_15m: Optional[pd.DataFrame] = None,
+    funnel: Optional[Dict[str, int]] = None,
 ) -> List[TradeResult]:
     high = df["High"].to_numpy(float)
     low = df["Low"].to_numpy(float)
     opn = df["Open"].to_numpy(float)
     close = df["Close"].to_numpy(float)
-    n = len(close)
+    ma5 = sma(close, 5)
+    ma10 = sma(close, 10)
+    ma20 = sma(close, 20)
+    ma30 = sma(close, 30)
+    ma60 = sma(close, 60)
+    ma200 = sma(close, 200)
+    m5_mas = overlay_5m_mas(df)
+    m5_ribbon = overlay_5m_ribbon(df)
+    ma200_15m = overlay_15m_ma200(df, df_15m)
+    df5 = resample_5m(df)
+    close_5m_times = set(df5.index)
+    close_5m_mask = np.array([ts in close_5m_times for ts in df.index], dtype=bool)
+    pending = list(signals)
     results: List[TradeResult] = []
     busy_until = -1
-    for sig in signals:
+    i = 0
+    while i < len(pending):
+        sig = pending[i]
+        i += 1
         if sig.entry_idx <= busy_until:
             continue
-        if sig.entry_idx >= n - 1:
-            continue
-        hard_stop = sig.stop_price
-        stop = hard_stop
-        target = sig.target_price
-        entry = sig.entry_price
-        armed = False
-        exit_idx = n - 1
-        exit_price = float(close[-1])
-        exit_reason = "eod"
-        for k in range(sig.entry_idx + 1, n):
-            o, h, l = float(opn[k]), float(high[k]), float(low[k])
-            if o <= stop:
-                exit_idx, exit_price, exit_reason = k, o, ("trail" if armed and stop > hard_stop + 1e-9 else "stop")
-                break
-            if o >= target:
-                exit_idx, exit_price, exit_reason = k, o, "target"
-                break
-            if (not armed) and breakeven_after > 0 and h >= entry + breakeven_after:
-                armed = True
-                stop = max(stop, entry)
-            hit_hard = l <= hard_stop
-            hit_trail = armed and l <= stop
-            hit_tp = h >= target
-            if hit_hard and hit_tp:
-                exit_idx, exit_price, exit_reason = k, hard_stop, "stop"
-                break
-            if hit_hard:
-                exit_idx, exit_price, exit_reason = k, hard_stop, "stop"
-                break
-            if hit_tp:
-                exit_idx, exit_price, exit_reason = k, target, "target"
-                break
-            if hit_trail:
-                exit_idx, exit_price, exit_reason = k, stop, "trail"
-                break
-        pnl = float(exit_price - sig.entry_price)
-        results.append(
-            TradeResult(
-                signal=sig,
-                entry_idx=sig.entry_idx,
-                exit_idx=exit_idx,
-                entry_price=sig.entry_price,
-                exit_price=exit_price,
-                stop_price=stop,
-                target_price=target,
-                pnl_points=pnl,
-                exit_reason=exit_reason,
-            )
+        trade = _simulate_one(
+            df, sig, high=high, low=low, opn=opn, close=close, breakeven_after=breakeven_after
         )
-        busy_until = exit_idx
+        if trade is None:
+            continue
+        results.append(trade)
+        busy_until = trade.exit_idx
+        if (
+            allow_reentry
+            and trade.exit_reason == "stop"
+            and getattr(sig, "entry_kind", "primary") != "reentry"
+        ):
+            retry = make_reentry_signal(
+                df,
+                sig,
+                trade.exit_idx,
+                ma5=ma5,
+                ma10=ma10,
+                ma20=ma20,
+                ma30=ma30,
+                ma60=ma60,
+                ma200=ma200,
+                m5_mas=m5_mas,
+                close_5m_mask=close_5m_mask,
+                ma200_15m=ma200_15m,
+                m5_ribbon=m5_ribbon,
+                stop_below_ma200=stop_below_ma200,
+                take_profit=take_profit,
+                window_minutes=reentry_minutes,
+            )
+            if retry is not None:
+                if funnel is not None:
+                    funnel["reentry"] = funnel.get("reentry", 0) + 1
+                pending.insert(i, retry)
     return results
 
 
@@ -729,6 +873,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             "dist_15m": trade.signal.dist_15m_ma200,
         },
         f"#{trade_no}  1m  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"{'再進  ' if getattr(trade.signal, 'entry_kind', 'primary') == 'reentry' else ''}"
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
     )
     fig.tight_layout(pad=0.45)
@@ -784,6 +929,7 @@ def draw_htf_png(
             "dist_15m": trade.signal.dist_15m_ma200 if label.startswith("15m") else None,
         },
         f"#{trade_no}  {label}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"{'再進  ' if getattr(trade.signal, 'entry_kind', 'primary') == 'reentry' else ''}"
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt{dist_note}",
     )
     fig.tight_layout(pad=0.45)
@@ -917,13 +1063,18 @@ def write_html_report(
             "</header>"
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            "<span class='tag tag-info'>1m</span>"
+            + (
+                "<span class='tag tag-retry'>再進場</span>"
+                if getattr(t.signal, "entry_kind", "primary") == "reentry"
+                else ""
+            )
+            + "<span class='tag tag-info'>1m</span>"
             "<span class='tag tag-info'>5m 對照</span>"
             "<span class='tag tag-info'>15m 對照</span>"
             "<span class='tag tag-info'>1h 對照</span>"
             f"<span class='tag tag-info'>距MA200 {t.signal.dist_ma200:.1f}</span>"
             f"<span class='tag tag-info'>距15mMA200 {_fmt_signed(t.signal.dist_15m_ma200)}</span>"
-            f"<span class='tag tag-info'>{'停損 破15mMA200' if t.signal.stop_kind == 'm15' else '停損 MA200−10'}</span>"
+            f"<span class='tag tag-info'>停損 MA200−10</span>"
             f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
             "</div>"
@@ -932,7 +1083,8 @@ def write_html_report(
             f"（15m MA200 {_fmt_price(t.signal.ma200_15m)}）\n"
             f"entry {t.entry_price:.2f}\n"
             f"stop  {t.signal.stop_price:.2f}  (−{risk:.1f} pts, "
-            f"{'破15mMA200' if t.signal.stop_kind == 'm15' else 'MA200−10'}；浮盈+60改保本）\n"
+            f"MA200−10；浮盈+60改保本"
+            f"{'；停損後五分站回再進' if getattr(t.signal, 'entry_kind', 'primary') == 'reentry' else ''}）\n"
             f"target {t.target_price:.2f}  (+100)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {t.signal.break_low:.2f} / 2h低 {t.signal.two_hr_low:.2f}\n"
@@ -952,7 +1104,8 @@ def write_html_report(
             f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → 進場 {funnel.get('taken', 0)}"
             f"（排列 {funnel.get('skip_stack', 0)} · 未連3 {funnel.get('skip_above3', 0)} · "
             f"距離 {funnel.get('skip_dist', 0)} · 未洗15 {funnel.get('skip_under', 0)} · "
-            f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)}）</p>"
+            f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)} · "
+            f"再進 {funnel.get('reentry', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
@@ -986,6 +1139,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
 .tag-trail{{background:rgba(121,192,255,0.14);color:#79c0ff;border-color:rgba(121,192,255,0.35)}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
+.tag-retry{{background:rgba(187,134,252,0.14);color:#d0bcff;border-color:rgba(187,134,252,0.35)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
 .mini-chart{{margin:0 -6px 8px;border-radius:10px;overflow:hidden}}
 .mini-chart:last-child{{margin-bottom:-4px}}
@@ -997,7 +1151,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10，進場在15mMA200上則破15mMA200 / TP=+100 · 浮盈+60改保本 · 5m / 15m / 1h 圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 停損後30分內五分K站回MA5&gt;10&gt;20&gt;60再進一次 · 5m / 15m / 1h 圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1037,7 +1191,7 @@ def cmd_backtest(args) -> int:
     else:
         print(f"[data] 15m bars={len(df_15m)} {df_15m.index[0]} -> {df_15m.index[-1]}", file=sys.stderr)
     sigs = detect_signals(df, funnel=funnel, df_15m=df_15m)
-    trades = simulate(df, sigs)
+    trades = simulate(df, sigs, df_15m=df_15m, funnel=funnel)
     stats = summarize_trades(trades)
     print(f"{args.symbol} {args.period} bars={len(df)} {df.index[0]} -> {df.index[-1]}")
     print(f"trades={stats['count']} WR={stats['win_rate']:.1f}% pnl={stats['total_points']:+.1f}")
@@ -1052,6 +1206,7 @@ def cmd_backtest(args) -> int:
         print(
             f"[{i}] {df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
             f"-> {df.index[t.exit_idx].strftime('%m-%d %H:%M')} "
+            f"{'再進 ' if getattr(t.signal, 'entry_kind', 'primary') == 'reentry' else ''}"
             f"{t.exit_reason} {t.pnl_points:+.1f}"
         )
     html_path = args.html
