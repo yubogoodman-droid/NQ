@@ -16,7 +16,6 @@ from nq_ma200_stand import (  # noqa: E402
     TradeResult,
     detect_signals,
     display_trades,
-    five_min_ma_exit_flags,
     in_open_skip,
     is_red_long_upper,
     parse_period_days,
@@ -170,7 +169,7 @@ def test_simulate_target_and_stop() -> None:
     df = _make_setup_bars()
     sigs = detect_signals(df, min_5m_ribbon=0.0)
     assert sigs
-    trades = simulate(df, sigs, early_exit_5m_ma20=False)
+    trades = simulate(df, sigs)
     assert trades
     assert isinstance(trades[0], TradeResult)
     assert trades[0].exit_idx >= trades[0].entry_idx
@@ -179,51 +178,14 @@ def test_simulate_target_and_stop() -> None:
     j = sigs[0].entry_idx
     df2.iloc[j + 3, df2.columns.get_loc("High")] = sigs[0].entry_price + 120
     df2.iloc[j + 3, df2.columns.get_loc("Close")] = sigs[0].entry_price + 110
-    trades2 = simulate(df2, sigs, early_exit_5m_ma20=False)
+    trades2 = simulate(df2, sigs)
     assert trades2[0].exit_reason == "target"
     assert abs(trades2[0].pnl_points - 100) < 1e-6
 
     df3 = df.copy()
     df3.iloc[j + 2, df3.columns.get_loc("Low")] = sigs[0].stop_price - 1
-    trades3 = simulate(df3, sigs, early_exit_5m_ma20=False)
+    trades3 = simulate(df3, sigs)
     assert trades3[0].exit_reason == "stop"
-
-
-def test_early_exit_5m_ma20() -> None:
-    df = _make_setup_bars(n=700)
-    sigs = detect_signals(df, min_5m_ribbon=0.0)
-    assert sigs
-    j = sigs[0].entry_idx
-    entry = sigs[0].entry_price
-    stop = sigs[0].stop_price
-    df2 = df.copy()
-    hold = entry + 12.0
-    for i in range(j + 1, len(df2)):
-        df2.iloc[i, df2.columns.get_loc("Open")] = hold
-        df2.iloc[i, df2.columns.get_loc("Close")] = hold
-        df2.iloc[i, df2.columns.get_loc("High")] = hold + 0.5
-        df2.iloc[i, df2.columns.get_loc("Low")] = hold - 0.5
-    df5 = resample_5m(df2)
-    later5 = [ts for ts in df5.index if ts > df2.index[j]]
-    assert len(later5) > 25
-    close_ts = later5[24]
-    k = int(df2.index.searchsorted(close_ts, side="right") - 1)
-    new_close = hold - 20.0
-    assert stop + 2 < new_close < hold
-    df2.iloc[k, df2.columns.get_loc("Close")] = new_close
-    df2.iloc[k, df2.columns.get_loc("Open")] = hold
-    df2.iloc[k, df2.columns.get_loc("High")] = hold
-    df2.iloc[k, df2.columns.get_loc("Low")] = new_close
-    flags = five_min_ma_exit_flags(df2)
-    assert flags[k]
-    trades = simulate(df2, sigs, early_exit_5m_ma20=True)
-    assert trades[0].exit_reason == "ma20_5m"
-    assert trades[0].exit_idx == k
-    # Same-bar stop still wins over the 5m close rule.
-    df3 = df2.copy()
-    df3.iloc[k, df3.columns.get_loc("Low")] = stop - 2
-    trades2 = simulate(df3, sigs, early_exit_5m_ma20=True)
-    assert trades2[0].exit_reason == "stop"
 
 
 def test_write_html(tmp_path: Path | None = None) -> None:
@@ -313,7 +275,6 @@ def main() -> int:
     test_skip_open_hour()
     test_skip_no_under_wash()
     test_simulate_target_and_stop()
-    test_early_exit_5m_ma20()
     test_write_html()
     test_display_trades_wins_first()
     test_resample_5m()
