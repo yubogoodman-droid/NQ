@@ -80,8 +80,8 @@ python3 examples/test_tw_1h_reclaim.py
 
 ## 幣安 5m 多頭排列 Telegram
 
-五分 K：`MA7 > MA14 > MA25`，且**前一根收在 MA200 下、這一根收盤才站上**才推通知。  
-已在 MA200 上只是短均排好的不算。同時小時 K 收盤還要在 `MA99` 與 `MA200` 之上。
+五分 K：`MA7 > MA14 > MA25`，且**前一根收在 MA200 下、這一根收盤才站上**；  
+再等三根，確認根收盤還在 MA200 上才推。同時小時 K 收盤還要在 `MA99` 與 `MA200` 之上。
 
 ```bash
 # Telegram 憑證放 tg_config.env（勿提交）
