@@ -18,6 +18,7 @@ from nq_ma200_stand import (  # noqa: E402
     display_trades,
     in_open_skip,
     is_red_long_upper,
+    initial_stop,
     overlay_15m_ma200,
     parse_period_days,
     resample_5m,
@@ -138,7 +139,51 @@ def test_detect_happy_path() -> None:
     assert 0 < sig.dist_ma200 <= 30
     assert sig.under_streak >= 15
     assert abs(sig.stop_price - (sig.ma200 - 10)) < 1e-6
+    assert sig.stop_kind == "ma200"
     assert abs(sig.target_price - (sig.entry_price + 100)) < 1e-6
+
+
+def test_initial_stop() -> None:
+    stop, kind = initial_stop(20000.0, 19900.0, 12.0)
+    assert kind == "break"
+    assert abs(stop - 19910.0) < 1e-9
+    stop, kind = initial_stop(20000.0, 19900.0, -5.0)
+    assert kind == "ma200"
+    assert abs(stop - 19990.0) < 1e-9
+    stop, kind = initial_stop(20000.0, 19900.0, float("nan"))
+    assert kind == "ma200"
+
+
+def test_stop_break_low_when_above_15m_ma200() -> None:
+    df = _make_setup_bars()
+    idx_15 = pd.date_range(df.index[0] - pd.Timedelta(days=3), periods=220, freq="15min", tz=ET)
+    close_15 = np.full(220, 19000.0)
+    df_15 = pd.DataFrame(
+        {"Open": close_15, "High": close_15 + 1, "Low": close_15 - 1, "Close": close_15},
+        index=idx_15,
+    )
+    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
+    assert sigs
+    sig = sigs[0]
+    assert sig.dist_15m_ma200 > 0
+    assert sig.stop_kind == "break"
+    assert abs(sig.stop_price - (sig.break_low + 10)) < 1e-6
+
+
+def test_stop_stays_ma200_when_below_15m_ma200() -> None:
+    df = _make_setup_bars()
+    idx_15 = pd.date_range(df.index[0] - pd.Timedelta(days=3), periods=220, freq="15min", tz=ET)
+    close_15 = np.full(220, 21000.0)
+    df_15 = pd.DataFrame(
+        {"Open": close_15, "High": close_15 + 1, "Low": close_15 - 1, "Close": close_15},
+        index=idx_15,
+    )
+    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
+    assert sigs
+    sig = sigs[0]
+    assert sig.dist_15m_ma200 < 0
+    assert sig.stop_kind == "ma200"
+    assert abs(sig.stop_price - (sig.ma200 - 10)) < 1e-6
 
 
 def test_skip_red_long_wick() -> None:
@@ -220,6 +265,8 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "距200日" not in text
         assert "距15mMA200" in text
         assert "進場距 15m MA200" in text
+        assert "停損 MA200−10" in text
+        assert "破底+10" in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
         assert any((path.parent / "img").glob("t01_*_15m.png"))
@@ -324,6 +371,9 @@ def main() -> int:
     test_in_open_skip()
     test_red_long_upper()
     test_detect_happy_path()
+    test_initial_stop()
+    test_stop_break_low_when_above_15m_ma200()
+    test_stop_stays_ma200_when_below_15m_ma200()
     test_skip_red_long_wick()
     test_skip_open_hour()
     test_skip_no_under_wash()
