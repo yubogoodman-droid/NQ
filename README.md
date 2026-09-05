@@ -96,7 +96,8 @@ python3 examples/watch_binance_5m_align.py --backtest --days 3 --pages
 python3 examples/test_watch_binance_5m_align.py
 ```
 
-只掃 24h 成交額前 100 檔 USDT 永續。近三天數字重跑後會更新。
+只掃 24h 成交額前 100 檔。近三天（2026-09-02 23:18 → 09-05 23:18）：**242 筆 / 67 檔**。  
+5m 從 MA200 下站上且多排 425 → 小時過濾後 242。持有 60 分鐘勝率 **46.3%、平均 +0.42%**；120 分鐘 **46.9%、平均 +0.62%**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-align-7d44/docs/binance-5m-align/view.html
 
