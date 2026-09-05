@@ -27,7 +27,6 @@ from nq_ma200_stand import (  # noqa: E402
     ribbon_tangled,
     simulate,
     sma,
-    stands_on_5m_mas,
     summarize_trades,
     write_html_report,
 )
@@ -139,17 +138,7 @@ def test_detect_happy_path() -> None:
     assert 0 < sig.dist_ma200 <= 30
     assert sig.under_streak >= 15
     assert abs(sig.stop_price - (sig.ma200 - 10)) < 1e-6
-    assert sig.entry_kind == "primary"
     assert abs(sig.target_price - (sig.entry_price + 100)) < 1e-6
-
-
-def test_stands_on_5m_mas() -> None:
-    assert stands_on_5m_mas(101.0, 100.0, 99.0, 98.0, 97.0) is True
-    assert stands_on_5m_mas(110.0, 108.0, 106.0, 104.0, 107.0) is True  # 5>10>20，60 只站上
-    assert stands_on_5m_mas(110.0, 100.0, 105.0, 102.0, 90.0) is False  # 沒有 5>10>20
-    assert stands_on_5m_mas(100.0, 100.0, 99.0, 98.0, 97.0) is False
-    assert stands_on_5m_mas(101.0, 100.0, 102.0, 98.0, 97.0) is False
-    assert stands_on_5m_mas(101.0, 100.0, 99.0, 98.0, float("nan")) is False
 
 
 def test_skip_red_long_wick() -> None:
@@ -196,7 +185,7 @@ def test_simulate_target_and_stop() -> None:
 
     df3 = df.copy()
     df3.iloc[j + 2, df3.columns.get_loc("Low")] = sigs[0].stop_price - 1
-    trades3 = simulate(df3, sigs, allow_reentry=False)
+    trades3 = simulate(df3, sigs)
     assert trades3[0].exit_reason == "stop"
 
 
@@ -232,37 +221,23 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "距15mMA200" in text
         assert "進場距 15m MA200" in text
         assert "停損 MA200−10" in text
-        assert "停損後30分內五分K站回" in text
         assert "5m連2根收在破底下" not in text
-        assert "破15mMA200" not in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
         assert any((path.parent / "img").glob("t01_*_15m.png"))
         assert any((path.parent / "img").glob("t01_*_1h.png"))
-        if any(getattr(t.signal, "entry_kind", "primary") == "reentry" for t in trades):
-            assert "再進" in text
-            if any(t.pnl_points > 0 for t in trades):
-                assert text.find("再進") < text.find("賺錢")
         if any(t.pnl_points > 0 for t in trades) and any(t.pnl_points <= 0 for t in trades):
-            if "賺錢" in text and "賠錢" in text:
-                assert text.find("賺錢") < text.find("賠錢")
+            assert text.find("賺錢") < text.find("賠錢")
 
 
 def test_display_trades_wins_first() -> None:
-    class S:
-        def __init__(self, kind: str = "primary"):
-            self.entry_kind = kind
-
     class T:
-        def __init__(self, pnl: float, entry_idx: int, kind: str = "primary"):
+        def __init__(self, pnl: float, entry_idx: int):
             self.pnl_points = pnl
             self.entry_idx = entry_idx
-            self.signal = S(kind)
 
-    ordered = display_trades(
-        [T(-10, 1), T(100, 5), T(-20, 3, "reentry"), T(80, 4, "reentry"), T(100, 2)]  # type: ignore[list-item]
-    )
-    assert [t.entry_idx for t in ordered] == [4, 3, 2, 5, 1]
+    ordered = display_trades([T(-10, 1), T(100, 5), T(-20, 3), T(100, 2)])  # type: ignore[list-item]
+    assert [t.entry_idx for t in ordered] == [2, 5, 1, 3]
 
 
 def test_resample_5m() -> None:
@@ -329,67 +304,6 @@ def test_ribbon_helpers() -> None:
     assert ribbon_tangled(100.0, 140.0, 120.0, 130.0, min_spread=17.0) is False
 
 
-def _ramp_after(df: pd.DataFrame, start: int, step: float) -> None:
-    for k in range(start, len(df)):
-        prev = float(df.iloc[k - 1]["Close"])
-        close = prev + step
-        df.iloc[k, df.columns.get_loc("Close")] = close
-        df.iloc[k, df.columns.get_loc("Open")] = prev
-        df.iloc[k, df.columns.get_loc("High")] = max(prev, close) + 0.4
-        df.iloc[k, df.columns.get_loc("Low")] = min(prev, close) - 0.4
-
-
-def test_reentry_after_stop() -> None:
-    df = _make_setup_bars(n=520)
-    sigs = detect_signals(df, min_5m_ribbon=0.0)
-    assert sigs
-    j = sigs[0].entry_idx
-    df2 = df.copy()
-    df2.iloc[j + 1, df2.columns.get_loc("Low")] = sigs[0].stop_price - 2
-    df2.iloc[j + 1, df2.columns.get_loc("Close")] = sigs[0].stop_price - 1
-    _ramp_after(df2, j + 2, 6.0)
-    trades = simulate(df2, sigs)
-    assert trades[0].exit_reason == "stop"
-    retries = [t for t in trades if t.signal.entry_kind == "reentry"]
-    assert len(retries) == 1
-    retry = retries[0]
-    assert 0 < retry.entry_idx - trades[0].exit_idx <= 30
-    assert abs(retry.signal.stop_price - (retry.signal.ma200 - 10)) < 1e-6
-    assert abs(retry.signal.target_price - (retry.entry_price + 100)) < 1e-6
-
-
-def test_reentry_only_once() -> None:
-    df = _make_setup_bars(n=520)
-    sigs = detect_signals(df, min_5m_ribbon=0.0)
-    assert sigs
-    j = sigs[0].entry_idx
-    df2 = df.copy()
-    df2.iloc[j + 1, df2.columns.get_loc("Low")] = sigs[0].stop_price - 2
-    _ramp_after(df2, j + 2, 6.0)
-    trades = simulate(df2, sigs)
-    retries = [t for t in trades if t.signal.entry_kind == "reentry"]
-    assert len(retries) == 1
-    r = retries[0]
-    df3 = df2.copy()
-    df3.iloc[r.entry_idx + 1, df3.columns.get_loc("Low")] = r.signal.stop_price - 2
-    _ramp_after(df3, r.entry_idx + 2, 6.0)
-    trades3 = simulate(df3, sigs)
-    assert sum(1 for t in trades3 if t.signal.entry_kind == "reentry") == 1
-
-
-def test_no_reentry_if_5m_stays_broken() -> None:
-    df = _make_setup_bars(n=520)
-    sigs = detect_signals(df, min_5m_ribbon=0.0)
-    assert sigs
-    j = sigs[0].entry_idx
-    df2 = df.copy()
-    df2.iloc[j + 1, df2.columns.get_loc("Low")] = sigs[0].stop_price - 2
-    _ramp_after(df2, j + 2, -80.0)
-    trades = simulate(df2, sigs)
-    assert trades[0].exit_reason == "stop"
-    assert all(t.signal.entry_kind != "reentry" for t in trades)
-
-
 def test_default_has_no_5m_tangle_filter() -> None:
     df = _make_setup_bars()
     assert detect_signals(df), "default is the original 7 rules; 5m ribbon is display-only"
@@ -412,7 +326,6 @@ def main() -> int:
     test_in_open_skip()
     test_red_long_upper()
     test_detect_happy_path()
-    test_stands_on_5m_mas()
     test_skip_red_long_wick()
     test_skip_open_hour()
     test_skip_no_under_wash()
@@ -424,9 +337,6 @@ def main() -> int:
     test_overlay_15m_ma200()
     test_overlay_15m_ma200_uses_long_history()
     test_ribbon_helpers()
-    test_reentry_after_stop()
-    test_reentry_only_once()
-    test_no_reentry_if_5m_stays_broken()
     test_default_has_no_5m_tangle_filter()
     test_summarize()
     print("ok")
