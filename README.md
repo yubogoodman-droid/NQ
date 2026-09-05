@@ -109,8 +109,7 @@ python3 examples/backtest_binance_1h_burst.py --days 3 --pages        # 近三�
 python3 examples/test_watch_binance_1h_burst.py                      # 單元測試（不打網路）
 ```
 
-近三天再加「只要收漲陽線」後：231 檔、原始訊號 **28**、進場 **24**。  
-已平勝率 **66.7%**，平均 **+0.42%**。BNB 14:00 那筆還在（陽線、離 MA25 +1.10%，2R +1.57%）。
+近三天再加「短均有點發散」後：進場 **3** 筆（SNDK、BNB、LINK），已平 2 筆都是 2R，平均 **+1.44%**。BNB 還在（短均散 +0.39%、離 MA25 +1.10%、2R +1.57%）。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-1h-bull-burst-ee86/docs/binance-1h-burst/view.html
 
