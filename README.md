@@ -96,8 +96,8 @@ python3 examples/watch_binance_5m_align.py --backtest --days 3 --pages
 python3 examples/test_watch_binance_5m_align.py
 ```
 
-近三天（2026-09-02 21:51 → 09-05 21:51）流動永續 238 檔：**572 筆 / 147 檔**。  
-5m 從 MA200 下站上且多排 1164 → 小時過濾後 572。持有 60 分鐘勝率 **46.8%、平均 +0.23%**；120 分鐘 **51.4%、平均 +0.49%**。
+近三天（2026-09-02 22:21 → 09-05 22:21）流動永續 233 檔：**375 筆 / 144 檔**。  
+從下站上 1112 → 三根後還在上面 724 → 小時過濾 375。持有 60 分鐘勝率 **51.4%、平均 +0.25%**；120 分鐘 **52.3%、平均 +0.32%**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-align-7d44/docs/binance-5m-align/view.html
 
