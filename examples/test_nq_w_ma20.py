@@ -16,6 +16,7 @@ from nq_w_ma20 import (  # noqa: E402
     TradeResult,
     detect_signals,
     quality_from_w,
+    resample_ohlc,
     simulate,
     summarize_trades,
     write_html_report,
@@ -172,6 +173,14 @@ def test_no_signal_on_deep_spring() -> None:
     assert not detect_signals(df), "回測破兩小時低超過 20 點應作廢"
 
 
+def test_resample_15m() -> None:
+    df = make_chart29()
+    m15 = resample_ohlc(df, "15min")
+    assert len(m15) > 0
+    assert len(m15) <= (len(df) + 2) // 3
+    assert {"Open", "High", "Low", "Close"} <= set(m15.columns)
+
+
 def test_simulate_and_html() -> None:
     df = make_chart29()
     sigs = detect_signals(df)
@@ -183,7 +192,8 @@ def test_simulate_and_html() -> None:
     text = path.read_text(encoding="utf-8")
     assert "雙底" in text
     assert "MA20" in text
-    assert "<svg" in text, "圖要內嵌 SVG，htmlpreview 才看得到"
+    assert "15分K" in text
+    assert text.count("<svg") >= 2, "五分圖 + 15 分圖都要內嵌 SVG"
 
 
 def main() -> int:
@@ -196,6 +206,7 @@ def main() -> int:
         test_no_signal_without_retest,
         test_no_signal_if_keeps_making_lows,
         test_no_signal_on_deep_spring,
+        test_resample_15m,
         test_simulate_and_html,
     ]
     failed = 0

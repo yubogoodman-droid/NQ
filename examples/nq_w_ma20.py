@@ -454,6 +454,19 @@ def _equity_svg(pnls: List[float], width: int = 720, height: int = 180) -> str:
     )
 
 
+def resample_ohlc(df: pd.DataFrame, rule: str = "15min") -> pd.DataFrame:
+    cols: Dict[str, str] = {"Open": "first", "High": "max", "Low": "min", "Close": "last"}
+    if "Volume" in df.columns:
+        cols["Volume"] = "sum"
+    out = df.resample(rule, label="left", closed="left").agg(cols)
+    return out.dropna(subset=["Open", "High", "Low", "Close"])
+
+
+def _asof_bar(df: pd.DataFrame, ts) -> int:
+    pos = int(df.index.searchsorted(ts, side="right")) - 1
+    return max(0, min(pos, len(df) - 1))
+
+
 def _inline_mpl_svg(fig, prefix: str) -> str:
     buf = BytesIO()
     fig.savefig(buf, format="svg", facecolor=fig.get_facecolor())
@@ -597,12 +610,125 @@ def draw_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str
     return svg
 
 
+def draw_15m_chart(df_5m: pd.DataFrame, df_15m: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
+    """同一筆五分進場，對照 15 分 K（綠線是 15m MA20）。"""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+    from matplotlib.patches import Rectangle
+
+    plt.rcParams["svg.fonttype"] = "path"
+    for fp in (
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ):
+        if Path(fp).exists():
+            font_manager.fontManager.addfont(fp)
+            plt.rcParams["font.sans-serif"] = [font_manager.FontProperties(fname=fp).get_name(), "DejaVu Sans"]
+            plt.rcParams["axes.unicode_minus"] = False
+            break
+
+    sig = trade.signal
+    dump_ts = df_5m.index[sig.first_low_idx]
+    stand_ts = df_5m.index[sig.stand_idx]
+    break_ts = df_5m.index[sig.break_idx]
+    retest_ts = df_5m.index[sig.second_low_idx]
+    entry_ts = df_5m.index[trade.entry_idx]
+    exit_ts = df_5m.index[trade.exit_idx]
+
+    i_dump = _asof_bar(df_15m, dump_ts)
+    i_stand = _asof_bar(df_15m, stand_ts)
+    i_break = _asof_bar(df_15m, break_ts)
+    i_retest = _asof_bar(df_15m, retest_ts)
+    i_entry = _asof_bar(df_15m, entry_ts)
+    i_exit = _asof_bar(df_15m, exit_ts)
+
+    start = max(0, i_dump - 8)
+    end = min(len(df_15m) - 1, max(i_entry + 8, i_exit + 3, i_dump + 16))
+    window = df_15m.iloc[start : end + 1]
+    if window.empty:
+        return ""
+    xs = range(len(window))
+    o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
+    vol = window["Volume"] if "Volume" in window.columns else None
+    close_full = df_15m["Close"].astype(float)
+
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.2),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+
+    colors_v = []
+    for k in range(len(window)):
+        up = float(c.iloc[k]) >= float(o.iloc[k])
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.85)
+        y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
+        if y1 == y0:
+            y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    if vol is not None:
+        axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
+
+    for nper, col in MA_COLORS.items():
+        ma = close_full.rolling(nper, min_periods=nper).mean().iloc[start : end + 1]
+        ax.plot(list(xs), ma, color=col, lw=2.2 if nper == 20 else (1.2 if nper <= 10 else 1.0), label=f"15m MA{nper}")
+
+    ax.axhline(sig.first_low, color="#facc15", ls=":", lw=1.0, alpha=0.75)
+    ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=0.9, alpha=0.7)
+    ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=0.9, alpha=0.65)
+
+    marks = (
+        (i_dump - start, sig.first_low, "2h低", (0, -13), "#fde68a"),
+        (i_stand - start, float(df_15m["Close"].iloc[i_stand]), "站上", (0, 8), "#86efac"),
+        (i_break - start, float(df_15m["Close"].iloc[i_break]), "跌破", (0, -12), "#fda4af"),
+        (i_retest - start, sig.second_low, "回測", (0, -13), "#fde68a"),
+    )
+    for x, y, lab, off, col in marks:
+        if 0 <= x < len(window):
+            ax.scatter([x], [y], s=30, color=col, zorder=6)
+            ax.annotate(lab, (x, y), textcoords="offset points", xytext=off, ha="center", color=col, fontsize=7)
+    ex = i_entry - start
+    if 0 <= ex < len(window):
+        ax.axvline(ex, color="#3dba7a", ls="--", lw=1.0, alpha=0.7)
+        ax.scatter([ex], [trade.entry_price], s=48, color="#22c55e", marker="^", zorder=7)
+        ax.annotate("5m進場", (ex, trade.entry_price), textcoords="offset points", xytext=(0, 10),
+                    ha="center", color="#86efac", fontsize=8)
+    xx = i_exit - start
+    if 0 <= xx < len(window):
+        ax.scatter([xx], [trade.exit_price], s=32, color="#fb7185", marker="v", zorder=7)
+
+    step = max(1, len(window) // 6)
+    ticks = list(range(0, len(window), step))
+    axv.set_xticks(ticks)
+    axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], rotation=0)
+    ax.set_title(f"#{trade_no}  15分K  {entry_ts.strftime('%m-%d %H:%M')} ET", color="#d7e3d4", fontsize=11, pad=8)
+    ax.legend(loc="upper left", fontsize=7, framealpha=0.35, labelcolor="#d7e3d4")
+    fig.tight_layout(pad=0.6)
+    svg = _inline_mpl_svg(fig, f"t15_{trade_no:02d}_")
+    plt.close(fig)
+    return svg
+
+
 def _ts(df: pd.DataFrame, idx: int) -> pd.Timestamp:
     t = df.index[idx]
     return t.tz_convert(ET) if getattr(t, "tzinfo", None) else t
 
 
 def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
+    df_15m = resample_ohlc(df, "15min") if len(df) else df
     cards = []
     for i, t in enumerate(trades, 1):
         et = _ts(df, t.entry_idx)
@@ -613,6 +739,7 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
         cls = "pnl-win" if t.pnl_points > 0 else ("pnl-loss" if t.pnl_points < 0 else "pnl-flat")
         reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
         chart = draw_trade_chart(df, t, i)
+        chart15 = draw_15m_chart(df, df_15m, t, i) if len(df_15m) else ""
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -626,6 +753,7 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
             f"<span class='tag tag-info'>雙底</span>"
             f"<span class='tag tag-info'>2h低回測</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
+            f"<span class='tag tag-info'>15分K</span>"
             "</div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}\n"
@@ -639,6 +767,7 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
             f"MA20 {t.signal.ma20:.2f}"
             "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
+            f"<div class='mini-chart'>{chart15}</div>"
             "</article>"
         )
     return "".join(cards)
@@ -714,7 +843,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 五分 K 雙底 · 2h低回測守三根</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">創下兩小時低點 → 收盤站上 MA20 → 再跌破 MA20 → 回到兩小時低點附近（可略破 20 點）→ 連續三根五分 K 沒新低才做多。對齊 09-04 圖 29。停損在回測低下方 4 點；目標取量度或 2R 較遠者。持倉最多 48 根。</p>
+<p class="muted">創下兩小時低點 → 收盤站上 MA20 → 再跌破 MA20 → 回到兩小時低點附近（可略破 20 點）→ 連續三根五分 K 沒新低才做多。對齊 09-04 圖 29。每筆下面加一張 15 分 K。停損在回測低下方 4 點；目標取量度或 2R 較遠者。持倉最多 48 根。</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
