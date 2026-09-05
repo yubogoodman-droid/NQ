@@ -133,6 +133,14 @@ def rolling_min_prev(arr, n: int) -> np.ndarray:
     return pd.Series(arr, dtype=float).shift(1).rolling(n, min_periods=n).min().to_numpy(float)
 
 
+def detect_params(interval: str = "5m") -> dict:
+    """15 分 K：兩小時 = 8 根、持倉 16 根；五分 K：兩小時 = 24 根、持倉 48 根。"""
+    iv = (interval or "5m").lower().replace("min", "m")
+    if iv == "15m":
+        return dict(two_hour_bars=8, max_hold=16)
+    return dict(two_hour_bars=24, max_hold=48)
+
+
 def quality_from_w(low_gap_pts: float, neck_pts: float, stand_pts: float) -> Tuple[int, str]:
     score = 0
     if abs(low_gap_pts) <= 15.0:
@@ -601,7 +609,7 @@ def draw_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str
     labels = [window.index[i].strftime("%m-%d %H:%M") for i in ticks]
     axv.set_xticks(ticks)
     axv.set_xticklabels(labels, rotation=0)
-    ax.set_title(f"#{trade_no}  雙底回測守三根  {window.index[0].strftime('%m-%d %H:%M')} ET",
+    ax.set_title(f"#{trade_no}  五分K  雙底回測守三根  {window.index[0].strftime('%m-%d %H:%M')} ET",
                  color="#d7e3d4", fontsize=11, pad=8)
     ax.legend(loc="upper left", fontsize=7, framealpha=0.35, labelcolor="#d7e3d4")
     fig.tight_layout(pad=0.6)
@@ -766,11 +774,90 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
             f"回測 {l2t.strftime('%m-%d %H:%M')}  三根沒新低  "
             f"MA20 {t.signal.ma20:.2f}"
             "</pre>"
+            "<div class='chart-label'>五分K</div>"
             f"<div class='mini-chart'>{chart}</div>"
+            "<div class='chart-label'>15分K</div>"
             f"<div class='mini-chart'>{chart15}</div>"
             "</article>"
         )
     return "".join(cards)
+
+
+def _render_15m_trade_cards(df_15m: pd.DataFrame, trades: List[TradeResult]) -> str:
+    cards = []
+    for i, t in enumerate(trades, 1):
+        et = _ts(df_15m, t.entry_idx)
+        xt = _ts(df_15m, t.exit_idx)
+        l2t = _ts(df_15m, t.signal.second_low_idx)
+        risk = t.entry_price - t.stop_price
+        r_mult = (t.target_price - t.entry_price) / risk if risk else 0.0
+        cls = "pnl-win" if t.pnl_points > 0 else ("pnl-loss" if t.pnl_points < 0 else "pnl-flat")
+        reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
+        chart = draw_trade_chart(df_15m, t, i)
+        cards.append(
+            "<article class='trade-card'>"
+            "<header class='card-header'>"
+            f"<div><div class='trade-no'>15m #{i}  Q{escape(t.quality)}</div>"
+            f"<span class='trade-time'>{escape(et.strftime('%m-%d %H:%M'))} → "
+            f"{escape(xt.strftime('%m-%d %H:%M'))}</span></div>"
+            f"<div class='card-pnl {cls}'>{t.pnl_points:+.1f} pts</div>"
+            "</header>"
+            "<div class='tags'>"
+            f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
+            f"<span class='tag tag-info'>15分K</span>"
+            f"<span class='tag tag-info'>雙底</span>"
+            f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
+            "</div>"
+            "<pre class='trade-detail'>"
+            f"entry {t.entry_price:.2f}\n"
+            f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts)\n"
+            f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
+            f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
+            f"2h低 {t.signal.first_low:.2f} / 回測 {t.signal.second_low:.2f}  "
+            f"差 {t.signal.low_gap_pts:+.1f}pt\n"
+            f"反彈高 {t.signal.neckline:.2f}  高度 {t.signal.neck_pts:.1f}pt\n"
+            f"回測 {l2t.strftime('%m-%d %H:%M')}  三根15分沒新低  "
+            f"MA20 {t.signal.ma20:.2f}"
+            "</pre>"
+            "<div class='chart-label'>15分K</div>"
+            f"<div class='mini-chart'>{chart}</div>"
+            "</article>"
+        )
+    return "".join(cards)
+
+
+def _section_summary(title: str, df: pd.DataFrame, trades: List[TradeResult], funnel: Optional[Dict[str, int]], verdict: str) -> str:
+    stats = summarize_trades(trades)
+    pnls = [t.pnl_points for t in trades]
+    q_bits = [f"Q{q} {info['n']}筆 {info['pnl']:+.1f}" for q, info in stats.get("by_quality", {}).items()]
+    q_line = " · ".join(q_bits) if q_bits else "無品質分組"
+    total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
+    start = df.index[0].strftime("%Y-%m-%d %H:%M") if len(df) else ""
+    end = df.index[-1].strftime("%Y-%m-%d %H:%M") if len(df) else ""
+    funnel_line = ""
+    if funnel:
+        funnel_line = (
+            f"<p class='muted'>漏斗：兩小時低 {funnel.get('dump', 0)} → "
+            f"站上MA20 {funnel.get('stand', 0)} → 跌破 {funnel.get('broke', 0)} → "
+            f"回測 {funnel.get('retest', 0)} → 進場 {funnel.get('taken', 0)}</p>"
+        )
+    verdict_html = f"<p class='muted'><b>{escape(verdict)}</b></p>" if verdict else ""
+    return (
+        "<section class='summary'>"
+        f"<h2>{escape(title)}</h2>"
+        f"<p class='muted'>{escape(start)} → {escape(end)} ET · bars={len(df)}</p>"
+        f"{verdict_html}"
+        "<div class='cards'>"
+        f"<div class='card'>筆數<b>{stats['count']}</b></div>"
+        f"<div class='card'>勝率<b>{stats['win_rate']:.1f}%</b></div>"
+        f"<div class='card'>總點數<b class='{total_cls}'>{stats['total_points']:+.1f}</b></div>"
+        f"<div class='card'>均筆<b>{stats['avg']:+.1f}</b></div>"
+        "</div>"
+        f"<p class='muted'>{escape(q_line)}</p>"
+        f"{funnel_line}"
+        f"<div class='equity'>{_equity_svg(pnls)}</div>"
+        "</section>"
+    )
 
 
 def write_html_report(
@@ -781,42 +868,37 @@ def write_html_report(
     period: str,
     funnel: Optional[Dict[str, int]] = None,
     verdict: str = "",
+    df_15m: Optional[pd.DataFrame] = None,
+    trades_15m: Optional[List[TradeResult]] = None,
+    funnel_15m: Optional[Dict[str, int]] = None,
+    verdict_15m: str = "",
 ) -> Path:
-    stats = summarize_trades(trades)
-    pnls = [t.pnl_points for t in trades]
-    q_bits = []
-    for q, info in stats.get("by_quality", {}).items():
-        q_bits.append(f"Q{q} {info['n']}筆 {info['pnl']:+.1f}")
-    q_line = " · ".join(q_bits) if q_bits else "無品質分組"
-    out = Path(path)
-    cards = _render_trade_cards(df, trades)
-    funnel_line = ""
-    if funnel:
-        funnel_line = (
-            f"<p class='muted'>漏斗：兩小時低 {funnel.get('dump', 0)} → "
-            f"站上MA20 {funnel.get('stand', 0)} → "
-            f"跌破 {funnel.get('broke', 0)} → "
-            f"回測 {funnel.get('retest', 0)} → "
-            f"進場 {funnel.get('taken', 0)}"
-            f"（沒站上 {funnel.get('skip_no_stand', 0)} · 沒跌破 {funnel.get('skip_no_break', 0)} · "
-            f"沒回測 {funnel.get('skip_no_retest', 0)} · 沒守住 {funnel.get('skip_no_hold', 0)} · "
-            f"新低 {funnel.get('skip_new_low', 0)} · 風險 {funnel.get('skip_max_risk', 0)}）</p>"
-        )
+    if df_15m is None:
+        df_15m = resample_ohlc(df, "15min") if len(df) else df
+    if trades_15m is None and len(df_15m):
+        funnel_15m = {} if funnel_15m is None else funnel_15m
+        p15 = detect_params("15m")
+        sigs15 = detect_signals(df_15m, funnel=funnel_15m, two_hour_bars=p15["two_hour_bars"])
+        trades_15m = simulate(df_15m, sigs15, max_hold=p15["max_hold"])
+        verdict_15m = verdict_15m or _verdict(summarize_trades(trades_15m), funnel_15m)
+    trades_15m = trades_15m or []
 
-    start = df.index[0].strftime("%Y-%m-%d %H:%M")
-    end = df.index[-1].strftime("%Y-%m-%d %H:%M")
-    total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
-    verdict_html = f"<p class='muted'><b>{escape(verdict)}</b></p>" if verdict else ""
+    out = Path(path)
+    cards5 = _render_trade_cards(df, trades)
+    cards15 = _render_15m_trade_cards(df_15m, trades_15m)
+    sec5 = _section_summary("五分K 回測", df, trades, funnel, verdict)
+    sec15 = _section_summary("15分K 回測", df_15m, trades_15m, funnel_15m, verdict_15m)
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>{escape(symbol)} 五分 K 雙底 · 2h低回測守三根</title>
+<title>{escape(symbol)} 五分 / 15分 雙底</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
 h1{{font-size:18px;margin:0 0 6px}}
+h2{{font-size:16px;margin:0 0 6px}}
 .muted{{color:#8b949e;font-size:13px;line-height:1.5}}
 .summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
 .cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
@@ -836,26 +918,20 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
-.mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
-.empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
+.chart-label{{margin:10px 0 4px;font-size:13px;font-weight:700;color:#79c0ff}}
+.mini-chart{{margin:0 -6px 8px;border-radius:10px;overflow:hidden}}
+.empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d;margin-bottom:14px}}
+.lead{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
 </style></head><body>
 <div class="page">
-<section class="summary">
-<h1>{escape(symbol)} 五分 K 雙底 · 2h低回測守三根</h1>
-<p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">創下兩小時低點 → 收盤站上 MA20 → 再跌破 MA20 → 回到兩小時低點附近（可略破 20 點）→ 連續三根五分 K 沒新低才做多。對齊 09-04 圖 29。每筆下面加一張 15 分 K。停損在回測低下方 4 點；目標取量度或 2R 較遠者。持倉最多 48 根。</p>
-{verdict_html}
-<div class="cards">
-<div class="card">筆數<b>{stats['count']}</b></div>
-<div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
-<div class="card">總點數<b class="{total_cls}">{stats['total_points']:+.1f}</b></div>
-<div class="card">均筆<b>{stats['avg']:+.1f}</b></div>
-</div>
-<p class="muted">{escape(q_line)}</p>
-{funnel_line}
-<div class="equity">{_equity_svg(pnls)}</div>
+<section class="lead">
+<h1>{escape(symbol)} 五分 / 15分 雙底</h1>
+<p class="muted">{escape(period)} · 同一套：兩小時低 → 站上 MA20 → 再跌破 → 回測附近守三根。15 分 K 的兩小時是 8 根，三根沒新低 = 45 分鐘。</p>
 </section>
-{cards or "<div class='empty'>無雙底回測守三根訊號</div>"}
+{sec5}
+{cards5 or "<div class='empty'>五分K 無訊號</div>"}
+{sec15}
+{cards15 or "<div class='empty'>15分K 無訊號</div>"}
 </div>
 </body></html>
 """
@@ -917,18 +993,36 @@ def cmd_backtest(args) -> int:
         return 1
     print(f"bars={len(df)} {df.index[0]} → {df.index[-1]}", file=sys.stderr)
 
+    params = detect_params(args.interval)
     funnel: Dict[str, int] = {}
-    sigs = detect_signals(df, funnel=funnel)
-    trades = simulate(df, sigs)
+    sigs = detect_signals(df, funnel=funnel, two_hour_bars=params["two_hour_bars"])
+    trades = simulate(df, sigs, max_hold=params["max_hold"])
     stats = summarize_trades(trades)
     print(
-        f"trades={stats['count']} WR={stats['win_rate']:.1f}% "
+        f"{args.interval} trades={stats['count']} WR={stats['win_rate']:.1f}% "
         f"pnl={stats['total_points']:+.1f} avg={stats['avg']:+.1f}"
     )
     print("funnel", funnel)
     _print_trades(df, trades)
     verdict = _verdict(stats, funnel)
     print(f"verdict: {verdict}")
+
+    df_15m = resample_ohlc(df, "15min") if args.interval == "5m" else pd.DataFrame()
+    trades_15m: List[TradeResult] = []
+    funnel_15m: Dict[str, int] = {}
+    verdict_15m = ""
+    if not df_15m.empty:
+        p15 = detect_params("15m")
+        sigs_15m = detect_signals(df_15m, funnel=funnel_15m, two_hour_bars=p15["two_hour_bars"])
+        trades_15m = simulate(df_15m, sigs_15m, max_hold=p15["max_hold"])
+        stats_15m = summarize_trades(trades_15m)
+        print(
+            f"15m trades={stats_15m['count']} WR={stats_15m['win_rate']:.1f}% "
+            f"pnl={stats_15m['total_points']:+.1f} avg={stats_15m['avg']:+.1f}"
+        )
+        print("funnel_15m", funnel_15m)
+        verdict_15m = _verdict(stats_15m, funnel_15m)
+        print(f"verdict_15m: {verdict_15m}")
 
     html_path = args.html
     if getattr(args, "pages", False):
@@ -942,6 +1036,10 @@ def cmd_backtest(args) -> int:
             args.period,
             funnel=funnel,
             verdict=verdict,
+            df_15m=df_15m if not df_15m.empty else None,
+            trades_15m=trades_15m,
+            funnel_15m=funnel_15m,
+            verdict_15m=verdict_15m,
         )
         print(f"html={out}")
         if getattr(args, "pages", False):

@@ -4,7 +4,7 @@ indicator("NQ 五分K 雙底 2h低回測守三根", overlay=true, max_labels_cou
 // 創兩小時低 → 站上 MA20 → 再跌破 MA20 → 回到低點附近 → 連續 3 根沒新低做多。
 // 對齊 2026-09-04 圖 29。套用至 NQ1! / MNQ1! 五分圖。
 
-twoHrBars   = input.int(24, "兩小時 K 數", minval=12)
+twoHrBars   = input.int(24, "兩小時 K 數（五分=24、15分=8）", minval=4)
 minBreak    = input.float(8.0, "最小破底（點）", minval=2)
 nearPts     = input.float(25.0, "回測附近（點）", minval=8)
 springPts   = input.float(20.0, "最多可略破（點）", minval=0)

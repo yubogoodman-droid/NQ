@@ -16,6 +16,7 @@ from nq_w_ma20 import (  # noqa: E402
     TradeResult,
     detect_signals,
     quality_from_w,
+    detect_params,
     resample_ohlc,
     simulate,
     summarize_trades,
@@ -193,7 +194,14 @@ def test_simulate_and_html() -> None:
     assert "雙底" in text
     assert "MA20" in text
     assert "15分K" in text
+    assert "15分K 回測" in text
     assert text.count("<svg") >= 2, "五分圖 + 15 分圖都要內嵌 SVG"
+
+
+def test_detect_params_15m() -> None:
+    assert detect_params("15m")["two_hour_bars"] == 8
+    assert detect_params("15m")["max_hold"] == 16
+    assert detect_params("5m")["two_hour_bars"] == 24
 
 
 def main() -> int:
@@ -208,6 +216,7 @@ def main() -> int:
         test_no_signal_on_deep_spring,
         test_resample_15m,
         test_simulate_and_html,
+        test_detect_params_15m,
     ]
     failed = 0
     for fn in tests:
