@@ -1,26 +1,23 @@
-# NQ 五分 K W 底進場策略
+# NQ 五分 K 破三小時低 · 5/20 多排站上 MA60
 
-那斯達克期貨（NQ）五分鐘 K 線的 **W 底（雙底）** 做多進場策略。
+那斯達克期貨（NQ）五分鐘 K：**跌破近三小時低點後，一小時內 MA5＞MA20＞MA60，且收盤站上 MA60** 做多。
 
 ## 型態定義
 
 ```
-        頸線 ─────────●─────────
-                   /   \
-                  /     \
-    第一低點 ●───         ───● 第二低點
-                              ↑
-                         突破進場
+  三小時低 ────────
+                    \\
+                     ● 破底
+                    /
+     1 小時內 MA5>MA20>MA60 站上 ← 進場
 ```
 
 | 條件 | 說明 |
 |------|------|
-| 第一低點 | 波段低點（左右各 3 根 K 確認） |
-| 頸線 | 兩低點之間的最高波段高點 |
-| 第二低點 | 與第一低點價差 ≤ 0.1%，間隔 5~60 根 K |
-| 進場 | 收盤突破頸線，做多 NQ |
-| 停損 | 第二低點 |
-| 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
+| 破底 | 當根低點跌破前 **36 根**（3 小時）最低點，且前一根尚未跌破 |
+| 進場 | 破底起算 **12 根內**（1 小時）收盤 **高於 MA60**，且 **MA5 > MA20 > MA60** |
+| 停損 | 破底低點下方 **20 點** |
+| 停利 | **2R**（進場到停損距離的兩倍） |
 
 ## NQ 一分 K 破底翻 MA Reclaim
 
@@ -116,8 +113,9 @@ python examples/run_backtest.py --csv your_nq_5m.csv
 # 交易卡片報告（每筆分開，手機版，推薦）
 python3 examples/chart_today.py --report --pages
 
-# 30 天回測報告
-python3 examples/chart_today.py --report --days 30 -o output/nq_report_30d.html
+# 近 7 天 / 近一個月回測報告
+python3 examples/chart_today.py --report --days 7 -o docs/nq-w-bottom/index.html
+python3 examples/chart_today.py --report --days 30 -o docs/nq-w-bottom/30d.html
 
 # 單一大圖
 python3 examples/chart_today.py
@@ -151,10 +149,13 @@ python3 examples/chart_today.py
 
 | 參數 | 預設 | 說明 |
 |------|------|------|
-| `swing_lookback` | 3 | 轉折確認 K 數 |
-| `low_tolerance_pct` | 0.001 | 兩低點價差容忍（0.1%） |
-| `min_bars_between_lows` | 5 | 兩低點最少間隔 |
-| `max_bars_between_lows` | 60 | 兩低點最多間隔（約 5 小時） |
+| `lookback_bars` | 36 | 三小時回看（五分 K 根數） |
+| `reclaim_bars` | 12 | 破底後須多排站上 MA60 的時限（1 小時） |
+| `ma5_period` | 5 | 短均 |
+| `ma20_period` | 20 | 中均 |
+| `ma60_period` | 60 | 長均（須站上且 5/20 在其上） |
+| `stop_below_break_points` | 20 | 停損在破底低點下方幾點 |
+| `reward_risk` | 2.0 | 停利為風險的幾倍 |
 
 ## 風險提示
 

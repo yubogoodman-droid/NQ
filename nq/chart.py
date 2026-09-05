@@ -1,4 +1,4 @@
-"""產生 NQ W 底回測 HTML 圖表。"""
+"""產生 NQ 破三小時低 5/20站上MA60 HTML 圖表。"""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def build_chart(
     signals: list[Signal],
     results: list[TradeResult],
     *,
-    title: str = "NQ 五分K W底進場",
+    title: str = "NQ 五分K 破三小時低 5/20站上MA60",
 ) -> go.Figure:
     times = [_marker_time(t) for t in df.index]
 
@@ -55,28 +55,25 @@ def build_chart(
         p = sig.pattern
         trade = results[i] if i < len(results) else None
 
-        low_points_x = [_marker_time(df.index[p.first_low_idx]), _marker_time(df.index[p.second_low_idx])]
-        low_points_y = [p.first_low, p.second_low]
         fig.add_trace(
             go.Scatter(
-                x=low_points_x,
-                y=low_points_y,
+                x=[_marker_time(df.index[p.break_idx])],
+                y=[p.break_low],
                 mode="markers+text",
                 marker=dict(symbol="circle", size=9, color=color, line=dict(width=1, color="white")),
-                text=["L1", "L2"],
+                text=["破3h低"],
                 textposition="bottom center",
-                name=f"W底 #{i + 1}",
+                name=f"破底 #{i + 1}",
                 showlegend=True,
             ),
             row=1,
             col=1,
         )
 
-        neck_x = [_marker_time(df.index[p.neckline_idx]), _marker_time(df.index[p.breakout_idx or p.second_low_idx])]
         fig.add_trace(
             go.Scatter(
-                x=neck_x,
-                y=[p.neckline, p.neckline],
+                x=[_marker_time(df.index[p.break_idx]), _marker_time(df.index[p.entry_idx])],
+                y=[p.lookback_low, p.lookback_low],
                 mode="lines",
                 line=dict(color=color, width=1.5, dash="dash"),
                 showlegend=False,
@@ -92,8 +89,8 @@ def build_chart(
                 x=[entry_x],
                 y=[sig.entry],
                 mode="markers+text",
-                marker=dict(symbol="triangle-up", size=14, color="#00e676", line=dict(width=1, color="white")),
-                text=[f"進場 {sig.entry:.2f}"],
+                marker=dict(symbol="circle-open", size=22, color="#00e676", line=dict(width=3, color="#00e676")),
+                text=[f"進 {sig.entry:.2f}"],
                 textposition="top center",
                 name=f"進場 #{i + 1}",
                 showlegend=False,
@@ -113,8 +110,8 @@ def build_chart(
                     x=[exit_x],
                     y=[trade.exit_price],
                     mode="markers+text",
-                    marker=dict(symbol="x", size=11, color=exit_color, line=dict(width=2, color="white")),
-                    text=[f"{trade.exit_reason} {trade.pnl_points:+.1f}pt"],
+                    marker=dict(symbol="circle-open", size=22, color=exit_color, line=dict(width=3, color=exit_color)),
+                    text=[f"出 {trade.exit_reason} {trade.pnl_points:+.1f}pt"],
                     textposition="bottom center",
                     showlegend=False,
                 ),
@@ -162,7 +159,7 @@ def save_html_chart(
     output: str | Path,
     *,
     strategy: NQWBottomStrategy | None = None,
-    title: str = "NQ 五分K W底進場",
+    title: str = "NQ 五分K 破三小時低 5/20站上MA60",
 ) -> Path:
     strategy = strategy or NQWBottomStrategy()
     signals = strategy.generate_signals(df)
