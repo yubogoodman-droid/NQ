@@ -95,6 +95,16 @@ def test_burst_rejects_zero_prev_volume() -> None:
     assert burst_at(d, len(d["c"]) - 1) is None
 
 
+def test_green_only_skips_red_bar() -> None:
+    raw = _uptrend()
+    raw["o"][-1] = raw["c"][-1] + 0.5
+    raw["v"][-1] = 250.0
+    d = indicators(raw)
+    i = len(d["c"]) - 1
+    assert burst_at(d, i) is not None
+    assert burst_at(d, i, green_only=True) is None
+
+
 def test_burst_rejects_early_bar() -> None:
     d = indicators(_uptrend(n=80))
     assert burst_at(d, 10) is None
@@ -138,6 +148,7 @@ def main() -> int:
         test_burst_rejects_low_volume,
         test_burst_rejects_bear_stack,
         test_burst_rejects_zero_prev_volume,
+        test_green_only_skips_red_bar,
         test_burst_rejects_early_bar,
         test_drop_unclosed,
         test_bars_from_raw_needs_ma200,

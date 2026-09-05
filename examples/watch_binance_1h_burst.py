@@ -160,7 +160,7 @@ def is_bull_align(mas: tuple[float, ...]) -> bool:
     return all(mas[k] > mas[k + 1] for k in range(len(mas) - 1))
 
 
-def burst_at(d: dict, i: int, vol_mult: float = VOL_MULT) -> dict | None:
+def burst_at(d: dict, i: int, vol_mult: float = VOL_MULT, green_only: bool = False) -> dict | None:
     """剛收盤的第 i 根是否符合多頭爆發。"""
     if i < 1 or i >= len(d["c"]):
         return None
@@ -171,14 +171,18 @@ def burst_at(d: dict, i: int, vol_mult: float = VOL_MULT) -> dict | None:
     cur_v = float(d["v"][i])
     if prev_v <= 0 or not (cur_v > prev_v * vol_mult):
         return None
+    close = float(d["c"][i])
+    open_ = float(d["o"][i])
+    if green_only and close < open_:
+        return None
     return {
         "i": i,
         "mas": mas,
         "vol": cur_v,
         "prev_vol": prev_v,
         "vol_ratio": cur_v / prev_v,
-        "close": float(d["c"][i]),
-        "open": float(d["o"][i]),
+        "close": close,
+        "open": open_,
         "high": float(d["h"][i]),
         "low": float(d["l"][i]),
     }
@@ -282,7 +286,9 @@ def draw_chart(sym: str, d: dict, i: int, path: str) -> str | None:
     return path
 
 
-def scan_symbol(sym: str, lookback: int = 2, vol_mult: float = VOL_MULT) -> list[dict]:
+def scan_symbol(
+    sym: str, lookback: int = 2, vol_mult: float = VOL_MULT, green_only: bool = False
+) -> list[dict]:
     raw = fetch_klines(sym)
     if raw is None:
         return []
@@ -291,7 +297,7 @@ def scan_symbol(sym: str, lookback: int = 2, vol_mult: float = VOL_MULT) -> list
     events = []
     start = max(MA_PERIODS[-1], last - lookback + 1)
     for i in range(start, last + 1):
-        hit = burst_at(d, i, vol_mult=vol_mult)
+        hit = burst_at(d, i, vol_mult=vol_mult, green_only=green_only)
         if not hit:
             continue
         events.append({"symbol": sym, "d": d, **hit})
@@ -317,10 +323,10 @@ def key_of(ev: dict) -> str:
     return f"{ev['symbol']}:{int(ev['d']['t'][ev['i']])}"
 
 
-def scan_all(symbols: list[str], lookback: int, vol_mult: float) -> list[dict]:
+def scan_all(symbols: list[str], lookback: int, vol_mult: float, green_only: bool = False) -> list[dict]:
     events = []
     with ThreadPoolExecutor(8) as ex:
-        futs = {ex.submit(scan_symbol, s, lookback, vol_mult): s for s in symbols}
+        futs = {ex.submit(scan_symbol, s, lookback, vol_mult, green_only): s for s in symbols}
         for fut in as_completed(futs):
             try:
                 events.extend(fut.result())
@@ -377,6 +383,7 @@ def main() -> int:
     p.add_argument("--dry-run", action="store_true", help="掃到也不送 Telegram")
     p.add_argument("--lookback", type=int, default=2, help="往回看幾根已收盤 1h（預設 2）")
     p.add_argument("--vol-mult", type=float, default=VOL_MULT, help="成交量倍數門檻（預設 2 = 大於前一根一倍）")
+    p.add_argument("--green-only", action="store_true", help="只報陽線（收盤 ≥ 開盤）")
     p.add_argument("--symbols", nargs="*", help="只掃這些代號，例如 BTCUSDT ETHUSDT")
     args = p.parse_args()
     apply_keys()
@@ -399,7 +406,9 @@ def main() -> int:
             uni_ts = time.time()
             print(f"更新標的 {len(symbols)}", flush=True)
         t0 = time.time()
-        events = scan_all(symbols, lookback=max(1, args.lookback), vol_mult=args.vol_mult)
+        events = scan_all(
+            symbols, lookback=max(1, args.lookback), vol_mult=args.vol_mult, green_only=args.green_only
+        )
         new = [e for e in events if key_of(e) not in seen]
         print(
             f"[{datetime.now(TZ).strftime('%H:%M:%S')}] "
@@ -407,9 +416,10 @@ def main() -> int:
             flush=True,
         )
         for ev in new:
-            seen.add(key_of(ev))
             notify(ev, dry_run=args.dry_run)
-        if new:
+            if not args.dry_run:
+                seen.add(key_of(ev))
+        if new and not args.dry_run:
             save_seen(seen)
 
     round_once()
