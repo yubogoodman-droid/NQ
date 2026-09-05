@@ -141,7 +141,7 @@ def test_detect_happy_path() -> None:
     assert sig.entry_price > sig.ma60
     assert 0 < sig.dist_ma200 <= 30
     assert sig.under_streak >= 15
-    assert abs(sig.stop_price - (sig.ma200 - 10)) < 1e-6
+    assert abs(sig.stop_price - sig.break_low) < 1e-6
     assert abs(sig.target_price - (sig.entry_price + 100)) < 1e-6
 
 
@@ -224,7 +224,8 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "距200日" not in text
         assert "距15mMA200" in text
         assert "進場距 15m MA200" in text
-        assert "停損 MA200−10" in text
+        assert "停損 破底" in text
+        assert "停損 MA200−10" not in text
         assert "15mMA200上被停損後30分內站回進場點再進一次" in text
         assert "收在MA60上" in text
         assert "5m連2根收在破底下" not in text
@@ -357,7 +358,7 @@ def test_reentry_after_stop_above_15m() -> None:
     retries = [t for t in trades if t.signal.entry_kind == "reentry"]
     assert len(retries) == 1
     assert retries[0].entry_idx == reclaim
-    assert abs(retries[0].signal.stop_price - (retries[0].signal.ma200 - 10)) < 1e-6
+    assert abs(retries[0].signal.stop_price - retries[0].signal.break_low) < 1e-6
     assert retries[0].signal.parent_entry_idx == sigs[0].entry_idx
     assert retries[0].signal.parent_exit_idx == trades[0].exit_idx
     png = Path("/tmp/nq_reentry_mark.png")
