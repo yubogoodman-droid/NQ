@@ -89,15 +89,14 @@ python3 examples/watch_binance_5m_align.py --test
 python3 examples/watch_binance_5m_align.py --once --dry-run
 python3 examples/watch_binance_5m_align.py
 
-# 近三天回測（流動永續，15/30/60/120 分鐘報酬）
+# 近三天回測（成交額前 100，15/30/60/120 分鐘報酬）
 python3 examples/watch_binance_5m_align.py --backtest --days 3 --pages
 
 # 單元測試（不打幣安）
 python3 examples/test_watch_binance_5m_align.py
 ```
 
-近三天（2026-09-02 22:31 → 09-05 22:31）流動永續 233 檔：**567 筆 / 146 檔**。  
-5m 從 MA200 下站上且多排 1105 → 小時過濾後 567。持有 60 分鐘勝率 **46.5%、平均 +0.23%**；120 分鐘 **50.9%、平均 +0.47%**。
+只掃 24h 成交額前 100 檔 USDT 永續。近三天數字重跑後會更新。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-align-7d44/docs/binance-5m-align/view.html
 

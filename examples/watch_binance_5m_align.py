@@ -3,7 +3,7 @@
 
 五分 K：MA7 > MA14 > MA25，且前一根收在 MA200 下、這一根收盤才站上。
 同時小時 K 收盤要在 MA99 與 MA200 之上。
-同一根不重發。
+預設只掃 24h 成交額前 100 檔。同一根不重發。
 
     python3 examples/watch_binance_5m_align.py --test
     python3 examples/watch_binance_5m_align.py --once --dry-run
@@ -38,10 +38,10 @@ CONFIG_ENV = ROOT / "tg_config.env"
 if not CONFIG_ENV.exists():
     CONFIG_ENV = Path(__file__).resolve().parent / "tg_config.env"
 
-KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT"}
 MS_5M = 5 * 60_000
 MS_1H = 60 * 60_000
 HORIZONS = (("15m", 3), ("30m", 6), ("60m", 12), ("120m", 24))
+UNIVERSE_LIMIT = 100
 PAGES = ROOT / "docs" / "binance-5m-align" / "index.html"
 
 
@@ -256,10 +256,17 @@ def get_json(path: str, params=None, retries: int = 5):
     raise last
 
 
-def universe() -> list[str]:
+def rank_universe(rows: list[tuple[str, float]], limit: int = UNIVERSE_LIMIT) -> list[str]:
+    """依 24h 成交額由高到低取前 limit 檔。"""
+    n = max(1, int(limit))
+    ranked = sorted(rows, key=lambda x: x[1], reverse=True)
+    return [sym for sym, _qv in ranked[:n]]
+
+
+def universe(limit: int = UNIVERSE_LIMIT) -> list[str]:
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
-    out = []
+    rows: list[tuple[str, float]] = []
     for s in info["symbols"]:
         if s.get("quoteAsset") != "USDT":
             continue
@@ -271,10 +278,8 @@ def universe() -> list[str]:
             continue
         sym = s["symbol"]
         qv = float((tickers.get(sym) or {}).get("quoteVolume") or 0)
-        if qv < 5_000_000 and sym not in KEEP:
-            continue
-        out.append(sym)
-    return out
+        rows.append((sym, qv))
+    return rank_universe(rows, limit)
 
 
 def fetch_klines(sym: str, interval: str, limit: int, interval_ms: int, *, keep_forming: bool = False) -> dict | None:
@@ -640,7 +645,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left
 <div class="page">
 <section class="summary">
 <h1>幣安 5m 多頭排列 · {escape(period)}</h1>
-<p class="muted">流動 USDT 永續 {funnel.get('symbols', 0)} 檔。
+<p class="muted">USDT 永續成交額前 {funnel.get('symbols', 0)} 檔。
 5m <b>MA7&gt;MA14&gt;MA25</b>，且前一根收在 MA200 下、這一根收盤才站上。
 同時 1h 收盤在 MA99 / MA200 之上。已在 MA200 上只是短均排好的不算。
 報酬從訊號收盤算到之後 15/30/60/120 分鐘收盤，不是進出場建議。</p>
@@ -722,8 +727,8 @@ def cmd_backtest(args) -> int:
         print(f"回測指定 {len(symbols)} 個：{', '.join(symbols)}", flush=True)
     else:
         print("載入標的…", flush=True)
-        symbols = universe()
-        print(f"回測 {len(symbols)} 個流動永續 · {period}", flush=True)
+        symbols = universe(args.limit)
+        print(f"回測成交額前 {len(symbols)} 檔 · {period}", flush=True)
     t0 = time.time()
     hits, funnel = backtest_all(symbols, start_ms, end_ms)
     stats = summarize_hits(hits)
@@ -768,6 +773,7 @@ def main() -> int:
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance-5m-align/")
     p.add_argument("--html", default="", help="回測 HTML 路徑")
     p.add_argument("--chart-limit", type=int, default=30, help="報告圖卡最多幾張")
+    p.add_argument("--limit", type=int, default=UNIVERSE_LIMIT, help="只掃 24h 成交額前 N 檔（預設 100）")
     args = p.parse_args()
     apply_keys()
     if args.test:
@@ -781,14 +787,17 @@ def main() -> int:
         print(f"監看指定 {len(symbols)} 個：{', '.join(symbols)}", flush=True)
     else:
         print("載入標的…", flush=True)
-        symbols = universe()
-        print(f"監看 {len(symbols)} 個流動永續。5m 7>14>25，且從 MA200 下那根收盤站上，1h 在 MA99/200 上才推。", flush=True)
+        symbols = universe(args.limit)
+        print(
+            f"監看成交額前 {len(symbols)} 檔。5m 7>14>25，且從 MA200 下那根收盤站上，1h 在 MA99/200 上才推。",
+            flush=True,
+        )
     uni_ts = time.time()
 
     def round_once() -> None:
         nonlocal symbols, uni_ts
         if not args.symbol and time.time() - uni_ts > 1800:
-            symbols = universe()
+            symbols = universe(args.limit)
             uni_ts = time.time()
             print(f"更新標的 {len(symbols)}", flush=True)
         t0 = time.time()

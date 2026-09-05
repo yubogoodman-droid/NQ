@@ -25,6 +25,7 @@ from watch_binance_5m_align import (  # noqa: E402
     key_of,
     parse_klines,
     pick_chart_hits,
+    rank_universe,
     reclaim_ma200,
     sma,
     summarize_hits,
@@ -43,6 +44,12 @@ def test_drop_unclosed() -> None:
     raw = [[0, 1, 1, 1, 1, 1], [300_000, 1, 1, 1, 1, 1]]
     assert len(drop_unclosed(raw, 300_000, now_ms=300_000 + 10_000)) == 1
     assert len(drop_unclosed(raw, 300_000, now_ms=600_000)) == 2
+
+
+def test_rank_universe_top_n() -> None:
+    rows = [("AAAUSDT", 10.0), ("BBBUSDT", 30.0), ("CCCUSDT", 20.0), ("DDDUSDT", 5.0)]
+    assert rank_universe(rows, 2) == ["BBBUSDT", "CCCUSDT"]
+    assert rank_universe(rows, 100) == ["BBBUSDT", "CCCUSDT", "AAAUSDT", "DDDUSDT"]
 
 
 def test_parse_klines() -> None:
