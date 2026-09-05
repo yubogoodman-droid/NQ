@@ -1,4 +1,4 @@
-"""NQ 五分 K：破三小時低點後半小時內站上 MA30 做多。"""
+"""NQ 五分 K：破三小時低點後半小時內站上 MA60 做多。"""
 
 from __future__ import annotations
 
@@ -36,14 +36,14 @@ class Signal:
 @dataclass
 class NQWBottomStrategy:
     """
-    五分 K 跌破近 3 小時低點後，30 分鐘內（6 根）收盤站上 MA30 做多。
+    五分 K 跌破近 3 小時低點後，30 分鐘內（6 根）收盤站上 MA60 做多。
     停損：破底低點下方 20 點
     停利：2R
     """
 
     lookback_bars: int = 36
     reclaim_bars: int = 6
-    ma_period: int = 30
+    ma_period: int = 60
     stop_below_break_points: float = 20.0
     reward_risk: float = 2.0
     tick_size: float = 0.25

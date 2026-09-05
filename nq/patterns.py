@@ -1,4 +1,4 @@
-"""五分 K：跌破近三小時低點後，半小時內收盤站上 MA30。"""
+"""五分 K：跌破近三小時低點後，半小時內收盤站上 MA60。"""
 
 from __future__ import annotations
 
@@ -9,18 +9,18 @@ import pandas as pd
 
 LOOKBACK_BARS = 36  # 3 小時 × 12 根/小時
 RECLAIM_BARS = 6  # 30 分鐘
-MA30_PERIOD = 30
+MA60_PERIOD = 60
 
 
 @dataclass(frozen=True)
 class ReclaimPattern:
-    """破三小時低點後，在時限內站上 MA30。"""
+    """破三小時低點後，在時限內站上 MA60。"""
 
     break_idx: int
     entry_idx: int
     lookback_low: float
     break_low: float
-    ma30: float
+    ma60: float
 
     @property
     def l1_idx(self) -> int:
@@ -69,7 +69,7 @@ class ReclaimPattern:
     @property
     def target(self) -> float:
         """佔位；實際目標由策略用 2R 計算。"""
-        return self.ma30
+        return self.ma60
 
 
 WBottomPattern = ReclaimPattern
@@ -86,11 +86,11 @@ def detect_reclaims(
     *,
     lookback_bars: int = LOOKBACK_BARS,
     reclaim_bars: int = RECLAIM_BARS,
-    ma_period: int = MA30_PERIOD,
+    ma_period: int = MA60_PERIOD,
 ) -> list[ReclaimPattern]:
     """
     當根低點跌破「前 lookback_bars 根」的最低點，視為破三小時低。
-    從破底那根起算 reclaim_bars 根內，收盤站上 MA30 則進場。
+    從破底那根起算 reclaim_bars 根內，收盤站上 MA60 則進場。
     """
     required = {"open", "high", "low", "close"}
     missing = required - set(df.columns)
@@ -113,16 +113,16 @@ def detect_reclaims(
         found: ReclaimPattern | None = None
         last = min(i + reclaim_bars - 1, n - 1)
         for k in range(i, last + 1):
-            ma30 = _sma(closes, k, ma_period)
-            if ma30 is None:
+            ma60 = _sma(closes, k, ma_period)
+            if ma60 is None:
                 continue
-            if closes[k] > ma30:
+            if closes[k] > ma60:
                 found = ReclaimPattern(
                     break_idx=i,
                     entry_idx=k,
                     lookback_low=lookback,
                     break_low=min(lows[i : k + 1]),
-                    ma30=ma30,
+                    ma60=ma60,
                 )
                 break
         if found:
@@ -134,5 +134,5 @@ def detect_reclaims(
 
 
 def detect_w_bottoms(df: pd.DataFrame, **_: object) -> list[ReclaimPattern]:
-    """相容舊名稱：改為三小時破底翻 MA30。"""
+    """相容舊名稱：改為三小時破底翻 MA60。"""
     return detect_reclaims(df)

@@ -1,13 +1,13 @@
 //@version=5
-strategy("NQ 五分K 破三小時低翻MA30", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, process_orders_on_close=true)
+strategy("NQ 五分K 破三小時低翻MA60", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, process_orders_on_close=true)
 
 lookbackBars = input.int(36, "三小時回看 K 數", minval=12)
-reclaimBars  = input.int(6, "破底後最多幾根須站上 MA30", minval=1)
-maLen        = input.int(30, "均線", minval=5)
+reclaimBars  = input.int(6, "破底後最多幾根須站上 MA60", minval=1)
+maLen        = input.int(60, "均線", minval=5)
 stopPts      = input.float(20.0, "停損在破底下方點數", minval=0, step=1)
 rr           = input.float(2.0, "盈虧比", minval=0.5, step=0.5)
 
-ma30 = ta.sma(close, maLen)
+ma60 = ta.sma(close, maLen)
 priorLow = ta.lowest(low[1], lookbackBars)
 newBreak = low < priorLow and low[1] >= priorLow
 
@@ -23,14 +23,14 @@ if not na(breakBar)
     if bar_index - breakBar >= reclaimBars
         breakBar := na
         breakLow := na
-    else if close > ma30
+    else if close > ma60
         entry = close
         stop = breakLow - stopPts
         if entry > stop
-            strategy.entry("破底翻MA30", strategy.long)
-            strategy.exit("出場", "破底翻MA30", stop=stop, limit=entry + rr * (entry - stop))
+            strategy.entry("破底翻MA60", strategy.long)
+            strategy.exit("出場", "破底翻MA60", stop=stop, limit=entry + rr * (entry - stop))
         breakBar := na
         breakLow := na
 
-plot(ma30, "MA30", color=color.yellow, linewidth=2)
+plot(ma60, "MA60", color=color.aqua, linewidth=2)
 plotshape(newBreak, title="破三小時低", style=shape.triangledown, location=location.belowbar, color=color.fuchsia, size=size.tiny)

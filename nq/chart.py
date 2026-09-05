@@ -1,4 +1,4 @@
-"""產生 NQ 破三小時低翻 MA30 HTML 圖表。"""
+"""產生 NQ 破三小時低翻 MA60 HTML 圖表。"""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def build_chart(
     signals: list[Signal],
     results: list[TradeResult],
     *,
-    title: str = "NQ 五分K 破三小時低翻MA30",
+    title: str = "NQ 五分K 破三小時低翻MA60",
 ) -> go.Figure:
     times = [_marker_time(t) for t in df.index]
 
@@ -159,7 +159,7 @@ def save_html_chart(
     output: str | Path,
     *,
     strategy: NQWBottomStrategy | None = None,
-    title: str = "NQ 五分K 破三小時低翻MA30",
+    title: str = "NQ 五分K 破三小時低翻MA60",
 ) -> Path:
     strategy = strategy or NQWBottomStrategy()
     signals = strategy.generate_signals(df)

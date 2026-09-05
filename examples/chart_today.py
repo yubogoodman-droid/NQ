@@ -42,7 +42,7 @@ def today_mask(df: "pd.DataFrame") -> "pd.Series":
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="產生 NQ 破三小時低翻 MA30 HTML")
+    parser = argparse.ArgumentParser(description="產生 NQ 破三小時低翻 MA60 HTML")
     parser.add_argument("--output", "-o", help="輸出路徑")
     parser.add_argument("--symbol", default="NQ=F")
     parser.add_argument("--pages", action="store_true", help="輸出到 docs/index.html（GitHub Pages）")
@@ -68,15 +68,15 @@ def main() -> None:
             "docs/index.html" if args.pages else (f"output/nq_report_{days}d.html" if days else "output/nq_report.html")
         )
         if days:
-            title = f"NQ 破三小時低翻 MA30 — 近一個月" if days >= 28 else f"NQ 破三小時低翻 MA30 — 近 {days} 天"
+            title = f"NQ 破三小時低翻 MA60 — 近一個月" if days >= 28 else f"NQ 破三小時低翻 MA60 — 近 {days} 天"
         else:
-            title = f"NQ 破三小時低翻 MA30 — {today}"
+            title = f"NQ 破三小時低翻 MA60 — {today}"
         out = save_report_html(
             df, output, title=title, symbol=args.symbol, today_only=days is None
         )
     else:
         output = args.output or "output/nq_w_bottom_today.html"
-        title = f"NQ 五分K 破三小時低翻MA30 — {today} ({args.symbol})"
+        title = f"NQ 五分K 破三小時低翻MA60 — {today} ({args.symbol})"
         out = save_html_chart(df, output, title=title)
 
     print(f"已產生: {out.resolve()}")

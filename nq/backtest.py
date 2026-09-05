@@ -26,7 +26,7 @@ def run_backtest(
     max_bars_hold: int = 48,
 ) -> list[TradeResult]:
     """
-    對歷史五分 K 執行破底翻 MA30 回測。
+    對歷史五分 K 執行破底翻 MA60 回測。
 
     出場規則（依序檢查）：
     1. 觸及停損
