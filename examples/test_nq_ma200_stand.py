@@ -221,6 +221,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "距15mMA200" in text
         assert "進場距 15m MA200" in text
         assert "停損 MA200−10" in text
+        assert "15mMA200上被停損後30分內站回進場點再進一次" in text
         assert "5m連2根收在破底下" not in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
@@ -231,13 +232,20 @@ def test_write_html(tmp_path: Path | None = None) -> None:
 
 
 def test_display_trades_wins_first() -> None:
+    class S:
+        def __init__(self, kind: str = "primary"):
+            self.entry_kind = kind
+
     class T:
-        def __init__(self, pnl: float, entry_idx: int):
+        def __init__(self, pnl: float, entry_idx: int, kind: str = "primary"):
             self.pnl_points = pnl
             self.entry_idx = entry_idx
+            self.signal = S(kind)
 
-    ordered = display_trades([T(-10, 1), T(100, 5), T(-20, 3), T(100, 2)])  # type: ignore[list-item]
-    assert [t.entry_idx for t in ordered] == [2, 5, 1, 3]
+    ordered = display_trades(
+        [T(-10, 1), T(100, 5), T(-20, 3, "reentry"), T(80, 4, "reentry"), T(100, 2)]  # type: ignore[list-item]
+    )
+    assert [t.entry_idx for t in ordered] == [4, 3, 2, 5, 1]
 
 
 def test_resample_5m() -> None:
@@ -309,6 +317,84 @@ def test_default_has_no_5m_tangle_filter() -> None:
     assert detect_signals(df), "default is the original 7 rules; 5m ribbon is display-only"
 
 
+def _long_15m(df: pd.DataFrame, level: float) -> pd.DataFrame:
+    idx_15 = pd.date_range(df.index[0] - pd.Timedelta(days=3), periods=220, freq="15min", tz=ET)
+    close_15 = np.full(220, level)
+    return pd.DataFrame(
+        {"Open": close_15, "High": close_15 + 1, "Low": close_15 - 1, "Close": close_15},
+        index=idx_15,
+    )
+
+
+def test_reentry_after_stop_above_15m() -> None:
+    df = _make_setup_bars(n=520)
+    df_15 = _long_15m(df, 19000.0)
+    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
+    assert sigs
+    assert sigs[0].dist_15m_ma200 > 0
+    j = sigs[0].entry_idx
+    entry = sigs[0].entry_price
+    df2 = df.copy()
+    df2.iloc[j + 1, df2.columns.get_loc("Low")] = sigs[0].stop_price - 2
+    df2.iloc[j + 1, df2.columns.get_loc("Close")] = sigs[0].stop_price - 1
+    for k in range(j + 2, j + 8):
+        df2.iloc[k, df2.columns.get_loc("Close")] = entry - 5
+        df2.iloc[k, df2.columns.get_loc("Open")] = entry - 6
+        df2.iloc[k, df2.columns.get_loc("High")] = entry - 4
+        df2.iloc[k, df2.columns.get_loc("Low")] = entry - 7
+    reclaim = j + 8
+    df2.iloc[reclaim, df2.columns.get_loc("Close")] = entry + 1
+    df2.iloc[reclaim, df2.columns.get_loc("Open")] = entry - 2
+    df2.iloc[reclaim, df2.columns.get_loc("High")] = entry + 2
+    df2.iloc[reclaim, df2.columns.get_loc("Low")] = entry - 3
+    trades = simulate(df2, sigs, df_15m=df_15)
+    assert trades[0].exit_reason == "stop"
+    retries = [t for t in trades if t.signal.entry_kind == "reentry"]
+    assert len(retries) == 1
+    assert retries[0].entry_idx == reclaim
+    assert abs(retries[0].signal.stop_price - (retries[0].signal.ma200 - 10)) < 1e-6
+
+
+def test_no_reentry_when_below_15m() -> None:
+    df = _make_setup_bars(n=520)
+    df_15 = _long_15m(df, 21000.0)
+    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
+    assert sigs
+    assert sigs[0].dist_15m_ma200 < 0
+    j = sigs[0].entry_idx
+    entry = sigs[0].entry_price
+    df2 = df.copy()
+    df2.iloc[j + 1, df2.columns.get_loc("Low")] = sigs[0].stop_price - 2
+    df2.iloc[j + 8, df2.columns.get_loc("Close")] = entry + 1
+    df2.iloc[j + 8, df2.columns.get_loc("High")] = entry + 2
+    trades = simulate(df2, sigs, df_15m=df_15)
+    assert trades[0].exit_reason == "stop"
+    assert all(t.signal.entry_kind != "reentry" for t in trades)
+
+
+def test_no_reentry_if_reclaim_too_late() -> None:
+    df = _make_setup_bars(n=520)
+    df_15 = _long_15m(df, 19000.0)
+    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
+    assert sigs
+    j = sigs[0].entry_idx
+    entry = sigs[0].entry_price
+    df2 = df.copy()
+    df2.iloc[j + 1, df2.columns.get_loc("Low")] = sigs[0].stop_price - 2
+    df2.iloc[j + 1, df2.columns.get_loc("Close")] = sigs[0].stop_price - 1
+    late = j + 1 + 35
+    for k in range(j + 2, late + 1):
+        df2.iloc[k, df2.columns.get_loc("Close")] = entry - 5
+        df2.iloc[k, df2.columns.get_loc("Open")] = entry - 6
+        df2.iloc[k, df2.columns.get_loc("High")] = entry - 4
+        df2.iloc[k, df2.columns.get_loc("Low")] = entry - 7
+    df2.iloc[late, df2.columns.get_loc("Close")] = entry + 1
+    df2.iloc[late, df2.columns.get_loc("High")] = entry + 2
+    trades = simulate(df2, sigs, df_15m=df_15)
+    assert trades[0].exit_reason == "stop"
+    assert all(t.signal.entry_kind != "reentry" for t in trades)
+
+
 def test_summarize() -> None:
     class T:
         def __init__(self, pnl: float):
@@ -338,6 +424,9 @@ def main() -> int:
     test_overlay_15m_ma200_uses_long_history()
     test_ribbon_helpers()
     test_default_has_no_5m_tangle_filter()
+    test_reentry_after_stop_above_15m()
+    test_no_reentry_when_below_15m()
+    test_no_reentry_if_reclaim_too_late()
     test_summarize()
     print("ok")
     return 0
