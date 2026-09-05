@@ -170,7 +170,7 @@ def test_simulate_target_and_stop() -> None:
     df = _make_setup_bars()
     sigs = detect_signals(df, min_5m_ribbon=0.0)
     assert sigs
-    trades = simulate(df, sigs, early_exit_5m_ma21=False)
+    trades = simulate(df, sigs, early_exit_5m_ma20=False)
     assert trades
     assert isinstance(trades[0], TradeResult)
     assert trades[0].exit_idx >= trades[0].entry_idx
@@ -179,17 +179,17 @@ def test_simulate_target_and_stop() -> None:
     j = sigs[0].entry_idx
     df2.iloc[j + 3, df2.columns.get_loc("High")] = sigs[0].entry_price + 120
     df2.iloc[j + 3, df2.columns.get_loc("Close")] = sigs[0].entry_price + 110
-    trades2 = simulate(df2, sigs, early_exit_5m_ma21=False)
+    trades2 = simulate(df2, sigs, early_exit_5m_ma20=False)
     assert trades2[0].exit_reason == "target"
     assert abs(trades2[0].pnl_points - 100) < 1e-6
 
     df3 = df.copy()
     df3.iloc[j + 2, df3.columns.get_loc("Low")] = sigs[0].stop_price - 1
-    trades3 = simulate(df3, sigs, early_exit_5m_ma21=False)
+    trades3 = simulate(df3, sigs, early_exit_5m_ma20=False)
     assert trades3[0].exit_reason == "stop"
 
 
-def test_early_exit_5m_ma21() -> None:
+def test_early_exit_5m_ma20() -> None:
     df = _make_setup_bars(n=700)
     sigs = detect_signals(df, min_5m_ribbon=0.0)
     assert sigs
@@ -216,13 +216,13 @@ def test_early_exit_5m_ma21() -> None:
     df2.iloc[k, df2.columns.get_loc("Low")] = new_close
     flags = five_min_ma_exit_flags(df2)
     assert flags[k]
-    trades = simulate(df2, sigs, early_exit_5m_ma21=True)
-    assert trades[0].exit_reason == "ma21_5m"
+    trades = simulate(df2, sigs, early_exit_5m_ma20=True)
+    assert trades[0].exit_reason == "ma20_5m"
     assert trades[0].exit_idx == k
     # Same-bar stop still wins over the 5m close rule.
     df3 = df2.copy()
     df3.iloc[k, df3.columns.get_loc("Low")] = stop - 2
-    trades2 = simulate(df3, sigs, early_exit_5m_ma21=True)
+    trades2 = simulate(df3, sigs, early_exit_5m_ma20=True)
     assert trades2[0].exit_reason == "stop"
 
 
@@ -313,7 +313,7 @@ def main() -> int:
     test_skip_open_hour()
     test_skip_no_under_wash()
     test_simulate_target_and_stop()
-    test_early_exit_5m_ma21()
+    test_early_exit_5m_ma20()
     test_write_html()
     test_display_trades_wins_first()
     test_resample_5m()

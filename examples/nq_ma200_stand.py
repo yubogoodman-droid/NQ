@@ -9,7 +9,7 @@
   5. 美東 9:30–10:00 不進
   6. 紅 K 長上影跳過
   7. 停損 MA200−10，停利 +100
-  8. 進場後五分 K 收盤跌破 MA21 提早出場（同根先看停損／停利）
+  8. 進場後五分 K 收盤跌破 MA20 提早出場（同根先看停損／停利）
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -47,8 +47,8 @@ STOP_BELOW_MA200 = 10.0
 TAKE_PROFIT = 100.0
 MIN_UPPER_WICK = 8.0
 MIN_5M_RIBBON = 0.0  # 關閉；五分圖只對照，不當進場條件
-EARLY_EXIT_5M_MA = 21
-EARLY_EXIT_5M_MA21 = True
+EARLY_EXIT_5M_MA = 20
+EARLY_EXIT_5M_MA20 = True
 
 
 # ---------------------------------------------------------------------------
@@ -357,14 +357,14 @@ def simulate(
     df: pd.DataFrame,
     signals: Sequence[Signal],
     *,
-    early_exit_5m_ma21: bool = EARLY_EXIT_5M_MA21,
+    early_exit_5m_ma20: bool = EARLY_EXIT_5M_MA20,
 ) -> List[TradeResult]:
     high = df["High"].to_numpy(float)
     low = df["Low"].to_numpy(float)
     opn = df["Open"].to_numpy(float)
     close = df["Close"].to_numpy(float)
     n = len(close)
-    ma21_exit = five_min_ma_exit_flags(df) if early_exit_5m_ma21 else np.zeros(n, dtype=bool)
+    ma20_exit = five_min_ma_exit_flags(df) if early_exit_5m_ma20 else np.zeros(n, dtype=bool)
     results: List[TradeResult] = []
     busy_until = -1
     for sig in signals:
@@ -396,8 +396,8 @@ def simulate(
             if hit_tp:
                 exit_idx, exit_price, exit_reason = k, target, "target"
                 break
-            if ma21_exit[k]:
-                exit_idx, exit_price, exit_reason = k, float(close[k]), "ma21_5m"
+            if ma20_exit[k]:
+                exit_idx, exit_price, exit_reason = k, float(close[k]), "ma20_5m"
                 break
         pnl = float(exit_price - sig.entry_price)
         results.append(
@@ -717,7 +717,7 @@ def draw_htf_png(
             "break": None if br is None else br - start,
             "entry": en - start,
             "exit": None if ex is None else ex - start,
-            "extra_mas": {21: "#e8eef2"} if label.startswith("5m") else {},
+            "extra_mas": {},
         },
         f"#{trade_no}  {label}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
@@ -795,7 +795,7 @@ def write_html_report(
             reason_cls = "tag-tp"
         elif t.exit_reason == "stop":
             reason_cls = "tag-sl"
-        elif t.exit_reason == "ma21_5m":
+        elif t.exit_reason == "ma20_5m":
             reason_cls = "tag-early"
         else:
             reason_cls = "tag-time"
@@ -852,7 +852,7 @@ def write_html_report(
             f"entry {t.entry_price:.2f}\n"
             f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts, MA200−10)\n"
             f"target {t.target_price:.2f}  (+100)\n"
-            f"提早  五分收盤跌破 MA21\n"
+            f"提早  五分收盤跌破 MA20\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {t.signal.break_low:.2f} / 2h低 {t.signal.two_hr_low:.2f}\n"
             f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f} "
@@ -915,7 +915,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 五分收盤跌破MA21提早出 · 5m / 15m / 1h 圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 五分收盤跌破MA20提早出 · 5m / 15m / 1h 圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
