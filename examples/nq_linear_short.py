@@ -624,19 +624,50 @@ def _htf_index(window: pd.DataFrame, ts) -> int:
     return i
 
 
-def _m5_window(df_5m: pd.DataFrame, peak_ts, entry_ts, exit_ts) -> pd.DataFrame:
-    """只切這筆結構附近，不要把盤前扁平 K 跟遠處均線一起拉進來。"""
-    if df_5m.empty:
-        return df_5m
-    left = min(peak_ts, entry_ts) - pd.Timedelta(minutes=170)
-    right = exit_ts + pd.Timedelta(minutes=30)
-    w = df_5m.loc[(df_5m.index >= left) & (df_5m.index <= right)]
-    if len(w) < 24:
-        w = df_5m.loc[
-            (df_5m.index >= entry_ts - pd.Timedelta(hours=3))
-            & (df_5m.index <= exit_ts + pd.Timedelta(minutes=40))
-        ]
+def normalize_1h_index(df_1h: pd.DataFrame) -> pd.DataFrame:
+    """小時 K 對齊整點，同一小時只留一根完整棒。"""
+    if df_1h.empty:
+        return df_1h
+    out = df_1h.copy()
+    out.index = out.index.floor("h")
+    return out[~out.index.duplicated(keep="last")].sort_index()
+
+
+def hour_window(df_1h: pd.DataFrame, entry_ts, exit_ts, *, before: int = 36, after: int = 6) -> pd.DataFrame:
+    """只取完整整點小時棒：進場小時往前 before 根，出場小時往後 after 根。不切半根。"""
+    if df_1h.empty:
+        return df_1h
+    work = normalize_1h_index(df_1h)
+    left = entry_ts.floor("h") - pd.Timedelta(hours=before)
+    right = exit_ts.floor("h") + pd.Timedelta(hours=after)
+    w = work.loc[(work.index >= left) & (work.index <= right)]
+    if w.empty:
+        return w
+    # 進出場那兩根整點一定要在（資料裡有的話）
+    need = {entry_ts.floor("h"), exit_ts.floor("h")}
+    have = set(w.index)
+    missing = [ts for ts in need if ts in work.index and ts not in have]
+    if missing:
+        extra = work.loc[missing]
+        w = pd.concat([w, extra]).sort_index()
+        w = w[~w.index.duplicated(keep="last")]
     return w
+
+
+def hour_bar_index(window: pd.DataFrame, ts) -> int:
+    """時間落在哪一根完整小時棒（start <= ts < start+1h）。"""
+    if window.empty:
+        return -1
+    hour = ts.floor("h")
+    if hour in window.index:
+        return int(window.index.get_loc(hour))
+    i = int(window.index.searchsorted(hour, side="right") - 1)
+    if i < 0 or i >= len(window):
+        return -1
+    start = window.index[i]
+    if start <= ts < start + pd.Timedelta(hours=1):
+        return i
+    return -1
 
 
 def _fit_price_ylim(ax, window: pd.DataFrame, extra: Sequence[float] = ()) -> tuple[float, float]:
@@ -704,7 +735,7 @@ def draw_trade_png(
     trade: TradeResult,
     path: Path,
     trade_no: int,
-    df_5m: pd.DataFrame | None = None,
+    df_1h: pd.DataFrame | None = None,
 ) -> Path:
     _setup_mpl()
     import matplotlib.pyplot as plt
@@ -713,18 +744,33 @@ def draw_trade_png(
     start, end = _trade_window(df, trade)
     window = df.iloc[start : end + 1]
     close_full = df["Close"].astype(float)
-    df_1h = add_mas(resample_1h(df))
-    h1_on_1m = map_closed_1h(df, df_1h, "Close")
+    if df_1h is None or df_1h.empty:
+        hourly = add_mas(normalize_1h_index(resample_1h(df)))
+    else:
+        hourly = add_mas(normalize_1h_index(df_1h))
+    h1_on_1m = map_closed_1h(df, hourly, "Close")
 
-    fig, (ax, axv) = plt.subplots(
-        2,
-        1,
-        figsize=(10.4, 5.6),
-        sharex=True,
-        gridspec_kw={"height_ratios": [3.2, 1]},
-        facecolor="#0c1210",
-    )
-    _style_axes((ax, axv))
+    have_1h = len(hourly) >= 8
+    if have_1h:
+        fig, (ax, axv, axh, axhv) = plt.subplots(
+            4,
+            1,
+            figsize=(10.4, 9.0),
+            gridspec_kw={"height_ratios": [3.15, 0.72, 2.85, 0.68]},
+            facecolor="#0c1210",
+        )
+        _style_axes((ax, axv, axh, axhv))
+    else:
+        fig, (ax, axv) = plt.subplots(
+            2,
+            1,
+            figsize=(10.4, 5.6),
+            sharex=True,
+            gridspec_kw={"height_ratios": [3.2, 1]},
+            facecolor="#0c1210",
+        )
+        _style_axes((ax, axv))
+        axh = axhv = None
 
     _paint_candles(ax, axv, window, min_slots=48)
     xs = range(len(window))
@@ -782,6 +828,41 @@ def draw_trade_png(
     axv.set_xticks(ticks)
     axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
 
+    if have_1h and axh is not None and axhv is not None:
+        hw = hour_window(hourly, et, xt, before=36, after=6)
+        _paint_candles(axh, axhv, hw, min_slots=max(36, len(hw)))
+        xh = range(len(hw))
+        if len(hw):
+            _fit_price_ylim(axh, hw, extra=(trade.stop_price, trade.entry_price, trade.exit_price))
+        for n, col in ((5, "#f0b429"), (10, "#ff7a00"), (20, "#e63946"), (60, "#9b5de5")):
+            colname = f"ma{n}"
+            if colname not in hw.columns or not hw[colname].notna().any():
+                continue
+            axh.plot(list(xh), hw[colname], color=col, lw=1.3 if n == 20 else 1.0, label=f"1H MA{n}")
+        ei = hour_bar_index(hw, et)
+        xi = hour_bar_index(hw, xt)
+        if 0 <= ei < len(hw):
+            axh.axvline(ei, color="#ef4444", ls="--", lw=0.9)
+            axh.scatter([ei], [trade.entry_price], s=42, color="#ef4444", marker="v", zorder=6)
+        if 0 <= xi < len(hw):
+            axh.axvline(xi, color="#f0c14b", ls=":", lw=0.9)
+            axh.scatter(
+                [xi],
+                [trade.exit_price],
+                s=36,
+                color="#00c805" if trade.pnl_points > 0 else "#ff5252",
+                marker="x",
+                zorder=6,
+            )
+        axh.axhline(trade.stop_price, color="#7f1d1d", ls=":", lw=1.0, alpha=0.8)
+        axh.set_title("1h（整點對齊，完整小時棒）", color="#e8f0ea", fontsize=10)
+        axh.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=5)
+        hstep = max(1, len(hw) // 6) if len(hw) else 1
+        hticks = list(range(0, len(hw), hstep))
+        axhv.set_xticks(hticks)
+        if len(hw):
+            axhv.set_xticklabels([hw.index[i].strftime("%m-%d %H:00") for i in hticks], color="#8aa193")
+
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -808,7 +889,7 @@ def write_html_report(
     period: str,
     funnel: Optional[Dict[str, int]] = None,
     embed_images: bool = False,
-    df_5m: pd.DataFrame | None = None,
+    df_1h: pd.DataFrame | None = None,
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -833,7 +914,7 @@ def write_html_report(
             "stop": "tag-sl",
         }.get(t.exit_reason, "tag-time")
         img_name = _trade_img_name(df, t, i)
-        png = draw_trade_png(df, t, img_dir / img_name, i, df_5m=df_5m)
+        png = draw_trade_png(df, t, img_dir / img_name, i, df_1h=df_1h)
         src = _img_data_uri(png) if embed_images else f"img/{escape(img_name)}"
         chart = (
             f"<img src='{src}' alt='#{i}' "
@@ -853,6 +934,7 @@ def write_html_report(
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
             f"<span class='tag tag-info'>1m</span>"
+            f"<span class='tag tag-info'>1h</span>"
             f"<span class='tag tag-info'>峰距 {t.signal.peak_dist:.0f}</span>"
             "</div>"
             "<pre class='trade-detail'>"
@@ -885,7 +967,7 @@ def write_html_report(
     end = df.index[-1].strftime("%Y-%m-%d %H:%M") if len(df) else ""
     total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
     dollars = stats["total_points"] * POINT_VALUE - stats["count"] * COMMISSION_RT
-    note = "<p class='muted'>圖是靜態 1m K 線。灰線是已收盤小時線。手機請往下捲。</p>" if embed_images else ""
+    note = "<p class='muted'>上圖 1m，下圖 Yahoo 原生 1h（整點對齊、不切半根）。灰線是已收盤小時線。手機請往下捲。</p>" if embed_images else ""
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -991,10 +1073,23 @@ def cmd_backtest(args) -> int:
     if args.pages:
         html_path = html_path or str(PAGES_DIR / "index.html")
     if html_path:
+        df_1h = pd.DataFrame()
+        if not args.csv:
+            try:
+                df_1h = to_et(load_yfinance(args.symbol, "1h", "30d"))
+                print(f"[data] native 1h bars={len(df_1h)}", file=sys.stderr)
+            except Exception as exc:
+                print(f"[data] native 1h failed ({exc}), resample 1m", file=sys.stderr)
         out = Path(html_path)
-        write_html_report(out, df, trades, args.symbol, args.period, funnel=funnel, embed_images=False)
+        write_html_report(
+            out, df, trades, args.symbol, args.period,
+            funnel=funnel, embed_images=False, df_1h=df_1h,
+        )
         view = out.parent / "view.html"
-        write_html_report(view, df, trades, args.symbol, args.period, funnel=funnel, embed_images=True)
+        write_html_report(
+            view, df, trades, args.symbol, args.period,
+            funnel=funnel, embed_images=True, df_1h=df_1h,
+        )
         print(f"html={out}")
         print(f"view={view}")
     return 0

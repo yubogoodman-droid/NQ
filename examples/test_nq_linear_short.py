@@ -13,8 +13,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nq_linear_short import (  # noqa: E402
     ET,
+    hour_bar_index,
+    hour_window,
     long_lower_wick,
     map_closed_1h,
+    normalize_1h_index,
     parse_period_days,
     resample_5m,
     resample_1h,
@@ -68,6 +71,32 @@ def test_resample_and_map_1h() -> None:
     assert len(m5) == 36
     assert abs(float(m5.iloc[0]["Open"]) - 20000.0) < 1e-9
     assert abs(float(m5.iloc[0]["Close"]) - 20004.0) < 1e-9
+
+
+def test_hour_window_keeps_full_bars() -> None:
+    idx = pd.date_range("2026-08-24 00:00", periods=48, freq="1h", tz=ET)
+    df = pd.DataFrame(
+        {
+            "Open": 20000.0,
+            "High": 20010.0,
+            "Low": 19990.0,
+            "Close": 20005.0,
+            "Volume": 10.0,
+        },
+        index=idx,
+    )
+    entry = pd.Timestamp("2026-08-24 11:08", tz=ET)
+    exit_ = pd.Timestamp("2026-08-24 11:40", tz=ET)
+    w = hour_window(df, entry, exit_, before=8, after=2)
+    assert w.index[0] == pd.Timestamp("2026-08-24 03:00", tz=ET)
+    assert w.index[-1] == pd.Timestamp("2026-08-24 13:00", tz=ET)
+    assert all(ts.minute == 0 and ts.second == 0 for ts in w.index)
+    assert hour_bar_index(w, entry) == list(w.index).index(pd.Timestamp("2026-08-24 11:00", tz=ET))
+    assert hour_bar_index(w, exit_) == hour_bar_index(w, entry)
+    messy = df.copy()
+    messy.index = messy.index + pd.Timedelta(minutes=17)
+    w2 = hour_window(normalize_1h_index(messy), entry, exit_, before=2, after=1)
+    assert all(ts.minute == 0 for ts in w2.index)
 
 
 def test_long_lower_wick() -> None:
@@ -246,6 +275,7 @@ def test_write_html_report() -> None:
     if trades:
         assert "<img src='img/" in text
         assert "1m" in text
+        assert "1h" in text
         assert any((path.parent / "img").glob("t01_*.png"))
 
 
@@ -253,6 +283,7 @@ def main() -> int:
     test_parse_period_days()
     test_sma()
     test_resample_and_map_1h()
+    test_hour_window_keeps_full_bars()
     test_long_lower_wick()
     test_summarize_trades()
     test_entry_and_ma200_tp()
