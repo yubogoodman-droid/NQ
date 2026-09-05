@@ -1192,6 +1192,7 @@ def write_html_report(
             f"<span class='tag tag-info'>距MA200 {t.signal.dist_ma200:.1f}</span>"
             f"<span class='tag tag-info'>距15mMA200 {_fmt_signed(t.signal.dist_15m_ma200)}</span>"
             f"<span class='tag tag-info'>停損 MA200−10</span>"
+            f"<span class='tag tag-info'>收&gt;MA60</span>"
             f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
             "</div>"
