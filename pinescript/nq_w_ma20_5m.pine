@@ -1,0 +1,81 @@
+//@version=5
+indicator("NQ 五分K W底 右側站上MA20", overlay=true, max_labels_count=200)
+
+// 雙底 L1／L2 都在 MA20 下，右腳確認後第一根收盤站上 MA20 進場。
+// 不等頸線。套用至 NQ1! / MNQ1! / NQ=F 五分圖。
+
+swingLen     = input.int(2, "轉折確認 K 數", minval=1)
+minBars      = input.int(5, "兩低點最少間隔", minval=3)
+maxBars      = input.int(72, "兩低點最多間隔", minval=10)
+lowBelow     = input.float(25.0, "L2 最多低於 L1（點）", minval=0)
+lowAbove     = input.float(60.0, "L2 最多高於 L1（點）", minval=0)
+minNeck      = input.float(15.0, "最小頸線高度（點）", minval=5)
+minRightLeg  = input.float(12.0, "右腳最小回落（點）", minval=4)
+maxWait      = input.int(36, "L2 後最多等幾根站上", minval=6)
+stopBuf      = input.float(4.0, "停損緩衝（點）", minval=0)
+targetR      = input.float(2.0, "目標 R", minval=1.0, step=0.5)
+
+ma20 = ta.sma(close, 20)
+pl = ta.pivotlow(low, swingLen, swingLen)
+ph = ta.pivothigh(high, swingLen, swingLen)
+
+var float firstLow = na
+var int   firstLowBar = na
+var float secondLow = na
+var int   secondLowBar = na
+var float neckline = na
+var int   necklineBar = na
+var bool  wReady = false
+var bool  taken = false
+
+if not na(pl)
+    firstLow := pl
+    firstLowBar := bar_index - swingLen
+    secondLow := na
+    secondLowBar := na
+    neckline := na
+    necklineBar := na
+    wReady := false
+    taken := false
+
+if not na(firstLow) and na(secondLow)
+    if not na(ph)
+        if na(neckline) or ph > neckline
+            neckline := ph
+            necklineBar := bar_index - swingLen
+
+if not na(pl) and not na(firstLow) and (bar_index - swingLen) > firstLowBar
+    gap = bar_index - swingLen - firstLowBar
+    rel = pl - firstLow
+    priceOk = rel >= -lowBelow and rel <= lowAbove
+    neckOk = not na(neckline) and (neckline - math.min(firstLow, pl)) >= minNeck
+    rightOk = not na(neckline) and (neckline - pl) >= minRightLeg
+    underMa = pl < ma20[swingLen]
+    if gap >= minBars and gap <= maxBars and priceOk and neckOk and rightOk and underMa
+        secondLow := pl
+        secondLowBar := bar_index - swingLen
+        wReady := true
+        taken := false
+
+stood = wReady and not taken and not na(ma20) and close > ma20 and close[1] <= ma20[1] and bar_index > secondLowBar + swingLen and bar_index <= secondLowBar + maxWait
+broke = wReady and not na(secondLow) and low < math.min(firstLow, secondLow) - 8.0
+
+if broke
+    wReady := false
+
+longSignal = stood
+if longSignal
+    floor = math.min(firstLow, secondLow)
+    stopLevel = floor - stopBuf
+    depth = neckline - floor
+    measured = neckline + depth
+    risk = close - stopLevel
+    targetLevel = math.max(measured, close + risk * targetR)
+    taken := true
+    wReady := false
+    label.new(bar_index, low, "W底站上MA20", style=label.style_label_up, color=color.new(color.lime, 20), textcolor=color.black, size=size.small)
+
+plotshape(longSignal, title="右側站上MA20", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
+plot(ma20, "MA20", color=color.new(#66bb6a, 0), linewidth=2)
+plot(not na(neckline) ? neckline : na, "頸線", color=color.orange, linewidth=1, style=plot.style_linebr)
+plot(not na(secondLow) ? secondLow : na, "L2", color=color.red, linewidth=1, style=plot.style_circles)

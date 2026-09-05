@@ -22,6 +22,21 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 五分 K W 底 · 右側站上 MA20（最多）
+
+五分圖雙底：L1／L2 都在 **MA20 下面**，右腳確認後**第一根收盤站上 MA20** 就做多。  
+不等頸線、不等 5/10/20 多排。停損在兩低點下方 4 點；目標取量度或 2R 較遠者。含盤外。
+
+```bash
+python3 examples/nq_w_ma20.py backtest --period 7d --pages
+python3 examples/nq_w_ma20.py backtest --period 60d --pages
+python3 examples/test_nq_w_ma20.py
+```
+
+TradingView：`pinescript/nq_w_ma20_5m.pine` 貼到 NQ1! / MNQ1! 五分圖。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-w-ma20-26e0/docs/nq-w-ma20/view.html
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
