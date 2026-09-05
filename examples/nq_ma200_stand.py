@@ -170,6 +170,8 @@ class Signal:
     m1_ribbon: float = 0.0
     ma200_15m: float = float("nan")
     dist_15m_ma200: float = float("nan")
+    ma200_daily: float = float("nan")
+    dist_daily_ma200: float = float("nan")
 
 
 @dataclass
@@ -497,6 +499,53 @@ def align_htf(df_1m: pd.DataFrame, series_htf: pd.Series) -> np.ndarray:
     return out
 
 
+def load_daily_ma200(symbol: str) -> pd.Series:
+    raw = load_yfinance(symbol, "1d", "2y")
+    if raw is None or raw.empty or "Close" not in raw.columns:
+        return pd.Series(dtype=float)
+    close = raw["Close"].astype(float)
+    return close.rolling(200, min_periods=200).mean().dropna()
+
+
+def daily_ma200_at(ma: pd.Series, ts) -> float:
+    if ma.empty:
+        return float("nan")
+    t = ts
+    if getattr(t, "tzinfo", None) is None:
+        t = pd.Timestamp(t, tz=ET)
+    else:
+        t = t.astimezone(ET)
+    cutoff = pd.Timestamp(t.date(), tz=ET)
+    idx = ma.index
+    if getattr(idx, "tz", None) is None:
+        try:
+            idx = idx.tz_localize(ET)
+        except TypeError:
+            idx = idx.tz_localize("UTC").tz_convert(ET)
+    else:
+        idx = idx.tz_convert(ET)
+    s = pd.Series(ma.to_numpy(float), index=idx)
+    ok = s.loc[s.index < cutoff]
+    if ok.empty:
+        ok = s.loc[s.index <= cutoff]
+    if ok.empty:
+        return float("nan")
+    return float(ok.iloc[-1])
+
+
+def attach_daily_ma200(df: pd.DataFrame, trades: Sequence[TradeResult], symbol: str) -> None:
+    try:
+        ma = load_daily_ma200(symbol)
+    except Exception:
+        return
+    for t in trades:
+        val = daily_ma200_at(ma, df.index[t.entry_idx])
+        t.signal.ma200_daily = val
+        t.signal.dist_daily_ma200 = (
+            float("nan") if np.isnan(val) else float(t.entry_price - val)
+        )
+
+
 def overlay_15m_ma200(df_1m: pd.DataFrame) -> np.ndarray:
     """已收盤十五分 MA200，對齊到 1m（不偷看未收的那根）。"""
     df15 = resample_15m(df_1m)
@@ -631,16 +680,21 @@ def _paint_ohlc(
     if ex is not None and 0 <= ex < len(window):
         ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([ex], [trade.entry_price], s=42, color="#00e676", marker="^", zorder=6)
-        if dist_15 is not None and not (isinstance(dist_15, float) and np.isnan(dist_15)):
+        dist_d = marks.get("dist_daily")
+        label = None
+        if dist_d is not None and not (isinstance(dist_d, float) and np.isnan(dist_d)):
+            label = f"距200日 {_fmt_signed(float(dist_d))}"
+        elif dist_15 is not None and not (isinstance(dist_15, float) and np.isnan(dist_15)):
+            label = f"距15mMA200 {_fmt_signed(float(dist_15))}"
+        if label:
             ax.annotate(
-                f"距15mMA200 {_fmt_signed(float(dist_15))}",
+                label,
                 (ex, trade.entry_price),
                 textcoords="offset points",
                 xytext=(8, 14),
                 ha="left",
                 color="#e1bee7",
                 fontsize=9,
-                fontweight="bold",
             )
     if xx is not None and 0 <= xx < len(window):
         ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
@@ -680,6 +734,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             "entry": trade.entry_idx - start,
             "exit": trade.exit_idx - start,
             "dist_15m": trade.signal.dist_15m_ma200,
+            "dist_daily": trade.signal.dist_daily_ma200,
         },
         f"#{trade_no}  1m  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
@@ -720,7 +775,10 @@ def draw_htf_png(
     sign = "+" if trade.pnl_points >= 0 else ""
     dist_note = ""
     if label.startswith("15m"):
-        dist_note = f"  距15mMA200 {_fmt_signed(trade.signal.dist_15m_ma200)}"
+        if not (isinstance(trade.signal.dist_daily_ma200, float) and np.isnan(trade.signal.dist_daily_ma200)):
+            dist_note = f"  距200日 {_fmt_signed(trade.signal.dist_daily_ma200)}"
+        else:
+            dist_note = f"  距15mMA200 {_fmt_signed(trade.signal.dist_15m_ma200)}"
     fig, ax = plt.subplots(figsize=(10.4, 4.8), facecolor="#0c1210")
     _paint_ohlc(
         ax,
@@ -735,6 +793,7 @@ def draw_htf_png(
             "exit": None if ex is None else ex - start,
             "ma200_15m": trade.signal.ma200_15m if label.startswith("15m") else None,
             "dist_15m": trade.signal.dist_15m_ma200 if label.startswith("15m") else None,
+            "dist_daily": trade.signal.dist_daily_ma200,
         },
         f"#{trade_no}  {label}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt{dist_note}",
@@ -804,6 +863,7 @@ def write_html_report(
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
     out = Path(path)
+    attach_daily_ma200(df, trades, symbol)
     df5 = resample_5m(df)
     df15 = resample_15m(df)
     df1h = resample_1h(df)
@@ -874,11 +934,14 @@ def write_html_report(
             "<span class='tag tag-info'>15m 對照</span>"
             "<span class='tag tag-info'>1h 對照</span>"
             f"<span class='tag tag-info'>距MA200 {t.signal.dist_ma200:.1f}</span>"
+            f"<span class='tag tag-info'>距200日 {_fmt_signed(t.signal.dist_daily_ma200)}</span>"
             f"<span class='tag tag-info'>距15mMA200 {_fmt_signed(t.signal.dist_15m_ma200)}</span>"
             f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
             "</div>"
             "<pre class='trade-detail'>"
+            f"進場距 200日  {_fmt_signed(t.signal.dist_daily_ma200)} pts"
+            f"（200日 {_fmt_price(t.signal.ma200_daily)}）\n"
             f"進場距 15m MA200  {_fmt_signed(t.signal.dist_15m_ma200)} pts"
             f"（15m MA200 {_fmt_price(t.signal.ma200_15m)}）\n"
             f"entry {t.entry_price:.2f}\n"

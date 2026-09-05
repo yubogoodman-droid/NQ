@@ -18,6 +18,7 @@ from nq_ma200_stand import (  # noqa: E402
     display_trades,
     in_open_skip,
     is_red_long_upper,
+    daily_ma200_at,
     overlay_15m_ma200,
     parse_period_days,
     resample_5m,
@@ -217,8 +218,9 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "5m 對照" in text
         assert "15m 對照" in text
         assert "1h 對照" in text
+        assert "距200日" in text
+        assert "進場距 200日" in text
         assert "距15mMA200" in text
-        assert "進場距 15m MA200" in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
         assert any((path.parent / "img").glob("t01_*_15m.png"))
@@ -259,6 +261,13 @@ def test_resample_5m() -> None:
     assert {"Open", "High", "Low", "Close"}.issubset(m5.columns)
     assert {"Open", "High", "Low", "Close"}.issubset(m15.columns)
     assert {"Open", "High", "Low", "Close"}.issubset(m1h.columns)
+
+
+def test_daily_ma200_at() -> None:
+    idx = pd.date_range("2025-01-02", periods=5, freq="D", tz=ET)
+    ma = pd.Series([100.0, 101.0, 102.0, 103.0, 104.0], index=idx)
+    ts = pd.Timestamp("2025-01-05 10:00", tz=ET)
+    assert abs(daily_ma200_at(ma, ts) - 103.0) < 1e-9
 
 
 def test_overlay_15m_ma200() -> None:
@@ -312,6 +321,7 @@ def main() -> int:
     test_write_html()
     test_display_trades_wins_first()
     test_resample_5m()
+    test_daily_ma200_at()
     test_overlay_15m_ma200()
     test_ribbon_helpers()
     test_default_has_no_5m_tangle_filter()
