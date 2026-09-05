@@ -16,6 +16,7 @@ from nq_ma200_stand import (  # noqa: E402
     TradeResult,
     detect_signals,
     display_trades,
+    draw_trade_png,
     in_open_skip,
     is_red_long_upper,
     overlay_15m_ma200,
@@ -353,6 +354,11 @@ def test_reentry_after_stop_above_15m() -> None:
     assert len(retries) == 1
     assert retries[0].entry_idx == reclaim
     assert abs(retries[0].signal.stop_price - (retries[0].signal.ma200 - 10)) < 1e-6
+    assert retries[0].signal.parent_entry_idx == sigs[0].entry_idx
+    assert retries[0].signal.parent_exit_idx == trades[0].exit_idx
+    png = Path("/tmp/nq_reentry_mark.png")
+    draw_trade_png(df2, retries[0], png, 1)
+    assert png.exists() and png.stat().st_size > 0
 
 
 def test_no_reentry_when_below_15m() -> None:

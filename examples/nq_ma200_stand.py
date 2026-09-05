@@ -173,6 +173,11 @@ class Signal:
     ma200_15m: float = float("nan")
     dist_15m_ma200: float = float("nan")
     entry_kind: str = "primary"  # primary | reentry
+    parent_entry_idx: Optional[int] = None
+    parent_exit_idx: Optional[int] = None
+    parent_entry_price: float = float("nan")
+    parent_exit_price: float = float("nan")
+    parent_stop_price: float = float("nan")
 
 
 @dataclass
@@ -384,6 +389,7 @@ def make_reclaim_reentry(
     stop_below_ma200: float = STOP_BELOW_MA200,
     take_profit: float = TAKE_PROFIT,
     window_minutes: int = REENTRY_MINUTES,
+    parent_exit_price: float = float("nan"),
 ) -> Optional[Signal]:
     """停損後 window_minutes 內，收盤站回原進場價則再進一次。"""
     close = df["Close"].to_numpy(float)
@@ -429,6 +435,11 @@ def make_reclaim_reentry(
             ma200_15m=m15_200,
             dist_15m_ma200=dist_15,
             entry_kind="reentry",
+            parent_entry_idx=parent.entry_idx,
+            parent_exit_idx=exit_idx,
+            parent_entry_price=float(parent.entry_price),
+            parent_exit_price=float(parent_exit_price),
+            parent_stop_price=float(parent.stop_price),
         )
     return None
 
@@ -554,6 +565,7 @@ def simulate(
                 stop_below_ma200=stop_below_ma200,
                 take_profit=take_profit,
                 window_minutes=reentry_minutes,
+                parent_exit_price=trade.exit_price,
             )
             if retry is not None:
                 if funnel is not None:
@@ -712,6 +724,54 @@ def _trade_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     return start, end
 
 
+def _rel_idx(abs_idx: Optional[int], start: int) -> Optional[int]:
+    if abs_idx is None:
+        return None
+    return int(abs_idx) - start
+
+
+def _shift_idx(
+    df_1m: pd.DataFrame,
+    df_htf: pd.DataFrame,
+    abs_idx: Optional[int],
+    start: int,
+) -> Optional[int]:
+    if abs_idx is None or abs_idx < 0 or abs_idx >= len(df_1m):
+        return None
+    found = bar_index_at(df_htf, df_1m.index[abs_idx])
+    return None if found is None else found - start
+
+
+def _chart_marks(
+    trade: TradeResult,
+    start: int,
+    *,
+    include_15m: bool,
+    show_dist: bool = True,
+    break_x: Optional[int] = None,
+    entry_x: Optional[int] = None,
+    exit_x: Optional[int] = None,
+    parent_entry_x: Optional[int] = None,
+    parent_exit_x: Optional[int] = None,
+) -> dict:
+    sig = trade.signal
+    return {
+        "break": trade.signal.break_idx - start if break_x is None else break_x,
+        "entry": trade.entry_idx - start if entry_x is None else entry_x,
+        "exit": trade.exit_idx - start if exit_x is None else exit_x,
+        "parent_entry": (
+            _rel_idx(getattr(sig, "parent_entry_idx", None), start) if parent_entry_x is None else parent_entry_x
+        ),
+        "parent_exit": (
+            _rel_idx(getattr(sig, "parent_exit_idx", None), start) if parent_exit_x is None else parent_exit_x
+        ),
+        "parent_entry_price": getattr(sig, "parent_entry_price", float("nan")),
+        "parent_exit_price": getattr(sig, "parent_exit_price", float("nan")),
+        "ma200_15m": sig.ma200_15m if include_15m else None,
+        "dist_15m": sig.dist_15m_ma200 if show_dist else None,
+    }
+
+
 def _setup_mpl():
     import matplotlib
 
@@ -762,13 +822,37 @@ def _paint_ohlc(
     for n, col in MA_COLORS.items():
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
         ax.plot(list(xs), ma, color=col, lw=1.35 if n <= 20 else 1.05, label=f"MA{n}")
-    ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
+
+    hard_stop = float(trade.signal.stop_price)
+    ax.axhline(hard_stop, color="#e35d5d", ls=":", lw=1.0, alpha=0.9)
+    ax.annotate(
+        "停損",
+        (len(window) - 1, hard_stop),
+        textcoords="offset points",
+        xytext=(-2, 5),
+        ha="right",
+        color="#ff8a80",
+        fontsize=8,
+    )
+    if abs(float(trade.stop_price) - hard_stop) > 1e-6:
+        ax.axhline(float(trade.stop_price), color="#79c0ff", ls=":", lw=1.0, alpha=0.85)
+        ax.annotate(
+            "保本",
+            (len(window) - 1, float(trade.stop_price)),
+            textcoords="offset points",
+            xytext=(-2, 5),
+            ha="right",
+            color="#79c0ff",
+            fontsize=8,
+        )
     ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
     ax.axhline(trade.signal.two_hr_low, color="#8aa193", ls="--", lw=0.85, alpha=0.55)
 
     bx = marks.get("break")
     ex = marks.get("entry")
     xx = marks.get("exit")
+    px_in = marks.get("parent_entry")
+    px_out = marks.get("parent_exit")
     if bx is not None and 0 <= bx < len(window):
         ax.scatter([bx], [trade.signal.break_low], s=38, color="#f472b6", zorder=5)
         ax.annotate(
@@ -782,15 +866,56 @@ def _paint_ohlc(
         )
     ma200_15 = marks.get("ma200_15m")
     dist_15 = marks.get("dist_15m")
+    extra_levels = [hard_stop, float(trade.target_price)]
     if ma200_15 is not None and not (isinstance(ma200_15, float) and np.isnan(ma200_15)):
         ax.axhline(float(ma200_15), color="#ce93d8", ls="-.", lw=1.35, alpha=0.95)
-        ymin, ymax = ax.get_ylim()
-        pad = max((ymax - ymin) * 0.08, 8.0)
-        ax.set_ylim(min(ymin, float(ma200_15)) - pad, max(ymax, float(ma200_15)) + pad)
+        extra_levels.append(float(ma200_15))
+    parent_in_px = marks.get("parent_entry_price")
+    parent_out_px = marks.get("parent_exit_price")
+    if parent_in_px is not None and not (isinstance(parent_in_px, float) and np.isnan(parent_in_px)):
+        extra_levels.append(float(parent_in_px))
+    if parent_out_px is not None and not (isinstance(parent_out_px, float) and np.isnan(parent_out_px)):
+        extra_levels.append(float(parent_out_px))
+    ymin, ymax = ax.get_ylim()
+    pad = max((ymax - ymin) * 0.08, 8.0)
+    ax.set_ylim(min(ymin, *extra_levels) - pad, max(ymax, *extra_levels) + pad)
 
+    if px_in is not None and 0 <= px_in < len(window) and parent_in_px is not None:
+        ax.scatter([px_in], [float(parent_in_px)], s=36, color="#80cbc4", marker="^", zorder=5)
+        ax.annotate(
+            "原進",
+            (px_in, float(parent_in_px)),
+            textcoords="offset points",
+            xytext=(0, -13),
+            ha="center",
+            color="#80cbc4",
+            fontsize=8,
+        )
+    if px_out is not None and 0 <= px_out < len(window) and parent_out_px is not None:
+        ax.scatter([px_out], [float(parent_out_px)], s=40, color="#ff8a80", marker="x", zorder=6)
+        ax.annotate(
+            "原停",
+            (px_out, float(parent_out_px)),
+            textcoords="offset points",
+            xytext=(0, 10),
+            ha="center",
+            color="#ff8a80",
+            fontsize=8,
+        )
+
+    is_retry = getattr(trade.signal, "entry_kind", "primary") == "reentry"
     if ex is not None and 0 <= ex < len(window):
         ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([ex], [trade.entry_price], s=42, color="#00e676", marker="^", zorder=6)
+        ax.annotate(
+            "再進" if is_retry else "進場",
+            (ex, trade.entry_price),
+            textcoords="offset points",
+            xytext=(-10, -14),
+            ha="right",
+            color="#69f0ae",
+            fontsize=9,
+        )
         if dist_15 is not None and not (isinstance(dist_15, float) and np.isnan(dist_15)):
             ax.annotate(
                 f"距15mMA200 {_fmt_signed(float(dist_15))}",
@@ -811,6 +936,17 @@ def _paint_ohlc(
             marker="x",
             zorder=6,
         )
+        exit_label = {"stop": "停損", "trail": "保本", "target": "停利"}.get(trade.exit_reason)
+        if exit_label:
+            ax.annotate(
+                exit_label,
+                (xx, trade.exit_price),
+                textcoords="offset points",
+                xytext=(8, -12 if trade.pnl_points > 0 else 10),
+                ha="left",
+                color="#00c805" if trade.pnl_points > 0 else "#ff8a80",
+                fontsize=9,
+            )
     ax.set_title(title, color="#e8f0ea", fontsize=11)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     step = max(1, len(window) // 6)
@@ -834,12 +970,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         start,
         end,
         trade,
-        {
-            "break": trade.signal.break_idx - start,
-            "entry": trade.entry_idx - start,
-            "exit": trade.exit_idx - start,
-            "dist_15m": trade.signal.dist_15m_ma200,
-        },
+        _chart_marks(trade, start, include_15m=False),
         f"#{trade_no}  1m  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{'再進  ' if getattr(trade.signal, 'entry_kind', 'primary') == 'reentry' else ''}"
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
@@ -889,13 +1020,17 @@ def draw_htf_png(
         start,
         end,
         trade,
-        {
-            "break": None if br is None else br - start,
-            "entry": en - start,
-            "exit": None if ex is None else ex - start,
-            "ma200_15m": trade.signal.ma200_15m if label.startswith("15m") else None,
-            "dist_15m": trade.signal.dist_15m_ma200 if label.startswith("15m") else None,
-        },
+        _chart_marks(
+            trade,
+            start,
+            include_15m=label.startswith("15m"),
+            show_dist=label.startswith("15m"),
+            break_x=None if br is None else br - start,
+            entry_x=en - start,
+            exit_x=None if ex is None else ex - start,
+            parent_entry_x=_shift_idx(df_1m, df_htf, getattr(trade.signal, "parent_entry_idx", None), start),
+            parent_exit_x=_shift_idx(df_1m, df_htf, getattr(trade.signal, "parent_exit_idx", None), start),
+        ),
         f"#{trade_no}  {label}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{'再進  ' if getattr(trade.signal, 'entry_kind', 'primary') == 'reentry' else ''}"
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt{dist_note}",
