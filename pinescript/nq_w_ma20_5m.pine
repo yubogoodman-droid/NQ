@@ -1,81 +1,92 @@
 //@version=5
-indicator("NQ 五分K W底 右側站上MA20", overlay=true, max_labels_count=200)
+indicator("NQ 五分K 雙底 2h低回測守三根", overlay=true, max_labels_count=200)
 
-// 雙底 L1／L2 都在 MA20 下，右腳確認後第一根收盤站上 MA20 進場。
-// 不等頸線。套用至 NQ1! / MNQ1! / NQ=F 五分圖。
+// 創兩小時低 → 站上 MA20 → 再跌破 MA20 → 回到低點附近 → 連續 3 根沒新低做多。
+// 對齊 2026-09-04 圖 29。套用至 NQ1! / MNQ1! 五分圖。
 
-swingLen     = input.int(2, "轉折確認 K 數", minval=1)
-minBars      = input.int(5, "兩低點最少間隔", minval=3)
-maxBars      = input.int(72, "兩低點最多間隔", minval=10)
-lowBelow     = input.float(25.0, "L2 最多低於 L1（點）", minval=0)
-lowAbove     = input.float(60.0, "L2 最多高於 L1（點）", minval=0)
-minNeck      = input.float(15.0, "最小頸線高度（點）", minval=5)
-minRightLeg  = input.float(12.0, "右腳最小回落（點）", minval=4)
-maxWait      = input.int(36, "L2 後最多等幾根站上", minval=6)
-stopBuf      = input.float(4.0, "停損緩衝（點）", minval=0)
-targetR      = input.float(2.0, "目標 R", minval=1.0, step=0.5)
+twoHrBars   = input.int(24, "兩小時 K 數", minval=12)
+minBreak    = input.float(8.0, "最小破底（點）", minval=2)
+nearPts     = input.float(25.0, "回測附近（點）", minval=8)
+springPts   = input.float(20.0, "最多可略破（點）", minval=0)
+holdNeed    = input.int(3, "連續沒新低 K 數", minval=2)
+maxWaitStand = input.int(36, "破底後最多等站上", minval=6)
+maxWaitBreak = input.int(36, "站上後最多等跌破", minval=6)
+maxWaitRet   = input.int(36, "跌破後最多等回測", minval=6)
 
 ma20 = ta.sma(close, 20)
-pl = ta.pivotlow(low, swingLen, swingLen)
-ph = ta.pivothigh(high, swingLen, swingLen)
+twoHr = ta.lowest(low, twoHrBars)[1]
 
-var float firstLow = na
-var int   firstLowBar = na
-var float secondLow = na
-var int   secondLowBar = na
-var float neckline = na
-var int   necklineBar = na
-var bool  wReady = false
-var bool  taken = false
+var float dumpLow = na
+var int   dumpBar = na
+var int   standBar = na
+var float bounceHigh = na
+var int   breakBar = na
+var float retestLow = na
+var int   retestBar = na
+var int   holdCount = 0
+var int   phase = 0  // 0 idle 1 dump 2 stood 3 broke 4 near
 
-if not na(pl)
-    firstLow := pl
-    firstLowBar := bar_index - swingLen
-    secondLow := na
-    secondLowBar := na
-    neckline := na
-    necklineBar := na
-    wReady := false
-    taken := false
+new2h = not na(twoHr) and low < twoHr and (twoHr - low) >= minBreak
 
-if not na(firstLow) and na(secondLow)
-    if not na(ph)
-        if na(neckline) or ph > neckline
-            neckline := ph
-            necklineBar := bar_index - swingLen
+if phase == 0 and new2h
+    dumpLow := low
+    dumpBar := bar_index
+    standBar := na
+    bounceHigh := na
+    breakBar := na
+    retestLow := na
+    holdCount := 0
+    phase := 1
 
-if not na(pl) and not na(firstLow) and (bar_index - swingLen) > firstLowBar
-    gap = bar_index - swingLen - firstLowBar
-    rel = pl - firstLow
-    priceOk = rel >= -lowBelow and rel <= lowAbove
-    neckOk = not na(neckline) and (neckline - math.min(firstLow, pl)) >= minNeck
-    rightOk = not na(neckline) and (neckline - pl) >= minRightLeg
-    underMa = pl < ma20[swingLen]
-    if gap >= minBars and gap <= maxBars and priceOk and neckOk and rightOk and underMa
-        secondLow := pl
-        secondLowBar := bar_index - swingLen
-        wReady := true
-        taken := false
+if phase == 1
+    if low < dumpLow
+        dumpLow := low
+        dumpBar := bar_index
+    if bar_index - dumpBar > maxWaitStand
+        phase := 0
+    else if not na(ma20) and close > ma20 and close[1] <= ma20[1]
+        standBar := bar_index
+        bounceHigh := high
+        phase := 2
 
-stood = wReady and not taken and not na(ma20) and close > ma20 and close[1] <= ma20[1] and bar_index > secondLowBar + swingLen and bar_index <= secondLowBar + maxWait
-broke = wReady and not na(secondLow) and low < math.min(firstLow, secondLow) - 8.0
+if phase == 2
+    bounceHigh := math.max(bounceHigh, high)
+    if low < dumpLow - springPts
+        phase := 0
+    else if bar_index - standBar > maxWaitBreak
+        phase := 0
+    else if not na(ma20) and close < ma20 and close[1] >= ma20[1]
+        breakBar := bar_index
+        phase := 3
 
-if broke
-    wReady := false
+if phase == 3
+    if low < dumpLow - springPts
+        phase := 0
+    else if bar_index - breakBar > maxWaitRet
+        phase := 0
+    else if low <= dumpLow + nearPts
+        retestLow := math.min(dumpLow, low)
+        retestBar := bar_index
+        holdCount := 0
+        phase := 4
 
-longSignal = stood
-if longSignal
-    floor = math.min(firstLow, secondLow)
-    stopLevel = floor - stopBuf
-    depth = neckline - floor
-    measured = neckline + depth
-    risk = close - stopLevel
-    targetLevel = math.max(measured, close + risk * targetR)
-    taken := true
-    wReady := false
-    label.new(bar_index, low, "W底站上MA20", style=label.style_label_up, color=color.new(color.lime, 20), textcolor=color.black, size=size.small)
+longSignal = false
+if phase == 4
+    if low < retestLow
+        if low < dumpLow - springPts
+            phase := 0
+        else
+            retestLow := low
+            retestBar := bar_index
+            holdCount := 0
+    else if bar_index != retestBar
+        holdCount += 1
+        if holdCount >= holdNeed
+            longSignal := true
+            label.new(bar_index, low, "雙底守三根", style=label.style_label_up, color=color.new(color.lime, 20), textcolor=color.black, size=size.small)
+            phase := 0
+            holdCount := 0
 
-plotshape(longSignal, title="右側站上MA20", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
+plotshape(longSignal, title="雙底守三根", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
 plot(ma20, "MA20", color=color.new(#66bb6a, 0), linewidth=2)
-plot(not na(neckline) ? neckline : na, "頸線", color=color.orange, linewidth=1, style=plot.style_linebr)
-plot(not na(secondLow) ? secondLow : na, "L2", color=color.red, linewidth=1, style=plot.style_circles)
+plot(not na(dumpLow) and phase > 0 ? dumpLow : na, "2h低", color=color.orange, linewidth=1, style=plot.style_linebr)

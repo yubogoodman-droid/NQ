@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""NQ 五分 K W 底：右側站上 MA20 進場（最多）。
+"""NQ 五分 K 雙底：創兩小時低 → 站上 MA20 → 再跌破 → 回測守三根。
 
-圖上那種雙底：左腳 L1、中間頸線、右腳 L2 都在五分 MA20 下面，
-右腳確認後第一根收盤站上 MA20 就做多，不等頸線、也不等 5/10/20 多排。
+對齊 2026-09-04 圖 29：
+  11:30 創兩小時低 29478 → 12:05 站上 MA20 → 13:05 跌破 MA20
+  → 13:45 回到低點附近 29468 → 連續三根五分 K 沒新低，14:00 做多。
 
 用法:
   python3 examples/nq_w_ma20.py
@@ -92,6 +93,8 @@ class Signal:
     first_low_idx: int
     second_low_idx: int
     neckline_idx: int
+    stand_idx: int
+    break_idx: int
     entry_idx: int
     entry_price: float
     stop_price: float
@@ -103,6 +106,7 @@ class Signal:
     stand_pts: float
     low_gap_pts: float
     neck_pts: float
+    hold_bars: int
     quality: str = "C"
     quality_score: int = 0
 
@@ -125,23 +129,15 @@ def sma(arr, n: int) -> np.ndarray:
     return pd.Series(arr, dtype=float).rolling(n, min_periods=n).mean().to_numpy(float)
 
 
-def _is_swing_low(lows: Sequence[float], idx: int, lookback: int) -> bool:
-    if idx < lookback or idx >= len(lows) - lookback:
-        return False
-    pivot = lows[idx]
-    window = lows[idx - lookback : idx + lookback + 1]
-    return pivot == min(window)
-
-
-def _find_swing_lows(lows: Sequence[float], lookback: int) -> list[int]:
-    return [i for i in range(len(lows)) if _is_swing_low(lows, i, lookback)]
+def rolling_min_prev(arr, n: int) -> np.ndarray:
+    return pd.Series(arr, dtype=float).shift(1).rolling(n, min_periods=n).min().to_numpy(float)
 
 
 def quality_from_w(low_gap_pts: float, neck_pts: float, stand_pts: float) -> Tuple[int, str]:
     score = 0
     if abs(low_gap_pts) <= 15.0:
         score += 1
-    if neck_pts >= 30.0:
+    if neck_pts >= 40.0:
         score += 1
     if stand_pts >= 4.0:
         score += 1
@@ -155,164 +151,195 @@ def quality_from_w(low_gap_pts: float, neck_pts: float, stand_pts: float) -> Tup
 def detect_signals(
     df,
     *,
-    swing_lookback: int = 2,
-    min_bars_between_lows: int = 5,
-    max_bars_between_lows: int = 72,
-    low_below_pts: float = 25.0,
-    low_above_pts: float = 60.0,
-    min_neck_pts: float = 15.0,
-    min_right_leg_pts: float = 12.0,
-    min_neck_offset: int = 2,
-    min_right_bars: int = 2,
-    max_mid_swing_lows: int = 2,
-    min_prior_drop_pts: float = 20.0,
-    prior_lookback: int = 36,
+    two_hour_bars: int = 24,
+    min_break_depth: float = 8.0,
     max_bars_to_stand: int = 36,
-    invalidate_pts: float = 8.0,
+    max_bars_after_stand: int = 36,
+    max_bars_to_retest: int = 36,
+    max_hold_wait: int = 24,
+    hold_bars: int = 3,
+    near_pts: float = 25.0,
+    spring_pts: float = 20.0,
     stop_buffer: float = 4.0,
     target_r: float = 2.0,
-    max_risk: float = 100.0,
+    max_risk: float = 50.0,
     min_entry_gap: int = 12,
     ma_period: int = 20,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """
-    視覺 W 底（兩低點在 MA20 下）形成後，右側第一根收盤站上 MA20 進場。
-
-    最多：兩低點容忍寬、不等頸線、不等多排、含盤外。
+    創下兩小時低點 → 收盤站上 MA20 → 再跌破 MA20 →
+    回到兩小時低點附近 → 連續 hold_bars 根五分 K 沒新低，進場做多。
     """
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
     low = df["Low"].to_numpy(float)
     ma20 = sma(close, ma_period)
+    two_hr = rolling_min_prev(low, two_hour_bars)
     n = len(close)
     fun = funnel if funnel is not None else {}
 
     def bump(key: str) -> None:
         fun[key] = fun.get(key, 0) + 1
 
-    swing_lows = _find_swing_lows(low.tolist(), swing_lookback)
     signals: List[Signal] = []
     last_entry = -(10**9)
+    i = max(ma_period, two_hour_bars) + 1
 
-    for i, first_idx in enumerate(swing_lows):
-        first_low = float(low[first_idx])
-        look_from = max(0, first_idx - prior_lookback)
-        prior_high = float(np.max(high[look_from : first_idx + 1]))
-        if prior_high - first_low < min_prior_drop_pts:
+    while i < n - hold_bars:
+        if np.isnan(two_hr[i]) or low[i] >= two_hr[i] or (two_hr[i] - low[i]) < min_break_depth:
+            i += 1
             continue
-        ma1 = ma20[first_idx]
-        if np.isnan(ma1) or first_low >= ma1:
-            continue
-        bump("left")
 
-        for second_idx in swing_lows[i + 1 :]:
-            gap = second_idx - first_idx
-            if gap < min_bars_between_lows:
-                continue
-            if gap > max_bars_between_lows:
+        dump_idx = i
+        dump_low = float(low[i])
+        bump("dump")
+
+        stand_idx: Optional[int] = None
+        j = i + 1
+        end_stand = min(i + max_bars_to_stand + 1, n)
+        while j < end_stand:
+            if float(low[j]) < dump_low:
+                dump_low = float(low[j])
+                dump_idx = j
+            m = ma20[j]
+            if not np.isnan(m) and close[j] > m and close[j - 1] <= ma20[j - 1]:
+                stand_idx = j
                 break
+            j += 1
+        if stand_idx is None:
+            bump("skip_no_stand")
+            i = dump_idx + 1
+            continue
+        bump("stand")
 
-            second_low = float(low[second_idx])
-            rel = second_low - first_low
-            if rel < -low_below_pts or rel > low_above_pts:
-                continue
+        break_idx: Optional[int] = None
+        k = stand_idx + 1
+        end_brk = min(stand_idx + max_bars_after_stand + 1, n)
+        while k < end_brk:
+            if float(low[k]) < dump_low - spring_pts:
+                bump("skip_dump_after_stand")
+                break_idx = None
+                break
+            mk = ma20[k]
+            prev_m = ma20[k - 1]
+            if not np.isnan(mk) and not np.isnan(prev_m) and close[k] < mk and close[k - 1] >= prev_m:
+                break_idx = k
+                break
+            k += 1
+        if break_idx is None:
+            bump("skip_no_break")
+            i = stand_idx + 1
+            continue
+        bump("broke")
 
-            ma2 = ma20[second_idx]
-            if np.isnan(ma2) or second_low >= ma2:
-                continue
+        neck_slice = high[stand_idx : break_idx + 1]
+        neckline_idx = stand_idx + int(np.argmax(neck_slice))
+        neckline_price = float(high[neckline_idx])
 
-            if second_idx - first_idx < 2:
-                continue
-            mid = slice(first_idx + 1, second_idx)
-            neckline_price = float(np.max(high[mid]))
-            neckline_idx = first_idx + 1 + int(np.argmax(high[mid]))
-            floor = min(first_low, second_low)
-            neck_pts = neckline_price - floor
-            if neck_pts < min_neck_pts:
-                continue
-            if neckline_idx - first_idx < min_neck_offset:
-                continue
-            if second_idx - neckline_idx < min_right_bars:
-                continue
-            extra = sum(1 for j in swing_lows if first_idx < j < second_idx)
-            if extra > max_mid_swing_lows:
-                continue
-            if neckline_price - second_low < min_right_leg_pts:
-                continue
-            bump("w")
+        near_idx: Optional[int] = None
+        retest_low = dump_low
+        retest_idx = dump_idx
+        m = break_idx + 1
+        end_rt = min(break_idx + max_bars_to_retest + 1, n)
+        while m < end_rt:
+            lv = float(low[m])
+            if lv < dump_low - spring_pts:
+                bump("skip_spring_too_deep")
+                near_idx = None
+                break
+            if lv <= dump_low + near_pts:
+                near_idx = m
+                retest_low = lv
+                retest_idx = m
+                break
+            m += 1
+        if near_idx is None:
+            bump("skip_no_retest")
+            i = break_idx + 1
+            continue
+        bump("retest")
 
-            confirm = second_idx + swing_lookback
-            if confirm >= n:
-                continue
-            start_k = max(confirm, ma_period)
-            end_k = min(n, second_idx + max_bars_to_stand + 1)
-            fail = floor - invalidate_pts
-            entry_idx: Optional[int] = None
-            for k in range(start_k, end_k):
-                if float(np.min(low[second_idx : k + 1])) < fail:
+        hold = 0
+        entry_idx: Optional[int] = None
+        p = near_idx
+        end_hold = min(near_idx + max_hold_wait + 1, n)
+        while p < end_hold:
+            lv = float(low[p])
+            if lv < retest_low - 1e-9:
+                if lv < dump_low - spring_pts:
                     bump("skip_new_low")
                     entry_idx = None
                     break
-                m = ma20[k]
-                prev_m = ma20[k - 1]
-                if np.isnan(m) or np.isnan(prev_m):
-                    continue
-                if close[k] > m and close[k - 1] <= prev_m:
-                    entry_idx = k
+                retest_low = lv
+                retest_idx = p
+                hold = 0
+            elif p != retest_idx:
+                hold += 1
+                if hold >= hold_bars:
+                    entry_idx = p
                     break
-            if entry_idx is None:
-                bump("skip_no_stand")
-                continue
-            if float(np.min(low[second_idx : entry_idx + 1])) < fail:
-                bump("skip_new_low")
-                continue
-            if entry_idx - last_entry < min_entry_gap:
-                bump("skip_gap")
-                continue
+            p += 1
+        if entry_idx is None:
+            bump("skip_no_hold")
+            i = near_idx + 1
+            continue
+        if entry_idx - last_entry < min_entry_gap:
+            bump("skip_gap")
+            i = entry_idx + 1
+            continue
 
-            entry = float(close[entry_idx])
-            stop = floor - stop_buffer
-            risk = entry - stop
-            if risk <= 0:
-                bump("skip_bad_risk")
-                continue
-            if max_risk > 0 and risk > max_risk:
-                bump("skip_max_risk")
-                continue
+        entry = float(close[entry_idx])
+        floor = min(dump_low, retest_low)
+        stop = floor - stop_buffer
+        risk = entry - stop
+        if risk <= 0:
+            bump("skip_bad_risk")
+            i = entry_idx + 1
+            continue
+        if max_risk > 0 and risk > max_risk:
+            bump("skip_max_risk")
+            i = entry_idx + 1
+            continue
 
-            measured = neckline_price + neck_pts
-            r_tgt = entry + risk * target_r
-            target = max(measured, r_tgt)
-            if target <= entry:
-                bump("skip_bad_target")
-                continue
+        neck_pts = neckline_price - floor
+        measured = neckline_price + max(neck_pts, 0.0)
+        r_tgt = entry + risk * target_r
+        target = max(measured, r_tgt)
+        if target <= entry:
+            bump("skip_bad_target")
+            i = entry_idx + 1
+            continue
 
-            stand_pts = entry - float(ma20[entry_idx])
-            low_gap = second_low - first_low
-            q_score, q_grade = quality_from_w(low_gap, neck_pts, stand_pts)
-            bump("taken")
-            signals.append(
-                Signal(
-                    first_low_idx=first_idx,
-                    second_low_idx=second_idx,
-                    neckline_idx=neckline_idx,
-                    entry_idx=entry_idx,
-                    entry_price=entry,
-                    stop_price=stop,
-                    target_price=float(target),
-                    first_low=first_low,
-                    second_low=second_low,
-                    neckline=neckline_price,
-                    ma20=float(ma20[entry_idx]),
-                    stand_pts=stand_pts,
-                    low_gap_pts=low_gap,
-                    neck_pts=neck_pts,
-                    quality=q_grade,
-                    quality_score=q_score,
-                )
+        stand_pts = float(close[stand_idx] - ma20[stand_idx]) if not np.isnan(ma20[stand_idx]) else 0.0
+        low_gap = retest_low - dump_low
+        q_score, q_grade = quality_from_w(low_gap, neck_pts, stand_pts)
+        bump("taken")
+        signals.append(
+            Signal(
+                first_low_idx=dump_idx,
+                second_low_idx=retest_idx,
+                neckline_idx=neckline_idx,
+                stand_idx=stand_idx,
+                break_idx=break_idx,
+                entry_idx=entry_idx,
+                entry_price=entry,
+                stop_price=stop,
+                target_price=float(target),
+                first_low=dump_low,
+                second_low=retest_low,
+                neckline=neckline_price,
+                ma20=float(ma20[entry_idx]) if not np.isnan(ma20[entry_idx]) else 0.0,
+                stand_pts=stand_pts,
+                low_gap_pts=low_gap,
+                neck_pts=neck_pts,
+                hold_bars=hold_bars,
+                quality=q_grade,
+                quality_score=q_score,
             )
-            last_entry = entry_idx
+        )
+        last_entry = entry_idx
+        i = entry_idx + 1
 
     return _dedupe_signals(signals)
 
@@ -511,10 +538,12 @@ def draw_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str
     ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
     ax.axhline(sig.neckline, color="#f59e0b", ls="--", lw=1.05, alpha=0.85)
 
-    l1x, l2x, nx, ex, xx = (
+    l1x, l2x, nx, sx, bx, ex, xx = (
         sig.first_low_idx - start,
         sig.second_low_idx - start,
         sig.neckline_idx - start,
+        sig.stand_idx - start,
+        sig.break_idx - start,
         trade.entry_idx - start,
         trade.exit_idx - start,
     )
@@ -523,23 +552,31 @@ def draw_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str
         w_x.append(l1x)
         w_y.append(sig.first_low)
         ax.scatter([l1x], [sig.first_low], s=36, color="#facc15", zorder=6)
-        ax.annotate("L1", (l1x, sig.first_low), textcoords="offset points", xytext=(0, -13),
+        ax.annotate("2h低", (l1x, sig.first_low), textcoords="offset points", xytext=(0, -13),
                     ha="center", color="#fde68a", fontsize=8)
+    if 0 <= sx < len(window):
+        ax.scatter([sx], [window["Close"].iloc[sx]], s=32, color="#22c55e", zorder=5, marker="^")
+        ax.annotate("站上MA20", (sx, window["Close"].iloc[sx]), textcoords="offset points", xytext=(0, 8),
+                    ha="center", color="#86efac", fontsize=7)
     if 0 <= nx < len(window):
         w_x.append(nx)
         w_y.append(sig.neckline)
         ax.scatter([nx], [sig.neckline], s=32, color="#f59e0b", zorder=5)
-        ax.annotate("頸線", (nx, sig.neckline), textcoords="offset points", xytext=(0, 8),
+        ax.annotate("反彈高", (nx, sig.neckline), textcoords="offset points", xytext=(0, 8),
                     ha="center", color="#fbbf24", fontsize=8)
+    if 0 <= bx < len(window):
+        ax.scatter([bx], [window["Close"].iloc[bx]], s=28, color="#fb7185", zorder=5, marker="v")
+        ax.annotate("跌破MA20", (bx, window["Close"].iloc[bx]), textcoords="offset points", xytext=(0, -12),
+                    ha="center", color="#fda4af", fontsize=7)
     if 0 <= l2x < len(window):
         w_x.append(l2x)
         w_y.append(sig.second_low)
         ax.scatter([l2x], [sig.second_low], s=36, color="#facc15", zorder=6)
-        ax.annotate("L2", (l2x, sig.second_low), textcoords="offset points", xytext=(0, -13),
+        ax.annotate("回測", (l2x, sig.second_low), textcoords="offset points", xytext=(0, -13),
                     ha="center", color="#fde68a", fontsize=8)
     if 0 <= ex < len(window):
         ax.scatter([ex], [trade.entry_price], s=44, color="#22c55e", zorder=7, marker="^")
-        ax.annotate("進場", (ex, trade.entry_price), textcoords="offset points", xytext=(0, 10),
+        ax.annotate("三根沒新低", (ex, trade.entry_price), textcoords="offset points", xytext=(0, 10),
                     ha="center", color="#86efac", fontsize=8)
     if 0 <= xx < len(window):
         ax.scatter([xx], [trade.exit_price], s=36, color="#fb7185", zorder=7, marker="v")
@@ -551,7 +588,7 @@ def draw_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str
     labels = [window.index[i].strftime("%m-%d %H:%M") for i in ticks]
     axv.set_xticks(ticks)
     axv.set_xticklabels(labels, rotation=0)
-    ax.set_title(f"#{trade_no}  W底右側站上MA20  {window.index[0].strftime('%m-%d %H:%M')} ET",
+    ax.set_title(f"#{trade_no}  雙底回測守三根  {window.index[0].strftime('%m-%d %H:%M')} ET",
                  color="#d7e3d4", fontsize=11, pad=8)
     ax.legend(loc="upper left", fontsize=7, framealpha=0.35, labelcolor="#d7e3d4")
     fig.tight_layout(pad=0.6)
@@ -586,8 +623,8 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
             "</header>"
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            f"<span class='tag tag-info'>W底</span>"
-            f"<span class='tag tag-info'>右側MA20</span>"
+            f"<span class='tag tag-info'>雙底</span>"
+            f"<span class='tag tag-info'>2h低回測</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
             "</div>"
             "<pre class='trade-detail'>"
@@ -595,11 +632,11 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
             f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts)\n"
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
-            f"L1 {t.signal.first_low:.2f} / L2 {t.signal.second_low:.2f}  "
+            f"2h低 {t.signal.first_low:.2f} / 回測 {t.signal.second_low:.2f}  "
             f"差 {t.signal.low_gap_pts:+.1f}pt\n"
-            f"頸線 {t.signal.neckline:.2f}  高度 {t.signal.neck_pts:.1f}pt\n"
-            f"L2 {l2t.strftime('%m-%d %H:%M')}  右側站上 MA20 {t.signal.ma20:.2f}  "
-            f"+{t.signal.stand_pts:.1f}pt"
+            f"反彈高 {t.signal.neckline:.2f}  高度 {t.signal.neck_pts:.1f}pt\n"
+            f"回測 {l2t.strftime('%m-%d %H:%M')}  三根沒新低  "
+            f"MA20 {t.signal.ma20:.2f}"
             "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
             "</article>"
@@ -627,11 +664,14 @@ def write_html_report(
     funnel_line = ""
     if funnel:
         funnel_line = (
-            f"<p class='muted'>漏斗：左腳 {funnel.get('left', 0)} → "
-            f"W底 {funnel.get('w', 0)} → "
+            f"<p class='muted'>漏斗：兩小時低 {funnel.get('dump', 0)} → "
+            f"站上MA20 {funnel.get('stand', 0)} → "
+            f"跌破 {funnel.get('broke', 0)} → "
+            f"回測 {funnel.get('retest', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
-            f"（沒站上 {funnel.get('skip_no_stand', 0)} · 新低 {funnel.get('skip_new_low', 0)} · "
-            f"間隔 {funnel.get('skip_gap', 0)} · 風險 {funnel.get('skip_max_risk', 0)}）</p>"
+            f"（沒站上 {funnel.get('skip_no_stand', 0)} · 沒跌破 {funnel.get('skip_no_break', 0)} · "
+            f"沒回測 {funnel.get('skip_no_retest', 0)} · 沒守住 {funnel.get('skip_no_hold', 0)} · "
+            f"新低 {funnel.get('skip_new_low', 0)} · 風險 {funnel.get('skip_max_risk', 0)}）</p>"
         )
 
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -642,7 +682,7 @@ def write_html_report(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>{escape(symbol)} 五分 K W底 右側站上MA20</title>
+<title>{escape(symbol)} 五分 K 雙底 · 2h低回測守三根</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -672,9 +712,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{escape(symbol)} 五分 K W底 右側站上MA20</h1>
+<h1>{escape(symbol)} 五分 K 雙底 · 2h低回測守三根</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">雙底 L1／L2 都在五分 MA20 下面，右腳確認後第一根收盤站上 MA20 進場。不等頸線、不等 5/10/20 多排。停損在兩低點下方 4 點；目標取量度或 2R 較遠者。持倉最多 48 根。含盤外。</p>
+<p class="muted">創下兩小時低點 → 收盤站上 MA20 → 再跌破 MA20 → 回到兩小時低點附近（可略破 20 點）→ 連續三根五分 K 沒新低才做多。對齊 09-04 圖 29。停損在回測低下方 4 點；目標取量度或 2R 較遠者。持倉最多 48 根。</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -686,7 +726,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 {funnel_line}
 <div class="equity">{_equity_svg(pnls)}</div>
 </section>
-{cards or "<div class='empty'>無 W 底右側站上 MA20 訊號</div>"}
+{cards or "<div class='empty'>無雙底回測守三根訊號</div>"}
 </div>
 </body></html>
 """
@@ -712,12 +752,12 @@ def _print_trades(df, trades, tag: str = "") -> None:
     for i, t in enumerate(trades, 1):
         l2 = df.index[t.signal.second_low_idx]
         print(
-            f"  [{prefix}{i}] Q{t.quality} L2 {l2.strftime('%m-%d %H:%M')} "
+            f"  [{prefix}{i}] Q{t.quality} 回測 {l2.strftime('%m-%d %H:%M')} "
             f"進 {df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
             f"-> {df.index[t.exit_idx].strftime('%m-%d %H:%M')} "
             f"{t.exit_reason} {t.pnl_points:+.1f}  "
-            f"L1/L2 {t.signal.first_low:.1f}/{t.signal.second_low:.1f} "
-            f"頸 {t.signal.neck_pts:.0f}pt 站上+{t.signal.stand_pts:.1f}"
+            f"2h/回測 {t.signal.first_low:.1f}/{t.signal.second_low:.1f} "
+            f"反彈 {t.signal.neck_pts:.0f}pt"
         )
 
 
@@ -726,16 +766,18 @@ def _verdict(stats: dict, funnel: Dict[str, int]) -> str:
     wr = stats["win_rate"]
     pnl = stats["total_points"]
     if n == 0:
-        if funnel.get("w", 0) and funnel.get("skip_no_stand", 0):
-            return "這段有做出 W，但右側一直沒站上 MA20，或站上前又破底。"
-        return "這段樣本沒抓到 W 底右側站上 MA20。"
+        if funnel.get("retest", 0) and funnel.get("skip_no_hold", 0):
+            return "這段有回到兩小時低點附近，但連續三根之前又創新低。"
+        if funnel.get("stand", 0) and funnel.get("skip_no_break", 0):
+            return "這段有站上 MA20，但之後沒再跌破回測。"
+        return "這段樣本沒抓到雙底回測守三根。"
     if pnl > 80 and wr >= 50:
-        return "有料：右側站上 MA20 比等頸線更早，這段抓得到且點數為正。"
+        return "有料：回測守三根比等第二次站上 MA20 更靠近低點。"
     if abs(pnl) <= 40:
-        return "抓得到雙底翻上均線，但優勢接近零。假 W 破底會把量度吐回去。"
+        return "抓得到 09-04 那種雙底，但優勢接近零。"
     if pnl > 0:
         return "邊緣：總點數正，但勝率或均筆還不算穩。"
-    return "沒料：右側剛站上 MA20 離兩低點已遠，停損偏寬，假 W 一次吐完。"
+    return "沒料：回測守三根之後仍常再破，停損被掃。"
 
 
 def cmd_backtest(args) -> int:
@@ -780,7 +822,7 @@ def cmd_backtest(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="NQ 五分 K W底 右側站上MA20（最多）")
+    p = argparse.ArgumentParser(description="NQ 五分 K 雙底：2h低回測守三根")
     sub = p.add_subparsers(dest="cmd")
 
     b = sub.add_parser("backtest", help="Yahoo 5m 回測")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic tests for NQ 5m W底 右側站上MA20 (no Yahoo)."""
+"""Synthetic tests for NQ 5m 雙底：2h低 → 站上MA20 → 跌破 → 回測守三根。"""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from nq_w_ma20 import (  # noqa: E402
 
 
 def test_quality_from_w() -> None:
-    assert quality_from_w(8.0, 40.0, 6.0)[1] == "A"
+    assert quality_from_w(8.0, 50.0, 6.0)[1] == "A"
     assert quality_from_w(40.0, 16.0, 1.0)[1] == "C"
     assert quality_from_w(8.0, 16.0, 1.0)[1] == "B"
 
@@ -42,7 +42,7 @@ def test_summarize_trades() -> None:
 
 def _ohlc(close: np.ndarray, low: np.ndarray, high: np.ndarray, open_: np.ndarray) -> pd.DataFrame:
     n = len(close)
-    idx = pd.date_range("2026-08-10 00:00", periods=n, freq="5min", tz=ET)
+    idx = pd.date_range("2026-09-04 08:00", periods=n, freq="5min", tz=ET)
     return pd.DataFrame(
         {
             "Open": open_,
@@ -55,98 +55,125 @@ def _ohlc(close: np.ndarray, low: np.ndarray, high: np.ndarray, open_: np.ndarra
     )
 
 
-def make_w_then_stand(*, stand: bool = True, break_new_low: bool = False, neckline_only: bool = False) -> pd.DataFrame:
-    """先在 MA20 下做出 L1／頸線／L2，再決定要不要站上均線。"""
-    n = 160
+def make_chart29(
+    *,
+    stand: bool = True,
+    break_ma: bool = True,
+    retest: bool = True,
+    hold3: bool = True,
+    deep_spring: bool = False,
+) -> pd.DataFrame:
+    """對齊圖 29：兩小時低 → 站上 MA20 → 跌破 → 回到低點 → 三根沒新低。"""
+    n = 90
     close = np.full(n, 20120.0)
-    for i in range(1, 40):
-        close[i] = 20120.0 + (i % 4) * 1.2
-    # 殺到 L1
-    close[40:55] = np.linspace(20110.0, 20040.0, 15)
-    # 反彈到頸線
-    close[55:65] = np.linspace(20045.0, 20085.0, 10)
-    # 右腳回 L2（略高）
-    close[65:75] = np.linspace(20080.0, 20048.0, 10)
-    close[75] = 20050.0
-    if stand and not break_new_low:
-        # 右側翻上，穿過當時 MA20
-        close[76:90] = np.linspace(20058.0, 20110.0, 14)
-        close[90:] = np.linspace(20112.0, 20180.0, n - 90)
-    elif stand and break_new_low:
-        # 先破 L2 超過容忍，之後才翻上——原 W 作廢，也不能再配成新 W
-        close[76:80] = [20040.0, 20020.0, 19990.0, 19985.0]
-        close[80:90] = np.linspace(20020.0, 20110.0, 10)
-        close[90:] = np.linspace(20112.0, 20180.0, n - 90)
-    elif neckline_only:
-        close[76:88] = np.linspace(20055.0, 20082.0, 12)
-        close[88:] = 20080.0
+    # 先走一段高位，讓 2h 低在上面
+    for i in range(1, 28):
+        close[i] = 20120.0 + (i % 5) * 1.5
+    # 創兩小時低
+    close[28:40] = np.linspace(20110.0, 20040.0, 12)
+    if stand:
+        close[40:50] = np.linspace(20050.0, 20100.0, 10)
+        close[50:56] = 20105.0
     else:
-        close[76:] = np.linspace(20048.0, 20020.0, n - 76)
+        close[40:] = np.linspace(20042.0, 20020.0, n - 40)
+        open_ = np.r_[close[0], close[:-1]]
+        high = np.maximum(open_, close) + 2.0
+        low = np.minimum(open_, close) - 2.0
+        low[39] = 20038.0
+        return _ohlc(close, low, high, open_)
+
+    if break_ma:
+        close[56:64] = np.linspace(20095.0, 20055.0, 8)
+    else:
+        close[56:] = 20110.0
+        open_ = np.r_[close[0], close[:-1]]
+        high = np.maximum(open_, close) + 2.0
+        low = np.minimum(open_, close) - 2.0
+        low[39] = 20038.0
+        high[50] = 20120.0
+        return _ohlc(close, low, high, open_)
+
+    if retest:
+        close[64:70] = np.linspace(20052.0, 20042.0, 6)
+        close[69] = 20044.0
+    else:
+        # 跌破 MA20 但停在半空，回不到兩小時低點附近
+        close[56:60] = [20090.0, 20078.0, 20070.0, 20068.0]
+        close[60:] = 20075.0
+        open_ = np.r_[close[0], close[:-1]]
+        high = np.maximum(open_, close) + 2.0
+        low = np.minimum(open_, close) - 2.0
+        low[39] = 20038.0
+        return _ohlc(close, low, high, open_)
+
+    if hold3:
+        close[70:73] = [20048.0, 20050.0, 20052.0]
+        close[73:] = np.linspace(20055.0, 20120.0, n - 73)
+    else:
+        close[70:] = np.linspace(20040.0, 19990.0, n - 70)
 
     open_ = np.r_[close[0], close[:-1]]
-    high = np.maximum(open_, close) + 2.0
+    high = np.maximum(open_, close) + 2.5
     low = np.minimum(open_, close) - 2.0
-    low[54] = 20038.0
-    low[53] = 20042.0
-    low[55] = 20043.0
-    high[64] = 20092.0
-    low[74] = 20044.0
-    low[73] = 20047.0
-    low[75] = 20046.0
-    if break_new_low:
-        low[78] = 19982.0
-        low[79] = 19980.0
+    low[39] = 20038.0
+    low[38] = 20045.0
+    high[50] = 20118.0
+    low[69] = 20036.0  # 回測略破 2h 低（圖 29 那種）
+    if hold3:
+        low[70] = 20040.0
+        low[71] = 20042.0
+        low[72] = 20044.0
+    if deep_spring:
+        low[69] = 20000.0
+        close[69] = 20010.0
+    if not hold3:
+        low[72] = 20010.0
+        low[73] = 19995.0
     return _ohlc(close, low, high, open_)
 
 
-def make_single_v() -> pd.DataFrame:
-    """尖 V，沒有第二個谷，不該算 W。"""
-    n = 120
-    close = np.full(n, 20100.0)
-    close[30:50] = np.linspace(20095.0, 20040.0, 20)
-    close[50:] = np.linspace(20045.0, 20140.0, n - 50)
-    open_ = np.r_[close[0], close[:-1]]
-    high = np.maximum(open_, close) + 1.5
-    low = np.minimum(open_, close) - 1.5
-    low[49] = 20035.0
-    return _ohlc(close, low, high, open_)
-
-
-def test_detect_w_right_stand() -> None:
-    df = make_w_then_stand(stand=True)
+def test_detect_chart29_hold() -> None:
+    df = make_chart29()
     sigs = detect_signals(df)
-    assert sigs, "W 右側站上 MA20 應進場"
+    assert sigs, "圖 29 那種雙底回測守三根應進場"
     sig = sigs[0]
+    assert sig.stand_idx > sig.first_low_idx
+    assert sig.break_idx > sig.stand_idx
+    assert sig.second_low_idx > sig.break_idx
     assert sig.entry_idx > sig.second_low_idx
-    assert sig.second_low_idx > sig.first_low_idx
-    assert sig.entry_price > sig.ma20
-    assert sig.second_low < sig.ma20 or True
-    assert abs(sig.second_low - sig.first_low) <= 60
-    assert sig.neckline > max(sig.first_low, sig.second_low)
-    assert sig.target_price > sig.entry_price
+    assert sig.entry_idx - sig.second_low_idx >= 3
+    assert abs(sig.second_low - sig.first_low) <= 20
     assert sig.entry_price > sig.stop_price
+    assert sig.target_price > sig.entry_price
 
 
 def test_no_signal_without_stand() -> None:
-    df = make_w_then_stand(stand=False)
-    sigs = detect_signals(df)
-    assert not sigs, "右腳之後繼續破底不該進場"
+    df = make_chart29(stand=False)
+    assert not detect_signals(df), "沒站上 MA20 不該進場"
 
 
-def test_no_signal_on_v() -> None:
-    df = make_single_v()
-    sigs = detect_signals(df)
-    assert not sigs, "單谷 V 不是 W"
+def test_no_signal_without_break() -> None:
+    df = make_chart29(break_ma=False)
+    assert not detect_signals(df), "站上後沒跌破 MA20 不該進場"
 
 
-def test_invalidate_new_low() -> None:
-    df = make_w_then_stand(stand=True, break_new_low=True)
-    sigs = detect_signals(df)
-    assert not sigs, "站上前破 L2 應作廢"
+def test_no_signal_without_retest() -> None:
+    df = make_chart29(retest=False)
+    assert not detect_signals(df), "沒回到兩小時低點附近不該進場"
+
+
+def test_no_signal_if_keeps_making_lows() -> None:
+    df = make_chart29(hold3=False)
+    assert not detect_signals(df), "連續三根前又創新低不該進場"
+
+
+def test_no_signal_on_deep_spring() -> None:
+    df = make_chart29(deep_spring=True)
+    assert not detect_signals(df), "回測破兩小時低超過 20 點應作廢"
 
 
 def test_simulate_and_html() -> None:
-    df = make_w_then_stand(stand=True)
+    df = make_chart29()
     sigs = detect_signals(df)
     trades = simulate(df, sigs)
     assert trades
@@ -154,7 +181,7 @@ def test_simulate_and_html() -> None:
     out = Path("/tmp/nq_w_ma20_test.html")
     path = write_html_report(out, df, trades, "NQ=F", "demo")
     text = path.read_text(encoding="utf-8")
-    assert "W底" in text
+    assert "雙底" in text
     assert "MA20" in text
     assert "<svg" in text, "圖要內嵌 SVG，htmlpreview 才看得到"
 
@@ -163,10 +190,12 @@ def main() -> int:
     tests = [
         test_quality_from_w,
         test_summarize_trades,
-        test_detect_w_right_stand,
+        test_detect_chart29_hold,
         test_no_signal_without_stand,
-        test_no_signal_on_v,
-        test_invalidate_new_low,
+        test_no_signal_without_break,
+        test_no_signal_without_retest,
+        test_no_signal_if_keeps_making_lows,
+        test_no_signal_on_deep_spring,
         test_simulate_and_html,
     ]
     failed = 0
