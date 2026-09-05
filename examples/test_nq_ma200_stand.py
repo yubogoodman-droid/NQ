@@ -18,7 +18,6 @@ from nq_ma200_stand import (  # noqa: E402
     display_trades,
     in_open_skip,
     is_red_long_upper,
-    daily_ma200_at,
     overlay_15m_ma200,
     parse_period_days,
     resample_5m,
@@ -218,9 +217,9 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "5m 對照" in text
         assert "15m 對照" in text
         assert "1h 對照" in text
-        assert "距200日" in text
-        assert "進場距 200日" in text
+        assert "距200日" not in text
         assert "距15mMA200" in text
+        assert "進場距 15m MA200" in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
         assert any((path.parent / "img").glob("t01_*_15m.png"))
@@ -263,13 +262,6 @@ def test_resample_5m() -> None:
     assert {"Open", "High", "Low", "Close"}.issubset(m1h.columns)
 
 
-def test_daily_ma200_at() -> None:
-    idx = pd.date_range("2025-01-02", periods=5, freq="D", tz=ET)
-    ma = pd.Series([100.0, 101.0, 102.0, 103.0, 104.0], index=idx)
-    ts = pd.Timestamp("2025-01-05 10:00", tz=ET)
-    assert abs(daily_ma200_at(ma, ts) - 103.0) < 1e-9
-
-
 def test_overlay_15m_ma200() -> None:
     n = 200 * 15 + 45
     idx = pd.date_range("2026-01-05 00:00", periods=n, freq="1min", tz=ET)
@@ -283,6 +275,25 @@ def test_overlay_15m_ma200() -> None:
     assert np.isnan(out[100])
     assert not np.isnan(out[-1])
     assert abs(out[-1] - 100.0) < 0.6
+
+
+def test_overlay_15m_ma200_uses_long_history() -> None:
+    idx_1m = pd.date_range("2026-03-01 10:00", periods=80, freq="1min", tz=ET)
+    close_1m = np.full(80, 110.0)
+    df_1m = pd.DataFrame(
+        {"Open": close_1m, "High": close_1m + 1, "Low": close_1m - 1, "Close": close_1m},
+        index=idx_1m,
+    )
+    idx_15 = pd.date_range("2026-02-01 00:00", periods=220, freq="15min", tz=ET)
+    close_15 = np.full(220, 100.0)
+    df_15 = pd.DataFrame(
+        {"Open": close_15, "High": close_15 + 1, "Low": close_15 - 1, "Close": close_15},
+        index=idx_15,
+    )
+    out = overlay_15m_ma200(df_1m, df_15)
+    assert not np.isnan(out[-1])
+    assert abs(out[-1] - 100.0) < 1e-6
+    assert np.isnan(overlay_15m_ma200(df_1m)[-1])
 
 
 def test_ribbon_helpers() -> None:
@@ -321,8 +332,8 @@ def main() -> int:
     test_write_html()
     test_display_trades_wins_first()
     test_resample_5m()
-    test_daily_ma200_at()
     test_overlay_15m_ma200()
+    test_overlay_15m_ma200_uses_long_history()
     test_ribbon_helpers()
     test_default_has_no_5m_tangle_filter()
     test_summarize()
