@@ -80,8 +80,8 @@ python3 examples/test_tw_1h_reclaim.py
 
 ## 幣安 5m 多頭排列 Telegram
 
-五分 K：`MA7 > MA14 > MA25`，且**前一根收在 MA200 下、這一根收盤才站上**；  
-再等三根，確認根收盤還在 MA200 上才推。同時小時 K 收盤還要在 `MA99` 與 `MA200` 之上。
+五分 K：`MA7 > MA14 > MA25`，從 MA200 下站上後**連續三根都收在上面**，  
+確認根還要 `7>14>25>200`。同標的 4 小時內不重發。同時小時 K 收盤還要在 `MA99` 與 `MA200` 之上。
 
 ```bash
 # Telegram 憑證放 tg_config.env（勿提交）
@@ -96,8 +96,8 @@ python3 examples/watch_binance_5m_align.py --backtest --days 3 --pages
 python3 examples/test_watch_binance_5m_align.py
 ```
 
-近三天（2026-09-02 22:21 → 09-05 22:21）流動永續 233 檔：**375 筆 / 144 檔**。  
-從下站上 1112 → 三根後還在上面 724 → 小時過濾 375。持有 60 分鐘勝率 **51.4%、平均 +0.25%**；120 分鐘 **52.3%、平均 +0.32%**。
+近三天（2026-09-02 22:25 → 09-05 22:25）流動永續 233 檔：**19 筆 / 19 檔**。  
+從下站上 1105 → 連續三根站穩且確認根 7>14>25>200 得 37 → 小時過濾 19。持有 60 分鐘勝率 **52.6%、平均 −0.17%**；120 分鐘 **55.6%、平均 +0.01%**。樣本少，數字會跳。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-align-7d44/docs/binance-5m-align/view.html
 
