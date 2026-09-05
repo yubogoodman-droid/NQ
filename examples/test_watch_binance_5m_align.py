@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from watch_binance_5m_align import (  # noqa: E402
     CONFIRM_BARS,
     add_mas,
+    apply_cooldown,
     attach_forwards,
     collect_signals,
     confirm_hold,
@@ -29,6 +30,7 @@ from watch_binance_5m_align import (  # noqa: E402
     pick_chart_hits,
     reclaim_ma200,
     sma,
+    stack_above_200,
     summarize_hits,
 )
 
@@ -70,13 +72,13 @@ def rising(n: int, start: float = 100.0, step: float = 0.15) -> np.ndarray:
     return start + np.arange(n, dtype=float) * step
 
 
-def reclaim_closes(n: int = 260) -> np.ndarray:
-    """長時間在 100，先跌到 MA200 下再爬、最後一根收過 MA200。"""
+def reclaim_closes(n: int = 280) -> np.ndarray:
+    """短跌後爬回，站上 MA200，之後維持夠高讓確認根 MA25 也上 200。"""
     c = np.full(n, 100.0)
-    c[190:210] = 96.5
-    c[210:229] = np.linspace(97.0, 99.35, 19)
-    c[229] = 101.4
-    c[230:] = 101.6
+    c[200:208] = 97.2
+    c[208:229] = np.linspace(97.6, 99.45, 21)
+    c[229] = 108.0
+    c[230:] = 108.5
     return c
 
 
@@ -130,6 +132,7 @@ def test_detect_reclaim_bar() -> None:
     assert d5["c"][228] < d5["m200"][228]
     assert d5["c"][229] > d5["m200"][229]
     assert d5["c"][confirm] > d5["m200"][confirm]
+    assert stack_above_200(d5, confirm)
     assert detect_new_align(d5, 229, h1, hi) is None
 
 
@@ -142,6 +145,30 @@ def test_confirm_fails_if_back_below() -> None:
     assert reclaim_ma200(d5, 229)
     assert not confirm_hold(d5, 229)
     assert detect_new_align(d5, 232, h1, hi) is None
+
+
+def test_confirm_fails_if_middle_dips() -> None:
+    closes = reclaim_closes()
+    closes[230] = 98.0
+    d5 = add_mas(_bars(closes), (7, 14, 25, 200))
+    assert reclaim_ma200(d5, 229)
+    assert not confirm_hold(d5, 229)
+    assert detect_new_align(d5, 232, hour_ok_hi(), len(hour_ok_hi()["c"]) - 1) is None
+
+
+def test_apply_cooldown() -> None:
+    hits = [
+        {"symbol": "AAAUSDT", "t": 1_000_000},
+        {"symbol": "AAAUSDT", "t": 1_000_000 + 60 * 60 * 1000},
+        {"symbol": "AAAUSDT", "t": 1_000_000 + 5 * 60 * 60 * 1000},
+        {"symbol": "BBBUSDT", "t": 1_000_000 + 10 * 60 * 1000},
+    ]
+    kept = apply_cooldown(hits, cooldown_ms=4 * 60 * 60 * 1000)
+    assert [(h["symbol"], h["t"]) for h in kept] == [
+        ("AAAUSDT", 1_000_000),
+        ("BBBUSDT", 1_000_000 + 10 * 60 * 1000),
+        ("AAAUSDT", 1_000_000 + 5 * 60 * 60 * 1000),
+    ]
 
 
 def test_detect_blocks_without_hour_filter() -> None:

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """幣安 5m 多頭排列 Telegram 監看。
 
-五分 K：MA7 > MA14 > MA25，且前一根收在 MA200 下、這一根收盤才站上；
-再等三根，確認根收盤還在 MA200 上才推。
+五分 K：MA7 > MA14 > MA25，從 MA200 下站上後連續三根都收在上面，
+確認根還要 7>14>25>200。同標的 4 小時內不重發。
 同時小時 K 收盤要在 MA99 與 MA200 之上。
-同一根不重發。
 
     python3 examples/watch_binance_5m_align.py --test
     python3 examples/watch_binance_5m_align.py --once --dry-run
@@ -44,6 +43,7 @@ MS_5M = 5 * 60_000
 MS_1H = 60 * 60_000
 HORIZONS = (("15m", 3), ("30m", 6), ("60m", 12), ("120m", 24))
 CONFIRM_BARS = 3
+COOLDOWN_MS = 4 * 60 * 60 * 1000
 PAGES = ROOT / "docs" / "binance-5m-align" / "index.html"
 
 
@@ -140,9 +140,18 @@ def above_ma200(d: dict, i: int) -> bool:
 
 
 def confirm_hold(d: dict, reclaim_i: int, bars: int = CONFIRM_BARS) -> bool:
-    """站上後再過 bars 根，確認根收盤還在 MA200 上。"""
+    """站上後連續 bars 根收盤都還在 MA200 上。"""
     j = reclaim_i + bars
-    return above_ma200(d, j)
+    if j >= len(d["c"]):
+        return False
+    return all(above_ma200(d, k) for k in range(reclaim_i, j + 1))
+
+
+def stack_above_200(d: dict, i: int) -> bool:
+    """短均也在 MA200 上：MA7>MA14>MA25>MA200。"""
+    if not five_align_ok(d, i):
+        return False
+    return d["m25"][i] > d["m200"][i]
 
 
 def hour_above_ok(h: dict, i: int) -> bool:
@@ -184,6 +193,8 @@ def detect_new_align(d5: dict, i: int, h1: dict, hi: int | None = None) -> dict 
     if not five_align_ok(d5, r) or not reclaim_ma200(d5, r):
         return None
     if not confirm_hold(d5, r):
+        return None
+    if not stack_above_200(d5, i):
         return None
     px = float(d5["c"][i])
     t = int(d5["t"][i])
@@ -318,18 +329,48 @@ def hm(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, TZ).strftime("%m-%d %H:%M")
 
 
-def load_seen() -> set[str]:
+def load_state() -> tuple[set[str], dict[str, int]]:
     if not SEEN_PATH.exists():
-        return set()
+        return set(), {}
     try:
-        return set(json.loads(SEEN_PATH.read_text()))
+        raw = json.loads(SEEN_PATH.read_text())
     except Exception:
-        return set()
+        return set(), {}
+    if isinstance(raw, list):
+        return set(raw), {}
+    keys = set(raw.get("keys") or [])
+    last = {str(k): int(v) for k, v in (raw.get("last") or {}).items()}
+    return keys, last
+
+
+def save_state(seen: set[str], last: dict[str, int]) -> None:
+    SEEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SEEN_PATH.write_text(json.dumps({"keys": sorted(seen), "last": last}, ensure_ascii=False))
+
+
+def load_seen() -> set[str]:
+    return load_state()[0]
 
 
 def save_seen(seen: set[str]) -> None:
-    SEEN_PATH.parent.mkdir(parents=True, exist_ok=True)
-    SEEN_PATH.write_text(json.dumps(sorted(seen)))
+    _, last = load_state()
+    save_state(seen, last)
+
+
+def apply_cooldown(hits: list[dict], cooldown_ms: int = COOLDOWN_MS, last: dict[str, int] | None = None) -> list[dict]:
+    """同一標的 cooldown 內只留第一筆。hits 需有 symbol 與 t。"""
+    used = dict(last or {})
+    out = []
+    for h in sorted(hits, key=lambda x: (int(x.get("t") or x["sig"]["t"]), x["symbol"])):
+        t = int(h.get("t") or h["sig"]["t"])
+        prev = used.get(h["symbol"])
+        if prev is not None and t - prev < cooldown_ms:
+            continue
+        used[h["symbol"]] = t
+        out.append(h)
+    if last is not None:
+        last.update(used)
+    return out
 
 
 def telegram_send(text: str, photo: str | None = None) -> bool:
@@ -502,7 +543,7 @@ def scan_history_symbol(sym: str, start_ms: int, end_ms: int) -> tuple[list[dict
             continue
         if five_align_ok(d5, i) and reclaim_ma200(d5, i):
             meta["five_new"] += 1
-            if confirm_hold(d5, i):
+            if confirm_hold(d5, i) and stack_above_200(d5, i + CONFIRM_BARS):
                 meta["confirmed"] += 1
         sig = detect_new_align(d5, i, h1)
         if sig:
@@ -536,6 +577,9 @@ def backtest_all(symbols: list[str], start_ms: int, end_ms: int) -> tuple[list[d
             if done % 40 == 0 or done == len(symbols):
                 print(f"  回測進度 {done}/{len(symbols)}　已中 {funnel['hits']}", flush=True)
     hits.sort(key=lambda h: (h["t"], h["symbol"]))
+    funnel["raw_hits"] = len(hits)
+    hits = apply_cooldown(hits)
+    funnel["hits"] = len(hits)
     return hits, funnel
 
 
@@ -679,10 +723,10 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left
 <section class="summary">
 <h1>幣安 5m 多頭排列 · {escape(period)}</h1>
 <p class="muted">流動 USDT 永續 {funnel.get('symbols', 0)} 檔。
-5m <b>MA7&gt;MA14&gt;MA25</b>，前一根收在 MA200 下、這一根收盤才站上，
-再等三根確認根還在 MA200 上。同時 1h 收盤在 MA99 / MA200 之上。
+5m <b>MA7&gt;MA14&gt;MA25</b>，從 MA200 下站上後連續三根都收在上面，
+確認根還要 7&gt;14&gt;25&gt;200。同時 1h 在 MA99 / MA200 上。同標的 4 小時內不重發。
 報酬從確認根收盤算到之後 15/30/60/120 分鐘，不是進出場建議。</p>
-<p class="muted">漏斗：5m 從下站上且多排 {funnel.get('five_new', 0)} → 三根後還在上面 {funnel.get('confirmed', 0)} → 小時過濾 {funnel.get('hits', 0)}
+<p class="muted">漏斗：從下站上且多排 {funnel.get('five_new', 0)} → 連續三根站穩且確認根 7&gt;14&gt;25&gt;200 {funnel.get('confirmed', 0)} → 小時過濾 {funnel.get('raw_hits', funnel.get('hits', 0))} → 同標的 4 小時冷卻 {funnel.get('hits', 0)}
 · 讀檔失敗 {funnel.get('errors', 0)}</p>
 <p class="muted">15m 勝率 {stats['15m']['win_rate']:.1f}% 均 {_fmt(stats['15m']['avg'])}
 · 30m {stats['30m']['win_rate']:.1f}% 均 {_fmt(stats['30m']['avg'])}
@@ -768,7 +812,8 @@ def cmd_backtest(args) -> int:
     hits, funnel = backtest_all(symbols, start_ms, end_ms)
     stats = summarize_hits(hits)
     print(
-        f"完成 {time.time()-t0:.1f}s　站上 {funnel['five_new']} → 三根後還在上面 {funnel.get('confirmed', 0)} → 訊號 {stats['count']} / {stats['symbols']} 檔\n"
+        f"完成 {time.time()-t0:.1f}s　站上 {funnel['five_new']} → 站穩+短均在200上 {funnel.get('confirmed', 0)} → "
+        f"小時 {funnel.get('raw_hits', stats['count'])} → 冷卻後 {stats['count']} / {stats['symbols']} 檔\n"
         f"15m {stats['15m']['win_rate']:.1f}% 均 {stats['15m']['avg']:+.2f}%　"
         f"30m {stats['30m']['win_rate']:.1f}% 均 {stats['30m']['avg']:+.2f}%　"
         f"60m {stats['60m']['win_rate']:.1f}% 均 {stats['60m']['avg']:+.2f}%　"
@@ -815,14 +860,18 @@ def main() -> int:
     if args.backtest:
         return cmd_backtest(args)
 
-    seen = load_seen()
+    seen, last = load_state()
     if args.symbol:
         symbols = [s.strip().upper() for s in args.symbol]
         print(f"監看指定 {len(symbols)} 個：{', '.join(symbols)}", flush=True)
     else:
         print("載入標的…", flush=True)
         symbols = universe()
-        print(f"監看 {len(symbols)} 個流動永續。5m 7>14>25，從 MA200 下站上後三根還在上面，1h 在 MA99/200 上才推。", flush=True)
+        print(
+            f"監看 {len(symbols)} 個流動永續。站上後連續三根站穩，確認根 7>14>25>200，"
+            f"1h 在 MA99/200 上，同標的 4 小時冷卻。",
+            flush=True,
+        )
     uni_ts = time.time()
 
     def round_once() -> None:
@@ -834,6 +883,7 @@ def main() -> int:
         t0 = time.time()
         events = scan_all(symbols)
         new = [e for e in events if key_of(e) not in seen]
+        new = apply_cooldown(new, last=last)
         print(
             f"[{datetime.now(TZ).strftime('%H:%M:%S')}] "
             f"掃完 {len(symbols)} 用 {time.time()-t0:.1f}s　新訊號 {len(new)}",
@@ -843,7 +893,7 @@ def main() -> int:
             seen.add(key_of(ev))
             notify(ev, dry_run=args.dry_run)
         if new:
-            save_seen(seen)
+            save_state(seen, last)
 
     round_once()
     if args.once:
@@ -855,7 +905,7 @@ def main() -> int:
             round_once()
     except KeyboardInterrupt:
         print("\n已停止。")
-        save_seen(seen)
+        save_state(seen, last)
     return 0
 
 
