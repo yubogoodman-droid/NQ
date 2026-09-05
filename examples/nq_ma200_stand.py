@@ -620,9 +620,28 @@ def _paint_ohlc(
             color="#f9a8d4",
             fontsize=8,
         )
+    ma200_15 = marks.get("ma200_15m")
+    dist_15 = marks.get("dist_15m")
+    if ma200_15 is not None and not (isinstance(ma200_15, float) and np.isnan(ma200_15)):
+        ax.axhline(float(ma200_15), color="#ce93d8", ls="-.", lw=1.35, alpha=0.95)
+        ymin, ymax = ax.get_ylim()
+        pad = max((ymax - ymin) * 0.08, 8.0)
+        ax.set_ylim(min(ymin, float(ma200_15)) - pad, max(ymax, float(ma200_15)) + pad)
+
     if ex is not None and 0 <= ex < len(window):
         ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([ex], [trade.entry_price], s=42, color="#00e676", marker="^", zorder=6)
+        if dist_15 is not None and not (isinstance(dist_15, float) and np.isnan(dist_15)):
+            ax.annotate(
+                f"距15mMA200 {_fmt_signed(float(dist_15))}",
+                (ex, trade.entry_price),
+                textcoords="offset points",
+                xytext=(8, 14),
+                ha="left",
+                color="#e1bee7",
+                fontsize=9,
+                fontweight="bold",
+            )
     if xx is not None and 0 <= xx < len(window):
         ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
         ax.scatter(
@@ -660,6 +679,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             "break": trade.signal.break_idx - start,
             "entry": trade.entry_idx - start,
             "exit": trade.exit_idx - start,
+            "dist_15m": trade.signal.dist_15m_ma200,
         },
         f"#{trade_no}  1m  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
@@ -698,6 +718,9 @@ def draw_htf_png(
     et = df_1m.index[trade.entry_idx]
     xt = df_1m.index[trade.exit_idx]
     sign = "+" if trade.pnl_points >= 0 else ""
+    dist_note = ""
+    if label.startswith("15m"):
+        dist_note = f"  距15mMA200 {_fmt_signed(trade.signal.dist_15m_ma200)}"
     fig, ax = plt.subplots(figsize=(10.4, 4.8), facecolor="#0c1210")
     _paint_ohlc(
         ax,
@@ -710,9 +733,11 @@ def draw_htf_png(
             "break": None if br is None else br - start,
             "entry": en - start,
             "exit": None if ex is None else ex - start,
+            "ma200_15m": trade.signal.ma200_15m if label.startswith("15m") else None,
+            "dist_15m": trade.signal.dist_15m_ma200 if label.startswith("15m") else None,
         },
         f"#{trade_no}  {label}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
-        f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
+        f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt{dist_note}",
     )
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -854,6 +879,8 @@ def write_html_report(
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
             "</div>"
             "<pre class='trade-detail'>"
+            f"進場距 15m MA200  {_fmt_signed(t.signal.dist_15m_ma200)} pts"
+            f"（15m MA200 {_fmt_price(t.signal.ma200_15m)}）\n"
             f"entry {t.entry_price:.2f}\n"
             f"stop  {t.signal.stop_price:.2f}  (−{risk:.1f} pts, MA200−10；浮盈+60改保本）\n"
             f"target {t.target_price:.2f}  (+100)\n"

@@ -218,6 +218,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "15m 對照" in text
         assert "1h 對照" in text
         assert "距15mMA200" in text
+        assert "進場距 15m MA200" in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
         assert any((path.parent / "img").glob("t01_*_15m.png"))
