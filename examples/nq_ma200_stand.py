@@ -8,7 +8,7 @@
   4. 進場前 1 小時曾連續 ≥15 根在 MA200 下
   5. 美東 9:30–10:00 不進
   6. 紅 K 長上影跳過
-  7. 停損 MA200−10，停利 +100
+  7. 停損 MA200−10；進場在 15m MA200 上則改破 15m MA200。停利 +100
   8. 浮盈先到 +60 後，停損提到進場價（保本）
 
 用法:
@@ -170,6 +170,7 @@ class Signal:
     m1_ribbon: float = 0.0
     ma200_15m: float = float("nan")
     dist_15m_ma200: float = float("nan")
+    stop_kind: str = "ma200"  # ma200 = 1m MA200−10；m15 = 破 15m MA200
 
 
 @dataclass
@@ -229,6 +230,19 @@ def max_under_streak(close: np.ndarray, ma200: np.ndarray, end_idx: int, lookbac
         else:
             run = 0
     return best
+
+
+def initial_stop(
+    ma200: float,
+    ma200_15m: float,
+    dist_15m: float,
+    *,
+    stop_below_ma200: float = STOP_BELOW_MA200,
+) -> tuple[float, str]:
+    """進場在 15m MA200 上：停損改破 15m MA200；否則 1m MA200−10。"""
+    if np.isfinite(dist_15m) and dist_15m > 0 and np.isfinite(ma200_15m):
+        return float(ma200_15m), "m15"
+    return float(ma200) - stop_below_ma200, "ma200"
 
 
 def above_ma200_streak(close: np.ndarray, ma200: np.ndarray, j: int, need: int) -> bool:
@@ -324,7 +338,12 @@ def detect_signals(
                 bump("skip_5m_tangle")
                 continue
             entry = float(close[j])
-            stop = float(ma200[j]) - stop_below_ma200
+            stop, stop_kind = initial_stop(
+                float(ma200[j]),
+                m15_200,
+                dist_15,
+                stop_below_ma200=stop_below_ma200,
+            )
             if entry <= stop:
                 bump("skip_bad_stop")
                 continue
@@ -350,6 +369,7 @@ def detect_signals(
                     m1_ribbon=0.0 if np.isnan(ribbon_1m) else ribbon_1m,
                     ma200_15m=m15_200,
                     dist_15m_ma200=dist_15,
+                    stop_kind=stop_kind,
                 )
             )
             entered = True
@@ -903,7 +923,7 @@ def write_html_report(
             "<span class='tag tag-info'>1h 對照</span>"
             f"<span class='tag tag-info'>距MA200 {t.signal.dist_ma200:.1f}</span>"
             f"<span class='tag tag-info'>距15mMA200 {_fmt_signed(t.signal.dist_15m_ma200)}</span>"
-            f"<span class='tag tag-info'>停損 MA200−10</span>"
+            f"<span class='tag tag-info'>{'停損 破15mMA200' if t.signal.stop_kind == 'm15' else '停損 MA200−10'}</span>"
             f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
             "</div>"
@@ -912,7 +932,7 @@ def write_html_report(
             f"（15m MA200 {_fmt_price(t.signal.ma200_15m)}）\n"
             f"entry {t.entry_price:.2f}\n"
             f"stop  {t.signal.stop_price:.2f}  (−{risk:.1f} pts, "
-            f"MA200−10；浮盈+60改保本）\n"
+            f"{'破15mMA200' if t.signal.stop_kind == 'm15' else 'MA200−10'}；浮盈+60改保本）\n"
             f"target {t.target_price:.2f}  (+100)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {t.signal.break_low:.2f} / 2h低 {t.signal.two_hr_low:.2f}\n"
@@ -977,7 +997,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 5m / 15m / 1h 圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10，進場在15mMA200上則破15mMA200 / TP=+100 · 浮盈+60改保本 · 5m / 15m / 1h 圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
