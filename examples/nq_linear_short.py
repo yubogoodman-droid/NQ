@@ -154,6 +154,43 @@ def sma(arr, n: int) -> np.ndarray:
     return pd.Series(arr, dtype=float).rolling(n, min_periods=n).mean().to_numpy(float)
 
 
+def resample_1h(df: pd.DataFrame) -> pd.DataFrame:
+    """把 1m 合成 1h（bar 起點對齊整點，不含未收盤小時）。"""
+    if df.empty:
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+    work = df[["Open", "High", "Low", "Close"]].copy()
+    work["Volume"] = df["Volume"] if "Volume" in df.columns else 0.0
+    out = work.resample("1h", label="left", closed="left").agg(
+        {"Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"}
+    )
+    return out.dropna(subset=["Open", "High", "Low", "Close"])
+
+
+def map_closed_1h(df: pd.DataFrame, df_1h: pd.DataFrame, column: str = "Close") -> np.ndarray:
+    """每個 1m bar 對到「已經收盤」的最近一根 1h，不看未來。"""
+    out = np.full(len(df), np.nan, dtype=float)
+    if df.empty or df_1h is None or df_1h.empty or column not in df_1h.columns:
+        return out
+    ends = df_1h.index + pd.Timedelta(hours=1)
+    vals = df_1h[column].to_numpy(float)
+    j = 0
+    n_h = len(ends)
+    for i, ts in enumerate(df.index):
+        while j + 1 < n_h and ends[j + 1] <= ts:
+            j += 1
+        if j < n_h and ends[j] <= ts:
+            out[i] = vals[j]
+    return out
+
+
+def add_1h_mas(df_1h: pd.DataFrame, periods: Sequence[int] = (5, 10, 20, 60, 200)) -> pd.DataFrame:
+    out = df_1h.copy()
+    close = out["Close"].astype(float)
+    for n in periods:
+        out[f"ma{n}"] = close.rolling(n, min_periods=n).mean()
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Strategy (bar-by-bar, matches Pine process_orders_on_close)
 # ---------------------------------------------------------------------------
@@ -176,6 +213,8 @@ class Signal:
     ma60: float
     ma120: float
     ma200: float
+    h1_close: float = float("nan")
+    h1_ma20: float = float("nan")
 
     @property
     def peak_dist(self) -> float:
@@ -279,6 +318,9 @@ def run_linear_short(
     ma120 = sma(c, p.ma120)
     ma200 = sma(c, p.ma200)
     high4h = pd.Series(h).rolling(p.lookback4h, min_periods=p.lookback4h).max().to_numpy(float)
+    df_1h = add_1h_mas(resample_1h(df))
+    h1_close = map_closed_1h(df, df_1h, "Close")
+    h1_ma20 = map_closed_1h(df, df_1h, "ma20")
 
     fun = funnel if funnel is not None else {}
 
@@ -379,6 +421,8 @@ def run_linear_short(
                                 ma60=float(ma60[i]),
                                 ma120=float(ma120[i]),
                                 ma200=float(ma200[i]),
+                                h1_close=float(h1_close[i]),
+                                h1_ma20=float(h1_ma20[i]),
                             )
                             if sig.risk > 0:
                                 position = -1
@@ -513,33 +557,20 @@ def _setup_mpl() -> None:
             break
 
 
-def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
-    _setup_mpl()
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import Rectangle
-
-    sig = trade.signal
-    start, end = _trade_window(df, trade)
-    window = df.iloc[start : end + 1]
-    xs = range(len(window))
-    o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
-    vol = window["Volume"] if "Volume" in window.columns else None
-    close_full = df["Close"].astype(float)
-
-    fig, (ax, axv) = plt.subplots(
-        2,
-        1,
-        figsize=(10.4, 5.6),
-        sharex=True,
-        gridspec_kw={"height_ratios": [3.2, 1]},
-        facecolor="#0c1210",
-    )
-    for a in (ax, axv):
+def _style_axes(axes) -> None:
+    for a in axes:
         a.set_facecolor("#101814")
         a.tick_params(colors="#8aa193", labelsize=8)
         for sp in a.spines.values():
             sp.set_color("#2a3a33")
 
+
+def _paint_candles(ax, axv, window: pd.DataFrame) -> None:
+    from matplotlib.patches import Rectangle
+
+    xs = range(len(window))
+    o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
+    vol = window["Volume"] if "Volume" in window.columns else None
     colors_v = []
     for k in range(len(window)):
         up = float(c.iloc[k]) >= float(o.iloc[k])
@@ -550,12 +581,73 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
         ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
         colors_v.append("#3dba7a99" if up else "#e35d5d99")
-    if vol is not None:
+    if axv is not None and vol is not None:
         axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
 
+
+def _hour_index(window_1h: pd.DataFrame, ts) -> int:
+    if window_1h.empty:
+        return -1
+    starts = window_1h.index
+    i = int(starts.searchsorted(ts, side="right") - 1)
+    if i < 0 or i >= len(window_1h):
+        return -1
+    return i
+
+
+def _hour_window(df_1h: pd.DataFrame, entry_ts, exit_ts, before: int = 28, after: int = 8) -> pd.DataFrame:
+    if df_1h.empty:
+        return df_1h
+    start = entry_ts - pd.Timedelta(hours=before)
+    end = exit_ts + pd.Timedelta(hours=after)
+    w = df_1h.loc[(df_1h.index >= start) & (df_1h.index <= end)]
+    if len(w) < 8:
+        w = df_1h.iloc[max(0, len(df_1h) - 36) :]
+    return w
+
+
+def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: int) -> Path:
+    _setup_mpl()
+    import matplotlib.pyplot as plt
+
+    sig = trade.signal
+    start, end = _trade_window(df, trade)
+    window = df.iloc[start : end + 1]
+    close_full = df["Close"].astype(float)
+    df_1h = add_1h_mas(resample_1h(df))
+    h1_on_1m = map_closed_1h(df, df_1h, "Close")
+
+    have_1h = len(df_1h) >= 2
+    if have_1h:
+        fig, (ax, axv, axh, axhv) = plt.subplots(
+            4,
+            1,
+            figsize=(10.4, 9.4),
+            gridspec_kw={"height_ratios": [3.05, 0.78, 2.7, 0.7]},
+            facecolor="#0c1210",
+        )
+        _style_axes((ax, axv, axh, axhv))
+    else:
+        fig, (ax, axv) = plt.subplots(
+            2,
+            1,
+            figsize=(10.4, 5.6),
+            sharex=True,
+            gridspec_kw={"height_ratios": [3.2, 1]},
+            facecolor="#0c1210",
+        )
+        _style_axes((ax, axv))
+        axh = axhv = None
+
+    _paint_candles(ax, axv, window)
+    xs = range(len(window))
     for n, col in MA_COLORS.items():
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
         ax.plot(list(xs), ma, color=col, lw=1.45 if n in (10, 20, 200) else 1.0, label=f"MA{n}")
+
+    h1_win = h1_on_1m[start : end + 1]
+    if not np.all(np.isnan(h1_win)):
+        ax.step(list(xs), h1_win, where="post", color="#e0e7ff", lw=1.7, label="1H")
 
     ax.axhline(trade.stop_price, color="#7f1d1d", ls=":", lw=1.1, alpha=0.9)
     ax.axhline(sig.peak_ma200, color="#264653", ls="--", lw=0.8, alpha=0.45)
@@ -566,8 +658,8 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         ax.annotate("4H高", (px, sig.peak_high), textcoords="offset points", xytext=(0, 8),
                     ha="center", color="#fdba74", fontsize=8)
     if 0 <= rx < len(window):
-        ax.scatter([rx], [float(l.iloc[rx])], s=36, color="#38bdf8", zorder=5)
-        ax.annotate("回測", (rx, float(l.iloc[rx])), textcoords="offset points", xytext=(0, -12),
+        ax.scatter([rx], [float(window["Low"].iloc[rx])], s=36, color="#38bdf8", zorder=5)
+        ax.annotate("回測", (rx, float(window["Low"].iloc[rx])), textcoords="offset points", xytext=(0, -12),
                     ha="center", color="#7dd3fc", fontsize=8)
     if 0 <= ex < len(window):
         ax.axvline(ex, color="#ef4444", ls="--", lw=0.9)
@@ -587,16 +679,49 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     xt = df.index[trade.exit_idx]
     sign = "+" if trade.pnl_points >= 0 else ""
     ax.set_title(
-        f"#{trade_no}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"#{trade_no}  1m  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt  峰距{sig.peak_dist:.0f}",
         color="#e8f0ea",
         fontsize=11,
     )
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=7)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=8)
     step = max(1, len(window) // 6)
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
     axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+
+    if have_1h and axh is not None and axhv is not None:
+        hw = _hour_window(df_1h, et, xt)
+        _paint_candles(axh, axhv, hw)
+        hxs = range(len(hw))
+        for n, col in ((5, "#f0b429"), (10, "#ff7a00"), (20, "#e63946"), (60, "#9b5de5"), (200, "#264653")):
+            colname = f"ma{n}"
+            if colname in hw.columns and hw[colname].notna().any():
+                axh.plot(list(hxs), hw[colname], color=col, lw=1.35 if n in (20, 200) else 1.0, label=f"1H MA{n}")
+        ei = _hour_index(hw, et)
+        xi = _hour_index(hw, xt)
+        if 0 <= ei < len(hw):
+            axh.axvline(ei, color="#ef4444", ls="--", lw=0.9)
+            axh.scatter([ei], [trade.entry_price], s=42, color="#ef4444", marker="v", zorder=6)
+        if 0 <= xi < len(hw):
+            axh.axvline(xi, color="#f0c14b", ls=":", lw=0.9)
+            axh.scatter(
+                [xi],
+                [trade.exit_price],
+                s=36,
+                color="#00c805" if trade.pnl_points > 0 else "#ff5252",
+                marker="x",
+                zorder=6,
+            )
+        axh.axhline(trade.stop_price, color="#7f1d1d", ls=":", lw=1.0, alpha=0.85)
+        axh.set_title("1h 對照（同一進出場時刻）", color="#e8f0ea", fontsize=10)
+        axh.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=5)
+        hstep = max(1, len(hw) // 6) if len(hw) else 1
+        hticks = list(range(0, len(hw), hstep))
+        axhv.set_xticks(hticks)
+        if len(hw):
+            axhv.set_xticklabels([hw.index[i].strftime("%m-%d %H:%M") for i in hticks], color="#8aa193")
+
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -661,6 +786,7 @@ def write_html_report(
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
             f"<span class='tag tag-info'>1m</span>"
+            f"<span class='tag tag-info'>1h</span>"
             f"<span class='tag tag-info'>峰距 {t.signal.peak_dist:.0f}</span>"
             "</div>"
             "<pre class='trade-detail'>"
@@ -670,7 +796,8 @@ def write_html_report(
             f"4H高 {t.signal.peak_high:.2f} @ {peak_t}  MA200當時 {t.signal.peak_ma200:.2f}\n"
             f"回測MA10 @ {retest_t}\n"
             f"進場 MA5 {t.signal.ma5:.1f} / MA10 {t.signal.ma10:.1f} / MA20 {t.signal.ma20:.1f}\n"
-            f"MA60 {t.signal.ma60:.1f} / MA200 {t.signal.ma200:.1f}"
+            f"MA60 {t.signal.ma60:.1f} / MA200 {t.signal.ma200:.1f}\n"
+            f"1H {t.signal.h1_close:.2f}  /  1H MA20 {t.signal.h1_ma20:.2f}"
             "</pre>"
             f"<div class='mini-chart'>{chart}</div>"
             "</article>"
@@ -692,7 +819,7 @@ def write_html_report(
     end = df.index[-1].strftime("%Y-%m-%d %H:%M") if len(df) else ""
     total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
     dollars = stats["total_points"] * POINT_VALUE - stats["count"] * COMMISSION_RT
-    note = "<p class='muted'>圖是靜態 1m K 線。手機請往下捲。</p>" if embed_images else ""
+    note = "<p class='muted'>圖是靜態 1m + 1h K 線。一分圖白線是已收盤小時線。手機請往下捲。</p>" if embed_images else ""
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>

@@ -13,10 +13,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nq_linear_short import (  # noqa: E402
     ET,
-    LinearShortParams,
-    TradeResult,
     long_lower_wick,
+    map_closed_1h,
     parse_period_days,
+    resample_1h,
     run_linear_short,
     sma,
     summarize_trades,
@@ -37,6 +37,32 @@ def test_sma() -> None:
     assert np.isnan(out[1])
     assert abs(out[2] - 2.0) < 1e-9
     assert abs(out[4] - 4.0) < 1e-9
+
+
+def test_resample_and_map_1h() -> None:
+    idx = pd.date_range("2026-08-24 09:00", periods=180, freq="1min", tz=ET)
+    close = 20000.0 + np.arange(180, dtype=float)
+    df = pd.DataFrame(
+        {
+            "Open": close,
+            "High": close + 0.5,
+            "Low": close - 0.5,
+            "Close": close,
+            "Volume": 1.0,
+        },
+        index=idx,
+    )
+    h1 = resample_1h(df)
+    assert len(h1) >= 2
+    # 09:00 那根小時要等 10:00 才算收盤
+    mapped = map_closed_1h(df, h1, "Close")
+    at_0959 = int(np.where(df.index == pd.Timestamp("2026-08-24 09:59", tz=ET))[0][0])
+    at_1000 = int(np.where(df.index == pd.Timestamp("2026-08-24 10:00", tz=ET))[0][0])
+    assert np.isnan(mapped[at_0959])
+    assert not np.isnan(mapped[at_1000])
+    assert abs(mapped[at_1000] - float(h1.iloc[0]["Close"])) < 1e-9
+    # 10:00 對到的是 09:00-10:00 收盤，不能是還在走的 10 點那根
+    assert mapped[at_1000] < float(df["Close"].iloc[at_1000])
 
 
 def test_long_lower_wick() -> None:
@@ -214,12 +240,14 @@ def test_write_html_report() -> None:
     assert "線性空" in text
     if trades:
         assert "<img src='img/" in text
+        assert "1h" in text
         assert any((path.parent / "img").glob("t01_*.png"))
 
 
 def main() -> int:
     test_parse_period_days()
     test_sma()
+    test_resample_and_map_1h()
     test_long_lower_wick()
     test_summarize_trades()
     test_entry_and_ma200_tp()
