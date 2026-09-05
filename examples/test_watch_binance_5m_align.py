@@ -25,6 +25,7 @@ from watch_binance_5m_align import (  # noqa: E402
     key_of,
     parse_klines,
     pick_chart_hits,
+    reclaim_ma200,
     sma,
     summarize_hits,
 )
@@ -67,6 +68,31 @@ def rising(n: int, start: float = 100.0, step: float = 0.15) -> np.ndarray:
     return start + np.arange(n, dtype=float) * step
 
 
+def reclaim_closes(n: int = 260) -> np.ndarray:
+    """長時間在 100，先跌到 MA200 下再爬、最後一根收過 MA200。"""
+    c = np.full(n, 100.0)
+    c[190:210] = 96.5
+    c[210:229] = np.linspace(97.0, 99.35, 19)
+    c[229] = 101.4
+    c[230:] = 101.6
+    return c
+
+
+def reclaim_5m(t0: int = 1_700_000_000_000):
+    return add_mas(_bars(reclaim_closes(), t0=t0), (7, 14, 25, 200))
+
+
+def hour_ok_hi():
+    return add_mas(_bars(rising(240, 50.0, 0.4), step=3_600_000), (99, 200))
+
+
+def reclaim_live_pair():
+    t0 = 1_700_000_000_000
+    d5 = add_mas(_bars(reclaim_closes(), t0=t0 + 220 * 3_600_000), (7, 14, 25, 200))
+    h1 = add_mas(_bars(np.full(240, 80.0), t0=t0, step=3_600_000), (99, 200))
+    return d5, h1
+
+
 def test_five_align_rising() -> None:
     d = add_mas(_bars(rising(240)), (7, 14, 25, 200))
     assert five_align_ok(d, 230)
@@ -82,42 +108,30 @@ def test_hour_above() -> None:
     assert not hour_above_ok(below, 239)
 
 
-def test_detect_only_first_bar() -> None:
+def test_already_above_does_not_fire() -> None:
     d5 = add_mas(_bars(rising(240)), (7, 14, 25, 200))
     h1 = add_mas(_bars(rising(240, 80.0, 0.3), step=3_600_000), (99, 200))
-    assert detect_new_align(d5, 230, h1, 230) is None
-    first = None
-    for i in range(len(d5["c"])):
-        if detect_new_align(d5, i, h1, 230):
-            first = i
-            break
-    assert first is not None
-    assert detect_new_align(d5, first + 1, h1, 230) is None
+    assert five_align_ok(d5, 230)
+    assert not reclaim_ma200(d5, 230)
+    assert all(detect_new_align(d5, i, h1, 230) is None for i in range(len(d5["c"])))
+
+
+def test_detect_reclaim_bar() -> None:
+    d5, h1 = reclaim_5m(), hour_ok_hi()
+    hi = len(h1["c"]) - 1
+    hits = [i for i in range(len(d5["c"])) if detect_new_align(d5, i, h1, hi)]
+    assert hits == [229]
+    assert reclaim_ma200(d5, 229)
+    assert five_align_ok(d5, 229)
+    assert d5["c"][228] < d5["m200"][228]
+    assert d5["c"][229] > d5["m200"][229]
+    assert detect_new_align(d5, 230, h1, hi) is None
 
 
 def test_detect_blocks_without_hour_filter() -> None:
-    d5 = add_mas(_bars(rising(240)), (7, 14, 25, 200))
+    d5 = reclaim_5m()
     weak = add_mas(_bars(np.concatenate([rising(200, 100.0, 0.2), np.full(40, 80.0)]), step=3_600_000), (99, 200))
-    first = None
-    for i in range(len(d5["c"])):
-        if five_align_ok(d5, i) and not five_align_ok(d5, i - 1):
-            first = i
-            break
-    assert first is not None
-    assert detect_new_align(d5, first, weak, len(weak["c"]) - 1) is None
-
-
-def test_detect_just_formed_align() -> None:
-    closes = np.full(240, 100.0)
-    # chop then lift so 7>14>25 and close > MA200 first appear near the end
-    closes[200:] = 100.0 + np.arange(40) * 0.8
-    d5 = add_mas(_bars(closes), (7, 14, 25, 200))
-    h1 = add_mas(_bars(rising(240, 90.0, 0.25), step=3_600_000), (99, 200))
-    hits = [i for i in range(len(closes)) if detect_new_align(d5, i, h1, 230)]
-    assert hits
-    assert five_align_ok(d5, hits[0])
-    assert not five_align_ok(d5, hits[0] - 1)
-    assert all(detect_new_align(d5, i, h1, 230) is None for i in hits[1:])
+    assert detect_new_align(d5, 229, weak, len(weak["c"]) - 1) is None
 
 
 def test_hour_mas_no_lookahead() -> None:
@@ -134,14 +148,11 @@ def test_hour_mas_no_lookahead() -> None:
 
 
 def test_collect_signals_first_bar_only() -> None:
-    t0 = 1_700_000_000_000
-    d5 = add_mas(_bars(rising(240), t0=t0 + 220 * 3_600_000), (7, 14, 25, 200))
-    h1 = add_mas(_bars(np.full(240, 80.0), t0=t0, step=3_600_000), (99, 200))
+    d5, h1 = reclaim_live_pair()
     start, end = int(d5["t"][0]), int(d5["t"][-1])
     hits = collect_signals(d5, h1, start, end)
-    assert len(hits) == 1
-    assert five_align_ok(d5, hits[0]["i"])
-    assert not five_align_ok(d5, hits[0]["i"] - 1)
+    assert [h["i"] for h in hits] == [229]
+    assert reclaim_ma200(d5, hits[0]["i"])
 
 
 def test_forward_and_summary() -> None:
@@ -168,15 +179,14 @@ def test_forward_and_summary() -> None:
 
 
 def test_format_and_key() -> None:
-    d5 = add_mas(_bars(rising(240)), (7, 14, 25, 200))
-    h1 = add_mas(_bars(rising(240, 80.0, 0.3), step=3_600_000), (99, 200))
-    first = next(i for i in range(len(d5["c"])) if detect_new_align(d5, i, h1, 230))
-    sig = detect_new_align(d5, first, h1, 230)
+    d5, h1 = reclaim_5m(), hour_ok_hi()
+    hi = len(h1["c"]) - 1
+    sig = detect_new_align(d5, 229, h1, hi)
     ev = {"symbol": "BTCUSDT", "sig": sig, "d5": d5, "h1": h1}
     text = format_alert(ev)
     assert "BTCUSDT" in text
     assert "多頭排列" in text
-    assert "MA7" in text
+    assert "MA200 下" in text
     assert key_of(ev) == f"BTCUSDT:{sig['t']}"
 
 

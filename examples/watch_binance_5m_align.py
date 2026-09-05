@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """幣安 5m 多頭排列 Telegram 監看。
 
-五分 K：MA7 > MA14 > MA25，且收盤站上 MA200。
+五分 K：MA7 > MA14 > MA25，且前一根收在 MA200 下、這一根收盤才站上。
 同時小時 K 收盤要在 MA99 與 MA200 之上。
-條件剛成立的那根 5m 收盤推一次，同一根不重發。
+同一根不重發。
 
     python3 examples/watch_binance_5m_align.py --test
     python3 examples/watch_binance_5m_align.py --once --dry-run
@@ -100,13 +100,32 @@ def add_mas(d: dict, periods: tuple[int, ...] = (7, 14, 25, 99, 200)) -> dict:
     return out
 
 
+def short_align_ok(d: dict, i: int) -> bool:
+    if i < 0 or i >= len(d["c"]):
+        return False
+    vals = [d["m7"][i], d["m14"][i], d["m25"][i]]
+    if np.isnan(vals).any():
+        return False
+    return vals[0] > vals[1] > vals[2]
+
+
 def five_align_ok(d: dict, i: int) -> bool:
     if i < 0 or i >= len(d["c"]):
         return False
-    vals = [d["m7"][i], d["m14"][i], d["m25"][i], d["m200"][i]]
-    if np.isnan(vals).any():
+    m200 = d["m200"][i]
+    if np.isnan(m200):
         return False
-    return vals[0] > vals[1] > vals[2] and d["c"][i] > vals[3]
+    return short_align_ok(d, i) and d["c"][i] > m200
+
+
+def reclaim_ma200(d: dict, i: int) -> bool:
+    """前一根收在 MA200 下，這一根收盤站上。"""
+    if i < 1 or i >= len(d["c"]):
+        return False
+    prev, now = d["m200"][i - 1], d["m200"][i]
+    if np.isnan([prev, now]).any():
+        return False
+    return d["c"][i - 1] < prev and d["c"][i] > now
 
 
 def hour_above_ok(h: dict, i: int) -> bool:
@@ -141,8 +160,8 @@ def hour_above_at(h: dict, t_ms: int, px: float) -> bool:
 
 
 def detect_new_align(d5: dict, i: int, h1: dict, hi: int | None = None) -> dict | None:
-    """剛收的 5m 第一次同時滿足多頭排列 + 小時站上 99/200。"""
-    if not five_align_ok(d5, i):
+    """5m 7>14>25，且這一根才從 MA200 下收盤站上；小時也在 99/200 上。"""
+    if not five_align_ok(d5, i) or not reclaim_ma200(d5, i):
         return None
     px = float(d5["c"][i])
     t = int(d5["t"][i])
@@ -159,8 +178,6 @@ def detect_new_align(d5: dict, i: int, h1: dict, hi: int | None = None) -> dict 
         h_m99 = float(h1["m99"][hi])
         h_m200 = float(h1["m200"][hi])
         hi_used = hi
-    if five_align_ok(d5, i - 1):
-        return None
     return {
         "i": i,
         "hi": hi_used,
@@ -394,7 +411,7 @@ def format_alert(ev: dict) -> str:
         f"時間 {hm(sig['t'])}\n"
         f"收盤 {sig['close']:g}\n"
         f"5m MA7 {sig['m7']:g} &gt; MA14 {sig['m14']:g} &gt; MA25 {sig['m25']:g}\n"
-        f"收盤站上 MA200 {sig['m200']:g}（{ext:+.2f}%）\n"
+        f"前一根在 MA200 下，這根站上 {sig['m200']:g}（{ext:+.2f}%）\n"
         f"1h 收盤 {sig['h_close']:g} &gt; MA99 {sig['h_m99']:g} / MA200 {sig['h_m200']:g}"
     )
 
@@ -450,7 +467,7 @@ def scan_history_symbol(sym: str, start_ms: int, end_ms: int) -> tuple[list[dict
         t = int(d5["t"][i])
         if t < start_ms or t > end_ms:
             continue
-        if five_align_ok(d5, i) and not five_align_ok(d5, i - 1):
+        if five_align_ok(d5, i) and reclaim_ma200(d5, i):
             meta["five_new"] += 1
             sig = detect_new_align(d5, i, h1)
             if sig:
@@ -573,7 +590,7 @@ def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period
             f"<span class='tag'>120m {_fmt(h.get('120m'))}</span></div>"
             "<pre class='trade-detail'>"
             f"收盤 {h['close']:g}  MA7 {h['m7']:g} > MA14 {h['m14']:g} > MA25 {h['m25']:g}\n"
-            f"站上 MA200 {h['m200']:g}（{ext:+.2f}%）\n"
+            f"前一根在 MA200 下，這根站上 {h['m200']:g}（{ext:+.2f}%）\n"
             f"1h {h['h_close']:g} > MA99 {h['h_m99']:g} / MA200 {h['h_m200']:g}"
             "</pre>"
             f"{img_html}"
@@ -624,9 +641,10 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left
 <section class="summary">
 <h1>幣安 5m 多頭排列 · {escape(period)}</h1>
 <p class="muted">流動 USDT 永續 {funnel.get('symbols', 0)} 檔。
-5m <b>MA7&gt;MA14&gt;MA25</b> 且收盤站上 MA200，同時 1h 收盤在 MA99 / MA200 之上。
-只計剛成立的那根。報酬從訊號收盤算到之後 15/30/60/120 分鐘收盤，不是進出場建議。</p>
-<p class="muted">漏斗：5m 新排列 {funnel.get('five_new', 0)} → 加上小時過濾 {funnel.get('hits', 0)}
+5m <b>MA7&gt;MA14&gt;MA25</b>，且前一根收在 MA200 下、這一根收盤才站上。
+同時 1h 收盤在 MA99 / MA200 之上。已在 MA200 上只是短均排好的不算。
+報酬從訊號收盤算到之後 15/30/60/120 分鐘收盤，不是進出場建議。</p>
+<p class="muted">漏斗：5m 從 MA200 下站上且多排 {funnel.get('five_new', 0)} → 加上小時過濾 {funnel.get('hits', 0)}
 · 讀檔失敗 {funnel.get('errors', 0)}</p>
 <p class="muted">15m 勝率 {stats['15m']['win_rate']:.1f}% 均 {_fmt(stats['15m']['avg'])}
 · 30m {stats['30m']['win_rate']:.1f}% 均 {_fmt(stats['30m']['avg'])}
@@ -710,7 +728,7 @@ def cmd_backtest(args) -> int:
     hits, funnel = backtest_all(symbols, start_ms, end_ms)
     stats = summarize_hits(hits)
     print(
-        f"完成 {time.time()-t0:.1f}s　5m 新排列 {funnel['five_new']} → 訊號 {stats['count']} / {stats['symbols']} 檔\n"
+        f"完成 {time.time()-t0:.1f}s　5m 從 MA200 下站上 {funnel['five_new']} → 訊號 {stats['count']} / {stats['symbols']} 檔\n"
         f"15m {stats['15m']['win_rate']:.1f}% 均 {stats['15m']['avg']:+.2f}%　"
         f"30m {stats['30m']['win_rate']:.1f}% 均 {stats['30m']['avg']:+.2f}%　"
         f"60m {stats['60m']['win_rate']:.1f}% 均 {stats['60m']['avg']:+.2f}%　"
@@ -764,7 +782,7 @@ def main() -> int:
     else:
         print("載入標的…", flush=True)
         symbols = universe()
-        print(f"監看 {len(symbols)} 個流動永續。5m 7>14>25 且收盤站上 MA200，1h 在 MA99/200 上才推。", flush=True)
+        print(f"監看 {len(symbols)} 個流動永續。5m 7>14>25，且從 MA200 下那根收盤站上，1h 在 MA99/200 上才推。", flush=True)
     uni_ts = time.time()
 
     def round_once() -> None:
