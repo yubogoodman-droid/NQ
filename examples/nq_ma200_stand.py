@@ -981,9 +981,17 @@ def _fmt_price(value: float) -> str:
     return f"{value:.1f}"
 
 
+def _entry_kind(trade) -> str:
+    sig = getattr(trade, "signal", None)
+    return getattr(sig, "entry_kind", "primary") if sig is not None else "primary"
+
+
 def display_trades(trades: Sequence[TradeResult]) -> List[TradeResult]:
-    """報告排版：賺錢在前，賠錢在後；同組內照進場時間。"""
-    return sorted(trades, key=lambda t: (t.pnl_points <= 0, t.entry_idx))
+    """報告排版：再進在最前，其餘賺錢在前、賠錢在後；同組內照進場時間。"""
+    return sorted(
+        trades,
+        key=lambda t: (_entry_kind(t) != "reentry", t.pnl_points <= 0, t.entry_idx),
+    )
 
 
 def write_html_report(
@@ -1002,13 +1010,18 @@ def write_html_report(
     df15 = merge_15m_for_chart(df, df_15m)
     df1h = resample_1h(df)
     cards: List[str] = []
+    shown_retry = False
+    shown_win = False
     shown_loss = False
-    n_win = sum(1 for t in trades if t.pnl_points > 0)
-    n_loss = sum(1 for t in trades if t.pnl_points <= 0)
     for i, t in enumerate(display_trades(trades), 1):
-        if i == 1 and n_win:
+        retry = _entry_kind(t) == "reentry"
+        if retry and not shown_retry:
+            cards.append("<h2 class='section'>再進</h2>")
+            shown_retry = True
+        elif (not retry) and t.pnl_points > 0 and not shown_win:
             cards.append("<h2 class='section'>賺錢</h2>")
-        if t.pnl_points <= 0 and not shown_loss and n_loss:
+            shown_win = True
+        elif (not retry) and t.pnl_points <= 0 and not shown_loss:
             cards.append("<h2 class='section'>賠錢</h2>")
             shown_loss = True
         et = df.index[t.entry_idx]

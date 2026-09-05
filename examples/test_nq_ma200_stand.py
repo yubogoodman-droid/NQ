@@ -238,18 +238,30 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert any((path.parent / "img").glob("t01_*_5m.png"))
         assert any((path.parent / "img").glob("t01_*_15m.png"))
         assert any((path.parent / "img").glob("t01_*_1h.png"))
+        if any(getattr(t.signal, "entry_kind", "primary") == "reentry" for t in trades):
+            assert "再進" in text
+            if any(t.pnl_points > 0 for t in trades):
+                assert text.find("再進") < text.find("賺錢")
         if any(t.pnl_points > 0 for t in trades) and any(t.pnl_points <= 0 for t in trades):
-            assert text.find("賺錢") < text.find("賠錢")
+            if "賺錢" in text and "賠錢" in text:
+                assert text.find("賺錢") < text.find("賠錢")
 
 
 def test_display_trades_wins_first() -> None:
+    class S:
+        def __init__(self, kind: str = "primary"):
+            self.entry_kind = kind
+
     class T:
-        def __init__(self, pnl: float, entry_idx: int):
+        def __init__(self, pnl: float, entry_idx: int, kind: str = "primary"):
             self.pnl_points = pnl
             self.entry_idx = entry_idx
+            self.signal = S(kind)
 
-    ordered = display_trades([T(-10, 1), T(100, 5), T(-20, 3), T(100, 2)])  # type: ignore[list-item]
-    assert [t.entry_idx for t in ordered] == [2, 5, 1, 3]
+    ordered = display_trades(
+        [T(-10, 1), T(100, 5), T(-20, 3, "reentry"), T(80, 4, "reentry"), T(100, 2)]  # type: ignore[list-item]
+    )
+    assert [t.entry_idx for t in ordered] == [4, 3, 2, 5, 1]
 
 
 def test_resample_5m() -> None:
