@@ -78,6 +78,29 @@ python3 examples/test_tw_1h_reclaim.py
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim/view.html
 
+## 幣安 5m 多頭排列 Telegram
+
+五分 K：`MA7 > MA14 > MA25`，且**前一根收在 MA200 下、這一根收盤才站上**才推通知。  
+已在 MA200 上只是短均排好的不算。同時小時 K 收盤還要在 `MA99` 與 `MA200` 之上。
+
+```bash
+# Telegram 憑證放 tg_config.env（勿提交）
+python3 examples/watch_binance_5m_align.py --test
+python3 examples/watch_binance_5m_align.py --once --dry-run
+python3 examples/watch_binance_5m_align.py
+
+# 近三天回測（成交額前 100，15/30/60/120 分鐘報酬）
+python3 examples/watch_binance_5m_align.py --backtest --days 3 --pages
+
+# 單元測試（不打幣安）
+python3 examples/test_watch_binance_5m_align.py
+```
+
+只掃 24h 成交額前 100 檔。近三天（2026-09-02 23:18 → 09-05 23:18）：**242 筆 / 67 檔**。  
+5m 從 MA200 下站上且多排 425 → 小時過濾後 242。持有 60 分鐘勝率 **46.3%、平均 +0.42%**；120 分鐘 **46.9%、平均 +0.62%**。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-align-7d44/docs/binance-5m-align/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
