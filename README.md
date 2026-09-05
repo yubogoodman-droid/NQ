@@ -22,6 +22,25 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 五分 K V轉
+
+圖上那種 **急跌 → 尖底 → 幾乎原速拉回**（2026-08-27 ETH：29401.75 → 29662）。  
+16~28 根內從左側高點灌到右側低點（≥120 點 / 4 ATR），底部不盤、dump 中途不能大陽反包；**頸線=起跌高，兩邊要差不多**（右腿第一次回到頸線 ≥98%，時間為左腿的 0.50~1.60 倍），收紅站上 MA5 做多。  
+停損右腿回撤低，目標頸線再延伸 0.7× dump。含盤外；09:00–10:00 不進。
+
+```bash
+python3 examples/nq_v_turn.py backtest --period 7d --pages
+python3 examples/nq_v_turn.py backtest --period 30d --pages
+python3 examples/test_nq_v_turn.py
+```
+
+TradingView：`pinescript/nq_v_turn_5m.pine` 貼到 NQ1! / MNQ1! 五分圖。
+
+近一週 Yahoo 五分（2026-08-28 → 09-04）：**0 筆**。急跌 53 → 回補頸線 8，全是 09-01 同一段（09:40 V底 → 10:45 回到頸線 0.52×），停損距離 143~170 點超過上限 120。  
+近一個月（2026-07-26 → 08-28）：**8 筆、勝率 75%、+436.0 點**（均筆 +54.5）。08-27 仍是 02:10 V底 → 04:00 進場、目標 **+86.5**（0.95×）。
+
+預覽（圖嵌在 HTML 裡，htmlpreview 才不會掛）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-v-turn-4941/docs/nq-v-turn/view.html
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
