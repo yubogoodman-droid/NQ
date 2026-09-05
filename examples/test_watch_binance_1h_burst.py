@@ -123,14 +123,14 @@ def test_accepts_bnb_like_ma25() -> None:
     assert 0 <= hit["ext_ma25"] <= 0.015
 
 
-def test_green_only_skips_red_bar() -> None:
+def test_rejects_red_bar() -> None:
     raw = _uptrend()
     raw["o"][-1] = raw["c"][-1] + 0.5
     raw["v"][-1] = 250.0
     d = indicators(raw)
     i = len(d["c"]) - 1
-    assert burst_at(d, i) is not None
-    assert burst_at(d, i, green_only=True) is None
+    assert burst_at(d, i) is None
+    assert burst_at(d, i, green_only=False) is not None
 
 
 def test_burst_rejects_early_bar() -> None:
@@ -247,7 +247,7 @@ def main() -> int:
         test_burst_rejects_zero_prev_volume,
         test_rejects_far_from_ma25,
         test_accepts_bnb_like_ma25,
-        test_green_only_skips_red_bar,
+        test_rejects_red_bar,
         test_burst_rejects_early_bar,
         test_drop_unclosed,
         test_bars_from_raw_needs_ma200,

@@ -97,22 +97,20 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 ## 幣安 1 小時 K 多頭爆發 Telegram
 
-1 小時圖：`MA7 > MA14 > MA25 > MA99 > MA120 > MA200` 多頭排列，剛收盤那根成交量 **大於前一根一倍以上**（量 > 前一根 × 2），且收盤在 MA25 上方、**離 MA25 ≤ 1.5%**（像 BNB 貼著走），推 Telegram（帶圖）。同一根 K 不會重發。
+1 小時圖：`MA7 > MA14 > MA25 > MA99 > MA120 > MA200` 多頭排列，剛收盤那根成交量 **大於前一根一倍以上**（量 > 前一根 × 2），收盤在 MA25 上方、**離 MA25 ≤ 1.5%**（像 BNB 貼著走），且必須是 **收漲陽線**（收盤 > 開盤）。推 Telegram（帶圖）。同一根 K 不會重發。
 
 憑證同樣放 `tg_config.env`，或寫在 `examples/watch_binance_1h_burst.py` 最上面。
 
 ```bash
 python3 examples/watch_binance_1h_burst.py --test                    # 先測通不通
 python3 examples/watch_binance_1h_burst.py --once --dry-run          # 只掃剛收盤、不送
-python3 examples/watch_binance_1h_burst.py --green-only              # 只要陽線
-python3 examples/watch_binance_1h_burst.py                           # 每根 1h 收盤掃一次
+python3 examples/watch_binance_1h_burst.py                           # 每根 1h 收盤掃一次（只要收漲陽線）
 python3 examples/backtest_binance_1h_burst.py --days 3 --pages        # 近三天回測 + HTML
 python3 examples/test_watch_binance_1h_burst.py                      # 單元測試（不打網路）
 ```
 
-近三天（2026-09-02 23:00 → 09-05 22:00 台北）：231 檔、原始訊號 **317**、進場 **223**（90 檔，同標的重疊不重做）。  
-已平 197 筆勝率 **40.6%**，平均 **+0.25%**。出場：2R 54 · 停損 100 · 時間 43 · 未平 26。  
-收盤後拿著：+1h +0.02% · +4h +0.78% · +8h +1.04% · **+24h +3.84%**（緊停損容易被洗，隔日方向比較明顯）。
+近三天加「離 MA25 ≤ 1.5%」後（2026-09-02 23:00 → 09-05 22:00 台北）：231 檔、原始訊號 **79**、進場 **63**。  
+已平勝率 **53.7%**，平均 **+0.65%**。收盤後 +1h +0.79% · +24h +3.17%。BNB 14:00 那筆還在（離 MA25 +1.10%，2R +1.57%）。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-1h-bull-burst-ee86/docs/binance-1h-burst/view.html
 

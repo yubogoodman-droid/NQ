@@ -353,6 +353,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <h1>幣安 1h 多頭爆發 · 近 {extra['days']} 天</h1>
 <p class="muted">USDT 永續 · MA7&gt;14&gt;25&gt;99&gt;120&gt;200 且收盤量 &gt; 前一根 × {extra['vol_mult']:g}
 · 收盤在 MA25 上方且離 MA25 ≤ {extra['max_ext_ma25']*100:g}%（像 BNB）
+· 只要收漲陽線（收盤 &gt; 開盤）
 <br/>收盤進場；停在訊號 K 低（太窄則 0.5%）、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。
 同標的重疊訊號預設不重做。加總％是各筆相加，不是組合複利。
 <br/>掃 {extra['scanned']} 檔 · 原始訊號 {extra['raw_hits']} · 進場 {stats['count']}
@@ -410,7 +411,7 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="幣安 1h 多頭爆發回測")
     p.add_argument("--days", type=int, default=3)
     p.add_argument("--vol-mult", type=float, default=VOL_MULT)
-    p.add_argument("--green-only", action="store_true")
+    p.add_argument("--allow-red", action="store_true", help="連陰線也做（預設只要收漲陽線）")
     p.add_argument("--overlap", action="store_true", help="同標的重疊訊號也做")
     p.add_argument("--time-bars", type=int, default=TIME_BARS)
     p.add_argument("--target-r", type=float, default=TARGET_R)
@@ -432,7 +433,8 @@ def main(argv=None) -> int:
     print(
         f"回測 {len(symbols)} 檔 · {args.days}d 1h · 量>{args.vol_mult:g}× · "
         f"{args.time_bars} 根 / {args.target_r:g}R"
-        + (f" · 離MA25≤{args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else ""),
+        + (f" · 離MA25≤{args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else "")
+        + (" · 只要收漲陽線" if not args.allow_red else ""),
         flush=True,
     )
     trades: list[Trade] = []
@@ -445,7 +447,7 @@ def main(argv=None) -> int:
                 s,
                 args.days,
                 args.vol_mult,
-                args.green_only,
+                not args.allow_red,
                 args.time_bars,
                 args.target_r,
                 args.overlap,
@@ -486,7 +488,7 @@ def main(argv=None) -> int:
     extra = {
         "days": args.days,
         "vol_mult": args.vol_mult,
-        "green_only": args.green_only,
+        "green_only": not args.allow_red,
         "overlap": args.overlap,
         "time_bars": args.time_bars,
         "target_r": args.target_r,

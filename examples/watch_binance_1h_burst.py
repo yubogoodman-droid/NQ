@@ -5,6 +5,7 @@
   MA7 > MA14 > MA25 > MA99 > MA120 > MA200
   收盤成交量 > 前一根 × 2
   收盤在 MA25 上方、且離 MA25 ≤ 1.5%（像 BNB 貼著走，不追已噴飛的）
+  收漲陽線（收盤 > 開盤）
 
 用法:
   python3 examples/watch_binance_1h_burst.py --test     # 測 Telegram
@@ -166,7 +167,7 @@ def burst_at(
     d: dict,
     i: int,
     vol_mult: float = VOL_MULT,
-    green_only: bool = False,
+    green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
 ) -> dict | None:
     """剛收盤的第 i 根是否符合多頭爆發。"""
@@ -181,7 +182,7 @@ def burst_at(
         return None
     close = float(d["c"][i])
     open_ = float(d["o"][i])
-    if green_only and close < open_:
+    if green_only and close <= open_:
         return None
     m25 = float(d["m25"][i])
     if m25 <= 0:
@@ -307,7 +308,7 @@ def find_bursts(
     start: int,
     end: int,
     vol_mult: float = VOL_MULT,
-    green_only: bool = False,
+    green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
 ) -> list[dict]:
     hits = []
@@ -324,7 +325,7 @@ def scan_symbol(
     sym: str,
     lookback: int = 2,
     vol_mult: float = VOL_MULT,
-    green_only: bool = False,
+    green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
 ) -> list[dict]:
     raw = fetch_klines(sym)
@@ -344,7 +345,7 @@ def format_burst(ev: dict) -> str:
     ts = hm(int(d["t"][ev["i"]]))
     mas = ev["mas"]
     ma_txt = " &gt; ".join(f"MA{n} {mas[k]:g}" for k, n in enumerate(MA_PERIODS))
-    side = "陽線" if ev["close"] >= ev["open"] else "陰線"
+    side = "陽線"
     return (
         f"🚀 <b>1h 多頭爆發</b>  {ev['symbol']}\n"
         f"收盤 {ts}（台北）  {side}\n"
@@ -363,7 +364,7 @@ def scan_all(
     symbols: list[str],
     lookback: int,
     vol_mult: float,
-    green_only: bool = False,
+    green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
 ) -> list[dict]:
     events = []
@@ -427,7 +428,7 @@ def main() -> int:
     p.add_argument("--dry-run", action="store_true", help="掃到也不送 Telegram")
     p.add_argument("--lookback", type=int, default=2, help="往回看幾根已收盤 1h（預設 2）")
     p.add_argument("--vol-mult", type=float, default=VOL_MULT, help="成交量倍數門檻（預設 2 = 大於前一根一倍）")
-    p.add_argument("--green-only", action="store_true", help="只報陽線（收盤 ≥ 開盤）")
+    p.add_argument("--allow-red", action="store_true", help="連陰線也報（預設只要收漲陽線）")
     p.add_argument(
         "--max-ext-ma25",
         type=float,
@@ -445,7 +446,8 @@ def main() -> int:
     symbols = list(args.symbols) if args.symbols else universe()
     print(
         f"監看 {len(symbols)} 個 1h：MA7>14>25>99>120>200 且量 > 前一根 × {args.vol_mult:g}"
-        + (f" 且離 MA25 ≤ {args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else ""),
+        + (f" 且離 MA25 ≤ {args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else "")
+        + (" 只要收漲陽線" if not args.allow_red else ""),
         flush=True,
     )
     uni_ts = time.time()
@@ -461,7 +463,7 @@ def main() -> int:
             symbols,
             lookback=max(1, args.lookback),
             vol_mult=args.vol_mult,
-            green_only=args.green_only,
+            green_only=not args.allow_red,
             max_ext_ma25=args.max_ext_ma25,
         )
         new = [e for e in events if key_of(e) not in seen]
