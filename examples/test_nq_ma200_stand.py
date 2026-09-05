@@ -145,7 +145,8 @@ def test_detect_happy_path() -> None:
 
 def test_stands_on_5m_mas() -> None:
     assert stands_on_5m_mas(101.0, 100.0, 99.0, 98.0, 97.0) is True
-    assert stands_on_5m_mas(110.0, 100.0, 105.0, 102.0, 90.0) is True  # 站回即可，不用多排
+    assert stands_on_5m_mas(110.0, 108.0, 106.0, 104.0, 107.0) is True  # 5>10>20，60 只站上
+    assert stands_on_5m_mas(110.0, 100.0, 105.0, 102.0, 90.0) is False  # 沒有 5>10>20
     assert stands_on_5m_mas(100.0, 100.0, 99.0, 98.0, 97.0) is False
     assert stands_on_5m_mas(101.0, 100.0, 102.0, 98.0, 97.0) is False
     assert stands_on_5m_mas(101.0, 100.0, 99.0, 98.0, float("nan")) is False
