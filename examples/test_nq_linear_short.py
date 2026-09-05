@@ -16,6 +16,7 @@ from nq_linear_short import (  # noqa: E402
     long_lower_wick,
     map_closed_1h,
     parse_period_days,
+    resample_5m,
     resample_1h,
     run_linear_short,
     sma,
@@ -63,6 +64,10 @@ def test_resample_and_map_1h() -> None:
     assert abs(mapped[at_1000] - float(h1.iloc[0]["Close"])) < 1e-9
     # 10:00 對到的是 09:00-10:00 收盤，不能是還在走的 10 點那根
     assert mapped[at_1000] < float(df["Close"].iloc[at_1000])
+    m5 = resample_5m(df)
+    assert len(m5) == 36
+    assert abs(float(m5.iloc[0]["Open"]) - 20000.0) < 1e-9
+    assert abs(float(m5.iloc[0]["Close"]) - 20004.0) < 1e-9
 
 
 def test_long_lower_wick() -> None:
@@ -240,7 +245,7 @@ def test_write_html_report() -> None:
     assert "線性空" in text
     if trades:
         assert "<img src='img/" in text
-        assert "1h" in text
+        assert "5m" in text
         assert any((path.parent / "img").glob("t01_*.png"))
 
 

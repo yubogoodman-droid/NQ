@@ -39,10 +39,9 @@ plot(ma60,  "MA60",  color=color.new(#9b5de5, 50))
 plot(ma120, "MA120", color=color.new(#2a9d8f, 50))
 plot(ma200, "MA200", color=color.new(#264653, 0), linewidth=2)
 
-// 一小時線：已收盤 1H 收盤（階梯）+ 1H MA20
-[h1Close, h1Ma20] = request.security(syminfo.tickerid, "60", [close, ta.sma(close, 20)], lookahead=barmerge.lookahead_off)
-plot(h1Close, "1H", color=color.new(#e0e7ff, 0), style=plot.style_stepline, linewidth=2)
-plot(h1Ma20, "1H MA20", color=color.new(#94a3b8, 15), linewidth=2)
+// 一小時線：只畫已收盤 1H 收盤（細灰階梯，避免蓋過 K 線）
+h1Close = request.security(syminfo.tickerid, "60", close, lookahead=barmerge.lookahead_off)
+plot(h1Close, "1H", color=color.new(#94a3b8, 30), style=plot.style_stepline, linewidth=1)
 
 bullStack = ma5 > ma10 and ma10 > ma20 and ma20 > ma30 and ma30 > ma60 and ma60 > ma120 and ma120 > ma200
 
