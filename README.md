@@ -78,6 +78,21 @@ python3 examples/test_tw_1h_reclaim.py
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim/view.html
 
+## 幣安 5m 多頭排列 Telegram
+
+五分 K：`MA7 > MA14 > MA25` 且收盤站上 `MA200` 才推通知。  
+同時小時 K 收盤還要在 `MA99` 與 `MA200` 之上。條件剛成立的那根 5m 收盤推一次。
+
+```bash
+# Telegram 憑證放 tg_config.env（勿提交）
+python3 examples/watch_binance_5m_align.py --test
+python3 examples/watch_binance_5m_align.py --once --dry-run
+python3 examples/watch_binance_5m_align.py
+
+# 單元測試（不打幣安）
+python3 examples/test_watch_binance_5m_align.py
+```
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
