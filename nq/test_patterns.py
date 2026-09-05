@@ -1,10 +1,10 @@
-"""破底 W 底偵測測試。"""
+"""三小時破底翻 MA30 測試。"""
 
 from __future__ import annotations
 
 import pandas as pd
 
-from nq.patterns import detect_w_bottoms
+from nq.patterns import detect_reclaims
 from nq.strategy import NQWBottomStrategy
 
 
@@ -33,186 +33,43 @@ def _flat(n: int, price: float, drift: float = 0.0) -> list[tuple[float, float, 
     return rows
 
 
-def _l1_l2_l3_rows() -> list[tuple[float, float, float, float]]:
-    """L1 左 → 頸線 → L2 破底 → 收復 → L3 右（L3 收盤進場）。"""
-    rows: list[tuple[float, float, float, float]] = []
-    rows.extend(_flat(8, 10040.0))
-    rows.append((10020, 10024, 10012, 10016))
-    rows.append((10016, 10018, 10000, 10008))  # L1
-    rows.append((10008, 10022, 10006, 10020))
-    rows.append((10020, 10032, 10016, 10030))
-    rows.append((10030, 10042, 10026, 10040))
-    rows.append((10040, 10052, 10036, 10048))  # 頸線
-    rows.append((10048, 10050, 10030, 10032))
-    rows.append((10032, 10034, 9970, 9978))  # L2 破底開始
-    rows.append((9978, 10012, 9968, 10008))  # L2 最低 + 收復
-    rows.append((10008, 10020, 10004, 10016))
-    rows.append((10016, 10022, 10006, 10010))
-    rows.append((10010, 10014, 10001, 10006))  # L3 ≈ L1
-    rows.append((10006, 10018, 10004, 10016))
-    rows.append((10016, 10028, 10012, 10026))
-    rows.append((10026, 10038, 10022, 10036))
-    rows.append((10036, 10048, 10032, 10046))
-    rows.append((10046, 10060, 10044, 10056))
-    rows.extend(_flat(6, 10058.0, drift=1.0))
+def _break_then_reclaim_rows() -> list[tuple[float, float, float, float]]:
+    """前 40 根在 10040，接著一根跌破三小時低，兩根內收盤站上 MA30。"""
+    rows = _flat(40, 10040.0)
+    rows.append((10020, 10024, 9990, 10010))  # 破 10036 附近的三小時低
+    rows.append((10010, 10050, 10008, 10045))  # 收盤站上 MA30
+    rows.extend(_flat(8, 10048.0, drift=1.0))
     return rows
 
 
-def test_detects_l1_l2_breakdown_l3() -> None:
-    df = _df(_l1_l2_l3_rows())
-    patterns = detect_w_bottoms(df)
+def test_detects_break_and_ma30_reclaim() -> None:
+    df = _df(_break_then_reclaim_rows())
+    patterns = detect_reclaims(df)
     assert len(patterns) >= 1
     p = patterns[0]
-    assert p.l1 == 10000
-    assert p.l2 < p.l1
-    assert p.l2 <= 9970
-    assert abs(p.l3 - p.l1) / p.l1 <= 0.001
-    assert p.l3 > p.l2
-    assert p.l1_idx < p.l2_idx < p.l3_idx
-    assert p.stop_loss == p.l3
+    assert p.break_low <= 9990
+    assert p.entry_idx > p.break_idx
+    assert df["close"].iloc[p.entry_idx] > p.ma30
 
 
-def test_l2_is_the_lowest_bar_between_shoulders() -> None:
-    """中間若有更深的殺，L2 必須抓那根，不能抓後來略破 L1 的回測。"""
-    rows = _flat(8, 10040.0)
-    rows.append((10020, 10024, 10012, 10016))
-    rows.append((10016, 10018, 10000, 10008))  # L1 = 10000
-    rows.append((10008, 10022, 10006, 10020))
-    rows.append((10020, 10032, 10016, 10030))
-    rows.append((10030, 10042, 10026, 10040))
-    rows.append((10040, 10052, 10036, 10048))  # 先彈出頸線
-    rows.append((10048, 10050, 10030, 10032))
-    rows.append((10030, 10018, 9950, 9955))  # 真正破底
-    rows.append((9955, 10020, 9948, 10010))  # 最低 9948 並收復
-    rows.append((10010, 10040, 10004, 10036))
-    rows.append((10036, 10048, 10020, 10028))
-    rows.append((10028, 10030, 9992, 10008))  # 淺回測，不可當 L2
-    rows.append((10008, 10018, 10002, 10012))
-    rows.append((10012, 10016, 10001, 10008))  # L3 ≈ L1
-    rows.append((10008, 10022, 10004, 10018))
-    rows.append((10018, 10034, 10014, 10032))
-    rows.append((10032, 10048, 10028, 10046))
-    rows.append((10046, 10060, 10044, 10056))
-    rows.extend(_flat(6, 10058.0, drift=1.0))
-    patterns = detect_w_bottoms(_df(rows))
-    assert patterns
-    p = patterns[0]
-    assert p.l2 <= 9950
-    assert p.l2 < 9992
+def test_no_reclaim_within_30_minutes_is_ignored() -> None:
+    rows = _flat(40, 10040.0)
+    rows.append((10020, 10024, 9990, 9995))
+    rows.extend(_flat(8, 9992.0))  # 一直趴在均線下
+    assert detect_reclaims(_df(rows)) == []
 
 
-def test_two_leg_without_right_shoulder_is_ignored() -> None:
-    rows = _flat(8, 10040.0)
-    rows.append((10020, 10024, 10012, 10016))
-    rows.append((10016, 10018, 10000, 10008))
-    rows.append((10008, 10022, 10006, 10020))
-    rows.append((10020, 10032, 10016, 10030))
-    rows.append((10030, 10042, 10026, 10040))
-    rows.append((10040, 10052, 10036, 10048))
-    rows.append((10048, 10050, 10030, 10032))
-    rows.append((10032, 10034, 9970, 9978))
-    rows.append((9978, 10012, 9968, 10008))
-    rows.append((10008, 10024, 10004, 10022))
-    rows.append((10022, 10038, 10018, 10036))
-    rows.append((10036, 10048, 10032, 10046))
-    rows.append((10046, 10060, 10044, 10056))
-    rows.extend(_flat(6, 10058.0, drift=1.0))
-    assert detect_w_bottoms(_df(rows)) == []
+def test_no_break_of_3h_low_is_ignored() -> None:
+    rows = _flat(50, 10040.0)
+    assert detect_reclaims(_df(rows)) == []
 
 
-def test_equal_double_bottom_without_l2_breakdown_is_ignored() -> None:
-    rows = _flat(8, 10040.0)
-    rows.append((10020, 10024, 10012, 10016))
-    rows.append((10016, 10018, 10000, 10008))
-    rows.append((10008, 10022, 10006, 10020))
-    rows.append((10020, 10032, 10016, 10030))
-    rows.append((10030, 10042, 10026, 10040))
-    rows.append((10040, 10052, 10036, 10048))
-    rows.append((10048, 10050, 10030, 10032))
-    rows.append((10032, 10036, 10008, 10012))
-    rows.append((10012, 10020, 10006, 10016))
-    rows.append((10016, 10018, 10001, 10008))
-    rows.append((10008, 10022, 10006, 10020))
-    rows.append((10020, 10036, 10016, 10034))
-    rows.append((10034, 10048, 10030, 10046))
-    rows.append((10046, 10060, 10044, 10056))
-    rows.extend(_flat(6, 10058.0))
-    assert detect_w_bottoms(_df(rows)) == []
-
-
-def test_strategy_enters_on_l3_close() -> None:
-    df = _df(_l1_l2_l3_rows())
+def test_strategy_enters_on_reclaim_close() -> None:
+    df = _df(_break_then_reclaim_rows())
     signals = NQWBottomStrategy().generate_signals(df)
     assert len(signals) == 1
     sig = signals[0]
-    assert sig.bar_idx == sig.pattern.l3_idx
-    assert sig.entry == round(float(df["close"].iloc[sig.pattern.l3_idx]) / 0.25) * 0.25
-    assert sig.pattern.l1_idx < sig.pattern.l2_idx < sig.pattern.l3_idx
-    assert sig.pattern.l2 < sig.pattern.l1
-    assert sig.entry > sig.stop_loss
-    assert sig.stop_loss == round((sig.pattern.l3 - 20.0) / 0.25) * 0.25
-
-
-def test_tangled_moving_averages_are_skipped() -> None:
-    """進場時 MA5/10/20/60 擠在一起則跳過。"""
-    # 先走 80 根橫盤，讓均線黏在一起，再接標準 W
-    rows = _flat(80, 10040.0) + _l1_l2_l3_rows()
-    assert NQWBottomStrategy().generate_signals(_df(rows)) == []
-
-
-def test_close_well_below_l1_is_skipped() -> None:
-    df = _df(_l1_l2_l3_rows())
-    idx = NQWBottomStrategy().generate_signals(df)[0].bar_idx
-    df.iat[idx, df.columns.get_loc("close")] = 9985.0
-    assert NQWBottomStrategy().generate_signals(df) == []
-
-
-def test_entry_already_at_neckline_is_skipped() -> None:
-    df = _df(_l1_l2_l3_rows())
-    sig = NQWBottomStrategy().generate_signals(df)[0]
-    df.iat[sig.bar_idx, df.columns.get_loc("close")] = sig.pattern.neckline - 5.0
-    assert NQWBottomStrategy().generate_signals(df) == []
-
-
-def test_stretched_above_ma200_is_skipped() -> None:
-    rows = _flat(220, 9800.0) + _l1_l2_l3_rows()
-    assert NQWBottomStrategy().generate_signals(_df(rows)) == []
-
-
-def test_far_below_ma60_is_skipped() -> None:
-    rows = _flat(80, 10200.0) + _l1_l2_l3_rows()
-    assert NQWBottomStrategy().generate_signals(_df(rows)) == []
-
-
-def test_pattern_longer_than_two_hours_is_ignored() -> None:
-    rows = _l1_l2_l3_rows()
-    # 在 L3 前插入超過 2 小時的空白 K
-    pad = _flat(30, 10020.0)
-    # L1 約在 index 9，L3 原本約 19；插入 30 根後間隔 > 2h
-    head, tail = rows[:18], rows[18:]
-    df = _df(head + pad + tail)
-    assert detect_w_bottoms(df) == []
-
-
-def test_shallow_l2_breakdown_is_ignored() -> None:
-    """L2 只略破 L1（約 20 點 / <0.10%）不算破底。"""
-    rows = _flat(8, 10040.0)
-    rows.append((10020, 10024, 10012, 10016))
-    rows.append((10016, 10018, 10000, 10008))  # L1
-    rows.append((10008, 10022, 10006, 10020))
-    rows.append((10020, 10032, 10016, 10030))
-    rows.append((10030, 10042, 10026, 10040))
-    rows.append((10040, 10052, 10036, 10048))
-    rows.append((10048, 10050, 10030, 10032))
-    rows.append((10032, 10034, 9985, 9990))  # 只破 15 點
-    rows.append((9990, 10012, 9982, 10008))
-    rows.append((10008, 10020, 10004, 10016))
-    rows.append((10016, 10022, 10006, 10010))
-    rows.append((10010, 10014, 10001, 10006))  # L3
-    rows.append((10006, 10018, 10004, 10016))
-    rows.append((10016, 10028, 10012, 10026))
-    rows.append((10026, 10038, 10022, 10036))
-    rows.append((10036, 10048, 10032, 10046))
-    rows.append((10046, 10060, 10044, 10056))
-    rows.extend(_flat(6, 10058.0, drift=1.0))
-    assert detect_w_bottoms(_df(rows)) == []
+    assert sig.bar_idx == sig.pattern.entry_idx
+    assert sig.entry == round(float(df["close"].iloc[sig.bar_idx]) / 0.25) * 0.25
+    assert sig.stop_loss < sig.entry
+    assert sig.target > sig.entry

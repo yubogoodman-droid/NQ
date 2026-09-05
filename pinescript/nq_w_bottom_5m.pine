@@ -1,93 +1,36 @@
 //@version=5
-strategy("NQ 五分K 破底W底進場", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, process_orders_on_close=true)
+strategy("NQ 五分K 破三小時低翻MA30", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, process_orders_on_close=true)
 
-// L1 左、L2 破底、L3 右；L3 收盤進場
-swingLen      = input.int(3, "轉折確認 K 數", minval=1)
-tolPct        = input.float(0.1, "L1/L3 價差容忍 (%)", minval=0.05, step=0.05) / 100
-minSpringPct  = input.float(0.10, "L2 低於 L1 最少 (%)", minval=0.05, step=0.01) / 100
-minSpringPts  = input.float(30.0, "L2 低於 L1 最少點數", minval=0, step=1)
-minBouncePct  = input.float(0.10, "破底前最少反彈 (%)", minval=0.05, step=0.01) / 100
-minBars       = input.int(8, "L1 到 L3 最少間隔", minval=4)
-maxBars       = input.int(24, "L1 到 L3 最多間隔（2小時）", minval=10)
-maxReclaim    = input.int(4, "L2 後最多幾根須收復", minval=2)
-stopPts       = input.float(20.0, "停損在 L3 下方點數", minval=0, step=1)
-minMaSpan     = input.float(40.0, "均線高低差最少點數", minval=0, step=1)
-maxAbove200   = input.float(120.0, "高於MA200最遠點數", minval=0, step=1)
-maxBelow60    = input.float(80.0, "低於MA60最遠點數", minval=0, step=1)
-maxBelowL1    = input.float(10.0, "收盤低於L1最多點數", minval=0, step=1)
-minNeckRoom   = input.float(20.0, "進場距頸線最少點數", minval=0, step=1)
+lookbackBars = input.int(36, "三小時回看 K 數", minval=12)
+reclaimBars  = input.int(6, "破底後最多幾根須站上 MA30", minval=1)
+maLen        = input.int(30, "均線", minval=5)
+stopPts      = input.float(20.0, "停損在破底下方點數", minval=0, step=1)
+rr           = input.float(2.0, "盈虧比", minval=0.5, step=0.5)
 
-ma5  = ta.sma(close, 5)
-ma10 = ta.sma(close, 10)
-ma20 = ta.sma(close, 20)
-ma60 = ta.sma(close, 60)
-ma120 = ta.sma(close, 120)
-ma200 = ta.sma(close, 200)
-maHi = math.max(ma5, math.max(ma10, math.max(ma20, math.max(ma60, math.max(ma120, ma200)))))
-maLo = math.min(ma5, math.min(ma10, math.min(ma20, math.min(ma60, math.min(ma120, ma200)))))
-maOk = not na(ma200) and (maHi - maLo) >= minMaSpan
+ma30 = ta.sma(close, maLen)
+priorLow = ta.lowest(low[1], lookbackBars)
+newBreak = low < priorLow and low[1] >= priorLow
 
-pl = ta.pivotlow(low, swingLen, swingLen)
+var int   breakBar = na
+var float breakLow = na
 
-var float l1         = na
-var int   l1Bar      = na
-var float bounceHigh = na
-var bool  bounced    = false
-var float l2         = na
-var int   l2Bar      = na
-var int   reclaimBar = na
-var float l3         = na
-var int   l3Bar      = na
-var float neckline   = na
-var bool  wReady     = false
+if newBreak and na(breakBar)
+    breakBar := bar_index
+    breakLow := low
 
-reset() =>
-    l1         := na
-    l1Bar      := na
-    bounceHigh := na
-    bounced    := false
-    l2         := na
-    l2Bar      := na
-    reclaimBar := na
-    l3         := na
-    l3Bar      := na
-    neckline   := na
-    wReady     := false
+if not na(breakBar)
+    breakLow := math.min(breakLow, low)
+    if bar_index - breakBar >= reclaimBars
+        breakBar := na
+        breakLow := na
+    else if close > ma30
+        entry = close
+        stop = breakLow - stopPts
+        if entry > stop
+            strategy.entry("破底翻MA30", strategy.long)
+            strategy.exit("出場", "破底翻MA30", stop=stop, limit=entry + rr * (entry - stop))
+        breakBar := na
+        breakLow := na
 
-if not na(pl) and na(l1)
-    l1         := pl
-    l1Bar      := bar_index - swingLen
-    bounceHigh := high
-    bounced    := false
-
-if not na(l1) and na(l3) and not na(pl)
-    candBar = bar_index - swingLen
-    gap = candBar - l1Bar
-    avgLow = (l1 + pl) / 2
-    priceOk = math.abs(l1 - pl) / avgLow <= tolPct
-    if gap >= minBars and gap <= maxBars and priceOk
-        midLow = ta.lowest(low, gap)
-        if l1 - midLow >= math.max(l1 * minSpringPct, minSpringPts) and pl > midLow
-            l2       := midLow
-            l2Bar    := candBar - ta.barssince(low == midLow)
-            l3       := pl
-            l3Bar    := candBar
-            neckline := ta.highest(high, gap)
-            wReady   := true
-
-stretchOk = na(ma200) or (close - ma200) <= maxAbove200
-ma60Ok = na(ma60) or (ma60 - close) <= maxBelow60
-l1CloseOk = na(l1) or close >= l1 - maxBelowL1
-neckOk = na(neckline) or (neckline - close) >= minNeckRoom
-longSignal = wReady and not na(l3) and maOk and stretchOk and ma60Ok and l1CloseOk and neckOk
-
-if longSignal
-    strategy.entry("破底W做多", strategy.long)
-    strategy.exit("破底W出場", "破底W做多", stop=l3 - stopPts, limit=neckline + (neckline - l2))
-    reset()
-
-plotshape(longSignal, title="破底W進場", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
-plot(not na(neckline) ? neckline : na, "頸線", color=color.orange, linewidth=2, style=plot.style_linebr)
-plot(not na(l1) ? l1 : na, "L1", color=color.aqua, linewidth=1, style=plot.style_circles)
-plot(not na(l2) ? l2 : na, "L2破底", color=color.fuchsia, linewidth=1, style=plot.style_circles)
-plot(not na(l3) ? l3 : na, "L3", color=color.red, linewidth=1, style=plot.style_circles)
+plot(ma30, "MA30", color=color.yellow, linewidth=2)
+plotshape(newBreak, title="破三小時低", style=shape.triangledown, location=location.belowbar, color=color.fuchsia, size=size.tiny)

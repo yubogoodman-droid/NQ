@@ -1,212 +1,138 @@
-"""破底 W 底型態偵測：L1 左、L2 破底、L3 右。"""
+"""五分 K：跌破近三小時低點後，半小時內收盤站上 MA30。"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Sequence
 
 import pandas as pd
 
 
+LOOKBACK_BARS = 36  # 3 小時 × 12 根/小時
+RECLAIM_BARS = 6  # 30 分鐘
+MA30_PERIOD = 30
+
+
 @dataclass(frozen=True)
-class WBottomPattern:
-    """L1 左腳、L2 中間破底、L3 右腳。"""
+class ReclaimPattern:
+    """破三小時低點後，在時限內站上 MA30。"""
 
-    l1_idx: int
-    l2_idx: int
-    l3_idx: int
-    neckline_idx: int
-    l1: float
-    l2: float
-    l3: float
-    neckline: float
-    reclaim_idx: int
-    breakout_idx: int | None = None
+    break_idx: int
+    entry_idx: int
+    lookback_low: float
+    break_low: float
+    ma30: float
 
     @property
-    def first_low_idx(self) -> int:
-        return self.l1_idx
+    def l1_idx(self) -> int:
+        return self.break_idx
 
     @property
-    def first_low(self) -> float:
-        return self.l1
+    def l2_idx(self) -> int:
+        return self.break_idx
 
     @property
-    def second_low_idx(self) -> int:
-        return self.l3_idx
+    def l3_idx(self) -> int:
+        return self.entry_idx
 
     @property
-    def second_low(self) -> float:
-        return self.l3
+    def neckline_idx(self) -> int:
+        return self.break_idx
 
     @property
-    def spring_idx(self) -> int:
-        return self.l2_idx
+    def l1(self) -> float:
+        return self.lookback_low
 
     @property
-    def spring_low(self) -> float:
-        return self.l2
+    def l2(self) -> float:
+        return self.break_low
+
+    @property
+    def l3(self) -> float:
+        return self.break_low
+
+    @property
+    def neckline(self) -> float:
+        return self.lookback_low
+
+    @property
+    def reclaim_idx(self) -> int:
+        return self.entry_idx
+
+    @property
+    def breakout_idx(self) -> int | None:
+        return self.entry_idx
 
     @property
     def stop_loss(self) -> float:
-        """結構低點（右腳 L3）。實際停損由策略放在 L3 下方。"""
-        return self.l3
+        return self.break_low
 
     @property
     def target(self) -> float:
-        """量度目標：頸線 + (頸線 − L2 破底)。"""
-        return self.neckline + (self.neckline - self.l2)
+        """佔位；實際目標由策略用 2R 計算。"""
+        return self.ma30
 
 
-def _is_swing_low(lows: Sequence[float], idx: int, lookback: int) -> bool:
-    if idx < lookback or idx >= len(lows) - lookback:
-        return False
-    pivot = lows[idx]
-    window = lows[idx - lookback : idx + lookback + 1]
-    return pivot == min(window) and window.count(pivot) == 1
+WBottomPattern = ReclaimPattern
 
 
-def _find_swing_lows(lows: Sequence[float], lookback: int) -> list[int]:
-    return [i for i in range(len(lows)) if _is_swing_low(lows, i, lookback)]
-
-
-def _elapsed_hours(index, start_idx: int, end_idx: int) -> float | None:
-    try:
-        return (index[end_idx] - index[start_idx]).total_seconds() / 3600.0
-    except Exception:
+def _sma(closes: list[float], idx: int, period: int) -> float | None:
+    if idx + 1 < period:
         return None
+    return sum(closes[idx - period + 1 : idx + 1]) / period
 
 
-def _is_right_trough(lows: Sequence[float], idx: int, lookback: int) -> bool:
-    n = len(lows)
-    if idx + lookback >= n:
-        return False
-    return lows[idx] == min(lows[idx : idx + lookback + 1])
-
-
-def detect_w_bottoms(
+def detect_reclaims(
     df: pd.DataFrame,
     *,
-    swing_lookback: int = 3,
-    low_tolerance_pct: float = 0.001,
-    min_bars_between_lows: int = 8,
-    max_bars_between_lows: int = 24,
-    max_pattern_hours: float = 2.0,
-    min_spring_pct: float = 0.001,
-    min_spring_points: float = 25.0,
-    min_bounce_pct: float = 0.001,
-    max_reclaim_bars: int = 36,
-    max_breakout_bars: int = 36,
-    require_neckline_break: bool = False,
-) -> list[WBottomPattern]:
+    lookback_bars: int = LOOKBACK_BARS,
+    reclaim_bars: int = RECLAIM_BARS,
+    ma_period: int = MA30_PERIOD,
+) -> list[ReclaimPattern]:
     """
-    偵測三點破底 W 底。
-
-    L2 取 L1 與 L3 之間的最低點。L1 到 L3 須在 2 小時內完成。
-    預設不要求頸線突破；進場由策略在 L3 收盤成交。
+    當根低點跌破「前 lookback_bars 根」的最低點，視為破三小時低。
+    從破底那根起算 reclaim_bars 根內，收盤站上 MA30 則進場。
     """
     required = {"open", "high", "low", "close"}
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"DataFrame 缺少欄位: {missing}")
 
-    lows = df["low"].tolist()
-    highs = df["high"].tolist()
-    closes = df["close"].tolist()
+    lows = df["low"].astype(float).tolist()
+    closes = df["close"].astype(float).tolist()
     n = len(df)
-
-    swing_lows = _find_swing_lows(lows, swing_lookback)
-    patterns: list[WBottomPattern] = []
-
-    for l1_idx in swing_lows:
-        l1 = lows[l1_idx]
-        if l1 <= 0:
+    start = max(lookback_bars, ma_period)
+    patterns: list[ReclaimPattern] = []
+    i = start
+    while i < n:
+        lookback = min(lows[i - lookback_bars : i])
+        fresh = lows[i] < lookback and lows[i - 1] >= lookback
+        if not fresh:
+            i += 1
             continue
-        min_spring = max(l1 * min_spring_pct, min_spring_points)
-        min_bounce = l1 * min_bounce_pct
-        search_end = min(l1_idx + max_bars_between_lows, n - 1 - swing_lookback)
-
-        for l3_idx in range(l1_idx + min_bars_between_lows, search_end + 1):
-            hours = _elapsed_hours(df.index, l1_idx, l3_idx)
-            if hours is not None and hours > max_pattern_hours:
-                break
-            if not _is_right_trough(lows, l3_idx, swing_lookback):
+        break_low = lows[i]
+        found: ReclaimPattern | None = None
+        last = min(i + reclaim_bars - 1, n - 1)
+        for k in range(i, last + 1):
+            ma30 = _sma(closes, k, ma_period)
+            if ma30 is None:
                 continue
-
-            l3 = lows[l3_idx]
-            avg = (l1 + l3) / 2
-            if avg == 0 or abs(l1 - l3) / avg > low_tolerance_pct:
-                continue
-
-            mid_lows = lows[l1_idx + 1 : l3_idx]
-            if len(mid_lows) < 3:
-                continue
-            l2 = min(mid_lows)
-            l2_idx = l1_idx + 1 + mid_lows.index(l2)
-            if l1 - l2 < min_spring or l3 <= l2:
-                continue
-            if l2_idx - l1_idx < 2 or l3_idx - l2_idx < 2:
-                continue
-
-            left0 = max(l2_idx + 1, l3_idx - swing_lookback)
-            if lows[l3_idx] != min(lows[left0 : l3_idx + 1]):
-                continue
-
-            neck_slice = highs[l1_idx + 1 : l3_idx]
-            neckline = max(neck_slice)
-            neckline_idx = l1_idx + 1 + neck_slice.index(neckline)
-            if neckline - max(l1, l3) < min_bounce:
-                continue
-
-            reclaim_end = min(l3_idx, l2_idx + max_reclaim_bars)
-            reclaim_idx: int | None = None
-            for k in range(l2_idx, reclaim_end + 1):
-                if closes[k] > l1:
-                    reclaim_idx = k
-                    break
-            if reclaim_idx is None or l3_idx <= reclaim_idx:
-                continue
-
-            breakout_idx: int | None = None
-            start_k = l3_idx + swing_lookback
-            end_k = min(l3_idx + max_breakout_bars, n - 1)
-            for k in range(start_k, end_k + 1):
-                if closes[k] > neckline:
-                    breakout_idx = k
-                    break
-            if require_neckline_break and breakout_idx is None:
-                continue
-
-            patterns.append(
-                WBottomPattern(
-                    l1_idx=l1_idx,
-                    l2_idx=l2_idx,
-                    l3_idx=l3_idx,
-                    neckline_idx=neckline_idx,
-                    l1=l1,
-                    l2=l2,
-                    l3=l3,
-                    neckline=neckline,
-                    reclaim_idx=reclaim_idx,
-                    breakout_idx=breakout_idx,
+            if closes[k] > ma30:
+                found = ReclaimPattern(
+                    break_idx=i,
+                    entry_idx=k,
+                    lookback_low=lookback,
+                    break_low=min(lows[i : k + 1]),
+                    ma30=ma30,
                 )
-            )
+                break
+        if found:
+            patterns.append(found)
+            i = found.entry_idx + 1
+        else:
+            i = last + 1
+    return patterns
 
-    return _dedupe_patterns(patterns, by_l3=not require_neckline_break)
 
-
-def _dedupe_patterns(
-    patterns: Iterable[WBottomPattern],
-    *,
-    by_l3: bool = True,
-) -> list[WBottomPattern]:
-    by_key: dict[int, WBottomPattern] = {}
-    for p in patterns:
-        key = p.l3_idx if by_l3 else p.breakout_idx
-        if key is None:
-            continue
-        depth = p.neckline - p.l2
-        existing = by_key.get(key)
-        if existing is None or depth > existing.neckline - existing.l2:
-            by_key[key] = p
-    return sorted(by_key.values(), key=lambda p: p.l3_idx)
+def detect_w_bottoms(df: pd.DataFrame, **_: object) -> list[ReclaimPattern]:
+    """相容舊名稱：改為三小時破底翻 MA30。"""
+    return detect_reclaims(df)

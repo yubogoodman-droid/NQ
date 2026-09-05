@@ -1,4 +1,4 @@
-"""產生 NQ W 底回測 HTML 圖表。"""
+"""產生 NQ 破三小時低翻 MA30 HTML 圖表。"""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def build_chart(
     signals: list[Signal],
     results: list[TradeResult],
     *,
-    title: str = "NQ 五分K W底進場",
+    title: str = "NQ 五分K 破三小時低翻MA30",
 ) -> go.Figure:
     times = [_marker_time(t) for t in df.index]
 
@@ -55,32 +55,25 @@ def build_chart(
         p = sig.pattern
         trade = results[i] if i < len(results) else None
 
-        low_points_x = [
-            _marker_time(df.index[p.l1_idx]),
-            _marker_time(df.index[p.l2_idx]),
-            _marker_time(df.index[p.l3_idx]),
-        ]
-        low_points_y = [p.l1, p.l2, p.l3]
         fig.add_trace(
             go.Scatter(
-                x=low_points_x,
-                y=low_points_y,
+                x=[_marker_time(df.index[p.break_idx])],
+                y=[p.break_low],
                 mode="markers+text",
                 marker=dict(symbol="circle", size=9, color=color, line=dict(width=1, color="white")),
-                text=["L1", "L2破底", "L3"],
+                text=["破3h低"],
                 textposition="bottom center",
-                name=f"破底W #{i + 1}",
+                name=f"破底 #{i + 1}",
                 showlegend=True,
             ),
             row=1,
             col=1,
         )
 
-        neck_x = [_marker_time(df.index[p.neckline_idx]), _marker_time(df.index[p.l3_idx])]
         fig.add_trace(
             go.Scatter(
-                x=neck_x,
-                y=[p.neckline, p.neckline],
+                x=[_marker_time(df.index[p.break_idx]), _marker_time(df.index[p.entry_idx])],
+                y=[p.lookback_low, p.lookback_low],
                 mode="lines",
                 line=dict(color=color, width=1.5, dash="dash"),
                 showlegend=False,
@@ -166,7 +159,7 @@ def save_html_chart(
     output: str | Path,
     *,
     strategy: NQWBottomStrategy | None = None,
-    title: str = "NQ 五分K W底進場",
+    title: str = "NQ 五分K 破三小時低翻MA30",
 ) -> Path:
     strategy = strategy or NQWBottomStrategy()
     signals = strategy.generate_signals(df)

@@ -13,13 +13,14 @@ import pandas as pd
 from nq.backtest import TradeResult, run_backtest, summarize
 from nq.strategy import NQWBottomStrategy
 
-_IMG_PREFIX = "wbt"
+_IMG_PREFIX = "rcm"
 
-MA_PERIODS = (5, 10, 20, 60, 120, 200)
+MA_PERIODS = (5, 10, 20, 30, 60, 120, 200)
 MA_COLORS = {
     5: "#ffa726",
     10: "#ffeb3b",
     20: "#66bb6a",
+    30: "#c6ff00",
     60: "#42a5f5",
     120: "#26c6da",
     200: "#ab47bc",
@@ -63,7 +64,7 @@ def _ma_snapshot(row: pd.Series) -> str:
         val = row.get(f"ma{period}")
         if pd.notna(val):
             text = f"MA{period} {val:.2f}"
-            if period <= 20:
+            if period <= 30:
                 short.append(text)
             else:
                 long_.append(text)
@@ -77,10 +78,10 @@ def _ma_snapshot(row: pd.Series) -> str:
 
 def _chart_window(df: pd.DataFrame, trade: TradeResult) -> tuple[int, int]:
     p = trade.signal.pattern
-    start = max(0, p.l1_idx - 12)
+    start = max(0, p.break_idx - 16)
     end = min(
         len(df) - 1,
-        max(trade.exit_idx + 8, trade.signal.bar_idx + 16, p.l3_idx + 14),
+        max(trade.exit_idx + 8, trade.signal.bar_idx + 16, p.entry_idx + 14),
     )
     return start, end
 
@@ -161,32 +162,17 @@ def _draw_trade_png(
         ma = close_full.rolling(period, min_periods=period).mean().iloc[start : end + 1]
         if ma.notna().sum() == 0:
             continue
-        ax.plot(list(xs), ma, color=MA_COLORS[period], lw=1.35 if period <= 20 else 1.05, label=f"MA{period}")
+        ax.plot(list(xs), ma, color=MA_COLORS[period], lw=1.8 if period == 30 else (1.35 if period <= 20 else 1.05), label=f"MA{period}")
 
-    neck_start = p.neckline_idx - start
-    neck_end = sig.bar_idx - start
-    if 0 <= neck_start < len(window) and 0 <= neck_end < len(window):
-        ax.hlines(p.neckline, neck_start, neck_end, colors="#ffa726", linestyles="--", lw=1.0, alpha=0.9)
-    else:
-        ax.axhline(p.neckline, color="#ffa726", ls="--", lw=1.0, alpha=0.8)
+    ax.axhline(p.lookback_low, color="#ffa726", ls="--", lw=1.0, alpha=0.85)
     ax.axhline(sig.stop_loss, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
     ax.axhline(sig.target, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
 
-    l1_rel = p.l1_idx - start
-    l2_rel = p.l2_idx - start
-    l3_rel = p.l3_idx - start
-    if 0 <= l1_rel < len(window):
-        ax.scatter([l1_rel], [p.l1], s=42, color="#42a5f5", zorder=5)
-        ax.annotate("L1", (l1_rel, p.l1), textcoords="offset points", xytext=(0, -12),
-                    ha="center", color="#79c0ff", fontsize=8)
-    if 0 <= l2_rel < len(window):
-        ax.scatter([l2_rel], [p.l2], s=48, color="#f472b6", zorder=5)
-        ax.annotate("L2破底", (l2_rel, p.l2), textcoords="offset points", xytext=(0, -13),
+    br = p.break_idx - start
+    if 0 <= br < len(window):
+        ax.scatter([br], [p.break_low], s=48, color="#f472b6", zorder=5)
+        ax.annotate("破3h低", (br, p.break_low), textcoords="offset points", xytext=(0, -13),
                     ha="center", color="#f9a8d4", fontsize=8)
-    if 0 <= l3_rel < len(window):
-        ax.scatter([l3_rel], [p.l3], s=42, color="#ec407a", zorder=5)
-        ax.annotate("L3", (l3_rel, p.l3), textcoords="offset points", xytext=(0, -12),
-                    ha="center", color="#ffab91", fontsize=8)
 
     entry_rel = sig.bar_idx - start
     exit_rel = trade.exit_idx - start
@@ -216,7 +202,7 @@ def _draw_trade_png(
 
     sign = "+" if trade.pnl_points >= 0 else ""
     ax.set_title(
-        f"#{trade_no}  破底W  {_fmt_time(sig.timestamp)} → {_fmt_time(trade.exit_time)}  "
+        f"#{trade_no}  破3h翻MA30  {_fmt_time(sig.timestamp)} → {_fmt_time(trade.exit_time)}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
         color="#e8f0ea",
         fontsize=11,
@@ -250,9 +236,7 @@ def _render_trade_card(
     p = sig.pattern
     pnl_class = "pnl-win" if trade.pnl_points > 0 else "pnl-loss"
     tag_text, tag_class = _exit_tag(trade.exit_reason, trade.pnl_points)
-    depth = p.neckline - p.l2
-    spring_gap = (p.l1 - p.l2) / p.l1 * 100 if p.l1 else 0
-    shoulder_gap = abs(p.l1 - p.l3) / ((p.l1 + p.l3) / 2) * 100 if (p.l1 + p.l3) else 0
+    bars = p.entry_idx - p.break_idx
     entry_row = df.iloc[sig.bar_idx]
     ma_line = _ma_snapshot(entry_row)
 
@@ -267,17 +251,16 @@ def _render_trade_card(
       </header>
       <div class="tags">
         <span class="tag {tag_class}">{tag_text}</span>
-        <span class="tag tag-info">破底W</span>
+        <span class="tag tag-info">破3h低</span>
+        <span class="tag tag-info">MA30</span>
         <span class="tag tag-info">5m</span>
       </div>
-      <pre class="trade-detail">進場(L3收盤) {sig.entry:.2f}
-停損 L3-20點 {sig.stop_loss:.2f}
-停利 量度漲幅 {sig.target:.2f}
+      <pre class="trade-detail">進場(站上MA30收盤) {sig.entry:.2f}
+停損 破底-20點 {sig.stop_loss:.2f}
+停利 2R {sig.target:.2f}
 出場 {trade.exit_price:.2f}
-L1 {p.l1:.2f} / L2破底 {p.l2:.2f} / L3 {p.l3:.2f}
-頸線 {p.neckline:.2f} / 深度 {depth:.2f}
-L1-L3 價差 {shoulder_gap:.2f}% (≤0.10%)
-破底 {p.l1 - p.l2:.2f} pts ({spring_gap:.2f}%)
+三小時低 {p.lookback_low:.2f} / 破底 {p.break_low:.2f}
+MA30 {p.ma30:.2f} / 破底後 {bars} 根進場
 {ma_line}
 $ {trade.pnl_dollars:+,.2f} NQ×{contracts}</pre>
       <div class="tf-badge">🕐 5分 K</div>
@@ -306,7 +289,7 @@ def build_report_html(
             img_href = _img_data_uri(png_path) if embed_images else f"img/{img_name}"
         cards_parts.append(_render_trade_card(df, trade, i, img_href=img_href))
     cards = "".join(cards_parts)
-    empty = '<div class="empty">今日未偵測到破底 W 底 L3 收盤進場</div>' if not results else ""
+    empty = '<div class="empty">未偵測到破三小時低翻 MA30 進場</div>' if not results else ""
 
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -447,7 +430,7 @@ def build_report_html(
   <div class="page">
     <section class="summary">
       <h1>{html.escape(title)}</h1>
-      <p>{html.escape(symbol)} · 五分 K 破底W底 · L3 收盤進場 · 停損 L3-20點 · 均線差≥40點 · 不追 MA200 / 不遠低於 MA60 · L1–L3 2 小時內 · {html.escape(_report_date_range(df))}</p>
+      <p>{html.escape(symbol)} · 五分 K · 破近三小時低點 · 半小時內收盤站上 MA30 · 停損破底-20點 · 停利 2R · {html.escape(_report_date_range(df))}</p>
       <p style="margin-top:6px;color:#8b949e;font-size:12px;">產生 {html.escape(datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M"))} ET · 綠圈進場 / 綠或紅圈出場</p>
       <div class="total">
         {stats.get("trades", 0)} 筆 · 勝率 {stats.get("win_rate", 0) * 100:.0f}% ·
@@ -487,7 +470,7 @@ def save_report_html(
         results = _filter_today_results(df, results)
     if title is None:
         today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
-        title = f"NQ 破底W底回測 — {today}"
+        title = f"NQ 破三小時低翻 MA30 — {today}"
 
     out = Path(output)
     img_dir = out.parent / "img"
