@@ -143,9 +143,9 @@ python3 examples/scan_binance_15m_ma200.py --watch
 
 ETH 近兩週圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m/view.html
 
-幣圈 5 日（179 檔、3 筆、勝率 66.7%、+1.95%）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-5d/view.html
+幣+股 5 日（223 檔、15 筆、勝率 33.3%、−0.25%）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-5d/view.html
 
-收緊後只剩跟 ETH 同型的：BTC 9/3 10:30（離 200 +0.26%、黏度 0.47%、3.7×，沒走出那根直豎）、ETH 9/3 20:30（截圖那筆，打到 +2.39%）、XAUT 9/1（黏得很緊但後續沒跟）。美股開盤 14× / 19× 已排除。
+跟 ETH 9/3 同型的：BTC 9/3 10:30（+0.26% / 0.47% / 3.7×）、ETH 9/3 20:30（打到 +2.39%）、MSFT 9/3 19:00（+0.17% / 0.27% / 3.1×，打到 +2.10%）、GOOGL / QQQ / SPY / META。開盤 14× / 19× 跳空仍排除。
 
 ## TradingView
 
