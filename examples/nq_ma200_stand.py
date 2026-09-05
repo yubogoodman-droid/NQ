@@ -8,7 +8,7 @@
   4. 進場前 1 小時曾連續 ≥15 根在 MA200 下
   5. 美東 9:30–10:00 不進
   6. 紅 K 長上影跳過
-  7. 停損 MA200−10；進場在 15m MA200 上則改破 15m MA200。停利 +100
+  7. 停損 MA200−10；進場在 15m MA200 上則改：5 分連 2 根收在破底低點下。停利 +100
   8. 浮盈先到 +60 後，停損提到進場價（保本）
 
 用法:
@@ -170,7 +170,7 @@ class Signal:
     m1_ribbon: float = 0.0
     ma200_15m: float = float("nan")
     dist_15m_ma200: float = float("nan")
-    stop_kind: str = "ma200"  # ma200 = 1m MA200−10；m15 = 破 15m MA200
+    stop_kind: str = "ma200"  # ma200 = 1m MA200−10；m5_under = 5m 連 2 根收在破底下
 
 
 @dataclass
@@ -236,13 +236,33 @@ def initial_stop(
     ma200: float,
     ma200_15m: float,
     dist_15m: float,
+    break_low: float,
     *,
     stop_below_ma200: float = STOP_BELOW_MA200,
 ) -> tuple[float, str]:
-    """進場在 15m MA200 上：停損改破 15m MA200；否則 1m MA200−10。"""
+    """進場在 15m MA200 上：停損改 5m 連 2 根收在破底下；否則 1m MA200−10。"""
     if np.isfinite(dist_15m) and dist_15m > 0 and np.isfinite(ma200_15m):
-        return float(ma200_15m), "m15"
+        return float(break_low), "m5_under"
     return float(ma200) - stop_below_ma200, "ma200"
+
+
+def two_5m_closes_below(
+    df_1m: pd.DataFrame,
+    entry_idx: int,
+    now_idx: int,
+    level: float,
+    df_5m: Optional[pd.DataFrame] = None,
+) -> bool:
+    """進場後已收的 5 分，最近連續兩根收盤都在 level 之下（不偷看未收的那根）。"""
+    src = df_5m if df_5m is not None and not df_5m.empty else resample_5m(df_1m)
+    if src.empty or entry_idx < 0 or now_idx < 0:
+        return False
+    entry_ts = df_1m.index[entry_idx]
+    now_ts = df_1m.index[now_idx]
+    closed = src.loc[(src.index > entry_ts) & (src.index <= now_ts)]
+    if len(closed) < 2:
+        return False
+    return float(closed["Close"].iloc[-2]) < level and float(closed["Close"].iloc[-1]) < level
 
 
 def above_ma200_streak(close: np.ndarray, ma200: np.ndarray, j: int, need: int) -> bool:
@@ -342,6 +362,7 @@ def detect_signals(
                 float(ma200[j]),
                 m15_200,
                 dist_15,
+                break_low,
                 stop_below_ma200=stop_below_ma200,
             )
             if entry <= stop:
@@ -391,6 +412,7 @@ def simulate(
     opn = df["Open"].to_numpy(float)
     close = df["Close"].to_numpy(float)
     n = len(close)
+    df_5m = resample_5m(df)
     results: List[TradeResult] = []
     busy_until = -1
     for sig in signals:
@@ -398,6 +420,7 @@ def simulate(
             continue
         if sig.entry_idx >= n - 1:
             continue
+        use_price_sl = sig.stop_kind != "m5_under"
         hard_stop = sig.stop_price
         stop = hard_stop
         target = sig.target_price
@@ -408,7 +431,7 @@ def simulate(
         exit_reason = "eod"
         for k in range(sig.entry_idx + 1, n):
             o, h, l = float(opn[k]), float(high[k]), float(low[k])
-            if o <= stop:
+            if o <= stop and (use_price_sl or armed):
                 exit_idx, exit_price, exit_reason = k, o, ("trail" if armed and stop > hard_stop + 1e-9 else "stop")
                 break
             if o >= target:
@@ -417,7 +440,7 @@ def simulate(
             if (not armed) and breakeven_after > 0 and h >= entry + breakeven_after:
                 armed = True
                 stop = max(stop, entry)
-            hit_hard = l <= hard_stop
+            hit_hard = use_price_sl and l <= hard_stop
             hit_trail = armed and l <= stop
             hit_tp = h >= target
             if hit_hard and hit_tp:
@@ -431,6 +454,11 @@ def simulate(
                 break
             if hit_trail:
                 exit_idx, exit_price, exit_reason = k, stop, "trail"
+                break
+            if sig.stop_kind == "m5_under" and two_5m_closes_below(
+                df, sig.entry_idx, k, sig.break_low, df_5m
+            ):
+                exit_idx, exit_price, exit_reason = k, float(close[k]), "stop"
                 break
         pnl = float(exit_price - sig.entry_price)
         results.append(
@@ -829,6 +857,18 @@ def _fmt_signed(value: float) -> str:
     return f"{value:+.1f}"
 
 
+def _stop_tag(kind: str) -> str:
+    if kind == "m5_under":
+        return "停損 5m×2破底"
+    return "停損 MA200−10"
+
+
+def _stop_note(kind: str) -> str:
+    if kind == "m5_under":
+        return "5m連2根收在破底下"
+    return "MA200−10"
+
+
 def _fmt_price(value: float) -> str:
     if value is None or (isinstance(value, float) and (np.isnan(value) or np.isinf(value))):
         return "—"
@@ -923,7 +963,7 @@ def write_html_report(
             "<span class='tag tag-info'>1h 對照</span>"
             f"<span class='tag tag-info'>距MA200 {t.signal.dist_ma200:.1f}</span>"
             f"<span class='tag tag-info'>距15mMA200 {_fmt_signed(t.signal.dist_15m_ma200)}</span>"
-            f"<span class='tag tag-info'>{'停損 破15mMA200' if t.signal.stop_kind == 'm15' else '停損 MA200−10'}</span>"
+            f"<span class='tag tag-info'>{_stop_tag(t.signal.stop_kind)}</span>"
             f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
             "</div>"
@@ -932,7 +972,7 @@ def write_html_report(
             f"（15m MA200 {_fmt_price(t.signal.ma200_15m)}）\n"
             f"entry {t.entry_price:.2f}\n"
             f"stop  {t.signal.stop_price:.2f}  (−{risk:.1f} pts, "
-            f"{'破15mMA200' if t.signal.stop_kind == 'm15' else 'MA200−10'}；浮盈+60改保本）\n"
+            f"{_stop_note(t.signal.stop_kind)}；浮盈+60改保本）\n"
             f"target {t.target_price:.2f}  (+100)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {t.signal.break_low:.2f} / 2h低 {t.signal.two_hr_low:.2f}\n"
@@ -997,7 +1037,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10，進場在15mMA200上則破15mMA200 / TP=+100 · 浮盈+60改保本 · 5m / 15m / 1h 圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10，進場在15mMA200上則5m連2根收在破底下 / TP=+100 · 浮盈+60改保本 · 5m / 15m / 1h 圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

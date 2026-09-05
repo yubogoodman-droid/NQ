@@ -20,6 +20,7 @@ from nq_ma200_stand import (  # noqa: E402
     is_red_long_upper,
     initial_stop,
     overlay_15m_ma200,
+    two_5m_closes_below,
     parse_period_days,
     resample_5m,
     resample_15m,
@@ -144,46 +145,77 @@ def test_detect_happy_path() -> None:
 
 
 def test_initial_stop() -> None:
-    stop, kind = initial_stop(20000.0, 19950.0, 12.0)
-    assert kind == "m15"
-    assert abs(stop - 19950.0) < 1e-9
-    stop, kind = initial_stop(20000.0, 19950.0, -5.0)
+    stop, kind = initial_stop(20000.0, 19950.0, 12.0, 19880.0)
+    assert kind == "m5_under"
+    assert abs(stop - 19880.0) < 1e-9
+    stop, kind = initial_stop(20000.0, 19950.0, -5.0, 19880.0)
     assert kind == "ma200"
     assert abs(stop - 19990.0) < 1e-9
-    stop, kind = initial_stop(20000.0, 19950.0, float("nan"))
+    stop, kind = initial_stop(20000.0, 19950.0, float("nan"), 19880.0)
     assert kind == "ma200"
 
 
-def test_stop_15m_ma200_when_above() -> None:
-    df = _make_setup_bars()
+def _long_15m(df: pd.DataFrame, value: float) -> pd.DataFrame:
     idx_15 = pd.date_range(df.index[0] - pd.Timedelta(days=3), periods=220, freq="15min", tz=ET)
-    close_15 = np.full(220, 19000.0)
-    df_15 = pd.DataFrame(
+    close_15 = np.full(220, value)
+    return pd.DataFrame(
         {"Open": close_15, "High": close_15 + 1, "Low": close_15 - 1, "Close": close_15},
         index=idx_15,
     )
-    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
+
+
+def test_stop_m5_under_when_above_15m() -> None:
+    df = _make_setup_bars()
+    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=_long_15m(df, 19000.0))
     assert sigs
     sig = sigs[0]
     assert sig.dist_15m_ma200 > 0
-    assert sig.stop_kind == "m15"
-    assert abs(sig.stop_price - sig.ma200_15m) < 1e-6
+    assert sig.stop_kind == "m5_under"
+    assert abs(sig.stop_price - sig.break_low) < 1e-6
 
 
 def test_stop_stays_ma200_when_below_15m_ma200() -> None:
     df = _make_setup_bars()
-    idx_15 = pd.date_range(df.index[0] - pd.Timedelta(days=3), periods=220, freq="15min", tz=ET)
-    close_15 = np.full(220, 21000.0)
-    df_15 = pd.DataFrame(
-        {"Open": close_15, "High": close_15 + 1, "Low": close_15 - 1, "Close": close_15},
-        index=idx_15,
-    )
-    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
+    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=_long_15m(df, 21000.0))
     assert sigs
     sig = sigs[0]
     assert sig.dist_15m_ma200 < 0
     assert sig.stop_kind == "ma200"
     assert abs(sig.stop_price - (sig.ma200 - 10)) < 1e-6
+
+
+def test_two_5m_closes_below() -> None:
+    idx = pd.date_range("2026-08-17 11:00", periods=20, freq="1min", tz=ET)
+    close = np.full(20, 100.0)
+    close[5:15] = 80.0
+    df = pd.DataFrame(
+        {"Open": close, "High": close + 1, "Low": close - 1, "Close": close, "Volume": np.ones(20)},
+        index=idx,
+    )
+    # Entry at 11:00 is excluded; first two later 5m close at 11:05 and 11:10.
+    assert two_5m_closes_below(df, 0, 5, 90.0) is False
+    assert two_5m_closes_below(df, 0, 10, 90.0) is True
+    assert two_5m_closes_below(df, 0, 10, 70.0) is False
+
+
+def test_simulate_m5_under_stop() -> None:
+    df = _make_setup_bars()
+    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=_long_15m(df, 19000.0))
+    assert sigs and sigs[0].stop_kind == "m5_under"
+    sig = sigs[0]
+    j = sig.entry_idx
+    df2 = df.copy()
+    dump = sig.break_low - 8.0
+    for i in range(j + 1, min(j + 16, len(df2))):
+        df2.iloc[i, df2.columns.get_loc("Open")] = dump
+        df2.iloc[i, df2.columns.get_loc("High")] = dump + 1
+        df2.iloc[i, df2.columns.get_loc("Low")] = dump - 1
+        df2.iloc[i, df2.columns.get_loc("Close")] = dump
+    trades = simulate(df2, sigs, breakeven_after=0.0)
+    assert trades
+    assert trades[0].exit_reason == "stop"
+    assert trades[0].exit_idx - j >= 5
+    assert trades[0].exit_price < sig.entry_price
 
 
 def test_skip_red_long_wick() -> None:
@@ -266,7 +298,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "距15mMA200" in text
         assert "進場距 15m MA200" in text
         assert "停損 MA200−10" in text
-        assert "破15mMA200" in text
+        assert "5m連2根收在破底下" in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
         assert any((path.parent / "img").glob("t01_*_15m.png"))
@@ -372,7 +404,9 @@ def main() -> int:
     test_red_long_upper()
     test_detect_happy_path()
     test_initial_stop()
-    test_stop_15m_ma200_when_above()
+    test_stop_m5_under_when_above_15m()
+    test_two_5m_closes_below()
+    test_simulate_m5_under_stop()
     test_stop_stays_ma200_when_below_15m_ma200()
     test_skip_red_long_wick()
     test_skip_open_hour()
