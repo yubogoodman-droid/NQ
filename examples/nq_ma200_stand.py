@@ -168,6 +168,8 @@ class Signal:
     under_streak: int
     m5_ribbon: float = 0.0
     m1_ribbon: float = 0.0
+    ma200_15m: float = float("nan")
+    dist_15m_ma200: float = float("nan")
 
 
 @dataclass
@@ -265,6 +267,7 @@ def detect_signals(
     ma200 = sma(close, 200)
     two_hr_low = rolling_min_prev(low, two_hour_bars)
     m5_ribbon = overlay_5m_ribbon(df)
+    ma200_15m = overlay_15m_ma200(df)
 
     fun = funnel if funnel is not None else {}
 
@@ -314,6 +317,8 @@ def detect_signals(
                 continue
             ribbon = float(m5_ribbon[j])
             ribbon_1m = float(ma5[j] - ma60[j])
+            m15_200 = float(ma200_15m[j])
+            dist_15 = float("nan") if np.isnan(m15_200) else float(close[j] - m15_200)
             if min_5m_ribbon > 0 and (np.isnan(ribbon) or ribbon < min_5m_ribbon):
                 bump("skip_5m_tangle")
                 continue
@@ -342,6 +347,8 @@ def detect_signals(
                     under_streak=streak,
                     m5_ribbon=0.0 if (np.isnan(ribbon) or np.isinf(ribbon)) else ribbon,
                     m1_ribbon=0.0 if np.isnan(ribbon_1m) else ribbon_1m,
+                    ma200_15m=m15_200,
+                    dist_15m_ma200=dist_15,
                 )
             )
             entered = True
@@ -488,6 +495,13 @@ def align_htf(df_1m: pd.DataFrame, series_htf: pd.Series) -> np.ndarray:
         if j < len(idx) and idx[j] <= ts:
             out[i] = vals[j]
     return out
+
+
+def overlay_15m_ma200(df_1m: pd.DataFrame) -> np.ndarray:
+    """已收盤十五分 MA200，對齊到 1m（不偷看未收的那根）。"""
+    df15 = resample_15m(df_1m)
+    ma = df15["Close"].astype(float).rolling(200, min_periods=200).mean()
+    return align_htf(df_1m, ma)
 
 
 def overlay_5m_ribbon(df_1m: pd.DataFrame) -> np.ndarray:
@@ -737,6 +751,18 @@ def draw_1h_png(
     return draw_htf_png(df_1m, df_1h, trade, path, trade_no, label="1h 對照", lookback=36, lookforward=4)
 
 
+def _fmt_signed(value: float) -> str:
+    if value is None or (isinstance(value, float) and (np.isnan(value) or np.isinf(value))):
+        return "—"
+    return f"{value:+.1f}"
+
+
+def _fmt_price(value: float) -> str:
+    if value is None or (isinstance(value, float) and (np.isnan(value) or np.isinf(value))):
+        return "—"
+    return f"{value:.1f}"
+
+
 def display_trades(trades: Sequence[TradeResult]) -> List[TradeResult]:
     """報告排版：賺錢在前，賠錢在後；同組內照進場時間。"""
     return sorted(trades, key=lambda t: (t.pnl_points <= 0, t.entry_idx))
@@ -823,6 +849,7 @@ def write_html_report(
             "<span class='tag tag-info'>15m 對照</span>"
             "<span class='tag tag-info'>1h 對照</span>"
             f"<span class='tag tag-info'>距MA200 {t.signal.dist_ma200:.1f}</span>"
+            f"<span class='tag tag-info'>距15mMA200 {_fmt_signed(t.signal.dist_15m_ma200)}</span>"
             f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
             "</div>"
@@ -835,6 +862,7 @@ def write_html_report(
             f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f} "
             f"> MA30 {t.signal.ma30:.1f} > MA60 {t.signal.ma60:.1f}\n"
             f"MA200 {t.signal.ma200:.1f}  先前連{t.signal.under_streak}根在下\n"
+            f"15m MA200 {_fmt_price(t.signal.ma200_15m)}  進場距 {_fmt_signed(t.signal.dist_15m_ma200)} pts\n"
             f"5m MA5–30 帶寬 {t.signal.m5_ribbon:.1f} · 1m MA5–60 帶寬 {t.signal.m1_ribbon:.1f}"
             "</pre>"
             f"{charts}"

@@ -18,6 +18,7 @@ from nq_ma200_stand import (  # noqa: E402
     display_trades,
     in_open_skip,
     is_red_long_upper,
+    overlay_15m_ma200,
     parse_period_days,
     resample_5m,
     resample_15m,
@@ -216,6 +217,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "5m 對照" in text
         assert "15m 對照" in text
         assert "1h 對照" in text
+        assert "距15mMA200" in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
         assert any((path.parent / "img").glob("t01_*_15m.png"))
@@ -258,6 +260,21 @@ def test_resample_5m() -> None:
     assert {"Open", "High", "Low", "Close"}.issubset(m1h.columns)
 
 
+def test_overlay_15m_ma200() -> None:
+    n = 200 * 15 + 45
+    idx = pd.date_range("2026-01-05 00:00", periods=n, freq="1min", tz=ET)
+    close = np.full(n, 100.0)
+    close[-15:] = 110.0
+    df = pd.DataFrame(
+        {"Open": close, "High": close + 1, "Low": close - 1, "Close": close, "Volume": np.ones(n)},
+        index=idx,
+    )
+    out = overlay_15m_ma200(df)
+    assert np.isnan(out[100])
+    assert not np.isnan(out[-1])
+    assert abs(out[-1] - 100.0) < 0.6
+
+
 def test_ribbon_helpers() -> None:
     assert abs(ribbon_spread(100.0, 110.0, 105.0, 108.0, 102.0) - 10.0) < 1e-9
     assert ribbon_tangled(100.0, 110.0, 105.0, 108.0, min_spread=17.0) is True
@@ -294,6 +311,7 @@ def main() -> int:
     test_write_html()
     test_display_trades_wins_first()
     test_resample_5m()
+    test_overlay_15m_ma200()
     test_ribbon_helpers()
     test_default_has_no_5m_tangle_filter()
     test_summarize()
