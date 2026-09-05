@@ -97,7 +97,7 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 ## 幣安 1 小時 K 多頭爆發 Telegram
 
-1 小時圖：`MA7 > MA14 > MA25 > MA99 > MA120 > MA200` 多頭排列，且剛收盤那根成交量 **大於前一根一倍以上**（量 > 前一根 × 2），推 Telegram（帶圖）。同一根 K 不會重發。
+1 小時圖：`MA7 > MA14 > MA25 > MA99 > MA120 > MA200` 多頭排列，剛收盤那根成交量 **大於前一根一倍以上**（量 > 前一根 × 2），且收盤在 MA25 上方、**離 MA25 ≤ 1.5%**（像 BNB 貼著走），推 Telegram（帶圖）。同一根 K 不會重發。
 
 憑證同樣放 `tg_config.env`，或寫在 `examples/watch_binance_1h_burst.py` 最上面。
 

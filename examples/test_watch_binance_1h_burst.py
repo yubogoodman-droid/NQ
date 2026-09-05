@@ -29,7 +29,7 @@ from watch_binance_1h_burst import (  # noqa: E402
 )
 
 
-def _uptrend(n: int = 240, start: float = 100.0, step: float = 0.4) -> dict:
+def _uptrend(n: int = 240, start: float = 100.0, step: float = 0.12) -> dict:
     c = start + step * np.arange(n, dtype=float)
     o = c - 0.15
     h = c + 0.20
@@ -99,6 +99,28 @@ def test_burst_rejects_zero_prev_volume() -> None:
     raw["v"][-1] = 500.0
     d = indicators(raw)
     assert burst_at(d, len(d["c"]) - 1) is None
+
+
+def test_rejects_far_from_ma25() -> None:
+    raw = _uptrend()
+    raw["v"][-1] = 250.0
+    raw["c"][-1] = raw["c"][-1] * 1.05
+    raw["h"][-1] = raw["c"][-1]
+    d = indicators(raw)
+    i = len(d["c"]) - 1
+    assert burst_at(d, i) is None
+    assert burst_at(d, i, max_ext_ma25=0.08) is not None
+    assert burst_at(d, i) is None or d["c"][i] / d["m25"][i] - 1 > 0.015
+
+
+def test_accepts_bnb_like_ma25() -> None:
+    raw = _uptrend()
+    raw["v"][-1] = 250.0
+    d = indicators(raw)
+    i = len(d["c"]) - 1
+    hit = burst_at(d, i)
+    assert hit is not None
+    assert 0 <= hit["ext_ma25"] <= 0.015
 
 
 def test_green_only_skips_red_bar() -> None:
@@ -211,6 +233,7 @@ def test_key_and_format() -> None:
     assert "BTCUSDT" in msg
     assert "多頭爆發" in msg
     assert "MA7" in msg and "MA200" in msg
+    assert "MA25" in msg
 
 
 def main() -> int:
@@ -222,6 +245,8 @@ def main() -> int:
         test_burst_rejects_low_volume,
         test_burst_rejects_bear_stack,
         test_burst_rejects_zero_prev_volume,
+        test_rejects_far_from_ma25,
+        test_accepts_bnb_like_ma25,
         test_green_only_skips_red_bar,
         test_burst_rejects_early_bar,
         test_drop_unclosed,

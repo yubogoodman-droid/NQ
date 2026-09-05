@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from watch_binance_1h_burst import (  # noqa: E402
     MA_PERIODS,
+    MAX_EXT_MA25,
     REPO,
     TZ,
     VOL_MULT,
@@ -52,6 +53,7 @@ class Trade:
     pnl_pct: float
     reason: str
     vol_ratio: float
+    ext_ma25: float
     green: bool
     fwd_1h: Optional[float]
     fwd_4h: Optional[float]
@@ -110,6 +112,7 @@ def simulate_trade(
         pnl_pct=(float(exit_px) / entry - 1.0) if entry else 0.0,
         reason=reason,
         vol_ratio=float(hit["vol_ratio"]),
+        ext_ma25=float(hit.get("ext_ma25") or 0.0),
         green=float(hit["close"]) >= float(hit["open"]),
         fwd_1h=_fwd(close, i, 1),
         fwd_4h=_fwd(close, i, 4),
@@ -171,6 +174,7 @@ def backtest_symbol(
     time_bars: int,
     target_r: float,
     allow_overlap: bool,
+    max_ext_ma25: float | None = MAX_EXT_MA25,
 ) -> tuple[list[Trade], int]:
     need = 200 + days * 24 + time_bars + 30
     raw = fetch_klines(sym, limit=max(280, need))
@@ -179,7 +183,9 @@ def backtest_symbol(
     d = indicators(raw)
     last = len(d["c"]) - 1
     start = max(MA_PERIODS[-1], last - days * 24 + 1)
-    hits = find_bursts(d, start, last, vol_mult=vol_mult, green_only=green_only)
+    hits = find_bursts(
+        d, start, last, vol_mult=vol_mult, green_only=green_only, max_ext_ma25=max_ext_ma25
+    )
     trades = [simulate_trade(d, hit, target_r=target_r, time_bars=time_bars) for hit in hits]
     for t in trades:
         t.symbol = sym
@@ -307,7 +313,8 @@ def write_html(path: Path, trades: list[Trade], stats: dict, extra: dict, max_ch
             "</header>"
             f"<div class='tags'><span class='tag tag-info'>{escape(t.reason)}</span>"
             f"<span class='tag'>{side}</span>"
-            f"<span class='tag'>量 {t.vol_ratio:.2f}×</span></div>"
+            f"<span class='tag'>量 {t.vol_ratio:.2f}×</span>"
+            f"<span class='tag'>離MA25 {t.ext_ma25*100:+.2f}%</span></div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry:g}  stop {t.stop:g}  target {t.target:g}\n"
             f"exit {t.exit:g} {t.reason}  {t.pnl_pct * 100:+.2f}%\n"
@@ -345,6 +352,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>幣安 1h 多頭爆發 · 近 {extra['days']} 天</h1>
 <p class="muted">USDT 永續 · MA7&gt;14&gt;25&gt;99&gt;120&gt;200 且收盤量 &gt; 前一根 × {extra['vol_mult']:g}
+· 收盤在 MA25 上方且離 MA25 ≤ {extra['max_ext_ma25']*100:g}%（像 BNB）
 <br/>收盤進場；停在訊號 K 低（太窄則 0.5%）、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。
 同標的重疊訊號預設不重做。加總％是各筆相加，不是組合複利。
 <br/>掃 {extra['scanned']} 檔 · 原始訊號 {extra['raw_hits']} · 進場 {stats['count']}
@@ -382,6 +390,7 @@ def dump_hits(path: Path, trades: list[Trade], stats: dict, extra: dict) -> Path
                 "pnl_pct": t.pnl_pct,
                 "reason": t.reason,
                 "vol_ratio": t.vol_ratio,
+                "ext_ma25": t.ext_ma25,
                 "green": t.green,
                 "fwd_1h": t.fwd_1h,
                 "fwd_4h": t.fwd_4h,
@@ -409,6 +418,12 @@ def main(argv=None) -> int:
     p.add_argument("--html", default="")
     p.add_argument("--json", dest="json_path", default="")
     p.add_argument("--max-charts", type=int, default=80)
+    p.add_argument(
+        "--max-ext-ma25",
+        type=float,
+        default=MAX_EXT_MA25,
+        help="收盤最多比 MA25 高多少（預設 0.015；0 關閉）",
+    )
     p.add_argument("--symbols", nargs="*")
     args = p.parse_args(argv)
 
@@ -416,7 +431,8 @@ def main(argv=None) -> int:
     symbols = list(args.symbols) if args.symbols else universe()
     print(
         f"回測 {len(symbols)} 檔 · {args.days}d 1h · 量>{args.vol_mult:g}× · "
-        f"{args.time_bars} 根 / {args.target_r:g}R",
+        f"{args.time_bars} 根 / {args.target_r:g}R"
+        + (f" · 離MA25≤{args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else ""),
         flush=True,
     )
     trades: list[Trade] = []
@@ -433,6 +449,7 @@ def main(argv=None) -> int:
                 args.time_bars,
                 args.target_r,
                 args.overlap,
+                args.max_ext_ma25,
             ): s
             for s in symbols
         }
@@ -461,7 +478,8 @@ def main(argv=None) -> int:
     for i, t in enumerate(trades, 1):
         print(
             f"  [{i:3d}] {t.symbol:16s} {hm(int(t.d['t'][t.entry_idx]))}  "
-            f"{t.reason:6s} {t.pnl_pct*100:+6.2f}%  {t.vol_ratio:.2f}×",
+            f"{t.reason:6s} {t.pnl_pct*100:+6.2f}%  {t.vol_ratio:.2f}×  "
+            f"MA25{t.ext_ma25*100:+.2f}%",
             flush=True,
         )
 
@@ -472,6 +490,7 @@ def main(argv=None) -> int:
         "overlap": args.overlap,
         "time_bars": args.time_bars,
         "target_r": args.target_r,
+        "max_ext_ma25": args.max_ext_ma25,
         "scanned": len(symbols),
         "raw_hits": raw_hits,
         "generated": datetime.now(TZ).isoformat(timespec="seconds"),

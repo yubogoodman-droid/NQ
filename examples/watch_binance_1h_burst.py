@@ -4,6 +4,7 @@
 條件（剛收盤的 1h K）：
   MA7 > MA14 > MA25 > MA99 > MA120 > MA200
   收盤成交量 > 前一根 × 2
+  收盤在 MA25 上方、且離 MA25 ≤ 1.5%（像 BNB 貼著走，不追已噴飛的）
 
 用法:
   python3 examples/watch_binance_1h_burst.py --test     # 測 Telegram
@@ -36,6 +37,7 @@ INTERVAL = "1h"
 INTERVAL_MS = 3_600_000
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
 VOL_MULT = 2.0
+MAX_EXT_MA25 = 0.015  # 收盤最多比 MA25 高 1.5%（BNB 當時約 +1.1%）
 MIN_QUOTE_VOL = 5_000_000
 KEEP = {"NBISUSDT", "UBUSDT", "STXXUSDT", "SNDKUSDT"}
 
@@ -160,7 +162,13 @@ def is_bull_align(mas: tuple[float, ...]) -> bool:
     return all(mas[k] > mas[k + 1] for k in range(len(mas) - 1))
 
 
-def burst_at(d: dict, i: int, vol_mult: float = VOL_MULT, green_only: bool = False) -> dict | None:
+def burst_at(
+    d: dict,
+    i: int,
+    vol_mult: float = VOL_MULT,
+    green_only: bool = False,
+    max_ext_ma25: float | None = MAX_EXT_MA25,
+) -> dict | None:
     """剛收盤的第 i 根是否符合多頭爆發。"""
     if i < 1 or i >= len(d["c"]):
         return None
@@ -175,6 +183,13 @@ def burst_at(d: dict, i: int, vol_mult: float = VOL_MULT, green_only: bool = Fal
     open_ = float(d["o"][i])
     if green_only and close < open_:
         return None
+    m25 = float(d["m25"][i])
+    if m25 <= 0:
+        return None
+    ext_ma25 = close / m25 - 1.0
+    if max_ext_ma25 is not None and max_ext_ma25 > 0:
+        if ext_ma25 < 0 or ext_ma25 > max_ext_ma25:
+            return None
     return {
         "i": i,
         "mas": mas,
@@ -185,6 +200,7 @@ def burst_at(d: dict, i: int, vol_mult: float = VOL_MULT, green_only: bool = Fal
         "open": open_,
         "high": float(d["h"][i]),
         "low": float(d["l"][i]),
+        "ext_ma25": ext_ma25,
     }
 
 
@@ -287,20 +303,29 @@ def draw_chart(sym: str, d: dict, i: int, path: str) -> str | None:
 
 
 def find_bursts(
-    d: dict, start: int, end: int, vol_mult: float = VOL_MULT, green_only: bool = False
+    d: dict,
+    start: int,
+    end: int,
+    vol_mult: float = VOL_MULT,
+    green_only: bool = False,
+    max_ext_ma25: float | None = MAX_EXT_MA25,
 ) -> list[dict]:
     hits = []
     lo = max(1, start)
     hi = min(end, len(d["c"]) - 1)
     for i in range(lo, hi + 1):
-        hit = burst_at(d, i, vol_mult=vol_mult, green_only=green_only)
+        hit = burst_at(d, i, vol_mult=vol_mult, green_only=green_only, max_ext_ma25=max_ext_ma25)
         if hit:
             hits.append(hit)
     return hits
 
 
 def scan_symbol(
-    sym: str, lookback: int = 2, vol_mult: float = VOL_MULT, green_only: bool = False
+    sym: str,
+    lookback: int = 2,
+    vol_mult: float = VOL_MULT,
+    green_only: bool = False,
+    max_ext_ma25: float | None = MAX_EXT_MA25,
 ) -> list[dict]:
     raw = fetch_klines(sym)
     if raw is None:
@@ -308,7 +333,10 @@ def scan_symbol(
     d = indicators(raw)
     last = len(d["c"]) - 1
     start = max(MA_PERIODS[-1], last - lookback + 1)
-    return [{"symbol": sym, "d": d, **hit} for hit in find_bursts(d, start, last, vol_mult, green_only)]
+    return [
+        {"symbol": sym, "d": d, **hit}
+        for hit in find_bursts(d, start, last, vol_mult, green_only, max_ext_ma25)
+    ]
 
 
 def format_burst(ev: dict) -> str:
@@ -322,6 +350,7 @@ def format_burst(ev: dict) -> str:
         f"收盤 {ts}（台北）  {side}\n"
         f"現價 {ev['close']:g}　OHLC {ev['open']:g} / {ev['high']:g} / {ev['low']:g} / {ev['close']:g}\n"
         f"成交量 {ev['vol']:.4g}　前一根 {ev['prev_vol']:.4g}　放大 {ev['vol_ratio']:.2f}×\n"
+        f"離 MA25 {ev.get('ext_ma25', 0) * 100:+.2f}%\n"
         f"多頭排列  {ma_txt}"
     )
 
@@ -330,10 +359,18 @@ def key_of(ev: dict) -> str:
     return f"{ev['symbol']}:{int(ev['d']['t'][ev['i']])}"
 
 
-def scan_all(symbols: list[str], lookback: int, vol_mult: float, green_only: bool = False) -> list[dict]:
+def scan_all(
+    symbols: list[str],
+    lookback: int,
+    vol_mult: float,
+    green_only: bool = False,
+    max_ext_ma25: float | None = MAX_EXT_MA25,
+) -> list[dict]:
     events = []
     with ThreadPoolExecutor(8) as ex:
-        futs = {ex.submit(scan_symbol, s, lookback, vol_mult, green_only): s for s in symbols}
+        futs = {
+            ex.submit(scan_symbol, s, lookback, vol_mult, green_only, max_ext_ma25): s for s in symbols
+        }
         for fut in as_completed(futs):
             try:
                 events.extend(fut.result())
@@ -391,6 +428,12 @@ def main() -> int:
     p.add_argument("--lookback", type=int, default=2, help="往回看幾根已收盤 1h（預設 2）")
     p.add_argument("--vol-mult", type=float, default=VOL_MULT, help="成交量倍數門檻（預設 2 = 大於前一根一倍）")
     p.add_argument("--green-only", action="store_true", help="只報陽線（收盤 ≥ 開盤）")
+    p.add_argument(
+        "--max-ext-ma25",
+        type=float,
+        default=MAX_EXT_MA25,
+        help="收盤最多比 MA25 高多少（預設 0.015 = 1.5%，像 BNB；0 關閉）",
+    )
     p.add_argument("--symbols", nargs="*", help="只掃這些代號，例如 BTCUSDT ETHUSDT")
     args = p.parse_args()
     apply_keys()
@@ -401,7 +444,8 @@ def main() -> int:
     print("載入標的…", flush=True)
     symbols = list(args.symbols) if args.symbols else universe()
     print(
-        f"監看 {len(symbols)} 個 1h：MA7>14>25>99>120>200 且量 > 前一根 × {args.vol_mult:g}",
+        f"監看 {len(symbols)} 個 1h：MA7>14>25>99>120>200 且量 > 前一根 × {args.vol_mult:g}"
+        + (f" 且離 MA25 ≤ {args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else ""),
         flush=True,
     )
     uni_ts = time.time()
@@ -414,7 +458,11 @@ def main() -> int:
             print(f"更新標的 {len(symbols)}", flush=True)
         t0 = time.time()
         events = scan_all(
-            symbols, lookback=max(1, args.lookback), vol_mult=args.vol_mult, green_only=args.green_only
+            symbols,
+            lookback=max(1, args.lookback),
+            vol_mult=args.vol_mult,
+            green_only=args.green_only,
+            max_ext_ma25=args.max_ext_ma25,
         )
         new = [e for e in events if key_of(e) not in seen]
         print(
