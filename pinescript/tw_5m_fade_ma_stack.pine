@@ -1,0 +1,28 @@
+//@version=5
+indicator("台股 5分K 空頭排列跌破 MA240", overlay=true)
+
+requireFalling = input.bool(true, "5/10/20 都要下彎")
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, 20)
+ma60 = ta.sma(close, 60)
+ma120 = ta.sma(close, 120)
+ma240 = ta.sma(close, 240)
+
+stacked = ma5 < ma10 and ma10 < ma20
+falling = ma5 < ma5[1] and ma10 < ma10[1] and ma20 < ma20[1]
+ribbon  = requireFalling ? (stacked and falling) : stacked
+crossed = close < ma240 and close[1] >= ma240[1]
+belowAll = close < ma5 and close < ma10 and close < ma20 and close < ma240
+sig = ribbon and crossed and belowAll
+
+plot(ma5, "5MA", color=color.new(#3b82f6, 0), linewidth=2)
+plot(ma10, "10MA", color=color.new(#22c55e, 0), linewidth=2)
+plot(ma20, "20MA", color=color.new(#f59e0b, 0), linewidth=2)
+plot(ma60, "60MA", color=color.new(#14b8a6, 0))
+plot(ma120, "120MA", color=color.new(#a855f7, 0))
+plot(ma240, "240MA", color=color.new(#f472b6, 0), linewidth=2)
+
+plotshape(sig, title="空排跌破 MA240", style=shape.triangledown, location=location.abovebar, color=color.green, size=size.small)
+alertcondition(sig, title="5/10/20 空排跌破 MA240", message="五分K：5<10<20 空頭排列跌破 MA240")
