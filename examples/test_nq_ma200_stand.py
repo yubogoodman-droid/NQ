@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nq_ma200_stand import (  # noqa: E402
     ET,
     MIN_5M_ALL,
+    MIN_5M_REENTRY_RIBBON,
     TradeResult,
     detect_signals,
     display_trades,
@@ -242,8 +243,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "停損 破底" not in text
         assert "15mMA200上被停損後30分內站回進場點再進一次" in text
         assert "再進也距MA200≤30" in text
-        assert "五分MA5–200全均帶寬" in text
-        assert "整次取消" in text
+        assert "再進短均帶" in text
         assert "收在MA60上" in text
         assert "5m連2根收在破底下" not in text
         assert any((path.parent / "img").glob("t01_*.png"))
@@ -432,7 +432,7 @@ def test_reentry_skips_5m_all_tangle() -> None:
         ma30=sma(close, 30),
         ma60=sma(close, 60),
         ma200=sma(close, 200),
-        m5_ribbon=overlay_5m_ribbon(df2),
+        m5_ribbon=np.full(len(close), 80.0),
         ma200_15m=overlay_15m_ma200(df2, df_15),
         m5_all=np.full(len(close), 80.0),
         min_5m_all=MIN_5M_ALL,
@@ -478,6 +478,48 @@ def test_reentry_requires_dist_to_ma200() -> None:
         ma200_15m=overlay_15m_ma200(df2, df_15),
         m5_all=np.full(len(close), 80.0),
         min_5m_all=MIN_5M_ALL,
+        parent_exit_price=parent.stop_price,
+    )
+    assert blocked is None
+
+
+def test_reentry_skips_tight_5m_short_ribbon() -> None:
+    df = _make_setup_bars(n=520)
+    df_15 = _long_15m(df, 19000.0)
+    sigs = detect_signals(df, min_5m_all=0.0, df_15m=df_15)
+    assert sigs
+    parent = sigs[0]
+    j = parent.entry_idx
+    entry = parent.entry_price
+    df2 = df.copy()
+    df2.iloc[j + 1, df2.columns.get_loc("Low")] = parent.stop_price - 2
+    df2.iloc[j + 1, df2.columns.get_loc("Close")] = parent.stop_price - 1
+    for k in range(j + 2, j + 8):
+        df2.iloc[k, df2.columns.get_loc("Close")] = entry - 5
+        df2.iloc[k, df2.columns.get_loc("Open")] = entry - 6
+        df2.iloc[k, df2.columns.get_loc("High")] = entry - 4
+        df2.iloc[k, df2.columns.get_loc("Low")] = entry - 7
+    reclaim = j + 8
+    df2.iloc[reclaim, df2.columns.get_loc("Close")] = entry + 1
+    df2.iloc[reclaim, df2.columns.get_loc("Open")] = entry - 2
+    df2.iloc[reclaim, df2.columns.get_loc("High")] = entry + 2
+    df2.iloc[reclaim, df2.columns.get_loc("Low")] = entry - 3
+    close = df2["Close"].to_numpy(float)
+    blocked = make_reclaim_reentry(
+        df2,
+        parent,
+        j + 1,
+        ma5=sma(close, 5),
+        ma10=sma(close, 10),
+        ma20=sma(close, 20),
+        ma30=sma(close, 30),
+        ma60=sma(close, 60),
+        ma200=sma(close, 200),
+        m5_ribbon=np.full(len(close), 7.0),
+        ma200_15m=overlay_15m_ma200(df2, df_15),
+        m5_all=np.full(len(close), 80.0),
+        min_5m_all=MIN_5M_ALL,
+        min_5m_reentry_ribbon=MIN_5M_REENTRY_RIBBON,
         parent_exit_price=parent.stop_price,
     )
     assert blocked is None
@@ -559,7 +601,7 @@ def test_reentry_after_stop_above_15m() -> None:
     df2.iloc[reclaim, df2.columns.get_loc("Open")] = entry - 2
     df2.iloc[reclaim, df2.columns.get_loc("High")] = entry + 2
     df2.iloc[reclaim, df2.columns.get_loc("Low")] = entry - 3
-    trades = simulate(df2, sigs, df_15m=df_15)
+    trades = simulate(df2, sigs, df_15m=df_15, min_5m_all=0.0, min_5m_reentry_ribbon=0.0)
     assert trades[0].exit_reason == "stop"
     retries = [t for t in trades if t.signal.entry_kind == "reentry"]
     assert len(retries) == 1
@@ -659,8 +701,9 @@ def test_reentry_requires_close_above_ma60() -> None:
         ma30=sma(close, 30),
         ma60=sma(close, 60),
         ma200=sma(close, 200),
-        m5_ribbon=overlay_5m_ribbon(df2),
+        m5_ribbon=np.full(len(close), 80.0),
         ma200_15m=overlay_15m_ma200(df2, df_15),
+        m5_all=np.full(len(close), 80.0),
         parent_exit_price=parent.stop_price,
     )
     assert allowed is not None
@@ -700,6 +743,7 @@ def main() -> int:
     test_skip_5m_all_tangle()
     test_reentry_skips_5m_all_tangle()
     test_reentry_requires_dist_to_ma200()
+    test_reentry_skips_tight_5m_short_ribbon()
     test_reentry_aborts_if_first_reclaim_tangled()
     test_reentry_after_stop_above_15m()
     test_no_reentry_when_below_15m()

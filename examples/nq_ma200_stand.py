@@ -11,7 +11,7 @@
   7. 停損 MA200−10，停利 +100
   8. 浮盈先到 +60 後，停損提到進場價（保本）
   9. 進場在 15m MA200 上被停損後，30 分鐘內站回原進場價再進一次。只再進一次，停損同上；再進也要距 MA200 ≤30。
-  10. 五分 MA5/10/20/30/60/200 全均帶寬 <28 視為糾結，主場與再進都不進。再進已是合格站上卻糾結，整次取消。
+  10. 五分 MA5/10/20/30/60/200 全均帶寬 <28 視為糾結，主場與再進都不進。再進另看五分 MA5–30 <20。已合格卻糾結，整次取消。
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -48,8 +48,9 @@ MAX_DIST_MA200 = 30.0
 STOP_BELOW_MA200 = 10.0
 TAKE_PROFIT = 100.0
 MIN_UPPER_WICK = 8.0
-MIN_5M_RIBBON = 0.0  # 關閉；五分 MA5–30 帶寬只對照
+MIN_5M_RIBBON = 0.0  # 主場不看短均帶寬
 MIN_5M_ALL = 28.0  # 五分 MA5–200 全均帶寬低於此＝糾結，不進
+MIN_5M_REENTRY_RIBBON = 20.0  # 再進：五分 MA5–30 仍擠在一起也不進（MA200 在遠處撐不開全均）
 BREAKEVEN_AFTER = 60.0
 REENTRY_MINUTES = 30
 ALL_5M_PERIODS = (5, 10, 20, 30, 60, 200)
@@ -413,6 +414,7 @@ def make_reclaim_reentry(
     ma200_15m: np.ndarray,
     m5_all: Optional[np.ndarray] = None,
     min_5m_all: float = MIN_5M_ALL,
+    min_5m_reentry_ribbon: float = MIN_5M_REENTRY_RIBBON,
     max_dist_ma200: float = MAX_DIST_MA200,
     stop_below_ma200: float = STOP_BELOW_MA200,
     take_profit: float = TAKE_PROFIT,
@@ -422,7 +424,7 @@ def make_reclaim_reentry(
     """停損後 window_minutes 內，收盤站回原進場價則再進一次。
 
     再進仍須是站上 MA200（距 ≤30）。距離不夠就繼續等；
-    已合格卻五分全均糾結，整次取消。
+    已合格卻五分全均或短均帶糾結，整次取消。
     """
     close = df["Close"].to_numpy(float)
     n = len(close)
@@ -450,6 +452,12 @@ def make_reclaim_reentry(
         ribbon = float(m5_ribbon[j])
         all_spread = float(m5_all[j]) if m5_all is not None else float("nan")
         if min_5m_all > 0 and not np.isnan(all_spread) and all_spread < min_5m_all:
+            return None
+        if (
+            min_5m_reentry_ribbon > 0
+            and not np.isnan(ribbon)
+            and ribbon < min_5m_reentry_ribbon
+        ):
             return None
         ribbon_1m = float(ma5[j] - ma60[j])
         m15_200 = float(ma200_15m[j])
@@ -554,6 +562,8 @@ def simulate(
     stop_below_ma200: float = STOP_BELOW_MA200,
     take_profit: float = TAKE_PROFIT,
     reentry_minutes: int = REENTRY_MINUTES,
+    min_5m_all: float = MIN_5M_ALL,
+    min_5m_reentry_ribbon: float = MIN_5M_REENTRY_RIBBON,
     df_15m: Optional[pd.DataFrame] = None,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[TradeResult]:
@@ -605,6 +615,8 @@ def simulate(
                 m5_ribbon=m5_ribbon,
                 ma200_15m=ma200_15m,
                 m5_all=m5_all,
+                min_5m_all=min_5m_all,
+                min_5m_reentry_ribbon=min_5m_reentry_ribbon,
                 stop_below_ma200=stop_below_ma200,
                 take_profit=take_profit,
                 window_minutes=reentry_minutes,
@@ -1415,7 +1427,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次（再進也距MA200≤30） · 五分MA5–200全均帶寬&lt;28不進（主場/再進；合格站上卻糾結則整次取消） · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次（再進也距MA200≤30） · 五分全均&lt;28或再進短均帶&lt;20不進 · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
