@@ -10,7 +10,7 @@
   6. 紅 K 長上影跳過
   7. 停損 MA200−10，停利 +100
   8. 浮盈先到 +60 後，停損提到進場價（保本）
-  9. 停損後 30 分鐘內，五分 K 站回 MA5>10>20>60 再進一次；停損設定同上。只再進一次。
+  9. 停損後 30 分鐘內，五分 K 站回 MA5/10/20/60 再進一次（不用多排）；停損設定同上。只再進一次。
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -235,12 +235,12 @@ def max_under_streak(close: np.ndarray, ma200: np.ndarray, end_idx: int, lookbac
     return best
 
 
-def stands_on_5m_stack(close: float, ma5: float, ma10: float, ma20: float, ma60: float) -> bool:
-    """五分 K 收盤站上 MA5>10>20>60。"""
+def stands_on_5m_mas(close: float, ma5: float, ma10: float, ma20: float, ma60: float) -> bool:
+    """五分 K 收盤站上 MA5/10/20/60，不要求多頭排列。"""
     vals = (close, ma5, ma10, ma20, ma60)
     if any(not np.isfinite(v) for v in vals):
         return False
-    return close > ma5 > ma10 > ma20 > ma60
+    return close > ma5 and close > ma10 and close > ma20 and close > ma60
 
 
 def above_ma200_streak(close: np.ndarray, ma200: np.ndarray, j: int, need: int) -> bool:
@@ -403,7 +403,7 @@ def make_reentry_signal(
     take_profit: float = TAKE_PROFIT,
     window_minutes: int = REENTRY_MINUTES,
 ) -> Optional[Signal]:
-    """停損後 window_minutes 內，五分 K 站回 MA5>10>20>60 則再進一次。"""
+    """停損後 window_minutes 內，五分 K 站回 MA5/10/20/60 則再進一次。"""
     close = df["Close"].to_numpy(float)
     n = len(close)
     stop_ts = df.index[exit_idx]
@@ -416,7 +416,7 @@ def make_reentry_signal(
             continue
         if in_open_skip(ts):
             continue
-        if not stands_on_5m_stack(
+        if not stands_on_5m_mas(
             float(close[j]),
             float(m5_mas[5][j]),
             float(m5_mas[10][j]),
@@ -1151,7 +1151,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 停損後30分內五分K站回MA5&gt;10&gt;20&gt;60再進一次 · 5m / 15m / 1h 圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 停損後30分內五分K站回MA5/10/20/60再進一次（不用多排） · 5m / 15m / 1h 圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>

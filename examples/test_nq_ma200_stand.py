@@ -27,7 +27,7 @@ from nq_ma200_stand import (  # noqa: E402
     ribbon_tangled,
     simulate,
     sma,
-    stands_on_5m_stack,
+    stands_on_5m_mas,
     summarize_trades,
     write_html_report,
 )
@@ -143,11 +143,12 @@ def test_detect_happy_path() -> None:
     assert abs(sig.target_price - (sig.entry_price + 100)) < 1e-6
 
 
-def test_stands_on_5m_stack() -> None:
-    assert stands_on_5m_stack(101.0, 100.0, 99.0, 98.0, 97.0) is True
-    assert stands_on_5m_stack(100.0, 100.0, 99.0, 98.0, 97.0) is False
-    assert stands_on_5m_stack(101.0, 100.0, 102.0, 98.0, 97.0) is False
-    assert stands_on_5m_stack(101.0, 100.0, 99.0, 98.0, float("nan")) is False
+def test_stands_on_5m_mas() -> None:
+    assert stands_on_5m_mas(101.0, 100.0, 99.0, 98.0, 97.0) is True
+    assert stands_on_5m_mas(110.0, 100.0, 105.0, 102.0, 90.0) is True  # 站回即可，不用多排
+    assert stands_on_5m_mas(100.0, 100.0, 99.0, 98.0, 97.0) is False
+    assert stands_on_5m_mas(101.0, 100.0, 102.0, 98.0, 97.0) is False
+    assert stands_on_5m_mas(101.0, 100.0, 99.0, 98.0, float("nan")) is False
 
 
 def test_skip_red_long_wick() -> None:
@@ -370,7 +371,7 @@ def test_no_reentry_if_5m_stays_broken() -> None:
     j = sigs[0].entry_idx
     df2 = df.copy()
     df2.iloc[j + 1, df2.columns.get_loc("Low")] = sigs[0].stop_price - 2
-    _ramp_after(df2, j + 2, -8.0)
+    _ramp_after(df2, j + 2, -80.0)
     trades = simulate(df2, sigs)
     assert trades[0].exit_reason == "stop"
     assert all(t.signal.entry_kind != "reentry" for t in trades)
@@ -398,7 +399,7 @@ def main() -> int:
     test_in_open_skip()
     test_red_long_upper()
     test_detect_happy_path()
-    test_stands_on_5m_stack()
+    test_stands_on_5m_mas()
     test_skip_red_long_wick()
     test_skip_open_hour()
     test_skip_no_under_wash()
