@@ -39,9 +39,14 @@ plot(ma60,  "MA60",  color=color.new(#9b5de5, 50))
 plot(ma120, "MA120", color=color.new(#2a9d8f, 50))
 plot(ma200, "MA200", color=color.new(#264653, 0), linewidth=2)
 
-// 一小時線：只畫已收盤 1H 收盤（細灰階梯，避免蓋過 K 線）
-h1Close = request.security(syminfo.tickerid, "60", close, lookahead=barmerge.lookahead_off)
-plot(h1Close, "1H", color=color.new(#94a3b8, 30), style=plot.style_stepline, linewidth=1)
+// 一小時K：畫在一分圖上（已收盤才更新，半透明避免蓋過 1m）
+[h1o, h1h, h1l, h1c] = request.security(syminfo.tickerid, "60", [open, high, low, close], lookahead=barmerge.lookahead_off)
+h1Up = h1c >= h1o
+plotcandle(h1o, h1h, h1l, h1c, title="1H K",
+     color = h1Up ? color.new(#22c55e, 72) : color.new(#ef4444, 72),
+     wickcolor = h1Up ? color.new(#86efac, 40) : color.new(#fca5a5, 40),
+     bordercolor = h1Up ? color.new(#22c55e, 50) : color.new(#ef4444, 50))
+plot(h1c, "1H", color=color.new(#94a3b8, 20), style=plot.style_stepline, linewidth=1)
 
 bullStack = ma5 > ma10 and ma10 > ma20 and ma20 > ma30 and ma30 > ma60 and ma60 > ma120 and ma120 > ma200
 

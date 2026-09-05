@@ -730,6 +730,23 @@ def _plot_h1_segments(ax, xs, values, label: str = "1H") -> None:
         flush(float(list(xs)[-1]) + 1.0)
 
 
+def _hourly_ohlc(df: pd.DataFrame, df_1h: pd.DataFrame | None = None) -> pd.DataFrame:
+    src = df_1h if df_1h is not None and not df_1h.empty else resample_1h(df)
+    if src.empty:
+        return src
+    return add_mas(normalize_1h_index(src))
+
+
+def _save_price_volume_fig(fig, path: Path) -> Path:
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    import matplotlib.pyplot as plt
+
+    plt.close(fig)
+    return path
+
+
 def draw_trade_png(
     df: pd.DataFrame,
     trade: TradeResult,
@@ -737,6 +754,7 @@ def draw_trade_png(
     trade_no: int,
     df_1h: pd.DataFrame | None = None,
 ) -> Path:
+    """一分 K：進場附近 + 已收盤 1H 水平段。"""
     _setup_mpl()
     import matplotlib.pyplot as plt
 
@@ -744,33 +762,18 @@ def draw_trade_png(
     start, end = _trade_window(df, trade)
     window = df.iloc[start : end + 1]
     close_full = df["Close"].astype(float)
-    if df_1h is None or df_1h.empty:
-        hourly = add_mas(normalize_1h_index(resample_1h(df)))
-    else:
-        hourly = add_mas(normalize_1h_index(df_1h))
-    h1_on_1m = map_closed_1h(df, hourly, "Close")
+    hourly = _hourly_ohlc(df, df_1h)
+    h1_on_1m = map_closed_1h(df, hourly, "Close") if not hourly.empty else np.full(len(df), np.nan)
 
-    have_1h = len(hourly) >= 8
-    if have_1h:
-        fig, (ax, axv, axh, axhv) = plt.subplots(
-            4,
-            1,
-            figsize=(10.4, 9.0),
-            gridspec_kw={"height_ratios": [3.15, 0.72, 2.85, 0.68]},
-            facecolor="#0c1210",
-        )
-        _style_axes((ax, axv, axh, axhv))
-    else:
-        fig, (ax, axv) = plt.subplots(
-            2,
-            1,
-            figsize=(10.4, 5.6),
-            sharex=True,
-            gridspec_kw={"height_ratios": [3.2, 1]},
-            facecolor="#0c1210",
-        )
-        _style_axes((ax, axv))
-        axh = axhv = None
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.6),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    _style_axes((ax, axv))
 
     _paint_candles(ax, axv, window, min_slots=48)
     xs = range(len(window))
@@ -817,7 +820,7 @@ def draw_trade_png(
     xt = df.index[trade.exit_idx]
     sign = "+" if trade.pnl_points >= 0 else ""
     ax.set_title(
-        f"#{trade_no}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"一分K  #{trade_no}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt  峰距{sig.peak_dist:.0f}",
         color="#e8f0ea",
         fontsize=11,
@@ -827,52 +830,81 @@ def draw_trade_png(
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
     axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
-
-    if have_1h and axh is not None and axhv is not None:
-        hw = hour_window(hourly, et, xt, before=36, after=6)
-        _paint_candles(axh, axhv, hw, min_slots=max(36, len(hw)))
-        xh = range(len(hw))
-        if len(hw):
-            _fit_price_ylim(axh, hw, extra=(trade.stop_price, trade.entry_price, trade.exit_price))
-        for n, col in ((5, "#f0b429"), (10, "#ff7a00"), (20, "#e63946"), (60, "#9b5de5")):
-            colname = f"ma{n}"
-            if colname not in hw.columns or not hw[colname].notna().any():
-                continue
-            axh.plot(list(xh), hw[colname], color=col, lw=1.3 if n == 20 else 1.0, label=f"1H MA{n}")
-        ei = hour_bar_index(hw, et)
-        xi = hour_bar_index(hw, xt)
-        if 0 <= ei < len(hw):
-            axh.axvline(ei, color="#ef4444", ls="--", lw=0.9)
-            axh.scatter([ei], [trade.entry_price], s=42, color="#ef4444", marker="v", zorder=6)
-        if 0 <= xi < len(hw):
-            axh.axvline(xi, color="#f0c14b", ls=":", lw=0.9)
-            axh.scatter(
-                [xi],
-                [trade.exit_price],
-                s=36,
-                color="#00c805" if trade.pnl_points > 0 else "#ff5252",
-                marker="x",
-                zorder=6,
-            )
-        axh.axhline(trade.stop_price, color="#7f1d1d", ls=":", lw=1.0, alpha=0.8)
-        axh.set_title("1h（整點對齊，完整小時棒）", color="#e8f0ea", fontsize=10)
-        axh.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=5)
-        hstep = max(1, len(hw) // 6) if len(hw) else 1
-        hticks = list(range(0, len(hw), hstep))
-        axhv.set_xticks(hticks)
-        if len(hw):
-            axhv.set_xticklabels([hw.index[i].strftime("%m-%d %H:00") for i in hticks], color="#8aa193")
-
-    fig.tight_layout(pad=0.45)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
-    plt.close(fig)
-    return path
+    return _save_price_volume_fig(fig, path)
 
 
-def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
+def draw_hourly_png(
+    df: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+    df_1h: pd.DataFrame | None = None,
+) -> Path | None:
+    """獨立一小時 K：整點對齊、完整小時棒，不跟一分圖疊在同一張。"""
+    hourly = _hourly_ohlc(df, df_1h)
+    if hourly.empty:
+        return None
     et = df.index[trade.entry_idx]
-    return f"t{trade_no:02d}_{et.strftime('%m%d_%H%M')}.png"
+    xt = df.index[trade.exit_idx]
+    hw = hour_window(hourly, et, xt, before=36, after=6)
+    if hw.empty:
+        return None
+
+    _setup_mpl()
+    import matplotlib.pyplot as plt
+
+    fig, (axh, axhv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.4),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    _style_axes((axh, axhv))
+    _paint_candles(axh, axhv, hw, min_slots=max(36, len(hw)))
+    xh = range(len(hw))
+    _fit_price_ylim(axh, hw, extra=(trade.stop_price, trade.entry_price, trade.exit_price))
+    for n, col in ((5, "#f0b429"), (10, "#ff7a00"), (20, "#e63946"), (60, "#9b5de5")):
+        colname = f"ma{n}"
+        if colname not in hw.columns or not hw[colname].notna().any():
+            continue
+        axh.plot(list(xh), hw[colname], color=col, lw=1.3 if n == 20 else 1.0, label=f"1H MA{n}")
+    ei = hour_bar_index(hw, et)
+    xi = hour_bar_index(hw, xt)
+    if 0 <= ei < len(hw):
+        axh.axvline(ei, color="#ef4444", ls="--", lw=0.9)
+        axh.scatter([ei], [trade.entry_price], s=42, color="#ef4444", marker="v", zorder=6)
+    if 0 <= xi < len(hw):
+        axh.axvline(xi, color="#f0c14b", ls=":", lw=0.9)
+        axh.scatter(
+            [xi],
+            [trade.exit_price],
+            s=36,
+            color="#00c805" if trade.pnl_points > 0 else "#ff5252",
+            marker="x",
+            zorder=6,
+        )
+    axh.axhline(trade.stop_price, color="#7f1d1d", ls=":", lw=1.0, alpha=0.8)
+    sign = "+" if trade.pnl_points >= 0 else ""
+    axh.set_title(
+        f"一小時K  #{trade_no}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%m-%d %H:%M')}  "
+        f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
+        color="#e8f0ea",
+        fontsize=11,
+    )
+    axh.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=5)
+    hstep = max(1, len(hw) // 6)
+    hticks = list(range(0, len(hw), hstep))
+    axhv.set_xticks(hticks)
+    axhv.set_xticklabels([hw.index[i].strftime("%m-%d %H:00") for i in hticks], color="#8aa193")
+    return _save_price_volume_fig(fig, path)
+
+
+def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int, suffix: str = "") -> str:
+    et = df.index[trade.entry_idx]
+    extra = f"_{suffix}" if suffix else ""
+    return f"t{trade_no:02d}_{et.strftime('%m%d_%H%M')}{extra}.png"
 
 
 def _fmt_h1(val: float) -> str:
@@ -902,6 +934,10 @@ def write_html_report(
         reason_bits.append(f"{r} {info['n']}筆 {info['pnl']:+.1f}")
     reason_line = " · ".join(reason_bits) if reason_bits else "無成交"
 
+    if img_dir.exists():
+        for old in img_dir.glob("t*.png"):
+            old.unlink()
+
     cards: List[str] = []
     for i, t in enumerate(trades, 1):
         et = df.index[t.entry_idx]
@@ -913,13 +949,27 @@ def write_html_report(
             "wick": "tag-tp",
             "stop": "tag-sl",
         }.get(t.exit_reason, "tag-time")
-        img_name = _trade_img_name(df, t, i)
-        png = draw_trade_png(df, t, img_dir / img_name, i, df_1h=df_1h)
-        src = _img_data_uri(png) if embed_images else f"img/{escape(img_name)}"
-        chart = (
-            f"<img src='{src}' alt='#{i}' "
+        name_1m = _trade_img_name(df, t, i, "1m")
+        png_1m = draw_trade_png(df, t, img_dir / name_1m, i, df_1h=df_1h)
+        src_1m = _img_data_uri(png_1m) if embed_images else f"img/{escape(name_1m)}"
+        charts = (
+            "<div class='chart-block'>"
+            "<p class='chart-label'>一分K</p>"
+            f"<img src='{src_1m}' alt='#{i} 一分K' "
             "style='width:100%;display:block;border-radius:10px'/>"
+            "</div>"
         )
+        name_1h = _trade_img_name(df, t, i, "1h")
+        png_1h = draw_hourly_png(df, t, img_dir / name_1h, i, df_1h=df_1h)
+        if png_1h is not None:
+            src_1h = _img_data_uri(png_1h) if embed_images else f"img/{escape(name_1h)}"
+            charts += (
+                "<div class='chart-block'>"
+                "<p class='chart-label'>一小時K（整點對齊，完整小時棒）</p>"
+                f"<img src='{src_1h}' alt='#{i} 一小時K' "
+                "style='width:100%;display:block;border-radius:10px'/>"
+                "</div>"
+            )
         pt = t.signal.peak_idx
         rt = t.signal.retest_idx
         peak_t = df.index[pt].strftime("%m-%d %H:%M") if 0 <= pt < len(df) else "?"
@@ -947,7 +997,7 @@ def write_html_report(
             f"MA60 {t.signal.ma60:.1f} / MA200 {t.signal.ma200:.1f}\n"
             f"1H {_fmt_h1(t.signal.h1_close)}  /  1H MA20 {_fmt_h1(t.signal.h1_ma20)}"
             "</pre>"
-            f"<div class='mini-chart'>{chart}</div>"
+            f"<div class='mini-chart'>{charts}</div>"
             "</article>"
         )
 
@@ -967,7 +1017,10 @@ def write_html_report(
     end = df.index[-1].strftime("%Y-%m-%d %H:%M") if len(df) else ""
     total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
     dollars = stats["total_points"] * POINT_VALUE - stats["count"] * COMMISSION_RT
-    note = "<p class='muted'>上圖 1m，下圖 Yahoo 原生 1h（整點對齊、不切半根）。灰線是已收盤小時線。手機請往下捲。</p>" if embed_images else ""
+    note = (
+        "<p class='muted'>每筆交易兩張圖：上面一分K，下面一小時K"
+        "（Yahoo 原生、整點對齊、不切半根）。一分圖灰線是已收盤小時收盤。</p>"
+    )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -997,6 +1050,8 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
+.chart-label{{margin:12px 0 6px;font-size:13px;font-weight:700;color:#e6edf3}}
+.chart-block{{margin:0 -6px 10px}}
 .mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
 .empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
 </style></head><body>
