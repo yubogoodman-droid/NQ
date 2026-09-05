@@ -1,0 +1,92 @@
+//@version=5
+indicator("NQ 五分K 雙底 2h低回測守三根", overlay=true, max_labels_count=200)
+
+// 創兩小時低 → 站上 MA20 → 再跌破 MA20 → 回到低點附近 → 連續 3 根沒新低做多。
+// 對齊 2026-09-04 圖 29。套用至 NQ1! / MNQ1! 五分圖。
+
+twoHrBars   = input.int(24, "兩小時 K 數（五分=24、15分=8）", minval=4)
+minBreak    = input.float(8.0, "最小破底（點）", minval=2)
+nearPts     = input.float(25.0, "回測附近（點）", minval=8)
+springPts   = input.float(20.0, "最多可略破（點）", minval=0)
+holdNeed    = input.int(3, "連續沒新低 K 數", minval=2)
+maxWaitStand = input.int(36, "破底後最多等站上", minval=6)
+maxWaitBreak = input.int(36, "站上後最多等跌破", minval=6)
+maxWaitRet   = input.int(36, "跌破後最多等回測", minval=6)
+
+ma20 = ta.sma(close, 20)
+twoHr = ta.lowest(low, twoHrBars)[1]
+
+var float dumpLow = na
+var int   dumpBar = na
+var int   standBar = na
+var float bounceHigh = na
+var int   breakBar = na
+var float retestLow = na
+var int   retestBar = na
+var int   holdCount = 0
+var int   phase = 0  // 0 idle 1 dump 2 stood 3 broke 4 near
+
+new2h = not na(twoHr) and low < twoHr and (twoHr - low) >= minBreak
+
+if phase == 0 and new2h
+    dumpLow := low
+    dumpBar := bar_index
+    standBar := na
+    bounceHigh := na
+    breakBar := na
+    retestLow := na
+    holdCount := 0
+    phase := 1
+
+if phase == 1
+    if low < dumpLow
+        dumpLow := low
+        dumpBar := bar_index
+    if bar_index - dumpBar > maxWaitStand
+        phase := 0
+    else if not na(ma20) and close > ma20 and close[1] <= ma20[1]
+        standBar := bar_index
+        bounceHigh := high
+        phase := 2
+
+if phase == 2
+    bounceHigh := math.max(bounceHigh, high)
+    if low < dumpLow - springPts
+        phase := 0
+    else if bar_index - standBar > maxWaitBreak
+        phase := 0
+    else if not na(ma20) and close < ma20 and close[1] >= ma20[1]
+        breakBar := bar_index
+        phase := 3
+
+if phase == 3
+    if low < dumpLow - springPts
+        phase := 0
+    else if bar_index - breakBar > maxWaitRet
+        phase := 0
+    else if low <= dumpLow + nearPts
+        retestLow := math.min(dumpLow, low)
+        retestBar := bar_index
+        holdCount := 0
+        phase := 4
+
+longSignal = false
+if phase == 4
+    if low < retestLow
+        if low < dumpLow - springPts
+            phase := 0
+        else
+            retestLow := low
+            retestBar := bar_index
+            holdCount := 0
+    else if bar_index != retestBar
+        holdCount += 1
+        if holdCount >= holdNeed
+            longSignal := true
+            label.new(bar_index, low, "雙底守三根", style=label.style_label_up, color=color.new(color.lime, 20), textcolor=color.black, size=size.small)
+            phase := 0
+            holdCount := 0
+
+plotshape(longSignal, title="雙底守三根", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
+plot(ma20, "MA20", color=color.new(#66bb6a, 0), linewidth=2)
+plot(not na(dumpLow) and phase > 0 ? dumpLow : na, "2h低", color=color.orange, linewidth=1, style=plot.style_linebr)
