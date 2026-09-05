@@ -105,9 +105,10 @@ def universe() -> list[str]:
             continue
         if s.get("status") != "TRADING":
             continue
-        if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
+        # 只掃幣圈永續；美股 / 商品 TradFi 開盤跳空不像 ETH 那波
+        if s.get("contractType") != "PERPETUAL":
             continue
-        if s.get("underlyingType") == "INDEX":
+        if s.get("underlyingType") != "COIN":
             continue
         sym = s["symbol"]
         qv = float((tickers.get(sym) or {}).get("quoteVolume") or 0)

@@ -40,9 +40,9 @@ def _bars(close: np.ndarray, vol: np.ndarray | None = None, *, noise: float = 0.
 
 def _coil_then_break(
     *,
-    break_close: float = 101.05,
+    break_close: float = 100.40,
     vol_signal: float = 3500.0,
-    coil_amp: float = 0.35,
+    coil_amp: float = 0.25,
     already_gone: bool = False,
     extra_after: int = 8,
 ) -> dict:
@@ -62,12 +62,12 @@ def _coil_then_break(
         close = np.concatenate([coil, np.array([break_close]), np.full(extra_after, break_close + 0.15)])
         vol = np.full(len(close), 1000.0)
         vol[n_flat] = vol_signal
-    d = add_indicators(_bars(close, vol, noise=0.0008))
-    # 突破根要有夠長的實體與高低差，壓過盤整中位振幅
+    d = add_indicators(_bars(close, vol, noise=0.0024))
+    # 突破根對齊 ETH 9/3：量能溫和、振幅約 2～3 倍，不是跳空
     i = n_flat if not already_gone else n_flat + 1
-    d["o"][i] = 99.95
-    d["l"][i] = 99.90
-    d["h"][i] = max(float(d["c"][i]), 101.10) + 0.05
+    d["o"][i] = 99.92
+    d["l"][i] = 99.86
+    d["h"][i] = max(float(d["c"][i]), 100.40) + 0.04
     if already_gone:
         d["o"][n_flat] = 99.90
         d["l"][n_flat] = 99.85
@@ -90,8 +90,9 @@ def test_coil_break_near_200_hits() -> None:
     h = hits[0]
     assert h.close > h.ma200
     assert h.ext <= MAX_ENTRY_EXT
-    assert h.ribbon <= 0.008
-    assert h.vol_ratio >= 3.0
+    assert h.ribbon <= 0.006
+    assert h.ext <= 0.008
+    assert 3.0 <= h.vol_ratio <= 8.0
     assert 99.0 < h.ma200 < 101.5
 
 
@@ -140,19 +141,35 @@ def test_chop_without_expansion_skips() -> None:
 
 def test_old_wick_does_not_block_close_break() -> None:
     """舊影線高於第一根放量收盤時，仍應以收盤箱頂判定突破（ETH 9/3 20:30）。"""
-    d = _coil_then_break(break_close=101.05)
+    d = _coil_then_break()
     i = 260
-    d["h"][i - 8] = 101.40  # 盤整中一根長上影
-    d["c"][i - 8] = 100.10
+    d["h"][i - 8] = 100.55  # 盤整中一根長上影，高於第一根放量收盤
+    d["c"][i - 8] = 100.05
     hits = detect_signals(d)
     assert hits, "不該被舊影線擋住靠近 200 的第一根放量陽線"
     assert hits[0].idx == i
-    assert hits[0].ribbon <= 0.008
+    assert hits[0].ribbon <= 0.006
+
+
+def test_open_gap_expand_skips() -> None:
+    """美股開盤那種 19× 振幅，不是 ETH 2.3× 的溫和打出。"""
+    d = _coil_then_break()
+    i = 260
+    d["h"][i] = 104.0
+    d["l"][i] = 99.5
+    d["c"][i] = 100.65
+    assert detect_signals(d) == []
+
+
+def test_insane_volume_skips() -> None:
+    """14× 開盤量不是 ETH 3.7× 那種線。"""
+    d = _coil_then_break(vol_signal=14000.0)
+    assert detect_signals(d) == []
 
 
 def test_second_bar_chase_skips() -> None:
     """前一根已經打出箱頂，這根再吃就是追價。"""
-    d = _coil_then_break(already_gone=True, break_close=101.10)
+    d = _coil_then_break(already_gone=True, break_close=100.70)
     hits = detect_signals(d)
     for h in hits:
         assert h.idx != 261

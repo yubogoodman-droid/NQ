@@ -13,18 +13,20 @@ import numpy as np
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
 
 LOOKBACK = 24  # 盤整回看：24 根 15m ≈ 6 小時
-MAX_RIBBON = 0.008  # 六條均線寬度 ≤ 0.8%（截圖那波突破前約 0.51%）
-MAX_BOX = 0.030  # 箱體高低差 ≤ 3.0%
-MAX_MA200_SLOPE = 0.008  # 近 20 根 MA200 斜率絕對值 ≤ 0.8%
-NEAR_200 = 0.015  # 收盤離 200 ≤ 1.5% 算「靠近」
-MIN_NEAR_FRAC = 0.70
-MAX_MA7_VS_200 = 0.012  # 突破前 MA7 仍黏著 200
-MAX_MA200_ABOVE_BOX = 0.012  # 200 可以略高於箱頂，但不能遠在天上
-MIN_BARS_AT_OR_BELOW = 4
+MAX_RIBBON = 0.006  # 六條均線寬度 ≤ 0.6%（ETH 9/3 突破前 0.51%）
+MAX_BOX = 0.018  # 箱體高低差 ≤ 1.8%（ETH 9/3 約 1.27%）
+MAX_MA200_SLOPE = 0.005  # 近 20 根 MA200 幾乎水平（ETH 9/3 約 −0.25%）
+NEAR_200 = 0.012  # 盤整收盤離 200 ≤ 1.2% 算「靠近」
+MIN_NEAR_FRAC = 0.85
+MAX_MA7_VS_200 = 0.008  # 突破前 MA7 仍黏著 200
+MAX_MA200_ABOVE_BOX = 0.010  # 200 可以略高於箱頂，但不能遠在天上
+MIN_BARS_AT_OR_BELOW = 6
 
 MIN_VOL_RATIO = 3.00  # 濾掉 ETH 8/28 那種 2.6× 假突破；截圖 9/3 約 3.7×
+MAX_VOL_RATIO = 8.00  # 美股開盤 14× 那種不是 ETH 的量能
 MIN_RANGE_EXPAND = 2.00
-MAX_ENTRY_EXT = 0.015  # 進場收盤仍 ≤ 1.5% 高於 200
+MAX_RANGE_EXPAND = 6.00  # ETH 9/3 約 2.3×；19× 跳空不是同一種線
+MAX_ENTRY_EXT = 0.008  # 進場收盤仍 ≤ 0.8% 高於 200（ETH 9/3 +0.27%）
 MIN_BODY_FRAC = 0.35
 MIN_RISK = 0.004
 MAX_RISK = 0.018
@@ -78,9 +80,10 @@ class SqueezeSignal:
 
     @property
     def quality(self) -> str:
-        if self.ribbon <= 0.006 and self.ext <= 0.008 and self.vol_ratio >= 3.0:
+        # A：更接近 ETH 9/3 截圖（離 200 很近、黏帶緊、量能溫和）
+        if self.ribbon <= 0.0055 and self.ext <= 0.005 and 3.2 <= self.vol_ratio <= 6.5 and self.expand <= 4.0:
             return "A"
-        if self.ribbon <= 0.008 and self.ext <= 0.012:
+        if self.ribbon <= 0.006 and self.ext <= 0.008:
             return "B"
         return "C"
 
@@ -173,13 +176,15 @@ def signal_at(d: dict, i: int) -> SqueezeSignal | None:
     if v20[i] <= 0 or np.isnan(v20[i]):
         return None
     vr = float(v[i] / v20[i])
-    if vr < MIN_VOL_RATIO:
+    if vr < MIN_VOL_RATIO or vr > MAX_VOL_RATIO:
         return None
 
     ranges = h[w0:w1] - l[w0:w1]
     med_rng = float(np.median(ranges))
     this_rng = float(h[i] - l[i])
     if med_rng <= 0 or this_rng < MIN_RANGE_EXPAND * med_rng:
+        return None
+    if this_rng > MAX_RANGE_EXPAND * med_rng:
         return None
     body = float(c[i] - o[i])
     if this_rng <= 0 or body / this_rng < MIN_BODY_FRAC:
