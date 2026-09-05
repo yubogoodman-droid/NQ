@@ -286,6 +286,19 @@ def draw_chart(sym: str, d: dict, i: int, path: str) -> str | None:
     return path
 
 
+def find_bursts(
+    d: dict, start: int, end: int, vol_mult: float = VOL_MULT, green_only: bool = False
+) -> list[dict]:
+    hits = []
+    lo = max(1, start)
+    hi = min(end, len(d["c"]) - 1)
+    for i in range(lo, hi + 1):
+        hit = burst_at(d, i, vol_mult=vol_mult, green_only=green_only)
+        if hit:
+            hits.append(hit)
+    return hits
+
+
 def scan_symbol(
     sym: str, lookback: int = 2, vol_mult: float = VOL_MULT, green_only: bool = False
 ) -> list[dict]:
@@ -294,14 +307,8 @@ def scan_symbol(
         return []
     d = indicators(raw)
     last = len(d["c"]) - 1
-    events = []
     start = max(MA_PERIODS[-1], last - lookback + 1)
-    for i in range(start, last + 1):
-        hit = burst_at(d, i, vol_mult=vol_mult, green_only=green_only)
-        if not hit:
-            continue
-        events.append({"symbol": sym, "d": d, **hit})
-    return events
+    return [{"symbol": sym, "d": d, **hit} for hit in find_bursts(d, start, last, vol_mult, green_only)]
 
 
 def format_burst(ev: dict) -> str:

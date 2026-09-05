@@ -106,6 +106,7 @@ python3 examples/watch_binance_1h_burst.py --test                    # 先測通
 python3 examples/watch_binance_1h_burst.py --once --dry-run          # 只掃剛收盤、不送
 python3 examples/watch_binance_1h_burst.py --green-only              # 只要陽線
 python3 examples/watch_binance_1h_burst.py                           # 每根 1h 收盤掃一次
+python3 examples/backtest_binance_1h_burst.py --days 3 --pages        # 近三天回測 + HTML
 python3 examples/test_watch_binance_1h_burst.py                      # 單元測試（不打網路）
 ```
 

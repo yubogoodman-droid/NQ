@@ -10,11 +10,17 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from backtest_binance_1h_burst import (  # noqa: E402
+    drop_overlap,
+    simulate_trade,
+    summarize,
+)
 from watch_binance_1h_burst import (  # noqa: E402
     MA_PERIODS,
     bars_from_raw,
     burst_at,
     drop_unclosed,
+    find_bursts,
     format_burst,
     indicators,
     is_bull_align,
@@ -126,6 +132,74 @@ def test_bars_from_raw_needs_ma200() -> None:
     assert len(d["c"]) == 210
 
 
+def test_find_bursts_window() -> None:
+    raw = _uptrend()
+    raw["v"][-3] = 80.0
+    raw["v"][-2] = 170.0
+    raw["v"][-1] = 90.0
+    d = indicators(raw)
+    n = len(d["c"])
+    hits = find_bursts(d, n - 3, n - 1)
+    assert len(hits) == 1
+    assert hits[0]["i"] == n - 2
+
+
+def test_simulate_hits_target() -> None:
+    raw = _uptrend()
+    raw["v"][-20] = 80.0
+    raw["v"][-19] = 200.0
+    d = indicators(raw)
+    i = len(d["c"]) - 19
+    hit = burst_at(d, i)
+    assert hit is not None
+    # next bars keep climbing; force a wide stop so 2R is reachable
+    d["l"][i] = d["c"][i] * 0.99
+    t = simulate_trade(d, hit, target_r=2.0, time_bars=8, min_risk_pct=0.005)
+    assert t.reason in ("target", "time")
+    assert t.entry == float(d["c"][i])
+
+
+def test_simulate_hits_stop() -> None:
+    raw = _uptrend()
+    raw["v"][-12] = 80.0
+    raw["v"][-11] = 200.0
+    d = indicators(raw)
+    i = len(d["c"]) - 11
+    hit = burst_at(d, i)
+    assert hit is not None
+    d["l"][i] = d["c"][i] * 0.99
+    d["l"][i + 1] = d["c"][i] * 0.98
+    d["h"][i + 1] = d["c"][i] * 1.001
+    t = simulate_trade(d, hit, target_r=2.0, time_bars=8, min_risk_pct=0.005)
+    assert t.reason == "stop"
+    assert t.pnl_pct < 0
+
+
+def test_drop_overlap_keeps_first() -> None:
+    raw = _uptrend()
+    d = indicators(raw)
+    a = simulate_trade(
+        d,
+        {"i": 210, "vol_ratio": 3.0, "close": float(d["c"][210]), "open": float(d["o"][210])},
+        time_bars=4,
+    )
+    b = simulate_trade(
+        d,
+        {"i": 212, "vol_ratio": 3.0, "close": float(d["c"][212]), "open": float(d["o"][212])},
+        time_bars=4,
+    )
+    a.symbol = b.symbol = "BTCUSDT"
+    kept = drop_overlap([b, a])
+    assert len(kept) == 1
+    assert kept[0].entry_idx == 210
+
+
+def test_summarize_empty() -> None:
+    s = summarize([])
+    assert s["count"] == 0
+    assert s["win_rate"] == 0.0
+
+
 def test_key_and_format() -> None:
     raw = _uptrend()
     raw["v"][-1] = 250.0
@@ -152,6 +226,11 @@ def main() -> int:
         test_burst_rejects_early_bar,
         test_drop_unclosed,
         test_bars_from_raw_needs_ma200,
+        test_find_bursts_window,
+        test_simulate_hits_target,
+        test_simulate_hits_stop,
+        test_drop_overlap_keeps_first,
+        test_summarize_empty,
         test_key_and_format,
     ]
     for fn in tests:
