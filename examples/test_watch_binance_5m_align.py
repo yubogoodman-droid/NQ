@@ -11,11 +11,9 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from watch_binance_5m_align import (  # noqa: E402
-    CONFIRM_BARS,
     add_mas,
     attach_forwards,
     collect_signals,
-    confirm_hold,
     detect_new_align,
     drop_unclosed,
     five_align_ok,
@@ -121,33 +119,19 @@ def test_already_above_does_not_fire() -> None:
 def test_detect_reclaim_bar() -> None:
     d5, h1 = reclaim_5m(), hour_ok_hi()
     hi = len(h1["c"]) - 1
-    confirm = 229 + CONFIRM_BARS
     hits = [i for i in range(len(d5["c"])) if detect_new_align(d5, i, h1, hi)]
-    assert hits == [confirm]
+    assert hits == [229]
     assert reclaim_ma200(d5, 229)
     assert five_align_ok(d5, 229)
-    assert confirm_hold(d5, 229)
     assert d5["c"][228] < d5["m200"][228]
     assert d5["c"][229] > d5["m200"][229]
-    assert d5["c"][confirm] > d5["m200"][confirm]
-    assert detect_new_align(d5, 229, h1, hi) is None
-
-
-def test_confirm_fails_if_back_below() -> None:
-    closes = reclaim_closes()
-    closes[232] = 98.0
-    d5 = add_mas(_bars(closes), (7, 14, 25, 200))
-    h1 = hour_ok_hi()
-    hi = len(h1["c"]) - 1
-    assert reclaim_ma200(d5, 229)
-    assert not confirm_hold(d5, 229)
-    assert detect_new_align(d5, 232, h1, hi) is None
+    assert detect_new_align(d5, 230, h1, hi) is None
 
 
 def test_detect_blocks_without_hour_filter() -> None:
     d5 = reclaim_5m()
     weak = add_mas(_bars(np.concatenate([rising(200, 100.0, 0.2), np.full(40, 80.0)]), step=3_600_000), (99, 200))
-    assert detect_new_align(d5, 229 + CONFIRM_BARS, weak, len(weak["c"]) - 1) is None
+    assert detect_new_align(d5, 229, weak, len(weak["c"]) - 1) is None
 
 
 def test_hour_mas_no_lookahead() -> None:
@@ -167,9 +151,8 @@ def test_collect_signals_first_bar_only() -> None:
     d5, h1 = reclaim_live_pair()
     start, end = int(d5["t"][0]), int(d5["t"][-1])
     hits = collect_signals(d5, h1, start, end)
-    assert [h["i"] for h in hits] == [229 + CONFIRM_BARS]
-    assert hits[0]["reclaim_i"] == 229
-    assert reclaim_ma200(d5, hits[0]["reclaim_i"])
+    assert [h["i"] for h in hits] == [229]
+    assert reclaim_ma200(d5, hits[0]["i"])
 
 
 def test_forward_and_summary() -> None:
@@ -198,13 +181,13 @@ def test_forward_and_summary() -> None:
 def test_format_and_key() -> None:
     d5, h1 = reclaim_5m(), hour_ok_hi()
     hi = len(h1["c"]) - 1
-    sig = detect_new_align(d5, 229 + CONFIRM_BARS, h1, hi)
+    sig = detect_new_align(d5, 229, h1, hi)
     ev = {"symbol": "BTCUSDT", "sig": sig, "d5": d5, "h1": h1}
     text = format_alert(ev)
     assert "BTCUSDT" in text
     assert "多頭排列" in text
-    assert "三根後" in text
-    assert key_of(ev) == f"BTCUSDT:{sig['reclaim_t']}"
+    assert "MA200 下" in text
+    assert key_of(ev) == f"BTCUSDT:{sig['t']}"
 
 
 if __name__ == "__main__":
