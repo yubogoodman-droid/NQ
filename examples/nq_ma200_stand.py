@@ -10,8 +10,8 @@
   6. 紅 K 長上影跳過
   7. 停損 MA200−10，停利 +100
   8. 浮盈先到 +60 後，停損提到進場價（保本）
-  9. 進場在 15m MA200 上被停損後，30 分鐘內站回原進場價再進一次。只再進一次，停損同上。
-  10. 五分 MA5/10/20/30/60/200 全均帶寬 <28 視為糾結，主場與再進都不進。再進站回當下若糾結，整次取消、不再往後找。
+  9. 進場在 15m MA200 上被停損後，30 分鐘內站回原進場價再進一次。只再進一次，停損同上；再進也要距 MA200 ≤30。
+  10. 五分 MA5/10/20/30/60/200 全均帶寬 <28 視為糾結，主場與再進都不進。再進已是合格站上卻糾結，整次取消。
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -413,6 +413,7 @@ def make_reclaim_reentry(
     ma200_15m: np.ndarray,
     m5_all: Optional[np.ndarray] = None,
     min_5m_all: float = MIN_5M_ALL,
+    max_dist_ma200: float = MAX_DIST_MA200,
     stop_below_ma200: float = STOP_BELOW_MA200,
     take_profit: float = TAKE_PROFIT,
     window_minutes: int = REENTRY_MINUTES,
@@ -420,7 +421,8 @@ def make_reclaim_reentry(
 ) -> Optional[Signal]:
     """停損後 window_minutes 內，收盤站回原進場價則再進一次。
 
-    站回當下若五分全均糾結，整次再進取消（不再往後找比較鬆的一根）。
+    再進仍須是站上 MA200（距 ≤30）。距離不夠就繼續等；
+    已合格卻五分全均糾結，整次取消。
     """
     close = df["Close"].to_numpy(float)
     n = len(close)
@@ -439,6 +441,9 @@ def make_reclaim_reentry(
         if float(close[j]) <= float(ma60[j]):
             continue
         entry = float(close[j])
+        dist = entry - float(ma200[j])
+        if dist <= 0 or dist > max_dist_ma200:
+            continue
         stop = float(ma200[j]) - stop_below_ma200
         if entry <= stop:
             continue
@@ -463,7 +468,7 @@ def make_reclaim_reentry(
             ma30=float(ma30[j]),
             ma60=float(ma60[j]),
             ma200=float(ma200[j]),
-            dist_ma200=entry - float(ma200[j]),
+            dist_ma200=dist,
             under_streak=parent.under_streak,
             m5_ribbon=0.0 if (np.isnan(ribbon) or np.isinf(ribbon)) else ribbon,
             m5_all=all_spread if np.isfinite(all_spread) else float("nan"),
@@ -1410,7 +1415,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次 · 五分MA5–200全均帶寬&lt;28不進（主場/再進；再進站回當下糾結則整次取消） · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次（再進也距MA200≤30） · 五分MA5–200全均帶寬&lt;28不進（主場/再進；合格站上卻糾結則整次取消） · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
