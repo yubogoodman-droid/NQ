@@ -11,6 +11,7 @@
   7. 停損 MA200−10，停利 +100
   8. 浮盈先到 +60 後，停損提到進場價（保本）
   9. 進場在 15m MA200 上被停損後，30 分鐘內站回原進場價再進一次。只再進一次，停損同上。
+  10. 五分 MA5/10/20/30/60/200 全均帶寬 <28 視為糾結，主場與再進都不進。
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -47,9 +48,11 @@ MAX_DIST_MA200 = 30.0
 STOP_BELOW_MA200 = 10.0
 TAKE_PROFIT = 100.0
 MIN_UPPER_WICK = 8.0
-MIN_5M_RIBBON = 0.0  # 關閉；五分圖只對照，不當進場條件
+MIN_5M_RIBBON = 0.0  # 關閉；五分 MA5–30 帶寬只對照
+MIN_5M_ALL = 28.0  # 五分 MA5–200 全均帶寬低於此＝糾結，不進
 BREAKEVEN_AFTER = 60.0
 REENTRY_MINUTES = 30
+ALL_5M_PERIODS = (5, 10, 20, 30, 60, 200)
 
 
 # ---------------------------------------------------------------------------
@@ -180,6 +183,7 @@ class Signal:
     dist_ma200: float
     under_streak: int
     m5_ribbon: float = 0.0
+    m5_all: float = 0.0
     m1_ribbon: float = 0.0
     ma200_15m: float = float("nan")
     dist_15m_ma200: float = float("nan")
@@ -272,6 +276,7 @@ def detect_signals(
     take_profit: float = TAKE_PROFIT,
     min_upper_wick: float = MIN_UPPER_WICK,
     min_5m_ribbon: float = MIN_5M_RIBBON,
+    min_5m_all: float = MIN_5M_ALL,
     df_15m: Optional[pd.DataFrame] = None,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
@@ -287,6 +292,7 @@ def detect_signals(
     ma200 = sma(close, 200)
     two_hr_low = rolling_min_prev(low, two_hour_bars)
     m5_ribbon = overlay_5m_ribbon(df)
+    m5_all = overlay_5m_all_spread(df)
     ma200_15m = overlay_15m_ma200(df, df_15m)
 
     fun = funnel if funnel is not None else {}
@@ -339,10 +345,14 @@ def detect_signals(
                 bump("skip_wick")
                 continue
             ribbon = float(m5_ribbon[j])
+            all_spread = float(m5_all[j])
             ribbon_1m = float(ma5[j] - ma60[j])
             m15_200 = float(ma200_15m[j])
             dist_15 = float("nan") if np.isnan(m15_200) else float(close[j] - m15_200)
             if min_5m_ribbon > 0 and (np.isnan(ribbon) or ribbon < min_5m_ribbon):
+                bump("skip_5m_ribbon")
+                continue
+            if min_5m_all > 0 and not np.isnan(all_spread) and all_spread < min_5m_all:
                 bump("skip_5m_tangle")
                 continue
             entry = float(close[j])
@@ -369,6 +379,7 @@ def detect_signals(
                     dist_ma200=dist,
                     under_streak=streak,
                     m5_ribbon=0.0 if (np.isnan(ribbon) or np.isinf(ribbon)) else ribbon,
+                    m5_all=0.0 if (np.isnan(all_spread) or np.isinf(all_spread)) else all_spread,
                     m1_ribbon=0.0 if np.isnan(ribbon_1m) else ribbon_1m,
                     ma200_15m=m15_200,
                     dist_15m_ma200=dist_15,
@@ -400,12 +411,14 @@ def make_reclaim_reentry(
     ma200: np.ndarray,
     m5_ribbon: np.ndarray,
     ma200_15m: np.ndarray,
+    m5_all: Optional[np.ndarray] = None,
+    min_5m_all: float = MIN_5M_ALL,
     stop_below_ma200: float = STOP_BELOW_MA200,
     take_profit: float = TAKE_PROFIT,
     window_minutes: int = REENTRY_MINUTES,
     parent_exit_price: float = float("nan"),
 ) -> Optional[Signal]:
-    """停損後 window_minutes 內，收盤站回原進場價則再進一次。"""
+    """停損後 window_minutes 內，收盤站回原進場價則再進一次。五分全均糾結不進。"""
     close = df["Close"].to_numpy(float)
     n = len(close)
     reclaim = float(parent.entry_price)
@@ -427,6 +440,9 @@ def make_reclaim_reentry(
         if entry <= stop:
             continue
         ribbon = float(m5_ribbon[j])
+        all_spread = float(m5_all[j]) if m5_all is not None else float("nan")
+        if min_5m_all > 0 and not np.isnan(all_spread) and all_spread < min_5m_all:
+            continue
         ribbon_1m = float(ma5[j] - ma60[j])
         m15_200 = float(ma200_15m[j])
         dist_15 = float("nan") if np.isnan(m15_200) else entry - m15_200
@@ -447,6 +463,7 @@ def make_reclaim_reentry(
             dist_ma200=entry - float(ma200[j]),
             under_streak=parent.under_streak,
             m5_ribbon=0.0 if (np.isnan(ribbon) or np.isinf(ribbon)) else ribbon,
+            m5_all=0.0 if (np.isnan(all_spread) or np.isinf(all_spread)) else all_spread,
             m1_ribbon=0.0 if np.isnan(ribbon_1m) else ribbon_1m,
             ma200_15m=m15_200,
             dist_15m_ma200=dist_15,
@@ -543,6 +560,7 @@ def simulate(
     ma60 = sma(close, 60)
     ma200 = sma(close, 200)
     m5_ribbon = overlay_5m_ribbon(df)
+    m5_all = overlay_5m_all_spread(df)
     ma200_15m = overlay_15m_ma200(df, df_15m)
     pending = list(signals)
     results: List[TradeResult] = []
@@ -578,6 +596,7 @@ def simulate(
                 ma200=ma200,
                 m5_ribbon=m5_ribbon,
                 ma200_15m=ma200_15m,
+                m5_all=m5_all,
                 stop_below_ma200=stop_below_ma200,
                 take_profit=take_profit,
                 window_minutes=reentry_minutes,
@@ -692,16 +711,26 @@ def overlay_15m_ma200(
     return align_htf(df_1m, ma)
 
 
-def overlay_5m_ribbon(df_1m: pd.DataFrame) -> np.ndarray:
-    """已收盤五分 MA5/10/20/30 帶寬。不把 MA60 算進去：第一張短均只差 13，MA60 會把帶寬撐到 40。"""
+def overlay_5m_spread(df_1m: pd.DataFrame, periods: Sequence[int]) -> np.ndarray:
+    """已收盤五分均線帶寬（max−min），對齊到 1m。缺任何一條則 nan。"""
     df5 = resample_5m(df_1m)
     close5 = df5["Close"].astype(float)
-    mas = [align_htf(df_1m, close5.rolling(n, min_periods=n).mean()) for n in (5, 10, 20, 30)]
+    mas = [align_htf(df_1m, close5.rolling(int(n), min_periods=int(n)).mean()) for n in periods]
     stacked = np.vstack(mas)
     with np.errstate(invalid="ignore"):
         spread = stacked.max(axis=0) - stacked.min(axis=0)
     spread[np.isnan(stacked).any(axis=0)] = np.nan
     return spread
+
+
+def overlay_5m_ribbon(df_1m: pd.DataFrame) -> np.ndarray:
+    """已收盤五分 MA5/10/20/30 帶寬。不把 MA60 算進去：短均只差 13 時 MA60 會把帶寬撐到 40。"""
+    return overlay_5m_spread(df_1m, (5, 10, 20, 30))
+
+
+def overlay_5m_all_spread(df_1m: pd.DataFrame) -> np.ndarray:
+    """已收盤五分 MA5/10/20/30/60/200 全均帶寬。六條擠在一起＝糾結。"""
+    return overlay_5m_spread(df_1m, ALL_5M_PERIODS)
 
 
 def resample_htf(df: pd.DataFrame, minutes: int) -> pd.DataFrame:
@@ -1294,6 +1323,7 @@ def write_html_report(
             f"<span class='tag tag-info'>停損 MA200−10</span>"
             f"<span class='tag tag-info'>收&gt;MA60</span>"
             f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
+            f"<span class='tag tag-info'>5m全均 {t.signal.m5_all:.1f}</span>"
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
             "</div>"
             "<pre class='trade-detail'>"
@@ -1310,7 +1340,7 @@ def write_html_report(
             f"> MA30 {t.signal.ma30:.1f} > MA60 {t.signal.ma60:.1f}\n"
             f"MA200 {t.signal.ma200:.1f}  先前連{t.signal.under_streak}根在下\n"
             f"15m MA200 {_fmt_price(t.signal.ma200_15m)}  進場距 {_fmt_signed(t.signal.dist_15m_ma200)} pts\n"
-            f"5m MA5–30 帶寬 {t.signal.m5_ribbon:.1f} · 1m MA5–60 帶寬 {t.signal.m1_ribbon:.1f}"
+            f"5m MA5–30 帶寬 {t.signal.m5_ribbon:.1f} · 5m 全均 {t.signal.m5_all:.1f} · 1m MA5–60 帶寬 {t.signal.m1_ribbon:.1f}"
             "</pre>"
             f"{charts}"
             "</article>"
@@ -1324,6 +1354,7 @@ def write_html_report(
             f"未連3 {funnel.get('skip_above3', 0)} · "
             f"距離 {funnel.get('skip_dist', 0)} · 未洗15 {funnel.get('skip_under', 0)} · "
             f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)} · "
+            f"五分糾結 {funnel.get('skip_5m_tangle', 0)} · "
             f"再進 {funnel.get('reentry', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -1370,7 +1401,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次 · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次 · 五分MA5–200全均帶寬&lt;28不進（主場/再進） · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1390,7 +1421,17 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
     view = out.parent / "view.html"
     if out.name == "index.html":
         view.write_text(html.replace("img/", "./img/"), encoding="utf-8")
+    _purge_orphan_pngs(out.parent / "img", html)
     return out
+
+
+def _purge_orphan_pngs(img_dir: Path, html: str) -> None:
+    if not img_dir.is_dir():
+        return
+    keep = {name for name in (p.name for p in img_dir.glob("*.png")) if name in html}
+    for png in img_dir.glob("*.png"):
+        if png.name not in keep:
+            png.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1421,6 +1462,7 @@ def cmd_backtest(args) -> int:
         f"above3={funnel.get('skip_above3', 0)} "
         f"dist={funnel.get('skip_dist', 0)} under={funnel.get('skip_under', 0)} "
         f"open={funnel.get('skip_open', 0)} wick={funnel.get('skip_wick', 0)} "
+        f"tangle={funnel.get('skip_5m_tangle', 0)} "
         f"reentry={funnel.get('reentry', 0)}"
     )
     for i, t in enumerate(trades, 1):
