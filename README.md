@@ -49,8 +49,8 @@ python3 examples/watch_binance_ribbon.py --also-1m       # 順便跑原本 1m �
 
 ```bash
 python3 examples/backtest_15m_ribbon.py --demo
-python3 examples/backtest_15m_ribbon.py --days 7 --pages
-python3 examples/backtest_15m_ribbon.py --days 7 --asset stocks --pages   # 只要股票
+python3 examples/backtest_15m_ribbon.py --days 3 --pages
+python3 examples/backtest_15m_ribbon.py --days 3 --asset stocks --pages   # 只要股票
 ```
 
 報告：

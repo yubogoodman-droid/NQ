@@ -2,7 +2,7 @@
 """回測：15 分 K 同時站上 MA7 / 14 / 25 / 99 / 120，圖例底下附同一時間 1 小時圖。
 
     python3 examples/backtest_15m_ribbon.py --demo
-    python3 examples/backtest_15m_ribbon.py --days 7 --pages
+    python3 examples/backtest_15m_ribbon.py --days 3 --pages
 """
 
 from __future__ import annotations
@@ -634,7 +634,7 @@ def scan_interval(symbols: list[str], days: int, interval: str, workers: int) ->
 def main() -> int:
     p = argparse.ArgumentParser(description="15 分 K 同時站上 7/14/25/99/120（圖例附 1 小時）")
     p.add_argument("--demo", action="store_true", help="只用合成資料驗證偵測")
-    p.add_argument("--days", type=int, default=7, help="回測天數（訊號窗口；前面另留 MA200 熱身）")
+    p.add_argument("--days", type=int, default=3, help="回測天數（訊號窗口；前面另留 MA200 熱身）")
     p.add_argument("--asset", choices=("all", "stocks"), default="all", help="all=加密+股票流動盤；stocks=只要股票永續")
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance 報告（全部或股票各一頁）")
