@@ -18,6 +18,7 @@ from nq_w_ma20 import (  # noqa: E402
     quality_from_w,
     detect_params,
     resample_ohlc,
+    resample_ohlc_asof,
     simulate,
     summarize_trades,
     write_html_report,
@@ -180,6 +181,11 @@ def test_resample_15m() -> None:
     assert len(m15) > 0
     assert len(m15) <= (len(df) + 2) // 3
     assert {"Open", "High", "Low", "Close"} <= set(m15.columns)
+    mid = df.index[40]
+    asof = resample_ohlc_asof(df, mid)
+    assert asof.index[-1] <= mid
+    full = resample_ohlc(df.loc[:mid], "15min")
+    assert len(asof) == len(full)
 
 
 def test_simulate_and_html() -> None:
@@ -194,8 +200,9 @@ def test_simulate_and_html() -> None:
     assert "雙底" in text
     assert "MA20" in text
     assert "15分K" in text
-    assert "15分K 回測" in text
-    assert text.count("<svg") >= 2, "五分圖 + 15 分圖都要內嵌 SVG"
+    assert "當下這根15分" in text or "當下15分" in text
+    assert "15分K 回測" not in text
+    assert text.count("<svg") >= 2, "五分圖 + 當下15分圖都要內嵌 SVG"
 
 
 def test_detect_params_15m() -> None:

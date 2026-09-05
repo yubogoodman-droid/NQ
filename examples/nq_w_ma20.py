@@ -470,6 +470,32 @@ def resample_ohlc(df: pd.DataFrame, rule: str = "15min") -> pd.DataFrame:
     return out.dropna(subset=["Open", "High", "Low", "Close"])
 
 
+def resample_ohlc_asof(df_5m: pd.DataFrame, asof, rule: str = "15min") -> pd.DataFrame:
+    """只看到 asof 這根五分為止，避免把尚未走完的 15 分 K 畫完整。"""
+    if df_5m.empty:
+        return df_5m
+    cut = df_5m.loc[df_5m.index <= asof]
+    return resample_ohlc(cut, rule)
+
+
+def fifteen_bar_at(df_15m: pd.DataFrame, ts) -> Optional[dict]:
+    if df_15m.empty:
+        return None
+    i = _asof_bar(df_15m, ts)
+    row = df_15m.iloc[i]
+    ma20 = float(df_15m["Close"].astype(float).rolling(20, min_periods=20).mean().iloc[i])
+    close = float(row["Close"])
+    return {
+        "ts": df_15m.index[i],
+        "open": float(row["Open"]),
+        "high": float(row["High"]),
+        "low": float(row["Low"]),
+        "close": close,
+        "ma20": ma20,
+        "above_ma20": close > ma20 if not np.isnan(ma20) else False,
+    }
+
+
 def _asof_bar(df: pd.DataFrame, ts) -> int:
     pos = int(df.index.searchsorted(ts, side="right")) - 1
     return max(0, min(pos, len(df) - 1))
@@ -618,8 +644,8 @@ def draw_trade_chart(df: pd.DataFrame, trade: TradeResult, trade_no: int) -> str
     return svg
 
 
-def draw_15m_chart(df_5m: pd.DataFrame, df_15m: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
-    """同一筆五分進場，對照 15 分 K（綠線是 15m MA20）。"""
+def draw_15m_chart(df_5m: pd.DataFrame, trade: TradeResult, trade_no: int) -> str:
+    """五分訊號成立當下的 15 分 K：只畫到進場那根五分為止，當下這根 15 分未走完。"""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -639,22 +665,24 @@ def draw_15m_chart(df_5m: pd.DataFrame, df_15m: pd.DataFrame, trade: TradeResult
             break
 
     sig = trade.signal
+    entry_ts = df_5m.index[trade.entry_idx]
     dump_ts = df_5m.index[sig.first_low_idx]
     stand_ts = df_5m.index[sig.stand_idx]
     break_ts = df_5m.index[sig.break_idx]
     retest_ts = df_5m.index[sig.second_low_idx]
-    entry_ts = df_5m.index[trade.entry_idx]
-    exit_ts = df_5m.index[trade.exit_idx]
 
+    df_15m = resample_ohlc_asof(df_5m, entry_ts)
+    if df_15m.empty:
+        return ""
+
+    i_now = _asof_bar(df_15m, entry_ts)
     i_dump = _asof_bar(df_15m, dump_ts)
     i_stand = _asof_bar(df_15m, stand_ts)
     i_break = _asof_bar(df_15m, break_ts)
     i_retest = _asof_bar(df_15m, retest_ts)
-    i_entry = _asof_bar(df_15m, entry_ts)
-    i_exit = _asof_bar(df_15m, exit_ts)
 
-    start = max(0, i_dump - 8)
-    end = min(len(df_15m) - 1, max(i_entry + 8, i_exit + 3, i_dump + 16))
+    start = max(0, min(i_dump, i_now) - 6)
+    end = i_now
     window = df_15m.iloc[start : end + 1]
     if window.empty:
         return ""
@@ -677,16 +705,30 @@ def draw_15m_chart(df_5m: pd.DataFrame, df_15m: pd.DataFrame, trade: TradeResult
         for sp in a.spines.values():
             sp.set_color("#2a3a33")
 
+    now_x = i_now - start
     colors_v = []
     for k in range(len(window)):
         up = float(c.iloc[k]) >= float(o.iloc[k])
-        col = "#3dba7a" if up else "#e35d5d"
-        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=0.85)
+        col = "#79c0ff" if k == now_x else ("#3dba7a" if up else "#e35d5d")
+        lw = 1.6 if k == now_x else 0.85
+        ax.vlines(xs[k], float(l.iloc[k]), float(h.iloc[k]), color=col, lw=lw)
         y0, y1 = min(float(o.iloc[k]), float(c.iloc[k])), max(float(o.iloc[k]), float(c.iloc[k]))
         if y1 == y0:
             y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
         ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
-        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+        if k == now_x:
+            ax.add_patch(
+                Rectangle(
+                    (xs[k] - 0.48, float(l.iloc[k])),
+                    0.96,
+                    max(float(h.iloc[k]) - float(l.iloc[k]), 1e-9),
+                    fill=False,
+                    edgecolor="#79c0ff",
+                    lw=1.6,
+                    zorder=8,
+                )
+            )
+        colors_v.append("#79c0ff99" if k == now_x else ("#3dba7a99" if up else "#e35d5d99"))
     if vol is not None:
         axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
 
@@ -695,9 +737,6 @@ def draw_15m_chart(df_5m: pd.DataFrame, df_15m: pd.DataFrame, trade: TradeResult
         ax.plot(list(xs), ma, color=col, lw=2.2 if nper == 20 else (1.2 if nper <= 10 else 1.0), label=f"15m MA{nper}")
 
     ax.axhline(sig.first_low, color="#facc15", ls=":", lw=1.0, alpha=0.75)
-    ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=0.9, alpha=0.7)
-    ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=0.9, alpha=0.65)
-
     marks = (
         (i_dump - start, sig.first_low, "2h低", (0, -13), "#fde68a"),
         (i_stand - start, float(df_15m["Close"].iloc[i_stand]), "站上", (0, 8), "#86efac"),
@@ -705,24 +744,33 @@ def draw_15m_chart(df_5m: pd.DataFrame, df_15m: pd.DataFrame, trade: TradeResult
         (i_retest - start, sig.second_low, "回測", (0, -13), "#fde68a"),
     )
     for x, y, lab, off, col in marks:
-        if 0 <= x < len(window):
+        if 0 <= x < len(window) and x != now_x:
             ax.scatter([x], [y], s=30, color=col, zorder=6)
             ax.annotate(lab, (x, y), textcoords="offset points", xytext=off, ha="center", color=col, fontsize=7)
-    ex = i_entry - start
-    if 0 <= ex < len(window):
-        ax.axvline(ex, color="#3dba7a", ls="--", lw=1.0, alpha=0.7)
-        ax.scatter([ex], [trade.entry_price], s=48, color="#22c55e", marker="^", zorder=7)
-        ax.annotate("5m進場", (ex, trade.entry_price), textcoords="offset points", xytext=(0, 10),
-                    ha="center", color="#86efac", fontsize=8)
-    xx = i_exit - start
-    if 0 <= xx < len(window):
-        ax.scatter([xx], [trade.exit_price], s=32, color="#fb7185", marker="v", zorder=7)
+    if 0 <= now_x < len(window):
+        ax.axvline(now_x, color="#79c0ff", ls="--", lw=1.1, alpha=0.85)
+        ax.scatter([now_x], [float(c.iloc[now_x])], s=52, color="#79c0ff", marker="o", zorder=9)
+        ax.annotate(
+            "當下這根15分",
+            (now_x, float(c.iloc[now_x])),
+            textcoords="offset points",
+            xytext=(0, 12),
+            ha="center",
+            color="#79c0ff",
+            fontsize=9,
+        )
 
     step = max(1, len(window) // 6)
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
     axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], rotation=0)
-    ax.set_title(f"#{trade_no}  15分K  {entry_ts.strftime('%m-%d %H:%M')} ET", color="#d7e3d4", fontsize=11, pad=8)
+    now_label = df_15m.index[i_now].strftime("%m-%d %H:%M")
+    ax.set_title(
+        f"#{trade_no}  五分滿足當下的15分K  {entry_ts.strftime('%m-%d %H:%M')} ET（藍框={now_label} 這根）",
+        color="#d7e3d4",
+        fontsize=11,
+        pad=8,
+    )
     ax.legend(loc="upper left", fontsize=7, framealpha=0.35, labelcolor="#d7e3d4")
     fig.tight_layout(pad=0.6)
     svg = _inline_mpl_svg(fig, f"t15_{trade_no:02d}_")
@@ -736,7 +784,6 @@ def _ts(df: pd.DataFrame, idx: int) -> pd.Timestamp:
 
 
 def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
-    df_15m = resample_ohlc(df, "15min") if len(df) else df
     cards = []
     for i, t in enumerate(trades, 1):
         et = _ts(df, t.entry_idx)
@@ -747,7 +794,20 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
         cls = "pnl-win" if t.pnl_points > 0 else ("pnl-loss" if t.pnl_points < 0 else "pnl-flat")
         reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
         chart = draw_trade_chart(df, t, i)
-        chart15 = draw_15m_chart(df, df_15m, t, i) if len(df_15m) else ""
+        chart15 = draw_15m_chart(df, t, i)
+        asof_15 = resample_ohlc_asof(df, df.index[t.entry_idx])
+        bar15 = fifteen_bar_at(asof_15, df.index[t.entry_idx])
+        if bar15:
+            vs = "站上" if bar15["above_ma20"] else "未站上"
+            ma_txt = f"{bar15['ma20']:.2f}" if not np.isnan(bar15["ma20"]) else "n/a"
+            bar15_line = (
+                f"當下15分 {bar15['ts'].strftime('%H:%M')}  "
+                f"O{bar15['open']:.2f} H{bar15['high']:.2f} "
+                f"L{bar15['low']:.2f} C{bar15['close']:.2f}  "
+                f"15mMA20 {ma_txt} {vs}"
+            )
+        else:
+            bar15_line = "當下15分 無資料"
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -761,7 +821,6 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
             f"<span class='tag tag-info'>雙底</span>"
             f"<span class='tag tag-info'>2h低回測</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
-            f"<span class='tag tag-info'>15分K</span>"
             "</div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}\n"
@@ -772,55 +831,13 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult]) -> str:
             f"差 {t.signal.low_gap_pts:+.1f}pt\n"
             f"反彈高 {t.signal.neckline:.2f}  高度 {t.signal.neck_pts:.1f}pt\n"
             f"回測 {l2t.strftime('%m-%d %H:%M')}  三根沒新低  "
-            f"MA20 {t.signal.ma20:.2f}"
+            f"MA20 {t.signal.ma20:.2f}\n"
+            f"{bar15_line}"
             "</pre>"
             "<div class='chart-label'>五分K</div>"
             f"<div class='mini-chart'>{chart}</div>"
-            "<div class='chart-label'>15分K</div>"
+            "<div class='chart-label'>五分滿足當下的15分K（藍框是進場那一刻這根，未走完）</div>"
             f"<div class='mini-chart'>{chart15}</div>"
-            "</article>"
-        )
-    return "".join(cards)
-
-
-def _render_15m_trade_cards(df_15m: pd.DataFrame, trades: List[TradeResult]) -> str:
-    cards = []
-    for i, t in enumerate(trades, 1):
-        et = _ts(df_15m, t.entry_idx)
-        xt = _ts(df_15m, t.exit_idx)
-        l2t = _ts(df_15m, t.signal.second_low_idx)
-        risk = t.entry_price - t.stop_price
-        r_mult = (t.target_price - t.entry_price) / risk if risk else 0.0
-        cls = "pnl-win" if t.pnl_points > 0 else ("pnl-loss" if t.pnl_points < 0 else "pnl-flat")
-        reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
-        chart = draw_trade_chart(df_15m, t, i)
-        cards.append(
-            "<article class='trade-card'>"
-            "<header class='card-header'>"
-            f"<div><div class='trade-no'>15m #{i}  Q{escape(t.quality)}</div>"
-            f"<span class='trade-time'>{escape(et.strftime('%m-%d %H:%M'))} → "
-            f"{escape(xt.strftime('%m-%d %H:%M'))}</span></div>"
-            f"<div class='card-pnl {cls}'>{t.pnl_points:+.1f} pts</div>"
-            "</header>"
-            "<div class='tags'>"
-            f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            f"<span class='tag tag-info'>15分K</span>"
-            f"<span class='tag tag-info'>雙底</span>"
-            f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
-            "</div>"
-            "<pre class='trade-detail'>"
-            f"entry {t.entry_price:.2f}\n"
-            f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts)\n"
-            f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
-            f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
-            f"2h低 {t.signal.first_low:.2f} / 回測 {t.signal.second_low:.2f}  "
-            f"差 {t.signal.low_gap_pts:+.1f}pt\n"
-            f"反彈高 {t.signal.neckline:.2f}  高度 {t.signal.neck_pts:.1f}pt\n"
-            f"回測 {l2t.strftime('%m-%d %H:%M')}  三根15分沒新低  "
-            f"MA20 {t.signal.ma20:.2f}"
-            "</pre>"
-            "<div class='chart-label'>15分K</div>"
-            f"<div class='mini-chart'>{chart}</div>"
             "</article>"
         )
     return "".join(cards)
@@ -868,31 +885,15 @@ def write_html_report(
     period: str,
     funnel: Optional[Dict[str, int]] = None,
     verdict: str = "",
-    df_15m: Optional[pd.DataFrame] = None,
-    trades_15m: Optional[List[TradeResult]] = None,
-    funnel_15m: Optional[Dict[str, int]] = None,
-    verdict_15m: str = "",
 ) -> Path:
-    if df_15m is None:
-        df_15m = resample_ohlc(df, "15min") if len(df) else df
-    if trades_15m is None and len(df_15m):
-        funnel_15m = {} if funnel_15m is None else funnel_15m
-        p15 = detect_params("15m")
-        sigs15 = detect_signals(df_15m, funnel=funnel_15m, two_hour_bars=p15["two_hour_bars"])
-        trades_15m = simulate(df_15m, sigs15, max_hold=p15["max_hold"])
-        verdict_15m = verdict_15m or _verdict(summarize_trades(trades_15m), funnel_15m)
-    trades_15m = trades_15m or []
-
     out = Path(path)
     cards5 = _render_trade_cards(df, trades)
-    cards15 = _render_15m_trade_cards(df_15m, trades_15m)
     sec5 = _section_summary("五分K 回測", df, trades, funnel, verdict)
-    sec15 = _section_summary("15分K 回測", df_15m, trades_15m, funnel_15m, verdict_15m)
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>{escape(symbol)} 五分 / 15分 雙底</title>
+<title>{escape(symbol)} 五分K 雙底</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -925,13 +926,11 @@ h2{{font-size:16px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="lead">
-<h1>{escape(symbol)} 五分 / 15分 雙底</h1>
-<p class="muted">{escape(period)} · 同一套：兩小時低 → 站上 MA20 → 再跌破 → 回測附近守三根。15 分 K 的兩小時是 8 根，三根沒新低 = 45 分鐘。</p>
+<h1>{escape(symbol)} 五分K 雙底</h1>
+<p class="muted">{escape(period)} · 兩小時低 → 站上 MA20 → 再跌破 → 回測附近守三根。每筆下面是<strong>五分滿足當下</strong>的 15 分 K（只畫到進場那根，藍框是當下這根）。</p>
 </section>
 {sec5}
 {cards5 or "<div class='empty'>五分K 無訊號</div>"}
-{sec15}
-{cards15 or "<div class='empty'>15分K 無訊號</div>"}
 </div>
 </body></html>
 """
@@ -999,30 +998,13 @@ def cmd_backtest(args) -> int:
     trades = simulate(df, sigs, max_hold=params["max_hold"])
     stats = summarize_trades(trades)
     print(
-        f"{args.interval} trades={stats['count']} WR={stats['win_rate']:.1f}% "
+        f"trades={stats['count']} WR={stats['win_rate']:.1f}% "
         f"pnl={stats['total_points']:+.1f} avg={stats['avg']:+.1f}"
     )
     print("funnel", funnel)
     _print_trades(df, trades)
     verdict = _verdict(stats, funnel)
     print(f"verdict: {verdict}")
-
-    df_15m = resample_ohlc(df, "15min") if args.interval == "5m" else pd.DataFrame()
-    trades_15m: List[TradeResult] = []
-    funnel_15m: Dict[str, int] = {}
-    verdict_15m = ""
-    if not df_15m.empty:
-        p15 = detect_params("15m")
-        sigs_15m = detect_signals(df_15m, funnel=funnel_15m, two_hour_bars=p15["two_hour_bars"])
-        trades_15m = simulate(df_15m, sigs_15m, max_hold=p15["max_hold"])
-        stats_15m = summarize_trades(trades_15m)
-        print(
-            f"15m trades={stats_15m['count']} WR={stats_15m['win_rate']:.1f}% "
-            f"pnl={stats_15m['total_points']:+.1f} avg={stats_15m['avg']:+.1f}"
-        )
-        print("funnel_15m", funnel_15m)
-        verdict_15m = _verdict(stats_15m, funnel_15m)
-        print(f"verdict_15m: {verdict_15m}")
 
     html_path = args.html
     if getattr(args, "pages", False):
@@ -1036,10 +1018,6 @@ def cmd_backtest(args) -> int:
             args.period,
             funnel=funnel,
             verdict=verdict,
-            df_15m=df_15m if not df_15m.empty else None,
-            trades_15m=trades_15m,
-            funnel_15m=funnel_15m,
-            verdict_15m=verdict_15m,
         )
         print(f"html={out}")
         if getattr(args, "pages", False):
