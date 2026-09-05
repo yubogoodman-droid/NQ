@@ -497,12 +497,12 @@ def write_html(
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     if asset == "stocks":
-        page_title = "15分K 股票 同時站上 7/14/25/99/120"
-        heading = "股票：一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120"
+        page_title = f"近{days}天 15分K 股票 同時站上 7/14/25/99/120"
+        heading = f"近 {days} 天 · 股票：一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120"
         nav = '<b>只要股票</b> · <a href="./ma-ribbon-15m.html">全部流動盤</a>'
     else:
-        page_title = "15分K 同時站上 7/14/25/99/120"
-        heading = "一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120"
+        page_title = f"近{days}天 15分K 同時站上 7/14/25/99/120"
+        heading = f"近 {days} 天 · 一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120"
         nav = '<b>全部流動盤</b> · <a href="./ma-ribbon-15m-stocks.html">只要股票</a>'
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
