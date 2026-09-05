@@ -2,7 +2,7 @@
 """NQ 一分 K：破兩小時低後站上 MA200。
 
 現行規則（無五分 MA60 斜率）：
-  1. MA5>10>20>30>60
+  1. MA5>10>20>30>60，且收盤在 MA60 上
   2. 站上 MA200 連 ≥3，且距離 ≤30
   3. 破兩小時低後 1 小時內
   4. 進場前 1 小時曾連續 ≥15 根在 MA200 下
@@ -307,6 +307,9 @@ def detect_signals(
             if not (ma5[j] > ma10[j] > ma20[j] > ma30[j] > ma60[j]):
                 bump("skip_stack")
                 continue
+            if close[j] <= ma60[j]:
+                bump("skip_ma60")
+                continue
             if not above_ma200_streak(close, ma200, j, above_streak):
                 bump("skip_above3")
                 continue
@@ -405,6 +408,8 @@ def make_reclaim_reentry(
         if float(close[j]) + 1e-9 < reclaim:
             continue
         if np.isnan(ma200[j]) or np.isnan(ma5[j]) or np.isnan(ma60[j]):
+            continue
+        if float(close[j]) <= float(ma60[j]):
             continue
         entry = float(close[j])
         stop = float(ma200[j]) - stop_below_ma200
@@ -1214,7 +1219,8 @@ def write_html_report(
     if funnel:
         funnel_line = (
             f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → 進場 {funnel.get('taken', 0)}"
-            f"（排列 {funnel.get('skip_stack', 0)} · 未連3 {funnel.get('skip_above3', 0)} · "
+            f"（排列 {funnel.get('skip_stack', 0)} · 未上MA60 {funnel.get('skip_ma60', 0)} · "
+            f"未連3 {funnel.get('skip_above3', 0)} · "
             f"距離 {funnel.get('skip_dist', 0)} · 未洗15 {funnel.get('skip_under', 0)} · "
             f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)} · "
             f"再進 {funnel.get('reentry', 0)}）</p>"
@@ -1263,7 +1269,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次 · 5m / 15m / 1h 圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次 · 5m / 15m / 1h 圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1310,7 +1316,8 @@ def cmd_backtest(args) -> int:
     print(
         "funnel "
         f"break={funnel.get('break', 0)} taken={funnel.get('taken', 0)} "
-        f"stack={funnel.get('skip_stack', 0)} above3={funnel.get('skip_above3', 0)} "
+        f"stack={funnel.get('skip_stack', 0)} ma60={funnel.get('skip_ma60', 0)} "
+        f"above3={funnel.get('skip_above3', 0)} "
         f"dist={funnel.get('skip_dist', 0)} under={funnel.get('skip_under', 0)} "
         f"open={funnel.get('skip_open', 0)} wick={funnel.get('skip_wick', 0)} "
         f"reentry={funnel.get('reentry', 0)}"

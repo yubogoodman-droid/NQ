@@ -19,7 +19,9 @@ from nq_ma200_stand import (  # noqa: E402
     draw_trade_png,
     in_open_skip,
     is_red_long_upper,
+    make_reclaim_reentry,
     overlay_15m_ma200,
+    overlay_5m_ribbon,
     parse_period_days,
     resample_5m,
     resample_15m,
@@ -136,6 +138,7 @@ def test_detect_happy_path() -> None:
     assert sig.entry_idx > sig.break_idx
     assert sig.entry_idx - sig.break_idx <= 60
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30 > sig.ma60
+    assert sig.entry_price > sig.ma60
     assert 0 < sig.dist_ma200 <= 30
     assert sig.under_streak >= 15
     assert abs(sig.stop_price - (sig.ma200 - 10)) < 1e-6
@@ -223,6 +226,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "進場距 15m MA200" in text
         assert "停損 MA200−10" in text
         assert "15mMA200上被停損後30分內站回進場點再進一次" in text
+        assert "收在MA60上" in text
         assert "5m連2根收在破底下" not in text
         assert any((path.parent / "img").glob("t01_*.png"))
         assert any((path.parent / "img").glob("t01_*_5m.png"))
@@ -401,6 +405,61 @@ def test_no_reentry_if_reclaim_too_late() -> None:
     assert all(t.signal.entry_kind != "reentry" for t in trades)
 
 
+def test_reentry_requires_close_above_ma60() -> None:
+    df = _make_setup_bars(n=520)
+    df_15 = _long_15m(df, 19000.0)
+    sigs = detect_signals(df, min_5m_ribbon=0.0, df_15m=df_15)
+    assert sigs
+    parent = sigs[0]
+    j = parent.entry_idx
+    entry = parent.entry_price
+    df2 = df.copy()
+    df2.iloc[j + 1, df2.columns.get_loc("Low")] = parent.stop_price - 2
+    df2.iloc[j + 1, df2.columns.get_loc("Close")] = parent.stop_price - 1
+    for k in range(j + 2, j + 8):
+        df2.iloc[k, df2.columns.get_loc("Close")] = entry - 5
+        df2.iloc[k, df2.columns.get_loc("Open")] = entry - 6
+        df2.iloc[k, df2.columns.get_loc("High")] = entry - 4
+        df2.iloc[k, df2.columns.get_loc("Low")] = entry - 7
+    reclaim = j + 8
+    df2.iloc[reclaim, df2.columns.get_loc("Close")] = entry + 1
+    df2.iloc[reclaim, df2.columns.get_loc("Open")] = entry - 2
+    df2.iloc[reclaim, df2.columns.get_loc("High")] = entry + 2
+    df2.iloc[reclaim, df2.columns.get_loc("Low")] = entry - 3
+    close = df2["Close"].to_numpy(float)
+    blocked = make_reclaim_reentry(
+        df2,
+        parent,
+        j + 1,
+        ma5=sma(close, 5),
+        ma10=sma(close, 10),
+        ma20=sma(close, 20),
+        ma30=sma(close, 30),
+        ma60=np.full(len(close), entry + 50.0),
+        ma200=sma(close, 200),
+        m5_ribbon=overlay_5m_ribbon(df2),
+        ma200_15m=overlay_15m_ma200(df2, df_15),
+        parent_exit_price=parent.stop_price,
+    )
+    assert blocked is None
+    allowed = make_reclaim_reentry(
+        df2,
+        parent,
+        j + 1,
+        ma5=sma(close, 5),
+        ma10=sma(close, 10),
+        ma20=sma(close, 20),
+        ma30=sma(close, 30),
+        ma60=sma(close, 60),
+        ma200=sma(close, 200),
+        m5_ribbon=overlay_5m_ribbon(df2),
+        ma200_15m=overlay_15m_ma200(df2, df_15),
+        parent_exit_price=parent.stop_price,
+    )
+    assert allowed is not None
+    assert allowed.entry_price > allowed.ma60
+
+
 def test_summarize() -> None:
     class T:
         def __init__(self, pnl: float):
@@ -433,6 +492,7 @@ def main() -> int:
     test_reentry_after_stop_above_15m()
     test_no_reentry_when_below_15m()
     test_no_reentry_if_reclaim_too_late()
+    test_reentry_requires_close_above_ma60()
     test_summarize()
     print("ok")
     return 0
