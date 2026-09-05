@@ -17,7 +17,6 @@ from nq_ma200_stand import (  # noqa: E402
     detect_signals,
     display_trades,
     in_open_skip,
-    in_thursday_skip,
     is_red_long_upper,
     parse_period_days,
     resample_5m,
@@ -189,16 +188,6 @@ def test_simulate_target_and_stop() -> None:
     assert trades3[0].exit_reason == "stop"
 
 
-def test_skip_thursday() -> None:
-    thu = pd.Timestamp("2026-08-13 12:00", tz=ET)
-    mon = pd.Timestamp("2026-08-17 12:00", tz=ET)
-    assert in_thursday_skip(thu) is True
-    assert in_thursday_skip(mon) is False
-    df = _make_setup_bars(start="2026-08-13 11:00")  # Thursday
-    assert detect_signals(df, min_5m_ribbon=0.0) == []
-    assert detect_signals(df, min_5m_ribbon=0.0, skip_thursday=False)
-
-
 def test_breakeven_after_plus_60() -> None:
     df = _make_setup_bars()
     sigs = detect_signals(df, min_5m_ribbon=0.0)
@@ -301,7 +290,6 @@ def main() -> int:
     test_skip_open_hour()
     test_skip_no_under_wash()
     test_simulate_target_and_stop()
-    test_skip_thursday()
     test_breakeven_after_plus_60()
     test_write_html()
     test_display_trades_wins_first()

@@ -9,8 +9,7 @@
   5. 美東 9:30–10:00 不進
   6. 紅 K 長上影跳過
   7. 停損 MA200−10，停利 +100
-  8. 美東星期四不進
-  9. 浮盈先到 +60 後，停損提到進場價（保本）
+  8. 浮盈先到 +60 後，停損提到進場價（保本）
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -48,7 +47,6 @@ STOP_BELOW_MA200 = 10.0
 TAKE_PROFIT = 100.0
 MIN_UPPER_WICK = 8.0
 MIN_5M_RIBBON = 0.0  # 關閉；五分圖只對照，不當進場條件
-SKIP_THURSDAY = True
 BREAKEVEN_AFTER = 60.0
 
 
@@ -198,16 +196,6 @@ def summarize_trades(trades: Sequence[TradeResult]) -> dict:
     }
 
 
-def in_thursday_skip(ts) -> bool:
-    """美東星期四不進。"""
-    t = ts
-    if getattr(t, "tzinfo", None) is None:
-        t = t.replace(tzinfo=ET)
-    else:
-        t = t.astimezone(ET)
-    return t.weekday() == 3
-
-
 def in_open_skip(ts) -> bool:
     """美東 9:30–10:00 不進（含 9:30，不含 10:00）。"""
     t = ts
@@ -263,7 +251,6 @@ def detect_signals(
     take_profit: float = TAKE_PROFIT,
     min_upper_wick: float = MIN_UPPER_WICK,
     min_5m_ribbon: float = MIN_5M_RIBBON,
-    skip_thursday: bool = SKIP_THURSDAY,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     close = df["Close"].to_numpy(float)
@@ -321,9 +308,6 @@ def detect_signals(
                 continue
             if in_open_skip(df.index[j]):
                 bump("skip_open")
-                continue
-            if skip_thursday and in_thursday_skip(df.index[j]):
-                bump("skip_thu")
                 continue
             if is_red_long_upper(float(opn[j]), float(high[j]), float(low[j]), float(close[j]), min_upper_wick):
                 bump("skip_wick")
@@ -863,8 +847,7 @@ def write_html_report(
             f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → 進場 {funnel.get('taken', 0)}"
             f"（排列 {funnel.get('skip_stack', 0)} · 未連3 {funnel.get('skip_above3', 0)} · "
             f"距離 {funnel.get('skip_dist', 0)} · 未洗15 {funnel.get('skip_under', 0)} · "
-            f"9:30檔 {funnel.get('skip_open', 0)} · 週四檔 {funnel.get('skip_thu', 0)} · "
-            f"長上影 {funnel.get('skip_wick', 0)}）</p>"
+            f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
@@ -909,7 +892,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 週四不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 5m / 15m / 1h 圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 5m / 15m / 1h 圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -953,8 +936,7 @@ def cmd_backtest(args) -> int:
         f"break={funnel.get('break', 0)} taken={funnel.get('taken', 0)} "
         f"stack={funnel.get('skip_stack', 0)} above3={funnel.get('skip_above3', 0)} "
         f"dist={funnel.get('skip_dist', 0)} under={funnel.get('skip_under', 0)} "
-        f"open={funnel.get('skip_open', 0)} thu={funnel.get('skip_thu', 0)} "
-        f"wick={funnel.get('skip_wick', 0)}"
+        f"open={funnel.get('skip_open', 0)} wick={funnel.get('skip_wick', 0)}"
     )
     for i, t in enumerate(trades, 1):
         print(
