@@ -242,6 +242,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "停損 破底" not in text
         assert "15mMA200上被停損後30分內站回進場點再進一次" in text
         assert "五分MA5–200全均帶寬" in text
+        assert "整次取消" in text
         assert "收在MA60上" in text
         assert "5m連2根收在破底下" not in text
         assert any((path.parent / "img").glob("t01_*.png"))
@@ -439,6 +440,52 @@ def test_reentry_skips_5m_all_tangle() -> None:
     assert allowed is not None
 
 
+def test_reentry_aborts_if_first_reclaim_tangled() -> None:
+    """站回第一根糾結就整次取消，即使後面帶寬已拉開。"""
+    df = _make_setup_bars(n=520)
+    df_15 = _long_15m(df, 19000.0)
+    sigs = detect_signals(df, min_5m_all=0.0, df_15m=df_15)
+    assert sigs
+    parent = sigs[0]
+    j = parent.entry_idx
+    entry = parent.entry_price
+    df2 = df.copy()
+    df2.iloc[j + 1, df2.columns.get_loc("Low")] = parent.stop_price - 2
+    df2.iloc[j + 1, df2.columns.get_loc("Close")] = parent.stop_price - 1
+    for k in range(j + 2, j + 8):
+        df2.iloc[k, df2.columns.get_loc("Close")] = entry - 5
+        df2.iloc[k, df2.columns.get_loc("Open")] = entry - 6
+        df2.iloc[k, df2.columns.get_loc("High")] = entry - 4
+        df2.iloc[k, df2.columns.get_loc("Low")] = entry - 7
+    first = j + 8
+    later = j + 12
+    for rec in (first, later):
+        df2.iloc[rec, df2.columns.get_loc("Close")] = entry + 1
+        df2.iloc[rec, df2.columns.get_loc("Open")] = entry - 2
+        df2.iloc[rec, df2.columns.get_loc("High")] = entry + 2
+        df2.iloc[rec, df2.columns.get_loc("Low")] = entry - 3
+    close = df2["Close"].to_numpy(float)
+    m5_all = np.full(len(close), 80.0)
+    m5_all[first] = 10.0
+    blocked = make_reclaim_reentry(
+        df2,
+        parent,
+        j + 1,
+        ma5=sma(close, 5),
+        ma10=sma(close, 10),
+        ma20=sma(close, 20),
+        ma30=sma(close, 30),
+        ma60=sma(close, 60),
+        ma200=sma(close, 200),
+        m5_ribbon=overlay_5m_ribbon(df2),
+        ma200_15m=overlay_15m_ma200(df2, df_15),
+        m5_all=m5_all,
+        min_5m_all=MIN_5M_ALL,
+        parent_exit_price=parent.stop_price,
+    )
+    assert blocked is None
+
+
 def _long_15m(df: pd.DataFrame, level: float) -> pd.DataFrame:
     idx_15 = pd.date_range(df.index[0] - pd.Timedelta(days=3), periods=220, freq="15min", tz=ET)
     close_15 = np.full(220, level)
@@ -609,6 +656,7 @@ def main() -> int:
     test_short_history_still_detects()
     test_skip_5m_all_tangle()
     test_reentry_skips_5m_all_tangle()
+    test_reentry_aborts_if_first_reclaim_tangled()
     test_reentry_after_stop_above_15m()
     test_no_reentry_when_below_15m()
     test_no_reentry_if_reclaim_too_late()
