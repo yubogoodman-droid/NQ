@@ -1,0 +1,114 @@
+//@version=5
+indicator("台股 五分K W底 5/10/20多排", overlay=true, max_labels_count=50)
+
+// 五分圖：W 底確認後，第一次翻成 MA5>MA10>MA20 多排才進場（不要求先過頸線）
+swingLen      = input.int(2, "轉折確認 K 數", minval=1)
+minBars       = input.int(6, "兩低點最少間隔", minval=3)
+maxBars       = input.int(48, "兩低點最多間隔", minval=10)
+lowBelowPct   = input.float(0.2, "第二低最多低於第一低 (%)", minval=0.0, step=0.1) / 100
+lowAbovePct   = input.float(1.0, "第二低最多高於第一低 (%)", minval=0.2, step=0.1) / 100
+minNeckPct    = input.float(1.25, "頸線相對低點最小高度 (%)", minval=0.2, step=0.1) / 100
+minDropPct    = input.float(5.5, "進場前最小跌幅 (%)", minval=0.5, step=0.1) / 100
+minSessionDropPct = input.float(3.5, "當天五分圖最小跌幅 (%)", minval=0.5, step=0.1) / 100
+minDumpBars   = input.int(4, "第一低至少開盤後第幾根", minval=1)
+maxRetracePct = input.float(80.0, "頸線最多回補當天跌幅 (%)", minval=20.0, step=5.0) / 100
+minHeightBars = input.float(2.3, "W高度 / 區間平均振幅", minval=1.0, step=0.1)
+minRightLegPct = input.float(1.0, "右腳從頸線最小回落 (%)", minval=0.3, step=0.1) / 100
+minHeightDumpAtr = input.float(1.10, "W高度 / 殺勢平均振幅", minval=0.5, step=0.05)
+minBouncePct  = input.float(1.1, "從低點最小彈回 (%)", minval=0.3, step=0.1) / 100
+maxBouncePct  = input.float(3.5, "從低點最大彈回 (%)", minval=1.0, step=0.1) / 100
+minStandPct   = input.float(0.45, "收盤站上 MA20 (%)", minval=0.1, step=0.05) / 100
+priorBars     = input.int(36, "回看出發高點 K 數", minval=8)
+maxCrossBars  = input.int(24, "第二低後幾根內等多排", minval=4)
+maLen         = input.int(20, "MA20 週期", minval=5)
+
+ma5 = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, maLen)
+plot(ma5, "MA5", color=color.new(color.aqua, 0))
+plot(ma10, "MA10", color=color.new(color.lime, 0))
+plot(ma20, "MA20", color=color.new(color.yellow, 0), linewidth=2)
+
+pl = ta.pivotlow(low, swingLen, swingLen)
+phHigh = ta.highest(high, math.max(1, maxBars))
+
+var float firstLow = na
+var int   firstLowBar = na
+var int   firstLowTime = na
+var float secondLow = na
+var int   secondLowBar = na
+var int   secondLowTime = na
+var float neckline = na
+var int   necklineBar = na
+var bool  wReady = false
+var bool  fired = false
+
+priorHigh = ta.highest(high, priorBars)
+
+if not na(pl)
+    firstLow := pl
+    firstLowBar := bar_index - swingLen
+    firstLowTime := time[swingLen]
+    secondLow := na
+    secondLowBar := na
+    secondLowTime := na
+    neckline := na
+    necklineBar := na
+    wReady := false
+    fired := false
+
+if not na(firstLow) and na(secondLow) and not na(phHigh)
+    if na(neckline) or high > neckline
+        neckline := high
+        necklineBar := bar_index
+
+if not na(pl) and not na(firstLow) and (bar_index - swingLen) > firstLowBar
+    gap = bar_index - swingLen - firstLowBar
+    rel = (pl - firstLow) / firstLow
+    dropOk = (priorHigh - firstLow) / firstLow >= minDropPct
+    neckOk = not na(neckline) and (neckline - (firstLow + pl) / 2) / ((firstLow + pl) / 2) >= minNeckPct
+    neckSpacingOk = not na(necklineBar) and necklineBar >= firstLowBar + 2 and (bar_index - swingLen) >= necklineBar + 3
+    if gap >= minBars and gap <= maxBars and rel >= -lowBelowPct and rel <= lowAbovePct and dropOk and neckOk and neckSpacingOk
+        secondLow := pl
+        secondLowBar := bar_index - swingLen
+        secondLowTime := time[swingLen]
+        wReady := true
+        fired := false
+
+stacked = ma5 > ma10 and ma10 > ma20 and close > ma5
+stackFlip = stacked and not stacked[1]
+confirmBar = not na(secondLowBar) and bar_index >= secondLowBar + swingLen
+stillValid = not na(secondLow) and low >= math.min(firstLow, secondLow) * 0.997
+fresh = not na(secondLowBar) and bar_index - secondLowBar <= maxCrossBars
+floorPx = math.min(firstLow, secondLow)
+bounce = close / floorPx - 1
+stand = close / ma20 - 1
+taipeiHour = hour(time, "Asia/Taipei")
+taipeiMinute = minute(time, "Asia/Taipei")
+afterOpen = taipeiHour > 9 or (taipeiHour == 9 and taipeiMinute >= 15)
+taipeiMins = taipeiHour * 60 + taipeiMinute
+barsToday = math.max(1, int((taipeiMins - 540) / 5) + 1)
+sessStart = bar_index - barsToday + 1
+dumpBarsOk = not na(firstLowBar) and firstLowBar - sessStart >= minDumpBars
+dumpLen = not na(firstLowBar) ? math.max(1, firstLowBar - sessStart + 1) : 1
+sessHighAtL1 = not na(firstLowBar) ? ta.highest(high, dumpLen)[bar_index - firstLowBar] : na
+sessHigh = ta.highest(high, barsToday)
+intraOk = not na(firstLow) and (sessHigh - math.min(firstLow, nz(secondLow, firstLow))) / math.min(firstLow, nz(secondLow, firstLow)) >= minSessionDropPct
+retraceOk = not na(neckline) and not na(sessHighAtL1) and sessHighAtL1 > floorPx and (neckline - floorPx) / (sessHighAtL1 - floorPx) <= maxRetracePct
+wGap = not na(firstLowBar) and not na(secondLowBar) ? math.max(1, secondLowBar - firstLowBar + 1) : 1
+avgBarRng = not na(secondLowBar) ? ta.sma(high - low, wGap)[bar_index - secondLowBar] : na
+heightOk = not na(avgBarRng) and avgBarRng > 0 and (neckline - floorPx) / avgBarRng >= minHeightBars
+rightLegOk = not na(neckline) and not na(secondLow) and secondLow > 0 and (neckline - secondLow) / secondLow >= minRightLegPct
+dumpAtr = not na(firstLowBar) ? ta.sma(high - low, dumpLen)[bar_index - firstLowBar] : na
+dumpAtrOk = not na(dumpAtr) and dumpAtr > 0 and (neckline - floorPx) / dumpAtr >= minHeightDumpAtr
+bounceOk = bounce >= minBouncePct and bounce <= maxBouncePct
+standOk = stand >= minStandPct
+sameDay = not na(firstLowTime) and not na(secondLowTime) and year(time, "Asia/Taipei") == year(firstLowTime, "Asia/Taipei") and dayofyear(time, "Asia/Taipei") == dayofyear(firstLowTime, "Asia/Taipei") and dayofyear(time, "Asia/Taipei") == dayofyear(secondLowTime, "Asia/Taipei")
+longSignal = wReady and not fired and confirmBar and stillValid and fresh and stackFlip and close > ma20 and afterOpen and bounceOk and standOk and sameDay and intraOk and dumpBarsOk and retraceOk and heightOk and rightLegOk and dumpAtrOk
+
+if longSignal
+    fired := true
+    label.new(bar_index, low, "W底多排", style=label.style_label_up, color=color.new(color.lime, 20), textcolor=color.black, size=size.small)
+
+alertcondition(longSignal, title="五分K W底 5/10/20多排", message="{{ticker}} 五分K W底，MA5>MA10>MA20 多排進場")
+plotshape(longSignal, title="W底多排", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
