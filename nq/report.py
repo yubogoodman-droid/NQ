@@ -202,7 +202,7 @@ def _draw_trade_png(
 
     sign = "+" if trade.pnl_points >= 0 else ""
     ax.set_title(
-        f"#{trade_no}  破3h翻MA60  {_fmt_time(sig.timestamp)} → {_fmt_time(trade.exit_time)}  "
+        f"#{trade_no}  破3h 5/20站上MA60  {_fmt_time(sig.timestamp)} → {_fmt_time(trade.exit_time)}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
         color="#e8f0ea",
         fontsize=11,
@@ -252,15 +252,17 @@ def _render_trade_card(
       <div class="tags">
         <span class="tag {tag_class}">{tag_text}</span>
         <span class="tag tag-info">破3h低</span>
+        <span class="tag tag-info">5/20多排</span>
         <span class="tag tag-info">MA60</span>
         <span class="tag tag-info">5m</span>
       </div>
-      <pre class="trade-detail">進場(站上MA60收盤) {sig.entry:.2f}
+      <pre class="trade-detail">進場(5/20多排站上MA60) {sig.entry:.2f}
 停損 破底-20點 {sig.stop_loss:.2f}
 停利 2R {sig.target:.2f}
 出場 {trade.exit_price:.2f}
 三小時低 {p.lookback_low:.2f} / 破底 {p.break_low:.2f}
-MA60 {p.ma60:.2f} / 破底後 {bars} 根進場
+MA5 {p.ma5:.2f} > MA20 {p.ma20:.2f} > MA60 {p.ma60:.2f}
+破底後 {bars} 根進場（限 12 根／1 小時）
 {ma_line}
 $ {trade.pnl_dollars:+,.2f} NQ×{contracts}</pre>
       <div class="tf-badge">🕐 5分 K</div>
@@ -289,7 +291,7 @@ def build_report_html(
             img_href = _img_data_uri(png_path) if embed_images else f"img/{img_name}"
         cards_parts.append(_render_trade_card(df, trade, i, img_href=img_href))
     cards = "".join(cards_parts)
-    empty = '<div class="empty">未偵測到破三小時低翻 MA60 進場</div>' if not results else ""
+    empty = '<div class="empty">未偵測到破三小時低後 5/20 多排站上 MA60</div>' if not results else ""
 
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -430,7 +432,7 @@ def build_report_html(
   <div class="page">
     <section class="summary">
       <h1>{html.escape(title)}</h1>
-      <p>{html.escape(symbol)} · 五分 K · 破近三小時低點 · 半小時內收盤站上 MA60 · 停損破底-20點 · 停利 2R · {html.escape(_report_date_range(df))}</p>
+      <p>{html.escape(symbol)} · 五分 K · 破近三小時低點 · 一小時內 MA5&gt;MA20&gt;MA60 且收盤站上 MA60 · 停損破底-20點 · 停利 2R · {html.escape(_report_date_range(df))}</p>
       <p style="margin-top:6px;color:#8b949e;font-size:12px;">產生 {html.escape(datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M"))} ET · 綠圈進場 / 綠或紅圈出場</p>
       <div class="total">
         {stats.get("trades", 0)} 筆 · 勝率 {stats.get("win_rate", 0) * 100:.0f}% ·
@@ -470,7 +472,7 @@ def save_report_html(
         results = _filter_today_results(df, results)
     if title is None:
         today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
-        title = f"NQ 破三小時低翻 MA60 — {today}"
+        title = f"NQ 破三小時低 5/20站上MA60 — {today}"
 
     out = Path(output)
     img_dir = out.parent / "img"

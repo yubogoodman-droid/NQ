@@ -1,4 +1,4 @@
-"""五分 K：跌破近三小時低點後，半小時內收盤站上 MA60。"""
+"""五分 K：跌破近三小時低點後，一小時內 MA5/MA20 多排站上 MA60。"""
 
 from __future__ import annotations
 
@@ -7,19 +7,23 @@ from dataclasses import dataclass
 import pandas as pd
 
 
-LOOKBACK_BARS = 36  # 3 小時 × 12 根/小時
-RECLAIM_BARS = 6  # 30 分鐘
+LOOKBACK_BARS = 36  # 3 小時
+RECLAIM_BARS = 12  # 1 小時
+MA5_PERIOD = 5
+MA20_PERIOD = 20
 MA60_PERIOD = 60
 
 
 @dataclass(frozen=True)
 class ReclaimPattern:
-    """破三小時低點後，在時限內站上 MA60。"""
+    """破三小時低點後，時限內 MA5>MA20>MA60 且收盤站上 MA60。"""
 
     break_idx: int
     entry_idx: int
     lookback_low: float
     break_low: float
+    ma5: float
+    ma20: float
     ma60: float
 
     @property
@@ -68,7 +72,6 @@ class ReclaimPattern:
 
     @property
     def target(self) -> float:
-        """佔位；實際目標由策略用 2R 計算。"""
         return self.ma60
 
 
@@ -86,11 +89,13 @@ def detect_reclaims(
     *,
     lookback_bars: int = LOOKBACK_BARS,
     reclaim_bars: int = RECLAIM_BARS,
-    ma_period: int = MA60_PERIOD,
+    ma5_period: int = MA5_PERIOD,
+    ma20_period: int = MA20_PERIOD,
+    ma60_period: int = MA60_PERIOD,
 ) -> list[ReclaimPattern]:
     """
-    當根低點跌破「前 lookback_bars 根」的最低點，視為破三小時低。
-    從破底那根起算 reclaim_bars 根內，收盤站上 MA60 則進場。
+    當根低點跌破前 lookback_bars 根最低點。
+    從破底起 reclaim_bars 根內，收盤站上 MA60 且 MA5 > MA20 > MA60 則進場。
     """
     required = {"open", "high", "low", "close"}
     missing = required - set(df.columns)
@@ -100,7 +105,7 @@ def detect_reclaims(
     lows = df["low"].astype(float).tolist()
     closes = df["close"].astype(float).tolist()
     n = len(df)
-    start = max(lookback_bars, ma_period)
+    start = max(lookback_bars, ma60_period)
     patterns: list[ReclaimPattern] = []
     i = start
     while i < n:
@@ -109,19 +114,22 @@ def detect_reclaims(
         if not fresh:
             i += 1
             continue
-        break_low = lows[i]
         found: ReclaimPattern | None = None
         last = min(i + reclaim_bars - 1, n - 1)
         for k in range(i, last + 1):
-            ma60 = _sma(closes, k, ma_period)
-            if ma60 is None:
+            ma5 = _sma(closes, k, ma5_period)
+            ma20 = _sma(closes, k, ma20_period)
+            ma60 = _sma(closes, k, ma60_period)
+            if ma5 is None or ma20 is None or ma60 is None:
                 continue
-            if closes[k] > ma60:
+            if closes[k] > ma60 and ma5 > ma20 > ma60:
                 found = ReclaimPattern(
                     break_idx=i,
                     entry_idx=k,
                     lookback_low=lookback,
                     break_low=min(lows[i : k + 1]),
+                    ma5=ma5,
+                    ma20=ma20,
                     ma60=ma60,
                 )
                 break
@@ -134,5 +142,4 @@ def detect_reclaims(
 
 
 def detect_w_bottoms(df: pd.DataFrame, **_: object) -> list[ReclaimPattern]:
-    """相容舊名稱：改為三小時破底翻 MA60。"""
     return detect_reclaims(df)

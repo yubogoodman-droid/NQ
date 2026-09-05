@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NQ 五分 K 破三小時低翻 MA60 範例。"""
+"""NQ 五分 K 破三小時低 5/20 多排站上 MA60 範例。"""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def make_sample_bars(n: int = 80, seed: int = 42) -> pd.DataFrame:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="NQ 五分 K 破三小時低翻 MA60")
+    parser = argparse.ArgumentParser(description="NQ 五分 K 破三小時低 5/20站上MA60")
     parser.add_argument("--csv", help="五分 K CSV 路徑（需含 datetime,open,high,low,close）")
     parser.add_argument("--demo", action="store_true", help="使用模擬資料示範")
     args = parser.parse_args()
@@ -55,7 +55,7 @@ def main() -> None:
 
     strategy = NQWBottomStrategy()
     signals = strategy.generate_signals(df)
-    print("=== 破三小時低翻 MA60 ===")
+    print("=== 破三小時低 5/20站上MA60 ===")
     if not signals:
         print("未偵測到進場訊號")
     for sig in signals:

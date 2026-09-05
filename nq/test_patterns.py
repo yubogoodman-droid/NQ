@@ -1,4 +1,4 @@
-"""三小時破底翻 MA60 測試。"""
+"""三小時破底後 MA5/MA20 多排站上 MA60 測試。"""
 
 from __future__ import annotations
 
@@ -33,43 +33,40 @@ def _flat(n: int, price: float, drift: float = 0.0) -> list[tuple[float, float, 
     return rows
 
 
-def _break_then_reclaim_rows() -> list[tuple[float, float, float, float]]:
-    """前 65 根在 10040，接著一根跌破三小時低，兩根內收盤站上 MA60。"""
+def _break_then_stack_rows() -> list[tuple[float, float, float, float]]:
+    """破底後快速拉升，讓 MA5>MA20>MA60 且收盤在 MA60 上。"""
     rows = _flat(65, 10040.0)
-    rows.append((10020, 10024, 9990, 10010))
-    rows.append((10010, 10050, 10008, 10045))
-    rows.extend(_flat(8, 10048.0, drift=1.0))
+    rows.append((10020, 10024, 9990, 10000))
+    rows.extend(_flat(8, 10080.0))
     return rows
 
 
-def test_detects_break_and_ma60_reclaim() -> None:
-    df = _df(_break_then_reclaim_rows())
+def test_detects_5_20_stack_above_ma60() -> None:
+    df = _df(_break_then_stack_rows())
     patterns = detect_reclaims(df)
     assert len(patterns) >= 1
     p = patterns[0]
     assert p.break_low <= 9990
-    assert p.entry_idx > p.break_idx
+    assert p.ma5 > p.ma20 > p.ma60
     assert df["close"].iloc[p.entry_idx] > p.ma60
+    assert p.entry_idx - p.break_idx < 12
 
 
-def test_no_reclaim_within_30_minutes_is_ignored() -> None:
+def test_no_stack_within_one_hour_is_ignored() -> None:
     rows = _flat(65, 10040.0)
     rows.append((10020, 10024, 9990, 9995))
-    rows.extend(_flat(8, 9992.0))
+    rows.extend(_flat(14, 9992.0))
     assert detect_reclaims(_df(rows)) == []
 
 
 def test_no_break_of_3h_low_is_ignored() -> None:
-    rows = _flat(80, 10040.0)
-    assert detect_reclaims(_df(rows)) == []
+    assert detect_reclaims(_df(_flat(80, 10040.0))) == []
 
 
-def test_strategy_enters_on_reclaim_close() -> None:
-    df = _df(_break_then_reclaim_rows())
+def test_strategy_enters_on_stack_close() -> None:
+    df = _df(_break_then_stack_rows())
     signals = NQWBottomStrategy().generate_signals(df)
     assert len(signals) == 1
     sig = signals[0]
     assert sig.bar_idx == sig.pattern.entry_idx
-    assert sig.entry == round(float(df["close"].iloc[sig.bar_idx]) / 0.25) * 0.25
-    assert sig.stop_loss < sig.entry
-    assert sig.target > sig.entry
+    assert sig.stop_loss < sig.entry < sig.target

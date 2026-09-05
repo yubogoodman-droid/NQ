@@ -1,4 +1,4 @@
-"""NQ 五分 K：破三小時低點後半小時內站上 MA60 做多。"""
+"""NQ 五分 K：破三小時低點後一小時內 MA5/MA20 多排站上 MA60 做多。"""
 
 from __future__ import annotations
 
@@ -36,14 +36,17 @@ class Signal:
 @dataclass
 class NQWBottomStrategy:
     """
-    五分 K 跌破近 3 小時低點後，30 分鐘內（6 根）收盤站上 MA60 做多。
+    五分 K 跌破近 3 小時低點後，1 小時內（12 根）
+    收盤站上 MA60，且 MA5 > MA20 > MA60，做多。
     停損：破底低點下方 20 點
     停利：2R
     """
 
     lookback_bars: int = 36
-    reclaim_bars: int = 6
-    ma_period: int = 60
+    reclaim_bars: int = 12
+    ma5_period: int = 5
+    ma20_period: int = 20
+    ma60_period: int = 60
     stop_below_break_points: float = 20.0
     reward_risk: float = 2.0
     tick_size: float = 0.25
@@ -54,7 +57,9 @@ class NQWBottomStrategy:
             df,
             lookback_bars=self.lookback_bars,
             reclaim_bars=self.reclaim_bars,
-            ma_period=self.ma_period,
+            ma5_period=self.ma5_period,
+            ma20_period=self.ma20_period,
+            ma60_period=self.ma60_period,
         )
         signals: list[Signal] = []
         for pattern in patterns:
