@@ -17,6 +17,7 @@ from nq_ma200_stand import (  # noqa: E402
     detect_signals,
     display_trades,
     in_open_skip,
+    in_thursday_skip,
     is_red_long_upper,
     parse_period_days,
     resample_5m,
@@ -188,6 +189,31 @@ def test_simulate_target_and_stop() -> None:
     assert trades3[0].exit_reason == "stop"
 
 
+def test_skip_thursday() -> None:
+    thu = pd.Timestamp("2026-08-13 12:00", tz=ET)
+    mon = pd.Timestamp("2026-08-17 12:00", tz=ET)
+    assert in_thursday_skip(thu) is True
+    assert in_thursday_skip(mon) is False
+    df = _make_setup_bars(start="2026-08-13 11:00")  # Thursday
+    assert detect_signals(df, min_5m_ribbon=0.0) == []
+    assert detect_signals(df, min_5m_ribbon=0.0, skip_thursday=False)
+
+
+def test_breakeven_after_plus_60() -> None:
+    df = _make_setup_bars()
+    sigs = detect_signals(df, min_5m_ribbon=0.0)
+    assert sigs
+    j = sigs[0].entry_idx
+    entry = sigs[0].entry_price
+    df2 = df.copy()
+    df2.iloc[j + 2, df2.columns.get_loc("High")] = entry + 65
+    df2.iloc[j + 4, df2.columns.get_loc("Low")] = entry - 1
+    df2.iloc[j + 4, df2.columns.get_loc("Close")] = entry - 1
+    trades = simulate(df2, sigs, breakeven_after=60.0)
+    assert trades[0].exit_reason == "trail"
+    assert abs(trades[0].exit_price - entry) < 1e-6
+
+
 def test_write_html(tmp_path: Path | None = None) -> None:
     df = _make_setup_bars()
     sigs = detect_signals(df, min_5m_ribbon=0.0)
@@ -275,6 +301,8 @@ def main() -> int:
     test_skip_open_hour()
     test_skip_no_under_wash()
     test_simulate_target_and_stop()
+    test_skip_thursday()
+    test_breakeven_after_plus_60()
     test_write_html()
     test_display_trades_wins_first()
     test_resample_5m()

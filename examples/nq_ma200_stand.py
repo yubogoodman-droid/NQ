@@ -9,6 +9,8 @@
   5. 美東 9:30–10:00 不進
   6. 紅 K 長上影跳過
   7. 停損 MA200−10，停利 +100
+  8. 美東星期四不進
+  9. 浮盈先到 +60 後，停損提到進場價（保本）
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -46,6 +48,8 @@ STOP_BELOW_MA200 = 10.0
 TAKE_PROFIT = 100.0
 MIN_UPPER_WICK = 8.0
 MIN_5M_RIBBON = 0.0  # 關閉；五分圖只對照，不當進場條件
+SKIP_THURSDAY = True
+BREAKEVEN_AFTER = 60.0
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +198,16 @@ def summarize_trades(trades: Sequence[TradeResult]) -> dict:
     }
 
 
+def in_thursday_skip(ts) -> bool:
+    """美東星期四不進。"""
+    t = ts
+    if getattr(t, "tzinfo", None) is None:
+        t = t.replace(tzinfo=ET)
+    else:
+        t = t.astimezone(ET)
+    return t.weekday() == 3
+
+
 def in_open_skip(ts) -> bool:
     """美東 9:30–10:00 不進（含 9:30，不含 10:00）。"""
     t = ts
@@ -249,6 +263,7 @@ def detect_signals(
     take_profit: float = TAKE_PROFIT,
     min_upper_wick: float = MIN_UPPER_WICK,
     min_5m_ribbon: float = MIN_5M_RIBBON,
+    skip_thursday: bool = SKIP_THURSDAY,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     close = df["Close"].to_numpy(float)
@@ -307,6 +322,9 @@ def detect_signals(
             if in_open_skip(df.index[j]):
                 bump("skip_open")
                 continue
+            if skip_thursday and in_thursday_skip(df.index[j]):
+                bump("skip_thu")
+                continue
             if is_red_long_upper(float(opn[j]), float(high[j]), float(low[j]), float(close[j]), min_upper_wick):
                 bump("skip_wick")
                 continue
@@ -350,7 +368,12 @@ def detect_signals(
     return signals
 
 
-def simulate(df: pd.DataFrame, signals: Sequence[Signal]) -> List[TradeResult]:
+def simulate(
+    df: pd.DataFrame,
+    signals: Sequence[Signal],
+    *,
+    breakeven_after: float = BREAKEVEN_AFTER,
+) -> List[TradeResult]:
     high = df["High"].to_numpy(float)
     low = df["Low"].to_numpy(float)
     opn = df["Open"].to_numpy(float)
@@ -363,29 +386,39 @@ def simulate(df: pd.DataFrame, signals: Sequence[Signal]) -> List[TradeResult]:
             continue
         if sig.entry_idx >= n - 1:
             continue
-        stop = sig.stop_price
+        hard_stop = sig.stop_price
+        stop = hard_stop
         target = sig.target_price
+        entry = sig.entry_price
+        armed = False
         exit_idx = n - 1
         exit_price = float(close[-1])
         exit_reason = "eod"
         for k in range(sig.entry_idx + 1, n):
             o, h, l = float(opn[k]), float(high[k]), float(low[k])
             if o <= stop:
-                exit_idx, exit_price, exit_reason = k, o, "stop"
+                exit_idx, exit_price, exit_reason = k, o, ("trail" if armed and stop > hard_stop + 1e-9 else "stop")
                 break
             if o >= target:
                 exit_idx, exit_price, exit_reason = k, o, "target"
                 break
-            hit_sl = l <= stop
+            if (not armed) and breakeven_after > 0 and h >= entry + breakeven_after:
+                armed = True
+                stop = max(stop, entry)
+            hit_hard = l <= hard_stop
+            hit_trail = armed and l <= stop
             hit_tp = h >= target
-            if hit_sl and hit_tp:
-                exit_idx, exit_price, exit_reason = k, stop, "stop"
+            if hit_hard and hit_tp:
+                exit_idx, exit_price, exit_reason = k, hard_stop, "stop"
                 break
-            if hit_sl:
-                exit_idx, exit_price, exit_reason = k, stop, "stop"
+            if hit_hard:
+                exit_idx, exit_price, exit_reason = k, hard_stop, "stop"
                 break
             if hit_tp:
                 exit_idx, exit_price, exit_reason = k, target, "target"
+                break
+            if hit_trail:
+                exit_idx, exit_price, exit_reason = k, stop, "trail"
                 break
         pnl = float(exit_price - sig.entry_price)
         results.append(
@@ -752,7 +785,14 @@ def write_html_report(
         et = df.index[t.entry_idx]
         xt = df.index[t.exit_idx]
         cls = "pnl-win" if t.pnl_points > 0 else ("pnl-flat" if t.pnl_points == 0 else "pnl-loss")
-        reason_cls = "tag-tp" if t.exit_reason == "target" else ("tag-sl" if t.exit_reason == "stop" else "tag-time")
+        if t.exit_reason == "target":
+            reason_cls = "tag-tp"
+        elif t.exit_reason == "stop":
+            reason_cls = "tag-sl"
+        elif t.exit_reason == "trail":
+            reason_cls = "tag-trail"
+        else:
+            reason_cls = "tag-time"
         img_name = f"t{i:02d}_{et.strftime('%m%d_%H%M')}.png"
         img5_name = f"t{i:02d}_{et.strftime('%m%d_%H%M')}_5m.png"
         img15_name = f"t{i:02d}_{et.strftime('%m%d_%H%M')}_15m.png"
@@ -784,7 +824,7 @@ def write_html_report(
                 f"<img src='img/{escape(img1h_name)}' alt='#{i} 1h' "
                 "style='width:100%;display:block;border-radius:10px'/></div>"
             )
-        risk = t.entry_price - t.stop_price
+        risk = t.entry_price - t.signal.stop_price
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -804,7 +844,7 @@ def write_html_report(
             "</div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}\n"
-            f"stop  {t.stop_price:.2f}  (−{risk:.1f} pts, MA200−10)\n"
+            f"stop  {t.signal.stop_price:.2f}  (−{risk:.1f} pts, MA200−10；浮盈+60改保本）\n"
             f"target {t.target_price:.2f}  (+100)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {t.signal.break_low:.2f} / 2h低 {t.signal.two_hr_low:.2f}\n"
@@ -823,7 +863,8 @@ def write_html_report(
             f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → 進場 {funnel.get('taken', 0)}"
             f"（排列 {funnel.get('skip_stack', 0)} · 未連3 {funnel.get('skip_above3', 0)} · "
             f"距離 {funnel.get('skip_dist', 0)} · 未洗15 {funnel.get('skip_under', 0)} · "
-            f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)}）</p>"
+            f"9:30檔 {funnel.get('skip_open', 0)} · 週四檔 {funnel.get('skip_thu', 0)} · "
+            f"長上影 {funnel.get('skip_wick', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
@@ -855,6 +896,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-tp{{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}}
 .tag-sl{{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}}
 .tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
+.tag-trail{{background:rgba(121,192,255,0.14);color:#79c0ff;border-color:rgba(121,192,255,0.35)}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
 .mini-chart{{margin:0 -6px 8px;border-radius:10px;overflow:hidden}}
@@ -867,7 +909,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 5m / 15m / 1h 圖只對照</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 週四不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 5m / 15m / 1h 圖只對照</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -911,7 +953,8 @@ def cmd_backtest(args) -> int:
         f"break={funnel.get('break', 0)} taken={funnel.get('taken', 0)} "
         f"stack={funnel.get('skip_stack', 0)} above3={funnel.get('skip_above3', 0)} "
         f"dist={funnel.get('skip_dist', 0)} under={funnel.get('skip_under', 0)} "
-        f"open={funnel.get('skip_open', 0)} wick={funnel.get('skip_wick', 0)}"
+        f"open={funnel.get('skip_open', 0)} thu={funnel.get('skip_thu', 0)} "
+        f"wick={funnel.get('skip_wick', 0)}"
     )
     for i, t in enumerate(trades, 1):
         print(
