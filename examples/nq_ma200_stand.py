@@ -379,7 +379,7 @@ def detect_signals(
                     dist_ma200=dist,
                     under_streak=streak,
                     m5_ribbon=0.0 if (np.isnan(ribbon) or np.isinf(ribbon)) else ribbon,
-                    m5_all=0.0 if (np.isnan(all_spread) or np.isinf(all_spread)) else all_spread,
+                    m5_all=all_spread if np.isfinite(all_spread) else float("nan"),
                     m1_ribbon=0.0 if np.isnan(ribbon_1m) else ribbon_1m,
                     ma200_15m=m15_200,
                     dist_15m_ma200=dist_15,
@@ -463,7 +463,7 @@ def make_reclaim_reentry(
             dist_ma200=entry - float(ma200[j]),
             under_streak=parent.under_streak,
             m5_ribbon=0.0 if (np.isnan(ribbon) or np.isinf(ribbon)) else ribbon,
-            m5_all=0.0 if (np.isnan(all_spread) or np.isinf(all_spread)) else all_spread,
+            m5_all=all_spread if np.isfinite(all_spread) else float("nan"),
             m1_ribbon=0.0 if np.isnan(ribbon_1m) else ribbon_1m,
             ma200_15m=m15_200,
             dist_15m_ma200=dist_15,
@@ -1206,6 +1206,12 @@ def draw_1h_png(
     return draw_htf_png(df_1m, df_1h, trade, path, trade_no, label="1h 對照", lookback=36, lookforward=4)
 
 
+def _fmt_spread(value: float) -> str:
+    if not np.isfinite(value):
+        return "—"
+    return f"{value:.1f}"
+
+
 def _fmt_signed(value: float) -> str:
     if value is None or (isinstance(value, float) and (np.isnan(value) or np.isinf(value))):
         return "—"
@@ -1323,7 +1329,7 @@ def write_html_report(
             f"<span class='tag tag-info'>停損 MA200−10</span>"
             f"<span class='tag tag-info'>收&gt;MA60</span>"
             f"<span class='tag tag-info'>5m帶寬 {t.signal.m5_ribbon:.1f}</span>"
-            f"<span class='tag tag-info'>5m全均 {t.signal.m5_all:.1f}</span>"
+            f"<span class='tag tag-info'>5m全均 {_fmt_spread(t.signal.m5_all)}</span>"
             f"<span class='tag tag-info'>1m帶寬 {t.signal.m1_ribbon:.1f}</span>"
             "</div>"
             "<pre class='trade-detail'>"
@@ -1340,7 +1346,7 @@ def write_html_report(
             f"> MA30 {t.signal.ma30:.1f} > MA60 {t.signal.ma60:.1f}\n"
             f"MA200 {t.signal.ma200:.1f}  先前連{t.signal.under_streak}根在下\n"
             f"15m MA200 {_fmt_price(t.signal.ma200_15m)}  進場距 {_fmt_signed(t.signal.dist_15m_ma200)} pts\n"
-            f"5m MA5–30 帶寬 {t.signal.m5_ribbon:.1f} · 5m 全均 {t.signal.m5_all:.1f} · 1m MA5–60 帶寬 {t.signal.m1_ribbon:.1f}"
+            f"5m MA5–30 帶寬 {t.signal.m5_ribbon:.1f} · 5m 全均 {_fmt_spread(t.signal.m5_all)} · 1m MA5–60 帶寬 {t.signal.m1_ribbon:.1f}"
             "</pre>"
             f"{charts}"
             "</article>"
