@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scan_binance_w_bottom import (  # noqa: E402
     detect_w_bottoms,
+    draw_hit_png,
     fmt_price,
     swing_lows,
 )
@@ -76,8 +77,18 @@ def test_fmt_price() -> None:
     assert fmt_price(0.4885) == "0.48850"
 
 
+def test_draw_hit_png(tmp_path: Path | None = None) -> None:
+    hits = detect_w_bottoms(*_series(), symbol="UAIUSDT", volume24=1e8)
+    best = max(hits, key=lambda h: h.score)
+    out = (tmp_path or Path("/tmp")) / "w_bottom_test.png"
+    draw_hit_png(best, _series(), out, "UAIUSDT 5m W底")
+    assert out.exists()
+    assert out.stat().st_size > 1000
+
+
 if __name__ == "__main__":
     test_swing_lows_finds_two_bottoms()
     test_detect_w_bottom_like_uai()
     test_fmt_price()
+    test_draw_hit_png()
     print("ok")

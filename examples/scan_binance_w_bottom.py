@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import statistics
 import sys
@@ -12,7 +13,7 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -267,26 +268,125 @@ def fmt_vol(value: float) -> str:
     return f"{value / 1e3:.0f}K"
 
 
-def chart_payload(hit: WHit, ohlcv: tuple[list[float], ...]) -> dict[str, Any]:
-    opens, highs, lows, closes, quote, times = ohlcv
-    n = len(closes)
+def _setup_cjk_font() -> None:
+    import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+
+    for fp in (
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    ):
+        if Path(fp).exists():
+            font_manager.fontManager.addfont(fp)
+            plt.rcParams["font.sans-serif"] = [font_manager.FontProperties(fname=fp).get_name(), "DejaVu Sans"]
+            plt.rcParams["axes.unicode_minus"] = False
+            return
+
+
+def chart_window(hit: WHit, n: int) -> tuple[int, int]:
     left = max(0, hit.i - 24)
-    right = min(n, (hit.b or hit.j) + 56)
-    window_o = opens[left:right]
-    window_h = highs[left:right]
-    window_l = lows[left:right]
-    window_c = closes[left:right]
-    window_v = quote[left:right]
-    window_t = [fmt_time(t) for t in times[left:right]]
-    mas = {f"ma{p}": rolling_mean(closes, p)[left:right] for p in MA_PERIODS}
+    right = min(n, max((hit.b or hit.j) + 40, hit.j + 24, n))
+    return left, right
+
+
+def draw_hit_png(hit: WHit, ohlcv: tuple[list[float], ...], path: Path, title: str) -> Path:
+    """靜態 K 線，不依賴 Plotly CDN，預覽頁也能直接看到圖。"""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+
+    _setup_cjk_font()
+    opens, highs, lows, closes, quote, times = ohlcv
+    left, right = chart_window(hit, len(closes))
+    w_o, w_h, w_l, w_c = opens[left:right], highs[left:right], lows[left:right], closes[left:right]
+    w_v, w_t = quote[left:right], times[left:right]
+    xs = list(range(len(w_c)))
+
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(10.4, 5.6),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+
+    colors_v = []
+    for k in xs:
+        up = w_c[k] >= w_o[k]
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(k, w_l[k], w_h[k], color=col, lw=0.65)
+        y0, y1 = min(w_o[k], w_c[k]), max(w_o[k], w_c[k])
+        if y1 == y0:
+            y1 = y0 + max(w_h[k] - w_l[k], 1e-12) * 0.02
+        ax.add_patch(Rectangle((k - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
+        colors_v.append("#3dba7a99" if up else "#e35d5d99")
+    axv.bar(xs, w_v, width=0.8, color=colors_v, linewidth=0)
+
+    for period in MA_PERIODS:
+        ma = rolling_mean(closes, period)[left:right]
+        ys = [v if v is not None else float("nan") for v in ma]
+        if all(v is None for v in ma):
+            continue
+        ax.plot(xs, ys, color=MA_COLORS[period], lw=1.35 if period <= 25 else 1.05, label=f"MA{period}")
+
+    i_rel, j_rel = hit.i - left, hit.j - left
+    neck_rel = hit.neck_idx - left
+    b_rel = (hit.b - left) if hit.b is not None else None
+    neck_end = b_rel if b_rel is not None else len(xs) - 1
+    if 0 <= neck_rel < len(xs) and 0 <= neck_end < len(xs):
+        ax.hlines(hit.neck, neck_rel, neck_end, colors="#ffa726", linestyles="--", lw=1.15, alpha=0.95)
+    ax.axhline(hit.neck, color="#ffa726", ls=":", lw=0.8, alpha=0.45)
+    ax.axhline(hit.target, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
+    ax.axhline(min(hit.bottom1, hit.bottom2), color="#e35d5d", ls=":", lw=0.8, alpha=0.55)
+
+    if 0 <= i_rel < len(xs):
+        ax.scatter([i_rel], [hit.bottom1], s=42, color="#42a5f5", zorder=5)
+        ax.annotate("L1", (i_rel, hit.bottom1), textcoords="offset points", xytext=(0, -13),
+                    ha="center", color="#79c0ff", fontsize=8)
+    if 0 <= j_rel < len(xs):
+        ax.scatter([j_rel], [hit.bottom2], s=42, color="#ec407a", zorder=5)
+        ax.annotate("L2", (j_rel, hit.bottom2), textcoords="offset points", xytext=(0, -13),
+                    ha="center", color="#f9a8d4", fontsize=8)
+    if b_rel is not None and 0 <= b_rel < len(xs):
+        ax.axvline(b_rel, color="#3dba7a", ls="--", lw=0.9)
+        ax.scatter([b_rel], [w_c[b_rel]], s=48, color="#00e676", marker="^", zorder=6)
+        ax.annotate("突破", (b_rel, w_c[b_rel]), textcoords="offset points", xytext=(0, 10),
+                    ha="center", color="#3ddc68", fontsize=8)
+
+    y_min, y_max = min(w_l), max(w_h)
+    pad = max((y_max - y_min) * 0.08, y_min * 0.01)
+    ax.set_ylim(y_min - pad, y_max + pad)
+    ax.set_title(title, color="#e8f0ea", fontsize=11)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    step = max(1, len(xs) // 6)
+    ticks = list(range(0, len(xs), step))
+    axv.set_xticks(ticks)
+    axv.set_xticklabels([fmt_time(w_t[i]) for i in ticks], color="#8aa193", rotation=20, ha="right")
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=120, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
+def png_data_uri(path: Path) -> str:
+    return f"data:image/png;base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+
+
+def chart_payload(hit: WHit, ohlcv: tuple[list[float], ...]) -> dict[str, Any]:
+    n = len(ohlcv[3])
+    left, right = chart_window(hit, n)
     return {
         **asdict(hit),
-        "times": window_t,
-        "open": window_o,
-        "high": window_h,
-        "low": window_l,
-        "close": window_c,
-        "volume": window_v,
         "t1_label": fmt_time(hit.t1),
         "t2_label": fmt_time(hit.t2),
         "t_neck_label": fmt_time(hit.t_neck),
@@ -295,7 +395,8 @@ def chart_payload(hit: WHit, ohlcv: tuple[list[float], ...]) -> dict[str, Any]:
         "j_rel": hit.j - left,
         "neck_rel": hit.neck_idx - left,
         "b_rel": (hit.b - left) if hit.b is not None else None,
-        **mas,
+        "left": left,
+        "right": right,
     }
 
 
@@ -330,6 +431,7 @@ def build_html(payload: dict[str, Any]) -> str:
             if hit.get("volx"):
                 extra += f" · 量能 {hit['volx']:.1f}x"
             detail += f"\n{extra}"
+        img = hit.get("img_href") or hit.get("img_src") or ""
         cards.append(
             f"""
     <article class="trade-card" data-status="{escape(hit['status'])}">
@@ -346,17 +448,15 @@ def build_html(payload: dict[str, Any]) -> str:
         <span class="tag tag-info">24h {escape(fmt_vol(hit['volume24']))}</span>
       </div>
       <pre class="trade-detail">{escape(detail)}</pre>
-      <div class="mini-chart" id="chart-{idx}"></div>
+      <div class="mini-chart"><img src="{escape(img)}" alt="{escape(hit['symbol'])} W底" loading="lazy" /></div>
     </article>"""
         )
-    data_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>幣安 5m W底 · 近兩天</title>
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     * {{ box-sizing: border-box; }}
     body {{
@@ -397,7 +497,8 @@ def build_html(payload: dict[str, Any]) -> str:
       border: 1px solid #21262d; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px; line-height: 1.55; color: #c9d1d9; white-space: pre-wrap;
     }}
-    .mini-chart {{ height: 420px; margin: 0 -6px -4px; }}
+    .mini-chart {{ margin: 0 -6px -4px; }}
+    .mini-chart img {{ display: block; width: 100%; height: auto; border-radius: 8px; }}
     .note {{ color: #8b949e; font-size: 12px; margin-top: 8px; line-height: 1.5; }}
   </style>
 </head>
@@ -412,79 +513,10 @@ def build_html(payload: dict[str, Any]) -> str:
       <div class="stat">待突破<b>{payload['pending']}</b></div>
       <div class="stat">仍有效<b>{payload['valid']}</b></div>
     </div>
-    <p class="note">黃虛線頸線、綠虛線量度目標。UAI 是基準圖；MAGMA / BULLA 較接近尚未確認突破。</p>
+    <p class="note">黃虛線頸線、綠虛線量度目標、藍／粉點為 L1／L2。圖已嵌在頁面裡，不用再等套件載入。</p>
   </section>
   {"".join(cards)}
 </div>
-<script id="payload" type="application/json">{data_json}</script>
-<script>
-const MA_COLORS = {json.dumps(MA_COLORS)};
-const payload = JSON.parse(document.getElementById("payload").textContent);
-function draw(hit, idx) {{
-  const traces = [{{
-    type: "candlestick",
-    x: hit.times, open: hit.open, high: hit.high, low: hit.low, close: hit.close,
-    name: hit.symbol,
-    increasing: {{line: {{color: "#26a69a"}}}},
-    decreasing: {{line: {{color: "#ef5350"}}}},
-    xaxis: "x", yaxis: "y"
-  }}];
-  for (const p of [7,14,25,99,120,200]) {{
-    traces.push({{
-      type: "scatter", mode: "lines", x: hit.times, y: hit["ma"+p],
-      name: "MA"+p, line: {{color: MA_COLORS[p], width: p<=25 ? 1.4 : 1.05}},
-      hoverinfo: "skip", xaxis: "x", yaxis: "y"
-    }});
-  }}
-  traces.push({{
-    type: "scatter", mode: "markers+text",
-    x: [hit.times[hit.i_rel], hit.times[hit.j_rel]],
-    y: [hit.bottom1, hit.bottom2],
-    text: ["L1","L2"], textposition: "bottom center",
-    marker: {{size: 10, color: ["#79c0ff","#f778ba"], line: {{color: "#fff", width: 1}}}},
-    name: "W底", xaxis: "x", yaxis: "y"
-  }});
-  traces.push({{
-    type: "scatter", mode: "lines",
-    x: [hit.times[hit.neck_rel], hit.times[hit.b_rel != null ? hit.b_rel : hit.times.length-1]],
-    y: [hit.neck, hit.neck],
-    line: {{color: "#f0c14b", width: 1.4, dash: "dash"}},
-    name: "頸線", hoverinfo: "skip", xaxis: "x", yaxis: "y"
-  }});
-  if (hit.b_rel != null) {{
-    traces.push({{
-      type: "scatter", mode: "markers+text",
-      x: [hit.times[hit.b_rel]], y: [hit.close[hit.b_rel]],
-      text: ["突破"], textposition: "top center",
-      marker: {{symbol: "triangle-up", size: 13, color: "#00e676"}},
-      name: "突破", xaxis: "x", yaxis: "y"
-    }});
-  }}
-  const volColor = hit.close.map((c,i) => c >= hit.open[i] ? "rgba(38,166,154,0.45)" : "rgba(239,83,80,0.45)");
-  traces.push({{
-    type: "bar", x: hit.times, y: hit.volume, marker: {{color: volColor}},
-    name: "Volume", showlegend: false, xaxis: "x2", yaxis: "y2"
-  }});
-  Plotly.newPlot("chart-"+idx, traces, {{
-    template: "plotly_dark",
-    paper_bgcolor: "#161b22",
-    plot_bgcolor: "#0d1117",
-    margin: {{l: 48, r: 12, t: 8, b: 36}},
-    height: 420,
-    showlegend: false,
-    hovermode: "x unified",
-    xaxis: {{matches: "x2", showticklabels: false, rangeslider: {{visible: false}}, gridcolor: "rgba(255,255,255,0.06)"}},
-    yaxis: {{domain: [0.28, 1], gridcolor: "rgba(255,255,255,0.06)"}},
-    xaxis2: {{anchor: "y2", gridcolor: "rgba(255,255,255,0.06)"}},
-    yaxis2: {{domain: [0, 0.22], gridcolor: "rgba(255,255,255,0.06)"}},
-    shapes: [
-      {{type:"line", xref:"x domain", x0:0, x1:1, y0:hit.neck, y1:hit.neck, line:{{color:"#f0c14b", width:1, dash:"dot"}}, opacity:0.55}},
-      {{type:"line", xref:"x domain", x0:0, x1:1, y0:hit.target, y1:hit.target, line:{{color:"#3ddc68", width:1, dash:"dot"}}, opacity:0.45}}
-    ]
-  }}, {{responsive: true, displayModeBar: false}});
-}}
-payload.hits.forEach((hit, i) => draw(hit, i+1));
-</script>
 </body>
 </html>
 """
@@ -523,7 +555,7 @@ def status_rank(hit: WHit) -> tuple[int, int, float]:
     return (0 if hit.reference else 1, order.get(hit.status, 9), -hit.score)
 
 
-def scan(min_quote_vol: float = MIN_QUOTE_VOL) -> dict[str, Any]:
+def scan(min_quote_vol: float = MIN_QUOTE_VOL) -> tuple[dict[str, Any], dict[str, tuple[list[float], ...]]]:
     symbols, tv = universe_symbols(min_quote_vol)
     with ThreadPoolExecutor(max_workers=16) as pool:
         raw = dict(pool.map(fetch_klines, symbols))
@@ -553,7 +585,7 @@ def scan(min_quote_vol: float = MIN_QUOTE_VOL) -> dict[str, Any]:
         last_ms = max(v[5][-1] for v in series.values() if v[5])
         asof = datetime.fromtimestamp(last_ms / 1000, TPE).strftime("%Y-%m-%d %H:%M")
     payload_hits = [chart_payload(h, series[h.symbol]) for h in hits if h.symbol in series]
-    return {
+    payload = {
         "asof": asof,
         "universe": len(symbols),
         "matched": len(hits),
@@ -561,6 +593,36 @@ def scan(min_quote_vol: float = MIN_QUOTE_VOL) -> dict[str, Any]:
         "valid": sum(1 for h in hits if h.status in {"突破仍有效", "已延伸"}),
         "hits": payload_hits,
     }
+    return payload, series
+
+
+def write_report(payload: dict[str, Any], series: dict[str, tuple[list[float], ...]], out: Path) -> None:
+    img_dir = out.parent / "img"
+    if img_dir.exists():
+        for old in img_dir.glob("*.png"):
+            old.unlink()
+    img_dir.mkdir(parents=True, exist_ok=True)
+    for idx, hit in enumerate(payload["hits"], 1):
+        symbol = hit["symbol"]
+        wh = WHit(**{k: hit[k] for k in WHit.__dataclass_fields__})
+        safe = "".join(ch if ch.isalnum() else "_" for ch in symbol)
+        png = img_dir / f"w{idx:02d}_{safe}.png"
+        status = "基準" if hit.get("reference") else hit["status"]
+        title = f"#{idx}  {symbol}  5m W底  {status}  距頸線 {hit['vsneck_pct']:+.1f}%"
+        draw_hit_png(wh, series[symbol], png, title)
+        hit["img_src"] = f"img/{png.name}"
+        hit["img_href"] = png_data_uri(png)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(build_html(payload), encoding="utf-8")
+    json_path = out.with_name("hits.json")
+    slim = {
+        **payload,
+        "hits": [
+            {k: v for k, v in h.items() if k not in {"img_href"}}
+            for h in payload["hits"]
+        ],
+    }
+    json_path.write_text(json.dumps(slim, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def main() -> None:
@@ -568,13 +630,9 @@ def main() -> None:
     parser.add_argument("--output", "-o", default=str(PAGES))
     parser.add_argument("--min-quote-vol", type=float, default=MIN_QUOTE_VOL)
     args = parser.parse_args()
-    payload = scan(args.min_quote_vol)
+    payload, series = scan(args.min_quote_vol)
     out = Path(args.output)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(build_html(payload), encoding="utf-8")
-    json_path = out.with_name("hits.json")
-    slim = {**payload, "hits": [{k: v for k, v in h.items() if k not in {"open", "high", "low", "close", "volume", "times"} and not str(k).startswith("ma")} for h in payload["hits"]]}
-    json_path.write_text(json.dumps(slim, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_report(payload, series, out)
     print(f"已產生: {out}")
     print(f"掃描 {payload['universe']} · 命中 {payload['matched']} · 截至 {payload['asof']}")
     for hit in payload["hits"]:
