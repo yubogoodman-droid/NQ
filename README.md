@@ -80,7 +80,7 @@ python3 examples/test_tw_1h_reclaim.py
 
 ## 幣安 5 分 K W 底掃描（對齊 UAI）
 
-近 48 小時、USDT 永續、成交額 ≥ 100 萬：找兩底價差 ≤4%、間隔 40–240 分、頸線深度 7–18% 的雙底。
+近 48 小時、USDT 永續：對齊 UAI 的急殺、較高第二底、40–100 分緊湊雙底，相似度不足的不進報告。
 
 ```bash
 python3 examples/scan_binance_w_bottom.py

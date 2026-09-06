@@ -9,10 +9,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scan_binance_w_bottom import (  # noqa: E402
+    MIN_LIKE_PCT,
     detect_w_bottoms,
     draw_hit_png,
     fmt_price,
+    like_pct_from_score,
     swing_lows,
+    uai_like_score,
 )
 
 
@@ -70,6 +73,19 @@ def test_detect_w_bottom_like_uai() -> None:
     assert 7 <= best.depth_pct <= 18
     assert best.status in {"突破仍有效", "已延伸"}
     assert best.b is not None
+    assert best.like_pct >= 50
+    assert best.bottom2 >= best.bottom1 * 0.995
+
+
+def test_uai_like_prefers_compact_higher_low() -> None:
+    close = uai_like_score(
+        sep=13, depth=0.087, hl=0.016, dump=0.21, breakout_bars=2, ext=0.25, now=0.12, volx=2.5, age_h=3
+    )
+    wide_lower = uai_like_score(
+        sep=36, depth=0.12, hl=-0.025, dump=0.09, breakout_bars=None, ext=0.0, now=-0.05, volx=None, age_h=6
+    )
+    assert like_pct_from_score(close) >= 80
+    assert like_pct_from_score(wide_lower) < 40
 
 
 def test_fmt_price() -> None:
@@ -89,6 +105,7 @@ def test_draw_hit_png(tmp_path: Path | None = None) -> None:
 if __name__ == "__main__":
     test_swing_lows_finds_two_bottoms()
     test_detect_w_bottom_like_uai()
+    test_uai_like_prefers_compact_higher_low()
     test_fmt_price()
     test_draw_hit_png()
     print("ok")

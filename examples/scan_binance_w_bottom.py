@@ -34,16 +34,20 @@ MA_COLORS = {
     200: "#ff7b72",
 }
 
-# 對齊 UAI 5m：兩底約 0.4885 / 0.4963，間隔 13 根，頸線深度約 8.7%
+# 對齊 UAI 5m：急殺約 21%、較高第二底 +1.6%、間隔 13 根、頸線深度約 8.7%、兩根內突破
 MIN_SEP = 8
-MAX_SEP = 48
-MAX_SYM_PCT = 0.04
-MIN_DEPTH = 0.07
-MAX_DEPTH = 0.18
-PRIOR_DROP = 0.07
+MAX_SEP = 20
+MAX_SYM_PCT = 0.035
+MIN_DEPTH = 0.06
+MAX_DEPTH = 0.14
+PRIOR_DROP = 0.10
 BREAKOUT_PAD = 0.003
-BREAKOUT_WINDOW = 48
+BREAKOUT_WINDOW = 16
 MIN_QUOTE_VOL = 1_000_000.0
+MIN_LIKE_PCT = 58.0
+UAI_REF_SCORE = 118.0
+LOOKBACK_BARS = 1000
+KEEP_HOURS = 48
 
 
 @dataclass
@@ -71,6 +75,10 @@ class WHit:
     neck_idx: int
     b: int | None
     volx: float | None
+    dump_pct: float = 0.0
+    breakout_bars: int | None = None
+    ext_pct: float = 0.0
+    like_pct: float = 0.0
     reference: bool = False
 
 
@@ -104,6 +112,40 @@ def swing_lows(lows: list[float], lookback: int = 3) -> list[int]:
         if lows[i] < left * 0.998 and lows[i] < right * 0.998:
             out.append(i)
     return out
+
+
+def uai_like_score(
+    *,
+    sep: int,
+    depth: float,
+    hl: float,
+    dump: float,
+    breakout_bars: int | None,
+    ext: float,
+    now: float,
+    volx: float | None,
+    age_h: float,
+) -> float:
+    """UAI 模板相似度，約 118 分 = 100%。"""
+    hl_pen = 0.0 if hl >= 0 else 40.0 * min(abs(hl) / 0.03, 1.0)
+    bo_pen = 8.0 * abs((breakout_bars or 8) - 2) if breakout_bars is not None else 18.0
+    return (
+        100.0
+        - 3.5 * abs(sep - 13)
+        - 350.0 * abs(depth - 0.087)
+        - 250.0 * abs(max(hl, 0.0) - 0.016)
+        - hl_pen
+        - 70.0 * abs(min(dump, 0.30) - 0.21)
+        - bo_pen
+        + (min(ext, 0.28) * 70.0 if breakout_bars is not None else 0.0)
+        + min(volx or 0.0, 4.0) * 2.0
+        - (0.0 if now > 0 else 12.0)
+        - min(age_h, 18.0) * 0.6
+    )
+
+
+def like_pct_from_score(score: float) -> float:
+    return max(0.0, min(100.0, 100.0 * score / UAI_REF_SCORE))
 
 
 def rolling_mean(values: list[float], period: int) -> list[float | None]:
@@ -148,71 +190,78 @@ def detect_w_bottoms(
             avg = (l1 + l2) / 2
             if avg <= 0:
                 continue
-            sym = abs(l2 / l1 - 1)
-            if sym > MAX_SYM_PCT:
+            hl = l2 / l1 - 1
+            if hl < -0.005:
+                continue
+            if abs(hl) > MAX_SYM_PCT:
                 continue
             if min(lows[i : j + 1]) < min(l1, l2) * 0.985:
-                continue
-            if j - i < 6:
                 continue
             neck_idx = max(range(i + 3, j - 2), key=lambda x: highs[x])
             neck = highs[neck_idx]
             depth = neck / avg - 1
             if not (MIN_DEPTH <= depth <= MAX_DEPTH):
                 continue
-            prior = max(closes[max(0, i - 24) : i])
-            if prior / l1 - 1 < PRIOR_DROP:
+            dump = max(closes[max(0, i - 18) : i]) / l1 - 1
+            if dump < PRIOR_DROP:
                 continue
             end = min(n, j + BREAKOUT_WINDOW + 1)
-            b = next((x for x in range(j + 2, end) if closes[x] > neck * (1 + BREAKOUT_PAD)), None)
+            b = next((x for x in range(j + 1, end) if closes[x] > neck * (1 + BREAKOUT_PAD)), None)
             current = closes[-1]
+            now = current / neck - 1
             target = neck + (neck - avg)
-            age2_h = (last_t - times[j]) / 3_600_000
             volx = None
             t_break = None
+            ext = 0.0
+            bo_bars = None
             if b is None:
-                if age2_h > 12 or min(lows[j:]) < l2 * 0.98:
-                    continue
-                if not (avg * 1.015 < current < neck * 1.01):
+                age_h = (last_t - times[j]) / 3_600_000
+                if age_h > 12 or min(lows[j:]) < l2 * 0.98:
                     continue
                 status = "待突破"
-                age_h = age2_h
             else:
                 if min(lows[j : b + 1]) < l2 * 0.98:
                     continue
                 age_h = (last_t - times[b]) / 3_600_000
-                if age_h > 24:
+                if age_h > KEEP_HOURS:
                     continue
                 base = quote_vol[max(0, b - 20) : b] or [1.0]
                 volx = quote_vol[b] / (statistics.median(base) or 1.0)
                 t_break = times[b]
+                bo_bars = b - j
+                ext = max(closes[b:]) / neck - 1
                 if current >= neck:
                     status = "已延伸" if current >= target * 1.02 else "突破仍有效"
                 elif current >= avg:
                     status = "跌回頸線下"
                 else:
                     status = "形態失敗"
-            score = (
-                100
-                - 600 * sym
-                - 220 * abs(depth - 0.087)
-                - min(age_h, 12)
-                + (min(volx, 4) * 2 if volx else 0)
+            raw = uai_like_score(
+                sep=sep,
+                depth=depth,
+                hl=hl,
+                dump=dump,
+                breakout_bars=bo_bars,
+                ext=ext,
+                now=now,
+                volx=volx,
+                age_h=age_h,
             )
+            like = like_pct_from_score(raw)
             hits.append(
                 WHit(
                     symbol=symbol,
                     status=status,
-                    score=score,
+                    score=raw,
                     bottom1=l1,
                     bottom2=l2,
                     neck=neck,
                     depth_pct=depth * 100,
-                    sym_pct=sym * 100,
+                    sym_pct=abs(hl) * 100,
                     sep_min=sep * 5,
                     target=target,
                     current=current,
-                    vsneck_pct=(current / neck - 1) * 100,
+                    vsneck_pct=now * 100,
                     vs_target_pct=(current / target - 1) * 100,
                     volume24=volume24,
                     t1=times[i],
@@ -224,6 +273,10 @@ def detect_w_bottoms(
                     neck_idx=neck_idx,
                     b=b,
                     volx=volx,
+                    dump_pct=dump * 100,
+                    breakout_bars=bo_bars,
+                    ext_pct=ext * 100,
+                    like_pct=like,
                 )
             )
     return hits
@@ -232,8 +285,7 @@ def detect_w_bottoms(
 def best_hit(hits: list[WHit]) -> WHit | None:
     if not hits:
         return None
-    rank = {"待突破": 0, "突破仍有效": 1, "已延伸": 2, "跌回頸線下": 3, "形態失敗": 4}
-    return max(hits, key=lambda h: (-rank.get(h.status, 9), h.score))
+    return max(hits, key=lambda h: (h.like_pct, h.score))
 
 
 def parse_klines(raw: list[list[Any]]) -> tuple[list[float], ...]:
@@ -286,7 +338,7 @@ def _setup_cjk_font() -> None:
 
 def chart_window(hit: WHit, n: int) -> tuple[int, int]:
     left = max(0, hit.i - 24)
-    right = min(n, max((hit.b or hit.j) + 40, hit.j + 24, n))
+    right = min(n, max((hit.b or hit.j) + 48, hit.j + 28))
     return left, right
 
 
@@ -417,13 +469,13 @@ def build_html(payload: dict[str, Any]) -> str:
         status = "基準" if hit.get("reference") else hit["status"]
         tag = STATUS_CLASS.get(status, "tag-info")
         vs = hit["vsneck_pct"]
-        vs_cls = "pnl-win" if vs >= 0 else "pnl-loss"
         detail = (
+            f"像 UAI {hit['like_pct']:.0f}%\n"
             f"L1 {fmt_price(hit['bottom1'])} @ {hit['t1_label']}\n"
             f"L2 {fmt_price(hit['bottom2'])} @ {hit['t2_label']}\n"
             f"頸線 {fmt_price(hit['neck'])} @ {hit['t_neck_label']}\n"
             f"量度目標 {fmt_price(hit['target'])}\n"
-            f"兩底價差 {hit['sym_pct']:.2f}% · 間隔 {hit['sep_min']} 分 · 深度 {hit['depth_pct']:.1f}%\n"
+            f"急殺 {hit.get('dump_pct', 0):.1f}% · 較高低 {hit['sym_pct']:.2f}% · 間隔 {hit['sep_min']} 分 · 深度 {hit['depth_pct']:.1f}%\n"
             f"現價 {fmt_price(hit['current'])}  距頸線 {vs:+.2f}%"
         )
         if hit.get("t_break_label"):
@@ -432,6 +484,8 @@ def build_html(payload: dict[str, Any]) -> str:
                 extra += f" · 量能 {hit['volx']:.1f}x"
             detail += f"\n{extra}"
         img = hit.get("img_href") or hit.get("img_src") or ""
+        like = hit.get("like_pct", 0.0)
+        like_cls = "pnl-win" if like >= 70 else ("pnl-loss" if like < 50 else "")
         cards.append(
             f"""
     <article class="trade-card" data-status="{escape(hit['status'])}">
@@ -440,7 +494,7 @@ def build_html(payload: dict[str, Any]) -> str:
           <span class="trade-no">#{idx} · {escape(hit['symbol'])}</span>
           <span class="trade-time">L1 {escape(hit['t1_label'])} → L2 {escape(hit['t2_label'])} 台北</span>
         </div>
-        <div class="card-pnl {vs_cls}">{vs:+.1f}%</div>
+        <div class="card-pnl {like_cls}">像UAI {like:.0f}%</div>
       </header>
       <div class="tags">
         <span class="tag {tag}">{escape(status)}</span>
@@ -506,14 +560,14 @@ def build_html(payload: dict[str, Any]) -> str:
 <div class="page">
   <section class="summary">
     <h1>幣安 USDT 永續 · 5m W底 · 近兩天</h1>
-    <p class="muted">對齊 UAI：兩底價差 ≤4%、間隔 40–240 分、頸線深度 7–18%，先有一腳下跌再做出雙底。時間為台北。資料截至 {escape(payload['asof'])}。僅供型態對照，不是進出場建議。</p>
+    <p class="muted">只留長得像 UAI 的：急殺 ≥10%、較高第二底、間隔 40–100 分、頸線深度 6–14%，最好兩根內放量突破。相似度用 UAI 當 100%。時間台北。截至 {escape(payload['asof'])}。僅供型態對照，不是進出場建議。</p>
     <div class="cards">
       <div class="stat">掃描<b>{payload['universe']}</b></div>
-      <div class="stat">命中<b>{payload['matched']}</b></div>
+      <div class="stat">像UAI<b>{payload['matched']}</b></div>
       <div class="stat">待突破<b>{payload['pending']}</b></div>
-      <div class="stat">仍有效<b>{payload['valid']}</b></div>
+      <div class="stat">已突破<b>{payload['valid']}</b></div>
     </div>
-    <p class="note">黃虛線頸線、綠虛線量度目標、藍／粉點為 L1／L2。圖已嵌在頁面裡，不用再等套件載入。</p>
+    <p class="note">黃虛線頸線、綠虛線量度目標。4USDT / BULLA 那種寬底或還在殺的，相似度不夠，已拿掉。</p>
   </section>
   {"".join(cards)}
 </div>
@@ -539,20 +593,13 @@ def universe_symbols(min_quote_vol: float = MIN_QUOTE_VOL) -> tuple[list[str], d
 
 def fetch_klines(symbol: str) -> tuple[str, list[list[Any]] | None]:
     try:
-        return symbol, get_json("/klines", {"symbol": symbol, "interval": "5m", "limit": 576})
+        return symbol, get_json("/klines", {"symbol": symbol, "interval": "5m", "limit": LOOKBACK_BARS})
     except Exception:  # noqa: BLE001
         return symbol, None
 
 
-def status_rank(hit: WHit) -> tuple[int, int, float]:
-    order = {
-        "待突破": 0,
-        "突破仍有效": 1,
-        "已延伸": 2,
-        "跌回頸線下": 3,
-        "形態失敗": 4,
-    }
-    return (0 if hit.reference else 1, order.get(hit.status, 9), -hit.score)
+def status_rank(hit: WHit) -> tuple[int, float]:
+    return (0 if hit.reference else 1, -hit.like_pct)
 
 
 def scan(min_quote_vol: float = MIN_QUOTE_VOL) -> tuple[dict[str, Any], dict[str, tuple[list[float], ...]]]:
@@ -572,6 +619,10 @@ def scan(min_quote_vol: float = MIN_QUOTE_VOL) -> tuple[dict[str, Any], dict[str
         if best:
             if symbol == "UAIUSDT":
                 best.reference = True
+            if not best.reference and best.like_pct < MIN_LIKE_PCT:
+                continue
+            if not best.reference and best.status in {"跌回頸線下", "形態失敗"}:
+                continue
             hits.append(best)
     if "UAIUSDT" in series and not any(h.symbol == "UAIUSDT" for h in hits):
         found = detect_w_bottoms(*series["UAIUSDT"], symbol="UAIUSDT", volume24=tv.get("UAIUSDT", 0.0))
@@ -608,7 +659,7 @@ def write_report(payload: dict[str, Any], series: dict[str, tuple[list[float], .
         safe = "".join(ch if ch.isalnum() else "_" for ch in symbol)
         png = img_dir / f"w{idx:02d}_{safe}.png"
         status = "基準" if hit.get("reference") else hit["status"]
-        title = f"#{idx}  {symbol}  5m W底  {status}  距頸線 {hit['vsneck_pct']:+.1f}%"
+        title = f"#{idx}  {symbol}  5m  像UAI {hit.get('like_pct', 0):.0f}%  {status}"
         draw_hit_png(wh, series[symbol], png, title)
         hit["img_src"] = f"img/{png.name}"
         hit["img_href"] = png_data_uri(png)
@@ -636,7 +687,7 @@ def main() -> None:
     print(f"已產生: {out}")
     print(f"掃描 {payload['universe']} · 命中 {payload['matched']} · 截至 {payload['asof']}")
     for hit in payload["hits"]:
-        print(f"  {hit['symbol']:16} {hit['status']:8} 頸線{fmt_price(hit['neck'])} 現價{fmt_price(hit['current'])} {hit['vsneck_pct']:+.1f}%")
+        print(f"  {hit['symbol']:16} {hit['status']:8} 像UAI {hit.get('like_pct', 0):5.1f}% 頸線{fmt_price(hit['neck'])} 現價{fmt_price(hit['current'])} {hit['vsneck_pct']:+.1f}%")
 
 
 if __name__ == "__main__":
