@@ -9,33 +9,37 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scan_binance_w_bottom import (  # noqa: E402
-    MIN_LIKE_PCT,
     detect_w_bottoms,
     draw_hit_png,
     fmt_price,
     like_pct_from_score,
+    ma_hold,
     swing_lows,
     uai_like_score,
 )
 
 
-def _series() -> tuple[list[float], ...]:
-    """合成一組近似 UAI 的 W 底：先急跌、雙底、再突破頸線。"""
-    closes = [round(0.62 * (0.996 ** i), 5) for i in range(36)]
-    # 第一底 → 頸線 → 第二底 → 突破
+def _paint_w(closes: list[float], start: int) -> tuple[int, int, int]:
+    """在 start 之後接急殺 + 雙底 + 突破，回傳 L1 / 頸線 / L2 索引。"""
+    dump = [round(0.60 * (0.985 ** i), 5) for i in range(12)]
     body = [
         0.530, 0.518, 0.505, 0.495, 0.492, 0.505, 0.515, 0.525, 0.532, 0.531,
         0.522, 0.512, 0.504, 0.500, 0.498, 0.508, 0.520, 0.532, 0.545, 0.552,
         0.561, 0.570, 0.582, 0.595, 0.610, 0.625, 0.640, 0.655, 0.668, 0.680,
     ]
+    closes.extend(dump)
     closes.extend(body)
-    while len(closes) < 90:
+    i1, neck_i, i2 = start + 16, start + 21, start + 26
+    return i1, neck_i, i2
+
+
+def _finalize(closes: list[float], i1: int, neck_i: int, i2: int) -> tuple[list[float], ...]:
+    while len(closes) < i2 + 40:
         closes.append(round(closes[-1] * 1.002, 5))
     n = len(closes)
     opens = [closes[0]] + closes[:-1]
     highs = [max(o, c) * 1.004 for o, c in zip(opens, closes)]
     lows = [min(o, c) * 0.998 for o, c in zip(opens, closes)]
-    i1, neck_i, i2 = 40, 45, 50
     lows[i1] = 0.4885
     closes[i1] = 0.492
     highs[i1] = 0.500
@@ -54,6 +58,20 @@ def _series() -> tuple[list[float], ...]:
     quote[i2 + 6] = 4_000_000.0
     times = [1_788_000_000_000 + i * 300_000 for i in range(n)]
     return opens, highs, lows, closes, quote, times
+
+
+def _series() -> tuple[list[float], ...]:
+    """長時間在 0.49 附近盤，急殺後雙底踩回 MA200。"""
+    closes = [0.490] * 220
+    i1, neck_i, i2 = _paint_w(closes, 220)
+    return _finalize(closes, i1, neck_i, i2)
+
+
+def _series_no_ma_floor() -> tuple[list[float], ...]:
+    """均線在 0.70，雙底懸在 0.49，不應算有支撐。"""
+    closes = [0.70] * 220
+    i1, neck_i, i2 = _paint_w(closes, 220)
+    return _finalize(closes, i1, neck_i, i2)
 
 
 def test_swing_lows_finds_two_bottoms() -> None:
@@ -75,6 +93,17 @@ def test_detect_w_bottom_like_uai() -> None:
     assert best.b is not None
     assert best.like_pct >= 50
     assert best.bottom2 >= best.bottom1 * 0.995
+    assert best.ma_support in {"MA200", "MA120", "MA99"}
+
+
+def test_rejects_w_without_ma_support() -> None:
+    hits = detect_w_bottoms(*_series_no_ma_floor(), symbol="FAKEUSDT", volume24=1e8)
+    assert not hits
+
+
+def test_ma_hold() -> None:
+    assert ma_hold(0.4885, 0.5062, 0.4924, 0.025)
+    assert not ma_hold(0.2249, 0.2363, 0.3253, 0.025)
 
 
 def test_uai_like_prefers_compact_higher_low() -> None:
@@ -105,6 +134,8 @@ def test_draw_hit_png(tmp_path: Path | None = None) -> None:
 if __name__ == "__main__":
     test_swing_lows_finds_two_bottoms()
     test_detect_w_bottom_like_uai()
+    test_rejects_w_without_ma_support()
+    test_ma_hold()
     test_uai_like_prefers_compact_higher_low()
     test_fmt_price()
     test_draw_hit_png()

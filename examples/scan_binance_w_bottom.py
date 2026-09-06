@@ -48,6 +48,9 @@ MIN_LIKE_PCT = 58.0
 UAI_REF_SCORE = 118.0
 LOOKBACK_BARS = 1000
 KEEP_HOURS = 48
+SUPPORT_MAS = (200, 120, 99)
+MA_L2_UNDERCUT = 0.02
+MA_L1_UNDERCUT = 0.025
 
 
 @dataclass
@@ -79,6 +82,7 @@ class WHit:
     breakout_bars: int | None = None
     ext_pct: float = 0.0
     like_pct: float = 0.0
+    ma_support: str = ""
     reference: bool = False
 
 
@@ -148,6 +152,32 @@ def like_pct_from_score(score: float) -> float:
     return max(0.0, min(100.0, 100.0 * score / UAI_REF_SCORE))
 
 
+def ma_hold(low: float, close: float, ma: float | None, undercut: float) -> bool:
+    """低點可略刺破均線，但收盤要收回均線附近，才算支撐。"""
+    if ma is None or ma <= 0:
+        return False
+    if low < ma * (1.0 - undercut):
+        return False
+    return close >= ma * 0.995
+
+
+def ma_supports_at(
+    idx: int,
+    lows: list[float],
+    closes: list[float],
+    mas: dict[int, list[float | None]],
+    undercut: float,
+) -> list[int]:
+    found: list[int] = []
+    for period in SUPPORT_MAS:
+        series = mas.get(period)
+        if not series or idx >= len(series):
+            continue
+        if ma_hold(lows[idx], closes[idx], series[idx], undercut):
+            found.append(period)
+    return found
+
+
 def rolling_mean(values: list[float], period: int) -> list[float | None]:
     out: list[float | None] = [None] * len(values)
     if period <= 0:
@@ -179,6 +209,7 @@ def detect_w_bottoms(
     mins = swing_lows(lows)
     hits: list[WHit] = []
     last_t = times[-1]
+    mas = {p: rolling_mean(closes, p) for p in SUPPORT_MAS}
     for ai, i in enumerate(mins):
         for j in mins[ai + 1 :]:
             sep = j - i
@@ -205,6 +236,13 @@ def detect_w_bottoms(
             dump = max(closes[max(0, i - 18) : i]) / l1 - 1
             if dump < PRIOR_DROP:
                 continue
+            l2_mas = ma_supports_at(j, lows, closes, mas, MA_L2_UNDERCUT)
+            if not l2_mas:
+                continue
+            l1_mas = ma_supports_at(i, lows, closes, mas, MA_L1_UNDERCUT)
+            if not l1_mas:
+                continue
+            ma_label = f"MA{l2_mas[0]}"
             end = min(n, j + BREAKOUT_WINDOW + 1)
             b = next((x for x in range(j + 1, end) if closes[x] > neck * (1 + BREAKOUT_PAD)), None)
             current = closes[-1]
@@ -277,6 +315,7 @@ def detect_w_bottoms(
                     breakout_bars=bo_bars,
                     ext_pct=ext * 100,
                     like_pct=like,
+                    ma_support=ma_label,
                 )
             )
     return hits
@@ -408,6 +447,16 @@ def draw_hit_png(hit: WHit, ohlcv: tuple[list[float], ...], path: Path, title: s
         ax.scatter([j_rel], [hit.bottom2], s=42, color="#ec407a", zorder=5)
         ax.annotate("L2", (j_rel, hit.bottom2), textcoords="offset points", xytext=(0, -13),
                     ha="center", color="#f9a8d4", fontsize=8)
+    if hit.ma_support and 0 <= j_rel < len(xs):
+        ax.annotate(
+            f"{hit.ma_support}支撐",
+            (j_rel, hit.bottom2),
+            textcoords="offset points",
+            xytext=(16, 10),
+            ha="left",
+            color="#3ddc97",
+            fontsize=8,
+        )
     if b_rel is not None and 0 <= b_rel < len(xs):
         ax.axvline(b_rel, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([b_rel], [w_c[b_rel]], s=48, color="#00e676", marker="^", zorder=6)
@@ -476,7 +525,7 @@ def build_html(payload: dict[str, Any]) -> str:
             f"頸線 {fmt_price(hit['neck'])} @ {hit['t_neck_label']}\n"
             f"量度目標 {fmt_price(hit['target'])}\n"
             f"急殺 {hit.get('dump_pct', 0):.1f}% · 較高低 {hit['sym_pct']:.2f}% · 間隔 {hit['sep_min']} 分 · 深度 {hit['depth_pct']:.1f}%\n"
-            f"現價 {fmt_price(hit['current'])}  距頸線 {vs:+.2f}%"
+            f"均線 {hit.get('ma_support') or '無'}支撐 · 現價 {fmt_price(hit['current'])}  距頸線 {vs:+.2f}%"
         )
         if hit.get("t_break_label"):
             extra = f"突破 {hit['t_break_label']}"
@@ -498,6 +547,7 @@ def build_html(payload: dict[str, Any]) -> str:
       </header>
       <div class="tags">
         <span class="tag {tag}">{escape(status)}</span>
+        <span class="tag tag-ok">{escape(hit.get('ma_support') or '均線')}支撐</span>
         <span class="tag tag-info">5m</span>
         <span class="tag tag-info">24h {escape(fmt_vol(hit['volume24']))}</span>
       </div>
@@ -560,14 +610,14 @@ def build_html(payload: dict[str, Any]) -> str:
 <div class="page">
   <section class="summary">
     <h1>幣安 USDT 永續 · 5m W底 · 近兩天</h1>
-    <p class="muted">只留長得像 UAI 的：急殺 ≥10%、較高第二底、間隔 40–100 分、頸線深度 6–14%，最好兩根內放量突破。相似度用 UAI 當 100%。時間台北。截至 {escape(payload['asof'])}。僅供型態對照，不是進出場建議。</p>
+    <p class="muted">只留長得像 UAI 的：急殺 ≥10%、較高第二底、間隔 40–100 分、頸線深度 6–14%，W 底附近要踩住 MA99／120／200。相似度用 UAI 當 100%。時間台北。截至 {escape(payload['asof'])}。僅供型態對照，不是進出場建議。</p>
     <div class="cards">
       <div class="stat">掃描<b>{payload['universe']}</b></div>
       <div class="stat">像UAI<b>{payload['matched']}</b></div>
       <div class="stat">待突破<b>{payload['pending']}</b></div>
       <div class="stat">已突破<b>{payload['valid']}</b></div>
     </div>
-    <p class="note">黃虛線頸線、綠虛線量度目標。4USDT / BULLA 那種寬底或還在殺的，相似度不夠，已拿掉。</p>
+    <p class="note">黃虛線頸線、綠虛線量度目標。兩底都要收到長均附近，MAGMA／HEMI 那種懸空下跌不算。</p>
   </section>
   {"".join(cards)}
 </div>
@@ -659,7 +709,7 @@ def write_report(payload: dict[str, Any], series: dict[str, tuple[list[float], .
         safe = "".join(ch if ch.isalnum() else "_" for ch in symbol)
         png = img_dir / f"w{idx:02d}_{safe}.png"
         status = "基準" if hit.get("reference") else hit["status"]
-        title = f"#{idx}  {symbol}  5m  像UAI {hit.get('like_pct', 0):.0f}%  {status}"
+        title = f"#{idx}  {symbol}  5m  像UAI {hit.get('like_pct', 0):.0f}%  {hit.get('ma_support','')}  {status}"
         draw_hit_png(wh, series[symbol], png, title)
         hit["img_src"] = f"img/{png.name}"
         hit["img_href"] = png_data_uri(png)
@@ -687,7 +737,11 @@ def main() -> None:
     print(f"已產生: {out}")
     print(f"掃描 {payload['universe']} · 命中 {payload['matched']} · 截至 {payload['asof']}")
     for hit in payload["hits"]:
-        print(f"  {hit['symbol']:16} {hit['status']:8} 像UAI {hit.get('like_pct', 0):5.1f}% 頸線{fmt_price(hit['neck'])} 現價{fmt_price(hit['current'])} {hit['vsneck_pct']:+.1f}%")
+        print(
+            f"  {hit['symbol']:16} {hit['status']:8} 像UAI {hit.get('like_pct', 0):5.1f}% "
+            f"{str(hit.get('ma_support') or ''):<6} 頸線{fmt_price(hit['neck'])} "
+            f"現價{fmt_price(hit['current'])} {hit['vsneck_pct']:+.1f}%"
+        )
 
 
 if __name__ == "__main__":
