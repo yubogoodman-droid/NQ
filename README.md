@@ -123,6 +123,23 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
+## 幣安 15m 多頭排列 · 站上 MA200（成交額前 100）
+
+15 分 K：MA5 > MA20 > MA99 > MA200，收盤站上 200。只在**剛排好的第一根**推 Telegram，已經排好的不重複叫。標的取 24h 成交額前 100（幣 + 股票）。
+
+```bash
+# TradingView：pinescript/ma_align_15m.pine 貼到 Pine Editor，套 15 分圖，設警示
+
+# 剛收盤掃一次 / 持續監看（成交額前 100）
+python3 examples/scan_binance_15m_align.py --once
+python3 examples/scan_binance_15m_align.py --watch
+
+# 前 100 名近 5 日剛排好的時點 + 圖
+python3 examples/scan_binance_15m_align.py --backtest --days 5 --pages
+```
+
+舊檔名 `scan_binance_15m_ma200.py` 也會轉到同一套。
+
 ## 幣安 15m 黏帶擠壓 · 200MA 附近進場
 
 線型對齊 ETH 9/3 20:30：MA7/14/25/99/120/200 黏成一條（寬度 ≤ 0.6%），箱體 ≤ 1.8%，價格貼著 200 橫盤，陽線量能 **3～8×**、振幅擴張 **2～6×** 打出收盤箱頂，**收盤離 200 仍 ≤ 0.8%** 才進。截圖那波進場 2412，離 200 只有 +0.27%，量 3.7×、振幅只擴 2.3×。8/28 那種 2.6× 假突破、開盤 14× / 19× 跳空都不進。標的：幣圈 + 股票永續。
@@ -150,7 +167,8 @@ ETH 近兩週圖：https://htmlpreview.github.io/?https://raw.githubusercontent.
 ## TradingView
 
 `pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
-`pinescript/ma200_squeeze_15m.pine` 套用至 ETHUSDT.P 或其他 U 本位 15 分圖。
+`pinescript/ma_align_15m.pine` 套用至 U 本位 15 分圖：MA5>20>99>200 剛排好且站上 200 會標、可設警示。  
+`pinescript/ma200_squeeze_15m.pine` 是舊的黏帶擠壓。
 
 ## 參數調整
 
