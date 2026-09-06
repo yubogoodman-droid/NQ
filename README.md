@@ -97,8 +97,8 @@ python3 examples/watch_binance_5m_short.py --backtest --days 2 --pages --gap 1
 python3 examples/test_watch_binance_5m_short.py
 ```
 
-只掃 24h 成交額前 100 檔。近兩天（2026-09-04 16:17 → 09-06 16:17）：未限制 328 筆 → **≤2% 為 303 筆 / 92 檔**。  
-MA14 離 MA200：≤1% 268 筆、≤2% 303、≤3% 315、≤4% 318。持有 30 分鐘勝率 **34.7%、平均 −0.15%**；60 分鐘 **35.4%、平均 −0.28%**。圖卡另外固定放 COLLECT（含 09-05 20:30、離 14 約 2.50% 那筆）。
+只掃 24h 成交額前 100 檔。近兩天（2026-09-04 16:31 → 09-06 16:31）：未限制 324 筆 → **≤2% 為 300 筆 / 92 檔**。  
+MA14 離 MA200：≤1% 265 筆、≤2% 300、≤3% 311、≤4% 314。持有 30 分鐘勝率 **34.9%、平均 −0.15%**；60 分鐘 **35.1%、平均 −0.28%**。圖卡另外固定放 COLLECT（含 09-05 20:30、離 14 約 2.50% 那筆）。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-short-align-5ca1/docs/binance-5m-short/view.html
 
