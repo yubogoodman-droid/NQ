@@ -11,14 +11,17 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from watch_binance_5m_short import (  # noqa: E402
+    MS_15M,
     add_mas,
     attach_forwards,
+    attach_k15,
     break_ma200,
     collect_signals,
     detect_new_short,
     drop_unclosed,
     five_align_ok,
     format_alert,
+    forming_15m_from_5m,
     forward_pct,
     key_of,
     parse_klines,
@@ -159,7 +162,64 @@ def test_format_and_key() -> None:
     assert "MA200 上" in text
     assert "跌破" in text
     assert "1h" not in text
+    assert "15m 當下 資料不足" in text
     assert key_of(ev) == f"BTCUSDT:{sig['t']}"
+    sig2 = {
+        **sig,
+        "k15_t": sig["t"],
+        "k15_o": 1.0,
+        "k15_h": 2.0,
+        "k15_l": 0.5,
+        "k15_c": 0.9,
+        "k15_bars": 2,
+        "k15_m7": 1.1,
+        "k15_m14": 1.2,
+        "k15_m25": 1.3,
+        "k15_m200": 1.0,
+        "k15_align": True,
+        "k15_below": True,
+    }
+    text2 = format_alert({"symbol": "BTCUSDT", "sig": sig2, "d5": d5})
+    assert "15m 當下（2/3）" in text2
+    assert "空排" in text2
+    assert "MA200 下" in text2
+
+
+def aligned_t0() -> int:
+    t = 1_700_000_000_000
+    return t - (t % MS_15M)
+
+
+def test_forming_15m_from_three_fives() -> None:
+    t0 = aligned_t0()
+    d5 = _bars(np.array([10.0, 11.0, 9.0, 8.0]), t0=t0)
+    cndl = forming_15m_from_5m(d5, 2)
+    assert cndl is not None
+    assert cndl["t"] == t0
+    assert cndl["bars"] == 3
+    assert cndl["o"] == 10.0
+    assert cndl["c"] == 9.0
+    assert abs(cndl["h"] - 11.2) < 1e-9
+    assert abs(cndl["l"] - 8.8) < 1e-9
+    nxt = forming_15m_from_5m(d5, 3)
+    assert nxt is not None
+    assert nxt["t"] == t0 + MS_15M
+    assert nxt["bars"] == 1
+    assert nxt["c"] == 8.0
+
+
+def test_forming_15m_no_lookahead() -> None:
+    t0 = aligned_t0()
+    d15 = add_mas(_bars(np.concatenate([np.full(219, 100.0), np.array([50.0])]), t0=t0, step=MS_15M))
+    last_t = int(d15["t"][-1])
+    d5 = add_mas(_bars(np.full(3, 100.0), t0=last_t))
+    k15 = attach_k15(d5, 2, d15)
+    assert k15 is not None
+    assert k15["k15_c"] == 100.0
+    assert k15["k15_bars"] == 3
+    assert abs(k15["k15_m200"] - 100.0) < 0.3
+    assert k15["d15"]["c"][-1] == 100.0
+    assert k15["d15"]["c"][-1] != 50.0
 
 
 if __name__ == "__main__":

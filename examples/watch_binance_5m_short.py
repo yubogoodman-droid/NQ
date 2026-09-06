@@ -2,6 +2,7 @@
 """幣安 5m 空頭排列 Telegram 監看。
 
 五分 K：MA7 < MA14 < MA25，且前一根收在 MA200 上、這一根收盤才跌破。
+通知與圖會附**當下這根 15 分 K**（用已收盤的 5m 合成，不看這根 15m 之後）。
 預設只掃 24h 成交額前 100 檔。同一根不重發。
 
     python3 examples/watch_binance_5m_short.py --test
@@ -39,6 +40,7 @@ if not CONFIG_ENV.exists():
     CONFIG_ENV = Path(__file__).resolve().parent / "tg_config.env"
 
 MS_5M = 5 * 60_000
+MS_15M = 15 * 60_000
 HORIZONS = (("15m", 3), ("30m", 6), ("60m", 12), ("120m", 24))
 UNIVERSE_LIMIT = 100
 PAGES = ROOT / "docs" / "binance-5m-short" / "index.html"
@@ -128,6 +130,108 @@ def break_ma200(d: dict, i: int) -> bool:
     return d["c"][i - 1] > prev and d["c"][i] < now
 
 
+def bar_open(t_ms: int, interval_ms: int) -> int:
+    return int(t_ms) - int(t_ms) % interval_ms
+
+
+def tf_index_at(d: dict, t_ms: int) -> int:
+    if len(d["t"]) == 0:
+        return -1
+    return int(np.searchsorted(d["t"], t_ms, side="right") - 1)
+
+
+def forming_15m_from_5m(d5: dict, i5: int) -> dict | None:
+    """訊號當下這根 15 分 K：只疊到這根 5m，不看同一根 15m 後面的 5m。"""
+    if i5 < 0 or i5 >= len(d5["c"]):
+        return None
+    t = int(d5["t"][i5])
+    start = bar_open(t, MS_15M)
+    i0 = int(np.searchsorted(d5["t"], start, side="left"))
+    if i0 < 0 or i0 > i5:
+        return None
+    if int(d5["t"][i0]) < start:
+        i0 += 1
+    if i0 > i5:
+        return None
+    sl = slice(i0, i5 + 1)
+    return {
+        "t": start,
+        "o": float(d5["o"][i0]),
+        "h": float(np.max(d5["h"][sl])),
+        "l": float(np.min(d5["l"][sl])),
+        "c": float(d5["c"][i5]),
+        "v": float(np.sum(d5["v"][sl])),
+        "bars": int(i5 - i0 + 1),
+    }
+
+
+def with_forming_15m(d15: dict, candle: dict) -> dict | None:
+    """把當下 15m 接到序列上，砍掉這根之後的 15m，避免用到後來的收盤。"""
+    t0 = int(candle["t"])
+    hi = tf_index_at(d15, t0)
+    if hi < 0:
+        return None
+    replace = int(d15["t"][hi]) == t0
+
+    def take(a: np.ndarray, extra) -> np.ndarray:
+        if replace:
+            out = np.array(a[: hi + 1], copy=True)
+            out[-1] = extra
+            return out
+        return np.append(a[: hi + 1], extra)
+
+    out = {
+        "t": take(d15["t"], t0),
+        "o": take(d15["o"], candle["o"]),
+        "h": take(d15["h"], candle["h"]),
+        "l": take(d15["l"], candle["l"]),
+        "c": take(d15["c"], candle["c"]),
+        "v": take(d15["v"], candle["v"]),
+    }
+    if len(out["c"]) < 200:
+        return None
+    return add_mas(out)
+
+
+def attach_k15(d5: dict, i5: int, d15: dict | None) -> dict | None:
+    if d15 is None:
+        return None
+    candle = forming_15m_from_5m(d5, i5)
+    if candle is None:
+        return None
+    d15f = with_forming_15m(d15, candle)
+    if d15f is None:
+        return None
+    i15 = len(d15f["c"]) - 1
+    m200 = float(d15f["m200"][i15])
+    if np.isnan([d15f["m7"][i15], d15f["m14"][i15], d15f["m25"][i15], m200]).any():
+        return None
+    return {
+        "d15": d15f,
+        "i15": i15,
+        "k15_t": candle["t"],
+        "k15_o": candle["o"],
+        "k15_h": candle["h"],
+        "k15_l": candle["l"],
+        "k15_c": candle["c"],
+        "k15_v": candle["v"],
+        "k15_bars": candle["bars"],
+        "k15_m7": float(d15f["m7"][i15]),
+        "k15_m14": float(d15f["m14"][i15]),
+        "k15_m25": float(d15f["m25"][i15]),
+        "k15_m200": m200,
+        "k15_align": bool(short_align_ok(d15f, i15)),
+        "k15_below": bool(candle["c"] < m200),
+    }
+
+
+def merge_k15(sig: dict, k15: dict | None) -> dict:
+    if not k15:
+        return sig
+    extra = {k: v for k, v in k15.items() if k != "d15"}
+    return {**sig, **extra}
+
+
 def detect_new_short(d5: dict, i: int) -> dict | None:
     """5m 7<14<25，且這一根才從 MA200 上收盤跌破。"""
     if not five_align_ok(d5, i) or not break_ma200(d5, i):
@@ -176,6 +280,12 @@ def summarize_hits(hits: list[dict]) -> dict:
     stats: dict = {
         "count": len(hits),
         "symbols": len({h["symbol"] for h in hits}),
+    }
+    k15 = [h for h in hits if h.get("k15_c") is not None]
+    stats["k15"] = {
+        "n": len(k15),
+        "align": sum(1 for h in k15 if h.get("k15_align")),
+        "below": sum(1 for h in k15 if h.get("k15_below")),
     }
     for name, _bars in HORIZONS:
         vals = [float(h[name]) for h in hits if h.get(name) is not None]
@@ -298,30 +408,12 @@ def telegram_send(text: str, photo: str | None = None) -> bool:
         return False
 
 
-def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4) -> str | None:
-    try:
-        import matplotlib
+def _paint_candles(ax, d: dict, a0: int, a1: int, mark: int | None, mark_color: str = "#e35d5d"):
+    from matplotlib.patches import Rectangle
 
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import Rectangle
-    except Exception as e:
-        print("chart skip", sym, e, flush=True)
-        return None
-    a0 = max(0, i - 80)
-    a1 = min(len(d["c"]), i + max(4, ahead))
     sl = slice(a0, a1)
     xs = np.arange(a1 - a0)
-    o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
-    fig, (ax, axv) = plt.subplots(
-        2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
-    )
-    for a in (ax, axv):
-        a.set_facecolor("#101814")
-        a.tick_params(colors="#8aa193", labelsize=8)
-        for sp in a.spines.values():
-            sp.set_color("#2a3a33")
-    colors_v = []
+    o, h, l, c = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl]
     for k in range(len(c)):
         up = c[k] >= o[k]
         col = "#3dba7a" if up else "#e35d5d"
@@ -330,17 +422,57 @@ def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4) -> str |
         if y1 == y0:
             y1 = y0 + max(h[k] - l[k], 1e-12) * 0.02
         ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
-        colors_v.append("#3dba7a99" if up else "#e35d5d99")
-    axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
     pal = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 200: "#ffffff"}
     for n, col in pal.items():
         ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.1, label=f"MA{n}")
-    x = i - a0
-    if 0 <= x < len(c):
-        ax.axvline(x, color="#e35d5d", ls="--", lw=0.9)
-        ax.scatter([x], [c[x]], s=36, color="#e35d5d", zorder=5)
+    if mark is not None:
+        x = mark - a0
+        if 0 <= x < len(c):
+            ax.axvline(x, color=mark_color, ls="--", lw=0.9)
+            ax.scatter([x], [c[x]], s=36, color=mark_color, zorder=5)
+    return xs, d["v"][sl], [bool(c[k] >= o[k]) for k in range(len(c))]
+
+
+def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4, d15: dict | None = None, i15: int | None = None) -> str | None:
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception as e:
+        print("chart skip", sym, e, flush=True)
+        return None
+    has15 = d15 is not None and i15 is not None
+    if has15:
+        fig, axes = plt.subplots(
+            3, 1, figsize=(10.6, 7.6), gridspec_kw={"height_ratios": [2.6, 1.9, 0.8]}, facecolor="#0c1210"
+        )
+        ax, ax15, axv = axes
+    else:
+        fig, axes = plt.subplots(
+            2, 1, figsize=(10.6, 5.8), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
+        )
+        ax, axv = axes
+        ax15 = None
+    for a in (ax, ax15, axv):
+        if a is None:
+            continue
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+    a0 = max(0, i - 80)
+    a1 = min(len(d["c"]), i + max(4, ahead))
+    xs, vol, ups = _paint_candles(ax, d, a0, a1, i)
+    axv.bar(xs, vol, width=0.8, color=["#3dba7a99" if u else "#e35d5d99" for u in ups], linewidth=0)
     ax.set_title(f"{sym}  5m short", color="#e8f0ea", fontsize=12)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
+    if ax15 is not None and d15 is not None and i15 is not None:
+        b0 = max(0, i15 - 48)
+        b1 = min(len(d15["c"]), i15 + 4)
+        _paint_candles(ax15, d15, b0, b1, i15)
+        ax15.set_title("15m 當下", color="#e8f0ea", fontsize=11)
+        ax15.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
     fig.tight_layout(pad=0.5)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
     plt.close(fig)
@@ -352,14 +484,40 @@ def scan_symbol(sym: str) -> list[dict]:
     if raw5 is None:
         return []
     d5 = add_mas(raw5)
+    raw15 = fetch_klines(sym, "15m", 260, MS_15M, keep_forming=True)
+    d15 = add_mas(raw15) if raw15 is not None else None
     last5 = len(d5["c"]) - 1
     events = []
     for closed in (last5, last5 - 1):
         sig = detect_new_short(d5, closed)
         if not sig:
             continue
-        events.append({"symbol": sym, "sig": sig, "d5": d5})
+        k15 = attach_k15(d5, closed, d15)
+        sig = merge_k15(sig, k15)
+        events.append(
+            {
+                "symbol": sym,
+                "sig": sig,
+                "d5": d5,
+                "d15": None if k15 is None else k15["d15"],
+                "i15": None if k15 is None else k15["i15"],
+            }
+        )
     return events
+
+
+def format_k15_lines(sig: dict) -> str:
+    if "k15_c" not in sig:
+        return "15m 當下 資料不足"
+    ext = (sig["k15_c"] / sig["k15_m200"] - 1) * 100 if sig["k15_m200"] else 0.0
+    join = "&lt;" if sig["k15_align"] else "/"
+    align = "空排" if sig["k15_align"] else "未空排"
+    side = "在 MA200 下" if sig["k15_below"] else "在 MA200 上"
+    return (
+        f"15m 當下（{sig['k15_bars']}/3）開 {sig['k15_o']:g} 高 {sig['k15_h']:g} 低 {sig['k15_l']:g} 收 {sig['k15_c']:g}\n"
+        f"15m MA7 {sig['k15_m7']:g} {join} MA14 {sig['k15_m14']:g} {join} MA25 {sig['k15_m25']:g}　{align}\n"
+        f"15m 收盤{side} {sig['k15_m200']:g}（{ext:+.2f}%）"
+    )
 
 
 def format_alert(ev: dict) -> str:
@@ -370,7 +528,8 @@ def format_alert(ev: dict) -> str:
         f"時間 {hm(sig['t'])}\n"
         f"收盤 {sig['close']:g}\n"
         f"5m MA7 {sig['m7']:g} &lt; MA14 {sig['m14']:g} &lt; MA25 {sig['m25']:g}\n"
-        f"前一根在 MA200 上，這根跌破 {sig['m200']:g}（{ext:+.2f}%）"
+        f"前一根在 MA200 上，這根跌破 {sig['m200']:g}（{ext:+.2f}%）\n"
+        f"{format_k15_lines(sig)}"
     )
 
 
@@ -399,7 +558,14 @@ def notify(ev: dict, *, dry_run: bool = False) -> None:
         print("  → dry-run，不送 Telegram", flush=True)
         return
     tmp = Path("/tmp") / f"short5m_{safe_name(ev['symbol'])}_{ev['sig']['t']}.png"
-    photo = draw_chart(ev["symbol"], ev["d5"], ev["sig"]["i"], str(tmp))
+    photo = draw_chart(
+        ev["symbol"],
+        ev["d5"],
+        ev["sig"]["i"],
+        str(tmp),
+        d15=ev.get("d15"),
+        i15=ev.get("i15"),
+    )
     ok = telegram_send(text, photo=photo)
     if ok:
         print("  → Telegram 已送", flush=True)
@@ -418,17 +584,24 @@ def scan_history_symbol(sym: str, start_ms: int, end_ms: int) -> tuple[list[dict
         meta["error"] = "too_few_bars"
         return [], meta
     d5 = add_mas(raw5)
+    raw15 = fetch_klines(sym, "15m", 500, MS_15M, keep_forming=True)
+    d15 = add_mas(raw15) if raw15 is not None else None
     hits = []
     for i in range(len(d5["c"])):
         t = int(d5["t"][i])
         if t < start_ms or t > end_ms:
             continue
         sig = detect_new_short(d5, i)
-        if sig:
-            row = attach_forwards(d5, sig)
-            row["symbol"] = sym
-            row["d5"] = d5
-            hits.append(row)
+        if not sig:
+            continue
+        k15 = attach_k15(d5, i, d15)
+        row = attach_forwards(d5, merge_k15(sig, k15))
+        row["symbol"] = sym
+        row["d5"] = d5
+        if k15:
+            row["d15"] = k15["d15"]
+            row["i15"] = k15["i15"]
+        hits.append(row)
     meta["hits"] = len(hits)
     return hits, meta
 
@@ -521,8 +694,23 @@ def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period
     cards = []
     for n, h in enumerate(chart_hits, 1):
         img_name = f"t{n:02d}_{safe_name(h['symbol'])}_{hm(h['t']).replace(' ', '_').replace(':', '')}.png"
-        drawn = draw_chart(h["symbol"], h["d5"], h["i"], str(img_dir / img_name), ahead=24)
+        drawn = draw_chart(
+            h["symbol"],
+            h["d5"],
+            h["i"],
+            str(img_dir / img_name),
+            ahead=24,
+            d15=h.get("d15"),
+            i15=h.get("i15"),
+        )
         ext = (h["close"] / h["m200"] - 1) * 100
+        k15_txt = format_k15_lines(h).replace("&lt;", "<")
+        k15_tag = ""
+        if "k15_c" in h:
+            k15_tag = (
+                f"<span class='tag'>{'15m空排' if h['k15_align'] else '15m未空排'} · "
+                f"{'年線下' if h['k15_below'] else '年線上'}</span>"
+            )
         img_html = (
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(h['symbol'])}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -539,10 +727,12 @@ def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period
             "<div class='tags'>"
             f"<span class='tag'>15m {_fmt(h.get('15m'))}</span>"
             f"<span class='tag'>30m {_fmt(h.get('30m'))}</span>"
-            f"<span class='tag'>120m {_fmt(h.get('120m'))}</span></div>"
+            f"<span class='tag'>120m {_fmt(h.get('120m'))}</span>"
+            f"{k15_tag}</div>"
             "<pre class='trade-detail'>"
             f"收盤 {h['close']:g}  MA7 {h['m7']:g} < MA14 {h['m14']:g} < MA25 {h['m25']:g}\n"
-            f"前一根在 MA200 上，這根跌破 {h['m200']:g}（{ext:+.2f}%）"
+            f"前一根在 MA200 上，這根跌破 {h['m200']:g}（{ext:+.2f}%）\n"
+            f"{k15_txt}"
             "</pre>"
             f"{img_html}"
             "</article>"
@@ -593,9 +783,11 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left
 <h1>幣安 5m 空頭排列 · {escape(period)}</h1>
 <p class="muted">USDT 永續成交額前 {funnel.get('symbols', 0)} 檔。
 5m <b>MA7&lt;MA14&lt;MA25</b>，且前一根收在 MA200 上、這一根收盤才跌破。
-已在 MA200 下只是短均排好的不算。
+已在 MA200 下只是短均排好的不算。圖卡附<strong>當下這根 15 分 K</strong>（用 5m 合成，不是過濾）。
 報酬是空頭：從訊號收盤算到之後 15/30/60/120 分鐘，價格往下為正。不是進出場建議。</p>
-<p class="muted">訊號 {funnel.get('hits', 0)} 筆 · 讀檔失敗 {funnel.get('errors', 0)}</p>
+<p class="muted">訊號 {funnel.get('hits', 0)} 筆 · 讀檔失敗 {funnel.get('errors', 0)}
+· 當下 15m 空排 {stats.get('k15', {}).get('align', 0)}/{stats.get('k15', {}).get('n', 0)}
+· 15m 收在年線下 {stats.get('k15', {}).get('below', 0)}/{stats.get('k15', {}).get('n', 0)}</p>
 <p class="muted">15m 勝率 {stats['15m']['win_rate']:.1f}% 均 {_fmt(stats['15m']['avg'])}
 · 30m {stats['30m']['win_rate']:.1f}% 均 {_fmt(stats['30m']['avg'])}
 · 60m {stats['60m']['win_rate']:.1f}% 均 {_fmt(stats['60m']['avg'])}
@@ -648,6 +840,18 @@ def dump_hits_json(path: Path, hits: list[dict], stats: dict, funnel: dict, peri
                 "m14": h["m14"],
                 "m25": h["m25"],
                 "m200": h["m200"],
+                "k15_t": h.get("k15_t"),
+                "k15_o": h.get("k15_o"),
+                "k15_h": h.get("k15_h"),
+                "k15_l": h.get("k15_l"),
+                "k15_c": h.get("k15_c"),
+                "k15_bars": h.get("k15_bars"),
+                "k15_m7": h.get("k15_m7"),
+                "k15_m14": h.get("k15_m14"),
+                "k15_m25": h.get("k15_m25"),
+                "k15_m200": h.get("k15_m200"),
+                "k15_align": h.get("k15_align"),
+                "k15_below": h.get("k15_below"),
                 "15m": h.get("15m"),
                 "30m": h.get("30m"),
                 "60m": h.get("60m"),
@@ -679,7 +883,8 @@ def cmd_backtest(args) -> int:
     hits, funnel = backtest_all(symbols, start_ms, end_ms)
     stats = summarize_hits(hits)
     print(
-        f"完成 {time.time()-t0:.1f}s　訊號 {stats['count']} / {stats['symbols']} 檔\n"
+        f"完成 {time.time()-t0:.1f}s　訊號 {stats['count']} / {stats['symbols']} 檔"
+        f"　當下15m空排 {stats['k15']['align']}/{stats['k15']['n']}　年線下 {stats['k15']['below']}/{stats['k15']['n']}\n"
         f"15m {stats['15m']['win_rate']:.1f}% 均 {stats['15m']['avg']:+.2f}%　"
         f"30m {stats['30m']['win_rate']:.1f}% 均 {stats['30m']['avg']:+.2f}%　"
         f"60m {stats['60m']['win_rate']:.1f}% 均 {stats['60m']['avg']:+.2f}%　"
@@ -735,7 +940,7 @@ def main() -> int:
         print("載入標的…", flush=True)
         symbols = universe(args.limit)
         print(
-            f"監看成交額前 {len(symbols)} 檔。5m 7<14<25，且從 MA200 上那根收盤跌破才推。",
+            f"監看成交額前 {len(symbols)} 檔。5m 7<14<25 跌破 MA200 才推；圖附當下 15m K。",
             flush=True,
         )
     uni_ts = time.time()
