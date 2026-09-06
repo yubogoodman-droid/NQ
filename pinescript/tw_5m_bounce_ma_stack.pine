@@ -11,6 +11,9 @@ minGap10_20 = input.float(0.12, "MA10-MA20 最小間隔 %", minval=0.0, step=0.0
 minGap5_20  = input.float(0.30, "MA5-MA20 最小間隔 %", minval=0.0, step=0.025)
 requirePretty = input.bool(true, "擋掉糾結黏帶")
 clearTrough   = input.bool(true, "破底那根下方不能有均線")
+minClimaxVol  = input.float(2.0, "破底段爆量倍數（0=不檢查）", minval=0.0, step=0.5)
+minBounceVol  = input.float(1.0, "反彈段量能倍數（0=不檢查）", minval=0.0, step=0.1)
+aboveMa60     = input.bool(true, "進場價要站上 60MA")
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -39,29 +42,52 @@ dumpBar    = low < priorLow and dropPct >= minDropPct
 var float trough = na
 var int   troughBar = na
 var float dumpHigh = na
+var float climaxRatio = na   // 破底段最大量 / 前 20 根均量
+var float preBounceVol = na  // 破底前 12 根均量
+var float upVolSum = 0.0
+var int   upBars = 0
+
+vol20   = ta.sma(volume, 20)
+vol12   = ta.sma(volume, 12)
+dumpVol = math.max(volume, volume[1], volume[2])
 
 if dumpBar
     if na(trough) or low < trough
         trough := low
         troughBar := bar_index
         dumpHigh := winHigh
+        climaxRatio := vol20[3] > 0 ? dumpVol / vol20[3] : na
+        preBounceVol := vol12[1] > 0 ? vol12[1] : na
+        upVolSum := 0.0
+        upBars := 0
+else if not na(troughBar)
+    upVolSum += volume
+    upBars += 1
 
 if not na(troughBar) and bar_index - troughBar > reboundBars
     trough := na
     troughBar := na
     dumpHigh := na
+    climaxRatio := na
+    preBounceVol := na
 
 bouncePct = not na(trough) and trough > 0 ? (close - trough) / trough * 100 : 0
+bounceVolRatio = upBars > 0 and not na(preBounceVol) ? (upVolSum / upBars) / preBounceVol : na
 skipOpen = hour(time, "Asia/Taipei") == 9 and minute(time, "Asia/Taipei") < 30
 maClear(src) =>
     na(troughBar) or na(src[bar_index - troughBar]) or src[bar_index - troughBar] > trough
 troughClear = not clearTrough or (maClear(ma5) and maClear(ma10) and maClear(ma20) and maClear(ma60) and maClear(ma120) and maClear(ma200) and maClear(ma240))
-sig = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear
+climaxOk = minClimaxVol <= 0 or na(climaxRatio) or climaxRatio >= minClimaxVol
+bounceVolOk = minBounceVol <= 0 or na(bounceVolRatio) or bounceVolRatio >= minBounceVol
+ma60Ok = not aboveMa60 or na(ma60) or close > ma60
+sig = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and ma60Ok
 
 if sig
     trough := na
     troughBar := na
     dumpHigh := na
+    climaxRatio := na
+    preBounceVol := na
 
 plot(ma5, "5MA", color=color.new(#3b82f6, 0), linewidth=2)
 plot(ma10, "10MA", color=color.new(#22c55e, 0), linewidth=2)

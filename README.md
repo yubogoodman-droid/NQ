@@ -55,6 +55,7 @@ python3 examples/nq_ma_reclaim.py alert
 | 破底 | 跌破近 48 根（約 4 小時）低點，且自該段高點跌幅 ≥ 2%；**破底那根下方不能有任何均線**（5/10/20/60/120/200/240） |
 | 反彈視窗 | 破底後 24 根內 |
 | 通知 | 5/10/20 三條都要看得見、往上張開（MA5−MA10 ≥ 0.15%、MA10−MA20 ≥ 0.12%、MA5−MA20 ≥ 0.30%），MA20 也要上彎；黏帶／糾結不算。09:30 前不報 |
+| 富喬標準 | 對齊富喬 1815 08-28 10:15 那筆：**破底那段要爆量**（3 根內最大量 ≥ 前 20 根均量 2 倍）、**反彈段要帶量**（破底後到進場均量 ≥ 破底前 12 根均量）、**進場價站回 60MA 之上**。`--min-climax-vol 0 --min-bounce-vol 0 --no-ma60` 可各自關掉 |
 
 ```bash
 # 先看力成近 5 日有沒有這種圖
@@ -66,8 +67,11 @@ python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
 # 只看今天（台北）的訊號，並把力成併進去
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pages
 
-# 近一週、700 以上拿掉；均線糾結的不會算
-python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 7d --pages
+# 近兩週、700 以上拿掉；均線糾結的不會算，並套富喬標準（量 + 60MA）
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 10d --also 1815.TWO --pages
+
+# 不要量的門檻，只看均線排列
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --min-climax-vol 0 --min-bounce-vol 0 --no-ma60 --pages
 
 # Telegram（憑證放 tg_config.env）
 python3 examples/watch_tw_5m_bounce.py alert --test
@@ -77,7 +81,7 @@ python3 examples/watch_tw_5m_bounce.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_bounce_ma_stack.pine`。
 
-近一週（2026-08-28→09-04）成交額前 80、**700 以上拿掉**： **61 筆**、勝率 43%、合計 −13.4%。圖上有 5/10/20/60/120/200/240。  
+近兩週（2026-08-25→09-04）成交額前 80、**700 以上拿掉**、套富喬標準： **27 筆**、勝率 59%、合計 +53.0%。同一段資料只看均線排列（不看量、不看 60MA）是 81 筆、勝率 59%、+82.5%，但 08-28→09-04 那週是 50 筆 −4.9%，套富喬標準後變 18 筆 +21.8%（09-03 的 12 筆 −35% 只剩 1 筆）。量的門檻主要是砍掉縮量乾拉、彈到均線就壓回去的那種。圖上有 5/10/20/60/120/200/240，卡片寫破底量／反彈量倍數。  
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）

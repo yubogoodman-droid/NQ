@@ -90,6 +90,8 @@ class BounceSignal:
     ma120: float
     ma200: float
     volume_ratio: float
+    climax_ratio: float = float("nan")
+    bounce_vol_ratio: float = float("nan")
 
 
 @dataclass
@@ -185,6 +187,12 @@ def _fmt_ma(name: str, val: float) -> str:
     return f"{name} {float(val):.2f}"
 
 
+def _fmt_x(name: str, val: float) -> str:
+    if val is None or (isinstance(val, (float, np.floating)) and np.isnan(val)):
+        return f"{name} —"
+    return f"{name} {float(val):.1f}x"
+
+
 def trough_clear_of_mas(low_px: float, *ma_vals: float) -> bool:
     """破底那根的下方不能有任何均線。還沒算出來的長均（NaN）不算。"""
     if low_px <= 0:
@@ -195,6 +203,33 @@ def trough_clear_of_mas(low_px: float, *ma_vals: float) -> bool:
         if float(v) < low_px:
             return False
     return True
+
+
+def climax_volume_ratio(volume: np.ndarray, trough_idx: int, *, span: int = 3, lookback: int = 20) -> float:
+    """急殺段（破底那根含前 span-1 根）最大量 / 再往前 lookback 根均量。富喬那種爆量殺盤會 >> 2。"""
+    lo = max(0, trough_idx - span + 1)
+    pre = volume[max(0, lo - lookback) : lo]
+    pre_avg = float(np.mean(pre)) if len(pre) else 0.0
+    if pre_avg <= 0:
+        return float("nan")
+    return float(np.max(volume[lo : trough_idx + 1])) / pre_avg
+
+
+def bounce_volume_ratio(volume: np.ndarray, trough_idx: int, entry_idx: int, *, lookback: int = 12) -> float:
+    """破底後到進場這段的均量 / 破底前 lookback 根均量。反彈要有量進來，不能縮量乾拉。"""
+    pre = volume[max(0, trough_idx - lookback) : trough_idx]
+    up = volume[trough_idx + 1 : entry_idx + 1]
+    pre_avg = float(np.mean(pre)) if len(pre) else 0.0
+    if pre_avg <= 0 or not len(up):
+        return float("nan")
+    return float(np.mean(up)) / pre_avg
+
+
+def _ratio_ok(ratio: float, minimum: float) -> bool:
+    """門檻 <= 0 代表不檢查；算不出來（NaN）也放行。"""
+    if minimum <= 0 or ratio is None or np.isnan(ratio):
+        return True
+    return ratio >= minimum
 
 
 def ma_flip_count(fast: np.ndarray, slow: np.ndarray, i: int, lookback: int) -> int:
@@ -269,8 +304,16 @@ def detect_signals(
     vol_lookback: int = 20,
     skip_before: tuple[int, int] = (9, 30),
     require_pretty: bool = True,
+    min_climax_vol: float = 2.0,
+    min_bounce_vol: float = 1.0,
+    require_above_ma60: bool = True,
 ) -> list[BounceSignal]:
-    """急殺破近期低點後，等 5>10>20 排漂亮（分開、上彎）才出訊號。"""
+    """急殺破近期低點後，等 5>10>20 排漂亮（分開、上彎）才出訊號。
+
+    富喬 1815 08-28 那種標準：破底那段要爆量（min_climax_vol 倍前 20 根均量）、
+    反彈段要帶量（min_bounce_vol 倍破底前均量）、進場價要站回 60MA 之上。
+    門檻設 0 / False 就不檢查。
+    """
     if df is None or len(df) < lookback + 20:
         return []
     close = df["Close"].to_numpy(float)
@@ -374,6 +417,14 @@ def detect_signals(
             continue
         if i >= slope_bars and not np.isnan(ma5[i - slope_bars]) and ma5[i] <= ma5[i - slope_bars]:
             continue
+        if require_above_ma60 and not np.isnan(ma60[i]) and float(close[i]) <= float(ma60[i]):
+            continue
+        climax = climax_volume_ratio(volume, trough_idx, lookback=vol_lookback)
+        if not _ratio_ok(climax, min_climax_vol):
+            continue
+        bounce_vol = bounce_volume_ratio(volume, trough_idx, i)
+        if not _ratio_ok(bounce_vol, min_bounce_vol):
+            continue
         vol_avg = float(np.mean(volume[max(0, i - vol_lookback) : i]) or 0.0)
         vol_ratio = float(volume[i] / vol_avg) if vol_avg > 0 else 0.0
         s0 = int(sess0[trough_idx])
@@ -398,6 +449,8 @@ def detect_signals(
                 ma120=float(ma120[i]),
                 ma200=float(ma200[i]),
                 volume_ratio=vol_ratio,
+                climax_ratio=climax,
+                bounce_vol_ratio=bounce_vol,
             )
         )
         last_entry = i
@@ -610,7 +663,8 @@ def write_html_report(
             f"跌幅 {sig.drop_pct*100:.1f}%  反彈 {sig.bounce_pct*100:.1f}%\n"
             f"MA5 {sig.ma5:.2f}  MA10 {sig.ma10:.2f}  MA20 {sig.ma20:.2f}"
             f"  間隔 {(sig.ma5-sig.ma20)/sig.entry_price*100:.2f}%\n"
-            f"{_fmt_ma('MA60', sig.ma60)}  {_fmt_ma('MA120', sig.ma120)}  {_fmt_ma('MA200', sig.ma200)}"
+            f"{_fmt_ma('MA60', sig.ma60)}  {_fmt_ma('MA120', sig.ma120)}  {_fmt_ma('MA200', sig.ma200)}\n"
+            f"{_fmt_x('破底量', sig.climax_ratio)}  {_fmt_x('反彈量', sig.bounce_vol_ratio)}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -642,7 +696,8 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 5分K 破底反彈</h1>
 <p class="muted">{escape(period)} · {len(universe)} 檔
-<br/>急殺破近 4 小時低點或今日低點（跌幅 ≥ 2%），且破底那根下方不能有任何均線。24 根內 5MA &gt; 10MA &gt; 20MA 要明顯分開、往上張開才算；糾結黏帶不算。</p>
+<br/>急殺破近 4 小時低點或今日低點（跌幅 ≥ 2%），且破底那根下方不能有任何均線。24 根內 5MA &gt; 10MA &gt; 20MA 要明顯分開、往上張開才算；糾結黏帶不算。
+<br/>富喬標準：破底那段要爆量（≥ 2 倍前 20 根均量）、反彈段要帶量（≥ 破底前均量）、進場價站回 60MA 之上。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -766,6 +821,7 @@ def fmt_alert(row: dict, df: pd.DataFrame, sig: BounceSignal) -> str:
         f"MA5 {sig.ma5:.2f} &gt; MA10 {sig.ma10:.2f} &gt; MA20 {sig.ma20:.2f}"
         f"（間隔 {(sig.ma5-sig.ma20)/sig.entry_price*100:.2f}%）\n"
         f"{_fmt_ma('MA60', sig.ma60)}  {_fmt_ma('MA120', sig.ma120)}  {_fmt_ma('MA200', sig.ma200)}\n"
+        f"{_fmt_x('破底量', sig.climax_ratio)}  {_fmt_x('反彈量', sig.bounce_vol_ratio)}\n"
         f"#台股 #五分K #破底反彈 #{row['code']}"
     )
 
@@ -863,11 +919,22 @@ def resolve_universe(args) -> list[dict]:
     return merge_universe(universe, extra)
 
 
+def detect_kwargs_from_args(args) -> dict[str, Any]:
+    """CLI 旗標 → detect_signals 的關鍵字參數。"""
+    return {
+        "require_pretty": not getattr(args, "loose", False),
+        "min_climax_vol": float(getattr(args, "min_climax_vol", 2.0)),
+        "min_bounce_vol": float(getattr(args, "min_bounce_vol", 1.0)),
+        "require_above_ma60": not getattr(args, "no_ma60", False),
+    }
+
+
 def scan_symbol(
     row: dict,
     range_: str,
     *,
     require_pretty: bool = True,
+    **detect_kwargs: Any,
 ) -> tuple[list[tuple[BounceSignal, pd.DataFrame]], dict]:
     meta = {**row, "bars": 0, "error": "", "n_sig": 0}
     try:
@@ -881,7 +948,7 @@ def scan_symbol(
         return [], meta
     if row.get("close") is None and len(df):
         row["close"] = float(df["Close"].iloc[-1])
-    sigs = detect_signals(df, require_pretty=require_pretty)
+    sigs = detect_signals(df, require_pretty=require_pretty, **detect_kwargs)
     meta["n_sig"] = len(sigs)
     return [(s, df) for s in sigs], meta
 
@@ -896,9 +963,10 @@ def cmd_scan(args) -> int:
     on_day = resolve_on_day(args)
     if on_day is not None:
         print(f"filter day={on_day}")
-    pretty = not getattr(args, "loose", False)
+    detect_kw = detect_kwargs_from_args(args)
+    pretty = detect_kw["require_pretty"]
     for i, row in enumerate(universe, 1):
-        pairs, meta = scan_symbol(row, args.range_, require_pretty=pretty)
+        pairs, meta = scan_symbol(row, args.range_, **detect_kw)
         if meta["error"]:
             errors += 1
         trades_by_entry = {}
@@ -941,6 +1009,8 @@ def cmd_scan(args) -> int:
             period += f" · 股價≤{args.max_price:g}"
         if pretty:
             period += " · 均線不糾結"
+        if detect_kw["min_climax_vol"] > 0 or detect_kw["min_bounce_vol"] > 0 or detect_kw["require_above_ma60"]:
+            period += " · 富喬標準"
         out = write_html_report(html_path, hits, universe, period)
         write_view_html(out)
         print(f"html={out}")
@@ -957,13 +1027,14 @@ def scan_once(
     seed_alert: bool,
     sleep_s: float,
     require_pretty: bool = True,
+    **detect_kwargs: Any,
 ) -> None:
     state = load_state()
     alerted = set(state.get("alerted") or [])
     first_run = not state.get("initialized")
     new_items: list[tuple[str, dict, BounceSignal, pd.DataFrame]] = []
     for row in universe:
-        pairs, meta = scan_symbol(row, range_, require_pretty=require_pretty)
+        pairs, meta = scan_symbol(row, range_, require_pretty=require_pretty, **detect_kwargs)
         if meta["error"]:
             print(f"  skip {row['symbol']} {meta['error']}", file=sys.stderr)
         for sig, df in pairs:
@@ -1024,9 +1095,12 @@ def cmd_alert(args) -> int:
     universe = resolve_universe(args)
     if not universe:
         return 1
+    detect_kw = detect_kwargs_from_args(args)
     print(
         f"TW 5m bounce TG | n={len(universe)} | dry_run={args.dry_run} | "
-        f"range={args.range_} | pretty={not args.loose} | session_only={not args.all_hours}"
+        f"range={args.range_} | pretty={detect_kw['require_pretty']} | "
+        f"climax>={detect_kw['min_climax_vol']:g} bounce_vol>={detect_kw['min_bounce_vol']:g} "
+        f"ma60={detect_kw['require_above_ma60']} | session_only={not args.all_hours}"
     )
     while True:
         try:
@@ -1039,7 +1113,7 @@ def cmd_alert(args) -> int:
                     dry_run=args.dry_run,
                     seed_alert=args.seed_alert,
                     sleep_s=args.sleep,
-                    require_pretty=not args.loose,
+                    **detect_kw,
                 )
             else:
                 print(f"[{datetime.now(TPE).strftime('%H:%M:%S')}] outside session, skip")
@@ -1070,6 +1144,19 @@ def build_parser() -> argparse.ArgumentParser:
             action="store_true",
             help="不擋均線糾結，第一次 5>10>20 就算",
         )
+        sp.add_argument(
+            "--min-climax-vol",
+            type=float,
+            default=2.0,
+            help="破底那段最大量至少要是前 20 根均量的幾倍（0 = 不檢查）",
+        )
+        sp.add_argument(
+            "--min-bounce-vol",
+            type=float,
+            default=1.0,
+            help="破底後到進場的均量至少要是破底前均量的幾倍（0 = 不檢查）",
+        )
+        sp.add_argument("--no-ma60", action="store_true", help="不要求進場價站上 60MA")
 
     s = sub.add_parser("scan", help="回看近幾日並可出 HTML")
     add_universe(s)

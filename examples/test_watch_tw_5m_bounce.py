@@ -14,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scan_tw_ma_reclaim import TPE  # noqa: E402
 from watch_tw_5m_bounce import (  # noqa: E402
+    bounce_volume_ratio,
+    climax_volume_ratio,
     detect_signals,
     drop_incomplete_5m,
     fmt_alert,
@@ -224,6 +226,53 @@ def test_dump_with_ma_underneath_skipped() -> None:
     assert not trough_clear_of_mas(float(low[dump_i]), *vals)
 
 
+def test_volume_ratios() -> None:
+    vol = np.full(60, 1000.0)
+    vol[40] = 5500.0  # 破底那根爆量
+    vol[41:50] = 1800.0  # 反彈帶量
+    assert abs(climax_volume_ratio(vol, 40) - 5.5) < 1e-9
+    assert abs(bounce_volume_ratio(vol, 40, 49) - 1.8) < 1e-9
+    quiet = np.full(60, 1000.0)
+    assert abs(climax_volume_ratio(quiet, 40) - 1.0) < 1e-9
+    assert np.isnan(climax_volume_ratio(np.zeros(60), 40))
+
+
+def test_dry_bounce_without_volume_skipped() -> None:
+    """同一張 V 彈圖，把量抹平：富喬標準下不算，關掉量的門檻才算。"""
+    df = make_v_bounce_bars()
+    strict = detect_signals(df)
+    assert strict
+    sig = strict[0]
+    assert sig.climax_ratio >= 2.0
+    assert sig.bounce_vol_ratio >= 1.0
+    assert sig.entry_price > sig.ma60
+    flat = df.copy()
+    flat["Volume"] = 1200.0
+    assert detect_signals(flat) == []
+    loose = detect_signals(flat, min_climax_vol=0, min_bounce_vol=0)
+    assert loose and loose[0].entry_idx == sig.entry_idx
+    # 只有破底爆量、反彈縮量也不算
+    dump_only = flat.copy()
+    dump_only.loc[dump_only.index[sig.break_idx], "Volume"] = 6000.0
+    dump_only.loc[dump_only.index[sig.break_idx + 1 :], "Volume"] = 700.0
+    assert detect_signals(dump_only) == []
+    assert detect_signals(dump_only, min_bounce_vol=0)
+
+
+def test_entry_below_ma60_skipped() -> None:
+    df = make_v_bounce_bars()
+    sig = detect_signals(df)[0]
+    lifted = df.copy()
+    # 把前面的高原抬高，讓 60MA 壓在進場價之上
+    head = lifted.index[: sig.break_idx - 6]
+    for col in ("Open", "High", "Low", "Close"):
+        lifted.loc[head, col] = lifted.loc[head, col] + 6.0
+    ma60 = sma(lifted["Close"].to_numpy(float), 60)
+    assert float(lifted["Close"].iloc[sig.entry_idx]) < ma60[sig.entry_idx]
+    assert all(s.entry_price > s.ma60 for s in detect_signals(lifted))
+    assert len(detect_signals(lifted, require_above_ma60=False)) >= len(detect_signals(lifted))
+
+
 def test_drop_incomplete_5m() -> None:
     idx = pd.DatetimeIndex(
         [
@@ -298,6 +347,8 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "間隔" in text
     assert "MA60" in text
     assert "MA200" in text
+    assert "破底量" in text
+    assert "反彈量" in text
     assert (path.parent / "img").exists()
 
 
@@ -312,6 +363,9 @@ def main() -> int:
     test_stack_pretty_rejects_glued_mas()
     test_trough_clear_of_mas()
     test_dump_with_ma_underneath_skipped()
+    test_volume_ratios()
+    test_dry_bounce_without_volume_skipped()
+    test_entry_below_ma60_skipped()
     test_drop_incomplete_5m()
     test_shallow_dip_ignored()
     test_simulate_and_summarize()
