@@ -28,6 +28,7 @@ from watch_binance_5m_short import (  # noqa: E402
     ma14_ma200_gap_pct,
     parse_klines,
     pick_chart_hits,
+    pin_chart_hits,
     rank_universe,
     safe_name,
     sma,
@@ -169,6 +170,21 @@ def test_forward_and_summary() -> None:
     assert stats["60m"]["n"] == 2
     picked = pick_chart_hits(hits, 2)
     assert len(picked) == 2
+
+
+def test_pick_chart_hits_pins_collect() -> None:
+    hits = [{"symbol": f"S{i}USDT", "t": i, "60m": float(i - 10)} for i in range(20)]
+    extra = [
+        {"symbol": "COLLECTUSDT", "t": 99, "60m": 5.79, "gap14": 2.50},
+        {"symbol": "COLLECTUSDT", "t": 88, "60m": 0.80, "gap14": 0.46},
+    ]
+    pinned = pin_chart_hits(extra + hits)
+    assert [h["t"] for h in pinned] == [99, 88]
+    picked = pick_chart_hits(hits, 6, extra=pinned)
+    assert picked[0]["symbol"] == "COLLECTUSDT" and picked[0]["t"] == 99
+    assert picked[1]["symbol"] == "COLLECTUSDT" and picked[1]["t"] == 88
+    assert len(picked) == 6
+    assert ("COLLECTUSDT", 99) in {(h["symbol"], h["t"]) for h in picked}
 
 
 def test_format_and_key() -> None:

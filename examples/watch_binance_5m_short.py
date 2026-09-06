@@ -4,6 +4,7 @@
 五分 K：MA7 < MA14 < MA25，且前一根收在 MA200 上、這一根收盤才跌破。
 跌破時 MA14 離 MA200 不能太遠（預設 ≤2%；回測對照 1/2/3/4%）。
 通知與圖會附**當下這根 15 分 K**（用已收盤的 5m 合成，不看這根 15m 之後）。
+回測圖卡會固定放 COLLECT（含超過距離上限的那筆）。
 預設只掃 24h 成交額前 100 檔。同一根不重發。
 
     python3 examples/watch_binance_5m_short.py --test
@@ -47,6 +48,7 @@ UNIVERSE_LIMIT = 100
 PAGES = ROOT / "docs" / "binance-5m-short" / "index.html"
 GAP_PCTS = (1.0, 2.0, 3.0, 4.0)
 DEFAULT_GAP_PCT = 2.0
+PIN_CHART_SYMBOLS = frozenset({"COLLECTUSDT"})
 
 
 def load_dotenv(path: Path = CONFIG_ENV) -> None:
@@ -692,21 +694,55 @@ def _equity_svg(pcts: list[float], width: int = 720, height: int = 160) -> str:
     )
 
 
-def pick_chart_hits(hits: list[dict], limit: int) -> list[dict]:
+def pin_chart_hits(hits_all: list[dict], symbols: frozenset[str] | None = None) -> list[dict]:
+    """固定出圖的標的，從尚未套距離上限的命中裡拿（例如 COLLECT 那筆 2.50%）。"""
+    want = {s.upper() for s in (symbols or PIN_CHART_SYMBOLS)}
+    pinned = [h for h in hits_all if str(h.get("symbol", "")).upper() in want and h.get("60m") is not None]
+    pinned.sort(key=lambda h: float(h["60m"]), reverse=True)
+    return pinned
+
+
+def pick_chart_hits(hits: list[dict], limit: int, extra: list[dict] | None = None) -> list[dict]:
+    limit = max(0, int(limit))
+    chosen: list[dict] = []
+    seen: set[tuple] = set()
+
+    def add(h: dict) -> bool:
+        if limit <= 0 or h.get("60m") is None:
+            return False
+        key = (h["symbol"], h["t"])
+        if key in seen or len(chosen) >= limit:
+            return False
+        chosen.append(h)
+        seen.add(key)
+        return True
+
+    for h in extra or []:
+        add(h)
+        if len(chosen) >= limit:
+            return chosen
+
     scored = [h for h in hits if h.get("60m") is not None]
     scored.sort(key=lambda h: float(h["60m"]), reverse=True)
-    if len(scored) <= limit:
-        return scored
-    half = max(1, limit // 2)
-    chosen = scored[:half] + scored[-half:]
-    seen = {(h["symbol"], h["t"]) for h in chosen}
-    for h in reversed(hits):
+    remaining = limit - len(chosen)
+    if remaining <= 0:
+        return chosen
+    if len(scored) <= remaining:
+        for h in scored:
+            add(h)
+        return chosen
+    half = max(1, remaining // 2)
+    for h in scored[:half]:
+        add(h)
+    for h in reversed(scored):
         if len(chosen) >= limit:
             break
-        key = (h["symbol"], h["t"])
-        if key not in seen and h.get("60m") is not None:
-            chosen.append(h)
-            seen.add(key)
+        add(h)
+    if len(chosen) < limit:
+        for h in reversed(hits):
+            if len(chosen) >= limit:
+                break
+            add(h)
     return chosen
 
 
@@ -720,13 +756,14 @@ def write_report(
     *,
     ablation: dict | None = None,
     gap_pct: float | None = None,
+    pin_hits: list[dict] | None = None,
 ) -> Path:
     img_dir = path.parent / "img"
     if img_dir.exists():
         for old in img_dir.glob("*.png"):
             old.unlink()
     img_dir.mkdir(parents=True, exist_ok=True)
-    chart_hits = pick_chart_hits(hits, chart_limit)
+    chart_hits = pick_chart_hits(hits, chart_limit, extra=pin_hits)
     cards = []
     for n, h in enumerate(chart_hits, 1):
         img_name = f"t{n:02d}_{safe_name(h['symbol'])}_{hm(h['t']).replace(' ', '_').replace(':', '')}.png"
@@ -747,6 +784,10 @@ def write_report(
                 f"<span class='tag'>{'15m空排' if h['k15_align'] else '15m未空排'} · "
                 f"{'年線下' if h['k15_below'] else '年線上'}</span>"
             )
+        if gap_pct and h.get("gap14") is not None and float(h["gap14"]) > float(gap_pct):
+            k15_tag += "<span class='tag'>超過上限 · 固定顯示</span>"
+        elif str(h.get("symbol", "")).upper() in PIN_CHART_SYMBOLS:
+            k15_tag += "<span class='tag'>固定顯示</span>"
         img_html = (
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(h['symbol'])}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -864,7 +905,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left
 <div class="card">60m 平均<b class="{_pnl_cls(s60['avg'])}">{_fmt(s60['avg'])}</b></div>
 </div>
 <div class="equity">{eq}</div>
-<p class="muted">下圖累積的是各筆 60 分鐘空頭報酬相加，不是組合複利。圖卡只放 60m 最好/最差各一部分。</p>
+<p class="muted">下圖累積的是各筆 60 分鐘空頭報酬相加，不是組合複利。圖卡放 60m 最好/最差各一部分，COLLECT 一律出圖（含超過距離上限的）。</p>
 {ab_html}
 </section>
 {''.join(cards) or "<div class='empty'>這兩天沒有符合的訊號</div>"}
@@ -972,8 +1013,10 @@ def cmd_backtest(args) -> int:
             f"60m {st['60m']['win_rate']:.1f}% 均 {st['60m']['avg']:+.2f}%",
             flush=True,
         )
+    pin_hits = pin_chart_hits(hits_all)
     print(
         f"圖卡 {('≤'+format(gap_pct, 'g')+'%') if gap_pct else '不限'}　"
+        f"固定 {', '.join(sorted(PIN_CHART_SYMBOLS))} {len(pin_hits)} 筆　"
         f"當下15m空排 {stats['k15']['align']}/{stats['k15']['n']}　年線下 {stats['k15']['below']}/{stats['k15']['n']}\n"
         f"15m {stats['15m']['win_rate']:.1f}% 均 {stats['15m']['avg']:+.2f}%　"
         f"30m {stats['30m']['win_rate']:.1f}% 均 {stats['30m']['avg']:+.2f}%　"
@@ -982,7 +1025,17 @@ def cmd_backtest(args) -> int:
         flush=True,
     )
     html_path = Path(args.html) if args.html else (PAGES if args.pages else ROOT / "output" / "binance_5m_short.html")
-    write_report(html_path, hits, stats, funnel, period, chart_limit=args.chart_limit, ablation=ablation, gap_pct=gap_pct)
+    write_report(
+        html_path,
+        hits,
+        stats,
+        funnel,
+        period,
+        chart_limit=args.chart_limit,
+        ablation=ablation,
+        gap_pct=gap_pct,
+        pin_hits=pin_hits,
+    )
     dump_hits_json(html_path.parent / "hits.json", hits, stats, funnel, period, ablation=ablation, gap_pct=gap_pct)
     if args.pages or html_path.parent == PAGES.parent:
         write_view_html(html_path)
