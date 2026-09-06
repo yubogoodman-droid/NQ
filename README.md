@@ -109,7 +109,7 @@ python3 examples/backtest_binance_1h_burst.py --days 3 --pages        # 近三�
 python3 examples/test_watch_binance_1h_burst.py                      # 單元測試（不打網路）
 ```
 
-近三天再加「短均有點發散」後：進場 **3** 筆（SNDK、BNB、LINK），已平 2 筆都是 2R，平均 **+1.44%**。BNB 還在（短均散 +0.39%、離 MA25 +1.10%、2R +1.57%）。
+近三天拿掉離 MA25／短均發散後：進場 **180** 筆（90 檔），已平 161 筆勝率 **47.2%**，平均 **+0.30%**。收盤後 +24h 平均 **+4.23%**。RAYSOL 有抓到 4 筆，含今天 09-06 10:00 那根（離 MA25 +13.6%，下一根 2R **+7.74%**；11:00 續噴因同標的重疊沒再進）。要像 BNB 再加 `--fan --max-ext-ma25 0.015`。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-1h-bull-burst-ee86/docs/binance-1h-burst/view.html
 
