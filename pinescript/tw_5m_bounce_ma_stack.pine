@@ -17,6 +17,7 @@ ma10 = ta.sma(close, 10)
 ma20 = ta.sma(close, 20)
 ma60 = ta.sma(close, 60)
 ma120 = ta.sma(close, 120)
+ma200 = ta.sma(close, 200)
 ma240 = ta.sma(close, 240)
 
 stacked    = ma5 > ma10 and ma10 > ma20
@@ -54,7 +55,7 @@ bouncePct = not na(trough) and trough > 0 ? (close - trough) / trough * 100 : 0
 skipOpen = hour(time, "Asia/Taipei") == 9 and minute(time, "Asia/Taipei") < 30
 maClear(src) =>
     na(troughBar) or na(src[bar_index - troughBar]) or src[bar_index - troughBar] > trough
-troughClear = not clearTrough or (maClear(ma5) and maClear(ma10) and maClear(ma20) and maClear(ma60) and maClear(ma120) and maClear(ma240))
+troughClear = not clearTrough or (maClear(ma5) and maClear(ma10) and maClear(ma20) and maClear(ma60) and maClear(ma120) and maClear(ma200) and maClear(ma240))
 sig = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear
 
 if sig
@@ -65,8 +66,9 @@ if sig
 plot(ma5, "5MA", color=color.new(#3b82f6, 0), linewidth=2)
 plot(ma10, "10MA", color=color.new(#22c55e, 0), linewidth=2)
 plot(ma20, "20MA", color=color.new(#f59e0b, 0), linewidth=2)
-plot(ma60, "60MA", color=color.new(#14b8a6, 0))
-plot(ma120, "120MA", color=color.new(#a855f7, 0))
+plot(ma60, "60MA", color=color.new(#14b8a6, 0), linewidth=2)
+plot(ma120, "120MA", color=color.new(#a855f7, 0), linewidth=2)
+plot(ma200, "200MA", color=color.new(#e5e7eb, 0), linewidth=2)
 plot(ma240, "240MA", color=color.new(#f472b6, 0))
 
 plotshape(sig, title="破底反彈多頭排列", style=shape.triangleup, location=location.belowbar, color=color.red, size=size.small)

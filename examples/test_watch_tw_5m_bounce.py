@@ -202,7 +202,7 @@ def test_trough_clear_of_mas() -> None:
 
 
 def make_bounce_resting_on_long_ma(n: int = 280) -> pd.DataFrame:
-    """急殺仍停在長均上方，破底那根底下還墊著 60/120/240。"""
+    """急殺仍停在長均上方，破底那根底下還墊著 60/120/200/240。"""
     close = 90.0 + np.linspace(0, 30, n)
     dump_i = n - 20
     close[dump_i] = close[dump_i - 1] * 0.97
@@ -218,7 +218,7 @@ def test_dump_with_ma_underneath_skipped() -> None:
     close = df["Close"].to_numpy(float)
     low = df["Low"].to_numpy(float)
     dump_i = n - 20
-    vals = [float(sma(close, p)[dump_i]) for p in (5, 10, 20, 60, 120, 240)]
+    vals = [float(sma(close, p)[dump_i]) for p in (5, 10, 20, 60, 120, 200, 240)]
     assert vals[-1] == vals[-1]  # not NaN
     assert vals[-1] < float(low[dump_i])
     assert not trough_clear_of_mas(float(low[dump_i]), *vals)
@@ -296,6 +296,8 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "破底反彈" in text
     assert "6239" in text
     assert "間隔" in text
+    assert "MA60" in text
+    assert "MA200" in text
     assert (path.parent / "img").exists()
 
 

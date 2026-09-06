@@ -60,14 +60,15 @@ if not CONFIG_ENV.exists():
 SEEN_PATH = REPO / "output" / "tw_5m_bounce_seen.json"
 STATE_PATH = Path(__file__).resolve().parent / "tw_5m_bounce_state.json"
 
-# 截圖同款均線色：5 藍、10 綠、20 橘、60 青、120 紫、240 粉
-MA_PERIODS = (5, 10, 20, 60, 120, 240)
+# 5 藍、10 綠、20 橘、60 青、120 紫、200 白、240 粉
+MA_PERIODS = (5, 10, 20, 60, 120, 200, 240)
 MA_COLORS = {
     5: "#3b82f6",
     10: "#22c55e",
     20: "#f59e0b",
     60: "#14b8a6",
     120: "#a855f7",
+    200: "#e5e7eb",
     240: "#f472b6",
 }
 
@@ -85,6 +86,9 @@ class BounceSignal:
     ma5: float
     ma10: float
     ma20: float
+    ma60: float
+    ma120: float
+    ma200: float
     volume_ratio: float
 
 
@@ -173,6 +177,12 @@ def sma(arr, n: int) -> np.ndarray:
 
 def _finite(*vals: float) -> bool:
     return all(v is not None and not np.isnan(v) for v in vals)
+
+
+def _fmt_ma(name: str, val: float) -> str:
+    if val is None or (isinstance(val, (float, np.floating)) and np.isnan(val)):
+        return f"{name} —"
+    return f"{name} {float(val):.2f}"
 
 
 def trough_clear_of_mas(low_px: float, *ma_vals: float) -> bool:
@@ -272,6 +282,7 @@ def detect_signals(
     ma20 = sma(close, 20)
     ma60 = sma(close, 60)
     ma120 = sma(close, 120)
+    ma200 = sma(close, 200)
     ma240 = sma(close, 240)
     n = len(close)
     warmup = max(lookback, 20)
@@ -354,6 +365,7 @@ def detect_signals(
             ma20[trough_idx],
             ma60[trough_idx],
             ma120[trough_idx],
+            ma200[trough_idx],
             ma240[trough_idx],
         ):
             continue
@@ -382,6 +394,9 @@ def detect_signals(
                 ma5=float(ma5[i]),
                 ma10=float(ma10[i]),
                 ma20=float(ma20[i]),
+                ma60=float(ma60[i]),
+                ma120=float(ma120[i]),
+                ma200=float(ma200[i]),
                 volume_ratio=vol_ratio,
             )
         )
@@ -520,7 +535,13 @@ def draw_signal_png(
 
     for n, col in MA_COLORS.items():
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start : stop + 1]
-        ax.plot(list(xs), ma, color=col, lw=1.45 if n <= 20 else 1.05, label=f"{n}MA")
+        if n <= 20:
+            lw = 1.45
+        elif n in (60, 120, 200):
+            lw = 1.55
+        else:
+            lw = 1.05
+        ax.plot(list(xs), ma, color=col, lw=lw, label=f"{n}MA")
 
     bx, ex = sig.break_idx - start, sig.entry_idx - start
     if 0 <= bx < len(window):
@@ -545,7 +566,7 @@ def draw_signal_png(
         color="#e8f0ea",
         fontsize=11,
     )
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    ax.legend(loc="upper left", fontsize=6.5, frameon=False, labelcolor="#c8d5cc", ncol=7)
     step = max(1, len(window) // 6)
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
@@ -588,7 +609,8 @@ def write_html_report(
             f"進場 {sig.entry_price:.2f}  破底 {sig.break_low:.2f} @ {bt.strftime('%H:%M')}\n"
             f"跌幅 {sig.drop_pct*100:.1f}%  反彈 {sig.bounce_pct*100:.1f}%\n"
             f"MA5 {sig.ma5:.2f}  MA10 {sig.ma10:.2f}  MA20 {sig.ma20:.2f}"
-            f"  間隔 {(sig.ma5-sig.ma20)/sig.entry_price*100:.2f}%"
+            f"  間隔 {(sig.ma5-sig.ma20)/sig.entry_price*100:.2f}%\n"
+            f"{_fmt_ma('MA60', sig.ma60)}  {_fmt_ma('MA120', sig.ma120)}  {_fmt_ma('MA200', sig.ma200)}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -743,6 +765,7 @@ def fmt_alert(row: dict, df: pd.DataFrame, sig: BounceSignal) -> str:
         f"跌幅: <b>{sig.drop_pct*100:.1f}%</b> → 反彈 <b>{sig.bounce_pct*100:.1f}%</b>\n"
         f"MA5 {sig.ma5:.2f} &gt; MA10 {sig.ma10:.2f} &gt; MA20 {sig.ma20:.2f}"
         f"（間隔 {(sig.ma5-sig.ma20)/sig.entry_price*100:.2f}%）\n"
+        f"{_fmt_ma('MA60', sig.ma60)}  {_fmt_ma('MA120', sig.ma120)}  {_fmt_ma('MA200', sig.ma200)}\n"
         f"#台股 #五分K #破底反彈 #{row['code']}"
     )
 
