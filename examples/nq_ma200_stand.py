@@ -12,6 +12,7 @@
   8. 浮盈先到 +60 後，停損提到進場價（保本）
   9. 進場在 15m MA200 上被停損後，30 分鐘內站回原進場價再進一次。只再進一次，停損同上；再進也要距 MA200 ≤30。
   10. 五分 MA5/10/20/30/60/200 全均帶寬 <28 視為糾結，主場與再進都不進。再進另看五分 MA5–30 <20。已合格卻糾結，整次取消。
+  11. 十五分 MA20 明顯下彎（1 小時至少掉 20）且收盤在其下 ≤15，不進（貼著下彎的 15 分均線）。
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -51,6 +52,9 @@ MIN_UPPER_WICK = 8.0
 MIN_5M_RIBBON = 0.0  # 主場不看短均帶寬
 MIN_5M_ALL = 28.0  # 五分 MA5–200 全均帶寬低於此＝糾結，不進
 MIN_5M_REENTRY_RIBBON = 20.0  # 再進：五分 MA5–30 仍擠在一起也不進（MA200 在遠處撐不開全均）
+NEAR_15M_MA20 = 15.0  # 收盤在下彎 15 分 MA20 下方不超過這麼多＝太近
+MIN_15M_MA20_DROP = 20.0  # 4 根 15 分（1 小時）MA20 至少掉這麼多才算下彎
+HTF_SLOPE_BARS = 4
 BREAKEVEN_AFTER = 60.0
 REENTRY_MINUTES = 30
 ALL_5M_PERIODS = (5, 10, 20, 30, 60, 200)
@@ -278,6 +282,8 @@ def detect_signals(
     min_upper_wick: float = MIN_UPPER_WICK,
     min_5m_ribbon: float = MIN_5M_RIBBON,
     min_5m_all: float = MIN_5M_ALL,
+    near_15m_ma20: float = NEAR_15M_MA20,
+    min_15m_ma20_drop: float = MIN_15M_MA20_DROP,
     df_15m: Optional[pd.DataFrame] = None,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
@@ -295,6 +301,8 @@ def detect_signals(
     m5_ribbon = overlay_5m_ribbon(df)
     m5_all = overlay_5m_all_spread(df)
     ma200_15m = overlay_15m_ma200(df, df_15m)
+    ma20_15m = overlay_15m_sma(df, 20, df_15m)
+    ma20_15m_slope = overlay_15m_sma_delta(df, 20, HTF_SLOPE_BARS, df_15m)
 
     fun = funnel if funnel is not None else {}
 
@@ -356,6 +364,15 @@ def detect_signals(
             if min_5m_all > 0 and not np.isnan(all_spread) and all_spread < min_5m_all:
                 bump("skip_5m_tangle")
                 continue
+            if near_falling_15m_ma20(
+                float(close[j]),
+                float(ma20_15m[j]),
+                float(ma20_15m_slope[j]),
+                near=near_15m_ma20,
+                min_drop=min_15m_ma20_drop,
+            ):
+                bump("skip_15m_down")
+                continue
             entry = float(close[j])
             stop = float(ma200[j]) - stop_below_ma200
             if entry <= stop:
@@ -413,8 +430,12 @@ def make_reclaim_reentry(
     m5_ribbon: np.ndarray,
     ma200_15m: np.ndarray,
     m5_all: Optional[np.ndarray] = None,
+    ma20_15m: Optional[np.ndarray] = None,
+    ma20_15m_slope: Optional[np.ndarray] = None,
     min_5m_all: float = MIN_5M_ALL,
     min_5m_reentry_ribbon: float = MIN_5M_REENTRY_RIBBON,
+    near_15m_ma20: float = NEAR_15M_MA20,
+    min_15m_ma20_drop: float = MIN_15M_MA20_DROP,
     max_dist_ma200: float = MAX_DIST_MA200,
     stop_below_ma200: float = STOP_BELOW_MA200,
     take_profit: float = TAKE_PROFIT,
@@ -459,6 +480,16 @@ def make_reclaim_reentry(
             and ribbon < min_5m_reentry_ribbon
         ):
             return None
+        m20_15 = float(ma20_15m[j]) if ma20_15m is not None else float("nan")
+        m20_15_slope = float(ma20_15m_slope[j]) if ma20_15m_slope is not None else float("nan")
+        if near_falling_15m_ma20(
+            entry,
+            m20_15,
+            m20_15_slope,
+            near=near_15m_ma20,
+            min_drop=min_15m_ma20_drop,
+        ):
+            continue
         ribbon_1m = float(ma5[j] - ma60[j])
         m15_200 = float(ma200_15m[j])
         dist_15 = float("nan") if np.isnan(m15_200) else entry - m15_200
@@ -564,6 +595,8 @@ def simulate(
     reentry_minutes: int = REENTRY_MINUTES,
     min_5m_all: float = MIN_5M_ALL,
     min_5m_reentry_ribbon: float = MIN_5M_REENTRY_RIBBON,
+    near_15m_ma20: float = NEAR_15M_MA20,
+    min_15m_ma20_drop: float = MIN_15M_MA20_DROP,
     df_15m: Optional[pd.DataFrame] = None,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[TradeResult]:
@@ -580,6 +613,8 @@ def simulate(
     m5_ribbon = overlay_5m_ribbon(df)
     m5_all = overlay_5m_all_spread(df)
     ma200_15m = overlay_15m_ma200(df, df_15m)
+    ma20_15m = overlay_15m_sma(df, 20, df_15m)
+    ma20_15m_slope = overlay_15m_sma_delta(df, 20, HTF_SLOPE_BARS, df_15m)
     pending = list(signals)
     results: List[TradeResult] = []
     busy_until = -1
@@ -615,8 +650,12 @@ def simulate(
                 m5_ribbon=m5_ribbon,
                 ma200_15m=ma200_15m,
                 m5_all=m5_all,
+                ma20_15m=ma20_15m,
+                ma20_15m_slope=ma20_15m_slope,
                 min_5m_all=min_5m_all,
                 min_5m_reentry_ribbon=min_5m_reentry_ribbon,
+                near_15m_ma20=near_15m_ma20,
+                min_15m_ma20_drop=min_15m_ma20_drop,
                 stop_below_ma200=stop_below_ma200,
                 take_profit=take_profit,
                 window_minutes=reentry_minutes,
@@ -721,14 +760,54 @@ def merge_15m_for_chart(df_1m: pd.DataFrame, df_15m: Optional[pd.DataFrame]) -> 
     return pd.concat([extra[cols], local[cols]]).sort_index()
 
 
+def overlay_15m_sma(
+    df_1m: pd.DataFrame,
+    period: int,
+    df_15m: Optional[pd.DataFrame] = None,
+) -> np.ndarray:
+    """已收盤十五分 SMA，對齊到 1m（不偷看未收的那根）。"""
+    src = df_15m if df_15m is not None and not df_15m.empty else resample_15m(df_1m)
+    ma = src["Close"].astype(float).rolling(int(period), min_periods=int(period)).mean()
+    return align_htf(df_1m, ma)
+
+
+def overlay_15m_sma_delta(
+    df_1m: pd.DataFrame,
+    period: int,
+    lookback: int = HTF_SLOPE_BARS,
+    df_15m: Optional[pd.DataFrame] = None,
+) -> np.ndarray:
+    """已收盤十五分 SMA 相對 lookback 根前的差值（負＝下彎）。"""
+    src = df_15m if df_15m is not None and not df_15m.empty else resample_15m(df_1m)
+    ma = src["Close"].astype(float).rolling(int(period), min_periods=int(period)).mean()
+    return align_htf(df_1m, ma - ma.shift(int(lookback)))
+
+
 def overlay_15m_ma200(
     df_1m: pd.DataFrame,
     df_15m: Optional[pd.DataFrame] = None,
 ) -> np.ndarray:
     """已收盤十五分 MA200，對齊到 1m（不偷看未收的那根）。"""
-    src = df_15m if df_15m is not None and not df_15m.empty else resample_15m(df_1m)
-    ma = src["Close"].astype(float).rolling(200, min_periods=200).mean()
-    return align_htf(df_1m, ma)
+    return overlay_15m_sma(df_1m, 200, df_15m)
+
+
+def near_falling_15m_ma20(
+    close: float,
+    ma20: float,
+    slope: float,
+    *,
+    near: float = NEAR_15M_MA20,
+    min_drop: float = MIN_15M_MA20_DROP,
+) -> bool:
+    """收盤貼在明顯下彎的 15 分 MA20 下方。缺資料不當下彎。"""
+    if near <= 0 or min_drop <= 0:
+        return False
+    if not (np.isfinite(close) and np.isfinite(ma20) and np.isfinite(slope)):
+        return False
+    if slope > -min_drop:
+        return False
+    overhead = ma20 - close
+    return 0.0 < overhead <= near
 
 
 def overlay_5m_spread(df_1m: pd.DataFrame, periods: Sequence[int]) -> np.ndarray:
@@ -1381,6 +1460,7 @@ def write_html_report(
             f"距離 {funnel.get('skip_dist', 0)} · 未洗15 {funnel.get('skip_under', 0)} · "
             f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)} · "
             f"五分糾結 {funnel.get('skip_5m_tangle', 0)} · "
+            f"15m下彎 {funnel.get('skip_15m_down', 0)} · "
             f"再進 {funnel.get('reentry', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
@@ -1427,7 +1507,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次（再進也距MA200≤30） · 五分全均&lt;28或再進短均帶&lt;20不進 · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次（再進也距MA200≤30） · 五分全均&lt;28或再進短均帶&lt;20不進 · 15分MA20明顯下彎且收在其下≤15不進 · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1489,6 +1569,7 @@ def cmd_backtest(args) -> int:
         f"dist={funnel.get('skip_dist', 0)} under={funnel.get('skip_under', 0)} "
         f"open={funnel.get('skip_open', 0)} wick={funnel.get('skip_wick', 0)} "
         f"tangle={funnel.get('skip_5m_tangle', 0)} "
+        f"down15={funnel.get('skip_15m_down', 0)} "
         f"reentry={funnel.get('reentry', 0)}"
     )
     for i, t in enumerate(trades, 1):

@@ -17,6 +17,7 @@ from nq_ma200_stand import (  # noqa: E402
     MIN_5M_REENTRY_RIBBON,
     TradeResult,
     detect_signals,
+    near_falling_15m_ma20,
     display_trades,
     draw_trade_png,
     in_open_skip,
@@ -244,6 +245,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "15mMA200上被停損後30分內站回進場點再進一次" in text
         assert "再進也距MA200≤30" in text
         assert "再進短均帶" in text
+        assert "15分MA20明顯下彎且收在其下≤15不進" in text
         assert "收在MA60上" in text
         assert "5m連2根收在破底下" not in text
         assert any((path.parent / "img").glob("t01_*.png"))
@@ -371,6 +373,34 @@ def _make_tangled_5m_bars(n: int = 1200) -> pd.DataFrame:
         },
         index=idx,
     )
+
+
+def test_near_falling_15m_ma20_helper() -> None:
+    assert near_falling_15m_ma20(100.0, 105.0, -31.0) is True
+    assert near_falling_15m_ma20(100.0, 105.0, -4.0) is False
+    assert near_falling_15m_ma20(100.0, 130.0, -31.0) is False
+    assert near_falling_15m_ma20(110.0, 105.0, -31.0) is False
+    assert near_falling_15m_ma20(100.0, 105.0, -31.0, near=0.0) is False
+    assert near_falling_15m_ma20(100.0, float("nan"), -31.0) is False
+
+
+def test_skip_near_falling_15m_ma20() -> None:
+    df = _make_setup_bars()
+    assert detect_signals(df, min_5m_all=0.0, near_15m_ma20=0.0)
+    sigs = detect_signals(df, min_5m_all=0.0, near_15m_ma20=0.0)
+    px = float(sigs[0].entry_price)
+    end = df.index[-1] + pd.Timedelta(minutes=15)
+    idx = pd.date_range(end - pd.Timedelta(minutes=15 * 79), periods=80, freq="15min", tz=ET)
+    # 每根 15m 跌 6：4 根掉 24（夠下彎）；MA20 ≈ 末收 + 57，讓末收 = px-49 → MA20 在進場價上方 8。
+    step = 6.0
+    last = px - 49.0
+    close15 = last + (len(idx) - 1 - np.arange(len(idx))) * step
+    df15 = pd.DataFrame(
+        {"Open": close15, "High": close15 + 1, "Low": close15 - 1, "Close": close15},
+        index=idx,
+    )
+    assert not detect_signals(df, min_5m_all=0.0, df_15m=df15)
+    assert detect_signals(df, min_5m_all=0.0, df_15m=df15, near_15m_ma20=0.0)
 
 
 def test_skip_5m_all_tangle() -> None:
