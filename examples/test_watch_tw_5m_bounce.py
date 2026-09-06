@@ -24,6 +24,8 @@ from watch_tw_5m_bounce import (  # noqa: E402
     in_tw_session,
     merge_universe,
     parse_symbols,
+    lid_ok,
+    nearest_overhead_ma_pct,
     signal_key,
     simulate,
     sma,
@@ -273,6 +275,56 @@ def test_entry_below_ma60_skipped() -> None:
     assert len(detect_signals(lifted, require_above_ma60=False)) >= len(detect_signals(lifted))
 
 
+def test_lid_helpers() -> None:
+    assert np.isnan(nearest_overhead_ma_pct(117.0, 115.3, 116.3, 112.5))
+    gap = nearest_overhead_ma_pct(40.20, 39.90, 40.35, 40.20)
+    assert abs(gap - 0.0) < 1e-9  # 200MA 剛好壓著
+    gap2 = nearest_overhead_ma_pct(395.5, 394.0, 396.3, 390.0)
+    assert abs(gap2 - (396.3 - 395.5) / 395.5) < 1e-9
+    assert lid_ok(float("nan"), 0.02, min_lid_pct=0.005, punch_drop_pct=0.05)
+    assert lid_ok(0.008, 0.02, min_lid_pct=0.005, punch_drop_pct=0.05)
+    assert not lid_ok(0.002, 0.03, min_lid_pct=0.005, punch_drop_pct=0.05)
+    assert lid_ok(0.002, 0.07, min_lid_pct=0.005, punch_drop_pct=0.05)  # 急殺可穿蓋
+    assert lid_ok(0.002, 0.03, min_lid_pct=0.0, punch_drop_pct=0.05)
+
+
+def test_tight_lid_skipped_unless_punch() -> None:
+    df = make_v_bounce_bars()
+    sig = detect_signals(df)[0]
+    # 把進場前的高原抬高，讓 60/120 貼在進場價上方約 0.2%
+    lifted = df.copy()
+    head = lifted.index[: sig.break_idx - 8]
+    for col in ("Open", "High", "Low", "Close"):
+        lifted.loc[head, col] = lifted.loc[head, col] + 8.0
+    close = lifted["Close"].to_numpy(float)
+    ma60 = sma(close, 60)
+    px = float(close[sig.entry_idx])
+    # 60MA 可能仍在下方；把更長的均線用高原拉到頭上
+    assert detect_signals(lifted, min_lid_pct=0.005, punch_drop_pct=0.50) == [] or all(
+        np.isnan(s.lid_pct) or s.lid_pct >= 0.005 or s.drop_pct >= 0.50 for s in detect_signals(lifted, punch_drop_pct=0.50)
+    )
+    blocked = detect_signals(lifted, min_lid_pct=0.005, punch_drop_pct=0.50)
+    punched = detect_signals(lifted, min_lid_pct=0.005, punch_drop_pct=0.01)
+    # 貼著蓋子：把穿蓋門檻拉到 50% 就不算，1% 就可以穿
+    if nearest_overhead_ma_pct(px, ma60[sig.entry_idx], sma(close, 120)[sig.entry_idx], sma(close, 200)[sig.entry_idx], sma(close, 240)[sig.entry_idx]) < 0.005:
+        assert blocked == []
+        assert punched
+
+
+def test_session_drop_must_meet_floor() -> None:
+    """48 根視窗含昨天，卡片跌幅卻不到 2%：不算急殺。"""
+    df = make_v_bounce_bars()
+    b = detect_signals(df)[0].break_idx
+    shallow = df.copy()
+    idx = shallow.index.to_list()
+    for k in range(max(0, b - 1)):
+        idx[k] = idx[k] - pd.Timedelta(days=1)
+    shallow.index = pd.DatetimeIndex(idx)
+    # 今天第一根附近只比昨收低一點
+    shallow.loc[shallow.index[b], ["Open", "Close", "High", "Low"]] = [266.0, 265.5, 266.4, 264.8]
+    assert all(s.drop_pct >= 0.02 for s in detect_signals(shallow))
+
+
 def test_drop_incomplete_5m() -> None:
     idx = pd.DatetimeIndex(
         [
@@ -349,6 +401,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "MA200" in text
     assert "破底量" in text
     assert "反彈量" in text
+    assert "蓋子" in text
     assert (path.parent / "img").exists()
 
 
@@ -366,6 +419,9 @@ def main() -> int:
     test_volume_ratios()
     test_dry_bounce_without_volume_skipped()
     test_entry_below_ma60_skipped()
+    test_lid_helpers()
+    test_tight_lid_skipped_unless_punch()
+    test_session_drop_must_meet_floor()
     test_drop_incomplete_5m()
     test_shallow_dip_ignored()
     test_simulate_and_summarize()

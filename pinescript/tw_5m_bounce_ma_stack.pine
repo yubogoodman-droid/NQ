@@ -14,6 +14,8 @@ clearTrough   = input.bool(true, "破底那根下方不能有均線")
 minClimaxVol  = input.float(2.0, "破底段爆量倍數（0=不檢查）", minval=0.0, step=0.5)
 minBounceVol  = input.float(1.0, "反彈段量能倍數（0=不檢查）", minval=0.0, step=0.1)
 aboveMa60     = input.bool(true, "進場價要站上 60MA")
+minLidPct     = input.float(0.5, "蓋子最小空檔 %（0=不檢查）", minval=0.0, step=0.1)
+punchDrop     = input.float(5.0, "穿蓋所需當日跌幅 %", minval=0.0, step=0.5)
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -46,6 +48,11 @@ var float climaxRatio = na   // 破底段最大量 / 前 20 根均量
 var float preBounceVol = na  // 破底前 12 根均量
 var float upVolSum = 0.0
 var int   upBars = 0
+var float sessHi = na
+var float troughSessHigh = na
+
+newDay = ta.change(time("D")) != 0
+sessHi := newDay or na(sessHi) ? high : math.max(sessHi, high)
 
 vol20   = ta.sma(volume, 20)
 vol12   = ta.sma(volume, 12)
@@ -56,6 +63,7 @@ if dumpBar
         trough := low
         troughBar := bar_index
         dumpHigh := winHigh
+        troughSessHigh := sessHi
         climaxRatio := vol20[3] > 0 ? dumpVol / vol20[3] : na
         preBounceVol := vol12[1] > 0 ? vol12[1] : na
         upVolSum := 0.0
@@ -80,7 +88,22 @@ troughClear = not clearTrough or (maClear(ma5) and maClear(ma10) and maClear(ma2
 climaxOk = minClimaxVol <= 0 or na(climaxRatio) or climaxRatio >= minClimaxVol
 bounceVolOk = minBounceVol <= 0 or na(bounceVolRatio) or bounceVolRatio >= minBounceVol
 ma60Ok = not aboveMa60 or na(ma60) or close > ma60
-sig = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and ma60Ok
+dayDrop = not na(troughSessHigh) and troughSessHigh > trough ? (troughSessHigh - trough) / troughSessHigh * 100 : 0
+dayDropOk = na(troughBar) or dayDrop >= minDropPct
+lidGap(src) =>
+    na(src) or close > src ? na : (src - close) / close * 100
+lid = math.min(nz(lidGap(ma60), 1e9), nz(lidGap(ma120), 1e9), nz(lidGap(ma200), 1e9), nz(lidGap(ma240), 1e9))
+noLid = lid >= 1e8
+lidOk = minLidPct <= 0 or noLid or lid >= minLidPct or dayDrop >= punchDrop
+cand = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and ma60Ok and dayDropOk
+sig = cand and lidOk
+
+if cand and not lidOk
+    trough := na
+    troughBar := na
+    dumpHigh := na
+    climaxRatio := na
+    preBounceVol := na
 
 if sig
     trough := na
