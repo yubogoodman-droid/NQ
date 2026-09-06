@@ -1,0 +1,257 @@
+//@version=5
+strategy("Gork bot NQ多｜破底站上MA200", overlay=true, pyramiding=0,
+     process_orders_on_close=true, calc_on_every_tick=false,
+     default_qty_type=strategy.fixed, default_qty_value=1,
+     initial_capital=100000, commission_type=strategy.commission.cash_per_contract,
+     commission_value=0, slippage=0)
+
+// 請掛在 **1 分鐘圖**（NQ / MNQ 皆可）。對齊 examples/nq_ma200_stand.py 定稿。
+
+// ---------------------------------------------------------------------------
+// 參數（預設 = Python 常數）
+// ---------------------------------------------------------------------------
+gCore   = "核心"
+gFilter = "過濾"
+gExit   = "出場"
+gRe     = "再進"
+
+twoHourBars     = input.int(120, "破底回看（1m 根）", minval=20, group=gCore)
+reclaimBars     = input.int(60, "破底後可進場根數", minval=1, group=gCore)
+underLookback   = input.int(60, "洗盤回看根數", minval=5, group=gCore)
+underStreakNeed = input.int(15, "洗盤：連幾根收在 MA200 下", minval=1, group=gCore)
+aboveStreakNeed = input.int(3, "站上 MA200 連幾根", minval=1, group=gCore)
+maxDistMa200    = input.float(30.0, "進場距 1m MA200 上限", minval=1.0, step=1.0, group=gCore)
+minUpperWick    = input.float(8.0, "紅K長上影最少點數", minval=0.0, step=1.0, group=gCore)
+
+min5mAll            = input.float(28.0, "五分全均帶寬下限（低於此＝糾結）", minval=0.0, step=1.0, group=gFilter)
+min5mRibbon         = input.float(0.0, "五分 MA5–30 帶寬下限（主場；0=關閉）", minval=0.0, step=1.0, group=gFilter)
+min5mReentryRibbon  = input.float(20.0, "再進：五分 MA5–30 帶寬下限", minval=0.0, step=1.0, group=gFilter)
+near15mMa20         = input.float(15.0, "15分 MA20 下方「太近」點數", minval=0.0, step=1.0, group=gFilter)
+min15mMa20Drop      = input.float(20.0, "15分 MA20 下彎：1小時至少掉幾點", minval=0.0, step=1.0, group=gFilter)
+htfSlopeBars        = input.int(4, "15分斜率回看根數（4根＝1小時）", minval=1, group=gFilter)
+
+stopBelowMa200  = input.float(10.0, "停損：MA200 下方點數", minval=0.0, step=1.0, group=gExit)
+takeProfit      = input.float(100.0, "停利點數", minval=1.0, step=1.0, group=gExit)
+breakevenAfter  = input.float(60.0, "浮盈幾點改保本", minval=0.0, step=1.0, group=gExit)
+
+allowReentry    = input.bool(true, "允許再進一次", group=gRe)
+reentryMinutes  = input.int(30, "再進限時（分鐘）", minval=1, group=gRe)
+
+// ---------------------------------------------------------------------------
+// 1m 均線
+// ---------------------------------------------------------------------------
+ma5   = ta.sma(close, 5)
+ma10  = ta.sma(close, 10)
+ma20  = ta.sma(close, 20)
+ma30  = ta.sma(close, 30)
+ma60  = ta.sma(close, 60)
+ma200 = ta.sma(close, 200)
+
+stackOk = not na(ma5) and not na(ma60) and ma5 > ma10 and ma10 > ma20 and ma20 > ma30 and ma30 > ma60
+aboveMa60 = close > ma60
+
+aboveMa200Streak = true
+for k = 0 to aboveStreakNeed - 1
+    if na(ma200[k]) or close[k] <= ma200[k]
+        aboveMa200Streak := false
+
+distMa200 = close - ma200
+distOk = not na(ma200) and distMa200 > 0 and distMa200 <= maxDistMa200
+
+// 進場前 underLookback 根（不含當根）最長連收 MA200 下
+maxUnderStreak = 0
+runUnder = 0
+for k = 1 to underLookback
+    if not na(ma200[k]) and close[k] < ma200[k]
+        runUnder += 1
+        if runUnder > maxUnderStreak
+            maxUnderStreak := runUnder
+    else
+        runUnder := 0
+underOk = maxUnderStreak >= underStreakNeed
+
+// 美東 9:30–10:00 不進（含 9:30，不含 10:00）
+etMins = hour(time, "America/New_York") * 60 + minute(time, "America/New_York")
+skipOpen = etMins >= 9 * 60 + 30 and etMins < 10 * 60
+
+redLongWick = close < open and (high - open) >= (open - close) and (high - open) >= minUpperWick
+
+// ---------------------------------------------------------------------------
+// 5m / 15m：已收盤 K（[1]），不偷看未收的那根
+// ---------------------------------------------------------------------------
+htfSma(string tf, int len, int ago) =>
+    request.security(syminfo.tickerid, tf, ta.sma(close, len)[ago], barmerge.gaps_off, barmerge.lookahead_off)
+
+m5_5   = htfSma("5", 5, 1)
+m5_10  = htfSma("5", 10, 1)
+m5_20  = htfSma("5", 20, 1)
+m5_30  = htfSma("5", 30, 1)
+m5_60  = htfSma("5", 60, 1)
+m5_200 = htfSma("5", 200, 1)
+
+f_spread(float a, float b, float c, float d, float e, float f) =>
+    mx = math.max(a, math.max(b, math.max(c, math.max(d, math.max(e, f)))))
+    mn = math.min(a, math.min(b, math.min(c, math.min(d, math.min(e, f)))))
+    mx - mn
+
+m5All    = f_spread(m5_5, m5_10, m5_20, m5_30, m5_60, m5_200)
+m5Ribbon = math.max(m5_5, math.max(m5_10, math.max(m5_20, m5_30))) - math.min(m5_5, math.min(m5_10, math.min(m5_20, m5_30)))
+
+tangle5mAll = min5mAll > 0 and not na(m5All) and m5All < min5mAll
+tangle5mRibbonPrimary = min5mRibbon > 0 and (na(m5Ribbon) or m5Ribbon < min5mRibbon)
+tangle5mRibbonRe = min5mReentryRibbon > 0 and not na(m5Ribbon) and m5Ribbon < min5mReentryRibbon
+
+ma200_15 = htfSma("15", 200, 1)
+ma20_15  = htfSma("15", 20, 1)
+ma20_15_prev = htfSma("15", 20, 1 + htfSlopeBars)
+slope15mMa20 = ma20_15 - ma20_15_prev
+dist15m = close - ma200_15
+above15mMa200 = not na(ma200_15) and dist15m > 0
+
+nearFalling15m = near15mMa20 > 0 and min15mMa20Drop > 0 and not na(ma20_15) and not na(slope15mMa20) and slope15mMa20 <= -min15mMa20Drop and (ma20_15 - close) > 0 and (ma20_15 - close) <= near15mMa20
+
+// 破兩小時低：當根低點 < 前 twoHourBars 根最低
+twoHrLow = ta.lowest(low, twoHourBars)[1]
+isBreak = not na(twoHrLow) and not na(ma200) and low < twoHrLow
+
+// ---------------------------------------------------------------------------
+// 破底視窗：一破一窗，合格卻 15m 下彎則整窗取消
+// ---------------------------------------------------------------------------
+var int   breakBar = na
+var bool  windowOpen = false
+var bool  windowDone = false
+
+if windowOpen and not na(breakBar) and bar_index > breakBar + reclaimBars
+    windowOpen := false
+    windowDone := true
+
+if isBreak and not windowOpen
+    breakBar := bar_index
+    windowOpen := true
+    windowDone := false
+
+inWindow = windowOpen and not windowDone and not na(breakBar) and bar_index > breakBar and bar_index <= breakBar + reclaimBars
+
+primaryReady = inWindow and stackOk and aboveMa60 and aboveMa200Streak and distOk and underOk and not skipOpen and not redLongWick and not tangle5mRibbonPrimary and not tangle5mAll
+hardStopNow = ma200 - stopBelowMa200
+primaryOk = primaryReady and close > hardStopNow
+
+// ---------------------------------------------------------------------------
+// 再進：15mMA200 上被硬停後，限時站回原進場價一次
+// ---------------------------------------------------------------------------
+var float entryPx = na
+var float hardStop = na
+var float targetPx = na
+var bool  trailArmed = false
+var bool  parentAbove15 = false
+var bool  reentryArmed = false
+var bool  reentryAbort = false
+var int   reentryUntil = na
+var float reentryParent = na
+
+if strategy.position_size > 0
+    if breakevenAfter > 0 and high >= entryPx + breakevenAfter
+        trailArmed := true
+    curStop = trailArmed ? math.max(hardStop, entryPx) : hardStop
+    strategy.exit("出", "多", stop=curStop, limit=targetPx)
+
+if strategy.position_size[1] > 0 and strategy.position_size == 0
+    lastPx = strategy.closedtrades.exit_price(strategy.closedtrades - 1)
+    isTp = not na(entryPx[1]) and lastPx >= entryPx[1] + takeProfit - 1.0
+    isTrail = trailArmed[1] and not na(entryPx[1]) and math.abs(lastPx - entryPx[1]) <= 1.0
+    if allowReentry and not isTp and not isTrail and parentAbove15[1]
+        reentryArmed := true
+        reentryAbort := false
+        reentryUntil := time + reentryMinutes * 60 * 1000
+        reentryParent := entryPx[1]
+    else
+        reentryArmed := false
+
+if reentryArmed and not reentryAbort and not na(reentryUntil) and time > reentryUntil
+    reentryArmed := false
+
+reStand = not na(ma200) and not na(ma5) and not na(ma60) and close >= reentryParent and close > ma60 and (close - ma200) > 0 and (close - ma200) <= maxDistMa200 and close > ma200 - stopBelowMa200
+reentryScan = reentryArmed and not reentryAbort and strategy.position_size == 0 and not skipOpen and reStand
+if reentryScan and (tangle5mAll or tangle5mRibbonRe or nearFalling15m)
+    reentryAbort := true
+    reentryArmed := false
+
+reentryOk = reentryScan and not reentryAbort and not tangle5mAll and not tangle5mRibbonRe and not nearFalling15m
+
+// 持倉中主場已合格 → 消耗該破底（Python 仍記訊號，simulate 因 busy 丟掉）
+if primaryOk and strategy.position_size != 0
+    windowDone := true
+    windowOpen := false
+// 合格卻貼著下彎 15 分 MA20 → 整窗取消
+if primaryReady and nearFalling15m
+    windowDone := true
+    windowOpen := false
+
+// ---------------------------------------------------------------------------
+// 進場（收盤）：再進優先於主場
+// ---------------------------------------------------------------------------
+enterRe = barstate.isconfirmed and reentryOk
+enterPrimary = barstate.isconfirmed and strategy.position_size == 0 and primaryOk and not nearFalling15m and not enterRe
+
+f_alert(string kind, float sl, float tp) =>
+    alert("Gork bot NQ多 " + kind + " 進=" + str.tostring(close, format.mintick) + " SL=" + str.tostring(sl, format.mintick) + " TP=" + str.tostring(tp, format.mintick), alert.freq_once_per_bar_close)
+
+if enterRe
+    entryPx := close
+    hardStop := ma200 - stopBelowMa200
+    targetPx := close + takeProfit
+    trailArmed := false
+    parentAbove15 := false
+    reentryArmed := false
+    windowDone := true
+    windowOpen := false
+    strategy.entry("多", strategy.long, comment="再進", alert_message="Gork bot NQ多 再進")
+    strategy.exit("出", "多", stop=hardStop, limit=targetPx)
+    f_alert("再進", hardStop, targetPx)
+
+if enterPrimary
+    entryPx := close
+    hardStop := ma200 - stopBelowMa200
+    targetPx := close + takeProfit
+    trailArmed := false
+    parentAbove15 := above15mMa200
+    reentryArmed := false
+    windowDone := true
+    windowOpen := false
+    strategy.entry("多", strategy.long, comment="主場", alert_message="Gork bot NQ多 主場")
+    strategy.exit("出", "多", stop=hardStop, limit=targetPx)
+    f_alert("主場", hardStop, targetPx)
+
+// ---------------------------------------------------------------------------
+// 圖
+// ---------------------------------------------------------------------------
+plot(ma60, "1m MA60", color=color.new(#42a5f5, 20), linewidth=1)
+plot(ma200, "1m MA200", color=color.new(#ab47bc, 0), linewidth=2)
+plotshape(enterPrimary, title="主場", style=shape.triangleup, location=location.belowbar, color=color.new(color.lime, 0), size=size.tiny)
+plotshape(enterRe, title="再進", style=shape.triangleup, location=location.belowbar, color=color.new(#d0bcff, 0), size=size.tiny)
+
+// ---------------------------------------------------------------------------
+// 規則摘要 / Alert
+// ---------------------------------------------------------------------------
+// 1. MA5>10>20>30>60 且收在 MA60 上
+// 2. 站上 1m MA200 連 ≥3，距 ≤30
+// 3. 破前 120 根低後 60 根內（一破一窗）
+// 4. 進場前 60 根曾連 ≥15 根收在 MA200 下
+// 5. 美東 9:30–10:00 不進
+// 6. 紅 K 長上影（上影≥實體且≥8）跳過
+// 7. SL=進場當根 MA200−10，TP=+100
+// 8. 浮盈先到 +60，停損提到進場價
+// 9. 進場在 15m MA200 上被硬停後，30 分內站回原進場價再進一次（距 MA200≤30；五分糾結或 15m 下彎則整次取消）
+// 10. 五分 MA5–200 全均 <28 不進；再進另看 MA5–30 <20
+// 11. 15 分 MA20 1 小時至少掉 20 且收在其下 ≤15：主場整窗取消、再進整次取消
+//
+// Alert 建議名稱：Gork bot NQ多
+// 建警報：此 strategy → 條件選「Order fills」或「alert() 函式呼叫」
+// 圖表：1 分鐘；商品用 TV 的 NQ / MNQ 連續合約（與 Yahoo NQ=F 不會 100% 同價）
+//
+// 與 Python / Yahoo 對不齊的地方：
+// - 資料源：TradingView CME 合約 vs Yahoo NQ=F，點位、夜盤缺口、換月不同
+// - 5m/15m：Python 用 1m 右標右閉重採樣；這裡用 request.security 的交易所 5m/15m，並取已收盤 [1]。時間戳可能差一根高週期 K
+// - 15m MA200：Python 可接 60d 15m 歷史；TV 用圖表能拿到的 15m 長度（一般夠 200 根）
+// - 同根既打停損又打停利：Python 先停損；TV 盤中先觸誰先成交
+// - 主場訊號若出現在持倉中：Python 仍記一筆再被 simulate 丟掉；這裡直接消耗該破底窗
