@@ -436,6 +436,43 @@ def test_json_config() -> None:
                     os.environ[key] = value
 
 
+def test_engine_snapshot() -> None:
+    engine = primed_engine()
+    snap = engine.snapshot()
+    assert snap["lead"]["name"] == "LEAD"
+    assert snap["lead"]["account_id"] == 10
+    assert snap["followers"][0]["name"] == "FOLLOW"
+    assert snap["copy_mode"] == "fills"
+
+
+def test_dashboard_page() -> None:
+    html = (REPO_ROOT / "docs" / "copier" / "index.html").read_text(encoding="utf-8")
+    for needle in ("主帳買 1 口 NQ", "symbol_map", "qty_ratio", "/api/status", "微型帳 B"):
+        assert needle in html, needle
+
+
+def test_demo_status() -> None:
+    from copier.web import demo_status
+
+    payload = demo_status()
+    assert payload["demo"] is True
+    assert payload["dry_run"] is True
+    assert payload["lead"]["name"]
+
+
+def test_web_cli_help() -> None:
+    import subprocess
+
+    out = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "examples" / "tradovate_copier.py"), "web", "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert out.returncode == 0
+    assert "--demo" in out.stdout
+
+
 class FakeResp:
     def __init__(self, status_code: int, payload) -> None:
         self.status_code = status_code
@@ -499,6 +536,10 @@ def main() -> int:
         test_dotenv_does_not_override,
         test_runner_dry_run_and_live_execute,
         test_json_config,
+        test_engine_snapshot,
+        test_dashboard_page,
+        test_demo_status,
+        test_web_cli_help,
     ]
     failed = 0
     for fn in tests:

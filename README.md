@@ -134,7 +134,13 @@ python3 examples/chart_today.py
 
 ## Tradovate 多帳跟單（本機 copier）
 
-本機版 lead → follower，只連你自己的 Tradovate 帳。不是 TradeSyncer 雲端服務：電腦要開著，也沒有他們的儀表板。先確認你的 prop firm 允許 API / 跟單。
+本機版 lead → follower，只連你自己的 Tradovate 帳。不是 TradeSyncer 雲端服務：電腦要開著。先確認你的 prop firm 允許 API / 跟單。
+
+先看網頁（不用登入，可點按鈕模擬複製）：
+
+- 本機：`python3 examples/tradovate_copier.py web --demo` → http://127.0.0.1:8787/
+- 檔案：開 `docs/copier/index.html`
+- GitHub Pages：`https://yubogoodman-droid.github.io/NQ/copier/`
 
 ```bash
 cp copier.env.example copier.env
@@ -142,10 +148,8 @@ cp copier.example.yaml copier.yaml
 # 填 API 帳密（Tradovate → Application Settings → API Access，權限不要設成 read-only）
 python3 examples/tradovate_copier.py list-accounts
 # 把印出來的帳號名稱填進 copier.yaml 的 lead / followers
-python3 examples/tradovate_copier.py run --config copier.yaml --dry-run --poll 2
-# demo 日誌看起來正確後，拿掉 yaml 裡的 dry_run，再跑：
-python3 examples/tradovate_copier.py run --config copier.yaml --ws
-# live 一定要加 --live
+python3 examples/tradovate_copier.py web --dry-run --poll 2
+# 網頁確認複製紀錄後，拿掉 yaml 的 dry_run。live 一定要加 --live
 ```
 
 預設 `copy_mode: fills`：主帳每筆成交，跟單帳下一張同方向市價單。可設 `qty_ratio`、`qty_fixed`、`symbol_map`（例如 NQ→MNQ）、`max_contracts`、日虧鎖定。主倉回到 0 時可把跟單帳一起平掉。

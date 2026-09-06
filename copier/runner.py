@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections import deque
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 from copier.config import CopierConfig
@@ -35,10 +37,12 @@ class CopierApp:
     ) -> None:
         self.config = config
         self.engine = engine or CopyEngine(config)
-        self.log = log
+        self._user_log = log
         self.sleep_fn = sleep_fn
         self.rests: Dict[str, TradovateRest] = {}
         self._lock = threading.Lock()
+        self.events: deque[Dict[str, Any]] = deque(maxlen=200)
+        self.started_at = datetime.now(timezone.utc).isoformat()
         environments = {conn.environment for conn in config.connections}
         if len(environments) > 1:
             raise TradovateError(
@@ -49,6 +53,23 @@ class CopierApp:
                 self.rests[conn.name] = rest_factory(conn.name)
             else:
                 self.rests[conn.name] = TradovateRest(conn.environment, conn.creds)
+
+    def log(self, message: str, kind: str = "log") -> None:
+        self.events.append(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "kind": kind,
+                "message": message,
+            }
+        )
+        self._user_log(message)
+
+    def status(self) -> Dict[str, Any]:
+        snap = self.engine.snapshot()
+        snap["connected"] = self.engine.lead_account_id is not None
+        snap["started_at"] = self.started_at
+        snap["events"] = list(self.events)[-80:]
+        return snap
 
     def connect_accounts(self) -> None:
         for conn in self.config.connections:
@@ -111,7 +132,7 @@ class CopierApp:
 
     def execute(self, intents: List[CopyIntent]) -> List[CopyIntent]:
         for intent in intents:
-            self.log(intent.describe())
+            self.log(intent.describe(), kind=intent.kind)
             if self.config.dry_run:
                 continue
             rest = self.rests[intent.connection]

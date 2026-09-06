@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0e11" />
+  <meta name="description" content="Tradovate 跟單台：主帳下一筆，其他帳一起跟。" />
+  <title>Tradovate 跟單台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b0e11;
+      --panel: #161b22;
+      --card: #1c222b;
+      --line: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --buy: #3fb950;
+      --sell: #f85149;
+      --accent: #58a6ff;
+      --warn: #d29922;
+      --lead: #a371f7;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Noto Sans TC", -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font-family: inherit; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+    .page { max-width: 720px; margin: 0 auto; padding: 0 14px 40px; }
+
+    .app-header {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      padding: calc(12px + env(safe-area-inset-top, 0px)) 0 12px;
+      background: rgba(11, 14, 17, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+      margin: 0 -14px 16px;
+      padding-left: 14px; padding-right: 14px;
+    }
+    .brand h1 { font-size: 20px; font-weight: 900; letter-spacing: 0.02em; }
+    .brand p { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+    .pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+    .pill {
+      font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+      border-radius: 999px; padding: 4px 8px; border: 1px solid var(--line);
+      color: var(--muted); background: var(--panel);
+    }
+    .pill.on { color: #fff; }
+    .pill.demo { background: #21262d; color: #c9d1d9; }
+    .pill.live { background: rgba(248, 81, 73, 0.2); color: #ff7b72; border-color: transparent; }
+    .pill.dry { background: rgba(210, 153, 34, 0.18); color: #e3b341; border-color: transparent; }
+    .pill.ok { background: rgba(63, 185, 80, 0.16); color: var(--buy); border-color: transparent; }
+
+    .hero {
+      background: linear-gradient(180deg, #1b2230 0%, var(--panel) 70%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .hero h2 { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
+    .hero p { font-size: 14px; color: var(--muted); line-height: 1.65; }
+    .hero strong { color: var(--text); }
+
+    .flow {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .acct {
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: 14px;
+      padding: 12px 14px;
+      transition: box-shadow 0.25s, border-color 0.25s, transform 0.2s;
+    }
+    .acct.lead { border-color: rgba(163, 113, 247, 0.45); }
+    .acct.flash-buy { box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.55); transform: translateY(-1px); }
+    .acct.flash-sell { box-shadow: 0 0 0 2px rgba(248, 81, 73, 0.55); transform: translateY(-1px); }
+    .acct-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .acct-name { font-size: 15px; font-weight: 800; }
+    .acct-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .badge {
+      font-size: 11px; font-weight: 800; border-radius: 999px; padding: 3px 8px;
+    }
+    .badge.lead { background: rgba(163, 113, 247, 0.18); color: #d2a8ff; }
+    .badge.follow { background: rgba(88, 166, 255, 0.14); color: var(--accent); }
+    .badge.lock { background: rgba(210, 153, 34, 0.18); color: var(--warn); }
+    .pos { margin-top: 10px; font-size: 13px; color: var(--muted); }
+    .pos b { color: var(--text); font-weight: 800; }
+    .pos .long { color: var(--buy); }
+    .pos .short { color: var(--sell); }
+    .meta { margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    .arrow {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 8px 0; color: var(--muted); font-size: 12px; font-weight: 700;
+    }
+    .arrow .line {
+      width: 2px; height: 18px;
+      background: linear-gradient(180deg, #a371f7, #58a6ff);
+      border-radius: 2px;
+    }
+    .arrow.pulse .line { animation: pulse 0.8s ease; }
+    .copy-msg { min-height: 18px; color: var(--accent); }
+    @keyframes pulse {
+      0% { transform: scaleY(0.4); opacity: 0.3; }
+      50% { transform: scaleY(1.2); opacity: 1; }
+      100% { transform: scaleY(1); opacity: 1; }
+    }
+
+    .followers { display: grid; gap: 8px; }
+    @media (min-width: 640px) { .followers { grid-template-columns: 1fr 1fr; } }
+
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 4px; }
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 12px 10px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn.buy { background: rgba(63, 185, 80, 0.14); color: var(--buy); border-color: transparent; }
+    .btn.sell { background: rgba(248, 81, 73, 0.14); color: var(--sell); border-color: transparent; }
+    .btn.wide { grid-column: 1 / -1; }
+    .hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 8px; }
+
+    .section { margin: 20px 0 8px; display: flex; justify-content: space-between; align-items: baseline; }
+    .section h3 { font-size: 14px; font-weight: 800; }
+    .section span { font-size: 12px; color: var(--muted); }
+
+    .cards { display: grid; gap: 8px; }
+    @media (min-width: 640px) { .cards { grid-template-columns: 1fr 1fr; } }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 13px 14px;
+    }
+    .card h4 { font-size: 14px; font-weight: 800; margin-bottom: 6px; }
+    .card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .card code, .log .mono {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+    }
+    .card code { color: #79c0ff; }
+
+    .steps { counter-reset: step; }
+    .step {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .step:last-child { border-bottom: 0; }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--card);
+      border: 1px solid var(--line);
+      display: grid; place-items: center;
+      font-size: 12px; font-weight: 800;
+      color: var(--accent);
+    }
+    .step b { display: block; font-size: 14px; margin-bottom: 3px; }
+    .step p { font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+    .log {
+      background: #0d1117;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 12px;
+      max-height: 280px;
+      overflow: auto;
+    }
+    .log-item { font-size: 12px; line-height: 1.55; padding: 5px 0; border-bottom: 1px solid #21262d; color: #c9d1d9; }
+    .log-item:last-child { border-bottom: 0; }
+    .log-item .k { color: var(--accent); font-weight: 700; margin-right: 6px; }
+    .log-item.place .k { color: var(--buy); }
+    .log-item.flatten .k { color: var(--warn); }
+    .log-item.sell .k { color: var(--sell); }
+
+    pre.cmd {
+      background: #0d1117;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #c9d1d9;
+      overflow: auto;
+      line-height: 1.55;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="app-header">
+      <div class="brand">
+        <h1>Tradovate 跟單台</h1>
+        <p>主帳下一筆，其他帳自動跟。只連你自己的帳。</p>
+      </div>
+      <div class="pills" id="pills"></div>
+    </header>
+
+    <section class="hero">
+      <h2>它只做一件事</h2>
+      <p>
+        這不是 prop firm，也不會幫你出金。你在 <strong>主帳</strong> 買或賣，
+        程式把同一筆複製到 <strong>跟單帳</strong>。
+        預設是「主帳成交了，跟單帳下市價單」。
+      </p>
+    </section>
+
+    <section class="flow" id="flow">
+      <div class="acct lead" id="lead-card">
+        <div class="acct-top">
+          <div>
+            <div class="acct-name" id="lead-name">主帳</div>
+            <div class="acct-sub">你在 Tradovate / TradingView 下單的地方</div>
+          </div>
+          <span class="badge lead">LEAD</span>
+        </div>
+        <div class="pos" id="lead-pos">倉位：空倉</div>
+      </div>
+
+      <div class="arrow" id="arrow">
+        <div class="line"></div>
+        <div class="copy-msg" id="copy-msg">成交之後往下複製</div>
+      </div>
+
+      <div class="followers" id="followers"></div>
+
+      <div class="actions">
+        <button class="btn buy" type="button" data-act="Buy">主帳買 1 口 NQ</button>
+        <button class="btn sell" type="button" data-act="Sell">主帳賣 1 口 NQ</button>
+        <button class="btn wide" type="button" data-act="Flat">主帳全部平掉</button>
+      </div>
+      <p class="hint" id="play-hint">這些按鈕是示範，不會連交易所。看懂之後再用下面的指令接真帳。</p>
+    </section>
+
+    <div class="section">
+      <h3>設定是什麼意思</h3>
+      <span>寫在 copier.yaml</span>
+    </div>
+    <div class="cards">
+      <article class="card">
+        <h4>口數比例 qty_ratio</h4>
+        <p>主帳買 2 口、比例 <code>1.0</code> → 跟 2 口。比例 <code>0.5</code> → 跟 1 口。也可以改 <code>qty_fixed: 1</code> 每次都跟固定口數。</p>
+      </article>
+      <article class="card">
+        <h4>契約對應 symbol_map</h4>
+        <p>主帳打大台 <code>NQ</code>，跟單帳可以改打微型 <code>MNQ</code>。右邊那張示範帳就是這樣設的。</p>
+      </article>
+      <article class="card">
+        <h4>最多幾口 max_contracts</h4>
+        <p>跟單帳這個契約的絕對倉位上限。到了就不再加倉，但平倉、反向減倉還是會做。</p>
+      </article>
+      <article class="card">
+        <h4>日虧鎖定 daily_loss_limit</h4>
+        <p>該帳今天已實現虧超過金額就停跟，可選擇順便平掉。美東 18:00 換日後解鎖。</p>
+      </article>
+    </div>
+
+    <div class="section">
+      <h3>要接真帳時</h3>
+      <span>先 demo + dry-run</span>
+    </div>
+    <div class="card steps">
+      <div class="step">
+        <div>
+          <b>Tradovate 開 API</b>
+          <p>Application Settings → API Access，權限不要設成 read-only。Demo 和 live 是不同環境。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <b>填憑證，列出帳號</b>
+          <p>複製 <code>copier.env.example</code> → <code>copier.env</code>，填帳密。然後：</p>
+          <pre class="cmd">python3 examples/tradovate_copier.py list-accounts</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <b>指定主帳 / 跟單帳</b>
+          <p>複製 <code>copier.example.yaml</code> → <code>copier.yaml</code>，把印出來的帳號名稱填進 lead 與 followers。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <b>開這個網頁看即時狀態</b>
+          <p>先乾跑，確認畫面出現「已複製」再拿掉 dry-run。Live 一定要加 <code>--live</code>。</p>
+          <pre class="cmd">python3 examples/tradovate_copier.py web --dry-run --poll 2</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>複製紀錄</h3>
+      <span id="log-cap">示範</span>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    const MONTH = "FGHJKMNQUVXZ";
+    const CONTRACT_RE = /^([A-Z]+)([FGHJKMNQUVXZ])(\d{1,2})$/;
+
+    function splitContract(symbol) {
+      const text = String(symbol || "").toUpperCase();
+      const m = text.match(CONTRACT_RE);
+      return m ? [m[1], m[2] + m[3]] : [text, ""];
+    }
+    function remapSymbol(symbol, mapping) {
+      if (!symbol) return symbol;
+      const [product, suffix] = splitContract(symbol);
+      const keys = Object.keys(mapping || {}).sort((a, b) => b.length - a.length);
+      for (const key of keys) {
+        if (product === key.toUpperCase()) {
+          const dest = mapping[key];
+          return suffix ? dest + suffix : dest;
+        }
+      }
+      return suffix ? symbol.toUpperCase() : symbol;
+    }
+    function sizeQty(leadQty, action, current, ratio, fixed, maxContracts) {
+      if (leadQty <= 0) return 0;
+      let qty = fixed != null ? Math.max(0, Number(fixed)) : Math.max(0, Math.floor(leadQty * ratio + 0.5));
+      if (qty <= 0 || maxContracts == null) return qty;
+      const allowed = action === "Buy" ? maxContracts - current : maxContracts + current;
+      return Math.max(0, Math.min(qty, allowed));
+    }
+    function posText(positions) {
+      const entries = Object.entries(positions || {}).filter(([, n]) => n);
+      if (!entries.length) return "倉位：空倉";
+      return "倉位：" + entries.map(([sym, n]) => {
+        const cls = n > 0 ? "long" : "short";
+        const side = n > 0 ? "多" : "空";
+        return `<b class="${cls}">${sym} ${side} ${Math.abs(n)}</b>`;
+      }).join("　");
+    }
+    function nowLabel() {
+      const d = new Date();
+      return d.toTimeString().slice(0, 8);
+    }
+
+    const demo = {
+      connected: false,
+      demo: true,
+      dry_run: true,
+      environment: "demo",
+      copy_mode: "fills",
+      lead: { name: "主帳（示範）", positions: {} },
+      followers: [
+        { name: "評測帳 A", qty_ratio: 1, symbol_map: {}, max_contracts: 5, positions: {}, locked: false },
+        { name: "微型帳 B", qty_ratio: 1, symbol_map: { NQ: "MNQ" }, max_contracts: 10, positions: {}, locked: false },
+      ],
+      events: [{ kind: "log", message: "示範已就緒。按「主帳買 1 口 NQ」看複製。" }],
+    };
+
+    let state = structuredClone(demo);
+    let live = false;
+
+    function applyLive(payload) {
+      if (!payload || payload.demo || !payload.connected) return false;
+      live = true;
+      state = {
+        connected: true,
+        demo: false,
+        dry_run: payload.dry_run,
+        environment: payload.environment,
+        copy_mode: payload.copy_mode,
+        lead: payload.lead || demo.lead,
+        followers: (payload.followers || []).length ? payload.followers : demo.followers,
+        events: payload.events || [],
+      };
+      return true;
+    }
+
+    function renderPills() {
+      const pills = [];
+      pills.push(`<span class="pill ${state.environment === "live" ? "live" : "demo"}">${(state.environment || "demo").toUpperCase()}</span>`);
+      if (state.dry_run) pills.push(`<span class="pill dry">DRY-RUN 不下真單</span>`);
+      pills.push(`<span class="pill ${live ? "ok" : "demo"}">${live ? "已連線" : "示範"}</span>`);
+      pills.push(`<span class="pill">${state.copy_mode === "orders" ? "跟掛單" : "跟成交"}</span>`);
+      document.getElementById("pills").innerHTML = pills.join("");
+      document.getElementById("play-hint").textContent = live
+        ? "上面的按鈕仍只改這個畫面，真單請在 Tradovate 主帳下。此頁會自動刷新真實倉位。"
+        : "這些按鈕是示範，不會連交易所。看懂之後再用下面的指令接真帳。";
+      document.getElementById("log-cap").textContent = live ? "即時" : "示範";
+    }
+
+    function renderAccounts() {
+      document.getElementById("lead-name").textContent = state.lead.name || "主帳";
+      document.getElementById("lead-pos").innerHTML = posText(state.lead.positions);
+      document.getElementById("followers").innerHTML = state.followers.map((f) => {
+        const map = Object.keys(f.symbol_map || {}).length
+          ? Object.entries(f.symbol_map).map(([a, b]) => `${a}→${b}`).join(" ")
+          : "同契約";
+        const ratio = f.qty_fixed != null ? `固定 ${f.qty_fixed} 口` : `比例 ${f.qty_ratio}`;
+        const lock = f.locked ? `<span class="badge lock">已鎖定</span>` : `<span class="badge follow">FOLLOW</span>`;
+        return `<div class="acct" data-name="${f.name}">
+          <div class="acct-top">
+            <div>
+              <div class="acct-name">${f.name}</div>
+              <div class="acct-sub">${ratio} · ${map}${f.max_contracts != null ? " · 最多 " + f.max_contracts + " 口" : ""}</div>
+            </div>
+            ${lock}
+          </div>
+          <div class="pos">${posText(f.positions)}</div>
+          <div class="meta">${f.lock_reason ? "鎖定：" + f.lock_reason : "主帳成交後，這裡下市價單"}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderLog() {
+      const box = document.getElementById("log");
+      const items = (state.events || []).slice(-40).reverse();
+      box.innerHTML = items.map((ev) => {
+        const kind = ev.kind || "log";
+        const label = kind === "place" ? "跟" : kind === "flatten" ? "平" : kind === "Buy" ? "買" : kind === "Sell" ? "賣" : "訊";
+        return `<div class="log-item ${kind}"><span class="k">${label}</span><span class="mono">${ev.message}</span></div>`;
+      }).join("") || `<div class="log-item">還沒有紀錄</div>`;
+    }
+
+    function flash(el, cls) {
+      if (!el) return;
+      el.classList.remove("flash-buy", "flash-sell");
+      void el.offsetWidth;
+      el.classList.add(cls);
+      setTimeout(() => el.classList.remove(cls), 700);
+    }
+
+    function addDelta(positions, symbol, action, qty) {
+      const cur = Number(positions[symbol] || 0);
+      const next = cur + (action === "Buy" ? qty : -qty);
+      if (next === 0) delete positions[symbol];
+      else positions[symbol] = next;
+    }
+
+    function simulate(action) {
+      if (live) return;
+      const symbol = "NQH6";
+      const arrow = document.getElementById("arrow");
+      arrow.classList.add("pulse");
+      const leadEl = document.getElementById("lead-card");
+
+      if (action === "Flat") {
+        state.lead.positions = {};
+        state.followers.forEach((f) => { f.positions = {}; });
+        document.getElementById("copy-msg").textContent = "主倉回到 0，跟單帳一起平掉";
+        flash(leadEl, "flash-sell");
+        state.events.push({ kind: "flatten", message: "主帳全部平掉 → 跟單帳 flatten" });
+        renderAll();
+        setTimeout(() => arrow.classList.remove("pulse"), 400);
+        return;
+      }
+
+      addDelta(state.lead.positions, symbol, action, 1);
+      flash(leadEl, action === "Buy" ? "flash-buy" : "flash-sell");
+      document.getElementById("copy-msg").textContent = `主帳 ${action === "Buy" ? "買" : "賣"} 1 ${symbol}`;
+      state.events.push({ kind: action, message: `主帳成交 ${action} 1 ${symbol}` });
+
+      state.followers.forEach((f) => {
+        if (f.locked || f.enabled === false) return;
+        const dest = remapSymbol(symbol, f.symbol_map || {});
+        const qty = sizeQty(1, action, Number((f.positions || {})[dest] || 0), Number(f.qty_ratio || 1), f.qty_fixed, f.max_contracts);
+        if (qty <= 0) {
+          state.events.push({ kind: "log", message: `${f.name} 跳過（已到上限或口數為 0）` });
+          return;
+        }
+        addDelta(f.positions, dest, action, qty);
+        state.events.push({ kind: "place", message: `${f.name} 市價 ${action} ${qty} ${dest}` });
+      });
+      renderAll();
+      document.querySelectorAll(".followers .acct").forEach((el) => flash(el, action === "Buy" ? "flash-buy" : "flash-sell"));
+      setTimeout(() => arrow.classList.remove("pulse"), 400);
+    }
+
+    function renderAll() {
+      renderPills();
+      renderAccounts();
+      renderLog();
+    }
+
+    document.querySelectorAll("[data-act]").forEach((btn) => {
+      btn.addEventListener("click", () => simulate(btn.getAttribute("data-act")));
+    });
+
+    async function pullStatus() {
+      try {
+        const res = await fetch("/api/status", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (applyLive(data)) renderAll();
+        else if (data.events && data.connected) {
+          state.events = data.events;
+          renderLog();
+        }
+      } catch (_) { /* file:// or GitHub Pages：維持示範 */ }
+    }
+
+    renderAll();
+    pullStatus();
+    setInterval(pullStatus, 2000);
+  </script>
+</body>
+</html>

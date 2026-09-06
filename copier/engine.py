@@ -497,3 +497,37 @@ class CopyEngine:
             follower.locked = False
             follower.lock_reason = ""
             follower.realized_pnl = 0.0
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "ready": self.ready,
+            "copy_mode": self.config.copy_mode,
+            "dry_run": self.config.dry_run,
+            "environment": self.config.environment,
+            "flatten_when_lead_flat": self.config.flatten_when_lead_flat,
+            "lead": {
+                "connection": self.lead_connection,
+                "account_id": self.lead_account_id,
+                "name": self.lead_account_spec or "主帳",
+                "positions": dict(self.lead_positions),
+            },
+            "followers": [
+                {
+                    "key": key,
+                    "name": follower.account_spec,
+                    "account_id": follower.account_id,
+                    "connection": follower.connection,
+                    "qty_ratio": follower.config.qty_ratio,
+                    "qty_fixed": follower.config.qty_fixed,
+                    "symbol_map": dict(follower.config.symbol_map),
+                    "max_contracts": follower.config.max_contracts,
+                    "daily_loss_limit": follower.config.daily_loss_limit,
+                    "enabled": follower.config.enabled,
+                    "locked": follower.locked,
+                    "lock_reason": follower.lock_reason,
+                    "realized_pnl": follower.realized_pnl,
+                    "positions": dict(follower.positions),
+                }
+                for key, follower in self.followers.items()
+            ],
+        }
