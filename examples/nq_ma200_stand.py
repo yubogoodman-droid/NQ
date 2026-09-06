@@ -12,7 +12,7 @@
   8. 浮盈先到 +60 後，停損提到進場價（保本）
   9. 進場在 15m MA200 上被停損後，30 分鐘內站回原進場價再進一次。只再進一次，停損同上；再進也要距 MA200 ≤30。
   10. 五分 MA5/10/20/30/60/200 全均帶寬 <28 視為糾結，主場與再進都不進。再進另看五分 MA5–30 <20。已合格卻糾結，整次取消。
-  11. 十五分 MA20 明顯下彎（1 小時至少掉 20）且收盤在其下 ≤15，不進（貼著下彎的 15 分均線）。
+  11. 十五分 MA20 明顯下彎（1 小時至少掉 20）且收盤在其下 ≤15，不進；同一破底不再往後找。
 
 用法:
   python3 examples/nq_ma200_stand.py backtest --period 30d --pages
@@ -130,7 +130,8 @@ def load_bars(symbol: str, interval: str, period: str) -> pd.DataFrame:
     if days is not None and days > 8:
         end = datetime.now(timezone.utc)
         start = end - timedelta(days=days)
-        df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=7)
+        chunk = 3 if interval == "1m" else 7
+        df = load_yahoo_intraday(symbol, interval, start, end, chunk_days=chunk)
         if not df.empty:
             return df
         print(f"[data] chunked {period} empty, fallback period download", file=sys.stderr)
@@ -372,7 +373,7 @@ def detect_signals(
                 min_drop=min_15m_ma20_drop,
             ):
                 bump("skip_15m_down")
-                continue
+                break
             entry = float(close[j])
             stop = float(ma200[j]) - stop_below_ma200
             if entry <= stop:
@@ -489,7 +490,7 @@ def make_reclaim_reentry(
             near=near_15m_ma20,
             min_drop=min_15m_ma20_drop,
         ):
-            continue
+            return None
         ribbon_1m = float(ma5[j] - ma60[j])
         m15_200 = float(ma200_15m[j])
         dist_15 = float("nan") if np.isnan(m15_200) else entry - m15_200
