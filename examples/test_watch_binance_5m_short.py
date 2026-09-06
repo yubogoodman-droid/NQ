@@ -134,10 +134,11 @@ def test_ma14_gap_filter() -> None:
     gap = sig["gap14"]
     assert detect_new_short(d5, 229, max_gap_pct=max(0.01, gap - 0.01)) is None
     assert detect_new_short(d5, 229, max_gap_pct=gap + 0.01) is not None
-    rows = [{"gap14": 0.5}, {"gap14": 2.0}, {"gap14": 4.5}]
+    rows = [{"gap14": 0.5}, {"gap14": 2.0}, {"gap14": 2.50}, {"gap14": 4.5}]
     assert [h["gap14"] for h in filter_hits_by_gap(rows, 2.0)] == [0.5, 2.0]
+    assert [h["gap14"] for h in filter_hits_by_gap(rows, 3.0)] == [0.5, 2.0, 2.50]
     assert len(filter_hits_by_gap(rows, 1.0)) == 1
-    assert len(filter_hits_by_gap(rows, 0)) == 3
+    assert len(filter_hits_by_gap(rows, 0)) == 4
 
 
 def test_collect_signals_first_bar_only() -> None:
@@ -178,7 +179,7 @@ def test_pick_chart_hits_pins_collect() -> None:
         {"symbol": "COLLECTUSDT", "t": 99, "60m": 5.79, "gap14": 2.50},
         {"symbol": "COLLECTUSDT", "t": 88, "60m": 0.80, "gap14": 0.46},
     ]
-    pinned = pin_chart_hits(extra + hits)
+    pinned = pin_chart_hits(extra + hits, symbols=frozenset({"COLLECTUSDT"}))
     assert [h["t"] for h in pinned] == [99, 88]
     picked = pick_chart_hits(hits, 6, extra=pinned)
     assert picked[0]["symbol"] == "COLLECTUSDT" and picked[0]["t"] == 99

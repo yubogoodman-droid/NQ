@@ -81,7 +81,7 @@ python3 examples/test_tw_1h_reclaim.py
 ## 幣安 5m 空頭排列 Telegram
 
 五分 K：`MA7 < MA14 < MA25`，且**前一根收在 MA200 上、這一根收盤才跌破**才推通知。  
-跌破時 **MA14 離 MA200 不能太遠**（通知預設 ≤2%；回測對照 1／2／3／4%）。已在 MA200 下只是短均排好的不算。通知與圖會附**當下這根 15 分 K**（用已收的 5m 合成，不看這根 15m 後面）。
+跌破時 **MA14 離 MA200 不能太遠**（通知／圖卡預設 ≤3%，能抓到 COLLECT 那種離 14 約 2.5% 的；回測對照 1／2／3／4%）。已在 MA200 下只是短均排好的不算。通知與圖會附**當下這根 15 分 K**（用已收的 5m 合成，不看這根 15m 後面）。
 
 ```bash
 # Telegram 憑證放 tg_config.env（勿提交）
@@ -89,9 +89,9 @@ python3 examples/watch_binance_5m_short.py --test
 python3 examples/watch_binance_5m_short.py --once --dry-run
 python3 examples/watch_binance_5m_short.py
 
-# 近兩天回測（對照 MA14 離 MA200 1/2/3/4%；圖卡預設 ≤2%，COLLECT 一律出圖）
+# 近兩天回測（對照 MA14 離 MA200 1/2/3/4%；圖卡預設 ≤3%）
 python3 examples/watch_binance_5m_short.py --backtest --days 2 --pages
-python3 examples/watch_binance_5m_short.py --backtest --days 2 --pages --gap 1
+python3 examples/watch_binance_5m_short.py --backtest --days 2 --pages --gap 2
 
 # 單元測試（不打幣安）
 python3 examples/test_watch_binance_5m_short.py

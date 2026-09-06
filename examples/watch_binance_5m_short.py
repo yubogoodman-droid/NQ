@@ -2,9 +2,8 @@
 """幣安 5m 空頭排列 Telegram 監看。
 
 五分 K：MA7 < MA14 < MA25，且前一根收在 MA200 上、這一根收盤才跌破。
-跌破時 MA14 離 MA200 不能太遠（預設 ≤2%；回測對照 1/2/3/4%）。
+跌破時 MA14 離 MA200 不能太遠（預設 ≤3%，能抓到 COLLECT 09-05 20:30 那種離 14 約 2.5% 的；回測對照 1/2/3/4%）。
 通知與圖會附**當下這根 15 分 K**（用已收盤的 5m 合成，不看這根 15m 之後）。
-回測圖卡會固定放 COLLECT（含超過距離上限的那筆）。
 預設只掃 24h 成交額前 100 檔。同一根不重發。
 
     python3 examples/watch_binance_5m_short.py --test
@@ -47,8 +46,8 @@ HORIZONS = (("15m", 3), ("30m", 6), ("60m", 12), ("120m", 24))
 UNIVERSE_LIMIT = 100
 PAGES = ROOT / "docs" / "binance-5m-short" / "index.html"
 GAP_PCTS = (1.0, 2.0, 3.0, 4.0)
-DEFAULT_GAP_PCT = 2.0
-PIN_CHART_SYMBOLS = frozenset({"COLLECTUSDT"})
+DEFAULT_GAP_PCT = 3.0
+PIN_CHART_SYMBOLS: frozenset[str] = frozenset()
 
 
 def load_dotenv(path: Path = CONFIG_ENV) -> None:
@@ -695,7 +694,7 @@ def _equity_svg(pcts: list[float], width: int = 720, height: int = 160) -> str:
 
 
 def pin_chart_hits(hits_all: list[dict], symbols: frozenset[str] | None = None) -> list[dict]:
-    """固定出圖的標的，從尚未套距離上限的命中裡拿（例如 COLLECT 那筆 2.50%）。"""
+    """可選：把指定標的從尚未套距離上限的命中裡抓出來出圖。"""
     want = {s.upper() for s in (symbols or PIN_CHART_SYMBOLS)}
     pinned = [h for h in hits_all if str(h.get("symbol", "")).upper() in want and h.get("60m") is not None]
     pinned.sort(key=lambda h: float(h["60m"]), reverse=True)
@@ -786,7 +785,7 @@ def write_report(
             )
         if gap_pct and h.get("gap14") is not None and float(h["gap14"]) > float(gap_pct):
             k15_tag += "<span class='tag'>超過上限 · 固定顯示</span>"
-        elif str(h.get("symbol", "")).upper() in PIN_CHART_SYMBOLS:
+        elif PIN_CHART_SYMBOLS and str(h.get("symbol", "")).upper() in PIN_CHART_SYMBOLS:
             k15_tag += "<span class='tag'>固定顯示</span>"
         img_html = (
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(h['symbol'])}' "
@@ -905,7 +904,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left
 <div class="card">60m 平均<b class="{_pnl_cls(s60['avg'])}">{_fmt(s60['avg'])}</b></div>
 </div>
 <div class="equity">{eq}</div>
-<p class="muted">下圖累積的是各筆 60 分鐘空頭報酬相加，不是組合複利。圖卡放 60m 最好/最差各一部分，COLLECT 一律出圖（含超過距離上限的）。</p>
+<p class="muted">下圖累積的是各筆 60 分鐘空頭報酬相加，不是組合複利。圖卡放 60m 最好/最差各一部分。</p>
 {ab_html}
 </section>
 {''.join(cards) or "<div class='empty'>這兩天沒有符合的訊號</div>"}
@@ -1013,10 +1012,11 @@ def cmd_backtest(args) -> int:
             f"60m {st['60m']['win_rate']:.1f}% 均 {st['60m']['avg']:+.2f}%",
             flush=True,
         )
-    pin_hits = pin_chart_hits(hits_all)
+    pin_hits = pin_chart_hits(hits_all) if PIN_CHART_SYMBOLS else []
+    pin_txt = f"固定 {', '.join(sorted(PIN_CHART_SYMBOLS))} {len(pin_hits)} 筆　" if pin_hits else ""
     print(
         f"圖卡 {('≤'+format(gap_pct, 'g')+'%') if gap_pct else '不限'}　"
-        f"固定 {', '.join(sorted(PIN_CHART_SYMBOLS))} {len(pin_hits)} 筆　"
+        f"{pin_txt}"
         f"當下15m空排 {stats['k15']['align']}/{stats['k15']['n']}　年線下 {stats['k15']['below']}/{stats['k15']['n']}\n"
         f"15m {stats['15m']['win_rate']:.1f}% 均 {stats['15m']['avg']:+.2f}%　"
         f"30m {stats['30m']['win_rate']:.1f}% 均 {stats['30m']['avg']:+.2f}%　"
@@ -1072,7 +1072,7 @@ def main() -> int:
         "--gap",
         type=float,
         default=DEFAULT_GAP_PCT,
-        help="跌破時 MA14 離 MA200 最大％（1/2/3/4；0＝不限；預設 2）",
+        help="跌破時 MA14 離 MA200 最大％（1/2/3/4；0＝不限；預設 3）",
     )
     args = p.parse_args()
     apply_keys()
