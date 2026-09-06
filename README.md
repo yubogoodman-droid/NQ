@@ -123,54 +123,43 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
-## 幣安 15m 多頭排列 · 站上 MA200（成交額前 100）
+## 幣安 15m · 200MA 附近進場（對齊 ETH 截圖）
 
-15 分 K：MA5 > MA20 > MA99 多頭排列，**那根剛收盤站上 MA200** 才通知。已經站在 200 上面、只是均線才排好的不算。均線距離對齊 ETH 9/3 那張圖：四條帶寬 ≤ 0.8%、MA99 與 MA200 ≤ 0.7%、收盤離 200 ≤ 1%。標的取 24h 成交額前 100（幣 + 股票）。
+進場要還貼著 **MA200**，線型就是你那張 ETH 15 分圖：MA7/14/25/99/120/200 先黏成一條，放量陽線打出箱頂，**收盤離 200 仍 ≤ 0.8%** 才進。ETH 9/3 **20:30、2412、離 200 +0.27%** 是進場點；後面噴到 2488 的大陽不追。另外要 MA5>MA20>MA99。標的取 24h 成交額前 100（幣 + 股票）。
 
 ```bash
-# TradingView：pinescript/ma_align_15m.pine 貼到 Pine Editor，套 15 分圖，設警示
+# TradingView：pinescript/ma200_squeeze_15m.pine 貼到 Pine Editor，套 15 分圖
 
 # 剛收盤掃一次 / 持續監看（成交額前 100）
 python3 examples/scan_binance_15m_align.py --once
 python3 examples/scan_binance_15m_align.py --watch
 
-# 前 100 名近 3 日剛站上 200 的時點 + 圖
-python3 examples/scan_binance_15m_align.py --backtest --days 3 --pages --html docs/binance/ma-align-15m-3d/index.html
+# 前 100 名近 3 日、200 附近像 ETH 截圖的進場 + 圖
+python3 examples/scan_binance_15m_align.py --backtest --days 3 --pages --html docs/binance/ma200-squeeze-15m-3d/index.html
 ```
 
 舊檔名 `scan_binance_15m_ma200.py` 也會轉到同一套。Telegram 憑證放 `tg_config.env`（`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`）。
 
-近 3 日剛站上 200、均線距離像 ETH 圖（成交額前 100、24 筆）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma-align-15m-3d/view.html
+## 幣安 15m 黏帶擠壓參數
 
-## 幣安 15m 黏帶擠壓 · 200MA 附近進場
-
-線型對齊 ETH 9/3 20:30：MA7/14/25/99/120/200 黏成一條（寬度 ≤ 0.6%），箱體 ≤ 1.8%，價格貼著 200 橫盤，陽線量能 **3～8×**、振幅擴張 **2～6×** 打出收盤箱頂，**收盤離 200 仍 ≤ 0.8%** 才進。截圖那波進場 2412，離 200 只有 +0.27%，量 3.7×、振幅只擴 2.3×。8/28 那種 2.6× 假突破、開盤 14× / 19× 跳空都不進。標的：幣圈 + 股票永續。
+六條均線寬度 ≤ 0.6%，箱體 ≤ 1.8%，量能 **3～8×**、振幅擴張 **2～6×**。8/28 那種 2.6× 假突破、開盤 14× / 19× 跳空都不進。
 
 ```bash
-# TradingView：pinescript/ma200_squeeze_15m.pine 貼到 Pine Editor，套 15 分圖
-
 # 單檔（ETH）近兩週
-python3 examples/scan_binance_15m_ma200.py --symbol ETHUSDT --days 14
-
-# 流動永續 5 日回測 + 手機版 HTML（全市場找類似 ETH 9/3 的）
-python3 examples/scan_binance_15m_ma200.py --backtest --days 5 --pages --html docs/binance/ma200-squeeze-15m-5d/index.html
-
-# Telegram：剛收盤掃一次 / 持續監看
-python3 examples/scan_binance_15m_ma200.py --once
-python3 examples/scan_binance_15m_ma200.py --watch
+python3 examples/scan_binance_15m_align.py --symbol ETHUSDT --days 14
 ```
 
 ETH 近兩週圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m/view.html
 
 幣+股 5 日（223 檔、15 筆、勝率 33.3%、−0.25%）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-5d/view.html
 
-跟 ETH 9/3 同型的：BTC 9/3 10:30（+0.26% / 0.47% / 3.7×）、ETH 9/3 20:30（打到 +2.39%）、MSFT 9/3 19:00（+0.17% / 0.27% / 3.1×，打到 +2.10%）、GOOGL / QQQ / SPY / META。開盤 14× / 19× 跳空仍排除。
+跟 ETH 9/3 同型的：BTC 9/3 10:30（+0.26% / 0.47% / 3.7×）、ETH 9/3 20:30（打到 +2.39%）、MSFT 9/3 19:00（+0.17% / 0.27% / 3.1×，打到 +2.10%）、GOOGL / QQQ / SPY / META。
 
 ## TradingView
 
 `pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
-`pinescript/ma_align_15m.pine` 套用至 U 本位 15 分圖：5>20>99、均線黏著、這根剛站上 200 會標、可設警示。  
-`pinescript/ma200_squeeze_15m.pine` 是舊的黏帶擠壓。
+`pinescript/ma200_squeeze_15m.pine` 套用至 U 本位 15 分圖：200 附近、ETH 截圖那條黏帶，可設警示。  
+`pinescript/ma_align_15m.pine` 是只記剛站上 200 的舊版。
 
 ## 參數調整
 

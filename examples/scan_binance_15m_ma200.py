@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""已改成 15m MA5/20/99 多頭排列站上 MA200。參數與 scan_binance_15m_align.py 相同。"""
+"""15m 200MA 附近進場（ETH 截圖線型）。參數與 scan_binance_15m_align.py 相同。"""
 from __future__ import annotations
 
 import runpy

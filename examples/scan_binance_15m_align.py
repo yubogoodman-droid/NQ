@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""幣安 15m：MA5 > MA20 > MA99 多頭排列、均線距離像 ETH 圖，剛站上 MA200 才通知。
+"""幣安 15m：在 MA200 附近進場，線型對齊 ETH 截圖（7/14/25/99/120/200 黏帶後放量打出）。
+
+進場是還貼著 200 的那一根（ETH 9/3 20:30、2412、離 200 +0.27%），
+不追後面噴到 2488 的大陽。另要 MA5>MA20>MA99。成交額前 100 跳通知。
 
 用法:
   python3 examples/scan_binance_15m_align.py --once
@@ -25,14 +28,15 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nq.ma_align import (  # noqa: E402
-    MIN_BARS,
-    AlignSignal,
+from nq.ma200_squeeze import (  # noqa: E402
+    SqueezeSignal,
     add_indicators,
     detect_signals,
     signal_at,
     sma,
 )
+
+MIN_BARS = 220
 
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
@@ -44,14 +48,22 @@ SESSION.headers.update({"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accep
 REPO = Path(__file__).resolve().parents[1]
 SEEN_PATH = REPO / "output" / "binance_15m_align_seen.json"
 CONFIG_ENV = REPO / "tg_config.env"
-PAGES_HTML = REPO / "docs" / "binance" / "ma-align-15m" / "index.html"
+PAGES_HTML = REPO / "docs" / "binance" / "ma200-squeeze-15m-3d" / "index.html"
 TOP_N = 100
 KLINE_LIMIT = 1000
 BAR_MS = 900_000
 PRE_BARS = 36
-FWD_BARS = 20  # 含 ETH 20:00 之後那波噴到 2488 的大陽
+FWD_BARS = 20  # 含 ETH 20:30 之後噴到 2488 的那波
 
-MA_COLORS = {5: "#f0c14a", 20: "#64b5f6", 99: "#7e57c2", 200: "#ef5350"}
+# 對齊幣安截圖：MA7 / 14 / 25 / 99 / 120 / 200
+MA_COLORS = {
+    7: "#f0c14a",
+    14: "#64b5f6",
+    25: "#ce93d8",
+    99: "#7e57c2",
+    120: "#81c784",
+    200: "#ef5350",
+}
 CJK_FONTS = (
     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
@@ -117,6 +129,20 @@ def universe(top_n: int = TOP_N) -> list[tuple[str, float]]:
         ranked.append((qv, sym))
     ranked.sort(reverse=True)
     return [(sym, qv) for qv, sym in ranked[:top_n]]
+
+
+def prepare(raw: dict) -> dict:
+    d = add_indicators(raw)
+    d["m5"] = sma(d["c"], 5)
+    d["m20"] = sma(d["c"], 20)
+    return d
+
+
+def is_stacked(d: dict, i: int) -> bool:
+    m5, m20, m99 = d["m5"][i], d["m20"][i], d["m99"][i]
+    if any(np.isnan(x) for x in (m5, m20, m99)):
+        return False
+    return bool(m5 > m20 > m99)
 
 
 def bars_from_raw(raw: list) -> dict:
@@ -197,7 +223,7 @@ def use_cjk_font(plt) -> None:
         return
 
 
-def draw_chart(sym: str, d: dict, sig: AlignSignal, path: Path) -> Path | None:
+def draw_chart(sym: str, d: dict, sig: SqueezeSignal, path: Path) -> Path | None:
     try:
         import matplotlib
 
@@ -238,12 +264,12 @@ def draw_chart(sym: str, d: dict, sig: AlignSignal, path: Path) -> Path | None:
     if 0 <= x < len(c):
         ax.axvline(x, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([x], [c[x]], s=40, color="#00e676", marker="^", zorder=6)
-        ax.set_title(
-        f"{sym}  15m  5>20>99  剛站上200  帶寬 {sig.ribbon*100:.2f}%  99↔200 {sig.gap99*100:.2f}%",
+    ax.set_title(
+        f"{sym}  15m  200附近  帶寬 {sig.ribbon*100:.2f}%  離200 {sig.ext*100:+.2f}%  量 {sig.vol_ratio:.1f}x",
         color="#e8f0ea",
         fontsize=12,
     )
-    ax.legend(loc="upper left", fontsize=8, frameon=False, labelcolor="#c8d5cc", ncol=4)
+    ax.legend(loc="upper left", fontsize=8, frameon=False, labelcolor="#c8d5cc", ncol=3)
     fig.tight_layout(pad=0.5)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -291,21 +317,22 @@ def telegram_send(text: str, photo: str | None = None) -> bool:
         return False
 
 
-def format_hit(sym: str, d: dict, sig: AlignSignal, *, rank: int | None = None, qv: float | None = None) -> str:
+def format_hit(sym: str, d: dict, sig: SqueezeSignal, *, rank: int | None = None, qv: float | None = None) -> str:
     ts = hm(int(d["t"][sig.idx]))
     rank_s = f"成交額 #{rank}" if rank else "成交額前100"
     qv_s = f"　24h {qv/1e6:.0f}M USDT" if qv else ""
     return (
-        f"<b>15m 多頭排列 · 剛站上 MA200</b>  {sym}\n"
+        f"<b>15m 200MA 附近進場</b>  {sym}\n"
         f"{ts}　現價 {sig.close:g}　離 200 {sig.ext*100:+.2f}%\n"
-        f"MA5 {sig.ma5:g} &gt; MA20 {sig.ma20:g} &gt; MA99 {sig.ma99:g}　MA200 {sig.ma200:g}\n"
-        f"均線帶寬 {sig.ribbon*100:.2f}%　99↔200 {sig.gap99*100:.2f}%\n"
+        f"MA7 {sig.ma7:g} / 14 {sig.ma14:g} / 25 {sig.ma25:g} / "
+        f"99 {sig.ma99:g} / 120 {sig.ma120:g} / 200 {sig.ma200:g}\n"
+        f"黏帶 {sig.ribbon*100:.2f}%　量 {sig.vol_ratio:.1f}x　振幅 {sig.expand:.1f}x\n"
         f"{rank_s}{qv_s}\n"
-        f"<i>MA5&gt;MA20&gt;MA99，均線黏得像 ETH 圖，這根剛收盤站上 MA200。</i>"
+        f"<i>均線黏得像 ETH 截圖，還貼著 200 才進，不追已經直豎的。</i>"
     )
 
 
-def key_of(sym: str, d: dict, sig: AlignSignal) -> str:
+def key_of(sym: str, d: dict, sig: SqueezeSignal) -> str:
     return f"{sym}:{int(d['t'][sig.idx])}"
 
 
@@ -313,14 +340,14 @@ def scan_symbol(sym: str, *, last_bars: int | None = 2) -> list[dict]:
     raw = fetch_klines(sym)
     if raw is None:
         return []
-    d = add_indicators(raw)
+    d = prepare(raw)
     if last_bars is None:
-        sigs = detect_signals(d)
+        sigs = [s for s in detect_signals(d) if is_stacked(d, s.idx)]
     else:
         sigs = []
         for i in range(max(MIN_BARS, len(d["c"]) - last_bars), len(d["c"])):
             s = signal_at(d, i)
-            if s:
+            if s and is_stacked(d, i):
                 sigs.append(s)
     return [{"symbol": sym, "d": d, "sig": s} for s in sigs]
 
@@ -342,10 +369,14 @@ def backtest_symbol(sym: str, start: datetime, end: datetime) -> list[dict]:
     raw = fetch_range(sym, start - timedelta(days=3), end)
     if raw is None:
         return []
-    d = add_indicators(raw)
+    d = prepare(raw)
     start_ms = int(start.timestamp() * 1000)
     end_ms = int(end.timestamp() * 1000)
-    sigs = [s for s in detect_signals(d) if start_ms <= int(d["t"][s.idx]) < end_ms]
+    sigs = [
+        s
+        for s in detect_signals(d)
+        if start_ms <= int(d["t"][s.idx]) < end_ms and is_stacked(d, s.idx)
+    ]
     return [{"symbol": sym, "d": d, "sig": s} for s in sigs]
 
 
@@ -361,6 +392,8 @@ def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_c
     if len(rows) > max_cards:
         rows = sorted(rows, key=lambda r: -r["sig"].ext)[:max_cards]
         rows = sorted(rows, key=lambda r: int(r["d"]["t"][r["sig"].idx]))
+    # 你的 ETH 截圖放第一張，對齊用
+    rows = sorted(rows, key=lambda r: (0 if r["symbol"] == "ETHUSDT" else 1, int(r["d"]["t"][r["sig"].idx])))
     cards = []
     for n, row in enumerate(rows, 1):
         sig, d, sym = row["sig"], row["d"], row["symbol"]
@@ -368,8 +401,10 @@ def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_c
         png = draw_chart(sym, d, sig, img_dir / img_name)
         src = _b64_img(png) if png and png.exists() else ""
         detail = (
-            f"現價 {sig.close:g}　離 200 {sig.ext*100:+.2f}%　帶寬 {sig.ribbon*100:.2f}%　99↔200 {sig.gap99*100:.2f}%\n"
-            f"MA5 {sig.ma5:g} > MA20 {sig.ma20:g} > MA99 {sig.ma99:g}　MA200 {sig.ma200:g}"
+            f"現價 {sig.close:g}　離 200 {sig.ext*100:+.2f}%　黏帶 {sig.ribbon*100:.2f}%　"
+            f"量 {sig.vol_ratio:.1f}x　振幅 {sig.expand:.1f}x\n"
+            f"MA7 {sig.ma7:g} / 14 {sig.ma14:g} / 25 {sig.ma25:g} / "
+            f"99 {sig.ma99:g} / 120 {sig.ma120:g} / 200 {sig.ma200:g}"
         )
         img_html = f"<img src='{src}' alt='{escape(sym)}' style='width:100%;display:block;border-radius:10px'/>" if src else ""
         cards.append(
@@ -377,9 +412,9 @@ def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_c
             f"<header class='card-header'><div class='card-title'><span class='trade-no'>#{n} · {escape(sym)}</span>"
             f"<span class='trade-time'>{hm(int(d['t'][sig.idx]))}</span></div>"
             f"<div class='card-pnl pnl-win'>{sig.ext*100:+.2f}%</div></header>"
-            f"<div class='tags'><span class='tag tag-info'>剛站上200</span>"
-            f"<span class='tag tag-info'>15m</span><span class='tag tag-info'>5&gt;20&gt;99</span>"
-            f"<span class='tag tag-info'>均線黏</span></div>"
+            f"<div class='tags'><span class='tag tag-info'>200附近</span>"
+            f"<span class='tag tag-info'>15m</span><span class='tag tag-info'>ETH線型</span>"
+            f"<span class='tag tag-info'>5&gt;20&gt;99</span></div>"
             f"<pre class='trade-detail'>{escape(detail)}</pre>"
             f"<div class='mini-chart'>{img_html}</div></article>"
         )
@@ -418,9 +453,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">週期<b>15m</b></div>
 <div class="card">標的<b>成交額前{TOP_N}</b></div>
 </div>
-<p class="muted">MA5 &gt; MA20 &gt; MA99，均線距離像 ETH 圖（帶寬 ≤ 0.8%、99 與 200 ≤ 0.7%），只記剛收盤站上 MA200 的那一根。</p>
+<p class="muted">對齊 ETH 截圖：7/14/25/99/120/200 黏在 200 附近，放量打出但收盤仍靠近 200 才進。不追已經直豎到 +3% 的那一段。</p>
 </section>
-{''.join(cards) if cards else "<div class='empty'>這段期間沒有剛站上 MA200（或均線已散開）。</div>"}
+{''.join(cards) if cards else "<div class='empty'>這段期間沒有 200 附近、像 ETH 截圖的進場。</div>"}
 </div></body></html>
 """
     path.write_text(html, encoding="utf-8")
@@ -428,12 +463,13 @@ h1{{font-size:18px;margin:0 0 6px}}
     return path
 
 
-def print_row(sym: str, d: dict, sig: AlignSignal, *, rank: int | None = None) -> None:
+def print_row(sym: str, d: dict, sig: SqueezeSignal, *, rank: int | None = None) -> None:
     r = f"  #{rank}" if rank else ""
     print(
         f"{sym:12s}{r:5s} {hm(int(d['t'][sig.idx]))}  "
-        f"px={sig.close:g}  5={sig.ma5:g} > 20={sig.ma20:g} > 99={sig.ma99:g}  200={sig.ma200:g}  "
-        f"ribbon={sig.ribbon*100:.2f}%  gap99={sig.gap99*100:.2f}%  ext={sig.ext*100:+.2f}%"
+        f"px={sig.close:g}  200={sig.ma200:g}  "
+        f"rib={sig.ribbon*100:.2f}%  ext={sig.ext*100:+.2f}%  "
+        f"vol={sig.vol_ratio:.1f}x  exp={sig.expand:.1f}x"
     )
 
 
@@ -466,8 +502,8 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             if done % 20 == 0:
                 print(f"  {done}/{len(symbols)}  已找到 {len(rows)}", flush=True)
     rows.sort(key=lambda r: int(r["d"]["t"][r["sig"].idx]))
-    print(f"\n=== {days} 日 5>20>99 剛站上 200 · 均線距離像 ETH ===")
-    print(f"剛站上 {len(rows)} 筆")
+    print(f"\n=== {days} 日 200MA 附近 · ETH 截圖線型 ===")
+    print(f"進場 {len(rows)} 筆")
     for r in rows:
         print_row(r["symbol"], r["d"], r["sig"], rank=ranks.get(r["symbol"]))
     if args.pages or args.html:
@@ -475,10 +511,10 @@ def cmd_backtest(args: argparse.Namespace) -> int:
         write_html(
             rows,
             out,
-            title="15m 多頭排列 · 剛站上 MA200 · 均線黏",
+            title="15m 200MA 附近進場 · ETH 截圖線型",
             subtitle=(
                 f"{days}d · {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')} · "
-                f"成交額前 {len(symbols)} · 帶寬≤0.8% · 99↔200≤0.7% · 剛站上 200 才記"
+                f"成交額前 {len(symbols)} · 黏帶≤0.6% · 離200≤0.8% · 不追直豎"
             ),
         )
         print(f"HTML {out}")
@@ -493,13 +529,13 @@ def cmd_symbol(args: argparse.Namespace) -> int:
         print(f"\n=== {sym} {days}d ===")
         rows = backtest_symbol(sym, start, end)
         if not rows:
-            print("沒有剛站上 MA200（或均線已散開）")
+            print("沒有 200 附近、像 ETH 截圖的進場")
             continue
         for r in rows:
             print_row(sym, r["d"], r["sig"])
         if args.html or args.pages:
             out = Path(args.html) if args.html else PAGES_HTML
-            write_html(rows, out, title=f"{sym} 15m 多頭排列", subtitle=f"{days}d")
+            write_html(rows, out, title=f"{sym} 15m 200附近 · ETH線型", subtitle=f"{days}d")
             print(f"HTML {out}")
     return 0
 
@@ -526,7 +562,7 @@ def wait_next_close() -> None:
 def cmd_watch(args: argparse.Namespace) -> int:
     apply_keys()
     if args.test:
-        ok = telegram_send("15m 多頭排列測試\n如果你看到這則，Telegram 已通。")
+        ok = telegram_send("15m 200MA 附近進場測試\n如果你看到這則，Telegram 已通。")
         print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
         return 0 if ok else 1
     seen = load_seen()
@@ -535,7 +571,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
     symbols = [s for s, _ in uni]
     ranks = {s: i for i, (s, _) in enumerate(uni, 1)}
     qvs = {s: q for s, q in uni}
-    print(f"監看 {len(symbols)} 檔。5>20>99、均線黏、這根剛站上 200 會推。", flush=True)
+    print(f"監看 {len(symbols)} 檔。200 附近、像 ETH 截圖的進場會推。", flush=True)
     print(f"  #1 {uni[0][0]}  {uni[0][1]/1e6:.0f}M  ·  #{len(uni)} {uni[-1][0]}  {uni[-1][1]/1e6:.0f}M", flush=True)
     uni_ts = time.time()
 
@@ -576,11 +612,11 @@ def cmd_watch(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="幣安 15m MA5/20/99 多頭排列 · 剛站上 MA200 · 均線距離像 ETH · 成交額前100")
+    p = argparse.ArgumentParser(description="幣安 15m 200MA 附近進場 · ETH 截圖線型 · 成交額前100")
     p.add_argument("--symbol", help="只掃這些合約，逗號分隔，例如 ETHUSDT")
     p.add_argument("--days", type=int, default=5, help="回看天數")
     p.add_argument("--top", type=int, default=TOP_N, help="成交額前 N")
-    p.add_argument("--backtest", action="store_true", help="前 N 名回測剛站上 200 的時點")
+    p.add_argument("--backtest", action="store_true", help="前 N 名回測 200 附近、像 ETH 截圖的進場")
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma-align-15m/")
     p.add_argument("--html", help="HTML 輸出路徑")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的 1～2 根並推通知")
