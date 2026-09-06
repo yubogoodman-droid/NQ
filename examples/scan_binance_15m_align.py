@@ -617,7 +617,7 @@ def main() -> int:
     p.add_argument("--days", type=int, default=5, help="回看天數")
     p.add_argument("--top", type=int, default=TOP_N, help="成交額前 N")
     p.add_argument("--backtest", action="store_true", help="前 N 名回測 200 附近、像 ETH 截圖的進場")
-    p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma-align-15m/")
+    p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma200-squeeze-15m-3d/")
     p.add_argument("--html", help="HTML 輸出路徑")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的 1～2 根並推通知")
     p.add_argument("--test", action="store_true", help="測 Telegram")
