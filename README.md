@@ -96,8 +96,8 @@ python3 examples/watch_binance_5m_short.py --backtest --days 2 --pages
 python3 examples/test_watch_binance_5m_short.py
 ```
 
-只掃 24h 成交額前 100 檔。近兩天（2026-09-04 16:00 → 09-06 16:00）：**327 筆 / 94 檔**。  
-持有 30 分鐘勝率 **34.6%、平均 −0.26%**；60 分鐘 **35.4%、平均 −0.43%**。
+只掃 24h 成交額前 100 檔。近兩天（2026-09-04 16:10 → 09-06 16:10）：**328 筆 / 94 檔**。  
+當下 15m 空排 125／328、收在年線下 77／328。持有 30 分鐘勝率 **34.5%、平均 −0.26%**；60 分鐘 **36.0%、平均 −0.42%**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-short-align-5ca1/docs/binance-5m-short/view.html
 
