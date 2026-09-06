@@ -95,6 +95,24 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## 幣安 1 小時 K 多頭爆發 Telegram
+
+1 小時圖：`MA7 > MA14 > MA25 > MA99 > MA120 > MA200` 多頭排列，剛收盤那根成交量 **大於前一根一倍以上**（量 > 前一根 × 2），且必須是 **收漲陽線**（收盤 > 開盤）。推 Telegram（帶圖）。同一根 K 不會重發。不限制離 MA25 多遠、也不要求短均發散（要像 BNB 再加 `--fan --max-ext-ma25 0.015`）。
+
+憑證同樣放 `tg_config.env`，或寫在 `examples/watch_binance_1h_burst.py` 最上面。
+
+```bash
+python3 examples/watch_binance_1h_burst.py --test                    # 先測通不通
+python3 examples/watch_binance_1h_burst.py --once --dry-run          # 只掃剛收盤、不送
+python3 examples/watch_binance_1h_burst.py                           # 每根 1h 收盤掃一次（只要收漲陽線）
+python3 examples/backtest_binance_1h_burst.py --days 3 --pages        # 近三天回測 + HTML
+python3 examples/test_watch_binance_1h_burst.py                      # 單元測試（不打網路）
+```
+
+近三天拿掉離 MA25／短均發散後：進場 **180** 筆（90 檔），已平 161 筆勝率 **47.2%**，平均 **+0.30%**。收盤後 +24h 平均 **+4.23%**。RAYSOL 有抓到 4 筆，含今天 09-06 10:00 那根（離 MA25 +13.6%，下一根 2R **+7.74%**；11:00 續噴因同標的重疊沒再進）。要像 BNB 再加 `--fan --max-ext-ma25 0.015`。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-1h-bull-burst-ee86/docs/binance-1h-burst/view.html
+
 ## 快速開始
 
 ```bash
