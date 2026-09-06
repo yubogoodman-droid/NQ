@@ -14,6 +14,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from functools import partial
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -46,8 +47,10 @@ BREAKOUT_WINDOW = 16
 MIN_QUOTE_VOL = 1_000_000.0
 MIN_LIKE_PCT = 58.0
 UAI_REF_SCORE = 118.0
-LOOKBACK_BARS = 1000
-KEEP_HOURS = 48
+KLINE_MAX = 1500
+DEFAULT_DAYS = 7
+LOOKBACK_BARS = DEFAULT_DAYS * 24 * 12 + 220
+KEEP_HOURS = DEFAULT_DAYS * 24
 SUPPORT_MAS = (200, 120, 99)
 MA_L2_UNDERCUT = 0.02
 MA_L1_UNDERCUT = 0.025
@@ -84,6 +87,24 @@ class WHit:
     like_pct: float = 0.0
     ma_support: str = ""
     reference: bool = False
+
+
+def kline_count(days: int) -> int:
+    return days * 24 * 12 + 220
+
+
+def merge_klines(*batches: list[list[Any]]) -> list[list[Any]]:
+    seen: set[int] = set()
+    out: list[list[Any]] = []
+    for batch in batches:
+        for row in batch:
+            ts = int(row[0])
+            if ts in seen:
+                continue
+            seen.add(ts)
+            out.append(row)
+    out.sort(key=lambda row: int(row[0]))
+    return out
 
 
 def get_json(path: str, params: dict[str, Any] | None = None, retries: int = 4) -> Any:
@@ -202,6 +223,7 @@ def detect_w_bottoms(
     *,
     symbol: str = "",
     volume24: float = 0.0,
+    keep_hours: float | None = None,
 ) -> list[WHit]:
     n = len(closes)
     if n < 60:
@@ -209,6 +231,7 @@ def detect_w_bottoms(
     mins = swing_lows(lows)
     hits: list[WHit] = []
     last_t = times[-1]
+    keep = KEEP_HOURS if keep_hours is None else keep_hours
     mas = {p: rolling_mean(closes, p) for p in SUPPORT_MAS}
     for ai, i in enumerate(mins):
         for j in mins[ai + 1 :]:
@@ -261,7 +284,7 @@ def detect_w_bottoms(
                 if min(lows[j : b + 1]) < l2 * 0.98:
                     continue
                 age_h = (last_t - times[b]) / 3_600_000
-                if age_h > KEEP_HOURS:
+                if age_h > keep:
                     continue
                 base = quote_vol[max(0, b - 20) : b] or [1.0]
                 volx = quote_vol[b] / (statistics.median(base) or 1.0)
@@ -609,7 +632,7 @@ def build_html(payload: dict[str, Any]) -> str:
 <body>
 <div class="page">
   <section class="summary">
-    <h1>幣安 USDT 永續 · 5m W底 · 近兩天</h1>
+    <h1>幣安 USDT 永續 · 5m W底 · 近{payload.get('days', DEFAULT_DAYS)}天</h1>
     <p class="muted">只留長得像 UAI 的：急殺 ≥10%、較高第二底、間隔 40–100 分、頸線深度 6–14%，W 底附近要踩住 MA99／120／200。相似度用 UAI 當 100%。時間台北。截至 {escape(payload['asof'])}。僅供型態對照，不是進出場建議。</p>
     <div class="cards">
       <div class="stat">掃描<b>{payload['universe']}</b></div>
@@ -617,7 +640,7 @@ def build_html(payload: dict[str, Any]) -> str:
       <div class="stat">待突破<b>{payload['pending']}</b></div>
       <div class="stat">已突破<b>{payload['valid']}</b></div>
     </div>
-    <p class="note">黃虛線頸線、綠虛線量度目標。兩底都要收到長均附近，MAGMA／HEMI 那種懸空下跌不算。</p>
+    <p class="note">黃虛線頸線、綠虛線量度目標。兩底都要收到 MA99／120／200。一週視窗含 MA200 暖機 K 線。</p>
   </section>
   {"".join(cards)}
 </div>
@@ -641,9 +664,25 @@ def universe_symbols(min_quote_vol: float = MIN_QUOTE_VOL) -> tuple[list[str], d
     return symbols, tv
 
 
-def fetch_klines(symbol: str) -> tuple[str, list[list[Any]] | None]:
+def fetch_klines(symbol: str, bars: int = LOOKBACK_BARS) -> tuple[str, list[list[Any]] | None]:
     try:
-        return symbol, get_json("/klines", {"symbol": symbol, "interval": "5m", "limit": LOOKBACK_BARS})
+        batches: list[list[list[Any]]] = []
+        end_time: int | None = None
+        remaining = bars
+        while remaining > 0:
+            params: dict[str, Any] = {"symbol": symbol, "interval": "5m", "limit": min(KLINE_MAX, remaining)}
+            if end_time is not None:
+                params["endTime"] = end_time
+            batch = get_json("/klines", params)
+            if not batch:
+                break
+            batches.append(batch)
+            if len(batch) < params["limit"]:
+                break
+            end_time = int(batch[0][0]) - 1
+            remaining = bars - sum(len(b) for b in batches)
+        merged = merge_klines(*reversed(batches))
+        return symbol, merged[-bars:]
     except Exception:  # noqa: BLE001
         return symbol, None
 
@@ -652,10 +691,15 @@ def status_rank(hit: WHit) -> tuple[int, float]:
     return (0 if hit.reference else 1, -hit.like_pct)
 
 
-def scan(min_quote_vol: float = MIN_QUOTE_VOL) -> tuple[dict[str, Any], dict[str, tuple[list[float], ...]]]:
+def scan(
+    min_quote_vol: float = MIN_QUOTE_VOL,
+    days: int = DEFAULT_DAYS,
+) -> tuple[dict[str, Any], dict[str, tuple[list[float], ...]]]:
+    bars = kline_count(days)
+    hours = float(days * 24)
     symbols, tv = universe_symbols(min_quote_vol)
-    with ThreadPoolExecutor(max_workers=16) as pool:
-        raw = dict(pool.map(fetch_klines, symbols))
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        raw = dict(pool.map(partial(fetch_klines, bars=bars), symbols))
     hits: list[WHit] = []
     series: dict[str, tuple[list[float], ...]] = {}
     for symbol, klines in raw.items():
@@ -664,7 +708,9 @@ def scan(min_quote_vol: float = MIN_QUOTE_VOL) -> tuple[dict[str, Any], dict[str
         closed = klines[:-1]
         ohlcv = parse_klines(closed)
         series[symbol] = ohlcv
-        found = detect_w_bottoms(*ohlcv, symbol=symbol, volume24=tv.get(symbol, 0.0))
+        found = detect_w_bottoms(
+            *ohlcv, symbol=symbol, volume24=tv.get(symbol, 0.0), keep_hours=hours
+        )
         best = best_hit(found)
         if best:
             if symbol == "UAIUSDT":
@@ -675,7 +721,12 @@ def scan(min_quote_vol: float = MIN_QUOTE_VOL) -> tuple[dict[str, Any], dict[str
                 continue
             hits.append(best)
     if "UAIUSDT" in series and not any(h.symbol == "UAIUSDT" for h in hits):
-        found = detect_w_bottoms(*series["UAIUSDT"], symbol="UAIUSDT", volume24=tv.get("UAIUSDT", 0.0))
+        found = detect_w_bottoms(
+            *series["UAIUSDT"],
+            symbol="UAIUSDT",
+            volume24=tv.get("UAIUSDT", 0.0),
+            keep_hours=hours,
+        )
         if found:
             best = max(found, key=lambda h: h.score)
             best.reference = True
@@ -688,6 +739,7 @@ def scan(min_quote_vol: float = MIN_QUOTE_VOL) -> tuple[dict[str, Any], dict[str
     payload_hits = [chart_payload(h, series[h.symbol]) for h in hits if h.symbol in series]
     payload = {
         "asof": asof,
+        "days": days,
         "universe": len(symbols),
         "matched": len(hits),
         "pending": sum(1 for h in hits if h.status == "待突破"),
@@ -729,13 +781,14 @@ def write_report(payload: dict[str, Any], series: dict[str, tuple[list[float], .
 def main() -> None:
     parser = argparse.ArgumentParser(description="掃描幣安 5m W底並輸出 HTML")
     parser.add_argument("--output", "-o", default=str(PAGES))
+    parser.add_argument("--days", type=int, default=DEFAULT_DAYS, help="回測天數（5m）")
     parser.add_argument("--min-quote-vol", type=float, default=MIN_QUOTE_VOL)
     args = parser.parse_args()
-    payload, series = scan(args.min_quote_vol)
+    payload, series = scan(args.min_quote_vol, days=args.days)
     out = Path(args.output)
     write_report(payload, series, out)
     print(f"已產生: {out}")
-    print(f"掃描 {payload['universe']} · 命中 {payload['matched']} · 截至 {payload['asof']}")
+    print(f"掃描 {payload['universe']} · {payload.get('days', DEFAULT_DAYS)}天 · 命中 {payload['matched']} · 截至 {payload['asof']}")
     for hit in payload["hits"]:
         print(
             f"  {hit['symbol']:16} {hit['status']:8} 像UAI {hit.get('like_pct', 0):5.1f}% "

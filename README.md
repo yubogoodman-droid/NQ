@@ -80,10 +80,10 @@ python3 examples/test_tw_1h_reclaim.py
 
 ## 幣安 5 分 K W 底掃描（對齊 UAI）
 
-近 48 小時、USDT 永續：對齊 UAI 的急殺、較高第二底、緊湊雙底，且兩底附近要有 MA99／120／200 支撐。
+近 7 天、USDT 永續：對齊 UAI 的急殺、較高第二底、緊湊雙底，且兩底附近要有 MA99／120／200 支撐。
 
 ```bash
-python3 examples/scan_binance_w_bottom.py
+python3 examples/scan_binance_w_bottom.py --days 7
 python3 examples/test_scan_binance_w_bottom.py
 ```
 

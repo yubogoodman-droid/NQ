@@ -12,8 +12,10 @@ from scan_binance_w_bottom import (  # noqa: E402
     detect_w_bottoms,
     draw_hit_png,
     fmt_price,
+    kline_count,
     like_pct_from_score,
     ma_hold,
+    merge_klines,
     swing_lows,
     uai_like_score,
 )
@@ -117,6 +119,18 @@ def test_uai_like_prefers_compact_higher_low() -> None:
     assert like_pct_from_score(wide_lower) < 40
 
 
+def test_kline_count_week() -> None:
+    assert kline_count(7) == 7 * 24 * 12 + 220
+
+
+def test_merge_klines_dedupes() -> None:
+    a = [[100, "1"], [200, "2"]]
+    b = [[200, "2b"], [300, "3"]]
+    merged = merge_klines(a, b)
+    assert [row[0] for row in merged] == [100, 200, 300]
+    assert merged[1][1] == "2"
+
+
 def test_fmt_price() -> None:
     assert fmt_price(123.456) == "123.46"
     assert fmt_price(0.4885) == "0.48850"
@@ -137,6 +151,8 @@ if __name__ == "__main__":
     test_rejects_w_without_ma_support()
     test_ma_hold()
     test_uai_like_prefers_compact_higher_low()
+    test_kline_count_week()
+    test_merge_klines_dedupes()
     test_fmt_price()
     test_draw_hit_png()
     print("ok")
