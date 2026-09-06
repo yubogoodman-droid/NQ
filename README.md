@@ -45,6 +45,47 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## 台股 5 分 K 破底反彈 → 5/10/20 多頭排列通知
+
+對齊力成（6239）那種五分圖：急殺破近期低點後 V 彈，**5MA > 10MA > 20MA 明顯分開、往上張開**才推 Telegram。均線黏在一起、橫盤糾結的不算。
+
+| 條件 | 預設 |
+|------|------|
+| 週期 | 5 分 K |
+| 破底 | 跌破近 48 根（約 4 小時）低點，且自該段高點跌幅 ≥ 2%；**破底那根下方不能有任何均線**（5/10/20/60/120/200/240） |
+| 反彈視窗 | 破底後 24 根內 |
+| 通知 | 5/10/20 三條都要看得見、往上張開（MA5−MA10 ≥ 0.15%、MA10−MA20 ≥ 0.12%、MA5−MA20 ≥ 0.30%），MA20 也要上彎；黏帶／糾結不算。09:30 前不報 |
+| 富喬標準 | 對齊富喬 1815 08-28 10:15 那筆：**破底那段要爆量**（3 根內最大量 ≥ 前 20 根均量 2 倍）、**反彈段要帶量**（破底後到進場均量 ≥ 破底前 12 根均量）、**進場價站回 60MA 之上**。`--min-climax-vol 0 --min-bounce-vol 0 --no-ma60` 可各自關掉 |
+| 當日跌幅 | 卡片上寫的「當日高點→破底」也要 ≥ 2%。48 根視窗跨到昨天的慢跌、今早只小跳空的不算急殺 |
+| 蓋子 | 進場價上方 0.5% 內有 60/120/200/240 就算蓋子。弱彈不追；當日急殺 ≥ 5% 允許穿蓋（國巨／鼎元那種）。`--min-lid-pct 0` 關掉 |
+
+```bash
+# 先看力成近 5 日有沒有這種圖
+python3 examples/watch_tw_5m_bounce.py scan --symbols 6239 --range 5d --pages
+
+# 成交額前 80 回看 + 手機版 HTML
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
+
+# 只看今天（台北）的訊號，並把力成併進去
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pages
+
+# 近兩週、700 以上拿掉；均線糾結的不會算，並套富喬標準（量 + 60MA）
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 10d --also 1815.TWO --pages
+
+# 不要量的門檻，只看均線排列
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --min-climax-vol 0 --min-bounce-vol 0 --no-ma60 --pages
+
+# Telegram（憑證放 tg_config.env）
+python3 examples/watch_tw_5m_bounce.py alert --test
+python3 examples/watch_tw_5m_bounce.py alert --dry-run --once
+python3 examples/watch_tw_5m_bounce.py alert
+```
+
+盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_bounce_ma_stack.pine`。
+
+近兩週（2026-08-25→09-04）成交額前 80、**700 以上拿掉**、套富喬標準 + 當日跌幅 + 蓋子： **19 筆**、勝率 74%、合計 +48.6%。同一段只看均線排列是 81 筆 +82.5%；量 + 60MA 是 27 筆 +53.0%。#11 仁寶（當日只跌 1.1%）、#15 仁寶／#19 台勝科（彈進貼頭的均線）會拿掉；急殺 ≥ 5% 的國巨、鼎元頭上有均線仍算。代價是光寶科那種 3% 跳空穿均線（+6.5%）不會出。圖上有 5/10/20/60/120/200/240，卡片寫破底量／反彈量／蓋子。  
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash

@@ -1,0 +1,124 @@
+//@version=5
+indicator("台股 5分K 破底反彈 · 5/10/20 多頭排列", overlay=true)
+
+lookback    = input.int(48, "破底回看 K 數", minval=12)
+minDropPct  = input.float(2.0, "最小跌幅 %", minval=0.5, step=0.1)
+minBouncePct = input.float(1.0, "最小反彈 %", minval=0.3, step=0.1)
+reboundBars = input.int(24, "反彈視窗（根）", minval=6)
+slopeBars   = input.int(3, "均線上彎回看", minval=1)
+minGap5_10  = input.float(0.15, "MA5-MA10 最小間隔 %", minval=0.0, step=0.025)
+minGap10_20 = input.float(0.12, "MA10-MA20 最小間隔 %", minval=0.0, step=0.025)
+minGap5_20  = input.float(0.30, "MA5-MA20 最小間隔 %", minval=0.0, step=0.025)
+requirePretty = input.bool(true, "擋掉糾結黏帶")
+clearTrough   = input.bool(true, "破底那根下方不能有均線")
+minClimaxVol  = input.float(2.0, "破底段爆量倍數（0=不檢查）", minval=0.0, step=0.5)
+minBounceVol  = input.float(1.0, "反彈段量能倍數（0=不檢查）", minval=0.0, step=0.1)
+aboveMa60     = input.bool(true, "進場價要站上 60MA")
+minLidPct     = input.float(0.5, "蓋子最小空檔 %（0=不檢查）", minval=0.0, step=0.1)
+punchDrop     = input.float(5.0, "穿蓋所需當日跌幅 %", minval=0.0, step=0.5)
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, 20)
+ma60 = ta.sma(close, 60)
+ma120 = ta.sma(close, 120)
+ma200 = ta.sma(close, 200)
+ma240 = ta.sma(close, 240)
+
+stacked    = ma5 > ma10 and ma10 > ma20
+gap5       = close > 0 ? (ma5 - ma10) / close * 100 : 0
+gap10      = close > 0 ? (ma10 - ma20) / close * 100 : 0
+gap20      = close > 0 ? (ma5 - ma20) / close * 100 : 0
+ma5Up      = ma5 > ma5[slopeBars]
+ma10Up     = (ma10 - ma10[slopeBars]) / close * 100 >= 0.15
+ma20Up     = (ma20 - ma20[slopeBars]) / close * 100 >= 0.05
+fanOpen    = (ma5 - ma20) > (ma5[slopeBars] - ma20[slopeBars])
+pretty     = stacked and gap5 >= minGap5_10 and gap10 >= minGap10_20 and gap20 >= minGap5_20 and ma5Up and ma10Up and ma20Up and fanOpen and close >= ma5
+ready      = requirePretty ? pretty : stacked
+readyNew   = ready and not ready[1]
+priorLow   = ta.lowest(low[1], lookback)
+winHigh    = ta.highest(high[1], lookback)
+dropPct    = winHigh > 0 ? (winHigh - low) / winHigh * 100 : 0
+dumpBar    = low < priorLow and dropPct >= minDropPct
+
+var float trough = na
+var int   troughBar = na
+var float dumpHigh = na
+var float climaxRatio = na   // 破底段最大量 / 前 20 根均量
+var float preBounceVol = na  // 破底前 12 根均量
+var float upVolSum = 0.0
+var int   upBars = 0
+var float sessHi = na
+var float troughSessHigh = na
+
+newDay = ta.change(time("D")) != 0
+sessHi := newDay or na(sessHi) ? high : math.max(sessHi, high)
+
+vol20   = ta.sma(volume, 20)
+vol12   = ta.sma(volume, 12)
+dumpVol = math.max(volume, volume[1], volume[2])
+
+if dumpBar
+    if na(trough) or low < trough
+        trough := low
+        troughBar := bar_index
+        dumpHigh := winHigh
+        troughSessHigh := sessHi
+        climaxRatio := vol20[3] > 0 ? dumpVol / vol20[3] : na
+        preBounceVol := vol12[1] > 0 ? vol12[1] : na
+        upVolSum := 0.0
+        upBars := 0
+else if not na(troughBar)
+    upVolSum += volume
+    upBars += 1
+
+if not na(troughBar) and bar_index - troughBar > reboundBars
+    trough := na
+    troughBar := na
+    dumpHigh := na
+    climaxRatio := na
+    preBounceVol := na
+
+bouncePct = not na(trough) and trough > 0 ? (close - trough) / trough * 100 : 0
+bounceVolRatio = upBars > 0 and not na(preBounceVol) ? (upVolSum / upBars) / preBounceVol : na
+skipOpen = hour(time, "Asia/Taipei") == 9 and minute(time, "Asia/Taipei") < 30
+maClear(src) =>
+    na(troughBar) or na(src[bar_index - troughBar]) or src[bar_index - troughBar] > trough
+troughClear = not clearTrough or (maClear(ma5) and maClear(ma10) and maClear(ma20) and maClear(ma60) and maClear(ma120) and maClear(ma200) and maClear(ma240))
+climaxOk = minClimaxVol <= 0 or na(climaxRatio) or climaxRatio >= minClimaxVol
+bounceVolOk = minBounceVol <= 0 or na(bounceVolRatio) or bounceVolRatio >= minBounceVol
+ma60Ok = not aboveMa60 or na(ma60) or close > ma60
+dayDrop = not na(troughSessHigh) and troughSessHigh > trough ? (troughSessHigh - trough) / troughSessHigh * 100 : 0
+dayDropOk = na(troughBar) or dayDrop >= minDropPct
+lidGap(src) =>
+    na(src) or close > src ? na : (src - close) / close * 100
+lid = math.min(nz(lidGap(ma60), 1e9), nz(lidGap(ma120), 1e9), nz(lidGap(ma200), 1e9), nz(lidGap(ma240), 1e9))
+noLid = lid >= 1e8
+lidOk = minLidPct <= 0 or noLid or lid >= minLidPct or dayDrop >= punchDrop
+cand = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and ma60Ok and dayDropOk
+sig = cand and lidOk
+
+if cand and not lidOk
+    trough := na
+    troughBar := na
+    dumpHigh := na
+    climaxRatio := na
+    preBounceVol := na
+
+if sig
+    trough := na
+    troughBar := na
+    dumpHigh := na
+    climaxRatio := na
+    preBounceVol := na
+
+plot(ma5, "5MA", color=color.new(#3b82f6, 0), linewidth=2)
+plot(ma10, "10MA", color=color.new(#22c55e, 0), linewidth=2)
+plot(ma20, "20MA", color=color.new(#f59e0b, 0), linewidth=2)
+plot(ma60, "60MA", color=color.new(#14b8a6, 0), linewidth=2)
+plot(ma120, "120MA", color=color.new(#a855f7, 0), linewidth=2)
+plot(ma200, "200MA", color=color.new(#e5e7eb, 0), linewidth=2)
+plot(ma240, "240MA", color=color.new(#f472b6, 0))
+
+plotshape(sig, title="破底反彈多頭排列", style=shape.triangleup, location=location.belowbar, color=color.red, size=size.small)
+alertcondition(sig, title="破底後 5/10/20 多頭排列", message="破底反彈：5分K 5>10>20 排列漂亮")
