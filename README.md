@@ -88,7 +88,7 @@ python3 examples/test_scan_binance_w_bottom.py
 ```
 
 報告：`docs/binance-w-bottom/index.html`  
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/binance-w-bottom/index.html
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-w-bottom-html-18d2/docs/binance-w-bottom/index.html
 
 ## 幣安黏帶三幕 Telegram
 
