@@ -13,7 +13,7 @@ requirePretty = input.bool(true, "擋掉糾結黏帶")
 clearTrough   = input.bool(true, "破底那根下方不能有均線")
 minClimaxVol  = input.float(2.0, "破底段爆量倍數（0=不檢查）", minval=0.0, step=0.5)
 minBounceVol  = input.float(1.0, "反彈段量能倍數（0=不檢查）", minval=0.0, step=0.1)
-aboveMas      = input.bool(true, "進場價要站上所有均線（上方不能有 60/120/200/240）")
+aboveMa60     = input.bool(true, "進場價要站上 60MA")
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -46,11 +46,6 @@ var float climaxRatio = na   // 破底段最大量 / 前 20 根均量
 var float preBounceVol = na  // 破底前 12 根均量
 var float upVolSum = 0.0
 var int   upBars = 0
-var float sessHi = na          // 今天到目前為止的最高點
-var float troughSessHigh = na  // 破底當下的當日高點
-
-newDay = ta.change(time("D")) != 0
-sessHi := newDay or na(sessHi) ? high : math.max(sessHi, high)
 
 vol20   = ta.sma(volume, 20)
 vol12   = ta.sma(volume, 12)
@@ -61,7 +56,6 @@ if dumpBar
         trough := low
         troughBar := bar_index
         dumpHigh := winHigh
-        troughSessHigh := sessHi
         climaxRatio := vol20[3] > 0 ? dumpVol / vol20[3] : na
         preBounceVol := vol12[1] > 0 ? vol12[1] : na
         upVolSum := 0.0
@@ -85,12 +79,8 @@ maClear(src) =>
 troughClear = not clearTrough or (maClear(ma5) and maClear(ma10) and maClear(ma20) and maClear(ma60) and maClear(ma120) and maClear(ma200) and maClear(ma240))
 climaxOk = minClimaxVol <= 0 or na(climaxRatio) or climaxRatio >= minClimaxVol
 bounceVolOk = minBounceVol <= 0 or na(bounceVolRatio) or bounceVolRatio >= minBounceVol
-maBelow(src) =>
-    na(src) or close > src
-masOk = not aboveMas or (maBelow(ma60) and maBelow(ma120) and maBelow(ma200) and maBelow(ma240))
-// 當日高點→破底也要過門檻：48 根視窗跨到前一天的慢跌不算急殺
-dayDropOk = na(troughBar) or (troughSessHigh > trough and (troughSessHigh - trough) / troughSessHigh * 100 >= minDropPct)
-sig = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and masOk and dayDropOk
+ma60Ok = not aboveMa60 or na(ma60) or close > ma60
+sig = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and ma60Ok
 
 if sig
     trough := na

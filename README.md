@@ -55,8 +55,7 @@ python3 examples/nq_ma_reclaim.py alert
 | 破底 | 跌破近 48 根（約 4 小時）低點，且自該段高點跌幅 ≥ 2%；**破底那根下方不能有任何均線**（5/10/20/60/120/200/240） |
 | 反彈視窗 | 破底後 24 根內 |
 | 通知 | 5/10/20 三條都要看得見、往上張開（MA5−MA10 ≥ 0.15%、MA10−MA20 ≥ 0.12%、MA5−MA20 ≥ 0.30%），MA20 也要上彎；黏帶／糾結不算。09:30 前不報 |
-| 富喬標準 | 對齊富喬 1815 08-28 10:15 那筆：**破底那段要爆量**（3 根內最大量 ≥ 前 20 根均量 2 倍）、**反彈段要帶量**（破底後到進場均量 ≥ 破底前 12 根均量）、**進場價站上所有均線**（上方不能有 60/120/200/240 壓著）。`--min-climax-vol 0 --min-bounce-vol 0 --allow-ma-overhead` 可各自關掉 |
-| 跌幅口徑 | 卡片上寫的「當日高點→破底」跌幅也要 ≥ 2%；48 根視窗跨到前一天的慢跌、今早只小跳空的不算急殺 |
+| 富喬標準 | 對齊富喬 1815 08-28 10:15 那筆：**破底那段要爆量**（3 根內最大量 ≥ 前 20 根均量 2 倍）、**反彈段要帶量**（破底後到進場均量 ≥ 破底前 12 根均量）、**進場價站回 60MA 之上**。`--min-climax-vol 0 --min-bounce-vol 0 --no-ma60` 可各自關掉 |
 
 ```bash
 # 先看力成近 5 日有沒有這種圖
@@ -71,8 +70,8 @@ python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pag
 # 近兩週、700 以上拿掉；均線糾結的不會算，並套富喬標準（量 + 60MA）
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 10d --also 1815.TWO --pages
 
-# 不要量的門檻、允許上方有長均，只看均線排列
-python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --min-climax-vol 0 --min-bounce-vol 0 --allow-ma-overhead --pages
+# 不要量的門檻，只看均線排列
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --min-climax-vol 0 --min-bounce-vol 0 --no-ma60 --pages
 
 # Telegram（憑證放 tg_config.env）
 python3 examples/watch_tw_5m_bounce.py alert --test
