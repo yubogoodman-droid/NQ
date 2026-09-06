@@ -1,0 +1,242 @@
+//@version=5
+strategy("M頭右肩破｜跌破MA60做空（5m）", overlay=true, pyramiding=0,
+     process_orders_on_close=true, calc_on_every_tick=false,
+     default_qty_type=strategy.fixed, default_qty_value=1,
+     initial_capital=100000, commission_value=0,
+     max_labels_count=50)
+
+// 建議警報名稱：M頭右肩破五分k60
+// 掛 5 分鐘圖。參數預設對齊 examples/nq_m_head.py TF_PRESETS["5m"]。
+
+// === 5m 定稿參數 ===
+swingLen     = input.int(3, "轉折確認 K 數", minval=2, group="M頭幾何")
+tolPct       = input.float(0.12, "雙頂價差上限 (%)", minval=0.01, step=0.01, group="M頭幾何") / 100.0
+h2OverTick   = input.float(0.25, "右肩最多高過左肩（點）", minval=0.0, step=0.25, group="M頭幾何")
+minGap       = input.int(4, "雙頂最少間隔", minval=2, group="M頭幾何")
+maxGap       = input.int(48, "雙頂最多間隔", minval=10, group="M頭幾何")
+minDepthPct  = input.float(0.15, "頸線深度下限 (%)", minval=0.01, step=0.01, group="M頭幾何") / 100.0
+hiLookback   = input.int(24, "高檔回看 K 數（約 2 小時）", minval=8, group="高檔")
+nearPct      = input.float(0.15, "高峰須接近回看高點 (%)", minval=0.01, step=0.01, group="高檔") / 100.0
+minH2Ext     = input.float(30.0, "右肩收盤高於 MA60（點）", minval=0.0, group="高檔")
+entryWin     = input.int(16, "確認後進場視窗", minval=1, group="進場")
+minBreak     = input.float(8.0, "收盤低於 MA60 至少（點）", minval=0.0, group="進場")
+ribbonMin    = input.float(28.0, "MA5/10/20/30/60 帶寬下限", minval=0.0, group="進場")
+useSandwich  = input.bool(true, "收盤夾在 MA120/MA200 中間不空", group="5m過濾")
+maxAbove200  = input.float(150.0, "遠 MA200 上限（且 1h 已破）", minval=0.0, group="5m過濾")
+htfGap       = input.float(200.0, "1h MA60 未測最小距離", minval=0.0, group="5m過濾")
+ma60SlopeN   = input.int(6, "MA60 斜率回看（根）", minval=1, group="5m過濾")
+stopBuf      = input.float(36.0, "停損 = 頭頂 +", minval=0.0, group="出場")
+minRisk      = input.float(50.0, "最小風險（點）", minval=1.0, group="出場")
+maxRisk      = input.float(220.0, "最大風險（點）", minval=10.0, group="出場")
+targetR      = input.float(2.0, "停利 R", minval=0.5, step=0.1, group="出場")
+holdBars     = input.int(48, "最長持倉 K 數", minval=2, group="出場")
+arm1         = input.float(0.75, "鎖利1 啟動 R", minval=0.1, step=0.05, group="出場")
+lock1        = input.float(0.5, "鎖利1 保留 R", minval=0.1, step=0.05, group="出場")
+arm2         = input.float(1.2, "鎖利2 啟動 R", minval=0.1, step=0.05, group="出場")
+lock2        = input.float(0.9, "鎖利2 保留 R", minval=0.1, step=0.05, group="出場")
+arm3         = input.float(1.6, "鎖利3 啟動 R", minval=0.1, step=0.05, group="出場")
+lock3        = input.float(1.2, "鎖利3 保留 R", minval=0.1, step=0.05, group="出場")
+tickSize     = input.float(0.25, "最小跳動", minval=0.01, group="出場")
+
+roundTick(p) =>
+    math.round(p / tickSize) * tickSize
+
+sma5   = ta.sma(close, 5)
+sma10  = ta.sma(close, 10)
+sma20  = ta.sma(close, 20)
+sma30  = ta.sma(close, 30)
+sma60  = ta.sma(close, 60)
+sma120 = ta.sma(close, 120)
+sma200 = ta.sma(close, 200)
+
+// 已收盤 1h MA60（不偷看當根未收的小時 K），對齊 overlay_htf_ma60 的 shift(1)+ffill
+htfMa60 = request.security(syminfo.tickerid, "60", ta.sma(close, 60), barmerge.gaps_off, barmerge.lookahead_off)
+
+ribbonSpread() =>
+    mx = math.max(sma5, math.max(sma10, math.max(sma20, math.max(sma30, sma60))))
+    mn = math.min(sma5, math.min(sma10, math.min(sma20, math.min(sma30, sma60))))
+    mx - mn
+
+inSandwich(c, a, b) =>
+    lo = math.min(a, b)
+    hi = math.max(a, b)
+    lo < c and c < hi
+
+farAboveMa200(c, m200, htf) =>
+    maxAbove200 > 0 and not na(c) and not na(m200) and not na(htf) and c >= m200 + maxAbove200 and c <= htf - minBreak
+
+untestedHtf(c, m60, m60ago, m200, htf) =>
+    htfGap > 0 and not na(c) and not na(m60) and not na(m60ago) and not na(m200) and not na(htf) and c < m200 and c >= htf + htfGap and m60 > m60ago
+
+trailLockR(rSeen) =>
+    float keep = na
+    if rSeen >= arm1
+        keep := lock1
+    if rSeen >= arm2
+        keep := math.max(nz(keep), lock2)
+    if rSeen >= arm3
+        keep := math.max(nz(keep), lock3)
+    keep
+
+ph = ta.pivothigh(high, swingLen, swingLen)
+
+var array<float> phPx = array.new_float()
+var array<int>   phBar = array.new_int()
+
+var bool  armed = false
+var bool  sawSandwich = false
+var float h1Px = na
+var float h2Px = na
+var float neckPx = na
+var float peakPx = na
+var int   confirmBar = na
+
+var float origStop = na
+var float trailStop = na
+var float pendingLock = na
+var float entryPx = na
+var float riskPx = na
+var float tgtPx = na
+var int   entryBar = na
+
+if not na(ph)
+    h2p = ph
+    h2b = bar_index - swingLen
+    bestDepth = 0.0
+    float bestH1 = na
+    float bestH2 = na
+    float bestNeck = na
+    float bestPeak = na
+    int   nPh = array.size(phBar)
+    if nPh > 0
+        for i = 0 to nPh - 1
+            h1p = array.get(phPx, i)
+            h1b = array.get(phBar, i)
+            gap = h2b - h1b
+            if gap >= minGap and gap <= maxGap
+                avgH = (h1p + h2p) / 2.0
+                if avgH > 0 and h2p <= h1p + h2OverTick and (h1p - h2p) / avgH <= tolPct
+                    nLen = h2b - h1b - 1
+                    if nLen >= 1
+                        off = bar_index - (h2b - 1)
+                        neck = ta.lowest(low, nLen)[off]
+                        peak = math.max(h1p, h2p)
+                        depth = peak - neck
+                        if peak > 0 and depth / peak >= minDepthPct and depth >= bestDepth
+                            h1Ma = sma60[bar_index - h1b]
+                            h2Ma = sma60[bar_index - h2b]
+                            neckOff = bar_index - (h2b - nLen)
+                            neckMa = sma60[math.max(0, neckOff)]
+                            h2Close = close[bar_index - h2b]
+                            winHi = ta.highest(high[swingLen], hiLookback)
+                            highOk = not na(h1Ma) and not na(h2Ma) and not na(neckMa) and not na(h2Close) and not na(winHi)
+                            highOk := highOk and h1p >= h1Ma and h2p >= h2Ma and h2Close >= h2Ma and neck >= neckMa
+                            highOk := highOk and (h2Close - h2Ma >= minH2Ext)
+                            highOk := highOk and peak >= winHi * (1.0 - nearPct)
+                            if highOk
+                                bestDepth := depth
+                                bestH1 := h1p
+                                bestH2 := h2p
+                                bestNeck := neck
+                                bestPeak := peak
+    array.push(phPx, h2p)
+    array.push(phBar, h2b)
+    if array.size(phBar) > 24
+        array.shift(phPx)
+        array.shift(phBar)
+    if not na(bestH1) and strategy.position_size == 0
+        armed := true
+        sawSandwich := false
+        h1Px := bestH1
+        h2Px := bestH2
+        neckPx := bestNeck
+        peakPx := bestPeak
+        confirmBar := bar_index
+
+shortNow = false
+if armed and strategy.position_size == 0
+    if high > peakPx
+        armed := false
+    else if bar_index > confirmBar + entryWin
+        armed := false
+    else if not na(sma5) and not na(sma10) and not na(sma20) and not na(sma30) and not na(sma60)
+        underMa = close <= sma60 - minBreak
+        underNeck = close < neckPx
+        ribbonOk = ribbonSpread() >= ribbonMin
+        if underMa and underNeck and ribbonOk
+            skip = false
+            if useSandwich and not na(sma120) and not na(sma200)
+                loSlow = math.min(sma120, sma200)
+                if inSandwich(close, sma120, sma200)
+                    sawSandwich := true
+                    skip := true
+                else if sawSandwich and close > loSlow - minBreak
+                    skip := true
+            if not skip and farAboveMa200(close, sma200, htfMa60)
+                armed := false
+                skip := true
+            if not skip and bar_index >= ma60SlopeN and untestedHtf(close, sma60, sma60[ma60SlopeN], sma200, htfMa60)
+                armed := false
+                skip := true
+            if not skip
+                stopCand = roundTick(peakPx + stopBuf)
+                ent = roundTick(close)
+                risk = stopCand - ent
+                tgt = roundTick(ent - risk * targetR)
+                if risk >= minRisk and risk <= maxRisk and tgt < ent
+                    shortNow := true
+                    origStop := stopCand
+                    trailStop := stopCand
+                    pendingLock := na
+                    entryPx := ent
+                    riskPx := risk
+                    tgtPx := tgt
+                    entryBar := bar_index
+                    strategy.entry("M頭空", strategy.short)
+                    strategy.exit("M頭出場", from_entry="M頭空", stop=stopCand, limit=tgt)
+                    alert("M頭右肩破五分k60 做空 @ " + str.tostring(ent) + " 停損 " + str.tostring(stopCand) + " 目標 " + str.tostring(tgt), alert.freq_once_per_bar_close)
+                    armed := false
+
+if strategy.position_size < 0
+    if not na(pendingLock)
+        trailStop := math.min(trailStop, pendingLock)
+        pendingLock := na
+        strategy.exit("M頭出場", from_entry="M頭空", stop=trailStop, limit=tgtPx)
+    if high >= origStop
+        strategy.exit("M頭出場", from_entry="M頭空", stop=origStop, limit=tgtPx)
+    else
+        mfe = entryPx - low
+        keepR = riskPx > 0 ? trailLockR(mfe / riskPx) : na
+        if not na(keepR)
+            locked = roundTick(entryPx - keepR * riskPx)
+            pendingLock := na(pendingLock) ? locked : math.min(pendingLock, locked)
+    if bar_index - entryBar >= holdBars
+        strategy.close("M頭空", comment="time_stop")
+        alert("M頭右肩破五分k60 逾時平倉 @ " + str.tostring(close), alert.freq_once_per_bar_close)
+
+plot(sma60, "MA60", color=color.new(color.aqua, 20), linewidth=2)
+plot(sma200, "MA200", color=color.new(color.gray, 40), linewidth=1)
+plot(htfMa60, "1h MA60（已收）", color=color.new(color.purple, 20), linewidth=1, style=plot.style_stepline)
+plot(armed ? neckPx : na, "頸線", color=color.orange, linewidth=2, style=plot.style_linebr)
+plot(armed ? peakPx : na, "頭頂", color=color.red, linewidth=1, style=plot.style_linebr)
+plotshape(shortNow, title="做空", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
+bgcolor(armed ? color.new(color.orange, 92) : na)
+
+alertcondition(shortNow, title="M頭右肩破五分k60", message="M頭右肩破五分k60 做空")
+
+// ---------------------------------------------------------------------------
+// 規則（對齊 TF_PRESETS["5m"]，不是 1m）
+// - 轉折 3、雙頂 4–48、高檔回看 24、進場窗 16、帶寬 28、持倉 48
+// - 收盤 < 頸線 且 ≤ MA60−8；夾在 MA120/MA200 中間不空，進過夾心後須收盤跌出慢均 −8
+// - 收盤仍在 MA200 上方超過 150 且 1h MA60 已破：不空
+// - 已破 MA200、1h MA60 還在下面超過 200、且 5m MA60 近 6 根仍往上：不空
+// - 停損頭頂 +36；2R；0.75R 鎖 0.5R / 1.2R 鎖 0.9R / 1.6R 鎖 1.2R（下一根）
+//
+// 與 Python 的差異：
+// 1) 擺動高只留最近約 24 個樞軸配對；Python 全歷史兩兩掃描後依右肩去重。
+// 2) 頸線那根 MA60 是偏移近似。
+// 3) 1h MA60 用 request.security(..., lookahead_off)，語意接近 shift(1)+ffill，但 TV 對齊／夏令時／合約與 Yahoo NQ=F 不同。
+// 4) 成交、滑價、商品由 TV 引擎決定；Python 是 fill=close、無費。
+// 5) 無破底翻平空、無硬虧 −60。
+// 非投資建議。
+// ---------------------------------------------------------------------------
