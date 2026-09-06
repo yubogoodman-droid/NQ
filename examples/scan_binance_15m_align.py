@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""幣安 15m：MA5 > MA20 > MA99 多頭排列且站上 MA200，成交額前 100 跳通知。
+"""幣安 15m：MA5 > MA20 > MA99 多頭排列、均線距離像 ETH 圖，剛站上 MA200 才通知。
 
 用法:
   python3 examples/scan_binance_15m_align.py --once
@@ -238,8 +238,8 @@ def draw_chart(sym: str, d: dict, sig: AlignSignal, path: Path) -> Path | None:
     if 0 <= x < len(c):
         ax.axvline(x, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([x], [c[x]], s=40, color="#00e676", marker="^", zorder=6)
-    ax.set_title(
-        f"{sym}  15m  5>20>99  剛站上200  離200 {sig.ext*100:+.2f}%",
+        ax.set_title(
+        f"{sym}  15m  5>20>99  剛站上200  帶寬 {sig.ribbon*100:.2f}%  99↔200 {sig.gap99*100:.2f}%",
         color="#e8f0ea",
         fontsize=12,
     )
@@ -298,9 +298,10 @@ def format_hit(sym: str, d: dict, sig: AlignSignal, *, rank: int | None = None, 
     return (
         f"<b>15m 多頭排列 · 剛站上 MA200</b>  {sym}\n"
         f"{ts}　現價 {sig.close:g}　離 200 {sig.ext*100:+.2f}%\n"
-        f"MA5 {sig.ma5:g} &gt; MA20 {sig.ma20:g} &gt; MA99 {sig.ma99:g} &gt; MA200 {sig.ma200:g}\n"
+        f"MA5 {sig.ma5:g} &gt; MA20 {sig.ma20:g} &gt; MA99 {sig.ma99:g}　MA200 {sig.ma200:g}\n"
+        f"均線帶寬 {sig.ribbon*100:.2f}%　99↔200 {sig.gap99*100:.2f}%\n"
         f"{rank_s}{qv_s}\n"
-        f"<i>MA5&gt;MA20&gt;MA99，這根剛收盤站上 MA200。</i>"
+        f"<i>MA5&gt;MA20&gt;MA99，均線黏得像 ETH 圖，這根剛收盤站上 MA200。</i>"
     )
 
 
@@ -367,8 +368,8 @@ def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_c
         png = draw_chart(sym, d, sig, img_dir / img_name)
         src = _b64_img(png) if png and png.exists() else ""
         detail = (
-            f"現價 {sig.close:g}　離 200 {sig.ext*100:+.2f}%　張開 {sig.stack_pct*100:.2f}%\n"
-            f"MA5 {sig.ma5:g} > MA20 {sig.ma20:g} > MA99 {sig.ma99:g} > MA200 {sig.ma200:g}"
+            f"現價 {sig.close:g}　離 200 {sig.ext*100:+.2f}%　帶寬 {sig.ribbon*100:.2f}%　99↔200 {sig.gap99*100:.2f}%\n"
+            f"MA5 {sig.ma5:g} > MA20 {sig.ma20:g} > MA99 {sig.ma99:g}　MA200 {sig.ma200:g}"
         )
         img_html = f"<img src='{src}' alt='{escape(sym)}' style='width:100%;display:block;border-radius:10px'/>" if src else ""
         cards.append(
@@ -377,7 +378,8 @@ def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_c
             f"<span class='trade-time'>{hm(int(d['t'][sig.idx]))}</span></div>"
             f"<div class='card-pnl pnl-win'>{sig.ext*100:+.2f}%</div></header>"
             f"<div class='tags'><span class='tag tag-info'>剛站上200</span>"
-            f"<span class='tag tag-info'>15m</span><span class='tag tag-info'>5&gt;20&gt;99</span></div>"
+            f"<span class='tag tag-info'>15m</span><span class='tag tag-info'>5&gt;20&gt;99</span>"
+            f"<span class='tag tag-info'>均線黏</span></div>"
             f"<pre class='trade-detail'>{escape(detail)}</pre>"
             f"<div class='mini-chart'>{img_html}</div></article>"
         )
@@ -416,9 +418,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">週期<b>15m</b></div>
 <div class="card">標的<b>成交額前{TOP_N}</b></div>
 </div>
-<p class="muted">MA5 &gt; MA20 &gt; MA99 多頭排列，只記剛收盤站上 MA200 的那一根。</p>
+<p class="muted">MA5 &gt; MA20 &gt; MA99，均線距離像 ETH 圖（帶寬 ≤ 0.8%、99 與 200 ≤ 0.7%），只記剛收盤站上 MA200 的那一根。</p>
 </section>
-{''.join(cards) if cards else "<div class='empty'>這段期間沒有剛站上 MA200。</div>"}
+{''.join(cards) if cards else "<div class='empty'>這段期間沒有剛站上 MA200（或均線已散開）。</div>"}
 </div></body></html>
 """
     path.write_text(html, encoding="utf-8")
@@ -430,8 +432,8 @@ def print_row(sym: str, d: dict, sig: AlignSignal, *, rank: int | None = None) -
     r = f"  #{rank}" if rank else ""
     print(
         f"{sym:12s}{r:5s} {hm(int(d['t'][sig.idx]))}  "
-        f"px={sig.close:g}  5={sig.ma5:g} > 20={sig.ma20:g} > 99={sig.ma99:g} > 200={sig.ma200:g}  "
-        f"ext={sig.ext*100:+.2f}%"
+        f"px={sig.close:g}  5={sig.ma5:g} > 20={sig.ma20:g} > 99={sig.ma99:g}  200={sig.ma200:g}  "
+        f"ribbon={sig.ribbon*100:.2f}%  gap99={sig.gap99*100:.2f}%  ext={sig.ext*100:+.2f}%"
     )
 
 
@@ -464,7 +466,7 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             if done % 20 == 0:
                 print(f"  {done}/{len(symbols)}  已找到 {len(rows)}", flush=True)
     rows.sort(key=lambda r: int(r["d"]["t"][r["sig"].idx]))
-    print(f"\n=== {days} 日 5>20>99 剛站上 200 ===")
+    print(f"\n=== {days} 日 5>20>99 剛站上 200 · 均線距離像 ETH ===")
     print(f"剛站上 {len(rows)} 筆")
     for r in rows:
         print_row(r["symbol"], r["d"], r["sig"], rank=ranks.get(r["symbol"]))
@@ -473,10 +475,10 @@ def cmd_backtest(args: argparse.Namespace) -> int:
         write_html(
             rows,
             out,
-            title="15m 多頭排列 · 剛站上 MA200",
+            title="15m 多頭排列 · 剛站上 MA200 · 均線黏",
             subtitle=(
                 f"{days}d · {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')} · "
-                f"成交額前 {len(symbols)} · 剛站上 200 才記"
+                f"成交額前 {len(symbols)} · 帶寬≤0.8% · 99↔200≤0.7% · 剛站上 200 才記"
             ),
         )
         print(f"HTML {out}")
@@ -491,7 +493,7 @@ def cmd_symbol(args: argparse.Namespace) -> int:
         print(f"\n=== {sym} {days}d ===")
         rows = backtest_symbol(sym, start, end)
         if not rows:
-            print("沒有剛站上 MA200")
+            print("沒有剛站上 MA200（或均線已散開）")
             continue
         for r in rows:
             print_row(sym, r["d"], r["sig"])
@@ -533,7 +535,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
     symbols = [s for s, _ in uni]
     ranks = {s: i for i, (s, _) in enumerate(uni, 1)}
     qvs = {s: q for s, q in uni}
-    print(f"監看 {len(symbols)} 檔。5>20>99 且這根剛站上 200 會推。", flush=True)
+    print(f"監看 {len(symbols)} 檔。5>20>99、均線黏、這根剛站上 200 會推。", flush=True)
     print(f"  #1 {uni[0][0]}  {uni[0][1]/1e6:.0f}M  ·  #{len(uni)} {uni[-1][0]}  {uni[-1][1]/1e6:.0f}M", flush=True)
     uni_ts = time.time()
 
@@ -574,7 +576,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="幣安 15m MA5/20/99 多頭排列 · 站上 MA200 · 成交額前100")
+    p = argparse.ArgumentParser(description="幣安 15m MA5/20/99 多頭排列 · 剛站上 MA200 · 均線距離像 ETH · 成交額前100")
     p.add_argument("--symbol", help="只掃這些合約，逗號分隔，例如 ETHUSDT")
     p.add_argument("--days", type=int, default=5, help="回看天數")
     p.add_argument("--top", type=int, default=TOP_N, help="成交額前 N")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""15m MA5/20/99 多頭排列、剛站上 MA200：合成 K 線測試（不連網）。"""
+"""15m MA5/20/99 多頭排列、剛站上 MA200、均線距離像 ETH 圖。"""
 from __future__ import annotations
 
 import sys
@@ -36,36 +36,57 @@ def _blank(n: int = 240) -> dict:
     return add_indicators(_bars(np.full(n, 100.0)))
 
 
-def _stack(d: dict, i: int, *, above: bool) -> None:
-    d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i] = 101.6, 101.2, 100.6, 100.1
-    d["c"][i] = 102.0 if above else 99.8
+def _eth_like(d: dict, i: int, *, above: bool) -> None:
+    """對齊 ETH 9/3 20:00：5>20>99，四條黏在 0.53%，剛貼過 200。"""
+    d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i] = 100.52, 100.35, 100.05, 100.58
+    d["c"][i] = 100.68 if above else 100.40
 
 
 def test_just_stood_on_200_hits() -> None:
     d = _blank()
     i = 220
-    _stack(d, i - 1, above=False)
-    _stack(d, i, above=True)
+    _eth_like(d, i - 1, above=False)
+    _eth_like(d, i, above=True)
     sig = signal_at(d, i)
     assert sig is not None
-    assert sig.ma5 > sig.ma20 > sig.ma99
-    assert sig.close > sig.ma200
+    assert sig.ribbon <= 0.008
+    assert sig.gap99 <= 0.007
+    assert sig.ext <= 0.010
 
 
 def test_already_above_200_skips() -> None:
-    """已經站在 200 上面，只是均線才排好，不算。"""
     d = _blank()
     i = 220
-    _stack(d, i - 1, above=True)
-    _stack(d, i, above=True)
+    _eth_like(d, i - 1, above=True)
+    _eth_like(d, i, above=True)
     assert signal_at(d, i) is None
     assert is_above_200(d, i)
+
+
+def test_wide_ribbon_skips() -> None:
+    """均線散開，不像截圖那種黏帶。"""
+    d = _blank()
+    i = 220
+    d["c"][i - 1], d["m200"][i - 1] = 99.5, 100.0
+    d["c"][i] = 101.0
+    d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i] = 102.5, 101.2, 98.0, 100.0
+    assert is_stacked(d, i)
+    assert signal_at(d, i) is None
+
+
+def test_99_far_from_200_skips() -> None:
+    d = _blank()
+    i = 220
+    d["c"][i - 1], d["m200"][i - 1] = 99.5, 100.0
+    d["c"][i] = 100.4
+    d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i] = 100.3, 100.2, 98.5, 100.0
+    assert signal_at(d, i) is None
 
 
 def test_below_200_skips() -> None:
     d = _blank()
     i = 220
-    _stack(d, i, above=False)
+    _eth_like(d, i, above=False)
     assert signal_at(d, i) is None
 
 
@@ -74,7 +95,7 @@ def test_not_stacked_skips() -> None:
     i = 220
     d["c"][i - 1] = 99.8
     d["m200"][i - 1] = 100.1
-    d["c"][i] = 102.0
+    d["c"][i] = 100.5
     d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i] = 100.2, 101.5, 100.6, 100.1
     assert signal_at(d, i) is None
     assert not is_stacked(d, i)
@@ -82,9 +103,9 @@ def test_not_stacked_skips() -> None:
 
 def test_detect_only_cross_bar() -> None:
     d = _blank(260)
-    _stack(d, 219, above=False)
+    _eth_like(d, 219, above=False)
     for i in range(220, 230):
-        _stack(d, i, above=True)
+        _eth_like(d, i, above=True)
     hits = detect_signals(d)
     assert len(hits) == 1
     assert hits[0].idx == 220
