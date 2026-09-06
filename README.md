@@ -48,7 +48,7 @@ python3 examples/backtest_tw_5m.py --days 10
 python3 examples/backtest_tw_15m.py --days 10
 ```
 
-報告：`docs/tw/backtest-5m-15m-1h.html`（五分K）、`docs/tw/backtest-15m-1h.html`（十五分K）
+報告：`docs/tw/backtest-5m-2026-08-31-09-04.html`（五分K 一週）、`docs/tw/backtest-15m-2026-08-31-09-04.html`（十五分K 一週）
 
 ## 永豐盤中監控 → Telegram
 
