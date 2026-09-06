@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -59,8 +60,7 @@ def size_qty(
     if qty_fixed is not None:
         qty = max(0, int(qty_fixed))
     else:
-        qty = int(round(lead_qty * qty_ratio))
-        qty = max(0, qty)
+        qty = max(0, int(math.floor(lead_qty * qty_ratio + 0.5)))
     if qty <= 0:
         return 0
     if max_contracts is None:
@@ -193,6 +193,7 @@ class CopyEngine:
         return intents
 
     def on_fill(self, connection: str, fill: Dict[str, Any]) -> List[CopyIntent]:
+        self._maybe_roll_session()
         if "id" not in fill:
             return []
         fill_id = int(fill["id"])

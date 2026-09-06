@@ -135,7 +135,7 @@ class TradovateRest:
         return data
 
     def renew(self) -> Dict[str, Any]:
-        data = self._request("POST", "/auth/renewAccessToken", json_body={})
+        data = self._request("POST", "/auth/renewAccessToken", json_body={}, ensure=False)
         if isinstance(data, dict) and data.get("accessToken"):
             self._store_token(data)
         return data if isinstance(data, dict) else {"raw": data}
@@ -202,9 +202,10 @@ class TradovateRest:
         params: Optional[Dict[str, Any]] = None,
         json_body: Optional[Dict[str, Any]] = None,
         auth: bool = True,
+        ensure: bool = True,
         retried: bool = False,
     ) -> Any:
-        if auth:
+        if auth and ensure:
             self.ensure_token()
         url = self.base + path
         if params:
@@ -224,7 +225,13 @@ class TradovateRest:
         if status == 401 and auth and not retried:
             self.login()
             return self._request(
-                method, path, params=params, json_body=json_body, auth=True, retried=True
+                method,
+                path,
+                params=params,
+                json_body=json_body,
+                auth=True,
+                ensure=False,
+                retried=True,
             )
         if status is not None and status >= 400:
             raise TradovateError(f"{method} {path} failed ({status}): {data}", status=status, payload=data)
