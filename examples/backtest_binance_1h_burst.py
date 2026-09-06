@@ -179,7 +179,7 @@ def backtest_symbol(
     target_r: float,
     allow_overlap: bool,
     max_ext_ma25: float | None = MAX_EXT_MA25,
-    require_fan: bool = True,
+    require_fan: bool = False,
 ) -> tuple[list[Trade], int]:
     need = 200 + days * 24 + time_bars + 30
     raw = fetch_klines(sym, limit=max(280, need))
@@ -364,9 +364,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>幣安 1h 多頭爆發 · 近 {extra['days']} 天</h1>
 <p class="muted">USDT 永續 · MA7&gt;14&gt;25&gt;99&gt;120&gt;200 且收盤量 &gt; 前一根 × {extra['vol_mult']:g}
-· 收盤在 MA25 上方且離 MA25 ≤ {extra['max_ext_ma25']*100:g}%（像 BNB）
-· 只要收漲陽線（收盤 &gt; 開盤）
-· 短均有點發散：MA7/MA25 {extra.get('min_short_fan', MIN_SHORT_FAN)*100:.2f}%～{extra.get('max_short_fan', MAX_SHORT_FAN)*100:.2f}%，且比 6 根前更散
+· 只要收漲陽線（收盤 &gt; 開盤）{" · 離 MA25 ≤ "+str(extra['max_ext_ma25']*100)+"%（像 BNB）" if extra.get("max_ext_ma25") else ""}{" · 短均有點發散" if extra.get("require_fan") else ""}
 <br/>收盤進場；停在訊號 K 低（太窄則 0.5%）、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。
 同標的重疊訊號預設不重做。加總％是各筆相加，不是組合複利。
 <br/>掃 {extra['scanned']} 檔 · 原始訊號 {extra['raw_hits']} · 進場 {stats['count']}
@@ -426,7 +424,7 @@ def main(argv=None) -> int:
     p.add_argument("--days", type=int, default=3)
     p.add_argument("--vol-mult", type=float, default=VOL_MULT)
     p.add_argument("--allow-red", action="store_true", help="連陰線也做（預設只要收漲陽線）")
-    p.add_argument("--no-fan", action="store_true", help="不要求短均發散")
+    p.add_argument("--fan", action="store_true", help="再要求短均有點發散（像 BNB）")
     p.add_argument("--overlap", action="store_true", help="同標的重疊訊號也做")
     p.add_argument("--time-bars", type=int, default=TIME_BARS)
     p.add_argument("--target-r", type=float, default=TARGET_R)
@@ -438,7 +436,7 @@ def main(argv=None) -> int:
         "--max-ext-ma25",
         type=float,
         default=MAX_EXT_MA25,
-        help="收盤最多比 MA25 高多少（預設 0.015；0 關閉）",
+        help="收盤最多比 MA25 高多少（預設 0=不限；像 BNB 用 0.015）",
     )
     p.add_argument("--symbols", nargs="*")
     args = p.parse_args(argv)
@@ -450,7 +448,7 @@ def main(argv=None) -> int:
         f"{args.time_bars} 根 / {args.target_r:g}R"
         + (f" · 離MA25≤{args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else "")
         + (" · 只要收漲陽線" if not args.allow_red else "")
-        + (" · 短均發散" if not args.no_fan else ""),
+        + (" · 短均發散" if args.fan else ""),
         flush=True,
     )
     trades: list[Trade] = []
@@ -468,7 +466,7 @@ def main(argv=None) -> int:
                 args.target_r,
                 args.overlap,
                 args.max_ext_ma25,
-                not args.no_fan,
+                args.fan,
             ): s
             for s in symbols
         }
@@ -510,7 +508,7 @@ def main(argv=None) -> int:
         "time_bars": args.time_bars,
         "target_r": args.target_r,
         "max_ext_ma25": args.max_ext_ma25,
-        "require_fan": not args.no_fan,
+        "require_fan": args.fan,
         "min_short_fan": MIN_SHORT_FAN,
         "max_short_fan": MAX_SHORT_FAN,
         "scanned": len(symbols),

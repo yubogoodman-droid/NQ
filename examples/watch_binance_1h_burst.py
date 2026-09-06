@@ -4,9 +4,7 @@
 條件（剛收盤的 1h K）：
   MA7 > MA14 > MA25 > MA99 > MA120 > MA200
   收盤成交量 > 前一根 × 2
-  收盤在 MA25 上方、且離 MA25 ≤ 1.5%（像 BNB 貼著走，不追已噴飛的）
   收漲陽線（收盤 > 開盤）
-  短均有點發散：MA7/MA25 在 0.20%～0.80%，且比 6 根前更散（BNB 當時 +0.39%）
 
 用法:
   python3 examples/watch_binance_1h_burst.py --test     # 測 Telegram
@@ -39,7 +37,7 @@ INTERVAL = "1h"
 INTERVAL_MS = 3_600_000
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
 VOL_MULT = 2.0
-MAX_EXT_MA25 = 0.015  # 收盤最多比 MA25 高 1.5%（BNB 當時約 +1.1%）
+MAX_EXT_MA25 = 0.0  # 預設不限制離 MA25 多遠；要像 BNB 再設 0.015
 MIN_SHORT_FAN = 0.0020  # MA7/MA25：有點散，BNB 約 +0.39%
 MAX_SHORT_FAN = 0.0080
 MIN_GAP_7_14 = 0.0008
@@ -179,7 +177,7 @@ def burst_at(
     vol_mult: float = VOL_MULT,
     green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
-    require_fan: bool = True,
+    require_fan: bool = False,
 ) -> dict | None:
     """剛收盤的第 i 根是否符合多頭爆發。"""
     if i < 1 or i >= len(d["c"]):
@@ -345,7 +343,7 @@ def find_bursts(
     vol_mult: float = VOL_MULT,
     green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
-    require_fan: bool = True,
+    require_fan: bool = False,
 ) -> list[dict]:
     hits = []
     lo = max(1, start)
@@ -370,7 +368,7 @@ def scan_symbol(
     vol_mult: float = VOL_MULT,
     green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
-    require_fan: bool = True,
+    require_fan: bool = False,
 ) -> list[dict]:
     raw = fetch_klines(sym)
     if raw is None:
@@ -413,7 +411,7 @@ def scan_all(
     vol_mult: float,
     green_only: bool = True,
     max_ext_ma25: float | None = MAX_EXT_MA25,
-    require_fan: bool = True,
+    require_fan: bool = False,
 ) -> list[dict]:
     events = []
     with ThreadPoolExecutor(8) as ex:
@@ -482,9 +480,9 @@ def main() -> int:
         "--max-ext-ma25",
         type=float,
         default=MAX_EXT_MA25,
-        help="收盤最多比 MA25 高多少（預設 0.015 = 1.5%，像 BNB；0 關閉）",
+        help="收盤最多比 MA25 高多少（預設 0=不限；像 BNB 用 0.015）",
     )
-    p.add_argument("--no-fan", action="store_true", help="不要求短均發散（預設要像 BNB 那樣有點散開）")
+    p.add_argument("--fan", action="store_true", help="再要求短均有點發散（像 BNB）")
     p.add_argument("--symbols", nargs="*", help="只掃這些代號，例如 BTCUSDT ETHUSDT")
     args = p.parse_args()
     apply_keys()
@@ -498,7 +496,7 @@ def main() -> int:
         f"監看 {len(symbols)} 個 1h：MA7>14>25>99>120>200 且量 > 前一根 × {args.vol_mult:g}"
         + (f" 且離 MA25 ≤ {args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else "")
         + (" 只要收漲陽線" if not args.allow_red else "")
-        + (" 且短均發散" if not args.no_fan else ""),
+        + (" 且短均發散" if args.fan else ""),
         flush=True,
     )
     uni_ts = time.time()
@@ -516,7 +514,7 @@ def main() -> int:
             vol_mult=args.vol_mult,
             green_only=not args.allow_red,
             max_ext_ma25=args.max_ext_ma25,
-            require_fan=not args.no_fan,
+            require_fan=args.fan,
         )
         new = [e for e in events if key_of(e) not in seen]
         print(

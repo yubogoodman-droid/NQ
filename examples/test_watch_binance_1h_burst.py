@@ -108,9 +108,9 @@ def test_rejects_far_from_ma25() -> None:
     raw["h"][-1] = raw["c"][-1]
     d = indicators(raw)
     i = len(d["c"]) - 1
-    assert burst_at(d, i) is None
-    assert burst_at(d, i, max_ext_ma25=0.08, require_fan=False) is not None
-    assert burst_at(d, i) is None or d["c"][i] / d["m25"][i] - 1 > 0.015
+    assert burst_at(d, i, max_ext_ma25=0.015) is None
+    assert burst_at(d, i, max_ext_ma25=0.08) is not None
+    assert burst_at(d, i) is not None  # 預設不限制離 MA25
 
 
 def test_accepts_bnb_like_ma25() -> None:
@@ -146,17 +146,19 @@ def test_bnb_style_fan_passes() -> None:
     raw = _fan_bars()
     raw["v"][-1] = 250.0
     d = indicators(raw)
-    hit = burst_at(d, len(d["c"]) - 1)
+    hit = burst_at(d, len(d["c"]) - 1, require_fan=True)
     assert hit is not None
     assert 0.002 <= hit["short_fan"] <= 0.008
     assert hit["fan_delta"] is not None and hit["fan_delta"] >= 0.001
 
 
-def test_tight_stack_not_fan() -> None:
-    raw = _uptrend(step=0.02)
+def test_opt_in_fan_rejects_linear() -> None:
+    raw = _uptrend()
     raw["v"][-1] = 250.0
     d = indicators(raw)
-    assert burst_at(d, len(d["c"]) - 1) is None
+    i = len(d["c"]) - 1
+    assert burst_at(d, i) is not None
+    assert burst_at(d, i, require_fan=True) is None
 
 
 def test_rejects_red_bar() -> None:
@@ -284,7 +286,7 @@ def main() -> int:
         test_rejects_far_from_ma25,
         test_accepts_bnb_like_ma25,
         test_bnb_style_fan_passes,
-        test_tight_stack_not_fan,
+        test_opt_in_fan_rejects_linear,
         test_rejects_red_bar,
         test_burst_rejects_early_bar,
         test_drop_unclosed,
