@@ -140,7 +140,7 @@ python3 examples/scan_binance_15m_align.py --backtest --days 5 --pages
 
 舊檔名 `scan_binance_15m_ma200.py` 也會轉到同一套。Telegram 憑證放 `tg_config.env`（`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`）。
 
-近 5 日剛排好圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma-align-15m/view.html
+近 3 日剛排好（成交額前 100、542 筆）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma-align-15m-3d/view.html
 
 ## 幣安 15m 黏帶擠壓 · 200MA 附近進場
 
