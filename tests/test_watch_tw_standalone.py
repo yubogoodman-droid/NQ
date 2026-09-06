@@ -46,11 +46,11 @@ class StandaloneWatcherTests(unittest.TestCase):
         self.assertIn("五分K 剛跌破 MA240", text)
 
 
-    def test_default_scan_pool_is_turnover_top_200(self) -> None:
-        self.assertEqual(watch_tw.TURNOVER_TOP, 200)
+    def test_default_scan_pool_is_turnover_top_100(self) -> None:
+        self.assertEqual(watch_tw.TURNOVER_TOP, 100)
         with patch("sys.argv", ["watch_tw.py"]):
             args = watch_tw.parse_args()
-        self.assertEqual(args.top, 200)
+        self.assertEqual(args.top, 100)
 
 
 if __name__ == "__main__":

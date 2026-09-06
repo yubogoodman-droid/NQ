@@ -113,7 +113,7 @@ def _universe_line(uni: DayUniverse, hit_count: int) -> str:
 
 def _lead_block(result: BacktestResult) -> str:
     short = _result_side(result) == "short"
-    top = getattr(result, "top", 200)
+    top = getattr(result, "top", 100)
     pool = f"每天上市＋上櫃成交額前 {top}"
     if result.signal_tf == "15m":
         if short:
@@ -167,7 +167,7 @@ def _lead_block(result: BacktestResult) -> str:
 
 
 def _chips_html(result: BacktestResult) -> str:
-    top = getattr(result, "top", 200)
+    top = getattr(result, "top", 100)
     if _result_side(result) == "short":
         common = f"""
       <span class="chip">不含 ETF</span>

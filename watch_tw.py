@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """台股永豐監控（單一檔，可直接放到 PyCharm 執行）。
 
-成交額前 200，濾 ETF／金融／電信／股價 500 以上。
+成交額前 100，濾 ETF／金融／電信／股價 500 以上。
 五分或十五分剛站上 MA240 就推 Telegram（只做多方）。
 
 把下面四行金鑰填好，然後 Run。不要把檔名取成 tw.py。
@@ -33,7 +33,7 @@ SHIOAJI_API_KEY = ""
 SHIOAJI_SECRET_KEY = ""
 TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
-TURNOVER_TOP = 200  # 成交額前幾名（上市＋上櫃合併）
+TURNOVER_TOP = 100  # 成交額前幾名（上市＋上櫃合併）
 
 HERE = Path(__file__).resolve().parent
 SEEN_PATH = HERE / "tw_shioaji_seen.json"
@@ -99,7 +99,7 @@ class RankedStock:
 
 
 def fetch_turnover_ranking(
-    top: int = 200,
+    top: int = 100,
     session: requests.Session | None = None,
     timeout: int = 20,
     as_of: date | None = None,
@@ -221,7 +221,7 @@ def last_n_weekdays(n: int = 5, today: date | None = None) -> list[date]:
 
 def fetch_daily_turnover_ranking(
     on_date: date,
-    top: int = 200,
+    top: int = 100,
     session: requests.Session | None = None,
     timeout: int = 20,
 ) -> tuple[list[RankedStock], str | None]:

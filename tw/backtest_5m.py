@@ -26,7 +26,7 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 @dataclass(frozen=True)
 class BacktestConfig:
     days: int = 5
-    top: int = 200
+    top: int = 100
     max_price: float | None = 500.0
     exclude_etf: bool = True
     exclude_financial: bool = True
@@ -70,7 +70,7 @@ class BacktestResult:
     errors: list[str] = field(default_factory=list)
     signal_tf: str = "5m"
     side: str = "long"
-    top: int = 200
+    top: int = 100
 
     def hits_on(self, day: date) -> list[BacktestHit]:
         return [h for h in self.hits if h.day == day]

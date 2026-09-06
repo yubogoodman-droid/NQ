@@ -42,7 +42,7 @@ class RankedStock:
 
 
 def fetch_turnover_ranking(
-    top: int = 200,
+    top: int = 100,
     session: requests.Session | None = None,
     timeout: int = 20,
     as_of: date | None = None,
@@ -164,7 +164,7 @@ def last_n_weekdays(n: int = 5, today: date | None = None) -> list[date]:
 
 def fetch_daily_turnover_ranking(
     on_date: date,
-    top: int = 200,
+    top: int = 100,
     session: requests.Session | None = None,
     timeout: int = 20,
 ) -> tuple[list[RankedStock], str | None]:
