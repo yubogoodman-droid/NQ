@@ -356,6 +356,7 @@ def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_c
     path.parent.mkdir(parents=True, exist_ok=True)
     img_dir = path.parent / "img"
     img_dir.mkdir(parents=True, exist_ok=True)
+    total = len(rows)
     if len(rows) > max_cards:
         rows = sorted(rows, key=lambda r: -r["sig"].ext)[:max_cards]
         rows = sorted(rows, key=lambda r: int(r["d"]["t"][r["sig"].idx]))
@@ -411,7 +412,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <h1>{escape(title)}</h1>
 <p class="muted">{escape(subtitle)}</p>
 <div class="cards">
-<div class="card">訊號<b>{len(rows)}</b></div>
+<div class="card">訊號<b>{total}</b></div>
 <div class="card">週期<b>15m</b></div>
 <div class="card">標的<b>成交額前{TOP_N}</b></div>
 </div>
