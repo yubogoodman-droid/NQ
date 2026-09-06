@@ -78,6 +78,18 @@ python3 examples/test_tw_1h_reclaim.py
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim/view.html
 
+## 幣安 5 分 K W 底掃描（對齊 UAI）
+
+近 48 小時、USDT 永續、成交額 ≥ 100 萬：找兩底價差 ≤4%、間隔 40–240 分、頸線深度 7–18% 的雙底。
+
+```bash
+python3 examples/scan_binance_w_bottom.py
+python3 examples/test_scan_binance_w_bottom.py
+```
+
+報告：`docs/binance-w-bottom/index.html`  
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/binance-w-bottom/index.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
