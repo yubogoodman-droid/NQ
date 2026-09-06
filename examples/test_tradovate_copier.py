@@ -447,8 +447,10 @@ def test_engine_snapshot() -> None:
 
 def test_dashboard_page() -> None:
     html = (REPO_ROOT / "docs" / "copier" / "index.html").read_text(encoding="utf-8")
+    view = (REPO_ROOT / "docs" / "copier" / "view.html").read_text(encoding="utf-8")
     for needle in ("主帳買 1 口 NQ", "symbol_map", "qty_ratio", "/api/status", "微型帳 B"):
         assert needle in html, needle
+    assert "主帳買 1 口 NQ" in view
 
 
 def test_demo_status() -> None:

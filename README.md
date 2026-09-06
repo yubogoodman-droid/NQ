@@ -138,9 +138,9 @@ python3 examples/chart_today.py
 
 先看網頁（不用登入，可點按鈕模擬複製）：
 
-- 本機：`python3 examples/tradovate_copier.py web --demo` → http://127.0.0.1:8787/
-- 檔案：開 `docs/copier/index.html`
-- GitHub Pages：`https://yubogoodman-droid.github.io/NQ/copier/`
+- **現在就能開：** https://raw.githack.com/yubogoodman-droid/NQ/cursor/tradovate-copier-6308/docs/copier/index.html
+- 備用：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tradovate-copier-6308/docs/copier/view.html
+- 本機（這台電腦自己跑）：`python3 examples/tradovate_copier.py web --demo` → http://127.0.0.1:8787/
 
 ```bash
 cp copier.env.example copier.env
