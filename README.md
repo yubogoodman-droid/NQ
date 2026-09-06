@@ -125,7 +125,7 @@ python3 examples/chart_today.py
 
 ## 幣安 15m 多頭排列 · 站上 MA200（成交額前 100）
 
-15 分 K：MA5 > MA20 > MA99 > MA200，收盤站上 200。只在**剛排好的第一根**推 Telegram，已經排好的不重複叫。標的取 24h 成交額前 100（幣 + 股票）。
+15 分 K：MA5 > MA20 > MA99 多頭排列，**那根剛收盤站上 MA200** 才通知。已經站在 200 上面、只是均線才排好的不算。標的取 24h 成交額前 100（幣 + 股票）。
 
 ```bash
 # TradingView：pinescript/ma_align_15m.pine 貼到 Pine Editor，套 15 分圖，設警示
@@ -134,8 +134,8 @@ python3 examples/chart_today.py
 python3 examples/scan_binance_15m_align.py --once
 python3 examples/scan_binance_15m_align.py --watch
 
-# 前 100 名近 5 日剛排好的時點 + 圖
-python3 examples/scan_binance_15m_align.py --backtest --days 5 --pages
+# 前 100 名近 3 日剛站上 200 的時點 + 圖
+python3 examples/scan_binance_15m_align.py --backtest --days 3 --pages --html docs/binance/ma-align-15m-3d/index.html
 ```
 
 舊檔名 `scan_binance_15m_ma200.py` 也會轉到同一套。Telegram 憑證放 `tg_config.env`（`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`）。
@@ -169,7 +169,7 @@ ETH 近兩週圖：https://htmlpreview.github.io/?https://raw.githubusercontent.
 ## TradingView
 
 `pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
-`pinescript/ma_align_15m.pine` 套用至 U 本位 15 分圖：MA5>20>99>200 剛排好且站上 200 會標、可設警示。  
+`pinescript/ma_align_15m.pine` 套用至 U 本位 15 分圖：5>20>99 且這根剛站上 200 會標、可設警示。  
 `pinescript/ma200_squeeze_15m.pine` 是舊的黏帶擠壓。
 
 ## 參數調整

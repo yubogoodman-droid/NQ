@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""15m MA5/20/99 多頭排列站上 MA200：合成 K 線測試（不連網）。"""
+"""15m MA5/20/99 多頭排列、剛站上 MA200：合成 K 線測試（不連網）。"""
 from __future__ import annotations
 
 import sys
@@ -14,7 +14,8 @@ from nq.ma_align import (  # noqa: E402
     MIN_BARS,
     add_indicators,
     detect_signals,
-    is_aligned,
+    is_above_200,
+    is_stacked,
     signal_at,
 )
 
@@ -35,50 +36,55 @@ def _blank(n: int = 240) -> dict:
     return add_indicators(_bars(np.full(n, 100.0)))
 
 
-def test_first_align_hits() -> None:
+def _stack(d: dict, i: int, *, above: bool) -> None:
+    d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i] = 101.6, 101.2, 100.6, 100.1
+    d["c"][i] = 102.0 if above else 99.8
+
+
+def test_just_stood_on_200_hits() -> None:
     d = _blank()
     i = 220
-    d["c"][i] = 102.0
-    d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i] = 101.6, 101.2, 100.6, 100.1
-    d["c"][i - 1] = 99.8
-    d["m5"][i - 1], d["m20"][i - 1], d["m99"][i - 1], d["m200"][i - 1] = 100.4, 100.3, 100.2, 100.2
+    _stack(d, i - 1, above=False)
+    _stack(d, i, above=True)
     sig = signal_at(d, i)
     assert sig is not None
-    assert sig.ma5 > sig.ma20 > sig.ma99 > sig.ma200
+    assert sig.ma5 > sig.ma20 > sig.ma99
     assert sig.close > sig.ma200
 
 
-def test_already_aligned_skips() -> None:
+def test_already_above_200_skips() -> None:
+    """已經站在 200 上面，只是均線才排好，不算。"""
     d = _blank()
     i = 220
-    for k in (i - 1, i):
-        d["c"][k] = 102.0
-        d["m5"][k], d["m20"][k], d["m99"][k], d["m200"][k] = 101.6, 101.2, 100.6, 100.1
+    _stack(d, i - 1, above=True)
+    _stack(d, i, above=True)
     assert signal_at(d, i) is None
-    assert is_aligned(d, i)
+    assert is_above_200(d, i)
 
 
 def test_below_200_skips() -> None:
     d = _blank()
     i = 220
-    d["c"][i] = 99.5
-    d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i] = 101.6, 101.2, 100.6, 100.1
+    _stack(d, i, above=False)
     assert signal_at(d, i) is None
 
 
 def test_not_stacked_skips() -> None:
     d = _blank()
     i = 220
+    d["c"][i - 1] = 99.8
+    d["m200"][i - 1] = 100.1
     d["c"][i] = 102.0
     d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i] = 100.2, 101.5, 100.6, 100.1
     assert signal_at(d, i) is None
+    assert not is_stacked(d, i)
 
 
-def test_detect_only_first_bar() -> None:
+def test_detect_only_cross_bar() -> None:
     d = _blank(260)
+    _stack(d, 219, above=False)
     for i in range(220, 230):
-        d["c"][i] = 102.0
-        d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i] = 101.6, 101.2, 100.6, 100.1
+        _stack(d, i, above=True)
     hits = detect_signals(d)
     assert len(hits) == 1
     assert hits[0].idx == 220

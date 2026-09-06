@@ -239,7 +239,7 @@ def draw_chart(sym: str, d: dict, sig: AlignSignal, path: Path) -> Path | None:
         ax.axvline(x, color="#3dba7a", ls="--", lw=0.9)
         ax.scatter([x], [c[x]], s=40, color="#00e676", marker="^", zorder=6)
     ax.set_title(
-        f"{sym}  15m  MA5>20>99>200  站上200  離200 {sig.ext*100:+.2f}%",
+        f"{sym}  15m  5>20>99  剛站上200  離200 {sig.ext*100:+.2f}%",
         color="#e8f0ea",
         fontsize=12,
     )
@@ -296,11 +296,11 @@ def format_hit(sym: str, d: dict, sig: AlignSignal, *, rank: int | None = None, 
     rank_s = f"成交額 #{rank}" if rank else "成交額前100"
     qv_s = f"　24h {qv/1e6:.0f}M USDT" if qv else ""
     return (
-        f"<b>15m 多頭排列 · 站上 MA200</b>  {sym}\n"
+        f"<b>15m 多頭排列 · 剛站上 MA200</b>  {sym}\n"
         f"{ts}　現價 {sig.close:g}　離 200 {sig.ext*100:+.2f}%\n"
         f"MA5 {sig.ma5:g} &gt; MA20 {sig.ma20:g} &gt; MA99 {sig.ma99:g} &gt; MA200 {sig.ma200:g}\n"
         f"{rank_s}{qv_s}\n"
-        f"<i>剛排好 5&gt;20&gt;99&gt;200，收盤站上 200。</i>"
+        f"<i>MA5&gt;MA20&gt;MA99，這根剛收盤站上 MA200。</i>"
     )
 
 
@@ -376,8 +376,8 @@ def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_c
             f"<header class='card-header'><div class='card-title'><span class='trade-no'>#{n} · {escape(sym)}</span>"
             f"<span class='trade-time'>{hm(int(d['t'][sig.idx]))}</span></div>"
             f"<div class='card-pnl pnl-win'>{sig.ext*100:+.2f}%</div></header>"
-            f"<div class='tags'><span class='tag tag-info'>剛排好</span>"
-            f"<span class='tag tag-info'>15m</span><span class='tag tag-info'>站上200</span></div>"
+            f"<div class='tags'><span class='tag tag-info'>剛站上200</span>"
+            f"<span class='tag tag-info'>15m</span><span class='tag tag-info'>5&gt;20&gt;99</span></div>"
             f"<pre class='trade-detail'>{escape(detail)}</pre>"
             f"<div class='mini-chart'>{img_html}</div></article>"
         )
@@ -416,9 +416,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">週期<b>15m</b></div>
 <div class="card">標的<b>成交額前{TOP_N}</b></div>
 </div>
-<p class="muted">MA5 &gt; MA20 &gt; MA99 &gt; MA200，收盤站上 200。只在剛排好的第一根通知。</p>
+<p class="muted">MA5 &gt; MA20 &gt; MA99 多頭排列，只記剛收盤站上 MA200 的那一根。</p>
 </section>
-{''.join(cards) if cards else "<div class='empty'>這段期間沒有剛排好的多頭排列。</div>"}
+{''.join(cards) if cards else "<div class='empty'>這段期間沒有剛站上 MA200。</div>"}
 </div></body></html>
 """
     path.write_text(html, encoding="utf-8")
@@ -464,8 +464,8 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             if done % 20 == 0:
                 print(f"  {done}/{len(symbols)}  已找到 {len(rows)}", flush=True)
     rows.sort(key=lambda r: int(r["d"]["t"][r["sig"].idx]))
-    print(f"\n=== {days} 日 5>20>99>200 ===")
-    print(f"剛排好 {len(rows)} 筆")
+    print(f"\n=== {days} 日 5>20>99 剛站上 200 ===")
+    print(f"剛站上 {len(rows)} 筆")
     for r in rows:
         print_row(r["symbol"], r["d"], r["sig"], rank=ranks.get(r["symbol"]))
     if args.pages or args.html:
@@ -473,10 +473,10 @@ def cmd_backtest(args: argparse.Namespace) -> int:
         write_html(
             rows,
             out,
-            title="15m 多頭排列 · 站上 MA200",
+            title="15m 多頭排列 · 剛站上 MA200",
             subtitle=(
                 f"{days}d · {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')} · "
-                f"成交額前 {len(symbols)} · 剛排好才記"
+                f"成交額前 {len(symbols)} · 剛站上 200 才記"
             ),
         )
         print(f"HTML {out}")
@@ -491,7 +491,7 @@ def cmd_symbol(args: argparse.Namespace) -> int:
         print(f"\n=== {sym} {days}d ===")
         rows = backtest_symbol(sym, start, end)
         if not rows:
-            print("沒有剛排好的多頭排列")
+            print("沒有剛站上 MA200")
             continue
         for r in rows:
             print_row(sym, r["d"], r["sig"])
@@ -533,7 +533,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
     symbols = [s for s, _ in uni]
     ranks = {s: i for i, (s, _) in enumerate(uni, 1)}
     qvs = {s: q for s, q in uni}
-    print(f"監看 {len(symbols)} 檔。5>20>99>200 剛排好且站上 200 會推。", flush=True)
+    print(f"監看 {len(symbols)} 檔。5>20>99 且這根剛站上 200 會推。", flush=True)
     print(f"  #1 {uni[0][0]}  {uni[0][1]/1e6:.0f}M  ·  #{len(uni)} {uni[-1][0]}  {uni[-1][1]/1e6:.0f}M", flush=True)
     uni_ts = time.time()
 
@@ -578,7 +578,7 @@ def main() -> int:
     p.add_argument("--symbol", help="只掃這些合約，逗號分隔，例如 ETHUSDT")
     p.add_argument("--days", type=int, default=5, help="回看天數")
     p.add_argument("--top", type=int, default=TOP_N, help="成交額前 N")
-    p.add_argument("--backtest", action="store_true", help="前 N 名回測剛排好的時點")
+    p.add_argument("--backtest", action="store_true", help="前 N 名回測剛站上 200 的時點")
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma-align-15m/")
     p.add_argument("--html", help="HTML 輸出路徑")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的 1～2 根並推通知")

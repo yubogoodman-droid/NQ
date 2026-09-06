@@ -1,6 +1,8 @@
-"""15m MA5 / MA20 / MA99 多頭排列，整排站上 MA200。
+"""15m MA5 / MA20 / MA99 多頭排列，那根剛收盤站上 MA200 才算。
 
-剛排好的第一根才發訊號（已經排好的不重複叫）。
+多頭排列 = MA5 > MA20 > MA99。
+剛站上 = 前一根收盤還在 200 下面（或剛好貼著），這根收盤才站上。
+已經站在 200 上面、只是均線才排好的，不算。
 """
 
 from __future__ import annotations
@@ -49,22 +51,37 @@ class AlignSignal:
         return self.ma5 / self.ma200 - 1.0
 
 
-def is_aligned(d: dict, i: int) -> bool:
+def is_stacked(d: dict, i: int) -> bool:
+    """MA5 > MA20 > MA99 多頭排列。"""
     if i < 0 or i >= len(d["c"]):
         return False
-    m5, m20, m99, m200 = d["m5"][i], d["m20"][i], d["m99"][i], d["m200"][i]
-    if any(np.isnan(x) or x <= 0 for x in (m5, m20, m99, m200)):
+    m5, m20, m99 = d["m5"][i], d["m20"][i], d["m99"][i]
+    if any(np.isnan(x) or x <= 0 for x in (m5, m20, m99)):
         return False
-    return bool(d["c"][i] > m200 and m5 > m20 > m99 > m200)
+    return bool(m5 > m20 > m99)
+
+
+def is_above_200(d: dict, i: int) -> bool:
+    if i < 0 or i >= len(d["c"]):
+        return False
+    m200 = d["m200"][i]
+    if np.isnan(m200) or m200 <= 0:
+        return False
+    return bool(d["c"][i] > m200)
+
+
+def just_stood_on_200(d: dict, i: int) -> bool:
+    """這根才剛收盤站上 200。"""
+    return is_above_200(d, i) and not is_above_200(d, i - 1)
 
 
 def signal_at(d: dict, i: int) -> AlignSignal | None:
-    """第 i 根剛變成「5>20>99>200 且收盤站上 200」。"""
+    """5>20>99 多頭排列，且第 i 根剛站上 MA200。"""
     if i < MIN_BARS or i >= len(d["c"]):
         return None
-    if not is_aligned(d, i):
+    if not is_stacked(d, i):
         return None
-    if is_aligned(d, i - 1):
+    if not just_stood_on_200(d, i):
         return None
     m200 = float(d["m200"][i])
     close = float(d["c"][i])

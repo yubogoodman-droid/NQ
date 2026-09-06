@@ -1,24 +1,25 @@
 //@version=5
-indicator("15m MA5/20/99 多頭排列 · 站上 MA200", overlay=true)
+indicator("15m MA5/20/99 多頭排列 · 剛站上 MA200", overlay=true)
 
-// 剛排好 MA5 > MA20 > MA99 > MA200，且收盤站上 200 才標。
+// MA5 > MA20 > MA99 多頭排列，且這根才剛收盤站上 200。
+// 已經站在 200 上面、只是均線才排好的，不標。
 
 ma5   = ta.sma(close, 5)
 ma20  = ta.sma(close, 20)
 ma99  = ta.sma(close, 99)
 ma200 = ta.sma(close, 200)
 
-stacked = ma5 > ma20 and ma20 > ma99 and ma99 > ma200
+stacked = ma5 > ma20 and ma20 > ma99
 above   = close > ma200
-align   = stacked and above
-first   = align and not align[1]
+justOn  = above and not (close[1] > ma200[1])
+first   = stacked and justOn
 
 plot(ma5,   "MA5",   color=color.new(#f0c14a, 0), linewidth=1)
 plot(ma20,  "MA20",  color=color.new(#64b5f6, 0), linewidth=1)
 plot(ma99,  "MA99",  color=color.new(#7e57c2, 0), linewidth=2)
 plot(ma200, "MA200", color=color.new(#ef5350, 0), linewidth=2)
 
-plotshape(first, title="剛排好站上200", style=shape.triangleup, location=location.belowbar, color=color.new(#3dba7a, 0), size=size.small)
-bgcolor(align and not first ? color.new(#3dba7a, 94) : na, title="維持多頭排列")
+plotshape(first, title="剛站上200", style=shape.triangleup, location=location.belowbar, color=color.new(#3dba7a, 0), size=size.small)
+bgcolor(stacked and above and not first ? color.new(#3dba7a, 94) : na, title="已站上200")
 
-alertcondition(first, title="15m 多頭排列 · 站上 MA200", message="MA5>MA20>MA99>MA200 剛排好，收盤站上 200")
+alertcondition(first, title="15m 多頭排列 · 剛站上 MA200", message="MA5>MA20>MA99，這根剛收盤站上 MA200")
