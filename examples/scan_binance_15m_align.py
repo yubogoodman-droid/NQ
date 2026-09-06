@@ -49,7 +49,7 @@ TOP_N = 100
 KLINE_LIMIT = 1000
 BAR_MS = 900_000
 PRE_BARS = 36
-FWD_BARS = 8
+FWD_BARS = 20  # 含 ETH 20:00 之後那波噴到 2488 的大陽
 
 MA_COLORS = {5: "#f0c14a", 20: "#64b5f6", 99: "#7e57c2", 200: "#ef5350"}
 CJK_FONTS = (
