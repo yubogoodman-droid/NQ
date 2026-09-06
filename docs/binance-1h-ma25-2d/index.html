@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>幣安 1h MA25 下破底再站上</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}
+.page{max-width:560px;margin:0 auto;padding:14px 12px 32px}
+h1{font-size:18px;margin:0 0 6px}
+.muted{color:#8b949e;font-size:13px;line-height:1.5}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.equity{margin:10px 0 4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}
+.trade-no{font-size:15px;font-weight:700}
+.trade-time{font-size:12px;color:#8b949e}
+.card-pnl{font-size:16px;font-weight:700;white-space:nowrap}
+.pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}
+.tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
+.tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
+.tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.tag-info{background:rgba(210,140,255,0.12);color:#e2b6ff;border-color:rgba(210,140,255,0.28)}
+.tag-fresh{background:rgba(88,166,255,0.16);color:#79c0ff;border-color:rgba(88,166,255,0.35)}
+.trade-detail{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}
+.mini-chart{margin:0 -6px -4px;border-radius:10px;overflow:hidden}
+.empty{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安 1h · MA25 下破底再站上（寬鬆）</h1>
+<p class="muted">近 2 天 · 掃 80 檔 U 本位永續 · 均線對齊你那兩張手機圖：黃7 / 青14 / 粉25 / 紫99 / 綠120 / 酒紅200<br/>
+寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%。破底後等 1h MA7&gt;MA14&gt;MA25 多頭排列才進場。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。</p>
+<div class="cards">
+<div class="card">筆數<b>60</b></div>
+<div class="card">勝率<b>80.0%</b></div>
+<div class="card">加總<b class="pnl-win">+220.16%</b></div>
+<div class="card">均筆<b>+3.67%</b></div>
+</div>
+<p class="muted">QA 44筆 +203.47% · QB 15筆 +13.04% · QC 1筆 +3.64%</p>
+<p class='muted'>漏斗：跌破 2250 → 站回 935 → 進場 817（太短 544 · 太長 246 · 太淺 438 · 急殺不夠 66 · 未站回 20）</p>
+<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="158.3" x2="720" y2="158.3" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,158.3 12.0,162.6 24.0,151.3 36.0,152.7 48.0,145.4 60.0,145.5 72.0,144.9 84.0,138.6 96.0,145.4 108.0,144.8 120.0,146.9 132.0,146.4 144.0,143.4 156.0,141.4 168.0,125.3 180.0,123.5 192.0,116.9 204.0,116.6 216.0,109.2 228.0,83.9 240.0,84.0 252.0,83.9 264.0,85.3 276.0,84.1 288.0,81.5 300.0,80.9 312.0,79.4 324.0,77.6 336.0,73.5 348.0,73.1 360.0,62.4 372.0,61.2 384.0,56.5 396.0,54.9 408.0,55.0 420.0,52.9 432.0,49.6 444.0,48.8 456.0,44.9 468.0,41.8 480.0,40.7 492.0,39.4 504.0,39.4 516.0,39.2 528.0,33.8 540.0,31.8 552.0,31.2 564.0,29.4 576.0,27.4 588.0,26.2 600.0,20.8 612.0,20.1 624.0,19.2 636.0,17.4 648.0,28.0 660.0,20.7 672.0,19.5 684.0,19.1 696.0,24.6 708.0,30.4 720.0,32.9"/></svg></div>
+</section>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · XMRUSDT · QA · V</span><span class='trade-time'>2026-09-04 17:00 → 09-04 23:00</span></div><div class='card-pnl pnl-loss'>-7.51%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 566.78
+stop  500  收盤跌破破底K  (−11.78%)
+target 700.34  (2.0R)
+exit  524.23  lost_ma25
+破底 500  深度 3.26%  在下 5h
+急殺 3.8% / 2.1ATR  破前低 2.1%
+量比 2.36x  MA25 521.202
+進場 1h MA7>MA14>MA25  MA7 528.757  MA14 523.266  MA25 521.202</pre><div class='mini-chart'><img src='img/t01_XMRUSDT_0904_1700_qa.png' alt='#1 XMRUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · FLOCKUSDT · QA · V</span><span class='trade-time'>2026-09-04 23:00 → 09-06 11:00</span></div><div class='card-pnl pnl-win'>+19.85%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.05865
+stop  0.03715  收盤跌破破底K  (−36.66%)
+target 0.10165  (2.0R)
+exit  0.07029  timeout
+破底 0.03715  深度 6.90%  在下 7h
+急殺 11.1% / 2.7ATR  破前低 1.9%
+量比 14.30x  MA25 0.0409844
+進場 1h MA7>MA14>MA25  MA7 0.0432057  MA14 0.0415836  MA25 0.0409844</pre><div class='mini-chart'><img src='img/t02_FLOCKUSDT_0904_2300_qa.png' alt='#2 FLOCKUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · ASTERUSDT · QA · W</span><span class='trade-time'>2026-09-05 00:00 → 09-05 11:00</span></div><div class='card-pnl pnl-loss'>-2.54%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.7442
+stop  0.7075  收盤跌破破底K  (−4.93%)
+target 0.8176  (2.0R)
+exit  0.7253  lost_ma25
+破底 0.7075  深度 2.79%  在下 14h
+急殺 2.4% / 1.7ATR  破前低 0.9%
+量比 0.80x  MA25 0.727832
+進場 1h MA7>MA14>MA25  MA7 0.737129  MA14 0.731921  MA25 0.727832</pre><div class='mini-chart'><img src='img/t03_ASTERUSDT_0905_0000_qa.png' alt='#3 ASTERUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · 4USDT · QA · V</span><span class='trade-time'>2026-09-05 02:00 → 09-06 11:00</span></div><div class='card-pnl pnl-win'>+12.80%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.022447
+stop  0.014965  收盤跌破破底K  (−33.33%)
+target 0.037411  (2.0R)
+exit  0.02532  lost_ma25
+破底 0.014965  深度 8.55%  在下 13h
+急殺 10.4% / 2.5ATR  破前低 1.6%
+量比 9.89x  MA25 0.0168274
+進場 1h MA7>MA14>MA25  MA7 0.0179861  MA14 0.0169686  MA25 0.0168274</pre><div class='mini-chart'><img src='img/t04_4USDT_0905_0200_qa.png' alt='#4 4USDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · NEARUSDT · QA · V</span><span class='trade-time'>2026-09-05 03:00 → 09-06 04:00</span></div><div class='card-pnl pnl-loss'>-0.05%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 2.166
+stop  1.905  收盤跌破破底K  (−12.05%)
+target 2.688  (2.0R)
+exit  2.165  lost_ma25
+破底 1.905  深度 3.19%  在下 4h
+急殺 6.2% / 2.9ATR  破前低 0.5%
+量比 3.59x  MA25 1.9744
+進場 1h MA7>MA14>MA25  MA7 1.99657  MA14 1.98979  MA25 1.9744</pre><div class='mini-chart'><img src='img/t05_NEARUSDT_0905_0300_qa.png' alt='#5 NEARUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · GIGGLEUSDT · QA · W</span><span class='trade-time'>2026-09-05 03:00 → 09-06 03:00</span></div><div class='card-pnl pnl-win'>+1.04%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 41.15
+stop  35.85  收盤跌破破底K  (−12.88%)
+target 51.75  (2.0R)
+exit  41.58  lost_ma25
+破底 35.85  深度 5.99%  在下 11h
+急殺 6.5% / 3.8ATR  破前低 3.4%
+量比 2.78x  MA25 38.2696
+進場 1h MA7>MA14>MA25  MA7 38.8814  MA14 38.3736  MA25 38.2696</pre><div class='mini-chart'><img src='img/t06_GIGGLEUSDT_0905_0300_qa.png' alt='#6 GIGGLEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · BUSDT · QB · V</span><span class='trade-time'>2026-09-05 04:00 → 09-05 14:00</span></div><div class='card-pnl pnl-win'>+10.92%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.1337
+stop  0.1264  收盤跌破破底K  (−5.46%)
+target 0.1483  (2.0R)
+exit  0.1483  target
+破底 0.1264  深度 2.80%  在下 15h
+急殺 2.2% / 2.0ATR  破前低 1.0%
+量比 0.24x  MA25 0.130208
+進場 1h MA7>MA14>MA25  MA7 0.131914  MA14 0.130321  MA25 0.130208</pre><div class='mini-chart'><img src='img/t07_BUSDT_0905_0400_qb.png' alt='#7 BUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · AKEUSDT · QA · W</span><span class='trade-time'>2026-09-05 10:00 → 09-06 09:00</span></div><div class='card-pnl pnl-loss'>-11.83%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.019395
+stop  0.012694  收盤跌破破底K  (−34.55%)
+target 0.032797  (2.0R)
+exit  0.0171  lost_ma25
+破底 0.012694  深度 11.43%  在下 18h
+急殺 5.1% / 1.5ATR  破前低 2.5%
+量比 7.77x  MA25 0.0140583
+進場 1h MA7>MA14>MA25  MA7 0.0148496  MA14 0.0140941  MA25 0.0140583</pre><div class='mini-chart'><img src='img/t08_AKEUSDT_0905_1000_qa.png' alt='#8 AKEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · BZUSDT · QB · V</span><span class='trade-time'>2026-09-05 10:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+0.99%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 95.81
+stop  93.09  收盤跌破破底K  (−2.84%)
+target 101.25  (2.0R)
+exit  96.76  timeout
+破底 93.09  深度 2.89%  在下 11h
+急殺 2.5% / 3.8ATR  破前低 1.7%
+量比 0.08x  MA25 95.4312
+進場 1h MA7>MA14>MA25  MA7 95.7714  MA14 95.585  MA25 95.4312</pre><div class='mini-chart'><img src='img/t09_BZUSDT_0905_1000_qb.png' alt='#9 BZUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · NOMUSDT · QA · W</span><span class='trade-time'>2026-09-05 10:00 → 09-06 09:00</span></div><div class='card-pnl pnl-loss'>-3.59%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.001865
+stop  0.001515  收盤跌破破底K  (−18.77%)
+target 0.002565  (2.0R)
+exit  0.001798  lost_ma25
+破底 0.001515  深度 4.34%  在下 27h
+急殺 3.1% / 3.0ATR  破前低 2.4%
+量比 25.07x  MA25 0.00157264
+進場 1h MA7>MA14>MA25  MA7 0.00161186  MA14 0.00158393  MA25 0.00157264</pre><div class='mini-chart'><img src='img/t10_NOMUSDT_0905_1000_qa.png' alt='#10 NOMUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · CLUSDT · QB · V</span><span class='trade-time'>2026-09-05 11:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+0.84%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 91.13
+stop  88.68  收盤跌破破底K  (−2.69%)
+target 96.03  (2.0R)
+exit  91.9  timeout
+破底 88.68  深度 3.23%  在下 13h
+急殺 2.5% / 3.5ATR  破前低 1.8%
+量比 0.05x  MA25 90.932
+進場 1h MA7>MA14>MA25  MA7 91.1229  MA14 91.0721  MA25 90.932</pre><div class='mini-chart'><img src='img/t11_CLUSDT_0905_1100_qb.png' alt='#11 CLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · DOTUSDT · QA · W</span><span class='trade-time'>2026-09-05 11:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+5.20%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.8926
+stop  0.8406  收盤跌破破底K  (−5.83%)
+target 0.9966  (2.0R)
+exit  0.939  timeout
+破底 0.8406  深度 4.84%  在下 22h
+急殺 4.8% / 3.7ATR  破前低 2.8%
+量比 0.51x  MA25 0.87288
+進場 1h MA7>MA14>MA25  MA7 0.8883  MA14 0.87415  MA25 0.87288</pre><div class='mini-chart'><img src='img/t12_DOTUSDT_0905_1100_qa.png' alt='#12 DOTUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · BNBUSDT · QB · W</span><span class='trade-time'>2026-09-05 12:00 → 09-05 16:00</span></div><div class='card-pnl pnl-win'>+3.50%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 721.81
+stop  709.17  收盤跌破破底K  (−1.75%)
+target 747.09  (2.0R)
+exit  747.09  target
+破底 709.17  深度 1.80%  在下 18h
+急殺 2.6% / 3.1ATR  破前低 0.7%
+量比 0.50x  MA25 719.844
+進場 1h MA7>MA14>MA25  MA7 721.231  MA14 719.944  MA25 719.844</pre><div class='mini-chart'><img src='img/t13_BNBUSDT_0905_1200_qb.png' alt='#13 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · BULLAUSDT · QA · V</span><span class='trade-time'>2026-09-05 12:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+28.26%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.061913
+stop  0.025157  收盤跌破破底K  (−59.37%)
+target 0.135425  (2.0R)
+exit  0.079408  timeout
+破底 0.025157  深度 24.34%  在下 10h
+急殺 20.5% / 1.9ATR  破前低 7.2%
+量比 2.01x  MA25 0.0339497
+進場 1h MA7>MA14>MA25  MA7 0.0391483  MA14 0.0340524  MA25 0.0339497</pre><div class='mini-chart'><img src='img/t14_BULLAUSDT_0905_1200_qa.png' alt='#14 BULLAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · LTCUSDT · QA · V</span><span class='trade-time'>2026-09-05 12:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+3.14%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 52.57
+stop  49.78  收盤跌破破底K  (−5.31%)
+target 58.15  (2.0R)
+exit  54.22  timeout
+破底 49.78  深度 2.76%  在下 14h
+急殺 3.1% / 4.0ATR  破前低 1.8%
+量比 1.54x  MA25 50.9684
+進場 1h MA7>MA14>MA25  MA7 51.5614  MA14 51.0257  MA25 50.9684</pre><div class='mini-chart'><img src='img/t15_LTCUSDT_0905_1200_qa.png' alt='#15 LTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · OPUSDT · QA · W</span><span class='trade-time'>2026-09-05 13:00 → 09-06 06:00</span></div><div class='card-pnl pnl-win'>+11.68%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.10054
+stop  0.09467  收盤跌破破底K  (−5.84%)
+target 0.11228  (2.0R)
+exit  0.11228  target
+破底 0.09467  深度 6.05%  在下 24h
+急殺 5.9% / 4.0ATR  破前低 3.3%
+量比 0.52x  MA25 0.0983556
+進場 1h MA7>MA14>MA25  MA7 0.0994114  MA14 0.0984457  MA25 0.0983556</pre><div class='mini-chart'><img src='img/t16_OPUSDT_0905_1300_qa.png' alt='#16 OPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · ONDOUSDT · QB · V</span><span class='trade-time'>2026-09-05 13:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+0.56%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.3729
+stop  0.3483  收盤跌破破底K  (−6.60%)
+target 0.4221  (2.0R)
+exit  0.375  timeout
+破底 0.3483  深度 4.37%  在下 12h
+急殺 5.4% / 3.6ATR  破前低 2.8%
+量比 0.73x  MA25 0.360852
+進場 1h MA7>MA14>MA25  MA7 0.366314  MA14 0.360929  MA25 0.360852</pre><div class='mini-chart'><img src='img/t17_ONDOUSDT_0905_1300_qb.png' alt='#17 ONDOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · 币安人生USDT · QB · V</span><span class='trade-time'>2026-09-05 13:00 → 09-05 22:00</span></div><div class='card-pnl pnl-win'>+12.90%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.5053
+stop  0.4727  收盤跌破破底K  (−6.45%)
+target 0.5705  (2.0R)
+exit  0.5705  target
+破底 0.4727  深度 4.77%  在下 19h
+急殺 5.2% / 3.5ATR  破前低 1.1%
+量比 1.22x  MA25 0.491916
+進場 1h MA7>MA14>MA25  MA7 0.4986  MA14 0.493286  MA25 0.491916</pre><div class='mini-chart'><img src='img/t18_币安人生USDT_0905_1300_qb.png' alt='#18 币安人生USDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · 牛来USDT · QA · W</span><span class='trade-time'>2026-09-05 14:00 → 09-06 01:00</span></div><div class='card-pnl pnl-win'>+44.49%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.09561
+stop  0.07434  收盤跌破破底K  (−22.25%)
+target 0.13815  (2.0R)
+exit  0.13815  target
+破底 0.07434  深度 18.09%  在下 21h
+急殺 17.7% / 2.1ATR  破前低 9.1%
+量比 0.88x  MA25 0.0867812
+進場 1h MA7>MA14>MA25  MA7 0.0909314  MA14 0.0868657  MA25 0.0867812</pre><div class='mini-chart'><img src='img/t19_牛来USDT_0905_1400_qa.png' alt='#19 牛来USDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · CHIPUSDT · QA · W</span><span class='trade-time'>2026-09-05 14:00 → 09-06 14:00</span></div><div class='card-pnl pnl-loss'>-0.31%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.05766
+stop  0.05132  收盤跌破破底K  (−11.00%)
+target 0.07034  (2.0R)
+exit  0.05748  timeout
+破底 0.05132  深度 9.17%  在下 21h
+急殺 10.5% / 1.9ATR  破前低 4.5%
+量比 0.81x  MA25 0.0552224
+進場 1h MA7>MA14>MA25  MA7 0.0564071  MA14 0.0553871  MA25 0.0552224</pre><div class='mini-chart'><img src='img/t20_CHIPUSDT_0905_1400_qa.png' alt='#20 CHIPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · SUIUSDT · QA · W</span><span class='trade-time'>2026-09-05 15:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+0.29%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.7933
+stop  0.7374  收盤跌破破底K  (−7.05%)
+target 0.9051  (2.0R)
+exit  0.7956  timeout
+破底 0.7374  深度 5.26%  在下 24h
+急殺 5.8% / 4.4ATR  破前低 3.4%
+量比 1.51x  MA25 0.762684
+進場 1h MA7>MA14>MA25  MA7 0.771957  MA14 0.763814  MA25 0.762684</pre><div class='mini-chart'><img src='img/t21_SUIUSDT_0905_1500_qa.png' alt='#21 SUIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · TRUMPUSDT · QA · W</span><span class='trade-time'>2026-09-05 15:00 → 09-06 14:00</span></div><div class='card-pnl pnl-loss'>-2.58%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 2.439
+stop  1.984  收盤跌破破底K  (−18.66%)
+target 3.349  (2.0R)
+exit  2.376  timeout
+破底 1.984  深度 16.88%  在下 17h
+急殺 17.8% / 5.9ATR  破前低 14.3%
+量比 1.47x  MA25 2.31196
+進場 1h MA7>MA14>MA25  MA7 2.35257  MA14 2.31707  MA25 2.31196</pre><div class='mini-chart'><img src='img/t22_TRUMPUSDT_0905_1500_qa.png' alt='#22 TRUMPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · WLDUSDT · QB · V</span><span class='trade-time'>2026-09-05 15:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+2.19%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.3926
+stop  0.3691  收盤跌破破底K  (−5.99%)
+target 0.4396  (2.0R)
+exit  0.4012  timeout
+破底 0.3691  深度 5.82%  在下 14h
+急殺 6.0% / 3.7ATR  破前低 3.6%
+量比 0.59x  MA25 0.383872
+進場 1h MA7>MA14>MA25  MA7 0.388657  MA14 0.384729  MA25 0.383872</pre><div class='mini-chart'><img src='img/t23_WLDUSDT_0905_1500_qb.png' alt='#23 WLDUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#24 · FILUSDT · QA · W</span><span class='trade-time'>2026-09-05 15:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+4.58%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.7686
+stop  0.692  收盤跌破破底K  (−9.97%)
+target 0.9218  (2.0R)
+exit  0.8038  timeout
+破底 0.692  深度 13.45%  在下 30h
+急殺 10.9% / 6.6ATR  破前低 9.3%
+量比 0.54x  MA25 0.758308
+進場 1h MA7>MA14>MA25  MA7 0.766329  MA14 0.759236  MA25 0.758308</pre><div class='mini-chart'><img src='img/t24_FILUSDT_0905_1500_qa.png' alt='#24 FILUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#25 · TAOUSDT · QA · W</span><span class='trade-time'>2026-09-05 15:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+0.96%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 233.6
+stop  220  收盤跌破破底K  (−5.82%)
+target 260.8  (2.0R)
+exit  235.85  timeout
+破底 220  深度 3.50%  在下 14h
+急殺 5.0% / 3.3ATR  破前低 1.9%
+量比 2.07x  MA25 226.644
+進場 1h MA7>MA14>MA25  MA7 229.567  MA14 226.909  MA25 226.644</pre><div class='mini-chart'><img src='img/t25_TAOUSDT_0905_1500_qa.png' alt='#25 TAOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#26 · APTUSDT · QA · W</span><span class='trade-time'>2026-09-05 15:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+2.73%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.6014
+stop  0.5686  收盤跌破破底K  (−5.45%)
+target 0.667  (2.0R)
+exit  0.6178  timeout
+破底 0.5686  深度 6.09%  在下 28h
+急殺 4.8% / 3.7ATR  破前低 3.3%
+量比 0.85x  MA25 0.586192
+進場 1h MA7>MA14>MA25  MA7 0.595171  MA14 0.587186  MA25 0.586192</pre><div class='mini-chart'><img src='img/t26_APTUSDT_0905_1500_qa.png' alt='#26 APTUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#27 · INJUSDT · QA · W</span><span class='trade-time'>2026-09-05 15:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+3.14%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 4.94
+stop  4.636  收盤跌破破底K  (−6.15%)
+target 5.548  (2.0R)
+exit  5.095  timeout
+破底 4.636  深度 6.37%  在下 27h
+急殺 4.4% / 2.9ATR  破前低 2.2%
+量比 1.22x  MA25 4.77752
+進場 1h MA7>MA14>MA25  MA7 4.79986  MA14 4.78493  MA25 4.77752</pre><div class='mini-chart'><img src='img/t27_INJUSDT_0905_1500_qa.png' alt='#27 INJUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#28 · CAKEUSDT · QA · W</span><span class='trade-time'>2026-09-05 16:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+7.22%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 2.1047
+stop  1.9255  收盤跌破破底K  (−8.51%)
+target 2.4631  (2.0R)
+exit  2.2567  timeout
+破底 1.9255  深度 3.67%  在下 17h
+急殺 5.8% / 3.4ATR  破前低 1.7%
+量比 3.61x  MA25 1.98517
+進場 1h MA7>MA14>MA25  MA7 2.00051  MA14 1.98541  MA25 1.98517</pre><div class='mini-chart'><img src='img/t28_CAKEUSDT_0905_1600_qa.png' alt='#28 CAKEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#29 · 1000SHIBUSDT · QA · W</span><span class='trade-time'>2026-09-05 16:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+0.74%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.005431
+stop  0.005153  收盤跌破破底K  (−5.12%)
+target 0.005987  (2.0R)
+exit  0.005471  timeout
+破底 0.005153  深度 3.95%  在下 23h
+急殺 4.0% / 3.5ATR  破前低 2.6%
+量比 1.29x  MA25 0.00526664
+進場 1h MA7>MA14>MA25  MA7 0.005334  MA14 0.00527457  MA25 0.00526664</pre><div class='mini-chart'><img src='img/t29_1000SHIBUSDT_0905_1600_qa.png' alt='#29 1000SHIBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#30 · SUSHIUSDT · QA · W</span><span class='trade-time'>2026-09-05 17:00 → 09-06 01:00</span></div><div class='card-pnl pnl-win'>+18.76%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.2015
+stop  0.1826  收盤跌破破底K  (−9.38%)
+target 0.2393  (2.0R)
+exit  0.2393  target
+破底 0.1826  深度 8.24%  在下 25h
+急殺 8.5% / 4.4ATR  破前低 6.2%
+量比 3.26x  MA25 0.192704
+進場 1h MA7>MA14>MA25  MA7 0.195786  MA14 0.192907  MA25 0.192704</pre><div class='mini-chart'><img src='img/t30_SUSHIUSDT_0905_1700_qa.png' alt='#30 SUSHIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#31 · AVAXUSDT · QB · V</span><span class='trade-time'>2026-09-05 17:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+2.01%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 7.504
+stop  7.256  收盤跌破破底K  (−3.30%)
+target 8  (2.0R)
+exit  7.655  timeout
+破底 7.256  深度 3.00%  在下 17h
+急殺 3.7% / 4.9ATR  破前低 2.2%
+量比 1.06x  MA25 7.40556
+進場 1h MA7>MA14>MA25  MA7 7.452  MA14 7.41214  MA25 7.40556</pre><div class='mini-chart'><img src='img/t31_AVAXUSDT_0905_1700_qb.png' alt='#31 AVAXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#32 · RAYSOLUSDT · QA · W</span><span class='trade-time'>2026-09-05 17:00 → 09-06 07:00</span></div><div class='card-pnl pnl-win'>+8.23%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.8356
+stop  0.8012  收盤跌破破底K  (−4.12%)
+target 0.9044  (2.0R)
+exit  0.9044  target
+破底 0.8012  深度 4.23%  在下 14h
+急殺 5.1% / 3.3ATR  破前低 2.5%
+量比 0.41x  MA25 0.823452
+進場 1h MA7>MA14>MA25  MA7 0.832157  MA14 0.825  MA25 0.823452</pre><div class='mini-chart'><img src='img/t32_RAYSOLUSDT_0905_1700_qa.png' alt='#32 RAYSOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#33 · SOLUSDT · QB · V</span><span class='trade-time'>2026-09-05 18:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+2.79%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 102.46
+stop  100.04  收盤跌破破底K  (−2.36%)
+target 107.3  (2.0R)
+exit  105.32  timeout
+破底 100.04  深度 3.74%  在下 18h
+急殺 4.5% / 4.9ATR  破前低 3.0%
+量比 0.84x  MA25 101.964
+進場 1h MA7>MA14>MA25  MA7 102.204  MA14 101.987  MA25 101.964</pre><div class='mini-chart'><img src='img/t33_SOLUSDT_0905_1800_qb.png' alt='#33 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#34 · XAUUSDT · QB · W</span><span class='trade-time'>2026-09-05 18:00 → 09-05 22:00</span></div><div class='card-pnl pnl-loss'>-0.05%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 4438
+stop  4370  收盤跌破破底K  (−1.53%)
+target 4574  (2.0R)
+exit  4435.71  lost_ma25
+破底 4370  深度 2.45%  在下 28h
+急殺 2.5% / 5.5ATR  破前低 2.1%
+量比 0.13x  MA25 4436.46
+進場 1h MA7>MA14>MA25  MA7 4437.51  MA14 4437.15  MA25 4436.46</pre><div class='mini-chart'><img src='img/t34_XAUUSDT_0905_1800_qb.png' alt='#34 XAUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#35 · PENGUUSDT · QC · V</span><span class='trade-time'>2026-09-05 18:00 → 09-06 11:00</span></div><div class='card-pnl pnl-win'>+3.64%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.008619
+stop  0.008462  收盤跌破破底K  (−1.82%)
+target 0.008933  (2.0R)
+exit  0.008933  target
+破底 0.008462  深度 1.88%  在下 8h
+急殺 2.8% / 1.9ATR  破前低 0.2%
+量比 0.65x  MA25 0.0083924
+進場 1h MA7>MA14>MA25  MA7 0.00852314  MA14 0.00841657  MA25 0.0083924</pre><div class='mini-chart'><img src='img/t35_PENGUUSDT_0905_1800_qc.png' alt='#35 PENGUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#36 · BOMEUSDT · QA · W</span><span class='trade-time'>2026-09-05 18:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+5.73%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.0008726
+stop  0.0007452  收盤跌破破底K  (−14.60%)
+target 0.0011274  (2.0R)
+exit  0.0009226  timeout
+破底 0.0007452  深度 17.24%  在下 30h
+急殺 16.1% / 6.7ATR  破前低 13.6%
+量比 2.84x  MA25 0.000834864
+進場 1h MA7>MA14>MA25  MA7 0.000843929  MA14 0.000836736  MA25 0.000834864</pre><div class='mini-chart'><img src='img/t36_BOMEUSDT_0905_1800_qa.png' alt='#36 BOMEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#37 · XLMUSDT · QB · V</span><span class='trade-time'>2026-09-05 18:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+1.39%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.18359
+stop  0.17691  收盤跌破破底K  (−3.64%)
+target 0.19695  (2.0R)
+exit  0.18615  timeout
+破底 0.17691  深度 3.93%  在下 16h
+急殺 4.5% / 3.9ATR  破前低 2.8%
+量比 1.04x  MA25 0.180518
+進場 1h MA7>MA14>MA25  MA7 0.182384  MA14 0.180789  MA25 0.180518</pre><div class='mini-chart'><img src='img/t37_XLMUSDT_0905_1800_qb.png' alt='#37 XLMUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#38 · JUPUSDT · QA · W</span><span class='trade-time'>2026-09-05 18:00 → 09-06 11:00</span></div><div class='card-pnl pnl-win'>+6.92%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.2198
+stop  0.2122  收盤跌破破底K  (−3.46%)
+target 0.235  (2.0R)
+exit  0.235  target
+破底 0.2122  深度 7.18%  在下 30h
+急殺 5.7% / 3.8ATR  破前低 4.0%
+量比 1.54x  MA25 0.21698
+進場 1h MA7>MA14>MA25  MA7 0.218071  MA14 0.217007  MA25 0.21698</pre><div class='mini-chart'><img src='img/t38_JUPUSDT_0905_1800_qa.png' alt='#38 JUPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#39 · DOGEUSDT · QA · W</span><span class='trade-time'>2026-09-05 19:00 → 09-06 01:00</span></div><div class='card-pnl pnl-win'>+5.48%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.08609
+stop  0.08373  收盤跌破破底K  (−2.74%)
+target 0.09081  (2.0R)
+exit  0.09081  target
+破底 0.08373  深度 4.35%  在下 18h
+急殺 4.9% / 4.3ATR  破前低 3.1%
+量比 0.92x  MA25 0.0850148
+進場 1h MA7>MA14>MA25  MA7 0.08566  MA14 0.0851286  MA25 0.0850148</pre><div class='mini-chart'><img src='img/t39_DOGEUSDT_0905_1900_qa.png' alt='#39 DOGEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#40 · MSTRUSDT · QB · V</span><span class='trade-time'>2026-09-05 19:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+1.95%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 142.21
+stop  135.41  收盤跌破破底K  (−4.78%)
+target 155.81  (2.0R)
+exit  144.98  timeout
+破底 135.41  深度 4.05%  在下 6h
+急殺 5.4% / 4.2ATR  破前低 3.9%
+量比 0.12x  MA25 141.87
+進場 1h MA7>MA14>MA25  MA7 142.167  MA14 142.121  MA25 141.87</pre><div class='mini-chart'><img src='img/t40_MSTRUSDT_0905_1900_qb.png' alt='#40 MSTRUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#41 · ETHUSDT · QA · W</span><span class='trade-time'>2026-09-05 20:00 → 09-06 11:00</span></div><div class='card-pnl pnl-win'>+2.20%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 2457.71
+stop  2430.67  收盤跌破破底K  (−1.10%)
+target 2511.79  (2.0R)
+exit  2511.79  target
+破底 2430.67  深度 2.80%  在下 24h
+急殺 4.0% / 4.1ATR  破前低 2.5%
+量比 1.33x  MA25 2451.7
+進場 1h MA7>MA14>MA25  MA7 2455.05  MA14 2453.1  MA25 2451.7</pre><div class='mini-chart'><img src='img/t41_ETHUSDT_0905_2000_qa.png' alt='#41 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#42 · BTCUSDT · QA · W</span><span class='trade-time'>2026-09-05 20:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+0.09%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 79666
+stop  78618.1  收盤跌破破底K  (−1.32%)
+target 81761.8  (2.0R)
+exit  79737.9  timeout
+破底 78618.1  深度 2.75%  在下 24h
+急殺 3.4% / 4.6ATR  破前低 2.3%
+量比 0.89x  MA25 79535
+進場 1h MA7>MA14>MA25  MA7 79616.1  MA14 79574.1  MA25 79535</pre><div class='mini-chart'><img src='img/t42_BTCUSDT_0905_2000_qa.png' alt='#42 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#43 · XRPUSDT · QA · W</span><span class='trade-time'>2026-09-05 20:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+0.25%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 1.414
+stop  1.3828  收盤跌破破底K  (−2.21%)
+target 1.4764  (2.0R)
+exit  1.4175  timeout
+破底 1.3828  深度 4.47%  在下 21h
+急殺 5.0% / 4.0ATR  破前低 3.6%
+量比 1.84x  MA25 1.40035
+進場 1h MA7>MA14>MA25  MA7 1.40579  MA14 1.40135  MA25 1.40035</pre><div class='mini-chart'><img src='img/t43_XRPUSDT_0905_2000_qa.png' alt='#43 XRPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#44 · ARBUSDT · QA · W</span><span class='trade-time'>2026-09-05 20:00 → 09-06 03:00</span></div><div class='card-pnl pnl-win'>+9.50%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.13447
+stop  0.12808  收盤跌破破底K  (−4.75%)
+target 0.14725  (2.0R)
+exit  0.14725  target
+破底 0.12808  深度 6.53%  在下 26h
+急殺 9.9% / 3.3ATR  破前低 4.2%
+量比 0.60x  MA25 0.132214
+進場 1h MA7>MA14>MA25  MA7 0.133544  MA14 0.132441  MA25 0.132214</pre><div class='mini-chart'><img src='img/t44_ARBUSDT_0905_2000_qa.png' alt='#44 ARBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#45 · LINKUSDT · QA · V</span><span class='trade-time'>2026-09-05 20:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+3.49%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 11.831
+stop  11.453  收盤跌破破底K  (−3.19%)
+target 12.587  (2.0R)
+exit  12.244  timeout
+破底 11.453  深度 3.25%  在下 19h
+急殺 5.8% / 4.5ATR  破前低 2.6%
+量比 1.90x  MA25 11.671
+進場 1h MA7>MA14>MA25  MA7 11.7587  MA14 11.6999  MA25 11.671</pre><div class='mini-chart'><img src='img/t45_LINKUSDT_0905_2000_qa.png' alt='#45 LINKUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#46 · SPCXUSDT · QB · W</span><span class='trade-time'>2026-09-05 20:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+1.08%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 149.35
+stop  147.28  收盤跌破破底K  (−1.39%)
+target 153.49  (2.0R)
+exit  150.97  timeout
+破底 147.28  深度 1.81%  在下 19h
+急殺 2.3% / 3.4ATR  破前低 1.3%
+量比 0.23x  MA25 148.555
+進場 1h MA7>MA14>MA25  MA7 149.033  MA14 148.612  MA25 148.555</pre><div class='mini-chart'><img src='img/t46_SPCXUSDT_0905_2000_qb.png' alt='#46 SPCXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#47 · CRVUSDT · QA · W</span><span class='trade-time'>2026-09-05 20:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+3.22%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.3637
+stop  0.3471  收盤跌破破底K  (−4.56%)
+target 0.3969  (2.0R)
+exit  0.3754  timeout
+破底 0.3471  深度 5.93%  在下 21h
+急殺 2.3% / 1.5ATR  破前低 1.2%
+量比 1.02x  MA25 0.355468
+進場 1h MA7>MA14>MA25  MA7 0.360314  MA14 0.356164  MA25 0.355468</pre><div class='mini-chart'><img src='img/t47_CRVUSDT_0905_2000_qa.png' alt='#47 CRVUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#48 · FARTCOINUSDT · QA · W</span><span class='trade-time'>2026-09-05 20:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+3.50%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.1688
+stop  0.1608  收盤跌破破底K  (−4.74%)
+target 0.1848  (2.0R)
+exit  0.1747  timeout
+破底 0.1608  深度 5.72%  在下 18h
+急殺 2.8% / 2.0ATR  破前低 0.6%
+量比 1.16x  MA25 0.164992
+進場 1h MA7>MA14>MA25  MA7 0.167057  MA14 0.165057  MA25 0.164992</pre><div class='mini-chart'><img src='img/t48_FARTCOINUSDT_0905_2000_qa.png' alt='#48 FARTCOINUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#49 · ADAUSDT · QA · W</span><span class='trade-time'>2026-09-05 21:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+2.09%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.2155
+stop  0.2089  收盤跌破破底K  (−3.06%)
+target 0.2287  (2.0R)
+exit  0.22  timeout
+破底 0.2089  深度 5.40%  在下 23h
+急殺 1.2% / 1.0ATR  破前低 0.1%
+量比 1.76x  MA25 0.21232
+進場 1h MA7>MA14>MA25  MA7 0.214014  MA14 0.212364  MA25 0.21232</pre><div class='mini-chart'><img src='img/t49_ADAUSDT_0905_2100_qa.png' alt='#49 ADAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#50 · UNIUSDT · QA · W</span><span class='trade-time'>2026-09-05 22:00 → 09-06 02:00</span></div><div class='card-pnl pnl-win'>+9.39%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 6.348
+stop  6.05  收盤跌破破底K  (−4.69%)
+target 6.944  (2.0R)
+exit  6.944  target
+破底 6.05  深度 3.58%  在下 14h
+急殺 5.3% / 1.9ATR  破前低 2.1%
+量比 2.63x  MA25 6.22844
+進場 1h MA7>MA14>MA25  MA7 6.27429  MA14 6.26229  MA25 6.22844</pre><div class='mini-chart'><img src='img/t50_UNIUSDT_0905_2200_qa.png' alt='#50 UNIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#51 · HYPEUSDT · QA · W</span><span class='trade-time'>2026-09-05 22:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+1.34%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 85.127
+stop  83.5  收盤跌破破底K  (−1.91%)
+target 88.381  (2.0R)
+exit  86.27  timeout
+破底 83.5  深度 2.76%  在下 23h
+急殺 4.5% / 3.5ATR  破前低 2.5%
+量比 0.69x  MA25 84.4963
+進場 1h MA7>MA14>MA25  MA7 84.9024  MA14 84.5175  MA25 84.4963</pre><div class='mini-chart'><img src='img/t51_HYPEUSDT_0905_2200_qa.png' alt='#51 HYPEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#52 · 1000PEPEUSDT · QA · W</span><span class='trade-time'>2026-09-06 00:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+1.61%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.003583
+stop  0.0034435  收盤跌破破底K  (−3.89%)
+target 0.003862  (2.0R)
+exit  0.0036407  timeout
+破底 0.0034435  深度 6.78%  在下 30h
+急殺 2.4% / 1.8ATR  破前低 0.8%
+量比 1.26x  MA25 0.00352706
+進場 1h MA7>MA14>MA25  MA7 0.00355769  MA14 0.00352991  MA25 0.00352706</pre><div class='mini-chart'><img src='img/t52_1000PEPEUSDT_0906_0000_qa.png' alt='#52 1000PEPEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#53 · BCHUSDT · QA · W</span><span class='trade-time'>2026-09-06 00:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+3.04%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 253.54
+stop  244.52  收盤跌破破底K  (−3.56%)
+target 271.58  (2.0R)
+exit  261.25  timeout
+破底 244.52  深度 4.73%  在下 19h
+急殺 3.4% / 2.5ATR  破前低 1.0%
+量比 1.02x  MA25 250.277
+進場 1h MA7>MA14>MA25  MA7 251.166  MA14 250.659  MA25 250.277</pre><div class='mini-chart'><img src='img/t53_BCHUSDT_0906_0000_qa.png' alt='#53 BCHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#54 · USELESSUSDT · QB · V</span><span class='trade-time'>2026-09-06 01:00 → 09-06 11:00</span></div><div class='card-pnl pnl-loss'>-18.50%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.29816
+stop  0.211  收盤跌破破底K  (−29.23%)
+target 0.47248  (2.0R)
+exit  0.24299  lost_ma25
+破底 0.211  深度 13.94%  在下 12h
+急殺 13.3% / 2.0ATR  破前低 4.1%
+量比 1.22x  MA25 0.24877
+進場 1h MA7>MA14>MA25  MA7 0.264106  MA14 0.249564  MA25 0.24877</pre><div class='mini-chart'><img src='img/t54_USELESSUSDT_0906_0100_qb.png' alt='#54 USELESSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#55 · ENAUSDT · QA · W</span><span class='trade-time'>2026-09-06 01:00 → 09-06 09:00</span></div><div class='card-pnl pnl-win'>+12.69%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.16582
+stop  0.1553  收盤跌破破底K  (−6.34%)
+target 0.18686  (2.0R)
+exit  0.18686  target
+破底 0.1553  深度 7.19%  在下 29h
+急殺 10.0% / 3.7ATR  破前低 3.6%
+量比 2.06x  MA25 0.163626
+進場 1h MA7>MA14>MA25  MA7 0.163936  MA14 0.163899  MA25 0.163626</pre><div class='mini-chart'><img src='img/t55_ENAUSDT_0906_0100_qa.png' alt='#55 ENAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#56 · AAVEUSDT · QA · W</span><span class='trade-time'>2026-09-06 01:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+2.08%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 132.93
+stop  128.36  收盤跌破破底K  (−3.44%)
+target 142.07  (2.0R)
+exit  135.69  timeout
+破底 128.36  深度 3.83%  在下 26h
+急殺 1.9% / 2.3ATR  破前低 0.4%
+量比 2.41x  MA25 130.332
+進場 1h MA7>MA14>MA25  MA7 131.016  MA14 130.437  MA25 130.332</pre><div class='mini-chart'><img src='img/t56_AAVEUSDT_0906_0100_qa.png' alt='#56 AAVEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#57 · ONDSUSDT · QA · V</span><span class='trade-time'>2026-09-06 02:00 → 09-06 14:00</span></div><div class='card-pnl pnl-win'>+0.72%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 7.653
+stop  7.45  收盤跌破破底K  (−2.65%)
+target 8.059  (2.0R)
+exit  7.708  timeout
+破底 7.45  深度 2.99%  在下 25h
+急殺 4.3% / 5.5ATR  破前低 2.3%
+量比 5.73x  MA25 7.61608
+進場 1h MA7>MA14>MA25  MA7 7.61986  MA14 7.617  MA25 7.61608</pre><div class='mini-chart'><img src='img/t57_ONDSUSDT_0906_0200_qa.png' alt='#57 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#58 · 龙虾USDT · QB · V</span><span class='trade-time'>2026-09-06 03:00 → 09-06 13:00</span></div><div class='card-pnl pnl-loss'>-9.55%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.09077
+stop  0.077465  收盤跌破破底K  (−14.66%)
+target 0.11738  (2.0R)
+exit  0.082103  lost_ma25
+破底 0.077465  深度 6.21%  在下 6h
+急殺 17.4% / 2.2ATR  破前低 2.8%
+量比 0.44x  MA25 0.0856892
+進場 1h MA7>MA14>MA25  MA7 0.0872389  MA14 0.0863918  MA25 0.0856892</pre><div class='mini-chart'><img src='img/t58_龙虾USDT_0906_0300_qb.png' alt='#58 龙虾USDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#59 · MAGMAUSDT · QA · W</span><span class='trade-time'>2026-09-06 08:00 → 09-06 14:00</span></div><div class='card-pnl pnl-loss'>-10.24%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.2826
+stop  0.21766  收盤跌破破底K  (−22.98%)
+target 0.41248  (2.0R)
+exit  0.25366  timeout
+破底 0.21766  深度 15.37%  在下 13h
+急殺 24.1% / 3.4ATR  破前低 7.8%
+量比 0.50x  MA25 0.253614
+進場 1h MA7>MA14>MA25  MA7 0.271627  MA14 0.256441  MA25 0.253614</pre><div class='mini-chart'><img src='img/t59_MAGMAUSDT_0906_0800_qa.png' alt='#59 MAGMAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#60 · DASHUSDT · QA · V</span><span class='trade-time'>2026-09-06 13:00 → 09-06 14:00</span></div><div class='card-pnl pnl-loss'>-4.31%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 77.57
+stop  64.74  收盤跌破破底K  (−16.54%)
+target 103.23  (2.0R)
+exit  74.23  timeout
+破底 64.74  深度 4.22%  在下 4h
+急殺 5.6% / 1.9ATR  破前低 1.2%
+量比 3.21x  MA25 68.6832
+進場 1h MA7>MA14>MA25  MA7 70.0914  MA14 68.8721  MA25 68.6832</pre><div class='mini-chart'><img src='img/t60_DASHUSDT_0906_1300_qa.png' alt='#60 DASHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div>
+</body></html>
