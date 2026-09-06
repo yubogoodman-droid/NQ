@@ -78,6 +78,24 @@ python3 examples/test_tw_1h_reclaim.py
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim/view.html
 
+## 幣安 5m 空頭排列 Telegram
+
+五分 K：`MA7 < MA14 < MA25`，且**前一根收在 MA200 上、這一根收盤才跌破**才推通知。  
+已在 MA200 下只是短均排好的不算。同時小時 K 收盤還要在 `MA99` 與 `MA200` 之下。
+
+```bash
+# Telegram 憑證放 tg_config.env（勿提交）
+python3 examples/watch_binance_5m_short.py --test
+python3 examples/watch_binance_5m_short.py --once --dry-run
+python3 examples/watch_binance_5m_short.py
+
+# 近兩天回測（成交額前 100，15/30/60/120 分鐘空頭報酬）
+python3 examples/watch_binance_5m_short.py --backtest --days 2 --pages
+
+# 單元測試（不打幣安）
+python3 examples/test_watch_binance_5m_short.py
+```
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
