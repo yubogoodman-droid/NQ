@@ -205,6 +205,18 @@ def trough_clear_of_mas(low_px: float, *ma_vals: float) -> bool:
     return True
 
 
+def price_above_mas(px: float, *ma_vals: float) -> bool:
+    """進場價上方不能有均線壓著。還沒算出來的長均（NaN）不算。"""
+    if px <= 0:
+        return False
+    for v in ma_vals:
+        if v is None or (isinstance(v, (float, np.floating)) and np.isnan(v)):
+            continue
+        if float(v) >= px:
+            return False
+    return True
+
+
 def climax_volume_ratio(volume: np.ndarray, trough_idx: int, *, span: int = 3, lookback: int = 20) -> float:
     """急殺段（破底那根含前 span-1 根）最大量 / 再往前 lookback 根均量。富喬那種爆量殺盤會 >> 2。"""
     lo = max(0, trough_idx - span + 1)
@@ -306,12 +318,13 @@ def detect_signals(
     require_pretty: bool = True,
     min_climax_vol: float = 2.0,
     min_bounce_vol: float = 1.0,
-    require_above_ma60: bool = True,
+    require_above_mas: bool = True,
 ) -> list[BounceSignal]:
     """急殺破近期低點後，等 5>10>20 排漂亮（分開、上彎）才出訊號。
 
     富喬 1815 08-28 那種標準：破底那段要爆量（min_climax_vol 倍前 20 根均量）、
-    反彈段要帶量（min_bounce_vol 倍破底前均量）、進場價要站回 60MA 之上。
+    反彈段要帶量（min_bounce_vol 倍破底前均量）、進場價要站上所有均線
+    （60/120/200/240 有算出來的都要在腳下，上面不能有均線壓著）。
     門檻設 0 / False 就不檢查。
     """
     if df is None or len(df) < lookback + 20:
@@ -417,7 +430,16 @@ def detect_signals(
             continue
         if i >= slope_bars and not np.isnan(ma5[i - slope_bars]) and ma5[i] <= ma5[i - slope_bars]:
             continue
-        if require_above_ma60 and not np.isnan(ma60[i]) and float(close[i]) <= float(ma60[i]):
+        if require_above_mas and not price_above_mas(
+            float(close[i]), ma60[i], ma120[i], ma200[i], ma240[i]
+        ):
+            continue
+        # 顯示用的跌幅（當日高點→破底）也要過門檻；48 根視窗跨到前一天的慢跌不算急殺
+        s0 = int(sess0[trough_idx])
+        sess_peak = float(np.max(high[s0 : trough_idx + 1])) if trough_idx >= s0 else dump_high
+        peak = sess_peak if sess_peak > trough_low else dump_high
+        drop_pct = (peak - trough_low) / peak if peak > 0 else 0.0
+        if drop_pct < min_drop_pct:
             continue
         climax = climax_volume_ratio(volume, trough_idx, lookback=vol_lookback)
         if not _ratio_ok(climax, min_climax_vol):
@@ -427,10 +449,6 @@ def detect_signals(
             continue
         vol_avg = float(np.mean(volume[max(0, i - vol_lookback) : i]) or 0.0)
         vol_ratio = float(volume[i] / vol_avg) if vol_avg > 0 else 0.0
-        s0 = int(sess0[trough_idx])
-        sess_peak = float(np.max(high[s0 : trough_idx + 1])) if trough_idx >= s0 else dump_high
-        peak = sess_peak if sess_peak > trough_low else dump_high
-        drop_pct = (peak - trough_low) / peak if peak > 0 else 0.0
         dump_high = peak
         signals.append(
             BounceSignal(
@@ -697,7 +715,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <h1>台股 5分K 破底反彈</h1>
 <p class="muted">{escape(period)} · {len(universe)} 檔
 <br/>急殺破近 4 小時低點或今日低點（跌幅 ≥ 2%），且破底那根下方不能有任何均線。24 根內 5MA &gt; 10MA &gt; 20MA 要明顯分開、往上張開才算；糾結黏帶不算。
-<br/>富喬標準：破底那段要爆量（≥ 2 倍前 20 根均量）、反彈段要帶量（≥ 破底前均量）、進場價站回 60MA 之上。</p>
+<br/>富喬標準：破底那段要爆量（≥ 2 倍前 20 根均量）、反彈段要帶量（≥ 破底前均量）、進場價站上所有均線（上方不能有 60/120/200/240 壓著）。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -925,7 +943,7 @@ def detect_kwargs_from_args(args) -> dict[str, Any]:
         "require_pretty": not getattr(args, "loose", False),
         "min_climax_vol": float(getattr(args, "min_climax_vol", 2.0)),
         "min_bounce_vol": float(getattr(args, "min_bounce_vol", 1.0)),
-        "require_above_ma60": not getattr(args, "no_ma60", False),
+        "require_above_mas": not getattr(args, "allow_ma_overhead", False),
     }
 
 
@@ -1009,7 +1027,7 @@ def cmd_scan(args) -> int:
             period += f" · 股價≤{args.max_price:g}"
         if pretty:
             period += " · 均線不糾結"
-        if detect_kw["min_climax_vol"] > 0 or detect_kw["min_bounce_vol"] > 0 or detect_kw["require_above_ma60"]:
+        if detect_kw["min_climax_vol"] > 0 or detect_kw["min_bounce_vol"] > 0 or detect_kw["require_above_mas"]:
             period += " · 富喬標準"
         out = write_html_report(html_path, hits, universe, period)
         write_view_html(out)
@@ -1100,7 +1118,7 @@ def cmd_alert(args) -> int:
         f"TW 5m bounce TG | n={len(universe)} | dry_run={args.dry_run} | "
         f"range={args.range_} | pretty={detect_kw['require_pretty']} | "
         f"climax>={detect_kw['min_climax_vol']:g} bounce_vol>={detect_kw['min_bounce_vol']:g} "
-        f"ma60={detect_kw['require_above_ma60']} | session_only={not args.all_hours}"
+        f"above_mas={detect_kw['require_above_mas']} | session_only={not args.all_hours}"
     )
     while True:
         try:
@@ -1156,7 +1174,11 @@ def build_parser() -> argparse.ArgumentParser:
             default=1.0,
             help="破底後到進場的均量至少要是破底前均量的幾倍（0 = 不檢查）",
         )
-        sp.add_argument("--no-ma60", action="store_true", help="不要求進場價站上 60MA")
+        sp.add_argument(
+            "--allow-ma-overhead",
+            action="store_true",
+            help="允許進場價上方還有 60/120/200/240 壓著（預設要站上所有均線）",
+        )
 
     s = sub.add_parser("scan", help="回看近幾日並可出 HTML")
     add_universe(s)

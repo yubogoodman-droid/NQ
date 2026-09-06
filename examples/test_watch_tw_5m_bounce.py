@@ -24,6 +24,7 @@ from watch_tw_5m_bounce import (  # noqa: E402
     in_tw_session,
     merge_universe,
     parse_symbols,
+    price_above_mas,
     signal_key,
     simulate,
     sma,
@@ -259,9 +260,16 @@ def test_dry_bounce_without_volume_skipped() -> None:
     assert detect_signals(dump_only, min_bounce_vol=0)
 
 
-def test_entry_below_ma60_skipped() -> None:
+def test_price_above_mas() -> None:
+    assert price_above_mas(117.0, 115.34, 116.33, 112.47, np.nan)
+    assert not price_above_mas(40.2, 39.9, 40.3, 40.2, 40.5)  # 120/200/240 壓在頭上
+    assert price_above_mas(100.0, np.nan, np.nan, np.nan, np.nan)
+
+
+def test_entry_under_ma_overhead_skipped() -> None:
     df = make_v_bounce_bars()
     sig = detect_signals(df)[0]
+    assert sig.entry_price > sig.ma60
     lifted = df.copy()
     # 把前面的高原抬高，讓 60MA 壓在進場價之上
     head = lifted.index[: sig.break_idx - 6]
@@ -270,7 +278,26 @@ def test_entry_below_ma60_skipped() -> None:
     ma60 = sma(lifted["Close"].to_numpy(float), 60)
     assert float(lifted["Close"].iloc[sig.entry_idx]) < ma60[sig.entry_idx]
     assert all(s.entry_price > s.ma60 for s in detect_signals(lifted))
-    assert len(detect_signals(lifted, require_above_ma60=False)) >= len(detect_signals(lifted))
+    assert len(detect_signals(lifted, require_above_mas=False)) >= len(detect_signals(lifted))
+
+
+def test_slow_slide_across_days_not_a_dump() -> None:
+    """昨天慢跌 3%、今早只跌 1%：48 根視窗看起來過 2%，但當日跌幅沒過，不算急殺。"""
+    df = make_v_bounce_bars()
+    b = detect_signals(df)[0].break_idx
+    shallow = df.copy()
+    # 破底只到 264（距 48 根高點 3%，但距今天高點只 1%），破底前一根起算今天
+    shallow.loc[shallow.index[b], "Close"] = 264.5
+    shallow.loc[shallow.index[b], "Low"] = 264.0
+    shallow.loc[shallow.index[b], "High"] = 266.8
+    shallow.loc[shallow.index[b + 1], ["Open", "Close"]] = [264.5, 265.0]
+    shallow.loc[shallow.index[b + 1], ["High", "Low"]] = [265.3, 264.4]
+    idx = shallow.index.to_list()
+    for k in range(b - 1):
+        idx[k] = idx[k] - pd.Timedelta(days=1)
+    shallow.index = pd.DatetimeIndex(idx)
+    assert detect_signals(shallow) == []
+    assert detect_signals(shallow, min_drop_pct=0.01)  # 門檻降到 1% 才會出現
 
 
 def test_drop_incomplete_5m() -> None:
@@ -365,7 +392,9 @@ def main() -> int:
     test_dump_with_ma_underneath_skipped()
     test_volume_ratios()
     test_dry_bounce_without_volume_skipped()
-    test_entry_below_ma60_skipped()
+    test_price_above_mas()
+    test_entry_under_ma_overhead_skipped()
+    test_slow_slide_across_days_not_a_dump()
     test_drop_incomplete_5m()
     test_shallow_dip_ignored()
     test_simulate_and_summarize()
