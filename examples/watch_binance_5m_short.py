@@ -471,7 +471,7 @@ def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4, d15: dic
         b0 = max(0, i15 - 48)
         b1 = min(len(d15["c"]), i15 + 4)
         _paint_candles(ax15, d15, b0, b1, i15)
-        ax15.set_title("15m 當下", color="#e8f0ea", fontsize=11)
+        ax15.set_title("15m", color="#e8f0ea", fontsize=11)
         ax15.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
     fig.tight_layout(pad=0.5)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
