@@ -140,6 +140,8 @@ python3 examples/scan_binance_15m_align.py --backtest --days 3 --pages --html do
 
 舊檔名 `scan_binance_15m_ma200.py` 也會轉到同一套。Telegram 憑證放 `tg_config.env`（`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`）。
 
+近 3 日成交額前 100：**4 筆**，ETH 9/3 20:30 在第一張：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-3d/view.html
+
 ## 幣安 15m 黏帶擠壓參數
 
 六條均線寬度 ≤ 0.6%，箱體 ≤ 1.8%，量能 **3～8×**、振幅擴張 **2～6×**。8/28 那種 2.6× 假突破、開盤 14× / 19× 跳空都不進。
