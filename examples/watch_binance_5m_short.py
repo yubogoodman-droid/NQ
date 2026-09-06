@@ -2,6 +2,7 @@
 """幣安 5m 空頭排列 Telegram 監看。
 
 五分 K：MA7 < MA14 < MA25，且前一根收在 MA200 上、這一根收盤才跌破。
+跌破時 MA14 離 MA200 不能太遠（預設 ≤2%；回測對照 1/2/3/4%）。
 通知與圖會附**當下這根 15 分 K**（用已收盤的 5m 合成，不看這根 15m 之後）。
 預設只掃 24h 成交額前 100 檔。同一根不重發。
 
@@ -44,6 +45,8 @@ MS_15M = 15 * 60_000
 HORIZONS = (("15m", 3), ("30m", 6), ("60m", 12), ("120m", 24))
 UNIVERSE_LIMIT = 100
 PAGES = ROOT / "docs" / "binance-5m-short" / "index.html"
+GAP_PCTS = (1.0, 2.0, 3.0, 4.0)
+DEFAULT_GAP_PCT = 2.0
 
 
 def load_dotenv(path: Path = CONFIG_ENV) -> None:
@@ -232,9 +235,30 @@ def merge_k15(sig: dict, k15: dict | None) -> dict:
     return {**sig, **extra}
 
 
-def detect_new_short(d5: dict, i: int) -> dict | None:
-    """5m 7<14<25，且這一根才從 MA200 上收盤跌破。"""
+def ma14_ma200_gap_pct(d: dict, i: int) -> float | None:
+    """|MA14 − MA200| / MA200，單位 %。"""
+    if i < 0 or i >= len(d["c"]):
+        return None
+    m14, m200 = float(d["m14"][i]), float(d["m200"][i])
+    if np.isnan([m14, m200]).any() or m200 == 0:
+        return None
+    return abs(m14 / m200 - 1.0) * 100.0
+
+
+def filter_hits_by_gap(hits: list[dict], max_gap_pct: float | None) -> list[dict]:
+    if max_gap_pct is None or max_gap_pct <= 0:
+        return list(hits)
+    return [h for h in hits if h.get("gap14") is not None and float(h["gap14"]) <= max_gap_pct]
+
+
+def detect_new_short(d5: dict, i: int, max_gap_pct: float | None = None) -> dict | None:
+    """5m 7<14<25，且這一根才從 MA200 上收盤跌破；MA14 離 MA200 不超過 max_gap_pct%。"""
     if not five_align_ok(d5, i) or not break_ma200(d5, i):
+        return None
+    gap = ma14_ma200_gap_pct(d5, i)
+    if gap is None:
+        return None
+    if max_gap_pct is not None and max_gap_pct > 0 and gap > max_gap_pct:
         return None
     return {
         "i": i,
@@ -243,17 +267,18 @@ def detect_new_short(d5: dict, i: int) -> dict | None:
         "m14": float(d5["m14"][i]),
         "m25": float(d5["m25"][i]),
         "m200": float(d5["m200"][i]),
+        "gap14": gap,
         "t": int(d5["t"][i]),
     }
 
 
-def collect_signals(d5: dict, start_ms: int, end_ms: int) -> list[dict]:
+def collect_signals(d5: dict, start_ms: int, end_ms: int, max_gap_pct: float | None = None) -> list[dict]:
     out = []
     for i in range(len(d5["c"])):
         t = int(d5["t"][i])
         if t < start_ms or t > end_ms:
             continue
-        sig = detect_new_short(d5, i)
+        sig = detect_new_short(d5, i, max_gap_pct=max_gap_pct)
         if sig:
             out.append(sig)
     return out
@@ -479,7 +504,7 @@ def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4, d15: dic
     return path
 
 
-def scan_symbol(sym: str) -> list[dict]:
+def scan_symbol(sym: str, max_gap_pct: float | None = None) -> list[dict]:
     raw5 = fetch_klines(sym, "5m", 260, MS_5M, keep_forming=False)
     if raw5 is None:
         return []
@@ -489,7 +514,7 @@ def scan_symbol(sym: str) -> list[dict]:
     last5 = len(d5["c"]) - 1
     events = []
     for closed in (last5, last5 - 1):
-        sig = detect_new_short(d5, closed)
+        sig = detect_new_short(d5, closed, max_gap_pct=max_gap_pct)
         if not sig:
             continue
         k15 = attach_k15(d5, closed, d15)
@@ -529,6 +554,7 @@ def format_alert(ev: dict) -> str:
         f"收盤 {sig['close']:g}\n"
         f"5m MA7 {sig['m7']:g} &lt; MA14 {sig['m14']:g} &lt; MA25 {sig['m25']:g}\n"
         f"前一根在 MA200 上，這根跌破 {sig['m200']:g}（{ext:+.2f}%）\n"
+        f"MA14 離 MA200 {sig.get('gap14', 0):.2f}%\n"
         f"{format_k15_lines(sig)}"
     )
 
@@ -537,10 +563,10 @@ def key_of(ev: dict) -> str:
     return f"{ev['symbol']}:{ev['sig']['t']}"
 
 
-def scan_all(symbols: list[str]) -> list[dict]:
+def scan_all(symbols: list[str], max_gap_pct: float | None = None) -> list[dict]:
     events = []
     with ThreadPoolExecutor(8) as ex:
-        futs = {ex.submit(scan_symbol, s): s for s in symbols}
+        futs = {ex.submit(scan_symbol, s, max_gap_pct): s for s in symbols}
         for fut in as_completed(futs):
             try:
                 events.extend(fut.result())
@@ -684,7 +710,17 @@ def pick_chart_hits(hits: list[dict], limit: int) -> list[dict]:
     return chosen
 
 
-def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period: str, chart_limit: int) -> Path:
+def write_report(
+    path: Path,
+    hits: list[dict],
+    stats: dict,
+    funnel: dict,
+    period: str,
+    chart_limit: int,
+    *,
+    ablation: dict | None = None,
+    gap_pct: float | None = None,
+) -> Path:
     img_dir = path.parent / "img"
     if img_dir.exists():
         for old in img_dir.glob("*.png"):
@@ -732,6 +768,7 @@ def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period
             "<pre class='trade-detail'>"
             f"收盤 {h['close']:g}  MA7 {h['m7']:g} < MA14 {h['m14']:g} < MA25 {h['m25']:g}\n"
             f"前一根在 MA200 上，這根跌破 {h['m200']:g}（{ext:+.2f}%）\n"
+            f"MA14 離 MA200 {float(h.get('gap14') or 0):.2f}%\n"
             f"{k15_txt}"
             "</pre>"
             f"{img_html}"
@@ -743,6 +780,7 @@ def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period
         rows.append(
             "<tr>"
             f"<td>{i}</td><td>{escape(h['symbol'])}</td><td>{escape(hm(h['t']))}</td>"
+            f"<td>{float(h.get('gap14') or 0):.2f}%</td>"
             f"<td class='{_pnl_cls(h.get('15m'))}'>{_fmt(h.get('15m'))}</td>"
             f"<td class='{_pnl_cls(h.get('30m'))}'>{_fmt(h.get('30m'))}</td>"
             f"<td class='{_pnl_cls(h.get('60m'))}'>{_fmt(h.get('60m'))}</td>"
@@ -752,6 +790,33 @@ def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period
 
     s60 = stats["60m"]
     eq = _equity_svg([float(h["60m"]) for h in hits if h.get("60m") is not None])
+    gap_label = "不限" if not gap_pct else f"≤{gap_pct:g}%"
+    ab_rows = []
+    if ablation:
+        order = [("all", "不限")] + [(str(int(g)), f"≤{int(g)}%") for g in GAP_PCTS]
+        for key, label in order:
+            st = ablation.get(key)
+            if not st:
+                continue
+            mark = " ←圖卡" if label == gap_label else ""
+            ab_rows.append(
+                "<tr>"
+                f"<td>{escape(label)}{escape(mark)}</td><td>{st['count']}</td>"
+                f"<td class='{_pnl_cls(st['15m']['avg'])}'>{st['15m']['win_rate']:.1f}% {_fmt(st['15m']['avg'])}</td>"
+                f"<td class='{_pnl_cls(st['30m']['avg'])}'>{st['30m']['win_rate']:.1f}% {_fmt(st['30m']['avg'])}</td>"
+                f"<td class='{_pnl_cls(st['60m']['avg'])}'>{st['60m']['win_rate']:.1f}% {_fmt(st['60m']['avg'])}</td>"
+                f"<td class='{_pnl_cls(st['120m']['avg'])}'>{st['120m']['win_rate']:.1f}% {_fmt(st['120m']['avg'])}</td>"
+                "</tr>"
+            )
+    ab_html = (
+        "<h1>MA14 離 MA200</h1>"
+        "<p class='muted'>跌破時 |MA14−MA200| / MA200。1／2／3／4% 對照；圖卡是 "
+        f"{escape(gap_label)}。</p>"
+        "<table><thead><tr><th>上限</th><th>筆數</th><th>15m</th><th>30m</th><th>60m</th><th>120m</th></tr></thead>"
+        f"<tbody>{''.join(ab_rows)}</tbody></table>"
+        if ab_rows
+        else ""
+    )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -783,9 +848,9 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left
 <h1>幣安 5m 空頭排列 · {escape(period)}</h1>
 <p class="muted">USDT 永續成交額前 {funnel.get('symbols', 0)} 檔。
 5m <b>MA7&lt;MA14&lt;MA25</b>，且前一根收在 MA200 上、這一根收盤才跌破。
-已在 MA200 下只是短均排好的不算。圖卡附<strong>當下這根 15 分 K</strong>（用 5m 合成，不是過濾）。
+跌破時 <b>MA14 離 MA200</b> 圖卡上限 {escape(gap_label)}。已在 MA200 下只是短均排好的不算。圖卡附<strong>當下這根 15 分 K</strong>（用 5m 合成，不是過濾）。
 報酬是空頭：從訊號收盤算到之後 15/30/60/120 分鐘，價格往下為正。不是進出場建議。</p>
-<p class="muted">訊號 {funnel.get('hits', 0)} 筆 · 讀檔失敗 {funnel.get('errors', 0)}
+<p class="muted">訊號 {stats['count']} 筆 / 未限制 {funnel.get('hits_all', funnel.get('hits', 0))} · 讀檔失敗 {funnel.get('errors', 0)}
 · 當下 15m 空排 {stats.get('k15', {}).get('align', 0)}/{stats.get('k15', {}).get('n', 0)}
 · 15m 收在年線下 {stats.get('k15', {}).get('below', 0)}/{stats.get('k15', {}).get('n', 0)}</p>
 <p class="muted">15m 勝率 {stats['15m']['win_rate']:.1f}% 均 {_fmt(stats['15m']['avg'])}
@@ -800,14 +865,15 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left
 </div>
 <div class="equity">{eq}</div>
 <p class="muted">下圖累積的是各筆 60 分鐘空頭報酬相加，不是組合複利。圖卡只放 60m 最好/最差各一部分。</p>
+{ab_html}
 </section>
 {''.join(cards) or "<div class='empty'>這兩天沒有符合的訊號</div>"}
 <section class="summary">
 <h1>全部訊號</h1>
 <table>
-<thead><tr><th>#</th><th>標的</th><th>時間</th><th>15m</th><th>30m</th><th>60m</th><th>120m</th></tr></thead>
+<thead><tr><th>#</th><th>標的</th><th>時間</th><th>離14</th><th>15m</th><th>30m</th><th>60m</th><th>120m</th></tr></thead>
 <tbody>
-{''.join(rows) or "<tr><td colspan='7'>無</td></tr>"}
+{''.join(rows) or "<tr><td colspan='8'>無</td></tr>"}
 </tbody>
 </table>
 </section>
@@ -827,7 +893,16 @@ def write_view_html(src: Path) -> Path:
     return out
 
 
-def dump_hits_json(path: Path, hits: list[dict], stats: dict, funnel: dict, period: str) -> Path:
+def dump_hits_json(
+    path: Path,
+    hits: list[dict],
+    stats: dict,
+    funnel: dict,
+    period: str,
+    *,
+    ablation: dict | None = None,
+    gap_pct: float | None = None,
+) -> Path:
     slim = []
     for h in hits:
         slim.append(
@@ -840,6 +915,7 @@ def dump_hits_json(path: Path, hits: list[dict], stats: dict, funnel: dict, peri
                 "m14": h["m14"],
                 "m25": h["m25"],
                 "m200": h["m200"],
+                "gap14": h.get("gap14"),
                 "k15_t": h.get("k15_t"),
                 "k15_o": h.get("k15_o"),
                 "k15_h": h.get("k15_h"),
@@ -858,11 +934,9 @@ def dump_hits_json(path: Path, hits: list[dict], stats: dict, funnel: dict, peri
                 "120m": h.get("120m"),
             }
         )
+    payload = {"period": period, "gap_pct": gap_pct, "stats": stats, "funnel": funnel, "ablation": ablation or {}, "hits": slim}
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"period": period, "stats": stats, "funnel": funnel, "hits": slim}, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
 
 
@@ -880,11 +954,27 @@ def cmd_backtest(args) -> int:
         symbols = universe(args.limit)
         print(f"回測成交額前 {len(symbols)} 檔 · {period}", flush=True)
     t0 = time.time()
-    hits, funnel = backtest_all(symbols, start_ms, end_ms)
+    hits_all, funnel = backtest_all(symbols, start_ms, end_ms)
+    funnel["hits_all"] = len(hits_all)
+    ablation = {"all": summarize_hits(hits_all)}
+    for g in GAP_PCTS:
+        ablation[str(int(g))] = summarize_hits(filter_hits_by_gap(hits_all, g))
+    gap_pct = None if args.gap <= 0 else float(args.gap)
+    hits = filter_hits_by_gap(hits_all, gap_pct)
+    funnel["hits"] = len(hits)
     stats = summarize_hits(hits)
+    print(f"完成 {time.time()-t0:.1f}s　未限制 {len(hits_all)} → ≤{gap_pct:g}% {stats['count']} / {stats['symbols']} 檔" if gap_pct else f"完成 {time.time()-t0:.1f}s　訊號 {stats['count']} / {stats['symbols']} 檔", flush=True)
+    for g in GAP_PCTS:
+        st = ablation[str(int(g))]
+        print(
+            f"  MA14離MA200 ≤{int(g)}%　{st['count']} 筆　"
+            f"15m {st['15m']['win_rate']:.1f}% 均 {st['15m']['avg']:+.2f}%　"
+            f"60m {st['60m']['win_rate']:.1f}% 均 {st['60m']['avg']:+.2f}%",
+            flush=True,
+        )
     print(
-        f"完成 {time.time()-t0:.1f}s　訊號 {stats['count']} / {stats['symbols']} 檔"
-        f"　當下15m空排 {stats['k15']['align']}/{stats['k15']['n']}　年線下 {stats['k15']['below']}/{stats['k15']['n']}\n"
+        f"圖卡 {('≤'+format(gap_pct, 'g')+'%') if gap_pct else '不限'}　"
+        f"當下15m空排 {stats['k15']['align']}/{stats['k15']['n']}　年線下 {stats['k15']['below']}/{stats['k15']['n']}\n"
         f"15m {stats['15m']['win_rate']:.1f}% 均 {stats['15m']['avg']:+.2f}%　"
         f"30m {stats['30m']['win_rate']:.1f}% 均 {stats['30m']['avg']:+.2f}%　"
         f"60m {stats['60m']['win_rate']:.1f}% 均 {stats['60m']['avg']:+.2f}%　"
@@ -892,8 +982,8 @@ def cmd_backtest(args) -> int:
         flush=True,
     )
     html_path = Path(args.html) if args.html else (PAGES if args.pages else ROOT / "output" / "binance_5m_short.html")
-    write_report(html_path, hits, stats, funnel, period, chart_limit=args.chart_limit)
-    dump_hits_json(html_path.parent / "hits.json", hits, stats, funnel, period)
+    write_report(html_path, hits, stats, funnel, period, chart_limit=args.chart_limit, ablation=ablation, gap_pct=gap_pct)
+    dump_hits_json(html_path.parent / "hits.json", hits, stats, funnel, period, ablation=ablation, gap_pct=gap_pct)
     if args.pages or html_path.parent == PAGES.parent:
         write_view_html(html_path)
     print(f"報告 {html_path}", flush=True)
@@ -925,6 +1015,12 @@ def main() -> int:
     p.add_argument("--html", default="", help="回測 HTML 路徑")
     p.add_argument("--chart-limit", type=int, default=30, help="報告圖卡最多幾張")
     p.add_argument("--limit", type=int, default=UNIVERSE_LIMIT, help="只掃 24h 成交額前 N 檔（預設 100）")
+    p.add_argument(
+        "--gap",
+        type=float,
+        default=DEFAULT_GAP_PCT,
+        help="跌破時 MA14 離 MA200 最大％（1/2/3/4；0＝不限；預設 2）",
+    )
     args = p.parse_args()
     apply_keys()
     if args.test:
@@ -940,7 +1036,7 @@ def main() -> int:
         print("載入標的…", flush=True)
         symbols = universe(args.limit)
         print(
-            f"監看成交額前 {len(symbols)} 檔。5m 7<14<25 跌破 MA200 才推；圖附當下 15m K。",
+            f"監看成交額前 {len(symbols)} 檔。5m 7<14<25 跌破 MA200，MA14 離 MA200 ≤{args.gap:g}% 才推；圖附當下 15m K。",
             flush=True,
         )
     uni_ts = time.time()
@@ -952,7 +1048,7 @@ def main() -> int:
             uni_ts = time.time()
             print(f"更新標的 {len(symbols)}", flush=True)
         t0 = time.time()
-        events = scan_all(symbols)
+        events = scan_all(symbols, max_gap_pct=None if args.gap <= 0 else args.gap)
         new = [e for e in events if key_of(e) not in seen]
         print(
             f"[{datetime.now(TZ).strftime('%H:%M:%S')}] "

@@ -19,11 +19,13 @@ from watch_binance_5m_short import (  # noqa: E402
     collect_signals,
     detect_new_short,
     drop_unclosed,
+    filter_hits_by_gap,
     five_align_ok,
     format_alert,
     forming_15m_from_5m,
     forward_pct,
     key_of,
+    ma14_ma200_gap_pct,
     parse_klines,
     pick_chart_hits,
     rank_universe,
@@ -118,6 +120,23 @@ def test_detect_break_bar() -> None:
     assert d5["c"][229] < d5["m200"][229]
     assert d5["m7"][229] < d5["m14"][229] < d5["m25"][229]
     assert detect_new_short(d5, 230) is None
+    sig = detect_new_short(d5, 229)
+    gap = ma14_ma200_gap_pct(d5, 229)
+    assert sig is not None and gap is not None
+    assert abs(sig["gap14"] - gap) < 1e-9
+
+
+def test_ma14_gap_filter() -> None:
+    d5 = breakdown_5m()
+    sig = detect_new_short(d5, 229)
+    assert sig is not None
+    gap = sig["gap14"]
+    assert detect_new_short(d5, 229, max_gap_pct=max(0.01, gap - 0.01)) is None
+    assert detect_new_short(d5, 229, max_gap_pct=gap + 0.01) is not None
+    rows = [{"gap14": 0.5}, {"gap14": 2.0}, {"gap14": 4.5}]
+    assert [h["gap14"] for h in filter_hits_by_gap(rows, 2.0)] == [0.5, 2.0]
+    assert len(filter_hits_by_gap(rows, 1.0)) == 1
+    assert len(filter_hits_by_gap(rows, 0)) == 3
 
 
 def test_collect_signals_first_bar_only() -> None:
@@ -163,6 +182,7 @@ def test_format_and_key() -> None:
     assert "跌破" in text
     assert "1h" not in text
     assert "15m 當下 資料不足" in text
+    assert "MA14 離 MA200" in text
     assert key_of(ev) == f"BTCUSDT:{sig['t']}"
     sig2 = {
         **sig,
