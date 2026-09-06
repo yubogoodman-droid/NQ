@@ -132,6 +132,28 @@ python3 examples/chart_today.py
 
 可記台股／美股買進賣出、自動帶入台股手續費與證交稅、用先進先出算持倉與已實現損益，並在持倉裡手動設現價看未實現。
 
+## Tradovate 多帳跟單（本機 copier）
+
+本機版 lead → follower，只連你自己的 Tradovate 帳。不是 TradeSyncer 雲端服務：電腦要開著。先確認你的 prop firm 允許 API / 跟單。
+
+先看網頁（不用登入，可點按鈕模擬複製）：
+
+- **現在就能開：** https://raw.githack.com/yubogoodman-droid/NQ/cursor/tradovate-copier-6308/docs/copier/index.html
+- 備用：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tradovate-copier-6308/docs/copier/view.html
+- 本機（這台電腦自己跑）：`python3 examples/tradovate_copier.py web --demo` → http://127.0.0.1:8787/
+
+```bash
+cp copier.env.example copier.env
+cp copier.example.yaml copier.yaml
+# 填 API 帳密（Tradovate → Application Settings → API Access，權限不要設成 read-only）
+python3 examples/tradovate_copier.py list-accounts
+# 把印出來的帳號名稱填進 copier.yaml 的 lead / followers
+python3 examples/tradovate_copier.py web --dry-run --poll 2
+# 網頁確認複製紀錄後，拿掉 yaml 的 dry_run。live 一定要加 --live
+```
+
+預設 `copy_mode: fills`：主帳每筆成交，跟單帳下一張同方向市價單。可設 `qty_ratio`、`qty_fixed`、`symbol_map`（例如 NQ→MNQ）、`max_contracts`、日虧鎖定。主倉回到 0 時可把跟單帳一起平掉。
+
 ## 外網開啟
 
 1. **GitHub Pages（永久）**  
