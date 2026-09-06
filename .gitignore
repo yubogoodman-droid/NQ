@@ -8,3 +8,8 @@ tg_config.env
 tg_alert_state.json
 examples/tg_alert_state.json
 examples/tg_config.env
+docs/binance/ma200-squeeze-15m/img/
+docs/binance/ma200-squeeze-15m-5d/img/
+docs/binance/ma200-squeeze-15m-3d/img/
+docs/binance/ma-align-15m/img/
+docs/binance/ma-align-15m-3d/img/

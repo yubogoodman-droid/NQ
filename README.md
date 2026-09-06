@@ -141,9 +141,45 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
+## 幣安 15m · 200MA 附近進場（對齊 ETH 截圖）
+
+進場要還貼著 **MA200**，線型就是你那張 ETH 15 分圖：MA7/14/25/99/120/200 先黏成一條，放量陽線打出箱頂，**收盤離 200 仍 ≤ 0.8%** 才進。ETH 9/3 **20:30、2412、離 200 +0.27%** 是進場點；後面噴到 2488 的大陽不追。另外要 MA5>MA20>MA99。標的取 24h 成交額前 100（幣 + 股票）。
+
+```bash
+# TradingView：pinescript/ma200_squeeze_15m.pine 貼到 Pine Editor，套 15 分圖
+
+# 剛收盤掃一次 / 持續監看（成交額前 100）
+python3 examples/scan_binance_15m_align.py --once
+python3 examples/scan_binance_15m_align.py --watch
+
+# 前 100 名近 3 日、200 附近像 ETH 截圖的進場 + 圖
+python3 examples/scan_binance_15m_align.py --backtest --days 3 --pages --html docs/binance/ma200-squeeze-15m-3d/index.html
+```
+
+舊檔名 `scan_binance_15m_ma200.py` 也會轉到同一套。Telegram 憑證放 `tg_config.env`（`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`）。
+
+近 3 日成交額前 100：**4 筆**，ETH 9/3 20:30 在第一張：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-3d/view.html
+
+## 幣安 15m 黏帶擠壓參數
+
+六條均線寬度 ≤ 0.6%，箱體 ≤ 1.8%，量能 **3～8×**、振幅擴張 **2～6×**。8/28 那種 2.6× 假突破、開盤 14× / 19× 跳空都不進。
+
+```bash
+# 單檔（ETH）近兩週
+python3 examples/scan_binance_15m_align.py --symbol ETHUSDT --days 14
+```
+
+ETH 近兩週圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m/view.html
+
+幣+股 5 日（223 檔、15 筆、勝率 33.3%、−0.25%）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-5d/view.html
+
+跟 ETH 9/3 同型的：BTC 9/3 10:30（+0.26% / 0.47% / 3.7×）、ETH 9/3 20:30（打到 +2.39%）、MSFT 9/3 19:00（+0.17% / 0.27% / 3.1×，打到 +2.10%）、GOOGL / QQQ / SPY / META。
+
 ## TradingView
 
-`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
+`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
+`pinescript/ma200_squeeze_15m.pine` 套用至 U 本位 15 分圖：200 附近、ETH 截圖那條黏帶，可設警示。  
+`pinescript/ma_align_15m.pine` 是只記剛站上 200 的舊版。
 
 ## 參數調整
 
