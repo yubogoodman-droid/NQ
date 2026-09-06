@@ -89,15 +89,16 @@ python3 examples/watch_binance_5m_short.py --test
 python3 examples/watch_binance_5m_short.py --once --dry-run
 python3 examples/watch_binance_5m_short.py
 
-# 近兩天回測（成交額前 100，15/30/60/120 分鐘空頭報酬）
+# 近兩天回測（對照 MA14 離 MA200 1/2/3/4%；圖卡預設 ≤2%）
 python3 examples/watch_binance_5m_short.py --backtest --days 2 --pages
+python3 examples/watch_binance_5m_short.py --backtest --days 2 --pages --gap 1
 
 # 單元測試（不打幣安）
 python3 examples/test_watch_binance_5m_short.py
 ```
 
-只掃 24h 成交額前 100 檔。近兩天（2026-09-04 16:10 → 09-06 16:10）：**328 筆 / 94 檔**。  
-當下 15m 空排 125／328、收在年線下 77／328。持有 30 分鐘勝率 **34.5%、平均 −0.26%**；60 分鐘 **36.0%、平均 −0.42%**。
+只掃 24h 成交額前 100 檔。近兩天（2026-09-04 16:17 → 09-06 16:17）：未限制 328 筆 → **≤2% 為 303 筆 / 92 檔**。  
+MA14 離 MA200：≤1% 268 筆、≤2% 303、≤3% 315、≤4% 318。持有 30 分鐘勝率 **34.7%、平均 −0.15%**；60 分鐘 **35.4%、平均 −0.28%**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-short-align-5ca1/docs/binance-5m-short/view.html
 
