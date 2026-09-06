@@ -78,6 +78,30 @@ python3 examples/test_tw_1h_reclaim.py
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim/view.html
 
+## 幣安 5m 空頭排列 Telegram
+
+五分 K：`MA7 < MA14 < MA25`，且**前一根收在 MA200 上、這一根收盤才跌破**才推通知。  
+跌破時 **MA14 離 MA200 不能太遠**（通知／圖卡預設 ≤3%，能抓到 COLLECT 那種離 14 約 2.5% 的；回測對照 1／2／3／4%）。已在 MA200 下只是短均排好的不算。通知與圖會附**當下這根 15 分 K**（用已收的 5m 合成，不看這根 15m 後面）。
+
+```bash
+# Telegram 憑證放 tg_config.env（勿提交）
+python3 examples/watch_binance_5m_short.py --test
+python3 examples/watch_binance_5m_short.py --once --dry-run
+python3 examples/watch_binance_5m_short.py
+
+# 近兩天回測（對照 MA14 離 MA200 1/2/3/4%；圖卡預設 ≤3%）
+python3 examples/watch_binance_5m_short.py --backtest --days 2 --pages
+python3 examples/watch_binance_5m_short.py --backtest --days 2 --pages --gap 2
+
+# 單元測試（不打幣安）
+python3 examples/test_watch_binance_5m_short.py
+```
+
+只掃 24h 成交額前 100 檔。近兩天（2026-09-04 16:31 → 09-06 16:31）：未限制 324 筆 → **≤2% 為 300 筆 / 92 檔**。  
+MA14 離 MA200：≤1% 265 筆、≤2% 300、≤3% 311、≤4% 314。持有 30 分鐘勝率 **34.9%、平均 −0.15%**；60 分鐘 **35.1%、平均 −0.28%**。圖卡另外固定放 COLLECT（含 09-05 20:30、離 14 約 2.50% 那筆）。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-short-align-5ca1/docs/binance-5m-short/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
