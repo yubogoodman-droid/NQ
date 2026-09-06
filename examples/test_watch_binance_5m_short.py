@@ -20,9 +20,6 @@ from watch_binance_5m_short import (  # noqa: E402
     five_align_ok,
     format_alert,
     forward_pct,
-    hour_below_at,
-    hour_below_ok,
-    hour_mas_at,
     key_of,
     parse_klines,
     pick_chart_hits,
@@ -92,86 +89,45 @@ def breakdown_closes(n: int = 260) -> np.ndarray:
 
 
 def breakdown_5m(t0: int = 1_700_000_000_000):
-    return add_mas(_bars(breakdown_closes(), t0=t0), (7, 14, 25, 200))
-
-
-def hour_ok_hi():
-    return add_mas(_bars(falling(240, 150.0, 0.4), step=3_600_000), (99, 200))
-
-
-def breakdown_live_pair():
-    t0 = 1_700_000_000_000
-    d5 = add_mas(_bars(breakdown_closes(), t0=t0 + 220 * 3_600_000), (7, 14, 25, 200))
-    h1 = add_mas(_bars(np.full(240, 120.0), t0=t0, step=3_600_000), (99, 200))
-    return d5, h1
+    return add_mas(_bars(breakdown_closes(), t0=t0))
 
 
 def test_five_align_falling() -> None:
-    d = add_mas(_bars(falling(240)), (7, 14, 25, 200))
+    d = add_mas(_bars(falling(240)))
     assert five_align_ok(d, 230)
     assert not five_align_ok(d, 10)
 
 
-def test_hour_below() -> None:
-    h = add_mas(_bars(falling(240, 150.0, 0.4), step=3_600_000), (99, 200))
-    assert hour_below_ok(h, 220)
-    flat = add_mas(_bars(np.full(240, 100.0), step=3_600_000), (99, 200))
-    assert not hour_below_ok(flat, 220)
-    above = add_mas(_bars(np.concatenate([falling(200, 100.0, 0.2), np.full(40, 110.0)]), step=3_600_000), (99, 200))
-    assert not hour_below_ok(above, 239)
-
-
 def test_already_below_does_not_fire() -> None:
-    d5 = add_mas(_bars(falling(240)), (7, 14, 25, 200))
-    h1 = add_mas(_bars(falling(240, 150.0, 0.3), step=3_600_000), (99, 200))
+    d5 = add_mas(_bars(falling(240)))
     assert five_align_ok(d5, 230)
     assert not break_ma200(d5, 230)
-    assert all(detect_new_short(d5, i, h1, 230) is None for i in range(len(d5["c"])))
+    assert all(detect_new_short(d5, i) is None for i in range(len(d5["c"])))
 
 
 def test_detect_break_bar() -> None:
-    d5, h1 = breakdown_5m(), hour_ok_hi()
-    hi = len(h1["c"]) - 1
-    hits = [i for i in range(len(d5["c"])) if detect_new_short(d5, i, h1, hi)]
+    d5 = breakdown_5m()
+    hits = [i for i in range(len(d5["c"])) if detect_new_short(d5, i)]
     assert hits == [229]
     assert break_ma200(d5, 229)
     assert five_align_ok(d5, 229)
     assert d5["c"][228] > d5["m200"][228]
     assert d5["c"][229] < d5["m200"][229]
     assert d5["m7"][229] < d5["m14"][229] < d5["m25"][229]
-    assert detect_new_short(d5, 230, h1, hi) is None
-
-
-def test_detect_blocks_without_hour_filter() -> None:
-    d5 = breakdown_5m()
-    weak = add_mas(_bars(np.concatenate([falling(200, 100.0, 0.2), np.full(40, 120.0)]), step=3_600_000), (99, 200))
-    assert detect_new_short(d5, 229, weak, len(weak["c"]) - 1) is None
-
-
-def test_hour_mas_no_lookahead() -> None:
-    h_c = falling(240, 150.0, 0.4)
-    h_c[-1] = 400.0
-    h = add_mas(_bars(h_c, step=3_600_000), (99, 200))
-    px = float(h_c[-2])
-    t = int(h["t"][-1])
-    mas = hour_mas_at(h, t, px)
-    assert mas is not None
-    assert px < mas[0] and px < mas[1]
-    assert hour_below_at(h, t, px)
-    assert not hour_below_ok(h, 239)
+    assert detect_new_short(d5, 230) is None
 
 
 def test_collect_signals_first_bar_only() -> None:
-    d5, h1 = breakdown_live_pair()
+    d5 = breakdown_5m()
     start, end = int(d5["t"][0]), int(d5["t"][-1])
-    hits = collect_signals(d5, h1, start, end)
+    hits = collect_signals(d5, start, end)
     assert [h["i"] for h in hits] == [229]
     assert break_ma200(d5, hits[0]["i"])
 
 
 def test_forward_and_summary() -> None:
     closes = falling(240)
-    d5 = add_mas(_bars(closes), (7, 14, 25, 200))
+    d5 = add_mas(_bars(closes))
     i = 200
     pct = forward_pct(d5, i, 12)
     expect = (closes[200] - closes[212]) / closes[200] * 100
@@ -194,15 +150,15 @@ def test_forward_and_summary() -> None:
 
 
 def test_format_and_key() -> None:
-    d5, h1 = breakdown_5m(), hour_ok_hi()
-    hi = len(h1["c"]) - 1
-    sig = detect_new_short(d5, 229, h1, hi)
-    ev = {"symbol": "BTCUSDT", "sig": sig, "d5": d5, "h1": h1}
+    d5 = breakdown_5m()
+    sig = detect_new_short(d5, 229)
+    ev = {"symbol": "BTCUSDT", "sig": sig, "d5": d5}
     text = format_alert(ev)
     assert "BTCUSDT" in text
     assert "空頭排列" in text
     assert "MA200 上" in text
     assert "跌破" in text
+    assert "1h" not in text
     assert key_of(ev) == f"BTCUSDT:{sig['t']}"
 
 
