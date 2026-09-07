@@ -110,8 +110,8 @@ python3 examples/binance_15m_short.py --symbol CLOUSDT --days 7 --pages
 python3 examples/binance_15m_short.py --days 7 --pages
 ```
 
-近一週（2026-09-01 → 09-08 TPE）、流動 U 永續 **142 檔（已濾股票；1h MA25 下、離 1h MA99 ≤ 20%、1h 五均不糾結）**：**51 筆、已平勝率 39.6%、平均 +1.35%、加總 +68.8%**。1h 均線糾結濾掉 44 筆（含舊 #8 FLOCKUSDT 那種五線疊在 3.7% 內）。  
-截圖那檔 **CLOUSDT** 09-03 15:30 急殺：15m **+13.0%**，離 1h MA99 約 **+10%**，1h 五均張開約 **28%**。同一時刻 1h 還是 **非空頭排列、價也還沒同時跌破 1h 的 99/120**，但進場價已在 **1h MA25 下**。
+近一週（2026-09-01 → 09-08 TPE）、流動 U 永續 **142 檔（已濾股票；1h MA25 下、離 1h MA99 ≤ 20%、離 1h MA120 ≥ 2%、1h 五均不糾結）**：**46 筆、已平勝率 41.9%、平均 +1.60%、加總 +73.8%**。貼著 1h MA120 的不空（含舊 #1 MORPHOUSDT 只離 120 約 0.8%）。  
+截圖那檔 **CLOUSDT** 09-03 15:30 急殺：15m **+13.0%**，離 1h MA99 約 **+10%**、離 1h MA120 約 **+13%**，1h 五均張開約 **28%**。同一時刻 1h 還是 **非空頭排列、價也還沒同時跌破 1h 的 99/120**，但進場價已在 **1h MA25 下**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short/view.html
 
