@@ -95,6 +95,19 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## 牛來 五分 K M 頭跌破 MA200 做空
+
+幣安 `牛来USDT` 永續、五分鐘圖：兩個相近波段高點結成 **M 頭**（價差 ≤ 2%、間隔 1～6 小時、中間低點深度 ≥ 2%），且兩峰收盤都在 MA200 上方；第二峰確認後 48 根內，**收盤跌破 MA200** 進場做空。停損在雙頂高點，目標 2R，或 48 根（4 小時）時間停。
+
+對齊 2026-09-07 截圖那筆：18:10 / 21:20 雙頂約 0.0939，22:15 收盤跌破 MA200 進場。
+
+```bash
+python3 examples/niulai_m_top.py --days 7 --pages
+python3 examples/test_niulai_m_top.py
+```
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/niulai-m-top/view.html
+
 ## 快速開始
 
 ```bash
