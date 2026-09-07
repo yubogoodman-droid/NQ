@@ -24,9 +24,6 @@ from binance_15m_short import (  # noqa: E402
     filter_untangled_1h_mas,
     filter_away_1h_ma120,
     filter_not_below_1h_ma200,
-    filter_1h_prior_lows,
-    count_near_prior_lows,
-    htf_swing_lows,
     default_params,
     htf_ma_at_entry,
     htf_mas_at_entry,
@@ -357,31 +354,6 @@ def make_1h(ts, n: int = 130, old: float = 1.0, recent: float = 1.0, recent_bars
     )
 
 
-def make_1h_shelf(ts, n: int = 40, lo: float = 0.97, hi: float = 1.03) -> pd.DataFrame:
-    """1h 在同一層低點來回，做出一堆前低。"""
-    ts = pd.Timestamp(ts)
-    if ts.tzinfo is None:
-        ts = ts.tz_localize(TPE)
-    else:
-        ts = ts.tz_convert(TPE)
-    end = ts.floor("h")
-    idx = pd.date_range(end - pd.Timedelta(hours=n - 1), periods=n, freq="h", tz=TPE)
-    phase = np.arange(n) % 4
-    close = np.where(phase == 0, lo, np.where(phase == 2, hi, (lo + hi) / 2.0))
-    low = np.where(phase == 0, lo, close - 0.002)
-    high = np.where(phase == 2, hi, close + 0.002)
-    return pd.DataFrame(
-        {
-            "open": close,
-            "high": high,
-            "low": low,
-            "close": close,
-            "volume": np.full(n, 1000.0),
-        },
-        index=idx,
-    )
-
-
 def test_1h_mas_reject_tangled_like_flock() -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -476,38 +448,6 @@ def test_1h_ma200_missing_data_skips() -> None:
     assert funnel.get("no_1h_ma200", 0) >= 1
 
 
-def test_1h_prior_lows_rejects_pendle_shelf() -> None:
-    df = bars(dump_closes())
-    sigs = detect_signals(df, LOOSE)
-    assert sigs
-    ts = df.index[sigs[0].entry_idx]
-    px = sigs[0].entry_price
-    h1 = make_1h_shelf(ts, n=40, lo=px * 0.97, hi=px * 1.03)
-    funnel: dict = {}
-    kept = filter_1h_prior_lows(df, sigs, h1, min_touches=3, funnel=funnel)
-    assert kept == []
-    assert funnel.get("blocked_1h_lows", 0) >= 1
-    swings = htf_swing_lows(h1, ts)
-    assert swings is not None
-    assert count_near_prior_lows(swings, px) >= 3
-
-
-def test_1h_prior_lows_keeps_cloud_dump() -> None:
-    df = bars(dump_closes())
-    sigs = detect_signals(df, LOOSE)
-    assert sigs
-    ts = df.index[sigs[0].entry_idx]
-    h1 = make_1h(ts, n=40, old=0.80, recent=1.05, recent_bars=20)
-    kept = filter_1h_prior_lows(df, sigs, h1, min_touches=3)
-    assert kept == sigs
-
-
-def test_1h_prior_lows_ignores_dump_staircase() -> None:
-    lows = [0.99, 0.96, 0.93]
-    entry = 1.00
-    assert count_near_prior_lows(lows, entry, near=0.08, cluster=0.04) == 0
-
-
 def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -529,7 +469,6 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "糾結" in text
     assert "MA120" in text
     assert "MA200" in text
-    assert "前低" in text
     assert "虧損在前" in text
     assert (out_dir / "img").exists()
     pngs = list((out_dir / "img").glob("*.png"))
@@ -587,9 +526,6 @@ def main() -> int:
     test_1h_ma200_rejects_already_below()
     test_1h_ma200_keeps_cloud_still_above()
     test_1h_ma200_missing_data_skips()
-    test_1h_prior_lows_rejects_pendle_shelf()
-    test_1h_prior_lows_keeps_cloud_dump()
-    test_1h_prior_lows_ignores_dump_staircase()
     test_summarize_and_html()
     test_charts_put_losses_first()
     print("ok")
