@@ -19,10 +19,13 @@ from binance_15m_short import (  # noqa: E402
     filter_below_1h_ma25,
     filter_entry_window,
     filter_near_1h_ma99,
+    filter_untangled_1h_mas,
     default_params,
     htf_ma_at_entry,
+    htf_mas_at_entry,
     htf_snapshot,
     is_stock_contract,
+    ma_cluster_spread,
     simulate,
     sma,
     summarize_trades,
@@ -323,6 +326,59 @@ def test_1h_ma99_rejects_too_far_below() -> None:
     assert kept == []
 
 
+def make_1h(ts, n: int = 130, old: float = 1.0, recent: float = 1.0, recent_bars: int = 30) -> pd.DataFrame:
+    ts = pd.Timestamp(ts)
+    if ts.tzinfo is None:
+        ts = ts.tz_localize(TPE)
+    else:
+        ts = ts.tz_convert(TPE)
+    end = ts.floor("h")
+    idx = pd.date_range(end - pd.Timedelta(hours=n - 1), periods=n, freq="h", tz=TPE)
+    closes = np.full(n, float(old))
+    if recent_bars > 0:
+        closes[-recent_bars:] = float(recent)
+    return pd.DataFrame(
+        {
+            "open": closes,
+            "high": closes + 0.002,
+            "low": closes - 0.002,
+            "close": closes,
+            "volume": np.full(n, 1000.0),
+        },
+        index=idx,
+    )
+
+
+def test_1h_mas_reject_tangled_like_flock() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    ts = df.index[sigs[0].entry_idx]
+    h1 = make_1h(ts, old=1.0, recent=1.0)
+    funnel: dict = {}
+    kept = filter_untangled_1h_mas(df, sigs, h1, min_spread=0.04, funnel=funnel)
+    assert kept == []
+    assert funnel.get("tangled_1h_ma", 0) >= 1
+    mas = htf_mas_at_entry(h1, ts, sigs[0].entry_price)
+    assert mas is not None
+    spread = ma_cluster_spread(mas)
+    assert spread is not None and spread < 0.04
+
+
+def test_1h_mas_keep_fanned_like_cloud() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    ts = df.index[sigs[0].entry_idx]
+    h1 = make_1h(ts, old=0.80, recent=1.05, recent_bars=30)
+    kept = filter_untangled_1h_mas(df, sigs, h1, min_spread=0.04)
+    assert kept == sigs
+    mas = htf_mas_at_entry(h1, ts, sigs[0].entry_price)
+    assert mas is not None
+    spread = ma_cluster_spread(mas)
+    assert spread is not None and spread >= 0.04
+
+
 def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -343,6 +399,7 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "股票／ETF 永續預設不掃" in text
     assert "1h MA25" in text
     assert "1h MA99" in text
+    assert "糾結" in text
     assert (out_dir / "img").exists()
     pngs = list((out_dir / "img").glob("*.png"))
     assert any("1h" in p.name for p in pngs)
@@ -368,6 +425,8 @@ def main() -> int:
     test_1h_ma99_keeps_near_like_cloud()
     test_1h_ma99_rejects_bulla_extension()
     test_1h_ma99_rejects_too_far_below()
+    test_1h_mas_reject_tangled_like_flock()
+    test_1h_mas_keep_fanned_like_cloud()
     test_summarize_and_html()
     print("ok")
     return 0

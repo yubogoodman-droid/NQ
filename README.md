@@ -97,7 +97,7 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 ## 幣安 15 分 K 空頭排列跌破 99/120 做空
 
-截圖那種：15m **MA7 < MA14 < MA25**，同一根紅 K 收盤同時跌破 **MA99 與 MA120**，且進場價在 **1h MA25 下方**、與 **1h MA99 距離 ≤ 20%**，進場做空。  
+截圖那種：15m **MA7 < MA14 < MA25**，同一根紅 K 收盤同時跌破 **MA99 與 MA120**，且進場價在 **1h MA25 下方**、與 **1h MA99 距離 ≤ 20%**，且 1h 的 **MA7/14/25/99/120 不能糾結**（張開 ≥ 4%），進場做空。  
 對齊急殺：實體 ≥ 0.8%、量 ≥ 1.5×成交量 MA20。停在跌破 K 高點／長均上緣，目標 2R，或 8 小時時間停。  
 報告每筆附 **1 小時 K 對照圖**（同一進場／出場時刻，1h 自己的 MA7/14/25/99/120）。  
 股票／ETF／盤前永續（AAPL、TSLA、HOOD、港股等）預設不掃；黃金原油等商品仍保留。要掃股票加 `--include-stocks`。
@@ -110,8 +110,8 @@ python3 examples/binance_15m_short.py --symbol CLOUSDT --days 7 --pages
 python3 examples/binance_15m_short.py --days 7 --pages
 ```
 
-近一週（2026-09-01 → 09-08 TPE）、流動 U 永續 **141 檔（已濾股票／ETF，進場須在 1h MA25 下）**：**105 筆、已平勝率 29.1%、平均 +0.14%、加總 +14.2%**。這週急殺本來就都在 1h MA25 下方，沒有因此少單。  
-截圖那檔 **CLOUSDT** 09-03 15:30 急殺：15m **+13.0%**。同一時刻 1h 還是 **非空頭排列、價也還沒同時跌破 1h 的 99/120**，但進場價已在 **1h MA25 下**。
+近一週（2026-09-01 → 09-08 TPE）、流動 U 永續 **141 檔（已濾股票／ETF；進場須在 1h MA25 下，且離 1h MA99 ≤ 20%）**：**96 筆、已平勝率 28.0%、平均 +0.17%、加總 +16.4%**。離 1h MA99 太遠濾掉 11 筆（含報告舊 #4 BULLAUSDT 那種泵完 +68%）。  
+截圖那檔 **CLOUSDT** 09-03 15:30 急殺：15m **+13.0%**，離 1h MA99 約 **+10%**。同一時刻 1h 還是 **非空頭排列、價也還沒同時跌破 1h 的 99/120**，但進場價已在 **1h MA25 下**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short/view.html
 
