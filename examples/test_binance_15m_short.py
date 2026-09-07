@@ -16,8 +16,10 @@ from binance_15m_short import (  # noqa: E402
     TPE,
     bar_index_at,
     detect_signals,
+    filter_below_1h_ma25,
     filter_entry_window,
     default_params,
+    htf_ma_at_entry,
     htf_snapshot,
     is_stock_contract,
     simulate,
@@ -204,6 +206,65 @@ def test_bar_index_at() -> None:
     assert "1h" in snap
 
 
+def _shift_1h_history(h1: pd.DataFrame, level: float) -> pd.DataFrame:
+    """把進場那根 1h 之前的收盤改成 level，用來控制 MA25。"""
+    out = h1.copy()
+    out.loc[out.index[:-1], "open"] = level
+    out.loc[out.index[:-1], "high"] = level + 0.002
+    out.loc[out.index[:-1], "low"] = level - 0.002
+    out.loc[out.index[:-1], "close"] = level
+    return out
+
+
+def test_1h_ma25_keeps_dump_from_above() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    h1 = _shift_1h_history(to_1h(df), 1.05)
+    kept = filter_below_1h_ma25(df, sigs, h1)
+    assert kept == sigs
+    ma = htf_ma_at_entry(h1, df.index[sigs[0].entry_idx], sigs[0].entry_price)
+    assert ma is not None and sigs[0].entry_price < ma
+
+
+def test_1h_ma25_rejects_still_above() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    h1 = _shift_1h_history(to_1h(df), 0.80)
+    funnel: dict = {}
+    kept = filter_below_1h_ma25(df, sigs, h1, funnel=funnel)
+    assert kept == []
+    assert funnel.get("above_1h_ma25", 0) >= 1
+    ma = htf_ma_at_entry(h1, df.index[sigs[0].entry_idx], sigs[0].entry_price)
+    assert ma is not None and sigs[0].entry_price >= ma
+
+
+def test_1h_ma25_no_lookahead() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    h1 = _shift_1h_history(to_1h(df), 1.05)
+    ts = df.index[sigs[0].entry_idx]
+    i = bar_index_at(h1, ts)
+    assert i is not None
+    later = h1.copy()
+    later.iloc[i, later.columns.get_loc("close")] = 0.50
+    ma_live = htf_ma_at_entry(h1, ts, sigs[0].entry_price)
+    ma_spoiled = htf_ma_at_entry(later, ts, sigs[0].entry_price)
+    assert ma_live is not None and ma_spoiled is not None
+    assert abs(ma_live - ma_spoiled) < 1e-12
+
+
+def test_1h_ma25_missing_data_skips() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    funnel: dict = {}
+    empty = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+    assert filter_below_1h_ma25(df, sigs, empty, funnel=funnel) == []
+    assert funnel.get("no_1h", 0) >= 1
+
+
 def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -222,6 +283,7 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "空頭排列" in text
     assert "1h 對照" in text
     assert "股票／ETF 永續預設不掃" in text
+    assert "1h MA25" in text
     assert (out_dir / "img").exists()
     pngs = list((out_dir / "img").glob("*.png"))
     assert any("1h" in p.name for p in pngs)
@@ -240,6 +302,10 @@ def main() -> int:
     test_filter_entry_window()
     test_volume_and_body_filters()
     test_bar_index_at()
+    test_1h_ma25_keeps_dump_from_above()
+    test_1h_ma25_rejects_still_above()
+    test_1h_ma25_no_lookahead()
+    test_1h_ma25_missing_data_skips()
     test_summarize_and_html()
     print("ok")
     return 0

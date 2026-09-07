@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """幣安 15 分 K：MA7/14/25 空頭排列，且收盤同時跌破 MA99 與 MA120，做空回測。
 
-對齊截圖 CLOUSDT 那種急殺：短均 7<14<25，同一根收盤穿過 99/120。
+對齊截圖 CLOUSDT 那種急殺：短均 7<14<25，同一根收盤穿過 99/120，
+且進場價在 1 小時 MA25 下方。
 
 用法:
   python3 examples/binance_15m_short.py
@@ -383,16 +384,21 @@ def fetch_klines(sym: str, interval: str = "15m", limit: int = 1500) -> pd.DataF
     )
 
 
-def bar_index_at(df: pd.DataFrame, ts) -> Optional[int]:
-    """含 ts 的那根 K（開盤 <= ts 的最後一根）。"""
-    if df is None or len(df) == 0:
-        return None
+def _as_index_ts(df: pd.DataFrame, ts):
     ts = pd.Timestamp(ts)
     if df.index.tz is not None:
         if ts.tzinfo is None:
             ts = ts.tz_localize(df.index.tz)
         else:
             ts = ts.tz_convert(df.index.tz)
+    return ts
+
+
+def bar_index_at(df: pd.DataFrame, ts) -> Optional[int]:
+    """含 ts 的那根 K（開盤 <= ts 的最後一根）。"""
+    if df is None or len(df) == 0:
+        return None
+    ts = _as_index_ts(df, ts)
     pos = int(df.index.searchsorted(ts, side="right") - 1)
     if pos < 0 or pos >= len(df):
         return None
@@ -422,6 +428,63 @@ def htf_snapshot(df: pd.DataFrame, ts) -> str:
     return "\n".join(parts)
 
 
+def htf_ma_at_entry(
+    df_htf: pd.DataFrame,
+    ts,
+    price: float,
+    n: int = 25,
+    interval: str = "1h",
+) -> Optional[float]:
+    """進場當下看得到的 HTF MA。未收完的 K 用進場價當收盤，不偷看後面。"""
+    if df_htf is None or len(df_htf) == 0:
+        return None
+    i = bar_index_at(df_htf, ts)
+    if i is None:
+        return None
+    closes = df_htf["close"].to_numpy(float)
+    ts = _as_index_ts(df_htf, ts)
+    bar_close = df_htf.index[i] + pd.Timedelta(milliseconds=INTERVAL_MS[interval])
+    if ts < bar_close:
+        if i < n - 1:
+            return None
+        window = np.concatenate([closes[i - n + 1 : i], [float(price)]])
+        if len(window) != n or not np.isfinite(window).all():
+            return None
+        return float(window.mean())
+    if i < n - 1:
+        return None
+    val = sma(closes, n)[i]
+    if not np.isfinite(val):
+        return None
+    return float(val)
+
+
+def filter_below_1h_ma25(
+    df: pd.DataFrame,
+    signals: Sequence[Signal],
+    df_1h: pd.DataFrame,
+    funnel: Optional[Dict[str, int]] = None,
+) -> List[Signal]:
+    """15m 進場收盤必須低於當時的 1h MA25。"""
+    kept: List[Signal] = []
+    above = 0
+    nodata = 0
+    for sig in signals:
+        ts = df.index[sig.entry_idx]
+        ma = htf_ma_at_entry(df_1h, ts, sig.entry_price, n=25, interval="1h")
+        if ma is None:
+            nodata += 1
+            continue
+        if sig.entry_price >= ma:
+            above += 1
+            continue
+        kept.append(sig)
+    if funnel is not None:
+        funnel["above_1h_ma25"] = funnel.get("above_1h_ma25", 0) + above
+        funnel["no_1h"] = funnel.get("no_1h", 0) + nodata
+    return kept
+
+
 def prefetch_1h(symbols: Sequence[str], workers: int = 8) -> Dict[str, pd.DataFrame]:
     out: Dict[str, pd.DataFrame] = {}
     uniq = list(dict.fromkeys(symbols))
@@ -443,6 +506,7 @@ def scan_symbol(
     days: int,
     params: ShortParams,
     funnel: Optional[Dict[str, int]] = None,
+    require_1h_ma25: bool = True,
 ) -> tuple[List[Hit], dict]:
     meta = {"symbol": sym, "bars": 0, "error": "", "n_sig": 0, "n_trade": 0}
     try:
@@ -460,10 +524,18 @@ def scan_symbol(
         for k, v in local.items():
             funnel[k] = funnel.get(k, 0) + v
     sigs = filter_entry_window(df, sigs, days)
+    df_1h = pd.DataFrame()
+    try:
+        df_1h = fetch_klines(sym, "1h")
+    except Exception:  # noqa: BLE001
+        df_1h = pd.DataFrame()
+    if require_1h_ma25:
+        sigs = filter_below_1h_ma25(df, sigs, df_1h, funnel=funnel)
     trades = simulate(df, sigs, params, funnel=funnel)
     meta["n_sig"] = len(sigs)
     meta["n_trade"] = len(trades)
-    return [Hit(sym, t, df) for t in trades], meta
+    h1 = df_1h if df_1h is not None and len(df_1h) else None
+    return [Hit(sym, t, df, df_1h=h1) for t in trades], meta
 
 
 def _setup_cjk() -> None:
@@ -652,6 +724,7 @@ def write_html(
     funnel: Optional[Dict[str, int]] = None,
     max_charts: int = 80,
     featured: str = "CLOUSDT",
+    require_1h_ma25: bool = True,
 ) -> Path:
     stats = summarize_trades([h.trade for h in hits])
     featured_hits = [h for h in hits if h.symbol == featured]
@@ -704,6 +777,7 @@ def write_html(
             )
             h1_detail = "\n" + htf_snapshot(df_1h, et)
         reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
+        h1_tag = "<span class='tag'>1h MA25下</span>" if require_1h_ma25 else ""
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -717,6 +791,7 @@ def write_html(
             f"<span class='tag'>空 {t.signal.ma7:.5g}&lt;{t.signal.ma14:.5g}&lt;{t.signal.ma25:.5g}</span>"
             f"<span class='tag'>實體 {t.signal.body_pct*100:.1f}%</span>"
             f"<span class='tag'>量 {t.signal.vol_ratio:.1f}x</span>"
+            f"{h1_tag}"
             "</div>"
             "<pre class='trade-detail'>"
             f"做空 entry {t.entry_price:.6g}  stop {t.stop_price:.6g} (+{risk:.6g})\n"
@@ -776,12 +851,13 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>幣安 15m · 7/14/25 空頭排列跌破 99/120 做空</h1>
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
-<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
+<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
 <br/>出場：停在跌破 K 高點與 MA99/120 上緣的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
 <br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120）。股票／ETF 永續預設不掃。</p>
 <p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 空頭排列 {fun.get('stack', 0)} → 同時跌破 {fun.get('cross', 0)}
 → 紅 K {fun.get('red', 0)} → 進場 {fun.get('entry', 0)}
 · 太淺 {fun.get('shallow', 0)} · 實體不夠 {fun.get('thin', 0)} · 量不夠 {fun.get('quiet', 0)}
+· 不在1h MA25下 {fun.get('above_1h_ma25', 0)} · 無1h {fun.get('no_1h', 0)}
 · 風險不合 {fun.get('skip_risk', 0)} · 持倉中 {fun.get('skip_busy', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 <br/>{escape(feat_line)}</p>
@@ -843,6 +919,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--loose", action="store_true", help="不做實體/量能過濾，只看均線排列與跌破")
     p.add_argument("--include-stocks", action="store_true", help="不過濾 TradFi 股票／ETF 永續")
+    p.add_argument("--no-1h-ma25", action="store_true", help="不要求進場價在 1h MA25 下方")
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
     p.add_argument("--json", dest="json_path", default="")
@@ -859,7 +936,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         symbols = universe(args.min_quote_vol, include_stocks=args.include_stocks)
     print(
         f"symbols={len(symbols)} days={args.days} interval=15m loose={args.loose} "
-        f"stocks={'on' if args.include_stocks else 'off'}",
+        f"stocks={'on' if args.include_stocks else 'off'} "
+        f"h1_ma25={'off' if args.no_1h_ma25 else 'on'}",
         flush=True,
     )
 
@@ -870,7 +948,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     def _one(sym: str) -> tuple[List[Hit], dict, Dict[str, int]]:
         local: Dict[str, int] = {}
-        stock_hits, meta = scan_symbol(sym, args.days, params, funnel=local)
+        stock_hits, meta = scan_symbol(
+            sym, args.days, params, funnel=local, require_1h_ma25=not args.no_1h_ma25
+        )
         return stock_hits, meta, local
 
     with ThreadPoolExecutor(max_workers=max(1, args.workers)) as ex:
@@ -917,6 +997,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "generated": datetime.now(TPE).isoformat(timespec="seconds"),
         "interval": "15m",
         "include_stocks": bool(args.include_stocks),
+        "require_1h_ma25": not bool(args.no_1h_ma25),
     }
     html_path = Path(args.html) if args.html else None
     if html_path is None and args.pages:
@@ -929,6 +1010,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             label += " · 寬鬆（無實體/量能過濾）"
         if not args.include_stocks and not args.symbol.strip():
             label += " · 已濾股票"
+        if not args.no_1h_ma25:
+            label += " · 1h MA25下"
         out = write_html(
             html_path,
             hits,
@@ -936,6 +1019,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             label,
             funnel=funnel,
             max_charts=args.max_charts,
+            require_1h_ma25=not args.no_1h_ma25,
         )
         write_view_html(out)
         print(f"html={out}", flush=True)
