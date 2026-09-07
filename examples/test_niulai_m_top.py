@@ -15,8 +15,11 @@ from niulai_m_top import (  # noqa: E402
     CST,
     detect_m_tops,
     default_params,
+    display_name,
     filter_entry_window,
+    fmt_px,
     generate_signals,
+    rank_usdt_perps,
     simulate,
     sma,
     summarize_trades,
@@ -180,6 +183,78 @@ def test_summarize() -> None:
     assert stats["reasons"]["target"] == 1
 
 
+def test_rank_usdt_perps_top50() -> None:
+    symbols = [
+        {
+            "symbol": "BTCUSDT",
+            "quoteAsset": "USDT",
+            "status": "TRADING",
+            "contractType": "PERPETUAL",
+            "underlyingType": "COIN",
+            "baseAsset": "BTC",
+            "filters": [{"filterType": "PRICE_FILTER", "tickSize": "0.10"}],
+        },
+        {
+            "symbol": "ETHUSDT",
+            "quoteAsset": "USDT",
+            "status": "TRADING",
+            "contractType": "PERPETUAL",
+            "underlyingType": "COIN",
+            "baseAsset": "ETH",
+            "filters": [{"filterType": "PRICE_FILTER", "tickSize": "0.01"}],
+        },
+        {
+            "symbol": "TSLAUSDT",
+            "quoteAsset": "USDT",
+            "status": "TRADING",
+            "contractType": "TRADIFI_PERPETUAL",
+            "underlyingType": "COIN",
+            "baseAsset": "TSLA",
+            "filters": [],
+        },
+        {
+            "symbol": "DEADUSDT",
+            "quoteAsset": "USDT",
+            "status": "SETTLING",
+            "contractType": "PERPETUAL",
+            "underlyingType": "COIN",
+            "baseAsset": "DEAD",
+            "filters": [],
+        },
+        {
+            "symbol": "牛来USDT",
+            "quoteAsset": "USDT",
+            "status": "TRADING",
+            "contractType": "PERPETUAL",
+            "underlyingType": "COIN",
+            "baseAsset": "牛来",
+            "filters": [{"filterType": "PRICE_FILTER", "tickSize": "0.0000100"}],
+        },
+    ]
+    tickers = [
+        {"symbol": "BTCUSDT", "quoteVolume": "100", "lastPrice": "70000"},
+        {"symbol": "ETHUSDT", "quoteVolume": "300", "lastPrice": "3000"},
+        {"symbol": "TSLAUSDT", "quoteVolume": "9999", "lastPrice": "400"},
+        {"symbol": "DEADUSDT", "quoteVolume": "800", "lastPrice": "1"},
+        {"symbol": "牛来USDT", "quoteVolume": "200", "lastPrice": "0.08"},
+    ]
+    rows = rank_usdt_perps(symbols, tickers, limit=50)
+    assert [r.symbol for r in rows] == ["ETHUSDT", "牛来USDT", "BTCUSDT"]
+    assert rows[0].rank == 1
+    assert rows[1].base == "牛来"
+    assert abs(rows[2].tick_size - 0.10) < 1e-9
+    tiny = rank_usdt_perps(symbols, tickers, limit=2)
+    assert len(tiny) == 2
+    assert tiny[0].symbol == "ETHUSDT"
+
+
+def test_display_and_fmt() -> None:
+    assert display_name("BTCUSDT") == "BTC"
+    assert display_name("牛来USDT") == "牛来"
+    assert fmt_px(70123.4) == "70123.40"
+    assert fmt_px(0.08978) == "0.08978"
+
+
 def main() -> int:
     tests = [
         test_sma,
@@ -189,6 +264,8 @@ def main() -> int:
         test_one_position_at_a_time,
         test_filter_entry_window,
         test_summarize,
+        test_rank_usdt_perps_top50,
+        test_display_and_fmt,
     ]
     failed = 0
     for fn in tests:

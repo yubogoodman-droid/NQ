@@ -101,12 +101,16 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 對齊 2026-09-07 截圖那筆：18:10 / 21:20 雙頂約 0.0939，22:15 收盤跌破 MA200 進場。
 
+`--scan` 掃幣安 USDT 永續 **24h 成交額前 50**（不含股票合約），同一套規則回測近 **3 天**。
+
 ```bash
 python3 examples/niulai_m_top.py --days 7 --pages
+python3 examples/niulai_m_top.py --scan --limit 50 --days 3 --pages
 python3 examples/test_niulai_m_top.py
 ```
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/niulai-m-top/view.html
+單檔預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/niulai-m-top/view.html  
+成交額前 50 · 三天：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/binance-m-top-3d/view.html
 
 ## 快速開始
 

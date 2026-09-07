@@ -7,6 +7,7 @@
 用法:
   python3 examples/niulai_m_top.py
   python3 examples/niulai_m_top.py --days 7 --pages
+  python3 examples/niulai_m_top.py --scan --limit 50 --days 3 --pages
   python3 examples/test_niulai_m_top.py
 """
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
@@ -27,6 +29,7 @@ import requests
 
 REPO = Path(__file__).resolve().parents[1]
 PAGES = REPO / "docs" / "niulai-m-top" / "index.html"
+SCAN_PAGES = REPO / "docs" / "binance-m-top-3d" / "index.html"
 CST = ZoneInfo("Asia/Shanghai")
 BINANCE = "https://www.binance.com"
 SYMBOL = "牛来USDT"
@@ -122,6 +125,23 @@ class TradeResult:
     exit_reason: str
 
 
+@dataclass(frozen=True)
+class CoinRow:
+    symbol: str
+    base: str
+    quote_volume: float
+    last_price: float
+    tick_size: float
+    rank: int = 0
+
+
+@dataclass
+class ScanHit:
+    row: CoinRow
+    trade: TradeResult
+    df: pd.DataFrame
+
+
 # ---------------------------------------------------------------------------
 # Data
 # ---------------------------------------------------------------------------
@@ -150,15 +170,107 @@ def get_json(path: str, params: Optional[dict] = None, retries: int = 5) -> Any:
     raise RuntimeError(f"GET {path} failed: {last}")
 
 
+def _tick_from_filters(filters: Sequence[dict]) -> float:
+    for item in filters:
+        if item.get("filterType") == "PRICE_FILTER":
+            try:
+                tick = float(item.get("tickSize") or 0)
+            except (TypeError, ValueError):
+                tick = 0.0
+            if tick > 0:
+                return tick
+    return 0.00001
+
+
+def rank_usdt_perps(
+    symbols: Sequence[dict],
+    tickers: Sequence[dict],
+    limit: int = 50,
+) -> list[CoinRow]:
+    """USDT 永續（不含股票合約／指數）依 24h 成交額（quoteVolume）排序。"""
+    ticker_map = {t.get("symbol"): t for t in tickers}
+    ranked: list[CoinRow] = []
+    for spec in symbols:
+        if spec.get("quoteAsset") != "USDT":
+            continue
+        if spec.get("status") != "TRADING":
+            continue
+        if spec.get("contractType") != "PERPETUAL":
+            continue
+        if spec.get("underlyingType") == "INDEX":
+            continue
+        symbol = str(spec.get("symbol") or "")
+        if not symbol:
+            continue
+        ticker = ticker_map.get(symbol) or {}
+        try:
+            quote_volume = float(ticker.get("quoteVolume") or 0)
+        except (TypeError, ValueError):
+            quote_volume = 0.0
+        try:
+            last_price = float(ticker.get("lastPrice") or 0)
+        except (TypeError, ValueError):
+            last_price = 0.0
+        ranked.append(
+            CoinRow(
+                symbol=symbol,
+                base=str(spec.get("baseAsset") or symbol.replace("USDT", "")),
+                quote_volume=quote_volume,
+                last_price=last_price,
+                tick_size=_tick_from_filters(spec.get("filters") or []),
+            )
+        )
+    ranked.sort(key=lambda r: r.quote_volume, reverse=True)
+    return [
+        CoinRow(
+            symbol=row.symbol,
+            base=row.base,
+            quote_volume=row.quote_volume,
+            last_price=row.last_price,
+            tick_size=row.tick_size,
+            rank=i,
+        )
+        for i, row in enumerate(ranked[: max(0, limit)], 1)
+    ]
+
+
+def fetch_top_universe(limit: int = 50) -> list[CoinRow]:
+    info = get_json("/fapi/v1/exchangeInfo")
+    tickers = get_json("/fapi/v1/ticker/24hr")
+    if not isinstance(info, dict) or not isinstance(tickers, list):
+        raise RuntimeError("幣安 exchangeInfo / ticker 格式不符")
+    return rank_usdt_perps(info.get("symbols") or [], tickers, limit=limit)
+
+
+def display_name(symbol: str) -> str:
+    return symbol[:-4] if symbol.endswith("USDT") else symbol
+
+
+def fmt_px(price: float) -> str:
+    ax = abs(price)
+    if ax >= 1000:
+        return f"{price:.2f}"
+    if ax >= 1:
+        return f"{price:.4f}"
+    if ax >= 0.01:
+        return f"{price:.5f}"
+    if ax >= 0.0001:
+        return f"{price:.6f}"
+    return f"{price:.8f}"
+
+
 def fetch_klines(
     symbol: str = SYMBOL,
     interval: str = INTERVAL,
-    start_ms: int = LISTING_MS,
+    start_ms: Optional[int] = LISTING_MS,
     limit: int = 1500,
+    lookback_days: Optional[int] = None,
 ) -> pd.DataFrame:
-    """拉幣安 U 本位永續 K 線，從上市時間一路到現在。"""
+    """拉幣安 U 本位永續 K 線。scan 用 lookback_days；單檔牛來預設從上市日。"""
+    if lookback_days is not None:
+        start_ms = int((time.time() - lookback_days * 86400) * 1000)
     rows: list[list] = []
-    cur = int(start_ms)
+    cur = int(start_ms or LISTING_MS)
     interval_ms = 5 * 60 * 1000 if interval == "5m" else 60 * 1000
     while True:
         raw = get_json(
@@ -327,6 +439,8 @@ def _dedupe_patterns(patterns: Sequence[MTopPattern]) -> list[MTopPattern]:
 
 
 def _round_tick(price: float, tick: float) -> float:
+    if tick <= 0:
+        return price
     return round(price / tick) * tick
 
 
@@ -866,6 +980,216 @@ h1{{font-size:18px;margin:0 0 6px}}
 
 
 # ---------------------------------------------------------------------------
+# Multi-coin scan
+# ---------------------------------------------------------------------------
+
+
+def scan_symbol(row: CoinRow, days: int) -> tuple[list[ScanHit], dict]:
+    meta = {
+        "symbol": row.symbol,
+        "bars": 0,
+        "error": "",
+        "n_trade": 0,
+        "quote_volume": row.quote_volume,
+    }
+    try:
+        df = fetch_klines(row.symbol, lookback_days=max(days + 2, 4))
+    except Exception as exc:  # noqa: BLE001
+        meta["error"] = str(exc)[:100]
+        return [], meta
+    meta["bars"] = int(len(df))
+    if len(df) < 220:
+        meta["error"] = "too_few_bars"
+        return [], meta
+    params = default_params(tick_size=row.tick_size)
+    funnel: Dict[str, int] = {}
+    sigs = generate_signals(df, params, funnel=funnel)
+    sigs = filter_entry_window(df, sigs, days)
+    trades = simulate(df, sigs, params)
+    meta["n_trade"] = len(trades)
+    meta["funnel"] = funnel
+    return [ScanHit(row, t, df) for t in trades], meta
+
+
+def write_scan_html(
+    path: Path,
+    hits: List[ScanHit],
+    universe: List[CoinRow],
+    *,
+    days: int,
+    funnel: Optional[Dict[str, int]] = None,
+) -> Path:
+    stats = summarize_trades([h.trade for h in hits])
+    img_dir = path.parent / "img"
+    if img_dir.exists():
+        for old in img_dir.glob("*.png"):
+            old.unlink()
+    img_dir.mkdir(parents=True, exist_ok=True)
+
+    cards: List[str] = []
+    for i, hit in enumerate(hits, 1):
+        t = hit.trade
+        df = hit.df
+        et = df.index[t.entry_idx]
+        xt = df.index[t.exit_idx]
+        cls = "pnl-win" if t.pnl_pct > 0 else ("pnl-flat" if t.pnl_pct == 0 else "pnl-loss")
+        reason_cls = {"target": "tag-tp", "stop": "tag-sl", "open": "tag-info"}.get(t.exit_reason, "tag-time")
+        label = display_name(hit.row.symbol)
+        safe = "".join(ch if ch.isalnum() else "_" for ch in hit.row.symbol)
+        img_name = f"t{i:02d}_{safe}_{et.strftime('%m%d_%H%M')}.png"
+        draw_trade_png(df, t, img_dir / img_name, i, title_extra=label)
+        p = t.signal.pattern
+        risk = t.stop_price - t.entry_price
+        qv = hit.row.quote_volume / 1e6
+        cards.append(
+            "<article class='trade-card'>"
+            "<header class='card-header'>"
+            f"<div class='card-title'><span class='trade-no'>#{i} · {escape(label)} · 做空</span>"
+            f"<span class='trade-time'>{escape(et.strftime('%Y-%m-%d %H:%M'))} → {escape(xt.strftime('%m-%d %H:%M'))}</span></div>"
+            f"<div class='card-pnl {cls}'>{t.pnl_pct*100:+.2f}%</div>"
+            "</header>"
+            "<div class='tags'>"
+            f"<span class='tag tag-info'>#{hit.row.rank} {escape(hit.row.symbol)}</span>"
+            f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
+            f"<span class='tag tag-info'>5m</span>"
+            f"<span class='tag tag-info'>深度 {p.depth_pct*100:.1f}%</span>"
+            f"<span class='tag tag-info'>{qv:.0f}M</span>"
+            "</div>"
+            "<pre class='trade-detail'>"
+            f"entry {fmt_px(t.entry_price)}  MA200 {fmt_px(t.signal.ma200)}\n"
+            f"stop  {fmt_px(t.stop_price)}  （M頭高 −{fmt_px(risk)}）\n"
+            f"target {fmt_px(t.target_price)}  （2R）\n"
+            f"exit  {fmt_px(t.exit_price)}  {t.exit_reason}  {t.pnl_pct*100:+.2f}%\n"
+            f"H1 {df.index[p.first_high_idx].strftime('%m-%d %H:%M')} {fmt_px(p.first_high)}\n"
+            f"H2 {df.index[p.second_high_idx].strftime('%m-%d %H:%M')} {fmt_px(p.second_high)}\n"
+            f"頸線 {df.index[p.neckline_idx].strftime('%m-%d %H:%M')} {fmt_px(p.neckline)}"
+            "</pre>"
+            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
+            "style='width:100%;display:block;border-radius:10px'/></div>"
+            "</article>"
+        )
+
+    fun = funnel or {}
+    reasons = stats.get("reasons") or {}
+    cutoff = universe[-1].quote_volume / 1e6 if universe else 0
+    names = {h.row.symbol for h in hits}
+    total_cls = "pnl-win" if stats["total_pct"] >= 0 else "pnl-loss"
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>幣安成交額前{len(universe)} · M頭跌破 MA200 · {days}天</title>
+<style>
+*{{box-sizing:border-box}}
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
+.page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
+h1{{font-size:18px;margin:0 0 6px}}
+.muted{{color:#8b949e;font-size:13px;line-height:1.5}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
+.cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
+.card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}}
+.card b{{display:block;font-size:20px;margin-top:4px}}
+.equity{{margin:10px 0 4px}}
+.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}}
+.card-header{{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}}
+.trade-no{{font-size:15px;font-weight:700}}
+.trade-time{{font-size:12px;color:#8b949e}}
+.card-pnl{{font-size:16px;font-weight:700;white-space:nowrap}}
+.pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}} .pnl-flat{{color:#8b949e}}
+.tags{{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}}
+.tag{{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}}
+.tag-tp{{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}}
+.tag-sl{{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}}
+.tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
+.tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
+.trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
+.mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+.empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安成交額前 {len(universe)} · M頭跌破 MA200 做空</h1>
+<p class="muted">USDT 永續（不含股票合約）· 24h 成交額前 {len(universe)} · 近 {days} 天
+· 末名約 {cutoff:.0f}M USDT
+<br/>規則同牛來：五分 K M 頭在 MA200 上方成形後，收盤跌破 MA200 進場做空。停損雙頂高點、2R、或 48 根時間停。加總％是各筆報酬相加，不是複利。</p>
+<p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
+→ 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
+<br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
+<div class="cards">
+<div class="card">筆數<b>{stats['count']}</b></div>
+<div class="card">勝率<b>{stats['closed_win_rate']:.1f}%</b></div>
+<div class="card">加總<b class="{total_cls}">{stats['total_pct']*100:+.2f}%</b></div>
+<div class="card">標的<b>{len(names)}</b></div>
+</div>
+<div class="equity">{_equity_svg([h.trade.pnl_pct for h in hits])}</div>
+</section>
+{''.join(cards) or f"<div class='empty'>這段期間前 {len(universe)} 檔沒有 M 頭跌破 MA200 訊號</div>"}
+</div></body></html>
+"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    return path
+
+
+def run_scan(limit: int = 50, days: int = 3, workers: int = 8, pages: bool = False, html_path: Optional[Path] = None) -> int:
+    universe = fetch_top_universe(limit)
+    if not universe:
+        print("no universe")
+        return 1
+    print(
+        f"universe {len(universe)}  #{universe[0].rank} {universe[0].symbol} "
+        f"{universe[0].quote_volume/1e6:.0f}M · 末 {universe[-1].symbol} "
+        f"{universe[-1].quote_volume/1e6:.0f}M"
+    )
+    hits: list[ScanHit] = []
+    funnel: Dict[str, int] = {}
+    errors = 0
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        futs = {pool.submit(scan_symbol, row, days): row for row in universe}
+        done = 0
+        for fut in as_completed(futs):
+            row = futs[fut]
+            done += 1
+            try:
+                coin_hits, meta = fut.result()
+            except Exception as exc:  # noqa: BLE001
+                errors += 1
+                print(f"[{done:2d}/{len(universe)}] {row.symbol} FAIL {exc}")
+                continue
+            if meta.get("error"):
+                errors += 1
+            hits.extend(coin_hits)
+            for k, v in (meta.get("funnel") or {}).items():
+                funnel[k] = funnel.get(k, 0) + v
+            flag = f" trades={meta['n_trade']}" if meta.get("n_trade") else ""
+            err = f" {meta.get('error')}" if meta.get("error") else ""
+            print(f"[{done:2d}/{len(universe)}] {row.symbol} bars={meta.get('bars', 0)}{flag}{err}")
+
+    hits.sort(key=lambda h: h.df.index[h.trade.entry_idx])
+    stats = summarize_trades([h.trade for h in hits])
+    print(
+        f"done errors={errors} trades={stats['count']} symbols={len({h.row.symbol for h in hits})} "
+        f"WR={stats['closed_win_rate']:.1f}% sum={stats['total_pct']*100:+.2f}%"
+    )
+    for i, hit in enumerate(hits, 1):
+        t = hit.trade
+        print(
+            f"  [{i}] {hit.row.symbol} {hit.df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
+            f"{t.exit_reason:6} {t.pnl_pct*100:+.2f}%"
+        )
+
+    out = html_path
+    if pages:
+        out = SCAN_PAGES
+    if out:
+        write_scan_html(Path(out), hits, universe, days=days, funnel=funnel)
+        view = write_view_html(Path(out))
+        print(f"html={Path(out).resolve()}")
+        print(f"view={view.resolve()}")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -912,17 +1236,32 @@ def run_backtest(days: int = 7, html_path: Optional[Path] = None, pages: bool = 
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="牛来 五分K M頭跌破 MA200 做空")
-    p.add_argument("--days", type=int, default=7, help="回測進場窗（天）")
+    p = argparse.ArgumentParser(description="牛来 / 幣安成交額前 N · 五分K M頭跌破 MA200 做空")
+    p.add_argument("--days", type=int, default=None, help="回測進場窗（天）；單檔預設 7，scan 預設 3")
     p.add_argument("--html", default="", help="輸出 HTML 路徑")
-    p.add_argument("--pages", action="store_true", help="寫到 docs/niulai-m-top/index.html")
+    p.add_argument("--pages", action="store_true", help="寫到 docs/（單檔或 scan 目錄）")
+    p.add_argument("--scan", action="store_true", help="掃 USDT 永續成交額前 N 檔")
+    p.add_argument("--limit", type=int, default=50, help="scan 時成交額檔數")
+    p.add_argument("--workers", type=int, default=8, help="scan 並行數")
     return p
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     html_path = Path(args.html) if args.html else None
-    return run_backtest(days=args.days, html_path=html_path, pages=args.pages)
+    if args.scan:
+        return run_scan(
+            limit=args.limit,
+            days=3 if args.days is None else args.days,
+            workers=args.workers,
+            pages=args.pages,
+            html_path=html_path,
+        )
+    return run_backtest(
+        days=7 if args.days is None else args.days,
+        html_path=html_path,
+        pages=args.pages,
+    )
 
 
 if __name__ == "__main__":
