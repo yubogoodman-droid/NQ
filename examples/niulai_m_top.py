@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """牛来 USDT 永續 · 五分 K M 頭跌破 MA200 做空。
 
-對齊幣安 App 截圖：雙頂（M 頭）在 MA200 上方成形後，收盤跌破 MA200 進場做空。
-停損在 M 頭高點，目標 2R，或 48 根（4 小時）時間停。
+對齊幣安 App 截圖：只做牛來那種對稱深 M（雙峰站在 MA200 上方、頸線回測均線），
+收盤同時跌破 MA200 與 MA25 才空。停損在 M 頭高點，目標 2R，或 48 根時間停。
 
 用法:
   python3 examples/niulai_m_top.py
@@ -73,10 +73,38 @@ class MTopParams:
     target_r: float = 2.0
     time_bars: int = 48
     tick_size: float = 0.00001
+    # 牛來同款：雙頂貼在 MA200 上方、頸線回測均線、跌破要帶量
+    min_peak_above_ma_pct: float = 0.0
+    max_neck_above_ma_pct: float = 1.0
+    require_close_below_ma25: bool = False
+    min_break_volume_mult: float = 0.0
+    local_high_pad: int = 0
 
 
 def default_params(**overrides: Any) -> MTopParams:
     return MTopParams(**overrides)
+
+
+def niulai_params(**overrides: Any) -> MTopParams:
+    """對齊截圖：對稱 M、深度夠、雙頂明顯站在 MA200 上方、頸線回測均線。
+
+    不要求跌破當根放量：09-07 那筆 22:15 收盤穿 MA200 時量其實偏小，
+    瀑布放量在後面幾根。
+    """
+    data = dict(
+        high_tolerance_pct=0.01,
+        second_high_max_overshoot=0.003,
+        min_bars_between=20,
+        max_bars_between=60,
+        min_depth_pct=0.04,
+        min_peak_above_ma_pct=0.02,
+        max_neck_above_ma_pct=0.012,
+        require_close_below_ma25=True,
+        min_break_volume_mult=0.0,
+        local_high_pad=16,
+    )
+    data.update(overrides)
+    return MTopParams(**data)
 
 
 @dataclass(frozen=True)
@@ -438,7 +466,9 @@ def detect_m_tops(
     highs = df["high"].to_numpy(float)
     lows = df["low"].to_numpy(float)
     closes = df["close"].to_numpy(float)
+    vols = df["volume"].to_numpy(float) if "volume" in df.columns else np.ones(len(closes))
     ma200 = sma(closes, params.ma_period)
+    ma25 = sma(closes, 25) if params.require_close_below_ma25 else None
     look = params.swing_lookback
     swing_highs = _find_swing_highs(highs, look)
     _bump(funnel, "swing_highs", len(swing_highs))
@@ -458,7 +488,9 @@ def detect_m_tops(
                 continue
             if h2 > h1 * (1.0 + params.second_high_max_overshoot):
                 continue
-            span_high = float(highs[i1 : i2 + 1].max())
+            left = max(0, i1 - params.local_high_pad)
+            right = min(len(highs), i2 + look + 1)
+            span_high = float(highs[left:right].max())
             if span_high > max(h1, h2) + 1e-12:
                 continue
             inner_lo, inner_hi = i1 + look, i2 - look
@@ -477,6 +509,14 @@ def detect_m_tops(
                 continue
             if not (closes[i1] > ma200[i1] and closes[i2] > ma200[i2]):
                 continue
+            if params.min_peak_above_ma_pct > 0:
+                if h1 < ma200[i1] * (1.0 + params.min_peak_above_ma_pct):
+                    continue
+                if h2 < ma200[i2] * (1.0 + params.min_peak_above_ma_pct):
+                    continue
+            if params.max_neck_above_ma_pct < 1.0 and not np.isnan(ma200[neck_i]):
+                if neck > ma200[neck_i] * (1.0 + params.max_neck_above_ma_pct):
+                    continue
             _bump(funnel, "above_ma200")
             confirm = i2 + look
             if confirm >= len(closes):
@@ -486,9 +526,18 @@ def detect_m_tops(
             for k in range(confirm, last):
                 if np.isnan(ma200[k]) or np.isnan(ma200[k - 1]):
                     continue
-                if closes[k - 1] >= ma200[k - 1] and closes[k] < ma200[k]:
-                    breakout = k
-                    break
+                if not (closes[k - 1] >= ma200[k - 1] and closes[k] < ma200[k]):
+                    continue
+                if params.require_close_below_ma25 and ma25 is not None:
+                    if np.isnan(ma25[k]) or closes[k] >= ma25[k]:
+                        continue
+                if params.min_break_volume_mult > 0:
+                    prev = vols[max(0, k - 20) : k]
+                    med = float(np.median(prev)) if len(prev) else 0.0
+                    if med > 0 and vols[k] < params.min_break_volume_mult * med:
+                        continue
+                breakout = k
+                break
             if breakout is None:
                 continue
             _bump(funnel, "ma200_break")
@@ -702,7 +751,8 @@ def _equity_svg(pnls: List[float], width: int = 720, height: int = 180) -> str:
     )
 
 
-def _trade_window(df: pd.DataFrame, trade: TradeResult, pad_left: int = 16, pad_right: int = 10) -> tuple[int, int]:
+def _trade_window(df: pd.DataFrame, trade: TradeResult, pad_left: int = 28, pad_right: int = 18) -> tuple[int, int]:
+    """截圖從 15:50 看到 H1 18:10（約 28 根），跌破後還要留瀑布。"""
     p = trade.signal.pattern
     start = max(0, min(p.first_high_idx, trade.entry_idx) - pad_left)
     end = min(len(df) - 1, max(trade.exit_idx, trade.entry_idx, p.second_high_idx) + pad_right)
@@ -760,7 +810,7 @@ def draw_trade_png(
     fig, (ax, axv) = plt.subplots(
         2,
         1,
-        figsize=(10.4, 5.6),
+        figsize=(11.2, 5.8),
         sharex=True,
         gridspec_kw={"height_ratios": [3.2, 1]},
         facecolor="#0c1210",
@@ -770,7 +820,7 @@ def draw_trade_png(
 
     for n, col in MA_COLORS.items():
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
-        lw = 1.8 if n == 200 else (1.25 if n <= 25 else 1.05)
+        lw = 2.5 if n == 200 else (1.25 if n <= 25 else 1.05)
         ax.plot(list(range(len(window))), ma, color=col, lw=lw, label=f"MA{n}")
 
     ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
@@ -780,6 +830,16 @@ def draw_trade_png(
     h1 = p.first_high_idx - start
     h2 = p.second_high_idx - start
     nk = p.neckline_idx - start
+    if 0 <= h1 < len(window) and 0 <= nk < len(window) and 0 <= h2 < len(window):
+        ax.plot(
+            [h1, nk, h2],
+            [p.first_high, p.neckline, p.second_high],
+            color="#f0c14a",
+            lw=1.35,
+            ls="--",
+            alpha=0.85,
+            zorder=4,
+        )
     ex = trade.entry_idx - start
     xx = trade.exit_idx - start
     if 0 <= h1 < len(window):
@@ -867,12 +927,23 @@ def draw_overview_png(df: pd.DataFrame, trade: TradeResult, path: Path, title: s
 
     for n, col in MA_COLORS.items():
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start_idx : start_idx + len(window)]
-        lw = 2.2 if n == 200 else (1.3 if n <= 25 else 1.1)
+        lw = 2.6 if n == 200 else (1.3 if n <= 25 else 1.1)
         ax.plot(list(range(len(window))), ma, color=col, lw=lw, label=f"MA{n}")
 
     ax.axhline(p.neckline, color="#f0c14a", ls="--", lw=1.0, alpha=0.7)
     ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.8)
     ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.75)
+    h1r, h2r, nkr = p.first_high_idx - start_idx, p.second_high_idx - start_idx, p.neckline_idx - start_idx
+    if 0 <= h1r < len(window) and 0 <= nkr < len(window) and 0 <= h2r < len(window):
+        ax.plot(
+            [h1r, nkr, h2r],
+            [p.first_high, p.neckline, p.second_high],
+            color="#f0c14a",
+            lw=1.4,
+            ls="--",
+            alpha=0.85,
+            zorder=4,
+        )
 
     def _mark(idx: int, y: float, text: str, color: str, dy: int) -> None:
         rel = idx - start_idx
@@ -1040,8 +1111,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{SYMBOL_TW} 五分K · M頭跌破 MA200 做空</h1>
 <p class="muted">幣安 U 本位永續 · 近 {days} 天 · {escape(start)} → {escape(end)} CST · {len(df)} 根
-<br/>M 頭：兩波段高點價差 ≤ 2%、間隔 1～6 小時、中間低點深度 ≥ 2%，且兩峰收盤都在 MA200 上方。
-第二峰確認後 48 根內，收盤由上跌破 MA200 進場做空。
+<br/>只做「牛來那種」M 頭：雙峰幾乎等高（價差 ≤ 1%、右峰不得明顯更高）、間隔約 1.5～5 小時、
+中間至少跌 4%，兩個峰都明顯站在 MA200 上方（≥ 2%），頸線回測或跌破 MA200，
+然後收盤同時跌破 MA200 與 MA25 才空。小振幅、貼均線的假 M 不畫。
 停損在雙頂高點、目標 2R、或 48 根時間停。加總％是各筆報酬相加，不是複利。</p>
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
@@ -1089,7 +1161,7 @@ def scan_symbol(
     if len(df) < 220:
         meta["error"] = "too_few_bars"
         return [], meta
-    params = default_params(tick_size=row.tick_size)
+    params = niulai_params(tick_size=row.tick_size)
     funnel: Dict[str, int] = {}
     sigs = generate_signals(df, params, funnel=funnel)
     sigs = filter_entry_window(df, sigs, days)
@@ -1170,11 +1242,11 @@ def write_scan_html(
     cutoff = universe[-1].quote_volume / 1e6 if universe else 0
     names = {h.row.symbol for h in hits}
     total_cls = "pnl-win" if stats["total_pct"] >= 0 else "pnl-loss"
-    title = heading or f"幣安成交額前 {len(universe)} · M頭跌破 MA200 做空"
+    title = heading or f"幣安成交額前 {len(universe)} · 牛來型 M 頭做空"
     if blurb is None:
         blurb = (
             f"USDT 永續（不含股票合約）· 24h 成交額前 {len(universe)} · 近 {days} 天"
-            f" · 末名約 {cutoff:.0f}M USDT"
+            f" · 末名約 {cutoff:.0f}M USDT · 只掃牛來那種 M 頭"
         )
     uni_line = ""
     if any(r.day_pct for r in universe):
@@ -1222,7 +1294,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(title)}</h1>
 <p class="muted">{blurb}
-<br/>規則同牛來：五分 K M 頭在 MA200 上方成形後，收盤跌破 MA200 進場做空。停損雙頂高點、2R、或 48 根時間停。加總％是各筆報酬相加，不是複利。</p>
+<br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4%、雙峰明顯站上 MA200、頸線回測均線，收盤同時跌破 MA200 與 MA25 才空。貼均線的小 M 不畫。停損雙頂高點、2R、或 48 根時間停。加總％是各筆報酬相加，不是複利。</p>
 {uni_line}
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
@@ -1332,7 +1404,7 @@ def run_scan(
 
 def run_backtest(days: int = 7, html_path: Optional[Path] = None, pages: bool = False) -> int:
     df = fetch_klines()
-    params = default_params()
+    params = niulai_params()
     funnel: Dict[str, int] = {}
     sigs = generate_signals(df, params, funnel=funnel)
     sigs = filter_entry_window(df, sigs, days)
@@ -1385,10 +1457,10 @@ def run_gainers_scan(
         return 1
     for row in universe:
         print(f"  #{row.rank} {row.symbol}  {row.day_pct*100:+.1f}%  qv={row.quote_volume/1e6:.0f}M")
-    heading = f"前一天漲幅榜前 {len(universe)} · M頭跌破 MA200 做空"
+    heading = f"前一天漲幅榜前 {len(universe)} · 牛來型 M 頭做空"
     blurb = (
         f"USDT 永續、24h 成交額 ≥ 5M · {day.isoformat()} CST 全日漲幅前 {len(universe)}"
-        f" · 進場從該日 00:00 CST 起（漲幅當日與之後）"
+        f" · 進場從該日 00:00 CST 起。只畫牛來那種對稱深 M，不是任何兩個小高點。"
     )
     return run_scan(
         limit=limit,

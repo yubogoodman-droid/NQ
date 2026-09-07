@@ -20,6 +20,7 @@ from niulai_m_top import (  # noqa: E402
     filter_entry_window,
     fmt_px,
     generate_signals,
+    niulai_params,
     prev_cst_date,
     rank_by_day_pct,
     rank_usdt_perps,
@@ -77,6 +78,95 @@ def _m_top_series(n: int = 320) -> tuple[np.ndarray, dict[str, int]]:
         close[i] = close[i - 1] - 0.00035
     marks = {"h1": h1, "neck": neck, "h2": h2, "br": br}
     return close, marks
+
+
+def _stamp_m(
+    df: pd.DataFrame,
+    marks: dict[str, int],
+    h1: float,
+    h2: float,
+    neck: float,
+    look: int = 3,
+) -> pd.DataFrame:
+    """把 H1/H2 做成唯一波段高，避免鄰棒 wick 打平。"""
+    i1, i2, nk = marks["h1"], marks["h2"], marks["neck"]
+    df.loc[df.index[i1], "high"] = h1
+    df.loc[df.index[i2], "high"] = h2
+    df.loc[df.index[nk], "low"] = neck
+    hi = df.columns.get_loc("high")
+    for i, peak in ((i1, h1), (i2, h2)):
+        for j in range(i - look, i + look + 1):
+            if j == i or j < 0 or j >= len(df):
+                continue
+            df.iloc[j, hi] = min(float(df.iloc[j, hi]), peak - 0.00035)
+    return df
+
+
+def _niulai_like_series(n: int = 330) -> tuple[np.ndarray, dict[str, int]]:
+    """截圖同款：雙峰等高、頸線回到 MA200、深度約 5%、峰在均線上方。"""
+    close = np.full(n, 0.1000, dtype=float)
+    for i in range(1, 210):
+        close[i] = 0.1000 + 0.00002 * np.sin(i / 9.0)
+    h1, neck, h2, br = 236, 256, 276, 290
+    close[210:h1] = np.linspace(0.1003, 0.1046, h1 - 210)
+    close[h1] = 0.1048
+    close[h1 + 1 : neck] = np.linspace(0.1042, 0.1002, neck - h1 - 1)
+    close[neck] = 0.0996
+    close[neck + 1 : h2] = np.linspace(0.1001, 0.1044, h2 - neck - 1)
+    close[h2] = 0.1046
+    close[h2 + 1 : br] = np.linspace(0.1040, 0.1008, br - h2 - 1)
+    close[br] = 0.0988
+    for i in range(br + 1, n):
+        close[i] = close[i - 1] - 0.00040
+    return close, {"h1": h1, "neck": neck, "h2": h2, "br": br}
+
+
+def test_niulai_params_keeps_screenshot_shape() -> None:
+    close, marks = _niulai_like_series()
+    df = _stamp_m(_ohlc(close), marks, 0.1052, 0.1050, 0.0994)
+    patterns = detect_m_tops(df, niulai_params())
+    assert patterns, "牛來型參數應抓到對稱深 M"
+    p = patterns[-1]
+    assert abs(p.first_high_idx - marks["h1"]) <= 2
+    assert abs(p.second_high_idx - marks["h2"]) <= 2
+    assert p.depth_pct >= 0.04
+    assert p.breakout_idx >= marks["h2"]
+
+
+def _shallow_chop_series(n: int = 320) -> tuple[np.ndarray, dict[str, int]]:
+    """SOPH 那種貼均線的小 M：深度 ~2%、峰只比 MA200 高一點。"""
+    close = np.full(n, 0.1000, dtype=float)
+    for i in range(1, 210):
+        close[i] = 0.1000 + 0.00002 * np.sin(i / 9.0)
+    h1, neck, h2, br = 230, 248, 266, 278
+    close[210:h1] = np.linspace(0.1002, 0.1015, h1 - 210)
+    close[h1] = 0.1016
+    close[h1 + 1 : neck] = np.linspace(0.1014, 0.1004, neck - h1 - 1)
+    close[neck] = 0.1003
+    close[neck + 1 : h2] = np.linspace(0.1005, 0.1014, h2 - neck - 1)
+    close[h2] = 0.1015
+    close[h2 + 1 : br] = np.linspace(0.1013, 0.1004, br - h2 - 1)
+    close[br] = 0.0996
+    for i in range(br + 1, n):
+        close[i] = 0.1000 + 0.00005 * np.sin(i / 7.0)
+    return close, {"h1": h1, "neck": neck, "h2": h2, "br": br}
+
+
+def test_niulai_params_rejects_shallow_chop() -> None:
+    """SOPH 那種貼均線、深度只有 2% 的假 M，不該進場。"""
+    close, marks = _shallow_chop_series()
+    df = _stamp_m(_ohlc(close), marks, 0.1020, 0.1019, 0.1002)
+    assert detect_m_tops(df, niulai_params()) == []
+
+
+def test_niulai_params_rejects_higher_right_peak() -> None:
+    close, marks = _niulai_like_series()
+    df = _stamp_m(_ohlc(close), marks, 0.1052, 0.1064, 0.0994)
+    patterns = detect_m_tops(df, niulai_params())
+    assert all(
+        not (abs(p.first_high_idx - marks["h1"]) <= 2 and abs(p.second_high_idx - marks["h2"]) <= 2)
+        for p in patterns
+    )
 
 
 def test_detects_m_top_ma200_short() -> None:
@@ -291,6 +381,9 @@ def test_prev_day_gainers() -> None:
 def main() -> int:
     tests = [
         test_sma,
+        test_niulai_params_keeps_screenshot_shape,
+        test_niulai_params_rejects_shallow_chop,
+        test_niulai_params_rejects_higher_right_peak,
         test_detects_m_top_ma200_short,
         test_rejects_higher_high_between_peaks,
         test_simulate_target_and_stop,
