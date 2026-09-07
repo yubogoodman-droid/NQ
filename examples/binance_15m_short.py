@@ -570,7 +570,6 @@ def write_html(
         rest = [h for h in hits if id(h) not in featured_set]
         rest.sort(key=lambda h: abs(h.trade.pnl_pct), reverse=True)
         keep = featured_hits + rest[: max(0, max_charts - len(featured_hits))]
-        keep.sort(key=lambda h: h.df.index[h.trade.entry_idx])
         chart_hits = keep
 
     cards: List[str] = []
