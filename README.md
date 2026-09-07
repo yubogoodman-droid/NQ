@@ -95,6 +95,21 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## 幣安 15 分 K 空頭排列跌破 99/120 做空
+
+截圖那種：15m **MA7 < MA14 < MA25**，同一根紅 K 收盤同時跌破 **MA99 與 MA120** 進場做空。  
+對齊急殺：實體 ≥ 0.8%、量 ≥ 1.5×成交量 MA20。停在跌破 K 高點／長均上緣，目標 2R，或 8 小時時間停。
+
+幣安永續代號是 `CLOUSDT`（App 常顯示 Cloud）。
+
+```bash
+python3 examples/test_binance_15m_short.py
+python3 examples/binance_15m_short.py --symbol CLOUSDT --days 7 --pages
+python3 examples/binance_15m_short.py --days 7 --pages
+```
+
+預覽：跑完會寫到 `docs/binance-15m-short/`。
+
 ## 快速開始
 
 ```bash
