@@ -909,6 +909,161 @@ def draw_overview_png(df: pd.DataFrame, trade: TradeResult, path: Path, title: s
     return path
 
 
+def _idx_at(df: pd.DataFrame, ts: pd.Timestamp) -> Optional[int]:
+    """對應到 ts 當下（含）已開盤的那根 K。"""
+    if df is None or df.empty:
+        return None
+    loc = int(df.index.get_indexer([ts], method="ffill")[0])
+    return None if loc < 0 else loc
+
+
+def fetch_hourly(symbol: str) -> pd.DataFrame:
+    if symbol == SYMBOL:
+        return fetch_klines(symbol, interval="1h")
+    return fetch_klines(symbol, interval="1h", lookback_days=32)
+
+
+def draw_hourly_png(
+    hourly: pd.DataFrame,
+    df5: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+    title_extra: str = "",
+) -> Optional[Path]:
+    """同一筆五分訊號，畫對齊時段的 1 小時 K。"""
+    if hourly is None or hourly.empty:
+        return None
+    p = trade.signal.pattern
+    t0 = df5.index[p.first_high_idx] - pd.Timedelta(hours=16)
+    t1 = df5.index[max(trade.exit_idx, trade.entry_idx)] + pd.Timedelta(hours=8)
+    start = _idx_at(hourly, t0)
+    end = _idx_at(hourly, t1)
+    if start is None or end is None or end <= start:
+        return None
+    window = hourly.iloc[start : end + 1]
+    if len(window) < 6:
+        return None
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    _setup_cjk()
+    close_full = hourly["close"].astype(float)
+    fig, (ax, axv) = plt.subplots(
+        2,
+        1,
+        figsize=(11.2, 5.4),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1]},
+        facecolor="#0c1210",
+    )
+    _style_axes(ax, axv)
+    _draw_candles(ax, axv, window)
+    for n, col in MA_COLORS.items():
+        ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
+        lw = 2.5 if n == 200 else (1.25 if n <= 25 else 1.05)
+        ax.plot(list(range(len(window))), ma, color=col, lw=lw, label=f"MA{n}")
+
+    ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
+    ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
+    ax.axhline(p.neckline, color="#f0c14a", ls="--", lw=1.0, alpha=0.75)
+
+    def rel(ts: pd.Timestamp) -> Optional[int]:
+        i = _idx_at(hourly, ts)
+        if i is None:
+            return None
+        r = i - start
+        return r if 0 <= r < len(window) else None
+
+    h1 = rel(df5.index[p.first_high_idx])
+    h2 = rel(df5.index[p.second_high_idx])
+    nk = rel(df5.index[p.neckline_idx])
+    ex = rel(df5.index[trade.entry_idx])
+    xx = rel(df5.index[trade.exit_idx])
+    if h1 is not None and nk is not None and h2 is not None:
+        ax.plot(
+            [h1, nk, h2],
+            [p.first_high, p.neckline, p.second_high],
+            color="#f0c14a",
+            lw=1.35,
+            ls="--",
+            alpha=0.85,
+            zorder=4,
+        )
+    if h1 is not None:
+        ax.scatter([h1], [p.first_high], s=42, color="#f0c14a", zorder=5)
+        ax.annotate("H1", (h1, p.first_high), textcoords="offset points", xytext=(0, 8),
+                    ha="center", color="#f0c14a", fontsize=8)
+    if h2 is not None:
+        ax.scatter([h2], [p.second_high], s=42, color="#f472b6", zorder=5)
+        ax.annotate("H2", (h2, p.second_high), textcoords="offset points", xytext=(0, 8),
+                    ha="center", color="#f9a8d4", fontsize=8)
+    if nk is not None:
+        ax.scatter([nk], [p.neckline], s=36, color="#79c0ff", zorder=5)
+        ax.annotate("頸線", (nk, p.neckline), textcoords="offset points", xytext=(0, -12),
+                    ha="center", color="#79c0ff", fontsize=8)
+    if ex is not None:
+        ax.axvline(ex, color="#e35d5d", ls="--", lw=0.9)
+        ax.scatter([ex], [trade.entry_price], s=52, color="#e35d5d", marker="v", zorder=6)
+        ax.annotate("S", (ex, trade.entry_price), textcoords="offset points", xytext=(8, -10),
+                    ha="left", color="#ff7b72", fontsize=9)
+    if xx is not None:
+        ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
+        ax.scatter(
+            [xx],
+            [trade.exit_price],
+            s=40,
+            color="#00c805" if trade.pnl_pct > 0 else "#ff5252",
+            marker="x",
+            zorder=6,
+        )
+
+    extra = f"{title_extra}  " if title_extra else ""
+    ax.set_title(
+        f"#{trade_no}  {extra}1小時K · 同一段  "
+        f"{df5.index[trade.entry_idx].strftime('%m-%d %H:%M')} → "
+        f"{df5.index[trade.exit_idx].strftime('%m-%d %H:%M')}",
+        color="#e8f0ea",
+        fontsize=11,
+    )
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    step = max(1, len(window) // 6)
+    ticks = list(range(0, len(window), step))
+    axv.set_xticks(ticks)
+    axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
+    fig.tight_layout(pad=0.45)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
+def _hourly_img_html(
+    hourly: pd.DataFrame,
+    df5: pd.DataFrame,
+    trade: TradeResult,
+    img_dir: Path,
+    stem: str,
+    trade_no: int,
+    title_extra: str = "",
+) -> str:
+    name = f"{stem}_1h.png"
+    try:
+        out = draw_hourly_png(hourly, df5, trade, img_dir / name, trade_no, title_extra=title_extra)
+    except Exception:  # noqa: BLE001
+        return ""
+    if out is None:
+        return ""
+    return (
+        "<p class='chart-cap'>1小時K · 同一段</p>"
+        f"<div class='mini-chart'><img src='img/{escape(name)}' alt='1h' "
+        "style='width:100%;display:block;border-radius:10px'/></div>"
+    )
+
+
 def _git_branch() -> str:
     try:
         out = subprocess.check_output(
@@ -947,6 +1102,11 @@ def write_html_report(
 
     overview_html = ""
     shot = next((t for t in reversed(trades) if t.signal.pattern.gap >= 20), trades[-1] if trades else None)
+    hourly = pd.DataFrame()
+    try:
+        hourly = fetch_hourly(SYMBOL)
+    except Exception:  # noqa: BLE001
+        hourly = pd.DataFrame()
     if shot is not None:
         draw_overview_png(
             df,
@@ -954,6 +1114,7 @@ def write_html_report(
             img_dir / "overview.png",
             f"{SYMBOL_TW} 五分K · M頭跌破 MA200 做空 · {shot.signal.timestamp.strftime('%Y-%m-%d')}",
         )
+        hourly_ov = _hourly_img_html(hourly, df, shot, img_dir, "overview", 0)
         overview_html = (
             "<article class='trade-card'>"
             "<header class='card-header'><div class='card-title'>"
@@ -961,9 +1122,11 @@ def write_html_report(
             f"<span class='trade-time'>{escape(shot.signal.timestamp.strftime('%Y-%m-%d %H:%M'))} 跌破 MA200</span>"
             "</div></header>"
             "<p class='muted' style='margin:0 0 10px'>左峰 H1、右峰 H2 在 MA200 上方結成 M 頭，"
-            "收盤跌破紅色 MA200 進場做空（S）。停損在雙頂高點，目標 2R。</p>"
+            "收盤跌破紅色 MA200 進場做空（S）。停損在雙頂高點，目標 2R。下面是同一段一小時 K。</p>"
+            "<p class='chart-cap'>五分K</p>"
             "<div class='mini-chart'><img src='img/overview.png' alt='overview' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
+            f"{hourly_ov}"
             "</article>"
         )
 
@@ -975,6 +1138,8 @@ def write_html_report(
         reason_cls = {"target": "tag-tp", "stop": "tag-sl", "open": "tag-info"}.get(t.exit_reason, "tag-time")
         img_name = f"t{i:02d}_{et.strftime('%m%d_%H%M')}.png"
         draw_trade_png(df, t, img_dir / img_name, i)
+        stem = img_name.replace(".png", "")
+        hourly_html = _hourly_img_html(hourly, df, t, img_dir, stem, i)
         p = t.signal.pattern
         risk = t.stop_price - t.entry_price
         cards.append(
@@ -999,8 +1164,10 @@ def write_html_report(
             f"H2 {df.index[p.second_high_idx].strftime('%m-%d %H:%M')} {p.second_high:.5f}\n"
             f"頸線 {df.index[p.neckline_idx].strftime('%m-%d %H:%M')} {p.neckline:.5f}"
             "</pre>"
+            "<p class='chart-cap'>五分K</p>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
+            f"{hourly_html}"
             "</article>"
         )
 
@@ -1039,6 +1206,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
 .mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+.chart-cap{{font-size:11px;color:#8b949e;margin:10px 0 4px}}
 .empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
 </style></head><body>
 <div class="page">
@@ -1048,7 +1216,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <br/>只做「牛來那種」M 頭：雙峰幾乎等高（價差 ≤ 1%、右峰不得明顯更高）、間隔約 1.5～4 小時、
 中間至少跌 4%，兩個峰都明顯站在 MA200 上方（≥ 3%），頸線回測 MA200（不得遠高或深跌穿），
 M 成形期間多數收盤仍在均線上，然後收盤同時跌破 MA200 與 MA25 才空。小振幅、貼均線亂鑽的假 M 不畫。
-停損在雙頂高點、目標 2R、或 48 根時間停。加總％是各筆報酬相加，不是複利。</p>
+停損在雙頂高點、目標 2R、或 48 根時間停。每筆下面附同一段一小時 K。加總％是各筆報酬相加，不是複利。</p>
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
@@ -1121,6 +1289,16 @@ def write_scan_html(
             old.unlink()
     img_dir.mkdir(parents=True, exist_ok=True)
 
+    hourly_by_sym: dict[str, pd.DataFrame] = {}
+
+    def hourly_of(symbol: str) -> pd.DataFrame:
+        if symbol not in hourly_by_sym:
+            try:
+                hourly_by_sym[symbol] = fetch_hourly(symbol)
+            except Exception:  # noqa: BLE001
+                hourly_by_sym[symbol] = pd.DataFrame()
+        return hourly_by_sym[symbol]
+
     cards: List[str] = []
     for i, hit in enumerate(hits, 1):
         t = hit.trade
@@ -1133,6 +1311,8 @@ def write_scan_html(
         safe = "".join(ch if ch.isalnum() else "_" for ch in hit.row.symbol)
         img_name = f"t{i:02d}_{safe}_{et.strftime('%m%d_%H%M')}.png"
         draw_trade_png(df, t, img_dir / img_name, i, title_extra=label)
+        stem = img_name.replace(".png", "")
+        hourly_html = _hourly_img_html(hourly_of(hit.row.symbol), df, t, img_dir, stem, i, title_extra=label)
         p = t.signal.pattern
         risk = t.stop_price - t.entry_price
         qv = hit.row.quote_volume / 1e6
@@ -1159,8 +1339,10 @@ def write_scan_html(
             f"H2 {df.index[p.second_high_idx].strftime('%m-%d %H:%M')} {fmt_px(p.second_high)}\n"
             f"頸線 {df.index[p.neckline_idx].strftime('%m-%d %H:%M')} {fmt_px(p.neckline)}"
             "</pre>"
+            "<p class='chart-cap'>五分K</p>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
+            f"{hourly_html}"
             "</article>"
         )
 
@@ -1205,13 +1387,14 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
 .mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+.chart-cap{{font-size:11px;color:#8b949e;margin:10px 0 4px}}
 .empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
 </style></head><body>
 <div class="page">
 <section class="summary">
 <h1>{escape(title)}</h1>
 <p class="muted">{blurb}
-<br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4%、雙峰明顯站上 MA200、頸線回測均線（不深跌穿）、成形期間多數收盤在均線上，收盤同時跌破 MA200 與 MA25 才空。貼均線亂鑽的小 M 不畫。停損雙頂高點、2R、或 48 根時間停。加總％是各筆報酬相加，不是複利。</p>
+<br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4%、雙峰明顯站上 MA200、頸線回測均線（不深跌穿）、成形期間多數收盤在均線上，收盤同時跌破 MA200 與 MA25 才空。貼均線亂鑽的小 M 不畫。停損雙頂高點、2R、或 48 根時間停。每筆下面附同一段一小時 K。加總％是各筆報酬相加，不是複利。</p>
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>

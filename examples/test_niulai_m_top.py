@@ -13,9 +13,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from niulai_m_top import (  # noqa: E402
     CST,
+    _idx_at,
     detect_m_tops,
     default_params,
     display_name,
+    draw_hourly_png,
     filter_entry_window,
     fmt_px,
     generate_signals,
@@ -349,6 +351,61 @@ def test_rank_usdt_perps_top50() -> None:
     assert tiny[0].symbol == "ETHUSDT"
 
 
+def test_idx_at_maps_intrabar_to_hourly() -> None:
+    idx = pd.date_range("2026-09-07 18:00", periods=4, freq="h", tz=CST)
+    df = pd.DataFrame({"close": [1.0, 1.1, 1.2, 1.3]}, index=idx)
+    i = _idx_at(df, pd.Timestamp("2026-09-07 18:10", tz=CST))
+    assert i == 0
+    assert df.index[i] == idx[0]
+    assert _idx_at(df, pd.Timestamp("2026-09-07 17:00", tz=CST)) is None
+    assert _idx_at(pd.DataFrame(), pd.Timestamp("2026-09-07 18:10", tz=CST)) is None
+
+
+def test_draw_hourly_png_for_5m_trade() -> None:
+    import tempfile
+
+    close, marks = _m_top_series(360)
+    df = _ohlc(close)
+    df.loc[df.index[marks["h1"]], "high"] = 0.1068
+    df.loc[df.index[marks["h2"]], "high"] = 0.1066
+    df.loc[df.index[marks["neck"]], "low"] = 0.1016
+    params = default_params(min_depth_pct=0.015, time_bars=80, target_r=2.0)
+    trades = simulate(df, generate_signals(df, params), params)
+    assert trades
+    hourly = (
+        df.resample("1h")
+        .agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"})
+        .dropna()
+    )
+    pad_idx = pd.date_range(
+        df.index[0] - pd.Timedelta(hours=20),
+        hourly.index[0],
+        freq="h",
+        tz=CST,
+        inclusive="left",
+    )
+    pad = pd.DataFrame(
+        {"open": 0.10, "high": 0.101, "low": 0.099, "close": 0.10, "volume": 1000.0},
+        index=pad_idx,
+    )
+    tail_idx = pd.date_range(
+        hourly.index[-1] + pd.Timedelta(hours=1),
+        df.index[-1] + pd.Timedelta(hours=10),
+        freq="h",
+        tz=CST,
+    )
+    tail = pd.DataFrame(
+        {"open": 0.09, "high": 0.091, "low": 0.089, "close": 0.09, "volume": 1000.0},
+        index=tail_idx,
+    )
+    hourly = pd.concat([pad, hourly, tail]).sort_index()
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "trade_1h.png"
+        out = draw_hourly_png(hourly, df, trades[-1], path, 1)
+        assert out is not None
+        assert path.is_file() and path.stat().st_size > 1000
+
+
 def test_display_and_fmt() -> None:
     assert display_name("BTCUSDT") == "BTC"
     assert display_name("牛来USDT") == "牛来"
@@ -370,6 +427,8 @@ def main() -> int:
         test_filter_entry_window,
         test_summarize,
         test_rank_usdt_perps_top50,
+        test_idx_at_maps_intrabar_to_hourly,
+        test_draw_hourly_png_for_5m_trade,
         test_display_and_fmt,
     ]
     failed = 0
