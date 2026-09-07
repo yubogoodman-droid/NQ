@@ -21,6 +21,7 @@ from binance_15m_short import (  # noqa: E402
     filter_near_1h_ma99,
     filter_untangled_1h_mas,
     filter_away_1h_ma120,
+    filter_not_below_1h_ma200,
     default_params,
     htf_ma_at_entry,
     htf_mas_at_entry,
@@ -407,6 +408,43 @@ def test_1h_ma120_keeps_cloud_distance() -> None:
     assert ma is not None and abs(sigs[0].entry_price / ma - 1.0) >= 0.02
 
 
+def test_1h_ma200_rejects_already_below() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    ts = df.index[sigs[0].entry_idx]
+    px = sigs[0].entry_price
+    h1 = make_1h(ts, n=220, old=px * 1.25, recent=px * 1.25)
+    funnel: dict = {}
+    kept = filter_not_below_1h_ma200(df, sigs, h1, funnel=funnel)
+    assert kept == []
+    assert funnel.get("below_1h_ma200", 0) >= 1
+    ma = htf_ma_at_entry(h1, ts, px, n=200)
+    assert ma is not None and px < ma
+
+
+def test_1h_ma200_keeps_cloud_still_above() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    ts = df.index[sigs[0].entry_idx]
+    px = sigs[0].entry_price
+    h1 = make_1h(ts, n=220, old=0.80, recent=1.05, recent_bars=30)
+    kept = filter_not_below_1h_ma200(df, sigs, h1)
+    assert kept == sigs
+    ma = htf_ma_at_entry(h1, ts, px, n=200)
+    assert ma is not None and px >= ma
+
+
+def test_1h_ma200_missing_data_skips() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    funnel: dict = {}
+    empty = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+    assert filter_not_below_1h_ma200(df, sigs, empty, funnel=funnel) == []
+    assert funnel.get("no_1h_ma200", 0) >= 1
+
+
 def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -429,6 +467,7 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "1h MA99" in text
     assert "糾結" in text
     assert "MA120" in text
+    assert "MA200" in text
     assert (out_dir / "img").exists()
     pngs = list((out_dir / "img").glob("*.png"))
     assert any("1h" in p.name for p in pngs)
@@ -458,6 +497,9 @@ def main() -> int:
     test_1h_mas_keep_fanned_like_cloud()
     test_1h_ma120_rejects_too_close_like_morpho()
     test_1h_ma120_keeps_cloud_distance()
+    test_1h_ma200_rejects_already_below()
+    test_1h_ma200_keeps_cloud_still_above()
+    test_1h_ma200_missing_data_skips()
     test_summarize_and_html()
     print("ok")
     return 0
