@@ -1022,8 +1022,9 @@ def draw_hourly_png(
         )
 
     extra = f"{title_extra}  " if title_extra else ""
+    prefix = f"#{trade_no}  " if trade_no else ""
     ax.set_title(
-        f"#{trade_no}  {extra}1小時K · 同一段  "
+        f"{prefix}{extra}1小時K · 同一段  "
         f"{df5.index[trade.entry_idx].strftime('%m-%d %H:%M')} → "
         f"{df5.index[trade.exit_idx].strftime('%m-%d %H:%M')}",
         color="#e8f0ea",
