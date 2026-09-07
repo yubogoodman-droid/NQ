@@ -76,6 +76,8 @@ class MTopParams:
     # 牛來同款：雙頂貼在 MA200 上方、頸線回測均線、跌破要帶量
     min_peak_above_ma_pct: float = 0.0
     max_neck_above_ma_pct: float = 1.0
+    max_neck_below_ma_pct: float = 1.0
+    min_frac_closes_above_ma: float = 0.0
     require_close_below_ma25: bool = False
     min_break_volume_mult: float = 0.0
     local_high_pad: int = 0
@@ -95,10 +97,12 @@ def niulai_params(**overrides: Any) -> MTopParams:
         high_tolerance_pct=0.01,
         second_high_max_overshoot=0.003,
         min_bars_between=20,
-        max_bars_between=60,
+        max_bars_between=48,
         min_depth_pct=0.04,
-        min_peak_above_ma_pct=0.02,
+        min_peak_above_ma_pct=0.03,
         max_neck_above_ma_pct=0.012,
+        max_neck_below_ma_pct=0.02,
+        min_frac_closes_above_ma=0.70,
         require_close_below_ma25=True,
         min_break_volume_mult=0.0,
         local_high_pad=16,
@@ -516,6 +520,15 @@ def detect_m_tops(
                     continue
             if params.max_neck_above_ma_pct < 1.0 and not np.isnan(ma200[neck_i]):
                 if neck > ma200[neck_i] * (1.0 + params.max_neck_above_ma_pct):
+                    continue
+            if params.max_neck_below_ma_pct < 1.0 and not np.isnan(ma200[neck_i]):
+                if neck < ma200[neck_i] * (1.0 - params.max_neck_below_ma_pct):
+                    continue
+            if params.min_frac_closes_above_ma > 0:
+                span_c = closes[i1 : i2 + 1]
+                span_m = ma200[i1 : i2 + 1]
+                ok = ~np.isnan(span_m)
+                if not ok.any() or float(np.mean(span_c[ok] > span_m[ok])) < params.min_frac_closes_above_ma:
                     continue
             _bump(funnel, "above_ma200")
             confirm = i2 + look
@@ -1111,9 +1124,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{SYMBOL_TW} 五分K · M頭跌破 MA200 做空</h1>
 <p class="muted">幣安 U 本位永續 · 近 {days} 天 · {escape(start)} → {escape(end)} CST · {len(df)} 根
-<br/>只做「牛來那種」M 頭：雙峰幾乎等高（價差 ≤ 1%、右峰不得明顯更高）、間隔約 1.5～5 小時、
-中間至少跌 4%，兩個峰都明顯站在 MA200 上方（≥ 2%），頸線回測或跌破 MA200，
-然後收盤同時跌破 MA200 與 MA25 才空。小振幅、貼均線的假 M 不畫。
+<br/>只做「牛來那種」M 頭：雙峰幾乎等高（價差 ≤ 1%、右峰不得明顯更高）、間隔約 1.5～4 小時、
+中間至少跌 4%，兩個峰都明顯站在 MA200 上方（≥ 3%），頸線回測 MA200（不得遠高或深跌穿），
+M 成形期間多數收盤仍在均線上，然後收盤同時跌破 MA200 與 MA25 才空。小振幅、貼均線亂鑽的假 M 不畫。
 停損在雙頂高點、目標 2R、或 48 根時間停。加總％是各筆報酬相加，不是複利。</p>
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
@@ -1294,7 +1307,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(title)}</h1>
 <p class="muted">{blurb}
-<br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4%、雙峰明顯站上 MA200、頸線回測均線，收盤同時跌破 MA200 與 MA25 才空。貼均線的小 M 不畫。停損雙頂高點、2R、或 48 根時間停。加總％是各筆報酬相加，不是複利。</p>
+<br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4%、雙峰明顯站上 MA200、頸線回測均線（不深跌穿）、成形期間多數收盤在均線上，收盤同時跌破 MA200 與 MA25 才空。貼均線亂鑽的小 M 不畫。停損雙頂高點、2R、或 48 根時間停。加總％是各筆報酬相加，不是複利。</p>
 {uni_line}
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}

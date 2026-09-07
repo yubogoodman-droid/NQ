@@ -169,6 +169,17 @@ def test_niulai_params_rejects_higher_right_peak() -> None:
     )
 
 
+def test_niulai_params_rejects_neck_far_below_ma() -> None:
+    """頸線深跌穿 MA200（USELESS / BULLA 那種）不是牛來。"""
+    close, marks = _niulai_like_series()
+    df = _stamp_m(_ohlc(close), marks, 0.1052, 0.1050, 0.0950)
+    patterns = detect_m_tops(df, niulai_params())
+    assert all(
+        not (abs(p.first_high_idx - marks["h1"]) <= 2 and abs(p.second_high_idx - marks["h2"]) <= 2)
+        for p in patterns
+    )
+
+
 def test_detects_m_top_ma200_short() -> None:
     close, marks = _m_top_series()
     df = _ohlc(close)
@@ -384,6 +395,7 @@ def main() -> int:
         test_niulai_params_keeps_screenshot_shape,
         test_niulai_params_rejects_shallow_chop,
         test_niulai_params_rejects_higher_right_peak,
+        test_niulai_params_rejects_neck_far_below_ma,
         test_detects_m_top_ma200_short,
         test_rejects_higher_high_between_peaks,
         test_simulate_target_and_stop,
