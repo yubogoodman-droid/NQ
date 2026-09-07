@@ -317,7 +317,15 @@ def get_json(path: str, params=None, retries: int = 5):
     raise last
 
 
-def universe(min_quote_vol: float = 10_000_000) -> List[str]:
+STOCK_UNDERLYING = {"EQUITY", "HK_EQUITY", "KR_EQUITY", "CN_EQUITY", "PREMARKET"}
+
+
+def is_stock_contract(info: dict) -> bool:
+    """幣安 TradFi 股票／ETF／盤前，不含黃金原油等商品。"""
+    return str(info.get("underlyingType") or "") in STOCK_UNDERLYING
+
+
+def universe(min_quote_vol: float = 10_000_000, include_stocks: bool = False) -> List[str]:
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
     out: List[str] = []
@@ -329,6 +337,8 @@ def universe(min_quote_vol: float = 10_000_000) -> List[str]:
         if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
             continue
         if s.get("underlyingType") == "INDEX":
+            continue
+        if not include_stocks and is_stock_contract(s):
             continue
         sym = s["symbol"]
         qv = float((tickers.get(sym) or {}).get("quoteVolume") or 0)
@@ -768,7 +778,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
 <br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
 <br/>出場：停在跌破 K 高點與 MA99/120 上緣的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
-<br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120）。</p>
+<br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120）。股票／ETF 永續預設不掃。</p>
 <p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 空頭排列 {fun.get('stack', 0)} → 同時跌破 {fun.get('cross', 0)}
 → 紅 K {fun.get('red', 0)} → 進場 {fun.get('entry', 0)}
 · 太淺 {fun.get('shallow', 0)} · 實體不夠 {fun.get('thin', 0)} · 量不夠 {fun.get('quiet', 0)}
@@ -832,6 +842,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--min-quote-vol", type=float, default=10_000_000)
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--loose", action="store_true", help="不做實體/量能過濾，只看均線排列與跌破")
+    p.add_argument("--include-stocks", action="store_true", help="不過濾 TradFi 股票／ETF 永續")
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
     p.add_argument("--json", dest="json_path", default="")
@@ -845,8 +856,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         symbols = [args.symbol.strip().upper()]
     else:
         print("載入標的…", flush=True)
-        symbols = universe(args.min_quote_vol)
-    print(f"symbols={len(symbols)} days={args.days} interval=15m loose={args.loose}", flush=True)
+        symbols = universe(args.min_quote_vol, include_stocks=args.include_stocks)
+    print(
+        f"symbols={len(symbols)} days={args.days} interval=15m loose={args.loose} "
+        f"stocks={'on' if args.include_stocks else 'off'}",
+        flush=True,
+    )
 
     hits: List[Hit] = []
     funnel: Dict[str, int] = {}
@@ -901,6 +916,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "symbols": symbols,
         "generated": datetime.now(TPE).isoformat(timespec="seconds"),
         "interval": "15m",
+        "include_stocks": bool(args.include_stocks),
     }
     html_path = Path(args.html) if args.html else None
     if html_path is None and args.pages:
@@ -911,6 +927,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             label += f" · {args.symbol.upper()}"
         if args.loose:
             label += " · 寬鬆（無實體/量能過濾）"
+        if not args.include_stocks and not args.symbol.strip():
+            label += " · 已濾股票"
         out = write_html(
             html_path,
             hits,

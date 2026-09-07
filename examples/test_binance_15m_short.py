@@ -19,6 +19,7 @@ from binance_15m_short import (  # noqa: E402
     filter_entry_window,
     default_params,
     htf_snapshot,
+    is_stock_contract,
     simulate,
     sma,
     summarize_trades,
@@ -61,6 +62,17 @@ def test_sma() -> None:
     assert np.isnan(out[1])
     assert abs(out[2] - 2.0) < 1e-9
     assert abs(out[4] - 4.0) < 1e-9
+
+
+def test_stock_contract_filter() -> None:
+    assert is_stock_contract({"underlyingType": "EQUITY"})
+    assert is_stock_contract({"underlyingType": "PREMARKET"})
+    assert is_stock_contract({"underlyingType": "HK_EQUITY"})
+    assert is_stock_contract({"underlyingType": "KR_EQUITY"})
+    assert is_stock_contract({"underlyingType": "CN_EQUITY"})
+    assert not is_stock_contract({"underlyingType": "COIN"})
+    assert not is_stock_contract({"underlyingType": "COMMODITY"})
+    assert not is_stock_contract({})
 
 
 def test_detect_dump_cross() -> None:
@@ -209,6 +221,7 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "CLOUSDT" in text
     assert "空頭排列" in text
     assert "1h 對照" in text
+    assert "股票／ETF 永續預設不掃" in text
     assert (out_dir / "img").exists()
     pngs = list((out_dir / "img").glob("*.png"))
     assert any("1h" in p.name for p in pngs)
@@ -216,6 +229,7 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
 
 def main() -> int:
     test_sma()
+    test_stock_contract_filter()
     test_detect_dump_cross()
     test_no_signal_if_bullish_stack()
     test_rebreak_after_reclaim()
