@@ -14,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from binance_15m_short import (  # noqa: E402
     TPE,
+    Hit,
+    TradeResult,
     bar_index_at,
     detect_signals,
     filter_below_1h_ma25,
@@ -28,6 +30,7 @@ from binance_15m_short import (  # noqa: E402
     htf_snapshot,
     is_stock_contract,
     ma_cluster_spread,
+    order_chart_hits,
     simulate,
     sma,
     summarize_trades,
@@ -452,8 +455,6 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     stats = summarize_trades(trades)
     assert stats["count"] == len(trades)
     assert "win_rate" in stats
-    from binance_15m_short import Hit
-
     out_dir = Path("/tmp/binance_15m_short_test") if tmp_path is None else tmp_path
     h1 = to_1h(df)
     hits = [Hit("CLOUSDT", t, df, df_1h=h1) for t in trades]
@@ -468,9 +469,34 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "糾結" in text
     assert "MA120" in text
     assert "MA200" in text
+    assert "虧損在前" in text
     assert (out_dir / "img").exists()
     pngs = list((out_dir / "img").glob("*.png"))
     assert any("1h" in p.name for p in pngs)
+
+
+def test_charts_put_losses_first() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    trades = simulate(df, sigs)
+    assert trades
+    win = trades[0]
+    lose = TradeResult(
+        signal=win.signal,
+        entry_idx=win.entry_idx,
+        exit_idx=win.exit_idx,
+        entry_price=win.entry_price,
+        exit_price=win.stop_price,
+        stop_price=win.stop_price,
+        target_price=win.target_price,
+        pnl_points=win.entry_price - win.stop_price,
+        pnl_pct=(win.entry_price - win.stop_price) / win.entry_price,
+        exit_reason="stop",
+    )
+    hits = [Hit("WINUSDT", win, df), Hit("LOSEUSDT", lose, df)]
+    ordered = order_chart_hits(hits)
+    assert [h.symbol for h in ordered] == ["LOSEUSDT", "WINUSDT"]
+    assert ordered[0].trade.pnl_pct < 0 <= ordered[1].trade.pnl_pct
 
 
 def main() -> int:
@@ -501,6 +527,7 @@ def main() -> int:
     test_1h_ma200_keeps_cloud_still_above()
     test_1h_ma200_missing_data_skips()
     test_summarize_and_html()
+    test_charts_put_losses_first()
     print("ok")
     return 0
 

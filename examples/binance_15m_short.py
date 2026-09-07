@@ -880,6 +880,17 @@ def write_view_html(src: Path) -> Path:
     return out
 
 
+def order_chart_hits(hits: Sequence[Hit]) -> List[Hit]:
+    """報告卡片：虧損在前（虧最多先看），其餘維持進場時間。"""
+    losses = [h for h in hits if h.trade.pnl_pct < 0]
+    rest = [h for h in hits if h.trade.pnl_pct >= 0]
+    losses.sort(
+        key=lambda h: (h.trade.pnl_pct, h.df.index[h.trade.entry_idx], h.symbol)
+    )
+    rest.sort(key=lambda h: (h.df.index[h.trade.entry_idx], h.symbol))
+    return losses + rest
+
+
 def write_html(
     path: Path,
     hits: List[Hit],
@@ -903,6 +914,7 @@ def write_html(
         rest.sort(key=lambda h: abs(h.trade.pnl_pct), reverse=True)
         keep = featured_hits + rest[: max(0, max_charts - len(featured_hits))]
         chart_hits = keep
+    chart_hits = order_chart_hits(chart_hits)
 
     need_1h = [h.symbol for h in chart_hits if h.df_1h is None or h.df_1h.empty]
     fetched_1h = prefetch_1h(need_1h) if need_1h else {}
@@ -1044,7 +1056,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
 <br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
 <br/>出場：停在跌破 K 高點與 MA99/120 上緣的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
-<br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120/200）。股票／ETF 永續預設不掃。</p>
+<br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120/200）。卡片 <b>虧損在前</b>（虧最多先看），賺錢的按進場時間。股票／ETF 永續預設不掃。</p>
 <p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 空頭排列 {fun.get('stack', 0)} → 同時跌破 {fun.get('cross', 0)}
 → 紅 K {fun.get('red', 0)} → 進場 {fun.get('entry', 0)}
 · 太淺 {fun.get('shallow', 0)} · 實體不夠 {fun.get('thin', 0)} · 量不夠 {fun.get('quiet', 0)}
