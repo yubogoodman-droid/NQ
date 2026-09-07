@@ -93,6 +93,7 @@ class Hit:
     symbol: str
     trade: TradeResult
     df: pd.DataFrame
+    df_1h: Optional[pd.DataFrame] = None
 
 
 def sma(values: np.ndarray, n: int) -> np.ndarray:
@@ -339,12 +340,24 @@ def universe(min_quote_vol: float = 10_000_000) -> List[str]:
     return sorted(set(out))
 
 
+INTERVAL_MS = {
+    "1m": 60_000,
+    "3m": 180_000,
+    "5m": 300_000,
+    "15m": 900_000,
+    "30m": 1_800_000,
+    "1h": 3_600_000,
+    "2h": 7_200_000,
+    "4h": 14_400_000,
+}
+
+
 def fetch_klines(sym: str, interval: str = "15m", limit: int = 1500) -> pd.DataFrame:
     raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": interval, "limit": limit})
     if not raw:
         return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
     now_ms = int(time.time() * 1000)
-    interval_ms = 15 * 60 * 1000
+    interval_ms = INTERVAL_MS.get(interval, 900_000)
     if int(raw[-1][0]) + interval_ms > now_ms:
         raw = raw[:-1]
     idx = pd.to_datetime([int(x[0]) for x in raw], unit="ms", utc=True).tz_convert(TPE)
@@ -358,6 +371,61 @@ def fetch_klines(sym: str, interval: str = "15m", limit: int = 1500) -> pd.DataF
         },
         index=idx,
     )
+
+
+def bar_index_at(df: pd.DataFrame, ts) -> Optional[int]:
+    """含 ts 的那根 K（開盤 <= ts 的最後一根）。"""
+    if df is None or len(df) == 0:
+        return None
+    ts = pd.Timestamp(ts)
+    if df.index.tz is not None:
+        if ts.tzinfo is None:
+            ts = ts.tz_localize(df.index.tz)
+        else:
+            ts = ts.tz_convert(df.index.tz)
+    pos = int(df.index.searchsorted(ts, side="right") - 1)
+    if pos < 0 or pos >= len(df):
+        return None
+    return pos
+
+
+def htf_snapshot(df: pd.DataFrame, ts) -> str:
+    i = bar_index_at(df, ts)
+    if i is None:
+        return "1h 無資料"
+    close = df["close"].to_numpy(float)
+    m7, m14, m25 = sma(close, 7)[i], sma(close, 14)[i], sma(close, 25)[i]
+    m99, m120 = sma(close, 99)[i], sma(close, 120)[i]
+    px = float(df["close"].iloc[i])
+    t = df.index[i].strftime("%m-%d %H:%M")
+    stack = np.isfinite([m7, m14, m25]).all() and m7 < m14 < m25
+    below = np.isfinite([m99, m120]).all() and px < m99 and px < m120
+    align = "空頭排列" if stack else "非空頭排列"
+    brk = "收在99/120下" if below else "尚未同時跌破99/120"
+    parts = [f"1h {t}  {align} · {brk}"]
+    mas = []
+    for name, val in (("MA7", m7), ("MA14", m14), ("MA25", m25), ("MA99", m99), ("MA120", m120)):
+        if np.isfinite(val):
+            mas.append(f"{name} {val:.5g}")
+    if mas:
+        parts.append(" / ".join(mas) + f"  close {px:.5g}")
+    return "\n".join(parts)
+
+
+def prefetch_1h(symbols: Sequence[str], workers: int = 8) -> Dict[str, pd.DataFrame]:
+    out: Dict[str, pd.DataFrame] = {}
+    uniq = list(dict.fromkeys(symbols))
+    if not uniq:
+        return out
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+        futs = {ex.submit(fetch_klines, s, "1h"): s for s in uniq}
+        for fut in as_completed(futs):
+            sym = futs[fut]
+            try:
+                out[sym] = fut.result()
+            except Exception:  # noqa: BLE001
+                out[sym] = pd.DataFrame()
+    return out
 
 
 def scan_symbol(
@@ -406,18 +474,19 @@ def _setup_cjk() -> None:
             break
 
 
-def _trade_window(df: pd.DataFrame, trade: TradeResult, pad_left: int = 36, pad_right: int = 8) -> tuple[int, int]:
-    start = max(0, trade.entry_idx - pad_left)
-    end = min(len(df) - 1, max(trade.exit_idx, trade.entry_idx) + pad_right)
-    return start, end
-
-
 def draw_trade_png(
     df: pd.DataFrame,
     trade: TradeResult,
     path: Path,
     trade_no: int,
     title_extra: str = "",
+    *,
+    interval: str = "15m",
+    entry_idx: Optional[int] = None,
+    exit_idx: Optional[int] = None,
+    pad_left: Optional[int] = None,
+    pad_right: Optional[int] = None,
+    mark_levels: bool = True,
 ) -> Path:
     import matplotlib
 
@@ -426,7 +495,16 @@ def draw_trade_png(
     from matplotlib.patches import Rectangle
 
     _setup_cjk()
-    start, end = _trade_window(df, trade)
+    if entry_idx is None:
+        entry_idx = trade.entry_idx
+    if exit_idx is None:
+        exit_idx = trade.exit_idx
+    if pad_left is None:
+        pad_left = 48 if interval == "1h" else 36
+    if pad_right is None:
+        pad_right = 12 if interval == "1h" else 8
+    start = max(0, min(entry_idx, exit_idx) - pad_left)
+    end = min(len(df) - 1, max(exit_idx, entry_idx) + pad_right)
     window = df.iloc[start : end + 1]
     xs = range(len(window))
     o, h, l, c = window["open"], window["high"], window["low"], window["close"]
@@ -464,13 +542,15 @@ def draw_trade_png(
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
         ax.plot(list(xs), ma, color=col, lw=1.35 if n <= 25 else 1.05, label=f"MA{n}")
 
-    ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
-    ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
-    ax.axhline(trade.signal.ma99, color="#42a5f5", ls="--", lw=0.6, alpha=0.35)
-    ax.axhline(trade.signal.ma120, color="#26c6da", ls="--", lw=0.6, alpha=0.35)
+    if mark_levels:
+        ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
+        ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
+        if interval == "15m":
+            ax.axhline(trade.signal.ma99, color="#42a5f5", ls="--", lw=0.6, alpha=0.35)
+            ax.axhline(trade.signal.ma120, color="#26c6da", ls="--", lw=0.6, alpha=0.35)
 
-    ex = trade.entry_idx - start
-    xx = trade.exit_idx - start
+    ex = entry_idx - start
+    xx = exit_idx - start
     if 0 <= ex < len(window):
         ax.axvline(ex, color="#e35d5d", ls="--", lw=0.9)
         ax.scatter([ex], [trade.entry_price], s=46, color="#ff5252", marker="v", zorder=6)
@@ -485,11 +565,12 @@ def draw_trade_png(
             zorder=6,
         )
 
-    et = df.index[trade.entry_idx]
-    xt = df.index[trade.exit_idx]
+    et = df.index[entry_idx] if 0 <= entry_idx < len(df) else df.index[trade.entry_idx]
+    xt = df.index[exit_idx] if 0 <= exit_idx < len(df) else df.index[trade.exit_idx]
     extra = f"{title_extra}  " if title_extra else ""
+    label = "1h 對照" if interval == "1h" else interval
     ax.set_title(
-        f"#{trade_no}  {extra}{et.strftime('%m-%d %H:%M')} → {xt.strftime('%m-%d %H:%M')}  "
+        f"#{trade_no}  {extra}{label}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%m-%d %H:%M')}  "
         f"{trade.exit_reason}  {trade.pnl_pct*100:+.2f}%",
         color="#e8f0ea",
         fontsize=11,
@@ -572,6 +653,9 @@ def write_html(
         keep = featured_hits + rest[: max(0, max_charts - len(featured_hits))]
         chart_hits = keep
 
+    need_1h = [h.symbol for h in chart_hits if h.df_1h is None or h.df_1h.empty]
+    fetched_1h = prefetch_1h(need_1h) if need_1h else {}
+
     cards: List[str] = []
     for i, hit in enumerate(chart_hits, 1):
         t = hit.trade
@@ -582,6 +666,33 @@ def write_html(
         risk = t.stop_price - t.entry_price
         img_name = f"t{i:02d}_{hit.symbol}_{et.strftime('%m%d_%H%M')}.png"
         draw_trade_png(df, t, path.parent / "img" / img_name, i, title_extra=hit.symbol)
+        df_1h = hit.df_1h if hit.df_1h is not None and len(hit.df_1h) else fetched_1h.get(hit.symbol)
+        h1_html = ""
+        h1_detail = ""
+        if df_1h is not None and len(df_1h):
+            e1 = bar_index_at(df_1h, et)
+            x1 = bar_index_at(df_1h, xt)
+            if e1 is None:
+                e1 = 0
+            if x1 is None:
+                x1 = e1
+            img_1h = f"h{i:02d}_{hit.symbol}_{et.strftime('%m%d_%H%M')}_1h.png"
+            draw_trade_png(
+                df_1h,
+                t,
+                path.parent / "img" / img_1h,
+                i,
+                title_extra=hit.symbol,
+                interval="1h",
+                entry_idx=e1,
+                exit_idx=x1,
+            )
+            h1_html = (
+                "<div class='chart-label'>1h 對照 · 同一進場／出場時刻</div>"
+                f"<div class='mini-chart'><img src='img/{escape(img_1h)}' alt='{escape(hit.symbol)} 1h' "
+                "style='width:100%;display:block;border-radius:10px'/></div>"
+            )
+            h1_detail = "\n" + htf_snapshot(df_1h, et)
         reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
         cards.append(
             "<article class='trade-card'>"
@@ -602,9 +713,12 @@ def write_html(
             f"target {t.target_price:.6g}  exit {t.exit_price:.6g} {t.exit_reason}  {t.pnl_pct*100:+.2f}%\n"
             f"MA99 {t.signal.ma99:.6g} / MA120 {t.signal.ma120:.6g}  跌破 {t.signal.ma_high:.6g}\n"
             f"實體 {t.signal.body_pct*100:.2f}%  量/MA20 {t.signal.vol_ratio:.2f}x"
+            f"{escape(h1_detail)}"
             "</pre>"
+            "<div class='chart-label'>15m</div>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(hit.symbol)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
+            f"{h1_html}"
             "</article>"
         )
 
@@ -645,6 +759,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 .tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}}
+.chart-label{{font-size:11px;color:#8b949e;margin:10px 0 4px}}
 .empty{{text-align:center;color:#8b949e;padding:40px 12px;border:1px solid #30363d;border-radius:14px}}
 </style></head><body>
 <div class="page">
@@ -652,7 +767,8 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <h1>幣安 15m · 7/14/25 空頭排列跌破 99/120 做空</h1>
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
 <br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
-<br/>出場：停在跌破 K 高點與 MA99/120 上緣的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。</p>
+<br/>出場：停在跌破 K 高點與 MA99/120 上緣的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
+<br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120）。</p>
 <p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 空頭排列 {fun.get('stack', 0)} → 同時跌破 {fun.get('cross', 0)}
 → 紅 K {fun.get('red', 0)} → 進場 {fun.get('entry', 0)}
 · 太淺 {fun.get('shallow', 0)} · 實體不夠 {fun.get('thin', 0)} · 量不夠 {fun.get('quiet', 0)}

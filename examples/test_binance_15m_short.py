@@ -14,9 +14,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from binance_15m_short import (  # noqa: E402
     TPE,
+    bar_index_at,
     detect_signals,
     filter_entry_window,
     default_params,
+    htf_snapshot,
     simulate,
     sma,
     summarize_trades,
@@ -171,6 +173,25 @@ def test_volume_and_body_filters() -> None:
     assert sigs[0].body_pct >= 0.008
 
 
+def to_1h(df: pd.DataFrame) -> pd.DataFrame:
+    return df.resample("1h").agg(
+        {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
+    ).dropna()
+
+
+def test_bar_index_at() -> None:
+    df = bars(dump_closes())
+    h1 = to_1h(df)
+    ts = df.index[130]
+    i = bar_index_at(h1, ts)
+    assert i is not None
+    assert h1.index[i] <= ts
+    if i + 1 < len(h1):
+        assert h1.index[i + 1] > ts
+    snap = htf_snapshot(h1, ts)
+    assert "1h" in snap
+
+
 def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -181,11 +202,16 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     from binance_15m_short import Hit
 
     out_dir = Path("/tmp/binance_15m_short_test") if tmp_path is None else tmp_path
-    hits = [Hit("CLOUSDT", t, df) for t in trades]
+    h1 = to_1h(df)
+    hits = [Hit("CLOUSDT", t, df, df_1h=h1) for t in trades]
     path = write_html(out_dir / "index.html", hits, ["CLOUSDT"], "7d · test")
     text = path.read_text(encoding="utf-8")
     assert "CLOUSDT" in text
     assert "空頭排列" in text
+    assert "1h 對照" in text
+    assert (out_dir / "img").exists()
+    pngs = list((out_dir / "img").glob("*.png"))
+    assert any("1h" in p.name for p in pngs)
 
 
 def main() -> int:
@@ -199,6 +225,7 @@ def main() -> int:
     test_one_position_skips_overlap()
     test_filter_entry_window()
     test_volume_and_body_filters()
+    test_bar_index_at()
     test_summarize_and_html()
     print("ok")
     return 0
