@@ -5,6 +5,7 @@
 且進場價在 1 小時 MA25 下方、還不能已經掉到 1h MA200 下面，
 與 1 小時 MA99 不能太遠（預設 20%），
 且 1h 的 MA7/14/25/99/120 不能糾結在一起，進場價也不能貼著 1h MA120。
+進場前若 1h 已經堆一疊前低（PENDLE 那種跌不下去）也不空。
 
 用法:
   python3 examples/binance_15m_short.py
@@ -41,6 +42,10 @@ UA = "Mozilla/5.0"
 MAX_1H_MA99_DIST = 0.20
 MIN_1H_MA120_DIST = 0.02
 MIN_1H_MA_SPREAD = 0.04
+MIN_1H_PRIOR_LOWS = 3
+PRIOR_LOW_LOOKBACK = 36
+PRIOR_LOW_NEAR = 0.05
+PRIOR_LOW_CLUSTER = 0.04
 HTF_MA_PERIODS = (7, 14, 25, 99, 120)
 MA_COLORS = {
     7: "#f0c14a",
@@ -663,6 +668,7 @@ def scan_symbol(
     max_1h_ma99_dist: float = MAX_1H_MA99_DIST,
     min_1h_ma120_dist: float = MIN_1H_MA120_DIST,
     min_1h_ma_spread: float = MIN_1H_MA_SPREAD,
+    min_1h_prior_lows: int = MIN_1H_PRIOR_LOWS,
 ) -> tuple[List[Hit], dict]:
     meta = {"symbol": sym, "bars": 0, "error": "", "n_sig": 0, "n_trade": 0}
     try:
@@ -695,6 +701,8 @@ def scan_symbol(
         sigs = filter_away_1h_ma120(df, sigs, df_1h, min_dist=min_1h_ma120_dist, funnel=funnel)
     if min_1h_ma_spread > 0:
         sigs = filter_untangled_1h_mas(df, sigs, df_1h, min_spread=min_1h_ma_spread, funnel=funnel)
+    if min_1h_prior_lows > 0:
+        sigs = filter_1h_prior_lows(df, sigs, df_1h, min_touches=min_1h_prior_lows, funnel=funnel)
     trades = simulate(df, sigs, params, funnel=funnel)
     meta["n_sig"] = len(sigs)
     meta["n_trade"] = len(trades)
@@ -891,6 +899,92 @@ def order_chart_hits(hits: Sequence[Hit]) -> List[Hit]:
     return losses + rest
 
 
+def _completed_htf_end(df_htf: pd.DataFrame, ts, interval: str = "1h") -> Optional[int]:
+    """進場當下已收完的最後一根 HTF（未收完的當根不算，不偷看）。"""
+    i = bar_index_at(df_htf, ts)
+    if i is None:
+        return None
+    ts = _as_index_ts(df_htf, ts)
+    bar_close = df_htf.index[i] + pd.Timedelta(milliseconds=INTERVAL_MS[interval])
+    return i - 1 if ts < bar_close else i
+
+
+def htf_swing_lows(
+    df_htf: pd.DataFrame,
+    ts,
+    lookback: int = PRIOR_LOW_LOOKBACK,
+    interval: str = "1h",
+) -> Optional[List[float]]:
+    """進場前 lookback 根已收完 1h 的三 K 轉折低點。"""
+    if df_htf is None or len(df_htf) == 0:
+        return None
+    end = _completed_htf_end(df_htf, ts, interval=interval)
+    if end is None or end < 2:
+        return None
+    start = max(0, end - lookback + 1)
+    lows = df_htf["low"].to_numpy(float)
+    out: List[float] = []
+    for i in range(start + 1, end):
+        left, mid, right = float(lows[i - 1]), float(lows[i]), float(lows[i + 1])
+        if mid <= left and mid <= right and np.isfinite(mid):
+            out.append(mid)
+    return out
+
+
+def count_near_prior_lows(
+    swing_lows: Sequence[float],
+    entry: float,
+    near: float = PRIOR_LOW_NEAR,
+    cluster: float = PRIOR_LOW_CLUSTER,
+) -> int:
+    """進場價下方 near 內、又疊在同一層（cluster）的前低個數。階梯新低下來不算支撐堆。"""
+    if entry <= 0:
+        return 0
+    near_lows = [
+        float(lo)
+        for lo in swing_lows
+        if lo > 0 and np.isfinite(lo) and 0.0 <= (entry - lo) / entry <= near
+    ]
+    if len(near_lows) < 2:
+        return len(near_lows)
+    lo, hi = min(near_lows), max(near_lows)
+    if lo > 0 and (hi - lo) / lo > cluster:
+        return 0
+    return len(near_lows)
+
+
+def filter_1h_prior_lows(
+    df: pd.DataFrame,
+    signals: Sequence[Signal],
+    df_1h: pd.DataFrame,
+    min_touches: int = MIN_1H_PRIOR_LOWS,
+    lookback: int = PRIOR_LOW_LOOKBACK,
+    near: float = PRIOR_LOW_NEAR,
+    cluster: float = PRIOR_LOW_CLUSTER,
+    funnel: Optional[Dict[str, int]] = None,
+) -> List[Signal]:
+    """進場前 1h 已有一堆前低墊在腳下（PENDLE #11 那種跌不下去）不空。"""
+    if min_touches <= 0:
+        return list(signals)
+    kept: List[Signal] = []
+    blocked = 0
+    nodata = 0
+    for sig in signals:
+        swings = htf_swing_lows(df_1h, df.index[sig.entry_idx], lookback=lookback)
+        if swings is None:
+            nodata += 1
+            continue
+        n = count_near_prior_lows(swings, sig.entry_price, near=near, cluster=cluster)
+        if n >= min_touches:
+            blocked += 1
+            continue
+        kept.append(sig)
+    if funnel is not None:
+        funnel["blocked_1h_lows"] = funnel.get("blocked_1h_lows", 0) + blocked
+        funnel["no_1h_lows"] = funnel.get("no_1h_lows", 0) + nodata
+    return kept
+
+
 def write_html(
     path: Path,
     hits: List[Hit],
@@ -904,6 +998,7 @@ def write_html(
     max_1h_ma99_dist: float = MAX_1H_MA99_DIST,
     min_1h_ma120_dist: float = MIN_1H_MA120_DIST,
     min_1h_ma_spread: float = MIN_1H_MA_SPREAD,
+    min_1h_prior_lows: int = MIN_1H_PRIOR_LOWS,
 ) -> Path:
     stats = summarize_trades([h.trade for h in hits])
     featured_hits = [h for h in hits if h.symbol == featured]
@@ -962,6 +1057,7 @@ def write_html(
         ma99_tag = ""
         ma120_tag = ""
         spread_tag = ""
+        lows_tag = ""
         if df_1h is not None and len(df_1h):
             mas = htf_mas_at_entry(df_1h, et, t.entry_price)
             ma200 = htf_ma_at_entry(df_1h, et, t.entry_price, n=200, interval="1h")
@@ -977,6 +1073,10 @@ def write_html(
             spread = ma_cluster_spread(mas) if mas else None
             if spread is not None:
                 spread_tag = f"<span class='tag'>1h均線散 {spread*100:.0f}%</span>"
+            swings = htf_swing_lows(df_1h, et)
+            if swings is not None:
+                n_lows = count_near_prior_lows(swings, t.entry_price)
+                lows_tag = f"<span class='tag'>1h前低 {n_lows}</span>"
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -995,6 +1095,7 @@ def write_html(
             f"{ma99_tag}"
             f"{ma120_tag}"
             f"{spread_tag}"
+            f"{lows_tag}"
             "</div>"
             "<pre class='trade-detail'>"
             f"做空 entry {t.entry_price:.6g}  stop {t.stop_price:.6g} (+{risk:.6g})\n"
@@ -1054,13 +1155,13 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>幣安 15m · 7/14/25 空頭排列跌破 99/120 做空</h1>
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
-<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
+<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空），進場前 36 根 1h <b>不能堆 ≥ {min_1h_prior_lows} 個前低</b>在進場價下方 5% 內（PENDLE 那種墊著一疊前低、跌不下去不空）。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
 <br/>出場：停在跌破 K 高點與 MA99/120 上緣的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
 <br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120/200）。卡片 <b>虧損在前</b>（虧最多先看），賺錢的按進場時間。股票／ETF 永續預設不掃。</p>
 <p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 空頭排列 {fun.get('stack', 0)} → 同時跌破 {fun.get('cross', 0)}
 → 紅 K {fun.get('red', 0)} → 進場 {fun.get('entry', 0)}
 · 太淺 {fun.get('shallow', 0)} · 實體不夠 {fun.get('thin', 0)} · 量不夠 {fun.get('quiet', 0)}
-· 不在1h MA25下 {fun.get('above_1h_ma25', 0)} · 已在1h MA200下 {fun.get('below_1h_ma200', 0)} · 離1h MA99太遠 {fun.get('far_1h_ma99', 0)} · 貼1h MA120 {fun.get('near_1h_ma120', 0)} · 1h均線糾結 {fun.get('tangled_1h_ma', 0)} · 無1h {fun.get('no_1h', 0) + fun.get('no_1h_ma99', 0) + fun.get('no_1h_ma120', 0) + fun.get('no_1h_ma200', 0) + fun.get('no_1h_spread', 0)}
+· 不在1h MA25下 {fun.get('above_1h_ma25', 0)} · 已在1h MA200下 {fun.get('below_1h_ma200', 0)} · 離1h MA99太遠 {fun.get('far_1h_ma99', 0)} · 貼1h MA120 {fun.get('near_1h_ma120', 0)} · 1h均線糾結 {fun.get('tangled_1h_ma', 0)} · 1h前低堆住 {fun.get('blocked_1h_lows', 0)} · 無1h {fun.get('no_1h', 0) + fun.get('no_1h_ma99', 0) + fun.get('no_1h_ma120', 0) + fun.get('no_1h_ma200', 0) + fun.get('no_1h_spread', 0) + fun.get('no_1h_lows', 0)}
 · 風險不合 {fun.get('skip_risk', 0)} · 持倉中 {fun.get('skip_busy', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 <br/>{escape(feat_line)}</p>
@@ -1142,6 +1243,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default=MIN_1H_MA_SPREAD,
         help="1h MA7/14/25/99/120 最小張開（0.04=4%%；0 關閉）",
     )
+    p.add_argument(
+        "--min-1h-prior-lows",
+        type=int,
+        default=MIN_1H_PRIOR_LOWS,
+        help="進場前 1h 前低堆疊最少幾個才濾掉（3；0 關閉）",
+    )
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
     p.add_argument("--json", dest="json_path", default="")
@@ -1163,7 +1270,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         f"h1_ma200={'off' if args.no_1h_ma200 else 'on'} "
         f"h1_ma99_dist={args.max_1h_ma99_dist:g} "
         f"h1_ma120_dist={args.min_1h_ma120_dist:g} "
-        f"h1_ma_spread={args.min_1h_ma_spread:g}",
+        f"h1_ma_spread={args.min_1h_ma_spread:g} "
+        f"h1_prior_lows={args.min_1h_prior_lows:g}",
         flush=True,
     )
 
@@ -1184,6 +1292,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             max_1h_ma99_dist=float(args.max_1h_ma99_dist),
             min_1h_ma120_dist=float(args.min_1h_ma120_dist),
             min_1h_ma_spread=float(args.min_1h_ma_spread),
+            min_1h_prior_lows=int(args.min_1h_prior_lows),
         )
         return stock_hits, meta, local
 
@@ -1236,6 +1345,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "max_1h_ma99_dist": float(args.max_1h_ma99_dist),
         "min_1h_ma120_dist": float(args.min_1h_ma120_dist),
         "min_1h_ma_spread": float(args.min_1h_ma_spread),
+        "min_1h_prior_lows": int(args.min_1h_prior_lows),
     }
     html_path = Path(args.html) if args.html else None
     if html_path is None and args.pages:
@@ -1258,6 +1368,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             label += f" · 離1h MA120≥{args.min_1h_ma120_dist*100:.0f}%"
         if args.min_1h_ma_spread > 0:
             label += f" · 1h均線不糾結≥{args.min_1h_ma_spread*100:.0f}%"
+        if args.min_1h_prior_lows > 0:
+            label += f" · 1h前低<{args.min_1h_prior_lows}"
         out = write_html(
             html_path,
             hits,
@@ -1270,6 +1382,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             max_1h_ma99_dist=float(args.max_1h_ma99_dist),
             min_1h_ma120_dist=float(args.min_1h_ma120_dist),
             min_1h_ma_spread=float(args.min_1h_ma_spread),
+            min_1h_prior_lows=int(args.min_1h_prior_lows),
         )
         write_view_html(out)
         print(f"html={out}", flush=True)
