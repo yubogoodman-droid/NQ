@@ -7,7 +7,7 @@
 用法:
   python3 examples/niulai_m_top.py
   python3 examples/niulai_m_top.py --days 7 --pages
-  python3 examples/niulai_m_top.py --scan --limit 50 --days 3 --pages
+  python3 examples/niulai_m_top.py --scan --limit 100 --days 14 --pages
   python3 examples/test_niulai_m_top.py
 """
 
@@ -18,7 +18,6 @@ import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
 from html import escape
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -30,8 +29,7 @@ import requests
 
 REPO = Path(__file__).resolve().parents[1]
 PAGES = REPO / "docs" / "niulai-m-top" / "index.html"
-SCAN_PAGES = REPO / "docs" / "binance-m-top-3d" / "index.html"
-GAINERS_PAGES = REPO / "docs" / "binance-m-top-gainers" / "index.html"
+SCAN_PAGES = REPO / "docs" / "binance-m-top-14d" / "index.html"
 CST = ZoneInfo("Asia/Shanghai")
 BINANCE = "https://www.binance.com"
 SYMBOL = "牛来USDT"
@@ -167,7 +165,6 @@ class CoinRow:
     last_price: float
     tick_size: float
     rank: int = 0
-    day_pct: float = 0.0
 
 
 @dataclass
@@ -269,88 +266,12 @@ def rank_usdt_perps(
     ]
 
 
-def fetch_top_universe(limit: int = 50) -> list[CoinRow]:
+def fetch_top_universe(limit: int = 100) -> list[CoinRow]:
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = get_json("/fapi/v1/ticker/24hr")
     if not isinstance(info, dict) or not isinstance(tickers, list):
         raise RuntimeError("幣安 exchangeInfo / ticker 格式不符")
     return rank_usdt_perps(info.get("symbols") or [], tickers, limit=limit)
-
-
-def prev_cst_date(now: Optional[datetime] = None) -> date:
-    cur = (now or datetime.now(CST)).astimezone(CST)
-    return (cur - timedelta(days=1)).date()
-
-
-def session_return_pct(df: pd.DataFrame, day: date) -> Optional[float]:
-    """該 CST 日第一根開盤到最後一根收盤的漲跌幅。"""
-    if df is None or df.empty:
-        return None
-    start = pd.Timestamp(day, tz=CST)
-    end = start + pd.Timedelta(days=1)
-    window = df.loc[(df.index >= start) & (df.index < end)]
-    if len(window) < 6:
-        return None
-    open_px = float(window["open"].iloc[0])
-    close_px = float(window["close"].iloc[-1])
-    if open_px <= 0:
-        return None
-    return (close_px / open_px) - 1.0
-
-
-def rank_by_day_pct(
-    rows: Sequence[CoinRow],
-    pct_by_symbol: Dict[str, float],
-    limit: int = 10,
-) -> list[CoinRow]:
-    scored = [(pct_by_symbol[r.symbol], r) for r in rows if r.symbol in pct_by_symbol]
-    scored.sort(key=lambda x: x[0], reverse=True)
-    out: list[CoinRow] = []
-    for i, (pct, row) in enumerate(scored[: max(0, limit)], 1):
-        out.append(
-            CoinRow(
-                symbol=row.symbol,
-                base=row.base,
-                quote_volume=row.quote_volume,
-                last_price=row.last_price,
-                tick_size=row.tick_size,
-                rank=i,
-                day_pct=pct,
-            )
-        )
-    return out
-
-
-def fetch_gainer_universe(
-    limit: int = 10,
-    *,
-    workers: int = 12,
-    min_quote_volume: float = 5_000_000,
-    day: Optional[date] = None,
-) -> tuple[list[CoinRow], date]:
-    """USDT 永續、可交易（24h 成交額 ≥ 5M），依前一個 CST 日漲幅取前 N。"""
-    pool = [r for r in fetch_top_universe(limit=10_000) if r.quote_volume >= min_quote_volume]
-    target_day = day or prev_cst_date()
-    pcts: Dict[str, float] = {}
-
-    def _one(row: CoinRow) -> tuple[str, Optional[float]]:
-        try:
-            hourly = fetch_klines(row.symbol, interval="1h", lookback_days=3, limit=80)
-        except Exception:  # noqa: BLE001
-            return row.symbol, None
-        return row.symbol, session_return_pct(hourly, target_day)
-
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool_ex:
-        futs = [pool_ex.submit(_one, row) for row in pool]
-        done = 0
-        for fut in as_completed(futs):
-            done += 1
-            symbol, pct = fut.result()
-            if pct is not None:
-                pcts[symbol] = pct
-            if done % 40 == 0 or done == len(pool):
-                print(f"  gainers {done}/{len(pool)}  ranked_day={target_day}")
-    return rank_by_day_pct(pool, pcts, limit=limit), target_day
 
 
 def display_name(symbol: str) -> str:
@@ -1156,7 +1077,6 @@ M 成形期間多數收盤仍在均線上，然後收盤同時跌破 MA200 與 M
 def scan_symbol(
     row: CoinRow,
     days: int,
-    entry_from: Optional[pd.Timestamp] = None,
 ) -> tuple[list[ScanHit], dict]:
     meta = {
         "symbol": row.symbol,
@@ -1178,8 +1098,6 @@ def scan_symbol(
     funnel: Dict[str, int] = {}
     sigs = generate_signals(df, params, funnel=funnel)
     sigs = filter_entry_window(df, sigs, days)
-    if entry_from is not None:
-        sigs = [s for s in sigs if s.timestamp >= entry_from]
     trades = simulate(df, sigs, params)
     meta["n_trade"] = len(trades)
     meta["funnel"] = funnel
@@ -1218,9 +1136,6 @@ def write_scan_html(
         p = t.signal.pattern
         risk = t.stop_price - t.entry_price
         qv = hit.row.quote_volume / 1e6
-        extra_tags = ""
-        if hit.row.day_pct:
-            extra_tags += f"<span class='tag tag-info'>昨日 {hit.row.day_pct*100:+.1f}%</span>"
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -1230,7 +1145,6 @@ def write_scan_html(
             "</header>"
             "<div class='tags'>"
             f"<span class='tag tag-info'>#{hit.row.rank} {escape(hit.row.symbol)}</span>"
-            f"{extra_tags}"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
             f"<span class='tag tag-info'>5m</span>"
             f"<span class='tag tag-info'>深度 {p.depth_pct*100:.1f}%</span>"
@@ -1260,16 +1174,6 @@ def write_scan_html(
         blurb = (
             f"USDT 永續（不含股票合約）· 24h 成交額前 {len(universe)} · 近 {days} 天"
             f" · 末名約 {cutoff:.0f}M USDT · 只掃牛來那種 M 頭"
-        )
-    uni_line = ""
-    if any(r.day_pct for r in universe):
-        uni_line = (
-            "<p class='muted'>"
-            + " · ".join(
-                f"#{r.rank} {escape(display_name(r.symbol))} {r.day_pct*100:+.1f}%"
-                for r in universe
-            )
-            + "</p>"
         )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
@@ -1308,7 +1212,6 @@ h1{{font-size:18px;margin:0 0 6px}}
 <h1>{escape(title)}</h1>
 <p class="muted">{blurb}
 <br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4%、雙峰明顯站上 MA200、頸線回測均線（不深跌穿）、成形期間多數收盤在均線上，收盤同時跌破 MA200 與 MA25 才空。貼均線亂鑽的小 M 不畫。停損雙頂高點、2R、或 48 根時間停。加總％是各筆報酬相加，不是複利。</p>
-{uni_line}
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
@@ -1329,8 +1232,8 @@ h1{{font-size:18px;margin:0 0 6px}}
 
 
 def run_scan(
-    limit: int = 50,
-    days: int = 3,
+    limit: int = 100,
+    days: int = 14,
     workers: int = 8,
     pages: bool = False,
     html_path: Optional[Path] = None,
@@ -1339,26 +1242,22 @@ def run_scan(
     pages_path: Optional[Path] = None,
     heading: Optional[str] = None,
     blurb: Optional[str] = None,
-    entry_from: Optional[pd.Timestamp] = None,
 ) -> int:
     if universe is None:
         universe = fetch_top_universe(limit)
     if not universe:
         print("no universe")
         return 1
-    extra = ""
-    if universe[0].day_pct:
-        extra = f"  {universe[0].day_pct*100:+.1f}%"
     print(
         f"universe {len(universe)}  #{universe[0].rank} {universe[0].symbol} "
-        f"{universe[0].quote_volume/1e6:.0f}M{extra} · 末 {universe[-1].symbol} "
+        f"{universe[0].quote_volume/1e6:.0f}M · 末 {universe[-1].symbol} "
         f"{universe[-1].quote_volume/1e6:.0f}M"
     )
     hits: list[ScanHit] = []
     funnel: Dict[str, int] = {}
     errors = 0
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        futs = {pool.submit(scan_symbol, row, days, entry_from): row for row in universe}
+        futs = {pool.submit(scan_symbol, row, days): row for row in universe}
         done = 0
         for fut in as_completed(futs):
             row = futs[fut]
@@ -1456,47 +1355,13 @@ def run_backtest(days: int = 7, html_path: Optional[Path] = None, pages: bool = 
     return 0
 
 
-def run_gainers_scan(
-    limit: int = 10,
-    days: int = 2,
-    workers: int = 12,
-    pages: bool = False,
-    html_path: Optional[Path] = None,
-) -> int:
-    print("ranking previous CST day gainers…")
-    universe, day = fetch_gainer_universe(limit=limit, workers=workers)
-    if not universe:
-        print("no gainers")
-        return 1
-    for row in universe:
-        print(f"  #{row.rank} {row.symbol}  {row.day_pct*100:+.1f}%  qv={row.quote_volume/1e6:.0f}M")
-    heading = f"前一天漲幅榜前 {len(universe)} · 牛來型 M 頭做空"
-    blurb = (
-        f"USDT 永續、24h 成交額 ≥ 5M · {day.isoformat()} CST 全日漲幅前 {len(universe)}"
-        f" · 進場從該日 00:00 CST 起。只畫牛來那種對稱深 M，不是任何兩個小高點。"
-    )
-    return run_scan(
-        limit=limit,
-        days=days,
-        workers=min(workers, 8),
-        pages=pages,
-        html_path=html_path,
-        universe=universe,
-        pages_path=GAINERS_PAGES,
-        heading=heading,
-        blurb=blurb,
-        entry_from=pd.Timestamp(day, tz=CST),
-    )
-
-
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="牛来 / 幣安成交額前 N · 五分K M頭跌破 MA200 做空")
-    p.add_argument("--days", type=int, default=None, help="回測進場窗（天）；單檔預設 7，scan 預設 3，漲幅榜預設 2")
+    p.add_argument("--days", type=int, default=None, help="回測進場窗（天）；單檔預設 7，scan 預設 14")
     p.add_argument("--html", default="", help="輸出 HTML 路徑")
     p.add_argument("--pages", action="store_true", help="寫到 docs/（單檔或 scan 目錄）")
     p.add_argument("--scan", action="store_true", help="掃 USDT 永續成交額前 N 檔")
-    p.add_argument("--gainers", action="store_true", help="改掃前一個 CST 日漲幅榜前 N 檔")
-    p.add_argument("--limit", type=int, default=None, help="scan 檔數；成交額預設 50，漲幅榜預設 10")
+    p.add_argument("--limit", type=int, default=None, help="scan 檔數；成交額預設 100")
     p.add_argument("--workers", type=int, default=8, help="scan 並行數")
     return p
 
@@ -1504,18 +1369,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     html_path = Path(args.html) if args.html else None
-    if args.gainers:
-        return run_gainers_scan(
-            limit=10 if args.limit is None else args.limit,
-            days=2 if args.days is None else args.days,
-            workers=max(args.workers, 12),
-            pages=args.pages,
-            html_path=html_path,
-        )
     if args.scan:
         return run_scan(
-            limit=50 if args.limit is None else args.limit,
-            days=3 if args.days is None else args.days,
+            limit=100 if args.limit is None else args.limit,
+            days=14 if args.days is None else args.days,
             workers=args.workers,
             pages=args.pages,
             html_path=html_path,

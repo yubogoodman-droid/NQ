@@ -13,7 +13,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from niulai_m_top import (  # noqa: E402
     CST,
-    CoinRow,
     detect_m_tops,
     default_params,
     display_name,
@@ -21,10 +20,7 @@ from niulai_m_top import (  # noqa: E402
     fmt_px,
     generate_signals,
     niulai_params,
-    prev_cst_date,
-    rank_by_day_pct,
     rank_usdt_perps,
-    session_return_pct,
     simulate,
     sma,
     summarize_trades,
@@ -360,35 +356,6 @@ def test_display_and_fmt() -> None:
     assert fmt_px(0.08978) == "0.08978"
 
 
-def test_prev_day_gainers() -> None:
-    from datetime import date, datetime
-
-    noon = datetime(2026, 9, 7, 16, 0, tzinfo=CST)
-    assert prev_cst_date(noon) == date(2026, 9, 6)
-
-    idx = pd.date_range("2026-09-06 00:00", periods=24, freq="1h", tz=CST)
-    close = [100.0 + i for i in range(24)]  # open 100 → close 123
-    opens = [100.0] + close[:-1]
-    df = pd.DataFrame(
-        {"open": opens, "high": close, "low": opens, "close": close, "volume": 1.0},
-        index=idx,
-    )
-    pct = session_return_pct(df, date(2026, 9, 6))
-    assert pct is not None
-    assert abs(pct - (123.0 / 100.0 - 1)) < 1e-9
-    assert session_return_pct(df, date(2026, 9, 5)) is None
-
-    rows = [
-        CoinRow("AAAUSDT", "AAA", 10, 1, 0.01),
-        CoinRow("BBBUSDT", "BBB", 10, 1, 0.01),
-        CoinRow("CCCUSDT", "CCC", 10, 1, 0.01),
-    ]
-    ranked = rank_by_day_pct(rows, {"CCCUSDT": 0.40, "AAAUSDT": 0.10, "BBBUSDT": 0.25}, limit=2)
-    assert [r.symbol for r in ranked] == ["CCCUSDT", "BBBUSDT"]
-    assert ranked[0].rank == 1
-    assert abs(ranked[0].day_pct - 0.40) < 1e-9
-
-
 def main() -> int:
     tests = [
         test_sma,
@@ -404,7 +371,6 @@ def main() -> int:
         test_summarize,
         test_rank_usdt_perps_top50,
         test_display_and_fmt,
-        test_prev_day_gainers,
     ]
     failed = 0
     for fn in tests:
