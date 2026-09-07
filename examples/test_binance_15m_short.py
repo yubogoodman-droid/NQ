@@ -18,6 +18,7 @@ from binance_15m_short import (  # noqa: E402
     detect_signals,
     filter_below_1h_ma25,
     filter_entry_window,
+    filter_near_1h_ma99,
     default_params,
     htf_ma_at_entry,
     htf_snapshot,
@@ -206,6 +207,27 @@ def test_bar_index_at() -> None:
     assert "1h" in snap
 
 
+def pad_1h(h1: pd.DataFrame, n: int = 120, level: float | None = None) -> pd.DataFrame:
+    """往前補滿 1h K，讓 MA99 算得出來。"""
+    if len(h1) >= n:
+        return h1
+    lvl = float(h1["close"].iloc[0] if level is None else level)
+    need = n - len(h1)
+    start = h1.index[0] - pd.Timedelta(hours=need)
+    idx = pd.date_range(start, periods=need, freq="h", tz=h1.index.tz)
+    pre = pd.DataFrame(
+        {
+            "open": np.full(need, lvl),
+            "high": np.full(need, lvl + 0.002),
+            "low": np.full(need, lvl - 0.002),
+            "close": np.full(need, lvl),
+            "volume": np.full(need, 1000.0),
+        },
+        index=idx,
+    )
+    return pd.concat([pre, h1])
+
+
 def _shift_1h_history(h1: pd.DataFrame, level: float) -> pd.DataFrame:
     """把進場那根 1h 之前的收盤改成 level，用來控制 MA25。"""
     out = h1.copy()
@@ -265,6 +287,42 @@ def test_1h_ma25_missing_data_skips() -> None:
     assert funnel.get("no_1h", 0) >= 1
 
 
+def test_1h_ma99_keeps_near_like_cloud() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    px = sigs[0].entry_price
+    h1 = pad_1h(_shift_1h_history(to_1h(df), px / 1.10), level=px / 1.10)
+    kept = filter_near_1h_ma99(df, sigs, h1, max_dist=0.20)
+    assert kept == sigs
+    ma = htf_ma_at_entry(h1, df.index[sigs[0].entry_idx], px, n=99)
+    assert ma is not None and abs(px / ma - 1.0) <= 0.20
+
+
+def test_1h_ma99_rejects_bulla_extension() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    px = sigs[0].entry_price
+    h1 = pad_1h(_shift_1h_history(to_1h(df), px / 1.68), level=px / 1.68)
+    funnel: dict = {}
+    kept = filter_near_1h_ma99(df, sigs, h1, max_dist=0.20, funnel=funnel)
+    assert kept == []
+    assert funnel.get("far_1h_ma99", 0) >= 1
+    ma = htf_ma_at_entry(h1, df.index[sigs[0].entry_idx], px, n=99)
+    assert ma is not None and abs(px / ma - 1.0) > 0.20
+
+
+def test_1h_ma99_rejects_too_far_below() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    px = sigs[0].entry_price
+    h1 = pad_1h(_shift_1h_history(to_1h(df), px / 0.65), level=px / 0.65)
+    kept = filter_near_1h_ma99(df, sigs, h1, max_dist=0.20)
+    assert kept == []
+
+
 def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -284,6 +342,7 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "1h 對照" in text
     assert "股票／ETF 永續預設不掃" in text
     assert "1h MA25" in text
+    assert "1h MA99" in text
     assert (out_dir / "img").exists()
     pngs = list((out_dir / "img").glob("*.png"))
     assert any("1h" in p.name for p in pngs)
@@ -306,6 +365,9 @@ def main() -> int:
     test_1h_ma25_rejects_still_above()
     test_1h_ma25_no_lookahead()
     test_1h_ma25_missing_data_skips()
+    test_1h_ma99_keeps_near_like_cloud()
+    test_1h_ma99_rejects_bulla_extension()
+    test_1h_ma99_rejects_too_far_below()
     test_summarize_and_html()
     print("ok")
     return 0
