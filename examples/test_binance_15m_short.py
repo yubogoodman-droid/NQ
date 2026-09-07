@@ -20,6 +20,7 @@ from binance_15m_short import (  # noqa: E402
     filter_entry_window,
     filter_near_1h_ma99,
     filter_untangled_1h_mas,
+    filter_away_1h_ma120,
     default_params,
     htf_ma_at_entry,
     htf_mas_at_entry,
@@ -379,6 +380,33 @@ def test_1h_mas_keep_fanned_like_cloud() -> None:
     assert spread is not None and spread >= 0.04
 
 
+def test_1h_ma120_rejects_too_close_like_morpho() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    ts = df.index[sigs[0].entry_idx]
+    px = sigs[0].entry_price
+    h1 = make_1h(ts, old=px, recent=px)
+    funnel: dict = {}
+    kept = filter_away_1h_ma120(df, sigs, h1, min_dist=0.02, funnel=funnel)
+    assert kept == []
+    assert funnel.get("near_1h_ma120", 0) >= 1
+    ma = htf_ma_at_entry(h1, ts, px, n=120)
+    assert ma is not None and abs(px / ma - 1.0) < 0.02
+
+
+def test_1h_ma120_keeps_cloud_distance() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    ts = df.index[sigs[0].entry_idx]
+    h1 = make_1h(ts, old=0.80, recent=1.05, recent_bars=30)
+    kept = filter_away_1h_ma120(df, sigs, h1, min_dist=0.02)
+    assert kept == sigs
+    ma = htf_ma_at_entry(h1, ts, sigs[0].entry_price, n=120)
+    assert ma is not None and abs(sigs[0].entry_price / ma - 1.0) >= 0.02
+
+
 def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -400,6 +428,7 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "1h MA25" in text
     assert "1h MA99" in text
     assert "糾結" in text
+    assert "MA120" in text
     assert (out_dir / "img").exists()
     pngs = list((out_dir / "img").glob("*.png"))
     assert any("1h" in p.name for p in pngs)
@@ -427,6 +456,8 @@ def main() -> int:
     test_1h_ma99_rejects_too_far_below()
     test_1h_mas_reject_tangled_like_flock()
     test_1h_mas_keep_fanned_like_cloud()
+    test_1h_ma120_rejects_too_close_like_morpho()
+    test_1h_ma120_keeps_cloud_distance()
     test_summarize_and_html()
     print("ok")
     return 0
