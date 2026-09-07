@@ -110,7 +110,7 @@ python3 examples/binance_15m_short.py --symbol CLOUSDT --days 7 --pages
 python3 examples/binance_15m_short.py --days 7 --pages
 ```
 
-近一週（2026-09-01 → 09-08 TPE）、流動 U 永續：**128 筆、已平勝率 27.8%、平均 −0.09%、加總 −11.2%**。  
+近一週（2026-09-01 → 09-08 TPE）、流動 U 永續 **140 檔（已濾股票／ETF）**：**105 筆、已平勝率 29.1%、平均 +0.14%、加總 +14.2%**。  
 截圖那檔 **CLOUSDT** 09-03 15:30 急殺：15m **+13.0%**。同一時刻 1h 還是 **非空頭排列、價也還沒同時跌破 1h 的 99/120**（1h 長均還在下面當支撐）。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short/view.html
