@@ -106,7 +106,7 @@ python3 examples/niulai_m_top.py --days 7 --pages
 python3 examples/test_niulai_m_top.py
 ```
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/niulai-m-top/view.html
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/niulai-m-top/view.html
 
 ## 快速開始
 
