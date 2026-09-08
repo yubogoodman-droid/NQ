@@ -41,6 +41,9 @@ from binance_15m_short import (  # noqa: E402
     sma,
     summarize_trades,
     write_html,
+    bars_per_day,
+    kline_limit,
+    fetch_klines,
 )
 
 LOOSE = default_params(min_body_pct=0.0, min_vol_ratio=0.0, min_break_pct=0.002, min_risk_pct=0.0001)
@@ -79,6 +82,59 @@ def test_sma() -> None:
     assert np.isnan(out[1])
     assert abs(out[2] - 2.0) < 1e-9
     assert abs(out[4] - 4.0) < 1e-9
+
+
+def test_kline_limit_covers_month() -> None:
+    assert bars_per_day("15m") == 96
+    assert bars_per_day("1h") == 24
+    assert kline_limit(7, "15m") == 1500
+    assert kline_limit(30, "15m") >= 30 * 96 + 200
+    assert kline_limit(30, "1h") == 1500
+
+
+def test_fetch_klines_pages() -> None:
+    """30 日需要的根數超過 1500 時，往回拼頁且丢掉未收完的最後一根。"""
+    import binance_15m_short as m
+
+    interval_ms = 900_000
+    now = int(__import__("time").time() * 1000)
+    newest_open = ((now - interval_ms) // interval_ms) * interval_ms
+    n = 1600
+    all_rows = []
+    for i in range(n):
+        t = newest_open - (n - 1 - i) * interval_ms
+        px = 1.0 + i * 0.0001
+        all_rows.append([t, px, px + 0.001, px - 0.001, px, 10.0])
+    incomplete = [
+        newest_open + interval_ms,
+        9.0,
+        9.0,
+        9.0,
+        9.0,
+        1.0,
+    ]
+
+    def fake_get(path, params=None, retries: int = 5):  # noqa: ARG001
+        assert path == "/fapi/v1/klines"
+        params = params or {}
+        lim = int(params["limit"])
+        end = params.get("endTime")
+        pool = all_rows + [incomplete]
+        if end is not None:
+            pool = [r for r in pool if int(r[0]) <= int(end)]
+        return pool[-lim:]
+
+    old = m.get_json
+    m.get_json = fake_get  # type: ignore[method-assign]
+    try:
+        df = fetch_klines("FOOUSDT", "15m", limit=1600)
+    finally:
+        m.get_json = old  # type: ignore[method-assign]
+    assert len(df) == 1600
+    assert df.index.is_monotonic_increasing
+    last_ms = int(df.index[-1].timestamp() * 1000)
+    assert abs(last_ms - newest_open) < 2000
+    assert float(df["close"].iloc[-1]) != 9.0
 
 
 def test_stock_contract_filter() -> None:
@@ -676,6 +732,8 @@ def test_charts_put_losses_first() -> None:
 
 def main() -> int:
     test_sma()
+    test_kline_limit_covers_month()
+    test_fetch_klines_pages()
     test_stock_contract_filter()
     test_detect_dump_cross()
     test_no_signal_if_bullish_stack()

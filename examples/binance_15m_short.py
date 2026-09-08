@@ -13,6 +13,7 @@
   python3 examples/binance_15m_short.py
   python3 examples/binance_15m_short.py --symbol CLOUSDT --days 7 --pages
   python3 examples/binance_15m_short.py --days 7 --pages
+  python3 examples/binance_15m_short.py --days 30 --html docs/binance-15m-short-30d/index.html
   python3 examples/test_binance_15m_short.py
 """
 
@@ -365,6 +366,8 @@ def universe(min_quote_vol: float = 10_000_000, include_stocks: bool = False) ->
     return sorted(set(out))
 
 
+KLINE_PAGE = 1500
+MA_WARMUP_BARS = 250
 INTERVAL_MS = {
     "1m": 60_000,
     "3m": 180_000,
@@ -377,14 +380,20 @@ INTERVAL_MS = {
 }
 
 
-def fetch_klines(sym: str, interval: str = "15m", limit: int = 1500) -> pd.DataFrame:
-    raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": interval, "limit": limit})
+def bars_per_day(interval: str) -> int:
+    ms = INTERVAL_MS.get(interval, 900_000)
+    return max(1, int(86_400_000 // ms))
+
+
+def kline_limit(days: int, interval: str = "15m") -> int:
+    """進場窗 + MA200 暖機。7 日仍 1500 根；30 日 15m 會超過單頁上限。"""
+    need = int(days) * bars_per_day(interval) + MA_WARMUP_BARS
+    return max(KLINE_PAGE, need)
+
+
+def _klines_frame(raw: Sequence, interval: str) -> pd.DataFrame:
     if not raw:
         return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
-    now_ms = int(time.time() * 1000)
-    interval_ms = INTERVAL_MS.get(interval, 900_000)
-    if int(raw[-1][0]) + interval_ms > now_ms:
-        raw = raw[:-1]
     idx = pd.to_datetime([int(x[0]) for x in raw], unit="ms", utc=True).tz_convert(TPE)
     return pd.DataFrame(
         {
@@ -396,6 +405,45 @@ def fetch_klines(sym: str, interval: str = "15m", limit: int = 1500) -> pd.DataF
         },
         index=idx,
     )
+
+
+def fetch_klines(sym: str, interval: str = "15m", limit: int = 1500) -> pd.DataFrame:
+    """往回翻頁拉已收完的 K（幣安單次最多 1500）。"""
+    want = max(1, int(limit))
+    interval_ms = INTERVAL_MS.get(interval, 900_000)
+    now_ms = int(time.time() * 1000)
+    raw: List[Any] = []
+    seen: set[int] = set()
+    end_ms: Optional[int] = None
+    while len(raw) < want:
+        paging = end_ms is not None
+        batch = min(KLINE_PAGE, want - len(raw) + (0 if paging else 1))
+        params: Dict[str, Any] = {"symbol": sym, "interval": interval, "limit": max(1, batch)}
+        if paging:
+            params["endTime"] = end_ms
+        chunk = get_json("/fapi/v1/klines", params=params) or []
+        if not chunk:
+            break
+        if int(chunk[-1][0]) + interval_ms > now_ms:
+            chunk = chunk[:-1]
+        if not chunk:
+            break
+        page: List[Any] = []
+        for row in chunk:
+            t = int(row[0])
+            if t in seen:
+                continue
+            seen.add(t)
+            page.append(row)
+        if not page:
+            break
+        raw = page + raw
+        if paging and len(chunk) < batch:
+            break
+        end_ms = int(page[0][0]) - 1
+    if len(raw) > want:
+        raw = raw[-want:]
+    return _klines_frame(raw, interval)
 
 
 def _as_index_ts(df: pd.DataFrame, ts):
@@ -799,7 +847,7 @@ def scan_symbol(
 ) -> tuple[List[Hit], dict]:
     meta = {"symbol": sym, "bars": 0, "error": "", "n_sig": 0, "n_trade": 0}
     try:
-        df = fetch_klines(sym)
+        df = fetch_klines(sym, "15m", limit=kline_limit(days, "15m"))
     except Exception as exc:  # noqa: BLE001
         meta["error"] = str(exc)[:100]
         return [], meta
@@ -821,7 +869,7 @@ def scan_symbol(
         sigs = filter_attack_15m_ma200(df, sigs, params=params, funnel=funnel)
     df_1h = pd.DataFrame()
     try:
-        df_1h = fetch_klines(sym, "1h")
+        df_1h = fetch_klines(sym, "1h", limit=kline_limit(days, "1h"))
     except Exception:  # noqa: BLE001
         df_1h = pd.DataFrame()
     if require_1h_ma25:
