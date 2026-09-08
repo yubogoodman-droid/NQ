@@ -108,12 +108,16 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 python3 examples/test_binance_15m_short.py
 python3 examples/binance_15m_short.py --symbol CLOUSDT --days 7 --pages
 python3 examples/binance_15m_short.py --days 7 --pages
+python3 examples/binance_15m_short.py --days 30 --html docs/binance-15m-short-30d/index.html
 ```
 
 近一週（2026-09-01 → 09-08 TPE）、流動 U 永續 **141 檔（已濾股票；1h MA25 下、不在 1h MA200 下、離 1h MA99 ≤ 20%、離 1h MA120 ≥ 2%、15m 五均張開 ≥ 1.5%、15m MA200 開盤 ≥ 4% 或已跌破、2R 在 MA200 下須打到 200、1h 五均張開 ≥ 4%）**：**14 筆、已平勝率 92.3%、平均 +6.39%、加總 +89.5%**。弱陰線踩在 15m MA200、2R 卻要打穿 200 的濾掉 10 個訊號（含龍蝦／NAORIS）；2R 還在 200 上面的 UNI／COTI／ZAMA 留著。已平只剩 JUP −1.04%。  
 截圖那檔 **CLOUSDT** 09-03 15:30 急殺：15m **+13.0%**，開盤仍高於 15m MA200 約 **10%** 再砸下來，留著。
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short/view.html
+近一個月（2026-08-09 → 09-08 TPE）同一套規則、同一 141 檔：**45 筆、已平勝率 45.5%、平均 +0.81%、加總 +36.4%**。八月 30 筆已平勝率 26.7%、合計 −51.1%（停損 19 次，08-24 一串山寨一起被停）；九月這段仍強（15 筆、已平 85.7%、+87.5%）。BTW 反覆做空 5 次合計 −9.7%。15m 超過 1500 根會往回翻頁，才蓋得住 30 日 + MA200。
+
+預覽（7 日）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short/view.html  
+預覽（30 日）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short-30d/view.html
 
 ## 快速開始
 
