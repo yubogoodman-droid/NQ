@@ -28,6 +28,8 @@ from binance_15m_short import (  # noqa: E402
     filter_away_1h_ma120,
     filter_away_15m_ma200,
     filter_attack_15m_ma200,
+    filter_sit_15m_ma200,
+    filter_away_1h_ma_support,
     filter_not_below_1h_ma200,
     default_params,
     htf_ma_at_entry,
@@ -582,6 +584,95 @@ def test_attack_ma200_keeps_already_through() -> None:
     assert filter_attack_15m_ma200(df, [sig]) == [sig]
 
 
+def test_sit_15m_ma200_rejects_btw_near_200_and_1h99() -> None:
+    """30d #2 BTW：收盤還貼 15m MA200，1h MA99 也近 → 濾掉。"""
+    df, sig = _ma200_sig(open_px=1.082, close_px=1.009, high_px=1.09)
+    ts = df.index[sig.entry_idx]
+    h1 = make_1h(ts, n=220, old=sig.entry_price, recent=sig.entry_price)
+    funnel: dict = {}
+    kept = filter_sit_15m_ma200(df, [sig], h1, funnel=funnel)
+    assert kept == []
+    assert funnel.get("sit_15m_ma200", 0) == 1
+    m200 = float(sma(df["close"].to_numpy(float), 200)[sig.entry_idx])
+    assert sig.entry_price >= m200
+    assert sig.entry_price / m200 - 1.0 < 0.02
+    ma99 = htf_ma_at_entry(h1, ts, sig.entry_price, n=99)
+    assert ma99 is not None and abs(sig.entry_price / ma99 - 1.0) < 0.05
+
+
+def test_sit_15m_ma200_keeps_clo_when_1h99_has_room() -> None:
+    """CLO：收盤砸到 15m 200 旁邊，但 1h MA99 還在 ≥5% 外 → 留著。"""
+    df, sig = _ma200_sig(open_px=1.097, close_px=1.007, high_px=1.020)
+    ts = df.index[sig.entry_idx]
+    h1 = make_1h(ts, n=220, old=0.80, recent=1.05, recent_bars=30)
+    kept = filter_sit_15m_ma200(df, [sig], h1)
+    assert kept == [sig]
+    ma99 = htf_ma_at_entry(h1, ts, sig.entry_price, n=99)
+    assert ma99 is not None and abs(sig.entry_price / ma99 - 1.0) >= 0.05
+
+
+def test_sit_15m_ma200_keeps_already_through() -> None:
+    df, sig = _ma200_sig(open_px=1.02, close_px=0.99, high_px=1.03)
+    ts = df.index[sig.entry_idx]
+    h1 = make_1h(ts, n=220, old=sig.entry_price, recent=sig.entry_price)
+    assert filter_sit_15m_ma200(df, [sig], h1) == [sig]
+
+
+def test_sit_15m_ma200_uses_closed_bar_not_next() -> None:
+    """下一根才決定進不進：過濾只用訊號 K 收盤，不偷看後面那根。"""
+    df, sig = _ma200_sig(open_px=1.082, close_px=1.009, high_px=1.09)
+    nxt = df.iloc[[-1]].copy()
+    nxt.index = nxt.index + pd.Timedelta(minutes=15)
+    nxt.iloc[0, nxt.columns.get_loc("open")] = float(sig.entry_price)
+    nxt.iloc[0, nxt.columns.get_loc("close")] = 0.50
+    nxt.iloc[0, nxt.columns.get_loc("high")] = float(sig.entry_price)
+    nxt.iloc[0, nxt.columns.get_loc("low")] = 0.49
+    later = pd.concat([df, nxt])
+    ts = df.index[sig.entry_idx]
+    h1 = make_1h(ts, n=220, old=sig.entry_price, recent=sig.entry_price)
+    spoiled = h1.copy()
+    i = bar_index_at(spoiled, ts)
+    assert i is not None
+    spoiled.iloc[i, spoiled.columns.get_loc("close")] = 0.50
+    assert filter_sit_15m_ma200(df, [sig], h1) == []
+    assert filter_sit_15m_ma200(later, [sig], spoiled) == []
+    m_now = sma(df["close"].to_numpy(float), 200)[sig.entry_idx]
+    m_later = sma(later["close"].to_numpy(float), 200)[sig.entry_idx]
+    assert abs(float(m_now) - float(m_later)) < 1e-12
+
+
+def test_1h_support_rejects_tut_cluster() -> None:
+    """30d #3 TUT：1h 99/120/200 疊在進場價旁當支撐 → 濾掉。"""
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    ts = df.index[sigs[0].entry_idx]
+    px = sigs[0].entry_price
+    h1 = make_1h(ts, n=220, old=px, recent=px)
+    funnel: dict = {}
+    kept = filter_away_1h_ma_support(df, sigs, h1, near=0.03, min_count=2, funnel=funnel)
+    assert kept == []
+    assert funnel.get("near_1h_support", 0) >= 1
+    n_hug = 0
+    for n in (99, 120, 200):
+        ma = htf_ma_at_entry(h1, ts, px, n=n)
+        assert ma is not None
+        if abs(px / ma - 1.0) < 0.03:
+            n_hug += 1
+    assert n_hug >= 2
+
+
+def test_1h_support_keeps_clo_fan() -> None:
+    """CLO 那種 1h 長均張開：進場價沒貼著 99/120/200 叢 → 留著。"""
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    ts = df.index[sigs[0].entry_idx]
+    h1 = make_1h(ts, n=220, old=0.80, recent=1.05, recent_bars=30)
+    kept = filter_away_1h_ma_support(df, sigs, h1, near=0.03, min_count=2)
+    assert kept == sigs
+
+
 def test_1h_mas_reject_tangled_like_flock() -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -677,7 +768,7 @@ def test_1h_ma200_missing_data_skips() -> None:
 
 
 def test_summarize_and_html(tmp_path: Path | None = None) -> None:
-    df = bars(dump_closes())
+    df = bars(dump_closes(n_flat=220))
     sigs = detect_signals(df, LOOSE)
     trades = simulate(df, sigs)
     stats = summarize_trades(trades)
@@ -699,6 +790,10 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "15m MA200" in text
     assert "2R 還在 15m MA200" in text
     assert "打到 200" in text
+    assert "收盤確認" in text
+    assert "BTW" in text
+    assert "TUT" in text
+    assert "15m MA200 開" in text
     assert "MA120" in text
     assert "MA200" in text
     assert "虧損在前" in text
@@ -780,6 +875,12 @@ def main() -> int:
     test_attack_ma200_keeps_when_2r_still_above()
     test_attack_ma200_keeps_real_dump_into_200()
     test_attack_ma200_keeps_already_through()
+    test_sit_15m_ma200_rejects_btw_near_200_and_1h99()
+    test_sit_15m_ma200_keeps_clo_when_1h99_has_room()
+    test_sit_15m_ma200_keeps_already_through()
+    test_sit_15m_ma200_uses_closed_bar_not_next()
+    test_1h_support_rejects_tut_cluster()
+    test_1h_support_keeps_clo_fan()
     test_1h_mas_reject_tangled_like_flock()
     test_1h_mas_keep_fanned_like_cloud()
     test_1h_ma120_rejects_too_close_like_morpho()
