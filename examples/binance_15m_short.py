@@ -1059,7 +1059,14 @@ def _git_branch() -> str:
 
 
 def write_view_html(src: Path) -> Path:
-    rel = src.parent.relative_to(REPO).as_posix()
+    src = src.expanduser()
+    if not src.is_absolute():
+        src = Path.cwd() / src
+    src = src.resolve()
+    try:
+        rel = src.parent.relative_to(REPO.resolve()).as_posix()
+    except ValueError:
+        rel = src.parent.as_posix()
     base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{_git_branch()}/{rel}/"
     text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
     out = src.with_name("view.html")
@@ -1475,6 +1482,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "require_15m_ma200_attack": not bool(args.no_15m_ma200_attack),
     }
     html_path = Path(args.html) if args.html else None
+    if html_path is not None and not html_path.is_absolute():
+        html_path = (Path.cwd() / html_path).resolve()
     if html_path is None and args.pages:
         html_path = PAGES
     if html_path:

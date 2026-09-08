@@ -41,6 +41,7 @@ from binance_15m_short import (  # noqa: E402
     sma,
     summarize_trades,
     write_html,
+    write_view_html,
     bars_per_day,
     kline_limit,
     fetch_klines,
@@ -706,6 +707,23 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert any("1h" in p.name for p in pngs)
 
 
+def test_write_view_html_relative_under_repo() -> None:
+    dest_dir = Path("docs/_tmp_view_test")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    src = dest_dir / "index.html"
+    src.write_text("<img src='img/x.png'/>", encoding="utf-8")
+    try:
+        out = write_view_html(Path("docs/_tmp_view_test/index.html"))
+        text = out.read_text(encoding="utf-8")
+        assert "raw.githubusercontent.com" in text
+        assert "docs/_tmp_view_test/img/x.png" in text
+        assert "src='img/" not in text
+    finally:
+        import shutil
+
+        shutil.rmtree(dest_dir)
+
+
 def test_charts_put_losses_first() -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -770,6 +788,7 @@ def main() -> int:
     test_1h_ma200_keeps_cloud_still_above()
     test_1h_ma200_missing_data_skips()
     test_summarize_and_html()
+    test_write_view_html_relative_under_repo()
     test_charts_put_losses_first()
     print("ok")
     return 0
