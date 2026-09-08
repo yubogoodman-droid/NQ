@@ -110,8 +110,8 @@ python3 examples/binance_15m_short.py --symbol CLOUSDT --days 7 --pages
 python3 examples/binance_15m_short.py --days 7 --pages
 ```
 
-近一週（2026-09-01 → 09-08 TPE）、流動 U 永續 **142 檔（已濾股票；1h MA25 下、不在 1h MA200 下、離 1h MA99 ≤ 20%、離 1h MA120 ≥ 2%、15m 五均不糾結、1h 五均不糾結）**：**38 筆、已平勝率 47.1%、平均 +1.85%、加總 +70.4%**（15m 中均糾結濾網統計見報告；舊 #5 ZENUSDT、#6 XMRUSDT 那種 15m 麵條不空）。已在 1h MA200 下方的不空（濾掉 44 筆，含舊 #1 TRUMPUSDT）。  
-截圖那檔 **CLOUSDT** 09-03 15:30 急殺：15m **+13.0%**，離 1h MA99 約 **+10%**、離 1h MA120 約 **+13%**、離 1h MA200 約 **+29%**，1h 五均張開約 **28%**。同一時刻 1h 還是 **非空頭排列、價也還沒同時跌破 1h 的 99/120**，但進場價已在 **1h MA25 下、仍在 1h MA200 上**。
+近一週（2026-09-01 → 09-08 TPE）、流動 U 永續 **141 檔（已濾股票；1h MA25 下、不在 1h MA200 下、離 1h MA99 ≤ 20%、離 1h MA120 ≥ 2%、15m 五均張開 ≥ 1.5%、1h 五均張開 ≥ 4%）**：**27 筆、勝率 48.1%、平均 +2.63%、加總 +71.1%**。15m 中均糾結濾掉 56 個訊號（含舊 #5 ZENUSDT 09-06 22:15、#6 XMRUSDT 那種橫盤麵條）。  
+截圖那檔 **CLOUSDT** 09-03 15:30 急殺：15m **+13.0%**，15m 五均張開約 **5.5%**，離 1h MA99 約 **+10%**、離 1h MA120 約 **+13%**、離 1h MA200 約 **+29%**，1h 五均張開約 **28%**。同一時刻 1h 還是 **非空頭排列、價也還沒同時跌破 1h 的 99/120**，但進場價已在 **1h MA25 下、仍在 1h MA200 上**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short/view.html
 
