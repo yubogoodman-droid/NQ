@@ -4,7 +4,7 @@
 對齊截圖 CLOUSDT 那種急殺：短均 7<14<25，同一根收盤穿過 99/120，
 且進場價在 1 小時 MA25 下方、還不能已經掉到 1h MA200 下面，
 與 1 小時 MA99 不能太遠（預設 20%），
-且 1h 的 MA7/14/25/99/120 不能糾結在一起，進場價也不能貼著 1h MA120。
+且 15m 與 1h 的 MA7/14/25/99/120 都不能糾結在一起，進場價也不能貼著 1h MA120。
 
 用法:
   python3 examples/binance_15m_short.py
@@ -41,6 +41,7 @@ UA = "Mozilla/5.0"
 MAX_1H_MA99_DIST = 0.20
 MIN_1H_MA120_DIST = 0.02
 MIN_1H_MA_SPREAD = 0.04
+MIN_15M_MA_SPREAD = 0.015
 HTF_MA_PERIODS = (7, 14, 25, 99, 120)
 MA_COLORS = {
     7: "#f0c14a",
@@ -497,6 +498,34 @@ def ma_cluster_spread(mas: Dict[int, float]) -> Optional[float]:
     return (max(vals) - lo) / lo if lo else None
 
 
+def signal_ma_spread(sig: Signal) -> Optional[float]:
+    """15m 進場當下 MA7/14/25/99/120 張開幅度。"""
+    return ma_cluster_spread(
+        {7: sig.ma7, 14: sig.ma14, 25: sig.ma25, 99: sig.ma99, 120: sig.ma120}
+    )
+
+
+def filter_untangled_15m_mas(
+    signals: Sequence[Signal],
+    min_spread: float = MIN_15M_MA_SPREAD,
+    funnel: Optional[Dict[str, int]] = None,
+) -> List[Signal]:
+    """15m 的 7/14/25/99/120 糾結在一起（ZEN #5、XMR #6 那種橫盤麵條）不空。"""
+    if min_spread <= 0:
+        return list(signals)
+    kept: List[Signal] = []
+    tangled = 0
+    for sig in signals:
+        spread = signal_ma_spread(sig)
+        if spread is None or spread < min_spread:
+            tangled += 1
+            continue
+        kept.append(sig)
+    if funnel is not None:
+        funnel["tangled_15m_ma"] = funnel.get("tangled_15m_ma", 0) + tangled
+    return kept
+
+
 def filter_untangled_1h_mas(
     df: pd.DataFrame,
     signals: Sequence[Signal],
@@ -663,6 +692,7 @@ def scan_symbol(
     max_1h_ma99_dist: float = MAX_1H_MA99_DIST,
     min_1h_ma120_dist: float = MIN_1H_MA120_DIST,
     min_1h_ma_spread: float = MIN_1H_MA_SPREAD,
+    min_15m_ma_spread: float = MIN_15M_MA_SPREAD,
 ) -> tuple[List[Hit], dict]:
     meta = {"symbol": sym, "bars": 0, "error": "", "n_sig": 0, "n_trade": 0}
     try:
@@ -680,6 +710,8 @@ def scan_symbol(
         for k, v in local.items():
             funnel[k] = funnel.get(k, 0) + v
     sigs = filter_entry_window(df, sigs, days)
+    if min_15m_ma_spread > 0:
+        sigs = filter_untangled_15m_mas(sigs, min_spread=min_15m_ma_spread, funnel=funnel)
     df_1h = pd.DataFrame()
     try:
         df_1h = fetch_klines(sym, "1h")
@@ -904,6 +936,7 @@ def write_html(
     max_1h_ma99_dist: float = MAX_1H_MA99_DIST,
     min_1h_ma120_dist: float = MIN_1H_MA120_DIST,
     min_1h_ma_spread: float = MIN_1H_MA_SPREAD,
+    min_15m_ma_spread: float = MIN_15M_MA_SPREAD,
 ) -> Path:
     stats = summarize_trades([h.trade for h in hits])
     featured_hits = [h for h in hits if h.symbol == featured]
@@ -962,6 +995,7 @@ def write_html(
         ma99_tag = ""
         ma120_tag = ""
         spread_tag = ""
+        ribbon_tag = ""
         if df_1h is not None and len(df_1h):
             mas = htf_mas_at_entry(df_1h, et, t.entry_price)
             ma200 = htf_ma_at_entry(df_1h, et, t.entry_price, n=200, interval="1h")
@@ -977,6 +1011,9 @@ def write_html(
             spread = ma_cluster_spread(mas) if mas else None
             if spread is not None:
                 spread_tag = f"<span class='tag'>1h均線散 {spread*100:.0f}%</span>"
+        ribbon = signal_ma_spread(t.signal)
+        if ribbon is not None:
+            ribbon_tag = f"<span class='tag'>15m均線散 {ribbon*100:.1f}%</span>"
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -995,6 +1032,7 @@ def write_html(
             f"{ma99_tag}"
             f"{ma120_tag}"
             f"{spread_tag}"
+            f"{ribbon_tag}"
             "</div>"
             "<pre class='trade-detail'>"
             f"做空 entry {t.entry_price:.6g}  stop {t.stop_price:.6g} (+{risk:.6g})\n"
@@ -1054,13 +1092,13 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>幣安 15m · 7/14/25 空頭排列跌破 99/120 做空</h1>
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
-<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
+<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 <b>15m 的 MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_15m_ma_spread*100:.1f}%，ZEN/XMR 那種中均黏成麵條不空），且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
 <br/>出場：停在跌破 K 高點與 MA99/120 上緣的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
 <br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120/200）。卡片 <b>虧損在前</b>（虧最多先看），賺錢的按進場時間。股票／ETF 永續預設不掃。</p>
 <p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 空頭排列 {fun.get('stack', 0)} → 同時跌破 {fun.get('cross', 0)}
 → 紅 K {fun.get('red', 0)} → 進場 {fun.get('entry', 0)}
 · 太淺 {fun.get('shallow', 0)} · 實體不夠 {fun.get('thin', 0)} · 量不夠 {fun.get('quiet', 0)}
-· 不在1h MA25下 {fun.get('above_1h_ma25', 0)} · 已在1h MA200下 {fun.get('below_1h_ma200', 0)} · 離1h MA99太遠 {fun.get('far_1h_ma99', 0)} · 貼1h MA120 {fun.get('near_1h_ma120', 0)} · 1h均線糾結 {fun.get('tangled_1h_ma', 0)} · 無1h {fun.get('no_1h', 0) + fun.get('no_1h_ma99', 0) + fun.get('no_1h_ma120', 0) + fun.get('no_1h_ma200', 0) + fun.get('no_1h_spread', 0)}
+· 不在1h MA25下 {fun.get('above_1h_ma25', 0)} · 已在1h MA200下 {fun.get('below_1h_ma200', 0)} · 離1h MA99太遠 {fun.get('far_1h_ma99', 0)} · 貼1h MA120 {fun.get('near_1h_ma120', 0)} · 15m均線糾結 {fun.get('tangled_15m_ma', 0)} · 1h均線糾結 {fun.get('tangled_1h_ma', 0)} · 無1h {fun.get('no_1h', 0) + fun.get('no_1h_ma99', 0) + fun.get('no_1h_ma120', 0) + fun.get('no_1h_ma200', 0) + fun.get('no_1h_spread', 0)}
 · 風險不合 {fun.get('skip_risk', 0)} · 持倉中 {fun.get('skip_busy', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 <br/>{escape(feat_line)}</p>
@@ -1142,6 +1180,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default=MIN_1H_MA_SPREAD,
         help="1h MA7/14/25/99/120 最小張開（0.04=4%%；0 關閉）",
     )
+    p.add_argument(
+        "--min-15m-ma-spread",
+        type=float,
+        default=MIN_15M_MA_SPREAD,
+        help="15m MA7/14/25/99/120 最小張開（0.015=1.5%%；0 關閉）",
+    )
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
     p.add_argument("--json", dest="json_path", default="")
@@ -1163,7 +1207,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         f"h1_ma200={'off' if args.no_1h_ma200 else 'on'} "
         f"h1_ma99_dist={args.max_1h_ma99_dist:g} "
         f"h1_ma120_dist={args.min_1h_ma120_dist:g} "
-        f"h1_ma_spread={args.min_1h_ma_spread:g}",
+        f"h1_ma_spread={args.min_1h_ma_spread:g} "
+        f"m15_ma_spread={args.min_15m_ma_spread:g}",
         flush=True,
     )
 
@@ -1184,6 +1229,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             max_1h_ma99_dist=float(args.max_1h_ma99_dist),
             min_1h_ma120_dist=float(args.min_1h_ma120_dist),
             min_1h_ma_spread=float(args.min_1h_ma_spread),
+            min_15m_ma_spread=float(args.min_15m_ma_spread),
         )
         return stock_hits, meta, local
 
@@ -1236,6 +1282,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "max_1h_ma99_dist": float(args.max_1h_ma99_dist),
         "min_1h_ma120_dist": float(args.min_1h_ma120_dist),
         "min_1h_ma_spread": float(args.min_1h_ma_spread),
+        "min_15m_ma_spread": float(args.min_15m_ma_spread),
     }
     html_path = Path(args.html) if args.html else None
     if html_path is None and args.pages:
@@ -1258,6 +1305,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             label += f" · 離1h MA120≥{args.min_1h_ma120_dist*100:.0f}%"
         if args.min_1h_ma_spread > 0:
             label += f" · 1h均線不糾結≥{args.min_1h_ma_spread*100:.0f}%"
+        if args.min_15m_ma_spread > 0:
+            label += f" · 15m均線不糾結≥{args.min_15m_ma_spread*100:.1f}%"
         out = write_html(
             html_path,
             hits,
@@ -1270,6 +1319,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             max_1h_ma99_dist=float(args.max_1h_ma99_dist),
             min_1h_ma120_dist=float(args.min_1h_ma120_dist),
             min_1h_ma_spread=float(args.min_1h_ma_spread),
+            min_15m_ma_spread=float(args.min_15m_ma_spread),
         )
         write_view_html(out)
         print(f"html={out}", flush=True)

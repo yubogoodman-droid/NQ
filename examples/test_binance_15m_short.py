@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from binance_15m_short import (  # noqa: E402
     filter_entry_window,
     filter_near_1h_ma99,
     filter_untangled_1h_mas,
+    filter_untangled_15m_mas,
     filter_away_1h_ma120,
     filter_not_below_1h_ma200,
     default_params,
@@ -30,6 +32,7 @@ from binance_15m_short import (  # noqa: E402
     htf_snapshot,
     is_stock_contract,
     ma_cluster_spread,
+    signal_ma_spread,
     order_chart_hits,
     simulate,
     sma,
@@ -354,6 +357,48 @@ def make_1h(ts, n: int = 130, old: float = 1.0, recent: float = 1.0, recent_bars
     )
 
 
+def test_15m_mas_reject_tangled_like_zen_xmr() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    px = sigs[0].entry_price
+    tangled = replace(
+        sigs[0],
+        ma7=px * 1.004,
+        ma14=px * 1.008,
+        ma25=px * 1.012,
+        ma99=px * 1.006,
+        ma120=px * 1.002,
+        ma_high=px * 1.006,
+    )
+    funnel: dict = {}
+    kept = filter_untangled_15m_mas([tangled], min_spread=0.015, funnel=funnel)
+    assert kept == []
+    assert funnel.get("tangled_15m_ma", 0) == 1
+    spread = signal_ma_spread(tangled)
+    assert spread is not None and spread < 0.015
+
+
+def test_15m_mas_keep_fanned_like_cloud() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    px = sigs[0].entry_price
+    fanned = replace(
+        sigs[0],
+        ma7=px * 1.102,
+        ma14=px * 1.134,
+        ma25=px * 1.143,
+        ma99=px * 1.097,
+        ma120=px * 1.084,
+        ma_high=px * 1.097,
+    )
+    spread = signal_ma_spread(fanned)
+    assert spread is not None and spread >= 0.015
+    kept = filter_untangled_15m_mas([fanned], min_spread=0.015)
+    assert kept == [fanned]
+
+
 def test_1h_mas_reject_tangled_like_flock() -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -467,6 +512,7 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "1h MA25" in text
     assert "1h MA99" in text
     assert "糾結" in text
+    assert "15m 的 MA7/14/25/99/120 不能糾結" in text
     assert "MA120" in text
     assert "MA200" in text
     assert "虧損在前" in text
@@ -519,6 +565,8 @@ def main() -> int:
     test_1h_ma99_keeps_near_like_cloud()
     test_1h_ma99_rejects_bulla_extension()
     test_1h_ma99_rejects_too_far_below()
+    test_15m_mas_reject_tangled_like_zen_xmr()
+    test_15m_mas_keep_fanned_like_cloud()
     test_1h_mas_reject_tangled_like_flock()
     test_1h_mas_keep_fanned_like_cloud()
     test_1h_ma120_rejects_too_close_like_morpho()
