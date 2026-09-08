@@ -25,6 +25,7 @@ from binance_15m_short import (  # noqa: E402
     filter_untangled_1h_mas,
     filter_untangled_15m_mas,
     filter_away_1h_ma120,
+    filter_away_15m_ma200,
     filter_not_below_1h_ma200,
     default_params,
     htf_ma_at_entry,
@@ -399,6 +400,72 @@ def test_15m_mas_keep_fanned_like_cloud() -> None:
     assert kept == [fanned]
 
 
+def test_15m_ma200_rejects_open_too_close() -> None:
+    """橫盤貼著 15m MA200 再小跌，開盤沒肉、收盤還在 200 上 → 濾掉。"""
+    closes = np.concatenate(
+        [
+            np.full(200, 0.99),
+            np.full(40, 1.02),
+            np.array([1.005, 0.998, 0.990, 0.985]),
+            np.linspace(0.985, 0.980, 15),
+        ]
+    )
+    df = bars(closes)
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    funnel: dict = {}
+    kept = filter_away_15m_ma200(df, sigs, min_open_dist=0.04, funnel=funnel)
+    assert kept == []
+    assert funnel.get("near_15m_ma200", 0) >= 1
+    s = sigs[0]
+    m200 = float(sma(df["close"].to_numpy(float), 200)[s.entry_idx])
+    op = float(df["open"].iloc[s.entry_idx])
+    assert s.entry_price >= m200
+    assert op / m200 - 1.0 < 0.04
+
+
+def test_15m_ma200_keeps_dump_from_well_above() -> None:
+    """CLO 那種：開盤遠高於 15m MA200，即使收盤砸到 200 附近仍可空。"""
+    closes = np.concatenate(
+        [
+            np.full(200, 0.85),
+            np.full(120, 1.0),
+            np.array([0.96, 0.94, 0.92, 0.90]),
+            np.linspace(0.89, 0.88, 20),
+        ]
+    )
+    df = bars(closes)
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    kept = filter_away_15m_ma200(df, sigs, min_open_dist=0.04)
+    assert kept == sigs
+    s = sigs[0]
+    m200 = float(sma(df["close"].to_numpy(float), 200)[s.entry_idx])
+    op = float(df["open"].iloc[s.entry_idx])
+    assert op / m200 - 1.0 >= 0.04
+
+
+def test_15m_ma200_keeps_already_through() -> None:
+    """收盤已跌破 15m MA200（CATI 那種穿過 200）不因貼近而濾掉。"""
+    df = bars(dump_closes(n_flat=220))
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    s = sigs[0]
+    m200 = float(sma(df["close"].to_numpy(float), 200)[s.entry_idx])
+    through = replace(s, entry_price=m200 * 0.99)
+    kept = filter_away_15m_ma200(df, [through], min_open_dist=0.04)
+    assert kept == [through]
+
+
+def test_15m_ma200_missing_data_skips() -> None:
+    df = bars(dump_closes(n_flat=130))
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    funnel: dict = {}
+    assert filter_away_15m_ma200(df, sigs, min_open_dist=0.04, funnel=funnel) == []
+    assert funnel.get("no_15m_ma200", 0) >= 1
+
+
 def test_1h_mas_reject_tangled_like_flock() -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
@@ -513,6 +580,7 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "1h MA99" in text
     assert "糾結" in text
     assert "15m 的 MA7/14/25/99/120 不能糾結" in text
+    assert "15m MA200" in text
     assert "MA120" in text
     assert "MA200" in text
     assert "虧損在前" in text
@@ -567,6 +635,10 @@ def main() -> int:
     test_1h_ma99_rejects_too_far_below()
     test_15m_mas_reject_tangled_like_zen_xmr()
     test_15m_mas_keep_fanned_like_cloud()
+    test_15m_ma200_rejects_open_too_close()
+    test_15m_ma200_keeps_dump_from_well_above()
+    test_15m_ma200_keeps_already_through()
+    test_15m_ma200_missing_data_skips()
     test_1h_mas_reject_tangled_like_flock()
     test_1h_mas_keep_fanned_like_cloud()
     test_1h_ma120_rejects_too_close_like_morpho()
