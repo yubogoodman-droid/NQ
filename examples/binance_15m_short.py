@@ -5,8 +5,9 @@
 且進場價在 1 小時 MA25 下方、還不能已經掉到 1h MA200 下面，
 與 1 小時 MA99 不能太遠（預設 20%），
 且 15m 與 1h 的 MA7/14/25/99/120 都不能糾結在一起，進場價也不能貼著 1h MA120，
-進場 K 開盤離 15m MA200 也要有肉（還在 200 上方時開盤至少高 4%；
-收盤仍貼 200 且實體太小如龍蝦也不空）。
+進場 K 開盤離 15m MA200 也要有肉（還在 200 上方時開盤至少高 4%），
+且若 2R 還在 15m MA200 下方，進場 K 必須真正打到 200
+（缺口回補 ≥50% 或實體 ≥3%；龍蝦那種弱陰線踩在支撐上不空）。
 
 用法:
   python3 examples/binance_15m_short.py
@@ -45,8 +46,9 @@ MIN_1H_MA120_DIST = 0.02
 MIN_1H_MA_SPREAD = 0.04
 MIN_15M_MA_SPREAD = 0.015
 MIN_15M_MA200_OPEN = 0.04
-MIN_15M_MA200_CLOSE = 0.05
-MIN_15M_MA200_BODY = 0.02
+MIN_15M_MA200_ATTACK_GAP = 0.50
+MIN_15M_MA200_ATTACK_BODY = 0.03
+NEAR_15M_MA200_CLOSE = 0.01
 HTF_MA_PERIODS = (7, 14, 25, 99, 120)
 MA_COLORS = {
     7: "#f0c14a",
@@ -514,15 +516,11 @@ def filter_away_15m_ma200(
     df: pd.DataFrame,
     signals: Sequence[Signal],
     min_open_dist: float = MIN_15M_MA200_OPEN,
-    min_close_dist: float = MIN_15M_MA200_CLOSE,
-    min_body_pct: float = MIN_15M_MA200_BODY,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """進場 K 還在 15m MA200 上方、卻沒肉不空。
+    """進場 K 還在 15m MA200 上方、開盤卻貼著 200（FLOCK/FIL/CRV/PROM 沒肉）不空。
 
-    開盤貼著 200（FLOCK/FIL/CRV/PROM），或收盤仍貼著 200 且實體太小（龍蝦
-    那種小陰線走在 200 上）都濾掉。急殺已跌破 200（CATI），或開盤夠高再砸
-    到 200 附近（CLO、實體夠大）仍可空。
+    急殺已跌破 200（CATI）或開盤夠高再砸到 200 附近（CLO）仍可空。
     """
     if min_open_dist <= 0:
         return list(signals)
@@ -546,19 +544,65 @@ def filter_away_15m_ma200(
         if not np.isfinite(op) or op / ma - 1.0 < min_open_dist:
             near += 1
             continue
-        close_dist = sig.entry_price / ma - 1.0
-        if (
-            min_close_dist > 0
-            and min_body_pct > 0
-            and close_dist < min_close_dist
-            and sig.body_pct < min_body_pct
-        ):
-            near += 1
-            continue
         kept.append(sig)
     if funnel is not None:
         funnel["near_15m_ma200"] = funnel.get("near_15m_ma200", 0) + near
         funnel["no_15m_ma200"] = funnel.get("no_15m_ma200", 0) + nodata
+    return kept
+
+
+def filter_attack_15m_ma200(
+    df: pd.DataFrame,
+    signals: Sequence[Signal],
+    params: Optional[ShortParams] = None,
+    min_gap: float = MIN_15M_MA200_ATTACK_GAP,
+    min_body: float = MIN_15M_MA200_ATTACK_BODY,
+    near_close: float = NEAR_15M_MA200_CLOSE,
+    funnel: Optional[Dict[str, int]] = None,
+) -> List[Signal]:
+    """2R 還在 15m MA200 下方、進場 K 卻沒打到 200，不空。
+
+    UNI/COTI/ZAMA 的 2R 仍在 200 上面，不用穿過支撐，留著。
+    CLO 已砸到 200 旁邊、MAGMA 那種大陰線，也留著。
+    龍蝦/NAORIS 弱陰線踩在 200 上、目標卻要打穿 200 才到 2R，濾掉。
+    """
+    p = params or default_params()
+    kept: List[Signal] = []
+    weak = 0
+    m200 = sma(df["close"].to_numpy(float), 200)
+    opens = df["open"].to_numpy(float)
+    high = df["high"].to_numpy(float)
+    for sig in signals:
+        i = sig.entry_idx
+        if i >= len(m200):
+            kept.append(sig)
+            continue
+        ma = m200[i]
+        entry = float(sig.entry_price)
+        if not np.isfinite(ma) or ma <= 0:
+            kept.append(sig)
+            continue
+        if entry < ma * (1.0 + near_close):
+            kept.append(sig)
+            continue
+        stop = _stop_price(high, i, p.stop_lookback, entry, sig.ma_high)
+        if stop is None:
+            kept.append(sig)
+            continue
+        target = entry - p.target_r * (stop - entry)
+        if target >= ma:
+            kept.append(sig)
+            continue
+        op = float(opens[i])
+        gap = 1.0
+        if np.isfinite(op) and op > ma:
+            gap = (op - entry) / (op - ma)
+        if gap >= min_gap or float(sig.body_pct) >= min_body:
+            kept.append(sig)
+            continue
+        weak += 1
+    if funnel is not None:
+        funnel["weak_15m_ma200"] = funnel.get("weak_15m_ma200", 0) + weak
     return kept
 
 
@@ -751,6 +795,7 @@ def scan_symbol(
     min_1h_ma_spread: float = MIN_1H_MA_SPREAD,
     min_15m_ma_spread: float = MIN_15M_MA_SPREAD,
     min_15m_ma200_open: float = MIN_15M_MA200_OPEN,
+    require_15m_ma200_attack: bool = True,
 ) -> tuple[List[Hit], dict]:
     meta = {"symbol": sym, "bars": 0, "error": "", "n_sig": 0, "n_trade": 0}
     try:
@@ -772,6 +817,8 @@ def scan_symbol(
         sigs = filter_untangled_15m_mas(sigs, min_spread=min_15m_ma_spread, funnel=funnel)
     if min_15m_ma200_open > 0:
         sigs = filter_away_15m_ma200(df, sigs, min_open_dist=min_15m_ma200_open, funnel=funnel)
+    if require_15m_ma200_attack:
+        sigs = filter_attack_15m_ma200(df, sigs, params=params, funnel=funnel)
     df_1h = pd.DataFrame()
     try:
         df_1h = fetch_klines(sym, "1h")
@@ -998,6 +1045,7 @@ def write_html(
     min_1h_ma_spread: float = MIN_1H_MA_SPREAD,
     min_15m_ma_spread: float = MIN_15M_MA_SPREAD,
     min_15m_ma200_open: float = MIN_15M_MA200_OPEN,
+    require_15m_ma200_attack: bool = True,
 ) -> Path:
     stats = summarize_trades([h.trade for h in hits])
     featured_hits = [h for h in hits if h.symbol == featured]
@@ -1130,6 +1178,13 @@ def write_html(
     omitted = ""
     if len(hits) > len(chart_hits):
         omitted = f"<p class='muted'>圖表只畫 {len(chart_hits)} / {len(hits)} 筆（含 {featured}，其餘依 |報酬|）。</p>"
+    attack_clause = (
+        "，且若 <b>2R 還在 15m MA200 下方</b>則進場 K 必須真正打到 200"
+        "（缺口回補 ≥50% 或實體 ≥3%；龍蝦那種弱陰線踩在支撐上不空；"
+        "UNI/COTI 那種 2R 還在 200 上面仍可）"
+        if require_15m_ma200_attack
+        else ""
+    )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -1162,13 +1217,13 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>幣安 15m · 7/14/25 空頭排列跌破 99/120 做空</h1>
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
-<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 <b>15m 的 MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_15m_ma_spread*100:.1f}%，ZEN/XMR 那種中均黏成麵條不空），且進場 K 若還在 <b>15m MA200 上方</b>則開盤須高於 200 至少 <b>{min_15m_ma200_open*100:.0f}%</b>（FLOCK/FIL/CRV/PROM 開盤貼 200 沒肉不空；龍蝦那種收盤仍貼 200、實體又小也不空；已跌破 200 或 CLO 那種從高處砸下來仍可），且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
+<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 <b>15m 的 MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_15m_ma_spread*100:.1f}%，ZEN/XMR 那種中均黏成麵條不空），且進場 K 若還在 <b>15m MA200 上方</b>則開盤須高於 200 至少 <b>{min_15m_ma200_open*100:.0f}%</b>（FLOCK/FIL/CRV/PROM 貼著 200 沒肉不空；已跌破 200 或 CLO 那種從高處砸下來仍可）{attack_clause}，且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
 <br/>出場：停在跌破 K 高點與 MA99/120 上緣的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
 <br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120/200）。卡片 <b>虧損在前</b>（虧最多先看），賺錢的按進場時間。股票／ETF 永續預設不掃。</p>
 <p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 空頭排列 {fun.get('stack', 0)} → 同時跌破 {fun.get('cross', 0)}
 → 紅 K {fun.get('red', 0)} → 進場 {fun.get('entry', 0)}
 · 太淺 {fun.get('shallow', 0)} · 實體不夠 {fun.get('thin', 0)} · 量不夠 {fun.get('quiet', 0)}
-· 貼15m MA200 {fun.get('near_15m_ma200', 0)} · 不在1h MA25下 {fun.get('above_1h_ma25', 0)} · 已在1h MA200下 {fun.get('below_1h_ma200', 0)} · 離1h MA99太遠 {fun.get('far_1h_ma99', 0)} · 貼1h MA120 {fun.get('near_1h_ma120', 0)} · 15m均線糾結 {fun.get('tangled_15m_ma', 0)} · 1h均線糾結 {fun.get('tangled_1h_ma', 0)} · 無1h {fun.get('no_1h', 0) + fun.get('no_1h_ma99', 0) + fun.get('no_1h_ma120', 0) + fun.get('no_1h_ma200', 0) + fun.get('no_1h_spread', 0)} · 無15m MA200 {fun.get('no_15m_ma200', 0)}
+· 貼15m MA200 {fun.get('near_15m_ma200', 0)} · 弱陰踩15m MA200 {fun.get('weak_15m_ma200', 0)} · 不在1h MA25下 {fun.get('above_1h_ma25', 0)} · 已在1h MA200下 {fun.get('below_1h_ma200', 0)} · 離1h MA99太遠 {fun.get('far_1h_ma99', 0)} · 貼1h MA120 {fun.get('near_1h_ma120', 0)} · 15m均線糾結 {fun.get('tangled_15m_ma', 0)} · 1h均線糾結 {fun.get('tangled_1h_ma', 0)} · 無1h {fun.get('no_1h', 0) + fun.get('no_1h_ma99', 0) + fun.get('no_1h_ma120', 0) + fun.get('no_1h_ma200', 0) + fun.get('no_1h_spread', 0)} · 無15m MA200 {fun.get('no_15m_ma200', 0)}
 · 風險不合 {fun.get('skip_risk', 0)} · 持倉中 {fun.get('skip_busy', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 <br/>{escape(feat_line)}</p>
@@ -1262,6 +1317,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default=MIN_15M_MA200_OPEN,
         help="進場 K 開盤須高於 15m MA200 的最小距離（0.04=4%%；已跌破 200 不限；0 關閉）",
     )
+    p.add_argument(
+        "--no-15m-ma200-attack",
+        action="store_true",
+        help="不要求 2R 在 15m MA200 下方時進場 K 必須打到 200",
+    )
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
     p.add_argument("--json", dest="json_path", default="")
@@ -1285,7 +1345,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         f"h1_ma120_dist={args.min_1h_ma120_dist:g} "
         f"h1_ma_spread={args.min_1h_ma_spread:g} "
         f"m15_ma_spread={args.min_15m_ma_spread:g} "
-        f"m15_ma200_open={args.min_15m_ma200_open:g}",
+        f"m15_ma200_open={args.min_15m_ma200_open:g} "
+        f"m15_ma200_attack={'off' if args.no_15m_ma200_attack else 'on'}",
         flush=True,
     )
 
@@ -1308,6 +1369,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             min_1h_ma_spread=float(args.min_1h_ma_spread),
             min_15m_ma_spread=float(args.min_15m_ma_spread),
             min_15m_ma200_open=float(args.min_15m_ma200_open),
+            require_15m_ma200_attack=not args.no_15m_ma200_attack,
         )
         return stock_hits, meta, local
 
@@ -1362,6 +1424,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "min_1h_ma_spread": float(args.min_1h_ma_spread),
         "min_15m_ma_spread": float(args.min_15m_ma_spread),
         "min_15m_ma200_open": float(args.min_15m_ma200_open),
+        "require_15m_ma200_attack": not bool(args.no_15m_ma200_attack),
     }
     html_path = Path(args.html) if args.html else None
     if html_path is None and args.pages:
@@ -1388,6 +1451,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             label += f" · 15m均線不糾結≥{args.min_15m_ma_spread*100:.1f}%"
         if args.min_15m_ma200_open > 0:
             label += f" · 15m MA200開盤≥{args.min_15m_ma200_open*100:.0f}%"
+        if not args.no_15m_ma200_attack:
+            label += " · 2R在MA200下須打到200"
         out = write_html(
             html_path,
             hits,
@@ -1402,6 +1467,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             min_1h_ma_spread=float(args.min_1h_ma_spread),
             min_15m_ma_spread=float(args.min_15m_ma_spread),
             min_15m_ma200_open=float(args.min_15m_ma200_open),
+            require_15m_ma200_attack=not args.no_15m_ma200_attack,
         )
         write_view_html(out)
         print(f"html={out}", flush=True)

@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from binance_15m_short import (  # noqa: E402
     TPE,
     Hit,
+    Signal,
     TradeResult,
     bar_index_at,
     detect_signals,
@@ -26,6 +27,7 @@ from binance_15m_short import (  # noqa: E402
     filter_untangled_15m_mas,
     filter_away_1h_ma120,
     filter_away_15m_ma200,
+    filter_attack_15m_ma200,
     filter_not_below_1h_ma200,
     default_params,
     htf_ma_at_entry,
@@ -445,32 +447,6 @@ def test_15m_ma200_keeps_dump_from_well_above() -> None:
     assert op / m200 - 1.0 >= 0.04
 
 
-def test_15m_ma200_rejects_hover_like_lobster() -> None:
-    """龍蝦那種：開盤離 200 夠遠，但收盤仍貼著、實體又小 → 沒肉不空。"""
-    closes = np.concatenate(
-        [
-            np.full(200, 0.90),
-            np.full(120, 1.02),
-            np.array([1.004, 0.998, 0.994, 0.992]),
-            np.linspace(0.992, 0.990, 15),
-        ]
-    )
-    df = bars(closes)
-    sigs = detect_signals(df, LOOSE)
-    assert sigs
-    s = sigs[0]
-    m200 = float(sma(df["close"].to_numpy(float), 200)[s.entry_idx])
-    op = float(df["open"].iloc[s.entry_idx])
-    assert s.entry_price >= m200
-    assert op / m200 - 1.0 >= 0.04
-    assert s.entry_price / m200 - 1.0 < 0.05
-    assert s.body_pct < 0.02
-    funnel: dict = {}
-    kept = filter_away_15m_ma200(df, sigs, min_open_dist=0.04, funnel=funnel)
-    assert kept == []
-    assert funnel.get("near_15m_ma200", 0) >= 1
-
-
 def test_15m_ma200_keeps_already_through() -> None:
     """收盤已跌破 15m MA200（CATI 那種穿過 200）不因貼近而濾掉。"""
     df = bars(dump_closes(n_flat=220))
@@ -490,6 +466,63 @@ def test_15m_ma200_missing_data_skips() -> None:
     funnel: dict = {}
     assert filter_away_15m_ma200(df, sigs, min_open_dist=0.04, funnel=funnel) == []
     assert funnel.get("no_15m_ma200", 0) >= 1
+
+
+def _ma200_sig(open_px: float, close_px: float, high_px: float) -> tuple[pd.DataFrame, Signal]:
+    """200 根收在 1.0，最後一根改成指定 OHLC，MA200 ≈ 1。"""
+    n = 220
+    closes = np.full(n, 1.0)
+    closes[-1] = close_px
+    df = bars(closes)
+    i = n - 1
+    df.iat[i, df.columns.get_loc("open")] = open_px
+    df.iat[i, df.columns.get_loc("close")] = close_px
+    df.iat[i, df.columns.get_loc("high")] = high_px
+    df.iat[i, df.columns.get_loc("low")] = min(open_px, close_px) - 0.001
+    body = (open_px - close_px) / open_px if open_px else 0.0
+    sig = Signal(
+        entry_idx=i,
+        entry_price=close_px,
+        ma7=0.99,
+        ma14=1.00,
+        ma25=1.01,
+        ma99=1.02,
+        ma120=1.03,
+        ma_high=float(high_px),
+        body_pct=body,
+        vol_ratio=2.0,
+    )
+    return df, sig
+
+
+def test_attack_ma200_rejects_weak_bar_when_2r_below() -> None:
+    """龍蝦那種：2R 在 15m MA200 下，弱陰線還沒打到 200 → 濾掉。"""
+    df, sig = _ma200_sig(open_px=1.065, close_px=1.047, high_px=1.083)
+    funnel: dict = {}
+    kept = filter_attack_15m_ma200(df, [sig], funnel=funnel)
+    assert kept == []
+    assert funnel.get("weak_15m_ma200", 0) == 1
+
+
+def test_attack_ma200_keeps_when_2r_still_above() -> None:
+    """UNI/COTI 那種：停很近，2R 還在 200 上面 → 留著。"""
+    df, sig = _ma200_sig(open_px=1.060, close_px=1.046, high_px=1.052)
+    kept = filter_attack_15m_ma200(df, [sig])
+    assert kept == [sig]
+
+
+def test_attack_ma200_keeps_real_dump_into_200() -> None:
+    """CLO / MAGMA：大陰線或已經砸到 200 旁邊 → 留著。"""
+    df_clo, clo = _ma200_sig(open_px=1.097, close_px=1.007, high_px=1.020)
+    assert filter_attack_15m_ma200(df_clo, [clo]) == [clo]
+    df_fat, fat = _ma200_sig(open_px=1.170, close_px=1.109, high_px=1.170)
+    assert fat.body_pct >= 0.03
+    assert filter_attack_15m_ma200(df_fat, [fat]) == [fat]
+
+
+def test_attack_ma200_keeps_already_through() -> None:
+    df, sig = _ma200_sig(open_px=1.02, close_px=0.99, high_px=1.03)
+    assert filter_attack_15m_ma200(df, [sig]) == [sig]
 
 
 def test_1h_mas_reject_tangled_like_flock() -> None:
@@ -607,6 +640,8 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     assert "糾結" in text
     assert "15m 的 MA7/14/25/99/120 不能糾結" in text
     assert "15m MA200" in text
+    assert "2R 還在 15m MA200" in text
+    assert "打到 200" in text
     assert "MA120" in text
     assert "MA200" in text
     assert "虧損在前" in text
@@ -663,9 +698,12 @@ def main() -> int:
     test_15m_mas_keep_fanned_like_cloud()
     test_15m_ma200_rejects_open_too_close()
     test_15m_ma200_keeps_dump_from_well_above()
-    test_15m_ma200_rejects_hover_like_lobster()
     test_15m_ma200_keeps_already_through()
     test_15m_ma200_missing_data_skips()
+    test_attack_ma200_rejects_weak_bar_when_2r_below()
+    test_attack_ma200_keeps_when_2r_still_above()
+    test_attack_ma200_keeps_real_dump_into_200()
+    test_attack_ma200_keeps_already_through()
     test_1h_mas_reject_tangled_like_flock()
     test_1h_mas_keep_fanned_like_cloud()
     test_1h_ma120_rejects_too_close_like_morpho()
