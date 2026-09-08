@@ -445,6 +445,32 @@ def test_15m_ma200_keeps_dump_from_well_above() -> None:
     assert op / m200 - 1.0 >= 0.04
 
 
+def test_15m_ma200_rejects_hover_like_lobster() -> None:
+    """龍蝦那種：開盤離 200 夠遠，但收盤仍貼著、實體又小 → 沒肉不空。"""
+    closes = np.concatenate(
+        [
+            np.full(200, 0.90),
+            np.full(120, 1.02),
+            np.array([1.004, 0.998, 0.994, 0.992]),
+            np.linspace(0.992, 0.990, 15),
+        ]
+    )
+    df = bars(closes)
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    s = sigs[0]
+    m200 = float(sma(df["close"].to_numpy(float), 200)[s.entry_idx])
+    op = float(df["open"].iloc[s.entry_idx])
+    assert s.entry_price >= m200
+    assert op / m200 - 1.0 >= 0.04
+    assert s.entry_price / m200 - 1.0 < 0.05
+    assert s.body_pct < 0.02
+    funnel: dict = {}
+    kept = filter_away_15m_ma200(df, sigs, min_open_dist=0.04, funnel=funnel)
+    assert kept == []
+    assert funnel.get("near_15m_ma200", 0) >= 1
+
+
 def test_15m_ma200_keeps_already_through() -> None:
     """收盤已跌破 15m MA200（CATI 那種穿過 200）不因貼近而濾掉。"""
     df = bars(dump_closes(n_flat=220))
@@ -637,6 +663,7 @@ def main() -> int:
     test_15m_mas_keep_fanned_like_cloud()
     test_15m_ma200_rejects_open_too_close()
     test_15m_ma200_keeps_dump_from_well_above()
+    test_15m_ma200_rejects_hover_like_lobster()
     test_15m_ma200_keeps_already_through()
     test_15m_ma200_missing_data_skips()
     test_1h_mas_reject_tangled_like_flock()

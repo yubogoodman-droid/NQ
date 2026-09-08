@@ -5,7 +5,8 @@
 且進場價在 1 小時 MA25 下方、還不能已經掉到 1h MA200 下面，
 與 1 小時 MA99 不能太遠（預設 20%），
 且 15m 與 1h 的 MA7/14/25/99/120 都不能糾結在一起，進場價也不能貼著 1h MA120，
-進場 K 開盤離 15m MA200 也要有肉（還在 200 上方時開盤至少高 4%）。
+進場 K 開盤離 15m MA200 也要有肉（還在 200 上方時開盤至少高 4%；
+收盤仍貼 200 且實體太小如龍蝦也不空）。
 
 用法:
   python3 examples/binance_15m_short.py
@@ -44,6 +45,8 @@ MIN_1H_MA120_DIST = 0.02
 MIN_1H_MA_SPREAD = 0.04
 MIN_15M_MA_SPREAD = 0.015
 MIN_15M_MA200_OPEN = 0.04
+MIN_15M_MA200_CLOSE = 0.05
+MIN_15M_MA200_BODY = 0.02
 HTF_MA_PERIODS = (7, 14, 25, 99, 120)
 MA_COLORS = {
     7: "#f0c14a",
@@ -511,11 +514,15 @@ def filter_away_15m_ma200(
     df: pd.DataFrame,
     signals: Sequence[Signal],
     min_open_dist: float = MIN_15M_MA200_OPEN,
+    min_close_dist: float = MIN_15M_MA200_CLOSE,
+    min_body_pct: float = MIN_15M_MA200_BODY,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """進場 K 還在 15m MA200 上方、開盤卻貼著 200（FLOCK/FIL/CRV/PROM 沒肉）不空。
+    """進場 K 還在 15m MA200 上方、卻沒肉不空。
 
-    急殺已跌破 200（CATI）或開盤夠高再砸到 200 附近（CLO）仍可空。
+    開盤貼著 200（FLOCK/FIL/CRV/PROM），或收盤仍貼著 200 且實體太小（龍蝦
+    那種小陰線走在 200 上）都濾掉。急殺已跌破 200（CATI），或開盤夠高再砸
+    到 200 附近（CLO、實體夠大）仍可空。
     """
     if min_open_dist <= 0:
         return list(signals)
@@ -537,6 +544,15 @@ def filter_away_15m_ma200(
             continue
         op = float(opens[sig.entry_idx])
         if not np.isfinite(op) or op / ma - 1.0 < min_open_dist:
+            near += 1
+            continue
+        close_dist = sig.entry_price / ma - 1.0
+        if (
+            min_close_dist > 0
+            and min_body_pct > 0
+            and close_dist < min_close_dist
+            and sig.body_pct < min_body_pct
+        ):
             near += 1
             continue
         kept.append(sig)
@@ -1146,7 +1162,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>幣安 15m · 7/14/25 空頭排列跌破 99/120 做空</h1>
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
-<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 <b>15m 的 MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_15m_ma_spread*100:.1f}%，ZEN/XMR 那種中均黏成麵條不空），且進場 K 若還在 <b>15m MA200 上方</b>則開盤須高於 200 至少 <b>{min_15m_ma200_open*100:.0f}%</b>（FLOCK/FIL/CRV/PROM 貼著 200 沒肉不空；已跌破 200 或 CLO 那種從高處砸下來仍可），且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
+<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 <b>15m 的 MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_15m_ma_spread*100:.1f}%，ZEN/XMR 那種中均黏成麵條不空），且進場 K 若還在 <b>15m MA200 上方</b>則開盤須高於 200 至少 <b>{min_15m_ma200_open*100:.0f}%</b>（FLOCK/FIL/CRV/PROM 開盤貼 200 沒肉不空；龍蝦那種收盤仍貼 200、實體又小也不空；已跌破 200 或 CLO 那種從高處砸下來仍可），且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。
 <br/>出場：停在跌破 K 高點與 MA99/120 上緣的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
 <br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120/200）。卡片 <b>虧損在前</b>（虧最多先看），賺錢的按進場時間。股票／ETF 永續預設不掃。</p>
 <p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 空頭排列 {fun.get('stack', 0)} → 同時跌破 {fun.get('cross', 0)}
