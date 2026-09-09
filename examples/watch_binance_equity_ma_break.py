@@ -19,7 +19,9 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+from html import escape
 from pathlib import Path
+from statistics import mean, median
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -41,6 +43,8 @@ MA_PERIODS = (7, 14, 25, 200)
 SESSION_START = (9, 0)  # 開盤前 30 分
 SESSION_END = (16, 0)
 MIN_DEPTH_PCT = 0.40  # 收盤至少低於最近那條均 0.4%，過濾輕吻
+HORIZONS = ((1, "15m"), (2, "30m"), (4, "1h"), (8, "2h"), (16, "4h"))
+PAGES_HTML = REPO / "docs" / "binance" / "ma-break-7d.html"
 
 SESSION = requests.Session()
 SESSION.headers.update(
@@ -233,6 +237,246 @@ def key_of(ev: dict) -> str:
     return f"{ev['symbol']}:{int(ev['d']['t'][ev['i']])}"
 
 
+def short_fwd_pct(entry: float, later: float) -> float:
+    if entry == 0:
+        return 0.0
+    return (entry - later) / entry * 100.0
+
+
+def trade_from_bar(sym: str, d: dict, i: int) -> dict:
+    entry = float(d["c"][i])
+    n = len(d["c"])
+    fwd: dict[str, float | None] = {}
+    for bars, name in HORIZONS:
+        j = i + bars
+        fwd[name] = None if j >= n else short_fwd_pct(entry, float(d["c"][j]))
+    close_et = bar_close_et(int(d["t"][i]))
+    eod = None
+    for j in range(i + 1, n):
+        cj = bar_close_et(int(d["t"][j]))
+        if cj.date() != close_et.date():
+            break
+        eod = short_fwd_pct(entry, float(d["c"][j]))
+        if (cj.hour, cj.minute) == SESSION_END:
+            break
+    j1 = min(n, i + 9)
+    mae = mfe = None
+    if j1 > i + 1:
+        hi = float(np.max(d["h"][i + 1 : j1]))
+        lo = float(np.min(d["l"][i + 1 : j1]))
+        mae = (hi - entry) / entry * 100.0
+        mfe = (entry - lo) / entry * 100.0
+    return {
+        "symbol": sym,
+        "t": int(d["t"][i]),
+        "et": hm_et(int(d["t"][i])),
+        "tw": hm8(int(d["t"][i])),
+        "entry": entry,
+        "depth": break_depth_pct(d, i),
+        "fwd": fwd,
+        "eod": eod,
+        "mae": mae,
+        "mfe": mfe,
+    }
+
+
+def backtest_symbol(sym: str, cutoff_ms: int) -> list[dict]:
+    raw = fetch_klines(sym, limit=1000)
+    if raw is None:
+        return []
+    d = indicators(raw)
+    out = []
+    for i in range(200, len(d["c"])):
+        close_ms = int(d["t"][i]) + INTERVAL_MS
+        if close_ms < cutoff_ms:
+            continue
+        if not is_signal(d, i) or not bar_in_session(int(d["t"][i])):
+            continue
+        out.append(trade_from_bar(sym, d, i))
+    return out
+
+
+def horizon_stats(trades: list[dict], name: str) -> dict | None:
+    xs = [t["fwd"][name] for t in trades if t["fwd"].get(name) is not None]
+    return _pnl_stats(xs)
+
+
+def _pnl_stats(xs: list[float]) -> dict | None:
+    if not xs:
+        return None
+    wins = sum(1 for x in xs if x > 0)
+    return {
+        "n": len(xs),
+        "wr": wins / len(xs) * 100.0,
+        "avg": mean(xs),
+        "med": median(xs),
+        "sum": sum(xs),
+    }
+
+
+def collect_backtest(days: int) -> tuple[list[str], list[dict], int]:
+    symbols = universe()
+    start = (datetime.now(ET) - timedelta(days=days)).replace(
+        hour=SESSION_START[0], minute=SESSION_START[1], second=0, microsecond=0
+    )
+    cutoff_ms = int(start.timestamp() * 1000)
+    trades: list[dict] = []
+    with ThreadPoolExecutor(8) as ex:
+        futs = {ex.submit(backtest_symbol, s, cutoff_ms): s for s in symbols}
+        for fut in as_completed(futs):
+            try:
+                trades.extend(fut.result())
+            except Exception as e:
+                print("err", futs[fut], e, flush=True)
+    trades.sort(key=lambda t: (t["t"], t["symbol"]))
+    return symbols, trades, cutoff_ms
+
+
+def _fmt_pnl(x: float | None) -> str:
+    if x is None:
+        return "—"
+    cls = "pos" if x > 0 else ("neg" if x < 0 else "")
+    return f'<span class="{cls}">{x:+.2f}%</span>'
+
+
+def _fmt_plain(x: float | None) -> str:
+    return "—" if x is None else f"{x:+.2f}%"
+
+
+def write_backtest_html(
+    path: Path,
+    *,
+    days: int,
+    symbols: list[str],
+    trades: list[dict],
+    cutoff_ms: int,
+) -> Path:
+    start = datetime.fromtimestamp(cutoff_ms / 1000, ET).strftime("%Y-%m-%d %H:%M")
+    end = datetime.now(ET).strftime("%Y-%m-%d %H:%M")
+    rows = []
+    for t in reversed(trades):
+        name = t["symbol"].replace("USDT", "")
+        rows.append(
+            "<tr>"
+            f"<td>{escape(t['et'])}</td>"
+            f"<td>{escape(name)}</td>"
+            f"<td>{t['entry']:g}</td>"
+            f"<td>{t['depth']:.2f}</td>"
+            f"<td>{_fmt_pnl(t['fwd']['15m'])}</td>"
+            f"<td>{_fmt_pnl(t['fwd']['1h'])}</td>"
+            f"<td>{_fmt_pnl(t['fwd']['2h'])}</td>"
+            f"<td>{_fmt_pnl(t['eod'])}</td>"
+            "</tr>"
+        )
+    kpi_bits = []
+    for _, name in HORIZONS:
+        st = horizon_stats(trades, name)
+        if not st:
+            continue
+        kpi_bits.append(
+            f'<div class="kpi"><div class="k">空 {name}</div>'
+            f'<div class="v">{st["wr"]:.0f}% / {st["avg"]:+.2f}%</div></div>'
+        )
+    eod_st = _pnl_stats([t["eod"] for t in trades if t["eod"] is not None])
+    if eod_st:
+        kpi_bits.append(
+            f'<div class="kpi"><div class="k">空到當日收</div>'
+            f'<div class="v">{eod_st["wr"]:.0f}% / {eod_st["avg"]:+.2f}%</div></div>'
+        )
+    by_day: dict[str, int] = {}
+    for t in trades:
+        by_day[t["et"][:5]] = by_day.get(t["et"][:5], 0) + 1
+    day_line = " · ".join(f"{d} {n}筆" for d, n in sorted(by_day.items()))
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>美股 15m 跌破均線 · 近 {days} 日</title>
+<style>
+:root{{--bg:#0c1210;--panel:#14201b;--ink:#e8f0ea;--muted:#8aa193;--line:rgba(232,240,234,.12);--long:#3dba7a;--short:#e35d5d}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:#0c1210;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
+.wrap{{max-width:720px;margin:0 auto;padding:16px 12px 40px}}
+h1{{font-size:20px;margin:0 0 6px}}
+.sub{{color:var(--muted);font-size:13px;line-height:1.55;margin:0 0 14px}}
+.kpis{{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}}
+.kpi{{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 12px}}
+.kpi .k{{color:var(--muted);font-size:11px}} .kpi .v{{font-size:16px;margin-top:4px}}
+.card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:14px;overflow-x:auto}}
+table{{width:100%;border-collapse:collapse;font-size:12px}}
+th,td{{text-align:left;padding:7px 4px;border-bottom:1px solid var(--line);white-space:nowrap}}
+th{{color:var(--muted);font-weight:500}}
+.pos{{color:var(--long)}} .neg{{color:var(--short)}}
+.note{{color:var(--muted);font-size:12px;line-height:1.5;margin:8px 0 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>15m 跌破 7/14/25/200 · 近 {days} 日</h1>
+  <p class="sub">幣安美股永續 {len(symbols)} 檔 · 美東 {start} → {end} · 訊號收盤做空 · 報酬是空單%</p>
+  <div class="kpis">
+    <div class="kpi"><div class="k">筆數 / 檔數</div><div class="v">{len(trades)} / {len({t["symbol"] for t in trades})}</div></div>
+    {"".join(kpi_bits)}
+  </div>
+  <div class="card">
+    <p class="note">每日：{escape(day_line) if day_line else "無"}</p>
+    <p class="note">陰線、同時低於四條均、距最近均 ≥ 0.4%。不含滑價與資金費。綠＝空單賺。</p>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th>美東</th><th>標的</th><th>進場</th><th>深度%</th><th>15m</th><th>1h</th><th>2h</th><th>當日</th></tr></thead>
+      <tbody>
+        {"".join(rows) if rows else "<tr><td colspan='8'>無訊號</td></tr>"}
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>
+"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    return path
+
+
+def print_backtest(trades: list[dict]) -> None:
+    print(f"訊號 {len(trades)} 筆、{len({t['symbol'] for t in trades})} 檔", flush=True)
+    for _, name in HORIZONS:
+        st = horizon_stats(trades, name)
+        if not st:
+            print(f"  {name}: 尚未走完")
+            continue
+        print(
+            f"  空 {name}: n={st['n']} 勝率 {st['wr']:.1f}% 均 {st['avg']:+.2f}% 中位 {st['med']:+.2f}% 合計 {st['sum']:+.2f}%",
+            flush=True,
+        )
+    eod_st = _pnl_stats([t["eod"] for t in trades if t["eod"] is not None])
+    if eod_st:
+        print(
+            f"  空到當日收: n={eod_st['n']} 勝率 {eod_st['wr']:.1f}% 均 {eod_st['avg']:+.2f}% 中位 {eod_st['med']:+.2f}%",
+            flush=True,
+        )
+    for t in trades:
+        if t["symbol"] != "VRTUSDT":
+            continue
+        print(
+            f"  VRT {t['et']} 深 {t['depth']:.2f}%  15m {_fmt_plain(t['fwd']['15m'])}  1h {_fmt_plain(t['fwd']['1h'])}  2h {_fmt_plain(t['fwd']['2h'])}",
+            flush=True,
+        )
+
+
+def run_backtest(days: int, html_path: Path) -> int:
+    print(f"回測近 {days} 日美股永續 15m 跌破…", flush=True)
+    t0 = time.time()
+    symbols, trades, cutoff_ms = collect_backtest(days)
+    print(f"掃完 {len(symbols)} 檔 {time.time()-t0:.1f}s", flush=True)
+    print_backtest(trades)
+    out = write_backtest_html(html_path, days=days, symbols=symbols, trades=trades, cutoff_ms=cutoff_ms)
+    print("html", out)
+    return 0
+
+
 def format_event(ev: dict) -> str:
     d, i, sym = ev["d"], ev["i"], ev["symbol"]
     px = float(d["c"][i])
@@ -395,10 +639,16 @@ def main() -> int:
     p.add_argument("--force", action="store_true", help="不管美東時段，立刻掃")
     p.add_argument("--dry-run", action="store_true", help="只印、不送 Telegram")
     p.add_argument("--test", action="store_true", help="只測 Telegram")
+    p.add_argument("--backtest", action="store_true", help="回測近 N 日（不做 Telegram）")
+    p.add_argument("--days", type=int, default=7, help="回測天數，預設 7")
+    p.add_argument("--html", default="", help="回測 HTML 路徑")
     args = p.parse_args()
     apply_keys()
     if args.test:
         return test_telegram()
+    if args.backtest:
+        html_path = Path(args.html) if args.html else PAGES_HTML
+        return run_backtest(max(1, args.days), html_path)
 
     seen = load_seen()
     print("載入美股永續…", flush=True)

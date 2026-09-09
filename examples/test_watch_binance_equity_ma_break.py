@@ -20,6 +20,7 @@ from watch_binance_equity_ma_break import (  # noqa: E402
     is_signal,
     next_window_start,
     now_should_scan,
+    short_fwd_pct,
     sma,
 )
 
@@ -87,6 +88,11 @@ def test_kiss_not_signal_smash_is() -> None:
     assert MIN_DEPTH_PCT == 0.40
 
 
+def test_short_fwd_pct() -> None:
+    assert abs(short_fwd_pct(100.0, 97.0) - 3.0) < 1e-9
+    assert abs(short_fwd_pct(100.0, 104.0) + 4.0) < 1e-9
+
+
 def test_session_window_weekday() -> None:
     # 2026-09-09 星期三。15m 開盤 ms → 收盤美東時間
     et = ZoneInfo("America/New_York")
@@ -136,6 +142,7 @@ def main() -> int:
     test_fresh_break_first_close_below_all()
     test_already_below_is_not_fresh()
     test_kiss_not_signal_smash_is()
+    test_short_fwd_pct()
     test_session_window_weekday()
     test_weekend_off()
     test_now_should_scan_and_next_window()

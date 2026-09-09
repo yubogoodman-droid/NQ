@@ -105,6 +105,7 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```bash
 python3 examples/watch_binance_equity_ma_break.py --test
 python3 examples/watch_binance_equity_ma_break.py --once --backfill --dry-run
+python3 examples/watch_binance_equity_ma_break.py --backtest --days 7
 python3 examples/watch_binance_equity_ma_break.py
 python3 examples/test_watch_binance_equity_ma_break.py
 ```
