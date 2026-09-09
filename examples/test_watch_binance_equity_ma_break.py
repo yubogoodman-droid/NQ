@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""離線測試：15m 同時跌破 MA7/14/25/200、美東偵測窗。"""
+"""離線測試：開盤瀑布條件與美東 09:00–10:00 偵測窗。"""
 from __future__ import annotations
 
 import sys
