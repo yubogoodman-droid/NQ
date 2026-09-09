@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""幣安美股永續：15m 收盤同時跌破 MA7 / MA14 / MA25 / MA200 → Telegram。
+"""幣安美股永續：開盤瀑布 Telegram。
 
-只掃 underlyingType=EQUITY 的股票永續（不含商品、港股、韓股）。
-只在美東開盤前後各 30 分有訊號才報（09:00–10:00），週末不掃。
+找你那種 15m：盤整後長陰放量摔出 MA7/14/25/99/120/200。
+只在美東 09:00–10:00（開盤前後各半小時）報，週末不掃。
 
     python3 examples/watch_binance_equity_ma_break.py --test
-    python3 examples/watch_binance_equity_ma_break.py --once --dry-run
-    python3 examples/watch_binance_equity_ma_break.py --once --backfill --dry-run
+    python3 examples/watch_binance_equity_ma_break.py --backtest --days 7
     python3 examples/watch_binance_equity_ma_break.py
-
-Telegram 憑證：腳本最上面，或 repo 根目錄 tg_config.env。
 """
 from __future__ import annotations
 
@@ -39,11 +36,15 @@ SEEN_PATH = REPO / "output" / "binance_equity_ma_break_seen.json"
 CONFIG_ENV = REPO / "tg_config.env"
 INTERVAL = "15m"
 INTERVAL_MS = 900_000
-MA_PERIODS = (7, 14, 25, 200)
+MA_PERIODS = (7, 14, 25, 99, 120, 200)
 SESSION_START = (9, 0)  # 開盤前 30 分
 SESSION_END = (10, 0)  # 開盤後 30 分
 CASH_CLOSE = (16, 0)  # 回測「當日收」仍看到美東 16:00
-MIN_DEPTH_PCT = 0.40  # 收盤至少低於最近那條均 0.4%，過濾輕吻
+MIN_BODY_PCT = 1.20
+MIN_RANGE_PCT = 2.50
+MIN_DROP_PCT = 2.50
+MIN_VOL_RATIO = 1.80
+DROP_LOOKBACK = 16
 HORIZONS = ((1, "15m"), (2, "30m"), (4, "1h"), (8, "2h"), (16, "4h"))
 PAGES_HTML = REPO / "docs" / "binance" / "ma-break-7d.html"
 
@@ -154,6 +155,35 @@ def is_fresh_break(d: dict, i: int) -> bool:
     return below_all(d, i) and not below_all(d, i - 1)
 
 
+def bar_body_pct(d: dict, i: int) -> float:
+    o = float(d["o"][i])
+    if o == 0:
+        return 0.0
+    return (o - float(d["c"][i])) / o * 100.0
+
+
+def bar_range_pct(d: dict, i: int) -> float:
+    c = float(d["c"][i])
+    if c == 0:
+        return 0.0
+    return (float(d["h"][i]) - float(d["l"][i])) / c * 100.0
+
+
+def vol_ratio(d: dict, i: int) -> float:
+    v20 = sma(d["v"], 20)[i]
+    if np.isnan(v20) or v20 <= 0:
+        return 0.0
+    return float(d["v"][i] / v20)
+
+
+def drop_from_swing_pct(d: dict, i: int) -> float:
+    a0 = max(0, i - DROP_LOOKBACK)
+    hi = float(np.max(d["h"][a0 : i + 1]))
+    if hi <= 0:
+        return 0.0
+    return (hi - float(d["c"][i])) / hi * 100.0
+
+
 def break_depth_pct(d: dict, i: int) -> float:
     mas = [float(d[f"m{n}"][i]) for n in MA_PERIODS]
     if any(np.isnan(v) for v in mas):
@@ -164,12 +194,27 @@ def break_depth_pct(d: dict, i: int) -> float:
     return (min(mas) / px - 1) * 100
 
 
+def prev_near_ribbon(d: dict, i: int) -> bool:
+    if i < 1:
+        return False
+    pc = d["c"][i - 1]
+    return any(pc >= d[f"m{n}"][i - 1] for n in (7, 14, 25, 200))
+
+
 def is_signal(d: dict, i: int) -> bool:
-    if not is_fresh_break(d, i):
+    if i < 210 or not is_fresh_break(d, i):
         return False
     if d["c"][i] >= d["o"][i]:
         return False
-    return break_depth_pct(d, i) >= MIN_DEPTH_PCT
+    if not prev_near_ribbon(d, i):
+        return False
+    if bar_body_pct(d, i) < MIN_BODY_PCT:
+        return False
+    if bar_range_pct(d, i) < MIN_RANGE_PCT:
+        return False
+    if drop_from_swing_pct(d, i) < MIN_DROP_PCT:
+        return False
+    return vol_ratio(d, i) >= MIN_VOL_RATIO
 
 
 def bar_close_et(open_ms: int) -> datetime:
@@ -221,9 +266,9 @@ def scan_symbol(sym: str, *, backfill: bool) -> list[dict]:
     d = indicators(raw)
     n = len(d["c"])
     if backfill:
-        idxs = range(200, n)
+        idxs = range(210, n)
     else:
-        idxs = [i for i in (n - 1, n - 2) if i >= 200]
+        idxs = [i for i in (n - 1, n - 2) if i >= 210]
     events = []
     for i in idxs:
         if not is_signal(d, i):
@@ -274,6 +319,10 @@ def trade_from_bar(sym: str, d: dict, i: int) -> dict:
         "tw": hm8(int(d["t"][i])),
         "entry": entry,
         "depth": break_depth_pct(d, i),
+        "body": bar_body_pct(d, i),
+        "rng": bar_range_pct(d, i),
+        "vr": vol_ratio(d, i),
+        "drop": drop_from_swing_pct(d, i),
         "fwd": fwd,
         "eod": eod,
         "mae": mae,
@@ -287,7 +336,7 @@ def backtest_symbol(sym: str, cutoff_ms: int) -> list[dict]:
         return []
     d = indicators(raw)
     out = []
-    for i in range(200, len(d["c"])):
+    for i in range(210, len(d["c"])):
         close_ms = int(d["t"][i]) + INTERVAL_MS
         if close_ms < cutoff_ms:
             continue
@@ -362,7 +411,9 @@ def write_backtest_html(
             f"<td>{escape(t['et'])}</td>"
             f"<td>{escape(name)}</td>"
             f"<td>{t['entry']:g}</td>"
-            f"<td>{t['depth']:.2f}</td>"
+            f"<td>{t['body']:.1f}</td>"
+            f"<td>{t['rng']:.1f}</td>"
+            f"<td>{t['drop']:.1f}</td>"
             f"<td>{_fmt_pnl(t['fwd']['15m'])}</td>"
             f"<td>{_fmt_pnl(t['fwd']['1h'])}</td>"
             f"<td>{_fmt_pnl(t['fwd']['2h'])}</td>"
@@ -414,7 +465,7 @@ th{{color:var(--muted);font-weight:500}}
 </head>
 <body>
 <div class="wrap">
-  <h1>15m 跌破 7/14/25/200 · 近 {days} 日</h1>
+  <h1>開盤瀑布 · 近 {days} 日</h1>
   <p class="sub">幣安美股永續 {len(symbols)} 檔 · 美東 {start} → {end} · 只計開盤前後各半小時 · 訊號收盤做空</p>
   <div class="kpis">
     <div class="kpi"><div class="k">筆數 / 檔數</div><div class="v">{len(trades)} / {len({t["symbol"] for t in trades})}</div></div>
@@ -422,13 +473,13 @@ th{{color:var(--muted);font-weight:500}}
   </div>
   <div class="card">
     <p class="note">每日：{escape(day_line) if day_line else "無"}</p>
-    <p class="note">只計美東 09:00–10:00（開盤前後各半小時）。陰線、同時低於四條均、距最近均 ≥ 0.4%。不含滑價與資金費。綠＝空單賺。</p>
+    <p class="note">開盤窗 09:00–10:00。長陰實體≥1.2%、振幅≥2.5%、近 4h 高回撤≥2.5%、量≥1.8×、收盤低於 MA7/14/25/99/120/200。綠＝空單賺。</p>
   </div>
   <div class="card">
     <table>
-      <thead><tr><th>美東</th><th>標的</th><th>進場</th><th>深度%</th><th>15m</th><th>1h</th><th>2h</th><th>當日</th></tr></thead>
+      <thead><tr><th>美東</th><th>標的</th><th>進場</th><th>實體%</th><th>振幅%</th><th>回撤%</th><th>15m</th><th>1h</th><th>2h</th><th>當日</th></tr></thead>
       <tbody>
-        {"".join(rows) if rows else "<tr><td colspan='8'>無訊號</td></tr>"}
+        {"".join(rows) if rows else "<tr><td colspan='10'>無訊號</td></tr>"}
       </tbody>
     </table>
   </div>
@@ -462,13 +513,13 @@ def print_backtest(trades: list[dict]) -> None:
         if t["symbol"] != "VRTUSDT":
             continue
         print(
-            f"  VRT {t['et']} 深 {t['depth']:.2f}%  15m {_fmt_plain(t['fwd']['15m'])}  1h {_fmt_plain(t['fwd']['1h'])}  2h {_fmt_plain(t['fwd']['2h'])}",
+            f"  VRT {t['et']} 實體 {t['body']:.2f}% 振幅 {t['rng']:.2f}% 回撤 {t['drop']:.2f}%  15m {_fmt_plain(t['fwd']['15m'])}  1h {_fmt_plain(t['fwd']['1h'])}  2h {_fmt_plain(t['fwd']['2h'])}",
             flush=True,
         )
 
 
 def run_backtest(days: int, html_path: Path) -> int:
-    print(f"回測近 {days} 日美股永續 15m 跌破…", flush=True)
+    print(f"回測近 {days} 日美股開盤瀑布…", flush=True)
     t0 = time.time()
     symbols, trades, cutoff_ms = collect_backtest(days)
     print(f"掃完 {len(symbols)} 檔 {time.time()-t0:.1f}s", flush=True)
@@ -481,14 +532,14 @@ def run_backtest(days: int, html_path: Path) -> int:
 def format_event(ev: dict) -> str:
     d, i, sym = ev["d"], ev["i"], ev["symbol"]
     px = float(d["c"][i])
-    m7, m14, m25, m200 = (float(d[f"m{n}"][i]) for n in MA_PERIODS)
-    ext = (px / m200 - 1) * 100
+    mas = "　".join(f"MA{n} {float(d[f'm{n}'][i]):g}" for n in MA_PERIODS)
     return (
-        f"<b>跌破均線</b>  {sym}  15m\n"
+        f"<b>開盤瀑布</b>  {sym}  15m\n"
         f"美東 {hm_et(int(d['t'][i]))}　台北 {hm8(int(d['t'][i]))}\n"
-        f"收 {px:g}\n"
-        f"MA7 {m7:g}　MA14 {m14:g}　MA25 {m25:g}　MA200 {m200:g}\n"
-        f"收盤同時低於 7/14/25/200　距最近均 {break_depth_pct(d, i):.2f}%　距 MA200 {ext:+.2f}%"
+        f"收 {px:g}　實體 {bar_body_pct(d, i):.2f}%　振幅 {bar_range_pct(d, i):.2f}%\n"
+        f"量 {vol_ratio(d, i):.1f}×　近4h高回撤 {drop_from_swing_pct(d, i):.2f}%\n"
+        f"{mas}\n"
+        f"盤整後長陰放量，收盤低於 7/14/25/99/120/200"
     )
 
 
@@ -509,7 +560,7 @@ def draw_chart(sym: str, d: dict, i: int, path: str) -> str | None:
     fig, (ax, axv) = plt.subplots(
         2, 1, figsize=(10.4, 5.6), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
     )
-    pal = {7: "#f0c14a", 14: "#26c6da", 25: "#d28cff", 200: "#e8f0ea"}
+    pal = {7: "#f0c14a", 14: "#26c6da", 25: "#d28cff", 99: "#42a5f5", 120: "#5fd2c2", 200: "#e8f0ea"}
     for a in (ax, axv):
         a.set_facecolor("#101814")
         a.tick_params(colors="#8aa193", labelsize=8)
@@ -529,8 +580,8 @@ def draw_chart(sym: str, d: dict, i: int, path: str) -> str | None:
     if 0 <= x < len(c):
         ax.axvline(x, color="#c9a227", ls="--", lw=0.9)
         ax.scatter([x], [c[x]], s=36, color="#e35d5d", zorder=5)
-    ax.set_title(f"{sym}  15m  跌破 7/14/25/200", color="#e8f0ea", fontsize=12)
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
+    ax.set_title(f"{sym}  15m  開盤瀑布", color="#e8f0ea", fontsize=12)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     fig.tight_layout(pad=0.5)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
     plt.close(fig)
@@ -634,7 +685,7 @@ def test_telegram() -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="幣安美股永續 15m 同時跌破 MA7/14/25/200（開盤前後各半小時）")
+    p = argparse.ArgumentParser(description="幣安美股永續 15m 開盤瀑布（開盤前後各半小時）")
     p.add_argument("--once", action="store_true", help="掃一次就結束")
     p.add_argument("--backfill", action="store_true", help="掃今日美東時段已收盤的 15m，不是只看剛收的兩根")
     p.add_argument("--force", action="store_true", help="不管美東時段，立刻掃")
@@ -654,7 +705,7 @@ def main() -> int:
     seen = load_seen()
     print("載入美股永續…", flush=True)
     symbols = universe()
-    print(f"監看 {len(symbols)} 檔 EQUITY。只在美東 09:00–10:00 跌破才推。", flush=True)
+    print(f"監看 {len(symbols)} 檔 EQUITY。開盤窗瀑布才推。", flush=True)
     uni_ts = time.time()
 
     def round_once(*, backfill: bool) -> None:

@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from watch_binance_equity_ma_break import (  # noqa: E402
     ET,
-    MIN_DEPTH_PCT,
+    MIN_BODY_PCT,
     bar_in_session,
     below_all,
     is_fresh_break,
@@ -33,19 +33,15 @@ def test_sma() -> None:
     assert abs(out[4] - 4.0) < 1e-9
 
 
-def _bars(close: np.ndarray, *, open_: np.ndarray | None = None) -> dict:
+def _bars(close: np.ndarray, *, open_: np.ndarray | None = None, high=None, low=None, vol=None) -> dict:
     n = len(close)
     close = close.astype(float)
     o = close.copy() if open_ is None else open_.astype(float)
-    d = {
-        "t": np.arange(n, dtype=np.int64) * 900_000,
-        "c": close,
-        "o": o,
-        "h": np.maximum(o, close),
-        "l": np.minimum(o, close),
-        "v": np.ones(n),
-    }
-    for nma in (7, 14, 25, 200):
+    h = np.maximum(o, close) if high is None else np.asarray(high, float)
+    l = np.minimum(o, close) if low is None else np.asarray(low, float)
+    v = np.ones(n) if vol is None else np.asarray(vol, float)
+    d = {"t": np.arange(n, dtype=np.int64) * 900_000, "c": close, "o": o, "h": h, "l": l, "v": v}
+    for nma in (7, 14, 25, 99, 120, 200):
         d[f"m{nma}"] = sma(d["c"], nma)
     return d
 
@@ -70,22 +66,34 @@ def test_already_below_is_not_fresh() -> None:
     assert not is_fresh_break(d, 219)
 
 
-def test_kiss_not_signal_smash_is() -> None:
-    close = np.full(220, 100.0)
+def test_kiss_not_signal_waterfall_is() -> None:
+    n = 230
+    close = np.full(n, 100.0)
     o = close.copy()
-    close[-1] = 99.8  # ~0.2%，不夠深
+    h = close.copy()
+    l = close.copy()
+    v = np.ones(n)
+    close[-1] = 99.8
     o[-1] = 100.2
-    d = _bars(close, open_=o)
-    assert is_fresh_break(d, 219)
-    assert not is_signal(d, 219)
+    h[-1] = 100.3
+    l[-1] = 99.7
+    d = _bars(close, open_=o, high=h, low=l, vol=v)
+    assert is_fresh_break(d, n - 1)
+    assert not is_signal(d, n - 1)
 
-    close = np.full(220, 100.0)
+    close = np.full(n, 100.0)
     o = close.copy()
-    close[-1] = 99.0  # 1%
-    o[-1] = 100.5
-    d = _bars(close, open_=o)
-    assert is_signal(d, 219)
-    assert MIN_DEPTH_PCT == 0.40
+    h = np.full(n, 100.2)
+    l = np.full(n, 99.8)
+    v = np.ones(n)
+    close[-1] = 96.8
+    o[-1] = 100.4
+    h[-1] = 100.6
+    l[-1] = 96.5
+    v[-1] = 4.0
+    d = _bars(close, open_=o, high=h, low=l, vol=v)
+    assert is_signal(d, n - 1)
+    assert MIN_BODY_PCT == 1.20
 
 
 def test_short_fwd_pct() -> None:
@@ -146,7 +154,7 @@ def main() -> int:
     test_sma()
     test_fresh_break_first_close_below_all()
     test_already_below_is_not_fresh()
-    test_kiss_not_signal_smash_is()
+    test_kiss_not_signal_waterfall_is()
     test_short_fwd_pct()
     test_session_window_weekday()
     test_weekend_off()
