@@ -2,6 +2,7 @@
 """幣安美股永續：開盤瀑布 Telegram。
 
 找你那種 15m：盤整後長陰放量摔出 MA7/14/25/99/120/200。
+進場當下 1h K 須 MA7 < MA14 < MA25 空頭排列（用截至該根 15m 的小時收盤，不偷看未走完的小時 K）。
 只在美東 09:00–10:00（開盤前後各半小時）報，週末不掃。
 
     python3 examples/watch_binance_equity_ma_break.py --test
@@ -39,7 +40,9 @@ SEEN_PATH = REPO / "output" / "binance_equity_ma_break_seen.json"
 CONFIG_ENV = REPO / "tg_config.env"
 INTERVAL = "15m"
 INTERVAL_MS = 900_000
+HOUR_MS = 3_600_000
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
+HOUR_MA_PERIODS = (7, 14, 25)
 SESSION_START = (9, 0)  # 開盤前 30 分
 SESSION_END = (10, 0)  # 開盤後 30 分
 CASH_CLOSE = (16, 0)  # 回測「當日收」仍看到美東 16:00
@@ -206,6 +209,35 @@ def prev_near_ribbon(d: dict, i: int) -> bool:
     return any(pc >= d[f"m{n}"][i - 1] for n in (7, 14, 25, 200))
 
 
+def hourly_closes_asof(d: dict, i: int) -> np.ndarray:
+    """1h 收盤：每根 UTC 小時取截至 bar i 的最後一筆 15m 收盤，不含之後的 15m。"""
+    if i < 0:
+        return np.array([], dtype=float)
+    t = d["t"][: i + 1]
+    c = d["c"][: i + 1]
+    if len(t) == 0:
+        return np.array([], dtype=float)
+    hour = t // HOUR_MS
+    last = np.concatenate((hour[1:] != hour[:-1], np.array([True])))
+    return np.asarray(c[last], dtype=float)
+
+
+def hourly_mas_asof(d: dict, i: int) -> tuple[float, float, float] | None:
+    hc = hourly_closes_asof(d, i)
+    if len(hc) < max(HOUR_MA_PERIODS):
+        return None
+    m7, m14, m25 = (float(np.mean(hc[-n:])) for n in HOUR_MA_PERIODS)
+    return m7, m14, m25
+
+
+def hourly_bearish(d: dict, i: int) -> bool:
+    mas = hourly_mas_asof(d, i)
+    if mas is None:
+        return False
+    m7, m14, m25 = mas
+    return m7 < m14 < m25
+
+
 def is_signal(d: dict, i: int) -> bool:
     if i < 210 or not is_fresh_break(d, i):
         return False
@@ -219,7 +251,9 @@ def is_signal(d: dict, i: int) -> bool:
         return False
     if drop_from_swing_pct(d, i) < MIN_DROP_PCT:
         return False
-    return vol_ratio(d, i) >= MIN_VOL_RATIO
+    if vol_ratio(d, i) < MIN_VOL_RATIO:
+        return False
+    return hourly_bearish(d, i)
 
 
 def bar_close_et(open_ms: int) -> datetime:
@@ -317,6 +351,7 @@ def trade_from_bar(sym: str, d: dict, i: int) -> dict:
         lo = float(np.min(d["l"][i + 1 : j1]))
         mae = (hi - entry) / entry * 100.0
         mfe = (entry - lo) / entry * 100.0
+    hmas = hourly_mas_asof(d, i)
     return {
         "symbol": sym,
         "t": int(d["t"][i]),
@@ -328,6 +363,9 @@ def trade_from_bar(sym: str, d: dict, i: int) -> dict:
         "rng": bar_range_pct(d, i),
         "vr": vol_ratio(d, i),
         "drop": drop_from_swing_pct(d, i),
+        "h1m7": None if hmas is None else hmas[0],
+        "h1m14": None if hmas is None else hmas[1],
+        "h1m25": None if hmas is None else hmas[2],
         "fwd": fwd,
         "eod": eod,
         "mae": mae,
@@ -425,11 +463,15 @@ def write_backtest_html(
             if png.exists():
                 b64 = base64.b64encode(png.read_bytes()).decode("ascii")
                 img_html = f'<img src="data:image/png;base64,{b64}" alt="{escape(name)}"/>'
+        hmas = ""
+        if t.get("h1m7") is not None:
+            hmas = f"<br/>1h MA7 {t['h1m7']:g}　MA14 {t['h1m14']:g}　MA25 {t['h1m25']:g}"
         cards.append(
             "<div class='card'>"
             f"<h2>{escape(name)}　{escape(t['et'])}　空1h {_fmt_pnl(h1)}</h2>"
             f"{img_html}"
             f"<p class='note'>收 {t['entry']:g}　實體 {t['body']:.1f}%　振幅 {t['rng']:.1f}%　回撤 {t['drop']:.1f}%　量 {t['vr']:.1f}×"
+            f"{hmas}"
             f"<br/>15m {_fmt_pnl(t['fwd']['15m'])}　1h {_fmt_pnl(t['fwd']['1h'])}　2h {_fmt_pnl(t['fwd']['2h'])}　當日 {_fmt_pnl(t['eod'])}</p>"
             "</div>"
         )
@@ -478,14 +520,14 @@ img{{width:100%;height:auto;display:block;border-radius:10px;background:#101814;
 <body>
 <div class="wrap">
   <h1>開盤瀑布 · 近 {days} 日</h1>
-  <p class="sub">幣安美股永續 {len(symbols)} 檔 · 美東 {start} → {end} · 只計開盤前後各半小時 · 訊號收盤做空</p>
+  <p class="sub">幣安美股永續 {len(symbols)} 檔 · 美東 {start} → {end} · 只計開盤前後各半小時 · 進場 1h 空頭排列 · 訊號收盤做空</p>
   <div class="kpis">
     <div class="kpi"><div class="k">筆數 / 檔數</div><div class="v">{len(trades)} / {len({t["symbol"] for t in trades})}</div></div>
     {"".join(kpi_bits)}
   </div>
   <div class="card">
     <p class="note">每日：{escape(day_line) if day_line else "無"}</p>
-    <p class="note">開盤窗 09:00–10:00。長陰實體≥1.2%、振幅≥2.5%、近 4h 高回撤≥2.5%、量≥1.8×、收盤低於 MA7/14/25/99/120/200。綠＝空單賺。</p>
+    <p class="note">開盤窗 09:00–10:00。長陰實體≥1.2%、振幅≥2.5%、近 4h 高回撤≥2.5%、量≥1.8×、收盤低於 15m MA7/14/25/99/120/200。進場當下 1h MA7&lt;MA14&lt;MA25 空頭排列。綠＝空單賺。</p>
   </div>
   {"".join(cards) if cards else "<div class='card'>無訊號</div>"}
 </div>
@@ -517,8 +559,11 @@ def print_backtest(trades: list[dict]) -> None:
     for t in trades:
         if t["symbol"] != "VRTUSDT":
             continue
+        h1s = ""
+        if t.get("h1m7") is not None:
+            h1s = f"  1h均 {t['h1m7']:.2f}<{t['h1m14']:.2f}<{t['h1m25']:.2f}"
         print(
-            f"  VRT {t['et']} 實體 {t['body']:.2f}% 振幅 {t['rng']:.2f}% 回撤 {t['drop']:.2f}%  15m {_fmt_plain(t['fwd']['15m'])}  1h {_fmt_plain(t['fwd']['1h'])}  2h {_fmt_plain(t['fwd']['2h'])}",
+            f"  VRT {t['et']} 實體 {t['body']:.2f}% 振幅 {t['rng']:.2f}% 回撤 {t['drop']:.2f}%{h1s}  15m {_fmt_plain(t['fwd']['15m'])}  1h {_fmt_plain(t['fwd']['1h'])}  2h {_fmt_plain(t['fwd']['2h'])}",
             flush=True,
         )
 
@@ -541,12 +586,17 @@ def format_event(ev: dict) -> str:
     d, i, sym = ev["d"], ev["i"], ev["symbol"]
     px = float(d["c"][i])
     mas = "　".join(f"MA{n} {float(d[f'm{n}'][i]):g}" for n in MA_PERIODS)
+    hmas = hourly_mas_asof(d, i)
+    hline = ""
+    if hmas is not None:
+        hline = f"1h MA7 {hmas[0]:g}　MA14 {hmas[1]:g}　MA25 {hmas[2]:g}　空頭排列\n"
     return (
         f"<b>開盤瀑布</b>  {sym}  15m\n"
         f"美東 {hm_et(int(d['t'][i]))}　台北 {hm8(int(d['t'][i]))}\n"
         f"收 {px:g}　實體 {bar_body_pct(d, i):.2f}%　振幅 {bar_range_pct(d, i):.2f}%\n"
         f"量 {vol_ratio(d, i):.1f}×　近4h高回撤 {drop_from_swing_pct(d, i):.2f}%\n"
         f"{mas}\n"
+        f"{hline}"
         f"盤整後長陰放量，收盤低於 7/14/25/99/120/200"
     )
 

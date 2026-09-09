@@ -16,6 +16,9 @@ from watch_binance_equity_ma_break import (  # noqa: E402
     MIN_BODY_PCT,
     bar_in_session,
     below_all,
+    hourly_bearish,
+    hourly_closes_asof,
+    hourly_mas_asof,
     is_fresh_break,
     is_signal,
     next_window_start,
@@ -92,8 +95,49 @@ def test_kiss_not_signal_waterfall_is() -> None:
     l[-1] = 96.5
     v[-1] = 4.0
     d = _bars(close, open_=o, high=h, low=l, vol=v)
+    assert hourly_bearish(d, n - 1)
     assert is_signal(d, n - 1)
     assert MIN_BODY_PCT == 1.20
+
+
+def test_hourly_closes_asof_no_lookahead() -> None:
+    n = 12
+    close = np.arange(n, dtype=float)
+    d = {"t": np.arange(n, dtype=np.int64) * 900_000, "c": close}
+    assert list(hourly_closes_asof(d, 11)) == [3.0, 7.0, 11.0]
+    assert list(hourly_closes_asof(d, 5)) == [3.0, 5.0]
+    assert list(hourly_closes_asof(d, 3)) == [3.0]
+
+
+def test_hourly_bearish_alignment() -> None:
+    n = 120
+    close = np.linspace(110.0, 90.0, n)
+    d = _bars(close)
+    assert hourly_bearish(d, n - 1)
+    m7, m14, m25 = hourly_mas_asof(d, n - 1)
+    assert m7 < m14 < m25
+
+    close = np.linspace(90.0, 110.0, n)
+    d = _bars(close)
+    assert not hourly_bearish(d, n - 1)
+
+
+def test_hourly_bullish_rejects_waterfall() -> None:
+    n = 230
+    close = np.linspace(90.0, 100.0, n)
+    o = close.copy()
+    h = close + 0.3
+    l = close - 0.3
+    v = np.ones(n)
+    close[-1] = 92.0
+    o[-1] = 100.2
+    h[-1] = 100.4
+    l[-1] = 91.8
+    v[-1] = 4.0
+    d = _bars(close, open_=o, high=h, low=l, vol=v)
+    assert is_fresh_break(d, n - 1)
+    assert not hourly_bearish(d, n - 1)
+    assert not is_signal(d, n - 1)
 
 
 def test_short_fwd_pct() -> None:
@@ -155,6 +199,9 @@ def main() -> int:
     test_fresh_break_first_close_below_all()
     test_already_below_is_not_fresh()
     test_kiss_not_signal_waterfall_is()
+    test_hourly_closes_asof_no_lookahead()
+    test_hourly_bearish_alignment()
+    test_hourly_bullish_rejects_waterfall()
     test_short_fwd_pct()
     test_session_window_weekday()
     test_weekend_off()
