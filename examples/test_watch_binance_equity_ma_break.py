@@ -102,11 +102,13 @@ def test_session_window_weekday() -> None:
         open_ = close.timestamp() - 900
         return int(open_ * 1000)
 
-    assert bar_in_session(open_ms(9, 0))  # 08:45–09:00 收盤，開始偵測
+    assert bar_in_session(open_ms(9, 0))  # 開盤前
     assert bar_in_session(open_ms(9, 30))
-    assert bar_in_session(open_ms(16, 0))
+    assert bar_in_session(open_ms(9, 45))
+    assert bar_in_session(open_ms(10, 0))  # 開盤後 30 分那根
     assert not bar_in_session(open_ms(8, 45))
-    assert not bar_in_session(open_ms(16, 15))
+    assert not bar_in_session(open_ms(10, 15))
+    assert not bar_in_session(open_ms(16, 0))
 
 
 def test_weekend_off() -> None:
@@ -124,13 +126,16 @@ def test_now_should_scan_and_next_window() -> None:
     nxt = next_window_start(before)
     assert nxt.hour == 9 and nxt.minute == 0 and nxt.day == 9
 
-    inside = datetime(2026, 9, 9, 12, 0, tzinfo=et)
+    inside = datetime(2026, 9, 9, 9, 30, tzinfo=et)
     assert now_should_scan(inside)
 
-    after = datetime(2026, 9, 9, 16, 1, tzinfo=et)
+    after = datetime(2026, 9, 9, 10, 1, tzinfo=et)
     assert not now_should_scan(after)
     nxt = next_window_start(after)
     assert nxt.day == 10 and nxt.hour == 9
+
+    noon = datetime(2026, 9, 9, 12, 0, tzinfo=et)
+    assert not now_should_scan(noon)
 
     friday_after = datetime(2026, 9, 11, 16, 1, tzinfo=et)
     nxt = next_window_start(friday_after)

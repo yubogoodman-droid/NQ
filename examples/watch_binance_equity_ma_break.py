@@ -2,7 +2,7 @@
 """幣安美股永續：15m 收盤同時跌破 MA7 / MA14 / MA25 / MA200 → Telegram。
 
 只掃 underlyingType=EQUITY 的股票永續（不含商品、港股、韓股）。
-美東 09:00 才開始偵測（開盤前 30 分），16:00 收盤後停，週末不掃。
+只在美東開盤前後各 30 分有訊號才報（09:00–10:00），週末不掃。
 
     python3 examples/watch_binance_equity_ma_break.py --test
     python3 examples/watch_binance_equity_ma_break.py --once --dry-run
@@ -41,7 +41,8 @@ INTERVAL = "15m"
 INTERVAL_MS = 900_000
 MA_PERIODS = (7, 14, 25, 200)
 SESSION_START = (9, 0)  # 開盤前 30 分
-SESSION_END = (16, 0)
+SESSION_END = (10, 0)  # 開盤後 30 分
+CASH_CLOSE = (16, 0)  # 回測「當日收」仍看到美東 16:00
 MIN_DEPTH_PCT = 0.40  # 收盤至少低於最近那條均 0.4%，過濾輕吻
 HORIZONS = ((1, "15m"), (2, "30m"), (4, "1h"), (8, "2h"), (16, "4h"))
 PAGES_HTML = REPO / "docs" / "binance" / "ma-break-7d.html"
@@ -257,7 +258,7 @@ def trade_from_bar(sym: str, d: dict, i: int) -> dict:
         if cj.date() != close_et.date():
             break
         eod = short_fwd_pct(entry, float(d["c"][j]))
-        if (cj.hour, cj.minute) == SESSION_END:
+        if (cj.hour, cj.minute) == CASH_CLOSE:
             break
     j1 = min(n, i + 9)
     mae = mfe = None
@@ -414,14 +415,14 @@ th{{color:var(--muted);font-weight:500}}
 <body>
 <div class="wrap">
   <h1>15m 跌破 7/14/25/200 · 近 {days} 日</h1>
-  <p class="sub">幣安美股永續 {len(symbols)} 檔 · 美東 {start} → {end} · 訊號收盤做空 · 報酬是空單%</p>
+  <p class="sub">幣安美股永續 {len(symbols)} 檔 · 美東 {start} → {end} · 只計開盤前後各半小時 · 訊號收盤做空</p>
   <div class="kpis">
     <div class="kpi"><div class="k">筆數 / 檔數</div><div class="v">{len(trades)} / {len({t["symbol"] for t in trades})}</div></div>
     {"".join(kpi_bits)}
   </div>
   <div class="card">
     <p class="note">每日：{escape(day_line) if day_line else "無"}</p>
-    <p class="note">陰線、同時低於四條均、距最近均 ≥ 0.4%。不含滑價與資金費。綠＝空單賺。</p>
+    <p class="note">只計美東 09:00–10:00（開盤前後各半小時）。陰線、同時低於四條均、距最近均 ≥ 0.4%。不含滑價與資金費。綠＝空單賺。</p>
   </div>
   <div class="card">
     <table>
@@ -633,7 +634,7 @@ def test_telegram() -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="幣安美股永續 15m 同時跌破 MA7/14/25/200")
+    p = argparse.ArgumentParser(description="幣安美股永續 15m 同時跌破 MA7/14/25/200（開盤前後各半小時）")
     p.add_argument("--once", action="store_true", help="掃一次就結束")
     p.add_argument("--backfill", action="store_true", help="掃今日美東時段已收盤的 15m，不是只看剛收的兩根")
     p.add_argument("--force", action="store_true", help="不管美東時段，立刻掃")
@@ -653,7 +654,7 @@ def main() -> int:
     seen = load_seen()
     print("載入美股永續…", flush=True)
     symbols = universe()
-    print(f"監看 {len(symbols)} 檔 EQUITY。15m 同時跌破 7/14/25/200 會推。", flush=True)
+    print(f"監看 {len(symbols)} 檔 EQUITY。只在美東 09:00–10:00 跌破才推。", flush=True)
     uni_ts = time.time()
 
     def round_once(*, backfill: bool) -> None:
@@ -679,7 +680,7 @@ def main() -> int:
     if not args.force and not now_should_scan():
         nxt = next_window_start()
         print(
-            f"現在不是偵測時段（美東 09:00–16:00）。下次開始 {nxt.strftime('%Y-%m-%d %H:%M %Z')}",
+            f"現在不是偵測時段（美東 09:00–10:00，開盤前後各半小時）。下次開始 {nxt.strftime('%Y-%m-%d %H:%M %Z')}",
             flush=True,
         )
         if args.once:
