@@ -11,8 +11,11 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
+import shutil
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
@@ -47,6 +50,8 @@ MIN_VOL_RATIO = 1.80
 DROP_LOOKBACK = 16
 HORIZONS = ((1, "15m"), (2, "30m"), (4, "1h"), (8, "2h"), (16, "4h"))
 PAGES_HTML = REPO / "docs" / "binance" / "ma-break-7d.html"
+CHART_DIR = REPO / "docs" / "binance" / "img" / "ma-break"
+_MPL_LOCK = threading.Lock()
 
 SESSION = requests.Session()
 SESSION.headers.update(
@@ -327,6 +332,7 @@ def trade_from_bar(sym: str, d: dict, i: int) -> dict:
         "eod": eod,
         "mae": mae,
         "mfe": mfe,
+        "img": None,
     }
 
 
@@ -342,7 +348,13 @@ def backtest_symbol(sym: str, cutoff_ms: int) -> list[dict]:
             continue
         if not is_signal(d, i) or not bar_in_session(int(d["t"][i])):
             continue
-        out.append(trade_from_bar(sym, d, i))
+        tr = trade_from_bar(sym, d, i)
+        fname = f"{sym}_{bar_close_et(int(d['t'][i])).strftime('%m%d_%H%M')}.png"
+        CHART_DIR.mkdir(parents=True, exist_ok=True)
+        png = CHART_DIR / fname
+        if draw_chart(sym, d, i, str(png)):
+            tr["img"] = f"./img/ma-break/{fname}"
+        out.append(tr)
     return out
 
 
@@ -403,22 +415,23 @@ def write_backtest_html(
 ) -> Path:
     start = datetime.fromtimestamp(cutoff_ms / 1000, ET).strftime("%Y-%m-%d %H:%M")
     end = datetime.now(ET).strftime("%Y-%m-%d %H:%M")
-    rows = []
+    cards = []
     for t in reversed(trades):
         name = t["symbol"].replace("USDT", "")
-        rows.append(
-            "<tr>"
-            f"<td>{escape(t['et'])}</td>"
-            f"<td>{escape(name)}</td>"
-            f"<td>{t['entry']:g}</td>"
-            f"<td>{t['body']:.1f}</td>"
-            f"<td>{t['rng']:.1f}</td>"
-            f"<td>{t['drop']:.1f}</td>"
-            f"<td>{_fmt_pnl(t['fwd']['15m'])}</td>"
-            f"<td>{_fmt_pnl(t['fwd']['1h'])}</td>"
-            f"<td>{_fmt_pnl(t['fwd']['2h'])}</td>"
-            f"<td>{_fmt_pnl(t['eod'])}</td>"
-            "</tr>"
+        h1 = t["fwd"].get("1h")
+        img_html = ""
+        if t.get("img"):
+            png = (path.parent / t["img"].replace("./", "")).resolve()
+            if png.exists():
+                b64 = base64.b64encode(png.read_bytes()).decode("ascii")
+                img_html = f'<img src="data:image/png;base64,{b64}" alt="{escape(name)}"/>'
+        cards.append(
+            "<div class='card'>"
+            f"<h2>{escape(name)}　{escape(t['et'])}　空1h {_fmt_pnl(h1)}</h2>"
+            f"{img_html}"
+            f"<p class='note'>收 {t['entry']:g}　實體 {t['body']:.1f}%　振幅 {t['rng']:.1f}%　回撤 {t['drop']:.1f}%　量 {t['vr']:.1f}×"
+            f"<br/>15m {_fmt_pnl(t['fwd']['15m'])}　1h {_fmt_pnl(t['fwd']['1h'])}　2h {_fmt_pnl(t['fwd']['2h'])}　當日 {_fmt_pnl(t['eod'])}</p>"
+            "</div>"
         )
     kpi_bits = []
     for _, name in HORIZONS:
@@ -444,7 +457,7 @@ def write_backtest_html(
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>美股 15m 跌破均線 · 近 {days} 日</title>
+<title>開盤瀑布 · 近 {days} 日</title>
 <style>
 :root{{--bg:#0c1210;--panel:#14201b;--ink:#e8f0ea;--muted:#8aa193;--line:rgba(232,240,234,.12);--long:#3dba7a;--short:#e35d5d}}
 *{{box-sizing:border-box}}
@@ -456,9 +469,8 @@ h1{{font-size:20px;margin:0 0 6px}}
 .kpi{{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 12px}}
 .kpi .k{{color:var(--muted);font-size:11px}} .kpi .v{{font-size:16px;margin-top:4px}}
 .card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:14px;overflow-x:auto}}
-table{{width:100%;border-collapse:collapse;font-size:12px}}
-th,td{{text-align:left;padding:7px 4px;border-bottom:1px solid var(--line);white-space:nowrap}}
-th{{color:var(--muted);font-weight:500}}
+.card h2{{font-size:15px;margin:0 0 8px}}
+img{{width:100%;height:auto;display:block;border-radius:10px;background:#101814;margin-bottom:8px}}
 .pos{{color:var(--long)}} .neg{{color:var(--short)}}
 .note{{color:var(--muted);font-size:12px;line-height:1.5;margin:8px 0 0}}
 </style>
@@ -475,14 +487,7 @@ th{{color:var(--muted);font-weight:500}}
     <p class="note">每日：{escape(day_line) if day_line else "無"}</p>
     <p class="note">開盤窗 09:00–10:00。長陰實體≥1.2%、振幅≥2.5%、近 4h 高回撤≥2.5%、量≥1.8×、收盤低於 MA7/14/25/99/120/200。綠＝空單賺。</p>
   </div>
-  <div class="card">
-    <table>
-      <thead><tr><th>美東</th><th>標的</th><th>進場</th><th>實體%</th><th>振幅%</th><th>回撤%</th><th>15m</th><th>1h</th><th>2h</th><th>當日</th></tr></thead>
-      <tbody>
-        {"".join(rows) if rows else "<tr><td colspan='10'>無訊號</td></tr>"}
-      </tbody>
-    </table>
-  </div>
+  {"".join(cards) if cards else "<div class='card'>無訊號</div>"}
 </div>
 </body>
 </html>
@@ -520,6 +525,9 @@ def print_backtest(trades: list[dict]) -> None:
 
 def run_backtest(days: int, html_path: Path) -> int:
     print(f"回測近 {days} 日美股開盤瀑布…", flush=True)
+    if CHART_DIR.exists():
+        shutil.rmtree(CHART_DIR)
+    CHART_DIR.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     symbols, trades, cutoff_ms = collect_backtest(days)
     print(f"掃完 {len(symbols)} 檔 {time.time()-t0:.1f}s", flush=True)
@@ -552,39 +560,51 @@ def draw_chart(sym: str, d: dict, i: int, path: str) -> str | None:
         from matplotlib.patches import Rectangle
     except Exception:
         return None
-    a0 = max(0, i - 48)
-    a1 = min(len(d["c"]), i + 4)
-    sl = slice(a0, a1)
-    xs = np.arange(a1 - a0)
-    o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
-    fig, (ax, axv) = plt.subplots(
-        2, 1, figsize=(10.4, 5.6), sharex=True, gridspec_kw={"height_ratios": [3.1, 1]}, facecolor="#0c1210"
-    )
-    pal = {7: "#f0c14a", 14: "#26c6da", 25: "#d28cff", 99: "#42a5f5", 120: "#5fd2c2", 200: "#e8f0ea"}
-    for a in (ax, axv):
-        a.set_facecolor("#101814")
-        a.tick_params(colors="#8aa193", labelsize=8)
-        for sp in a.spines.values():
-            sp.set_color("#2a3a33")
-    for k in range(len(c)):
-        col = "#3dba7a" if c[k] >= o[k] else "#e35d5d"
-        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.7)
-        y0, y1 = min(o[k], c[k]), max(o[k], c[k])
-        if y1 == y0:
-            y1 = y0 + max(h[k] - l[k], 1e-12) * 0.02
-        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
-        axv.bar(xs[k], v[k], width=0.8, color=col + "99", linewidth=0)
-    for n, col in pal.items():
-        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.08, label=f"MA{n}")
-    x = i - a0
-    if 0 <= x < len(c):
-        ax.axvline(x, color="#c9a227", ls="--", lw=0.9)
-        ax.scatter([x], [c[x]], s=36, color="#e35d5d", zorder=5)
-    ax.set_title(f"{sym}  15m  開盤瀑布", color="#e8f0ea", fontsize=12)
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
-    fig.tight_layout(pad=0.5)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
-    plt.close(fig)
+    with _MPL_LOCK:
+        a0 = max(0, i - 36)
+        a1 = min(len(d["c"]), i + 18)
+        sl = slice(a0, a1)
+        xs = np.arange(a1 - a0)
+        o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
+        fig, (ax, axv) = plt.subplots(
+            2, 1, figsize=(9.2, 5.2), sharex=True, gridspec_kw={"height_ratios": [3.15, 1]}, facecolor="#0c1210"
+        )
+        pal = {7: "#f0c14a", 14: "#26c6da", 25: "#d28cff", 99: "#42a5f5", 120: "#5fd2c2", 200: "#e8f0ea"}
+        for a in (ax, axv):
+            a.set_facecolor("#101814")
+            a.tick_params(colors="#8aa193", labelsize=8)
+            for sp in a.spines.values():
+                sp.set_color("#2a3a33")
+        for k in range(len(c)):
+            col = "#3dba7a" if c[k] >= o[k] else "#e35d5d"
+            ax.vlines(xs[k], l[k], h[k], color=col, lw=0.7)
+            y0, y1 = min(o[k], c[k]), max(o[k], c[k])
+            if y1 == y0:
+                y1 = y0 + max(h[k] - l[k], 1e-12) * 0.02
+            ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
+            axv.bar(xs[k], v[k], width=0.8, color=col + "99", linewidth=0)
+        for n, col in pal.items():
+            ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.08, label=f"MA{n}")
+        x = i - a0
+        if 0 <= x < len(c):
+            ax.axvline(x, color="#c9a227", ls="--", lw=0.9)
+            ax.scatter([x], [c[x]], s=36, color="#e35d5d", zorder=5)
+        ax.set_title(f"{sym}  15m", color="#e8f0ea", fontsize=12)
+        ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+        if len(xs):
+            ticks = list(range(0, len(xs), max(1, len(xs) // 6)))
+            if ticks[-1] != len(xs) - 1:
+                ticks.append(len(xs) - 1)
+            axv.set_xticks(ticks)
+            axv.set_xticklabels(
+                [hm_et(int(d["t"][a0 + t]))[-5:] for t in ticks],
+                color="#8aa193",
+                fontsize=7,
+            )
+        fig.tight_layout(pad=0.45)
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(path, dpi=100, facecolor=fig.get_facecolor())
+        plt.close(fig)
     return path
 
 
