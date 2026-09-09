@@ -19,6 +19,8 @@ from watch_binance_equity_ma_break import (  # noqa: E402
     hourly_bearish,
     hourly_closes_asof,
     hourly_mas_asof,
+    hourly_ohlcv,
+    hourly_series_for_chart,
     is_fresh_break,
     is_signal,
     next_window_start,
@@ -107,6 +109,24 @@ def test_hourly_closes_asof_no_lookahead() -> None:
     assert list(hourly_closes_asof(d, 11)) == [3.0, 7.0, 11.0]
     assert list(hourly_closes_asof(d, 5)) == [3.0, 5.0]
     assert list(hourly_closes_asof(d, 3)) == [3.0]
+
+
+def test_hourly_ohlcv_and_chart_asof() -> None:
+    n = 16
+    close = np.arange(n, dtype=float)
+    d = _bars(close)
+    h = hourly_ohlcv(d, 5)
+    assert list(h["c"]) == [3.0, 5.0]
+    assert h["o"][0] == 0.0
+    assert h["h"][0] == 3.0
+    assert h["l"][0] == 0.0
+    full = hourly_ohlcv(d, None)
+    assert list(full["c"]) == [3.0, 7.0, 11.0, 15.0]
+    src, idx = hourly_series_for_chart(d, 5)
+    assert idx == 1
+    assert src["c"][1] == 5.0
+    assert src["c"][2] == 11.0
+    assert src["c"][3] == 15.0
 
 
 def test_hourly_bearish_alignment() -> None:
@@ -200,6 +220,7 @@ def main() -> int:
     test_already_below_is_not_fresh()
     test_kiss_not_signal_waterfall_is()
     test_hourly_closes_asof_no_lookahead()
+    test_hourly_ohlcv_and_chart_asof()
     test_hourly_bearish_alignment()
     test_hourly_bullish_rejects_waterfall()
     test_short_fwd_pct()

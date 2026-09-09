@@ -209,6 +209,42 @@ def prev_near_ribbon(d: dict, i: int) -> bool:
     return any(pc >= d[f"m{n}"][i - 1] for n in (7, 14, 25, 200))
 
 
+def hourly_ohlcv(d: dict, i_end: int | None = None) -> dict:
+    """15m 合成 1h。i_end 有值時只看到該根 15m（含），不含之後。"""
+    n = len(d["c"]) if i_end is None else min(max(i_end + 1, 0), len(d["c"]))
+    empty = {
+        "t": np.array([], np.int64),
+        "o": np.array([]),
+        "h": np.array([]),
+        "l": np.array([]),
+        "c": np.array([]),
+        "v": np.array([]),
+    }
+    if n <= 0:
+        return empty
+    hour = (d["t"][:n] // HOUR_MS) * HOUR_MS
+    change = np.ones(n, dtype=bool)
+    change[1:] = hour[1:] != hour[:-1]
+    starts = np.flatnonzero(change)
+    ot, oo, hh, ll, cc, vv = [], [], [], [], [], []
+    for k, a in enumerate(starts):
+        b = starts[k + 1] if k + 1 < len(starts) else n
+        ot.append(int(hour[a]))
+        oo.append(float(d["o"][a]))
+        hh.append(float(np.max(d["h"][a:b])))
+        ll.append(float(np.min(d["l"][a:b])))
+        cc.append(float(d["c"][b - 1]))
+        vv.append(float(np.sum(d["v"][a:b])))
+    return {
+        "t": np.array(ot, np.int64),
+        "o": np.array(oo),
+        "h": np.array(hh),
+        "l": np.array(ll),
+        "c": np.array(cc),
+        "v": np.array(vv),
+    }
+
+
 def hourly_closes_asof(d: dict, i: int) -> np.ndarray:
     """1h 收盤：每根 UTC 小時取截至 bar i 的最後一筆 15m 收盤，不含之後的 15m。"""
     if i < 0:
@@ -220,6 +256,24 @@ def hourly_closes_asof(d: dict, i: int) -> np.ndarray:
     hour = t // HOUR_MS
     last = np.concatenate((hour[1:] != hour[:-1], np.array([True])))
     return np.asarray(c[last], dtype=float)
+
+
+def hourly_series_for_chart(d: dict, i_sig: int) -> tuple[dict, int]:
+    """1h 圖：訊號當根用 as-of，後面小時用完整 K 方便對比走勢。"""
+    full = hourly_ohlcv(d, None)
+    asof = hourly_ohlcv(d, i_sig)
+    if len(asof["t"]) == 0:
+        return full, 0
+    sig_t = int(asof["t"][-1])
+    if len(full["t"]) == 0:
+        return asof, len(asof["t"]) - 1
+    idx = int(np.searchsorted(full["t"], sig_t))
+    if idx >= len(full["t"]) or int(full["t"][idx]) != sig_t:
+        return asof, len(asof["t"]) - 1
+    out = {k: np.copy(v) for k, v in full.items()}
+    for k in ("o", "h", "l", "c", "v"):
+        out[k][idx] = asof[k][-1]
+    return out, idx
 
 
 def hourly_mas_asof(d: dict, i: int) -> tuple[float, float, float] | None:
@@ -290,8 +344,12 @@ def next_window_start(now: datetime | None = None) -> datetime:
     return day.replace(hour=SESSION_START[0], minute=SESSION_START[1], second=0, microsecond=0)
 
 
+def close_hm_et(open_ms: int, interval_ms: int = INTERVAL_MS) -> str:
+    return datetime.fromtimestamp((open_ms + interval_ms) / 1000, ET).strftime("%m-%d %H:%M")
+
+
 def hm_et(open_ms: int) -> str:
-    return bar_close_et(open_ms).strftime("%m-%d %H:%M")
+    return close_hm_et(open_ms, INTERVAL_MS)
 
 
 def hm8(open_ms: int) -> str:
@@ -470,7 +528,7 @@ def write_backtest_html(
             "<div class='card'>"
             f"<h2>{escape(name)}　{escape(t['et'])}　空1h {_fmt_pnl(h1)}</h2>"
             f"{img_html}"
-            f"<p class='note'>收 {t['entry']:g}　實體 {t['body']:.1f}%　振幅 {t['rng']:.1f}%　回撤 {t['drop']:.1f}%　量 {t['vr']:.1f}×"
+            f"<p class='note'>上 15m　下 1h　收 {t['entry']:g}　實體 {t['body']:.1f}%　振幅 {t['rng']:.1f}%　回撤 {t['drop']:.1f}%　量 {t['vr']:.1f}×"
             f"{hmas}"
             f"<br/>15m {_fmt_pnl(t['fwd']['15m'])}　1h {_fmt_pnl(t['fwd']['1h'])}　2h {_fmt_pnl(t['fwd']['2h'])}　當日 {_fmt_pnl(t['eod'])}</p>"
             "</div>"
@@ -504,7 +562,7 @@ def write_backtest_html(
 :root{{--bg:#0c1210;--panel:#14201b;--ink:#e8f0ea;--muted:#8aa193;--line:rgba(232,240,234,.12);--long:#3dba7a;--short:#e35d5d}}
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0c1210;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
-.wrap{{max-width:720px;margin:0 auto;padding:16px 12px 40px}}
+.wrap{{max-width:760px;margin:0 auto;padding:16px 12px 40px}}
 h1{{font-size:20px;margin:0 0 6px}}
 .sub{{color:var(--muted);font-size:13px;line-height:1.55;margin:0 0 14px}}
 .kpis{{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}}
@@ -527,7 +585,7 @@ img{{width:100%;height:auto;display:block;border-radius:10px;background:#101814;
   </div>
   <div class="card">
     <p class="note">每日：{escape(day_line) if day_line else "無"}</p>
-    <p class="note">開盤窗 09:00–10:00。長陰實體≥1.2%、振幅≥2.5%、近 4h 高回撤≥2.5%、量≥1.8×、收盤低於 15m MA7/14/25/99/120/200。進場當下 1h MA7&lt;MA14&lt;MA25 空頭排列。綠＝空單賺。</p>
+    <p class="note">開盤窗 09:00–10:00。長陰實體≥1.2%、振幅≥2.5%、近 4h 高回撤≥2.5%、量≥1.8×、收盤低於 15m MA7/14/25/99/120/200。進場當下 1h MA7&lt;MA14&lt;MA25 空頭排列。圖上 15m、下 1h，黃虛線＝進場。綠＝空單賺。</p>
   </div>
   {"".join(cards) if cards else "<div class='card'>無訊號</div>"}
 </div>
@@ -610,16 +668,14 @@ def draw_chart(sym: str, d: dict, i: int, path: str) -> str | None:
         from matplotlib.patches import Rectangle
     except Exception:
         return None
-    with _MPL_LOCK:
-        a0 = max(0, i - 36)
-        a1 = min(len(d["c"]), i + 18)
+    pal = {7: "#f0c14a", 14: "#26c6da", 25: "#d28cff", 99: "#42a5f5", 120: "#5fd2c2", 200: "#e8f0ea"}
+
+    def panel(ax, axv, src: dict, mark: int, *, lookback: int, lookfwd: int, interval_ms: int, title: str) -> None:
+        a0 = max(0, mark - lookback)
+        a1 = min(len(src["c"]), mark + lookfwd)
         sl = slice(a0, a1)
         xs = np.arange(a1 - a0)
-        o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
-        fig, (ax, axv) = plt.subplots(
-            2, 1, figsize=(9.2, 5.2), sharex=True, gridspec_kw={"height_ratios": [3.15, 1]}, facecolor="#0c1210"
-        )
-        pal = {7: "#f0c14a", 14: "#26c6da", 25: "#d28cff", 99: "#42a5f5", 120: "#5fd2c2", 200: "#e8f0ea"}
+        o, h, l, c, v = src["o"][sl], src["h"][sl], src["l"][sl], src["c"][sl], src["v"][sl]
         for a in (ax, axv):
             a.set_facecolor("#101814")
             a.tick_params(colors="#8aa193", labelsize=8)
@@ -634,23 +690,52 @@ def draw_chart(sym: str, d: dict, i: int, path: str) -> str | None:
             ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
             axv.bar(xs[k], v[k], width=0.8, color=col + "99", linewidth=0)
         for n, col in pal.items():
-            ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.08, label=f"MA{n}")
-        x = i - a0
+            m = sma(src["c"], n)[sl]
+            if len(m) == 0 or np.all(np.isnan(m)):
+                continue
+            ax.plot(xs, m, color=col, lw=1.08, label=f"MA{n}")
+        x = mark - a0
         if 0 <= x < len(c):
             ax.axvline(x, color="#c9a227", ls="--", lw=0.9)
             ax.scatter([x], [c[x]], s=36, color="#e35d5d", zorder=5)
-        ax.set_title(f"{sym}  15m", color="#e8f0ea", fontsize=12)
+        ax.set_title(title, color="#e8f0ea", fontsize=12)
         ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
         if len(xs):
             ticks = list(range(0, len(xs), max(1, len(xs) // 6)))
             if ticks[-1] != len(xs) - 1:
                 ticks.append(len(xs) - 1)
             axv.set_xticks(ticks)
+            fmt = "%m-%d %H" if interval_ms >= HOUR_MS else "%H:%M"
             axv.set_xticklabels(
-                [hm_et(int(d["t"][a0 + t]))[-5:] for t in ticks],
+                [
+                    datetime.fromtimestamp((int(src["t"][a0 + t]) + interval_ms) / 1000, ET).strftime(fmt)
+                    for t in ticks
+                ],
                 color="#8aa193",
                 fontsize=7,
             )
+
+    with _MPL_LOCK:
+        h1, hi = hourly_series_for_chart(d, i)
+        fig, axes = plt.subplots(
+            4,
+            1,
+            figsize=(9.2, 8.8),
+            facecolor="#0c1210",
+            gridspec_kw={"height_ratios": [3.2, 0.95, 3.2, 0.95]},
+        )
+        ax15, ax15v, ax1h, ax1hv = axes
+        panel(ax15, ax15v, d, i, lookback=36, lookfwd=18, interval_ms=INTERVAL_MS, title=f"{sym}  15m")
+        if len(h1["c"]) >= 8:
+            panel(ax1h, ax1hv, h1, hi, lookback=40, lookfwd=12, interval_ms=HOUR_MS, title=f"{sym}  1h")
+        else:
+            for a in (ax1h, ax1hv):
+                a.set_facecolor("#101814")
+                a.set_xticks([])
+                a.set_yticks([])
+                for sp in a.spines.values():
+                    sp.set_color("#2a3a33")
+            ax1h.set_title(f"{sym}  1h（K線不足）", color="#8aa193", fontsize=12)
         fig.tight_layout(pad=0.45)
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(path, dpi=100, facecolor=fig.get_facecolor())
