@@ -19,12 +19,15 @@ from watch_binance_equity_ma_break import (  # noqa: E402
     hourly_bearish,
     hourly_closes_asof,
     hourly_mas_asof,
+    hourly_off_high_pct,
     hourly_ohlcv,
     hourly_series_for_chart,
     is_fresh_break,
     is_signal,
     next_window_start,
     now_should_scan,
+    prior_held_ma200,
+    ribbon_width_pct,
     short_fwd_pct,
     sma,
 )
@@ -71,6 +74,20 @@ def test_already_below_is_not_fresh() -> None:
     assert not is_fresh_break(d, 219)
 
 
+def _waterfall_last(n: int = 230, last_close: float = 96.8) -> dict:
+    close = np.full(n, 100.0)
+    o = close.copy()
+    h = np.full(n, 100.2)
+    l = np.full(n, 99.8)
+    v = np.ones(n)
+    close[-1] = last_close
+    o[-1] = 100.4
+    h[-1] = 100.6
+    l[-1] = last_close - 0.3
+    v[-1] = 4.0
+    return _bars(close, open_=o, high=h, low=l, vol=v)
+
+
 def test_kiss_not_signal_waterfall_is() -> None:
     n = 230
     close = np.full(n, 100.0)
@@ -86,10 +103,21 @@ def test_kiss_not_signal_waterfall_is() -> None:
     assert is_fresh_break(d, n - 1)
     assert not is_signal(d, n - 1)
 
+    d = _waterfall_last(n)
+    assert hourly_bearish(d, n - 1)
+    assert is_signal(d, n - 1)
+    assert MIN_BODY_PCT == 1.20
+    assert ribbon_width_pct(d, n - 2) < 1.0
+    assert hourly_off_high_pct(d, n - 1) < 1.0
+
+
+def test_overnight_lost_ma200_not_vrt() -> None:
+    n = 230
     close = np.full(n, 100.0)
+    close[-17:-1] = 99.3
     o = close.copy()
-    h = np.full(n, 100.2)
-    l = np.full(n, 99.8)
+    h = np.maximum(o, close) + 0.2
+    l = np.minimum(o, close) - 0.2
     v = np.ones(n)
     close[-1] = 96.8
     o[-1] = 100.4
@@ -97,9 +125,9 @@ def test_kiss_not_signal_waterfall_is() -> None:
     l[-1] = 96.5
     v[-1] = 4.0
     d = _bars(close, open_=o, high=h, low=l, vol=v)
-    assert hourly_bearish(d, n - 1)
-    assert is_signal(d, n - 1)
-    assert MIN_BODY_PCT == 1.20
+    assert is_fresh_break(d, n - 1)
+    assert not prior_held_ma200(d, n - 1)
+    assert not is_signal(d, n - 1)
 
 
 def test_hourly_closes_asof_no_lookahead() -> None:
@@ -219,6 +247,7 @@ def main() -> int:
     test_fresh_break_first_close_below_all()
     test_already_below_is_not_fresh()
     test_kiss_not_signal_waterfall_is()
+    test_overnight_lost_ma200_not_vrt()
     test_hourly_closes_asof_no_lookahead()
     test_hourly_ohlcv_and_chart_asof()
     test_hourly_bearish_alignment()

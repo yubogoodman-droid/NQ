@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """幣安美股永續：開盤瀑布 Telegram。
 
-找你那種 15m：盤整後長陰放量摔出 MA7/14/25/99/120/200。
-進場當下 1h K 須 MA7 < MA14 < MA25 空頭排列（用截至該根 15m 的小時收盤，不偷看未走完的小時 K）。
+找你那種 15m：隔夜貼著均線盤整，開盤長陰放量才摔出 MA7/14/25/99/120/200。
+1h 仍在近日高、MA7 < MA14 < MA25 空頭排列才進（小時收盤用截至該根 15m，不偷看未走完的小時 K）。
 只在美東 09:00–10:00（開盤前後各半小時）報，週末不掃。
 
     python3 examples/watch_binance_equity_ma_break.py --test
@@ -51,6 +51,14 @@ MIN_RANGE_PCT = 2.50
 MIN_DROP_PCT = 2.50
 MIN_VOL_RATIO = 1.80
 DROP_LOOKBACK = 16
+MAX_RIBBON_PCT = 2.50
+MAX_PRIOR_RANGE_PCT = 3.50
+PRIOR_RANGE_LOOKBACK = 20
+PRIOR_HOLD_LOOKBACK = 16
+MIN_PREV_VS_MA200_PCT = -0.20
+MIN_PRIOR_VS_MA200_PCT = -0.50
+MAX_OFF_HOUR_HIGH_PCT = 5.00
+HOUR_HIGH_LOOKBACK = 24
 HORIZONS = ((1, "15m"), (2, "30m"), (4, "1h"), (8, "2h"), (16, "4h"))
 PAGES_HTML = REPO / "docs" / "binance" / "ma-break-7d.html"
 CHART_DIR = REPO / "docs" / "binance" / "img" / "ma-break"
@@ -209,6 +217,58 @@ def prev_near_ribbon(d: dict, i: int) -> bool:
     return any(pc >= d[f"m{n}"][i - 1] for n in (7, 14, 25, 200))
 
 
+def ribbon_width_pct(d: dict, i: int) -> float:
+    mas = [float(d[f"m{n}"][i]) for n in MA_PERIODS]
+    if any(np.isnan(v) for v in mas):
+        return 999.0
+    px = float(d["c"][i])
+    if px <= 0:
+        return 999.0
+    return (max(mas) - min(mas)) / px * 100.0
+
+
+def prior_range_pct(d: dict, i: int) -> float:
+    a0 = max(0, i - PRIOR_RANGE_LOOKBACK)
+    if a0 >= i:
+        return 999.0
+    px = float(d["c"][i - 1])
+    if px <= 0:
+        return 999.0
+    hi = float(np.max(d["h"][a0:i]))
+    lo = float(np.min(d["l"][a0:i]))
+    return (hi - lo) / px * 100.0
+
+
+def close_vs_ma200_pct(d: dict, i: int) -> float:
+    m = float(d["m200"][i])
+    px = float(d["c"][i])
+    if np.isnan(m) or m <= 0 or px <= 0:
+        return -999.0
+    return (px / m - 1) * 100.0
+
+
+def prior_held_ma200(d: dict, i: int) -> bool:
+    a0 = max(0, i - PRIOR_HOLD_LOOKBACK)
+    if a0 >= i:
+        return False
+    return all(close_vs_ma200_pct(d, j) >= MIN_PRIOR_VS_MA200_PCT for j in range(a0, i))
+
+
+def hourly_off_high_pct(d: dict, i: int) -> float:
+    """上一根完整 1h 收盤，離近 24 根 1h 高多少。已先摔過的續跌會很大。"""
+    h = hourly_ohlcv(d, i)
+    if len(h["c"]) < 2:
+        return 999.0
+    prev_h = h["h"][:-1]
+    prev_c = h["c"][:-1]
+    w = min(HOUR_HIGH_LOOKBACK, len(prev_h))
+    hi = float(np.max(prev_h[-w:]))
+    px = float(prev_c[-1])
+    if hi <= 0:
+        return 999.0
+    return (hi - px) / hi * 100.0
+
+
 def hourly_ohlcv(d: dict, i_end: int | None = None) -> dict:
     """15m 合成 1h。i_end 有值時只看到該根 15m（含），不含之後。"""
     n = len(d["c"]) if i_end is None else min(max(i_end + 1, 0), len(d["c"]))
@@ -299,6 +359,14 @@ def is_signal(d: dict, i: int) -> bool:
         return False
     if not prev_near_ribbon(d, i):
         return False
+    if close_vs_ma200_pct(d, i - 1) < MIN_PREV_VS_MA200_PCT:
+        return False
+    if not prior_held_ma200(d, i):
+        return False
+    if ribbon_width_pct(d, i - 1) > MAX_RIBBON_PCT:
+        return False
+    if prior_range_pct(d, i) > MAX_PRIOR_RANGE_PCT:
+        return False
     if bar_body_pct(d, i) < MIN_BODY_PCT:
         return False
     if bar_range_pct(d, i) < MIN_RANGE_PCT:
@@ -306,6 +374,8 @@ def is_signal(d: dict, i: int) -> bool:
     if drop_from_swing_pct(d, i) < MIN_DROP_PCT:
         return False
     if vol_ratio(d, i) < MIN_VOL_RATIO:
+        return False
+    if hourly_off_high_pct(d, i) > MAX_OFF_HOUR_HIGH_PCT:
         return False
     return hourly_bearish(d, i)
 
@@ -578,14 +648,14 @@ img{{width:100%;height:auto;display:block;border-radius:10px;background:#101814;
 <body>
 <div class="wrap">
   <h1>開盤瀑布 · 近 {days} 日</h1>
-  <p class="sub">幣安美股永續 {len(symbols)} 檔 · 美東 {start} → {end} · 只計開盤前後各半小時 · 進場 1h 空頭排列 · 訊號收盤做空</p>
+  <p class="sub">幣安美股永續 {len(symbols)} 檔 · 美東 {start} → {end} · 開盤窗 · 隔夜貼均線再瀑布 · 1h 仍在高位空頭排列 · 訊號收盤做空</p>
   <div class="kpis">
     <div class="kpi"><div class="k">筆數 / 檔數</div><div class="v">{len(trades)} / {len({t["symbol"] for t in trades})}</div></div>
     {"".join(kpi_bits)}
   </div>
   <div class="card">
     <p class="note">每日：{escape(day_line) if day_line else "無"}</p>
-    <p class="note">開盤窗 09:00–10:00。長陰實體≥1.2%、振幅≥2.5%、近 4h 高回撤≥2.5%、量≥1.8×、收盤低於 15m MA7/14/25/99/120/200。進場當下 1h MA7&lt;MA14&lt;MA25 空頭排列。圖上 15m、下 1h，黃虛線＝進場。綠＝空單賺。</p>
+    <p class="note">開盤窗 09:00–10:00。隔夜仍貼 15m MA200、均線帶寬≤2.5%、近 5h 振幅≤3.5%，再長陰摔出 MA7/14/25/99/120/200。1h 仍在近日高 5% 內且 MA7&lt;MA14&lt;MA25。圖上 15m、下 1h，黃虛線＝進場。綠＝空單賺。</p>
   </div>
   {"".join(cards) if cards else "<div class='card'>無訊號</div>"}
 </div>
