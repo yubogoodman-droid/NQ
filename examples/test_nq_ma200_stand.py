@@ -15,8 +15,10 @@ from nq_ma200_stand import (  # noqa: E402
     ET,
     MIN_5M_ALL,
     MIN_5M_REENTRY_RIBBON,
+    REL_LOW_RESTART_PTS,
     TradeResult,
     detect_signals,
+    is_rel_low_restart,
     near_falling_15m_ma20,
     display_trades,
     draw_trade_png,
@@ -151,6 +153,8 @@ def test_detect_happy_path() -> None:
     sig = sigs[0]
     assert sig.entry_idx > sig.break_idx
     assert sig.entry_idx - sig.break_idx <= 60
+    assert sig.entry_idx - sig.window_idx <= 60
+    assert sig.window_idx >= sig.break_idx
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30 > sig.ma60
     assert sig.entry_price > sig.ma60
     assert 0 < sig.dist_ma200 <= 30
@@ -245,6 +249,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert "15mMA200上被停損後30分內站回進場點再進一次" in text
         assert "再進也距MA200≤30" in text
         assert "再進短均帶" in text
+        assert "破2h低後1小時（相對低距破底≤10則從該K重算1小時）" in text
         assert "15分MA20明顯下彎且收在其下≤15不進" in text
         assert "收在MA60上" in text
         assert "5m連2根收在破底下" not in text
@@ -253,7 +258,117 @@ def test_write_html(tmp_path: Path | None = None) -> None:
         assert any((path.parent / "img").glob("t01_*_15m.png"))
         assert any((path.parent / "img").glob("t01_*_1h.png"))
         if any(t.pnl_points > 0 for t in trades) and any(t.pnl_points <= 0 for t in trades):
-            assert text.find("賺錢") < text.find("賠錢")
+            assert text.find("賺錢") < text.find("賠錢"    )
+
+
+def _make_rel_low_restart_bars(
+    *,
+    bounce_bars: int = 68,
+    stall_after_rel: int = 0,
+    rel_above: float = 5.0,
+    n: int = 560,
+    start: str = "2026-08-17 11:00",
+) -> tuple[pd.DataFrame, int, int]:
+    """2h dump, stay away from the break, then a relative low and MA200 reclaim.
+
+    bounce_bars=68 is after the original 60-bar window (Sep 15 analog).
+    rel_above is how many points the bounce low sits above the break low.
+    """
+    close = np.zeros(n, dtype=float)
+    close[0] = 20000.0
+    for i in range(1, 250):
+        close[i] = close[i - 1] + 0.12
+    base = close[249]
+    for i in range(250, 370):
+        close[i] = base - 25.0 + (2.0 if i % 2 == 0 else -1.0)
+    break_i = 370
+    close[break_i] = base - 45.0
+    rel_i = break_i + bounce_bars
+    climb = rel_i + stall_after_rel
+    assert climb + 20 < n
+    break_low = close[break_i] - 1.0
+    park = break_low + 16.0
+    for i in range(break_i + 1, climb):
+        close[i] = park + (0.4 if i % 2 == 0 else -0.4)
+    close[rel_i] = park
+    close[climb] = park
+    close[climb + 1] = park + 8.0
+    close[climb + 2] = park + 16.0
+    close[climb + 3] = park + 22.0
+    close[climb + 4] = park + 26.0
+    close[climb + 5] = park + 28.0
+    for i in range(climb + 6, n):
+        close[i] = close[i - 1] + 0.3
+
+    open_ = np.r_[close[0], close[:-1]]
+    high = np.maximum(open_, close) + 0.8
+    low = np.minimum(open_, close) - 0.8
+    for i in range(250, 370):
+        low[i] = min(low[i], base - 8.0)
+    low[break_i] = break_low
+    for i in range(break_i + 1, rel_i):
+        low[i] = max(float(low[i]), break_low + 12.0)
+        low[i] = min(float(low[i]), float(close[i]) - 0.25)
+    low[rel_i] = break_low + rel_above
+    for i in range(rel_i + 1, n):
+        if i == rel_i:
+            continue
+        low[i] = max(float(low[i]), break_low + 12.0)
+        low[i] = min(float(low[i]), float(close[i]) - 0.25)
+
+    idx = pd.date_range(start, periods=n, freq="1min", tz=ET)
+    df = pd.DataFrame(
+        {
+            "Open": open_,
+            "High": high,
+            "Low": low,
+            "Close": close,
+            "Volume": np.full(n, 80.0),
+        },
+        index=idx,
+    )
+    return df, break_i, rel_i
+
+
+def test_is_rel_low_restart() -> None:
+    assert REL_LOW_RESTART_PTS == 10.0
+    assert is_rel_low_restart(29236.50, 29231.00) is True
+    assert is_rel_low_restart(29241.00, 29231.00) is True
+    assert is_rel_low_restart(29241.25, 29231.00) is False
+    assert is_rel_low_restart(29230.75, 29231.00) is False
+    assert is_rel_low_restart(29236.50, 29231.00, pts=0) is False
+
+
+def test_rel_low_restarts_window_after_expiry() -> None:
+    df, break_i, rel_i = _make_rel_low_restart_bars(bounce_bars=68, rel_above=5.0)
+    funnel: dict = {}
+    sigs = detect_signals(df, min_5m_all=0.0, near_15m_ma20=0.0, funnel=funnel)
+    assert sigs, "relative low within 10 pts should reopen the 1h window"
+    sig = sigs[0]
+    assert sig.break_idx == break_i
+    assert sig.window_idx == rel_i
+    assert sig.entry_idx - sig.break_idx > 60
+    assert sig.entry_idx - sig.window_idx <= 60
+    assert funnel.get("rel_low_restart", 0) >= 1
+    off = detect_signals(df, min_5m_all=0.0, near_15m_ma20=0.0, rel_low_restart_pts=0)
+    assert not off, "without the restart, the expired 1h window must miss this reclaim"
+
+
+def test_rel_low_11pts_does_not_restart() -> None:
+    df, _, _ = _make_rel_low_restart_bars(bounce_bars=68, rel_above=11.0)
+    sigs = detect_signals(df, min_5m_all=0.0, near_15m_ma20=0.0)
+    assert not sigs, "11 pts above the break low is outside REL_LOW_RESTART_PTS"
+
+
+def test_rel_low_extends_window_before_expiry() -> None:
+    df, break_i, rel_i = _make_rel_low_restart_bars(bounce_bars=50, stall_after_rel=20, rel_above=4.0)
+    sigs = detect_signals(df, min_5m_all=0.0, near_15m_ma20=0.0)
+    assert sigs, "in-window relative low should push the 1h clock forward"
+    sig = sigs[0]
+    assert sig.break_idx == break_i
+    assert sig.window_idx == rel_i
+    assert sig.entry_idx - sig.break_idx > 60
+    assert sig.entry_idx - sig.window_idx <= 60
 
 
 def test_display_trades_wins_first() -> None:
@@ -764,6 +879,10 @@ def main() -> int:
     test_simulate_target_and_stop()
     test_breakeven_after_plus_60()
     test_write_html()
+    test_is_rel_low_restart()
+    test_rel_low_restarts_window_after_expiry()
+    test_rel_low_11pts_does_not_restart()
+    test_rel_low_extends_window_before_expiry()
     test_display_trades_wins_first()
     test_resample_5m()
     test_overlay_15m_ma200()

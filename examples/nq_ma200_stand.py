@@ -4,7 +4,7 @@
 現行規則（無五分 MA60 斜率）：
   1. MA5>10>20>30>60，且收盤在 MA60 上
   2. 站上 MA200 連 ≥3，且距離 ≤30
-  3. 破兩小時低後 1 小時內
+  3. 破兩小時低後 1 小時內；之後若出現相對低（低點距該破底低 ≤ REL_LOW_RESTART_PTS）則從該 K 重開 1 小時窗（不必再破 2h 低）
   4. 進場前 1 小時曾連續 ≥15 根在 MA200 下
   5. 美東 9:30–10:00 不進
   6. 紅 K 長上影跳過
@@ -42,6 +42,7 @@ PAGES_HTML = REPO_ROOT / "docs" / "nq-ma200-stand" / "index.html"
 
 TWO_HOUR_BARS = 120
 RECLAIM_BARS = 60
+REL_LOW_RESTART_PTS = 10.0  # 破底後相對低距破底低幾點內，從該 K 重算 1 小時
 UNDER_LOOKBACK = 60
 UNDER_STREAK = 15
 ABOVE_STREAK = 3
@@ -188,6 +189,7 @@ class Signal:
     ma200: float
     dist_ma200: float
     under_streak: int
+    window_idx: int = 0  # 1h 窗起算 K（2h 破底，或相對低重計）
     m5_ribbon: float = 0.0
     m5_all: float = 0.0
     m1_ribbon: float = 0.0
@@ -269,11 +271,26 @@ def above_ma200_streak(close: np.ndarray, ma200: np.ndarray, j: int, need: int) 
     return True
 
 
+def is_rel_low_restart(
+    bar_low: float,
+    break_low: float,
+    pts: float = REL_LOW_RESTART_PTS,
+) -> bool:
+    """相對低：低點在破底低之上、且差距不超過 pts（含剛好 10 點）。
+
+    不必再破 2h 低。pts<=0 關閉。低於破底低的新 2h 破底由呼叫端另外處理。
+    """
+    if pts <= 0 or not np.isfinite(bar_low) or not np.isfinite(break_low):
+        return False
+    return float(break_low) - 1e-9 <= float(bar_low) <= float(break_low) + float(pts) + 1e-9
+
+
 def detect_signals(
     df: pd.DataFrame,
     *,
     two_hour_bars: int = TWO_HOUR_BARS,
     reclaim_bars: int = RECLAIM_BARS,
+    rel_low_restart_pts: float = REL_LOW_RESTART_PTS,
     under_lookback: int = UNDER_LOOKBACK,
     under_streak: int = UNDER_STREAK,
     above_streak: int = ABOVE_STREAK,
@@ -326,33 +343,64 @@ def detect_signals(
         bump("break")
         break_idx = i
         break_low = float(low[i])
+        support = float(two_hr_low[i])
+        window_start = break_idx
         entered = False
-        end_j = min(break_idx + reclaim_bars, n - 1)
-        for j in range(break_idx + 1, end_j + 1):
+        aborted = False
+        j = break_idx + 1
+        while j < n:
+            lo_j = float(low[j])
+            is_new_2h = not np.isnan(two_hr_low[j]) and lo_j < float(two_hr_low[j])
+            # 真正的新 2h 破底：開新窗（原窗還開著也刷新）。相對低不會走到這裡。
+            if is_new_2h:
+                bump("break")
+                break_idx = j
+                break_low = lo_j
+                support = float(two_hr_low[j])
+                window_start = j
+                j += 1
+                continue
+            # 相對低（含窗過期後）重開 1h，不必再破 2h 低。
+            if j > window_start and is_rel_low_restart(lo_j, break_low, rel_low_restart_pts):
+                bump("rel_low_restart")
+                window_start = j
+                j += 1
+                continue
+            if j > window_start + reclaim_bars:
+                j += 1
+                continue
             if np.isnan(ma5[j]) or np.isnan(ma60[j]) or np.isnan(ma200[j]):
+                j += 1
                 continue
             if not (ma5[j] > ma10[j] > ma20[j] > ma30[j] > ma60[j]):
                 bump("skip_stack")
+                j += 1
                 continue
             if close[j] <= ma60[j]:
                 bump("skip_ma60")
+                j += 1
                 continue
             if not above_ma200_streak(close, ma200, j, above_streak):
                 bump("skip_above3")
+                j += 1
                 continue
             dist = float(close[j] - ma200[j])
             if dist <= 0 or dist > max_dist_ma200:
                 bump("skip_dist")
+                j += 1
                 continue
             streak = max_under_streak(close, ma200, j, under_lookback)
             if streak < under_streak:
                 bump("skip_under")
+                j += 1
                 continue
             if in_open_skip(df.index[j]):
                 bump("skip_open")
+                j += 1
                 continue
             if is_red_long_upper(float(opn[j]), float(high[j]), float(low[j]), float(close[j]), min_upper_wick):
                 bump("skip_wick")
+                j += 1
                 continue
             ribbon = float(m5_ribbon[j])
             all_spread = float(m5_all[j])
@@ -361,9 +409,11 @@ def detect_signals(
             dist_15 = float("nan") if np.isnan(m15_200) else float(close[j] - m15_200)
             if min_5m_ribbon > 0 and (np.isnan(ribbon) or ribbon < min_5m_ribbon):
                 bump("skip_5m_ribbon")
+                j += 1
                 continue
             if min_5m_all > 0 and not np.isnan(all_spread) and all_spread < min_5m_all:
                 bump("skip_5m_tangle")
+                j += 1
                 continue
             if near_falling_15m_ma20(
                 float(close[j]),
@@ -373,11 +423,13 @@ def detect_signals(
                 min_drop=min_15m_ma20_drop,
             ):
                 bump("skip_15m_down")
+                aborted = True
                 break
             entry = float(close[j])
             stop = float(ma200[j]) - stop_below_ma200
             if entry <= stop:
                 bump("skip_bad_stop")
+                j += 1
                 continue
             bump("taken")
             signals.append(
@@ -397,6 +449,7 @@ def detect_signals(
                     ma200=float(ma200[j]),
                     dist_ma200=dist,
                     under_streak=streak,
+                    window_idx=window_start,
                     m5_ribbon=0.0 if (np.isnan(ribbon) or np.isinf(ribbon)) else ribbon,
                     m5_all=all_spread if np.isfinite(all_spread) else float("nan"),
                     m1_ribbon=0.0 if np.isnan(ribbon_1m) else ribbon_1m,
@@ -409,7 +462,7 @@ def detect_signals(
             i = j + 1
             break
         if not entered:
-            i = break_idx + 1
+            i = (j + 1) if aborted else n
     return signals
 
 
@@ -510,6 +563,7 @@ def make_reclaim_reentry(
             ma200=float(ma200[j]),
             dist_ma200=dist,
             under_streak=parent.under_streak,
+            window_idx=parent.window_idx or parent.break_idx,
             m5_ribbon=0.0 if (np.isnan(ribbon) or np.isinf(ribbon)) else ribbon,
             m5_all=all_spread if np.isfinite(all_spread) else float("nan"),
             m1_ribbon=0.0 if np.isnan(ribbon_1m) else ribbon_1m,
@@ -1410,6 +1464,10 @@ def write_html_report(
                 "style='width:100%;display:block;border-radius:10px'/></div>"
             )
         risk = t.entry_price - t.signal.stop_price
+        widx = int(getattr(t.signal, "window_idx", 0) or 0)
+        window_note = ""
+        if widx and widx != t.signal.break_idx and 0 <= widx < len(df):
+            window_note = " / 窗起 " + df.index[widx].strftime("%m-%d %H:%M")
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -1441,7 +1499,7 @@ def write_html_report(
             f"{'；15mMA200上停損後站回進場點再進' if retry else ''}）\n"
             f"target {t.target_price:.2f}  (+100)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
-            f"破底 {t.signal.break_low:.2f} / 2h低 {t.signal.two_hr_low:.2f}\n"
+            f"破底 {t.signal.break_low:.2f} / 2h低 {t.signal.two_hr_low:.2f}{window_note}\n"
             f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f} "
             f"> MA30 {t.signal.ma30:.1f} > MA60 {t.signal.ma60:.1f}\n"
             f"MA200 {t.signal.ma200:.1f}  先前連{t.signal.under_streak}根在下\n"
@@ -1456,7 +1514,7 @@ def write_html_report(
     if funnel:
         funnel_line = (
             f"<p class='muted'>漏斗：破底 {funnel.get('break', 0)} → 進場 {funnel.get('taken', 0)}"
-            f"（排列 {funnel.get('skip_stack', 0)} · 未上MA60 {funnel.get('skip_ma60', 0)} · "
+            f"（相對低重計 {funnel.get('rel_low_restart', 0)} · 排列 {funnel.get('skip_stack', 0)} · 未上MA60 {funnel.get('skip_ma60', 0)} · "
             f"未連3 {funnel.get('skip_above3', 0)} · "
             f"距離 {funnel.get('skip_dist', 0)} · 未洗15 {funnel.get('skip_under', 0)} · "
             f"9:30檔 {funnel.get('skip_open', 0)} · 長上影 {funnel.get('skip_wick', 0)} · "
@@ -1508,7 +1566,7 @@ h2.section{{font-size:15px;margin:18px 0 10px;color:#e6edf3}}
 <section class="summary">
 <h1>{escape(symbol)} 破底站上 MA200</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時 · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次（再進也距MA200≤30） · 五分全均&lt;28或再進短均帶&lt;20不進 · 15分MA20明顯下彎且收在其下≤15不進 · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
+<p class="muted">MA5&gt;10&gt;20&gt;30&gt;60且收在MA60上 · 站上MA200連3且距≤30 · 破2h低後1小時（相對低距破底≤10則從該K重算1小時） · 先前連15根在MA200下 · 9:30–10:00不進 · 紅K長上影跳過 · SL=MA200−10 / TP=+100 · 浮盈+60改保本 · 15mMA200上被停損後30分內站回進場點再進一次（再進也距MA200≤30） · 五分全均&lt;28或再進短均帶&lt;20不進 · 15分MA20明顯下彎且收在其下≤15不進 · 5m / 15m / 1h 圖只對照（含成交量、MACD 12/26/9）</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1565,6 +1623,7 @@ def cmd_backtest(args) -> int:
     print(
         "funnel "
         f"break={funnel.get('break', 0)} taken={funnel.get('taken', 0)} "
+        f"relow={funnel.get('rel_low_restart', 0)} "
         f"stack={funnel.get('skip_stack', 0)} ma60={funnel.get('skip_ma60', 0)} "
         f"above3={funnel.get('skip_above3', 0)} "
         f"dist={funnel.get('skip_dist', 0)} under={funnel.get('skip_under', 0)} "
