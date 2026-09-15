@@ -17,6 +17,7 @@ gRe     = "再進"
 
 twoHourBars     = input.int(120, "破底回看（1m 根）", minval=20, group=gCore)
 reclaimBars     = input.int(60, "破底後可進場根數", minval=1, group=gCore)
+relLowRestartPts = input.float(10.0, "相對低重計：距破底低幾點內重開 1 小時窗", minval=0.0, step=1.0, group=gCore)
 underLookback   = input.int(60, "洗盤回看根數", minval=5, group=gCore)
 underStreakNeed = input.int(15, "洗盤：連幾根收在 MA200 下", minval=1, group=gCore)
 aboveStreakNeed = input.int(3, "站上 MA200 連幾根", minval=1, group=gCore)
@@ -115,22 +116,34 @@ twoHrLow = ta.lowest(low, twoHourBars)[1]
 isBreak = not na(twoHrLow) and not na(ma200) and low < twoHrLow
 
 // ---------------------------------------------------------------------------
-// 破底視窗：一破一窗，合格卻 15m 下彎則整窗取消
+// 破底視窗：破 2h 低開 1h 窗；真正的新 2h 破底刷新起點。
+// 相對低距破底低 ≤ relLowRestartPts 則從該 K 重開 1h（不必再破 2h 低；窗過期後仍可重開）。
+// 合格卻 15m 下彎則整窗取消（含之後的相對低重計）。
 // ---------------------------------------------------------------------------
 var int   breakBar = na
+var int   windowOrigin = na
+var float breakLow = na
 var bool  windowOpen = false
 var bool  windowDone = false
 
-if windowOpen and not na(breakBar) and bar_index > breakBar + reclaimBars
+if windowOpen and not na(windowOrigin) and bar_index > windowOrigin + reclaimBars
     windowOpen := false
-    windowDone := true
+    // 不設 windowDone：過期後相對低仍可重開。進場 / 15m 下彎才 Done。
 
-if isBreak and not windowOpen
+if isBreak
     breakBar := bar_index
+    windowOrigin := bar_index
+    breakLow := low
     windowOpen := true
     windowDone := false
 
-inWindow = windowOpen and not windowDone and not na(breakBar) and bar_index > breakBar and bar_index <= breakBar + reclaimBars
+// 相對低重計：low 在 [breakLow, breakLow+pts]。新 2h 破底的 low < breakLow，不會走進這裡。
+relLowRestart = relLowRestartPts > 0 and not windowDone and not na(breakLow) and not na(windowOrigin) and bar_index > windowOrigin and low >= breakLow and low <= breakLow + relLowRestartPts
+if relLowRestart
+    windowOrigin := bar_index
+    windowOpen := true
+
+inWindow = windowOpen and not windowDone and not na(windowOrigin) and bar_index > windowOrigin and bar_index <= windowOrigin + reclaimBars
 
 primaryReady = inWindow and stackOk and aboveMa60 and aboveMa200Streak and distOk and underOk and not skipOpen and not redLongWick and not tangle5mRibbonPrimary and not tangle5mAll
 hardStopNow = ma200 - stopBelowMa200
@@ -235,7 +248,7 @@ plotshape(enterRe, title="再進", style=shape.triangleup, location=location.bel
 // ---------------------------------------------------------------------------
 // 1. MA5>10>20>30>60 且收在 MA60 上
 // 2. 站上 1m MA200 連 ≥3，距 ≤30
-// 3. 破前 120 根低後 60 根內（一破一窗）
+// 3. 破前 120 根低後 60 根內（一破一窗）；之後相對低距破底低 ≤10 則從該 K 重開 1h（不必再破 2h 低）
 // 4. 進場前 60 根曾連 ≥15 根收在 MA200 下
 // 5. 美東 9:30–10:00 不進
 // 6. 紅 K 長上影（上影≥實體且≥8）跳過
