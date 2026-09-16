@@ -215,6 +215,7 @@ def _render_trade_card(df: pd.DataFrame, trade: TradeResult, trade_no: int, cont
     low_gap = abs(p.first_low - p.second_low)
     avg_low = (p.first_low + p.second_low) / 2
     gap_pct = low_gap / avg_low * 100 if avg_low else 0
+    tp_mult = (sig.target - p.neckline) / depth if depth else 1.0
     entry_row = df.iloc[sig.bar_idx]
     ma_line = _ma_snapshot(entry_row)
 
@@ -236,7 +237,7 @@ def _render_trade_card(df: pd.DataFrame, trade: TradeResult, trade_no: int, cont
       </div>
       <pre class="trade-detail">entry(頸線突破) {sig.entry:.2f}
 stop L2 {sig.stop_loss:.2f}
-TP 量度漲幅 = {sig.target:.2f}
+TP 量度×{tp_mult:.1f} = {sig.target:.2f}
 exit {trade.exit_price:.2f}
 W底 L1 {p.first_low:.2f} / L2 {p.second_low:.2f}
 頸線 {p.neckline:.2f} / 深度 {depth:.2f}

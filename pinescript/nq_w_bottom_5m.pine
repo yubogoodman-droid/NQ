@@ -15,6 +15,7 @@ priorLook     = input.int(36, "殺勢回看 K 數", minval=10)
 maxCrossBars  = input.int(12, "第二低後幾根內要破頸線", minval=4)
 startHour     = input.int(3, "進場時段起（美東小時）", minval=0, maxval=23)
 endHour       = input.int(7, "進場時段迄（不含）", minval=1, maxval=24)
+tpMult        = input.float(2.0, "停利量度倍數", minval=1.0, step=0.5)
 useCloseBreak = input.bool(true, "收盤突破頸線進場")
 
 pivotLow(val, left, right) =>
@@ -78,7 +79,7 @@ longSignal = waitOk and hourOk and not na(neckline) and breakPrice > neckline
 if longSignal
     stopLevel   = secondLow
     depth       = neckline - math.min(firstLow, secondLow)
-    targetLevel = neckline + depth
+    targetLevel = neckline + depth * tpMult
     strategy.entry("W底做多", strategy.long)
     strategy.exit("W底出場", "W底做多", stop=stopLevel, limit=targetLevel)
     firstLow := na

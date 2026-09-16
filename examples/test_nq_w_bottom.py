@@ -53,9 +53,15 @@ def make_screenshot_like() -> pd.DataFrame:
         low[i] = px - 4.0
     low[41] = 29236.5
     close[41] = 29250.0
-    # breakout
-    close[45] = 29300.0
-    low[45] = 29280.0
+    # breakout: climb through neck, still below 2× 量度
+    close[42] = 29270.0
+    low[42] = 29255.0
+    close[43] = 29285.0
+    low[43] = 29270.0
+    close[44] = 29300.0
+    low[44] = 29285.0
+    close[45] = 29310.0
+    low[45] = 29290.0
     close[46:] = 29320.0
     high = np.maximum(close, np.roll(close, 1)) + 3.0
     high[0] = close[0] + 3.0
@@ -95,6 +101,8 @@ def test_screenshot_like_fires() -> None:
     p = sigs[0].pattern
     assert abs(p.first_low - 29231.0) < 8
     assert abs(p.second_low - 29236.5) < 12
+    depth = p.neckline - min(p.first_low, p.second_low)
+    assert abs(sigs[0].target - (p.neckline + 2 * depth)) < 0.3
 
 
 def test_morning_w_rejected() -> None:

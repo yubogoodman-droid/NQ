@@ -42,7 +42,7 @@ class NQWBottomStrategy:
 
     預設對齊券商圖 9/15 那種：美東凌晨先大跌，打出乾淨兩個谷，
     同一 Globex session、07:00 前進場才算。早盤淺雙底、中間多轉折的不算。
-    停損：第二低點；停利：量度漲幅。
+    停損：第二低點；停利：量度漲幅 ×2。
     """
 
     swing_lookback: int = 3
@@ -66,6 +66,8 @@ class NQWBottomStrategy:
     # 截圖是美東凌晨 04:10→05:35，不是 07:45 那種早盤
     entry_hour_start: int = 3
     entry_hour_end: int = 7
+    # 1 倍量度太短（9/15 只吃 +49，後面還走到 +190）；預設 2 倍
+    tp_multiple: float = 2.0
 
     def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
         patterns = detect_w_bottoms(
@@ -95,9 +97,12 @@ class NQWBottomStrategy:
             idx = pattern.breakout_idx
             entry = self._round_tick(df["close"].iloc[idx])
             stop = self._round_tick(pattern.stop_loss)
-            target = self._round_tick(pattern.target)
+            depth = pattern.neckline - min(pattern.first_low, pattern.second_low)
+            target = self._round_tick(pattern.neckline + depth * self.tp_multiple)
 
             if entry <= stop:
+                continue
+            if target <= entry:
                 continue
             if not self._in_entry_window(df.index[pattern.first_low_idx]):
                 continue
@@ -145,4 +150,5 @@ class NQWBottomStrategy:
             require_same_globex_session=False,
             entry_hour_start=0,
             entry_hour_end=24,
+            tp_multiple=1.0,
         )
