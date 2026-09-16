@@ -61,6 +61,16 @@ def _find_swing_lows(lows: Sequence[float], lookback: int, allow_tie: bool = Fal
     return [i for i in range(len(lows)) if _is_swing_low(lows, i, lookback, allow_tie)]
 
 
+def _globex_session_key(ts: object) -> object:
+    """NQ 日盤切點：美東 18:00 開新的 Globex session。"""
+    t = pd.Timestamp(ts)
+    if t.tzinfo is not None:
+        t = t.tz_convert("America/New_York")
+    if t.hour >= 18:
+        return t.date()
+    return (t - pd.Timedelta(days=1)).date()
+
+
 def detect_w_bottoms(
     df: pd.DataFrame,
     *,
@@ -69,6 +79,17 @@ def detect_w_bottoms(
     min_bars_between_lows: int = 5,
     max_bars_between_lows: int = 60,
     require_neckline_break: bool = True,
+    min_prior_drop_pct: float = 0.0,
+    prior_lookback: int = 36,
+    min_dump_bars: int = 0,
+    min_neck_pct: float = 0.0,
+    min_right_leg_pct: float = 0.0,
+    max_neck_retrace: float | None = None,
+    max_mid_swing_lows: int | None = None,
+    max_bars_to_break: int | None = None,
+    min_neck_offset: int = 0,
+    min_right_bars: int = 0,
+    require_same_globex_session: bool = False,
 ) -> list[WBottomPattern]:
     """
     在 OHLCV DataFrame 上偵測 W 底型態。
@@ -92,6 +113,8 @@ def detect_w_bottoms(
         兩低點最多間隔 K 數。
     require_neckline_break : bool
         是否要求收盤突破頸線才視為有效。
+    min_prior_drop_pct / min_dump_bars / min_neck_pct / max_bars_to_break
+        可選品質過濾（預設關閉）。NQ 截圖那種：先大跌、兩個谷、很快破頸線。
     """
     required = {"open", "high", "low", "close"}
     missing = required - set(df.columns)
@@ -131,10 +154,51 @@ def detect_w_bottoms(
 
             if neckline_idx is None:
                 continue
+            if min_neck_offset or min_right_bars or max_mid_swing_lows is not None:
+                if not _is_visual_w_pair(
+                    first_idx,
+                    second_idx,
+                    neckline_idx,
+                    swing_lows,
+                    min_neck_offset=min_neck_offset,
+                    min_right_bars=min_right_bars,
+                    max_mid_swing_lows=99 if max_mid_swing_lows is None else max_mid_swing_lows,
+                ):
+                    continue
+
+            look_from = max(0, first_idx - prior_lookback)
+            prior_high = max(highs[look_from : first_idx + 1])
+            prior_high_idx = look_from + highs[look_from : first_idx + 1].index(prior_high)
+            if min_prior_drop_pct > 0 and (prior_high - first_low) / first_low < min_prior_drop_pct:
+                continue
+            if min_dump_bars > 0 and first_idx - prior_high_idx < min_dump_bars:
+                continue
+            floor = min(first_low, second_low)
+            if min_neck_pct > 0 and (neckline_price - avg_low) / avg_low < min_neck_pct:
+                continue
+            if min_right_leg_pct > 0 and (
+                second_low <= 0 or (neckline_price - second_low) / second_low < min_right_leg_pct
+            ):
+                continue
+            if max_neck_retrace is not None:
+                dump = prior_high - floor
+                if dump <= 0 or (neckline_price - floor) / dump > max_neck_retrace:
+                    continue
+            if require_same_globex_session and (
+                _globex_session_key(df.index[second_idx]) != _globex_session_key(df.index[first_idx])
+            ):
+                continue
 
             breakout_idx: int | None = None
             if require_neckline_break:
-                for k in range(second_idx + swing_lookback, len(closes)):
+                start_k = second_idx + swing_lookback
+                end_k = len(closes)
+                if max_bars_to_break is not None:
+                    end_k = min(end_k, second_idx + max_bars_to_break + 1)
+                sess = _globex_session_key(df.index[first_idx])
+                for k in range(start_k, end_k):
+                    if require_same_globex_session and _globex_session_key(df.index[k]) != sess:
+                        break
                     if closes[k] > neckline_price:
                         breakout_idx = k
                         break

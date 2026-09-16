@@ -61,7 +61,7 @@ def main() -> None:
     else:
         parser.error("請提供 --csv 或使用 --demo")
 
-    strategy = NQWBottomStrategy()
+    strategy = NQWBottomStrategy.loose()
     signals = strategy.generate_signals(df)
 
     print("=== W 底進場訊號 ===")

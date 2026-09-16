@@ -163,8 +163,11 @@ python3 examples/chart_today.py
 |------|------|------|
 | `swing_lookback` | 3 | 轉折確認 K 數 |
 | `low_tolerance_pct` | 0.001 | 兩低點價差容忍（0.1%） |
-| `min_bars_between_lows` | 5 | 兩低點最少間隔 |
-| `max_bars_between_lows` | 60 | 兩低點最多間隔（約 5 小時） |
+| `min_bars_between_lows` | 8 | 兩低點最少間隔 |
+| `min_prior_drop_pct` | 0.55% | 先大跌（回看 36 根） |
+| `min_neck_pct` | 0.16% | 頸線深度 |
+| `max_neck_retrace` | 40% | 頸線不能漲回殺勢起點（排除 V） |
+| `max_bars_to_break` | 12 | 第二低後 1 小時內破頸線 |
 
 ## 風險提示
 

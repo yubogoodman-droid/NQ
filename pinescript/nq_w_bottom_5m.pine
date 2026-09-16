@@ -1,14 +1,20 @@
 //@version=5
 strategy("NQ 五分K W底進場", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
 
-// === 參數 ===
-swingLen     = input.int(3, "轉折確認 K 數", minval=1)
-tolPct       = input.float(0.1, "兩低點價差容忍 (%)", minval=0.05, step=0.05) / 100
-minBars      = input.int(5, "兩低點最少間隔", minval=2)
-maxBars      = input.int(60, "兩低點最多間隔", minval=10)
+// === 參數（對齊 9/15 04:10 / 05:15 → 05:35 破頸線那張）===
+swingLen      = input.int(3, "轉折確認 K 數", minval=1)
+tolPct        = input.float(0.1, "兩低點價差容忍 (%)", minval=0.05, step=0.05) / 100
+minBars       = input.int(8, "兩低點最少間隔", minval=2)
+maxBars       = input.int(48, "兩低點最多間隔", minval=10)
+minDumpPct    = input.float(0.55, "最少殺勢 (%)", minval=0.1, step=0.05) / 100
+minNeckPct    = input.float(0.16, "最少頸線深度 (%)", minval=0.05, step=0.01) / 100
+minRightPct   = input.float(0.15, "右腳最少回落 (%)", minval=0.05, step=0.01) / 100
+maxRetrace    = input.float(40.0, "頸線最多收回殺勢 (%)", minval=10, step=5) / 100
+minDumpBars   = input.int(10, "L1 距殺勢高點最少 K", minval=0)
+priorLook     = input.int(36, "殺勢回看 K 數", minval=10)
+maxCrossBars  = input.int(12, "第二低後幾根內要破頸線", minval=4)
 useCloseBreak = input.bool(true, "收盤突破頸線進場")
 
-// === 波段高低點 ===
 pivotLow(val, left, right) =>
     ta.pivotlow(val, left, right)
 
@@ -18,58 +24,64 @@ pivotHigh(val, left, right) =>
 pl = pivotLow(low, swingLen, swingLen)
 ph = pivotHigh(high, swingLen, swingLen)
 
-var float firstLow   = na
+var float firstLow    = na
 var int   firstLowBar = na
-var float secondLow  = na
+var float priorHigh   = na
+var int   priorHighBar = na
+var float secondLow   = na
 var int   secondLowBar = na
-var float neckline   = na
+var float neckline    = na
 var int   necklineBar = na
-var bool  wReady     = false
+var bool  wReady      = false
 
-// 記錄第一個低點
 if not na(pl)
-    firstLow    := pl
-    firstLowBar := bar_index - swingLen
-    secondLow   := na
+    firstLow     := pl
+    firstLowBar  := bar_index - swingLen
+    priorHigh    := ta.highest(high[swingLen], priorLook)
+    priorHighBar := firstLowBar
+    secondLow    := na
     secondLowBar := na
-    neckline    := na
-    necklineBar := na
-    wReady      := false
+    neckline     := na
+    necklineBar  := na
+    wReady       := false
 
-// 在兩低點之間追蹤頸線
 if not na(firstLow) and na(secondLow)
     if not na(ph)
         if na(neckline) or ph > neckline
             neckline    := ph
             necklineBar := bar_index - swingLen
 
-// 記錄第二個低點
 if not na(pl) and not na(firstLow) and bar_index - swingLen > firstLowBar
     gap = bar_index - swingLen - firstLowBar
     avgLow = (firstLow + pl) / 2
     priceOk = math.abs(firstLow - pl) / avgLow <= tolPct
-    if gap >= minBars and gap <= maxBars and priceOk and not na(neckline)
+    dumpOk = (priorHigh - firstLow) / firstLow >= minDumpPct
+    dumpBarsOk = -ta.highestbars(high[swingLen], priorLook) >= minDumpBars
+    neckOk = not na(neckline) and (neckline - avgLow) / avgLow >= minNeckPct
+    rightOk = not na(neckline) and (neckline - pl) / pl >= minRightPct
+    floor_ = math.min(firstLow, pl)
+    retrOk = not na(neckline) and priorHigh > floor_ and (neckline - floor_) / (priorHigh - floor_) <= maxRetrace
+    shapeOk = not na(neckline) and necklineBar - firstLowBar >= 2 and (bar_index - swingLen) - necklineBar >= 3
+    if gap >= minBars and gap <= maxBars and priceOk and dumpOk and dumpBarsOk and neckOk and rightOk and retrOk and shapeOk
         secondLow    := pl
         secondLowBar := bar_index - swingLen
         wReady       := true
 
-// 進場條件：突破頸線
 breakPrice = useCloseBreak ? close : high
-longSignal = wReady and not na(neckline) and breakPrice > neckline and bar_index > secondLowBar + swingLen
+waitOk = wReady and bar_index > secondLowBar + swingLen and bar_index <= secondLowBar + maxCrossBars
+longSignal = waitOk and not na(neckline) and breakPrice > neckline
 
 if longSignal
-    stopLevel  = secondLow
-    depth      = neckline - math.min(firstLow, secondLow)
+    stopLevel   = secondLow
+    depth       = neckline - math.min(firstLow, secondLow)
     targetLevel = neckline + depth
     strategy.entry("W底做多", strategy.long)
     strategy.exit("W底出場", "W底做多", stop=stopLevel, limit=targetLevel)
-    // 重置，避免重複進場
     firstLow := na
     secondLow := na
     neckline := na
     wReady := false
 
-// === 視覺標記 ===
 plotshape(longSignal, title="W底進場", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
 plot(not na(neckline) ? neckline : na, "頸線", color=color.orange, linewidth=2, style=plot.style_linebr)
 plot(not na(secondLow) ? secondLow : na, "第二低點", color=color.red, linewidth=1, style=plot.style_circles)
