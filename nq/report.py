@@ -249,6 +249,38 @@ $ {trade.pnl_dollars:+,.2f} NQ×{contracts}</pre>
     """
 
 
+def _day_summary_html(results: list[TradeResult]) -> str:
+    """Compact per-session counts for week/multi-day reports."""
+    if not results:
+        return ""
+    days: dict[str, list[TradeResult]] = {}
+    for r in results:
+        ts = r.signal.timestamp
+        if getattr(ts, "tzinfo", None) is not None:
+            ts = ts.tz_convert("America/New_York")
+        key = ts.strftime("%m-%d")
+        days.setdefault(key, []).append(r)
+    if len(days) < 2:
+        return ""
+    cards = []
+    lines = []
+    for key, rs in days.items():
+        pnl = sum(x.pnl_points for x in rs)
+        wins = sum(1 for x in rs if x.pnl_points > 0)
+        cards.append(
+            f"<div class='card'>{html.escape(key)}<b>{len(rs)}</b>"
+            f"<span class='muted' style='font-size:11px'>{wins} 勝 · {pnl:+.0f}pt</span></div>"
+        )
+        names = "、".join(x.signal.timestamp.tz_convert("America/New_York").strftime("%H:%M") for x in rs)
+        lines.append(f"<p class='muted' style='margin:6px 0 0'><b>{html.escape(key)}</b>　{html.escape(names)}</p>")
+    return (
+        "<div class='cards'>"
+        + "".join(cards)
+        + "</div>"
+        + "".join(lines)
+    )
+
+
 def build_report_html(
     df: pd.DataFrame,
     results: list[TradeResult],
@@ -258,6 +290,7 @@ def build_report_html(
 ) -> str:
     df = _add_mas(df)
     stats = summarize(results)
+    day_html = _day_summary_html(results)
     cards = "".join(_render_trade_card(df, r, i + 1) for i, r in enumerate(results))
     empty = '<div class="empty">今日未偵測到 W 底突破訊號</div>' if not results else ""
 
@@ -306,6 +339,13 @@ def build_report_html(
       font-weight: 600;
       color: #00c805;
     }}
+    .summary .muted {{ color: #8b949e; font-size: 13px; line-height: 1.5; }}
+    .cards {{ display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 0; }}
+    .card {{
+      background: #0d1117; padding: 8px 10px; border-radius: 10px;
+      min-width: 72px; border: 1px solid #21262d;
+    }}
+    .card b {{ display: block; font-size: 18px; margin-top: 2px; }}
     .trade-card {{
       background: #161b22;
       border: 1px solid #30363d;
@@ -400,6 +440,7 @@ def build_report_html(
         {stats.get("trades", 0)} 筆 · 勝率 {stats.get("win_rate", 0) * 100:.0f}% ·
         總計 {stats.get("total_pnl_points", 0):+.1f} 點 (${stats.get("total_pnl_dollars", 0):+,.0f})
       </div>
+      {day_html}
     </section>
     {cards}{empty}
   </div>
