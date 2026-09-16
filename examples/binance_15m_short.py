@@ -1,22 +1,16 @@
 #!/usr/bin/env python3
-"""幣安 15 分 K：MA7/14/25 空頭排列，且收盤同時跌破 MA99 與 MA120，做空回測。
+"""幣安 15 分 K：MA7<14<25<99 空頭排列，且收盤跌破 MA200，做空回測／Telegram 通知。
 
-對齊截圖 CLOUSDT 那種急殺：短均 7<14<25，同一根收盤穿過 99/120，
-且進場價在 1 小時 MA25 下方、還不能已經掉到 1h MA200 下面，
-與 1 小時 MA99 不能太遠（預設 20%），
-且 15m 與 1h 的 MA7/14/25/99/120 都不能糾結在一起，進場價也不能貼著 1h MA120，
-進場 K 開盤離 15m MA200 也要有肉（還在 200 上方時開盤至少高 4%），
-且若 2R 還在 15m MA200 下方，進場 K 必須真正打到 200
-（缺口回補 ≥50% 或實體 ≥3%；龍蝦那種弱陰線踩在支撐上不空）。
 訊號以收盤確認，下一根才決定進不進；均線距離只看這根收盤，不偷看後面。
-收盤還貼著 15m MA200、同時 1h MA99 也近（BTW）不空；
-1h 的 MA99/120/200 有兩條以上貼在進場價旁當支撐（TUT）也不空。
+回測仍可套 1h 過濾；監看則剛收完的 15m 符合就推 Telegram。
 
 用法:
   python3 examples/binance_15m_short.py
   python3 examples/binance_15m_short.py --symbol CLOUSDT --days 7 --pages
   python3 examples/binance_15m_short.py --days 7 --pages
   python3 examples/binance_15m_short.py --days 30 --html docs/binance-15m-short-30d/index.html
+  python3 examples/binance_15m_short.py --watch --test
+  python3 examples/binance_15m_short.py --watch
   python3 examples/test_binance_15m_short.py
 """
 
@@ -24,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -44,6 +39,9 @@ REPO = Path(__file__).resolve().parents[1]
 PAGES = REPO / "docs" / "binance-15m-short" / "index.html"
 BASE = "https://www.binance.com"
 KEEP = {"CLOUSDT"}
+SEEN_PATH = REPO / "output" / "binance_15m_short_seen.json"
+TELEGRAM_BOT_TOKEN = ""  # BotFather 給的 token，例如 123456:ABC...
+TELEGRAM_CHAT_ID = ""    # 你的 chat id，數字
 UA = "Mozilla/5.0"
 MAX_1H_MA99_DIST = 0.20
 MIN_1H_MA120_DIST = 0.02
@@ -92,6 +90,7 @@ class Signal:
     ma25: float
     ma99: float
     ma120: float
+    ma200: float
     ma_high: float
     body_pct: float
     vol_ratio: float
@@ -134,8 +133,8 @@ def default_params(**overrides: Any) -> ShortParams:
     return ShortParams(**overrides)
 
 
-def _below_both(close: float, ma99: float, ma120: float) -> bool:
-    return close < ma99 and close < ma120
+def _bearish_stack(m7: float, m14: float, m25: float, m99: float) -> bool:
+    return m7 < m14 < m25 < m99
 
 
 def detect_signals(
@@ -143,14 +142,14 @@ def detect_signals(
     params: Optional[ShortParams] = None,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """收盤確認：7<14<25，且這一根才同時跌破 99 與 120。"""
+    """收盤確認：7<14<25<99，且這一根紅 K 才跌破 MA200。"""
     p = params or default_params()
     close = df["close"].to_numpy(float)
     open_ = df["open"].to_numpy(float)
     vol = df["volume"].to_numpy(float) if "volume" in df.columns else np.ones(len(df), dtype=float)
     n = len(close)
     m7, m14, m25 = sma(close, 7), sma(close, 14), sma(close, 25)
-    m99, m120 = sma(close, 99), sma(close, 120)
+    m99, m120, m200 = sma(close, 99), sma(close, 120), sma(close, 200)
     v20 = sma(vol, 20)
     counts = {
         "ready": 0,
@@ -164,22 +163,22 @@ def detect_signals(
     }
     signals: List[Signal] = []
     for i in range(1, n):
-        vals = (m7[i], m14[i], m25[i], m99[i], m120[i], m99[i - 1], m120[i - 1])
+        vals = (m7[i], m14[i], m25[i], m99[i], m200[i], m200[i - 1])
         if np.isnan(vals).any():
             continue
         counts["ready"] += 1
-        if not (m7[i] < m14[i] < m25[i]):
+        if not _bearish_stack(float(m7[i]), float(m14[i]), float(m25[i]), float(m99[i])):
             continue
         counts["stack"] += 1
-        now_below = _below_both(close[i], m99[i], m120[i])
-        was_below = _below_both(close[i - 1], m99[i - 1], m120[i - 1])
+        now_below = close[i] < m200[i]
+        was_below = close[i - 1] < m200[i - 1]
         if not (now_below and not was_below):
             continue
         counts["cross"] += 1
         if p.require_red and close[i] >= open_[i]:
             continue
         counts["red"] += 1
-        ma_high = max(float(m99[i]), float(m120[i]))
+        ma_high = float(m200[i])
         if close[i] >= ma_high * (1.0 - p.min_break_pct):
             counts["shallow"] += 1
             continue
@@ -200,7 +199,8 @@ def detect_signals(
                 ma14=float(m14[i]),
                 ma25=float(m25[i]),
                 ma99=float(m99[i]),
-                ma120=float(m120[i]),
+                ma120=float(m120[i]) if np.isfinite(m120[i]) else float(m99[i]),
+                ma200=float(m200[i]),
                 ma_high=ma_high,
                 body_pct=float(body_pct),
                 vol_ratio=float(vol_ratio),
@@ -483,10 +483,10 @@ def htf_snapshot(df: pd.DataFrame, ts) -> str:
     m99, m120, m200 = sma(close, 99)[i], sma(close, 120)[i], sma(close, 200)[i]
     px = float(df["close"].iloc[i])
     t = df.index[i].strftime("%m-%d %H:%M")
-    stack = np.isfinite([m7, m14, m25]).all() and m7 < m14 < m25
-    below = np.isfinite([m99, m120]).all() and px < m99 and px < m120
-    align = "空頭排列" if stack else "非空頭排列"
-    brk = "收在99/120下" if below else "尚未同時跌破99/120"
+    stack = np.isfinite([m7, m14, m25, m99]).all() and m7 < m14 < m25 < m99
+    below = np.isfinite(m200) and px < m200
+    align = "空頭排列 7<14<25<99" if stack else "非 7<14<25<99"
+    brk = "收在MA200下" if below else "尚未跌破MA200"
     parts = [f"1h {t}  {align} · {brk}"]
     mas = []
     for name, val in (
@@ -948,7 +948,7 @@ def scan_symbol(
         meta["error"] = str(exc)[:100]
         return [], meta
     meta["bars"] = int(len(df))
-    if len(df) < 130:
+    if len(df) < 210:
         meta["error"] = "too_few_bars"
         return [], meta
     local: Dict[str, int] = {}
@@ -1094,7 +1094,7 @@ def draw_trade_png(
         ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
         if interval == "15m":
             ax.axhline(trade.signal.ma99, color="#42a5f5", ls="--", lw=0.6, alpha=0.35)
-            ax.axhline(trade.signal.ma120, color="#26c6da", ls="--", lw=0.6, alpha=0.35)
+            ax.axhline(trade.signal.ma200, color="#c4b5fd", ls="--", lw=0.8, alpha=0.55)
 
     ex = entry_idx - start
     xx = exit_idx - start
@@ -1317,7 +1317,7 @@ def write_html(
             "<div class='tags'>"
             f"<span class='tag tag-info'>{escape(hit.symbol)}</span>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            f"<span class='tag'>空 {t.signal.ma7:.5g}&lt;{t.signal.ma14:.5g}&lt;{t.signal.ma25:.5g}</span>"
+            f"<span class='tag'>空 {t.signal.ma7:.5g}&lt;{t.signal.ma14:.5g}&lt;{t.signal.ma25:.5g}&lt;{t.signal.ma99:.5g}</span>"
             f"<span class='tag'>實體 {t.signal.body_pct*100:.1f}%</span>"
             f"<span class='tag'>量 {t.signal.vol_ratio:.1f}x</span>"
             f"{h1_tag}"
@@ -1331,7 +1331,7 @@ def write_html(
             "<pre class='trade-detail'>"
             f"做空 entry {t.entry_price:.6g}  stop {t.stop_price:.6g} (+{risk:.6g})\n"
             f"target {t.target_price:.6g}  exit {t.exit_price:.6g} {t.exit_reason}  {t.pnl_pct*100:+.2f}%\n"
-            f"MA99 {t.signal.ma99:.6g} / MA120 {t.signal.ma120:.6g}  跌破 {t.signal.ma_high:.6g}\n"
+            f"MA99 {t.signal.ma99:.6g} / MA200 {t.signal.ma200:.6g}  跌破 {t.signal.ma_high:.6g}\n"
             f"實體 {t.signal.body_pct*100:.2f}%  量/MA20 {t.signal.vol_ratio:.2f}x"
             f"{escape(h1_detail)}"
             "</pre>"
@@ -1377,7 +1377,7 @@ def write_html(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>幣安 15m 空頭排列跌破 99/120</title>
+<title>幣安 15m 空頭排列跌破 MA200</title>
 <style>
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -1403,12 +1403,13 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安 15m · 7/14/25 空頭排列跌破 99/120 做空</h1>
+<h1>幣安 15m · 7/14/25/99 空頭排列跌破 MA200 做空</h1>
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
-<br/>進場：收盤 MA7&lt;MA14&lt;MA25，上一根還沒同時低於 MA99 與 MA120、這一根紅 K 收盤同時跌破，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 <b>15m 的 MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_15m_ma_spread*100:.1f}%，ZEN/XMR 那種中均黏成麵條不空），且進場 K 若還在 <b>15m MA200 上方</b>則開盤須高於 200 至少 <b>{min_15m_ma200_open*100:.0f}%</b>（FLOCK/FIL/CRV/PROM 貼著 200 沒肉不空；已跌破 200 或 CLO 那種從高處砸下來仍可）{attack_clause}{sit_clause}{support_clause}，且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊截圖急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破長均 0.3%。訊號以<b>收盤確認</b>，下一根才決定進不進；均線距離只看這根收盤，不偷看後面。
+<br/>進場：收盤 <b>MA7&lt;MA14&lt;MA25&lt;MA99</b>，上一根還沒低於 MA200、這一根紅 K 收盤跌破 <b>MA200</b>，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 <b>15m 的 MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_15m_ma_spread*100:.1f}%，ZEN/XMR 那種中均黏成麵條不空），且進場 K 若還在 <b>15m MA200 上方</b>則開盤須高於 200 至少 <b>{min_15m_ma200_open*100:.0f}%</b>（貼著 200 沒肉不空；已跌破 200 仍可）{attack_clause}{sit_clause}{support_clause}，且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破 MA200 的 0.3%。訊號以<b>收盤確認</b>，下一根才決定進不進；均線距離只看這根收盤，不偷看後面。
+<br/>出場：停在跌破 K 高點與 <b>MA200</b> 的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
 <br/>出場：停在跌破 K 高點與 MA99/120 上緣的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
 <br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120/200）。卡片 <b>虧損在前</b>（虧最多先看），賺錢的按進場時間。股票／ETF 永續預設不掃。</p>
-<p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 空頭排列 {fun.get('stack', 0)} → 同時跌破 {fun.get('cross', 0)}
+<p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 7&lt;14&lt;25&lt;99 {fun.get('stack', 0)} → 跌破MA200 {fun.get('cross', 0)}
 → 紅 K {fun.get('red', 0)} → 進場 {fun.get('entry', 0)}
 · 太淺 {fun.get('shallow', 0)} · 實體不夠 {fun.get('thin', 0)} · 量不夠 {fun.get('quiet', 0)}
 · 貼15m MA200 {fun.get('near_15m_ma200', 0)} · 弱陰踩15m MA200 {fun.get('weak_15m_ma200', 0)} · 收盤貼15m MA200 {fun.get('sit_15m_ma200', 0)} · 1h 99/120/200支撐 {fun.get('near_1h_support', 0)} · 不在1h MA25下 {fun.get('above_1h_ma25', 0)} · 已在1h MA200下 {fun.get('below_1h_ma200', 0)} · 離1h MA99太遠 {fun.get('far_1h_ma99', 0)} · 貼1h MA120 {fun.get('near_1h_ma120', 0)} · 15m均線糾結 {fun.get('tangled_15m_ma', 0)} · 1h均線糾結 {fun.get('tangled_1h_ma', 0)} · 無1h {fun.get('no_1h', 0) + fun.get('no_1h_ma99', 0) + fun.get('no_1h_ma120', 0) + fun.get('no_1h_ma200', 0) + fun.get('no_1h_spread', 0)} · 無15m MA200 {fun.get('no_15m_ma200', 0)}
@@ -1453,6 +1454,7 @@ def dump_hits_json(path: Path, hits: List[Hit], stats: dict, funnel: dict, extra
                 "ma25": t.signal.ma25,
                 "ma99": t.signal.ma99,
                 "ma120": t.signal.ma120,
+                "ma200": t.signal.ma200,
                 "body_pct": t.signal.body_pct,
                 "vol_ratio": t.signal.vol_ratio,
             }
@@ -1465,8 +1467,221 @@ def dump_hits_json(path: Path, hits: List[Hit], stats: dict, funnel: dict, extra
     return path
 
 
+def apply_telegram_keys() -> None:
+    if TELEGRAM_BOT_TOKEN.strip():
+        os.environ.setdefault("TELEGRAM_BOT_TOKEN", TELEGRAM_BOT_TOKEN.strip())
+    if TELEGRAM_CHAT_ID.strip():
+        os.environ.setdefault("TELEGRAM_CHAT_ID", TELEGRAM_CHAT_ID.strip())
+
+
+def telegram_send(text: str, photo: Optional[str] = None) -> bool:
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        return False
+    try:
+        if photo and Path(photo).exists():
+            with open(photo, "rb") as f:
+                r = SESSION.post(
+                    f"https://api.telegram.org/bot{token}/sendPhoto",
+                    data={
+                        "chat_id": chat_id,
+                        "caption": text[:1024],
+                        "parse_mode": "HTML",
+                    },
+                    files={"photo": f},
+                    timeout=25,
+                )
+            if r.ok:
+                return True
+        r = SESSION.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={
+                "chat_id": chat_id,
+                "text": text[:3900],
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            },
+            timeout=20,
+        )
+        return bool(r.ok)
+    except requests.RequestException:
+        return False
+
+
+def load_seen() -> set:
+    if not SEEN_PATH.exists():
+        return set()
+    try:
+        return set(json.loads(SEEN_PATH.read_text(encoding="utf-8")))
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def save_seen(seen: set) -> None:
+    SEEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SEEN_PATH.write_text(json.dumps(sorted(seen)), encoding="utf-8")
+
+
+def recent_signals(df: pd.DataFrame, signals: Sequence[Signal], lookback: int = 2) -> List[Signal]:
+    """只看剛收完的 1～2 根，不把歷史訊號拿來洗通知。"""
+    if not signals or len(df) == 0:
+        return []
+    last = len(df) - 1
+    lo = max(0, last - max(1, lookback) + 1)
+    return [s for s in signals if lo <= s.entry_idx <= last]
+
+
+def alert_key(symbol: str, df: pd.DataFrame, sig: Signal) -> str:
+    ts = df.index[sig.entry_idx]
+    return f"{symbol}:{ts.strftime('%Y%m%d%H%M')}"
+
+
+def format_alert(symbol: str, df: pd.DataFrame, sig: Signal) -> str:
+    ts = df.index[sig.entry_idx]
+    return (
+        f"📉 <b>15m 空頭</b>  {symbol}\n"
+        f"{ts.strftime('%m-%d %H:%M')} TPE 收盤\n"
+        f"7&lt;14&lt;25&lt;99 且跌破 <b>MA200</b>\n"
+        f"進 {sig.entry_price:.6g}  MA200 {sig.ma200:.6g}  "
+        f"破 {(sig.entry_price / sig.ma200 - 1.0) * 100:.2f}%\n"
+        f"MA7 {sig.ma7:.5g} / 14 {sig.ma14:.5g} / 25 {sig.ma25:.5g} / 99 {sig.ma99:.5g}\n"
+        f"實體 {sig.body_pct * 100:.1f}%  量 {sig.vol_ratio:.1f}x"
+    )
+
+
+def alert_chart(symbol: str, df: pd.DataFrame, sig: Signal, path: Path) -> Optional[Path]:
+    stop = max(float(df["high"].iloc[sig.entry_idx]), float(sig.ma200))
+    risk = stop - sig.entry_price
+    target = sig.entry_price - 2.0 * risk if risk > 0 else sig.entry_price
+    trade = TradeResult(
+        signal=sig,
+        entry_idx=sig.entry_idx,
+        exit_idx=sig.entry_idx,
+        entry_price=sig.entry_price,
+        exit_price=sig.entry_price,
+        stop_price=stop,
+        target_price=target,
+        pnl_points=0.0,
+        pnl_pct=0.0,
+        exit_reason="alert",
+    )
+    try:
+        return draw_trade_png(df, trade, path, 0, title_extra=symbol, mark_levels=True)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def notify_signal(symbol: str, df: pd.DataFrame, sig: Signal) -> None:
+    text = format_alert(symbol, df, sig)
+    plain = (
+        text.replace("<b>", "")
+        .replace("</b>", "")
+        .replace("&lt;", "<")
+    )
+    print("\n" + plain, flush=True)
+    tmp = Path("/tmp") / f"short15m_{symbol}_{sig.entry_idx}.png"
+    photo = alert_chart(symbol, df, sig, tmp)
+    ok = telegram_send(text, photo=str(photo) if photo else None)
+    if ok:
+        print("  → Telegram 已送", flush=True)
+        return
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    if not token:
+        print("  → 還沒填 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID，只印在這裡", flush=True)
+    else:
+        print("  → Telegram 送出失敗，檢查 token 與 chat id", flush=True)
+
+
+def wait_next_15m_close() -> None:
+    now = time.time()
+    slot = 15 * 60
+    nxt = (int(now) // slot + 1) * slot + 2
+    time.sleep(max(1.0, nxt - now))
+
+
+def watch_scan_symbol(sym: str, params: ShortParams) -> tuple[str, pd.DataFrame, List[Signal], str]:
+    try:
+        df = fetch_klines(sym, "15m", limit=kline_limit(7, "15m"))
+    except Exception as exc:  # noqa: BLE001
+        return sym, pd.DataFrame(), [], str(exc)[:100]
+    if len(df) < 210:
+        return sym, df, [], "too_few_bars"
+    return sym, df, recent_signals(df, detect_signals(df, params)), ""
+
+
+def cmd_watch(args) -> int:
+    apply_telegram_keys()
+    if args.test:
+        ok = telegram_send("15m 空頭監看測試\n7&lt;14&lt;25&lt;99 跌破 MA200\n如果你看到這則，Telegram 已通。")
+        print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
+        return 0 if ok else 1
+
+    params = default_params()
+    if args.loose:
+        params = default_params(min_body_pct=0.0, min_vol_ratio=0.0, min_break_pct=0.002, min_risk_pct=0.004)
+    seen = load_seen()
+    print("載入標的…", flush=True)
+    if args.symbol.strip():
+        symbols = [args.symbol.strip().upper()]
+    else:
+        symbols = universe(args.min_quote_vol, include_stocks=args.include_stocks)
+    print(
+        f"監看 {len(symbols)} 檔 15m：7<14<25<99 且收盤跌破 MA200 就推 Telegram。",
+        flush=True,
+    )
+    uni_ts = time.time()
+
+    def round_once() -> None:
+        nonlocal symbols, uni_ts
+        if not args.symbol.strip() and time.time() - uni_ts > 1800:
+            symbols = universe(args.min_quote_vol, include_stocks=args.include_stocks)
+            uni_ts = time.time()
+            print(f"更新標的 {len(symbols)}", flush=True)
+        t0 = time.time()
+        new_n = 0
+        with ThreadPoolExecutor(max_workers=max(1, args.workers)) as ex:
+            futs = {ex.submit(watch_scan_symbol, s, params): s for s in symbols}
+            for fut in as_completed(futs):
+                sym = futs[fut]
+                try:
+                    _sym, df, sigs, err = fut.result()
+                except Exception as exc:  # noqa: BLE001
+                    print(f"{sym} err {exc}", flush=True)
+                    continue
+                if err:
+                    continue
+                for sig in sigs:
+                    key = alert_key(sym, df, sig)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    notify_signal(sym, df, sig)
+                    new_n += 1
+        if new_n:
+            save_seen(seen)
+        print(
+            f"[{datetime.now(TPE).strftime('%H:%M:%S')}] "
+            f"掃完 {len(symbols)} 用 {time.time() - t0:.1f}s　新訊號 {new_n}",
+            flush=True,
+        )
+
+    round_once()
+    if args.once:
+        return 0
+    print("watch 中，每根 15m 收盤掃一次（Ctrl+C 停）", flush=True)
+    try:
+        while True:
+            wait_next_15m_close()
+            round_once()
+    except KeyboardInterrupt:
+        print("\n已停止。")
+        save_seen(seen)
+        return 0
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    p = argparse.ArgumentParser(description="幣安 15m 空頭排列跌破 MA99/120 做空回測")
+    p = argparse.ArgumentParser(description="幣安 15m 7/14/25/99 空頭排列跌破 MA200 做空回測／通知")
     p.add_argument("--symbol", default="", help="單一標的，例如 CLOUSDT；空白則掃流動永續")
     p.add_argument("--days", type=int, default=7, help="只統計進場落在最近 N 日")
     p.add_argument("--min-quote-vol", type=float, default=10_000_000)
@@ -1538,7 +1753,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--html", default="")
     p.add_argument("--json", dest="json_path", default="")
     p.add_argument("--max-charts", type=int, default=80)
+    p.add_argument("--watch", action="store_true", help="每根 15m 收盤掃一次，符合就推 Telegram")
+    p.add_argument("--once", action="store_true", help="搭配 --watch：只掃剛收盤的那根，然後結束")
+    p.add_argument("--test", action="store_true", help="搭配 --watch：只測 Telegram 通不通")
     args = p.parse_args(argv)
+    if args.watch or args.test:
+        return cmd_watch(args)
 
     params = default_params()
     if args.loose:

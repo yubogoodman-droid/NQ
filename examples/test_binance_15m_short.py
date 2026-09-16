@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic tests for 幣安 15m 空頭排列跌破 99/120（不打幣安）。"""
+"""Synthetic tests for 幣安 15m 7/14/25/99 空頭排列跌破 MA200（不打幣安）。"""
 
 from __future__ import annotations
 
@@ -31,6 +31,9 @@ from binance_15m_short import (  # noqa: E402
     filter_sit_15m_ma200,
     filter_away_1h_ma_support,
     filter_not_below_1h_ma200,
+    format_alert,
+    recent_signals,
+    alert_key,
     default_params,
     htf_ma_at_entry,
     htf_mas_at_entry,
@@ -71,12 +74,13 @@ def bars(closes, start: str = "2026-08-31 00:00") -> pd.DataFrame:
     )
 
 
-def dump_closes(n_flat: int = 130, dump: float = 0.04) -> np.ndarray:
-    """長時間橫盤後急殺，讓 7<14<25 且收盤穿過 99/120。"""
-    flat = np.full(n_flat, 1.0)
-    drop = np.array([0.985, 0.96, 0.94, 0.92, 0.90])
-    rest = np.linspace(0.90 - dump, 0.90 - dump - 0.02, 20)
-    return np.concatenate([flat, drop, rest])
+def dump_closes(n_flat: int = 110, dump: float = 0.04) -> np.ndarray:
+    """低位橫盤 → 從高處回壓出 7<14<25<99 → 急殺跌破 MA200。"""
+    low = np.full(n_flat, 0.70)
+    pull = np.linspace(1.20, 1.02, 90)
+    drop = np.array([0.98, 0.92, 0.86, 0.82])
+    rest = np.linspace(0.82 - dump, 0.70, 40)
+    return np.concatenate([low, pull, drop, rest])
 
 
 def test_sma() -> None:
@@ -156,30 +160,39 @@ def test_detect_dump_cross() -> None:
     sigs = detect_signals(df, LOOSE)
     assert sigs, "急殺應出現做空訊號"
     s = sigs[0]
-    assert s.ma7 < s.ma14 < s.ma25
-    assert s.entry_price < s.ma99 and s.entry_price < s.ma120
+    assert s.ma7 < s.ma14 < s.ma25 < s.ma99
+    assert s.entry_price < s.ma200
     prev_c = float(df["close"].iloc[s.entry_idx - 1])
-    prev_m99 = float(df["close"].rolling(99).mean().iloc[s.entry_idx - 1])
-    prev_m120 = float(df["close"].rolling(120).mean().iloc[s.entry_idx - 1])
-    assert not (prev_c < prev_m99 and prev_c < prev_m120)
+    prev_m200 = float(sma(df["close"].to_numpy(float), 200)[s.entry_idx - 1])
+    assert prev_c >= prev_m200
     assert len(sigs) == 1
 
 
 def test_no_signal_if_bullish_stack() -> None:
     # 先漲再微跌，短均仍 7>14>25
-    up = np.linspace(1.0, 1.12, 130)
+    up = np.linspace(1.0, 1.12, 220)
     dip = np.array([1.118, 1.116, 1.114])
     df = bars(np.concatenate([up, dip]))
     sigs = detect_signals(df, LOOSE)
     assert sigs == []
 
 
+def test_no_signal_if_99_not_in_stack() -> None:
+    """只有 7<14<25、99 還在下面，不算空頭排列。"""
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    s = sigs[0]
+    flipped = replace(s, ma99=s.ma7 * 0.99)
+    assert not (flipped.ma7 < flipped.ma14 < flipped.ma25 < flipped.ma99)
+
+
 def test_rebreak_after_reclaim() -> None:
-    flat = np.full(130, 1.0)
-    dump1 = np.array([0.97, 0.95, 0.93])
-    reclaim = np.full(24, 1.03)
-    dump2 = np.array([0.90, 0.88])
-    df = bars(np.concatenate([flat, dump1, reclaim, dump2]))
+    first = dump_closes()
+    high = np.full(80, 1.30)
+    pull = np.linspace(1.30, 1.22, 20)
+    drop = np.array([1.16, 1.08, 0.95, 0.80])
+    df = bars(np.concatenate([first, high, pull, drop]))
     sigs = detect_signals(df, LOOSE)
     assert len(sigs) >= 2
 
@@ -210,15 +223,18 @@ def test_short_profit_and_stop() -> None:
 
 
 def test_stop_on_rally() -> None:
-    flat = np.full(130, 1.0)
-    dump = np.array([0.97, 0.95])
-    rally = np.array([1.02, 1.03, 1.04])
-    df = bars(np.concatenate([flat, dump, rally]))
-    # 讓進場 K 的高點不要蓋過後面反彈
+    df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
     assert sigs
     i = sigs[0].entry_idx
     df.loc[df.index[i], "high"] = float(df["close"].iloc[i]) + 0.001
+    m200 = float(sma(df["close"].to_numpy(float), 200)[i])
+    bounce = max(m200, float(df["close"].iloc[i])) * 1.03
+    for j in range(i + 1, min(i + 4, len(df))):
+        df.iat[j, df.columns.get_loc("open")] = bounce * 0.99
+        df.iat[j, df.columns.get_loc("high")] = bounce
+        df.iat[j, df.columns.get_loc("low")] = bounce * 0.98
+        df.iat[j, df.columns.get_loc("close")] = bounce
     trades = simulate(df, sigs, default_params(stop_lookback=1, min_risk_pct=0.0001))
     assert trades
     assert trades[0].exit_reason == "stop"
@@ -226,14 +242,9 @@ def test_stop_on_rally() -> None:
 
 
 def test_one_position_skips_overlap() -> None:
-    flat = np.full(130, 1.0)
-    dump1 = np.array([0.97, 0.95, 0.93])
-    reclaim = np.array([1.01])
-    dump2 = np.array([0.96, 0.94])
-    df = bars(np.concatenate([flat, dump1, reclaim, dump2]))
+    df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
     trades = simulate(df, sigs, default_params(time_bars=40))
-    # 第一筆若還沒平，第二筆應被 skip_busy；急殺後很快 2R 也可能兩筆都做
     assert len(trades) <= len(sigs)
 
 
@@ -252,7 +263,9 @@ def test_filter_entry_window() -> None:
 def test_volume_and_body_filters() -> None:
     df = bars(dump_closes())
     assert detect_signals(df) == []  # 量是平的，預設 1.5x 濾掉
-    dump_i = 130
+    loose = detect_signals(df, LOOSE)
+    assert loose
+    dump_i = loose[0].entry_idx
     df.loc[df.index[dump_i], "volume"] = 5000.0
     sigs = detect_signals(df)
     assert sigs
@@ -270,7 +283,7 @@ def to_1h(df: pd.DataFrame) -> pd.DataFrame:
 def test_bar_index_at() -> None:
     df = bars(dump_closes())
     h1 = to_1h(df)
-    ts = df.index[130]
+    ts = df.index[200]
     i = bar_index_at(h1, ts)
     assert i is not None
     assert h1.index[i] <= ts
@@ -463,46 +476,24 @@ def test_15m_mas_keep_fanned_like_cloud() -> None:
 
 def test_15m_ma200_rejects_open_too_close() -> None:
     """橫盤貼著 15m MA200 再小跌，開盤沒肉、收盤還在 200 上 → 濾掉。"""
-    closes = np.concatenate(
-        [
-            np.full(200, 0.99),
-            np.full(40, 1.02),
-            np.array([1.005, 0.998, 0.990, 0.985]),
-            np.linspace(0.985, 0.980, 15),
-        ]
-    )
-    df = bars(closes)
-    sigs = detect_signals(df, LOOSE)
-    assert sigs
+    df, sig = _ma200_sig(open_px=1.02, close_px=1.01, high_px=1.03)
     funnel: dict = {}
-    kept = filter_away_15m_ma200(df, sigs, min_open_dist=0.04, funnel=funnel)
+    kept = filter_away_15m_ma200(df, [sig], min_open_dist=0.04, funnel=funnel)
     assert kept == []
-    assert funnel.get("near_15m_ma200", 0) >= 1
-    s = sigs[0]
-    m200 = float(sma(df["close"].to_numpy(float), 200)[s.entry_idx])
-    op = float(df["open"].iloc[s.entry_idx])
-    assert s.entry_price >= m200
+    assert funnel.get("near_15m_ma200", 0) == 1
+    m200 = float(sma(df["close"].to_numpy(float), 200)[sig.entry_idx])
+    op = float(df["open"].iloc[sig.entry_idx])
+    assert sig.entry_price >= m200
     assert op / m200 - 1.0 < 0.04
 
 
 def test_15m_ma200_keeps_dump_from_well_above() -> None:
     """CLO 那種：開盤遠高於 15m MA200，即使收盤砸到 200 附近仍可空。"""
-    closes = np.concatenate(
-        [
-            np.full(200, 0.85),
-            np.full(120, 1.0),
-            np.array([0.96, 0.94, 0.92, 0.90]),
-            np.linspace(0.89, 0.88, 20),
-        ]
-    )
-    df = bars(closes)
-    sigs = detect_signals(df, LOOSE)
-    assert sigs
-    kept = filter_away_15m_ma200(df, sigs, min_open_dist=0.04)
-    assert kept == sigs
-    s = sigs[0]
-    m200 = float(sma(df["close"].to_numpy(float), 200)[s.entry_idx])
-    op = float(df["open"].iloc[s.entry_idx])
+    df, sig = _ma200_sig(open_px=1.10, close_px=1.007, high_px=1.11)
+    kept = filter_away_15m_ma200(df, [sig], min_open_dist=0.04)
+    assert kept == [sig]
+    m200 = float(sma(df["close"].to_numpy(float), 200)[sig.entry_idx])
+    op = float(df["open"].iloc[sig.entry_idx])
     assert op / m200 - 1.0 >= 0.04
 
 
@@ -519,11 +510,22 @@ def test_15m_ma200_keeps_already_through() -> None:
 
 
 def test_15m_ma200_missing_data_skips() -> None:
-    df = bars(dump_closes(n_flat=130))
-    sigs = detect_signals(df, LOOSE)
-    assert sigs
+    df = bars(np.full(130, 1.0))
+    sig = Signal(
+        entry_idx=129,
+        entry_price=1.0,
+        ma7=0.99,
+        ma14=1.00,
+        ma25=1.01,
+        ma99=1.02,
+        ma120=1.03,
+        ma200=1.0,
+        ma_high=1.02,
+        body_pct=0.02,
+        vol_ratio=2.0,
+    )
     funnel: dict = {}
-    assert filter_away_15m_ma200(df, sigs, min_open_dist=0.04, funnel=funnel) == []
+    assert filter_away_15m_ma200(df, [sig], min_open_dist=0.04, funnel=funnel) == []
     assert funnel.get("no_15m_ma200", 0) >= 1
 
 
@@ -547,6 +549,7 @@ def _ma200_sig(open_px: float, close_px: float, high_px: float) -> tuple[pd.Data
         ma25=1.01,
         ma99=1.02,
         ma120=1.03,
+        ma200=1.0,
         ma_high=float(high_px),
         body_pct=body,
         vol_ratio=2.0,
@@ -604,7 +607,7 @@ def test_sit_15m_ma200_keeps_clo_when_1h99_has_room() -> None:
     """CLO：收盤砸到 15m 200 旁邊，但 1h MA99 還在 ≥5% 外 → 留著。"""
     df, sig = _ma200_sig(open_px=1.097, close_px=1.007, high_px=1.020)
     ts = df.index[sig.entry_idx]
-    h1 = make_1h(ts, n=220, old=0.80, recent=1.05, recent_bars=30)
+    h1 = make_1h(ts, n=220, old=0.55, recent=1.15, recent_bars=30)
     kept = filter_sit_15m_ma200(df, [sig], h1)
     assert kept == [sig]
     ma99 = htf_ma_at_entry(h1, ts, sig.entry_price, n=99)
@@ -668,7 +671,7 @@ def test_1h_support_keeps_clo_fan() -> None:
     sigs = detect_signals(df, LOOSE)
     assert sigs
     ts = df.index[sigs[0].entry_idx]
-    h1 = make_1h(ts, n=220, old=0.80, recent=1.05, recent_bars=30)
+    h1 = make_1h(ts, n=220, old=0.55, recent=1.15, recent_bars=30)
     kept = filter_away_1h_ma_support(df, sigs, h1, near=0.03, min_count=2)
     assert kept == sigs
 
@@ -694,7 +697,7 @@ def test_1h_mas_keep_fanned_like_cloud() -> None:
     sigs = detect_signals(df, LOOSE)
     assert sigs
     ts = df.index[sigs[0].entry_idx]
-    h1 = make_1h(ts, old=0.80, recent=1.05, recent_bars=30)
+    h1 = make_1h(ts, old=0.55, recent=1.15, recent_bars=30)
     kept = filter_untangled_1h_mas(df, sigs, h1, min_spread=0.04)
     assert kept == sigs
     mas = htf_mas_at_entry(h1, ts, sigs[0].entry_price)
@@ -723,7 +726,7 @@ def test_1h_ma120_keeps_cloud_distance() -> None:
     sigs = detect_signals(df, LOOSE)
     assert sigs
     ts = df.index[sigs[0].entry_idx]
-    h1 = make_1h(ts, old=0.80, recent=1.05, recent_bars=30)
+    h1 = make_1h(ts, old=0.55, recent=1.15, recent_bars=30)
     kept = filter_away_1h_ma120(df, sigs, h1, min_dist=0.02)
     assert kept == sigs
     ma = htf_ma_at_entry(h1, ts, sigs[0].entry_price, n=120)
@@ -751,7 +754,7 @@ def test_1h_ma200_keeps_cloud_still_above() -> None:
     assert sigs
     ts = df.index[sigs[0].entry_idx]
     px = sigs[0].entry_price
-    h1 = make_1h(ts, n=220, old=0.80, recent=1.05, recent_bars=30)
+    h1 = make_1h(ts, n=220, old=0.55, recent=1.15, recent_bars=30)
     kept = filter_not_below_1h_ma200(df, sigs, h1)
     assert kept == sigs
     ma = htf_ma_at_entry(h1, ts, px, n=200)
@@ -781,6 +784,8 @@ def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     text = path.read_text(encoding="utf-8")
     assert "CLOUSDT" in text
     assert "空頭排列" in text
+    assert "7/14/25/99" in text
+    assert "跌破 MA200" in text
     assert "1h 對照" in text
     assert "股票／ETF 永續預設不掃" in text
     assert "1h MA25" in text
@@ -843,6 +848,34 @@ def test_charts_put_losses_first() -> None:
     assert ordered[0].trade.pnl_pct < 0 <= ordered[1].trade.pnl_pct
 
 
+def test_recent_signals_only_last_bars() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    s = sigs[0]
+    if s.entry_idx < len(df) - 2:
+        assert recent_signals(df, sigs, lookback=2) == []
+    last = replace(s, entry_idx=len(df) - 1)
+    kept = recent_signals(df, [last], lookback=2)
+    assert kept == [last]
+    assert "跌破" in format_alert("CLOUSDT", df, last)
+    assert "MA200" in format_alert("CLOUSDT", df, last)
+    assert alert_key("CLOUSDT", df, last).startswith("CLOUSDT:")
+
+
+def test_no_signal_if_already_below_ma200() -> None:
+    df = bars(dump_closes())
+    sigs = detect_signals(df, LOOSE)
+    assert sigs
+    s = sigs[0]
+    # 進場後繼續在 200 下再陰線，不該再發同一輪跌破
+    later = [x for x in sigs if x.entry_idx > s.entry_idx]
+    for x in later:
+        prev = float(df["close"].iloc[x.entry_idx - 1])
+        prev_m = float(sma(df["close"].to_numpy(float), 200)[x.entry_idx - 1])
+        assert prev >= prev_m
+
+
 def main() -> int:
     test_sma()
     test_kline_limit_covers_month()
@@ -850,6 +883,7 @@ def main() -> int:
     test_stock_contract_filter()
     test_detect_dump_cross()
     test_no_signal_if_bullish_stack()
+    test_no_signal_if_99_not_in_stack()
     test_rebreak_after_reclaim()
     test_green_candle_skipped()
     test_short_profit_and_stop()
@@ -891,6 +925,8 @@ def main() -> int:
     test_summarize_and_html()
     test_write_view_html_relative_under_repo()
     test_charts_put_losses_first()
+    test_recent_signals_only_last_bars()
+    test_no_signal_if_already_below_ma200()
     print("ok")
     return 0
 
