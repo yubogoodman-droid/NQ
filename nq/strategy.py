@@ -40,8 +40,8 @@ class NQWBottomStrategy:
     """
     NQ（那斯達克期貨）五分 K W 底做多策略。
 
-    預設對齊券商圖那種：先有一段殺勢，打出兩個相近谷，
-    同一根 Globex session 內很快收盤破頸線才進。淺雙底、隔夜才破的不算。
+    預設對齊券商圖 9/15 那種：美東凌晨先大跌，打出乾淨兩個谷，
+    同一 Globex session、07:00 前進場才算。早盤淺雙底、中間多轉折的不算。
     停損：第二低點；停利：量度漲幅。
     """
 
@@ -58,11 +58,14 @@ class NQWBottomStrategy:
     min_neck_pct: float = 0.0016
     min_right_leg_pct: float = 0.0015
     max_neck_retrace: float = 0.40
-    max_mid_swing_lows: int = 1
+    max_mid_swing_lows: int = 0
     max_bars_to_break: int = 12
     min_neck_offset: int = 2
     min_right_bars: int = 3
     require_same_globex_session: bool = True
+    # 截圖是美東凌晨 04:10→05:35，不是 07:45 那種早盤
+    entry_hour_start: int = 3
+    entry_hour_end: int = 7
 
     def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
         patterns = detect_w_bottoms(
@@ -96,6 +99,10 @@ class NQWBottomStrategy:
 
             if entry <= stop:
                 continue
+            if not self._in_entry_window(df.index[pattern.first_low_idx]):
+                continue
+            if not self._in_entry_window(df.index[idx]):
+                continue
 
             signals.append(
                 Signal(
@@ -114,6 +121,12 @@ class NQWBottomStrategy:
     def _round_tick(self, price: float) -> float:
         return round(price / self.tick_size) * self.tick_size
 
+    def _in_entry_window(self, ts: pd.Timestamp) -> bool:
+        t = pd.Timestamp(ts)
+        if t.tzinfo is not None:
+            t = t.tz_convert("America/New_York")
+        return self.entry_hour_start <= t.hour < self.entry_hour_end
+
     @classmethod
     def loose(cls) -> "NQWBottomStrategy":
         """舊版：只看兩低點價差與破頸線，不濾殺勢／形狀。"""
@@ -130,4 +143,6 @@ class NQWBottomStrategy:
             min_neck_offset=0,
             min_right_bars=0,
             require_same_globex_session=False,
+            entry_hour_start=0,
+            entry_hour_end=24,
         )

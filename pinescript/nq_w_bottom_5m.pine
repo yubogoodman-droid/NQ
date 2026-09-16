@@ -13,6 +13,8 @@ maxRetrace    = input.float(40.0, "頸線最多收回殺勢 (%)", minval=10, ste
 minDumpBars   = input.int(10, "L1 距殺勢高點最少 K", minval=0)
 priorLook     = input.int(36, "殺勢回看 K 數", minval=10)
 maxCrossBars  = input.int(12, "第二低後幾根內要破頸線", minval=4)
+startHour     = input.int(3, "進場時段起（美東小時）", minval=0, maxval=23)
+endHour       = input.int(7, "進場時段迄（不含）", minval=1, maxval=24)
 useCloseBreak = input.bool(true, "收盤突破頸線進場")
 
 pivotLow(val, left, right) =>
@@ -67,9 +69,11 @@ if not na(pl) and not na(firstLow) and bar_index - swingLen > firstLowBar
         secondLowBar := bar_index - swingLen
         wReady       := true
 
+etHour = hour(time, "America/New_York")
+hourOk = etHour >= startHour and etHour < endHour
 breakPrice = useCloseBreak ? close : high
 waitOk = wReady and bar_index > secondLowBar + swingLen and bar_index <= secondLowBar + maxCrossBars
-longSignal = waitOk and not na(neckline) and breakPrice > neckline
+longSignal = waitOk and hourOk and not na(neckline) and breakPrice > neckline
 
 if longSignal
     stopLevel   = secondLow

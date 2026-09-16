@@ -81,6 +81,13 @@ def make_tiny_chop() -> pd.DataFrame:
     return _ohlc(close, low)
 
 
+def make_morning_w() -> pd.DataFrame:
+    """同一形狀但發生在 07:xx 早盤，不該進。"""
+    df = make_screenshot_like()
+    df.index = pd.date_range("2026-09-09 05:00", periods=len(df), freq="5min", tz="America/New_York")
+    return df
+
+
 def test_screenshot_like_fires() -> None:
     df = make_screenshot_like()
     sigs = NQWBottomStrategy().generate_signals(df)
@@ -88,6 +95,10 @@ def test_screenshot_like_fires() -> None:
     p = sigs[0].pattern
     assert abs(p.first_low - 29231.0) < 8
     assert abs(p.second_low - 29236.5) < 12
+
+
+def test_morning_w_rejected() -> None:
+    assert NQWBottomStrategy().generate_signals(make_morning_w()) == []
 
 
 def test_tiny_chop_rejected() -> None:
@@ -107,6 +118,7 @@ def test_strict_skips_demo_chop_scale() -> None:
 
 if __name__ == "__main__":
     test_screenshot_like_fires()
+    test_morning_w_rejected()
     test_tiny_chop_rejected()
     test_loose_still_sees_demo_w()
     test_strict_skips_demo_chop_scale()

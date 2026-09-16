@@ -167,6 +167,8 @@ python3 examples/chart_today.py
 | `min_prior_drop_pct` | 0.55% | 先大跌（回看 36 根） |
 | `min_neck_pct` | 0.16% | 頸線深度 |
 | `max_neck_retrace` | 40% | 頸線不能漲回殺勢起點（排除 V） |
+| `max_mid_swing_lows` | 0 | 兩谷之間不能再多一個轉折 |
+| `entry_hour_start/end` | 3–7 美東 | 只做凌晨（截圖 04:10→05:35） |
 | `max_bars_to_break` | 12 | 第二低後 1 小時內破頸線 |
 
 ## 風險提示
