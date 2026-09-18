@@ -11,17 +11,35 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from types import SimpleNamespace
+
 from nq_ma_reclaim import (  # noqa: E402
     ET,
     TradeResult,
+    detect_kwargs,
     detect_signals,
+    draw_event_png,
     parse_period_days,
     quality_from_slopes,
     simulate,
     sma,
     summarize_trades,
     write_html_report,
+    write_view_html,
 )
+
+
+def test_detect_kwargs_allow_open_hour() -> None:
+    assert detect_kwargs(SimpleNamespace(loose=False)) == {}
+    kw = detect_kwargs(SimpleNamespace(loose=False, allow_open_hour=True))
+    assert kw["skip_hour_start"] is None
+    assert kw["skip_hour_end"] is None
+    kw20 = detect_kwargs(SimpleNamespace(loose=False, reclaim_ma20_only=True))
+    assert kw20["require_ma30"] is False
+    strict = detect_kwargs(SimpleNamespace(strict=True))
+    assert strict["skip_hour_start"] == 9
+    assert strict["skip_hour_end"] == 10
+    assert strict["max_risk"] == 100.0
 
 
 def test_parse_period_days() -> None:
@@ -114,6 +132,19 @@ def test_detect_and_simulate_reclaim() -> None:
     assert trades[0].pnl_points != 0 or trades[0].exit_reason
 
 
+def test_trace_records_taken() -> None:
+    df = _make_reclaim_bars()
+    trace: list = []
+    detect_signals(df, trace=trace)
+    assert any(row["reason"] == "taken" for row in trace)
+
+
+def test_draw_event_png() -> None:
+    df = _make_reclaim_bars()
+    path = draw_event_png(df, 222, Path("/tmp/nq_event_test.png"), "demo", break_idx=220)
+    assert path.exists() and path.stat().st_size > 1000
+
+
 def test_write_html_report(tmp_path: Path | None = None) -> None:
     df = _make_reclaim_bars()
     sigs = detect_signals(df)
@@ -129,13 +160,35 @@ def test_write_html_report(tmp_path: Path | None = None) -> None:
         assert any(img_dir.glob("t01_*.png")), "expected a static trade PNG"
 
 
+def test_write_view_html_custom_name() -> None:
+    from nq_ma_reclaim import ROOT
+
+    src = ROOT / "_tmp_view_src.html"
+    dest = ROOT / "_tmp_view_out.html"
+    src.write_text("<img src='img/x.png'/>", encoding="utf-8")
+    try:
+        out = write_view_html(src, dest_name="_tmp_view_out.html")
+        assert out == dest
+        text = dest.read_text(encoding="utf-8")
+        assert "raw.githubusercontent.com" in text
+        assert "img/x.png" in text
+        assert not (ROOT / "view.html").exists()
+    finally:
+        src.unlink(missing_ok=True)
+        dest.unlink(missing_ok=True)
+
+
 def main() -> int:
+    test_detect_kwargs_allow_open_hour()
     test_parse_period_days()
     test_quality_from_slopes()
     test_sma()
     test_summarize_trades()
     test_detect_and_simulate_reclaim()
+    test_trace_records_taken()
+    test_draw_event_png()
     test_write_html_report()
+    test_write_view_html_custom_name()
     print("ok")
     return 0
 
