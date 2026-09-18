@@ -69,8 +69,8 @@ python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
 # 只看今天（台北）的訊號，並把力成併進去
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pages
 
-# 近兩週、700 以上拿掉；均線糾結的不會算，並套富喬標準（量 + 60MA）
-python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 10d --also 1815.TWO --pages
+# 近一週、700 以上拿掉；套富喬標準（量 + 60MA + 蓋子）
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 7d --also 1815.TWO --pages
 
 # 不要量的門檻，只看均線排列
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --min-climax-vol 0 --min-bounce-vol 0 --no-ma60 --pages
@@ -83,7 +83,7 @@ python3 examples/watch_tw_5m_bounce.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_bounce_ma_stack.pine`。
 
-近兩週（2026-08-25→09-04）成交額前 80、**700 以上拿掉**、套富喬標準 + 當日跌幅 + 蓋子： **19 筆**、勝率 74%、合計 +48.6%。同一段只看均線排列是 81 筆 +82.5%；量 + 60MA 是 27 筆 +53.0%。#11 仁寶（當日只跌 1.1%）、#15 仁寶／#19 台勝科（彈進貼頭的均線）會拿掉；急殺 ≥ 5% 的國巨、鼎元頭上有均線仍算。代價是光寶科那種 3% 跳空穿均線（+6.5%）不會出。圖上有 5/10/20/60/120/200/240，卡片寫破底量／反彈量／蓋子。  
+近一週（2026-09-11→09-18）成交額前 80、**700 以上拿掉**： **14 筆**、12 檔、勝率 50%、合計 **+5.5%**。09-14 一早就出 6 筆（強茂／頎邦賺、聯鈞／力成小虧），09-18 信昌電／華通／鼎元三筆都收正。圖上有 5/10/20/60/120/200/240，卡片寫破底量／反彈量／蓋子。  
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
