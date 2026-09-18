@@ -39,12 +39,15 @@ python3 examples/nq_ma_reclaim.py alert --dry-run --once
 python3 examples/nq_ma_reclaim.py alert
 ```
 
-近一個月 Yahoo 1m（2026-07-29 → 08-28）：**預設 9 筆、勝率 77.8%、約 +670 點**。  
-允許 09–10、風險上限 130。含 08-27 02:19 QB ma20 +84.8。hug 仍擋 08-11 12:39。
+近一週 Yahoo 1m（2026-09-11 → 09-18）：**預設 3 筆、勝率 0%、−52.8 點**。  
+三筆都是 60 根後 MA20 時間出場：09-15 04:24 QB −44.8、09-15 11:05 QA −4.2、09-18 10:27 QB −3.8。規則沒改。
+
+近一個月（2026-07-29 → 08-28）當時是 9 筆、77.8%、約 +670。
 
 同一窗口改五分 K：**沒料**。根數照搬 4 筆 25% −211；時間對齊 15 分收復 0 筆。預設仍 1m。
 
 ```bash
+python3 examples/nq_ma_reclaim.py backtest --period 7d --pages
 python3 examples/nq_ma_reclaim.py backtest --period 30d --pages
 python3 examples/nq_ma_reclaim.py backtest --period 30d --strict --pages
 python3 examples/research_nq_5m.py --period 30d --pages
