@@ -33,7 +33,9 @@ from nq.ma200_squeeze import (  # noqa: E402
     add_indicators,
     detect_signals,
     signal_at,
+    simulate_trades,
     sma,
+    summarize_trades,
 )
 
 MIN_BARS = 220
@@ -384,7 +386,25 @@ def _b64_img(path: Path) -> str:
     return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
 
-def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_cards: int = 40) -> Path:
+def _attach_trades(rows: list[dict]) -> dict:
+    from collections import defaultdict
+
+    by_sym: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        by_sym[r["symbol"]].append(r)
+    trades = []
+    for rs in by_sym.values():
+        d = rs[0]["d"]
+        sigs = [r["sig"] for r in rs]
+        got = simulate_trades(d, sigs)
+        by_idx = {t.signal.idx: t for t in got}
+        for r in rs:
+            r["trade"] = by_idx.get(r["sig"].idx)
+        trades.extend(got)
+    return summarize_trades(trades)
+
+
+def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_cards: int = 40, stats: dict | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     img_dir = path.parent / "img"
     img_dir.mkdir(parents=True, exist_ok=True)
@@ -400,23 +420,44 @@ def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_c
         img_name = f"{n:03d}_{sym}_{hm(int(d['t'][sig.idx])).replace(' ', '_').replace(':', '')}.png"
         png = draw_chart(sym, d, sig, img_dir / img_name)
         src = _b64_img(png) if png and png.exists() else ""
-        detail = (
-            f"現價 {sig.close:g}　離 200 {sig.ext*100:+.2f}%　黏帶 {sig.ribbon*100:.2f}%　"
-            f"量 {sig.vol_ratio:.1f}x　振幅 {sig.expand:.1f}x\n"
-            f"MA7 {sig.ma7:g} / 14 {sig.ma14:g} / 25 {sig.ma25:g} / "
-            f"99 {sig.ma99:g} / 120 {sig.ma120:g} / 200 {sig.ma200:g}"
-        )
+        trade = row.get("trade")
+        if trade is not None:
+            pnl_s = f"{trade.pnl_pct:+.2f}%"
+            pnl_cls = "pnl-win" if trade.pnl_pct >= 0 else "pnl-loss"
+            detail = (
+                f"進 {trade.entry_price:g}　出 {trade.exit_price:g}　{trade.exit_reason}　"
+                f"{trade.pnl_pct:+.2f}%\n"
+                f"現價 {sig.close:g}　離 200 {sig.ext*100:+.2f}%　黏帶 {sig.ribbon*100:.2f}%　"
+                f"量 {sig.vol_ratio:.1f}x　振幅 {sig.expand:.1f}x\n"
+                f"MA7 {sig.ma7:g} / 14 {sig.ma14:g} / 25 {sig.ma25:g} / "
+                f"99 {sig.ma99:g} / 120 {sig.ma120:g} / 200 {sig.ma200:g}"
+            )
+        else:
+            pnl_s = f"{sig.ext*100:+.2f}%"
+            pnl_cls = "pnl-win"
+            detail = (
+                f"現價 {sig.close:g}　離 200 {sig.ext*100:+.2f}%　黏帶 {sig.ribbon*100:.2f}%　"
+                f"量 {sig.vol_ratio:.1f}x　振幅 {sig.expand:.1f}x\n"
+                f"MA7 {sig.ma7:g} / 14 {sig.ma14:g} / 25 {sig.ma25:g} / "
+                f"99 {sig.ma99:g} / 120 {sig.ma120:g} / 200 {sig.ma200:g}"
+            )
         img_html = f"<img src='{src}' alt='{escape(sym)}' style='width:100%;display:block;border-radius:10px'/>" if src else ""
         cards.append(
             "<article class='trade-card'>"
             f"<header class='card-header'><div class='card-title'><span class='trade-no'>#{n} · {escape(sym)}</span>"
             f"<span class='trade-time'>{hm(int(d['t'][sig.idx]))}</span></div>"
-            f"<div class='card-pnl pnl-win'>{sig.ext*100:+.2f}%</div></header>"
+            f"<div class='card-pnl {pnl_cls}'>{pnl_s}</div></header>"
             f"<div class='tags'><span class='tag tag-info'>200附近</span>"
             f"<span class='tag tag-info'>15m</span><span class='tag tag-info'>ETH線型</span>"
             f"<span class='tag tag-info'>5&gt;20&gt;99</span></div>"
             f"<pre class='trade-detail'>{escape(detail)}</pre>"
             f"<div class='mini-chart'>{img_html}</div></article>"
+        )
+    extra = ""
+    if stats and stats.get("count"):
+        extra = (
+            f"<div class='card'>勝率<b>{stats['win_rate']:.0f}%</b></div>"
+            f"<div class='card'>損益<b>{stats['pnl_pct']:+.2f}%</b></div>"
         )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
@@ -439,6 +480,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 .trade-time{{font-size:12px;color:#8b949e}}
 .card-pnl{{font-size:16px;font-weight:700;white-space:nowrap}}
 .pnl-win{{color:#00c805}}
+.pnl-loss{{color:#f85149}}
 .tags{{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}}
 .tag{{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid rgba(88,166,255,0.28);background:rgba(88,166,255,0.12);color:#79c0ff}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
@@ -452,6 +494,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">訊號<b>{total}</b></div>
 <div class="card">週期<b>15m</b></div>
 <div class="card">標的<b>成交額前{TOP_N}</b></div>
+{extra}
 </div>
 <p class="muted">對齊 ETH 截圖：7/14/25/99/120/200 黏在 200 附近，放量打出但收盤仍靠近 200 才進。不追已經直豎到 +3% 的那一段。</p>
 </section>
@@ -463,13 +506,14 @@ h1{{font-size:18px;margin:0 0 6px}}
     return path
 
 
-def print_row(sym: str, d: dict, sig: SqueezeSignal, *, rank: int | None = None) -> None:
+def print_row(sym: str, d: dict, sig: SqueezeSignal, *, rank: int | None = None, trade=None) -> None:
     r = f"  #{rank}" if rank else ""
+    pnl = f"  pnl={trade.pnl_pct:+.2f}% {trade.exit_reason}" if trade is not None else ""
     print(
         f"{sym:12s}{r:5s} {hm(int(d['t'][sig.idx]))}  "
         f"px={sig.close:g}  200={sig.ma200:g}  "
         f"rib={sig.ribbon*100:.2f}%  ext={sig.ext*100:+.2f}%  "
-        f"vol={sig.vol_ratio:.1f}x  exp={sig.expand:.1f}x"
+        f"vol={sig.vol_ratio:.1f}x  exp={sig.expand:.1f}x{pnl}"
     )
 
 
@@ -502,10 +546,11 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             if done % 20 == 0:
                 print(f"  {done}/{len(symbols)}  已找到 {len(rows)}", flush=True)
     rows.sort(key=lambda r: int(r["d"]["t"][r["sig"].idx]))
+    stats = _attach_trades(rows)
     print(f"\n=== {days} 日 200MA 附近 · ETH 截圖線型 ===")
-    print(f"進場 {len(rows)} 筆")
+    print(f"進場 {len(rows)} 筆　成交 {stats['count']}　勝率 {stats['win_rate']:.1f}%　損益 {stats['pnl_pct']:+.2f}%")
     for r in rows:
-        print_row(r["symbol"], r["d"], r["sig"], rank=ranks.get(r["symbol"]))
+        print_row(r["symbol"], r["d"], r["sig"], rank=ranks.get(r["symbol"]), trade=r.get("trade"))
     if args.pages or args.html:
         out = Path(args.html) if args.html else PAGES_HTML
         write_html(
@@ -516,6 +561,7 @@ def cmd_backtest(args: argparse.Namespace) -> int:
                 f"{days}d · {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')} · "
                 f"成交額前 {len(symbols)} · 黏帶≤0.6% · 離200≤0.8% · 不追直豎"
             ),
+            stats=stats,
         )
         print(f"HTML {out}")
     return 0
@@ -533,9 +579,11 @@ def cmd_symbol(args: argparse.Namespace) -> int:
             continue
         for r in rows:
             print_row(sym, r["d"], r["sig"])
+        stats = _attach_trades(rows)
+        print(f"成交 {stats['count']}　勝率 {stats['win_rate']:.1f}%　損益 {stats['pnl_pct']:+.2f}%")
         if args.html or args.pages:
             out = Path(args.html) if args.html else PAGES_HTML
-            write_html(rows, out, title=f"{sym} 15m 200附近 · ETH線型", subtitle=f"{days}d")
+            write_html(rows, out, title=f"{sym} 15m 200附近 · ETH線型", subtitle=f"{days}d", stats=stats)
             print(f"HTML {out}")
     return 0
 
