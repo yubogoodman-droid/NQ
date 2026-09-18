@@ -1,0 +1,178 @@
+//@version=5
+strategy("NQ 一分K 破翻回踩MA20", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, pyramiding=0, calc_on_every_tick=false)
+
+// 與五分版同一套：破底 → 收復 MA20 → 連續離開 → 回踩 MA20 做多
+// 1m 根數：2 小時=120 根；離開 3 根即可回踩。1m MA20 ≈ 20 分鐘，比 5m 更貼，故 failBelow 較寬。
+
+lookback      = input.int(120, "破底回看 K 數（1m×120≈2小時）", minval=20)
+minDepth      = input.float(10.0, "最小破底深度（點）", minval=5)
+reclaimWin    = input.int(120, "收復 MA20 時限（根）", minval=10)
+retestWin     = input.int(90, "回踩時限（根）", minval=10)
+leaveBars     = input.int(3, "離開 MA20 連續根數", minval=1)
+leaveBuf      = input.float(6.0, "離開緩衝（點）", minval=0)
+touchAbove    = input.float(8.0, "回踩允許低點高於 MA20（點）", minval=0)
+maxCloseAbove = input.float(20.0, "回踩允許收盤高於 MA20（點）", minval=0)
+maxPierce     = input.float(20.0, "回踩允許刺穿 MA20（點）", minval=0)
+failBelow     = input.float(40.0, "收盤跌破 MA20 則作廢（點）", minval=0)
+stopBuf       = input.float(10.0, "停損在破底下方（點）", minval=0)
+targetR       = input.float(1.5, "停利 R", minval=0.5, step=0.1)
+targetRUp     = input.float(2.0, "5m MA20 上彎時停利 R（0=關）", minval=0, step=0.1)
+entryUntil    = input.int(1300, "最晚進場 HHMM（0=關，1300=13:00 ET）", minval=0)
+maxRisk       = input.float(100.0, "最大風險（點）", minval=10)
+minRisk       = input.float(20.0, "最小風險（點）", minval=1)
+maLen         = input.int(20, "回踩均線", minval=5)
+rthOnly       = input.bool(true, "只做 09:30–15:45 ET")
+maExitAfter   = input.int(60, "滿 N 根後收破 MA20 出場", minval=1)
+maxHold       = input.int(180, "最長持有根數", minval=10)
+ma60Near      = input.float(40.0, "避開下彎 5m MA60（點，0=關）", minval=0)
+ma20Near      = input.float(45.0, "避開下彎 5m MA20/MA30 蓋頭（點，0=關）", minval=0)
+ma20Below     = input.float(45.0, "避開遠低於下彎 5m MA20（點，0=關）", minval=0)
+ma20Chase     = input.float(35.0, "5m MA20 下跌時，收盤高它這麼多 → 追價跳過", minval=0)
+ma20LidSlope  = input.float(-15.0, "5m MA20 斜率比這更負、且收盤在它下 → 蓋子跳過")
+ma20Tangle    = input.float(25.0, "5m MA20 上彎、MA60 下彎且兩條差這麼近、收盤已在綠線上 → 糾結跳過", minval=0)
+ma60SlopeBars = input.int(6, "5m MA60 斜率回看（5分K根數）", minval=1)
+minEntryGap   = input.int(60, "距上一筆最少根數", minval=0)
+minPullback   = input.float(25.0, "右肩至少從高點拉回（點，0=關）", minval=0)
+maxDumpBody   = input.float(30.0, "進場棒大陰實體上限（點，0=關；達標且 5m MA20 下彎則作廢）", minval=0)
+dumpSkipBody  = input.float(20.0, "大陰線踩 MA20 不進、等下一根（點，0=關）", minval=0)
+maxPrevAbove  = input.float(50.0, "前一根收盤高於 MA20 上限（點，0=關）", minval=0)
+minRetestBars = input.int(8, "收復後至少再過 N 根才進", minval=0)
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, maLen)
+ma60 = ta.sma(close, 60)
+ma60_5 = request.security(syminfo.tickerid, "5", ta.sma(close, 60), barmerge.gaps_off, barmerge.lookahead_off)
+ma60_5_prev = request.security(syminfo.tickerid, "5", ta.sma(close, 60)[ma60SlopeBars], barmerge.gaps_off, barmerge.lookahead_off)
+ma20_5 = request.security(syminfo.tickerid, "5", ta.sma(close, 20), barmerge.gaps_off, barmerge.lookahead_off)
+ma20_5_prev = request.security(syminfo.tickerid, "5", ta.sma(close, 20)[ma60SlopeBars], barmerge.gaps_off, barmerge.lookahead_off)
+ma30_5 = request.security(syminfo.tickerid, "5", ta.sma(close, 30), barmerge.gaps_off, barmerge.lookahead_off)
+ma30_5_prev = request.security(syminfo.tickerid, "5", ta.sma(close, 30)[ma60SlopeBars], barmerge.gaps_off, barmerge.lookahead_off)
+floor = ta.lowest(low, lookback)[1]
+
+inRth() =>
+    not rthOnly or (time(timeframe.period, "0930-1545", "America/New_York") != 0)
+
+var float breakLow = na
+var int   breakBar = na
+var int   troughBar = na
+var int   reclaimBar = na
+var int   leftRun = 0
+var bool  leftOk = false
+var bool  inSetup = false
+var int   lastEntryBar = na
+var float bounceHigh = na
+var float shoulderLow = na
+var bool  pulledOk = false
+
+newBreak = not inSetup and not na(floor) and low < floor and (floor - low) >= minDepth and inRth()
+
+if newBreak and strategy.position_size == 0
+    inSetup := true
+    breakLow := low
+    breakBar := bar_index
+    troughBar := bar_index
+    reclaimBar := na
+    leftRun := 0
+    leftOk := false
+    bounceHigh := na
+    shoulderLow := na
+    pulledOk := false
+
+if inSetup
+    if low < breakLow
+        breakLow := low
+        troughBar := bar_index
+        reclaimBar := na
+        leftRun := 0
+        leftOk := false
+        bounceHigh := na
+        shoulderLow := na
+        pulledOk := false
+    if na(reclaimBar)
+        expired = bar_index - troughBar > reclaimWin
+        if expired
+            inSetup := false
+        else if close > ma20 and breakLow < ma20
+            reclaimBar := bar_index
+            bounceHigh := high
+            shoulderLow := low
+            pulledOk := minPullback <= 0
+    else
+        expiredRetest = bar_index - reclaimBar > retestWin
+        failed = close < ma20 - failBelow
+        if expiredRetest or failed
+            inSetup := false
+        else if bar_index > reclaimBar
+            if high >= bounceHigh
+                bounceHigh := high
+                shoulderLow := low
+            else
+                shoulderLow := math.min(nz(shoulderLow, low), low)
+            pulledOk := minPullback <= 0 or bounceHigh - close >= minPullback
+            if low > ma20 + leaveBuf
+                leftRun += 1
+                if leftRun >= leaveBars
+                    leftOk := true
+            else
+                leftRun := 0
+            pierce = ma20 - low
+            prevDumpSit = dumpSkipBody > 0 and (open[1] - close[1]) >= dumpSkipBody and close[1] >= ma20[1] and (ma20[1] - low[1]) >= -touchAbove and (ma20[1] - low[1]) <= maxPierce
+            closeLim = maxCloseAbove + (prevDumpSit ? 12.0 : 0.0)
+            touchLim = touchAbove + (prevDumpSit ? 8.0 : 0.0)
+            // 08-28 10:27 大陰線不進；10:28 綠K 確認。高 31 點那種彈走再等
+            touch = leftOk and pulledOk and pierce >= -touchLim and pierce <= maxPierce and close >= ma20 and (close - ma20) <= closeLim
+            dumpKill = maxDumpBody > 0 and (open - close) >= maxDumpBody and (na(ma20_5) or na(ma20_5_prev) or ma20_5 < ma20_5_prev)
+            dumpSkip = dumpSkipBody > 0 and (open - close) >= dumpSkipBody
+            nearPrev = maxPrevAbove <= 0 or close[1] - ma20 < maxPrevAbove
+            oldEnough = minRetestBars <= 0 or (bar_index - reclaimBar >= minRetestBars)
+            stopLevel = nz(shoulderLow, low) - stopBuf
+            risk = close - stopLevel
+            ma60FallingNear = ma60Near > 0 and not na(ma60_5) and not na(ma60_5_prev) and ma60_5 < ma60_5_prev and math.abs(close - ma60_5) <= ma60Near and (na(ma20_5) or na(ma20_5_prev) or ma20_5 < ma20_5_prev)
+            ma20_30FallingNear = ma20Near > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma30_5) and not na(ma30_5_prev) and not na(ma60_5) and not na(ma60_5_prev) and ma20_5 < ma20_5_prev and ma30_5 < ma30_5_prev and ma60_5 < ma60_5_prev and close < ma20_5 and close < ma30_5 and ma20_5 < ma30_5 and ma30_5 < ma60_5 and (ma20_5 - close) <= ma20Near and (ma30_5 - close) <= ma20Near
+            farBelow5mMa20 = ma20Below > 0 and not na(ma20_5) and not na(ma20_5_prev) and ma20_5 < ma20_5_prev and (ma20_5 - close) > ma20Below
+            falling5 = not na(ma20_5) and not na(ma20_5_prev) and ma20_5 < ma20_5_prev
+            chase5 = ma20Chase > 0 and falling5 and (close - ma20_5) > ma20Chase
+            lid5 = ma20LidSlope < 0 and falling5 and (ma20_5 - ma20_5_prev) < ma20LidSlope and close < ma20_5
+            tangle5 = ma20Tangle > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma60_5) and not na(ma60_5_prev) and ma20_5 > ma20_5_prev and ma60_5 < ma60_5_prev and math.abs(ma60_5 - ma20_5) <= ma20Tangle and close >= ma60_5
+            gapOk = na(lastEntryBar) or (bar_index - lastEntryBar >= minEntryGap)
+            nyHour = hour(time, "America/New_York")
+            nyMinute = minute(time, "America/New_York")
+            notLate = entryUntil <= 0 or (nyHour * 100 + nyMinute) < entryUntil
+            tgtR = targetRUp > 0 and not na(ma20_5) and not na(ma20_5_prev) and ma20_5 > ma20_5_prev ? targetRUp : targetR
+            if touch and dumpKill and oldEnough
+                inSetup := false
+            else if touch and lid5 and oldEnough
+                // 壓在陡降五分 MA20 下：這波作廢，不要 4 分鐘後又買
+                inSetup := false
+            else if touch and tangle5 and oldEnough
+                // 粉紅剛翻、綠線還下彎又纏在一起，價已在綠線上：糾結作廢
+                inSetup := false
+            else if touch and dumpSkip
+                // 砸上均線的大陰線不進，留在這波等下一根
+                inSetup := true
+            else if touch and chase5
+                // 追在下跌五分 MA20 上太高：這波作廢，不要再拖到均線翻
+                inSetup := false
+            else if touch and nearPrev and oldEnough and inRth() and notLate and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and not farBelow5mMa20 and not chase5 and not lid5 and not tangle5 and strategy.position_size == 0 and gapOk
+                tgt = close + risk * tgtR
+                strategy.entry("破翻回踩", strategy.long)
+                strategy.exit("破翻出場", "破翻回踩", stop=stopLevel, limit=tgt)
+                lastEntryBar := bar_index
+                inSetup := false
+
+if strategy.position_size > 0
+    held = bar_index - strategy.opentrades.entry_bar_index(0)
+    if held >= maExitAfter and close < ma20
+        strategy.close("破翻回踩", comment="ma20")
+    if held >= maxHold
+        strategy.close("破翻回踩", comment="timeout")
+
+plot(ma5,  "MA5",  color=color.new(#ffa726, 0), linewidth=1)
+plot(ma10, "MA10", color=color.new(#26c6da, 0), linewidth=1)
+plot(ma20, "MA20", color=color.new(#ec407a, 0), linewidth=2)
+plot(ma60, "MA60", color=color.new(#66bb6a, 40), linewidth=1)
+plot(ma60_5, "5m MA60", color=color.new(#66bb6a, 0), linewidth=2)
+plot(inSetup and not na(breakLow) ? breakLow : na, "破底", color=color.new(#f472b6, 0), style=plot.style_circles, linewidth=2)
+
+plotshape(newBreak, title="破底", style=shape.triangledown, location=location.belowbar, color=color.new(#f472b6, 0), size=size.tiny)

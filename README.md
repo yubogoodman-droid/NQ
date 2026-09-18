@@ -2,6 +2,46 @@
 
 那斯達克期貨（NQ）五分鐘 K 線的 **W 底（雙底）** 做多進場策略。
 
+## NQ 一分 K 破底翻 · 右肩在 MA20 上
+
+對齊手機 1 分圖：先 **破底翻**（跌破近 2 小時低點後快速收復），反彈離開粉紅 **MA20** 後，**右肩踩回 MA20** 才做多，不在收復當根追。
+
+```
+破底（近 2 小時低點，只算日盤） → 收復 MA20 → 離開均線 → 右肩回踩 MA20 進場
+右肩：相對這波反彈高點至少拉回 25 點再踩 MA20
+進場收盤須貼 1m MA20（高於不超過 20 點）；影線掃到但收在均線上方 30 點那種要再等回踩
+大陰線砸上 MA20：不進，等下一根小 K；實體超過 30 點且 5m MA20 下彎則這波作廢
+停損：右肩低點下方 10 點（不是破底）
+停利：1.5R；5m MA20 上彎時 2R。滿 60 根若收盤跌破 MA20 出場
+0.8R 後停損拉到進場；同一根 K 的高點不能用來掃這根的低點
+13:00 ET 後不進（午餐後／尾盤假右肩）
+過濾：貼著下彎 5m MA60，或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下，或遠低於下彎 5m MA20（瀑布後假破底），則略過
+五分 MA20 下跌時：追在它上方超過 35 點、或壓在斜率比 −15 更負的蓋子下 → 整波不進
+五分粉紅剛上彎、綠線還下彎、兩條差不到 25 點且價已在綠線上（均線糾結）→ 整波不進
+```
+
+只做日盤 09:30–15:45 ET。1m MA20 約 20 分鐘，比 5m MA20（約 100 分鐘）更貼價格。
+
+近一個月 Yahoo 1m（2026-07-30 → 08-28，日盤 09:30–13:00）：**7 筆、勝率 71.4%、+372.6 點**（5 勝）。  
+08-03 **#1** 進在圈裡：**09:50 右肩踩 1m MA20 28470**，5m MA20 上彎走 2R **+126.5**。  
+你給的 08-28 圖是 **#7**：10:13 破底 29505 → 10:27 大陰線不進 → **10:28 綠 K 確認 29627**，1.5R **+50.2**。  
+08-24 同一波：11:18 進場，1.5R **+43**（10:50 那腳只拉回 20 點，之後還破，不是右肩）。  
+追在下跌五分 MA20 上太高（08-19 11:05）整波作廢，不再拖到 11:44。
+
+近一週 Yahoo 1m（2026-08-28 → 09-04，日盤）：**2 筆、勝率 50%、+50.2 點**。  
+08-28 10:28 圈裡那筆 +50.2（與 30 天最後一天重疊）；**09-01 10:05 保本 0**（這週新的一筆）。08-31 / 09-02 / 09-03 沒進場。09-04 日盤尚未走完。
+
+```bash
+python3 examples/nq_5m_ma20_retest.py --interval 1m --period 30d --pages
+python3 examples/nq_5m_ma20_retest.py --interval 1m --period 7d --html docs/nq-1m-ma20-retest-7d/index.html
+python3 examples/test_nq_5m_ma20_retest.py
+```
+
+報告每筆附 **進場當下的五分 K**（粉紅線是 5m MA20）。TradingView：`pinescript/nq_1m_ma20_retest.pine`。
+
+現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest/view.html  
+近一週：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest-7d/view.html
+
 ## 型態定義
 
 ```
@@ -143,7 +183,9 @@ python3 examples/chart_today.py
 
 ## TradingView
 
-`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
+`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
+`pinescript/nq_1m_ma20_retest.pine` 是一分 K 破底翻右肩踩 MA20。  
+`pinescript/nq_5m_ma20_retest.pine` 是同一套五分 K 版。
 
 ## 參數調整
 
