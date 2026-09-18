@@ -1,0 +1,34 @@
+# Copy this file to copier.yaml (gitignored) and fill account names.
+# Credentials live in copier.env — never commit passwords.
+
+environment: demo          # demo | live  (live also needs --live)
+copy_mode: fills           # fills = copy each lead fill as a market order
+                           # orders = copy working Limit/Stop/Market tickets
+dry_run: true              # set false only after demo logs look right
+app_id: NQ Copier
+app_version: "1.0"
+
+risk:
+  flatten_followers_when_lead_flat: true
+  flatten_on_lock: true
+
+# One Tradovate login can see many accounts. Add more connections
+# only when lead/followers use different usernames.
+connections:
+  - name: main
+    env_prefix: TRADOVATE
+    environment: demo
+
+lead:
+  connection: main
+  account: LEAD_ACCOUNT_NAME    # from: python3 examples/tradovate_copier.py list-accounts
+
+followers:
+  - connection: main
+    account: FOLLOW_ACCOUNT_NAME
+    qty_ratio: 1.0              # 1 lot on lead → 1 lot here
+    # qty_fixed: 1              # ignore lead size; always this many
+    symbol_map: {}              # example: {NQ: MNQ, ES: MES}
+    max_contracts: 5
+    daily_loss_limit: 500       # lock + flatten this follower after -$500 realized
+    enabled: true
