@@ -130,7 +130,7 @@ python3 examples/chart_today.py
 - 本機：開 `docs/journal/index.html`
 - GitHub Pages：`https://yubogoodman-droid.github.io/NQ/journal/`
 
-可記台股／美股買進賣出、自動帶入台股手續費與證交稅、用先進先出算持倉與已實現損益，並在持倉裡手動設現價看未實現。
+可記台股、美股、加密貨幣與納斯達克期貨（NQ／MNQ）的買進賣出。台股手續費與證交稅、加密成交費、期貨每口佣金都可自動帶入。持倉用先進先出撮合；納指期損益按小台每點 20 美元、微台每點 2 美元計算。台幣與美元分開顯示，可在持倉裡手動設現價看未實現。
 
 ## 外網開啟
 
