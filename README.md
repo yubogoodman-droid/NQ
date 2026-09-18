@@ -95,6 +95,23 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## 牛來 五分 K M 頭跌破 MA200 做空
+
+幣安 `牛来USDT` 永續、五分鐘圖：只做 **牛來那種** M 頭——雙峰幾乎等高（價差 ≤ 1%）、中間至少跌 4%、兩個峰都明顯站在 MA200 上方（≥ 3%）、頸線回測 MA200（不深跌穿），M 成形期間多數 K 線仍在均線上，然後收盤同時跌破 MA200 與 MA25 才空。貼均線亂鑽的小振幅假 M 不畫。停損在雙頂高點，目標 2R，或 48 根時間停。
+
+對齊 2026-09-07 截圖那筆：18:10 / 21:20 雙頂約 0.0939，頸線貼 MA200，22:15 收盤跌破進場。
+
+`--scan` 掃幣安 USDT 永續 **24h 成交額前 100**（不含股票合約），同一套 **牛來型** 規則回測近 **14 天**。進場仍用五分 K；每筆符合條件的圖下面附同一段 **1 小時 K** 對照。
+
+```bash
+python3 examples/niulai_m_top.py --days 7 --pages
+python3 examples/niulai_m_top.py --scan --limit 100 --days 14 --pages
+python3 examples/test_niulai_m_top.py
+```
+
+單檔預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/niulai-m-top/view.html  
+成交額前 100 · 兩週：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/binance-m-top-14d/view.html
+
 ## 快速開始
 
 ```bash
