@@ -45,6 +45,35 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## 台股 5 分 K 空頭排列跌破 MA240
+
+多方「站上 MA240」的鏡像。五分圖 **MA5 < MA10 < MA20 且三條下彎**，當根收盤剛跌破 MA240，收盤也低於 5/10/20。開盤第一根也算（陽明 08-26 09:05 那種）。
+
+| 條件 | 預設 |
+|------|------|
+| 週期 | 5 分 K |
+| 空排 | MA5 < MA10 < MA20，且三條都比前一根低 |
+| 跌破 | 前一根收盤 ≥ MA240，當根收盤 < MA240 |
+| 收盤 | 低於 MA5 / MA10 / MA20 / MA240 |
+| 做空 | 停損在跌破那根高點與 MA240 較高者上方 0.3%；目標 2R；收到收 |
+
+```bash
+# 陽明今天有沒有
+python3 examples/watch_tw_5m_fade.py scan --symbols 2609 --range 7d --on 2026-08-26 --pages
+
+# 近一週、700 以上拿掉
+python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 7d --pages
+
+# Telegram（憑證放 tg_config.env）
+python3 examples/watch_tw_5m_fade.py alert --test
+python3 examples/watch_tw_5m_fade.py alert
+```
+
+盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView：`pinescript/tw_5m_fade_ma_stack.pine`。
+
+近一週（Yahoo 7d，基準日 2026-09-04，成交額前 80、700 以上拿掉、實掃 44 檔）：**40 筆、勝率 57.5%、合計 +27.9%**。訊號集中 09-02～09-04；臻鼎-KY 09-03 兩筆都走到目標（+5.4%、+4.6%），強茂 09-04 09:10 +4.5%。陽明這週沒再破線。
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-fade-short-9faf/docs/tw-5m-fade/view.html
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash
