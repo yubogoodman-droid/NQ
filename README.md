@@ -134,8 +134,9 @@ python3 examples/chart_today.py
 python3 examples/scan_binance_15m_align.py --once
 python3 examples/scan_binance_15m_align.py --watch
 
-# 前 100 名近 3 日、200 附近像 ETH 截圖的進場 + 圖
+# 前 100 名近 3 日 / 近 7 日、200 附近像 ETH 截圖的進場 + 圖
 python3 examples/scan_binance_15m_align.py --backtest --days 3 --pages --html docs/binance/ma200-squeeze-15m-3d/index.html
+python3 examples/scan_binance_15m_align.py --backtest --days 7 --pages --html docs/binance/ma200-squeeze-15m-7d/index.html
 ```
 
 舊檔名 `scan_binance_15m_ma200.py` 也會轉到同一套。Telegram 憑證放 `tg_config.env`（`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`）。
