@@ -100,15 +100,16 @@ python examples/scan_tw_top50_spring.py --date 20260814 --limit 50
 python examples/scan_tw_top50_spring.py --date 20260814 --limit 100 --max-price 700
 python examples/scan_tw_top50_spring.py --date 20260826 --days 5 --limit 100 --max-price 700
 python examples/scan_tw_top50_spring.py --date 20260904 --days 5 --limit 100 --max-price 700
+python examples/scan_tw_top50_spring.py --date 20260918 --days 5 --limit 100 --max-price 700
 python examples/chart_spring_top50.py                                  # 1 分 K 報告，每張底下有 5 分 K
 python examples/chart_spring_week.py                                   # 近一週訊號圖
 ```
 
-報告：`docs/spring_top50_20260814.html`、`docs/spring_week_20260820_26.md`、`docs/spring_week_20260831_0904.md`
+報告：`docs/spring_top50_20260814.html`、`docs/spring_week_20260820_26.md`、`docs/spring_week_20260831_0904.md`、`docs/spring_week_20260914_0918.md`
 
 外網直接開（手機可）：  
 https://yubogoodman-droid.github.io/NQ/spring/?v=overnight  
-近一週圖：https://yubogoodman-droid.github.io/NQ/spring/week/?v=20260904
+近一週圖：https://yubogoodman-droid.github.io/NQ/spring/week/?v=20260918
 
 ## TradingView
 
