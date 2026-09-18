@@ -1,0 +1,48 @@
+//@version=5
+strategy("NQ 五分破底站回 5/10/20", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
+
+twoHourBars  = input.int(24, "兩小時回看 K 數（5m）", minval=6)
+reclaimBars  = input.int(12, "站回時限（根）= 1 小時", minval=1)
+minDepth     = input.float(12.0, "最少破底點數")
+stopBuf      = input.float(8.0, "停損緩衝")
+targetR      = input.float(2.0, "目標 R")
+maxRisk      = input.float(150.0, "單筆最大風險")
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, 20)
+twoHrLow = ta.lowest(low, twoHourBars)[1]
+broke = not na(twoHrLow) and low < twoHrLow
+depth = broke ? twoHrLow - low : na
+
+var float breakLow = na
+var float support = na
+var int   breakBar = na
+var bool  armed = false
+
+if broke and not na(depth) and depth >= minDepth
+    breakLow := low
+    support := twoHrLow
+    breakBar := bar_index
+    armed := true
+
+barsSince = armed ? bar_index - breakBar : na
+late = armed and not na(barsSince) and barsSince >= reclaimBars
+if late
+    armed := false
+
+stood = close > ma5 and close > ma10 and close > ma20
+stacked = ma5 > ma10 and ma10 > ma20
+longSignal = armed and stood and stacked and not na(breakLow)
+if longSignal
+    risk = close - (breakLow - stopBuf)
+    if risk > 0 and risk <= maxRisk
+        strategy.entry("破底站回", strategy.long)
+        strategy.exit("破底出場", "破底站回", stop=breakLow - stopBuf, limit=close + risk * targetR)
+    armed := false
+
+plot(ma5,  "MA5",  color=color.orange)
+plot(ma10, "MA10", color=color.aqua)
+plot(ma20, "MA20", color=color.fuchsia)
+plot(twoHrLow, "兩小時低", color=color.gray, style=plot.style_linebr)
+plotshape(longSignal, title="破底站回", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)

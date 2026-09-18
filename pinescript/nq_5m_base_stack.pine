@@ -1,0 +1,85 @@
+//@version=5
+strategy("NQ 五分打底 5/10/20 多排", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
+
+swingLen     = input.int(3, "轉折確認 K 數", minval=1)
+dropLook     = input.int(24, "回看出發高點 K 數")
+minDrop      = input.float(80.0, "最少下跌點數")
+minBase      = input.int(6, "打底最少 K 數")
+maxWait      = input.int(16, "等多排最長 K 數")
+stopBuf      = input.float(8.0, "停損緩衝點數")
+targetR      = input.float(2.0, "目標 R")
+maxRisk      = input.float(80.0, "單筆風險下限（點）")
+maxRiskFrac  = input.float(0.55, "單筆風險最多佔跌幅")
+minRibbon    = input.float(14.0, "MA5−MA20 最小帶寬")
+maxRibbon    = input.float(40.0, "MA5−MA20 帶寬下限")
+maxRibbonFrac= input.float(0.20, "帶寬最多佔跌幅")
+minGap5      = input.float(8.0, "MA5−MA10 最小")
+minGap10     = input.float(3.0, "MA10−MA20 最小")
+minSlope5    = input.float(15.0, "MA5 五根最小斜率")
+concBars     = input.int(16, "急跌回看 K 數")
+minConc      = input.float(0.80, "急跌佔總跌幅")
+minMa30Gap   = input.float(20.0, "剛站上 MA30 最少距離")
+maxRecover   = input.float(0.85, "最多收回比例")
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, 20)
+ma30 = ta.sma(close, 30)
+
+pl = ta.pivotlow(low, swingLen, swingLen)
+stacked = ma5 > ma10 and ma10 > ma20
+stackedPrev = ma5[1] > ma10[1] and ma10[1] > ma20[1]
+stackFlip = stacked and not stackedPrev and close > ma5
+
+var float baseLow = na
+var int   baseBar = na
+var float dumpHigh = na
+var bool  armed = false
+
+if not na(pl)
+    candidate = pl
+    highWin = ta.highest(high, dropLook)
+    dropPts = highWin - candidate
+    already = ma5[swingLen] > ma10[swingLen] and ma10[swingLen] > ma20[swingLen]
+    conc = ta.highest(high, concBars)[swingLen] - candidate
+    steep = dropPts > 0 and conc / dropPts >= minConc
+    if dropPts >= minDrop and not already and steep
+        baseLow := candidate
+        baseBar := bar_index - swingLen
+        dumpHigh := highWin
+        armed := true
+
+barsSinceBase = armed ? bar_index - baseBar : na
+brokeBase = armed and not na(baseLow) and low < baseLow
+late = armed and not na(barsSinceBase) and barsSinceBase > maxWait
+tooSoon = armed and not na(barsSinceBase) and barsSinceBase < minBase
+
+if brokeBase or late
+    armed := false
+
+longSignal = armed and not tooSoon and stackFlip and not na(baseLow)
+if longSignal
+    dropPts = dumpHigh - baseLow
+    recover = (close - baseLow) / dropPts
+    ribbon = ma5 - ma20
+    gap5 = ma5 - ma10
+    gap10 = ma10 - ma20
+    slope5 = ma5 - ma5[5]
+    risk = close - (baseLow - stopBuf)
+    upCount = (close >= open ? 1 : 0) + (close[1] >= open[1] ? 1 : 0) + (close[2] >= open[2] ? 1 : 0) + (close[3] >= open[3] ? 1 : 0) + (close[4] >= open[4] ? 1 : 0) + (close[5] >= open[5] ? 1 : 0)
+    ribbonCap = math.max(maxRibbon, maxRibbonFrac * dropPts)
+    fan = ribbon >= minRibbon and ribbon <= ribbonCap and gap5 >= minGap5 and gap10 >= minGap10 and slope5 >= minSlope5 and upCount >= 4
+    ma30Hug = close >= ma30 and (close - ma30) < minMa30Gap and low <= ma30
+    ok = recover <= maxRecover and fan and not ma30Hug and risk > 0 and risk <= math.max(maxRisk, maxRiskFrac * dropPts)
+    if ok
+        stopLevel = baseLow - stopBuf
+        targetLevel = close + risk * targetR
+        strategy.entry("打底多排", strategy.long)
+        strategy.exit("打底出場", "打底多排", stop=stopLevel, limit=targetLevel)
+    armed := false
+
+plot(ma5,  "MA5",  color=color.orange)
+plot(ma10, "MA10", color=color.aqua)
+plot(ma20, "MA20", color=color.fuchsia)
+plotshape(longSignal and close > ma5, title="打底多排", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
+plot(armed and not na(baseLow) ? baseLow : na, "打底低", color=color.yellow, style=plot.style_linebr)
