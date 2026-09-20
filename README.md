@@ -74,11 +74,13 @@ python3 examples/binance_15m_ma_break_short.py --pages --days 60
 python3 examples/binance_15m_ma_break_short.py --symbol MUBARAKUSDT
 ```
 
-近一週（2026-08-28 → 09-04，265 檔 USDT 永續，含 1h／4h 確認）：**0 筆**。漏斗 15m 打穿 150 → 空頭排列 30 → 1h 首次打穿 6 → 4h 首次打穿 0。100 USDT × 3 倍仍為 **100 USDT**。MUBARAK 這一週沒訊號。  
+近三日（2026-09-18 → 09-21，251 檔 USDT 永續，含 1h／4h 確認）：**0 筆**。漏斗 15m 打穿 30 → 空頭排列 4 → 1h 首次打穿 0。100 USDT × 3 倍仍為 **100 USDT**。MUBARAK 這三天沒訊號。  
+近一週（2026-08-28 → 09-04，265 檔，含 1h／4h）：**0 筆**。漏斗 15m 打穿 150 → 空頭排列 30 → 1h 首次打穿 6 → 4h 首次打穿 0。  
 近一個月（2026-07-30 → 08-29，241 檔，含 1h／4h）：**3 筆、勝率 66.7%、單筆加總 −0.35%**（LIT +2.31、BABA −4.55、MU +1.89）。  
 近兩個月（2026-06-30 → 08-29，241 檔，含 1h／4h）：**6 筆、勝率 50%、單筆加總 −3.0%**。100 USDT × 3 倍、同時只能一單，約 **89 USDT**。  
 截圖那檔 **MUBARAK 08-25 16:00** 過不了 4h MA99，不進場。
 
+三日：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-3d/view.html  
 週報：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/view.html  
 月報：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-30d/view.html  
 兩個月：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-60d/view.html
