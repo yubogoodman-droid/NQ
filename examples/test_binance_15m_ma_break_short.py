@@ -267,9 +267,10 @@ def test_kline_limit_covers_month() -> None:
     assert kline_limit_needed(60, "15m") >= 60 * 96 + 200
     assert kline_limit_needed(60, "1h") >= 60 * 24 + 200
     assert kline_limit_needed(60, "4h") >= 60 * 6 + 200
+    assert "3d" in pages_html_path(3).as_posix()
     assert "30d" in pages_html_path(30).as_posix()
     assert "60d" in pages_html_path(60).as_posix()
-    assert pages_html_path(7) != pages_html_path(30) != pages_html_path(60)
+    assert pages_html_path(3) != pages_html_path(7) != pages_html_path(30) != pages_html_path(60)
 
 
 def test_sequential_equity_skips_overlap() -> None:

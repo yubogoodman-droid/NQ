@@ -29,6 +29,7 @@ import requests
 TZ = ZoneInfo("Asia/Taipei")
 REPO = Path(__file__).resolve().parents[1]
 PAGES = REPO / "docs" / "binance-15m-ma-short" / "index.html"
+PAGES_3D = REPO / "docs" / "binance-15m-ma-short-3d" / "index.html"
 PAGES_30D = REPO / "docs" / "binance-15m-ma-short-30d" / "index.html"
 PAGES_60D = REPO / "docs" / "binance-15m-ma-short-60d" / "index.html"
 BRANCH_VIEW = "cursor/15m-ma-break-short-9d44"
@@ -126,11 +127,13 @@ def kline_limit_needed(days: int, interval: str = INTERVAL) -> int:
 
 
 def pages_html_path(days: int) -> Path:
-    """週報 / 月報 / 兩個月報分開寫，避免互相覆蓋。"""
+    """3 日 / 週報 / 月報 / 兩個月報分開寫，避免互相覆蓋。"""
     if days >= 50:
         return PAGES_60D
     if days >= 28:
         return PAGES_30D
+    if days <= 4:
+        return PAGES_3D
     return PAGES
 
 
@@ -1248,7 +1251,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--pages",
         action="store_true",
-        help="寫到 docs/binance-15m-ma-short/（28–49 日寫 30d，50 日以上寫 60d）",
+        help="寫到 docs/binance-15m-ma-short/（≤4 日寫 3d，28–49 日寫 30d，50 日以上寫 60d）",
     )
     p.add_argument("--embed", action="store_true", help="圖用 base64 嵌進 HTML")
     args = p.parse_args(argv)
