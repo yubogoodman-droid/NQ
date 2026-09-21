@@ -148,6 +148,8 @@ python3 examples/scan_binance_15m_align.py --backtest --days 7 --all --pages --h
 
 近 7 日（2026-09-12 → 09-19）成交額前 100：**9 筆、勝率 55.6%、−0.39%**。ETH 9/3 那張已超出這週。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d/view.html
 
+近 7 日全部永續（724 檔、幣+股）：**87 筆、勝率 58.6%、+22.70%**。含 BTC、MAV 等幣，也含美股／韓股開盤那一串。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d-all/view.html
+
 ## 幣安 15m 黏帶擠壓參數
 
 六條均線寬度 ≤ 0.6%，箱體 ≤ 1.8%，量能 **3～8×**、振幅擴張 **2～6×**。8/28 那種 2.6× 假突破、開盤 14× / 19× 跳空都不進。
