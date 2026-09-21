@@ -107,8 +107,8 @@ def get_json(path: str, params=None, retries: int = 6):
     raise last
 
 
-def universe(top_n: int = TOP_N) -> list[tuple[str, float]]:
-    """成交額（24h quoteVolume）前 N 的 USDT 永續，含幣與股票。"""
+def universe(top_n: int | None = TOP_N) -> list[tuple[str, float]]:
+    """USDT 永續（幣 + 股票）。top_n<=0 表示全部，不限成交額。"""
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = get_json("/fapi/v1/ticker/24hr")
     trading = set()
@@ -130,7 +130,9 @@ def universe(top_n: int = TOP_N) -> list[tuple[str, float]]:
         qv = float(t.get("quoteVolume") or 0)
         ranked.append((qv, sym))
     ranked.sort(reverse=True)
-    return [(sym, qv) for qv, sym in ranked[:top_n]]
+    if not top_n or int(top_n) <= 0:
+        return [(sym, qv) for qv, sym in ranked]
+    return [(sym, qv) for qv, sym in ranked[: int(top_n)]]
 
 
 def prepare(raw: dict) -> dict:
@@ -404,7 +406,17 @@ def _attach_trades(rows: list[dict]) -> dict:
     return summarize_trades(trades)
 
 
-def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_cards: int = 40, stats: dict | None = None) -> Path:
+def write_html(
+    rows: list[dict],
+    path: Path,
+    *,
+    title: str,
+    subtitle: str,
+    max_cards: int = 80,
+    stats: dict | None = None,
+    universe_n: int | None = None,
+    pin_eth: bool = False,
+) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     img_dir = path.parent / "img"
     img_dir.mkdir(parents=True, exist_ok=True)
@@ -412,8 +424,10 @@ def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_c
     if len(rows) > max_cards:
         rows = sorted(rows, key=lambda r: -r["sig"].ext)[:max_cards]
         rows = sorted(rows, key=lambda r: int(r["d"]["t"][r["sig"].idx]))
-    # 你的 ETH 截圖放第一張，對齊用
-    rows = sorted(rows, key=lambda r: (0 if r["symbol"] == "ETHUSDT" else 1, int(r["d"]["t"][r["sig"].idx])))
+    if pin_eth:
+        rows = sorted(rows, key=lambda r: (0 if r["symbol"] == "ETHUSDT" else 1, int(r["d"]["t"][r["sig"].idx])))
+    else:
+        rows = sorted(rows, key=lambda r: int(r["d"]["t"][r["sig"].idx]))
     cards = []
     for n, row in enumerate(rows, 1):
         sig, d, sym = row["sig"], row["d"], row["symbol"]
@@ -453,6 +467,7 @@ def write_html(rows: list[dict], path: Path, *, title: str, subtitle: str, max_c
             f"<pre class='trade-detail'>{escape(detail)}</pre>"
             f"<div class='mini-chart'>{img_html}</div></article>"
         )
+    uni_label = f"{universe_n} 檔" if universe_n is not None else f"成交額前{TOP_N}"
     extra = ""
     if stats and stats.get("count"):
         extra = (
@@ -493,7 +508,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="cards">
 <div class="card">訊號<b>{total}</b></div>
 <div class="card">週期<b>15m</b></div>
-<div class="card">標的<b>成交額前{TOP_N}</b></div>
+<div class="card">標的<b>{escape(uni_label)}</b></div>
 {extra}
 </div>
 <p class="muted">對齊 ETH 截圖：7/14/25/99/120/200 黏在 200 附近，放量打出但收盤仍靠近 200 才進。不追已經直豎到 +3% 的那一段。</p>
@@ -526,13 +541,18 @@ def cmd_backtest(args: argparse.Namespace) -> int:
     if args.symbol:
         symbols = [s.strip().upper() for s in args.symbol.split(",") if s.strip()]
     else:
-        print("載入成交額前 100…", flush=True)
-        uni = universe(int(args.top))
+        top = 0 if args.all else int(args.top)
+        if top <= 0:
+            print("載入全部 U 本位永續（幣+股，不限成交額）…", flush=True)
+        else:
+            print(f"載入成交額前 {top}…", flush=True)
+        uni = universe(top)
         symbols = [s for s, _ in uni]
         ranks = {s: i for i, (s, _) in enumerate(uni, 1)}
         qvs = {s: q for s, q in uni}
         print(f"掃描 {len(symbols)} 檔，{days} 日", flush=True)
-        print(f"  #1 {uni[0][0]}  {uni[0][1]/1e6:.0f}M  ·  #{len(uni)} {uni[-1][0]}  {uni[-1][1]/1e6:.0f}M", flush=True)
+        if uni:
+            print(f"  #1 {uni[0][0]}  {uni[0][1]/1e6:.0f}M  ·  #{len(uni)} {uni[-1][0]}  {uni[-1][1]/1e6:.0f}M", flush=True)
     rows: list[dict] = []
     with ThreadPoolExecutor(6) as ex:
         futs = {ex.submit(backtest_symbol, s, start, end): s for s in symbols}
@@ -559,9 +579,13 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             title="15m 200MA 附近進場 · ETH 截圖線型",
             subtitle=(
                 f"{days}d · {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')} · "
-                f"成交額前 {len(symbols)} · 黏帶≤0.6% · 離200≤0.8% · 不追直豎"
+                f"{'全部永續 幣+股' if (args.all or int(args.top) <= 0) and not args.symbol else f'成交額前 {len(symbols)}'} · "
+                f"黏帶≤0.6% · 離200≤0.8% · 不追直豎"
             ),
             stats=stats,
+            universe_n=len(symbols),
+            pin_eth=False,
+            max_cards=80,
         )
         print(f"HTML {out}")
     return 0
@@ -660,11 +684,12 @@ def cmd_watch(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="幣安 15m 200MA 附近進場 · ETH 截圖線型 · 成交額前100")
+    p = argparse.ArgumentParser(description="幣安 15m 200MA 附近進場 · ETH 截圖線型")
     p.add_argument("--symbol", help="只掃這些合約，逗號分隔，例如 ETHUSDT")
     p.add_argument("--days", type=int, default=5, help="回看天數")
-    p.add_argument("--top", type=int, default=TOP_N, help="成交額前 N")
-    p.add_argument("--backtest", action="store_true", help="前 N 名回測 200 附近、像 ETH 截圖的進場")
+    p.add_argument("--top", type=int, default=TOP_N, help="成交額前 N；0 表示全部")
+    p.add_argument("--all", action="store_true", help="全部 U 本位永續（幣+股），不限成交額、不限股票")
+    p.add_argument("--backtest", action="store_true", help="回測 200 附近、像 ETH 截圖的進場")
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance/ma200-squeeze-15m-3d/")
     p.add_argument("--html", help="HTML 輸出路徑")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的 1～2 根並推通知")
