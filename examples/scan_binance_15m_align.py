@@ -92,11 +92,12 @@ def hm(ms: int) -> str:
 
 
 def get_json(path: str, params=None, retries: int = 6):
-    last = None
+    last: Exception | None = None
     for i in range(retries):
         try:
             r = SESSION.get(BASE + path, params=params, timeout=20)
             if r.status_code == 429:
+                last = RuntimeError(f"429 {path}")
                 time.sleep(1.5 * (i + 1))
                 continue
             r.raise_for_status()
@@ -104,7 +105,7 @@ def get_json(path: str, params=None, retries: int = 6):
         except Exception as e:
             last = e
             time.sleep(0.5 * (i + 1))
-    raise last
+    raise last if last is not None else RuntimeError(f"failed {path}")
 
 
 def universe(top_n: int | None = TOP_N) -> list[tuple[str, float]]:
@@ -585,7 +586,7 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             stats=stats,
             universe_n=len(symbols),
             pin_eth=False,
-            max_cards=80,
+            max_cards=200,
         )
         print(f"HTML {out}")
     return 0
