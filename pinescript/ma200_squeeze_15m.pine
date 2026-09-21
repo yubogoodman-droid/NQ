@@ -1,0 +1,92 @@
+//@version=5
+strategy("15m 黏帶擠壓 · 200MA 附近進場", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.04, pyramiding=0, process_orders_on_close=true)
+
+// 線型：MA7/14/25/99/120/200 黏成一條，價格在 200 附近橫盤，
+// 放量陽線打出箱頂，但收盤離 200 仍近 —— 這時進，不追直豎那段。
+
+lookback     = input.int(24, "盤整回看 K 數", minval=8, maxval=64)
+maxRibbonPct = input.float(0.6, "均線黏度上限 %", minval=0.2, step=0.1)
+maxBoxPct    = input.float(1.8, "箱體高度上限 %", minval=0.5, step=0.1)
+maxSlopePct  = input.float(0.5, "MA200 斜率上限 %", minval=0.1, step=0.1)
+near200Pct   = input.float(1.2, "盤整靠近 200MA %", minval=0.3, step=0.1)
+minNearFrac  = input.float(85.0, "靠近 200 的 K 數比例 %", minval=40, step=5)
+minVolRatio  = input.float(3.0, "量比下限", minval=1.0, step=0.1)
+maxVolRatio  = input.float(8.0, "量比上限", minval=3.0, step=0.5)
+minExpand    = input.float(2.0, "K 線振幅擴張倍數", minval=1.0, step=0.1)
+maxExpand    = input.float(6.0, "K 線振幅擴張上限", minval=2.0, step=0.5)
+maxExtPct    = input.float(0.8, "進場離 200MA 上限 %", minval=0.3, step=0.1)
+minBodyFrac  = input.float(0.35, "實體 / 振幅", minval=0.1, step=0.05)
+targetR      = input.float(2.0, "停利 R", minval=1.0, step=0.5)
+stopBufPct   = input.float(0.2, "停損緩衝 %", minval=0.0, step=0.05)
+minRiskPct   = input.float(0.4, "最小風險 %", minval=0.1, step=0.1)
+maxRiskPct   = input.float(1.8, "最大風險 %", minval=0.5, step=0.1)
+
+ma7   = ta.sma(close, 7)
+ma14  = ta.sma(close, 14)
+ma25  = ta.sma(close, 25)
+ma99  = ta.sma(close, 99)
+ma120 = ta.sma(close, 120)
+ma200 = ta.sma(close, 200)
+v20   = ta.sma(volume, 20)
+
+ribbonHi = math.max(ma7[1], math.max(ma14[1], math.max(ma25[1], math.max(ma99[1], math.max(ma120[1], ma200[1])))))
+ribbonLo = math.min(ma7[1], math.min(ma14[1], math.min(ma25[1], math.min(ma99[1], math.min(ma120[1], ma200[1])))))
+ribbon   = ribbonLo > 0 ? ribbonHi / ribbonLo - 1.0 : 99.0
+
+boxHi   = ta.highest(high, lookback)[1]
+boxLo   = ta.lowest(low, lookback)[1]
+closeHi = ta.highest(close, lookback)[1]
+ribbonTop = math.max(ma7[1], math.max(ma14[1], math.max(ma25[1], math.max(ma99[1], math.max(ma120[1], ma200[1])))))
+boxMid  = (boxHi + boxLo) / 2.0
+boxPct  = boxMid > 0 ? (boxHi - boxLo) / boxMid : 99.0
+
+slope20 = ma200[20] > 0 ? ma200 / ma200[20] - 1.0 : 99.0
+
+nearCount = 0
+belowCount = 0
+for k = 1 to lookback
+    if not na(ma200[k]) and ma200[k] > 0
+        if math.abs(close[k] / ma200[k] - 1.0) <= near200Pct / 100.0
+            nearCount += 1
+        if close[k] <= ma200[k] * 1.003
+            belowCount += 1
+nearFrac = nearCount / lookback
+
+medRng  = ta.median(high - low, lookback)[1]
+thisRng = high - low
+body    = close - open
+vr      = v20 > 0 ? volume / v20 : 0.0
+ext     = ma200 > 0 ? close / ma200 - 1.0 : 99.0
+
+ma7Stuck   = math.abs(ma7[1] / ma200[1] - 1.0) <= 0.008
+ma200InBox = ma200[1] >= boxLo * 0.995 and ma200[1] <= boxHi * 1.010
+firstBreak = not (close[1] > closeHi and close[1] > ma200[1] and close[1] > ribbonTop)
+
+squeeze = ribbon <= maxRibbonPct / 100.0 and boxPct <= maxBoxPct / 100.0 and math.abs(slope20) <= maxSlopePct / 100.0 and nearFrac >= minNearFrac / 100.0 and belowCount >= 6 and ma7Stuck and ma200InBox
+breakout = close > open and close > ma200 and close > closeHi and close > ribbonTop and thisRng >= minExpand * medRng and thisRng <= maxExpand * medRng and body / thisRng >= minBodyFrac
+nearEntry = ext >= 0 and ext <= maxExtPct / 100.0
+volOk = vr >= minVolRatio and vr <= maxVolRatio
+
+rawLong = bar_index > 220 and squeeze and breakout and nearEntry and volOk and firstBreak
+
+stopLevel = math.min(boxLo, ma200) * (1.0 - stopBufPct / 100.0)
+riskPct   = close > stopLevel ? (close - stopLevel) / close : 0.0
+riskOk    = riskPct >= minRiskPct / 100.0 and riskPct <= maxRiskPct / 100.0
+longSignal = rawLong and riskOk
+
+if longSignal
+    tgt = close + targetR * (close - stopLevel)
+    strategy.entry("200擠壓多", strategy.long)
+    strategy.exit("200擠壓出", "200擠壓多", stop=stopLevel, limit=tgt)
+
+plot(ma7,   "MA7",   color=color.new(#f0c14a, 0), linewidth=1)
+plot(ma14,  "MA14",  color=color.new(#64b5f6, 0), linewidth=1)
+plot(ma25,  "MA25",  color=color.new(#d28cff, 0), linewidth=1)
+plot(ma99,  "MA99",  color=color.new(#7e57c2, 0), linewidth=1)
+plot(ma120, "MA120", color=color.new(#26a69a, 0), linewidth=1)
+plot(ma200, "MA200", color=color.new(#ef5350, 0), linewidth=2)
+
+plotshape(longSignal, title="200MA 附近進場", style=shape.triangleup, location=location.belowbar, color=color.new(#3dba7a, 0), size=size.small)
+bgcolor(squeeze and not longSignal ? color.new(#c9a227, 92) : na, title="黏帶盤整")
+
+alertcondition(longSignal, title="黏帶擠壓 · 200MA 附近進場", message="15m 黏帶打出箱頂，收盤仍靠近 200MA")
