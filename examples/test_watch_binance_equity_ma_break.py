@@ -16,6 +16,8 @@ from watch_binance_equity_ma_break import (  # noqa: E402
     MIN_BODY_PCT,
     bar_in_session,
     below_all,
+    configure_session,
+    in_signal_window,
     hourly_bearish,
     hourly_closes_asof,
     hourly_mas_asof,
@@ -211,6 +213,22 @@ def test_session_window_weekday() -> None:
     assert not bar_in_session(open_ms(16, 0))
 
 
+def test_all_hours_ignores_session() -> None:
+    et = ZoneInfo("America/New_York")
+
+    def open_ms(dt: datetime) -> int:
+        return int((dt.timestamp() - 900) * 1000)
+
+    noon = datetime(2026, 9, 9, 12, 0, tzinfo=et)
+    configure_session(all_hours=False)
+    assert not in_signal_window(open_ms(noon))
+    configure_session(all_hours=True)
+    assert in_signal_window(open_ms(noon))
+    sat = datetime(2026, 9, 12, 10, 0, tzinfo=et)
+    assert in_signal_window(open_ms(sat))
+    configure_session(all_hours=False)
+
+
 def test_weekend_off() -> None:
     et = ZoneInfo("America/New_York")
     sat = datetime(2026, 9, 12, 10, 0, tzinfo=et)
@@ -254,6 +272,7 @@ def main() -> int:
     test_hourly_bullish_rejects_waterfall()
     test_short_fwd_pct()
     test_session_window_weekday()
+    test_all_hours_ignores_session()
     test_weekend_off()
     test_now_should_scan_and_next_window()
     print("ok")

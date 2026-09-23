@@ -61,7 +61,11 @@ MAX_OFF_HOUR_HIGH_PCT = 5.00
 HOUR_HIGH_LOOKBACK = 24
 HORIZONS = ((1, "15m"), (2, "30m"), (4, "1h"), (8, "2h"), (16, "4h"))
 PAGES_HTML = REPO / "docs" / "binance" / "ma-break-7d.html"
+PAGES_HTML_ALL = REPO / "docs" / "binance" / "ma-break-7d-allhours.html"
 CHART_DIR = REPO / "docs" / "binance" / "img" / "ma-break"
+CHART_DIR_ALL = REPO / "docs" / "binance" / "img" / "ma-break-all"
+CHART_WEB = "./img/ma-break"
+REQUIRE_SESSION = True
 _MPL_LOCK = threading.Lock()
 
 SESSION = requests.Session()
@@ -394,6 +398,12 @@ def bar_in_session(open_ms: int) -> bool:
     return start <= t <= end
 
 
+def in_signal_window(open_ms: int) -> bool:
+    if not REQUIRE_SESSION:
+        return True
+    return bar_in_session(open_ms)
+
+
 def now_should_scan(now: datetime | None = None) -> bool:
     local = (now or datetime.now(timezone.utc)).astimezone(ET)
     if local.weekday() >= 5:
@@ -440,7 +450,7 @@ def scan_symbol(sym: str, *, backfill: bool) -> list[dict]:
     for i in idxs:
         if not is_signal(d, i):
             continue
-        if not bar_in_session(int(d["t"][i])):
+        if not in_signal_window(int(d["t"][i])):
             continue
         events.append({"symbol": sym, "i": i, "d": d})
     return events
@@ -512,14 +522,14 @@ def backtest_symbol(sym: str, cutoff_ms: int) -> list[dict]:
         close_ms = int(d["t"][i]) + INTERVAL_MS
         if close_ms < cutoff_ms:
             continue
-        if not is_signal(d, i) or not bar_in_session(int(d["t"][i])):
+        if not is_signal(d, i) or not in_signal_window(int(d["t"][i])):
             continue
         tr = trade_from_bar(sym, d, i)
         fname = f"{sym}_{bar_close_et(int(d['t'][i])).strftime('%m%d_%H%M')}.png"
         CHART_DIR.mkdir(parents=True, exist_ok=True)
         png = CHART_DIR / fname
         if draw_chart(sym, d, i, str(png)):
-            tr["img"] = f"./img/ma-break/{fname}"
+            tr["img"] = f"{CHART_WEB}/{fname}"
         out.append(tr)
     return out
 
@@ -544,9 +554,9 @@ def _pnl_stats(xs: list[float]) -> dict | None:
 
 def collect_backtest(days: int) -> tuple[list[str], list[dict], int]:
     symbols = universe()
-    start = (datetime.now(ET) - timedelta(days=days)).replace(
-        hour=SESSION_START[0], minute=SESSION_START[1], second=0, microsecond=0
-    )
+    start = datetime.now(ET) - timedelta(days=days)
+    if REQUIRE_SESSION:
+        start = start.replace(hour=SESSION_START[0], minute=SESSION_START[1], second=0, microsecond=0)
     cutoff_ms = int(start.timestamp() * 1000)
     trades: list[dict] = []
     with ThreadPoolExecutor(8) as ex:
@@ -622,12 +632,24 @@ def write_backtest_html(
     for t in trades:
         by_day[t["et"][:5]] = by_day.get(t["et"][:5], 0) + 1
     day_line = " · ".join(f"{d} {n}筆" for d, n in sorted(by_day.items()))
+    by_hour: dict[int, int] = {}
+    for t in trades:
+        hr = bar_close_et(t["t"]).hour
+        by_hour[hr] = by_hour.get(hr, 0) + 1
+    hour_line = " · ".join(f"{h:02d}時 {n}筆" for h, n in sorted(by_hour.items()))
+    window_note = (
+        "不限美東開盤窗，含週末。"
+        if not REQUIRE_SESSION
+        else "開盤窗 09:00–10:00。"
+    )
+    title = f"{'全時段瀑布' if not REQUIRE_SESSION else '開盤瀑布'} · 近 {days} 日"
+    sub_win = "全時段" if not REQUIRE_SESSION else "開盤窗"
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>開盤瀑布 · 近 {days} 日</title>
+<title>{title}</title>
 <style>
 :root{{--bg:#0c1210;--panel:#14201b;--ink:#e8f0ea;--muted:#8aa193;--line:rgba(232,240,234,.12);--long:#3dba7a;--short:#e35d5d}}
 *{{box-sizing:border-box}}
@@ -647,15 +669,16 @@ img{{width:100%;height:auto;display:block;border-radius:10px;background:#101814;
 </head>
 <body>
 <div class="wrap">
-  <h1>開盤瀑布 · 近 {days} 日</h1>
-  <p class="sub">幣安美股永續 {len(symbols)} 檔 · 美東 {start} → {end} · 開盤窗 · 隔夜貼均線再瀑布 · 1h 仍在高位空頭排列 · 訊號收盤做空</p>
+  <h1>{title}</h1>
+  <p class="sub">幣安美股永續 {len(symbols)} 檔 · 美東 {start} → {end} · {sub_win} · 隔夜貼均線再瀑布 · 1h 仍在高位空頭排列 · 訊號收盤做空</p>
   <div class="kpis">
     <div class="kpi"><div class="k">筆數 / 檔數</div><div class="v">{len(trades)} / {len({t["symbol"] for t in trades})}</div></div>
     {"".join(kpi_bits)}
   </div>
   <div class="card">
     <p class="note">每日：{escape(day_line) if day_line else "無"}</p>
-    <p class="note">開盤窗 09:00–10:00。隔夜仍貼 15m MA200、均線帶寬≤2.5%、近 5h 振幅≤3.5%，再長陰摔出 MA7/14/25/99/120/200。1h 仍在近日高 5% 內且 MA7&lt;MA14&lt;MA25。圖上 15m、下 1h，黃虛線＝進場。綠＝空單賺。</p>
+    <p class="note">美東小時：{escape(hour_line) if hour_line else "無"}</p>
+    <p class="note">{window_note}隔夜仍貼 15m MA200、均線帶寬≤2.5%、近 5h 振幅≤3.5%，再長陰摔出 MA7/14/25/99/120/200。1h 仍在近日高 5% 內且 MA7&lt;MA14&lt;MA25。圖上 15m、下 1h，黃虛線＝進場。綠＝空單賺。</p>
   </div>
   {"".join(cards) if cards else "<div class='card'>無訊號</div>"}
 </div>
@@ -684,6 +707,13 @@ def print_backtest(trades: list[dict]) -> None:
             f"  空到當日收: n={eod_st['n']} 勝率 {eod_st['wr']:.1f}% 均 {eod_st['avg']:+.2f}% 中位 {eod_st['med']:+.2f}%",
             flush=True,
         )
+    by_hour: dict[int, int] = {}
+    for t in trades:
+        hr = bar_close_et(t["t"]).hour
+        by_hour[hr] = by_hour.get(hr, 0) + 1
+    if by_hour:
+        bits = "  ".join(f"{h:02d}時 {n}" for h, n in sorted(by_hour.items()))
+        print(f"  美東小時：{bits}", flush=True)
     for t in trades:
         if t["symbol"] != "VRTUSDT":
             continue
@@ -696,8 +726,22 @@ def print_backtest(trades: list[dict]) -> None:
         )
 
 
+def configure_session(*, all_hours: bool) -> None:
+    global REQUIRE_SESSION, CHART_DIR, CHART_WEB
+    REQUIRE_SESSION = not all_hours
+    if all_hours:
+        CHART_DIR = CHART_DIR_ALL
+        CHART_WEB = "./img/ma-break-all"
+    else:
+        CHART_DIR = REPO / "docs" / "binance" / "img" / "ma-break"
+        CHART_WEB = "./img/ma-break"
+
+
 def run_backtest(days: int, html_path: Path) -> int:
-    print(f"回測近 {days} 日美股開盤瀑布…", flush=True)
+    print(
+        f"回測近 {days} 日美股瀑布" + ("（不限美東開盤窗）" if not REQUIRE_SESSION else "（開盤窗）") + "…",
+        flush=True,
+    )
     if CHART_DIR.exists():
         shutil.rmtree(CHART_DIR)
     CHART_DIR.mkdir(parents=True, exist_ok=True)
@@ -912,8 +956,9 @@ def test_telegram() -> int:
 def main() -> int:
     p = argparse.ArgumentParser(description="幣安美股永續 15m 開盤瀑布（開盤前後各半小時）")
     p.add_argument("--once", action="store_true", help="掃一次就結束")
-    p.add_argument("--backfill", action="store_true", help="掃今日美東時段已收盤的 15m，不是只看剛收的兩根")
+    p.add_argument("--backfill", action="store_true", help="掃今日已收盤的 15m，不是只看剛收的兩根")
     p.add_argument("--force", action="store_true", help="不管美東時段，立刻掃")
+    p.add_argument("--all-hours", action="store_true", help="不限美東 09:00–10:00，全時段（含週末）")
     p.add_argument("--dry-run", action="store_true", help="只印、不送 Telegram")
     p.add_argument("--test", action="store_true", help="只測 Telegram")
     p.add_argument("--backtest", action="store_true", help="回測近 N 日（不做 Telegram）")
@@ -921,16 +966,18 @@ def main() -> int:
     p.add_argument("--html", default="", help="回測 HTML 路徑")
     args = p.parse_args()
     apply_keys()
+    configure_session(all_hours=args.all_hours)
     if args.test:
         return test_telegram()
     if args.backtest:
-        html_path = Path(args.html) if args.html else PAGES_HTML
+        html_path = Path(args.html) if args.html else (PAGES_HTML_ALL if args.all_hours else PAGES_HTML)
         return run_backtest(max(1, args.days), html_path)
 
     seen = load_seen()
     print("載入美股永續…", flush=True)
     symbols = universe()
-    print(f"監看 {len(symbols)} 檔 EQUITY。開盤窗瀑布才推。", flush=True)
+    win = "全時段瀑布才推" if args.all_hours else "開盤窗瀑布才推"
+    print(f"監看 {len(symbols)} 檔 EQUITY。{win}。", flush=True)
     uni_ts = time.time()
 
     def round_once(*, backfill: bool) -> None:
@@ -953,7 +1000,7 @@ def main() -> int:
         if new and not args.dry_run:
             save_seen(seen)
 
-    if not args.force and not now_should_scan():
+    if not args.force and not args.all_hours and not now_should_scan():
         nxt = next_window_start()
         print(
             f"現在不是偵測時段（美東 09:00–10:00，開盤前後各半小時）。下次開始 {nxt.strftime('%Y-%m-%d %H:%M %Z')}",
@@ -963,21 +1010,21 @@ def main() -> int:
             return 0
 
     if args.once:
-        if args.force or now_should_scan():
+        if args.force or args.all_hours or now_should_scan():
             round_once(backfill=args.backfill)
         return 0
 
     print("watch 中，每根 15m 收盤掃一次（Ctrl+C 停）", flush=True)
     try:
         while True:
-            if not args.force and not now_should_scan():
+            if not args.force and not args.all_hours and not now_should_scan():
                 nxt = next_window_start()
                 sec = max(5.0, (nxt - datetime.now(ET)).total_seconds())
                 print(f"休眠到 {nxt.strftime('%m-%d %H:%M %Z')}（{sec/60:.0f} 分）", flush=True)
                 time.sleep(min(sec, 3600))
                 continue
             wait_next_close()
-            if args.force or now_should_scan():
+            if args.force or args.all_hours or now_should_scan():
                 round_once(backfill=False)
     except KeyboardInterrupt:
         print("\n已停止。")
