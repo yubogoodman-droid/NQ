@@ -148,11 +148,11 @@ python3 examples/scan_binance_15m_align.py --backtest --days 7 --all --pages --h
 
 近 7 日（2026-09-12 → 09-19）成交額前 100：**9 筆、勝率 55.6%、−0.39%**。ETH 9/3 那張已超出這週。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d/view.html
 
-近 7 日全部永續（2026-09-20 → 09-27，725 檔、幣+股）：**3 筆、勝率 100%、+2.84%**。DKNG 那種已經離 200 +0.50% 的不進。留下 STABLE、BTC 9/27、ETH 9/27。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d-all/view.html
+近 7 日全部永續（2026-09-20 → 09-27，725 檔、幣+股）：**12 筆、勝率 58.3%、+5.77%**。GS / EWZ / SNOW 9/21 / BZ / AAOI / ETH 9/25 / BTC 9/21 仍不進；後面收太緊的已改回。ETH 9/27、BTC 9/27 還在。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d-all/view.html
 
 ## 幣安 15m 黏帶擠壓參數
 
-六條均線寬度 ≤ 0.6%，箱體 ≤ 1.8%，量能 **3～6.5×**、振幅擴張 **2～4×**。8/28 那種 2.6× 假突破、GS 7.8× / SNOW 4.1× 大棒、99/120 掉在短均下面另成一層、已經在 200 上晃很久、200 懸在黏帶上面都不進。你點過的怪圖會濾，後面收太緊的「再想想」先拿掉。
+六條均線寬度 ≤ 0.6%，箱體 ≤ 1.8%，量能 **3～6.5×**、振幅擴張 **2～4×**。8/28 那種 2.6× 假突破、GS 7.8× / SNOW 4.1× 大棒、99/120 掉在短均下面另成一層、已經在 200 上晃很久、200 懸在黏帶上面都不進。
 
 ```bash
 # 單檔（ETH）近兩週
