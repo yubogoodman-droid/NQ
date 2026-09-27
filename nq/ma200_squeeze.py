@@ -23,10 +23,12 @@ MAX_MA200_ABOVE_BOX = 0.010  # 200 可以略高於箱頂，但不能遠在天上
 MIN_BARS_AT_OR_BELOW = 6
 
 MIN_VOL_RATIO = 3.00  # 濾掉 ETH 8/28 那種 2.6× 假突破；截圖 9/3 約 3.7×
-MAX_VOL_RATIO = 8.00  # 美股開盤 14× 那種不是 ETH 的量能
+MAX_VOL_RATIO = 6.50  # GS 7.8× 那種股票放量不是 ETH 3.7×
 MIN_RANGE_EXPAND = 2.00
 MAX_RANGE_EXPAND = 6.00  # ETH 9/3 約 2.3×；19× 跳空不是同一種線
-MAX_ENTRY_EXT = 0.008  # 進場收盤仍 ≤ 0.8% 高於 200（ETH 9/3 +0.27%）
+MAX_ENTRY_EXT = 0.0055  # 進場仍近 200（ETH 9/3 +0.27%；BTC 9/21 +0.79% 已追）
+MAX_ABOVE_BARS = 14  # 盤整 24 根裡，嚴格站上 200 不能超過 14（BTC 9/21 已 19 根）
+MAX_MA200_ABOVE_OTHERS = 0.0015  # 200 要纏在其餘均線裡，不能單獨掛在上面（ETH 9/25）
 MIN_BODY_FRAC = 0.35
 MIN_RISK = 0.004
 MAX_RISK = 0.018
@@ -83,7 +85,7 @@ class SqueezeSignal:
         # A：更接近 ETH 9/3 截圖（離 200 很近、黏帶緊、量能溫和）
         if self.ribbon <= 0.0055 and self.ext <= 0.005 and 3.2 <= self.vol_ratio <= 6.5 and self.expand <= 4.0:
             return "A"
-        if self.ribbon <= 0.006 and self.ext <= 0.008:
+        if self.ribbon <= 0.006 and self.ext <= 0.0055:
             return "B"
         return "C"
 
@@ -124,6 +126,9 @@ def signal_at(d: dict, i: int) -> SqueezeSignal | None:
         return None
     if abs(float(m7[prev] / m200[prev] - 1.0)) > MAX_MA7_VS_200:
         return None
+    others_prev = (float(m7[prev]), float(m14[prev]), float(m25[prev]), float(m99[prev]), float(m120[prev]))
+    if float(m200[prev]) > max(others_prev) * (1.0 + MAX_MA200_ABOVE_OTHERS):
+        return None
 
     w0, w1 = i - LOOKBACK, i
     if np.isnan(m200[w0:w1]).any() or np.any(m200[w0:w1] <= 0):
@@ -157,6 +162,9 @@ def signal_at(d: dict, i: int) -> SqueezeSignal | None:
         return None
     at_or_below = int(np.sum(c[w0:w1] <= m200[w0:w1] * 1.003))
     if at_or_below < MIN_BARS_AT_OR_BELOW:
+        return None
+    already_above = int(np.sum(c[w0:w1] > m200[w0:w1]))
+    if already_above > MAX_ABOVE_BARS:
         return None
 
     if c[i] <= o[i]:

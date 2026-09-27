@@ -14,6 +14,7 @@ from nq.ma200_squeeze import (  # noqa: E402
     HOLD_BARS,
     LOOKBACK,
     MAX_ENTRY_EXT,
+    MAX_VOL_RATIO,
     add_indicators,
     detect_signals,
     signal_at,
@@ -91,8 +92,7 @@ def test_coil_break_near_200_hits() -> None:
     assert h.close > h.ma200
     assert h.ext <= MAX_ENTRY_EXT
     assert h.ribbon <= 0.006
-    assert h.ext <= 0.008
-    assert 3.0 <= h.vol_ratio <= 8.0
+    assert 3.0 <= h.vol_ratio <= MAX_VOL_RATIO
     assert 99.0 < h.ma200 < 101.5
 
 
@@ -165,6 +165,48 @@ def test_insane_volume_skips() -> None:
     """14× 開盤量不是 ETH 3.7× 那種線。"""
     d = _coil_then_break(vol_signal=14000.0)
     assert detect_signals(d) == []
+
+
+def test_gs_style_volume_skips() -> None:
+    """GS 那種 7.8× 開盤放量不是 ETH 3.7×。"""
+    d = _coil_then_break()
+    i = 260
+    d["v"][i] = 7800.0
+    d["v20"][i] = 1000.0
+    assert detect_signals(d) == []
+
+
+def test_already_riding_200_skips() -> None:
+    """盤整 24 根已經站上 200 太久，是 BTC 9/21 / EWZ 那種追價。"""
+    d = _coil_then_break()
+    hits = detect_signals(d)
+    assert hits
+    i = hits[0].idx
+    w0 = i - LOOKBACK
+    cap = float(d["c"][i]) - 0.05
+    for k in range(w0, w0 + 20):
+        lifted = max(float(d["c"][k]), float(d["m200"][k]) * 1.001)
+        d["c"][k] = min(lifted, cap)
+        d["h"][k] = max(float(d["h"][k]), float(d["c"][k]))
+    assert signal_at(d, i) is None
+
+
+def test_ma200_hanging_above_ribbon_skips() -> None:
+    """200 單獨掛在黏帶上面，像 ETH 9/25。"""
+    d = _coil_then_break()
+    hits = detect_signals(d)
+    assert hits
+    i = hits[0].idx
+    prev = i - 1
+    others_hi = max(
+        float(d["m7"][prev]),
+        float(d["m14"][prev]),
+        float(d["m25"][prev]),
+        float(d["m99"][prev]),
+        float(d["m120"][prev]),
+    )
+    d["m200"][prev] = others_hi * 1.0025
+    assert signal_at(d, i) is None
 
 
 def test_second_bar_chase_skips() -> None:

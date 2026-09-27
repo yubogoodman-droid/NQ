@@ -29,6 +29,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nq.ma200_squeeze import (  # noqa: E402
+    MAX_ENTRY_EXT,
     SqueezeSignal,
     add_indicators,
     detect_signals,
@@ -581,7 +582,7 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             subtitle=(
                 f"{days}d · {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')} · "
                 f"{'全部永續 幣+股' if (args.all or int(args.top) <= 0) and not args.symbol else f'成交額前 {len(symbols)}'} · "
-                f"黏帶≤0.6% · 離200≤0.8% · 不追直豎"
+                f"黏帶≤0.6% · 離200≤{MAX_ENTRY_EXT*100:.2f}% · 不追已站上/200懸空"
             ),
             stats=stats,
             universe_n=len(symbols),
