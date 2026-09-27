@@ -768,7 +768,7 @@ def dump_hits_json(path: Path, hits: List[TwHit], stats: dict, funnel: dict, ext
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(description="台股成交額前 N · 1h 破底翻回測")
+    p = argparse.ArgumentParser(description="台股成交額前 200 · 1h 破底翻回測")
     p.add_argument("--date", default="", help="YYYYMMDD，預設上一個交易日")
     p.add_argument("--limit", type=int, default=200, help="成交額前 N；0 = 不限成交額")
     p.add_argument("--pool", type=int, default=400, help="先取成交額前 N 再套股價過濾")

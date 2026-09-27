@@ -67,8 +67,8 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 回測出場（方便看兩個禮拜成績）：停在破底低、目標 2R、或 20 根時間停。
 
 ```bash
-# 成交額前 100、近兩個禮拜；預設寬鬆、股價 1000 以上刪掉
-python3 examples/tw_1h_reclaim.py --limit 100 --days 14 --range 2mo --pages
+# 成交額前 200、近兩個禮拜；預設寬鬆、股價 1000 以上刪掉
+python3 examples/tw_1h_reclaim.py --days 14 --range 2mo --pages
 
 # 不限成交額（仍刪股價 1000 以上）
 python3 examples/tw_1h_reclaim.py --limit 0 --days 7 --range 1mo
