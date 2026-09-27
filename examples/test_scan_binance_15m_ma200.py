@@ -222,20 +222,20 @@ def test_long_mas_detached_skips() -> None:
         float(d["m25"][prev]),
         float(d["m200"][prev]),
     )
-    d["m99"][prev] = rest_lo / 1.0042
-    d["m120"][prev] = rest_lo / 1.0042
+    d["m99"][prev] = rest_lo / 1.0052
+    d["m120"][prev] = rest_lo / 1.0052
     assert signal_at(d, i) is None
 
 
-def test_snow_style_expand_skips() -> None:
-    """SNOW 那種 4.1× 大棒，不是 ETH 2.3×。"""
+def test_wide_breakout_bar_skips() -> None:
+    """5.2× 大棒仍不是 ETH 2.3×。"""
     d = _coil_then_break()
     hits = detect_signals(d)
     assert hits
     i = hits[0].idx
     w0 = i - LOOKBACK
     med = float(np.median(d["h"][w0:i] - d["l"][w0:i]))
-    d["h"][i] = float(d["l"][i]) + 4.2 * med
+    d["h"][i] = float(d["l"][i]) + 5.2 * med
     d["c"][i] = min(float(d["c"][i]), float(d["h"][i]) - 0.01)
     assert signal_at(d, i) is None
 
