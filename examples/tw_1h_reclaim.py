@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""台股 1h 破底翻（寬鬆版）— 認定一波後，破底 36 小時內收盤站上 MA5/10/20 發訊號。
+"""台股 1h 破底翻（元晶型）— 認定一波後，破底 36 小時內收盤站上 MA5/10/20 發訊號。
 
-寬鬆版（預設，沒加 --strict）:
+預設對齊 6443 元晶 2026-09-16 那波（深度 4.4%、下面 9 根、0 假站、隔根翻上、低點彈 3.1%）:
   • 1h 收盤從 MA20 上方跌到下方，開始算。
-  • 在下面待 4～36 根。中間 1～2 根假站上，不算結束。
+  • 在下面待 6～16 根。中間不准假站上。
   • 之後要再有一根收盤站回 MA20 這波才算數。
-  • 相對過程中最高 MA20，最低點深度 ≥ 1.8%。
+  • 相對過程中最高 MA20，最低點深度 ≥ 3.5%。
   • 最低點必須是近 16 根新低（破底）。更高低點的 W 不算。
-  • 不要求急殺、ATR、也不要求先做一腳再吻回的筆畫 W。
+  • 破底跟翻上不能同一根（先破、隔根再翻，不要單根錘）。
+  • 進場價相對破底低點至少彈回 3%。
   • 破底之後 36 根內，第一根同時 收盤 > MA5 MA10 MA20 → 進場／通知。
 
---strict 只多兩道：不准假站上；進場還要 MA5>MA10>MA20 多頭排列。
+--strict 只多一道：進場還要 MA5>MA10>MA20 多頭排列。
 """
 
 from __future__ import annotations
@@ -53,10 +54,12 @@ MA_COLORS = {5: "#f0c14b", 10: "#79c0ff", 20: "#f472b6"}
 
 @dataclass(frozen=True)
 class ReclaimParams:
-    min_below: int = 4
-    max_below: int = 36
-    max_fakes: int = 2
-    min_depth: float = 0.018
+    min_below: int = 6
+    max_below: int = 16
+    max_fakes: int = 0
+    min_depth: float = 0.035
+    min_bounce: float = 0.03
+    separate_trough: bool = True
     lookback: int = 16
     entry_window: int = 36
     require_stack: bool = False
@@ -254,12 +257,24 @@ def detect_signals(
         lo = confirmed.reclaim_idx
         hi = min(confirmed.trough_idx + p.entry_window, n - 1)
         found = False
+        fail_entry = "entry_timeout"
         if lo <= hi:
             for e in range(lo, hi + 1):
                 if np.isnan(ma5[e]) or np.isnan(ma10[e]) or np.isnan(ma20[e]):
                     continue
+                if p.separate_trough and e == confirmed.trough_idx:
+                    fail_entry = "same_bar"
+                    continue
                 stacked = (not p.require_stack) or (ma5[e] > ma10[e] > ma20[e])
                 if close[e] > ma5[e] and close[e] > ma10[e] and close[e] > ma20[e] and stacked:
+                    bounce = (
+                        (float(close[e]) / confirmed.trough_low - 1.0)
+                        if confirmed.trough_low > 0
+                        else 0.0
+                    )
+                    if bounce < p.min_bounce:
+                        fail_entry = "weak_bounce"
+                        continue
                     signals.append(
                         Signal(
                             entry_idx=e,
@@ -274,7 +289,7 @@ def detect_signals(
                     found = True
                     break
         if not found:
-            bump("entry_timeout")
+            bump(fail_entry)
         i = confirmed.reclaim_idx + 1
 
     return signals
@@ -440,7 +455,7 @@ def _setup_cjk() -> None:
             break
 
 
-def _trade_window(df: pd.DataFrame, trade: TradeResult, pad_left: int = 10, pad_right: int = 4) -> tuple[int, int]:
+def _trade_window(df: pd.DataFrame, trade: TradeResult, pad_left: int = 16, pad_right: int = 10) -> tuple[int, int]:
     sig = trade.signal
     start = max(0, min(sig.wave.start_idx, sig.wave.trough_idx, trade.entry_idx) - pad_left)
     end = min(len(df) - 1, max(trade.exit_idx, trade.entry_idx, sig.wave.reclaim_idx) + pad_right)
@@ -571,6 +586,7 @@ def _git_branch() -> str:
 
 
 def write_view_html(src: Path) -> Path:
+    src = src.resolve()
     rel = src.parent.relative_to(REPO).as_posix()
     base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{_git_branch()}/{rel}/"
     text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
@@ -617,7 +633,8 @@ def write_tw_html(
             f"<div class='tags'><span class='tag tag-info'>{escape(hit.row['symbol'])}</span>"
             f"<span class='tag'>{escape(t.exit_reason)}</span>"
             f"<span class='tag'>深度 {w.depth_pct*100:.1f}%</span>"
-            f"<span class='tag'>假站 {w.fake_stands}</span></div>"
+            f"<span class='tag'>下面 {w.bars_below} 根</span>"
+            f"<span class='tag'>彈 {t.entry_price / w.trough_low * 100 - 100:.1f}%</span></div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}  stop {t.stop_price:.2f} (−{risk:.2f})\n"
             f"target {t.target_price:.2f}  exit {t.exit_price:.2f} {t.exit_reason}  {t.pnl_points:+.2f}\n"
@@ -632,7 +649,7 @@ def write_tw_html(
         )
 
     cutoff = universe[-1]["amount"] / 1e8 if universe else 0
-    mode = "嚴格" if strict else "寬鬆"
+    mode = "嚴格" if strict else "元晶型"
     fun = funnel or {}
     fwd1 = _fmt_fwd(stats.get("fwd_1d"))
     fwd3 = _fmt_fwd(stats.get("fwd_3d"))
@@ -664,13 +681,13 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 1h 破底翻 · {mode}版 · 成交額前 {len(universe)}</h1>
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
-<br/>跌破 MA20 後待 4～36 根（中間最多 {0 if strict else 2} 根假站上），深度 ≥ 1.8%，最低點為近 16 根新低，再站回 MA20。
+<br/>跌破 MA20 後待 6～16 根（不准假站上），深度 ≥ 3.5%，最低點為近 16 根新低，破底與翻上不同根，從低點至少彈 3%，再站回 MA20。
 破底後 36 根內第一根收盤 &gt; MA5 / MA10 / MA20 進場。
 回測出場：停在破底低、2R、或 20 根時間停。加總％是各筆報酬相加，不是組合複利。</p>
 <p class="muted">漏斗：跌破 {fun.get('cross_below', 0)} → 成波 {fun.get('wave_ok', 0)} → 進場 {fun.get('entry', 0)}
 · 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 非破底 {fun.get('not_16h_low', 0)}
 · 假站過多 {fun.get('too_many_fakes', 0)} · 逾時 {fun.get('timeout', 0)} · 沒站上均線 {fun.get('entry_timeout', 0)}
-· 進場價過高 {fun.get('price_cap', 0)}
+· 同根錘 {fun.get('same_bar', 0)} · 彈太弱 {fun.get('weak_bounce', 0)} · 進場價過高 {fun.get('price_cap', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}</p>
 <div class="cards">
@@ -754,6 +771,7 @@ def dump_hits_json(path: Path, hits: List[TwHit], stats: dict, funnel: dict, ext
                 "reclaim_time": str(df.index[w.reclaim_idx]),
                 "fake_stands": w.fake_stands,
                 "bars_below": w.bars_below,
+                "bounce_pct": (t.entry_price / w.trough_low - 1.0) if w.trough_low else None,
                 "fwd_1d": t.fwd_1d,
                 "fwd_3d": t.fwd_3d,
                 "fwd_5d": t.fwd_5d,
@@ -852,7 +870,7 @@ def main(argv=None) -> int:
         "max_price": args.max_price,
         "generated": datetime.now(TPE).isoformat(timespec="seconds"),
     }
-    html_path = Path(args.html) if args.html else None
+    html_path = Path(args.html).resolve() if args.html else None
     if html_path is None and args.pages:
         html_path = PAGES
     if html_path:
@@ -862,7 +880,7 @@ def main(argv=None) -> int:
         out = write_tw_html(html_path, hits, universe, period_label, date, funnel=funnel, strict=args.strict)
         write_view_html(out)
         print(f"html={out}")
-    json_path = Path(args.json_path) if args.json_path else None
+    json_path = Path(args.json_path).resolve() if args.json_path else None
     if json_path is None and html_path:
         json_path = html_path.with_name("hits.json")
     if json_path:

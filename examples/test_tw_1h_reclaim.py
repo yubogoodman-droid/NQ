@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic tests for 台股 1h 破底翻（寬鬆版，不打 Yahoo）。"""
+"""Synthetic tests for 台股 1h 破底翻（元晶型，不打 Yahoo）。"""
 
 from __future__ import annotations
 
@@ -103,14 +103,26 @@ def test_valid_wave_and_entry() -> None:
     assert abs(s.wave.trough_low - 95.4) < 1e-9
 
 
-def test_fake_stands_still_count() -> None:
+def test_fake_stands_rejected_by_default() -> None:
     warmup = [100.0] * 30
-    # 3 根下面 → 1 根假站上 → 5 根再下去 → 站回
+    # 3 根下面 → 1 根假站上 → 5 根再下去 → 站回。元晶型不准假站。
     body = [98.5, 97.8, 97.2, 100.2, 97.0, 96.4, 95.9, 96.2, 96.6]
     lows = [c - 0.3 for c in warmup] + [98.1, 97.4, 96.8, 99.6, 96.6, 96.0, 95.3, 95.8, 96.2]
     reclaim = [101.0]
     df = ohlc_from_close(warmup + body + reclaim, lows=lows + [100.4])
-    sigs = detect_signals(df, loose_params())
+    funnel: dict = {}
+    sigs = detect_signals(df, loose_params(), funnel=funnel)
+    assert sigs == []
+    assert funnel.get("too_many_fakes", 0) + funnel.get("too_short", 0) >= 1
+
+
+def test_fake_stands_ok_if_allowed() -> None:
+    warmup = [100.0] * 30
+    body = [98.5, 97.8, 97.2, 100.2, 97.0, 96.4, 95.9, 96.2, 96.6]
+    lows = [c - 0.3 for c in warmup] + [98.1, 97.4, 96.8, 99.6, 96.6, 96.0, 95.3, 95.8, 96.2]
+    reclaim = [101.0]
+    df = ohlc_from_close(warmup + body + reclaim, lows=lows + [100.4])
+    sigs = detect_signals(df, loose_params(max_fakes=2, min_below=4, min_depth=0.018, min_bounce=0.0))
     assert len(sigs) == 1
     assert sigs[0].wave.fake_stands == 1
     assert sigs[0].wave.bars_below >= 4
@@ -142,7 +154,7 @@ def test_too_short_rejected() -> None:
 
 def test_shallow_rejected() -> None:
     warmup = [100.0] * 30
-    # 深度約 1.0% < 1.8%
+    # 深度約 1.0% < 3.5%
     below = [99.4, 99.3, 99.2, 99.2, 99.3, 99.4]
     lows = [c - 0.15 for c in warmup] + [99.1, 99.0, 98.95, 98.9, 99.0, 99.1]
     reclaim = [100.4, 100.6, 100.8]
@@ -182,8 +194,57 @@ def test_strict_rejects_fake_stand() -> None:
     body = [98.5, 97.8, 97.2, 100.2, 97.0, 96.4, 95.9, 96.2, 96.6]
     lows = [c - 0.3 for c in warmup] + [98.1, 97.4, 96.8, 99.6, 96.6, 96.0, 95.3, 95.8, 96.2]
     df = ohlc_from_close(warmup + body + [101.0], lows=lows + [100.4])
-    assert detect_signals(df, loose_params())
+    allowed = loose_params(max_fakes=2, min_below=4, min_depth=0.018, min_bounce=0.0)
+    assert detect_signals(df, allowed)
     assert detect_signals(df, strict_params()) == []
+
+
+def test_yuanjing_like_passes() -> None:
+    """對齊元晶：9 根下面、深度 ~4.6%、0 假站、隔根翻上、彈 ~3.8%。"""
+    warmup = [100.0] * 30
+    below = [98.8, 98.2, 97.5, 96.9, 96.4, 96.0, 95.8, 95.7, 95.7]
+    below_lows = [98.4, 97.8, 97.1, 96.5, 96.0, 95.6, 95.4, 95.6, 95.5]
+    reclaim = [99.0]
+    df = ohlc_from_close(warmup + below + reclaim, lows=[c - 0.3 for c in warmup] + below_lows + [97.8])
+    funnel: dict = {}
+    sigs = detect_signals(df, loose_params(), funnel=funnel)
+    assert funnel.get("wave_ok") == 1
+    assert len(sigs) == 1
+    s = sigs[0]
+    assert s.wave.fake_stands == 0
+    assert s.wave.bars_below == 9
+    assert s.wave.depth_pct >= 0.035
+    assert s.entry_idx > s.wave.trough_idx
+    assert s.entry_price / s.wave.trough_low - 1.0 >= 0.03
+
+
+def test_bounce_too_small() -> None:
+    closes, lows = valid_closes()
+    df = ohlc_from_close(closes, lows=lows)
+    funnel: dict = {}
+    sigs = detect_signals(df, loose_params(min_bounce=0.08), funnel=funnel)
+    assert sigs == []
+    assert funnel.get("weak_bounce", 0) >= 1
+
+
+def test_same_bar_trough_skipped() -> None:
+    """翻上那根自己創新低，元晶型要隔根才進；後面沒再站上就沒訊號。"""
+    warmup = [100.0] * 30
+    below = [98.6, 97.8, 97.0, 96.4, 96.0, 95.8]
+    below_lows = [98.2, 97.4, 96.6, 96.0, 95.6, 95.5]
+    # 這根低點 95.2 是波谷，收盤卻站回均線
+    hammer_c = [101.0]
+    hammer_l = [95.2]
+    after_c = [97.0, 96.6]
+    after_l = [96.4, 96.0]
+    df = ohlc_from_close(
+        warmup + below + hammer_c + after_c,
+        lows=[c - 0.3 for c in warmup] + below_lows + hammer_l + after_l,
+    )
+    funnel: dict = {}
+    sigs = detect_signals(df, loose_params(), funnel=funnel)
+    assert sigs == []
+    assert funnel.get("same_bar", 0) >= 1
 
 
 def test_simulate_stop_and_target() -> None:
@@ -245,13 +306,17 @@ def test_summarize() -> None:
 def main() -> int:
     test_sma()
     test_valid_wave_and_entry()
-    test_fake_stands_still_count()
+    test_fake_stands_rejected_by_default()
+    test_fake_stands_ok_if_allowed()
     test_three_fakes_rejected()
     test_too_short_rejected()
     test_shallow_rejected()
     test_higher_low_w_rejected()
     test_entry_must_be_within_36_of_trough()
     test_strict_rejects_fake_stand()
+    test_yuanjing_like_passes()
+    test_bounce_too_small()
+    test_same_bar_trough_skipped()
     test_simulate_stop_and_target()
     test_filter_entry_window()
     test_price_cap_keeps_cheap_entry()

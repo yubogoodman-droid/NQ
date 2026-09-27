@@ -60,14 +60,14 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/tw-ma-reclaim-30d/view.html
 
-## 台股 1 小時 K 破底翻（寬鬆版）
+## 台股 1 小時 K 破底翻（元晶型）
 
-1 小時圖：收盤從 MA20 上方跌到下方後，在下面待 4～36 根（中間 1～2 根假站上不算結束），相對過程中最高 MA20 深度 ≥ 1.8%，且最低點是近 16 根新低；再站回 MA20 這波才算。破底後 36 根內，第一根收盤同時大於 MA5 / MA10 / MA20 進場。不要求急殺、ATR、也不要求先做一腳再吻回的 W。
+1 小時圖，對齊 6443 元晶 2026-09-16 那波：收盤從 MA20 上方跌到下方後，在下面待 6～16 根（不准假站上），相對過程中最高 MA20 深度 ≥ 3.5%，且最低點是近 16 根新低；破底與翻上不能同一根，從低點至少彈回 3%，再站回 MA20 這波才算。破底後 36 根內，第一根收盤同時大於 MA5 / MA10 / MA20 進場。
 
 回測出場（方便看兩個禮拜成績）：停在破底低、目標 2R、或 20 根時間停。
 
 ```bash
-# 成交額前 200、近兩個禮拜；預設寬鬆、股價 1000 以上刪掉
+# 成交額前 200、近兩個禮拜；預設元晶型、股價 1000 以上刪掉
 python3 examples/tw_1h_reclaim.py --days 14 --range 2mo --pages
 
 # 不限成交額（仍刪股價 1000 以上）
