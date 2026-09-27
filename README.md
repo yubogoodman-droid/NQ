@@ -67,7 +67,10 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 回測出場（方便看兩個禮拜成績）：停在破底低、目標 2R、或 20 根時間停。
 
 ```bash
-# 成交額前 200、近兩個禮拜；預設元晶型、股價 1000 以上刪掉
+# 成交額前 200、近一個月；預設元晶型、股價 1000 以上刪掉
+python3 examples/tw_1h_reclaim.py --days 30 --range 2mo --pages --html docs/tw-1h-reclaim-30d/index.html
+
+# 近兩個禮拜
 python3 examples/tw_1h_reclaim.py --days 14 --range 2mo --pages
 
 # 不限成交額（仍刪股價 1000 以上）
@@ -77,9 +80,9 @@ python3 examples/tw_1h_reclaim.py --limit 0 --days 7 --range 1mo
 python3 examples/test_tw_1h_reclaim.py
 ```
 
-2026-08-21 → 09-04、成交額前 100 且**股價 < 1000**（聯發科／台積電／大立光等已濾；末名約 11.9 億）：**109 筆、73 檔**。已平 89 筆勝率 **68.5%**，平均 **+3.84%**。進場價 ≥ 1000 的 2 筆（欣興 1135、環球晶 1000）也拿掉。
+2026-08-26 → 09-24、成交額前 200 且**股價 < 1000**：元晶型 **149 筆、104 檔**。已平 142 筆勝率 **50.7%**，平均 **+1.30%**；2R 16 筆平均 +12.7%，停損 39 筆平均 −4.8%。6443 元晶 9/16 進場，次日 2R +5.98%。
 
-預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim/view.html
+月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
 ## 幣安黏帶三幕 Telegram
 
