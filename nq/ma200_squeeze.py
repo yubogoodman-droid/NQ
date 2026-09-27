@@ -27,7 +27,7 @@ MIN_VOL_RATIO = 3.00  # 濾掉 ETH 8/28 那種 2.6× 假突破；截圖 9/3 約 
 MAX_VOL_RATIO = 6.00  # SNOW 9/25 6.1×、GS 7.8× 那種放量不是 ETH 3.7×
 MIN_RANGE_EXPAND = 2.00
 MAX_RANGE_EXPAND = 4.00  # ETH 9/27 3.6×、BTC 9/27 3.8×；SNOW 4.1× / AAOI 4.2× 那種大棒不進
-MAX_ENTRY_EXT = 0.0055  # 進場仍近 200（ETH 9/3 +0.27%；BTC 9/21 +0.79% 已追）
+MAX_ENTRY_EXT = 0.0046  # 進場仍近 200（ETH 9/3 +0.27%、9/27 +0.44%；DKNG +0.50% 已離開）
 MAX_ABOVE_BARS = 14  # 盤整 24 根裡，嚴格站上 200 不能超過 14（BTC 9/21 已 19 根）
 MAX_MA200_ABOVE_OTHERS = 0.0015  # 200 要纏在其餘均線裡，不能單獨掛在上面（ETH 9/25）
 MAX_LONG_DETACH = 0.0025  # 99/120 不能另成一層（IWM 0.27%、SNOW 0.29%；ETH 9/3 0.23%）
@@ -87,7 +87,7 @@ class SqueezeSignal:
         # A：更接近 ETH 9/3 截圖（離 200 很近、黏帶緊、量能溫和）
         if self.ribbon <= 0.0055 and self.ext <= 0.005 and 3.2 <= self.vol_ratio <= 6.0 and self.expand <= 4.0:
             return "A"
-        if self.ribbon <= 0.006 and self.ext <= 0.0055:
+        if self.ribbon <= 0.006 and self.ext <= 0.0046:
             return "B"
         return "C"
 

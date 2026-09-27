@@ -107,6 +107,17 @@ def test_too_far_from_200_skips() -> None:
     assert detect_signals(d) == []
 
 
+def test_dkng_style_half_percent_skips() -> None:
+    """DKNG 那種離 200 已經 +0.50%，不是 ETH +0.27%。"""
+    d = _coil_then_break()
+    hits = detect_signals(d)
+    assert hits
+    i = hits[0].idx
+    d["c"][i] = float(d["m200"][i]) * 1.0050
+    d["h"][i] = max(float(d["h"][i]), float(d["c"][i]))
+    assert signal_at(d, i) is None
+
+
 def test_low_volume_skips() -> None:
     d = _coil_then_break(vol_signal=1050.0)
     assert detect_signals(d) == []
