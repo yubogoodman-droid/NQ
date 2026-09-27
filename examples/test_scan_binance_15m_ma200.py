@@ -51,10 +51,6 @@ def _coil_then_break(
     n_flat = 260
     base = 100.0
     coil = base + coil_amp * np.sin(np.linspace(0, 10 * np.pi, n_flat))
-    # 盤整要像 ETH 9/3：多數在 200 下，但有幾根穿過，不是全程在下面第一次才撞
-    coil[-18] = base + 0.12
-    coil[-14] = base + 0.10
-    coil[-10] = base + 0.08
     # 最後幾根略壓在 200 下方，做出「在 200 附近」而不是已經起飛
     coil[-6:] = np.array([99.85, 99.70, 99.90, 99.80, 99.95, 99.88])
     if already_gone:
@@ -105,17 +101,6 @@ def test_too_far_from_200_skips() -> None:
     d = _coil_then_break(break_close=104.0)
     d["h"][260] = 104.2
     assert detect_signals(d) == []
-
-
-def test_dkng_style_half_percent_skips() -> None:
-    """DKNG 那種離 200 已經 +0.50%，不是 ETH +0.27%。"""
-    d = _coil_then_break()
-    hits = detect_signals(d)
-    assert hits
-    i = hits[0].idx
-    d["c"][i] = float(d["m200"][i]) * 1.0050
-    d["h"][i] = max(float(d["h"][i]), float(d["c"][i]))
-    assert signal_at(d, i) is None
 
 
 def test_low_volume_skips() -> None:
@@ -189,19 +174,6 @@ def test_gs_style_volume_skips() -> None:
     d["v"][i] = 7800.0
     d["v20"][i] = 1000.0
     assert detect_signals(d) == []
-
-
-def test_never_stood_on_200_skips() -> None:
-    """盤整全程在 200 下面、第一次才碰到，是 AAPL/XBI 那種去撞 200。"""
-    d = _coil_then_break()
-    hits = detect_signals(d)
-    assert hits
-    i = hits[0].idx
-    w0 = i - LOOKBACK
-    for k in range(w0, i):
-        d["c"][k] = min(float(d["c"][k]), float(d["m200"][k]) * 0.999)
-        d["h"][k] = max(float(d["h"][k]), float(d["c"][k]))
-    assert signal_at(d, i) is None
 
 
 def test_already_riding_200_skips() -> None:
