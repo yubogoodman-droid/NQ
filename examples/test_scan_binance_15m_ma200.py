@@ -209,6 +209,37 @@ def test_ma200_hanging_above_ribbon_skips() -> None:
     assert signal_at(d, i) is None
 
 
+def test_long_mas_detached_skips() -> None:
+    """99/120 掉在短均下面另成一層，像 BZ / AAOI。"""
+    d = _coil_then_break()
+    hits = detect_signals(d)
+    assert hits
+    i = hits[0].idx
+    prev = i - 1
+    rest_lo = min(
+        float(d["m7"][prev]),
+        float(d["m14"][prev]),
+        float(d["m25"][prev]),
+        float(d["m200"][prev]),
+    )
+    d["m99"][prev] = rest_lo / 1.0042
+    d["m120"][prev] = rest_lo / 1.0042
+    assert signal_at(d, i) is None
+
+
+def test_snow_style_expand_skips() -> None:
+    """SNOW 那種 4.1× 大棒，不是 ETH 2.3×。"""
+    d = _coil_then_break()
+    hits = detect_signals(d)
+    assert hits
+    i = hits[0].idx
+    w0 = i - LOOKBACK
+    med = float(np.median(d["h"][w0:i] - d["l"][w0:i]))
+    d["h"][i] = float(d["l"][i]) + 4.2 * med
+    d["c"][i] = min(float(d["c"][i]), float(d["h"][i]) - 0.01)
+    assert signal_at(d, i) is None
+
+
 def test_second_bar_chase_skips() -> None:
     """前一根已經打出箱頂，這根再吃就是追價。"""
     d = _coil_then_break(already_gone=True, break_close=100.70)

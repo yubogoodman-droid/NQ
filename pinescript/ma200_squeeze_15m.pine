@@ -13,10 +13,11 @@ minNearFrac  = input.float(85.0, "靠近 200 的 K 數比例 %", minval=40, step
 minVolRatio  = input.float(3.0, "量比下限", minval=1.0, step=0.1)
 maxVolRatio  = input.float(6.5, "量比上限", minval=3.0, step=0.5)
 minExpand    = input.float(2.0, "K 線振幅擴張倍數", minval=1.0, step=0.1)
-maxExpand    = input.float(6.0, "K 線振幅擴張上限", minval=2.0, step=0.5)
+maxExpand    = input.float(4.0, "K 線振幅擴張上限", minval=2.0, step=0.5)
 maxExtPct    = input.float(0.55, "進場離 200MA 上限 %", minval=0.3, step=0.05)
 maxAboveBars = input.int(14, "盤整已站上 200 的上限根數", minval=4, maxval=20)
 max200AbovePct = input.float(0.15, "MA200 高於其餘均線上限 %", minval=0.05, step=0.05)
+maxLongDetachPct = input.float(0.32, "99/120 掉在短均下的上限 %", minval=0.10, step=0.02)
 minBodyFrac  = input.float(0.35, "實體 / 振幅", minval=0.1, step=0.05)
 targetR      = input.float(2.0, "停利 R", minval=1.0, step=0.5)
 stopBufPct   = input.float(0.2, "停損緩衝 %", minval=0.0, step=0.05)
@@ -58,6 +59,9 @@ for k = 1 to lookback
 nearFrac = nearCount / lookback
 othersHi = math.max(ma7[1], math.max(ma14[1], math.max(ma25[1], math.max(ma99[1], ma120[1]))))
 ma200InRibbon = othersHi > 0 and ma200[1] <= othersHi * (1.0 + max200AbovePct / 100.0)
+longLo = math.min(ma99[1], ma120[1])
+restLo = math.min(ma7[1], math.min(ma14[1], math.min(ma25[1], ma200[1])))
+longDetach = longLo > 0 ? restLo / longLo - 1.0 : 99.0
 
 medRng  = ta.median(high - low, lookback)[1]
 thisRng = high - low
@@ -69,7 +73,7 @@ ma7Stuck   = math.abs(ma7[1] / ma200[1] - 1.0) <= 0.008
 ma200InBox = ma200[1] >= boxLo * 0.995 and ma200[1] <= boxHi * 1.010
 firstBreak = not (close[1] > closeHi and close[1] > ma200[1] and close[1] > ribbonTop)
 
-squeeze = ribbon <= maxRibbonPct / 100.0 and boxPct <= maxBoxPct / 100.0 and math.abs(slope20) <= maxSlopePct / 100.0 and nearFrac >= minNearFrac / 100.0 and belowCount >= 6 and aboveCount <= maxAboveBars and ma7Stuck and ma200InBox and ma200InRibbon
+squeeze = ribbon <= maxRibbonPct / 100.0 and boxPct <= maxBoxPct / 100.0 and math.abs(slope20) <= maxSlopePct / 100.0 and nearFrac >= minNearFrac / 100.0 and belowCount >= 6 and aboveCount <= maxAboveBars and ma7Stuck and ma200InBox and ma200InRibbon and longDetach <= maxLongDetachPct / 100.0
 breakout = close > open and close > ma200 and close > closeHi and close > ribbonTop and thisRng >= minExpand * medRng and thisRng <= maxExpand * medRng and body / thisRng >= minBodyFrac
 nearEntry = ext >= 0 and ext <= maxExtPct / 100.0
 volOk = vr >= minVolRatio and vr <= maxVolRatio
