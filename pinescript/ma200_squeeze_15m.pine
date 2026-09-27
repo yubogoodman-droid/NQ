@@ -11,13 +11,14 @@ maxSlopePct  = input.float(0.5, "MA200 斜率上限 %", minval=0.1, step=0.1)
 near200Pct   = input.float(1.2, "盤整靠近 200MA %", minval=0.3, step=0.1)
 minNearFrac  = input.float(85.0, "靠近 200 的 K 數比例 %", minval=40, step=5)
 minVolRatio  = input.float(3.0, "量比下限", minval=1.0, step=0.1)
-maxVolRatio  = input.float(6.5, "量比上限", minval=3.0, step=0.5)
+maxVolRatio  = input.float(6.0, "量比上限", minval=3.0, step=0.5)
 minExpand    = input.float(2.0, "K 線振幅擴張倍數", minval=1.0, step=0.1)
 maxExpand    = input.float(4.0, "K 線振幅擴張上限", minval=2.0, step=0.5)
 maxExtPct    = input.float(0.55, "進場離 200MA 上限 %", minval=0.3, step=0.05)
+minAboveBars = input.int(3, "盤整至少站上 200 的根數", minval=1, maxval=12)
 maxAboveBars = input.int(14, "盤整已站上 200 的上限根數", minval=4, maxval=20)
 max200AbovePct = input.float(0.15, "MA200 高於其餘均線上限 %", minval=0.05, step=0.05)
-maxLongDetachPct = input.float(0.32, "99/120 掉在短均下的上限 %", minval=0.10, step=0.02)
+maxLongDetachPct = input.float(0.25, "99/120 掉在短均下的上限 %", minval=0.10, step=0.02)
 minBodyFrac  = input.float(0.35, "實體 / 振幅", minval=0.1, step=0.05)
 targetR      = input.float(2.0, "停利 R", minval=1.0, step=0.5)
 stopBufPct   = input.float(0.2, "停損緩衝 %", minval=0.0, step=0.05)
@@ -39,6 +40,7 @@ ribbon   = ribbonLo > 0 ? ribbonHi / ribbonLo - 1.0 : 99.0
 boxHi   = ta.highest(high, lookback)[1]
 boxLo   = ta.lowest(low, lookback)[1]
 closeHi = ta.highest(close, lookback)[1]
+priorCloseHi = ta.highest(close, lookback - 1)[2]
 ribbonTop = math.max(ma7[1], math.max(ma14[1], math.max(ma25[1], math.max(ma99[1], math.max(ma120[1], ma200[1])))))
 boxMid  = (boxHi + boxLo) / 2.0
 boxPct  = boxMid > 0 ? (boxHi - boxLo) / boxMid : 99.0
@@ -71,9 +73,9 @@ ext     = ma200 > 0 ? close / ma200 - 1.0 : 99.0
 
 ma7Stuck   = math.abs(ma7[1] / ma200[1] - 1.0) <= 0.008
 ma200InBox = ma200[1] >= boxLo * 0.995 and ma200[1] <= boxHi * 1.010
-firstBreak = not (close[1] > closeHi and close[1] > ma200[1] and close[1] > ribbonTop)
+firstBreak = not (close[1] > priorCloseHi and close[1] > ma200[1] and close[1] > ribbonTop)
 
-squeeze = ribbon <= maxRibbonPct / 100.0 and boxPct <= maxBoxPct / 100.0 and math.abs(slope20) <= maxSlopePct / 100.0 and nearFrac >= minNearFrac / 100.0 and belowCount >= 6 and aboveCount <= maxAboveBars and ma7Stuck and ma200InBox and ma200InRibbon and longDetach <= maxLongDetachPct / 100.0
+squeeze = ribbon <= maxRibbonPct / 100.0 and boxPct <= maxBoxPct / 100.0 and math.abs(slope20) <= maxSlopePct / 100.0 and nearFrac >= minNearFrac / 100.0 and belowCount >= 6 and aboveCount >= minAboveBars and aboveCount <= maxAboveBars and ma7Stuck and ma200InBox and ma200InRibbon and longDetach <= maxLongDetachPct / 100.0
 breakout = close > open and close > ma200 and close > closeHi and close > ribbonTop and thisRng >= minExpand * medRng and thisRng <= maxExpand * medRng and body / thisRng >= minBodyFrac
 nearEntry = ext >= 0 and ext <= maxExtPct / 100.0
 volOk = vr >= minVolRatio and vr <= maxVolRatio

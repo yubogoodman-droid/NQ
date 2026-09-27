@@ -21,15 +21,16 @@ MIN_NEAR_FRAC = 0.85
 MAX_MA7_VS_200 = 0.008  # 突破前 MA7 仍黏著 200
 MAX_MA200_ABOVE_BOX = 0.010  # 200 可以略高於箱頂，但不能遠在天上
 MIN_BARS_AT_OR_BELOW = 6
+MIN_ABOVE_BARS = 3  # 要在 200 裡穿過，不能全程在下面第一次才撞（ETH 9/3 正好 3；AAPL/XBI 0）
 
 MIN_VOL_RATIO = 3.00  # 濾掉 ETH 8/28 那種 2.6× 假突破；截圖 9/3 約 3.7×
-MAX_VOL_RATIO = 6.50  # GS 7.8× 那種股票放量不是 ETH 3.7×
+MAX_VOL_RATIO = 6.00  # SNOW 9/25 6.1×、GS 7.8× 那種放量不是 ETH 3.7×
 MIN_RANGE_EXPAND = 2.00
 MAX_RANGE_EXPAND = 4.00  # ETH 9/27 3.6×、BTC 9/27 3.8×；SNOW 4.1× / AAOI 4.2× 那種大棒不進
 MAX_ENTRY_EXT = 0.0055  # 進場仍近 200（ETH 9/3 +0.27%；BTC 9/21 +0.79% 已追）
 MAX_ABOVE_BARS = 14  # 盤整 24 根裡，嚴格站上 200 不能超過 14（BTC 9/21 已 19 根）
 MAX_MA200_ABOVE_OTHERS = 0.0015  # 200 要纏在其餘均線裡，不能單獨掛在上面（ETH 9/25）
-MAX_LONG_DETACH = 0.0032  # 99/120 不能掉在短均+200 下面另成一層（BZ/AAOI 0.40%；ETH 9/3 0.23%）
+MAX_LONG_DETACH = 0.0025  # 99/120 不能另成一層（IWM 0.27%、SNOW 0.29%；ETH 9/3 0.23%）
 MIN_BODY_FRAC = 0.35
 MIN_RISK = 0.004
 MAX_RISK = 0.018
@@ -84,7 +85,7 @@ class SqueezeSignal:
     @property
     def quality(self) -> str:
         # A：更接近 ETH 9/3 截圖（離 200 很近、黏帶緊、量能溫和）
-        if self.ribbon <= 0.0055 and self.ext <= 0.005 and 3.2 <= self.vol_ratio <= 6.5 and self.expand <= 4.0:
+        if self.ribbon <= 0.0055 and self.ext <= 0.005 and 3.2 <= self.vol_ratio <= 6.0 and self.expand <= 4.0:
             return "A"
         if self.ribbon <= 0.006 and self.ext <= 0.0055:
             return "B"
@@ -169,7 +170,7 @@ def signal_at(d: dict, i: int) -> SqueezeSignal | None:
     if at_or_below < MIN_BARS_AT_OR_BELOW:
         return None
     already_above = int(np.sum(c[w0:w1] > m200[w0:w1]))
-    if already_above > MAX_ABOVE_BARS:
+    if already_above < MIN_ABOVE_BARS or already_above > MAX_ABOVE_BARS:
         return None
 
     if c[i] <= o[i]:
@@ -203,8 +204,9 @@ def signal_at(d: dict, i: int) -> SqueezeSignal | None:
     if this_rng <= 0 or body / this_rng < MIN_BODY_FRAC:
         return None
 
-    # 只吃第一根突破：前一根已經收過收盤箱頂且站上 200，這根就是追價
-    if c[prev] > close_hi and c[prev] > m200[prev] and c[prev] > hi_m:
+    # 只吃第一根突破。箱頂若含前一根，c[prev] > close_hi 永遠不成立。
+    prior_close_hi = float(c[w0:prev].max()) if prev > w0 else close_hi
+    if c[prev] > prior_close_hi and c[prev] > m200[prev] and c[prev] > hi_m:
         return None
 
     entry = float(c[i])
