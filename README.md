@@ -148,7 +148,7 @@ python3 examples/scan_binance_15m_align.py --backtest --days 7 --all --pages --h
 
 近 7 日（2026-09-12 → 09-19）成交額前 100：**9 筆、勝率 55.6%、−0.39%**。ETH 9/3 那張已超出這週。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d/view.html
 
-近 7 日全部永續（2026-09-20 → 09-27，725 檔、幣+股）：**12 筆、勝率 58.3%、+5.77%**。GS / EWZ / SNOW 9/21 / BZ / AAOI / ETH 9/25 / BTC 9/21 仍不進；後面收太緊的已改回。ETH 9/27、BTC 9/27 還在。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d-all/view.html
+近 7 日全部永續（2026-09-20 → 09-27，725 檔、幣+股）：**18 筆、勝率 61.1%、+6.19%**。振幅放到 5×、99/120 脫層 0.45%。GS / EWZ / ETH 9/25 / BTC 9/21 仍不進。ETH 9/27、BTC 9/27 還在。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d-all/view.html
 
 ## 幣安 15m 黏帶擠壓參數
 
