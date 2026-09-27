@@ -161,7 +161,9 @@ def fetch_top_turnover(date: str, limit: int) -> list[dict]:
         if prev is None or amt > prev[0]:
             best[code] = (amt, code, name, mkt, close)
 
-    ranked = sorted(best.values(), reverse=True)[:limit]
+    ranked = sorted(best.values(), reverse=True)
+    if limit and limit > 0:
+        ranked = ranked[:limit]
     return [
         {
             "rank": i,
@@ -177,8 +179,9 @@ def fetch_top_turnover(date: str, limit: int) -> list[dict]:
 
 
 def filter_by_max_price(rows: list[dict], max_price: float | None, limit: int) -> tuple[list[dict], list[dict]]:
+    unlimited = limit is None or limit <= 0
     if max_price is None:
-        kept = rows[:limit]
+        kept = list(rows) if unlimited else rows[:limit]
         return kept, []
     kept: list[dict] = []
     dropped: list[dict] = []
@@ -188,7 +191,7 @@ def filter_by_max_price(rows: list[dict], max_price: float | None, limit: int) -
             dropped.append(row)
             continue
         kept.append(row)
-        if len(kept) >= limit:
+        if not unlimited and len(kept) >= limit:
             break
     for i, row in enumerate(kept, 1):
         row["rank"] = i

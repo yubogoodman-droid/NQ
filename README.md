@@ -70,6 +70,9 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 # 成交額前 100、近兩個禮拜；預設寬鬆、股價 1000 以上刪掉
 python3 examples/tw_1h_reclaim.py --limit 100 --days 14 --range 2mo --pages
 
+# 不限成交額（仍刪股價 1000 以上）
+python3 examples/tw_1h_reclaim.py --limit 0 --days 7 --range 1mo
+
 # 單元測試（不打網路）
 python3 examples/test_tw_1h_reclaim.py
 ```

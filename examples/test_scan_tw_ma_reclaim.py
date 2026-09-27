@@ -66,6 +66,8 @@ def test_filter_by_max_price() -> None:
     assert [r["code"] for r in kept] == ["2408", "2303"]
     assert {r["code"] for r in dropped} == {"2330", "3008"}
     assert kept[0]["rank"] == 1
+    all_kept, _ = filter_by_max_price(rows, 600.0, 0)
+    assert [r["code"] for r in all_kept] == ["2408", "2303"]
 
 
 def test_last_session_skips_weekend() -> None:

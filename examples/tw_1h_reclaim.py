@@ -770,7 +770,7 @@ def dump_hits_json(path: Path, hits: List[TwHit], stats: dict, funnel: dict, ext
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="台股成交額前 N · 1h 破底翻回測")
     p.add_argument("--date", default="", help="YYYYMMDD，預設上一個交易日")
-    p.add_argument("--limit", type=int, default=100)
+    p.add_argument("--limit", type=int, default=100, help="成交額前 N；0 = 不限成交額")
     p.add_argument("--pool", type=int, default=200)
     p.add_argument("--max-price", type=float, default=1000, help="股價達此值以上剔除，預設 1000；0 不過濾")
     p.add_argument("--days", type=int, default=14, help="只統計進場落在最近 N 日的訊號")
@@ -784,7 +784,7 @@ def main(argv=None) -> int:
 
     params = strict_params() if args.strict else loose_params()
     date = resolve_twse_date(args.date or last_tw_session_yyyymmdd())
-    pool = max(args.limit, args.pool if args.max_price else args.limit)
+    pool = 0 if args.limit <= 0 else max(args.limit, args.pool if args.max_price else args.limit)
     print(
         f"universe date={date} limit={args.limit} days={args.days} range={args.range_} "
         f"strict={args.strict} max_price={args.max_price}"
