@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from tw_1h_stack_ma60 import (  # noqa: E402
     TPE,
+    above_ma60_at,
     bar_close_time,
     current_setup,
     detect_signals,
@@ -25,6 +26,7 @@ from tw_1h_stack_ma60 import (  # noqa: E402
     next_scan_time,
     setup_at,
     sma,
+    stacked_at,
     Signal,
 )
 
@@ -103,6 +105,7 @@ def test_reclaim_ma60_while_stacked() -> None:
     assert close[-1] > ma60[-1]
     sigs = detect_signals(df)
     assert sigs[-1].idx == len(df) - 1
+    assert not above_ma60_at(len(df) - 2, close, ma60)
     assert sigs[-1].close > sigs[-1].ma60
     assert sigs[-1].ma5 > sigs[-1].ma10 > sigs[-1].ma20
 
@@ -114,25 +117,27 @@ def test_no_repeat_while_already_standing() -> None:
     assert len(sigs) == 1
 
 
-def test_stack_forms_while_already_above_ma60() -> None:
-    """價已在 MA60 上，短均交叉成 5>10>20 才通知。"""
+def test_stack_forms_while_already_above_ma60_is_not_a_signal() -> None:
+    """價已在 MA60 上，短均才交叉成 5>10>20 → 不算。"""
     n = 80
     closes = np.full(n, 100.0)
-    # 先讓短均糾結：後半段微幅向下再向上
     closes[:60] = 100 + 0.05 * np.arange(60)
-    closes[60:70] = closes[59] - 0.4 * np.arange(1, 11)  # 短均翻空，但仍高於 MA60
-    closes[70:] = closes[69] + 0.8 * np.arange(1, n - 69)  # 再拉，短均轉多
+    closes[60:70] = closes[59] - 0.4 * np.arange(1, 11)
+    closes[70:] = closes[69] + 0.8 * np.arange(1, n - 69)
     df = ohlc_from_close(closes)
-    sigs = detect_signals(df)
-    assert sigs
-    last = sigs[-1]
-    assert last.idx >= 70
-    assert last.ma5 > last.ma10 > last.ma20
-    assert last.close > last.ma60
-    # 轉多那根的前一根還沒排列
     close = df["Close"].to_numpy(float)
     ma5, ma10, ma20, ma60 = sma(close, 5), sma(close, 10), sma(close, 20), sma(close, 60)
-    assert not setup_at(last.idx - 1, close, ma5, ma10, ma20, ma60)
+    sigs = detect_signals(df)
+    for sig in sigs:
+        assert above_ma60_at(sig.idx, close, ma60)
+        assert not above_ma60_at(sig.idx - 1, close, ma60)
+    found_already_up = False
+    for i in range(70, n):
+        if stacked_at(i, ma5, ma10, ma20) and above_ma60_at(i, close, ma60) and above_ma60_at(i - 1, close, ma60):
+            found_already_up = True
+            assert i not in {s.idx for s in sigs}
+            break
+    assert found_already_up
 
 
 def test_below_ma60_is_not_current() -> None:
@@ -212,7 +217,7 @@ def main() -> int:
         test_first_valid_ma60_bar_is_a_signal,
         test_reclaim_ma60_while_stacked,
         test_no_repeat_while_already_standing,
-        test_stack_forms_while_already_above_ma60,
+        test_stack_forms_while_already_above_ma60_is_not_a_signal,
         test_below_ma60_is_not_current,
         test_current_setup_when_standing,
         test_filter_recent_keeps_last_n,

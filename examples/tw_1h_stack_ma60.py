@@ -3,8 +3,8 @@
 
 條件（小時 K 收盤）：
   • MA5 > MA10 > MA20
-  • 收盤 > MA60
-  • 上一根還沒同時滿足（剛形成才通知，避免每小時洗版）
+  • 這一根收盤站上 MA60（收盤 > MA60）
+  • 上一根收盤還沒站上 MA60
 
 成交額前 200、股價 < 1000（跟 1h 破底翻同一池）。
 每根小時 K 收盤後掃一次；GitHub Actions 在盤中整點代跑。
@@ -93,6 +93,23 @@ class Hit:
 # ---------------------------------------------------------------------------
 
 
+def stacked_at(i: int, ma5: np.ndarray, ma10: np.ndarray, ma20: np.ndarray) -> bool:
+    if i < 0 or i >= len(ma5):
+        return False
+    vals = (ma5[i], ma10[i], ma20[i])
+    if np.isnan(vals).any():
+        return False
+    return bool(ma5[i] > ma10[i] > ma20[i])
+
+
+def above_ma60_at(i: int, close: np.ndarray, ma60: np.ndarray) -> bool:
+    if i < 0 or i >= len(close):
+        return False
+    if np.isnan(close[i]) or np.isnan(ma60[i]):
+        return False
+    return bool(close[i] > ma60[i])
+
+
 def setup_at(
     i: int,
     close: np.ndarray,
@@ -101,16 +118,11 @@ def setup_at(
     ma20: np.ndarray,
     ma60: np.ndarray,
 ) -> bool:
-    if i < 0 or i >= len(close):
-        return False
-    vals = (close[i], ma5[i], ma10[i], ma20[i], ma60[i])
-    if np.isnan(vals).any():
-        return False
-    return bool(ma5[i] > ma10[i] > ma20[i] and close[i] > ma60[i])
+    return stacked_at(i, ma5, ma10, ma20) and above_ma60_at(i, close, ma60)
 
 
 def detect_signals(df: pd.DataFrame) -> List[Signal]:
-    """剛形成：本根多頭排列且站上 MA60，上一根還沒同時滿足。"""
+    """本根多頭排列且站上 MA60，上一根收盤還沒站上 MA60。"""
     if df is None or len(df) < 61:
         return []
     close = df["Close"].to_numpy(float)
@@ -120,8 +132,10 @@ def detect_signals(df: pd.DataFrame) -> List[Signal]:
     ma60 = sma(close, 60)
     out: List[Signal] = []
     for i in range(1, len(close)):
-        if setup_at(i, close, ma5, ma10, ma20, ma60) and not setup_at(
-            i - 1, close, ma5, ma10, ma20, ma60
+        if (
+            stacked_at(i, ma5, ma10, ma20)
+            and above_ma60_at(i, close, ma60)
+            and not above_ma60_at(i - 1, close, ma60)
         ):
             out.append(
                 Signal(
@@ -590,7 +604,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 1h · MA5&gt;MA10&gt;MA20 且站上 MA60</h1>
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
-<br/>小時 K 收盤同時滿足多頭排列與收盤 &gt; MA60，且上一根還沒同時滿足才算一筆（剛形成）。
+<br/>小時 K 收盤：MA5&gt;MA10&gt;MA20，且<strong>上一根還沒站上 MA60、這一根才站上</strong>。
 卡片右上是訊號後下一個交易日收盤報酬（還沒走完就顯示站上 MA60 幅度）。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -930,7 +944,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--days", type=int, default=0, help="scan 子命令：進場落在最近 N 日")
     sub = p.add_subparsers(dest="cmd")
 
-    s = sub.add_parser("scan", help="回看最近 N 日剛形成的訊號（不推播）")
+    s = sub.add_parser("scan", help="回看最近 N 日站上 MA60 的訊號（不推播）")
     add_common(s)
     s.add_argument("--days", type=int, default=14)
     s.set_defaults(func=cmd_scan)
