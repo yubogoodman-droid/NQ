@@ -84,6 +84,35 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## 台股 1 小時 K：5/10/20 多頭排列站上 MA60
+
+小時 K 收盤同時滿足 **MA5 > MA10 > MA20** 且 **收盤 > MA60**，而且上一根還沒同時成立，才推 Telegram（剛形成才叫，避免已站上的股票每小時洗版）。
+
+池子跟破底翻一樣：成交額前 200、股價 < 1000。GitHub Actions 在台北 10:03 / 11:03 / 12:03 / 13:03 / 13:33 代跑；本機也可以自己掛著。
+
+```bash
+# 測 Telegram（憑證放 tg_config.env，勿提交）
+python3 examples/tw_1h_stack_ma60.py --test
+
+# 只掃剛收盤的 1～2 根（盤後 / Actions）
+python3 examples/tw_1h_stack_ma60.py --dry-run --once
+python3 examples/tw_1h_stack_ma60.py --once
+
+# 等到下一根小時 K 收盤再掃
+python3 examples/tw_1h_stack_ma60.py
+
+# 現在已經多頭排列且站上 MA60 的名單
+python3 examples/tw_1h_stack_ma60.py --now
+
+# 近兩週剛形成的訊號
+python3 examples/tw_1h_stack_ma60.py scan --days 14
+
+# 單元測試（不打網路）
+python3 examples/test_tw_1h_stack_ma60.py
+```
+
+排程推播請在 repo 設定 GitHub Secrets：`TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID`（跟 NQ 破底翻同一組即可）。沒填的話 Actions 仍會掃，只印在 log。
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
