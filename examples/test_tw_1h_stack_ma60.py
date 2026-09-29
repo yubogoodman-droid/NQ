@@ -18,6 +18,7 @@ from tw_1h_stack_ma60 import (  # noqa: E402
     current_setup,
     detect_signals,
     drop_forming,
+    fill_fwd,
     filter_recent,
     hit_key,
     Hit,
@@ -195,6 +196,16 @@ def test_hit_key_stable() -> None:
     assert k1.startswith("2330.TW|")
 
 
+def test_fill_fwd_uses_next_sessions() -> None:
+    df = ohlc_from_close(uptrend_closes(80))
+    sig = detect_signals(df)[0]
+    hit = fill_fwd(Hit({"code": "2330", "name": "台積電", "symbol": "2330.TW"}, sig, df))
+    assert hit.fwd_1d is not None
+    assert hit.fwd_3d is not None
+    # 上升數列，隔日收盤應高於進場
+    assert hit.fwd_1d > 0
+
+
 def main() -> int:
     tests = [
         test_setup_needs_stack_and_ma60,
@@ -208,6 +219,7 @@ def main() -> int:
         test_drop_forming_hourly_and_1330,
         test_next_scan_skips_weekend,
         test_hit_key_stable,
+        test_fill_fwd_uses_next_sessions,
     ]
     failed = 0
     for fn in tests:

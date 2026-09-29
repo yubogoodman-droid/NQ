@@ -14,7 +14,7 @@
     python3 examples/tw_1h_stack_ma60.py --once
     python3 examples/tw_1h_stack_ma60.py              # 等到下一根 1h 收盤再掃
     python3 examples/tw_1h_stack_ma60.py --now        # 現在已站上的名單
-    python3 examples/tw_1h_stack_ma60.py scan --days 14
+    python3 examples/tw_1h_stack_ma60.py scan --days 7 --pages
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 import traceback
@@ -50,13 +51,19 @@ from scan_tw_ma_reclaim import (  # noqa: E402
     last_tw_session_yyyymmdd,
     resolve_twse_date,
 )
-from tw_1h_reclaim import fetch_yahoo_1h, sma  # noqa: E402
+from tw_1h_reclaim import (  # noqa: E402
+    _fwd_pct,
+    _session_close_indices,
+    fetch_yahoo_1h,
+    sma,
+)
 
 CONFIG_ENV = REPO / "tg_config.env"
 if not CONFIG_ENV.exists():
     CONFIG_ENV = Path(__file__).resolve().parent / "tg_config.env"
 SEEN_PATH = REPO / "output" / "tw_1h_stack_ma60_seen.json"
 PAGES = REPO / "docs" / "tw-1h-stack-ma60" / "index.html"
+PAGES_7D = REPO / "docs" / "tw-1h-stack-ma60-7d" / "index.html"
 MA_COLORS = {5: "#f0c14b", 10: "#79c0ff", 20: "#f472b6", 60: "#e6edf3"}
 SCAN_LAG = timedelta(minutes=2)
 HOUR_CLOSES = ((10, 0), (11, 0), (12, 0), (13, 0), (13, 30))
@@ -77,6 +84,9 @@ class Hit:
     row: dict
     signal: Signal
     df: pd.DataFrame
+    fwd_1d: Optional[float] = None
+    fwd_3d: Optional[float] = None
+    fwd_5d: Optional[float] = None
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +193,40 @@ def filter_entry_window(df: pd.DataFrame, signals: Sequence[Signal], days: int) 
         return list(signals)
     start = df.index[-1] - pd.Timedelta(days=days)
     return [s for s in signals if df.index[s.idx] >= start]
+
+
+def fill_fwd(hit: Hit) -> Hit:
+    close = hit.df["Close"].to_numpy(float)
+    ends = _session_close_indices(hit.df.index)
+    hit.fwd_1d = _fwd_pct(close, ends, hit.signal.idx, 1)
+    hit.fwd_3d = _fwd_pct(close, ends, hit.signal.idx, 3)
+    hit.fwd_5d = _fwd_pct(close, ends, hit.signal.idx, 5)
+    return hit
+
+
+def summarize_fwd(hits: Sequence[Hit]) -> dict:
+    def _avg(attr: str) -> tuple[Optional[float], int, int]:
+        xs = [getattr(h, attr) for h in hits if getattr(h, attr) is not None]
+        if not xs:
+            return None, 0, 0
+        return float(sum(xs) / len(xs)), len(xs), sum(1 for x in xs if x > 0)
+
+    avg1, n1, w1 = _avg("fwd_1d")
+    avg3, n3, w3 = _avg("fwd_3d")
+    avg5, n5, w5 = _avg("fwd_5d")
+    return {
+        "count": len(hits),
+        "names": len({h.row["code"] for h in hits}),
+        "fwd_1d": avg1,
+        "fwd_1d_n": n1,
+        "fwd_1d_wr": 100.0 * w1 / n1 if n1 else 0.0,
+        "fwd_3d": avg3,
+        "fwd_3d_n": n3,
+        "fwd_3d_wr": 100.0 * w3 / n3 if n3 else 0.0,
+        "fwd_5d": avg5,
+        "fwd_5d_n": n5,
+        "fwd_5d_wr": 100.0 * w5 / n5 if n5 else 0.0,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -410,36 +454,106 @@ def fmt_hit(hit: Hit) -> str:
     )
 
 
+def _git_branch() -> str:
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=REPO,
+            text=True,
+        )
+        return out.strip() or "main"
+    except Exception:  # noqa: BLE001
+        return "main"
+
+
+def write_view_html(src: Path) -> Path:
+    src = src.resolve()
+    rel = src.parent.relative_to(REPO).as_posix()
+    base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{_git_branch()}/{rel}/"
+    text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    out = src.with_name("view.html")
+    out.write_text(text, encoding="utf-8")
+    return out
+
+
+def _fmt_fwd(value: Optional[float]) -> str:
+    if value is None:
+        return "—"
+    return f"{value * 100:+.2f}%"
+
+
+def _pnl_cls(value: Optional[float]) -> str:
+    if value is None or value == 0:
+        return "pnl-flat"
+    return "pnl-win" if value > 0 else "pnl-loss"
+
+
+def dump_hits_json(path: Path, hits: List[Hit], stats: dict, extra: dict) -> Path:
+    rows = []
+    for hit in hits:
+        sig = hit.signal
+        ts = hit.df.index[sig.idx]
+        rows.append(
+            {
+                "code": hit.row["code"],
+                "name": hit.row.get("name"),
+                "symbol": hit.row.get("symbol"),
+                "time": str(ts),
+                "close": sig.close,
+                "ma5": sig.ma5,
+                "ma10": sig.ma10,
+                "ma20": sig.ma20,
+                "ma60": sig.ma60,
+                "above_ma60_pct": (sig.close / sig.ma60 - 1.0) if sig.ma60 else None,
+                "fwd_1d": hit.fwd_1d,
+                "fwd_3d": hit.fwd_3d,
+                "fwd_5d": hit.fwd_5d,
+            }
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"stats": stats, "extra": extra, "hits": rows}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return path
+
+
 def write_html(path: Path, hits: List[Hit], universe: List[dict], period: str, date: str) -> Path:
+    stats = summarize_fwd(hits)
     cards: List[str] = []
     for i, hit in enumerate(hits, 1):
         sig = hit.signal
         ts = hit.df.index[sig.idx]
-        img_name = f"t{i:02d}_{hit.row['code']}_{ts.strftime('%m%d_%H%M')}.png"
+        img_name = f"t{i:03d}_{hit.row['code']}_{ts.strftime('%m%d_%H%M')}.png"
         draw_hit_png(hit, path.parent / "img" / img_name)
         ext = (sig.close / sig.ma60 - 1.0) * 100 if sig.ma60 else 0.0
         label = f"{hit.row['code']} {hit.row.get('name', '')}".strip()
+        show_fwd = hit.fwd_1d is not None
+        headline = hit.fwd_1d if show_fwd else ext / 100.0
+        headline_txt = _fmt_fwd(hit.fwd_1d) if show_fwd else f"{ext:+.2f}%"
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
             f"<div class='card-title'><span class='trade-no'>#{i} · {escape(label)}</span>"
             f"<span class='trade-time'>{escape(ts.strftime('%Y-%m-%d %H:%M'))}</span></div>"
-            f"<div class='card-pnl pnl-win'>{ext:+.2f}%</div>"
+            f"<div class='card-pnl {_pnl_cls(headline)}'>{headline_txt}</div>"
             "</header>"
             f"<div class='tags'><span class='tag tag-info'>{escape(hit.row['symbol'])}</span>"
-            f"<span class='tag'>MA5 {sig.ma5:.2f}</span>"
-            f"<span class='tag'>MA10 {sig.ma10:.2f}</span>"
-            f"<span class='tag'>MA20 {sig.ma20:.2f}</span>"
-            f"<span class='tag'>MA60 {sig.ma60:.2f}</span></div>"
+            f"<span class='tag'>+1d {_fmt_fwd(hit.fwd_1d)}</span>"
+            f"<span class='tag'>+3d {_fmt_fwd(hit.fwd_3d)}</span>"
+            f"<span class='tag'>+5d {_fmt_fwd(hit.fwd_5d)}</span></div>"
             "<pre class='trade-detail'>"
             f"close {sig.close:.2f}  站上 MA60 {ext:+.2f}%\n"
-            f"MA5 {sig.ma5:.2f} > MA10 {sig.ma10:.2f} > MA20 {sig.ma20:.2f}"
+            f"MA5 {sig.ma5:.2f} > MA10 {sig.ma10:.2f} > MA20 {sig.ma20:.2f}  MA60 {sig.ma60:.2f}\n"
+            f"fwd +1d {_fmt_fwd(hit.fwd_1d)}  +3d {_fmt_fwd(hit.fwd_3d)}  +5d {_fmt_fwd(hit.fwd_5d)}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
             "</article>"
         )
     cutoff = universe[-1]["amount"] / 1e8 if universe else 0
+    avg1 = _fmt_fwd(stats["fwd_1d"])
+    avg3 = _fmt_fwd(stats["fwd_3d"])
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -456,7 +570,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 .trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}}
 .card-header{{display:flex;justify-content:space-between;gap:10px}}
 .trade-no{{font-weight:700}} .trade-time{{font-size:12px;color:#8b949e}}
-.card-pnl{{font-weight:700}} .pnl-win{{color:#00c805}}
+.card-pnl{{font-weight:700}} .pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}} .pnl-flat{{color:#8b949e}}
 .tags{{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}}
 .tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#79c0ff}}
 .trade-detail{{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}}
@@ -466,10 +580,14 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 1h · MA5&gt;MA10&gt;MA20 且站上 MA60</h1>
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
-<br/>小時 K 收盤同時滿足多頭排列與收盤 &gt; MA60，且上一根還沒同時滿足才算一筆（剛形成）。</p>
+<br/>小時 K 收盤同時滿足多頭排列與收盤 &gt; MA60，且上一根還沒同時滿足才算一筆（剛形成）。
+卡片右上是訊號後下一個交易日收盤報酬（還沒走完就顯示站上 MA60 幅度）。</p>
 <div class="cards">
-<div class="card">筆數<b>{len(hits)}</b></div>
-<div class="card">標的<b>{len({h.row['code'] for h in hits})}</b></div>
+<div class="card">筆數<b>{stats['count']}</b></div>
+<div class="card">標的<b>{stats['names']}</b></div>
+<div class="card">+1d 勝率<b>{stats['fwd_1d_wr']:.0f}%</b></div>
+<div class="card">平均 +1d<b class="{_pnl_cls(stats['fwd_1d'])}">{avg1}</b></div>
+<div class="card">平均 +3d<b class="{_pnl_cls(stats['fwd_3d'])}">{avg3}</b></div>
 </div>
 </section>
 {''.join(cards) or "<div class='empty'>這段期間沒有訊號</div>"}
@@ -561,7 +679,7 @@ def collect_hits(
             sig = current_setup(df)
             if sig is None:
                 continue
-            hits.append(Hit(row, sig, df))
+            hits.append(fill_fwd(Hit(row, sig, df)))
             continue
         sigs = detect_signals(df)
         if days:
@@ -569,7 +687,7 @@ def collect_hits(
         if lookback_bars:
             sigs = filter_recent(df, sigs, lookback_bars)
         for sig in sigs:
-            hits.append(Hit(row, sig, df))
+            hits.append(fill_fwd(Hit(row, sig, df)))
     hits.sort(key=lambda h: h.df.index[h.signal.idx])
     return hits
 
@@ -638,7 +756,12 @@ def wait_next_close() -> None:
 
 
 def print_hits(hits: Sequence[Hit], title: str) -> None:
-    print(f"{title}: {len(hits)} 筆 / {len({h.row['code'] for h in hits})} 檔")
+    stats = summarize_fwd(hits)
+    print(
+        f"{title}: {stats['count']} 筆 / {stats['names']} 檔  "
+        f"+1d {_fmt_fwd(stats['fwd_1d'])} WR={stats['fwd_1d_wr']:.0f}%  "
+        f"+3d {_fmt_fwd(stats['fwd_3d'])}"
+    )
     for i, hit in enumerate(hits, 1):
         sig = hit.signal
         ts = hit.df.index[sig.idx]
@@ -646,8 +769,8 @@ def print_hits(hits: Sequence[Hit], title: str) -> None:
         print(
             f"  [{i}] {hit.row['code']} {hit.row.get('name', '')} "
             f"{ts.strftime('%m-%d %H:%M')} close={sig.close:.2f} "
-            f"MA5/10/20={sig.ma5:.2f}/{sig.ma10:.2f}/{sig.ma20:.2f} "
-            f"MA60={sig.ma60:.2f} {ext:+.2f}%"
+            f"MA60={sig.ma60:.2f} {ext:+.2f}%  "
+            f"+1d {_fmt_fwd(hit.fwd_1d)} +3d {_fmt_fwd(hit.fwd_3d)}"
         )
 
 
@@ -705,12 +828,26 @@ def run_scan_round(
         print(f"notified={sent} dry_run={dry_run}", flush=True)
 
     html_path = Path(args.html).resolve() if getattr(args, "html", "") else None
+    days = getattr(args, "days", 0) or 0
     if html_path is None and getattr(args, "pages", False):
-        html_path = PAGES
+        html_path = PAGES_7D if days == 7 else PAGES
     if html_path:
-        period = f"{'now' if now_only else (str(getattr(args, 'days', 0) or 'live') + 'd')} · Yahoo {args.range_} 1h"
+        period = f"{'now' if now_only else (str(days or 'live') + 'd')} · Yahoo {args.range_} 1h"
+        if args.max_price:
+            period += f" · 股價<{args.max_price:g}"
         write_html(html_path, hits, universe, period, date)
+        write_view_html(html_path)
+        extra = {
+            "date": date,
+            "days": days,
+            "range": args.range_,
+            "limit": args.limit,
+            "max_price": args.max_price,
+            "generated": datetime.now(TPE).isoformat(timespec="seconds"),
+        }
+        dump_hits_json(html_path.with_name("hits.json"), hits, summarize_fwd(hits), extra)
         print(f"html={html_path}")
+        print(f"view={html_path.with_name('view.html')}")
     return 0
 
 
