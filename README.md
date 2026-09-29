@@ -116,6 +116,10 @@ python3 examples/test_tw_1h_stack_ma60.py
 
 週報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma60-20bb/docs/tw-1h-stack-ma60-7d/view.html
 
+2026-08-31 → 09-29 近一個月：**154 筆、109 檔**。已走完隔日勝率 **50.3%**，平均 **+0.86%**；+3d 勝率 **56.1%** 平均 **+1.77%**；+5d 勝率 **64.4%** 平均 **+3.77%**。
+
+月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma60-20bb/docs/tw-1h-stack-ma60-30d/view.html
+
 排程推播請在 repo 設定 GitHub Secrets：`TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID`（跟 NQ 破底翻同一組即可）。沒填的話 Actions 仍會掃，只印在 log。
 
 ## 幣安黏帶三幕 Telegram
