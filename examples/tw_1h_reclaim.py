@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """台股 1h 破底翻（元晶型）— 認定一波後，破底 36 小時內收盤站上 MA5/10/20 發訊號。
 
-預設對齊 6443 元晶 2026-09-16 那波（深度 4.4%、下面 9 根、0 假站、隔根翻上、低點彈 3.1%）:
+預設對齊 6443 元晶 2026-09-16 那波（深度 4.4%、下面 9 根、0 假站、隔根翻上、低點彈 3.1%）；
+下面天數放寬到 36 根，讓 6456 GIS-KY 那種先磨再翻也算：
   • 1h 收盤從 MA20 上方跌到下方，開始算。
-  • 在下面待 6～16 根。中間不准假站上。
+  • 在下面待 6～36 根。中間不准假站上。
   • 之後要再有一根收盤站回 MA20 這波才算數。
   • 相對過程中最高 MA20，最低點深度 ≥ 3.5%。
   • 最低點必須是近 16 根新低（破底）。更高低點的 W 不算。
@@ -55,7 +56,7 @@ MA_COLORS = {5: "#f0c14b", 10: "#79c0ff", 20: "#f472b6"}
 @dataclass(frozen=True)
 class ReclaimParams:
     min_below: int = 6
-    max_below: int = 16
+    max_below: int = 36
     max_fakes: int = 0
     min_depth: float = 0.035
     min_bounce: float = 0.03
@@ -681,7 +682,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 1h 破底翻 · {mode}版 · 成交額前 {len(universe)}</h1>
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
-<br/>跌破 MA20 後待 6～16 根（不准假站上），深度 ≥ 3.5%，最低點為近 16 根新低，破底與翻上不同根，從低點至少彈 3%，再站回 MA20。
+<br/>跌破 MA20 後待 6～36 根（不准假站上），深度 ≥ 3.5%，最低點為近 16 根新低，破底與翻上不同根，從低點至少彈 3%，再站回 MA20。
 破底後 36 根內第一根收盤 &gt; MA5 / MA10 / MA20 進場。
 回測出場：停在破底低、2R、或 20 根時間停。加總％是各筆報酬相加，不是組合複利。</p>
 <p class="muted">漏斗：跌破 {fun.get('cross_below', 0)} → 成波 {fun.get('wave_ok', 0)} → 進場 {fun.get('entry', 0)}

@@ -218,6 +218,34 @@ def test_yuanjing_like_passes() -> None:
     assert s.entry_price / s.wave.trough_low - 1.0 >= 0.03
 
 
+def test_long_grind_still_counts() -> None:
+    """GIS-KY 那種：下面磨超過 16 根，36 根內翻上仍算。"""
+    warmup = [100.0] * 30
+    below = [98.8 - i * 0.12 for i in range(20)]
+    below_lows = [c - 0.35 for c in below]
+    below_lows[-1] = 95.4
+    reclaim = [99.2]
+    df = ohlc_from_close(warmup + below + reclaim, lows=[c - 0.3 for c in warmup] + below_lows + [98.0])
+    funnel: dict = {}
+    sigs = detect_signals(df, loose_params(), funnel=funnel)
+    assert funnel.get("wave_ok") == 1
+    assert len(sigs) == 1
+    assert sigs[0].wave.bars_below == 20
+    assert sigs[0].entry_idx > sigs[0].wave.trough_idx
+
+
+def test_too_long_still_timeout() -> None:
+    warmup = [100.0] * 30
+    below = [98.5] * 38
+    below_lows = [98.0] * 37 + [95.4]
+    reclaim = [101.0]
+    df = ohlc_from_close(warmup + below + reclaim, lows=[c - 0.3 for c in warmup] + below_lows + [100.4])
+    funnel: dict = {}
+    sigs = detect_signals(df, loose_params(), funnel=funnel)
+    assert sigs == []
+    assert funnel.get("timeout", 0) >= 1
+
+
 def test_bounce_too_small() -> None:
     closes, lows = valid_closes()
     df = ohlc_from_close(closes, lows=lows)
@@ -315,6 +343,8 @@ def main() -> int:
     test_entry_must_be_within_36_of_trough()
     test_strict_rejects_fake_stand()
     test_yuanjing_like_passes()
+    test_long_grind_still_counts()
+    test_too_long_still_timeout()
     test_bounce_too_small()
     test_same_bar_trough_skipped()
     test_simulate_stop_and_target()
