@@ -104,11 +104,9 @@ python3 examples/tw_1h_stack_ma60.py
 # 現在已經多頭排列且站上 MA60 的名單
 python3 examples/tw_1h_stack_ma60.py --now
 
-# 近一週回測（每筆一張圖）
+# 近一週 / 近一個月回測（每筆一張圖）
 python3 examples/tw_1h_stack_ma60.py scan --days 7 --pages
-
-# 近兩週剛形成的訊號
-python3 examples/tw_1h_stack_ma60.py scan --days 14
+python3 examples/tw_1h_stack_ma60.py scan --days 30 --pages
 
 # 單元測試（不打網路）
 python3 examples/test_tw_1h_stack_ma60.py

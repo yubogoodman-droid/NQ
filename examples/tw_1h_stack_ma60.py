@@ -14,7 +14,7 @@
     python3 examples/tw_1h_stack_ma60.py --once
     python3 examples/tw_1h_stack_ma60.py              # 等到下一根 1h 收盤再掃
     python3 examples/tw_1h_stack_ma60.py --now        # 現在已站上的名單
-    python3 examples/tw_1h_stack_ma60.py scan --days 7 --pages
+    python3 examples/tw_1h_stack_ma60.py scan --days 30 --pages
 """
 
 from __future__ import annotations
@@ -63,6 +63,7 @@ if not CONFIG_ENV.exists():
 SEEN_PATH = REPO / "output" / "tw_1h_stack_ma60_seen.json"
 PAGES = REPO / "docs" / "tw-1h-stack-ma60" / "index.html"
 PAGES_7D = REPO / "docs" / "tw-1h-stack-ma60-7d" / "index.html"
+PAGES_30D = REPO / "docs" / "tw-1h-stack-ma60-30d" / "index.html"
 MA_COLORS = {5: "#f0c14b", 10: "#79c0ff", 20: "#f472b6", 60: "#e6edf3"}
 SCAN_LAG = timedelta(minutes=2)
 HOUR_CLOSES = ((10, 0), (11, 0), (12, 0), (13, 0), (13, 30))
@@ -854,7 +855,12 @@ def run_scan_round(
     html_path = Path(args.html).resolve() if getattr(args, "html", "") else None
     days = getattr(args, "days", 0) or 0
     if html_path is None and getattr(args, "pages", False):
-        html_path = PAGES_7D if days == 7 else PAGES
+        if days == 7:
+            html_path = PAGES_7D
+        elif days >= 28:
+            html_path = PAGES_30D
+        else:
+            html_path = PAGES
     if html_path:
         period = f"{'now' if now_only else (str(days or 'live') + 'd')} · Yahoo {args.range_} 1h"
         if args.max_price:
