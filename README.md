@@ -114,6 +114,10 @@ python3 examples/tw_1h_stack_ma60.py scan --days 14
 python3 examples/test_tw_1h_stack_ma60.py
 ```
 
+2026-09-23 → 09-29、成交額前 200 且**股價 < 1000**：**113 筆、97 檔**。已走完隔日的 57 筆勝率 **52.6%**，平均 **+1.56%**（9/25–9/28 連假，+3d 還沒滿）。
+
+週報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma60-20bb/docs/tw-1h-stack-ma60-7d/view.html
+
 排程推播請在 repo 設定 GitHub Secrets：`TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID`（跟 NQ 破底翻同一組即可）。沒填的話 Actions 仍會掃，只印在 log。
 
 ## 幣安黏帶三幕 Telegram

@@ -52,7 +52,6 @@ from scan_tw_ma_reclaim import (  # noqa: E402
     resolve_twse_date,
 )
 from tw_1h_reclaim import (  # noqa: E402
-    _fwd_pct,
     _session_close_indices,
     fetch_yahoo_1h,
     sma,
@@ -196,11 +195,22 @@ def filter_entry_window(df: pd.DataFrame, signals: Sequence[Signal], days: int) 
 
 
 def fill_fwd(hit: Hit) -> Hit:
-    close = hit.df["Close"].to_numpy(float)
-    ends = _session_close_indices(hit.df.index)
-    hit.fwd_1d = _fwd_pct(close, ends, hit.signal.idx, 1)
-    hit.fwd_3d = _fwd_pct(close, ends, hit.signal.idx, 3)
-    hit.fwd_5d = _fwd_pct(close, ends, hit.signal.idx, 5)
+    """訊號日之後第 N 個交易日收盤報酬，不含當日稍後收盤。"""
+    df = hit.df
+    close = df["Close"].to_numpy(float)
+    entry_idx = hit.signal.idx
+    entry_date = df.index[entry_idx].date()
+    later_days = [i for i in _session_close_indices(df.index) if df.index[i].date() > entry_date]
+
+    def _at(sessions: int) -> Optional[float]:
+        if len(later_days) < sessions or close[entry_idx] == 0:
+            return None
+        nxt = later_days[sessions - 1]
+        return float(close[nxt] / close[entry_idx] - 1.0)
+
+    hit.fwd_1d = _at(1)
+    hit.fwd_3d = _at(3)
+    hit.fwd_5d = _at(5)
     return hit
 
 
