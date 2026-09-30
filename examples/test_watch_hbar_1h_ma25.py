@@ -12,13 +12,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from watch_hbar_1h_ma25 import (  # noqa: E402
     INTERVAL_MS,
     Params,
+    Trade,
     crossed_below_ma25,
     detect_at,
     detect_signals,
     drop_unclosed,
+    filter_universe,
     format_alert,
     indicators,
     key_of,
+    pages_path,
+    pick_chart_indices,
+    safe_name,
+    skip_overlap,
     simulate,
     sma,
     summarize,
@@ -179,6 +185,77 @@ def test_simulate_short_and_html(tmp_path: Path | None = None) -> None:
     assert any((path.parent / "img").glob("t01_*.png"))
 
 
+def test_filter_universe_keeps_liquid_and_hbar() -> None:
+    info = {
+        "symbols": [
+            {"symbol": "AAAUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL"},
+            {"symbol": "HBARUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL"},
+            {"symbol": "BTCUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL"},
+            {"symbol": "ETHBTC", "quoteAsset": "BTC", "status": "TRADING", "contractType": "PERPETUAL"},
+            {"symbol": "DEADUSDT", "quoteAsset": "USDT", "status": "BREAK", "contractType": "PERPETUAL"},
+            {"symbol": "IDXUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL", "underlyingType": "INDEX"},
+        ]
+    }
+    tickers = [
+        {"symbol": "AAAUSDT", "quoteVolume": "1000"},
+        {"symbol": "HBARUSDT", "quoteVolume": "100"},
+        {"symbol": "BTCUSDT", "quoteVolume": "9000000"},
+    ]
+    out = filter_universe(info, tickers, min_quote_vol=5_000_000)
+    assert out == ["HBARUSDT", "BTCUSDT"]
+
+
+def test_skip_overlap_and_chart_pick() -> None:
+    d = fake_break_then_fail()
+    sig = detect_signals(d)[0]
+    a = Trade(
+        symbol="AAAUSDT",
+        signal=sig,
+        entry_idx=10,
+        exit_idx=20,
+        entry=1.0,
+        exit=0.9,
+        stop=1.2,
+        target=0.6,
+        pnl_pct=0.10,
+        reason="time",
+        d=d,
+    )
+    b = Trade(
+        symbol="AAAUSDT",
+        signal=sig,
+        entry_idx=15,
+        exit_idx=25,
+        entry=1.0,
+        exit=1.1,
+        stop=1.2,
+        target=0.6,
+        pnl_pct=-0.10,
+        reason="stop",
+        d=d,
+    )
+    c = Trade(
+        symbol="HBARUSDT",
+        signal=sig,
+        entry_idx=12,
+        exit_idx=18,
+        entry=1.0,
+        exit=0.95,
+        stop=1.2,
+        target=0.6,
+        pnl_pct=0.05,
+        reason="time",
+        d=d,
+    )
+    kept = skip_overlap([b, a, c])
+    assert [(t.symbol, t.entry_idx) for t in kept] == [("AAAUSDT", 10), ("HBARUSDT", 12)]
+    ix = pick_chart_indices([a, b, c], max_charts=2)
+    assert 2 in ix  # pin HBAR
+    assert safe_name("HBARUSDT") == "HBARUSDT"
+    assert "_" in safe_name("A/B")
+    assert pages_path(universe=True, days=7, symbol="HBARUSDT").as_posix().endswith("binance-1h-fake-ma25-7d/index.html")
+
+
 def main() -> int:
     test_sma()
     test_drop_unclosed()
@@ -187,6 +264,8 @@ def main() -> int:
     test_already_below_does_not_refire()
     test_tight_ext_filter()
     test_simulate_short_and_html()
+    test_filter_universe_keeps_liquid_and_hbar()
+    test_skip_overlap_and_chart_pick()
     print("ok")
     return 0
 

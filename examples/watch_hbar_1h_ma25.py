@@ -15,6 +15,7 @@
   python3 examples/watch_hbar_1h_ma25.py --once --dry-run
   python3 examples/watch_hbar_1h_ma25.py
   python3 examples/watch_hbar_1h_ma25.py --backtest --days 60 --pages
+  python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
   python3 examples/test_watch_hbar_1h_ma25.py
 """
 from __future__ import annotations
@@ -24,6 +25,7 @@ import json
 import os
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from html import escape
@@ -43,6 +45,9 @@ INTERVAL = "1h"
 INTERVAL_MS = 3_600_000
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
 DEFAULT_SYMBOL = "HBARUSDT"
+MIN_QUOTE_VOL = 5_000_000
+KEEP = {DEFAULT_SYMBOL}
+MAX_CHARTS = 36
 
 # 對齊 HBAR 09-29 14:00
 LOOKBACK = 48
@@ -179,6 +184,93 @@ def bars_from_raw(raw: list) -> dict | None:
 def fetch_klines(sym: str, limit: int = 1500) -> dict | None:
     raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": INTERVAL, "limit": limit})
     return bars_from_raw(drop_unclosed(raw))
+
+
+def filter_universe(
+    info: dict,
+    tickers: list,
+    min_quote_vol: float = MIN_QUOTE_VOL,
+    keep: set[str] | None = None,
+) -> list[str]:
+    keep = keep or set(KEEP)
+    tmap = {t["symbol"]: t for t in tickers}
+    out = []
+    for s in info.get("symbols") or []:
+        if s.get("quoteAsset") != "USDT":
+            continue
+        if s.get("status") != "TRADING":
+            continue
+        if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
+            continue
+        if s.get("underlyingType") == "INDEX":
+            continue
+        sym = s["symbol"]
+        qv = float((tmap.get(sym) or {}).get("quoteVolume") or 0)
+        if qv < min_quote_vol and sym not in keep:
+            continue
+        out.append(sym)
+    return out
+
+
+def universe(min_quote_vol: float = MIN_QUOTE_VOL) -> list[str]:
+    info = get_json("/fapi/v1/exchangeInfo")
+    tickers = get_json("/fapi/v1/ticker/24hr")
+    return filter_universe(info, tickers, min_quote_vol=min_quote_vol)
+
+
+def skip_overlap(trades: list[Trade]) -> list[Trade]:
+    """同一標的持倉重疊時，只留先進場那筆。"""
+    kept: list[Trade] = []
+    last_exit: dict[str, int] = {}
+    for t in sorted(trades, key=lambda x: (x.symbol, x.entry_idx, x.exit_idx)):
+        prev = last_exit.get(t.symbol)
+        if prev is not None and t.entry_idx <= prev:
+            continue
+        kept.append(t)
+        last_exit[t.symbol] = t.exit_idx
+    return sorted(kept, key=lambda t: (int(t.d["t"][t.entry_idx]), t.symbol))
+
+
+def pick_chart_indices(
+    trades: list[Trade],
+    max_charts: int = MAX_CHARTS,
+    pin: tuple[str, ...] = (DEFAULT_SYMBOL,),
+) -> set[int]:
+    n = len(trades)
+    if n <= max_charts:
+        return set(range(n))
+    chosen: list[int] = []
+    for i, t in enumerate(trades):
+        if t.symbol in pin:
+            chosen.append(i)
+    ranked = sorted(range(n), key=lambda i: trades[i].pnl_pct, reverse=True)
+    half = max(1, (max_charts - len(chosen)) // 2)
+    for i in ranked:
+        if i in chosen:
+            continue
+        chosen.append(i)
+        if sum(1 for j in chosen if trades[j].symbol not in pin) >= half:
+            break
+    for i in reversed(ranked):
+        if i in chosen:
+            continue
+        chosen.append(i)
+        if len(chosen) >= max_charts:
+            break
+    return set(chosen[:max_charts])
+
+
+def safe_name(sym: str) -> str:
+    out = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in sym)
+    return out or "SYM"
+
+
+def pages_path(*, universe: bool, days: int, symbol: str) -> Path:
+    if universe:
+        return REPO / "docs" / f"binance-1h-fake-ma25-{days}d" / "index.html"
+    if symbol == DEFAULT_SYMBOL:
+        return PAGES
+    return REPO / "docs" / f"{symbol.lower()}-1h-ma25" / "index.html"
 
 
 def indicators(d: dict) -> dict:
@@ -350,6 +442,7 @@ def summarize(trades: list[Trade]) -> dict:
         "closed_win_rate": wr,
         "avg_pct": avg,
         "total_pct": total,
+        "symbols": len({t.symbol for t in trades}),
         "reasons": reasons,
         "fwd_4h": avg_fwd("fwd_4h"),
         "fwd_8h": avg_fwd("fwd_8h"),
@@ -489,7 +582,7 @@ def format_alert(sym: str, d: dict, sig: Signal) -> str:
     pk = hm(int(d["t"][sig.peak_i]))
     o, h, l, c = float(d["o"][sig.i]), float(d["h"][sig.i]), float(d["l"][sig.i]), sig.close
     return (
-        f"🔻 <b>HBAR 1h 假突破跌破 MA25</b>\n"
+        f"🔻 <b>1h 假突破跌破 MA25</b>\n"
         f"<b>{sym}</b>  收盤 {ts}（台北）\n"
         f"現價 {c:g}　OHLC {o:g} / {h:g} / {l:g} / {c:g}\n"
         f"MA25 {sig.ma25:g}　收盤低 {((c / sig.ma25) - 1) * 100:.2f}%\n"
@@ -574,19 +667,33 @@ def _fmt_fwd(value: Optional[float]) -> str:
     return f"{value * 100:+.2f}%"
 
 
-def write_html(path: Path, trades: list[Trade], stats: dict, extra: dict) -> Path:
+def write_html(
+    path: Path,
+    trades: list[Trade],
+    stats: dict,
+    extra: dict,
+    max_charts: int = MAX_CHARTS,
+) -> Path:
     cards = []
     img_dir = path.parent / "img"
     if img_dir.exists():
         for old in img_dir.glob("*.png"):
             old.unlink()
+    chart_ix = pick_chart_indices(trades, max_charts=max_charts)
+    pad = 3 if len(trades) >= 100 else 2
     for i, t in enumerate(trades, 1):
         et = hm(int(t.d["t"][t.entry_idx]))
         xt = hm(int(t.d["t"][t.exit_idx]))
         pk = hm(int(t.d["t"][t.signal.peak_i]))
         cls = "pnl-win" if t.pnl_pct > 0 else ("pnl-flat" if t.pnl_pct == 0 else "pnl-loss")
-        img_name = f"t{i:02d}_{t.symbol}_{et.replace(' ', '_').replace(':', '')}.png"
-        draw_chart(t.symbol, t.d, t.signal, str(img_dir / img_name), trade=t)
+        img_html = ""
+        if (i - 1) in chart_ix:
+            img_name = f"t{i:0{pad}d}_{safe_name(t.symbol)}_{et.replace(' ', '_').replace(':', '')}.png"
+            draw_chart(t.symbol, t.d, t.signal, str(img_dir / img_name), trade=t)
+            img_html = (
+                f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(t.symbol)}' "
+                "style='width:100%;display:block;border-radius:10px'/></div>"
+            )
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -604,17 +711,21 @@ def write_html(path: Path, trades: list[Trade], stats: dict, extra: dict) -> Pat
             f"exit {t.exit:g} {t.reason}  {t.pnl_pct * 100:+.2f}%\n"
             f"fwd +4h {_fmt_fwd(t.fwd_4h)}  +8h {_fmt_fwd(t.fwd_8h)}  +24h {_fmt_fwd(t.fwd_24h)}"
             "</pre>"
-            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(t.symbol)}' "
-            "style='width:100%;display:block;border-radius:10px'/></div>"
+            f"{img_html}"
             "</article>"
         )
     reasons = stats.get("reasons") or {}
     avg = stats["avg_pct"]
+    uni = bool(extra.get("universe"))
+    title_scope = "幣安流動永續" if uni else extra.get("symbol", DEFAULT_SYMBOL)
+    scanned_line = ""
+    if extra.get("scanned"):
+        scanned_line = f"掃 {extra['scanned']} 檔 · 原始訊號 {extra.get('raw_hits', stats['count'])} · "
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>HBAR 1h 假突破跌破 MA25 · {extra['days']} 天</title>
+<title>{escape(str(title_scope))} 1h 假突破跌破 MA25 · {extra['days']} 天</title>
 <style>
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -635,11 +746,11 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>HBAR 1h 假突破跌破 MA25 · 近 {extra['days']} 天</h1>
-<p class="muted">對齊 2026-09-29 14:00：假突破創 24 根新高、高點離 MA25 ≥ {extra['min_ext']*100:g}%，
+<h1>{escape(str(title_scope))} 1h 假突破跌破 MA25 · 近 {extra['days']} 天</h1>
+<p class="muted">對齊 2026-09-29 HBAR：假突破創 24 根新高、高點離 MA25 ≥ {extra['min_ext']*100:g}%，
 從高點回落 ≥ {extra['min_fail']*100:g}% 後，1h 收盤跌破 MA25 才算。
-<br/>收盤空；停在假突破高、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。加總％是各筆相加。
-<br/>{escape(extra['symbol'])} · 訊號 {stats['count']}
+<br/>收盤空；停在假突破高、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。同標的重疊不重做。加總％是各筆相加。
+<br/>{scanned_line}進場 {stats['count']} · 標的 {stats.get('symbols', extra.get('symbol', ''))}
 · 出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)}
 · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +4h {_fmt_fwd(stats.get('fwd_4h'))} · +8h {_fmt_fwd(stats.get('fwd_8h'))}
@@ -690,6 +801,18 @@ def dump_hits(path: Path, trades: list[Trade], stats: dict, extra: dict) -> Path
     return path
 
 
+def backtest_one(sym: str, days: int, p: Params, limit: int) -> tuple[str, list[Trade], int, str]:
+    raw = fetch_klines(sym, limit=limit)
+    if raw is None:
+        return sym, [], 0, "no data"
+    d = indicators(raw)
+    cutoff = int(d["t"][-1]) - days * 24 * INTERVAL_MS
+    start = next((i for i, ts in enumerate(d["t"]) if int(ts) >= cutoff), 0)
+    sigs = detect_signals(d, start=start, p=p)
+    trades = simulate(d, sigs, p=p, symbol=sym)
+    return sym, trades, len(sigs), hm(int(d["t"][start])) + " → " + hm(int(d["t"][-1]))
+
+
 def cmd_backtest(args) -> int:
     p = Params(
         min_ext=args.min_ext,
@@ -697,50 +820,77 @@ def cmd_backtest(args) -> int:
         target_r=args.target_r,
         time_bars=args.time_bars,
     )
-    limit = min(1500, max(260, args.days * 24 + 40))
-    print(f"抓 {args.symbol} 1h × {limit} …", flush=True)
-    raw = fetch_klines(args.symbol, limit=limit)
-    if raw is None:
-        print("沒資料", flush=True)
-        return 1
-    d = indicators(raw)
-    cutoff = int(d["t"][-1]) - args.days * 24 * INTERVAL_MS
-    start = next((i for i, ts in enumerate(d["t"]) if int(ts) >= cutoff), 0)
-    sigs = detect_signals(d, start=start, p=p)
-    trades = simulate(d, sigs, p=p, symbol=args.symbol)
+    limit = min(1500, max(260, args.days * 24 + 220))
+    if args.universe:
+        print("載入標的…", flush=True)
+        symbols = universe(min_quote_vol=args.min_quote_vol)
+    else:
+        symbols = [s.upper() for s in (args.symbols or [args.symbol])]
+    print(f"回測 {len(symbols)} 檔 1h × {limit}，近 {args.days} 天…", flush=True)
+    trades: list[Trade] = []
+    raw_hits = 0
+    span = ""
+    t0 = time.time()
+    workers = 1 if len(symbols) == 1 else 8
+    with ThreadPoolExecutor(workers) as ex:
+        futs = {ex.submit(backtest_one, s, args.days, p, limit): s for s in symbols}
+        done = 0
+        for fut in as_completed(futs):
+            done += 1
+            try:
+                sym, ts, nsig, sp = fut.result()
+            except Exception as e:
+                print("err", futs[fut], e, flush=True)
+                continue
+            trades.extend(ts)
+            raw_hits += nsig
+            if sp:
+                span = sp
+            if done % 40 == 0 or done == len(symbols):
+                print(f"  {done}/{len(symbols)}  訊號 {raw_hits}  {time.time()-t0:.0f}s", flush=True)
+    before = len(trades)
+    trades = skip_overlap(trades)
     stats = summarize(trades)
     extra = {
-        "symbol": args.symbol,
+        "symbol": symbols[0] if len(symbols) == 1 else "UNIVERSE",
+        "universe": bool(args.universe) or len(symbols) > 1,
         "days": args.days,
         "min_ext": p.min_ext,
         "min_fail": p.min_fail,
         "target_r": p.target_r,
         "time_bars": p.time_bars,
-        "bars": len(d["c"]),
-        "start": hm(int(d["t"][start])),
-        "end": hm(int(d["t"][-1])),
+        "scanned": len(symbols),
+        "raw_hits": raw_hits,
+        "overlap_dropped": before - len(trades),
+        "start": span.split(" → ")[0] if " → " in span else "",
+        "end": span.split(" → ")[-1] if span else "",
     }
     print(
-        f"{args.symbol} {args.days}d bars={len(d['c'])} {extra['start']} → {extra['end']}",
+        f"{extra['symbol']} {args.days}d scanned={len(symbols)} raw={raw_hits} "
+        f"taken={stats['count']} (drop overlap {extra['overlap_dropped']}) "
+        f"{extra['start']} → {extra['end']}",
         flush=True,
     )
     print(
-        f"signals={stats['count']} WR={stats['closed_win_rate']:.1f}% "
+        f"signals={stats['count']} symbols={stats['symbols']} WR={stats['closed_win_rate']:.1f}% "
         f"avg={stats['avg_pct']*100:+.2f}% total={stats['total_pct']*100:+.2f}% "
         f"{stats['reasons']}",
         flush=True,
     )
-    for i, t in enumerate(trades, 1):
+    show = trades[:40]
+    for i, t in enumerate(show, 1):
         print(
-            f"[{i}] {hm(int(d['t'][t.entry_idx]))} peak {hm(int(d['t'][t.signal.peak_i]))} "
+            f"[{i}] {t.symbol} {hm(int(t.d['t'][t.entry_idx]))} peak {hm(int(t.d['t'][t.signal.peak_i]))} "
             f"{t.reason} {t.pnl_pct*100:+.2f}% ext={t.signal.ext*100:.1f}% fail={t.signal.fail*100:.1f}%",
             flush=True,
         )
+    if len(trades) > 40:
+        print(f"  … 還有 {len(trades) - 40} 筆", flush=True)
     html_path = Path(args.html) if args.html else None
     if args.pages:
-        html_path = PAGES
+        html_path = pages_path(universe=extra["universe"], days=args.days, symbol=symbols[0])
     if html_path:
-        out = write_html(html_path, trades, stats, extra)
+        out = write_html(html_path, trades, stats, extra, max_charts=args.max_charts)
         write_view_html(out)
         dump_hits(out.with_name("hits.json"), trades, stats, extra)
         print(f"html={out}", flush=True)
@@ -754,9 +904,13 @@ def cmd_watch(args) -> int:
         return test_telegram()
     p = Params(min_ext=args.min_ext, min_fail=args.min_fail)
     seen = load_seen()
-    symbols = [s.upper() for s in (args.symbols or [DEFAULT_SYMBOL])]
+    if args.universe:
+        print("載入標的…", flush=True)
+        symbols = universe(min_quote_vol=args.min_quote_vol)
+    else:
+        symbols = [s.upper() for s in (args.symbols or [DEFAULT_SYMBOL])]
     print(
-        f"監看 {' '.join(symbols)} 1h：假突破後收盤跌破 MA25"
+        f"監看 {len(symbols)} 檔 1h：假突破後收盤跌破 MA25"
         f"（伸≥{p.min_ext*100:g}% 回落≥{p.min_fail*100:g}%）",
         flush=True,
     )
@@ -806,19 +960,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-ext", type=float, default=MIN_EXT, help="假突破高點相對 MA25 最少伸出去")
     p.add_argument("--min-fail", type=float, default=MIN_FAIL, help="從高點回到收盤最少回落")
     p.add_argument("--backtest", action="store_true", help="回測最近 N 天並可出 HTML")
+    p.add_argument("--universe", action="store_true", help="掃幣安流動 USDT 永續（全幣種）")
+    p.add_argument("--min-quote-vol", type=float, default=MIN_QUOTE_VOL, help="24h 成交額門檻，預設 500 萬")
     p.add_argument("--days", type=int, default=60)
     p.add_argument("--html", default="")
-    p.add_argument("--pages", action="store_true", help="寫到 docs/hbar-1h-ma25/index.html")
-    p.add_argument("--symbol", default=DEFAULT_SYMBOL, help="回測代號")
+    p.add_argument("--pages", action="store_true", help="寫到 docs/…/index.html")
+    p.add_argument("--symbol", default=DEFAULT_SYMBOL, help="回測代號（沒開 --universe 時）")
     p.add_argument("--target-r", type=float, default=TARGET_R)
     p.add_argument("--time-bars", type=int, default=TIME_BARS)
+    p.add_argument("--max-charts", type=int, default=MAX_CHARTS)
     return p
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     if args.backtest:
-        if not args.symbols:
+        if args.universe:
+            args.symbols = args.symbols or []
+        elif not args.symbols:
             args.symbols = [args.symbol]
         else:
             args.symbol = args.symbols[0]
