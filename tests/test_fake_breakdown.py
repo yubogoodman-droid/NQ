@@ -154,6 +154,13 @@ class FakeBreakdownTests(unittest.TestCase):
         self.assertEqual(float(first["volume"]), 500)
         self.assertAlmostEqual(float(first["close"]), 420.0)
 
+    def test_twse_holiday_index_is_not_a_session(self) -> None:
+        from examples.scan_tw_top50_spring import _twse_has_quotes
+
+        self.assertTrue(_twse_has_quotes({"stat": "OK", "tables": [{"data": [1]}]}))
+        self.assertFalse(_twse_has_quotes({"stat": "OK", "tables": []}))
+        self.assertFalse(_twse_has_quotes({"stat": "很抱歉，沒有符合條件的資料!", "tables": []}))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -68,17 +68,22 @@ def yahoo_symbol(code: str, market: str) -> str:
     return f"{code}.TW" if market == "tse" else f"{code}.TWO"
 
 
+def _twse_has_quotes(payload: dict | list) -> bool:
+    """IND 在中秋／教師節等休市日仍可能回 OK；個股表 ALLBUT0999 才準。"""
+    return isinstance(payload, dict) and payload.get("stat") == "OK" and bool(payload.get("tables"))
+
+
 def list_trading_days(end: str, n: int) -> list[str]:
     """從 end（YYYYMMDD）往回找 n 個上市交易日。"""
     day = datetime.strptime(end, "%Y%m%d")
     found: list[str] = []
-    for _ in range(21):
+    for _ in range(40):
         if day.weekday() < 5:
             ymd = day.strftime("%Y%m%d")
             payload = _get_json(
-                f"https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date={ymd}&type=IND&response=json"
+                f"https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date={ymd}&type=ALLBUT0999&response=json"
             )
-            if payload.get("stat") == "OK":
+            if _twse_has_quotes(payload):
                 found.append(ymd)
                 if len(found) >= n:
                     break
