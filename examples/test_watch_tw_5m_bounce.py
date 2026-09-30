@@ -456,6 +456,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "進場量" in text
     assert "突破量" in text
     assert "蓋子" in text
+    assert "data:image/png;base64," in text
     assert (path.parent / "img").exists()
 
 

@@ -18,6 +18,7 @@ Telegram 憑證放 tg_config.env（勿提交）:
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -725,6 +726,11 @@ def draw_signal_png(
     return path
 
 
+def png_data_uri(path: Path) -> str:
+    """htmlpreview 擋外連圖；把 PNG 嵌進 HTML 才看得到。"""
+    return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
 def write_html_report(
     path: Path,
     hits: list[tuple[dict, BounceSignal, BounceTrade | None, pd.DataFrame]],
@@ -738,7 +744,8 @@ def write_html_report(
         bt = df.index[sig.break_idx]
         label = f"{row['code']} {row.get('name') or ''}".strip()
         img_name = f"t{i:02d}_{row['code']}_{et.strftime('%m%d_%H%M')}.png"
-        draw_signal_png(df, sig, path.parent / "img" / img_name, label, trade=trade)
+        img_path = draw_signal_png(df, sig, path.parent / "img" / img_name, label, trade=trade)
+        img_src = png_data_uri(img_path)
         pnl = ""
         if trade is not None:
             cls = "pnl-win" if trade.pnl_pct > 0 else ("pnl-flat" if trade.pnl_pct == 0 else "pnl-loss")
@@ -761,7 +768,7 @@ def write_html_report(
             f"{_fmt_x('破底量', sig.climax_ratio)}  {_fmt_x('反彈量', sig.bounce_vol_ratio)}  "
             f"{_fmt_x('進場量', sig.volume_ratio)}  {_fmt_x('突破量', sig.breakout_ratio)}  {_fmt_lid(sig.lid_pct)}"
             "</pre>"
-            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
+            f"<div class='mini-chart'><img src='{img_src}' alt='{escape(label)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
             "</article>"
         )
@@ -809,9 +816,12 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 
 
 def write_view_html(src: Path, branch: str = "cursor/tw-5m-bounce-alert-c176") -> Path:
+    """預覽頁：圖已嵌在 HTML 裡，直接複製即可；舊的 img/ 相對路徑才改成 raw GitHub。"""
     rel = src.parent.relative_to(REPO).as_posix()
     base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{branch}/{rel}/"
-    text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    text = src.read_text(encoding="utf-8")
+    if "src='img/" in text:
+        text = text.replace("src='img/", f"src='{base}img/")
     out = src.with_name("view.html")
     out.write_text(text, encoding="utf-8")
     return out
