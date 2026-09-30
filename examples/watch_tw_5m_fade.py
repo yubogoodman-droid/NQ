@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """台股 5 分 K：5/10/20 空頭排列且收盤剛跌破 MA240 就推 Telegram。
 
-多方「站上 MA240」的鏡像。對齊券商圖 5/10/20/60/120/240：MA5 < MA10 < MA20
-且三條下彎，當根收盤從 MA240 上跌到下方，收盤也低於 5/10/20。開盤第一根也算。
-陽明 2609 2026-08-26 09:05 那種圖。
+對齊國巨 2327 2026-09-29 09:00、陽明 2609 2026-08-26 09:05：前一盤箱體站在
+MA240 上，當根真下穿（不是貼年線刺一下）。5<10<20 下彎，收盤也低於 5/10/20。
+開盤第一根也算。一天只取第一筆。
 
 用法:
   python3 examples/watch_tw_5m_fade.py scan --symbols 2609 --range 7d --pages
@@ -63,6 +63,12 @@ SEEN_PATH = REPO / "output" / "tw_5m_fade_seen.json"
 STATE_PATH = Path(__file__).resolve().parent / "tw_5m_fade_state.json"
 BRANCH = "cursor/tw-5m-fade-short-9faf"
 
+# 國巨濾網：真下穿 + 前一盤站在年線上。華新科／順達那種貼線 0.1% 不算。
+MIN_BREAK_PCT = 0.007
+MIN_PRIOR_OVER_PCT = 0.005
+PRIOR_LOOKBACK = 12
+PRIOR_MIN_BARS = 8
+
 # 截圖同款均線色：5 藍、10 綠、20 橘、60 青、120 紫、240 粉
 MA_PERIODS = (5, 10, 20, 60, 120, 240)
 MA_COLORS = {
@@ -88,6 +94,7 @@ class FadeSignal:
     ma10: float
     ma20: float
     volume_ratio: float
+    prior_over: float
 
 
 @dataclass
@@ -195,14 +202,54 @@ def ribbon_down(
     return True
 
 
+def prior_session_min_over(
+    index: pd.DatetimeIndex,
+    close: np.ndarray,
+    ma240: np.ndarray,
+    i: int,
+    *,
+    lookback: int = PRIOR_LOOKBACK,
+    min_bars: int = PRIOR_MIN_BARS,
+) -> float | None:
+    """前一交易日最後 lookback 根，(收盤−MA240)/MA240 的最小值。
+
+    只用前一個日曆交易日，不含當天（陽明 09:05 的前一根 09:00 可能已貼近年線）。
+    有效均線根數不足則回 None。
+    """
+    sess = index[i].date()
+    j = i - 1
+    while j >= 0 and index[j].date() == sess:
+        j -= 1
+    if j < 0:
+        return None
+    prev = index[j].date()
+    start = j
+    while start >= 0 and index[start].date() == prev:
+        start -= 1
+    window = list(range(start + 1, j + 1))[-lookback:]
+    overs: list[float] = []
+    for k in window:
+        if not _finite(close[k], ma240[k]) or float(ma240[k]) == 0.0:
+            continue
+        overs.append((float(close[k]) - float(ma240[k])) / float(ma240[k]))
+    if len(overs) < min_bars:
+        return None
+    return min(overs)
+
+
 def detect_signals(
     df: pd.DataFrame,
     *,
     vol_lookback: int = 20,
     skip_before: tuple[int, int] | None = None,
     require_pretty: bool = True,
+    min_break_pct: float = MIN_BREAK_PCT,
+    min_prior_over_pct: float = MIN_PRIOR_OVER_PCT,
+    prior_lookback: int = PRIOR_LOOKBACK,
+    prior_min_bars: int = PRIOR_MIN_BARS,
+    one_per_day: bool = True,
 ) -> list[FadeSignal]:
-    """5/10/20 空排（下彎）且收盤剛跌破 MA240、收也低於 5/10/20。開盤第一根也算。"""
+    """國巨邏輯：前一盤箱體站在 MA240 上，當根真下穿，5/10/20 空排。一天一筆。"""
     if df is None or len(df) < 241:
         return []
     close = df["Close"].to_numpy(float)
@@ -214,6 +261,7 @@ def detect_signals(
     ma240 = sma(close, 240)
     n = len(close)
     signals: list[FadeSignal] = []
+    last_day = None
 
     for i in range(240, n):
         ts = df.index[i]
@@ -231,10 +279,25 @@ def detect_signals(
         )
         if not (stacked and crossed and below_all):
             continue
-        vol_avg = float(np.mean(volume[max(0, i - vol_lookback) : i]) or 0.0)
-        vol_ratio = float(volume[i] / vol_avg) if vol_avg > 0 else 0.0
         m240 = float(ma240[i])
         px = float(close[i])
+        dist = (m240 - px) / m240 if m240 else 0.0
+        if dist < min_break_pct:
+            continue
+        prior = prior_session_min_over(
+            df.index,
+            close,
+            ma240,
+            i,
+            lookback=prior_lookback,
+            min_bars=prior_min_bars,
+        )
+        if min_prior_over_pct > 0 and (prior is None or prior < min_prior_over_pct):
+            continue
+        if one_per_day and last_day == ts.date():
+            continue
+        vol_avg = float(np.mean(volume[max(0, i - vol_lookback) : i]) or 0.0)
+        vol_ratio = float(volume[i] / vol_avg) if vol_avg > 0 else 0.0
         signals.append(
             FadeSignal(
                 break_idx=i,
@@ -243,13 +306,15 @@ def detect_signals(
                 break_high=float(high[i]),
                 ma240=m240,
                 prev_close=float(close[i - 1]),
-                dist_pct=(m240 - px) / m240 if m240 else 0.0,
+                dist_pct=dist,
                 ma5=float(ma5[i]),
                 ma10=float(ma10[i]),
                 ma20=float(ma20[i]),
                 volume_ratio=vol_ratio,
+                prior_over=float(prior) if prior is not None else 0.0,
             )
         )
+        last_day = ts.date()
     return signals
 
 
@@ -450,7 +515,8 @@ def write_html_report(
             f"<span class='tag'>破MA240</span></div>"
             "<pre class='trade-detail'>"
             f"進場 {sig.entry_price:.2f}  破 MA240 {sig.ma240:.2f} @ {bt.strftime('%H:%M')}\n"
-            f"前收 {sig.prev_close:.2f}  距年線 {sig.dist_pct*100:.2f}%\n"
+            f"前收 {sig.prev_close:.2f}  距年線 {sig.dist_pct*100:.2f}%  "
+            f"前一盤 {sig.prior_over*100:+.2f}%\n"
             f"MA5 {sig.ma5:.2f}  MA10 {sig.ma10:.2f}  MA20 {sig.ma20:.2f}"
             f"  MA240 {sig.ma240:.2f}"
             "</pre>"
@@ -484,7 +550,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 5分K 空頭排列跌破 MA240</h1>
 <p class="muted">{escape(period)} · {len(universe)} 檔
-<br/>5MA &lt; 10MA &lt; 20MA 且三條下彎，當根收盤剛跌破 MA240，收盤也低於 5/10/20。開盤第一根也算。</p>
+<br/>國巨邏輯：前一盤箱體站在 MA240 上，當根真下穿（距年線 ≥0.7%），5&lt;10&lt;20 下彎。開盤第一根也算，一天一筆。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -605,6 +671,7 @@ def fmt_alert(row: dict, df: pd.DataFrame, sig: FadeSignal) -> str:
         f"現價: <code>{sig.entry_price:.2f}</code>（最新 {last:.2f}）\n"
         f"破線: <code>{bt.strftime('%H:%M')}</code> MA240={sig.ma240:.2f}\n"
         f"前收 {sig.prev_close:.2f} → 收 {sig.entry_price:.2f}（距年線 {sig.dist_pct*100:.2f}%）\n"
+        f"前一盤相對年線 {sig.prior_over*100:+.2f}%\n"
         f"MA5 {sig.ma5:.2f} &lt; MA10 {sig.ma10:.2f} &lt; MA20 {sig.ma20:.2f}\n"
         f"#台股 #五分K #空頭排列 #MA240 #{row['code']}"
     )
@@ -702,11 +769,24 @@ def resolve_universe(args) -> list[dict]:
     return merge_universe(universe, extra)
 
 
+def detect_kwargs_from_args(args) -> dict:
+    any_nick = bool(getattr(args, "any_nick", False))
+    return {
+        "require_pretty": not bool(getattr(args, "loose", False)),
+        "min_break_pct": 0.0 if any_nick else MIN_BREAK_PCT,
+        "min_prior_over_pct": 0.0 if any_nick else MIN_PRIOR_OVER_PCT,
+        "one_per_day": not any_nick,
+    }
+
+
 def scan_symbol(
     row: dict,
     range_: str,
     *,
     require_pretty: bool = True,
+    min_break_pct: float = MIN_BREAK_PCT,
+    min_prior_over_pct: float = MIN_PRIOR_OVER_PCT,
+    one_per_day: bool = True,
 ) -> tuple[list[tuple[FadeSignal, pd.DataFrame]], dict]:
     meta = {**row, "bars": 0, "error": "", "n_sig": 0}
     try:
@@ -720,7 +800,13 @@ def scan_symbol(
         return [], meta
     if row.get("close") is None and len(df):
         row["close"] = float(df["Close"].iloc[-1])
-    sigs = detect_signals(df, require_pretty=require_pretty)
+    sigs = detect_signals(
+        df,
+        require_pretty=require_pretty,
+        min_break_pct=min_break_pct,
+        min_prior_over_pct=min_prior_over_pct,
+        one_per_day=one_per_day,
+    )
     meta["n_sig"] = len(sigs)
     return [(s, df) for s in sigs], meta
 
@@ -736,8 +822,9 @@ def cmd_scan(args) -> int:
     if on_day is not None:
         print(f"filter day={on_day}")
     pretty = not getattr(args, "loose", False)
+    dkw = detect_kwargs_from_args(args)
     for i, row in enumerate(universe, 1):
-        pairs, meta = scan_symbol(row, args.range_, require_pretty=pretty)
+        pairs, meta = scan_symbol(row, args.range_, **dkw)
         if meta["error"]:
             errors += 1
         trades_by_entry = {}
@@ -767,7 +854,8 @@ def cmd_scan(args) -> int:
         extra = f" {trade.exit_reason} {trade.pnl_pct*100:+.2f}%" if trade else ""
         print(
             f"  [{i}] {row['code']} {row.get('name','')} {ts.strftime('%m-%d %H:%M')} "
-            f"MA240 {sig.ma240:.2f} dist {sig.dist_pct*100:.2f}%{extra}"
+            f"MA240 {sig.ma240:.2f} dist {sig.dist_pct*100:.2f}% "
+            f"prior {sig.prior_over*100:+.2f}%{extra}"
         )
 
     html_path = Path(args.html) if args.html else (PAGES if args.pages else None)
@@ -780,6 +868,8 @@ def cmd_scan(args) -> int:
             period += f" · 股價≤{args.max_price:g}"
         if pretty:
             period += " · 均線下彎"
+        if not getattr(args, "any_nick", False):
+            period += " · 國巨濾網"
         out = write_html_report(html_path, hits, universe, period)
         write_view_html(out)
         print(f"html={out}")
@@ -796,13 +886,23 @@ def scan_once(
     seed_alert: bool,
     sleep_s: float,
     require_pretty: bool = True,
+    min_break_pct: float = MIN_BREAK_PCT,
+    min_prior_over_pct: float = MIN_PRIOR_OVER_PCT,
+    one_per_day: bool = True,
 ) -> None:
     state = load_state()
     alerted = set(state.get("alerted") or [])
     first_run = not state.get("initialized")
     new_items: list[tuple[str, dict, FadeSignal, pd.DataFrame]] = []
     for row in universe:
-        pairs, meta = scan_symbol(row, range_, require_pretty=require_pretty)
+        pairs, meta = scan_symbol(
+            row,
+            range_,
+            require_pretty=require_pretty,
+            min_break_pct=min_break_pct,
+            min_prior_over_pct=min_prior_over_pct,
+            one_per_day=one_per_day,
+        )
         if meta["error"]:
             print(f"  skip {row['symbol']} {meta['error']}", file=sys.stderr)
         for sig, df in pairs:
@@ -865,8 +965,10 @@ def cmd_alert(args) -> int:
         return 1
     print(
         f"TW 5m fade TG | n={len(universe)} | dry_run={args.dry_run} | "
-        f"range={args.range_} | pretty={not args.loose} | session_only={not args.all_hours}"
+        f"range={args.range_} | pretty={not args.loose} | any_nick={args.any_nick} | "
+        f"session_only={not args.all_hours}"
     )
+    dkw = detect_kwargs_from_args(args)
     while True:
         try:
             if args.all_hours or in_tw_session():
@@ -878,7 +980,7 @@ def cmd_alert(args) -> int:
                     dry_run=args.dry_run,
                     seed_alert=args.seed_alert,
                     sleep_s=args.sleep,
-                    require_pretty=not args.loose,
+                    **dkw,
                 )
             else:
                 print(f"[{datetime.now(TPE).strftime('%H:%M:%S')}] outside session, skip")
@@ -908,6 +1010,11 @@ def build_parser() -> argparse.ArgumentParser:
             "--loose",
             action="store_true",
             help="不要求均線下彎，只要 5<10<20 且跌破 MA240",
+        )
+        sp.add_argument(
+            "--any-nick",
+            action="store_true",
+            help="關掉國巨濾網（不要求跌破深度、前一盤站上、一天一筆）",
         )
 
     s = sub.add_parser("scan", help="回看近幾日並可出 HTML")
