@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="description" content="股市進出簿 — 紀錄買賣、持倉與損益，資料存在本機。" />
+  <meta name="description" content="進出簿 — 紀錄台股、美股、加密貨幣與納斯達克期貨的買賣、持倉與損益。" />
   <title>股市進出簿</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -99,6 +99,7 @@
     .stat-card.wide { grid-column: 1 / -1; }
     .stat-card .k { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
     .stat-card .v { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+    .stat-card.wide .v { font-size: 18px; line-height: 1.35; word-break: break-word; }
     .stat-card .s { font-size: 12px; color: var(--muted); margin-top: 4px; }
     .up { color: var(--buy); }
     .down { color: var(--sell); }
@@ -337,7 +338,7 @@
   <header class="app-header">
     <div class="brand">
       <h1>股市進出簿</h1>
-      <p>買賣、持倉、損益 · 資料只存在這台裝置</p>
+      <p>台股、美股、加密、納指期 · 資料只存在這台裝置</p>
     </div>
     <button class="icon-btn primary" id="btnAdd" aria-label="新增進出">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
@@ -378,21 +379,28 @@
   <script>
     const STORAGE_KEY = "nq-stock-journal-v1";
     const STOCKS = [
-      ["2330", "台積電"], ["2317", "鴻海"], ["2454", "聯發科"], ["2308", "台達電"],
-      ["2412", "中華電"], ["2881", "富邦金"], ["2882", "國泰金"], ["2891", "中信金"],
-      ["2886", "兆豐金"], ["2884", "玉山金"], ["2885", "元大金"], ["5880", "合庫金"],
-      ["2303", "聯電"], ["2382", "廣達"], ["2357", "華碩"], ["2379", "瑞昱"],
-      ["3034", "聯詠"], ["3008", "大立光"], ["6669", "緯穎"], ["3231", "緯創"],
-      ["2327", "國巨"], ["3711", "日月光投控"], ["2301", "光寶科"], ["2395", "研華"],
-      ["4938", "和碩"], ["2345", "智邦"], ["3661", "世芯-KY"], ["3443", "創意"],
-      ["2603", "長榮"], ["2609", "陽明"], ["2615", "萬海"], ["2207", "和泰車"],
-      ["2912", "統一超"], ["1216", "統一"], ["1301", "台塑"], ["1303", "南亞"],
-      ["1326", "台化"], ["2002", "中鋼"], ["1101", "台泥"], ["3045", "台灣大"],
-      ["4904", "遠傳"], ["5871", "中租-KY"], ["6505", "台塑化"], ["9910", "豐泰"],
-      ["8454", "富邦媒"], ["3037", "欣興"], ["8046", "南電"], ["2408", "南亞科"],
-      ["3017", "奇鋐"], ["3653", "健策"], ["2633", "台灣高鐵"], ["2801", "彰銀"],
-      ["AAPL", "蘋果"], ["MSFT", "微軟"], ["NVDA", "輝達"], ["AMZN", "亞馬遜"],
-      ["GOOG", "Alphabet"], ["META", "Meta"], ["TSLA", "特斯拉"], ["TSM", "TSMC ADR"]
+      ["2330", "台積電", "TW"], ["2317", "鴻海", "TW"], ["2454", "聯發科", "TW"], ["2308", "台達電", "TW"],
+      ["2412", "中華電", "TW"], ["2881", "富邦金", "TW"], ["2882", "國泰金", "TW"], ["2891", "中信金", "TW"],
+      ["2886", "兆豐金", "TW"], ["2884", "玉山金", "TW"], ["2885", "元大金", "TW"], ["5880", "合庫金", "TW"],
+      ["2303", "聯電", "TW"], ["2382", "廣達", "TW"], ["2357", "華碩", "TW"], ["2379", "瑞昱", "TW"],
+      ["3034", "聯詠", "TW"], ["3008", "大立光", "TW"], ["6669", "緯穎", "TW"], ["3231", "緯創", "TW"],
+      ["2327", "國巨", "TW"], ["3711", "日月光投控", "TW"], ["2301", "光寶科", "TW"], ["2395", "研華", "TW"],
+      ["4938", "和碩", "TW"], ["2345", "智邦", "TW"], ["3661", "世芯-KY", "TW"], ["3443", "創意", "TW"],
+      ["2603", "長榮", "TW"], ["2609", "陽明", "TW"], ["2615", "萬海", "TW"], ["2207", "和泰車", "TW"],
+      ["2912", "統一超", "TW"], ["1216", "統一", "TW"], ["1301", "台塑", "TW"], ["1303", "南亞", "TW"],
+      ["1326", "台化", "TW"], ["2002", "中鋼", "TW"], ["1101", "台泥", "TW"], ["3045", "台灣大", "TW"],
+      ["4904", "遠傳", "TW"], ["5871", "中租-KY", "TW"], ["6505", "台塑化", "TW"], ["9910", "豐泰", "TW"],
+      ["8454", "富邦媒", "TW"], ["3037", "欣興", "TW"], ["8046", "南電", "TW"], ["2408", "南亞科", "TW"],
+      ["3017", "奇鋐", "TW"], ["3653", "健策", "TW"], ["2633", "台灣高鐵", "TW"], ["2801", "彰銀", "TW"],
+      ["AAPL", "蘋果", "US"], ["MSFT", "微軟", "US"], ["NVDA", "輝達", "US"], ["AMZN", "亞馬遜", "US"],
+      ["GOOG", "Alphabet", "US"], ["META", "Meta", "US"], ["TSLA", "特斯拉", "US"], ["TSM", "TSMC ADR", "US"],
+      ["BTC", "比特幣", "CRYPTO"], ["ETH", "以太幣", "CRYPTO"], ["SOL", "Solana", "CRYPTO"], ["BNB", "BNB", "CRYPTO"],
+      ["XRP", "XRP", "CRYPTO"], ["DOGE", "狗狗幣", "CRYPTO"], ["ADA", "Cardano", "CRYPTO"], ["AVAX", "Avalanche", "CRYPTO"],
+      ["LINK", "Chainlink", "CRYPTO"], ["SUI", "Sui", "CRYPTO"], ["TON", "Ton", "CRYPTO"], ["DOT", "Polkadot", "CRYPTO"],
+      ["NEAR", "NEAR", "CRYPTO"], ["APT", "Aptos", "CRYPTO"], ["ARB", "Arbitrum", "CRYPTO"], ["OP", "Optimism", "CRYPTO"],
+      ["LTC", "萊特幣", "CRYPTO"], ["BCH", "比特幣現金", "CRYPTO"], ["UNI", "Uniswap", "CRYPTO"], ["AAVE", "Aave", "CRYPTO"],
+      ["PEPE", "Pepe", "CRYPTO"], ["WIF", "dogwifhat", "CRYPTO"],
+      ["NQ", "納斯達克小台", "NQ"], ["MNQ", "納斯達克微台", "NQ"]
     ];
 
     const DEFAULT_SETTINGS = {
@@ -400,6 +408,8 @@
       feeDiscount: 0.6,
       minFee: 20,
       taxRate: 0.003,
+      cryptoFeeRate: 0.001,
+      nqFeePerContract: 0.62,
       autoFee: true,
       colorMode: "tw"
     };
@@ -448,6 +458,18 @@
     function applyColor() {
       document.documentElement.dataset.color = state.settings.colorMode === "us" ? "us" : "tw";
     }
+    function marketLabel(m) {
+      return ({ TW: "台股", US: "美股", CRYPTO: "加密", NQ: "納指期" })[m] || m;
+    }
+    function marketUnit(m) {
+      return ({ TW: "股", US: "股", CRYPTO: "枚", NQ: "口" })[m] || "股";
+    }
+    function marketCcy(m) {
+      return ({ TW: "TWD", US: "USD", CRYPTO: "USDT", NQ: "USD" })[m] || "";
+    }
+    function normalizeMarket(m) {
+      return (m === "US" || m === "CRYPTO" || m === "NQ") ? m : "TW";
+    }
     function money(n, digits) {
       const d = digits == null ? (Math.abs(n) >= 100 ? 0 : 2) : digits;
       return Number(n).toLocaleString("zh-TW", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -455,6 +477,29 @@
     function signed(n, digits) {
       if (!n) return money(0, digits || 0);
       return (n > 0 ? "+" : "") + money(n, digits);
+    }
+    function moneyCcy(n, ccy, withSign) {
+      const digits = ccy === "TWD" ? 0 : 2;
+      const text = withSign ? signed(n, digits) : money(n, digits);
+      return ccy ? `${text} ${ccy}` : text;
+    }
+    function qtyFmt(n, market) {
+      if (market === "CRYPTO") {
+        return Number(n).toLocaleString("zh-TW", { maximumFractionDigits: 8 });
+      }
+      return money(n, 0);
+    }
+    function priceFmt(n, market) {
+      if (n == null) return "—";
+      if (market === "CRYPTO") {
+        return Number(n).toLocaleString("zh-TW", { maximumFractionDigits: 8 });
+      }
+      return money(n, 2);
+    }
+    function formatCcyMap(map, withSign) {
+      const keys = ["TWD", "USD", "USDT"].filter((k) => map[k] != null && Math.abs(map[k]) > 1e-9);
+      if (!keys.length) return withSign ? "0" : "—";
+      return keys.map((k) => moneyCcy(map[k], k, withSign)).join(" · ");
     }
     function clsPnl(n) {
       if (n > 0.0000001) return "up";
@@ -485,7 +530,8 @@
         if (!pnl) continue;
         const m = String(t.date || "").slice(0, 7);
         if (!m) continue;
-        map.set(m, (map.get(m) || 0) + pnl);
+        const key = `${m} · ${marketCcy(t.market)}`;
+        map.set(key, (map.get(key) || 0) + pnl);
       }
       return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6);
     }
@@ -503,17 +549,29 @@
       const { books, realizedByTrade } = buildBooks(state.trades);
       const positions = positionsFrom(books);
       const open = positions.filter((p) => Math.abs(p.qty) > 1e-9);
-      const realized = positions.reduce((s, p) => s + p.realized, 0);
-      const unrealized = open.reduce((s, p) => s + (p.unrealized || 0), 0);
-      const cost = open.reduce((s, p) => s + (p.qty > 0 ? p.cost : 0), 0);
-      const mkt = open.reduce((s, p) => s + (p.marketValue || 0), 0);
-      const wins = state.trades.filter((t) => (realizedByTrade[t.id] || 0) > 0.5).length;
-      const losses = state.trades.filter((t) => (realizedByTrade[t.id] || 0) < -0.5).length;
+      const realized = {};
+      const unrealized = {};
+      const cost = {};
+      const mkt = {};
+      for (const p of positions) {
+        const ccy = marketCcy(p.market);
+        realized[ccy] = (realized[ccy] || 0) + p.realized;
+      }
+      for (const p of open) {
+        const ccy = marketCcy(p.market);
+        if (p.qty > 0) cost[ccy] = (cost[ccy] || 0) + p.cost;
+        if (p.unrealized != null) unrealized[ccy] = (unrealized[ccy] || 0) + p.unrealized;
+        if (p.marketValue != null) mkt[ccy] = (mkt[ccy] || 0) + Math.abs(p.marketValue);
+      }
+      const realizedSum = Object.values(realized).reduce((s, n) => s + n, 0);
+      const unrealizedSum = Object.values(unrealized).reduce((s, n) => s + n, 0);
+      const wins = state.trades.filter((t) => (realizedByTrade[t.id] || 0) > 0.01).length;
+      const losses = state.trades.filter((t) => (realizedByTrade[t.id] || 0) < -0.01).length;
       const closed = wins + losses;
       const winRate = closed ? (wins / closed) * 100 : 0;
 
       document.getElementById("page-home").innerHTML = renderHome({
-        open, realized, unrealized, cost, mkt, winRate, closed, wins, realizedByTrade
+        open, realized, unrealized, cost, mkt, realizedSum, unrealizedSum, winRate, closed, wins, realizedByTrade
       });
       document.getElementById("page-pos").innerHTML = renderPos(open);
       document.getElementById("page-log").innerHTML = renderLog(realizedByTrade);
@@ -535,18 +593,18 @@
         <div class="hero-grid">
           <div class="stat-card wide">
             <div class="k">已實現損益</div>
-            <div class="v mono ${clsPnl(s.realized)}">${signed(s.realized, 0)}</div>
-            <div class="s">平倉後真正進口袋的金額</div>
+            <div class="v mono ${clsPnl(s.realizedSum)}">${formatCcyMap(s.realized, true)}</div>
+            <div class="s">不同幣別分開計，不會把台幣和美元加在一起</div>
           </div>
           <div class="stat-card">
             <div class="k">未實現損益</div>
-            <div class="v mono ${clsPnl(s.unrealized)}">${s.open.some((p) => p.quote != null) ? signed(s.unrealized, 0) : "—"}</div>
+            <div class="v mono ${clsPnl(s.unrealizedSum)}">${s.open.some((p) => p.quote != null) ? formatCcyMap(s.unrealized, true) : "—"}</div>
             <div class="s">需先在持倉設定現價</div>
           </div>
           <div class="stat-card">
             <div class="k">持倉成本</div>
-            <div class="v mono">${money(s.cost, 0)}</div>
-            <div class="s">${s.open.length} 檔持倉${s.mkt ? " · 市值 " + money(s.mkt, 0) : ""}</div>
+            <div class="v mono">${formatCcyMap(s.cost, false)}</div>
+            <div class="s">${s.open.length} 檔持倉${Object.keys(s.mkt).length ? " · 市值 " + formatCcyMap(s.mkt, false) : ""}</div>
           </div>
           <div class="stat-card">
             <div class="k">勝率</div>
@@ -559,27 +617,29 @@
         ${s.open.length > 4 ? `<button class="btn block" data-go="pos">看全部持倉</button>` : ""}
         <div class="section-title">最近進出</div>
         ${recent.map((t) => tradeCard(t, s.realizedByTrade[t.id])).join("")}
-        ${months.length ? `<div class="section-title">每月已實現</div><div class="card">${months.map(([m, v]) => `<div class="month-row"><span>${m}</span><span class="mono ${clsPnl(v)}">${signed(v, 0)}</span></div>`).join("")}</div>` : ""}
+        ${months.length ? `<div class="section-title">每月已實現</div><div class="card">${months.map(([m, v]) => `<div class="month-row"><span>${m}</span><span class="mono ${clsPnl(v)}">${signed(v, /TWD$/.test(m) ? 0 : 2)}</span></div>`).join("")}</div>` : ""}
       `;
     }
 
     function posCard(p) {
       const short = p.qty < 0;
+      const ccy = marketCcy(p.market);
+      const pvNote = p.market === "NQ" ? ` · 每點 ${p.pointValue} ${ccy}` : "";
       return `<article class="card" data-pos="${esc(posKey(p))}">
         <div class="pos-top">
           <div>
             <div class="sym">${esc(p.symbol)} <span class="name">${esc(p.name)}</span></div>
-            <div class="name">${p.market === "US" ? "美股" : "台股"} · ${short ? "空單" : "多單"} ${money(Math.abs(p.qty), 0)} 股</div>
+            <div class="name">${marketLabel(p.market)} · ${short ? "空單" : "多單"} ${qtyFmt(Math.abs(p.qty), p.market)} ${marketUnit(p.market)}${pvNote}</div>
           </div>
           ${short ? `<span class="badge short">空</span>` : `<span class="badge buy">持有</span>`}
         </div>
         <div class="metrics">
-          <div class="metric"><div class="k">均價</div><div class="v mono">${money(p.avgCost, 2)}</div></div>
-          <div class="metric"><div class="k">現價</div><div class="v mono">${p.quote == null ? "未設" : money(p.quote, 2)}</div></div>
-          <div class="metric"><div class="k">未實現</div><div class="v mono ${p.unrealized == null ? "flat" : clsPnl(p.unrealized)}">${p.unrealized == null ? "—" : signed(p.unrealized, 0)}</div></div>
-          <div class="metric"><div class="k">成本</div><div class="v mono">${money(Math.abs(p.cost), 0)}</div></div>
-          <div class="metric"><div class="k">市值</div><div class="v mono">${p.marketValue == null ? "—" : money(Math.abs(p.marketValue), 0)}</div></div>
-          <div class="metric"><div class="k">已實現</div><div class="v mono ${clsPnl(p.realized)}">${signed(p.realized, 0)}</div></div>
+          <div class="metric"><div class="k">均價</div><div class="v mono">${priceFmt(p.avgCost, p.market)}</div></div>
+          <div class="metric"><div class="k">現價</div><div class="v mono">${p.quote == null ? "未設" : priceFmt(p.quote, p.market)}</div></div>
+          <div class="metric"><div class="k">未實現</div><div class="v mono ${p.unrealized == null ? "flat" : clsPnl(p.unrealized)}">${p.unrealized == null ? "—" : moneyCcy(p.unrealized, ccy, true)}</div></div>
+          <div class="metric"><div class="k">成本</div><div class="v mono">${moneyCcy(Math.abs(p.cost), ccy, false)}</div></div>
+          <div class="metric"><div class="k">市值</div><div class="v mono">${p.marketValue == null ? "—" : moneyCcy(Math.abs(p.marketValue), ccy, false)}</div></div>
+          <div class="metric"><div class="k">已實現</div><div class="v mono ${clsPnl(p.realized)}">${moneyCcy(p.realized, ccy, true)}</div></div>
         </div>
         <div class="row-actions">
           <button class="btn" data-quote="${esc(posKey(p))}">設現價</button>
@@ -594,7 +654,7 @@
       const closed = positionsFrom(buildBooks(state.trades).books).filter((p) => Math.abs(p.qty) <= 1e-9 && (p.buyQty || p.sellQty));
       return `
         ${open.length ? open.map(posCard).join("") : `<div class="card empty">目前沒有未平倉部位。</div>`}
-        ${closed.length ? `<div class="section-title">已平倉</div>${closed.map((p) => `<div class="card"><div class="pos-top"><div><div class="sym">${esc(p.symbol)} <span class="name">${esc(p.name)}</span></div><div class="name">已出清 · 已實現損益</div></div><div class="mono ${clsPnl(p.realized)}">${signed(p.realized, 0)}</div></div></div>`).join("")}` : ""}
+        ${closed.length ? `<div class="section-title">已平倉</div>${closed.map((p) => `<div class="card"><div class="pos-top"><div><div class="sym">${esc(p.symbol)} <span class="name">${esc(p.name)}</span></div><div class="name">${marketLabel(p.market)} · 已出清 · 已實現損益</div></div><div class="mono ${clsPnl(p.realized)}">${moneyCcy(p.realized, marketCcy(p.market), true)}</div></div></div>`).join("")}` : ""}
       `;
     }
 
@@ -604,14 +664,14 @@
         <div class="trade-top">
           <div>
             <div class="sym">${esc(t.symbol)} <span class="name">${esc(t.name || "")}</span></div>
-            <div class="name">${esc(t.date)}${t.time ? " " + esc(t.time) : ""} · ${t.market === "US" ? "美股" : "台股"} · ${money(t.qty, 0)} 股 @ ${money(t.price, 2)}</div>
+            <div class="name">${esc(t.date)}${t.time ? " " + esc(t.time) : ""} · ${marketLabel(t.market)} · ${qtyFmt(t.qty, t.market)} ${marketUnit(t.market)} @ ${priceFmt(t.price, t.market)}</div>
           </div>
           <span class="badge ${side}">${side === "buy" ? "買進" : "賣出"}</span>
         </div>
         <div class="metrics">
-          <div class="metric"><div class="k">成交金額</div><div class="v mono">${money(Number(t.price) * Number(t.qty), 0)}</div></div>
-          <div class="metric"><div class="k">費用</div><div class="v mono">${money((Number(t.fee) || 0) + (Number(t.tax) || 0), 0)}</div></div>
-          <div class="metric"><div class="k">此筆損益</div><div class="v mono ${realized ? clsPnl(realized) : "flat"}">${realized ? signed(realized, 0) : "—"}</div></div>
+          <div class="metric"><div class="k">成交金額</div><div class="v mono">${moneyCcy(Number(t.price) * Number(t.qty) * Ledger.pointValue(t.market, t.symbol), marketCcy(t.market), false)}</div></div>
+          <div class="metric"><div class="k">費用</div><div class="v mono">${moneyCcy((Number(t.fee) || 0) + (Number(t.tax) || 0), marketCcy(t.market), false)}</div></div>
+          <div class="metric"><div class="k">此筆損益</div><div class="v mono ${realized ? clsPnl(realized) : "flat"}">${realized ? moneyCcy(realized, marketCcy(t.market), true) : "—"}</div></div>
         </div>
         ${t.note ? `<div class="help">${esc(t.note)}</div>` : ""}
       </article>`;
@@ -633,6 +693,8 @@
           <button class="chip ${state.filter.side === "sell" ? "on" : ""}" data-side="sell">賣出</button>
           <button class="chip ${state.filter.market === "TW" ? "on" : ""}" data-market="TW">台股</button>
           <button class="chip ${state.filter.market === "US" ? "on" : ""}" data-market="US">美股</button>
+          <button class="chip ${state.filter.market === "CRYPTO" ? "on" : ""}" data-market="CRYPTO">加密</button>
+          <button class="chip ${state.filter.market === "NQ" ? "on" : ""}" data-market="NQ">納指期</button>
         </div>
         ${list.length ? list.map((t) => tradeCard(t, realizedByTrade[t.id])).join("") : `<div class="empty">沒有符合的紀錄</div>`}
       `;
@@ -643,7 +705,7 @@
       return `
         <div class="card">
           <div class="setting-row">
-            <div>自動帶入台股費用<small>手續費 ${s.feeRate * 100}% × ${Math.round(s.feeDiscount * 100)} 折，賣出再加證交稅 ${s.taxRate * 100}%</small></div>
+            <div>自動帶入費用<small>台股手續費＋證交稅、加密 ${((s.cryptoFeeRate != null ? s.cryptoFeeRate : 0.001) * 100).toFixed(2)}%、納指期每口 ${s.nqFeePerContract != null ? s.nqFeePerContract : 0.62} USD</small></div>
             <button class="switch ${s.autoFee ? "on" : ""}" id="swFee" aria-label="自動費用"><i></i></button>
           </div>
           <div class="setting-row">
@@ -655,8 +717,10 @@
           <div class="form-grid">
             <div><label>手續費率</label><input class="field" id="setFeeRate" type="number" step="0.000001" value="${s.feeRate}" /></div>
             <div><label>折扣（0.6 = 6 折）</label><input class="field" id="setDiscount" type="number" step="0.05" value="${s.feeDiscount}" /></div>
-            <div><label>最低手續費</label><input class="field" id="setMinFee" type="number" step="1" value="${s.minFee}" /></div>
-            <div><label>證交稅率</label><input class="field" id="setTax" type="number" step="0.0001" value="${s.taxRate}" /></div>
+            <div><label>最低手續費（台股）</label><input class="field" id="setMinFee" type="number" step="1" value="${s.minFee}" /></div>
+            <div><label>證交稅率（台股）</label><input class="field" id="setTax" type="number" step="0.0001" value="${s.taxRate}" /></div>
+            <div><label>加密費率</label><input class="field" id="setCryptoFee" type="number" step="0.0001" value="${s.cryptoFeeRate != null ? s.cryptoFeeRate : 0.001}" /></div>
+            <div><label>納指期每口佣金（USD）</label><input class="field" id="setNqFee" type="number" step="0.01" value="${s.nqFeePerContract != null ? s.nqFeePerContract : 0.62}" /></div>
           </div>
           <button class="btn block" style="margin-top:12px" id="btnSaveSet">儲存費率</button>
         </div>
@@ -672,7 +736,7 @@
           <input type="file" id="fileImport" accept="application/json" hidden />
         </div>
         <div class="card">
-          <p class="help">本工具只是個人進出帳本，不連券商、不抓即時報價、也不構成投資建議。損益以加權平均／先進先出撮合，費用可自行改。</p>
+          <p class="help">本工具只是個人進出帳本，不連券商、不抓即時報價、也不構成投資建議。納指期損益＝價差 × 口數 × 每點價值（小台 NQ 20 美元、微台 MNQ 2 美元）。台幣與美元分開計。</p>
         </div>
       `;
     }
@@ -734,8 +798,32 @@
     }
 
     function lookupName(symbol, market) {
-      const hit = STOCKS.find((s) => s[0].toUpperCase() === String(symbol).toUpperCase());
+      const list = STOCKS.filter((s) => s[0].toUpperCase() === String(symbol).toUpperCase());
+      const hit = list.find((s) => s[2] === market) || list[0];
       return hit ? hit[1] : "";
+    }
+    function qtyChips(market) {
+      if (market === "CRYPTO") {
+        return `<button type="button" class="chip" data-qty="1">1 枚</button>
+                <button type="button" class="chip" data-qty="0.1">0.1</button>
+                <button type="button" class="chip" data-qty="0.01">0.01</button>`;
+      }
+      if (market === "NQ") {
+        return `<button type="button" class="chip" data-qty="1">1 口</button>
+                <button type="button" class="chip" data-qty="2">2 口</button>
+                <button type="button" class="chip" data-qty="5">5 口</button>`;
+      }
+      if (market === "US") {
+        return `<button type="button" class="chip" data-qty="100">100 股</button>
+                <button type="button" class="chip" data-qty="10">10 股</button>
+                <button type="button" class="chip" data-qty="1">1 股</button>`;
+      }
+      return `<button type="button" class="chip" data-qty="1000">1 張</button>
+              <button type="button" class="chip" data-qty="100">100 股</button>
+              <button type="button" class="chip" data-qty="1">1 股</button>`;
+    }
+    function symbolPlaceholder(market) {
+      return ({ TW: "例如 2330", US: "例如 AAPL", CRYPTO: "例如 BTC", NQ: "NQ 或 MNQ" })[market] || "";
     }
 
     function openSheet(preset) {
@@ -763,16 +851,18 @@
               <select class="field" name="market">
                 <option value="TW" ${market === "TW" ? "selected" : ""}>台股</option>
                 <option value="US" ${market === "US" ? "selected" : ""}>美股</option>
+                <option value="CRYPTO" ${market === "CRYPTO" ? "selected" : ""}>加密貨幣</option>
+                <option value="NQ" ${market === "NQ" ? "selected" : ""}>納斯達克期貨</option>
               </select>
             </div>
             <div class="rel">
               <label>代碼</label>
-              <input class="field" name="symbol" autocomplete="off" required value="${esc(t.symbol || "")}" placeholder="例如 2330" />
+              <input class="field" name="symbol" autocomplete="off" required value="${esc(t.symbol || "")}" placeholder="${esc(symbolPlaceholder(market))}" />
               <div class="suggest" id="suggest"></div>
             </div>
             <div class="span-2">
               <label>名稱</label>
-              <input class="field" name="name" value="${esc(t.name || "")}" placeholder="台積電" />
+              <input class="field" name="name" value="${esc(t.name || "")}" placeholder="台積電／比特幣／納斯達克微台" />
             </div>
             <div>
               <label>日期</label>
@@ -787,17 +877,15 @@
               <input class="field" type="number" name="price" inputmode="decimal" step="0.01" min="0" required value="${t.price != null ? esc(t.price) : ""}" />
             </div>
             <div>
-              <label>股數</label>
-              <input class="field" type="number" name="qty" inputmode="numeric" step="1" min="1" required value="${t.qty != null ? esc(t.qty) : ""}" />
-              <div class="chip-row" style="margin-top:6px">
-                <button type="button" class="chip" data-qty="1000">1 張</button>
-                <button type="button" class="chip" data-qty="100">100 股</button>
-                <button type="button" class="chip" data-qty="1">1 股</button>
+              <label id="qtyLabel">數量（${marketUnit(market)}）</label>
+              <input class="field" type="number" name="qty" inputmode="decimal" step="${market === "CRYPTO" ? "any" : "1"}" min="0" required value="${t.qty != null ? esc(t.qty) : ""}" />
+              <div class="chip-row" id="qtyChips" style="margin-top:6px">
+                ${qtyChips(market)}
               </div>
             </div>
             <div>
               <label>手續費</label>
-              <input class="field" type="number" name="fee" inputmode="decimal" step="1" min="0" value="${t.fee != null ? esc(t.fee) : ""}" />
+              <input class="field" type="number" name="fee" inputmode="decimal" step="0.01" min="0" value="${t.fee != null ? esc(t.fee) : ""}" />
             </div>
             <div>
               <label>交易稅</label>
@@ -824,10 +912,22 @@
         form.querySelectorAll("[data-pick]").forEach((x) => x.classList.toggle("on", x === b));
         autofillFees();
       }));
-      form.querySelectorAll("[data-qty]").forEach((b) => b.addEventListener("click", () => {
-        form.elements.qty.value = b.dataset.qty;
+      function bindQtyChips() {
+        form.querySelectorAll("[data-qty]").forEach((b) => b.addEventListener("click", () => {
+          form.elements.qty.value = b.dataset.qty;
+          autofillFees();
+        }));
+      }
+      bindQtyChips();
+      form.elements.market.addEventListener("change", () => {
+        const m = form.elements.market.value;
+        document.getElementById("qtyLabel").textContent = `數量（${marketUnit(m)}）`;
+        form.elements.qty.step = m === "CRYPTO" ? "any" : "1";
+        form.elements.symbol.placeholder = symbolPlaceholder(m);
+        document.getElementById("qtyChips").innerHTML = qtyChips(m);
+        bindQtyChips();
         autofillFees();
-      }));
+      });
       ["price", "qty", "market", "side"].forEach((n) => {
         form.elements[n] && form.elements[n].addEventListener("input", autofillFees);
         form.elements[n] && form.elements[n].addEventListener("change", autofillFees);
@@ -838,12 +938,13 @@
         const q = symbol.value.trim().toLowerCase();
         const hits = STOCKS.filter((s) => s[0].toLowerCase().includes(q) || s[1].includes(symbol.value.trim())).slice(0, 8);
         if (!q || !hits.length) { suggest.style.display = "none"; return; }
-        suggest.innerHTML = hits.map(([code, name]) => `<button type="button" data-code="${esc(code)}" data-cname="${esc(name)}">${esc(code)} ${esc(name)}</button>`).join("");
+        suggest.innerHTML = hits.map(([code, name, mk]) => `<button type="button" data-code="${esc(code)}" data-cname="${esc(name)}" data-mk="${esc(mk)}">${esc(code)} ${esc(name)} · ${marketLabel(mk)}</button>`).join("");
         suggest.style.display = "block";
         suggest.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
           form.elements.symbol.value = b.dataset.code;
           form.elements.name.value = b.dataset.cname;
-          if (/^[A-Z.]+$/.test(b.dataset.code) && !/^\d/.test(b.dataset.code)) form.elements.market.value = "US";
+          form.elements.market.value = b.dataset.mk;
+          form.elements.market.dispatchEvent(new Event("change"));
           suggest.style.display = "none";
           autofillFees();
         }));
@@ -887,10 +988,21 @@
       const qty = Number(form.elements.qty.value) || 0;
       const fee = Number(form.elements.fee.value) || 0;
       const tax = Number(form.elements.tax.value) || 0;
-      const notional = price * qty;
-      if (!notional) { hint.textContent = "台股預設：手續費 0.1425% 再打折、賣出另計 0.3% 證交稅，可改。"; return; }
+      const market = form.elements.market.value;
+      const symbol = form.elements.symbol.value || (market === "NQ" ? "MNQ" : "");
+      const pv = Ledger.pointValue(market, symbol);
+      const notional = price * qty * pv;
+      const ccy = marketCcy(market);
+      if (!price || !qty) {
+        if (market === "NQ") hint.textContent = "納指期：小台 NQ 每點 20 美元、微台 MNQ 每點 2 美元。損益＝價差 × 口數 × 每點價值。";
+        else if (market === "CRYPTO") hint.textContent = "加密貨幣可用小數數量（例如 0.01 BTC）。預設手續費約 0.1%，可在設定改。";
+        else if (market === "US") hint.textContent = "美股費用請自行填，或關掉自動帶入後手動輸入。";
+        else hint.textContent = "台股預設：手續費 0.1425% 再打折、賣出另計 0.3% 證交稅，可改。";
+        return;
+      }
       const net = form.elements.side.value === "buy" ? -(notional + fee) : (notional - fee - tax);
-      hint.textContent = `成交 ${money(notional, 0)} · 費用 ${money(fee + tax, 0)} · 淨額 ${signed(net, 0)}`;
+      const extra = market === "NQ" ? ` · 每點 ${pv} USD` : "";
+      hint.textContent = `成交 ${moneyCcy(notional, ccy, false)} · 費用 ${moneyCcy(fee + tax, ccy, false)} · 淨額 ${moneyCcy(net, ccy, true)}${extra}`;
     }
 
     function upsertTrade(raw) {
@@ -898,7 +1010,7 @@
         id: state.editingId || uid(),
         date: raw.date,
         time: raw.time || "",
-        market: raw.market === "US" ? "US" : "TW",
+        market: normalizeMarket(raw.market),
         symbol: String(raw.symbol || "").trim().toUpperCase(),
         name: String(raw.name || "").trim() || lookupName(raw.symbol, raw.market),
         side: raw.side === "sell" ? "sell" : "buy",
@@ -912,7 +1024,7 @@
           : new Date().toISOString()
       };
       if (!trade.symbol) return toast("請填代碼");
-      if (!(trade.price > 0) || !(trade.qty > 0)) return toast("價格與股數需大於 0");
+      if (!(trade.price > 0) || !(trade.qty > 0)) return toast("價格與數量需大於 0");
       if (state.editingId) {
         state.trades = state.trades.map((x) => x.id === trade.id ? trade : x);
       } else {
@@ -938,7 +1050,7 @@
       download(blob, `股市進出簿-${today()}.json`);
     }
     function exportCsv() {
-      const header = ["日期", "時間", "市場", "代碼", "名稱", "方向", "價格", "股數", "手續費", "交易稅", "備註"];
+      const header = ["日期", "時間", "市場", "代碼", "名稱", "方向", "價格", "數量", "手續費", "交易稅", "備註"];
       const rows = sortedTrades(state.trades).map((t) => [
         t.date, t.time, t.market, t.symbol, t.name, t.side === "sell" ? "賣出" : "買進",
         t.price, t.qty, t.fee, t.tax, `"${String(t.note || "").replace(/"/g, '""')}"`
@@ -989,11 +1101,17 @@
         demo("2026-07-08", "09:48", "TW", "2330", "台積電", "sell", 1050, 1000, "減碼一半"),
         demo("2026-04-02", "11:10", "TW", "2317", "鴻海", "buy", 168, 2000, ""),
         demo("2026-06-15", "10:02", "TW", "2454", "聯發科", "buy", 1280, 500, ""),
-        demo("2026-08-01", "13:33", "TW", "2454", "聯發科", "sell", 1190, 500, "停損")
+        demo("2026-08-01", "13:33", "TW", "2454", "聯發科", "sell", 1190, 500, "停損"),
+        demo("2026-02-01", "08:12", "CRYPTO", "BTC", "比特幣", "buy", 65000, 0.1, "現貨建立"),
+        demo("2026-02-18", "21:05", "CRYPTO", "ETH", "以太幣", "buy", 2400, 1.5, ""),
+        demo("2026-03-01", "21:32", "NQ", "MNQ", "納斯達克微台", "buy", 19200, 2, "突破進場"),
+        demo("2026-03-02", "22:18", "NQ", "MNQ", "納斯達克微台", "sell", 19450, 2, "量度停利")
       ];
       state.quotes = {
         "TW:2330": { price: 960, updatedAt: new Date().toISOString() },
-        "TW:2317": { price: 175, updatedAt: new Date().toISOString() }
+        "TW:2317": { price: 175, updatedAt: new Date().toISOString() },
+        "CRYPTO:BTC": { price: 69000, updatedAt: new Date().toISOString() },
+        "CRYPTO:ETH": { price: 2550, updatedAt: new Date().toISOString() }
       };
       save(); render(); toast("已載入示範資料");
     }
@@ -1057,6 +1175,10 @@
         state.settings.feeDiscount = Number(document.getElementById("setDiscount").value) || 0;
         state.settings.minFee = Number(document.getElementById("setMinFee").value) || 0;
         state.settings.taxRate = Number(document.getElementById("setTax").value) || 0;
+        state.settings.cryptoFeeRate = Number(document.getElementById("setCryptoFee").value);
+        if (!(state.settings.cryptoFeeRate >= 0)) state.settings.cryptoFeeRate = DEFAULT_SETTINGS.cryptoFeeRate;
+        state.settings.nqFeePerContract = Number(document.getElementById("setNqFee").value);
+        if (!(state.settings.nqFeePerContract >= 0)) state.settings.nqFeePerContract = DEFAULT_SETTINGS.nqFeePerContract;
         save(); toast("費率已儲存"); render(); return go("set");
       }
       if (e.target.closest("#btnExport")) return exportJson();

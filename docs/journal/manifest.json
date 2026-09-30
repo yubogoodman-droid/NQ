@@ -1,7 +1,7 @@
 {
   "name": "股市進出簿",
   "short_name": "進出簿",
-  "description": "紀錄台股與美股買賣、持倉與損益",
+  "description": "紀錄台股、美股、加密貨幣與納斯達克期貨的買賣、持倉與損益",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b0e11",
