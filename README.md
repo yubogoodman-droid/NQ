@@ -84,6 +84,25 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## HBAR 1h 假突破跌破 MA25 Telegram
+
+對齊 2026-09-29 14:00 那波：小時 K 先假突破創 24 根新高（高點離 MA25 ≥ 8%），從高點回落 ≥ 5% 後，**收盤跌破 MA25** 推 Telegram（帶圖）。同一根 K 不重發。沒填 token 時只印在終端。
+
+```bash
+python3 examples/test_watch_hbar_1h_ma25.py
+python3 examples/watch_hbar_1h_ma25.py --test
+python3 examples/watch_hbar_1h_ma25.py --once --dry-run
+python3 examples/watch_hbar_1h_ma25.py                 # 每根 1h 收盤掃 HBAR
+python3 examples/watch_hbar_1h_ma25.py --lookback 48 --once   # 把 09-29 那筆也掃出來
+python3 examples/watch_hbar_1h_ma25.py --backtest --days 60 --pages
+```
+
+憑證放 `tg_config.env`，或在 `examples/watch_hbar_1h_ma25.py` 最上面填 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`。
+
+近 60 天（08-01 → 09-30）：**2 筆、已平勝率 100%、平均 +6.70%**（都是 24 根時間停）。09-29 14:00 那筆從 0.13099 假突破後跌破 MA25，時間停 **+11.10%**。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/hbar-1h-ma25/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
