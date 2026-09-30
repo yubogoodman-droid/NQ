@@ -86,7 +86,13 @@ python3 examples/test_tw_1h_reclaim.py
 
 ## HBAR 1h 假突破跌破 MA25 Telegram
 
-對齊 2026-09-29 14:00 那波：小時 K 先假突破創 24 根新高（高點離 MA25 ≥ 8%），從高點回落 ≥ 5% 後，**收盤跌破 MA25** 推 Telegram（帶圖）。同一根 K 不重發。沒填 token 時只印在終端。
+對齊 2026-09-29 14:00 那波（箱體後直拉、高點離 MA25 ~23%、隔 12 根陰線剛跌破）：
+
+- 伸 15%～40%，回落 8%～18%，隔 6～18 根
+- 相對拉升前箱體再高出 ≥ 18%
+- 陰線第一根跌破 MA25（離均線 ≤ 2.5%），MA25 仍上、尖峰放量
+
+同一根 K 不重發。沒填 token 時只印在終端。
 
 ```bash
 python3 examples/test_watch_hbar_1h_ma25.py
@@ -100,11 +106,11 @@ python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
 
 憑證放 `tg_config.env`，或在 `examples/watch_hbar_1h_ma25.py` 最上面填 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`。
 
-近 60 天 HBAR（08-01 → 09-30）：**2 筆、已平勝率 100%、平均 +6.70%**（都是 24 根時間停）。09-29 14:00 那筆從 0.13099 假突破後跌破 MA25，時間停 **+11.10%**。
+近 60 天 HBAR（08-01 → 09-30）：只剩 **09-29 14:00** 一筆，時間停 **+11.10%**（08-22 那種 11% 輕觸、2 根就破的已濾掉）。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/hbar-1h-ma25/view.html
 
-全幣種近 1 週（流動 USDT 永續 281 檔，09-23 → 09-30）：原始訊號 391，同標的重疊刪掉後進場 **212 筆 / 123 檔**。已平 184 筆勝率 **53.3%**，平均 **−0.24%**，加總 −43.6%。出場：時間 152 · 停損 32 · 未平 28。HBAR 09-29 14:00 那筆在裡面，時間停 **+11.10%**。大賺有 TAKE +38%、龙虾 +34%；大虧有 Q −85%、US −33%。
+全幣種近 1 週（流動 USDT 永續 283 檔，09-23 → 09-30）：收緊後 **8 筆 / 8 檔**（原本 212 筆）。已平勝率 **75.0%**，平均 **+2.77%**，加總 +22.2%。HBAR +11.10%、2Z +9.22%、MARSCOIN +6.85%；虧 GRASS −14.13%、ACE −3.47%。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-7d/view.html
 
