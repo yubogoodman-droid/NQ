@@ -1,7 +1,13 @@
 (function () {
   "use strict";
 
-  const DEMO_TEXT = `窗边的约定
+  const TREE_TEXT = `大樹跟小樹
+
+大樹跟小樹。
+大樹跟小樹差在那裏？
+答案是插在土裡。`;
+
+  const WINDOW_TEXT = `窗边的约定
 
 小猫坐在窗边，看着下雨的街道。
 一只小鸟停在湿漉漉的枝头，抖了抖羽毛。
@@ -9,8 +15,32 @@
 小鸟歪了歪头，好像听懂了。
 雨停以后，阳光把窗台晒得暖暖的。`;
 
+  const REMOTION = {
+    trees: {
+      video: "assets/tree-riddle-preview.mp4",
+      poster: "assets/tree-poster.jpg",
+      download: "大樹跟小樹.mp4",
+      sheet: "assets/tree-character-sheet.jpg",
+      sheetAlt: "大樹與小樹角色設定",
+      pages: 3,
+      duration: 13.7,
+      storyUrl: "trees.json",
+    },
+    window: {
+      video: "assets/demo-preview.mp4",
+      poster: "assets/scenes/00-cover.jpg",
+      download: "窗边的约定.mp4",
+      sheet: "assets/character-sheet.jpg",
+      sheetAlt: "小猫与小鸟角色设定",
+      pages: 6,
+      duration: 30.6,
+      storyUrl: "story.json",
+    },
+  };
+
   const PRESETS = [
-    { id: "window", title: "窗边的约定", art: "ai", text: DEMO_TEXT },
+    { id: "trees", title: "大樹跟小樹", art: "ai", remotion: "trees", text: TREE_TEXT },
+    { id: "window", title: "窗边的约定", art: "ai", remotion: "window", text: WINDOW_TEXT },
     {
       id: "moon",
       title: "月亮邮差",
@@ -40,7 +70,8 @@
   const video = $("demoVideo");
   const book = $("book");
   const player = new StoryPlayer(canvas);
-  let demoStory = null;
+  let demoStories = {};
+  let activeRemotion = "trees";
   let source = "ai";
   let uploaded = [];
   let view = "video";
@@ -71,17 +102,23 @@
     $("status").textContent = msg;
   }
 
+  function remotionMeta() {
+    return REMOTION[activeRemotion] || REMOTION.trees;
+  }
+
   function updateMeta() {
     if (view === "video") {
-      const dur = video.duration && isFinite(video.duration) ? video.duration : 28.8;
-      $("pageCount").textContent = "6 页 · Remotion";
+      const demo = remotionMeta();
+      const dur = video.duration && isFinite(video.duration) ? video.duration : demo.duration;
+      $("pageCount").textContent = demo.pages + " 页 · Remotion";
       $("durationLabel").textContent = fmt(dur);
       $("timeLabel").textContent = fmt(video.currentTime || 0);
       $("seek").max = String(dur);
       $("seek").value = String(video.currentTime || 0);
       $("playBtn").textContent = video.paused ? "播放" : "暂停";
-      const page = Math.min(5, Math.floor((video.currentTime || 0) / 4.8));
-      renderDots(page, 6);
+      const pageSec = dur / Math.max(1, demo.pages);
+      const page = Math.min(demo.pages - 1, Math.floor((video.currentTime || 0) / pageSec));
+      renderDots(page, demo.pages);
       return;
     }
     const n = player.pages.length;
@@ -116,16 +153,43 @@
     return $("transSel").value;
   }
 
-  async function loadDemo() {
-    if (!demoStory) {
-      const res = await fetch("story.json");
-      demoStory = await res.json();
+  function applyRemotionChrome(id) {
+    const demo = REMOTION[id];
+    if (!demo) return;
+    activeRemotion = id;
+    if (video.getAttribute("src") !== demo.video) {
+      video.pause();
+      video.src = demo.video;
+      video.poster = demo.poster;
+      video.load();
     }
-    $("storyInput").value = demoStory.text;
+    const dl = $("demoDl");
+    if (dl) {
+      dl.href = demo.video;
+      dl.setAttribute("download", demo.download);
+    }
+    const img = $("castImg");
+    if (img) {
+      img.src = demo.sheet;
+      img.alt = demo.sheetAlt;
+    }
+  }
+
+  async function loadRemotion(id) {
+    const demo = REMOTION[id] || REMOTION.trees;
+    applyRemotionChrome(id);
+    if (!demoStories[id] && demo.storyUrl) {
+      const res = await fetch(demo.storyUrl);
+      demoStories[id] = await res.json();
+    }
+    const story = demoStories[id];
+    $("storyInput").value = (story && story.text) || PRESETS.find((p) => p.remotion === id).text;
     player.transition = currentTransition();
     source = "ai";
     setView("video");
-    await player.loadAiPages(demoStory);
+    if (story && story.pages && story.pages[0] && story.pages[0].color) {
+      await player.loadAiPages(story);
+    }
     updateMeta();
     setStatus("GitHub 源项目 Remotion 成片已载入：文字 → 黑白 → 彩色。");
   }
@@ -138,11 +202,13 @@
       return;
     }
     player.transition = currentTransition();
-    if (normalize(text) === normalize(DEMO_TEXT) && demoStory) {
+    const remotionPreset = PRESETS.find(
+      (p) => p.art === "ai" && normalize(text) === normalize(p.text)
+    );
+    if (remotionPreset) {
       source = "ai";
       setView("video");
-      return player.loadAiPages(demoStory).then(() => {
-        updateMeta();
+      return loadRemotion(remotionPreset.remotion).then(() => {
         setStatus("使用 GitHub Remotion 示例成片。");
       });
     }
@@ -204,7 +270,9 @@
     if (!btn) return;
     const i = Number(btn.dataset.i);
     if (view === "video") {
-      video.currentTime = i * 4.8;
+      const demo = remotionMeta();
+      const dur = video.duration && isFinite(video.duration) ? video.duration : demo.duration;
+      video.currentTime = i * (dur / Math.max(1, demo.pages));
       updateMeta();
       return;
     }
@@ -226,7 +294,7 @@
     generateFromText();
   });
   $("demoBtn").addEventListener("click", () => {
-    loadDemo().then(() => {
+    loadRemotion(activeRemotion).then(() => {
       video.currentTime = 0;
       video.play();
       updateMeta();
@@ -241,12 +309,17 @@
       if (!p) return;
       $("storyInput").value = p.text;
       document.querySelectorAll("[data-preset]").forEach((b) => b.classList.toggle("on", b === btn));
-      if (p.art === "ai") loadDemo();
+      if (p.art === "ai") loadRemotion(p.remotion);
       else generateFromText();
     });
   });
 
   $("dlBtn").addEventListener("click", async () => {
+    if (view === "video") {
+      const a = $("demoDl");
+      if (a) a.click();
+      return;
+    }
     if (!player.pages.length) return;
     $("dlBtn").disabled = true;
     setStatus("正在录制成片（静音 WebM）…请等这一遍播完。");
@@ -281,7 +354,7 @@
     }
   });
 
-  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadDemo()]).catch((err) => {
+  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("trees")]).catch((err) => {
     setStatus("载入示例失败：" + err.message);
   });
 })();
