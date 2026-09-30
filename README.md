@@ -102,6 +102,7 @@ python3 examples/watch_hbar_1h_ma25.py                 # 每根 1h 收盤掃 HBA
 python3 examples/watch_hbar_1h_ma25.py --lookback 48 --once   # 把 09-29 那筆也掃出來
 python3 examples/watch_hbar_1h_ma25.py --backtest --days 60 --pages
 python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
+python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 30 --pages
 ```
 
 憑證放 `tg_config.env`，或在 `examples/watch_hbar_1h_ma25.py` 最上面填 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`。
@@ -113,6 +114,10 @@ python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
 全幣種近 1 週（流動 USDT 永續 283 檔，09-23 → 09-30）：收緊後 **8 筆 / 8 檔**（原本 212 筆）。已平勝率 **75.0%**，平均 **+2.77%**，加總 +22.2%。HBAR +11.10%、2Z +9.22%、MARSCOIN +6.85%；虧 GRASS −14.13%、ACE −3.47%。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-7d/view.html
+
+全幣種近 1 個月（同一套、08-31 23:00 → 09-30 23:00）：掃 283 檔，原始訊號 50，重疊丟掉 9 後 **41 筆 / 32 檔**。已平勝率 **56.1%**，平均 **−0.61%**，加總 −24.97%。出場：時間停 29、停損 11、2R 1。HBAR 仍在最後一筆 **+11.10%**；最好 MARSCOIN +24.09%、FLOCK 2R +23.17% / +17.23%；最差 REZ −20.17%、SAGA −19.74%、NIL −19.60%。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-30d/view.html
 
 ## 幣安黏帶三幕 Telegram
 

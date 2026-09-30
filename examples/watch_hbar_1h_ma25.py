@@ -20,6 +20,7 @@
   python3 examples/watch_hbar_1h_ma25.py
   python3 examples/watch_hbar_1h_ma25.py --backtest --days 60 --pages
   python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
+  python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 30 --pages
   python3 examples/test_watch_hbar_1h_ma25.py
 """
 from __future__ import annotations
