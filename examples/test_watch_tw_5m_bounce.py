@@ -18,6 +18,7 @@ from watch_tw_5m_bounce import (  # noqa: E402
     climax_volume_ratio,
     detect_signals,
     drop_incomplete_5m,
+    entry_volume_ratio,
     fmt_alert,
     hit_on_day,
     hit_within_max_price,
@@ -77,7 +78,8 @@ def make_v_bounce_bars(n: int = 90) -> pd.DataFrame:
         close[i] = 273.2 + (i - dump_i - 8) * 0.12
     df = _ohlc(close, dump_i, 259.0)
     df.loc[df.index[dump_i], "Volume"] = 4800.0
-    df.loc[df.index[dump_i + 6], "Volume"] = 3600.0
+    # 墊底段安靜，排列完成那幾根才放量（晶技那種）
+    df.loc[df.index[68:72], "Volume"] = 5000.0
     return df
 
 
@@ -234,6 +236,9 @@ def test_volume_ratios() -> None:
     vol[41:50] = 1800.0  # 反彈帶量
     assert abs(climax_volume_ratio(vol, 40) - 5.5) < 1e-9
     assert abs(bounce_volume_ratio(vol, 40, 49) - 1.8) < 1e-9
+    entry = np.full(60, 1000.0)
+    entry[50] = 3000.0
+    assert abs(entry_volume_ratio(entry, 50) - 3.0) < 1e-9
     quiet = np.full(60, 1000.0)
     assert abs(climax_volume_ratio(quiet, 40) - 1.0) < 1e-9
     assert np.isnan(climax_volume_ratio(np.zeros(60), 40))
@@ -251,14 +256,30 @@ def test_dry_bounce_without_volume_skipped() -> None:
     flat = df.copy()
     flat["Volume"] = 1200.0
     assert detect_signals(flat) == []
-    loose = detect_signals(flat, min_climax_vol=0, min_bounce_vol=0)
+    loose = detect_signals(flat, min_climax_vol=0, min_bounce_vol=0, min_entry_vol=0)
     assert loose and loose[0].entry_idx == sig.entry_idx
     # 只有破底爆量、反彈縮量也不算
     dump_only = flat.copy()
     dump_only.loc[dump_only.index[sig.break_idx], "Volume"] = 6000.0
     dump_only.loc[dump_only.index[sig.break_idx + 1 :], "Volume"] = 700.0
     assert detect_signals(dump_only) == []
-    assert detect_signals(dump_only, min_bounce_vol=0)
+    assert detect_signals(dump_only, min_bounce_vol=0, min_entry_vol=0)
+
+
+def test_quiet_reclaim_waits_for_entry_volume() -> None:
+    """5>10>20 先排好但沒放量：晶技標準下繼續等；進場根爆量才出。"""
+    df = make_v_bounce_bars()
+    quiet = df.copy()
+    quiet["Volume"] = 1200.0
+    quiet.loc[quiet.index[58], "Volume"] = 4800.0  # 破底爆量，反彈段安靜
+    assert detect_signals(quiet) == []
+    assert detect_signals(quiet, min_entry_vol=0)
+    spiked = quiet.copy()
+    # 後面幾根放量，對齊晶技那種突破根
+    spiked.loc[spiked.index[65:], "Volume"] = 4000.0
+    sigs = detect_signals(spiked)
+    assert sigs
+    assert sigs[0].volume_ratio >= 2.0
 
 
 def test_entry_below_ma60_skipped() -> None:
@@ -401,6 +422,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "MA200" in text
     assert "破底量" in text
     assert "反彈量" in text
+    assert "進場量" in text
     assert "蓋子" in text
     assert (path.parent / "img").exists()
 
@@ -418,6 +440,7 @@ def main() -> int:
     test_dump_with_ma_underneath_skipped()
     test_volume_ratios()
     test_dry_bounce_without_volume_skipped()
+    test_quiet_reclaim_waits_for_entry_volume()
     test_entry_below_ma60_skipped()
     test_lid_helpers()
     test_tight_lid_skipped_unless_punch()
