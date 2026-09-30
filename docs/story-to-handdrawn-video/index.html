@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="把中文故事做成 3:4 竖屏手绘动画：文字 → 黑白画稿 → 彩色插画，也可翻书或上传分镜。" />
+  <title>手绘故事 · Story to Hand-drawn Video</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Liu+Jian+Mao+Cao&family=Ma+Shan+Zheng&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --paper: #faf6ee;
+      --sheet: #fffefb;
+      --ink: #2b241c;
+      --muted: #8a7b68;
+      --brick: #b85c4a;
+      --dusty: #6b8ca8;
+      --line: #e6d9c6;
+      --shadow: 0 18px 40px rgba(60, 40, 20, 0.16);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      background:
+        radial-gradient(ellipse 80% 40% at 50% -10%, rgba(184, 92, 74, 0.1), transparent),
+        radial-gradient(ellipse 50% 40% at 100% 100%, rgba(107, 140, 168, 0.12), transparent),
+        var(--paper);
+      color: var(--ink);
+      font-family: "Noto Sans TC", -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 1.1rem 1rem 2.8rem;
+    }
+    header { text-align: center; margin-bottom: 1.1rem; }
+    .logo {
+      font-family: "Ma Shan Zheng", cursive;
+      font-size: clamp(2rem, 8vw, 2.8rem);
+      line-height: 1.15;
+    }
+    .subtitle { color: var(--muted); margin-top: 0.35rem; font-size: 0.92rem; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(260px, 390px) 1fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    @media (max-width: 820px) {
+      .layout { grid-template-columns: 1fr; }
+      .stage-col { order: -1; }
+    }
+    .stage-col { display: flex; flex-direction: column; align-items: center; }
+    .book {
+      width: min(100%, 390px);
+      background: var(--sheet);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--line);
+      overflow: hidden;
+      position: relative;
+    }
+    .book canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 3 / 4;
+      background: var(--sheet);
+    }
+    .transport {
+      width: min(100%, 390px);
+      margin-top: 0.7rem;
+    }
+    .row { display: flex; gap: 0.45rem; align-items: center; }
+    .row + .row { margin-top: 0.45rem; }
+    button, select, .file-btn, a.file-btn {
+      font-family: inherit;
+      font-size: 0.9rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      padding: 0.45rem 0.9rem;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    button.primary {
+      background: var(--brick);
+      color: #fff;
+      border-color: transparent;
+      font-weight: 700;
+    }
+    button:disabled { opacity: 0.5; cursor: default; }
+    button:hover, .file-btn:hover, select:hover { border-color: var(--dusty); }
+    button.primary:hover { filter: brightness(1.05); }
+    #seek { flex: 1; accent-color: var(--brick); }
+    .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.8rem; min-width: 4.6rem; text-align: right; }
+    .dots { display: flex; justify-content: center; gap: 0.35rem; margin-top: 0.55rem; flex-wrap: wrap; }
+    .dot {
+      width: 9px; height: 9px; padding: 0; border-radius: 50%;
+      background: #d8cbb8; border: 0;
+    }
+    .dot.on { background: var(--brick); transform: scale(1.15); }
+    .panel {
+      background: rgba(255, 254, 251, 0.72);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .panel h2 {
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 0.55rem;
+    }
+    textarea {
+      width: 100%;
+      min-height: 170px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.75rem 0.85rem;
+      font-family: "Noto Sans TC", sans-serif;
+      font-size: 0.95rem;
+      line-height: 1.65;
+      background: var(--sheet);
+      color: var(--ink);
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.65rem 0 0.85rem; }
+    .chips button {
+      background: #fff;
+    }
+    .chips button.on {
+      background: rgba(107, 140, 168, 0.16);
+      border-color: var(--dusty);
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin: 0.7rem 0;
+    }
+    .controls label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+    .meta {
+      display: flex;
+      gap: 0.8rem;
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin: 0.7rem 0 0.35rem;
+    }
+    #status { color: var(--muted); font-size: 0.85rem; line-height: 1.55; min-height: 2.5em; }
+    .hint {
+      margin-top: 0.85rem;
+      padding-top: 0.75rem;
+      border-top: 1px dashed var(--line);
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.55;
+    }
+    .file-btn { display: inline-block; }
+    .file-btn input { display: none; }
+    .cast {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      margin-top: 0.8rem;
+    }
+    .cast img {
+      width: 72px; height: 72px; object-fit: cover;
+      border-radius: 12px; border: 1px solid var(--line); background: #fff;
+    }
+    .cast p { color: var(--muted); font-size: 0.78rem; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1 class="logo">手绘故事</h1>
+      <p class="subtitle">3:4 竖屏 · 文字 → 黑白画稿 → 彩色插画 · 静音成片</p>
+    </header>
+
+    <div class="layout">
+      <section class="panel">
+        <h2>STORY</h2>
+        <div class="chips">
+          <button type="button" data-preset="window" class="on">窗边的约定</button>
+          <button type="button" data-preset="moon">月亮邮差</button>
+          <button type="button" data-preset="soup">一碗热汤</button>
+        </div>
+        <textarea id="storyInput" spellcheck="false" aria-label="故事文案"></textarea>
+        <div class="controls">
+          <label>画风
+            <select id="styleSel">
+              <option value="diary" selected>彩铅日记</option>
+              <option value="crayon">儿童蜡笔</option>
+              <option value="line">极简线条</option>
+              <option value="ink">水墨</option>
+            </select>
+          </label>
+          <label>转场
+            <select id="transSel">
+              <option value="cut" selected>逐层绘制</option>
+              <option value="page-flip">右下翻书</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button type="button" class="primary" id="genBtn">生成预览</button>
+          <button type="button" id="demoBtn">播放示例</button>
+          <label class="file-btn">上传分镜
+            <input id="fileInput" type="file" accept="image/*" multiple />
+          </label>
+          <button type="button" id="dlBtn">下载成片</button>
+          <a class="file-btn" href="assets/demo-preview.mp4" download="窗边的约定.mp4">示例 MP4</a>
+        </div>
+        <div class="meta">
+          <span id="pageCount">—</span>
+          <span id="durationLabel">0:00</span>
+        </div>
+        <p id="status">正在载入示例插画…</p>
+        <div class="cast">
+          <img src="assets/character-sheet.jpg" alt="小猫与小鸟角色设定" />
+          <p>默认锁定「彩铅日记漫画」：钝头毡笔轮廓、短促彩铅、大留白。自定义故事用画布手绘；上传图按原顺序 contain 适配。</p>
+        </div>
+        <p class="hint">每句一个节拍，保留原文。成片为静音 H.264/WebM 画面轨，方便后期配音。空格键播放／暂停。</p>
+      </section>
+
+      <div class="stage-col">
+        <div class="book">
+          <canvas id="stage" width="720" height="960" aria-label="故事画布"></canvas>
+        </div>
+        <div class="transport">
+          <div class="row">
+            <button type="button" class="primary" id="playBtn">播放</button>
+            <button type="button" id="stopBtn">开头</button>
+            <input id="seek" type="range" min="0" max="0" step="0.05" value="0" />
+            <span class="time" id="timeLabel">0:00</span>
+          </div>
+          <div class="dots" id="dots"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="split.js"></script>
+  <script src="doodle.js"></script>
+  <script src="player.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
