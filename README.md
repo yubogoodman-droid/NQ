@@ -70,8 +70,9 @@ python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
 # 只看今天（台北）的訊號，並把力成併進去
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pages
 
-# 近一週、700 以上拿掉；套晶技標準（進場放量 + 量 + 60MA + 蓋子）
+# 近一週 / 近一個月、700 以上拿掉；套晶技標準（當日破底 + 墊完再爆量）
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 7d --also 1815.TWO,3042 --pages
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 1mo --also 1815.TWO,3042 --pages
 
 # 不要量的門檻，只看均線排列
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --min-climax-vol 0 --min-bounce-vol 0 --no-ma60 --pages
@@ -84,7 +85,9 @@ python3 examples/watch_tw_5m_bounce.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_bounce_ma_stack.pine`。
 
-近一週（2026-09-22→09-30）成交額前 80、**700 以上拿掉**： **2 筆**、2 檔、勝率 50%、合計 **+5.8%**。只剩 09-22 南茂收盤 −2.3%，以及 09-23 晶技 +8.1%（進場量 15×、突破量 25×）。富喬／友達／頎邦那種隔夜 V 或一路帶量的假彈都不算。圖上有 5/10/20/60/120/200/240，卡片寫破底量／反彈量／進場量／突破量／蓋子。  
+近一個月（2026-08-31→09-30）成交額前 80、**700 以上拿掉**： **5 筆**、5 檔、勝率 60%、合計 **+14.6%**。賺的是 09-10 信昌電 +6.9%、嘉晶 +5.9%，以及 09-23 晶技 +8.1%；虧的是 09-01 強茂 −1.9%、09-03 台勝科停損 −4.4%。圖庫目前是這一個月。  
+近一週 7 日 K 會多出 09-22 南茂（−2.3%）：7 日還沒畫出 120/200/240，破底那根底下看起來是空的；一個月資料這三條長均墊在 99.5 底下，所以不算。  
+
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
