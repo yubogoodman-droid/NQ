@@ -70,9 +70,10 @@ python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
 # 只看今天（台北）的訊號，並把力成併進去
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pages
 
-# 近一週 / 近一個月、700 以上拿掉；套晶技標準（當日破底 + 墊完再爆量）
+# 近一週 / 近一個月 / 近兩個月（Yahoo 5分K 最長 60d）、700 以上拿掉；套晶技標準
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 7d --also 1815.TWO,3042 --pages
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 1mo --also 1815.TWO,3042 --pages
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 60d --also 1815.TWO,3042 --pages
 
 # 不要量的門檻，只看均線排列
 python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --min-climax-vol 0 --min-bounce-vol 0 --no-ma60 --pages
@@ -85,7 +86,8 @@ python3 examples/watch_tw_5m_bounce.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_bounce_ma_stack.pine`。
 
-近一個月（2026-08-31→09-30）成交額前 80、**700 以上拿掉**： **3 筆**、3 檔、勝率 100%、合計 **+20.9%**。信昌電 +6.9%、嘉晶 +5.9%、晶技 +8.1%。強茂／台勝科那種急殺後立刻站回 20MA、沒在均線下墊過的已拿掉。K 線圖嵌在 HTML 裡。  
+近兩個月（Yahoo 5 分 K 最長 60d，2026-07-07→09-30）成交額前 80、**700 以上拿掉**： **7 筆**、7 檔、勝率 71%、合計 **+15.1%**。大賺仍是 09-10 信昌電 +6.9%、嘉晶 +5.9%、09-23 晶技 +8.1%；拖累是 08-21 台虹收盤 −8.7%（進去時已經彈了 17%）。圖庫目前是這段。  
+近一個月（2026-08-31→09-30）同一套規則是 **3 筆、勝率 100%、+20.9%**（信昌電／嘉晶／晶技）。  
 近一週 7 日 K 會多出 09-22 南茂（−2.3%）：7 日還沒畫出 120/200/240，破底那根底下看起來是空的；一個月資料這三條長均墊在 99.5 底下，所以不算。  
 
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
