@@ -46,7 +46,12 @@ def test_drop_unclosed() -> None:
     assert len(drop_unclosed(raw, now_ms=2 * INTERVAL_MS)) == 2
 
 
-def _bars(closes: np.ndarray, highs: np.ndarray | None = None, lows: np.ndarray | None = None) -> dict:
+def _bars(
+    closes: np.ndarray,
+    highs: np.ndarray | None = None,
+    lows: np.ndarray | None = None,
+    vols: np.ndarray | None = None,
+) -> dict:
     n = len(closes)
     c = np.asarray(closes, dtype=float)
     if highs is None:
@@ -61,7 +66,7 @@ def _bars(closes: np.ndarray, highs: np.ndarray | None = None, lows: np.ndarray 
         "h": np.asarray(highs, dtype=float),
         "l": np.asarray(lows, dtype=float),
         "c": c,
-        "v": np.full(n, 1000.0),
+        "v": np.full(n, 1000.0) if vols is None else np.asarray(vols, dtype=float),
     }
 
 
@@ -89,7 +94,9 @@ def fake_break_then_fail(n: int = 90) -> dict:
         c[k] = 0.99
         h[k] = 1.00
         l[k] = 0.98
-    return indicators(_bars(c, h, l))
+    v = np.full(n, 1000.0)
+    v[a : a + 6] = 5000.0
+    return indicators(_bars(c, h, l, v))
 
 
 def chop_around_ma(n: int = 80) -> dict:
@@ -120,6 +127,10 @@ def test_detects_hbar_style_dump() -> None:
     assert sig.fail >= 0.05
     assert 1 <= sig.bars_after <= 36
     assert sig.peak_high >= 1.19
+    assert sig.range_break >= 0.18
+    assert sig.close_below <= 0.025
+    assert sig.vol_ratio >= 1.8
+    assert 0.15 <= sig.ext <= 0.40
     assert detect_at(d, sig.i + 1) is None
 
 
@@ -148,6 +159,14 @@ def test_tight_ext_filter() -> None:
     tight = detect_signals(d, p=Params(min_ext=0.50))
     assert loose
     assert tight == []
+
+
+def test_rejects_meme_extension() -> None:
+    d = fake_break_then_fail()
+    peak = detect_signals(d)[0].peak_i
+    d["h"][peak] = float(d["m25"][peak]) * 1.80
+    d = indicators(d)
+    assert detect_signals(d) == []
 
 
 def test_simulate_short_and_html(tmp_path: Path | None = None) -> None:
@@ -263,6 +282,7 @@ def main() -> int:
     test_chop_does_not_fire()
     test_already_below_does_not_refire()
     test_tight_ext_filter()
+    test_rejects_meme_extension()
     test_simulate_short_and_html()
     test_filter_universe_keeps_liquid_and_hbar()
     test_skip_overlap_and_chart_pick()

@@ -4,11 +4,15 @@
 對齊 2026-09-29 14:00（台北）那波：先拉到 0.13099（相對當時 MA25 伸 ~23%），
 12 根後收盤從 MA25 上方跌到下方（0.11766 < 0.11837）。
 
-條件（剛收盤的 1h K）：
-  1. 上一根收盤 ≥ MA25，這一根收盤 < MA25（第一次跌破）
-  2. 往回 48 根內有假突破高點：創先前 24 根新高、當根收盤仍在 MA25 上、
-     高點相對當根 MA25 ≥ 8%，且距離這一根 1～36 根
-  3. 從那個高點回到這一根收盤，回落 ≥ 5%
+條件（剛收盤的 1h K，對齊 HBAR 箱體假突破）：
+  1. 上一根收盤 ≥ MA25，這一根收盤 < MA25（第一次跌破），且是收跌陰線
+  2. 往回 48 根內有假突破高點：創先前 24 根新高、當根收盤仍在 MA25 上
+  3. 高點相對當根 MA25 伸 15%～40%（HBAR 約 23%；不要 8% 輕觸，也不要 100% 妖幣）
+  4. 從高點回落 8%～18%（HBAR 約 10%；剛失守，不是已經崩完）
+  5. 隔 6～18 根才跌破（HBAR 12 根；要有一段派發）
+  6. 相對拉升前箱體（高點往前 48 根、扣掉最後 10 根尖峰）再高出 ≥ 18%
+  7. 收盤離 MA25 不超過 2.5%（第一根跌破，不要追低）
+  8. MA25 仍在上（近 6 根至少 +1%），尖峰附近量能 ≥ 均量 1.8 倍
 
 用法:
   python3 examples/watch_hbar_1h_ma25.py --test
@@ -49,13 +53,22 @@ MIN_QUOTE_VOL = 5_000_000
 KEEP = {DEFAULT_SYMBOL}
 MAX_CHARTS = 36
 
-# 對齊 HBAR 09-29 14:00
+# 對齊 HBAR 09-29 14:00 箱體假突破（伸 ~23%、回落 ~10%、隔 12 根）
 LOOKBACK = 48
 PRIOR_RANGE = 24
-MIN_EXT = 0.08
-MIN_FAIL = 0.05
-MIN_BARS_AFTER = 1
-MAX_BARS_AFTER = 36
+MIN_EXT = 0.15
+MAX_EXT = 0.40
+MIN_FAIL = 0.08
+MAX_FAIL = 0.18
+MIN_BARS_AFTER = 6
+MAX_BARS_AFTER = 18
+MIN_RANGE_BREAK = 0.18
+RANGE_BASE_SKIP = 10
+MAX_CLOSE_BELOW = 0.025
+MIN_MA25_SLOPE = 0.01
+MA25_SLOPE_BARS = 6
+MIN_VOL_RATIO = 1.8
+VOL_LOOKBACK = 12
 TARGET_R = 2.0
 TIME_BARS = 24
 
@@ -77,9 +90,19 @@ class Params:
     lookback: int = LOOKBACK
     prior_range: int = PRIOR_RANGE
     min_ext: float = MIN_EXT
+    max_ext: float = MAX_EXT
     min_fail: float = MIN_FAIL
+    max_fail: float = MAX_FAIL
     min_bars_after: int = MIN_BARS_AFTER
     max_bars_after: int = MAX_BARS_AFTER
+    min_range_break: float = MIN_RANGE_BREAK
+    range_base_skip: int = RANGE_BASE_SKIP
+    max_close_below: float = MAX_CLOSE_BELOW
+    min_ma25_slope: float = MIN_MA25_SLOPE
+    ma25_slope_bars: int = MA25_SLOPE_BARS
+    require_red: bool = True
+    min_vol_ratio: float = MIN_VOL_RATIO
+    vol_lookback: int = VOL_LOOKBACK
     target_r: float = TARGET_R
     time_bars: int = TIME_BARS
 
@@ -95,6 +118,9 @@ class Signal:
     ext: float
     fail: float
     bars_after: int
+    range_break: float = 0.0
+    close_below: float = 0.0
+    vol_ratio: float = 0.0
 
 
 @dataclass
@@ -277,6 +303,7 @@ def indicators(d: dict) -> dict:
     out = dict(d)
     for n in MA_PERIODS:
         out[f"m{n}"] = sma(d["c"], n)
+    out["v20"] = sma(d["v"], 20)
     return out
 
 
@@ -290,7 +317,7 @@ def crossed_below_ma25(d: dict, i: int) -> bool:
 
 
 def find_fake_peak(d: dict, i: int, p: Params) -> int | None:
-    """跌破這根之前，往回找符合假突破的最高點。"""
+    """跌破這根之前，往回找符合箱體假突破的最高點。"""
     lo = max(p.prior_range, i - p.lookback)
     if i - lo < p.min_bars_after:
         return None
@@ -314,34 +341,75 @@ def find_fake_peak(d: dict, i: int, p: Params) -> int | None:
     if peak_high <= prior_high:
         return None
     ext = peak_high / m_peak - 1.0
-    if ext < p.min_ext:
+    if ext < p.min_ext or ext > p.max_ext:
         return None
     fail = 1.0 - float(d["c"][i]) / peak_high
-    if fail < p.min_fail:
+    if fail < p.min_fail or fail > p.max_fail:
         return None
     return peak
+
+
+def _range_break(d: dict, peak: int, p: Params) -> float | None:
+    base_to = peak - p.range_base_skip
+    base_from = max(0, peak - p.lookback)
+    if base_to <= base_from:
+        return None
+    base_high = float(np.max(d["h"][base_from:base_to]))
+    if base_high <= 0:
+        return None
+    return float(d["h"][peak]) / base_high - 1.0
+
+
+def _vol_ratio(d: dict, peak: int, p: Params) -> float | None:
+    v20 = float(d["v20"][peak]) if "v20" in d else float("nan")
+    if np.isnan(v20) or v20 <= 0:
+        return None
+    lo = max(0, peak - p.vol_lookback)
+    return float(np.max(d["v"][lo : peak + 1])) / v20
 
 
 def detect_at(d: dict, i: int, p: Params | None = None) -> Signal | None:
     p = p or Params()
     if not crossed_below_ma25(d, i):
         return None
+    close = float(d["c"][i])
+    ma25 = float(d["m25"][i])
+    if ma25 <= 0 or np.isnan(ma25):
+        return None
+    if p.require_red and close >= float(d["o"][i]):
+        return None
+    close_below = 1.0 - close / ma25
+    if close_below > p.max_close_below:
+        return None
+    slope_i = i - p.ma25_slope_bars
+    if slope_i < 0 or np.isnan(d["m25"][slope_i]) or float(d["m25"][slope_i]) <= 0:
+        return None
+    if ma25 / float(d["m25"][slope_i]) - 1.0 < p.min_ma25_slope:
+        return None
     peak = find_fake_peak(d, i, p)
     if peak is None:
         return None
+    rb = _range_break(d, peak, p)
+    if rb is None or rb < p.min_range_break:
+        return None
+    vr = _vol_ratio(d, peak, p)
+    if vr is None or vr < p.min_vol_ratio:
+        return None
     peak_high = float(d["h"][peak])
     peak_ma25 = float(d["m25"][peak])
-    close = float(d["c"][i])
     return Signal(
         i=i,
         peak_i=peak,
         close=close,
-        ma25=float(d["m25"][i]),
+        ma25=ma25,
         peak_high=peak_high,
         peak_ma25=peak_ma25,
         ext=peak_high / peak_ma25 - 1.0,
         fail=1.0 - close / peak_high,
         bars_after=i - peak,
+        range_break=rb,
+        close_below=close_below,
+        vol_ratio=vr,
     )
 
 
@@ -582,12 +650,12 @@ def format_alert(sym: str, d: dict, sig: Signal) -> str:
     pk = hm(int(d["t"][sig.peak_i]))
     o, h, l, c = float(d["o"][sig.i]), float(d["h"][sig.i]), float(d["l"][sig.i]), sig.close
     return (
-        f"🔻 <b>1h 假突破跌破 MA25</b>\n"
+        f"🔻 <b>1h 箱體假突破跌破 MA25</b>\n"
         f"<b>{sym}</b>  收盤 {ts}（台北）\n"
         f"現價 {c:g}　OHLC {o:g} / {h:g} / {l:g} / {c:g}\n"
-        f"MA25 {sig.ma25:g}　收盤低 {((c / sig.ma25) - 1) * 100:.2f}%\n"
-        f"假突破高 {pk}  {sig.peak_high:g}　伸 {sig.ext * 100:.1f}%\n"
-        f"從高點回落 {sig.fail * 100:.1f}%　隔 {sig.bars_after} 根才跌破\n"
+        f"MA25 {sig.ma25:g}　剛跌破 {sig.close_below * 100:.2f}%　陰線\n"
+        f"假突破高 {pk}  {sig.peak_high:g}　伸 {sig.ext * 100:.1f}%　箱體假突破 {sig.range_break * 100:.1f}%\n"
+        f"從高點回落 {sig.fail * 100:.1f}%　隔 {sig.bars_after} 根　量 {sig.vol_ratio:.1f}×\n"
         f"空：停在假突破高、目標 {TARGET_R:g}R（對照用）"
     )
 
@@ -704,8 +772,10 @@ def write_html(
             f"<div class='tags'><span class='tag tag-info'>{escape(t.reason)}</span>"
             f"<span class='tag'>假突破 {escape(pk)}</span>"
             f"<span class='tag'>伸 {t.signal.ext * 100:.1f}%</span>"
+            f"<span class='tag'>箱破 {t.signal.range_break * 100:.1f}%</span>"
             f"<span class='tag'>回落 {t.signal.fail * 100:.1f}%</span>"
-            f"<span class='tag'>{t.signal.bars_after} 根後跌破</span></div>"
+            f"<span class='tag'>{t.signal.bars_after} 根</span>"
+            f"<span class='tag'>量 {t.signal.vol_ratio:.1f}×</span></div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry:g}  stop {t.stop:g}  target {t.target:g}\n"
             f"exit {t.exit:g} {t.reason}  {t.pnl_pct * 100:+.2f}%\n"
@@ -747,8 +817,9 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <div class="page">
 <section class="summary">
 <h1>{escape(str(title_scope))} 1h 假突破跌破 MA25 · 近 {extra['days']} 天</h1>
-<p class="muted">對齊 2026-09-29 HBAR：假突破創 24 根新高、高點離 MA25 ≥ {extra['min_ext']*100:g}%，
-從高點回落 ≥ {extra['min_fail']*100:g}% 後，1h 收盤跌破 MA25 才算。
+<p class="muted">對齊 2026-09-29 HBAR 箱體假突破：高點離 MA25 {extra['min_ext']*100:g}～{extra.get('max_ext', 0.4)*100:g}%，
+從箱體再高出 ≥ {extra.get('min_range_break', 0.18)*100:g}%，回落 {extra['min_fail']*100:g}～{extra.get('max_fail', 0.18)*100:g}% 後，
+隔 6～18 根、陰線剛跌破 MA25（離均線 ≤ 2.5%）才算。MA25 仍上、尖峰放量。
 <br/>收盤空；停在假突破高、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。同標的重疊不重做。加總％是各筆相加。
 <br/>{scanned_line}進場 {stats['count']} · 標的 {stats.get('symbols', extra.get('symbol', ''))}
 · 出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)}
@@ -788,6 +859,9 @@ def dump_hits(path: Path, trades: list[Trade], stats: dict, extra: dict) -> Path
                 "ext": t.signal.ext,
                 "fail": t.signal.fail,
                 "bars_after": t.signal.bars_after,
+                "range_break": t.signal.range_break,
+                "close_below": t.signal.close_below,
+                "vol_ratio": t.signal.vol_ratio,
                 "fwd_4h": t.fwd_4h,
                 "fwd_8h": t.fwd_8h,
                 "fwd_24h": t.fwd_24h,
@@ -816,7 +890,10 @@ def backtest_one(sym: str, days: int, p: Params, limit: int) -> tuple[str, list[
 def cmd_backtest(args) -> int:
     p = Params(
         min_ext=args.min_ext,
+        max_ext=args.max_ext,
         min_fail=args.min_fail,
+        max_fail=args.max_fail,
+        min_range_break=args.min_range_break,
         target_r=args.target_r,
         time_bars=args.time_bars,
     )
@@ -856,7 +933,10 @@ def cmd_backtest(args) -> int:
         "universe": bool(args.universe) or len(symbols) > 1,
         "days": args.days,
         "min_ext": p.min_ext,
+        "max_ext": p.max_ext,
         "min_fail": p.min_fail,
+        "max_fail": p.max_fail,
+        "min_range_break": p.min_range_break,
         "target_r": p.target_r,
         "time_bars": p.time_bars,
         "scanned": len(symbols),
@@ -902,7 +982,7 @@ def cmd_watch(args) -> int:
     apply_keys()
     if args.test:
         return test_telegram()
-    p = Params(min_ext=args.min_ext, min_fail=args.min_fail)
+    p = Params(min_ext=args.min_ext, max_ext=args.max_ext, min_fail=args.min_fail, max_fail=args.max_fail, min_range_break=args.min_range_break)
     seen = load_seen()
     if args.universe:
         print("載入標的…", flush=True)
@@ -910,8 +990,8 @@ def cmd_watch(args) -> int:
     else:
         symbols = [s.upper() for s in (args.symbols or [DEFAULT_SYMBOL])]
     print(
-        f"監看 {len(symbols)} 檔 1h：假突破後收盤跌破 MA25"
-        f"（伸≥{p.min_ext*100:g}% 回落≥{p.min_fail*100:g}%）",
+        f"監看 {len(symbols)} 檔 1h：HBAR 型箱體假突破後收盤跌破 MA25"
+        f"（伸 {p.min_ext*100:g}～{p.max_ext*100:g}% 回落 {p.min_fail*100:g}～{p.max_fail*100:g}%）",
         flush=True,
     )
 
@@ -958,7 +1038,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lookback", type=int, default=2, help="往回看幾根已收盤 1h（預設 2）")
     p.add_argument("--symbols", nargs="*", help="預設 HBARUSDT")
     p.add_argument("--min-ext", type=float, default=MIN_EXT, help="假突破高點相對 MA25 最少伸出去")
+    p.add_argument("--max-ext", type=float, default=MAX_EXT, help="最多伸出去，避開妖幣直線")
     p.add_argument("--min-fail", type=float, default=MIN_FAIL, help="從高點回到收盤最少回落")
+    p.add_argument("--max-fail", type=float, default=MAX_FAIL, help="最多回落，不要已經崩完才進")
+    p.add_argument("--min-range-break", type=float, default=MIN_RANGE_BREAK, help="相對拉升前箱體最少再高出多少")
     p.add_argument("--backtest", action="store_true", help="回測最近 N 天並可出 HTML")
     p.add_argument("--universe", action="store_true", help="掃幣安流動 USDT 永續（全幣種）")
     p.add_argument("--min-quote-vol", type=float, default=MIN_QUOTE_VOL, help="24h 成交額門檻，預設 500 萬")
