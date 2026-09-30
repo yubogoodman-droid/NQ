@@ -284,10 +284,8 @@
         drawCaption(targetCtx, page, 1);
         return;
       }
-      const lp = layeredProgress(local);
-      wipeImage(targetCtx, page.bw, lp.bw);
-      wipeImage(targetCtx, page.color, lp.color);
-      drawCaption(targetCtx, page, lp.text);
+      targetCtx.drawImage(page.color, 0, 0, W, H);
+      drawCaption(targetCtx, page, 1);
     }
 
     drawAt(time) {

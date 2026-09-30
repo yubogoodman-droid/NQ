@@ -191,7 +191,10 @@
       await player.loadAiPages(story);
     }
     updateMeta();
-    setStatus("GitHub 源项目 Remotion 成片已载入：文字 → 黑白 → 彩色。");
+    const note = id === "trees"
+      ? "彩图直出，无黑白上色。"
+      : "文字 → 黑白 → 彩色。";
+    setStatus("GitHub 源项目 Remotion 成片已载入：" + note);
   }
 
   function generateFromText() {
