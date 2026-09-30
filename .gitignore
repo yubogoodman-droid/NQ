@@ -7,4 +7,5 @@ output/*.json
 tg_config.env
 tg_alert_state.json
 examples/tg_alert_state.json
+examples/tg_base_stack_state.json
 examples/tg_config.env
