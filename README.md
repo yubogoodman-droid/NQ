@@ -95,13 +95,18 @@ python3 examples/watch_hbar_1h_ma25.py --once --dry-run
 python3 examples/watch_hbar_1h_ma25.py                 # 每根 1h 收盤掃 HBAR
 python3 examples/watch_hbar_1h_ma25.py --lookback 48 --once   # 把 09-29 那筆也掃出來
 python3 examples/watch_hbar_1h_ma25.py --backtest --days 60 --pages
+python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
 ```
 
 憑證放 `tg_config.env`，或在 `examples/watch_hbar_1h_ma25.py` 最上面填 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`。
 
-近 60 天（08-01 → 09-30）：**2 筆、已平勝率 100%、平均 +6.70%**（都是 24 根時間停）。09-29 14:00 那筆從 0.13099 假突破後跌破 MA25，時間停 **+11.10%**。
+近 60 天 HBAR（08-01 → 09-30）：**2 筆、已平勝率 100%、平均 +6.70%**（都是 24 根時間停）。09-29 14:00 那筆從 0.13099 假突破後跌破 MA25，時間停 **+11.10%**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/hbar-1h-ma25/view.html
+
+全幣種近 1 週（流動 USDT 永續 281 檔，09-23 → 09-30）：原始訊號 391，同標的重疊刪掉後進場 **212 筆 / 123 檔**。已平 184 筆勝率 **53.3%**，平均 **−0.24%**，加總 −43.6%。出場：時間 152 · 停損 32 · 未平 28。HBAR 09-29 14:00 那筆在裡面，時間停 **+11.10%**。大賺有 TAKE +38%、龙虾 +34%；大虧有 Q −85%、US −33%。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-7d/view.html
 
 ## 幣安黏帶三幕 Telegram
 
