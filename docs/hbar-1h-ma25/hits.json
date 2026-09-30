@@ -1,0 +1,57 @@
+{
+  "stats": {
+    "count": 1,
+    "closed": 1,
+    "wins": 1,
+    "closed_win_rate": 100.0,
+    "avg_pct": 0.11099779024307328,
+    "total_pct": 0.11099779024307328,
+    "symbols": 1,
+    "reasons": {
+      "time": 1
+    },
+    "fwd_4h": 0.005439401665816774,
+    "fwd_8h": 0.0294067652558219,
+    "fwd_24h": 0.11099779024307328
+  },
+  "extra": {
+    "symbol": "HBARUSDT",
+    "universe": false,
+    "days": 60,
+    "min_ext": 0.15,
+    "max_ext": 0.4,
+    "min_fail": 0.08,
+    "max_fail": 0.18,
+    "min_range_break": 0.18,
+    "target_r": 2.0,
+    "time_bars": 24,
+    "scanned": 1,
+    "raw_hits": 1,
+    "overlap_dropped": 0,
+    "start": "08-01 22:00",
+    "end": "09-30 22:00"
+  },
+  "hits": [
+    {
+      "symbol": "HBARUSDT",
+      "entry_time": "09-29 14:00",
+      "exit_time": "09-30 14:00",
+      "peak_time": "09-29 02:00",
+      "entry": 0.11766,
+      "exit": 0.1046,
+      "stop": 0.13099,
+      "target": 0.09100000000000001,
+      "pnl_pct": 0.11099779024307328,
+      "reason": "time",
+      "ext": 0.23164613139564616,
+      "fail": 0.10176349339644242,
+      "bars_after": 12,
+      "range_break": 0.31793943052620977,
+      "close_below": 0.005974628106434898,
+      "vol_ratio": 2.1355833170081238,
+      "fwd_4h": 0.005439401665816774,
+      "fwd_8h": 0.0294067652558219,
+      "fwd_24h": 0.11099779024307328
+    }
+  ]
+}
