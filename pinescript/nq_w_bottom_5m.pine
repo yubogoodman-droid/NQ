@@ -1,75 +1,40 @@
 //@version=5
-strategy("NQ 五分K W底進場", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000)
+strategy("NQ 五分K 破三小時低 5/20多排站上MA60", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, process_orders_on_close=true)
 
-// === 參數 ===
-swingLen     = input.int(3, "轉折確認 K 數", minval=1)
-tolPct       = input.float(0.1, "兩低點價差容忍 (%)", minval=0.05, step=0.05) / 100
-minBars      = input.int(5, "兩低點最少間隔", minval=2)
-maxBars      = input.int(60, "兩低點最多間隔", minval=10)
-useCloseBreak = input.bool(true, "收盤突破頸線進場")
+lookbackBars = input.int(36, "三小時回看 K 數", minval=12)
+reclaimBars  = input.int(12, "破底後最多幾根須多排站上 MA60", minval=1)
+stopPts      = input.float(20.0, "停損在破底下方點數", minval=0, step=1)
+rr           = input.float(2.0, "盈虧比", minval=0.5, step=0.5)
 
-// === 波段高低點 ===
-pivotLow(val, left, right) =>
-    ta.pivotlow(val, left, right)
+ma5  = ta.sma(close, 5)
+ma20 = ta.sma(close, 20)
+ma60 = ta.sma(close, 60)
+stacked = close > ma60 and ma5 > ma20 and ma20 > ma60
+priorLow = ta.lowest(low[1], lookbackBars)
+newBreak = low < priorLow and low[1] >= priorLow
 
-pivotHigh(val, left, right) =>
-    ta.pivothigh(val, left, right)
+var int   breakBar = na
+var float breakLow = na
 
-pl = pivotLow(low, swingLen, swingLen)
-ph = pivotHigh(high, swingLen, swingLen)
+if newBreak and na(breakBar)
+    breakBar := bar_index
+    breakLow := low
 
-var float firstLow   = na
-var int   firstLowBar = na
-var float secondLow  = na
-var int   secondLowBar = na
-var float neckline   = na
-var int   necklineBar = na
-var bool  wReady     = false
+if not na(breakBar)
+    breakLow := math.min(breakLow, low)
+    if bar_index - breakBar >= reclaimBars
+        breakBar := na
+        breakLow := na
+    else if stacked
+        entry = close
+        stop = breakLow - stopPts
+        if entry > stop
+            strategy.entry("5/20站上MA60", strategy.long)
+            strategy.exit("出場", "5/20站上MA60", stop=stop, limit=entry + rr * (entry - stop))
+        breakBar := na
+        breakLow := na
 
-// 記錄第一個低點
-if not na(pl)
-    firstLow    := pl
-    firstLowBar := bar_index - swingLen
-    secondLow   := na
-    secondLowBar := na
-    neckline    := na
-    necklineBar := na
-    wReady      := false
-
-// 在兩低點之間追蹤頸線
-if not na(firstLow) and na(secondLow)
-    if not na(ph)
-        if na(neckline) or ph > neckline
-            neckline    := ph
-            necklineBar := bar_index - swingLen
-
-// 記錄第二個低點
-if not na(pl) and not na(firstLow) and bar_index - swingLen > firstLowBar
-    gap = bar_index - swingLen - firstLowBar
-    avgLow = (firstLow + pl) / 2
-    priceOk = math.abs(firstLow - pl) / avgLow <= tolPct
-    if gap >= minBars and gap <= maxBars and priceOk and not na(neckline)
-        secondLow    := pl
-        secondLowBar := bar_index - swingLen
-        wReady       := true
-
-// 進場條件：突破頸線
-breakPrice = useCloseBreak ? close : high
-longSignal = wReady and not na(neckline) and breakPrice > neckline and bar_index > secondLowBar + swingLen
-
-if longSignal
-    stopLevel  = secondLow
-    depth      = neckline - math.min(firstLow, secondLow)
-    targetLevel = neckline + depth
-    strategy.entry("W底做多", strategy.long)
-    strategy.exit("W底出場", "W底做多", stop=stopLevel, limit=targetLevel)
-    // 重置，避免重複進場
-    firstLow := na
-    secondLow := na
-    neckline := na
-    wReady := false
-
-// === 視覺標記 ===
-plotshape(longSignal, title="W底進場", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small)
-plot(not na(neckline) ? neckline : na, "頸線", color=color.orange, linewidth=2, style=plot.style_linebr)
-plot(not na(secondLow) ? secondLow : na, "第二低點", color=color.red, linewidth=1, style=plot.style_circles)
+plot(ma5, "MA5", color=color.orange, linewidth=1)
+plot(ma20, "MA20", color=color.lime, linewidth=1)
+plot(ma60, "MA60", color=color.aqua, linewidth=2)
+plotshape(newBreak, title="破三小時低", style=shape.triangledown, location=location.belowbar, color=color.fuchsia, size=size.tiny)
