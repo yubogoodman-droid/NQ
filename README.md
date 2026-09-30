@@ -73,7 +73,7 @@ python3 examples/watch_tw_5m_fade.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView：`pinescript/tw_5m_fade_ma_stack.pine`。
 
-近一週（Yahoo 7d，基準日 2026-09-30，成交額前 80、700 以上拿掉）：舊規則 20 筆裡多數是貼線；改成國巨濾網後重掃。
+近一週（Yahoo 7d，基準日 2026-09-30，成交額前 80、700 以上拿掉、實掃 44 檔）：國巨濾網後 **1 筆、勝率 100%、+2.74%**（2327 國巨 09-29 09:00，距年線 1.06%，前一盤 +1.05%，走到目標）。華新科／順達／蔚華科貼線已濾掉。陽明 2609 08-26 09:05 用 60d 仍抓得到（距年線 1.10%，前一盤 +1.53%）。
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-fade-short-9faf/docs/tw-5m-fade/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
