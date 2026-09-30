@@ -1,0 +1,119 @@
+{
+  "window": "1m 07-30 21:52 → 08-28 16:59 ET（與預設 1m 圖廊同一本帳）",
+  "rows": [
+    {
+      "name": "1m 預設（對照）",
+      "n": 9, "wins": 7, "wr": 77.8, "pnl": 669.7,
+      "funnel_line": "break=1172 deep=227 reclaim=207 taken=9 hug=17 ma60=15 hour=0 vol=9 risk=76 wide=14",
+      "trades": [
+        {"n": 1, "q": "B", "entry": "07-31 08:53", "exit": "07-31 09:30", "reason": "preopen_flat", "pnl": 111.2},
+        {"n": 2, "q": "A", "entry": "08-06 09:39", "exit": "08-06 10:11", "reason": "target", "pnl": 222.8},
+        {"n": 3, "q": "C", "entry": "08-11 02:46", "exit": "08-11 03:46", "reason": "ma20", "pnl": -14.2},
+        {"n": 4, "q": "A", "entry": "08-11 10:00", "exit": "08-11 11:04", "reason": "ma20", "pnl": 30.8},
+        {"n": 5, "q": "B", "entry": "08-13 12:04", "exit": "08-13 13:33", "reason": "ma20", "pnl": 81.8},
+        {"n": 6, "q": "B", "entry": "08-18 11:22", "exit": "08-18 12:26", "reason": "ma20", "pnl": 61.2},
+        {"n": 7, "q": "A", "entry": "08-20 04:42", "exit": "08-20 05:52", "reason": "ma20", "pnl": -5.5},
+        {"n": 8, "q": "A", "entry": "08-21 10:33", "exit": "08-21 11:32", "reason": "ma200_near", "pnl": 96.9},
+        {"n": 9, "q": "B", "entry": "08-27 02:19", "exit": "08-27 03:27", "reason": "ma20", "pnl": 84.8}
+      ]
+    },
+    {
+      "name": "5m 根數照搬（2h=10h、收復 75 分、持有 5h）",
+      "n": 4, "wins": 1, "wr": 25.0, "pnl": -210.8,
+      "funnel_line": "break=206 deep=104 reclaim=161 taken=4 hug=0 ma60=11 hour=0 vol=5 risk=98 wide=12",
+      "trades": [
+        {"n": 1, "q": "A", "entry": "08-11 15:45", "exit": "08-11 21:40", "reason": "ma20", "pnl": 24.2},
+        {"n": 2, "q": "A", "entry": "08-18 03:00", "exit": "08-18 04:00", "reason": "stop", "pnl": -89.2},
+        {"n": 3, "q": "A", "entry": "08-18 06:50", "exit": "08-18 09:25", "reason": "stop", "pnl": -67.0},
+        {"n": 4, "q": "A", "entry": "08-18 12:05", "exit": "08-18 18:00", "reason": "ma20", "pnl": -78.8}
+      ]
+    },
+    {
+      "name": "5m 時間對齊（2h=24、收復 15 分=3 根、持有 60 分）",
+      "n": 0, "wins": 0, "wr": 0.0, "pnl": 0.0,
+      "funnel_line": "break=587 deep=241 reclaim=7 taken=0 hug=0 ma60=0 hour=0 vol=2 risk=5 wide=0",
+      "trades": []
+    },
+    {
+      "name": "5m 時間對齊 · 收復 30 分（6 根）",
+      "n": 0, "wins": 0, "wr": 0.0, "pnl": 0.0,
+      "funnel_line": "break=587 deep=241 reclaim=32 taken=0 hug=1 ma60=3 hour=0 vol=2 risk=26 wide=0",
+      "trades": []
+    },
+    {
+      "name": "5m 時間對齊 · 收復 75 分（15 根）",
+      "n": 6, "wins": 1, "wr": 16.7, "pnl": -181.8,
+      "funnel_line": "break=563 deep=234 reclaim=332 taken=6 hug=11 ma60=57 hour=0 vol=14 risk=176 wide=33",
+      "trades": [
+        {"n": 1, "q": "C", "entry": "08-03 05:20", "exit": "08-03 06:20", "reason": "stop", "pnl": -57.0},
+        {"n": 2, "q": "C", "entry": "08-03 09:05", "exit": "08-03 09:30", "reason": "stop", "pnl": -55.5},
+        {"n": 3, "q": "C", "entry": "08-05 05:40", "exit": "08-05 06:45", "reason": "ma20", "pnl": -40.5},
+        {"n": 4, "q": "C", "entry": "08-18 00:35", "exit": "08-18 01:35", "reason": "ma20", "pnl": -45.5},
+        {"n": 5, "q": "C", "entry": "08-18 06:50", "exit": "08-18 08:00", "reason": "ma20", "pnl": -7.2},
+        {"n": 6, "q": "C", "entry": "08-25 15:00", "exit": "08-25 18:25", "reason": "ma20", "pnl": 24.0}
+      ]
+    },
+    {
+      "name": "5m 時間對齊 MA（MA4/6≈1m MA20/30）",
+      "n": 7, "wins": 3, "wr": 42.9, "pnl": 16.0,
+      "funnel_line": "break=565 deep=234 reclaim=114 taken=7 hug=14 ma60=18 hour=0 vol=32 risk=13 wide=1",
+      "trades": [
+        {"n": 1, "q": "C", "entry": "08-03 04:45", "exit": "08-03 05:45", "reason": "ma4", "pnl": 19.0},
+        {"n": 2, "q": "C", "entry": "08-06 16:05", "exit": "08-06 18:00", "reason": "ma4", "pnl": -42.0},
+        {"n": 3, "q": "C", "entry": "08-11 12:40", "exit": "08-11 13:05", "reason": "stop", "pnl": -44.2},
+        {"n": 4, "q": "C", "entry": "08-17 09:00", "exit": "08-17 09:40", "reason": "stop", "pnl": 0.0},
+        {"n": 5, "q": "B", "entry": "08-18 06:00", "exit": "08-18 07:25", "reason": "ma4", "pnl": 27.0},
+        {"n": 6, "q": "A", "entry": "08-20 04:40", "exit": "08-20 04:55", "reason": "stop", "pnl": -30.5},
+        {"n": 7, "q": "C", "entry": "08-27 02:20", "exit": "08-27 03:25", "reason": "ma4", "pnl": 86.8}
+      ]
+    },
+    {
+      "name": "Yahoo 5m 60d · 根數照搬",
+      "n": 10, "wins": 4, "wr": 40.0, "pnl": 52.0,
+      "funnel_line": "break=641 deep=382 reclaim=467 taken=10 hug=2 ma60=19 hour=0 vol=24 risk=291 wide=10",
+      "trades": [
+        {"n": 1, "q": "A", "entry": "07-07 01:55", "exit": "07-07 07:00", "reason": "ma20", "pnl": -70.0},
+        {"n": 2, "q": "B", "entry": "07-13 20:40", "exit": "07-13 22:15", "reason": "stop", "pnl": 0.0},
+        {"n": 3, "q": "A", "entry": "07-16 23:25", "exit": "07-17 00:05", "reason": "stop", "pnl": -95.2},
+        {"n": 4, "q": "A", "entry": "07-20 19:20", "exit": "07-21 01:05", "reason": "ma20", "pnl": 240.5},
+        {"n": 5, "q": "A", "entry": "07-28 03:05", "exit": "07-28 09:25", "reason": "ma20", "pnl": -22.0},
+        {"n": 6, "q": "A", "entry": "08-10 10:20", "exit": "08-10 10:35", "reason": "ma200_tp", "pnl": 47.0},
+        {"n": 7, "q": "B", "entry": "08-10 20:25", "exit": "08-11 01:30", "reason": "ma20", "pnl": 54.2},
+        {"n": 8, "q": "A", "entry": "08-18 03:00", "exit": "08-18 03:55", "reason": "stop", "pnl": -59.8},
+        {"n": 9, "q": "A", "entry": "08-18 12:00", "exit": "08-18 18:00", "reason": "ma20", "pnl": -71.5},
+        {"n": 10, "q": "B", "entry": "08-20 15:20", "exit": "08-20 21:35", "reason": "ma20", "pnl": 28.8}
+      ]
+    },
+    {
+      "name": "Yahoo 5m 60d · 時間對齊 15 分收復",
+      "n": 0, "wins": 0, "wr": 0.0, "pnl": 0.0,
+      "funnel_line": "break=1641 deep=864 reclaim=13 taken=0 hug=0 ma60=0 hour=0 vol=6 risk=6 wide=1",
+      "trades": []
+    },
+    {
+      "name": "Yahoo 5m 60d · 時間對齊 75 分收復",
+      "n": 18, "wins": 8, "wr": 44.4, "pnl": -121.2,
+      "funnel_line": "break=1573 deep=836 reclaim=1026 taken=18 hug=15 ma60=133 hour=0 vol=57 risk=693 wide=77",
+      "trades": [
+        {"n": 1, "q": "C", "entry": "06-18 19:50", "exit": "06-18 20:50", "reason": "ma20", "pnl": -44.0},
+        {"n": 2, "q": "C", "entry": "06-21 18:50", "exit": "06-21 19:00", "reason": "stop", "pnl": -73.8},
+        {"n": 3, "q": "C", "entry": "06-23 15:50", "exit": "06-23 15:55", "reason": "stop", "pnl": -49.8},
+        {"n": 4, "q": "C", "entry": "07-05 23:35", "exit": "07-05 23:45", "reason": "stop", "pnl": 33.8},
+        {"n": 5, "q": "C", "entry": "07-07 02:05", "exit": "07-07 03:45", "reason": "ma20", "pnl": 30.8},
+        {"n": 6, "q": "C", "entry": "07-09 21:35", "exit": "07-09 23:50", "reason": "ma20", "pnl": 19.8},
+        {"n": 7, "q": "C", "entry": "07-10 05:15", "exit": "07-10 07:30", "reason": "ma20", "pnl": 21.2},
+        {"n": 8, "q": "C", "entry": "07-13 20:40", "exit": "07-13 21:50", "reason": "ma20", "pnl": 55.8},
+        {"n": 9, "q": "C", "entry": "07-15 22:15", "exit": "07-15 23:45", "reason": "ma20", "pnl": 40.5},
+        {"n": 10, "q": "C", "entry": "07-16 23:30", "exit": "07-17 00:05", "reason": "stop", "pnl": -57.0},
+        {"n": 11, "q": "C", "entry": "07-24 00:50", "exit": "07-24 01:50", "reason": "ma20", "pnl": 11.0},
+        {"n": 12, "q": "C", "entry": "08-03 05:15", "exit": "08-03 06:15", "reason": "ma20", "pnl": -47.8},
+        {"n": 13, "q": "C", "entry": "08-05 05:35", "exit": "08-05 06:40", "reason": "ma20", "pnl": -24.0},
+        {"n": 14, "q": "C", "entry": "08-10 20:30", "exit": "08-10 22:55", "reason": "ma20", "pnl": 60.2},
+        {"n": 15, "q": "C", "entry": "08-18 02:55", "exit": "08-18 03:55", "reason": "stop", "pnl": -72.8},
+        {"n": 16, "q": "C", "entry": "08-18 06:45", "exit": "08-18 08:05", "reason": "ma20", "pnl": -4.0},
+        {"n": 17, "q": "C", "entry": "08-20 15:20", "exit": "08-20 16:20", "reason": "ma20", "pnl": -8.2},
+        {"n": 18, "q": "C", "entry": "08-25 11:35", "exit": "08-25 12:50", "reason": "ma20", "pnl": -13.0}
+      ]
+    }
+  ]
+}
