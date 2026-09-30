@@ -66,6 +66,9 @@ python3 examples/watch_tw_5m_fade.py scan --symbols 2609 --range 7d --on 2026-08
 # 近一週、700 以上拿掉
 python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 7d --pages
 
+# 近一個月（60d 養 MA240，只計近 30 天）
+python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 60d --since 2026-08-31 --pages
+
 # Telegram（憑證放 tg_config.env）
 python3 examples/watch_tw_5m_fade.py alert --test
 python3 examples/watch_tw_5m_fade.py alert

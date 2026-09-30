@@ -19,6 +19,7 @@ from watch_tw_5m_fade import (  # noqa: E402
     drop_incomplete_5m,
     fmt_alert,
     hit_on_day,
+    hit_since,
     hit_within_max_price,
     in_tw_session,
     merge_universe,
@@ -281,6 +282,10 @@ def test_merge_universe_and_day_filter() -> None:
     sig = detect_signals(df)[0]
     assert hit_on_day(df, sig, df.index[sig.entry_idx].date())
     assert not hit_on_day(df, sig, datetime(2026, 1, 1).date())
+    day = df.index[sig.entry_idx].date()
+    assert hit_since(df, sig, day)
+    assert hit_since(df, sig, datetime(2026, 1, 1).date())
+    assert not hit_since(df, sig, datetime(2026, 12, 31).date())
     row = {"code": "2609", "close": 57.6}
     assert hit_within_max_price(row, sig, df, 400.0)
     assert not hit_within_max_price(row, sig, df, 50.0)

@@ -715,6 +715,10 @@ def hit_on_day(df: pd.DataFrame, sig: FadeSignal, day) -> bool:
     return df.index[sig.entry_idx].date() == day
 
 
+def hit_since(df: pd.DataFrame, sig: FadeSignal, day) -> bool:
+    return df.index[sig.entry_idx].date() >= day
+
+
 def hit_prices(row: dict, sig: FadeSignal, df: pd.DataFrame) -> list[float]:
     out: list[float] = [float(sig.entry_price), float(sig.break_high), float(sig.ma240)]
     if row.get("close") is not None:
@@ -739,6 +743,13 @@ def resolve_on_day(args) -> object | None:
     if getattr(args, "today", False):
         return datetime.now(TPE).date()
     text = getattr(args, "on", "") or ""
+    if not text:
+        return None
+    return datetime.strptime(text, "%Y-%m-%d").date()
+
+
+def resolve_since(args) -> object | None:
+    text = getattr(args, "since", "") or ""
     if not text:
         return None
     return datetime.strptime(text, "%Y-%m-%d").date()
@@ -819,8 +830,11 @@ def cmd_scan(args) -> int:
     hits: list[tuple[dict, FadeSignal, FadeTrade | None, pd.DataFrame]] = []
     errors = 0
     on_day = resolve_on_day(args)
+    since = resolve_since(args)
     if on_day is not None:
         print(f"filter day={on_day}")
+    if since is not None:
+        print(f"filter since={since}")
     pretty = not getattr(args, "loose", False)
     dkw = detect_kwargs_from_args(args)
     for i, row in enumerate(universe, 1):
@@ -834,6 +848,8 @@ def cmd_scan(args) -> int:
                 trades_by_entry[t.entry_idx] = t
         for sig, df in pairs:
             if on_day is not None and not hit_on_day(df, sig, on_day):
+                continue
+            if since is not None and not hit_since(df, sig, since):
                 continue
             if not hit_within_max_price(row, sig, df, getattr(args, "max_price", None)):
                 continue
@@ -862,8 +878,11 @@ def cmd_scan(args) -> int:
     if html_path:
         period = args.range_
         on_day = resolve_on_day(args)
+        since = resolve_since(args)
         if on_day is not None:
             period = f"{on_day.isoformat()} · {args.range_}資料"
+        elif since is not None:
+            period = f"{since.isoformat()}起 · {args.range_}資料"
         if args.max_price is not None:
             period += f" · 股價≤{args.max_price:g}"
         if pretty:
@@ -1021,6 +1040,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_universe(s)
     s.add_argument("--today", action="store_true", help="只留台北今天的訊號")
     s.add_argument("--on", default="", help="只留這一天 YYYY-MM-DD")
+    s.add_argument("--since", default="", help="只留這天起的訊號 YYYY-MM-DD（資料仍用 --range，給 MA240 預熱）")
     s.add_argument("--pages", action="store_true")
     s.add_argument("--html", default="")
     s.set_defaults(func=cmd_scan)
