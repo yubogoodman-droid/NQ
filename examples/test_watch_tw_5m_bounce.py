@@ -16,6 +16,7 @@ from scan_tw_ma_reclaim import TPE  # noqa: E402
 from watch_tw_5m_bounce import (  # noqa: E402
     bounce_volume_ratio,
     breakout_volume_ratio,
+    base_under_ma20_frac,
     climax_volume_ratio,
     detect_signals,
     drop_incomplete_5m,
@@ -36,6 +37,13 @@ from watch_tw_5m_bounce import (  # noqa: E402
     trough_clear_of_mas,
     write_html_report,
 )
+
+
+def detect(df, **kw):
+    """短合成 K 沒有 200MA、也還沒在 20MA 下墊過；單元測試預設關掉這兩項。"""
+    kw.setdefault("require_ma200", False)
+    kw.setdefault("min_base_under", 0.0)
+    return detect_signals(df, **kw)
 
 
 def _session_index(n: int, start: str = "2026-08-21 09:00") -> pd.DatetimeIndex:
@@ -134,7 +142,7 @@ def test_merge_universe_and_day_filter() -> None:
     merged = merge_universe(base, extra)
     assert [r["code"] for r in merged] == ["2330", "6239"]
     df = make_v_bounce_bars()
-    sig = detect_signals(df)[0]
+    sig = detect(df)[0]
     assert hit_on_day(df, sig, df.index[sig.entry_idx].date())
     assert not hit_on_day(df, sig, datetime(2026, 1, 1).date())
     row = {"code": "6239", "close": 269.0}
@@ -146,12 +154,12 @@ def test_merge_universe_and_day_filter() -> None:
     prev.index = prev.index - pd.Timedelta(days=1)
     prev["High"] = 900.0
     week = pd.concat([prev, df])
-    assert hit_within_max_price(row, detect_signals(week)[0], week, 400.0)
+    assert hit_within_max_price(row, detect(week)[0], week, 400.0)
 
 
 def test_detect_v_bounce_like_6239() -> None:
     df = make_v_bounce_bars()
-    sigs = detect_signals(df)
+    sigs = detect(df)
     assert sigs, "急殺 272→259 再拉回後應出現 5/10/20 多頭排列"
     sig = sigs[0]
     assert sig.entry_idx > sig.break_idx
@@ -164,18 +172,18 @@ def test_detect_v_bounce_like_6239() -> None:
 
 def test_skip_before_filters_open() -> None:
     df = make_v_bounce_bars()
-    assert detect_signals(df)
-    assert detect_signals(df, skip_before=(23, 59)) == []
+    assert detect(df)
+    assert detect(df, skip_before=(23, 59)) == []
 
 
 def test_flat_market_has_no_signal() -> None:
-    assert detect_signals(make_flat_bars()) == []
+    assert detect(make_flat_bars()) == []
 
 
 def test_tangled_ribbon_skipped() -> None:
     df = make_tangled_bounce_bars()
-    pretty = detect_signals(df, require_pretty=True)
-    loose = detect_signals(df, require_pretty=False)
+    pretty = detect(df, require_pretty=True)
+    loose = detect(df, require_pretty=False)
     assert pretty == []
     assert len(pretty) <= len(loose)
 
@@ -205,7 +213,7 @@ def test_trough_clear_of_mas() -> None:
     assert trough_clear_of_mas(259.0, 260.8, np.nan, np.nan)  # 長均還沒畫不算
     assert not trough_clear_of_mas(95.5, 96.5, 97.4, 98.3, 98.2, 95.2, 91.2)
     df = make_v_bounce_bars()
-    assert detect_signals(df)
+    assert detect(df)
 
 
 def make_bounce_resting_on_long_ma(n: int = 280) -> pd.DataFrame:
@@ -245,6 +253,11 @@ def test_volume_ratios() -> None:
     quiet[50] = 5000.0
     assert abs(breakout_volume_ratio(quiet, 40, 50) - 5.0) < 1e-9
     assert np.isnan(breakout_volume_ratio(quiet, 40, 41))
+    close = np.array([10.0, 10.0, 9.0, 5.0, 5.0, 5.0, 5.0, 9.0, 9.0, 12.0, 12.0])
+    ma20 = np.full(len(close), 8.0)
+    # trough=2, entry=9 → bars 3..8 = 5,5,5,5,9,9 → 4/6 under
+    assert abs(base_under_ma20_frac(close, ma20, 2, 9) - 4 / 6) < 1e-9
+    assert np.isnan(base_under_ma20_frac(close, ma20, 2, 3))
     assert abs(climax_volume_ratio(quiet, 40) - 4.0) < 1e-9
     assert abs(climax_volume_ratio(np.full(60, 1000.0), 40) - 1.0) < 1e-9
     assert np.isnan(climax_volume_ratio(np.zeros(60), 40))
@@ -253,7 +266,7 @@ def test_volume_ratios() -> None:
 def test_dry_bounce_without_volume_skipped() -> None:
     """同一張 V 彈圖，把量抹平：富喬標準下不算，關掉量的門檻才算。"""
     df = make_v_bounce_bars()
-    strict = detect_signals(df)
+    strict = detect(df)
     assert strict
     sig = strict[0]
     assert sig.climax_ratio >= 2.0
@@ -261,15 +274,15 @@ def test_dry_bounce_without_volume_skipped() -> None:
     assert sig.entry_price > sig.ma60
     flat = df.copy()
     flat["Volume"] = 1200.0
-    assert detect_signals(flat) == []
-    loose = detect_signals(flat, min_climax_vol=0, min_bounce_vol=0, min_entry_vol=0, min_breakout_vol=0)
+    assert detect(flat) == []
+    loose = detect(flat, min_climax_vol=0, min_bounce_vol=0, min_entry_vol=0, min_breakout_vol=0)
     assert loose and loose[0].entry_idx == sig.entry_idx
     # 只有破底爆量、反彈縮量也不算
     dump_only = flat.copy()
     dump_only.loc[dump_only.index[sig.break_idx], "Volume"] = 6000.0
     dump_only.loc[dump_only.index[sig.break_idx + 1 :], "Volume"] = 700.0
-    assert detect_signals(dump_only) == []
-    assert detect_signals(dump_only, min_bounce_vol=0, min_entry_vol=0, min_breakout_vol=0)
+    assert detect(dump_only) == []
+    assert detect(dump_only, min_bounce_vol=0, min_entry_vol=0, min_breakout_vol=0)
 
 
 def test_quiet_reclaim_waits_for_entry_volume() -> None:
@@ -278,15 +291,23 @@ def test_quiet_reclaim_waits_for_entry_volume() -> None:
     quiet = df.copy()
     quiet["Volume"] = 1200.0
     quiet.loc[quiet.index[58], "Volume"] = 4800.0  # 破底爆量，反彈段安靜
-    assert detect_signals(quiet) == []
-    assert detect_signals(quiet, min_entry_vol=0, min_breakout_vol=0)
+    assert detect(quiet) == []
+    assert detect(quiet, min_entry_vol=0, min_breakout_vol=0)
     spiked = quiet.copy()
     # 排列完成那根才放量，對齊晶技那種突破根
     spiked.loc[spiked.index[68:72], "Volume"] = 4000.0
-    sigs = detect_signals(spiked)
+    sigs = detect(spiked)
     assert sigs
     assert sigs[0].volume_ratio >= 2.0
     assert sigs[0].breakout_ratio >= 3.0
+
+
+def test_immediate_v_without_base_under_ribbon_skipped() -> None:
+    """強茂／台勝科那種急殺立刻站回 20MA：晶技標準下不算。"""
+    df = make_v_bounce_bars()
+    assert detect(df)
+    assert detect_signals(df, require_ma200=False) == []
+    assert detect_signals(df, min_base_under=0.0) == []  # 短 K 沒 200MA
 
 
 def test_loud_v_skipped_until_breakout_spike() -> None:
@@ -295,27 +316,27 @@ def test_loud_v_skipped_until_breakout_spike() -> None:
     loud = df.copy()
     loud.loc[loud.index[59:72], "Volume"] = 3500.0
     loud.loc[loud.index[68:72], "Volume"] = 5000.0
-    assert detect_signals(loud) == []
-    assert detect_signals(loud, min_breakout_vol=0)
+    assert detect(loud) == []
+    assert detect(loud, min_breakout_vol=0)
 
 
 def test_dump_does_not_carry_overnight() -> None:
     """昨天洗盤、今早 V 彈：富喬 09-23 那種，隔夜不帶過來。"""
     df = make_v_bounce_bars()
-    assert detect_signals(df)
-    sig = detect_signals(df)[0]
+    assert detect(df)
+    sig = detect(df)[0]
     idx = df.index.to_list()
     for k in range(sig.break_idx + 1):
         idx[k] = idx[k] - pd.Timedelta(days=1)
     overnight = df.copy()
     overnight.index = pd.DatetimeIndex(idx)
-    assert detect_signals(overnight) == []
-    assert detect_signals(overnight, min_breakout_vol=0) == []
+    assert detect(overnight) == []
+    assert detect(overnight, min_breakout_vol=0) == []
 
 
 def test_entry_below_ma60_skipped() -> None:
     df = make_v_bounce_bars()
-    sig = detect_signals(df)[0]
+    sig = detect(df)[0]
     lifted = df.copy()
     # 把前面的高原抬高，讓 60MA 壓在進場價之上
     head = lifted.index[: sig.break_idx - 6]
@@ -323,8 +344,8 @@ def test_entry_below_ma60_skipped() -> None:
         lifted.loc[head, col] = lifted.loc[head, col] + 6.0
     ma60 = sma(lifted["Close"].to_numpy(float), 60)
     assert float(lifted["Close"].iloc[sig.entry_idx]) < ma60[sig.entry_idx]
-    assert all(s.entry_price > s.ma60 for s in detect_signals(lifted))
-    assert len(detect_signals(lifted, require_above_ma60=False)) >= len(detect_signals(lifted))
+    assert all(s.entry_price > s.ma60 for s in detect(lifted))
+    assert len(detect(lifted, require_above_ma60=False)) >= len(detect(lifted))
 
 
 def test_lid_helpers() -> None:
@@ -342,7 +363,7 @@ def test_lid_helpers() -> None:
 
 def test_tight_lid_skipped_unless_punch() -> None:
     df = make_v_bounce_bars()
-    sig = detect_signals(df)[0]
+    sig = detect(df)[0]
     # 把進場前的高原抬高，讓 60/120 貼在進場價上方約 0.2%
     lifted = df.copy()
     head = lifted.index[: sig.break_idx - 8]
@@ -352,11 +373,11 @@ def test_tight_lid_skipped_unless_punch() -> None:
     ma60 = sma(close, 60)
     px = float(close[sig.entry_idx])
     # 60MA 可能仍在下方；把更長的均線用高原拉到頭上
-    assert detect_signals(lifted, min_lid_pct=0.005, punch_drop_pct=0.50) == [] or all(
-        np.isnan(s.lid_pct) or s.lid_pct >= 0.005 or s.drop_pct >= 0.50 for s in detect_signals(lifted, punch_drop_pct=0.50)
+    assert detect(lifted, min_lid_pct=0.005, punch_drop_pct=0.50) == [] or all(
+        np.isnan(s.lid_pct) or s.lid_pct >= 0.005 or s.drop_pct >= 0.50 for s in detect(lifted, punch_drop_pct=0.50)
     )
-    blocked = detect_signals(lifted, min_lid_pct=0.005, punch_drop_pct=0.50)
-    punched = detect_signals(lifted, min_lid_pct=0.005, punch_drop_pct=0.01)
+    blocked = detect(lifted, min_lid_pct=0.005, punch_drop_pct=0.50)
+    punched = detect(lifted, min_lid_pct=0.005, punch_drop_pct=0.01)
     # 貼著蓋子：把穿蓋門檻拉到 50% 就不算，1% 就可以穿
     if nearest_overhead_ma_pct(px, ma60[sig.entry_idx], sma(close, 120)[sig.entry_idx], sma(close, 200)[sig.entry_idx], sma(close, 240)[sig.entry_idx]) < 0.005:
         assert blocked == []
@@ -366,7 +387,7 @@ def test_tight_lid_skipped_unless_punch() -> None:
 def test_session_drop_must_meet_floor() -> None:
     """48 根視窗含昨天，卡片跌幅卻不到 2%：不算急殺。"""
     df = make_v_bounce_bars()
-    b = detect_signals(df)[0].break_idx
+    b = detect(df)[0].break_idx
     shallow = df.copy()
     idx = shallow.index.to_list()
     for k in range(max(0, b - 1)):
@@ -374,7 +395,7 @@ def test_session_drop_must_meet_floor() -> None:
     shallow.index = pd.DatetimeIndex(idx)
     # 今天第一根附近只比昨收低一點
     shallow.loc[shallow.index[b], ["Open", "Close", "High", "Low"]] = [266.0, 265.5, 266.4, 264.8]
-    assert all(s.drop_pct >= 0.02 for s in detect_signals(shallow))
+    assert all(s.drop_pct >= 0.02 for s in detect(shallow))
 
 
 def test_drop_incomplete_5m() -> None:
@@ -399,12 +420,12 @@ def test_shallow_dip_ignored() -> None:
     close = np.full(80, 100.0)
     close[50] = 99.4  # 0.6%，低於 2% 門檻
     df = _ohlc(close, 50, 99.3)
-    assert detect_signals(df) == []
+    assert detect(df) == []
 
 
 def test_simulate_and_summarize() -> None:
     df = make_v_bounce_bars()
-    sigs = detect_signals(df)
+    sigs = detect(df)
     trades = simulate(df, sigs)
     assert trades
     stats = summarize_trades(trades)
@@ -416,7 +437,7 @@ def test_simulate_and_summarize() -> None:
 
 def test_signal_key_and_alert_text() -> None:
     df = make_v_bounce_bars()
-    sig = detect_signals(df)[0]
+    sig = detect(df)[0]
     row = {"code": "6239", "name": "力成", "symbol": "6239.TW"}
     key = signal_key(row, df, sig)
     assert key.startswith("6239.TW|")
@@ -438,7 +459,7 @@ def test_in_tw_session() -> None:
 
 def test_write_html(tmp_path: Path | None = None) -> None:
     df = make_v_bounce_bars()
-    sigs = detect_signals(df)
+    sigs = detect(df)
     trades = simulate(df, sigs)
     out_dir = tmp_path or Path("/tmp/tw5m_bounce_test")
     html = out_dir / "index.html"
@@ -455,6 +476,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "反彈量" in text
     assert "進場量" in text
     assert "突破量" in text
+    assert "墊底" in text
     assert "蓋子" in text
     assert "data:image/png;base64," in text
     assert (path.parent / "img").exists()
@@ -474,6 +496,7 @@ def main() -> int:
     test_volume_ratios()
     test_dry_bounce_without_volume_skipped()
     test_quiet_reclaim_waits_for_entry_volume()
+    test_immediate_v_without_base_under_ribbon_skipped()
     test_loud_v_skipped_until_breakout_spike()
     test_dump_does_not_carry_overnight()
     test_entry_below_ma60_skipped()

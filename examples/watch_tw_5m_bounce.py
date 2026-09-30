@@ -94,6 +94,7 @@ class BounceSignal:
     climax_ratio: float = float("nan")
     bounce_vol_ratio: float = float("nan")
     breakout_ratio: float = float("nan")
+    base_under_frac: float = float("nan")
     lid_pct: float = float("nan")
 
 
@@ -196,6 +197,12 @@ def _fmt_x(name: str, val: float) -> str:
     return f"{name} {float(val):.1f}x"
 
 
+def _fmt_under(val: float) -> str:
+    if val is None or (isinstance(val, (float, np.floating)) and np.isnan(val)):
+        return "墊底 —"
+    return f"墊底 {float(val)*100:.0f}%"
+
+
 def _fmt_lid(val: float) -> str:
     if val is None or (isinstance(val, (float, np.floating)) and np.isnan(val)):
         return "蓋子 —"
@@ -279,6 +286,23 @@ def breakout_volume_ratio(volume: np.ndarray, trough_idx: int, i: int) -> float:
     if mid_avg <= 0:
         return float("nan")
     return float(volume[i]) / mid_avg
+
+
+def base_under_ma20_frac(close: np.ndarray, ma20: np.ndarray, trough_idx: int, i: int) -> float:
+    """破底後到進場前，收盤還在 20MA 下面的比例。晶技／嘉晶會墊在均線下；強茂／台勝科是立刻拉回。"""
+    if i <= trough_idx + 1:
+        return float("nan")
+    n = 0
+    under = 0
+    for k in range(trough_idx + 1, i):
+        if not np.isfinite(ma20[k]):
+            continue
+        n += 1
+        if float(close[k]) < float(ma20[k]):
+            under += 1
+    if n <= 0:
+        return float("nan")
+    return under / n
 
 
 def _ratio_ok(ratio: float, minimum: float) -> bool:
@@ -376,12 +400,16 @@ def detect_signals(
     punch_drop_pct: float = 0.05,
     min_entry_vol: float = 2.0,
     min_breakout_vol: float = 3.0,
+    min_base_under: float = 0.40,
+    require_ma200: bool = True,
 ) -> list[BounceSignal]:
     """急殺破近期低點後，等 5>10>20 排漂亮（分開、上彎）才出訊號。
 
-    晶技 3042 09-23 那種標準：破底要在當天、先縮量墊、進場那根相對墊底段爆量
+    晶技 3042 09-23 那種標準：破底要在當天、先縮量墊在 20MA 底下、進場那根相對墊底段爆量
     （min_breakout_vol 倍破底後均量，且 min_entry_vol 倍前 20 根均量）。
     沒爆量就繼續等，不把第一次排好或一路帶量的 V 彈當進場。隔夜不把昨天的破底帶過來。
+    長均 200 還沒畫完不算。破底後到進場前至少 min_base_under 的 K 要收在 20MA 下面，
+    立刻拉回站上均線的（強茂／台勝科那種）不算。
     破底段仍要爆量、反彈段要帶量、進場價站回 60MA；當日跌幅 ≥ min_drop_pct；
     頭上 0.5% 內有均線蓋子的，除非急殺 ≥ punch_drop_pct 否則不算。
     門檻設 0 / False 就不檢查。
@@ -475,17 +503,23 @@ def detect_signals(
         vol_prev = entry_volume_ratio(volume, i - 1, lookback=vol_lookback)
         brk_now = breakout_volume_ratio(volume, trough_idx, i)
         brk_prev = breakout_volume_ratio(volume, trough_idx, i - 1)
+        under_now = base_under_ma20_frac(close, ma20, trough_idx, i)
+        under_prev = base_under_ma20_frac(close, ma20, trough_idx, i - 1)
         ready = (
             pretty
             and _ratio_ok(vol_now, min_entry_vol)
             and _breakout_ok(brk_now, min_breakout_vol)
+            and _breakout_ok(under_now, min_base_under)
         )
         was_ready = (
             was_pretty
             and _ratio_ok(vol_prev, min_entry_vol)
             and _breakout_ok(brk_prev, min_breakout_vol)
+            and _breakout_ok(under_prev, min_base_under)
         )
         if not ready or was_ready:
+            continue
+        if require_ma200 and not np.isfinite(ma200[i]):
             continue
         if trough_low <= 0:
             continue
@@ -545,6 +579,7 @@ def detect_signals(
                 climax_ratio=climax,
                 bounce_vol_ratio=bounce_vol,
                 breakout_ratio=float(brk_now) if brk_now == brk_now else 0.0,
+                base_under_frac=float(under_now) if under_now == under_now else 0.0,
                 lid_pct=lid,
             )
         )
@@ -766,7 +801,8 @@ def write_html_report(
             f"  間隔 {(sig.ma5-sig.ma20)/sig.entry_price*100:.2f}%\n"
             f"{_fmt_ma('MA60', sig.ma60)}  {_fmt_ma('MA120', sig.ma120)}  {_fmt_ma('MA200', sig.ma200)}\n"
             f"{_fmt_x('破底量', sig.climax_ratio)}  {_fmt_x('反彈量', sig.bounce_vol_ratio)}  "
-            f"{_fmt_x('進場量', sig.volume_ratio)}  {_fmt_x('突破量', sig.breakout_ratio)}  {_fmt_lid(sig.lid_pct)}"
+            f"{_fmt_x('進場量', sig.volume_ratio)}  {_fmt_x('突破量', sig.breakout_ratio)}  "
+            f"{_fmt_under(sig.base_under_frac)}  {_fmt_lid(sig.lid_pct)}"
             "</pre>"
             f"<div class='mini-chart'><img src='{img_src}' alt='{escape(label)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -799,7 +835,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <h1>台股 5分K 破底反彈</h1>
 <p class="muted">{escape(period)} · {len(universe)} 檔
 <br/>急殺破近 4 小時低點或今日低點（跌幅 ≥ 2%），且破底那根下方不能有任何均線。24 根內 5MA &gt; 10MA &gt; 20MA 要明顯分開、往上張開才算；糾結黏帶不算。
-<br/>晶技標準：破底要在當天。墊完後進場那根要相對墊底段爆量（≥ 破底後均量 3 倍，且 ≥ 前 20 根均量 2 倍）才算突破；一路帶量的 V 彈、隔夜把昨天洗盤帶過來的都不算。破底段仍要爆量、反彈段要帶量、進場價站回 60MA。卡片跌幅用當日高點，也要 ≥ 2%。頭上 0.5% 內有均線蓋子的，除非當日急殺 ≥ 5% 否則不算。</p>
+<br/>晶技標準：破底要在當天，200MA 要畫得出來。墊底時至少四成 K 收在 20MA 下面，再等進場根相對墊底段爆量（≥ 破底後均量 3 倍，且 ≥ 前 20 根均量 2 倍）。立刻拉回站上均線的 V 彈、一路帶量、隔夜把昨天洗盤帶過來的都不算。破底段仍要爆量、反彈段要帶量、進場價站回 60MA。卡片跌幅用當日高點，也要 ≥ 2%。頭上 0.5% 內有均線蓋子的，除非當日急殺 ≥ 5% 否則不算。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -927,7 +963,8 @@ def fmt_alert(row: dict, df: pd.DataFrame, sig: BounceSignal) -> str:
         f"（間隔 {(sig.ma5-sig.ma20)/sig.entry_price*100:.2f}%）\n"
         f"{_fmt_ma('MA60', sig.ma60)}  {_fmt_ma('MA120', sig.ma120)}  {_fmt_ma('MA200', sig.ma200)}\n"
         f"{_fmt_x('破底量', sig.climax_ratio)}  {_fmt_x('反彈量', sig.bounce_vol_ratio)}  "
-        f"{_fmt_x('進場量', sig.volume_ratio)}  {_fmt_x('突破量', sig.breakout_ratio)}  {_fmt_lid(sig.lid_pct)}\n"
+        f"{_fmt_x('進場量', sig.volume_ratio)}  {_fmt_x('突破量', sig.breakout_ratio)}  "
+        f"{_fmt_under(sig.base_under_frac)}  {_fmt_lid(sig.lid_pct)}\n"
         f"#台股 #五分K #破底反彈 #{row['code']}"
     )
 
@@ -1036,6 +1073,8 @@ def detect_kwargs_from_args(args) -> dict[str, Any]:
         "punch_drop_pct": float(getattr(args, "punch_drop", 5.0)) / 100.0,
         "min_entry_vol": float(getattr(args, "min_entry_vol", 2.0)),
         "min_breakout_vol": float(getattr(args, "min_breakout_vol", 3.0)),
+        "min_base_under": float(getattr(args, "min_base_under", 40.0)) / 100.0,
+        "require_ma200": not getattr(args, "no_ma200", False),
     }
 
 
@@ -1119,7 +1158,7 @@ def cmd_scan(args) -> int:
             period += f" · 股價≤{args.max_price:g}"
         if pretty:
             period += " · 均線不糾結"
-        if detect_kw["min_climax_vol"] > 0 or detect_kw["min_bounce_vol"] > 0 or detect_kw["require_above_ma60"] or detect_kw["min_entry_vol"] > 0 or detect_kw["min_breakout_vol"] > 0:
+        if detect_kw["min_climax_vol"] > 0 or detect_kw["min_bounce_vol"] > 0 or detect_kw["require_above_ma60"] or detect_kw["min_entry_vol"] > 0 or detect_kw["min_breakout_vol"] > 0 or detect_kw["min_base_under"] > 0 or detect_kw["require_ma200"]:
             period += " · 晶技標準"
         out = write_html_report(html_path, hits, universe, period)
         write_view_html(out)
@@ -1212,7 +1251,8 @@ def cmd_alert(args) -> int:
         f"climax>={detect_kw['min_climax_vol']:g} bounce_vol>={detect_kw['min_bounce_vol']:g} "
         f"ma60={detect_kw['require_above_ma60']} lid>={detect_kw['min_lid_pct']*100:g}% "
         f"punch={detect_kw['punch_drop_pct']*100:g}% entry_vol>={detect_kw['min_entry_vol']:g} "
-        f"breakout>={detect_kw['min_breakout_vol']:g} | "
+        f"breakout>={detect_kw['min_breakout_vol']:g} under>={detect_kw['min_base_under']*100:g}% "
+        f"ma200={detect_kw['require_ma200']} | "
         f"session_only={not args.all_hours}"
     )
     while True:
@@ -1294,6 +1334,13 @@ def build_parser() -> argparse.ArgumentParser:
             default=3.0,
             help="進場那根量至少要是破底後墊底段均量的幾倍（0 = 不檢查；縮量再爆才算）",
         )
+        sp.add_argument(
+            "--min-base-under",
+            type=float,
+            default=40.0,
+            help="破底後到進場前，至少幾 % 的 K 要收在 20MA 下面（0 = 不檢查）",
+        )
+        sp.add_argument("--no-ma200", action="store_true", help="不要求 200MA 已經畫出來")
 
     s = sub.add_parser("scan", help="回看近幾日並可出 HTML")
     add_universe(s)

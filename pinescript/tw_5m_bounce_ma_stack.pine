@@ -18,6 +18,8 @@ minLidPct     = input.float(0.5, "蓋子最小空檔 %（0=不檢查）", minval
 punchDrop     = input.float(5.0, "穿蓋所需當日跌幅 %", minval=0.0, step=0.5)
 minEntryVol   = input.float(2.0, "進場量倍數（0=不檢查）", minval=0.0, step=0.5)
 minBreakoutVol = input.float(3.0, "墊底突破倍數（0=不檢查）", minval=0.0, step=0.5)
+minBaseUnder   = input.float(40.0, "墊底收在20MA下的比例 %（0=不檢查）", minval=0.0, step=5.0)
+requireMa200   = input.bool(true, "要有 200MA")
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -51,6 +53,7 @@ var float climaxRatio = na   // 破底段最大量 / 前 20 根均量
 var float preBounceVol = na  // 破底前 12 根均量
 var float upVolSum = 0.0
 var int   upBars = 0
+var int   under20Bars = 0
 var float sessHi = na
 var float troughSessHigh = na
 
@@ -64,6 +67,7 @@ if newDay
     preBounceVol := na
     upVolSum := 0.0
     upBars := 0
+    under20Bars := 0
 else
     sessHi := na(sessHi) ? high : math.max(sessHi, high)
 
@@ -80,9 +84,12 @@ if dumpBar
         preBounceVol := vol12[1] > 0 ? vol12[1] : na
         upVolSum := 0.0
         upBars := 0
+        under20Bars := 0
 else if not na(troughBar)
     upVolSum += volume
     upBars += 1
+    if close < ma20
+        under20Bars += 1
 
 if not na(troughBar) and bar_index - troughBar > reboundBars
     trough := na
@@ -95,7 +102,12 @@ baseBars   = upBars > 1 ? upBars - 1 : 0
 baseVol    = baseBars > 0 ? (upVolSum - volume) / baseBars : na
 breakoutVol = not na(baseVol) and baseVol > 0 ? volume / baseVol : na
 breakoutOk = minBreakoutVol <= 0 or (not na(breakoutVol) and breakoutVol >= minBreakoutVol)
-ready      = (requirePretty ? pretty : stacked) and entryVolOk and breakoutOk
+priorN     = upBars > 1 ? upBars - 1 : 0
+priorUnder = close < ma20 ? math.max(under20Bars - 1, 0) : under20Bars
+underFrac  = priorN > 0 ? priorUnder / priorN : na
+underOk    = minBaseUnder <= 0 or (not na(underFrac) and underFrac >= minBaseUnder / 100)
+ma200Ok    = not requireMa200 or not na(ma200)
+ready      = (requirePretty ? pretty : stacked) and entryVolOk and breakoutOk and underOk
 readyNew   = ready and not ready[1]
 
 bouncePct = not na(trough) and trough > 0 ? (close - trough) / trough * 100 : 0
@@ -114,7 +126,7 @@ lidGap(src) =>
 lid = math.min(nz(lidGap(ma60), 1e9), nz(lidGap(ma120), 1e9), nz(lidGap(ma200), 1e9), nz(lidGap(ma240), 1e9))
 noLid = lid >= 1e8
 lidOk = minLidPct <= 0 or noLid or lid >= minLidPct or dayDrop >= punchDrop
-cand = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and ma60Ok and dayDropOk
+cand = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and ma60Ok and dayDropOk and ma200Ok
 sig = cand and lidOk
 
 if cand and not lidOk
