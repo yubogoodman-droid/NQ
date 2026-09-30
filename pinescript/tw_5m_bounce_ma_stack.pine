@@ -17,6 +17,7 @@ aboveMa60     = input.bool(true, "進場價要站上 60MA")
 minLidPct     = input.float(0.5, "蓋子最小空檔 %（0=不檢查）", minval=0.0, step=0.1)
 punchDrop     = input.float(5.0, "穿蓋所需當日跌幅 %", minval=0.0, step=0.5)
 minEntryVol   = input.float(2.0, "進場量倍數（0=不檢查）", minval=0.0, step=0.5)
+minBreakoutVol = input.float(3.0, "墊底突破倍數（0=不檢查）", minval=0.0, step=0.5)
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
@@ -38,8 +39,6 @@ pretty     = stacked and gap5 >= minGap5_10 and gap10 >= minGap10_20 and gap20 >
 vol20      = ta.sma(volume, 20)
 entryVol   = vol20[1] > 0 ? volume / vol20[1] : na
 entryVolOk = minEntryVol <= 0 or na(entryVol) or entryVol >= minEntryVol
-ready      = (requirePretty ? pretty : stacked) and entryVolOk
-readyNew   = ready and not ready[1]
 priorLow   = ta.lowest(low[1], lookback)
 winHigh    = ta.highest(high[1], lookback)
 dropPct    = winHigh > 0 ? (winHigh - low) / winHigh * 100 : 0
@@ -56,7 +55,17 @@ var float sessHi = na
 var float troughSessHigh = na
 
 newDay = ta.change(time("D")) != 0
-sessHi := newDay or na(sessHi) ? high : math.max(sessHi, high)
+if newDay
+    sessHi := high
+    trough := na
+    troughBar := na
+    dumpHigh := na
+    climaxRatio := na
+    preBounceVol := na
+    upVolSum := 0.0
+    upBars := 0
+else
+    sessHi := na(sessHi) ? high : math.max(sessHi, high)
 
 vol12   = ta.sma(volume, 12)
 dumpVol = math.max(volume, volume[1], volume[2])
@@ -81,6 +90,13 @@ if not na(troughBar) and bar_index - troughBar > reboundBars
     dumpHigh := na
     climaxRatio := na
     preBounceVol := na
+
+baseBars   = upBars > 1 ? upBars - 1 : 0
+baseVol    = baseBars > 0 ? (upVolSum - volume) / baseBars : na
+breakoutVol = not na(baseVol) and baseVol > 0 ? volume / baseVol : na
+breakoutOk = minBreakoutVol <= 0 or (not na(breakoutVol) and breakoutVol >= minBreakoutVol)
+ready      = (requirePretty ? pretty : stacked) and entryVolOk and breakoutOk
+readyNew   = ready and not ready[1]
 
 bouncePct = not na(trough) and trough > 0 ? (close - trough) / trough * 100 : 0
 bounceVolRatio = upBars > 0 and not na(preBounceVol) ? (upVolSum / upBars) / preBounceVol : na

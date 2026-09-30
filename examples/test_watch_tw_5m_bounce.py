@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from scan_tw_ma_reclaim import TPE  # noqa: E402
 from watch_tw_5m_bounce import (  # noqa: E402
     bounce_volume_ratio,
+    breakout_volume_ratio,
     climax_volume_ratio,
     detect_signals,
     drop_incomplete_5m,
@@ -240,7 +241,12 @@ def test_volume_ratios() -> None:
     entry[50] = 3000.0
     assert abs(entry_volume_ratio(entry, 50) - 3.0) < 1e-9
     quiet = np.full(60, 1000.0)
-    assert abs(climax_volume_ratio(quiet, 40) - 1.0) < 1e-9
+    quiet[40] = 4000.0
+    quiet[50] = 5000.0
+    assert abs(breakout_volume_ratio(quiet, 40, 50) - 5.0) < 1e-9
+    assert np.isnan(breakout_volume_ratio(quiet, 40, 41))
+    assert abs(climax_volume_ratio(quiet, 40) - 4.0) < 1e-9
+    assert abs(climax_volume_ratio(np.full(60, 1000.0), 40) - 1.0) < 1e-9
     assert np.isnan(climax_volume_ratio(np.zeros(60), 40))
 
 
@@ -256,14 +262,14 @@ def test_dry_bounce_without_volume_skipped() -> None:
     flat = df.copy()
     flat["Volume"] = 1200.0
     assert detect_signals(flat) == []
-    loose = detect_signals(flat, min_climax_vol=0, min_bounce_vol=0, min_entry_vol=0)
+    loose = detect_signals(flat, min_climax_vol=0, min_bounce_vol=0, min_entry_vol=0, min_breakout_vol=0)
     assert loose and loose[0].entry_idx == sig.entry_idx
     # 只有破底爆量、反彈縮量也不算
     dump_only = flat.copy()
     dump_only.loc[dump_only.index[sig.break_idx], "Volume"] = 6000.0
     dump_only.loc[dump_only.index[sig.break_idx + 1 :], "Volume"] = 700.0
     assert detect_signals(dump_only) == []
-    assert detect_signals(dump_only, min_bounce_vol=0, min_entry_vol=0)
+    assert detect_signals(dump_only, min_bounce_vol=0, min_entry_vol=0, min_breakout_vol=0)
 
 
 def test_quiet_reclaim_waits_for_entry_volume() -> None:
@@ -273,13 +279,38 @@ def test_quiet_reclaim_waits_for_entry_volume() -> None:
     quiet["Volume"] = 1200.0
     quiet.loc[quiet.index[58], "Volume"] = 4800.0  # 破底爆量，反彈段安靜
     assert detect_signals(quiet) == []
-    assert detect_signals(quiet, min_entry_vol=0)
+    assert detect_signals(quiet, min_entry_vol=0, min_breakout_vol=0)
     spiked = quiet.copy()
-    # 後面幾根放量，對齊晶技那種突破根
-    spiked.loc[spiked.index[65:], "Volume"] = 4000.0
+    # 排列完成那根才放量，對齊晶技那種突破根
+    spiked.loc[spiked.index[68:72], "Volume"] = 4000.0
     sigs = detect_signals(spiked)
     assert sigs
     assert sigs[0].volume_ratio >= 2.0
+    assert sigs[0].breakout_ratio >= 3.0
+
+
+def test_loud_v_skipped_until_breakout_spike() -> None:
+    """反彈段一路有量、進場根沒明顯變大：不像晶技縮量再爆，不算。"""
+    df = make_v_bounce_bars()
+    loud = df.copy()
+    loud.loc[loud.index[59:72], "Volume"] = 3500.0
+    loud.loc[loud.index[68:72], "Volume"] = 5000.0
+    assert detect_signals(loud) == []
+    assert detect_signals(loud, min_breakout_vol=0)
+
+
+def test_dump_does_not_carry_overnight() -> None:
+    """昨天洗盤、今早 V 彈：富喬 09-23 那種，隔夜不帶過來。"""
+    df = make_v_bounce_bars()
+    assert detect_signals(df)
+    sig = detect_signals(df)[0]
+    idx = df.index.to_list()
+    for k in range(sig.break_idx + 1):
+        idx[k] = idx[k] - pd.Timedelta(days=1)
+    overnight = df.copy()
+    overnight.index = pd.DatetimeIndex(idx)
+    assert detect_signals(overnight) == []
+    assert detect_signals(overnight, min_breakout_vol=0) == []
 
 
 def test_entry_below_ma60_skipped() -> None:
@@ -423,6 +454,7 @@ def test_write_html(tmp_path: Path | None = None) -> None:
     assert "破底量" in text
     assert "反彈量" in text
     assert "進場量" in text
+    assert "突破量" in text
     assert "蓋子" in text
     assert (path.parent / "img").exists()
 
@@ -441,6 +473,8 @@ def main() -> int:
     test_volume_ratios()
     test_dry_bounce_without_volume_skipped()
     test_quiet_reclaim_waits_for_entry_volume()
+    test_loud_v_skipped_until_breakout_spike()
+    test_dump_does_not_carry_overnight()
     test_entry_below_ma60_skipped()
     test_lid_helpers()
     test_tight_lid_skipped_unless_punch()
