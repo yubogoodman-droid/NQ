@@ -71,7 +71,7 @@ python3 examples/watch_tw_5m_fade.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView：`pinescript/tw_5m_fade_ma_stack.pine`。
 
-近一週（Yahoo 7d，基準日 2026-09-04，成交額前 80、700 以上拿掉、實掃 44 檔）：**40 筆、勝率 57.5%、合計 +27.9%**。訊號集中 09-02～09-04；臻鼎-KY 09-03 兩筆都走到目標（+5.4%、+4.6%），強茂 09-04 09:10 +4.5%。陽明這週沒再破線。
+近一週（Yahoo 7d，基準日 2026-09-30，成交額前 80、700 以上拿掉、實掃 44 檔）：**20 筆、勝率 25%、合計 −9.0%**。訊號在 09-24、09-29、09-30；國巨 09-29 開盤破線走到目標 +2.7%，多數盤中跌破很快被停損。
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-fade-short-9faf/docs/tw-5m-fade/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
