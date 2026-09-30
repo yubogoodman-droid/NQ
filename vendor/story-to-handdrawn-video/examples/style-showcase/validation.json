@@ -1,0 +1,35 @@
+{
+  "file": "examples/style-showcase/handdrawn-styles-75-page-flip-45s-bgm.mp4",
+  "duration_sec": 45.0,
+  "frames": 1350,
+  "resolution": [
+    1080,
+    1440
+  ],
+  "fps": 30,
+  "audio": {
+    "codec": "aac",
+    "sample_rate": 48000,
+    "channels": 2,
+    "duration_sec": 45.0,
+    "music_title": "Carefree",
+    "artist": "Kevin MacLeod",
+    "license": "CC BY 4.0",
+    "source_page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400037",
+    "excerpt_sec": [
+      0,
+      45
+    ],
+    "fade_in_sec": 0.7,
+    "fade_out_sec": 2.5,
+    "target_loudness_lufs": -18,
+    "measured_loudness_lufs": -18.04,
+    "measured_true_peak_dbtp": -3.68,
+    "loudness_range_lu": 1.9
+  },
+  "original_video_stream_unchanged": true,
+  "video_stream_sha256": "SHA256=4b6c028e6cc44fe431948d4e79dc89264fe1ac7c3921985f8c192ca1add9d5b9",
+  "complete_decode": "passed",
+  "bytes": 19838667,
+  "sha256": "7df3924600a61bc09f5dff444c1cfaa4c21406de8a31ae07a55645a436e26e73"
+}

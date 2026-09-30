@@ -43,6 +43,17 @@
       line-height: 1.15;
     }
     .subtitle { color: var(--muted); margin-top: 0.35rem; font-size: 0.92rem; }
+    .source { margin-top: 0.45rem; font-size: 0.78rem; color: var(--muted); }
+    .source a { color: var(--dusty); font-weight: 700; }
+    .book video {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 3 / 4;
+      background: var(--sheet);
+    }
+    .book.mode-video canvas { display: none; }
+    .book.mode-canvas video { display: none; }
     .layout {
       display: grid;
       grid-template-columns: minmax(260px, 390px) 1fr;
@@ -189,6 +200,10 @@
     <header>
       <h1 class="logo">手绘故事</h1>
       <p class="subtitle">3:4 竖屏 · 文字 → 黑白画稿 → 彩色插画 · 静音成片</p>
+      <p class="source">源项目
+        <a href="https://github.com/gnipbao/story-to-handdrawn-video" target="_blank" rel="noopener">gnipbao/story-to-handdrawn-video</a>
+        · Remotion 4.0 · MIT
+      </p>
     </header>
 
     <div class="layout">
@@ -232,13 +247,14 @@
         <p id="status">正在载入示例插画…</p>
         <div class="cast">
           <img src="assets/character-sheet.jpg" alt="小猫与小鸟角色设定" />
-          <p>默认锁定「彩铅日记漫画」：钝头毡笔轮廓、短促彩铅、大留白。自定义故事用画布手绘；上传图按原顺序 contain 适配。</p>
+          <p>示例成片用 GitHub 上的 Remotion 渲染器导出。默认锁定彩铅日记漫画；自定义故事用画布手绘，上传图按原顺序 contain 不裁切。</p>
         </div>
         <p class="hint">每句一个节拍，保留原文。成片为静音 H.264/WebM 画面轨，方便后期配音。空格键播放／暂停。</p>
       </section>
 
       <div class="stage-col">
-        <div class="book">
+        <div class="book mode-video" id="book">
+          <video id="demoVideo" playsinline muted loop preload="metadata" poster="assets/scenes/00-cover.jpg" src="assets/demo-preview.mp4" aria-label="Remotion 示例成片"></video>
           <canvas id="stage" width="720" height="960" aria-label="故事画布"></canvas>
         </div>
         <div class="transport">

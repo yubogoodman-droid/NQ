@@ -37,10 +37,22 @@
 
   const $ = (id) => document.getElementById(id);
   const canvas = $("stage");
+  const video = $("demoVideo");
+  const book = $("book");
   const player = new StoryPlayer(canvas);
   let demoStory = null;
   let source = "ai";
   let uploaded = [];
+  let view = "video";
+
+  function setView(mode) {
+    view = mode;
+    book.classList.toggle("mode-video", mode === "video");
+    book.classList.toggle("mode-canvas", mode !== "video");
+    if (mode !== "video") {
+      video.pause();
+    }
+  }
 
   function normalize(s) {
     return String(s || "")
@@ -60,6 +72,18 @@
   }
 
   function updateMeta() {
+    if (view === "video") {
+      const dur = video.duration && isFinite(video.duration) ? video.duration : 28.8;
+      $("pageCount").textContent = "6 页 · Remotion";
+      $("durationLabel").textContent = fmt(dur);
+      $("timeLabel").textContent = fmt(video.currentTime || 0);
+      $("seek").max = String(dur);
+      $("seek").value = String(video.currentTime || 0);
+      $("playBtn").textContent = video.paused ? "播放" : "暂停";
+      const page = Math.min(5, Math.floor((video.currentTime || 0) / 4.8));
+      renderDots(page, 6);
+      return;
+    }
     const n = player.pages.length;
     $("pageCount").textContent = n ? n + " 页" : "—";
     $("durationLabel").textContent = n ? fmt(player.totalSec) : "0:00";
@@ -67,17 +91,15 @@
     $("seek").max = String(player.totalSec || 0);
     $("seek").value = String(player.elapsed);
     $("playBtn").textContent = player.playing ? "暂停" : "播放";
-    renderDots(player.pageAt(player.elapsed).index);
+    renderDots(player.pageAt(player.elapsed).index, n);
   }
 
-  function renderDots(active) {
+  function renderDots(active, count) {
+    const n = count == null ? player.pages.length : count;
     const el = $("dots");
-    el.innerHTML = player.pages
-      .map(
-        (p, i) =>
-          `<button type="button" class="dot${i === active ? " on" : ""}" data-i="${i}" aria-label="第 ${i + 1} 页"></button>`
-      )
-      .join("");
+    el.innerHTML = Array.from({ length: n }, (_, i) =>
+      `<button type="button" class="dot${i === active ? " on" : ""}" data-i="${i}" aria-label="第 ${i + 1} 页"></button>`
+    ).join("");
   }
 
   player.onFrame = () => updateMeta();
@@ -102,9 +124,10 @@
     $("storyInput").value = demoStory.text;
     player.transition = currentTransition();
     source = "ai";
+    setView("video");
     await player.loadAiPages(demoStory);
     updateMeta();
-    setStatus("示例故事已载入：彩铅日记漫画 · 文字 → 黑白 → 彩色。");
+    setStatus("GitHub 源项目 Remotion 成片已载入：文字 → 黑白 → 彩色。");
   }
 
   function generateFromText() {
@@ -117,12 +140,15 @@
     player.transition = currentTransition();
     if (normalize(text) === normalize(DEMO_TEXT) && demoStory) {
       source = "ai";
+      setView("video");
       return player.loadAiPages(demoStory).then(() => {
         updateMeta();
-        setStatus("使用锁定的彩铅日记插画。");
+        setStatus("使用 GitHub Remotion 示例成片。");
       });
     }
     source = "doodle";
+    player.pause();
+    setView("canvas");
     player.loadDoodlePages(title, beats, currentStyle());
     updateMeta();
     setStatus("已按句子分镜，画布手绘 " + (beats.length + 1) + " 页。");
@@ -134,29 +160,54 @@
     const { title } = splitStory($("storyInput").value);
     player.transition = currentTransition();
     source = "upload";
+    player.pause();
+    setView("canvas");
     await player.loadUploadPages(uploaded, title);
     updateMeta();
     setStatus("已按上传顺序导入 " + uploaded.length + " 张，构图 contain 不裁切。");
   }
 
   $("playBtn").addEventListener("click", () => {
+    if (view === "video") {
+      if (video.paused) video.play();
+      else video.pause();
+      updateMeta();
+      return;
+    }
     if (!player.pages.length) return;
     if (player.playing) player.pause();
     else player.play();
     updateMeta();
   });
   $("stopBtn").addEventListener("click", () => {
+    if (view === "video") {
+      video.pause();
+      video.currentTime = 0;
+      updateMeta();
+      return;
+    }
     player.stop();
     updateMeta();
   });
   $("seek").addEventListener("input", (e) => {
-    player.seek(Number(e.target.value));
+    const t = Number(e.target.value);
+    if (view === "video") {
+      video.currentTime = t;
+      updateMeta();
+      return;
+    }
+    player.seek(t);
     updateMeta();
   });
   $("dots").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-i]");
     if (!btn) return;
     const i = Number(btn.dataset.i);
+    if (view === "video") {
+      video.currentTime = i * 4.8;
+      updateMeta();
+      return;
+    }
     const flip = currentTransition() === "page-flip" ? 0.7 : 0;
     player.seek(i * (player.pageSec + flip));
     updateMeta();
@@ -176,8 +227,9 @@
   });
   $("demoBtn").addEventListener("click", () => {
     loadDemo().then(() => {
-      player.stop();
-      player.play();
+      video.currentTime = 0;
+      video.play();
+      updateMeta();
     });
   });
 
@@ -212,6 +264,13 @@
       $("dlBtn").disabled = false;
       updateMeta();
     }
+  });
+
+  video.addEventListener("timeupdate", () => {
+    if (view === "video") updateMeta();
+  });
+  video.addEventListener("loadedmetadata", () => {
+    if (view === "video") updateMeta();
   });
 
   document.addEventListener("keydown", (e) => {
