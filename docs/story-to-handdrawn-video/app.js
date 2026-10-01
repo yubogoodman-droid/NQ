@@ -1,6 +1,16 @@
 (function () {
   "use strict";
 
+  const LIUTI_TEXT = `留體力學
+
+小明是個習武之人。
+有一天一位大師要傳授畢生絕學給小明。
+小明便開始苦練基礎。
+每天到筋疲力盡為止。
+在傳授那天，大師對著小明說：「你這呆徒」。
+不留一點體力，我要怎麼把功夫傳給你？
+小明：「可是師父，留體力學，好難」。`;
+
   const TREE_TEXT = `大樹跟小樹
 
 大樹跟小樹。
@@ -16,6 +26,17 @@
 雨停以后，阳光把窗台晒得暖暖的。`;
 
   const REMOTION = {
+    liuti: {
+      video: "assets/liuti-preview.mp4",
+      poster: "assets/liuti-poster.jpg",
+      download: "留體力學.mp4",
+      sheet: "assets/liuti-character-sheet.jpg",
+      sheetAlt: "小明與大師角色設定",
+      pages: 7,
+      duration: 35.5,
+      storyUrl: "liuti.json",
+      colorOnly: true,
+    },
     trees: {
       video: "assets/tree-riddle-preview.mp4",
       poster: "assets/tree-poster.jpg",
@@ -25,6 +46,7 @@
       pages: 3,
       duration: 13.7,
       storyUrl: "trees.json",
+      colorOnly: true,
     },
     window: {
       video: "assets/demo-preview.mp4",
@@ -39,6 +61,7 @@
   };
 
   const PRESETS = [
+    { id: "liuti", title: "留體力學", art: "ai", remotion: "liuti", text: LIUTI_TEXT },
     { id: "trees", title: "大樹跟小樹", art: "ai", remotion: "trees", text: TREE_TEXT },
     { id: "window", title: "窗边的约定", art: "ai", remotion: "window", text: WINDOW_TEXT },
     {
@@ -71,7 +94,7 @@
   const book = $("book");
   const player = new StoryPlayer(canvas);
   let demoStories = {};
-  let activeRemotion = "trees";
+  let activeRemotion = "liuti";
   let source = "ai";
   let uploaded = [];
   let view = "video";
@@ -103,7 +126,7 @@
   }
 
   function remotionMeta() {
-    return REMOTION[activeRemotion] || REMOTION.trees;
+    return REMOTION[activeRemotion] || REMOTION.liuti;
   }
 
   function updateMeta() {
@@ -176,7 +199,7 @@
   }
 
   async function loadRemotion(id) {
-    const demo = REMOTION[id] || REMOTION.trees;
+    const demo = REMOTION[id] || REMOTION.liuti;
     applyRemotionChrome(id);
     if (!demoStories[id] && demo.storyUrl) {
       const res = await fetch(demo.storyUrl);
@@ -191,7 +214,7 @@
       await player.loadAiPages(story);
     }
     updateMeta();
-    const note = id === "trees"
+    const note = demo.colorOnly
       ? "彩图直出，无黑白上色。"
       : "文字 → 黑白 → 彩色。";
     setStatus("GitHub 源项目 Remotion 成片已载入：" + note);
@@ -357,7 +380,7 @@
     }
   });
 
-  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("trees")]).catch((err) => {
+  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("liuti")]).catch((err) => {
     setStatus("载入示例失败：" + err.message);
   });
 })();

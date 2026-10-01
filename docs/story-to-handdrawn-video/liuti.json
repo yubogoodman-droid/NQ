@@ -1,0 +1,22 @@
+{
+  "id": "liuti-mechanics",
+  "title": "留體力學",
+  "style": "colored-pencil-diary",
+  "styleName": "彩铅日记漫画",
+  "aspect": "3:4",
+  "width": 720,
+  "height": 960,
+  "durationSec": 35.5,
+  "text": "留體力學\n\n小明是個習武之人。\n有一天一位大師要傳授畢生絕學給小明。\n小明便開始苦練基礎。\n每天到筋疲力盡為止。\n在傳授那天，大師對著小明說：「你這呆徒」。\n不留一點體力，我要怎麼把功夫傳給你？\n小明：「可是師父，留體力學，好難」。",
+  "video": "assets/liuti-preview.mp4",
+  "poster": "assets/liuti-poster.jpg",
+  "pages": [
+    { "id": "01", "kind": "beat", "caption": "小明是個習武之人。" },
+    { "id": "02", "kind": "beat", "caption": "有一天一位大師要傳授畢生絕學給小明。" },
+    { "id": "03", "kind": "beat", "caption": "小明便開始苦練基礎。" },
+    { "id": "04", "kind": "beat", "caption": "每天到筋疲力盡為止。" },
+    { "id": "05", "kind": "beat", "caption": "在傳授那天，大師對著小明說：「你這呆徒」。" },
+    { "id": "06", "kind": "beat", "caption": "不留一點體力，我要怎麼把功夫傳給你？" },
+    { "id": "07", "kind": "beat", "caption": "小明：「可是師父，留體力學，好難」。" }
+  ]
+}
