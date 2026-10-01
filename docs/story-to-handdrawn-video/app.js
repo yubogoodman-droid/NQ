@@ -33,7 +33,7 @@
       sheet: "assets/liuti-character-sheet.jpg",
       sheetAlt: "小明與大師角色設定",
       pages: 7,
-      duration: 35.5,
+      duration: 15.0,
       storyUrl: "liuti.json",
       colorOnly: true,
     },
