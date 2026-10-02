@@ -98,7 +98,7 @@ python3 examples/tw_1h_ma60_retest.py --days 7 --range 2mo --pages
 python3 examples/test_tw_1h_ma60_retest.py
 ```
 
-週報（2026-09-29 → 10-02、成交額前 200 且股價 < 1000）：**23 筆、18 檔**。已平 18 筆勝率 **61.1%**，平均 **+0.80%**（加總 +18.3%）。2R 11 筆平均約 +2.7%，停損 7 筆平均約 −1.5%。收盤後抱 3 天平均 **+2.90%**，比 2R 出場肥。對話裡五檔本週沒訊號（噴出在 9/22 那週；立積 9/24 回踩 91.1 才是進場點）。
+週報（2026-09-29 → 10-02）：成交額前 200 刪掉股價 ≥ 1000 後剩 **155 檔**，**19 筆、14 檔**。已平 15 筆勝率 **73.3%**，平均 **+1.16%**（加總 +22.0%）。2R 11 筆平均約 +2.7%，停損 4 筆平均約 −1.8%。收盤後抱 3 天平均 **+3.96%**。
 
 週報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-ma60-retest-3376/docs/tw-1h-ma60-retest-7d/view.html
 
