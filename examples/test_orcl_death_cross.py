@@ -49,7 +49,7 @@ def test_death_and_below_fires() -> None:
     # 最後幾根急殺，讓 MA7 下穿 MA14，收盤掉到 MA25 下
     close[-8:] = np.array([109.2, 108.4, 107.2, 105.8, 104.1, 102.4, 100.6, 99.0])
     m7, m14, m25 = _mas(close)
-    hits = detect_shorts(close, m7, m14, m25, min_lead=3)
+    hits = detect_shorts(close, m7, m14, m25, min_lead=3, require_cross_ma25=False)
     assert hits, "急殺應出現死亡交叉且破 MA25"
     hit = hits[-1]
     assert close[hit.i] < m25[hit.i]
@@ -63,7 +63,7 @@ def test_death_above_ma25_skipped() -> None:
     # 輕微回檔：7/14 交叉但價格仍在 MA25 上
     close[-4:] = np.array([107.85, 107.70, 107.55, 107.45])
     m7, m14, m25 = _mas(close)
-    raw = detect_shorts(close, m7, m14, m25, min_lead=0)
+    raw = detect_shorts(close, m7, m14, m25, min_lead=0, require_cross_ma25=False)
     for h in raw:
         assert close[h.i] < m25[h.i]
 
@@ -73,7 +73,7 @@ def test_only_the_cross_bar() -> None:
     close = np.linspace(100.0, 110.0, n)
     close[-10:] = np.array([109.4, 108.6, 107.0, 105.2, 103.4, 102.0, 101.2, 100.8, 100.5, 100.3])
     m7, m14, m25 = _mas(close)
-    hits = detect_shorts(close, m7, m14, m25, min_lead=0)
+    hits = detect_shorts(close, m7, m14, m25, min_lead=0, require_cross_ma25=False)
     assert hits
     # 交叉後持續 7<14 且收在 25 下，不應每根都發
     idxs = [h.i for h in hits]
@@ -91,8 +91,8 @@ def test_min_lead_filters_flicker() -> None:
     # 補到夠算 MA25
     close = np.concatenate([np.full(20, 10.0), close])
     m7, m14, m25 = _mas(close)
-    loose = detect_shorts(close, m7, m14, m25, min_lead=0)
-    tight = detect_shorts(close, m7, m14, m25, min_lead=20)
+    loose = detect_shorts(close, m7, m14, m25, min_lead=0, require_cross_ma25=False)
+    tight = detect_shorts(close, m7, m14, m25, min_lead=20, require_cross_ma25=False)
     assert len(tight) <= len(loose)
 
 
@@ -116,19 +116,20 @@ def test_lead_bars_counts_pre_cross() -> None:
 
 
 def test_dump_like_screenshot() -> None:
-    """高點後急殺：死亡交叉當根收盤跌破 MA25（對齊 10-02 22:49 那波）。"""
-    n = 90
-    close = np.linspace(140.0, 144.9, n - 8)
-    dump = np.array([144.58, 144.44, 144.23, 144.10, 143.89, 143.64, 143.47, 143.41])
-    close = np.concatenate([close, dump])
+    """高點後急殺：同一根死亡交叉且收盤跌破 MA25（對齊 ORCL 22:49）。"""
+    close = np.full(80, 144.50)
+    close[:40] = np.linspace(140.0, 144.50, 40)
+    close[77] = 144.55
+    close[78] = 144.58
+    close[79] = 143.70
     m7, m14, m25 = _mas(close)
     hits = detect_shorts(close, m7, m14, m25, min_lead=5)
     assert hits, "這波急殺應抓得到"
     hit = hits[-1]
-    assert hit.crossed_ma25 or close[hit.i] < m25[hit.i]
+    assert hit.i == 79
+    assert hit.crossed_ma25, "ORCL 那波是同一根跌破 MA25"
     assert m7[hit.i] < m14[hit.i]
-    # 訊號發生在急殺段，不是還在創新高時
-    assert hit.i >= n - 8
+    assert m7[hit.i - 1] >= m14[hit.i - 1]
 
 
 def test_filter_universe_keeps_orcl_drops_index() -> None:
@@ -237,13 +238,13 @@ def test_new_high_mask() -> None:
 
 
 def test_4h_high_then_death_within_30() -> None:
-    n = 300
-    close = np.linspace(100.0, 120.0, n - 12)
-    dump = np.array([119.5, 118.8, 117.2, 115.4, 113.6, 112.0, 110.6, 109.4, 108.4, 107.6, 107.0, 106.5])
-    close = np.concatenate([close, dump])
-    high = close + 0.25
-    peak = n - 13
-    high[peak] = float(close[peak] + 1.8)
+    rise = np.linspace(100.0, 144.50, 250)
+    wait = np.full(20, 144.50)
+    tail = np.array([144.55, 144.58, 143.70])
+    close = np.concatenate([rise, wait, tail])
+    high = close + 0.15
+    peak = 249
+    high[peak] = 150.0
     m7, m14, m25 = _mas(close)
     hits = detect_shorts(
         close,
@@ -258,17 +259,19 @@ def test_4h_high_then_death_within_30() -> None:
     )
     assert hits, "4h 新高後 30 分內急殺應抓得到"
     hit = hits[-1]
+    assert hit.crossed_ma25, "條件2要同一根跌破 MA25"
     assert hit.bars_after_high is not None and hit.bars_after_high <= 30
-    assert hit.peak_i == peak or high[hit.peak_i] >= high[peak] - 1e-9
+    assert hit.peak_i is not None
+    assert high[hit.peak_i] >= 150.0 - 1e-9
 
 
 def test_4h_high_too_old_skipped() -> None:
-    rise = np.linspace(100.0, 120.0, 250)
-    wait = np.linspace(120.0, 120.4, 45)
-    dump = np.array([120.1, 119.2, 117.6, 115.5, 113.2, 111.0, 109.2, 107.8, 106.6, 105.8, 105.2, 104.8])
-    close = np.concatenate([rise, wait, dump])
+    rise = np.linspace(100.0, 144.50, 250)
+    wait = np.full(45, 144.50)
+    tail = np.array([144.55, 144.58, 143.70])
+    close = np.concatenate([rise, wait, tail])
     high = close + 0.15
-    high[249] = 130.0
+    high[249] = 150.0
     m7, m14, m25 = _mas(close)
     raw = detect_shorts(close, m7, m14, m25, min_lead=0, require_4h_high=False)
     gated = detect_shorts(

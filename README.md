@@ -101,13 +101,16 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
-## ORCL / 幣安一分 K 空：4 小時新高後死亡交叉且破 MA25
+## ORCL / 幣安一分 K 空：4 小時新高後，同一根死亡交叉且破 MA25
 
-創下過去 **4 小時新高** 後 **30 分鐘內**，1 分鐘收盤 **MA7 下穿 MA14** 且 **收盤 < MA25**。可只看 `ORCLUSDT`，或 `--all` 掃幣安所有 USDT 永續。
+創下過去 **4 小時新高** 後 **30 分鐘內**，**同一根** 1 分鐘 K 同時：
 
-2026-10-02 ORCL：22:44 創四小時高 **144.95**，**22:49（+5 分）收 144.44** 死亡交叉且破 MA25，之後砸到 141。截圖 23:48 的 141.34 是訊號後的結果。
+1. MA7 下穿 MA14（死亡交叉）
+2. 收盤由上跌破 MA25
 
-`--no-4h-high` 可關掉新高條件。`--high-hours` / `--within-minutes` 可改窗口。
+對齊 2026-10-02 ORCL：22:44 創四小時高 **144.95**，**22:49（+5 分）同一根** 收 144.44 死亡交叉且跌破 MA25。
+
+`--no-same-bar-ma25` 才允許交叉時價已經在 MA25 下面。`--no-4h-high` 關掉新高條件。
 
 ```bash
 python3 examples/watch_orcl_death_cross.py --all --scan --date 2026-10-02 --pages

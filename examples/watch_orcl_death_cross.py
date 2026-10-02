@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""1m 空：創 4 小時新高後 30 分鐘內，MA7/MA14 死亡交叉且收盤破 MA25。
+"""1m 空：創 4 小時新高後 30 分鐘內，同一根 K 死亡交叉且跌破 MA25。
 
-對 2026-10-02 ORCL：22:44 創四小時高 144.95，22:49 收 144.44 死亡交叉且破 MA25。
+對 2026-10-02 ORCL：22:44 創四小時高 144.95；22:49 同一根收 144.44 死亡交叉且破 MA25。
 
 用法：
   python3 examples/watch_orcl_death_cross.py --all --scan --date 2026-10-02 --pages
@@ -136,12 +136,12 @@ def detect_shorts(
     *,
     high: np.ndarray | None = None,
     min_lead: int = 5,
-    require_cross_ma25: bool = False,
+    require_cross_ma25: bool = True,
     require_4h_high: bool = False,
     high_lookback: int = 240,
     within_bars: int = 30,
 ) -> list[ShortHit]:
-    """收盤根：MA7 下穿 MA14，且收盤 < MA25。
+    """收盤根：同一根 K 上 MA7 下穿 MA14，且收盤由上跌破 MA25（對齊 ORCL 22:49）。
 
     require_4h_high：訊號前 within_bars 根內，必須創下 high_lookback 根新高
     （預設 4 小時新高後 30 分鐘內）。
@@ -578,7 +578,7 @@ def print_scan(sym: str, d: dict, hits: list[ShortHit], *, hours: int, day: str 
     start, end = cutoff_ms(day=day, hours=hours, now_ms=int(d["t"][-1]) + 1)
     recent = [h for h in hits if in_window(int(d["t"][h.i]), start, end)]
     label = day if day else f"近 {hours}h"
-    print(f"\n{sym} {label}  4h新高後30分內死亡交叉且破 MA25：{len(recent)} 筆")
+    print(f"\n{sym} {label}  4h新高後30分內、同一根死亡交叉且破 MA25：{len(recent)} 筆")
     for h in recent:
         x = "同根破25" if h.crossed_ma25 else "已在25下"
         after = f"  高點後{h.bars_after_high}m" if h.bars_after_high is not None else ""
@@ -622,7 +622,7 @@ def print_market_scan(rows: list[ScanRow], *, start_ms: int, end_ms: int, n_symb
     same = sum(1 for r in recent if r.hit.crossed_ma25)
     names = sorted({r.symbol for r in recent})
     print(
-        f"\n幣安 USDT 永續 {n_symbols} 檔　4h新高後30分內死亡交叉且破MA25："
+        f"\n幣安 USDT 永續 {n_symbols} 檔　4h新高後30分內、同一根死亡交叉且破MA25："
         f"{len(recent)} 筆 / {len(names)} 檔　同根破25 {same} 筆"
     )
     ranked = sorted(
@@ -767,7 +767,7 @@ a{{color:#c9a227;text-decoration:none}}
 <body>
 <div class="wrap">
 <h1>{escape(title)}</h1>
-<p class="sub">創下過去 4 小時新高後 30 分鐘內：1 分鐘收盤 MA7 下穿 MA14，且收盤 &lt; MA25。急殺深度是訊號後 30 根最低點。不是進出場建議。</p>
+<p class="sub">創下過去 4 小時新高後 30 分鐘內，<b>同一根</b> 1 分鐘 K：MA7 下穿 MA14，且收盤由上跌破 MA25（對齊 ORCL 22:49）。急殺深度是訊號後 30 根最低點。不是進出場建議。</p>
 <div class="chips">
   <div class="chip">掃 <b>{n_symbols}</b> 檔</div>
   <div class="chip">訊號 <b>{len(recent)}</b> 筆</div>
@@ -796,7 +796,7 @@ a{{color:#c9a227;text-decoration:none}}
 {"".join(sym_html) or "<tr><td colspan='7' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
-<p class="note">ORCL 10-02：22:44 創四小時高 144.95，22:49（+5 分）死亡交叉且破 MA25，之後砸到 141。</p>
+<p class="note">ORCL 10-02：22:44 創四小時高 144.95；22:49（+5 分）同一根死亡交叉且跌破 MA25，之後砸到 141。</p>
 </div>
 </body>
 </html>
@@ -889,7 +889,7 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
                 start_ms=start,
                 end_ms=end,
                 n_symbols=len(symbols),
-                title=f"幣安 1m 空 · 4h新高後死亡交叉且破 MA25 · {label}",
+                title=f"幣安 1m 空 · 4h新高後同一根死亡交叉且破 MA25 · {label}",
                 top=args.top,
             )
             print(f"html={out}")
@@ -909,7 +909,12 @@ def main() -> int:
     p.add_argument("--min-quote-vol", type=float, default=0.0, help="24h 成交額下限，--all 時用")
     p.add_argument("--workers", type=int, default=12, help="並行下載 K 線")
     p.add_argument("--min-lead", type=int, default=5, help="死亡交叉前 MA7≥MA14 最少根數，濾雜訊")
-    p.add_argument("--require-cross-ma25", action="store_true", help="要求這根同時由上跌破 MA25")
+    p.add_argument(
+        "--no-same-bar-ma25",
+        dest="require_cross_ma25",
+        action="store_false",
+        help="允許死亡交叉時價已在 MA25 下（不要求同一根跌破，不像 ORCL）",
+    )
     p.add_argument("--high-hours", type=float, default=4.0, help="新高回看幾小時，預設 4")
     p.add_argument("--within-minutes", type=int, default=30, help="新高後幾分鐘內要出現死亡交叉，預設 30")
     p.add_argument("--no-4h-high", action="store_true", help="關掉四小時新高條件")
@@ -923,6 +928,7 @@ def main() -> int:
     p.add_argument("--once", action="store_true", help="只掃剛收盤的那一分，然後結束")
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
     p.add_argument("--dry-run", action="store_true", help="只印不送 Telegram")
+    p.set_defaults(require_cross_ma25=True)
     args = p.parse_args()
     apply_keys()
     if args.test:
@@ -940,7 +946,7 @@ def main() -> int:
         watch_limit = max(look + 10, 320)
     print(
         f"監看 {len(symbols)} 檔  1m  空  "
-        f"4h新高後{args.within_minutes}分內  MA7×MA14 死亡交叉且收盤<MA25  "
+        f"4h新高後{args.within_minutes}分內  同一根MA7×MA14死亡交叉且跌破MA25  "
         f"min_lead={args.min_lead}  4h={'開' if detect_kw['require_4h_high'] else '關'}",
         flush=True,
     )
