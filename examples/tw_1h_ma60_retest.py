@@ -496,8 +496,8 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>台股 1h 突破後回踩 MA60 · 成交額前 {len(universe)}</h1>
-<p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
+<h1>台股 1h 突破後回踩 MA60 · {escape(period)}</h1>
+<p class="muted">基準日 {escape(date)} · 掃描 {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
 <br/>先在 MA60 上方延伸 ≥ 3%，再回踩均線附近（可刺穿 1.5%），收盤站上且離 MA60 ≤ 2.5%。MA60 不能下彎。同一段只吃第一次回踩。
 回測出場：停在回踩低（至少 0.8%）、2R、或 20 根時間停。加總％是各筆報酬相加，不是組合複利。</p>
 <p class="muted">漏斗（Yahoo 全區間，本週只留進場日）：站上 {fun.get('above_run', 0)} → 有延伸 {fun.get('extended', 0)} → 全區間進場 {fun.get('entry', 0)} → 本週 {stats['count']}
@@ -614,16 +614,25 @@ def _merge_watch(universe: List[dict]) -> List[dict]:
     return extra + universe
 
 
+def resolve_pool(limit: int, pool: int) -> int:
+    """成交額前 limit，不往後補。pool>0 才額外擴大候選。"""
+    if limit <= 0:
+        return 0
+    if pool and pool > 0:
+        return int(pool)
+    return int(limit)
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="台股 1h 突破後回踩 MA60 回測")
     p.add_argument("--date", default="", help="YYYYMMDD，預設上一個交易日")
     p.add_argument("--limit", type=int, default=200, help="成交額前 N；0 = 不限成交額")
-    p.add_argument("--pool", type=int, default=400, help="先取成交額前 N 再套股價過濾")
-    p.add_argument("--max-price", type=float, default=1000, help="股價達此值以上剔除；0 不過濾")
+    p.add_argument("--pool", type=int, default=0, help="先取成交額前 N 再過濾；0 = 等於 --limit，不往後補")
+    p.add_argument("--max-price", type=float, default=1000, help="股價 1000 以上刪掉；0 不過濾")
     p.add_argument("--days", type=int, default=7, help="只統計進場落在最近 N 日的訊號")
     p.add_argument("--range", dest="range_", default="2mo", help="Yahoo 1h 下載區間")
     p.add_argument("--sleep", type=float, default=0.18)
-    p.add_argument("--no-watch", action="store_true", help="不強制納入對話那五檔")
+    p.add_argument("--watch", action="store_true", help="額外納入晶心科／中美晶／系統電／GIS-KY／立積")
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
     p.add_argument("--json", dest="json_path", default="")
@@ -631,25 +640,27 @@ def main(argv=None) -> int:
 
     params = loose_params()
     date = resolve_twse_date(args.date or last_tw_session_yyyymmdd())
-    pool = 0 if args.limit <= 0 else max(args.limit, args.pool if args.max_price else args.limit)
+    pool = resolve_pool(args.limit, args.pool)
     print(
-        f"universe date={date} limit={args.limit} days={args.days} range={args.range_} "
+        f"universe date={date} limit={args.limit} pool={pool} days={args.days} range={args.range_} "
         f"max_price={args.max_price}"
     )
     raw = fetch_top_turnover(date, pool)
     price_cap = None if args.max_price is None or args.max_price <= 0 else float(args.max_price)
     helper_cap = None if price_cap is None else price_cap - 1e-9
-    universe, dropped = filter_by_max_price(raw, helper_cap, args.limit)
+    # 成交額前 N 之後刪股價門檻；不足 N 也不用更後面的名次補。
+    keep_n = 0 if pool == args.limit and args.limit > 0 else args.limit
+    universe, dropped = filter_by_max_price(raw, helper_cap, keep_n)
     args.max_price = price_cap
     if dropped:
         print(
             "drop price>="
             + str(args.max_price)
-            + ": "
+            + f" n={len(dropped)}: "
             + ", ".join(f"{r['code']} {r['close']}" for r in dropped[:12])
             + (" …" if len(dropped) > 12 else "")
         )
-    if not args.no_watch:
+    if args.watch:
         universe = _merge_watch(universe)
     if not universe:
         print("no universe", file=sys.stderr)
@@ -704,9 +715,9 @@ def main(argv=None) -> int:
     if html_path is None and args.pages:
         html_path = PAGES
     if html_path:
-        period_label = f"{args.days}d · Yahoo {args.range_} 1h"
+        period_label = f"{args.days}d · Yahoo {args.range_} 1h · 成交額前{args.limit}"
         if args.max_price is not None:
-            period_label += f" · 股價<{args.max_price:g}"
+            period_label += f" · 刪股價≥{args.max_price:g}後{len(universe)}檔"
         out = write_tw_html(html_path, hits, universe, period_label, date, funnel=funnel)
         write_view_html(out)
         print(f"html={out}")

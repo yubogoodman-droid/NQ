@@ -91,7 +91,7 @@ python3 examples/test_tw_1h_reclaim.py
 回測出場：停在回踩低（至少 0.8%）、目標 2R、或 20 根時間停。
 
 ```bash
-# 成交額前 200、近一週；預設也掃晶心科／中美晶／系統電／GIS-KY／立積
+# 成交額前 200，股價 1000 以上刪掉（不往後補名次）
 python3 examples/tw_1h_ma60_retest.py --days 7 --range 2mo --pages
 
 # 單元測試（不打網路）

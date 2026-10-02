@@ -17,6 +17,7 @@ from tw_1h_ma60_retest import (  # noqa: E402
     detect_signals,
     filter_entry_window,
     loose_params,
+    resolve_pool,
     simulate,
     sma,
     summarize_trades,
@@ -278,6 +279,13 @@ def test_summarize_empty() -> None:
     assert stats["win_rate"] == 0.0
 
 
+def test_resolve_pool_does_not_refill() -> None:
+    assert resolve_pool(200, 0) == 200
+    assert resolve_pool(200, 200) == 200
+    assert resolve_pool(200, 400) == 400
+    assert resolve_pool(0, 0) == 0
+
+
 def main() -> int:
     test_sma()
     test_breakout_then_ma60_retest_enters()
@@ -292,6 +300,7 @@ def main() -> int:
     test_simulate_stop_and_target()
     test_filter_entry_window()
     test_summarize_empty()
+    test_resolve_pool_does_not_refill()
     print("ok")
     return 0
 
