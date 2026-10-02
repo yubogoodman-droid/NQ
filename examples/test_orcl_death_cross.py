@@ -2,14 +2,31 @@
 """ORCL 1m MA7/MA14 死亡交叉且破 MA25（不打網路）。"""
 from __future__ import annotations
 
+import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from watch_orcl_death_cross import detect_shorts, lead_bars, sma  # noqa: E402
+from watch_orcl_death_cross import (  # noqa: E402
+    ScanRow,
+    ShortHit,
+    cutoff_ms,
+    day_bounds_ms,
+    detect_shorts,
+    filter_universe,
+    forward_moves,
+    in_window,
+    lead_bars,
+    orcl_like,
+    pct_move,
+    sma,
+    taipei_day,
+    write_html_report,
+)
 
 
 def test_sma() -> None:
@@ -112,6 +129,100 @@ def test_dump_like_screenshot() -> None:
     assert hit.i >= n - 8
 
 
+def test_filter_universe_keeps_orcl_drops_index() -> None:
+    info = [
+        {"symbol": "BTCUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL", "underlyingType": "COIN"},
+        {"symbol": "ORCLUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "TRADIFI_PERPETUAL", "underlyingType": "EQUITY"},
+        {"symbol": "DEADUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL", "underlyingType": "COIN"},
+        {"symbol": "IDXUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL", "underlyingType": "INDEX"},
+        {"symbol": "ETHBTC", "quoteAsset": "BTC", "status": "TRADING", "contractType": "PERPETUAL", "underlyingType": "COIN"},
+    ]
+    tickers = {
+        "BTCUSDT": {"quoteVolume": "10000000"},
+        "ORCLUSDT": {"quoteVolume": "100"},
+        "DEADUSDT": {"quoteVolume": "1"},
+        "IDXUSDT": {"quoteVolume": "99999999"},
+    }
+    out = filter_universe(info, tickers, min_quote_vol=5_000_000, keep={"ORCLUSDT"})
+    assert out == ["BTCUSDT", "ORCLUSDT"]
+    all_usdt = filter_universe(info, tickers, min_quote_vol=0)
+    assert "DEADUSDT" in all_usdt
+    assert "IDXUSDT" not in all_usdt
+    assert "ETHBTC" not in all_usdt
+
+
+def test_day_window() -> None:
+    start, end = day_bounds_ms("2026-10-02")
+    # 22:49 台北 should be inside
+    ts = int(datetime(2026, 10, 2, 22, 49, tzinfo=timezone(timedelta(hours=8))).timestamp() * 1000)
+    assert in_window(ts, start, end)
+    assert taipei_day(ts) == "2026-10-02"
+    assert not in_window(start - 1, start, end)
+    assert not in_window(end, start, end)
+    s2, e2 = cutoff_ms(day="2026-10-02", hours=24)
+    assert (s2, e2) == (start, end)
+
+
+def test_forward_moves_dump() -> None:
+    close = np.array([100.0, 99.0, 98.0, 97.0, 96.0], dtype=float)
+    low = np.array([99.5, 98.5, 97.5, 96.5, 95.0], dtype=float)
+    f15, f30, l15, l30 = forward_moves(close, low, 0, n15=2, n30=4)
+    assert f15 is not None and abs(f15 - pct_move(100, 98)) < 1e-9
+    assert l30 is not None and abs(l30 - pct_move(100, 95)) < 1e-9
+    empty = forward_moves(close, low, 4, n15=2, n30=4)
+    assert empty == (None, None, None, None)
+
+
+def test_write_html_report(tmp_path=None) -> None:
+    from pathlib import Path
+    import tempfile
+
+    hit = ShortHit(i=10, close=144.44, m7=144.63, m14=144.65, m25=144.55, lead=22, crossed_ma25=True)
+    ts = int(datetime(2026, 10, 2, 22, 49, tzinfo=timezone(timedelta(hours=8))).timestamp() * 1000)
+    row = ScanRow(
+        symbol="ORCLUSDT",
+        ts_ms=ts,
+        hit=hit,
+        fwd15=-1.2,
+        fwd30=-2.4,
+        low15=-1.5,
+        low30=-2.8,
+        quote_vol=1.0,
+    )
+    start, end = day_bounds_ms("2026-10-02")
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "index.html"
+        out = write_html_report(
+            path, [row], start_ms=start, end_ms=end, n_symbols=1, title="test", top=10
+        )
+        html = out.read_text(encoding="utf-8")
+        assert "ORCLUSDT" in html
+        assert "22:49" in html
+        payload = json.loads((out.parent / "hits.json").read_text())
+        assert payload["count"] == 1
+        assert payload["top"][0]["symbol"] == "ORCLUSDT"
+        assert payload["orcl_like"] == 1
+
+
+def test_orcl_like_needs_same_bar_and_lead() -> None:
+    ts = 1
+    a = ScanRow(
+        "A", ts, ShortHit(1, 1, 1, 1, 1, 22, True), -1, -2, -1.5, -2.5, 0
+    )
+    b = ScanRow(
+        "B", ts, ShortHit(1, 1, 1, 1, 1, 22, False), -3, -4, -3, -5, 0
+    )
+    c = ScanRow(
+        "C", ts, ShortHit(1, 1, 1, 1, 1, 3, True), -4, -6, -4, -7, 0
+    )
+    got = orcl_like([a, b, c])
+    assert [r.symbol for r in got] == ["A"]
+    shallow = ScanRow(
+        "D", ts, ShortHit(1, 1, 1, 1, 1, 22, True), -0.2, -0.1, -0.2, -0.3, 0
+    )
+    assert orcl_like([a, shallow]) == [a]
+
+
 def main() -> int:
     test_sma()
     test_death_and_below_fires()
@@ -121,6 +232,11 @@ def main() -> int:
     test_require_cross_ma25()
     test_lead_bars_counts_pre_cross()
     test_dump_like_screenshot()
+    test_filter_universe_keeps_orcl_drops_index()
+    test_day_window()
+    test_forward_moves_dump()
+    test_write_html_report()
+    test_orcl_like_needs_same_bar_and_lead()
     print("ok")
     return 0
 

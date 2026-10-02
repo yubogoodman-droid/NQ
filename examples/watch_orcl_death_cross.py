@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""ORCL 1m 空：MA7/MA14 死亡交叉且收盤破 MA25 → Telegram。
+"""1m 空：MA7/MA14 死亡交叉且收盤破 MA25 → 掃幣安 / Telegram。
 
-對 2026-10-02 那張圖：高點 144.95（22:44 台北）後，
+對 2026-10-02 ORCL 那張圖：高點 144.95（22:44 台北）後，
 22:49 收盤 144.44 同時 MA7 下穿 MA14、收盤跌破 MA25，之後砸到 141。
-截圖 23:48（收 141.34、MA7 141.55 / MA14 141.78 / MA25 141.84）是訊號後的結果。
 
 用法：
+  python3 examples/watch_orcl_death_cross.py --all --scan
   python3 examples/watch_orcl_death_cross.py --scan
+  python3 examples/watch_orcl_death_cross.py --all
   python3 examples/watch_orcl_death_cross.py --test
-  python3 examples/watch_orcl_death_cross.py --dry-run --once
-  python3 examples/watch_orcl_death_cross.py
 
 Telegram 憑證放 tg_config.env（勿提交），或本檔最上面。
 """
@@ -18,9 +17,12 @@ from __future__ import annotations
 import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from html import escape
 from pathlib import Path
+from urllib.parse import quote
 
 import numpy as np
 import requests
@@ -36,7 +38,9 @@ CONFIG_ENV = REPO_ROOT / "tg_config.env"
 if not CONFIG_ENV.exists():
     CONFIG_ENV = Path(__file__).resolve().parent / "tg_config.env"
 SEEN_PATH = REPO_ROOT / "output" / "orcl_death_cross_seen.json"
+PAGES_HTML = REPO_ROOT / "docs" / "binance" / "death-cross-1m" / "index.html"
 DEFAULT_SYMBOLS = ("ORCLUSDT",)
+KEEP = {"ORCLUSDT"}
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"})
 
@@ -50,6 +54,18 @@ class ShortHit:
     m25: float
     lead: int
     crossed_ma25: bool
+
+
+@dataclass(frozen=True)
+class ScanRow:
+    symbol: str
+    ts_ms: int
+    hit: ShortHit
+    fwd15: float | None
+    fwd30: float | None
+    low15: float | None
+    low30: float | None
+    quote_vol: float = 0.0
 
 
 def load_dotenv(path: Path = CONFIG_ENV) -> None:
@@ -131,12 +147,95 @@ def detect_shorts(
     return hits
 
 
+def pct_move(start: float, end: float) -> float:
+    if start == 0:
+        return 0.0
+    return (end / start - 1.0) * 100.0
+
+
+def forward_moves(
+    close: np.ndarray,
+    low: np.ndarray,
+    i: int,
+    *,
+    n15: int = 15,
+    n30: int = 30,
+) -> tuple[float | None, float | None, float | None, float | None]:
+    """訊號後 15/30 根收盤漲跌、以及期間最低點相對進場收盤。"""
+    n = len(close)
+    if i < 0 or i >= n:
+        return None, None, None, None
+    c0 = float(close[i])
+
+    def at(k: int) -> tuple[float | None, float | None]:
+        j = i + k
+        if j >= n:
+            j = n - 1
+        if j <= i:
+            return None, None
+        sl = low[i : j + 1]
+        return pct_move(c0, float(close[j])), pct_move(c0, float(np.min(sl)))
+
+    f15, l15 = at(n15)
+    f30, l30 = at(n30)
+    return f15, f30, l15, l30
+
+
+def taipei_day(ms: int) -> str:
+    return datetime.fromtimestamp(ms / 1000, TZ).strftime("%Y-%m-%d")
+
+
+def day_bounds_ms(day: str) -> tuple[int, int]:
+    start = datetime.strptime(day, "%Y-%m-%d").replace(tzinfo=TZ)
+    end = start + timedelta(days=1)
+    return int(start.timestamp() * 1000), int(end.timestamp() * 1000)
+
+
+def cutoff_ms(*, day: str | None, hours: int, now_ms: int | None = None) -> tuple[int, int]:
+    """回傳 [start, end) 毫秒。有 day 就用台北日；否則用近 hours。"""
+    now = int(time.time() * 1000) if now_ms is None else now_ms
+    if day:
+        return day_bounds_ms(day)
+    return now - hours * 3600 * 1000, now + 1
+
+
+def in_window(ms: int, start_ms: int, end_ms: int) -> bool:
+    return start_ms <= ms < end_ms
+
+
+def filter_universe(
+    info_symbols: list[dict],
+    tickers: dict[str, dict],
+    *,
+    min_quote_vol: float = 0.0,
+    keep: set[str] | None = None,
+) -> list[str]:
+    keep = keep or set()
+    out: list[str] = []
+    for s in info_symbols:
+        if s.get("quoteAsset") != "USDT":
+            continue
+        if s.get("status") != "TRADING":
+            continue
+        if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
+            continue
+        if s.get("underlyingType") == "INDEX":
+            continue
+        sym = s["symbol"]
+        qv = float((tickers.get(sym) or {}).get("quoteVolume") or 0)
+        if qv < min_quote_vol and sym not in keep:
+            continue
+        out.append(sym)
+    return out
+
+
 def get_json(path: str, params=None, retries: int = 5):
     last = None
     for i in range(retries):
         try:
             r = SESSION.get(BASE + path, params=params, timeout=20)
             if r.status_code == 429:
+                last = RuntimeError(f"HTTP 429 {path}")
                 time.sleep(1.3 * (i + 1))
                 continue
             r.raise_for_status()
@@ -144,7 +243,7 @@ def get_json(path: str, params=None, retries: int = 5):
         except Exception as e:
             last = e
             time.sleep(0.4 * (i + 1))
-    raise last
+    raise last if last else RuntimeError(f"GET failed {path}")
 
 
 def fetch_klines(sym: str, limit: int = 400, *, drop_forming: bool = True) -> dict | None:
@@ -171,6 +270,15 @@ def with_ma(d: dict) -> dict:
     out = dict(d)
     out["m7"], out["m14"], out["m25"] = sma(c, 7), sma(c, 14), sma(c, 25)
     return out
+
+
+def universe(*, min_quote_vol: float = 0.0) -> tuple[list[str], dict[str, float]]:
+    info = get_json("/fapi/v1/exchangeInfo")
+    raw_tickers = get_json("/fapi/v1/ticker/24hr")
+    tickers = {t["symbol"]: t for t in raw_tickers}
+    symbols = filter_universe(info["symbols"], tickers, min_quote_vol=min_quote_vol, keep=KEEP)
+    vols = {s: float((tickers.get(s) or {}).get("quoteVolume") or 0) for s in symbols}
+    return symbols, vols
 
 
 def hm(ms: int) -> str:
@@ -271,7 +379,7 @@ def draw_chart(sym: str, d: dict, hit: ShortHit, path: str) -> str | None:
 def format_hit(sym: str, d: dict, hit: ShortHit) -> str:
     ts = hm(int(d["t"][hit.i]))
     x25 = "這根同時跌破 MA25" if hit.crossed_ma25 else "收盤已在 MA25 下方"
-    link = f"https://www.binance.com/zh-TW/futures/{sym}"
+    link = binance_href(sym)
     return (
         f"🔻 <b>{sym} 空</b>  1m\n"
         f"MA7 / MA14 <b>死亡交叉</b>，{x25}\n"
@@ -295,6 +403,83 @@ def scan_symbol(sym: str, *, min_lead: int, require_cross_ma25: bool, limit: int
     return d, detect_shorts(
         d["c"], d["m7"], d["m14"], d["m25"], min_lead=min_lead, require_cross_ma25=require_cross_ma25
     )
+
+
+def rows_from_hits(sym: str, d: dict, hits: list[ShortHit], *, quote_vol: float = 0.0) -> list[ScanRow]:
+    rows: list[ScanRow] = []
+    for hit in hits:
+        f15, f30, l15, l30 = forward_moves(d["c"], d["l"], hit.i)
+        rows.append(
+            ScanRow(
+                symbol=sym,
+                ts_ms=int(d["t"][hit.i]),
+                hit=hit,
+                fwd15=f15,
+                fwd30=f30,
+                low15=l15,
+                low30=l30,
+                quote_vol=quote_vol,
+            )
+        )
+    return rows
+
+
+def scan_symbol_rows(
+    sym: str,
+    *,
+    min_lead: int,
+    require_cross_ma25: bool,
+    limit: int,
+    quote_vol: float = 0.0,
+) -> tuple[dict, list[ScanRow]]:
+    d, hits = scan_symbol(sym, min_lead=min_lead, require_cross_ma25=require_cross_ma25, limit=limit)
+    if not d:
+        return {}, []
+    return d, rows_from_hits(sym, d, hits, quote_vol=quote_vol)
+
+
+def scan_universe(
+    symbols: list[str],
+    *,
+    min_lead: int,
+    require_cross_ma25: bool,
+    limit: int,
+    workers: int,
+    vols: dict[str, float] | None = None,
+    keep_bars: bool = False,
+) -> tuple[list[ScanRow], dict[str, dict]]:
+    vols = vols or {}
+    rows: list[ScanRow] = []
+    bars: dict[str, dict] = {}
+    err = 0
+
+    def one(sym: str) -> tuple[str, dict, list[ScanRow]]:
+        d, rs = scan_symbol_rows(
+            sym,
+            min_lead=min_lead,
+            require_cross_ma25=require_cross_ma25,
+            limit=limit,
+            quote_vol=float(vols.get(sym) or 0),
+        )
+        return sym, d, rs
+
+    with ThreadPoolExecutor(max(1, workers)) as ex:
+        futs = {ex.submit(one, s): s for s in symbols}
+        for n, fut in enumerate(as_completed(futs), 1):
+            sym = futs[fut]
+            try:
+                s, d, rs = fut.result()
+            except Exception as e:
+                err += 1
+                print("err", sym, e, flush=True)
+                continue
+            rows.extend(rs)
+            if keep_bars and d:
+                bars[s] = d
+            if n % 80 == 0 or n == len(symbols):
+                print(f"  … {n}/{len(symbols)}  訊號 {len(rows)}  失敗 {err}", flush=True)
+    rows.sort(key=lambda r: (r.ts_ms, r.symbol))
+    return rows, bars
 
 
 def notify(sym: str, d: dict, hit: ShortHit, *, dry_run: bool) -> None:
@@ -329,13 +514,14 @@ def wait_next_close() -> None:
     time.sleep(max(1, nxt - now))
 
 
-def print_scan(sym: str, d: dict, hits: list[ShortHit], *, hours: int) -> None:
+def print_scan(sym: str, d: dict, hits: list[ShortHit], *, hours: int, day: str | None = None) -> None:
     if not d:
         print(f"{sym} 沒資料")
         return
-    cutoff = int(d["t"][-1]) - hours * 3600 * 1000
-    recent = [h for h in hits if int(d["t"][h.i]) >= cutoff]
-    print(f"\n{sym} 近 {hours}h  死亡交叉且破 MA25：{len(recent)} 筆")
+    start, end = cutoff_ms(day=day, hours=hours, now_ms=int(d["t"][-1]) + 1)
+    recent = [h for h in hits if in_window(int(d["t"][h.i]), start, end)]
+    label = day if day else f"近 {hours}h"
+    print(f"\n{sym} {label}  死亡交叉且破 MA25：{len(recent)} 筆")
     for h in recent:
         x = "同根破25" if h.crossed_ma25 else "已在25下"
         print(
@@ -343,6 +529,246 @@ def print_scan(sym: str, d: dict, hits: list[ShortHit], *, hours: int) -> None:
             f"MA7 {h.m7:.4f}  MA14 {h.m14:.4f}  MA25 {h.m25:.4f}  "
             f"lead {h.lead}  {x}"
         )
+
+
+def orcl_like(rows: list[ScanRow], *, min_dump: float = -1.0) -> list[ScanRow]:
+    """同根跌破 MA25、交叉前 MA7 領先夠久；有 30 根資料時還要砸過 min_dump%。"""
+    out = []
+    for r in rows:
+        if not r.hit.crossed_ma25 or r.hit.lead < 10:
+            continue
+        if r.low30 is not None and r.low30 > min_dump:
+            continue
+        out.append(r)
+    out.sort(
+        key=lambda r: (
+            r.low30 if r.low30 is not None else r.low15 if r.low15 is not None else 0.0,
+            -r.hit.lead,
+        )
+    )
+    return out
+
+
+def binance_href(sym: str) -> str:
+    return "https://www.binance.com/zh-TW/futures/" + quote(sym, safe="")
+
+
+def fmt_pct(v: float | None) -> str:
+    if v is None:
+        return "—"
+    return f"{v:+.2f}%"
+    if v is None:
+        return "—"
+    return f"{v:+.2f}%"
+
+
+def print_market_scan(rows: list[ScanRow], *, start_ms: int, end_ms: int, n_symbols: int, top: int = 40) -> None:
+    recent = [r for r in rows if in_window(r.ts_ms, start_ms, end_ms)]
+    same = sum(1 for r in recent if r.hit.crossed_ma25)
+    names = sorted({r.symbol for r in recent})
+    print(
+        f"\n幣安 USDT 永續 {n_symbols} 檔　死亡交叉且破 MA25：{len(recent)} 筆 / {len(names)} 檔　"
+        f"同根破25 {same} 筆"
+    )
+    ranked = sorted(
+        recent,
+        key=lambda r: (
+            r.low30 if r.low30 is not None else r.low15 if r.low15 is not None else 0.0,
+            -r.hit.lead,
+        ),
+    )
+    print(f"\n急殺最深（訊號後 30 根最低，前 {top}）：")
+    for r in ranked[:top]:
+        x = "同根破25" if r.hit.crossed_ma25 else "已在25下"
+        print(
+            f"  {r.symbol:<14} {hm(r.ts_ms)}  收 {r.hit.close:g}  "
+            f"30m低 {fmt_pct(r.low30)}  15m {fmt_pct(r.fwd15)}  "
+            f"lead {r.hit.lead}  {x}"
+        )
+    like = orcl_like(recent)
+    print(f"\n比較像 ORCL（同根破25、lead≥10、30m 至少砸 1%）：{len(like)} 筆 / {len({r.symbol for r in like})} 檔")
+    for r in like[:top]:
+        print(
+            f"  {r.symbol:<14} {hm(r.ts_ms)}  收 {r.hit.close:g}  "
+            f"30m低 {fmt_pct(r.low30)}  15m {fmt_pct(r.fwd15)}  lead {r.hit.lead}"
+        )
+
+
+def row_to_json(r: ScanRow) -> dict:
+    return {
+        "symbol": r.symbol,
+        "ts": r.ts_ms,
+        "time": hm(r.ts_ms),
+        "close": r.hit.close,
+        "ma7": r.hit.m7,
+        "ma14": r.hit.m14,
+        "ma25": r.hit.m25,
+        "lead": r.hit.lead,
+        "crossed_ma25": r.hit.crossed_ma25,
+        "fwd15": r.fwd15,
+        "fwd30": r.fwd30,
+        "low15": r.low15,
+        "low30": r.low30,
+        "quote_vol": r.quote_vol,
+    }
+
+
+def write_html_report(
+    path: str | Path,
+    rows: list[ScanRow],
+    *,
+    start_ms: int,
+    end_ms: int,
+    n_symbols: int,
+    title: str,
+    top: int = 50,
+) -> Path:
+    recent = [r for r in rows if in_window(r.ts_ms, start_ms, end_ms)]
+    ranked = sorted(
+        recent,
+        key=lambda r: (
+            r.low30 if r.low30 is not None else r.low15 if r.low15 is not None else 0.0,
+            -r.hit.lead,
+        ),
+    )
+    same = sum(1 for r in recent if r.hit.crossed_ma25)
+    names = sorted({r.symbol for r in recent})
+    like = orcl_like(recent)
+    by_sym: dict[str, list[ScanRow]] = {}
+    for r in recent:
+        by_sym.setdefault(r.symbol, []).append(r)
+    sym_rows = []
+    for sym, rs in by_sym.items():
+        lows = [x.low30 for x in rs if x.low30 is not None]
+        last = rs[-1]
+        worst = min(lows) if lows else None
+        with_low = [x for x in rs if x.low30 is not None]
+        dump = min(with_low, key=lambda z: z.low30) if with_low else last
+        sym_rows.append((worst if worst is not None else 0.0, sym, len(rs), dump, last))
+    sym_rows.sort()
+
+    def pct_cell(v: float | None) -> str:
+        if v is None:
+            return '<td class="muted">—</td>'
+        cls = "dn" if v < 0 else "up"
+        return f'<td class="{cls}">{v:+.2f}%</td>'
+
+    def row_tr(r: ScanRow, extra: str) -> str:
+        return (
+            "<tr>"
+            f"<td><a href='{escape(binance_href(r.symbol))}'>{escape(r.symbol)}</a></td>"
+            f"<td>{escape(hm(r.ts_ms))}</td>"
+            f"<td>{r.hit.close:g}</td>"
+            f"{pct_cell(r.low30)}{pct_cell(r.fwd15)}{pct_cell(r.fwd30)}"
+            f"<td>{r.hit.lead}</td>"
+            f"<td>{extra}</td>"
+            "</tr>"
+        )
+
+    top_html = [row_tr(r, "同根破25" if r.hit.crossed_ma25 else "已在25下") for r in ranked[:top]]
+    like_html = [row_tr(r, f"lead {r.hit.lead}") for r in like[:top]]
+    sym_html = []
+    for _w, sym, n, dump, last in sym_rows[:200]:
+        x = "同根破25" if dump.hit.crossed_ma25 else "已在25下"
+        sym_html.append(
+            "<tr>"
+            f"<td><a href='{escape(binance_href(sym))}'>{escape(sym)}</a></td>"
+            f"<td>{n}</td>"
+            f"<td>{escape(hm(dump.ts_ms))}</td>"
+            f"<td>{dump.hit.close:g}</td>"
+            f"{pct_cell(dump.low30)}"
+            f"<td>{x}</td>"
+            f"<td>{escape(hm(last.ts_ms))}</td>"
+            "</tr>"
+        )
+
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>{escape(title)}</title>
+<style>
+body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
+.wrap{{max-width:980px;margin:0 auto;padding:18px 14px 48px}}
+h1{{font-size:1.35rem;margin:0 0 8px}}
+h2{{font-size:1.02rem;margin:22px 0 8px}}
+.sub{{color:#8aa193;line-height:1.55;margin:0 0 14px;font-size:.92rem}}
+.chips{{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}}
+.chip{{border:1px solid rgba(232,240,234,.12);background:#14201b;border-radius:999px;padding:7px 12px;font-size:.82rem}}
+.chip b{{color:#c9a227}}
+table{{width:100%;border-collapse:collapse;font-size:.82rem}}
+th,td{{padding:7px 6px;border-bottom:1px solid rgba(232,240,234,.1);text-align:left}}
+th{{color:#8aa193;font-weight:500}}
+a{{color:#c9a227;text-decoration:none}}
+.dn{{color:#e35d5d}} .up{{color:#3dba7a}} .muted{{color:#8aa193}}
+.note{{margin-top:16px;color:#8aa193;font-size:.8rem;line-height:1.5}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>{escape(title)}</h1>
+<p class="sub">1 分鐘收盤：MA7 下穿 MA14，且收盤 &lt; MA25。急殺深度是訊號後 30 根的最低點。不是進出場建議。</p>
+<div class="chips">
+  <div class="chip">掃 <b>{n_symbols}</b> 檔</div>
+  <div class="chip">訊號 <b>{len(recent)}</b> 筆</div>
+  <div class="chip">有訊號 <b>{len(names)}</b> 檔</div>
+  <div class="chip">同根破 MA25 <b>{same}</b></div>
+  <div class="chip">像 ORCL <b>{len(like)}</b></div>
+</div>
+<h2>比較像 ORCL（同根破 MA25、lead≥10、30m 砸 ≥1%，前 {min(top, len(like))}）</h2>
+<table>
+<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th></th></tr></thead>
+<tbody>
+{"".join(like_html) or "<tr><td colspan='8' class='muted'>沒有訊號</td></tr>"}
+</tbody>
+</table>
+<h2>急殺最深（不限同根，前 {min(top, len(ranked))}）</h2>
+<table>
+<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>破25</th></tr></thead>
+<tbody>
+{"".join(top_html) or "<tr><td colspan='8' class='muted'>沒有訊號</td></tr>"}
+</tbody>
+</table>
+<h2>有訊號的標的</h2>
+<table>
+<thead><tr><th>標的</th><th>筆數</th><th>最深那筆</th><th>收</th><th>30m低</th><th>破25</th><th>最後一筆</th></tr></thead>
+<tbody>
+{"".join(sym_html) or "<tr><td colspan='7' class='muted'>沒有訊號</td></tr>"}
+</tbody>
+</table>
+<p class="note">ORCL 10-02 22:49 那波是同一根死亡交叉且跌破 MA25，之後 30 根砸到 141。表上越紅越像那張圖。</p>
+</div>
+</body>
+</html>
+"""
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html, encoding="utf-8")
+    hits_path = out.parent / "hits.json"
+    payload = {
+        "title": title,
+        "n_symbols": n_symbols,
+        "count": len(recent),
+        "symbols_hit": len(names),
+        "same_bar_ma25": same,
+        "orcl_like": len(like),
+        "top": [row_to_json(r) for r in ranked[:200]],
+        "like": [row_to_json(r) for r in like[:200]],
+        "by_symbol": [
+            {
+                "symbol": sym,
+                "n": n,
+                "worst_time": hm(dump.ts_ms),
+                "worst_close": dump.hit.close,
+                "worst_low30": dump.low30,
+                "last_time": hm(last.ts_ms),
+            }
+            for _w, sym, n, dump, last in sym_rows
+        ],
+    }
+    hits_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    return out
 
 
 def test_telegram() -> int:
@@ -359,15 +785,76 @@ def parse_symbols(raw: str | None) -> list[str]:
     return out or list(DEFAULT_SYMBOLS)
 
 
+def load_symbol_list(args) -> tuple[list[str], dict[str, float]]:
+    if args.all:
+        print("載入幣安 USDT 永續…", flush=True)
+        symbols, vols = universe(min_quote_vol=args.min_quote_vol)
+        print(f"共 {len(symbols)} 檔（min 成交額 {args.min_quote_vol:g}）", flush=True)
+        return symbols, vols
+    return parse_symbols(args.symbols), {}
+
+
+def scan_window_label(args) -> tuple[int, int, str]:
+    start, end = cutoff_ms(day=args.date, hours=args.hours)
+    if args.date:
+        return start, end, f"台北 {args.date}"
+    return start, end, f"近 {args.hours}h"
+
+
+def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
+    start, end, label = scan_window_label(args)
+    t0 = time.time()
+    if args.all or len(symbols) > 1:
+        print(f"掃 {len(symbols)} 檔 1m　{label}　min_lead={args.min_lead}", flush=True)
+        rows, _ = scan_universe(
+            symbols,
+            min_lead=args.min_lead,
+            require_cross_ma25=args.require_cross_ma25,
+            limit=args.limit,
+            workers=args.workers,
+            vols=vols,
+        )
+        print(f"掃完 {time.time()-t0:.1f}s", flush=True)
+        print_market_scan(rows, start_ms=start, end_ms=end, n_symbols=len(symbols), top=args.top)
+        html_path = args.html
+        if args.pages:
+            html_path = html_path or str(PAGES_HTML)
+        if html_path:
+            out = write_html_report(
+                html_path,
+                rows,
+                start_ms=start,
+                end_ms=end,
+                n_symbols=len(symbols),
+                title=f"幣安 1m 空 · 死亡交叉且破 MA25 · {label}",
+                top=args.top,
+            )
+            print(f"html={out}")
+        return 0
+    for sym in symbols:
+        d, hits = scan_symbol(
+            sym, min_lead=args.min_lead, require_cross_ma25=args.require_cross_ma25, limit=args.limit
+        )
+        print_scan(sym, d, hits, hours=args.hours, day=args.date)
+    return 0
+
+
 def main() -> int:
     import argparse
 
-    p = argparse.ArgumentParser(description="ORCL 1m MA7/MA14 死亡交叉且破 MA25 → Telegram")
+    p = argparse.ArgumentParser(description="1m MA7/MA14 死亡交叉且破 MA25 → 掃幣安 / Telegram")
     p.add_argument("--symbols", default="ORCLUSDT", help="逗號分隔，預設 ORCLUSDT")
+    p.add_argument("--all", action="store_true", help="掃幣安所有 USDT 永續（含股票型如 ORCL）")
+    p.add_argument("--min-quote-vol", type=float, default=0.0, help="24h 成交額下限，--all 時用")
+    p.add_argument("--workers", type=int, default=12, help="並行下載 K 線")
     p.add_argument("--min-lead", type=int, default=5, help="死亡交叉前 MA7≥MA14 最少根數，濾雜訊")
     p.add_argument("--require-cross-ma25", action="store_true", help="要求這根同時由上跌破 MA25")
-    p.add_argument("--scan", action="store_true", help="印出近幾小時歷史訊號後結束")
-    p.add_argument("--hours", type=int, default=24, help="--scan 回看小時數")
+    p.add_argument("--scan", action="store_true", help="印出歷史訊號後結束")
+    p.add_argument("--hours", type=int, default=24, help="沒指定 --date 時，回看小時數")
+    p.add_argument("--date", default=None, help="台北日 YYYY-MM-DD，只看這一天")
+    p.add_argument("--top", type=int, default=40, help="市場掃描列出急殺最深幾筆")
+    p.add_argument("--html", default=None, help="寫入 HTML 報告路徑")
+    p.add_argument("--pages", action="store_true", help="寫到 docs/binance/death-cross-1m/")
     p.add_argument("--limit", type=int, default=1500, help="K 線根數")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的那一分，然後結束")
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
@@ -377,44 +864,87 @@ def main() -> int:
     if args.test:
         return test_telegram()
 
-    symbols = parse_symbols(args.symbols)
+    symbols, vols = load_symbol_list(args)
     if args.scan:
-        for sym in symbols:
-            d, hits = scan_symbol(
-                sym, min_lead=args.min_lead, require_cross_ma25=args.require_cross_ma25, limit=args.limit
-            )
-            print_scan(sym, d, hits, hours=args.hours)
-        return 0
+        return run_scan(args, symbols, vols)
 
     seen = load_seen()
+    watch_limit = 80 if args.all else max(120, args.limit)
     print(
-        f"監看 {', '.join(symbols)}  1m  空  "
+        f"監看 {len(symbols)} 檔  1m  空  "
         f"MA7×MA14 死亡交叉且收盤<MA25  min_lead={args.min_lead}",
         flush=True,
     )
+    if args.all:
+        print("全市場 1m 這條件很密，Telegram 會很吵；報告請用 --scan --pages。", flush=True)
+    uni_ts = time.time()
 
     def round_once() -> None:
-        for sym in symbols:
-            d, hits = scan_symbol(
-                sym, min_lead=args.min_lead, require_cross_ma25=args.require_cross_ma25, limit=max(120, args.limit)
-            )
-            if not hits:
-                print(f"[{datetime.now(TZ).strftime('%H:%M:%S')}] {sym} 無訊號", flush=True)
-                continue
-            # 只推剛收盤、以及前一根（怕整點掃晚了）
-            last = len(d["c"]) - 1
-            fresh = [h for h in hits if h.i in (last, last - 1)]
-            new = [h for h in fresh if key_of(sym, d, h) not in seen]
-            print(
-                f"[{datetime.now(TZ).strftime('%H:%M:%S')}] {sym} "
-                f"歷史 {len(hits)}　剛收盤新訊號 {len(new)}",
-                flush=True,
-            )
-            for hit in new:
-                seen.add(key_of(sym, d, hit))
-                notify(sym, d, hit, dry_run=args.dry_run)
-            if new:
-                save_seen(seen)
+        nonlocal symbols, vols, uni_ts
+        if args.all and time.time() - uni_ts > 1800:
+            symbols, vols = universe(min_quote_vol=args.min_quote_vol)
+            uni_ts = time.time()
+            print(f"更新標的 {len(symbols)}", flush=True)
+        t0 = time.time()
+        n_new = 0
+        if args.all or len(symbols) > 4:
+            with ThreadPoolExecutor(max(1, args.workers)) as ex:
+                futs = {
+                    ex.submit(
+                        scan_symbol,
+                        s,
+                        min_lead=args.min_lead,
+                        require_cross_ma25=args.require_cross_ma25,
+                        limit=watch_limit,
+                    ): s
+                    for s in symbols
+                }
+                for fut in as_completed(futs):
+                    sym = futs[fut]
+                    try:
+                        d, hits = fut.result()
+                    except Exception as e:
+                        print("err", sym, e, flush=True)
+                        continue
+                    if not d or not hits:
+                        continue
+                    last = len(d["c"]) - 1
+                    fresh = [h for h in hits if h.i in (last, last - 1)]
+                    new = [h for h in fresh if key_of(sym, d, h) not in seen]
+                    for hit in new:
+                        seen.add(key_of(sym, d, hit))
+                        notify(sym, d, hit, dry_run=args.dry_run)
+                        n_new += 1
+        else:
+            for sym in symbols:
+                d, hits = scan_symbol(
+                    sym,
+                    min_lead=args.min_lead,
+                    require_cross_ma25=args.require_cross_ma25,
+                    limit=watch_limit,
+                )
+                if not hits or not d:
+                    print(f"[{datetime.now(TZ).strftime('%H:%M:%S')}] {sym} 無訊號", flush=True)
+                    continue
+                last = len(d["c"]) - 1
+                fresh = [h for h in hits if h.i in (last, last - 1)]
+                new = [h for h in fresh if key_of(sym, d, h) not in seen]
+                print(
+                    f"[{datetime.now(TZ).strftime('%H:%M:%S')}] {sym} "
+                    f"歷史 {len(hits)}　剛收盤新訊號 {len(new)}",
+                    flush=True,
+                )
+                for hit in new:
+                    seen.add(key_of(sym, d, hit))
+                    notify(sym, d, hit, dry_run=args.dry_run)
+                    n_new += 1
+        print(
+            f"[{datetime.now(TZ).strftime('%H:%M:%S')}] "
+            f"掃完 {len(symbols)} 用 {time.time()-t0:.1f}s　新訊號 {n_new}",
+            flush=True,
+        )
+        if n_new:
+            save_seen(seen)
 
     round_once()
     if args.once:
