@@ -782,7 +782,7 @@ a{{color:#c9a227;text-decoration:none}}
 {"".join(like_html) or "<tr><td colspan='9' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
-<h2>急殺最深（不限同根，前 {min(top, len(ranked))}）</h2>
+<h2>急殺最深（皆同根破 MA25，前 {min(top, len(ranked))}）</h2>
 <table>
 <thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th>破25</th></tr></thead>
 <tbody>
