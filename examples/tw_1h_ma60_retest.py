@@ -180,6 +180,7 @@ def detect_signals(
                     bump("retest_timeout")
                     ended = j + 1
                     break
+                live_ext = (peak_high / float(ma[j]) - 1.0) if float(ma[j]) > 0 else 0.0
                 if j > peak_idx:
                     rising = True
                     sl = j - p.slope_lookback
@@ -187,6 +188,8 @@ def detect_signals(
                         rising = float(ma[j]) >= float(ma[sl]) - 1e-12
                     if not rising:
                         bump("falling_ma")
+                    elif live_ext < p.min_ext:
+                        bump("ext_faded")
                     else:
                         touched = (float(low[j]) <= float(ma[j]) * (1.0 + p.touch_above)) and (
                             float(low[j]) >= float(ma[j]) * (1.0 - p.max_under)
@@ -201,7 +204,7 @@ def detect_signals(
                                     ma60=float(ma[j]),
                                     peak_idx=peak_idx,
                                     peak_high=peak_high,
-                                    ext_pct=ext_pct,
+                                    ext_pct=live_ext,
                                     retest_low=float(low[j]),
                                     run_start=run_start,
                                 )
@@ -497,8 +500,9 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
 <br/>先在 MA60 上方延伸 ≥ 3%，再回踩均線附近（可刺穿 1.5%），收盤站上且離 MA60 ≤ 2.5%。MA60 不能下彎。同一段只吃第一次回踩。
 回測出場：停在回踩低（至少 0.8%）、2R、或 20 根時間停。加總％是各筆報酬相加，不是組合複利。</p>
-<p class="muted">漏斗：站上 {fun.get('above_run', 0)} → 有延伸 {fun.get('extended', 0)} → 進場 {fun.get('entry', 0)}
+<p class="muted">漏斗（Yahoo 全區間，本週只留進場日）：站上 {fun.get('above_run', 0)} → 有延伸 {fun.get('extended', 0)} → 全區間進場 {fun.get('entry', 0)} → 本週 {stats['count']}
 · 轉空 {fun.get('breakdown', 0)} · 回踩逾時 {fun.get('retest_timeout', 0)} · MA60 下彎 {fun.get('falling_ma', 0)}
+· 延伸被均線追上 {fun.get('ext_faded', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}</p>
 <div class="cards">

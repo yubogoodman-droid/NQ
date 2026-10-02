@@ -184,6 +184,25 @@ def test_same_bar_breakout_wick_not_entry() -> None:
     assert sigs == []
 
 
+def test_extension_must_still_hold_at_retest() -> None:
+    """曾經延伸 3%，但回踩時高點相對當下 MA60 已不到 3%，不進。"""
+    base = rising_base(80)
+    ext = [101.8] + [101.5] * 22
+    df0 = ohlc_from_close(base + ext)
+    ma = sma(df0["Close"].to_numpy(float), 60)
+    m = float(ma[-1])
+    peak = 101.8 + 0.25
+    assert peak / m - 1.0 < 0.03
+    closes = base + ext + [m * 1.006]
+    lows = list(df0["Low"]) + [m * 0.998]
+    highs = list(df0["High"]) + [m * 1.012]
+    df = ohlc_from_close(closes, lows=lows, highs=highs)
+    funnel: dict = {}
+    sigs = detect_signals(df, loose_params(), funnel=funnel)
+    assert sigs == []
+    assert funnel.get("ext_faded", 0) + funnel.get("retest_timeout", 0) >= 1
+
+
 def test_falling_ma60_rejected() -> None:
     """下降 MA60 是壓力，回踩不進。"""
     closes = list(np.linspace(110.0, 100.0, 80)) + [103.0, 106.0, 108.0, 104.0]
@@ -268,6 +287,7 @@ def main() -> int:
     test_chase_extended_close_rejected()
     test_first_retest_only()
     test_same_bar_breakout_wick_not_entry()
+    test_extension_must_still_hold_at_retest()
     test_falling_ma60_rejected()
     test_simulate_stop_and_target()
     test_filter_entry_window()
