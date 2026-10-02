@@ -101,6 +101,22 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## ORCL 一分 K 空：MA7/MA14 死亡交叉且破 MA25
+
+幣安 `ORCLUSDT` 1 分鐘：收盤時 **MA7 下穿 MA14**，且 **收盤 < MA25**，推 Telegram（可帶圖）。
+
+2026-10-02 那張圖抓得到：22:44 台北衝到 144.95，**22:49 收 144.44** 同一根死亡交叉且跌破 MA25，之後砸到 141。截圖 23:48（141.34，MA7 141.55 / MA14 141.78 / MA25 141.84）是訊號後的結果，不是進場當根。
+
+預設要 MA7 先連續 5 根 ≥ MA14 再下穿，濾掉 1m 來來回回的假交叉。`--require-cross-ma25` 更嚴：死亡交叉那根必須同時由上跌破 MA25。
+
+```bash
+python3 examples/watch_orcl_death_cross.py --scan          # 近 24h 歷史
+python3 examples/watch_orcl_death_cross.py --test          # 測 Telegram
+python3 examples/watch_orcl_death_cross.py --dry-run --once
+python3 examples/watch_orcl_death_cross.py                 # 每根 1m 收盤掃
+python3 examples/test_orcl_death_cross.py                  # 不打網路
+```
+
 ## 快速開始
 
 ```bash
