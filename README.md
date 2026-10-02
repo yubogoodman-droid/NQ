@@ -84,6 +84,22 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## 台股 1 小時 K 突破後回踩 MA60
+
+對齊「先突破、再回踩小時 MA60」：MA60 不下彎，高點距均線 ≥ 3%，之後低點碰到 MA60 附近、收盤仍站上且離均線 ≤ 2.5%。同一段突破只吃第一次回踩；收盤跌破當轉空，從下方站回（破底翻）不吃。
+
+回測出場：停在回踩低（至少 0.8%）、目標 2R、或 20 根時間停。
+
+```bash
+# 成交額前 200、近一週；預設也掃晶心科／中美晶／系統電／GIS-KY／立積
+python3 examples/tw_1h_ma60_retest.py --days 7 --range 2mo --pages
+
+# 單元測試（不打網路）
+python3 examples/test_tw_1h_ma60_retest.py
+```
+
+週報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-ma60-retest-7d/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
