@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
-"""1m 空：MA7/MA14 死亡交叉且收盤破 MA25 → 掃幣安 / Telegram。
+"""1m 空：創 4 小時新高後 30 分鐘內，MA7/MA14 死亡交叉且收盤破 MA25。
 
-對 2026-10-02 ORCL 那張圖：高點 144.95（22:44 台北）後，
-22:49 收盤 144.44 同時 MA7 下穿 MA14、收盤跌破 MA25，之後砸到 141。
+對 2026-10-02 ORCL：22:44 創四小時高 144.95，22:49 收 144.44 死亡交叉且破 MA25。
 
 用法：
-  python3 examples/watch_orcl_death_cross.py --all --scan
+  python3 examples/watch_orcl_death_cross.py --all --scan --date 2026-10-02 --pages
   python3 examples/watch_orcl_death_cross.py --scan
   python3 examples/watch_orcl_death_cross.py --all
   python3 examples/watch_orcl_death_cross.py --test
-
-Telegram 憑證放 tg_config.env（勿提交），或本檔最上面。
 """
 from __future__ import annotations
 
@@ -54,6 +51,9 @@ class ShortHit:
     m25: float
     lead: int
     crossed_ma25: bool
+    peak_i: int | None = None
+    peak_high: float | None = None
+    bars_after_high: int | None = None
 
 
 @dataclass(frozen=True)
@@ -106,16 +106,47 @@ def lead_bars(m7: np.ndarray, m14: np.ndarray, i: int) -> int:
     return n
 
 
+def new_high_mask(high: np.ndarray, lookback: int = 240) -> np.ndarray:
+    """high[i] 是否創下過去 lookback 根（不含當根）的新高。4 小時 1m = 240。"""
+    n = len(high)
+    out = np.zeros(n, dtype=bool)
+    if n <= lookback or lookback < 1:
+        return out
+    windows = np.lib.stride_tricks.sliding_window_view(high, lookback)
+    out[lookback:] = high[lookback:] > windows[: n - lookback].max(axis=1)
+    return out
+
+
+def latest_high_in_window(mask: np.ndarray, i: int, within: int) -> int | None:
+    """i 往前 within 根（含當根）裡，最近一次新高的 index。"""
+    if i < 0 or i >= len(mask) or within < 0:
+        return None
+    start = max(0, i - within)
+    seg = np.flatnonzero(mask[start : i + 1])
+    if len(seg) == 0:
+        return None
+    return int(start + seg[-1])
+
+
 def detect_shorts(
     close: np.ndarray,
     m7: np.ndarray,
     m14: np.ndarray,
     m25: np.ndarray,
     *,
+    high: np.ndarray | None = None,
     min_lead: int = 5,
     require_cross_ma25: bool = False,
+    require_4h_high: bool = False,
+    high_lookback: int = 240,
+    within_bars: int = 30,
 ) -> list[ShortHit]:
-    """收盤根：MA7 下穿 MA14，且收盤 < MA25。"""
+    """收盤根：MA7 下穿 MA14，且收盤 < MA25。
+
+    require_4h_high：訊號前 within_bars 根內，必須創下 high_lookback 根新高
+    （預設 4 小時新高後 30 分鐘內）。
+    """
+    hi_mask = new_high_mask(high, high_lookback) if (require_4h_high and high is not None) else None
     hits: list[ShortHit] = []
     for i in range(1, len(close)):
         vals = (close[i], close[i - 1], m7[i], m7[i - 1], m14[i], m14[i - 1], m25[i], m25[i - 1])
@@ -133,6 +164,15 @@ def detect_shorts(
         lead = lead_bars(m7, m14, i)
         if lead < min_lead:
             continue
+        peak_i = peak_high = bars_after = None
+        if require_4h_high:
+            if hi_mask is None:
+                continue
+            peak_i = latest_high_in_window(hi_mask, i, within_bars)
+            if peak_i is None:
+                continue
+            peak_high = float(high[peak_i])  # type: ignore[index]
+            bars_after = i - peak_i
         hits.append(
             ShortHit(
                 i=i,
@@ -142,6 +182,9 @@ def detect_shorts(
                 m25=float(m25[i]),
                 lead=lead,
                 crossed_ma25=bool(crossed),
+                peak_i=peak_i,
+                peak_high=peak_high,
+                bars_after_high=bars_after,
             )
         )
     return hits
@@ -368,7 +411,12 @@ def draw_chart(sym: str, d: dict, hit: ShortHit, path: str) -> str | None:
     if 0 <= x < len(c):
         ax.axvline(x, color="#e35d5d", ls="--", lw=0.95)
         ax.scatter([x], [c[x]], s=38, color="#e35d5d", zorder=5)
-    ax.set_title(f"{sym}  1m  空  MA7×MA14 死亡交叉且破 MA25", color="#e8f0ea", fontsize=12)
+    ax.set_title(f"{sym}  1m  空  4h新高後死亡交叉且破 MA25", color="#e8f0ea", fontsize=12)
+    if hit.peak_i is not None:
+        px = hit.peak_i - a0
+        if 0 <= px < len(c):
+            ax.axvline(px, color="#c9a227", ls=":", lw=0.9)
+            ax.scatter([px], [d["h"][hit.peak_i]], s=28, color="#c9a227", zorder=5, marker="^")
     ax.legend(loc="upper left", fontsize=8, frameon=False, labelcolor="#c8d5cc", ncol=3)
     fig.tight_layout(pad=0.5)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -380,8 +428,12 @@ def format_hit(sym: str, d: dict, hit: ShortHit) -> str:
     ts = hm(int(d["t"][hit.i]))
     x25 = "這根同時跌破 MA25" if hit.crossed_ma25 else "收盤已在 MA25 下方"
     link = binance_href(sym)
+    high_line = ""
+    if hit.bars_after_high is not None and hit.peak_i is not None:
+        high_line = f"四小時新高 {hm(int(d['t'][hit.peak_i]))} 後 {hit.bars_after_high} 分鐘\n"
     return (
         f"🔻 <b>{sym} 空</b>  1m\n"
+        f"{high_line}"
         f"MA7 / MA14 <b>死亡交叉</b>，{x25}\n"
         f"時間 {ts}（台北）\n"
         f"收 {hit.close:g}\n"
@@ -395,14 +447,22 @@ def key_of(sym: str, d: dict, hit: ShortHit) -> str:
     return f"{sym}:{int(d['t'][hit.i])}"
 
 
-def scan_symbol(sym: str, *, min_lead: int, require_cross_ma25: bool, limit: int) -> tuple[dict, list[ShortHit]]:
+def detect_kw_from_args(args) -> dict:
+    return {
+        "min_lead": args.min_lead,
+        "require_cross_ma25": args.require_cross_ma25,
+        "require_4h_high": not args.no_4h_high,
+        "high_lookback": max(1, int(round(args.high_hours * 60))),
+        "within_bars": max(0, args.within_minutes),
+    }
+
+
+def scan_symbol(sym: str, *, limit: int, **detect_kw) -> tuple[dict, list[ShortHit]]:
     raw = fetch_klines(sym, limit=limit)
     if raw is None:
         return {}, []
     d = with_ma(raw)
-    return d, detect_shorts(
-        d["c"], d["m7"], d["m14"], d["m25"], min_lead=min_lead, require_cross_ma25=require_cross_ma25
-    )
+    return d, detect_shorts(d["c"], d["m7"], d["m14"], d["m25"], high=d["h"], **detect_kw)
 
 
 def rows_from_hits(sym: str, d: dict, hits: list[ShortHit], *, quote_vol: float = 0.0) -> list[ScanRow]:
@@ -427,12 +487,11 @@ def rows_from_hits(sym: str, d: dict, hits: list[ShortHit], *, quote_vol: float 
 def scan_symbol_rows(
     sym: str,
     *,
-    min_lead: int,
-    require_cross_ma25: bool,
     limit: int,
     quote_vol: float = 0.0,
+    **detect_kw,
 ) -> tuple[dict, list[ScanRow]]:
-    d, hits = scan_symbol(sym, min_lead=min_lead, require_cross_ma25=require_cross_ma25, limit=limit)
+    d, hits = scan_symbol(sym, limit=limit, **detect_kw)
     if not d:
         return {}, []
     return d, rows_from_hits(sym, d, hits, quote_vol=quote_vol)
@@ -441,12 +500,11 @@ def scan_symbol_rows(
 def scan_universe(
     symbols: list[str],
     *,
-    min_lead: int,
-    require_cross_ma25: bool,
     limit: int,
     workers: int,
     vols: dict[str, float] | None = None,
     keep_bars: bool = False,
+    **detect_kw,
 ) -> tuple[list[ScanRow], dict[str, dict]]:
     vols = vols or {}
     rows: list[ScanRow] = []
@@ -456,10 +514,9 @@ def scan_universe(
     def one(sym: str) -> tuple[str, dict, list[ScanRow]]:
         d, rs = scan_symbol_rows(
             sym,
-            min_lead=min_lead,
-            require_cross_ma25=require_cross_ma25,
             limit=limit,
             quote_vol=float(vols.get(sym) or 0),
+            **detect_kw,
         )
         return sym, d, rs
 
@@ -521,13 +578,14 @@ def print_scan(sym: str, d: dict, hits: list[ShortHit], *, hours: int, day: str 
     start, end = cutoff_ms(day=day, hours=hours, now_ms=int(d["t"][-1]) + 1)
     recent = [h for h in hits if in_window(int(d["t"][h.i]), start, end)]
     label = day if day else f"近 {hours}h"
-    print(f"\n{sym} {label}  死亡交叉且破 MA25：{len(recent)} 筆")
+    print(f"\n{sym} {label}  4h新高後30分內死亡交叉且破 MA25：{len(recent)} 筆")
     for h in recent:
         x = "同根破25" if h.crossed_ma25 else "已在25下"
+        after = f"  高點後{h.bars_after_high}m" if h.bars_after_high is not None else ""
         print(
             f"  {hm(int(d['t'][h.i]))}  收 {h.close:g}  "
             f"MA7 {h.m7:.4f}  MA14 {h.m14:.4f}  MA25 {h.m25:.4f}  "
-            f"lead {h.lead}  {x}"
+            f"lead {h.lead}  {x}{after}"
         )
 
 
@@ -557,9 +615,6 @@ def fmt_pct(v: float | None) -> str:
     if v is None:
         return "—"
     return f"{v:+.2f}%"
-    if v is None:
-        return "—"
-    return f"{v:+.2f}%"
 
 
 def print_market_scan(rows: list[ScanRow], *, start_ms: int, end_ms: int, n_symbols: int, top: int = 40) -> None:
@@ -567,8 +622,8 @@ def print_market_scan(rows: list[ScanRow], *, start_ms: int, end_ms: int, n_symb
     same = sum(1 for r in recent if r.hit.crossed_ma25)
     names = sorted({r.symbol for r in recent})
     print(
-        f"\n幣安 USDT 永續 {n_symbols} 檔　死亡交叉且破 MA25：{len(recent)} 筆 / {len(names)} 檔　"
-        f"同根破25 {same} 筆"
+        f"\n幣安 USDT 永續 {n_symbols} 檔　4h新高後30分內死亡交叉且破MA25："
+        f"{len(recent)} 筆 / {len(names)} 檔　同根破25 {same} 筆"
     )
     ranked = sorted(
         recent,
@@ -583,14 +638,15 @@ def print_market_scan(rows: list[ScanRow], *, start_ms: int, end_ms: int, n_symb
         print(
             f"  {r.symbol:<14} {hm(r.ts_ms)}  收 {r.hit.close:g}  "
             f"30m低 {fmt_pct(r.low30)}  15m {fmt_pct(r.fwd15)}  "
-            f"lead {r.hit.lead}  {x}"
+            f"lead {r.hit.lead}  高點後{r.hit.bars_after_high}m  {x}"
         )
     like = orcl_like(recent)
     print(f"\n比較像 ORCL（同根破25、lead≥10、30m 至少砸 1%）：{len(like)} 筆 / {len({r.symbol for r in like})} 檔")
     for r in like[:top]:
         print(
             f"  {r.symbol:<14} {hm(r.ts_ms)}  收 {r.hit.close:g}  "
-            f"30m低 {fmt_pct(r.low30)}  15m {fmt_pct(r.fwd15)}  lead {r.hit.lead}"
+            f"30m低 {fmt_pct(r.low30)}  15m {fmt_pct(r.fwd15)}  "
+            f"lead {r.hit.lead}  高點後{r.hit.bars_after_high}m"
         )
 
 
@@ -605,6 +661,8 @@ def row_to_json(r: ScanRow) -> dict:
         "ma25": r.hit.m25,
         "lead": r.hit.lead,
         "crossed_ma25": r.hit.crossed_ma25,
+        "peak_high": r.hit.peak_high,
+        "bars_after_high": r.hit.bars_after_high,
         "fwd15": r.fwd15,
         "fwd30": r.fwd30,
         "low15": r.low15,
@@ -661,6 +719,7 @@ def write_html_report(
             f"<td>{r.hit.close:g}</td>"
             f"{pct_cell(r.low30)}{pct_cell(r.fwd15)}{pct_cell(r.fwd30)}"
             f"<td>{r.hit.lead}</td>"
+            f"<td>{r.hit.bars_after_high if r.hit.bars_after_high is not None else '—'}</td>"
             f"<td>{extra}</td>"
             "</tr>"
         )
@@ -708,7 +767,7 @@ a{{color:#c9a227;text-decoration:none}}
 <body>
 <div class="wrap">
 <h1>{escape(title)}</h1>
-<p class="sub">1 分鐘收盤：MA7 下穿 MA14，且收盤 &lt; MA25。急殺深度是訊號後 30 根的最低點。不是進出場建議。</p>
+<p class="sub">創下過去 4 小時新高後 30 分鐘內：1 分鐘收盤 MA7 下穿 MA14，且收盤 &lt; MA25。急殺深度是訊號後 30 根最低點。不是進出場建議。</p>
 <div class="chips">
   <div class="chip">掃 <b>{n_symbols}</b> 檔</div>
   <div class="chip">訊號 <b>{len(recent)}</b> 筆</div>
@@ -718,16 +777,16 @@ a{{color:#c9a227;text-decoration:none}}
 </div>
 <h2>比較像 ORCL（同根破 MA25、lead≥10、30m 砸 ≥1%，前 {min(top, len(like))}）</h2>
 <table>
-<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th></th></tr></thead>
+<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th></th></tr></thead>
 <tbody>
-{"".join(like_html) or "<tr><td colspan='8' class='muted'>沒有訊號</td></tr>"}
+{"".join(like_html) or "<tr><td colspan='9' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
 <h2>急殺最深（不限同根，前 {min(top, len(ranked))}）</h2>
 <table>
-<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>破25</th></tr></thead>
+<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th>破25</th></tr></thead>
 <tbody>
-{"".join(top_html) or "<tr><td colspan='8' class='muted'>沒有訊號</td></tr>"}
+{"".join(top_html) or "<tr><td colspan='9' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
 <h2>有訊號的標的</h2>
@@ -737,7 +796,7 @@ a{{color:#c9a227;text-decoration:none}}
 {"".join(sym_html) or "<tr><td colspan='7' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
-<p class="note">ORCL 10-02 22:49 那波是同一根死亡交叉且跌破 MA25，之後 30 根砸到 141。表上越紅越像那張圖。</p>
+<p class="note">ORCL 10-02：22:44 創四小時高 144.95，22:49（+5 分）死亡交叉且破 MA25，之後砸到 141。</p>
 </div>
 </body>
 </html>
@@ -803,16 +862,20 @@ def scan_window_label(args) -> tuple[int, int, str]:
 
 def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
     start, end, label = scan_window_label(args)
+    detect_kw = detect_kw_from_args(args)
     t0 = time.time()
+    extra = "4h新高+30m" if detect_kw["require_4h_high"] else "不過濾4h高"
     if args.all or len(symbols) > 1:
-        print(f"掃 {len(symbols)} 檔 1m　{label}　min_lead={args.min_lead}", flush=True)
+        print(
+            f"掃 {len(symbols)} 檔 1m　{label}　min_lead={args.min_lead}　{extra}",
+            flush=True,
+        )
         rows, _ = scan_universe(
             symbols,
-            min_lead=args.min_lead,
-            require_cross_ma25=args.require_cross_ma25,
             limit=args.limit,
             workers=args.workers,
             vols=vols,
+            **detect_kw,
         )
         print(f"掃完 {time.time()-t0:.1f}s", flush=True)
         print_market_scan(rows, start_ms=start, end_ms=end, n_symbols=len(symbols), top=args.top)
@@ -826,15 +889,13 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
                 start_ms=start,
                 end_ms=end,
                 n_symbols=len(symbols),
-                title=f"幣安 1m 空 · 死亡交叉且破 MA25 · {label}",
+                title=f"幣安 1m 空 · 4h新高後死亡交叉且破 MA25 · {label}",
                 top=args.top,
             )
             print(f"html={out}")
         return 0
     for sym in symbols:
-        d, hits = scan_symbol(
-            sym, min_lead=args.min_lead, require_cross_ma25=args.require_cross_ma25, limit=args.limit
-        )
+        d, hits = scan_symbol(sym, limit=args.limit, **detect_kw)
         print_scan(sym, d, hits, hours=args.hours, day=args.date)
     return 0
 
@@ -842,13 +903,16 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
 def main() -> int:
     import argparse
 
-    p = argparse.ArgumentParser(description="1m MA7/MA14 死亡交叉且破 MA25 → 掃幣安 / Telegram")
+    p = argparse.ArgumentParser(description="1m 4h新高後 MA7/MA14 死亡交叉且破 MA25 → 掃幣安 / Telegram")
     p.add_argument("--symbols", default="ORCLUSDT", help="逗號分隔，預設 ORCLUSDT")
     p.add_argument("--all", action="store_true", help="掃幣安所有 USDT 永續（含股票型如 ORCL）")
     p.add_argument("--min-quote-vol", type=float, default=0.0, help="24h 成交額下限，--all 時用")
     p.add_argument("--workers", type=int, default=12, help="並行下載 K 線")
     p.add_argument("--min-lead", type=int, default=5, help="死亡交叉前 MA7≥MA14 最少根數，濾雜訊")
     p.add_argument("--require-cross-ma25", action="store_true", help="要求這根同時由上跌破 MA25")
+    p.add_argument("--high-hours", type=float, default=4.0, help="新高回看幾小時，預設 4")
+    p.add_argument("--within-minutes", type=int, default=30, help="新高後幾分鐘內要出現死亡交叉，預設 30")
+    p.add_argument("--no-4h-high", action="store_true", help="關掉四小時新高條件")
     p.add_argument("--scan", action="store_true", help="印出歷史訊號後結束")
     p.add_argument("--hours", type=int, default=24, help="沒指定 --date 時，回看小時數")
     p.add_argument("--date", default=None, help="台北日 YYYY-MM-DD，只看這一天")
@@ -869,14 +933,19 @@ def main() -> int:
         return run_scan(args, symbols, vols)
 
     seen = load_seen()
-    watch_limit = 80 if args.all else max(120, args.limit)
+    detect_kw = detect_kw_from_args(args)
+    look = detect_kw["high_lookback"] + detect_kw["within_bars"] + 25
+    watch_limit = max(look + 10, 120 if not args.all else look + 10, args.limit if not args.all else look + 10)
+    if args.all:
+        watch_limit = max(look + 10, 320)
     print(
         f"監看 {len(symbols)} 檔  1m  空  "
-        f"MA7×MA14 死亡交叉且收盤<MA25  min_lead={args.min_lead}",
+        f"4h新高後{args.within_minutes}分內  MA7×MA14 死亡交叉且收盤<MA25  "
+        f"min_lead={args.min_lead}  4h={'開' if detect_kw['require_4h_high'] else '關'}",
         flush=True,
     )
     if args.all:
-        print("全市場 1m 這條件很密，Telegram 會很吵；報告請用 --scan --pages。", flush=True)
+        print("全市場每分鐘掃一次；報告請用 --scan --pages。", flush=True)
     uni_ts = time.time()
 
     def round_once() -> None:
@@ -893,9 +962,8 @@ def main() -> int:
                     ex.submit(
                         scan_symbol,
                         s,
-                        min_lead=args.min_lead,
-                        require_cross_ma25=args.require_cross_ma25,
                         limit=watch_limit,
+                        **detect_kw,
                     ): s
                     for s in symbols
                 }
@@ -919,9 +987,8 @@ def main() -> int:
             for sym in symbols:
                 d, hits = scan_symbol(
                     sym,
-                    min_lead=args.min_lead,
-                    require_cross_ma25=args.require_cross_ma25,
                     limit=watch_limit,
+                    **detect_kw,
                 )
                 if not hits or not d:
                     print(f"[{datetime.now(TZ).strftime('%H:%M:%S')}] {sym} 無訊號", flush=True)

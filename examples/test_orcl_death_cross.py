@@ -20,7 +20,9 @@ from watch_orcl_death_cross import (  # noqa: E402
     filter_universe,
     forward_moves,
     in_window,
+    latest_high_in_window,
     lead_bars,
+    new_high_mask,
     orcl_like,
     pct_move,
     sma,
@@ -223,6 +225,71 @@ def test_orcl_like_needs_same_bar_and_lead() -> None:
     assert orcl_like([a, shallow]) == [a]
 
 
+def test_new_high_mask() -> None:
+    high = np.array([1.0, 2.0, 3.0, 2.0, 4.0, 3.0])
+    mask = new_high_mask(high, lookback=2)
+    assert list(mask) == [False, False, True, False, True, False]
+    assert latest_high_in_window(mask, 5, 1) == 4
+    assert latest_high_in_window(mask, 5, 0) is None
+    assert latest_high_in_window(mask, 4, 0) == 4
+    assert latest_high_in_window(mask, 3, 0) is None
+    assert latest_high_in_window(mask, 3, 1) == 2
+
+
+def test_4h_high_then_death_within_30() -> None:
+    n = 300
+    close = np.linspace(100.0, 120.0, n - 12)
+    dump = np.array([119.5, 118.8, 117.2, 115.4, 113.6, 112.0, 110.6, 109.4, 108.4, 107.6, 107.0, 106.5])
+    close = np.concatenate([close, dump])
+    high = close + 0.25
+    peak = n - 13
+    high[peak] = float(close[peak] + 1.8)
+    m7, m14, m25 = _mas(close)
+    hits = detect_shorts(
+        close,
+        m7,
+        m14,
+        m25,
+        high=high,
+        min_lead=3,
+        require_4h_high=True,
+        high_lookback=240,
+        within_bars=30,
+    )
+    assert hits, "4h 新高後 30 分內急殺應抓得到"
+    hit = hits[-1]
+    assert hit.bars_after_high is not None and hit.bars_after_high <= 30
+    assert hit.peak_i == peak or high[hit.peak_i] >= high[peak] - 1e-9
+
+
+def test_4h_high_too_old_skipped() -> None:
+    rise = np.linspace(100.0, 120.0, 250)
+    wait = np.linspace(120.0, 120.4, 45)
+    dump = np.array([120.1, 119.2, 117.6, 115.5, 113.2, 111.0, 109.2, 107.8, 106.6, 105.8, 105.2, 104.8])
+    close = np.concatenate([rise, wait, dump])
+    high = close + 0.15
+    high[249] = 130.0
+    m7, m14, m25 = _mas(close)
+    raw = detect_shorts(close, m7, m14, m25, min_lead=0, require_4h_high=False)
+    gated = detect_shorts(
+        close,
+        m7,
+        m14,
+        m25,
+        high=high,
+        min_lead=0,
+        require_4h_high=True,
+        high_lookback=240,
+        within_bars=30,
+    )
+    assert raw, "沒加 4h 條件時急殺仍應有死亡交叉"
+    late = [h for h in raw if h.i >= 249 + 40]
+    assert late, "死亡交叉發生在新高 40 根之後"
+    for h in gated:
+        assert h.bars_after_high is not None and h.bars_after_high <= 30
+    assert all(h.i <= 249 + 30 for h in gated)
+
+
 def main() -> int:
     test_sma()
     test_death_and_below_fires()
@@ -237,6 +304,9 @@ def main() -> int:
     test_forward_moves_dump()
     test_write_html_report()
     test_orcl_like_needs_same_bar_and_lead()
+    test_new_high_mask()
+    test_4h_high_then_death_within_30()
+    test_4h_high_too_old_skipped()
     print("ok")
     return 0
 
