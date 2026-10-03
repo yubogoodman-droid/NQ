@@ -1,6 +1,12 @@
 (function () {
   "use strict";
 
+  const XIAOHUANG_TEXT = `蕭煌車
+
+蕭煌奇開什麼車？
+答案是蕭煌車～。
+消防車。`;
+
   const SUOLONG_TEXT = `鎖龍頭
 
 你知道為什麼綠色頭髮的人，機車不會被偷嗎？
@@ -32,6 +38,17 @@
 雨停以后，阳光把窗台晒得暖暖的。`;
 
   const REMOTION = {
+    xiaohuang: {
+      video: "assets/xiaohuang-preview.mp4",
+      poster: "assets/xiaohuang-poster.jpg",
+      download: "蕭煌車.mp4",
+      sheet: "assets/xiaohuang-character-sheet.jpg",
+      sheetAlt: "黃外套主角角色設定",
+      pages: 3,
+      duration: 13.6,
+      storyUrl: "xiaohuang.json",
+      colorOnly: true,
+    },
     suolong: {
       video: "assets/suolong-preview.mp4",
       poster: "assets/suolong-poster.jpg",
@@ -78,6 +95,7 @@
   };
 
   const PRESETS = [
+    { id: "xiaohuang", title: "蕭煌車", art: "ai", remotion: "xiaohuang", text: XIAOHUANG_TEXT },
     { id: "suolong", title: "鎖龍頭", art: "ai", remotion: "suolong", text: SUOLONG_TEXT },
     { id: "liuti", title: "留體力學", art: "ai", remotion: "liuti", text: LIUTI_TEXT },
     { id: "trees", title: "大樹跟小樹", art: "ai", remotion: "trees", text: TREE_TEXT },
@@ -112,7 +130,7 @@
   const book = $("book");
   const player = new StoryPlayer(canvas);
   let demoStories = {};
-  let activeRemotion = "suolong";
+  let activeRemotion = "xiaohuang";
   let source = "ai";
   let uploaded = [];
   let view = "video";
@@ -398,7 +416,7 @@
     }
   });
 
-  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("suolong")]).catch((err) => {
+  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("xiaohuang")]).catch((err) => {
     setStatus("载入示例失败：" + err.message);
   });
 })();

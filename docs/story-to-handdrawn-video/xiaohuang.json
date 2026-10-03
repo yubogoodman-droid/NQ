@@ -1,0 +1,18 @@
+{
+  "id": "xiao-huang-che",
+  "title": "蕭煌車",
+  "style": "colored-pencil-diary",
+  "styleName": "彩铅日记漫画",
+  "aspect": "3:4",
+  "width": 720,
+  "height": 960,
+  "durationSec": 13.6,
+  "text": "蕭煌車\n\n蕭煌奇開什麼車？\n答案是蕭煌車～。\n消防車。",
+  "video": "assets/xiaohuang-preview.mp4",
+  "poster": "assets/xiaohuang-poster.jpg",
+  "pages": [
+    { "id": "01", "kind": "beat", "caption": "蕭煌奇開什麼車？" },
+    { "id": "02", "kind": "beat", "caption": "答案是蕭煌車～。" },
+    { "id": "03", "kind": "beat", "caption": "消防車。" }
+  ]
+}
