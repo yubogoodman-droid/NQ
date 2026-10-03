@@ -136,7 +136,7 @@ python3 examples/chart_today.py
 - 本機：開 `docs/journal/index.html`
 - GitHub Pages：`https://yubogoodman-droid.github.io/NQ/journal/`
 
-可記台股／美股買進賣出、自動帶入台股手續費與證交稅、用先進先出算持倉與已實現損益，並在持倉裡手動設現價看未實現。
+只記台股買進賣出，自動帶入手續費與證交稅，用先進先出算持倉與已實現損益，並可在持倉裡手動設現價看未實現。
 
 ## 外網開啟
 
