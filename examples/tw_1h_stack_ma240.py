@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""台股 1h：MA5>MA10>MA20 多頭排列且收盤站上 MA240 → Telegram。
+"""台股 1h：MA5>MA10>MA20 多頭排列且當下這根才站上 MA240 → Telegram。
 
 智原型：小時 K 收盤同時滿足
   • MA5 > MA10 > MA20
-  • 收盤站上 MA240（收盤 > MA240）
-上一根還沒同時滿足、這一根才成立才推播（短均剛排好、或剛站上 MA240 都算）。
-已經排好且一直站在 MA240 上面的，不會每根都發。
+  • 這一根收盤站上 MA240（收盤 > MA240）
+  • 上一根收盤還沒站上 MA240
 
+已經站在 MA240 上面、只是短均才排好的不算。
 預設掃成交額前 200、股價 < 1000，並固定把 3035 智原放進池子。
 `--symbols 3035` 只盯智原。每根小時 K 收盤後掃一次；GitHub Actions 在盤中整點代跑。
 
@@ -14,7 +14,7 @@
     python3 examples/tw_1h_stack_ma240.py --dry-run --once
     python3 examples/tw_1h_stack_ma240.py --once
     python3 examples/tw_1h_stack_ma240.py              # 等到下一根 1h 收盤再掃
-    python3 examples/tw_1h_stack_ma240.py --now        # 成交額前 200 現在已站上
+    python3 examples/tw_1h_stack_ma240.py --now        # 剛收的那根才站上 MA240
     python3 examples/tw_1h_stack_ma240.py --symbols 3035 --now
     python3 examples/tw_1h_stack_ma240.py scan --days 7 --pages
     python3 examples/tw_1h_stack_ma240.py scan --days 30 --pages
@@ -130,21 +130,35 @@ def setup_at(
     return stacked_at(i, ma5, ma10, ma20) and above_ma240_at(i, close, ma240)
 
 
+def stood_this_bar(
+    i: int,
+    close: np.ndarray,
+    ma5: np.ndarray,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma240: np.ndarray,
+) -> bool:
+    """當下這根才站上 MA240，且 5>10>20。"""
+    return (
+        stacked_at(i, ma5, ma10, ma20)
+        and above_ma240_at(i, close, ma240)
+        and not above_ma240_at(i - 1, close, ma240)
+    )
+
+
 def _mas(close: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     return sma(close, 5), sma(close, 10), sma(close, 20), sma(close, MA_LONG)
 
 
 def detect_signals(df: pd.DataFrame) -> List[Signal]:
-    """本根多頭排列且站上 MA240，上一根還沒同時滿足。"""
+    """本根多頭排列且這一根才站上 MA240（上一根收盤還沒站上）。"""
     if df is None or len(df) < MIN_BARS:
         return []
     close = df["Close"].to_numpy(float)
     ma5, ma10, ma20, ma240 = _mas(close)
     out: List[Signal] = []
     for i in range(1, len(close)):
-        if setup_at(i, close, ma5, ma10, ma20, ma240) and not setup_at(
-            i - 1, close, ma5, ma10, ma20, ma240
-        ):
+        if stood_this_bar(i, close, ma5, ma10, ma20, ma240):
             out.append(
                 Signal(
                     idx=i,
@@ -164,7 +178,7 @@ def current_setup(df: pd.DataFrame) -> Optional[Signal]:
     close = df["Close"].to_numpy(float)
     ma5, ma10, ma20, ma240 = _mas(close)
     i = len(close) - 1
-    if not setup_at(i, close, ma5, ma10, ma20, ma240):
+    if not stood_this_bar(i, close, ma5, ma10, ma20, ma240):
         return None
     return Signal(
         idx=i,
@@ -653,7 +667,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 1h · MA5&gt;MA10&gt;MA20 且站上 MA240</h1>
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {escape(pool_txt)}
-<br/>智原型小時 K：MA5&gt;MA10&gt;MA20，且收盤站上 MA240。上一根還沒同時滿足、這一根才成立才算訊號。
+<br/>智原型小時 K：MA5&gt;MA10&gt;MA20，且<strong>當下這根收盤才站上 MA240</strong>（上一根還沒站上）。已經站在上面、只是短均才排好的不算。
 卡片右上是訊號後下一個交易日收盤報酬（還沒走完就顯示站上 MA240 幅度）。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -961,7 +975,7 @@ def run_scan_round(
         f"{time.time()-t0:.1f}s",
         flush=True,
     )
-    title = "現在站上" if now_only else "新形成"
+    title = "這一根才站上" if now_only else "新形成"
     print_hits(hits, title)
 
     if notify:
@@ -1073,7 +1087,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(p)
     p.add_argument("--once", action="store_true", help="只掃一次（剛收盤的 1～2 根）")
     p.add_argument("--test", action="store_true", help="只測 Telegram")
-    p.add_argument("--now", action="store_true", help="列出目前已站上的標的")
+    p.add_argument("--now", action="store_true", help="列出剛收的那根才站上 MA240 的標的")
     p.add_argument("--notify", action="store_true", help="--now 時也推播")
     p.add_argument("--lookback-bars", type=int, default=2, help="alert 只看最近 N 根已收盤 1h")
     p.add_argument("--days", type=int, default=0, help="scan 子命令：進場落在最近 N 日")
@@ -1084,7 +1098,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--days", type=int, default=14)
     s.set_defaults(func=cmd_scan)
 
-    n = sub.add_parser("now", help="目前已多頭排列且站上 MA240 的名單")
+    n = sub.add_parser("now", help="剛收的那根才站上 MA240 的名單")
     add_common(n)
     n.add_argument("--notify", action="store_true")
     n.set_defaults(func=cmd_now)

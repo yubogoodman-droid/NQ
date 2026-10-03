@@ -112,8 +112,8 @@ def test_reclaim_ma240_while_stacked() -> None:
     assert sigs[-1].ma5 > sigs[-1].ma10 > sigs[-1].ma20
 
 
-def test_stack_forming_while_already_above_ma240_is_a_signal() -> None:
-    """價已在 MA240 上，短均才交叉成 5>10>20 → 算進場（智原型）。"""
+def test_stack_forming_while_already_above_ma240_is_not_a_signal() -> None:
+    """價已在 MA240 上，短均才交叉成 5>10>20 → 不算（要當下那根才站上）。"""
     n = 280
     closes = np.full(n, 100.0)
     closes[:240] = 100 + 0.04 * np.arange(240)
@@ -133,7 +133,9 @@ def test_stack_forming_while_already_above_ma240_is_a_signal() -> None:
     assert stack_idxs, "synthetic series never formed 5>10>20 while already above MA240"
     sigs = detect_signals(df)
     sig_idxs = {s.idx for s in sigs}
-    assert stack_idxs[0] in sig_idxs
+    assert stack_idxs[0] not in sig_idxs
+    for sig in sigs:
+        assert not above_ma240_at(sig.idx - 1, close, ma240)
 
 
 def test_no_repeat_while_already_standing() -> None:
@@ -149,12 +151,17 @@ def test_below_ma240_is_not_current() -> None:
     assert current_setup(df) is None
 
 
-def test_current_setup_when_standing() -> None:
+def test_current_setup_requires_this_bar_stand() -> None:
+    # 已經站在上面的最後一根不算
     df = ohlc_from_close(uptrend_closes(280))
-    sig = current_setup(df)
+    assert current_setup(df) is None
+    # 這一根才從 MA240 下方站上
+    base = [100.0] * 240 + [100.02, 100.04, 100.06, 100.08, 100.10]
+    m240 = float(sma(np.asarray(base, dtype=float), 240)[-1])
+    df2 = ohlc_from_close(base + [m240 - 0.005, base[-1]])
+    sig = current_setup(df2)
     assert sig is not None
-    assert sig.idx == len(df) - 1
-    assert sig.ma5 > sig.ma10 > sig.ma20
+    assert sig.idx == len(df2) - 1
     assert sig.close > sig.ma240
 
 
@@ -236,10 +243,10 @@ def main() -> int:
         test_setup_needs_stack_and_ma240,
         test_first_valid_ma240_bar_is_a_signal,
         test_reclaim_ma240_while_stacked,
-        test_stack_forming_while_already_above_ma240_is_a_signal,
+        test_stack_forming_while_already_above_ma240_is_not_a_signal,
         test_no_repeat_while_already_standing,
         test_below_ma240_is_not_current,
-        test_current_setup_when_standing,
+        test_current_setup_requires_this_bar_stand,
         test_filter_recent_keeps_last_n,
         test_drop_forming_hourly_and_1330,
         test_next_scan_skips_weekend,
