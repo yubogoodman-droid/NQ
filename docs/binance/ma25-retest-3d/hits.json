@@ -1,0 +1,548 @@
+{
+  "meta": {
+    "symbols": 287,
+    "errors": 0,
+    "entries": 46,
+    "period": "2026-10-01 → 2026-10-03 21:00 台北"
+  },
+  "funnel": {
+    "break": 776,
+    "reclaim": 370,
+    "lost_before_retest": 218,
+    "no_reclaim": 429,
+    "retest": 61,
+    "trades": 46,
+    "no_stand": 90,
+    "risk_skip": 15,
+    "no_retest": 7
+  },
+  "stats": {
+    "count": 46,
+    "open": 0,
+    "wins": 16,
+    "win_rate": 34.78260869565217,
+    "avg_pct": 0.07274928886899563,
+    "sum_pct": 3.346467287973797,
+    "sum_all_pct": 3.346467287973797,
+    "by_reason": {
+      "停損": {
+        "n": 30,
+        "pnl": -21.314441714293093,
+        "wins": 0
+      },
+      "2R": {
+        "n": 16,
+        "pnl": 24.660909002266887,
+        "wins": 16
+      }
+    }
+  },
+  "trades": [
+    {
+      "symbol": "UAIUSDT",
+      "entry": 0.2993,
+      "stop": 0.2974,
+      "target": 0.30310000000000004,
+      "exit": 0.2974,
+      "reason": "停損",
+      "pnl_pct": -0.6348,
+      "depth_pct": 1.9297,
+      "risk_pct": 0.6348
+    },
+    {
+      "symbol": "ACEUSDT",
+      "entry": 0.1827,
+      "stop": 0.18184,
+      "target": 0.18442,
+      "exit": 0.18184,
+      "reason": "停損",
+      "pnl_pct": -0.4707,
+      "depth_pct": 1.2102,
+      "risk_pct": 0.4707
+    },
+    {
+      "symbol": "XLMUSDT",
+      "entry": 0.22654,
+      "stop": 0.22463,
+      "target": 0.23035999999999998,
+      "exit": 0.23035999999999998,
+      "reason": "2R",
+      "pnl_pct": 1.6862,
+      "depth_pct": 2.8219,
+      "risk_pct": 0.8431
+    },
+    {
+      "symbol": "INTCUSDT",
+      "entry": 120.04,
+      "stop": 119.47,
+      "target": 121.18000000000002,
+      "exit": 119.47,
+      "reason": "停損",
+      "pnl_pct": -0.4748,
+      "depth_pct": 0.6965,
+      "risk_pct": 0.4748
+    },
+    {
+      "symbol": "INTWUSDT",
+      "entry": 31.18,
+      "stop": 30.92,
+      "target": 31.699999999999996,
+      "exit": 30.92,
+      "reason": "停損",
+      "pnl_pct": -0.8339,
+      "depth_pct": 1.1862,
+      "risk_pct": 0.8339
+    },
+    {
+      "symbol": "AMDUSDT",
+      "entry": 613.11,
+      "stop": 611.68,
+      "target": 615.9700000000001,
+      "exit": 611.68,
+      "reason": "停損",
+      "pnl_pct": -0.2332,
+      "depth_pct": 0.9128,
+      "risk_pct": 0.2332
+    },
+    {
+      "symbol": "CRDOUSDT",
+      "entry": 194.56,
+      "stop": 192.93,
+      "target": 197.82,
+      "exit": 197.82,
+      "reason": "2R",
+      "pnl_pct": 1.6756,
+      "depth_pct": 2.7365,
+      "risk_pct": 0.8378
+    },
+    {
+      "symbol": "APEUSDT",
+      "entry": 0.151,
+      "stop": 0.1503,
+      "target": 0.1524,
+      "exit": 0.1524,
+      "reason": "2R",
+      "pnl_pct": 0.9272,
+      "depth_pct": 2.0324,
+      "risk_pct": 0.4636
+    },
+    {
+      "symbol": "BILLUSDT",
+      "entry": 0.01158,
+      "stop": 0.01153,
+      "target": 0.01168,
+      "exit": 0.01168,
+      "reason": "2R",
+      "pnl_pct": 0.8636,
+      "depth_pct": 2.3904,
+      "risk_pct": 0.4318
+    },
+    {
+      "symbol": "MOVEUSDT",
+      "entry": 0.009864,
+      "stop": 0.009787,
+      "target": 0.010017999999999997,
+      "exit": 0.010017999999999997,
+      "reason": "2R",
+      "pnl_pct": 1.5612,
+      "depth_pct": 2.6365,
+      "risk_pct": 0.7806
+    },
+    {
+      "symbol": "MEGAUSDT",
+      "entry": 0.0455,
+      "stop": 0.04471,
+      "target": 0.04708,
+      "exit": 0.04708,
+      "reason": "2R",
+      "pnl_pct": 3.4725,
+      "depth_pct": 1.5951,
+      "risk_pct": 1.7363
+    },
+    {
+      "symbol": "UNIUSDT",
+      "entry": 8.998,
+      "stop": 8.925,
+      "target": 9.143999999999997,
+      "exit": 8.925,
+      "reason": "停損",
+      "pnl_pct": -0.8113,
+      "depth_pct": 1.9784,
+      "risk_pct": 0.8113
+    },
+    {
+      "symbol": "ACEUSDT",
+      "entry": 0.18568,
+      "stop": 0.18442,
+      "target": 0.18820000000000003,
+      "exit": 0.18820000000000003,
+      "reason": "2R",
+      "pnl_pct": 1.3572,
+      "depth_pct": 1.542,
+      "risk_pct": 0.6786
+    },
+    {
+      "symbol": "ROBOUSDT",
+      "entry": 0.00923,
+      "stop": 0.00916,
+      "target": 0.009370000000000002,
+      "exit": 0.00916,
+      "reason": "停損",
+      "pnl_pct": -0.7584,
+      "depth_pct": 1.82,
+      "risk_pct": 0.7584
+    },
+    {
+      "symbol": "MUBARAKUSDT",
+      "entry": 0.06083,
+      "stop": 0.06019,
+      "target": 0.062110000000000005,
+      "exit": 0.06019,
+      "reason": "停損",
+      "pnl_pct": -1.0521,
+      "depth_pct": 2.1058,
+      "risk_pct": 1.0521
+    },
+    {
+      "symbol": "SYNUSDT",
+      "entry": 0.19724,
+      "stop": 0.19473,
+      "target": 0.20226000000000002,
+      "exit": 0.19473,
+      "reason": "停損",
+      "pnl_pct": -1.2726,
+      "depth_pct": 1.8337,
+      "risk_pct": 1.2726
+    },
+    {
+      "symbol": "BBUSDT",
+      "entry": 0.009699,
+      "stop": 0.00965,
+      "target": 0.009796999999999997,
+      "exit": 0.00965,
+      "reason": "停損",
+      "pnl_pct": -0.5052,
+      "depth_pct": 2.2237,
+      "risk_pct": 0.5052
+    },
+    {
+      "symbol": "ORCAUSDT",
+      "entry": 1.664,
+      "stop": 1.655,
+      "target": 1.6819999999999997,
+      "exit": 1.6819999999999997,
+      "reason": "2R",
+      "pnl_pct": 1.0817,
+      "depth_pct": 2.3819,
+      "risk_pct": 0.5409
+    },
+    {
+      "symbol": "TAKEUSDT",
+      "entry": 0.06087,
+      "stop": 0.06038,
+      "target": 0.061849999999999995,
+      "exit": 0.06038,
+      "reason": "停損",
+      "pnl_pct": -0.805,
+      "depth_pct": 9.1862,
+      "risk_pct": 0.805
+    },
+    {
+      "symbol": "DYDXUSDT",
+      "entry": 0.1478,
+      "stop": 0.1466,
+      "target": 0.15019999999999994,
+      "exit": 0.15019999999999994,
+      "reason": "2R",
+      "pnl_pct": 1.6238,
+      "depth_pct": 2.8148,
+      "risk_pct": 0.8119
+    },
+    {
+      "symbol": "MUUUSDT",
+      "entry": 38.22,
+      "stop": 38.1,
+      "target": 38.459999999999994,
+      "exit": 38.459999999999994,
+      "reason": "2R",
+      "pnl_pct": 0.6279,
+      "depth_pct": 6.3603,
+      "risk_pct": 0.314
+    },
+    {
+      "symbol": "SMCIUSDT",
+      "entry": 42.05,
+      "stop": 41.91,
+      "target": 42.33,
+      "exit": 41.91,
+      "reason": "停損",
+      "pnl_pct": -0.3329,
+      "depth_pct": 2.5003,
+      "risk_pct": 0.3329
+    },
+    {
+      "symbol": "SOXLUSDT",
+      "entry": 154.79,
+      "stop": 153.41,
+      "target": 157.54999999999998,
+      "exit": 157.54999999999998,
+      "reason": "2R",
+      "pnl_pct": 1.7831,
+      "depth_pct": 4.4546,
+      "risk_pct": 0.8915
+    },
+    {
+      "symbol": "TSMUSDT",
+      "entry": 460.19,
+      "stop": 459.19,
+      "target": 462.19,
+      "exit": 459.19,
+      "reason": "停損",
+      "pnl_pct": -0.2173,
+      "depth_pct": 0.7956,
+      "risk_pct": 0.2173
+    },
+    {
+      "symbol": "ARUSDT",
+      "entry": 4.297,
+      "stop": 4.263,
+      "target": 4.364999999999999,
+      "exit": 4.364999999999999,
+      "reason": "2R",
+      "pnl_pct": 1.5825,
+      "depth_pct": 3.801,
+      "risk_pct": 0.7912
+    },
+    {
+      "symbol": "GLWUSDT",
+      "entry": 160.8,
+      "stop": 160.35,
+      "target": 161.70000000000005,
+      "exit": 160.35,
+      "reason": "停損",
+      "pnl_pct": -0.2799,
+      "depth_pct": 2.5663,
+      "risk_pct": 0.2799
+    },
+    {
+      "symbol": "SUPERUSDT",
+      "entry": 0.22488,
+      "stop": 0.22091,
+      "target": 0.23282,
+      "exit": 0.23282,
+      "reason": "2R",
+      "pnl_pct": 3.5308,
+      "depth_pct": 1.8747,
+      "risk_pct": 1.7654
+    },
+    {
+      "symbol": "COTIUSDT",
+      "entry": 0.013932,
+      "stop": 0.013819,
+      "target": 0.014158,
+      "exit": 0.013819,
+      "reason": "停損",
+      "pnl_pct": -0.8111,
+      "depth_pct": 1.7961,
+      "risk_pct": 0.8111
+    },
+    {
+      "symbol": "币安人生USDT",
+      "entry": 0.5177,
+      "stop": 0.5035,
+      "target": 0.5461000000000003,
+      "exit": 0.5035,
+      "reason": "停損",
+      "pnl_pct": -2.7429,
+      "depth_pct": 1.2279,
+      "risk_pct": 2.7429
+    },
+    {
+      "symbol": "LINKUSDT",
+      "entry": 14.441,
+      "stop": 14.384,
+      "target": 14.555000000000001,
+      "exit": 14.384,
+      "reason": "停損",
+      "pnl_pct": -0.3947,
+      "depth_pct": 1.134,
+      "risk_pct": 0.3947
+    },
+    {
+      "symbol": "EVAAUSDT",
+      "entry": 0.6719,
+      "stop": 0.6685,
+      "target": 0.6787000000000002,
+      "exit": 0.6685,
+      "reason": "停損",
+      "pnl_pct": -0.506,
+      "depth_pct": 1.9086,
+      "risk_pct": 0.506
+    },
+    {
+      "symbol": "ADAUSDT",
+      "entry": 0.256,
+      "stop": 0.2534,
+      "target": 0.2612,
+      "exit": 0.2534,
+      "reason": "停損",
+      "pnl_pct": -1.0156,
+      "depth_pct": 0.9458,
+      "risk_pct": 1.0156
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "entry": 11.095,
+      "stop": 11.044,
+      "target": 11.197000000000001,
+      "exit": 11.197000000000001,
+      "reason": "2R",
+      "pnl_pct": 0.9193,
+      "depth_pct": 0.9591,
+      "risk_pct": 0.4597
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "entry": 0.0968,
+      "stop": 0.09632,
+      "target": 0.09775999999999999,
+      "exit": 0.09632,
+      "reason": "停損",
+      "pnl_pct": -0.4959,
+      "depth_pct": 1.1122,
+      "risk_pct": 0.4959
+    },
+    {
+      "symbol": "EGLDUSDT",
+      "entry": 4.573,
+      "stop": 4.554,
+      "target": 4.611000000000001,
+      "exit": 4.611000000000001,
+      "reason": "2R",
+      "pnl_pct": 0.831,
+      "depth_pct": 1.2871,
+      "risk_pct": 0.4155
+    },
+    {
+      "symbol": "ENSUSDT",
+      "entry": 7.034,
+      "stop": 6.994,
+      "target": 7.114,
+      "exit": 7.114,
+      "reason": "2R",
+      "pnl_pct": 1.1373,
+      "depth_pct": 0.8306,
+      "risk_pct": 0.5687
+    },
+    {
+      "symbol": "VIRTUALUSDT",
+      "entry": 0.8176,
+      "stop": 0.8126,
+      "target": 0.8276,
+      "exit": 0.8126,
+      "reason": "停損",
+      "pnl_pct": -0.6115,
+      "depth_pct": 1.2472,
+      "risk_pct": 0.6115
+    },
+    {
+      "symbol": "GRTUSDT",
+      "entry": 0.02913,
+      "stop": 0.02904,
+      "target": 0.02931,
+      "exit": 0.02904,
+      "reason": "停損",
+      "pnl_pct": -0.309,
+      "depth_pct": 2.6297,
+      "risk_pct": 0.309
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "entry": 2.168,
+      "stop": 2.142,
+      "target": 2.2200000000000006,
+      "exit": 2.142,
+      "reason": "停損",
+      "pnl_pct": -1.1993,
+      "depth_pct": 0.992,
+      "risk_pct": 1.1993
+    },
+    {
+      "symbol": "BTWUSDT",
+      "entry": 1.4404,
+      "stop": 1.4334,
+      "target": 1.4543999999999997,
+      "exit": 1.4334,
+      "reason": "停損",
+      "pnl_pct": -0.486,
+      "depth_pct": 7.9162,
+      "risk_pct": 0.486
+    },
+    {
+      "symbol": "POWERUSDT",
+      "entry": 0.09145,
+      "stop": 0.0906,
+      "target": 0.09315000000000001,
+      "exit": 0.0906,
+      "reason": "停損",
+      "pnl_pct": -0.9295,
+      "depth_pct": 2.066,
+      "risk_pct": 0.9295
+    },
+    {
+      "symbol": "ORCAUSDT",
+      "entry": 1.77,
+      "stop": 1.761,
+      "target": 1.7880000000000003,
+      "exit": 1.761,
+      "reason": "停損",
+      "pnl_pct": -0.5085,
+      "depth_pct": 4.387,
+      "risk_pct": 0.5085
+    },
+    {
+      "symbol": "COMPUSDT",
+      "entry": 24.51,
+      "stop": 24.43,
+      "target": 24.670000000000005,
+      "exit": 24.43,
+      "reason": "停損",
+      "pnl_pct": -0.3264,
+      "depth_pct": 7.2328,
+      "risk_pct": 0.3264
+    },
+    {
+      "symbol": "MOVEUSDT",
+      "entry": 0.010218,
+      "stop": 0.010181,
+      "target": 0.010291999999999997,
+      "exit": 0.010181,
+      "reason": "停損",
+      "pnl_pct": -0.3621,
+      "depth_pct": 6.2313,
+      "risk_pct": 0.3621
+    },
+    {
+      "symbol": "INJUSDT",
+      "entry": 7.705,
+      "stop": 7.63,
+      "target": 7.855,
+      "exit": 7.63,
+      "reason": "停損",
+      "pnl_pct": -0.9734,
+      "depth_pct": 4.6305,
+      "risk_pct": 0.9734
+    },
+    {
+      "symbol": "IMXUSDT",
+      "entry": 0.1874,
+      "stop": 0.1856,
+      "target": 0.19100000000000006,
+      "exit": 0.1856,
+      "reason": "停損",
+      "pnl_pct": -0.9605,
+      "depth_pct": 3.5248,
+      "risk_pct": 0.9605
+    }
+  ]
+}
