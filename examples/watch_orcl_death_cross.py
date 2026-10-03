@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""1m 空：創 4 小時新高後 30 分鐘內，同一根 K 死亡交叉且跌破 MA25。
+"""1m 空：4 小時新高後，同一根死亡交叉且破 MA25，形狀對齊 ORCL 22:49。
 
-對 2026-10-02 ORCL：22:44 創四小時高 144.95；22:49 同一根收 144.44 死亡交叉且破 MA25。
+對 2026-10-02 ORCL：22:44 創四小時高 144.95；22:49（+5 分）同一根收 144.44。
+當根還要：MA7 領先夠久、高點後至少幾分鐘、從高點連陰、收在 K 棒下緣、已經離高點一段。
 
 用法：
   python3 examples/watch_orcl_death_cross.py --all --scan --date 2026-10-02 --pages
@@ -13,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -54,6 +56,9 @@ class ShortHit:
     peak_i: int | None = None
     peak_high: float | None = None
     bars_after_high: int | None = None
+    drop_from_high: float | None = None
+    close_loc: float | None = None
+    reds_from_high: int | None = None
 
 
 @dataclass(frozen=True)
@@ -135,16 +140,25 @@ def detect_shorts(
     m25: np.ndarray,
     *,
     high: np.ndarray | None = None,
-    min_lead: int = 5,
+    low: np.ndarray | None = None,
+    open_: np.ndarray | None = None,
+    min_lead: int = 15,
     require_cross_ma25: bool = True,
     require_4h_high: bool = False,
     high_lookback: int = 240,
     within_bars: int = 30,
+    orcl_shape: bool = True,
+    min_after_high: int = 4,
+    min_drop_from_high: float = 0.25,
+    min_reds_from_high: int = 3,
+    max_close_loc: float = 0.25,
 ) -> list[ShortHit]:
     """收盤根：同一根 K 上 MA7 下穿 MA14，且收盤由上跌破 MA25（對齊 ORCL 22:49）。
 
-    require_4h_high：訊號前 within_bars 根內，必須創下 high_lookback 根新高
-    （預設 4 小時新高後 30 分鐘內）。
+    require_4h_high：訊號前 within_bars 根內，必須創下 high_lookback 根新高。
+    orcl_shape（預設開）：再壓成 ORCL 那種——領先夠久、高點後幾分鐘才破、
+    從高點連陰、收在 K 棒下緣、收盤已離 4h 高至少 min_drop_from_high%。
+    沒傳 open/low 時，跳過連陰與收盤位置。
     """
     hi_mask = new_high_mask(high, high_lookback) if (require_4h_high and high is not None) else None
     hits: list[ShortHit] = []
@@ -164,7 +178,7 @@ def detect_shorts(
         lead = lead_bars(m7, m14, i)
         if lead < min_lead:
             continue
-        peak_i = peak_high = bars_after = None
+        peak_i = peak_high = bars_after = drop = loc = reds = None
         if require_4h_high:
             if hi_mask is None:
                 continue
@@ -173,6 +187,25 @@ def detect_shorts(
                 continue
             peak_high = float(high[peak_i])  # type: ignore[index]
             bars_after = i - peak_i
+            drop = pct_move(peak_high, float(close[i]))
+            if orcl_shape:
+                if bars_after < min_after_high:
+                    continue
+                if drop > -min_drop_from_high:
+                    continue
+                if open_ is not None:
+                    reds = int(np.sum(close[peak_i : i + 1] < open_[peak_i : i + 1]))
+                    if reds < min_reds_from_high:
+                        continue
+                    if close[i] >= open_[i]:
+                        continue
+                if low is not None and high is not None:
+                    rng = float(high[i] - low[i])
+                    if rng <= 0:
+                        continue
+                    loc = float((close[i] - low[i]) / rng)
+                    if loc > max_close_loc:
+                        continue
         hits.append(
             ShortHit(
                 i=i,
@@ -185,6 +218,9 @@ def detect_shorts(
                 peak_i=peak_i,
                 peak_high=peak_high,
                 bars_after_high=bars_after,
+                drop_from_high=drop,
+                close_loc=loc,
+                reds_from_high=reds,
             )
         )
     return hits
@@ -430,11 +466,20 @@ def format_hit(sym: str, d: dict, hit: ShortHit) -> str:
     link = binance_href(sym)
     high_line = ""
     if hit.bars_after_high is not None and hit.peak_i is not None:
-        high_line = f"四小時新高 {hm(int(d['t'][hit.peak_i]))} 後 {hit.bars_after_high} 分鐘\n"
+        dump = ""
+        if hit.drop_from_high is not None:
+            dump = f"，離高 {hit.drop_from_high:+.2f}%"
+        high_line = f"四小時新高 {hm(int(d['t'][hit.peak_i]))} 後 {hit.bars_after_high} 分鐘{dump}\n"
+    extra = ""
+    if hit.reds_from_high is not None:
+        extra += f"從高點連陰 {hit.reds_from_high} 根\n"
+    if hit.close_loc is not None:
+        extra += f"收在 K 棒下方 {hit.close_loc:.0%}\n"
     return (
         f"🔻 <b>{sym} 空</b>  1m\n"
         f"{high_line}"
         f"MA7 / MA14 <b>死亡交叉</b>，{x25}\n"
+        f"{extra}"
         f"時間 {ts}（台北）\n"
         f"收 {hit.close:g}\n"
         f"MA7 {hit.m7:.4f}　MA14 {hit.m14:.4f}　MA25 {hit.m25:.4f}\n"
@@ -448,12 +493,18 @@ def key_of(sym: str, d: dict, hit: ShortHit) -> str:
 
 
 def detect_kw_from_args(args) -> dict:
+    shape = not args.loose
     return {
         "min_lead": args.min_lead,
         "require_cross_ma25": args.require_cross_ma25,
         "require_4h_high": not args.no_4h_high,
         "high_lookback": max(1, int(round(args.high_hours * 60))),
         "within_bars": max(0, args.within_minutes),
+        "orcl_shape": shape,
+        "min_after_high": 0 if not shape else args.min_after,
+        "min_drop_from_high": 0.0 if not shape else args.min_drop_high,
+        "min_reds_from_high": 0 if not shape else args.min_reds,
+        "max_close_loc": 1.0 if not shape else args.max_close_loc,
     }
 
 
@@ -462,7 +513,16 @@ def scan_symbol(sym: str, *, limit: int, **detect_kw) -> tuple[dict, list[ShortH
     if raw is None:
         return {}, []
     d = with_ma(raw)
-    return d, detect_shorts(d["c"], d["m7"], d["m14"], d["m25"], high=d["h"], **detect_kw)
+    return d, detect_shorts(
+        d["c"],
+        d["m7"],
+        d["m14"],
+        d["m25"],
+        high=d["h"],
+        low=d["l"],
+        open_=d["o"],
+        **detect_kw,
+    )
 
 
 def rows_from_hits(sym: str, d: dict, hits: list[ShortHit], *, quote_vol: float = 0.0) -> list[ScanRow]:
@@ -578,19 +638,20 @@ def print_scan(sym: str, d: dict, hits: list[ShortHit], *, hours: int, day: str 
     start, end = cutoff_ms(day=day, hours=hours, now_ms=int(d["t"][-1]) + 1)
     recent = [h for h in hits if in_window(int(d["t"][h.i]), start, end)]
     label = day if day else f"近 {hours}h"
-    print(f"\n{sym} {label}  4h新高後30分內、同一根死亡交叉且破 MA25：{len(recent)} 筆")
+    print(f"\n{sym} {label}  4h新高後、同一根死亡交叉且破 MA25（ORCL 形）：{len(recent)} 筆")
     for h in recent:
         x = "同根破25" if h.crossed_ma25 else "已在25下"
         after = f"  高點後{h.bars_after_high}m" if h.bars_after_high is not None else ""
+        dump = f"  離高{h.drop_from_high:+.2f}%" if h.drop_from_high is not None else ""
         print(
             f"  {hm(int(d['t'][h.i]))}  收 {h.close:g}  "
             f"MA7 {h.m7:.4f}  MA14 {h.m14:.4f}  MA25 {h.m25:.4f}  "
-            f"lead {h.lead}  {x}{after}"
+            f"lead {h.lead}  {x}{after}{dump}"
         )
 
 
 def orcl_like(rows: list[ScanRow], *, min_dump: float = -1.0) -> list[ScanRow]:
-    """同根跌破 MA25、交叉前 MA7 領先夠久；有 30 根資料時還要砸過 min_dump%。"""
+    """主訊號已是 ORCL 形；這裡再留之後 30 根有砸過 min_dump% 的。"""
     out = []
     for r in rows:
         if not r.hit.crossed_ma25 or r.hit.lead < 10:
@@ -622,8 +683,8 @@ def print_market_scan(rows: list[ScanRow], *, start_ms: int, end_ms: int, n_symb
     same = sum(1 for r in recent if r.hit.crossed_ma25)
     names = sorted({r.symbol for r in recent})
     print(
-        f"\n幣安 USDT 永續 {n_symbols} 檔　4h新高後30分內、同一根死亡交叉且破MA25："
-        f"{len(recent)} 筆 / {len(names)} 檔　同根破25 {same} 筆"
+        f"\n幣安 USDT 永續 {n_symbols} 檔　4h新高後、同一根死亡交叉且破MA25、ORCL形："
+        f"{len(recent)} 筆 / {len(names)} 檔"
     )
     ranked = sorted(
         recent,
@@ -638,15 +699,15 @@ def print_market_scan(rows: list[ScanRow], *, start_ms: int, end_ms: int, n_symb
         print(
             f"  {r.symbol:<14} {hm(r.ts_ms)}  收 {r.hit.close:g}  "
             f"30m低 {fmt_pct(r.low30)}  15m {fmt_pct(r.fwd15)}  "
-            f"lead {r.hit.lead}  高點後{r.hit.bars_after_high}m  {x}"
+            f"lead {r.hit.lead}  高點後{r.hit.bars_after_high}m  離高{fmt_pct(r.hit.drop_from_high)}  {x}"
         )
     like = orcl_like(recent)
-    print(f"\n比較像 ORCL（同根破25、lead≥10、30m 至少砸 1%）：{len(like)} 筆 / {len({r.symbol for r in like})} 檔")
+    print(f"\n之後砸得比較深（30m 至少 −1%，前 {top}）：{len(like)} 筆 / {len({r.symbol for r in like})} 檔")
     for r in like[:top]:
         print(
             f"  {r.symbol:<14} {hm(r.ts_ms)}  收 {r.hit.close:g}  "
             f"30m低 {fmt_pct(r.low30)}  15m {fmt_pct(r.fwd15)}  "
-            f"lead {r.hit.lead}  高點後{r.hit.bars_after_high}m"
+            f"lead {r.hit.lead}  高點後{r.hit.bars_after_high}m  離高{fmt_pct(r.hit.drop_from_high)}"
         )
 
 
@@ -663,6 +724,9 @@ def row_to_json(r: ScanRow) -> dict:
         "crossed_ma25": r.hit.crossed_ma25,
         "peak_high": r.hit.peak_high,
         "bars_after_high": r.hit.bars_after_high,
+        "drop_from_high": r.hit.drop_from_high,
+        "close_loc": r.hit.close_loc,
+        "reds_from_high": r.hit.reds_from_high,
         "fwd15": r.fwd15,
         "fwd30": r.fwd30,
         "low15": r.low15,
@@ -720,11 +784,18 @@ def write_html_report(
             f"{pct_cell(r.low30)}{pct_cell(r.fwd15)}{pct_cell(r.fwd30)}"
             f"<td>{r.hit.lead}</td>"
             f"<td>{r.hit.bars_after_high if r.hit.bars_after_high is not None else '—'}</td>"
+            f"{pct_cell(r.hit.drop_from_high)}"
             f"<td>{extra}</td>"
             "</tr>"
         )
 
-    top_html = [row_tr(r, "同根破25" if r.hit.crossed_ma25 else "已在25下") for r in ranked[:top]]
+    top_html = [
+        row_tr(
+            r,
+            f"連陰{r.hit.reds_from_high}" if r.hit.reds_from_high is not None else "ORCL形",
+        )
+        for r in ranked[:top]
+    ]
     like_html = [row_tr(r, f"lead {r.hit.lead}") for r in like[:top]]
     sym_html = []
     for _w, sym, n, dump, last in sym_rows[:200]:
@@ -767,26 +838,25 @@ a{{color:#c9a227;text-decoration:none}}
 <body>
 <div class="wrap">
 <h1>{escape(title)}</h1>
-<p class="sub">創下過去 4 小時新高後 30 分鐘內，<b>同一根</b> 1 分鐘 K：MA7 下穿 MA14，且收盤由上跌破 MA25（對齊 ORCL 22:49）。急殺深度是訊號後 30 根最低點。不是進出場建議。</p>
+<p class="sub">創下過去 4 小時新高後 30 分鐘內，<b>同一根</b> 1 分鐘 K：MA7 下穿 MA14 且收盤跌破 MA25。再壓成 ORCL 22:49 那種：領先 ≥15 根、高點後 ≥4 分、從高點至少 3 根陰、收在 K 棒下緣、離高點 ≥0.25%。急殺深度是訊號後 30 根最低點。不是進出場建議。</p>
 <div class="chips">
   <div class="chip">掃 <b>{n_symbols}</b> 檔</div>
   <div class="chip">訊號 <b>{len(recent)}</b> 筆</div>
   <div class="chip">有訊號 <b>{len(names)}</b> 檔</div>
-  <div class="chip">同根破 MA25 <b>{same}</b></div>
-  <div class="chip">像 ORCL <b>{len(like)}</b></div>
+  <div class="chip">之後砸 ≥1% <b>{len(like)}</b></div>
 </div>
-<h2>比較像 ORCL（同根破 MA25、lead≥10、30m 砸 ≥1%，前 {min(top, len(like))}）</h2>
+<h2>之後砸得比較深（30m ≥1%，前 {min(top, len(like))}）</h2>
 <table>
-<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th></th></tr></thead>
+<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th>離高</th><th></th></tr></thead>
 <tbody>
-{"".join(like_html) or "<tr><td colspan='9' class='muted'>沒有訊號</td></tr>"}
+{"".join(like_html) or "<tr><td colspan='10' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
-<h2>急殺最深（皆同根破 MA25，前 {min(top, len(ranked))}）</h2>
+<h2>全部 ORCL 形（前 {min(top, len(ranked))}）</h2>
 <table>
-<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th>破25</th></tr></thead>
+<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th>離高</th><th></th></tr></thead>
 <tbody>
-{"".join(top_html) or "<tr><td colspan='9' class='muted'>沒有訊號</td></tr>"}
+{"".join(top_html) or "<tr><td colspan='10' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
 <h2>有訊號的標的</h2>
@@ -796,7 +866,7 @@ a{{color:#c9a227;text-decoration:none}}
 {"".join(sym_html) or "<tr><td colspan='7' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
-<p class="note">ORCL 10-02：22:44 創四小時高 144.95；22:49（+5 分）同一根死亡交叉且跌破 MA25，之後砸到 141。</p>
+<p class="note">ORCL 10-02：22:44 創四小時高 144.95；22:49（+5 分）同一根死亡交叉且跌破 MA25，lead 22、連陰 4、收在下緣、離高 −0.35%，之後砸到 141。</p>
 </div>
 </body>
 </html>
@@ -864,7 +934,10 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
     start, end, label = scan_window_label(args)
     detect_kw = detect_kw_from_args(args)
     t0 = time.time()
-    extra = "4h新高+30m" if detect_kw["require_4h_high"] else "不過濾4h高"
+    extra = "4h新高+ORCL形" if detect_kw["require_4h_high"] and detect_kw["orcl_shape"] else (
+        "4h新高+30m" if detect_kw["require_4h_high"] else "不過濾4h高"
+    )
+    extra += f"  min_lead={detect_kw['min_lead']}"
     if args.all or len(symbols) > 1:
         print(
             f"掃 {len(symbols)} 檔 1m　{label}　min_lead={args.min_lead}　{extra}",
@@ -889,7 +962,7 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
                 start_ms=start,
                 end_ms=end,
                 n_symbols=len(symbols),
-                title=f"幣安 1m 空 · 4h新高後同一根死亡交叉且破 MA25 · {label}",
+                title=f"幣安 1m 空 · ORCL 形（同根死亡交叉且破 MA25）· {label}",
                 top=args.top,
             )
             print(f"html={out}")
@@ -908,7 +981,7 @@ def main() -> int:
     p.add_argument("--all", action="store_true", help="掃幣安所有 USDT 永續（含股票型如 ORCL）")
     p.add_argument("--min-quote-vol", type=float, default=0.0, help="24h 成交額下限，--all 時用")
     p.add_argument("--workers", type=int, default=12, help="並行下載 K 線")
-    p.add_argument("--min-lead", type=int, default=5, help="死亡交叉前 MA7≥MA14 最少根數，濾雜訊")
+    p.add_argument("--min-lead", type=int, default=15, help="死亡交叉前 MA7≥MA14 最少根數，ORCL 是 22")
     p.add_argument(
         "--no-same-bar-ma25",
         dest="require_cross_ma25",
@@ -917,6 +990,11 @@ def main() -> int:
     )
     p.add_argument("--high-hours", type=float, default=4.0, help="新高回看幾小時，預設 4")
     p.add_argument("--within-minutes", type=int, default=30, help="新高後幾分鐘內要出現死亡交叉，預設 30")
+    p.add_argument("--min-after", type=int, default=4, help="高點後至少過幾分鐘才算，ORCL 是 +5")
+    p.add_argument("--min-drop-high", type=float, default=0.25, help="收盤離 4h 高至少百分之幾，ORCL 約 0.35")
+    p.add_argument("--min-reds", type=int, default=3, help="從高點到訊號至少幾根陰線，ORCL 是 4")
+    p.add_argument("--max-close-loc", type=float, default=0.25, help="收盤在 K 棒位置，0=最低 1=最高，ORCL 收在最低")
+    p.add_argument("--loose", action="store_true", help="關掉 ORCL 形，只留 4h 新高+同根死亡交叉")
     p.add_argument("--no-4h-high", action="store_true", help="關掉四小時新高條件")
     p.add_argument("--scan", action="store_true", help="印出歷史訊號後結束")
     p.add_argument("--hours", type=int, default=24, help="沒指定 --date 時，回看小時數")
@@ -930,6 +1008,8 @@ def main() -> int:
     p.add_argument("--dry-run", action="store_true", help="只印不送 Telegram")
     p.set_defaults(require_cross_ma25=True)
     args = p.parse_args()
+    if args.loose and "--min-lead" not in sys.argv:
+        args.min_lead = 5
     apply_keys()
     if args.test:
         return test_telegram()
@@ -946,8 +1026,9 @@ def main() -> int:
         watch_limit = max(look + 10, 320)
     print(
         f"監看 {len(symbols)} 檔  1m  空  "
-        f"4h新高後{args.within_minutes}分內  同一根MA7×MA14死亡交叉且跌破MA25  "
-        f"min_lead={args.min_lead}  4h={'開' if detect_kw['require_4h_high'] else '關'}",
+        f"4h新高後{args.within_minutes}分內  同一根死亡交叉且破MA25  "
+        f"ORCL形={'開' if detect_kw['orcl_shape'] else '關'}  "
+        f"min_lead={args.min_lead}  min_after={detect_kw['min_after_high']}",
         flush=True,
     )
     if args.all:

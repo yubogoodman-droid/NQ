@@ -293,6 +293,95 @@ def test_4h_high_too_old_skipped() -> None:
     assert all(h.i <= 249 + 30 for h in gated)
 
 
+def test_orcl_shape_skips_immediate_and_upper_close() -> None:
+    """高點太近、或收在 K 棒上緣，不該算 ORCL 形。"""
+    rise = np.linspace(100.0, 144.50, 250)
+    wait = np.full(20, 144.50)
+    tail = np.array([144.55, 144.58, 143.70])
+    close = np.concatenate([rise, wait, tail])
+    open_ = np.empty_like(close)
+    open_[0] = close[0]
+    open_[1:] = close[:-1]
+    high = np.maximum(open_, close)
+    low = np.minimum(open_, close)
+    peak = len(close) - 3  # 訊號前 2 根才新高
+    high[peak] = 150.0
+    m7, m14, m25 = _mas(close)
+    base = dict(
+        high=high,
+        low=low,
+        open_=open_,
+        min_lead=0,
+        require_4h_high=True,
+        high_lookback=240,
+        within_bars=30,
+    )
+    loose = detect_shorts(close, m7, m14, m25, orcl_shape=False, **base)
+    tight = detect_shorts(close, m7, m14, m25, orcl_shape=True, **base)
+    assert loose, "關掉形狀時這波急殺應還在"
+    assert any(h.crossed_ma25 for h in loose)
+    assert not tight, "高點後不到 4 根不該過 ORCL 形"
+
+    # 同一條走勢，高點拉遠，但訊號根收在上緣
+    high2 = high.copy()
+    high2[249] = 150.0
+    high2[peak] = close[peak]  # 取消近端假高
+    low2 = low.copy()
+    sig = len(close) - 1
+    low2[sig] = close[sig] - 2.0  # 長下影，收在相對高位
+    high2[sig] = close[sig] + 0.01
+    loc_skip = detect_shorts(
+        close, m7, m14, m25, high=high2, low=low2, open_=open_,
+        min_lead=0, require_4h_high=True, high_lookback=240, within_bars=30,
+        orcl_shape=True, min_after_high=4, min_drop_from_high=0.0,
+        min_reds_from_high=0, max_close_loc=0.25,
+    )
+    assert not loc_skip, "收在 K 棒上緣不該過 ORCL 形"
+
+
+def test_orcl_shape_keeps_dump_like_orcl() -> None:
+    """高點後數根連陰、收在下緣、離高一段，應對齊 ORCL 22:49。"""
+    rise = np.linspace(140.0, 144.50, 250)
+    wait = np.full(4, 144.50)
+    # 先連陰再一根大陰：同一根死亡交叉且破 MA25
+    dump = np.array([144.48, 144.46, 144.44, 144.42, 143.55])
+    close = np.concatenate([rise, wait, dump])
+    open_ = np.empty_like(close)
+    open_[0] = close[0]
+    open_[1:] = close[:-1]
+    high = np.maximum(open_, close)
+    low = np.minimum(open_, close)
+    peak = 249
+    high[peak] = 144.95
+    low[-1] = close[-1]
+    m7, m14, m25 = _mas(close)
+    hits = detect_shorts(
+        close,
+        m7,
+        m14,
+        m25,
+        high=high,
+        low=low,
+        open_=open_,
+        min_lead=5,
+        require_4h_high=True,
+        high_lookback=240,
+        within_bars=30,
+        orcl_shape=True,
+        min_after_high=4,
+        min_drop_from_high=0.25,
+        min_reds_from_high=3,
+        max_close_loc=0.25,
+    )
+    assert hits, "ORCL 那種連陰急殺應抓得到"
+    hit = hits[-1]
+    assert hit.crossed_ma25
+    assert hit.bars_after_high is not None and hit.bars_after_high >= 4
+    assert hit.drop_from_high is not None and hit.drop_from_high <= -0.25
+    assert hit.reds_from_high is not None and hit.reds_from_high >= 3
+    assert hit.close_loc is not None and hit.close_loc <= 0.25
+
+
 def main() -> int:
     test_sma()
     test_death_and_below_fires()
@@ -310,6 +399,8 @@ def main() -> int:
     test_new_high_mask()
     test_4h_high_then_death_within_30()
     test_4h_high_too_old_skipped()
+    test_orcl_shape_skips_immediate_and_upper_close()
+    test_orcl_shape_keeps_dump_like_orcl()
     print("ok")
     return 0
 
