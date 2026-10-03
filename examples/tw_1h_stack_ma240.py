@@ -3,10 +3,11 @@
 
 智原型：小時 K 收盤同時滿足
   • MA5 > MA10 > MA20
-  • 這一根收盤站上 MA240（收盤 > MA240）
-  • 上一根收盤還沒站上 MA240
+  • 這一根收盤站上 MA240（至少高出一個跳動點）
+  • 上一根收盤還沒站上（不到一個跳動點）
 
 已經站在 MA240 上面、只是短均才排好的不算。
+貼線雜訊（例如收盤只比 MA240 高 0.01、不到 1 檔）不算站上。
 預設掃成交額前 200、股價 < 1000，並固定把 3035 智原放進池子。
 `--symbols 3035` 只盯智原。每根小時 K 收盤後掃一次；GitHub Actions 在盤中整點代跑。
 
@@ -111,12 +112,32 @@ def stacked_at(i: int, ma5: np.ndarray, ma10: np.ndarray, ma20: np.ndarray) -> b
     return bool(ma5[i] > ma10[i] > ma20[i])
 
 
+def tw_tick(price: float) -> float:
+    """上市櫃普通股跳動點（依現價）。"""
+    p = abs(float(price))
+    if p < 10:
+        return 0.01
+    if p < 50:
+        return 0.05
+    if p < 100:
+        return 0.10
+    if p < 500:
+        return 0.50
+    if p < 1000:
+        return 1.00
+    if p < 5000:
+        return 5.00
+    return 10.00
+
+
 def above_ma240_at(i: int, close: np.ndarray, ma240: np.ndarray) -> bool:
+    """收盤至少高出 MA240 一個跳動點才算站上。"""
     if i < 0 or i >= len(close):
         return False
     if np.isnan(close[i]) or np.isnan(ma240[i]):
         return False
-    return bool(close[i] > ma240[i])
+    tick = tw_tick(close[i])
+    return bool(close[i] - ma240[i] >= tick - 1e-9)
 
 
 def setup_at(
@@ -138,7 +159,7 @@ def stood_this_bar(
     ma20: np.ndarray,
     ma240: np.ndarray,
 ) -> bool:
-    """當下這根才站上 MA240，且 5>10>20。"""
+    """當下這根才站上 MA240（至少 1 檔），且 5>10>20。"""
     return (
         stacked_at(i, ma5, ma10, ma20)
         and above_ma240_at(i, close, ma240)
@@ -667,7 +688,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 1h · MA5&gt;MA10&gt;MA20 且站上 MA240</h1>
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {escape(pool_txt)}
-<br/>智原型小時 K：MA5&gt;MA10&gt;MA20，且<strong>當下這根收盤才站上 MA240</strong>（上一根還沒站上）。已經站在上面、只是短均才排好的不算。
+<br/>智原型小時 K：MA5&gt;MA10&gt;MA20，且<strong>當下這根收盤才站上 MA240</strong>（至少高出一個跳動點；上一根還沒站上）。已經站在上面、只是短均才排好的不算。貼線不到 1 檔不算。
 卡片右上是訊號後下一個交易日收盤報酬（還沒走完就顯示站上 MA240 幅度）。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>

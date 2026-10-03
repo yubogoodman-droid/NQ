@@ -30,6 +30,7 @@ from tw_1h_stack_ma240 import (  # noqa: E402
     setup_at,
     sma,
     stacked_at,
+    tw_tick,
 )
 
 HOURS = (9, 10, 11, 12, 13)
@@ -74,13 +75,21 @@ def uptrend_closes(n: int = 280, start: float = 90.0, step: float = 0.25) -> np.
     return start + step * np.arange(n, dtype=float)
 
 
+def test_tw_tick() -> None:
+    assert tw_tick(9.9) == 0.01
+    assert tw_tick(10) == 0.05
+    assert tw_tick(65.1) == 0.10
+    assert tw_tick(251.5) == 0.50
+    assert tw_tick(689) == 1.00
+
+
 def test_setup_needs_stack_and_ma240() -> None:
     close = np.array([10.0, 10.0, 10.0])
     ma5 = np.array([9.0, 9.0, 8.0])
     ma10 = np.array([8.0, 9.5, 7.5])
     ma20 = np.array([7.0, 8.0, 7.0])
     ma240 = np.array([9.5, 9.5, 11.0])
-    assert setup_at(0, close, ma5, ma10, ma20, ma240)  # stacked and close > ma240
+    assert setup_at(0, close, ma5, ma10, ma20, ma240)  # stacked and close 高於 MA240 至少 1 檔
     assert not setup_at(1, close, ma5, ma10, ma20, ma240)  # 5 < 10
     assert not setup_at(2, close, ma5, ma10, ma20, ma240)  # close < ma240
 
@@ -95,21 +104,37 @@ def test_first_valid_ma240_bar_is_a_signal() -> None:
     assert first.close > first.ma240
 
 
-def test_reclaim_ma240_while_stacked() -> None:
-    # 長盤整後只輕輕往上，MA240 貼近現價，才能小跌破再站回且 5>10>20 還在。
+def _flat_then_reclaim(stand_extra: float) -> pd.DataFrame:
+    # 長盤整後輕輕往上，MA240 貼近現價，才能跌破再站回且 5>10>20 還在。
     base = [100.0] * 240 + [100.02, 100.04, 100.06, 100.08, 100.10]
     m240 = float(sma(np.asarray(base, dtype=float), 240)[-1])
-    df = ohlc_from_close(base + [m240 - 0.005, base[-1]])
+    return ohlc_from_close(base + [m240 - 0.01, m240 + stand_extra])
+
+
+def test_reclaim_ma240_while_stacked() -> None:
+    df = _flat_then_reclaim(0.60)  # 100 元檔 1 檔 = 0.5
     close = df["Close"].to_numpy(float)
     ma240 = sma(close, 240)
     assert close[-3] > ma240[-3]
     assert close[-2] < ma240[-2]
-    assert close[-1] > ma240[-1]
+    assert close[-1] - ma240[-1] >= 0.50
     sigs = detect_signals(df)
     assert sigs[-1].idx == len(df) - 1
     assert not above_ma240_at(len(df) - 2, close, ma240)
     assert sigs[-1].close > sigs[-1].ma240
     assert sigs[-1].ma5 > sigs[-1].ma10 > sigs[-1].ma20
+
+
+def test_kiss_ma240_less_than_one_tick_is_not_a_stand() -> None:
+    """鴻海那種收 251.50 / MA240 251.49（不到 1 檔）不算站上。"""
+    df = _flat_then_reclaim(0.01)  # << 0.5
+    close = df["Close"].to_numpy(float)
+    ma240 = sma(close, 240)
+    assert close[-1] > ma240[-1]
+    assert close[-1] - ma240[-1] < tw_tick(close[-1])
+    sigs = detect_signals(df)
+    assert all(s.idx != len(df) - 1 for s in sigs)
+    assert current_setup(df) is None
 
 
 def test_stack_forming_while_already_above_ma240_is_not_a_signal() -> None:
@@ -155,14 +180,12 @@ def test_current_setup_requires_this_bar_stand() -> None:
     # 已經站在上面的最後一根不算
     df = ohlc_from_close(uptrend_closes(280))
     assert current_setup(df) is None
-    # 這一根才從 MA240 下方站上
-    base = [100.0] * 240 + [100.02, 100.04, 100.06, 100.08, 100.10]
-    m240 = float(sma(np.asarray(base, dtype=float), 240)[-1])
-    df2 = ohlc_from_close(base + [m240 - 0.005, base[-1]])
+    # 這一根才從 MA240 下方站上（至少 1 檔）
+    df2 = _flat_then_reclaim(0.60)
     sig = current_setup(df2)
     assert sig is not None
     assert sig.idx == len(df2) - 1
-    assert sig.close > sig.ma240
+    assert sig.close - sig.ma240 >= tw_tick(sig.close) - 1e-9
 
 
 def test_filter_recent_keeps_last_n() -> None:
@@ -240,9 +263,11 @@ def test_resolve_symbols_defaults_to_universe() -> None:
 
 def main() -> int:
     tests = [
+        test_tw_tick,
         test_setup_needs_stack_and_ma240,
         test_first_valid_ma240_bar_is_a_signal,
         test_reclaim_ma240_while_stacked,
+        test_kiss_ma240_less_than_one_tick_is_not_a_stand,
         test_stack_forming_while_already_above_ma240_is_not_a_signal,
         test_no_repeat_while_already_standing,
         test_below_ma240_is_not_current,
