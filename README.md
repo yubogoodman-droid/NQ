@@ -84,6 +84,23 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## 台股 1 小時 K 達發多
+
+1 小時圖，對齊 6526 達發 2026-09-18 開盤那根（9:00–10:00，部分看盤軟體標成 10:00）：
+
+- 只看每個交易日第一根。
+- 跳空：這根低點高於前一根高點。
+- 站上 MA60：前一根收盤還在 MA60 下面，這根低點與收盤都在 MA60 上面。
+- MA5 > MA10 > MA20。
+
+進場為這根收盤。回測停在這根低點、目標 2R、或 20 根時間停。
+
+```bash
+python3 examples/tw_1h_daifa.py --days 30 --range 3mo --pages
+python3 examples/tw_1h_daifa.py --symbol 6526.TW --days 30 --range 3mo
+python3 examples/test_tw_1h_daifa.py
+```
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
