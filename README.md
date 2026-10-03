@@ -103,7 +103,9 @@ python3 examples/tw_1h_ma60_retest.py --alert
 python3 examples/test_tw_1h_ma60_retest.py
 ```
 
-週報（2026-09-29 → 10-02）：成交額前 200 刪掉股價 ≥ 1000 後剩 **155 檔**，**19 筆、14 檔**。已平 15 筆勝率 **73.3%**，平均 **+1.16%**（加總 +22.0%）。2R 11 筆平均約 +2.7%，停損 4 筆平均約 −1.8%。收盤後抱 3 天平均 **+3.96%**。
+晶心科 2026-09-23 11:00 回測 MA60 **252**（均線 248），之後 2R **+3.53%**；333 漲停是通知之後才走的。右上角追價不再報。
+
+Telegram 憑證放 `tg_config.env`（勿提交）。
 
 週報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-ma60-retest-3376/docs/tw-1h-ma60-retest-7d/view.html
 
