@@ -887,6 +887,8 @@ def cmd_scan(args: argparse.Namespace) -> int:
     if html_path is None and args.pages:
         if getattr(args, "today", False):
             html_path = REPO / "docs" / "tw-w-ma20-today" / "index.html"
+        elif days >= 28:
+            html_path = REPO / "docs" / "tw-w-ma20-month" / "index.html"
         elif days >= 7:
             html_path = REPO / "docs" / "tw-w-ma20-week" / "index.html"
         else:
