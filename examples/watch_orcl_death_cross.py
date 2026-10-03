@@ -20,11 +20,12 @@ import io
 import json
 import os
 import platform
+import statistics
 import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
@@ -52,6 +53,9 @@ if not CONFIG_ENV.exists():
     CONFIG_ENV = Path(__file__).resolve().parent / "tg_config.env"
 SEEN_PATH = REPO_ROOT / "output" / "orcl_death_cross_seen.json"
 PAGES_HTML = REPO_ROOT / "docs" / "binance" / "death-cross-1m" / "index.html"
+PAGES_WEEK = REPO_ROOT / "docs" / "binance" / "death-cross-1m-7d" / "index.html"
+MAX_FETCH_BARS = 16000
+MAX_EMBED_CHARTS = 80
 DEFAULT_SYMBOLS = ("ORCLUSDT",)
 KEEP = {"ORCLUSDT"}
 SESSION = requests.Session()
@@ -284,11 +288,19 @@ def day_bounds_ms(day: str) -> tuple[int, int]:
     return int(start.timestamp() * 1000), int(end.timestamp() * 1000)
 
 
-def cutoff_ms(*, day: str | None, hours: int, now_ms: int | None = None) -> tuple[int, int]:
-    """回傳 [start, end) 毫秒。有 day 就用台北日；否則用近 hours。"""
+def cutoff_ms(
+    *,
+    day: str | None,
+    hours: int,
+    days: int | None = None,
+    now_ms: int | None = None,
+) -> tuple[int, int]:
+    """回傳 [start, end) 毫秒。有 day 就用台北日；有 days 用近 N 天；否則近 hours。"""
     now = int(time.time() * 1000) if now_ms is None else now_ms
     if day:
         return day_bounds_ms(day)
+    if days is not None and days > 0:
+        return now - int(days) * 86_400_000, now + 1
     return now - hours * 3600 * 1000, now + 1
 
 
@@ -369,7 +381,7 @@ def fetch_klines(
             if nxt <= cursor or len(batch) < 1500:
                 break
             cursor = nxt
-            if len(raw) >= 4000:
+            if len(raw) >= MAX_FETCH_BARS:
                 break
     else:
         params = {"symbol": sym, "interval": "1m", "limit": min(int(limit), 1500)}
@@ -643,13 +655,30 @@ def chart_data_uri(sym: str, d: dict, hit: ShortHit) -> str | None:
     return "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
 
 
-def charts_for_like(like: list[ScanRow], bars: dict[str, dict]) -> dict[str, str]:
+def charts_for_like(
+    like: list[ScanRow],
+    bars: dict[str, dict],
+    *,
+    max_charts: int = MAX_EMBED_CHARTS,
+) -> dict[str, str]:
     out: dict[str, str] = {}
-    for r in like:
+    for r in like[: max(0, max_charts)]:
+        hit = r.hit
         d = bars.get(r.symbol)
-        if not d:
-            continue
-        uri = chart_data_uri(r.symbol, d, r.hit)
+        if d is None or not np.any(d["t"] == r.ts_ms):
+            d = fetch_klines(r.symbol, start_ms=r.ts_ms - 90 * 60_000, end_ms=r.ts_ms + 45 * 60_000)
+            if not d:
+                continue
+            idxs = np.where(d["t"] == r.ts_ms)[0]
+            if len(idxs) == 0:
+                continue
+            i = int(idxs[0])
+            peak_i = hit.peak_i
+            if hit.bars_after_high is not None:
+                cand = i - int(hit.bars_after_high)
+                peak_i = cand if 0 <= cand < len(d["t"]) else None
+            hit = replace(hit, i=i, peak_i=peak_i)
+        uri = chart_data_uri(r.symbol, d, hit)
         if uri:
             out[f"{r.symbol}:{r.ts_ms}"] = uri
     return out
@@ -845,13 +874,20 @@ def wait_next_close() -> None:
     time.sleep(max(1, nxt - now))
 
 
-def print_scan(sym: str, d: dict, hits: list[ShortHit], *, hours: int, day: str | None = None) -> None:
+def print_scan(
+    sym: str, d: dict, hits: list[ShortHit], *, hours: int, day: str | None = None, days: int | None = None
+) -> None:
     if not d:
         print(f"{sym} 沒資料")
         return
-    start, end = cutoff_ms(day=day, hours=hours, now_ms=int(d["t"][-1]) + 1)
+    start, end = cutoff_ms(day=day, hours=hours, days=days, now_ms=int(d["t"][-1]) + 1)
     recent = [h for h in hits if in_window(int(d["t"][h.i]), start, end)]
-    label = day if day else f"近 {hours}h"
+    if day:
+        label = day
+    elif days:
+        label = f"近 {days} 天"
+    else:
+        label = f"近 {hours}h"
     print(f"\n{sym} {label}  4h新高後、同一根死亡交叉且破 MA25（ORCL 形）：{len(recent)} 筆")
     for h in recent:
         x = "同根破25" if h.crossed_ma25 else "已在25下"
@@ -892,6 +928,59 @@ def fmt_pct(v: float | None) -> str:
     return f"{v:+.2f}%"
 
 
+def _avg(xs: list[float]) -> float | None:
+    return sum(xs) / len(xs) if xs else None
+
+
+def _med(xs: list[float]) -> float | None:
+    return float(statistics.median(xs)) if xs else None
+
+
+def summarize_rows(rows: list[ScanRow]) -> dict:
+    """進場＝訊號收盤做空；fwd30 是價格，空損益 = −fwd30。"""
+    lows = [r.low30 for r in rows if r.low30 is not None]
+    fwds = [r.fwd30 for r in rows if r.fwd30 is not None]
+    pnl = [-x for x in fwds]
+    n = len(rows)
+    dump05 = sum(1 for x in lows if x <= -0.5)
+    dump1 = sum(1 for x in lows if x <= -1.0)
+    dump2 = sum(1 for x in lows if x <= -2.0)
+    wins = sum(1 for x in pnl if x > 0)
+    by_day: list[dict] = []
+    days = sorted({taipei_day(r.ts_ms) for r in rows})
+    for day in days:
+        rs = [r for r in rows if taipei_day(r.ts_ms) == day]
+        dlows = [r.low30 for r in rs if r.low30 is not None]
+        dfwds = [r.fwd30 for r in rs if r.fwd30 is not None]
+        dpnl = [-x for x in dfwds]
+        by_day.append(
+            {
+                "day": day,
+                "n": len(rs),
+                "dump1": sum(1 for x in dlows if x <= -1.0),
+                "low30_avg": _avg(dlows),
+                "pnl30_avg": _avg(dpnl),
+                "win": sum(1 for x in dpnl if x > 0),
+            }
+        )
+    return {
+        "n": n,
+        "symbols": len({r.symbol for r in rows}),
+        "low30_avg": _avg(lows),
+        "low30_med": _med(lows),
+        "fwd30_avg": _avg(fwds),
+        "pnl30_avg": _avg(pnl),
+        "pnl30_med": _med(pnl),
+        "win": wins,
+        "win_pct": (100.0 * wins / len(pnl)) if pnl else None,
+        "dump05": dump05,
+        "dump1": dump1,
+        "dump2": dump2,
+        "dump1_pct": (100.0 * dump1 / len(lows)) if lows else None,
+        "by_day": by_day,
+    }
+
+
 def print_market_scan(rows: list[ScanRow], *, start_ms: int, end_ms: int, n_symbols: int, top: int = 40) -> None:
     recent = [r for r in rows if in_window(r.ts_ms, start_ms, end_ms)]
     same = sum(1 for r in recent if r.hit.crossed_ma25)
@@ -923,6 +1012,24 @@ def print_market_scan(rows: list[ScanRow], *, start_ms: int, end_ms: int, n_symb
             f"30m低 {fmt_pct(r.low30)}  15m {fmt_pct(r.fwd15)}  "
             f"lead {r.hit.lead}  高點後{r.hit.bars_after_high}m  離高{fmt_pct(r.hit.drop_from_high)}"
         )
+    st = summarize_rows(recent)
+    print("\n回測（進場＝訊號收盤做空，看之後 30 分鐘，不是建議）")
+    print(
+        f"  30m 最低 平均 {fmt_pct(st['low30_avg'])}  中位 {fmt_pct(st['low30_med'])}  "
+        f"砸≥0.5% {st['dump05']}  ≥1% {st['dump1']}  ≥2% {st['dump2']}"
+    )
+    wp = f"{st['win_pct']:.1f}%" if st["win_pct"] is not None else "—"
+    print(
+        f"  30m 收盤空損益 平均 {fmt_pct(st['pnl30_avg'])}  中位 {fmt_pct(st['pnl30_med'])}  "
+        f"空賺 {st['win']}/{st['n']}（{wp}）"
+    )
+    if st["by_day"]:
+        print("  按日：")
+        for d in st["by_day"]:
+            print(
+                f"    {d['day']}  {d['n']:>4} 筆  砸≥1% {d['dump1']:>3}  "
+                f"30m低均 {fmt_pct(d['low30_avg'])}  空損益均 {fmt_pct(d['pnl30_avg'])}"
+            )
 
 
 def row_to_json(r: ScanRow) -> dict:
@@ -973,6 +1080,7 @@ def write_html_report(
     names = sorted({r.symbol for r in recent})
     like = orcl_like(recent)
     charts = charts or {}
+    st = summarize_rows(recent)
     by_sym: dict[str, list[ScanRow]] = {}
     for r in recent:
         by_sym.setdefault(r.symbol, []).append(r)
@@ -1041,7 +1149,11 @@ def write_html_report(
         )
 
     like_html = [
-        row_tr(r, f"#{i:02d}", href=f"#hit-{i:02d}")
+        row_tr(
+            r,
+            f"#{i:02d}",
+            href=f"#hit-{i:02d}" if f"{r.symbol}:{r.ts_ms}" in charts else None,
+        )
         for i, r in enumerate(like, 1)
     ]
     all_html = [
@@ -1051,8 +1163,22 @@ def write_html_report(
         )
         for r in ranked
     ]
-    cards = [like_card(i, r) for i, r in enumerate(like, 1)]
-    n_charts = sum(1 for r in like if f"{r.symbol}:{r.ts_ms}" in charts)
+    cards = [like_card(i, r) for i, r in enumerate(like, 1) if f"{r.symbol}:{r.ts_ms}" in charts]
+    n_charts = len(cards)
+    wp = f"{st['win_pct']:.1f}%" if st["win_pct"] is not None else "—"
+    dump1p = f"{st['dump1_pct']:.1f}%" if st["dump1_pct"] is not None else "—"
+    day_html = []
+    for drow in st["by_day"]:
+        day_html.append(
+            "<tr>"
+            f"<td>{escape(drow['day'])}</td>"
+            f"<td>{drow['n']}</td>"
+            f"<td>{drow['dump1']}</td>"
+            f"{pct_cell(drow['low30_avg'])}"
+            f"{pct_cell(drow['pnl30_avg'])}"
+            f"<td>{drow['win']}</td>"
+            "</tr>"
+        )
     sym_html = []
     for _w, sym, n, dump, last in sym_rows:
         x = "同根破25" if dump.hit.crossed_ma25 else "已在25下"
@@ -1106,16 +1232,20 @@ a{{color:#c9a227;text-decoration:none}}
 <body>
 <div class="wrap">
 <h1>{escape(title)}</h1>
-<p class="sub">單檔把規則、砸 ≥1% 的每一筆圖、以及當天全部 ORCL 形訊號都寫在裡面。急殺深度是訊號後 30 根最低點。不是進出場建議。</p>
+<p class="sub">回測：進場＝訊號收盤做空，看之後 30 分鐘收盤與最低。砸 ≥1% 最多嵌 {MAX_EMBED_CHARTS} 張圖。不是進出場建議。</p>
 <div class="chips">
   <div class="chip">掃 <b>{n_symbols}</b> 檔</div>
   <div class="chip">訊號 <b>{len(recent)}</b> 筆</div>
   <div class="chip">有訊號 <b>{len(names)}</b> 檔</div>
-  <div class="chip">之後砸 ≥1% <b>{len(like)}</b></div>
+  <div class="chip">砸 ≥1% <b>{len(like)}</b>（{dump1p}）</div>
+  <div class="chip">30m低均 <b>{fmt_pct(st['low30_avg'])}</b></div>
+  <div class="chip">空30m均 <b>{fmt_pct(st['pnl30_avg'])}</b></div>
+  <div class="chip">空勝率 <b>{wp}</b></div>
   <div class="chip">圖 <b>{n_charts}</b></div>
 </div>
 <nav class="toc">
   <a href="#rules">規則</a>
+  <a href="#bt">按日</a>
   <a href="#dump">砸 ≥1%（{len(like)}）</a>
   <a href="#all">全部 {len(ranked)} 筆</a>
   <a href="#syms">{len(sym_rows)} 檔</a>
@@ -1130,8 +1260,17 @@ a{{color:#c9a227;text-decoration:none}}
   <li>收盤在 K 棒下緣（位置 ≤ 0.25，ORCL 收在最低）</li>
   <li>收盤已離 4h 高 ≥ <b>0.25%</b>（ORCL 約 −0.35%）</li>
 </ol>
-<p class="note">漏斗：同根死亡交叉且破 MA25 約 1070 → 壓成 ORCL 形 {len(recent)} → 之後 30 分鐘砸過 1% 剩 {len(like)}。金點線是 4 小時高，紅虛線是訊號根。</p>
-<h2 id="dump">之後砸 ≥1%（全部 {len(like)} 筆{f'，{n_charts} 張圖' if n_charts else ''}）</h2>
+<p class="note">空損益 = −（訊號後 30 分鐘收盤漲跌）。30m 最低是這段最深不利（對空是有利）。砸 ≥2% {st['dump2']} 筆、≥0.5% {st['dump05']} 筆。金點線是 4 小時高，紅虛線是訊號根。</p>
+<h2 id="bt">按日</h2>
+<div class="scroll">
+<table>
+<thead><tr><th>台北日</th><th>筆數</th><th>砸≥1%</th><th>30m低均</th><th>空30m均</th><th>空賺筆數</th></tr></thead>
+<tbody>
+{"".join(day_html) or "<tr><td colspan='6' class='muted'>沒有訊號</td></tr>"}
+</tbody>
+</table>
+</div>
+<h2 id="dump">之後砸 ≥1%（全部 {len(like)} 筆{f'，圖 {n_charts}' if n_charts else ''}）</h2>
 <div class="scroll">
 <table>
 <thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th>離高</th><th>連陰</th><th>收位</th><th></th></tr></thead>
@@ -1192,6 +1331,7 @@ a{{color:#c9a227;text-decoration:none}}
         "all": [row_to_json(r) for r in ranked],
         "top": [row_to_json(r) for r in ranked],
         "like": [row_to_json(r) for r in like],
+        "stats": st,
         "by_symbol": [
             {
                 "symbol": sym,
@@ -1240,9 +1380,13 @@ def load_symbol_list(args) -> tuple[list[str], dict[str, float]]:
 
 
 def scan_window_label(args) -> tuple[int, int, str]:
-    start, end = cutoff_ms(day=args.date, hours=args.hours)
+    start, end = cutoff_ms(day=args.date, hours=args.hours, days=getattr(args, "days", None))
     if args.date:
         return start, end, f"台北 {args.date}"
+    if getattr(args, "days", None):
+        a = datetime.fromtimestamp(start / 1000, TZ).strftime("%m-%d %H:%M")
+        b = datetime.fromtimestamp((end - 1) / 1000, TZ).strftime("%m-%d %H:%M")
+        return start, end, f"近 {args.days} 天（{a} → {b} 台北）"
     return start, end, f"近 {args.hours}h"
 
 
@@ -1259,16 +1403,18 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
             f"掃 {len(symbols)} 檔 1m　{label}　min_lead={args.min_lead}　{extra}",
             flush=True,
         )
+        span_h = (end - start) / 3_600_000
         html_path = args.html
         if args.pages:
-            html_path = html_path or str(PAGES_HTML)
+            html_path = html_path or str(PAGES_WEEK if span_h >= 36 else PAGES_HTML)
         want_charts = bool(html_path) and not args.no_charts
+        keep_bars = want_charts and span_h < 36
         rows, bars = scan_universe(
             symbols,
             limit=args.limit,
             workers=args.workers,
             vols=vols,
-            keep_bars=want_charts,
+            keep_bars=keep_bars,
             start_ms=start - (detect_kw["high_lookback"] + 25) * 60_000,
             end_ms=end + 40 * 60_000,
             **detect_kw,
@@ -1300,7 +1446,7 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
             end_ms=end + 40 * 60_000,
             **detect_kw,
         )
-        print_scan(sym, d, hits, hours=args.hours, day=args.date)
+        print_scan(sym, d, hits, hours=args.hours, day=args.date, days=getattr(args, "days", None))
     return 0
 
 
@@ -1328,7 +1474,8 @@ def build_parser():
     p.add_argument("--loose", action="store_true", help="關掉 ORCL 形，只留 4h 新高+同根死亡交叉")
     p.add_argument("--no-4h-high", action="store_true", help="關掉四小時新高條件")
     p.add_argument("--scan", action="store_true", help="印出歷史訊號後結束")
-    p.add_argument("--hours", type=int, default=24, help="沒指定 --date 時，回看小時數")
+    p.add_argument("--hours", type=int, default=24, help="沒指定 --date / --days 時，回看小時數")
+    p.add_argument("--days", type=int, default=None, help="回測近 N 天（例如 7），台北時間往回算")
     p.add_argument("--date", default=None, help="台北日 YYYY-MM-DD，只看這一天")
     p.add_argument("--top", type=int, default=40, help="市場掃描列出急殺最深幾筆")
     p.add_argument("--html", default=None, help="寫入 HTML 報告路徑")

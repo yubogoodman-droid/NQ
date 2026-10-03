@@ -131,10 +131,10 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 `--loose` 關掉形狀條件，只留 4h 新高 + 同根。`--no-same-bar-ma25` / `--no-4h-high` 再往下鬆。
 
 ```bash
+python3 examples/watch_orcl_death_cross.py --all --scan --days 7 --pages
 python3 examples/pycharm_orcl_watch.py
 python3 examples/watch_orcl_death_cross.py --all
 python3 examples/watch_orcl_death_cross.py --all --scan --date 2026-10-02 --pages
-python3 examples/watch_orcl_death_cross.py --scan
 python3 examples/test_orcl_death_cross.py
 ```
 

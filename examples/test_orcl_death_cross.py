@@ -28,6 +28,7 @@ from watch_orcl_death_cross import (  # noqa: E402
     orcl_like,
     pct_move,
     sma,
+    summarize_rows,
     taipei_day,
     watch_args_from_pycharm,
     write_html_report,
@@ -167,6 +168,22 @@ def test_day_window() -> None:
     assert not in_window(end, start, end)
     s2, e2 = cutoff_ms(day="2026-10-02", hours=24)
     assert (s2, e2) == (start, end)
+    now = int(datetime(2026, 10, 3, 14, 0, tzinfo=timezone(timedelta(hours=8))).timestamp() * 1000)
+    s7, e7 = cutoff_ms(day=None, hours=24, days=7, now_ms=now)
+    assert e7 - s7 == 7 * 86_400_000 + 1
+
+
+def test_summarize_rows_short_pnl() -> None:
+    ts = int(datetime(2026, 10, 2, 22, 49, tzinfo=timezone(timedelta(hours=8))).timestamp() * 1000)
+    hit = ShortHit(i=10, close=1, m7=1, m14=1, m25=1, lead=22, crossed_ma25=True)
+    a = ScanRow("A", ts, hit, -1, -2, -1.5, -2.5, 0)
+    b = ScanRow("B", ts, hit, 0.5, 1.0, -0.2, -0.3, 0)
+    st = summarize_rows([a, b])
+    assert st["n"] == 2
+    assert abs(st["pnl30_avg"] - 0.5) < 1e-9  # -(-2) and -(+1) → +2 and -1 → avg 0.5
+    assert st["win"] == 1
+    assert st["dump1"] == 1
+    assert st["by_day"][0]["day"] == "2026-10-02"
 
 
 def test_forward_moves_dump() -> None:
@@ -205,9 +222,11 @@ def test_write_html_report(tmp_path=None) -> None:
         assert "ORCLUSDT" in html
         assert "22:49" in html
         assert "規則" in html
-        assert "死亡交叉" in html
+        assert "空30m均" in html
         payload = json.loads((out.parent / "hits.json").read_text())
         assert payload["count"] == 1
+        assert payload["stats"]["n"] == 1
+        assert payload["stats"]["dump1"] == 1
         assert payload["top"][0]["symbol"] == "ORCLUSDT"
         assert payload["all"][0]["symbol"] == "ORCLUSDT"
         assert payload["orcl_like"] == 1
@@ -470,6 +489,7 @@ def main() -> int:
     test_dump_like_screenshot()
     test_filter_universe_keeps_orcl_drops_index()
     test_day_window()
+    test_summarize_rows_short_pnl()
     test_forward_moves_dump()
     test_write_html_report()
     test_write_html_report_keeps_all_hits()
