@@ -252,6 +252,18 @@ def test_rows_from_symbols_and_watch() -> None:
     assert "2330" in {r["code"] for r in uni}
 
 
+def test_default_universe_is_top200_without_backfill() -> None:
+    from tw_1h_stack_ma240 import build_parser
+
+    args = build_parser().parse_args([])
+    assert args.limit == 200
+    assert args.pool == 200
+    assert args.max_price == 1000
+    # 只抓前 200，濾掉 1000 元以上後不會再向後補。
+    take = 0 if args.limit <= 0 else max(args.limit, args.pool if args.max_price else args.limit)
+    assert take == 200
+
+
 def test_resolve_symbols_defaults_to_universe() -> None:
     from argparse import Namespace
     from tw_1h_stack_ma240 import resolve_symbols
@@ -278,6 +290,7 @@ def main() -> int:
         test_hit_key_stable,
         test_fill_fwd_uses_next_sessions,
         test_rows_from_symbols_and_watch,
+        test_default_universe_is_top200_without_backfill,
         test_resolve_symbols_defaults_to_universe,
     ]
     failed = 0

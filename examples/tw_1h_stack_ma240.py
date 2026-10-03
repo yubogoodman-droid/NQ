@@ -8,7 +8,7 @@
 
 已經站在 MA240 上面、只是短均才排好的不算。
 貼線雜訊（例如收盤只比 MA240 高 0.01、不到 1 檔）不算站上。
-預設掃成交額前 200、股價 < 1000，並固定把 3035 智原放進池子。
+預設只掃成交額前 200，股價達 1000 的剔除、不往後遞補，並固定把 3035 智原放進池子。
 `--symbols 3035` 只盯智原。每根小時 K 收盤後掃一次；GitHub Actions 在盤中整點代跑。
 
     python3 examples/tw_1h_stack_ma240.py --test
@@ -769,6 +769,7 @@ def load_universe(
         ymd = date or last_tw_session_yyyymmdd()
         return rows, ymd
     ymd = resolve_twse_date(date or last_tw_session_yyyymmdd())
+    # pool 預設等於 limit：只看成交額前 N，1000 元以上剔除後不從第 N+1 名遞補。
     take = 0 if limit <= 0 else max(limit, pool if max_price else limit)
     raw = fetch_top_turnover(ymd, take)
     helper_cap = None if max_price is None or max_price <= 0 else float(max_price) - 1e-9
@@ -1090,7 +1091,7 @@ def cmd_scan(args) -> int:
 def add_common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--date", default="", help="YYYYMMDD，成交額排名基準日")
     p.add_argument("--limit", type=int, default=200, help="成交額前 N；0 = 不限")
-    p.add_argument("--pool", type=int, default=400, help="先取成交額前 N 再套股價過濾")
+    p.add_argument("--pool", type=int, default=200, help="成交額先取前 N 再濾股價；預設等於 --limit，不往後遞補")
     p.add_argument("--max-price", type=float, default=1000, help="股價達此值以上剔除；0 不過濾")
     p.add_argument("--range", dest="range_", default="6mo", help="Yahoo 1h 下載區間（MA240 需要約 3 個月以上）")
     p.add_argument("--workers", type=int, default=4)
