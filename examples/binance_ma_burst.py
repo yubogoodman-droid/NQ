@@ -164,6 +164,7 @@ def scan_since(symbols: list[str], since_ms: int, limit: int = 500) -> list[dict
             hit["time"] = ts
             hit["after_1h"] = path_after(d, hit["i"], 4)
             hit["after_4h"] = path_after(d, hit["i"], 16)
+            hit["d"] = d
             found.append(hit)
         return found
 
@@ -214,6 +215,75 @@ def fmt_row(row: dict) -> str:
     )
 
 
+def draw_burst(row: dict, path: str) -> str:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+
+    plt.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei", "Droid Sans Fallback", "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+    d = row["d"]
+    i = row["i"]
+    a0 = max(0, i - 48)
+    a1 = min(len(d["c"]), i + 17)
+    sl = slice(a0, a1)
+    xs = np.arange(a1 - a0)
+    o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
+    fig, (ax, axv) = plt.subplots(
+        2, 1, figsize=(10.4, 5.6), sharex=True, gridspec_kw={"height_ratios": [3.2, 1]}, facecolor="#0c1210"
+    )
+    for a in (ax, axv):
+        a.set_facecolor("#101814")
+        a.tick_params(colors="#8aa193", labelsize=8)
+        for sp in a.spines.values():
+            sp.set_color("#2a3a33")
+    for k in range(len(c)):
+        up = c[k] >= o[k]
+        col = "#3dba7a" if up else "#e35d5d"
+        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.7)
+        y0, y1 = min(o[k], c[k]), max(o[k], c[k])
+        if y1 == y0:
+            y1 = y0 + max(h[k] - l[k], c[k] * 1e-6) * 0.02
+        ax.add_patch(Rectangle((xs[k] - 0.32, y0), 0.64, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
+        axv.bar(xs[k], v[k], width=0.72, color="#3dba7a99" if up else "#e35d5d99", linewidth=0)
+    pal = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
+    full = {n: sma(d["c"], n) for n in MA_PERIODS}
+    for n, col in pal.items():
+        ax.plot(xs, full[n][sl], color=col, lw=1.05, label=f"MA{n}")
+    x = i - a0
+    ax.axvline(x, color="#f0c14a", ls="--", lw=0.9)
+    ax.scatter([x], [c[x]], s=28, color="#f0c14a", zorder=5)
+    ts = datetime.fromtimestamp(row["time"] / 1000, TZ).strftime("%m-%d %H:%M")
+    a1r, a4 = row.get("after_1h"), row.get("after_4h")
+    ax.set_title(
+        f"{row['symbol']}  15m  {ts}    實體 {row['body'] * 100:+.1f}%    量 {row['vol_ratio']:.1f}×前一根\n"
+        f"之後 1h {fmt_span(a1r, 4)}    4h {fmt_span(a4, 16)}",
+        color="#e8f0ea",
+        fontsize=11,
+        loc="left",
+    )
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    fig.tight_layout(pad=0.45)
+    fig.savefig(path, dpi=120, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return path
+
+
+def write_charts(rows: list[dict], directory: str) -> list[str]:
+    from pathlib import Path
+
+    out = Path(directory)
+    out.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for n, row in enumerate(rows, start=1):
+        ts = datetime.fromtimestamp(row["time"] / 1000, TZ).strftime("%m%d_%H%M")
+        path = out / f"{n:02d}_{row['symbol']}_{ts}.png"
+        paths.append(draw_burst(row, str(path)))
+    return paths
+
+
 def fmt_hit(sym: str, d: dict, hit: dict) -> str:
     ts = datetime.fromtimestamp(int(d["t"][hit["i"]]) / 1000, TZ).strftime("%Y-%m-%d %H:%M")
     mas = "  ".join(f"MA{n} {hit['mas'][n]:.6g}" for n in MA_PERIODS)
@@ -242,6 +312,7 @@ def main() -> int:
     p.add_argument("--symbol", default="AINUSDT", help="永續代號，例如 AINUSDT")
     p.add_argument("--limit", type=int, default=1500, help="單幣往回看幾根 15 分 K，最多 1500")
     p.add_argument("--days", type=float, default=0, help="掃成交額夠的永續，只留最近幾天的訊號")
+    p.add_argument("--charts", default="", help="把訊號圖存到這個資料夾")
     args = p.parse_args()
     if args.days > 0:
         since = datetime.now(TZ) - timedelta(days=args.days)
@@ -257,6 +328,9 @@ def main() -> int:
             return 0
         for row in rows:
             print(fmt_row(row))
+        if args.charts:
+            paths = write_charts(rows, args.charts)
+            print(f"\n圖 {len(paths)} 張 → {args.charts}")
         return 0
     sym = args.symbol.upper()
     lines = check_symbol(sym, limit=args.limit)

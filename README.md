@@ -111,7 +111,7 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```bash
 python3 examples/test_binance_ma_burst.py
 python3 examples/binance_ma_burst.py --symbol AINUSDT
-python3 examples/binance_ma_burst.py --days 2
+python3 examples/binance_ma_burst.py --days 3 --charts output/ma_burst_3d
 ```
 
 AINUSDT 永續、2026-08-02 → 10-04：**2026-10-03 22:00**（台北）。開 0.02322、收 0.02474（+6.55%），六條當時在 0.02332–0.02372。SANDUSDT 那張圖抓在 **2026-10-01 23:45**：開 0.04276、收 0.04404，量是前一根的 11.6 倍。10/2 15:00 那根 +12.6% 的量大陽開盤時已經在六條上面。
