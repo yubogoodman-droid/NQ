@@ -101,6 +101,17 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## 幣安 15 分 K：爆量一根穿六條均線
+
+跟上面的 1 分鐘黏帶不是同一件事。15 分圖上，MA7 / 14 / 25 / 99 / 120 / 200 若還擠在一起，一根陽線可以全部穿過去：開盤在每一條之下，收盤在每一條之上，而且量至少是前 20 根的 5 倍。已經站上六條之後的大陽不再算突破。
+
+```bash
+python3 examples/test_binance_ma_burst.py
+python3 examples/binance_ma_burst.py --symbol AINUSDT
+```
+
+AINUSDT 永續、2026-08-02 → 10-04：只有 **2026-10-03 22:00**（台北）這根。開 0.02322、收 0.02474（+6.55%），量是前 20 根的 30.5 倍，收盤同時站上六條。22:15、22:45 那些 +20% 大陽開盤時已經在均線上面，是後面的延伸。
+
 ## 快速開始
 
 ```bash
