@@ -341,7 +341,7 @@ def get_json(path: str, params=None, retries: int = 5):
             r = SESSION.get(BASE + path, params=params, timeout=20)
             if r.status_code == 429:
                 last = RuntimeError(f"HTTP 429 {path}")
-                time.sleep(1.3 * (i + 1))
+                time.sleep(1.8 * (i + 1))
                 continue
             r.raise_for_status()
             return r.json()
@@ -662,23 +662,29 @@ def charts_for_like(
     max_charts: int = MAX_EMBED_CHARTS,
 ) -> dict[str, str]:
     out: dict[str, str] = {}
-    for r in like[: max(0, max_charts)]:
+    for n, r in enumerate(like[: max(0, max_charts)], 1):
         hit = r.hit
         d = bars.get(r.symbol)
-        if d is None or not np.any(d["t"] == r.ts_ms):
-            d = fetch_klines(r.symbol, start_ms=r.ts_ms - 90 * 60_000, end_ms=r.ts_ms + 45 * 60_000)
-            if not d:
-                continue
-            idxs = np.where(d["t"] == r.ts_ms)[0]
-            if len(idxs) == 0:
-                continue
-            i = int(idxs[0])
-            peak_i = hit.peak_i
-            if hit.bars_after_high is not None:
-                cand = i - int(hit.bars_after_high)
-                peak_i = cand if 0 <= cand < len(d["t"]) else None
-            hit = replace(hit, i=i, peak_i=peak_i)
-        uri = chart_data_uri(r.symbol, d, hit)
+        try:
+            if d is None or not np.any(d["t"] == r.ts_ms):
+                if n > 1:
+                    time.sleep(0.25)
+                d = fetch_klines(r.symbol, start_ms=r.ts_ms - 90 * 60_000, end_ms=r.ts_ms + 45 * 60_000)
+                if not d:
+                    continue
+                idxs = np.where(d["t"] == r.ts_ms)[0]
+                if len(idxs) == 0:
+                    continue
+                i = int(idxs[0])
+                peak_i = hit.peak_i
+                if hit.bars_after_high is not None:
+                    cand = i - int(hit.bars_after_high)
+                    peak_i = cand if 0 <= cand < len(d["t"]) else None
+                hit = replace(hit, i=i, peak_i=peak_i)
+            uri = chart_data_uri(r.symbol, d, hit)
+        except Exception as e:
+            print("chart-err", r.symbol, e, flush=True)
+            continue
         if uri:
             out[f"{r.symbol}:{r.ts_ms}"] = uri
     return out
