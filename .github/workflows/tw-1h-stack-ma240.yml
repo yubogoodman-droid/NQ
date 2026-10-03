@@ -42,4 +42,4 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           mkdir -p output
-          python3 examples/tw_1h_stack_ma240.py alert --once --lookback-bars 2
+          python3 examples/tw_1h_stack_ma240.py alert --once --lookback-bars 2 --symbols 3035

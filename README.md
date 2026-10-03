@@ -88,7 +88,11 @@ python3 examples/test_tw_1h_reclaim.py
 
 對齊 3035 智原小時 K：收盤同時 **MA5 > MA10 > MA20**，且 **站上 MA240**。上一根還沒同時滿足、這一根才成立才推 Telegram；已經排好且一直站在上面的不會每根都發。
 
-池子跟破底翻一樣（成交額前 200、股價 < 1000），並固定把智原放進池子。GitHub Actions 在台北 10:03 / 11:03 / 12:03 / 13:03 / 13:33 代跑。
+預設只盯智原。GitHub Actions 在台北 10:03 / 11:03 / 12:03 / 13:03 / 13:33 代跑。加 `--universe` 才掃成交額前 200。
+
+Yahoo 1h、近 30 日智原 **4 筆**：+1d 全贏、平均 **+3.73%**；+3d 平均 **+9.09%**（3 筆）。9/17 剛站上 MA240（+0.5%），9/24 與 10/01 是短均再排好（當時已高出 MA240 約 16–18%）。截圖那種 5/10/20 貼在一起、價在 240 之上，對應 9/24 11:00。
+
+圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-30d/view.html
 
 ```bash
 # 單元測試（不打網路）
@@ -98,7 +102,7 @@ python3 examples/test_tw_1h_stack_ma240.py
 python3 examples/tw_1h_stack_ma240.py --test
 
 # 智原現在有沒有多頭排列且站上 MA240
-python3 examples/tw_1h_stack_ma240.py --symbols 3035 --now --dry-run
+python3 examples/tw_1h_stack_ma240.py --now --dry-run
 
 # 只掃剛收盤的 1～2 根（盤後 / Actions）
 python3 examples/tw_1h_stack_ma240.py --dry-run --once
@@ -107,8 +111,11 @@ python3 examples/tw_1h_stack_ma240.py --once
 # 等到下一根小時 K 收盤再掃
 python3 examples/tw_1h_stack_ma240.py
 
-# 近一個月回測 + 手機版 HTML
+# 智原近一個月訊號圖
 python3 examples/tw_1h_stack_ma240.py scan --days 30 --pages
+
+# 成交額前 200 現況（筆數會很多，只宜看名單）
+python3 examples/tw_1h_stack_ma240.py --universe --now --dry-run --no-chart
 ```
 
 ## 幣安黏帶三幕 Telegram

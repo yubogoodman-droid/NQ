@@ -7,7 +7,7 @@
 上一根還沒同時滿足、這一根才成立才推播（短均剛排好、或剛站上 MA240 都算）。
 已經排好且一直站在 MA240 上面的，不會每根都發。
 
-預設掃成交額前 200、股價 < 1000，並固定把 3035 智原放進池子。
+預設只盯 3035 智原。加 `--universe` 才掃成交額前 200（股價 < 1000，仍固定含智原）。
 每根小時 K 收盤後掃一次；GitHub Actions 在盤中整點代跑。
 
     python3 examples/tw_1h_stack_ma240.py --test
@@ -15,8 +15,9 @@
     python3 examples/tw_1h_stack_ma240.py --once
     python3 examples/tw_1h_stack_ma240.py              # 等到下一根 1h 收盤再掃
     python3 examples/tw_1h_stack_ma240.py --now        # 現在已站上的名單（含智原）
-    python3 examples/tw_1h_stack_ma240.py --symbols 3035 --now
+    python3 examples/tw_1h_stack_ma240.py --now
     python3 examples/tw_1h_stack_ma240.py scan --days 30 --pages
+    python3 examples/tw_1h_stack_ma240.py --universe --now   # 成交額前 200 現況
 """
 
 from __future__ import annotations
@@ -584,6 +585,12 @@ def write_html(path: Path, hits: List[Hit], universe: List[dict], period: str, d
             "</article>"
         )
     cutoff = universe[-1].get("amount", 0) / 1e8 if universe else 0
+    symbols_only = all((r.get("amount") or 0) == 0 for r in universe) if universe else False
+    pool_txt = (
+        f"{len(universe)} 檔"
+        if symbols_only
+        else f"{len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億"
+    )
     avg1 = _fmt_fwd(stats["fwd_1d"])
     avg3 = _fmt_fwd(stats["fwd_3d"])
     html = f"""<!DOCTYPE html>
@@ -611,7 +618,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <div class="page">
 <section class="summary">
 <h1>台股 1h · MA5&gt;MA10&gt;MA20 且站上 MA240</h1>
-<p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
+<p class="muted">{escape(period)} · 基準日 {escape(date)} · {escape(pool_txt)}
 <br/>智原型小時 K：MA5&gt;MA10&gt;MA20，且收盤站上 MA240。上一根還沒同時滿足、這一根才成立才算訊號。
 卡片右上是訊號後下一個交易日收盤報酬（還沒走完就顯示站上 MA240 幅度）。</p>
 <div class="cards">
@@ -672,6 +679,14 @@ def ensure_watch(universe: List[dict], codes: Sequence[str] = WATCH_CODES) -> Li
     have = {r["code"] for r in universe}
     extra = [row_from_code(code) for code in codes if code not in have]
     return extra + list(universe)
+
+
+def resolve_symbols(args) -> str:
+    """Alert/scan 預設智原；--universe 改成交額池；--symbols 可另指定。"""
+    if getattr(args, "universe", False):
+        return ""
+    text = (getattr(args, "symbols", "") or "").strip()
+    return text or "3035"
 
 
 def load_universe(
@@ -882,15 +897,16 @@ def run_scan_round(
             dry_run = True
 
     price_cap = None if args.max_price is None or args.max_price <= 0 else float(args.max_price)
+    symbols = resolve_symbols(args)
     universe, date = load_universe(
-        args.limit, args.pool, price_cap, args.date, getattr(args, "symbols", "") or ""
+        args.limit, args.pool, price_cap, args.date, symbols
     )
     if not universe:
         print("no universe", file=sys.stderr)
         return 1
     print(
         f"universe date={date} n={len(universe)} range={args.range_} "
-        f"lookback_bars={lookback_bars} now_only={now_only} symbols={getattr(args, 'symbols', '') or '-'}",
+        f"lookback_bars={lookback_bars} now_only={now_only} symbols={symbols or '-'}",
         flush=True,
     )
     t0 = time.time()
@@ -940,7 +956,7 @@ def run_scan_round(
             "range": args.range_,
             "limit": args.limit,
             "max_price": args.max_price,
-            "symbols": getattr(args, "symbols", "") or "",
+            "symbols": symbols,
             "generated": datetime.now(TPE).isoformat(timespec="seconds"),
         }
         dump_hits_json(html_path.with_name("hits.json"), hits, summarize_fwd(hits), extra)
@@ -1005,7 +1021,8 @@ def add_common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--pages", action="store_true")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--no-chart", action="store_true")
-    p.add_argument("--symbols", default="", help="只掃這些代號，逗號分隔，例如 3035；空=成交額池+智原")
+    p.add_argument("--symbols", default="", help="只掃這些代號，逗號分隔；預設 3035 智原")
+    p.add_argument("--universe", action="store_true", help="改掃成交額前 N（仍固定含智原）")
 
 
 def build_parser() -> argparse.ArgumentParser:
