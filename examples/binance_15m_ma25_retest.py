@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""幣安 15 分 K：破底 → 收盤站上 MA25 就做多。
+"""幣安 15 分 K：破底 → 收盤站上圖上六條均線就做多。
 
-圖上的均線：MA7、MA14、MA25、MA99、MA120、MA200。
+圖上的均線跟那張 NB 圖一樣：MA7、MA14、MA25、MA99、MA120、MA200。
 
 進場
   1. 破底：最低價跌破前 32 根，而且收盤同時低於這六條。
-  2. 站上就進：48 根內，低點不再創新低之後，第一根收盤站上 MA25，
-     就以該收盤做多。不等回測，也不要求同時站上另外五條。
+  2. 站上就進：48 根內，低點不再創新低之後，第一根陽線收盤站上這六條，
+     而且 MA7 > MA14 > MA25。以該收盤做多。不等回測。
 
 出場（這次沒指定，回測用）
   停損＝進場那根的低點。目標＝2R。32 根（8 小時）都沒碰到就用收盤時間停。
@@ -125,6 +125,14 @@ def _under_all(c: np.ndarray, mas: dict[int, np.ndarray], i: int) -> bool:
     return all(c[i] < mas[n][i] for n in mas)
 
 
+def _above_all(c: np.ndarray, mas: dict[int, np.ndarray], i: int) -> bool:
+    return all(c[i] > mas[n][i] for n in mas)
+
+
+def _fan(mas: dict[int, np.ndarray], i: int) -> bool:
+    return mas[7][i] > mas[14][i] > mas[25][i]
+
+
 def detect_trades(
     o: np.ndarray,
     h: np.ndarray,
@@ -152,13 +160,22 @@ def detect_trades(
         trough_low = float(l[i])
         entry_i = None
         j = i + 1
-        j_end = min(n, i + 1 + p.reclaim_window)
-        while j < j_end:
+        # 計時從最低點起算。NB 那張是先磨出低點，過幾小時才站上六條。
+        while j < n:
             if l[j] < trough_low:
                 trough_low = float(l[j])
                 trough_i = j
-            if j > trough_i and _ready(mas, j) and c[j] > ma[j]:
+            if (
+                j > trough_i
+                and _ready(mas, j)
+                and c[j] > o[j]
+                and _above_all(c, mas, j)
+                and _fan(mas, j)
+            ):
                 entry_i = j
+                break
+            if j >= trough_i + p.reclaim_window:
+                j += 1
                 break
             j += 1
         if entry_i is None:
@@ -271,8 +288,9 @@ def _scale(values: np.ndarray, lo: float, span: float) -> list[int | None]:
 def chart_payload(bars: dict, trade: Trade, times: list[int], number: int) -> dict:
     """給網頁畫圖用的精簡 K 線。價格壓成 0–1000，一頁再組成 JSON。"""
     o, h, l, c = bars["o"], bars["h"], bars["l"], bars["c"]
-    a0 = max(0, trade.trough_i - 16)
-    a1 = min(len(c), trade.exit_i + 6)
+    # 低點前一段，再加上站上之後的直拉，視窗才會像那張 NB 圖。
+    a0 = max(0, trade.trough_i - 36)
+    a1 = min(len(c), max(trade.exit_i + 6, trade.entry_i + 28))
     sl = slice(a0, a1)
     mas = _mas_cached(c)
     stack = [h[sl], l[sl], np.array([trade.stop, trade.target], dtype=float)]
@@ -287,6 +305,17 @@ def chart_payload(bars: dict, trade: Trade, times: list[int], number: int) -> di
 
     def q_px(px: float) -> int:
         return int(round((px - lo) / span * 1000))
+
+    vol = bars.get("v")
+    if vol is None:
+        v_scaled: list[int] = []
+    else:
+        chunk = np.asarray(vol[sl], dtype=float)
+        peak = float(np.nanmax(chunk)) if len(chunk) else 0.0
+        if peak <= 0:
+            v_scaled = [0] * len(chunk)
+        else:
+            v_scaled = [int(round(float(x) / peak * 100)) for x in chunk]
 
     return {
         "n": number,
@@ -303,6 +332,8 @@ def chart_payload(bars: dict, trade: Trade, times: list[int], number: int) -> di
         "target": fmt_px(trade.target),
         "exit": fmt_px(trade.exit),
         "trough": fmt_px(trade.trough_low),
+        "ylo": fmt_px(lo),
+        "yhi": fmt_px(hi),
         "stopQ": q_px(trade.stop),
         "targetQ": q_px(trade.target),
         "marks": [trade.trough_i - a0, trade.entry_i - a0, trade.exit_i - a0],
@@ -316,6 +347,7 @@ def chart_payload(bars: dict, trade: Trade, times: list[int], number: int) -> di
         "m99": _scale(mas[99][sl], lo, span),
         "m120": _scale(mas[120][sl], lo, span),
         "m200": _scale(mas[200][sl], lo, span),
+        "v": v_scaled,
     }
 
 
@@ -357,7 +389,7 @@ def write_html(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>幣安 15 分 站上 MA25 就進場</title>
+<title>幣安 15 分 站上六條就進場</title>
 <style>
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -374,7 +406,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 .tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#c9d1d9}}
 .tag-info{{color:#79c0ff}}
 .trade-detail{{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap;margin:0}}
-.mini-chart canvas{{width:100%;height:260px;display:block;border-radius:10px;margin-top:8px;background:#101814}}
+.mini-chart canvas{{width:100%;height:340px;display:block;border-radius:10px;margin-top:8px;background:#fff}}
 .pager{{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}}
 .pager button{{background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:6px 8px;font-size:12px}}
 .pager button.on{{border-color:#79c0ff;color:#79c0ff}}
@@ -382,12 +414,12 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安 15 分 · 破底後站上 MA25 就進場</h1>
+<h1>幣安 15 分 · 破底後站上六條，圖照 NB 那張</h1>
 <p class="muted">{escape(meta['period'])} · 掃描 {meta['symbols']} 檔 U 本位永續（24h 成交額 ≥ 500 萬 USDT）· 進場 {meta['entries']} 筆
-<br/>均線仍畫 NB 圖上那六條：MA7、MA14、MA25、MA99、MA120、MA200。破底＝收盤同時低於這六條，且低點跌破前 32 根。48 根內，低點不再創新低之後，第一根收盤站上 MA25 就做多。不等回測。
+<br/>均線顏色和那張 NB 圖一樣：MA7 黃、MA14 青、MA25 粉、MA99 紫、MA120 綠、MA200 玫紅。破底＝收盤同時低於這六條，且低點跌破前 32 根。48 根內，低點不再創新低之後，第一根陽線收盤站上六條，且 MA7 &gt; MA14 &gt; MA25，就做多。不等回測。圖把低點前和站上後的直拉一起畫出來。
 <br/>出場：停損在進場那根低點，目標 2R，或 32 根時間停。停損距離 0.2%–4%。加總％是各筆報酬相加，不是組合複利。未平倉不計勝率，用最後一根收盤估。沒扣手續費與滑價。
-<br/>漏斗：破底 {funnel.get('break', 0)} → 站上 MA25 {funnel.get('reclaim', 0)} → 風險過濾掉 {funnel.get('risk_skip', 0)} → 成交 {funnel.get('trades', 0)}
-<br/>48 根內沒站上 MA25 {funnel.get('no_reclaim', 0)}
+<br/>漏斗：破底 {funnel.get('break', 0)} → 站上六條 {funnel.get('reclaim', 0)} → 風險過濾掉 {funnel.get('risk_skip', 0)} → 成交 {funnel.get('trades', 0)}
+<br/>48 根內沒站上六條 {funnel.get('no_reclaim', 0)}
 <br/>{reason_line}</p>
 <div class="cards">
 <div class="card">已平<b>{stats['count']}</b></div>
@@ -411,20 +443,34 @@ function cls(pnl) {{ return pnl > 0 ? "pnl-win" : (pnl === 0 ? "pnl-flat" : "pnl
 function esc(s) {{ return String(s).replace(/[&<>"']/g, (c) => ({{"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}}[c])); }}
 function draw(canvas, row) {{
   const w = canvas.clientWidth || 520;
-  const h = 260;
+  const h = 340;
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#101814";
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
   const n = row.c.length;
   if (!n) return;
-  const pad = 10;
-  const x = (i) => pad + (i + 0.5) * (w - pad * 2) / n;
-  const y = (v) => 22 + (1000 - v) / 1000 * (h - 36);
-  const cw = Math.max(1.2, (w - pad * 2) / n * 0.62);
-  const mas = [["m7","#f0c14a"],["m14","#ff8a4c"],["m25","#d28cff"],["m99","#5fd2c2"],["m120","#42a5f5"],["m200","#ffffff"]];
-  ctx.lineWidth = 1.1;
+  const left = 8;
+  const right = 58;
+  const top = 28;
+  const volH = 52;
+  const plotBottom = h - volH - 8;
+  const plotH = plotBottom - top;
+  const x = (i) => left + (i + 0.5) * (w - left - right) / n;
+  const y = (v) => top + (1000 - v) / 1000 * plotH;
+  const cw = Math.max(1.4, (w - left - right) / n * 0.62);
+  ctx.strokeStyle = "#f0f1f2";
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {{
+    const gy = top + plotH * g / 4;
+    ctx.beginPath();
+    ctx.moveTo(left, gy);
+    ctx.lineTo(w - right, gy);
+    ctx.stroke();
+  }}
+  const mas = [["m7","#f0b60d","MA7"],["m14","#5ac2db","MA14"],["m25","#ed40bc","MA25"],["m99","#8a65c4","MA99"],["m120","#41dc5a","MA120"],["m200","#a61a61","MA200"]];
+  ctx.lineWidth = 1.35;
   mas.forEach(([key, col]) => {{
     ctx.beginPath();
     ctx.strokeStyle = col;
@@ -436,50 +482,53 @@ function draw(canvas, row) {{
     }});
     ctx.stroke();
   }});
-  ctx.setLineDash([4, 3]);
-  [["#e35d5d", row.stopQ], ["#3dba7a", row.targetQ]].forEach(([col, v]) => {{
-    ctx.strokeStyle = col;
-    ctx.beginPath();
-    ctx.moveTo(pad, y(v));
-    ctx.lineTo(w - pad, y(v));
-    ctx.stroke();
-  }});
-  ctx.setLineDash([]);
   for (let i = 0; i < n; i++) {{
     const up = row.c[i] >= row.o[i];
-    ctx.strokeStyle = ctx.fillStyle = up ? "#3dba7a" : "#e35d5d";
+    ctx.strokeStyle = ctx.fillStyle = up ? "#2ebd85" : "#f6465d";
     ctx.beginPath();
     ctx.moveTo(x(i), y(row.h[i]));
     ctx.lineTo(x(i), y(row.l[i]));
     ctx.stroke();
-    const top = y(Math.max(row.o[i], row.c[i]));
-    const bot = y(Math.min(row.o[i], row.c[i]));
-    ctx.fillRect(x(i) - cw / 2, top, cw, Math.max(1, bot - top));
+    const topY = y(Math.max(row.o[i], row.c[i]));
+    const botY = y(Math.min(row.o[i], row.c[i]));
+    ctx.fillRect(x(i) - cw / 2, topY, cw, Math.max(1, botY - topY));
   }}
-  const labels = [["破底", "#8ab4ff", row.marks[0], row.l[row.marks[0]]], ["站上進", "#3dba7a", row.marks[1], row.c[row.marks[1]]], [row.reason, "#ff8a80", row.marks[2], row.c[row.marks[2]]]];
+  const labels = [["破底", "#1e2329", row.marks[0], row.l[row.marks[0]]], ["站上", "#0b8f5a", row.marks[1], row.c[row.marks[1]]], [row.reason, "#c43232", row.marks[2], row.c[row.marks[2]]]];
   ctx.font = "12px sans-serif";
   ctx.textAlign = "center";
   labels.forEach(([text, col, i, v]) => {{
     if (i < 0 || i >= n || v == null) return;
     ctx.fillStyle = col;
     ctx.beginPath();
-    ctx.arc(x(i), y(v), 3, 0, Math.PI * 2);
+    ctx.arc(x(i), y(v), 3.2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillText(text, x(i), y(v) - 8);
+    ctx.fillText(text, x(i), Math.max(14, y(v) - 8));
   }});
+  if (row.v && row.v.length === n) {{
+    row.v.forEach((v, i) => {{
+      const up = row.c[i] >= row.o[i];
+      ctx.fillStyle = up ? "rgba(46,189,133,0.85)" : "rgba(246,70,93,0.85)";
+      const bh = Math.max(1, (v / 100) * (volH - 10));
+      ctx.fillRect(x(i) - cw / 2, h - 6 - bh, cw, bh);
+    }});
+  }}
+  ctx.fillStyle = "#707a8a";
   ctx.font = "11px sans-serif";
   ctx.textAlign = "left";
-  mas.forEach(([key, col], i) => {{
+  ctx.fillText(row.yhi || "", w - right + 4, top + 10);
+  ctx.fillText(row.ylo || "", w - right + 4, plotBottom);
+  ctx.textAlign = "left";
+  mas.forEach(([key, col, name], i) => {{
     ctx.fillStyle = col;
-    ctx.fillText(key.slice(1).toUpperCase() === "7" ? "MA7" : "MA" + key.slice(1), 8 + i * 52, 14);
+    ctx.fillText(name, 8 + (i % 6) * 62, 16);
   }});
 }}
 function card(row) {{
-  return '<article class="trade-card"><header class="card-header"><div class="card-title"><span class="trade-no">#' + row.n + ' · ' + esc(row.symbol) + '</span><span class="trade-time">' + esc(row.et) + ' → ' + esc(row.xt) + '</span></div><div class="card-pnl ' + cls(row.pnl) + '">' + (row.pnl > 0 ? '+' : '') + row.pnl.toFixed(2) + '%</div></header><div class="tags"><span class="tag">' + esc(row.reason) + '</span><span class="tag tag-info">風險 ' + row.risk.toFixed(2) + '%</span><span class="tag tag-info">破底深 ' + row.depth.toFixed(2) + '%</span></div><pre class="trade-detail">破底 ' + esc(row.bt) + '  low ' + esc(row.trough) + '\\n站上 MA25 進場 ' + esc(row.entry) + '  停損 ' + esc(row.stop) + '  目標 ' + esc(row.target) + '\\n出場 ' + esc(row.exit) + '  ' + esc(row.reason) + '</pre><div class="mini-chart"><canvas id="c' + row.n + '"></canvas></div></article>';
+  return '<article class="trade-card"><header class="card-header"><div class="card-title"><span class="trade-no">#' + row.n + ' · ' + esc(row.symbol) + '</span><span class="trade-time">' + esc(row.et) + ' → ' + esc(row.xt) + '</span></div><div class="card-pnl ' + cls(row.pnl) + '">' + (row.pnl > 0 ? '+' : '') + row.pnl.toFixed(2) + '%</div></header><div class="tags"><span class="tag">' + esc(row.reason) + '</span><span class="tag tag-info">風險 ' + row.risk.toFixed(2) + '%</span><span class="tag tag-info">破底深 ' + row.depth.toFixed(2) + '%</span></div><pre class="trade-detail">破底 ' + esc(row.bt) + '  low ' + esc(row.trough) + '\\n站上六條進場 ' + esc(row.entry) + '  停損 ' + esc(row.stop) + '  目標 ' + esc(row.target) + '\\n出場 ' + esc(row.exit) + '  ' + esc(row.reason) + '</pre><div class="mini-chart"><canvas id="c' + row.n + '"></canvas></div></article>';
 }}
 async function load(i) {{
   if (!PAGES) {{
-    feed.innerHTML = '<div class="empty">這段沒有站上 MA25 進場的交易</div>';
+    feed.innerHTML = '<div class="empty">這段沒有站上六條的交易</div>';
     return;
   }}
   const res = await fetch(BASE + "data/p" + String(i).padStart(3, "0") + ".json");
@@ -603,6 +652,7 @@ def fetch_klines(session: requests.Session, symbol: str, start_ms: int, end_ms: 
         "h": np.array([float(x[2]) for x in rows]),
         "l": np.array([float(x[3]) for x in rows]),
         "c": np.array([float(x[4]) for x in rows]),
+        "v": np.array([float(x[5]) for x in rows]),
     }
 
 
@@ -716,12 +766,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     print("[reasons]", stats["by_reason"])
     write_html(path, rows, stats, funnel, meta)
-    if args.days == 7:
-        page_title = "一個禮拜 · 站上 MA25 就進場"
+    if args.days == 2:
+        page_title = "兩天 · 像 NB 那張圖"
+    elif args.days == 7:
+        page_title = "一個禮拜 · 像 NB 那張圖"
     elif args.days >= 28:
-        page_title = "一個月 · 站上 MA25 就進場"
+        page_title = "一個月 · 像 NB 那張圖"
     else:
-        page_title = f"{args.days} 天 · 站上 MA25 就進場"
+        page_title = f"{args.days} 天 · 像 NB 那張圖"
     preview = write_preview(path, page_title)
     print(f"[html] {path}")
     print(f"[web] {preview}")
@@ -737,7 +789,7 @@ def write_preview(index: Path, title: str = "站上 MA25 就進場") -> Path:
     )
     text = index.read_text(encoding="utf-8").replace('const BASE = "";', f'const BASE = "{base}";')
     text = text.replace(
-        "<title>幣安 15 分 站上 MA25 就進場</title>",
+        "<title>幣安 15 分 站上六條就進場</title>",
         f"<title>{title}</title>",
     )
     out = index.with_name("all.html")

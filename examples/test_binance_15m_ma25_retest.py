@@ -29,25 +29,27 @@ def _ohlc(closes: list[float], wick: float = 0.05) -> tuple[np.ndarray, np.ndarr
     return o, h, l, c
 
 
-def _stand_setup() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
-    """破底後盤整在 MA25 下，再用一根收盤站上 MA25、但仍低於 MA200。"""
-    closes = [100.0] * 210 + [90.0] + [92.0] * 20 + [96.0, 97.0, 99.0]
+def _picture_setup() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """破底後拉回，第一根陽線同時站上六條且 MA7 > MA14 > MA25。"""
+    closes = [100.0] * 210 + [88, 94, 98, 103, 108, 112, 116, 120, 124, 128]
     o, h, l, c = _ohlc(closes)
-    entry_i = 231
-    l[entry_i] = 95.0
-    h[entry_i] = 96.2
-    o[entry_i] = 92.2
+    entry_i = 215
+    l[entry_i] = 110.0
+    h[entry_i] = 112.4
     for j in range(entry_i + 1, len(c)):
-        l[j] = 95.4
-        h[j] = max(h[j], 99.2)
+        l[j] = max(l[j], 110.5)
+    h[entry_i + 1] = max(h[entry_i + 1], 116.4)
     return o, h, l, c, entry_i
 
 
-def test_close_above_ma25_is_the_entry() -> None:
-    o, h, l, c, entry_i = _stand_setup()
+def test_picture_reclaim_is_the_entry() -> None:
+    o, h, l, c, entry_i = _picture_setup()
     mas = _mas(c)
-    assert c[entry_i] > mas[25][entry_i]
-    assert c[entry_i] < mas[200][entry_i]
+    assert c[entry_i] > o[entry_i]
+    assert all(c[entry_i] > mas[n][entry_i] for n in mas)
+    assert mas[7][entry_i] > mas[14][entry_i] > mas[25][entry_i]
+    assert all(c[213] > mas[n][213] for n in mas)
+    assert not (mas[7][213] > mas[14][213] > mas[25][213])
     risk = (c[entry_i] - l[entry_i]) / c[entry_i]
     assert 0.002 <= risk <= 0.04
 
@@ -62,6 +64,17 @@ def test_close_above_ma25_is_the_entry() -> None:
     assert trade.pnl_pct > 0
     assert funnel["trades"] == 1
     assert funnel["reclaim"] == 1
+
+
+def test_ma25_cross_under_long_ma_is_not_entry() -> None:
+    closes = [100.0] * 210 + [90.0] + [92.0] * 20 + [96.0, 97.0, 99.0]
+    o, h, l, c = _ohlc(closes)
+    mas = _mas(c)
+    poke = 231
+    assert c[poke] > mas[25][poke]
+    assert c[poke] < mas[200][poke]
+    trades = detect_trades(o, h, l, c, Params())
+    assert trades == []
 
 
 def test_stays_under_ma25_has_no_trade() -> None:
@@ -82,7 +95,7 @@ def test_new_low_on_the_cross_bar_is_not_entry() -> None:
 
 
 def test_wide_stop_is_skipped() -> None:
-    o, h, l, c, entry_i = _stand_setup()
+    o, h, l, c, entry_i = _picture_setup()
     l[entry_i] = c[entry_i] * 0.90
     trades = detect_trades(o, h, l, c, Params())
     assert all(t.entry_i != entry_i for t in trades)
@@ -112,7 +125,7 @@ def test_summarize_splits_open_trades() -> None:
 
 
 def test_chart_payload_aligns_marks() -> None:
-    o, h, l, c, entry_i = _stand_setup()
+    o, h, l, c, entry_i = _picture_setup()
     trades = detect_trades(o, h, l, c, Params())
     assert trades
     trade = trades[0]
@@ -126,11 +139,13 @@ def test_chart_payload_aligns_marks() -> None:
     assert 0 <= trough_x < entry_x < n
     assert 0 <= exit_x < n
     assert payload["c"][entry_x] > payload["m25"][entry_x]
+    assert payload["c"][entry_x] > payload["m200"][entry_x]
+    assert n > entry_x + 3
     assert payload["symbol"] == "TESTUSDT"
 
 
 def test_min_entry_index_filters_warmup() -> None:
-    o, h, l, c, entry_i = _stand_setup()
+    o, h, l, c, entry_i = _picture_setup()
     early = detect_trades(o, h, l, c, Params(), min_entry_i=0)
     assert early
     assert early[0].entry_i == entry_i
@@ -139,7 +154,8 @@ def test_min_entry_index_filters_warmup() -> None:
 
 
 def main() -> int:
-    test_close_above_ma25_is_the_entry()
+    test_picture_reclaim_is_the_entry()
+    test_ma25_cross_under_long_ma_is_not_entry()
     test_stays_under_ma25_has_no_trade()
     test_new_low_on_the_cross_bar_is_not_entry()
     test_wide_stop_is_skipped()
