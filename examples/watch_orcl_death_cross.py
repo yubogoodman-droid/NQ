@@ -325,8 +325,43 @@ def get_json(path: str, params=None, retries: int = 5):
     raise last if last else RuntimeError(f"GET failed {path}")
 
 
-def fetch_klines(sym: str, limit: int = 400, *, drop_forming: bool = True) -> dict | None:
-    raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": "1m", "limit": limit})
+def fetch_klines(
+    sym: str,
+    limit: int = 400,
+    *,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+    drop_forming: bool = True,
+) -> dict | None:
+    raw: list = []
+    if start_ms is not None:
+        cursor = int(start_ms)
+        stop = int(end_ms) if end_ms is not None else int(time.time() * 1000)
+        while cursor < stop:
+            batch = get_json(
+                "/fapi/v1/klines",
+                params={
+                    "symbol": sym,
+                    "interval": "1m",
+                    "startTime": cursor,
+                    "endTime": stop,
+                    "limit": 1500,
+                },
+            )
+            if not batch:
+                break
+            raw.extend(batch)
+            nxt = int(batch[-1][0]) + 60_000
+            if nxt <= cursor or len(batch) < 1500:
+                break
+            cursor = nxt
+            if len(raw) >= 4000:
+                break
+    else:
+        params = {"symbol": sym, "interval": "1m", "limit": min(int(limit), 1500)}
+        if end_ms is not None:
+            params["endTime"] = int(end_ms)
+        raw = get_json("/fapi/v1/klines", params=params) or []
     if not raw or len(raw) < 30:
         return None
     now_ms = int(time.time() * 1000)
@@ -334,13 +369,26 @@ def fetch_klines(sym: str, limit: int = 400, *, drop_forming: bool = True) -> di
         raw = raw[:-1]
     if len(raw) < 30:
         return None
+    seen: set[int] = set()
+    t, o, h, l, c, v = [], [], [], [], [], []
+    for x in raw:
+        ts = int(x[0])
+        if ts in seen:
+            continue
+        seen.add(ts)
+        t.append(ts)
+        o.append(float(x[1]))
+        h.append(float(x[2]))
+        l.append(float(x[3]))
+        c.append(float(x[4]))
+        v.append(float(x[5]))
     return {
-        "t": np.array([int(x[0]) for x in raw], np.int64),
-        "o": np.array([float(x[1]) for x in raw]),
-        "h": np.array([float(x[2]) for x in raw]),
-        "l": np.array([float(x[3]) for x in raw]),
-        "c": np.array([float(x[4]) for x in raw]),
-        "v": np.array([float(x[5]) for x in raw]),
+        "t": np.array(t, np.int64),
+        "o": np.array(o),
+        "h": np.array(h),
+        "l": np.array(l),
+        "c": np.array(c),
+        "v": np.array(v),
     }
 
 
@@ -508,8 +556,15 @@ def detect_kw_from_args(args) -> dict:
     }
 
 
-def scan_symbol(sym: str, *, limit: int, **detect_kw) -> tuple[dict, list[ShortHit]]:
-    raw = fetch_klines(sym, limit=limit)
+def scan_symbol(
+    sym: str,
+    *,
+    limit: int,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+    **detect_kw,
+) -> tuple[dict, list[ShortHit]]:
+    raw = fetch_klines(sym, limit=limit, start_ms=start_ms, end_ms=end_ms)
     if raw is None:
         return {}, []
     d = with_ma(raw)
@@ -549,9 +604,11 @@ def scan_symbol_rows(
     *,
     limit: int,
     quote_vol: float = 0.0,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
     **detect_kw,
 ) -> tuple[dict, list[ScanRow]]:
-    d, hits = scan_symbol(sym, limit=limit, **detect_kw)
+    d, hits = scan_symbol(sym, limit=limit, start_ms=start_ms, end_ms=end_ms, **detect_kw)
     if not d:
         return {}, []
     return d, rows_from_hits(sym, d, hits, quote_vol=quote_vol)
@@ -564,6 +621,8 @@ def scan_universe(
     workers: int,
     vols: dict[str, float] | None = None,
     keep_bars: bool = False,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
     **detect_kw,
 ) -> tuple[list[ScanRow], dict[str, dict]]:
     vols = vols or {}
@@ -576,6 +635,8 @@ def scan_universe(
             sym,
             limit=limit,
             quote_vol=float(vols.get(sym) or 0),
+            start_ms=start_ms,
+            end_ms=end_ms,
             **detect_kw,
         )
         return sym, d, rs
@@ -948,6 +1009,8 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
             limit=args.limit,
             workers=args.workers,
             vols=vols,
+            start_ms=start - (detect_kw["high_lookback"] + 25) * 60_000,
+            end_ms=end + 40 * 60_000,
             **detect_kw,
         )
         print(f"掃完 {time.time()-t0:.1f}s", flush=True)
@@ -968,7 +1031,13 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
             print(f"html={out}")
         return 0
     for sym in symbols:
-        d, hits = scan_symbol(sym, limit=args.limit, **detect_kw)
+        d, hits = scan_symbol(
+            sym,
+            limit=args.limit,
+            start_ms=start - (detect_kw["high_lookback"] + 25) * 60_000,
+            end_ms=end + 40 * 60_000,
+            **detect_kw,
+        )
         print_scan(sym, d, hits, hours=args.hours, day=args.date)
     return 0
 
