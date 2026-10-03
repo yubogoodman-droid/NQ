@@ -14,12 +14,13 @@
   },
   "extra": {
     "date": "20261002",
-    "days": 90,
     "range": "6mo",
     "limit": 200,
-    "max_price": 1000,
+    "max_price": 1000.0,
     "symbols": "3035",
-    "generated": "2026-10-03T15:36:56+08:00"
+    "generated": "2026-10-03T15:58:47+08:00",
+    "days": 90,
+    "now_only": false
   },
   "hits": [
     {
