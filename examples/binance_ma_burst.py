@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""幣安 15 分 K：爆量，一根 K 從六條均線下方收到上方。
+"""幣安 15 分 K：爆量，並且同一根一次突破 7/14/25/99/120/200。
 
 條件就這兩句：
 
-  • 開盤 ≤ MA7、MA14、MA25、MA99、MA120、MA200，收盤高於這六條。
-  • 成交量 ≥ 前 20 根均量的 5 倍。
-
-六條若擠在一起，一根普通的陽線就跨得過去，所以要爆量才算。
-已經站上全部均線之後的大陽是延伸，不是突破。
+  • 一次突破：開盤在 MA7、MA14、MA25、MA99、MA120、MA200 每一條之下，收盤在每一條之上。
+  • 爆量：這根成交量大於前 10 根的合計。10 根是圖上的量 MA10。
 
     python3 examples/binance_ma_burst.py --symbol AINUSDT
 """
@@ -20,8 +17,7 @@ import numpy as np
 import requests
 
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
-VOL_LOOKBACK = 20
-VOL_MULT = 5.0
+VOL_WINDOW = 10  # 圖上的量 MA10
 INTERVAL_MS = 15 * 60_000
 
 TZ = timezone(timedelta(hours=8))
@@ -43,46 +39,33 @@ def burst_at(
     v: np.ndarray,
     ma: dict[int, np.ndarray],
     i: int,
-    vol_mult: float = VOL_MULT,
 ) -> dict | None:
-    """一根 15 分 K 開在六條均線下、收在六條上，且量是前 20 根的 vol_mult 倍。"""
-    need = max(MA_PERIODS) - 1
-    if i < max(need, VOL_LOOKBACK) or i >= len(c):
+    """同一根 15 分 K：一次穿六條均線，而且量大於前 10 根合計。"""
+    need = max(max(MA_PERIODS) - 1, VOL_WINDOW)
+    if i < need or i >= len(c):
         return None
     vals = np.array([ma[n][i] for n in MA_PERIODS], dtype=float)
     if np.isnan(vals).any():
         return None
     if not (c[i] > o[i] and np.all(o[i] <= vals) and np.all(c[i] > vals)):
         return None
-    base = float(v[i - VOL_LOOKBACK : i].mean())
-    if base <= 0:
-        return None
-    vr = float(v[i] / base)
-    if vr < vol_mult:
+    prior = float(v[i - VOL_WINDOW : i].sum())
+    if not (v[i] > prior):
         return None
     return {
         "i": i,
         "open": float(o[i]),
         "close": float(c[i]),
         "body": float(c[i] / o[i] - 1.0),
-        "vol_ratio": vr,
+        "volume": float(v[i]),
+        "prior_volume": prior,
         "mas": {n: float(ma[n][i]) for n in MA_PERIODS},
     }
 
 
-def find_bursts(
-    o: np.ndarray,
-    c: np.ndarray,
-    v: np.ndarray,
-    vol_mult: float = VOL_MULT,
-) -> list[dict]:
+def find_bursts(o: np.ndarray, c: np.ndarray, v: np.ndarray) -> list[dict]:
     ma = {n: sma(c, n) for n in MA_PERIODS}
-    hits = []
-    for i in range(len(c)):
-        hit = burst_at(o, c, v, ma, i, vol_mult=vol_mult)
-        if hit:
-            hits.append(hit)
-    return hits
+    return [hit for i in range(len(c)) if (hit := burst_at(o, c, v, ma, i))]
 
 
 def get_json(path: str, params=None, retries: int = 5):
@@ -103,12 +86,12 @@ def get_json(path: str, params=None, retries: int = 5):
 
 def fetch_klines(sym: str, limit: int = 1500) -> dict | None:
     raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": "15m", "limit": limit})
-    if not raw or len(raw) < max(MA_PERIODS) + VOL_LOOKBACK:
+    if not raw or len(raw) < max(MA_PERIODS) + VOL_WINDOW:
         return None
     now_ms = int(time.time() * 1000)
     if int(raw[-1][0]) + INTERVAL_MS > now_ms:
         raw = raw[:-1]
-    if len(raw) < max(MA_PERIODS) + VOL_LOOKBACK:
+    if len(raw) < max(MA_PERIODS) + VOL_WINDOW:
         return None
     return {
         "t": np.array([int(x[0]) for x in raw], np.int64),
@@ -126,7 +109,7 @@ def fmt_hit(sym: str, d: dict, hit: dict) -> str:
     return (
         f"{sym}  15m  {ts}\n"
         f"開 {hit['open']:.6g} → 收 {hit['close']:.6g}  ({hit['body'] * 100:+.2f}%)\n"
-        f"量是前 {VOL_LOOKBACK} 根的 {hit['vol_ratio']:.1f} 倍\n"
+        f"量 {hit['volume'] / 1e6:.2f}M，前 {VOL_WINDOW} 根合計 {hit['prior_volume'] / 1e6:.2f}M\n"
         f"{mas}"
     )
 

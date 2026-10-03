@@ -10,7 +10,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from binance_ma_burst import MA_PERIODS, VOL_LOOKBACK, VOL_MULT, burst_at, find_bursts, sma  # noqa: E402
+from binance_ma_burst import MA_PERIODS, VOL_WINDOW, burst_at, find_bursts, sma  # noqa: E402
 
 
 def flat(n: int = 260, price: float = 10.0, vol: float = 100.0):
@@ -32,21 +32,22 @@ def test_one_bar_clears_all_six_with_volume() -> None:
     i = len(c) - 1
     o[i] = 9.9
     c[i] = 10.8
-    v[i] = 100.0 * VOL_MULT
+    v[i] = 100.0 * VOL_WINDOW + 50  # 大於前 10 根合計
     hits = find_bursts(o, c, v)
     assert [h["i"] for h in hits] == [i]
     hit = hits[0]
-    assert hit["vol_ratio"] == VOL_MULT
+    assert hit["volume"] > hit["prior_volume"]
     assert set(hit["mas"]) == set(MA_PERIODS)
     assert all(hit["open"] <= hit["mas"][n] < hit["close"] for n in MA_PERIODS)
 
 
 def test_quiet_cross_is_not_a_burst() -> None:
+    """均量的幾倍還不夠。爆量是這根比前 10 根加總還大。"""
     o, c, v = flat()
     i = len(c) - 1
     o[i] = 9.9
     c[i] = 10.8
-    v[i] = 100.0 * (VOL_MULT - 0.1)
+    v[i] = 100.0 * VOL_WINDOW - 50
     assert find_bursts(o, c, v) == []
 
 
@@ -80,7 +81,7 @@ def test_only_the_crossing_bar_fires() -> None:
     i = 250
     o[i] = 9.9
     c[i] = 10.8
-    v[i] = 100.0 * 12
+    v[i] = 100.0 * VOL_WINDOW + 200
     # 下一根沿高檔繼續放量，開盤已在均線上
     o[i + 1] = 10.8
     c[i + 1] = 12.5
@@ -90,7 +91,7 @@ def test_only_the_crossing_bar_fires() -> None:
 
 
 def test_needs_warmup() -> None:
-    o, c, v = flat(n=VOL_LOOKBACK + 5)
+    o, c, v = flat(n=VOL_WINDOW + 5)
     i = len(c) - 1
     o[i] = 9.0
     c[i] = 12.0
