@@ -1,0 +1,45 @@
+name: TW 1h MA stack + MA240 alert
+
+on:
+  schedule:
+    # 台北 10:03 / 11:03 / 12:03 / 13:03（小時 K 收盤後）
+    - cron: "3 2,3,4,5 * * 1-5"
+    # 台北 13:33（最後一根 13:00–13:30 收盤後）
+    - cron: "33 5 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tw-1h-stack-ma240
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-wqy-microhei
+          pip install -r requirements.txt
+      - name: Restore seen keys
+        uses: actions/cache@v4
+        with:
+          path: output/tw_1h_stack_ma240_seen.json
+          key: tw-1h-stack-ma240-${{ github.run_id }}
+          restore-keys: |
+            tw-1h-stack-ma240-
+      - name: Scan last closed 1h and notify
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          mkdir -p output
+          python3 examples/tw_1h_stack_ma240.py alert --once --lookback-bars 2 --universe
