@@ -273,7 +273,17 @@ def draw_trade_png(bars: dict, trade: Trade, path: Path, title: str) -> None:
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib import font_manager
     from matplotlib.patches import Rectangle
+
+    for font_path in (
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ):
+        if Path(font_path).exists():
+            font_manager.fontManager.addfont(font_path)
+    plt.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei", "Droid Sans Fallback", "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
 
     o, h, l, c = bars["o"], bars["h"], bars["l"], bars["c"]
     ma = sma(c, 25)
@@ -389,7 +399,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <h1>幣安 15 分 · 破底站回 MA25，等回測做多</h1>
 <p class="muted">{escape(meta['period'])} · 掃描 {meta['symbols']} 檔 U 本位永續（24h 成交額 ≥ 500 萬 USDT）· 進場 {meta['entries']} 筆
 <br/>破底＝收盤在 MA25 下，且低點跌破前 32 根。48 根內收盤站回。先有一根完全站在均線上，之後 48 根內第一根觸到 MA25、收盤仍站上，用收盤價做多。
-<br/>出場：停損在回測低點，目標 2R，或 32 根時間停。停損距離 0.2%–4%。加總％是各筆報酬相加，不是組合複利。未平倉不計勝率，用最後一根收盤估。
+<br/>出場：停損在回測低點，目標 2R，或 32 根時間停。停損距離 0.2%–4%。加總％是各筆報酬相加，不是組合複利。未平倉不計勝率，用最後一根收盤估。沒扣手續費與滑價。
 <br/>漏斗：破底 {funnel.get('break', 0)} → 站回 {funnel.get('reclaim', 0)} → 回測 {funnel.get('retest', 0)} → 風險過濾掉 {funnel.get('risk_skip', 0)} → 成交 {funnel.get('trades', 0)}
 <br/>沒站回 {funnel.get('no_reclaim', 0)} · 沒站穩 {funnel.get('no_stand', 0)} · 回測前跌回 {funnel.get('lost_before_retest', 0)} · 等到超時 {funnel.get('no_retest', 0)}
 <br/>{reason_line}</p>
@@ -547,7 +557,7 @@ def main(argv: list[str] | None = None) -> int:
     rows, funnel, meta = run_scan(args.days, args.workers)
     trades = [r[0] for r in rows]
     stats = summarize(trades)
-    path = write_html(Path(args.html), rows, stats, funnel, meta)
+    path = Path(args.html)
     payload = {
         "meta": meta,
         "funnel": funnel,
@@ -567,6 +577,7 @@ def main(argv: list[str] | None = None) -> int:
             for t in trades
         ],
     }
+    path.parent.mkdir(parents=True, exist_ok=True)
     json_path = path.parent / "hits.json"
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(
@@ -574,6 +585,8 @@ def main(argv: list[str] | None = None) -> int:
         f"closed={stats['count']} win={stats['win_rate']:.1f}% avg={stats['avg_pct']:+.2f}% "
         f"sum={stats['sum_pct']:+.2f}% open={stats['open']}"
     )
+    print("[reasons]", stats["by_reason"])
+    write_html(path, rows, stats, funnel, meta)
     print(f"[html] {path}")
     return 0
 

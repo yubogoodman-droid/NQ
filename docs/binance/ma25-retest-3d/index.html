@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>幣安 15 分 破底站回 MA25 回測</title>
+<style>
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}
+.page{max-width:560px;margin:0 auto;padding:14px 12px 32px}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+h1{font-size:18px;margin:0 0 6px} .muted{color:#8b949e;font-size:13px;line-height:1.55}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}
+.card-header{display:flex;justify-content:space-between;gap:10px}
+.trade-no{font-weight:700} .trade-time{display:block;font-size:12px;color:#8b949e;margin-top:2px}
+.card-pnl{font-weight:700;white-space:nowrap} .pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.tag{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#c9d1d9}
+.tag-info{color:#79c0ff}
+.trade-detail{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap;margin:0}
+.mini-chart img{width:100%;display:block;border-radius:10px;margin-top:8px}
+.empty{text-align:center;color:#8b949e;padding:40px 12px;border:1px solid #30363d;border-radius:14px}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安 15 分 · 破底站回 MA25，等回測做多</h1>
+<p class="muted">2026-10-01 → 2026-10-03 20:30 台北 · 掃描 289 檔 U 本位永續（24h 成交額 ≥ 500 萬 USDT）· 進場 321 筆
+<br/>破底＝收盤在 MA25 下，且低點跌破前 32 根。48 根內收盤站回。先有一根完全站在均線上，之後 48 根內第一根觸到 MA25、收盤仍站上，用收盤價做多。
+<br/>出場：停損在回測低點，目標 2R，或 32 根時間停。停損距離 0.2%–4%。加總％是各筆報酬相加，不是組合複利。未平倉不計勝率，用最後一根收盤估。沒扣手續費與滑價。
+<br/>漏斗：破底 1208 → 站回 1203 → 回測 471 → 風險過濾掉 150 → 成交 321
+<br/>沒站回 87 · 沒站穩 358 · 回測前跌回 359 · 等到超時 31
+<br/>停損 204 筆 -120.33% · 2R 112 筆 +141.09% · 時間停 4 筆 +2.93% · 未平倉 1 筆 +0.00%</p>
+<div class="cards">
+<div class="card">已平<b>320</b></div>
+<div class="card">勝率<b>35.9%</b></div>
+<div class="card">平均<b class="pnl-win">+0.07%</b></div>
+<div class="card">加總<b class="pnl-win">+23.70%</b></div>
+<div class="card">未平<b>1</b></div>
+</div>
+<p class="muted">含未平倉的加總 +23.70%。這是規則回測，不是進出場建議。</p>
+</section>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · ARBUSDT</span><span class='trade-time'>10-01 00:30 → 10-01 01:30</span></div><div class='card-pnl pnl-loss'>-1.02%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.02%</span><span class='tag tag-info'>破底深 2.61%</span></div><pre class='trade-detail'>破底 09-30 23:15  low 0.19937
+站回 09-30 23:45
+進場 0.20593  停損 0.20383  目標 0.21013
+出場 0.20383  停損</pre><div class='mini-chart'><img src='img/t001_ARBUSDT_10-01_0030.png' alt='ARBUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · NEIROUSDT</span><span class='trade-time'>10-01 00:30 → 10-01 00:45</span></div><div class='card-pnl pnl-loss'>-0.52%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.52%</span><span class='tag tag-info'>破底深 1.80%</span></div><pre class='trade-detail'>破底 09-30 22:30  low 0.00009191
+站回 09-30 23:45
+進場 0.00009396  停損 0.00009347  目標 0.00009494
+出場 0.00009347  停損</pre><div class='mini-chart'><img src='img/t002_NEIROUSDT_10-01_0030.png' alt='NEIROUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · ZKUSDT</span><span class='trade-time'>10-01 00:30 → 10-01 01:15</span></div><div class='card-pnl pnl-loss'>-0.94%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.94%</span><span class='tag tag-info'>破底深 2.12%</span></div><pre class='trade-detail'>破底 09-30 23:15  low 0.01201
+站回 10-01 00:00
+進場 0.01234  停損 0.01223  目標 0.01257
+出場 0.01223  停損</pre><div class='mini-chart'><img src='img/t003_ZKUSDT_10-01_0030.png' alt='ZKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · LINKUSDT</span><span class='trade-time'>10-01 01:00 → 10-01 01:15</span></div><div class='card-pnl pnl-loss'>-0.21%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.21%</span><span class='tag tag-info'>破底深 2.63%</span></div><pre class='trade-detail'>破底 09-30 22:30  low 14.0400
+站回 10-01 00:30
+進場 14.4100  停損 14.3800  目標 14.4700
+出場 14.3800  停損</pre><div class='mini-chart'><img src='img/t004_LINKUSDT_10-01_0100.png' alt='LINKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · EIGENUSDT</span><span class='trade-time'>10-01 01:15 → 10-01 01:30</span></div><div class='card-pnl pnl-loss'>-0.56%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.56%</span><span class='tag tag-info'>破底深 3.29%</span></div><pre class='trade-detail'>破底 09-30 23:15  low 0.24170
+站回 10-01 00:00
+進場 0.25020  停損 0.24880  目標 0.25300
+出場 0.24880  停損</pre><div class='mini-chart'><img src='img/t005_EIGENUSDT_10-01_0115.png' alt='EIGENUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · FARTCOINUSDT</span><span class='trade-time'>10-01 01:15 → 10-01 01:30</span></div><div class='card-pnl pnl-loss'>-0.72%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.72%</span><span class='tag tag-info'>破底深 2.98%</span></div><pre class='trade-detail'>破底 09-30 22:15  low 0.17460
+站回 10-01 00:00
+進場 0.18010  停損 0.17880  目標 0.18270
+出場 0.17880  停損</pre><div class='mini-chart'><img src='img/t006_FARTCOINUSDT_10-01_0115.png' alt='FARTCOINUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · MARSCOINUSDT</span><span class='trade-time'>10-01 01:15 → 10-01 01:30</span></div><div class='card-pnl pnl-loss'>-0.72%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.72%</span><span class='tag tag-info'>破底深 5.52%</span></div><pre class='trade-detail'>破底 09-30 22:30  low 0.13288
+站回 10-01 00:30
+進場 0.13951  停損 0.13851  目標 0.14151
+出場 0.13851  停損</pre><div class='mini-chart'><img src='img/t007_MARSCOINUSDT_10-01_0115.png' alt='MARSCOINUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · ONDOUSDT</span><span class='trade-time'>10-01 01:15 → 10-01 01:30</span></div><div class='card-pnl pnl-loss'>-0.65%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.65%</span><span class='tag tag-info'>破底深 3.01%</span></div><pre class='trade-detail'>破底 09-30 23:15  low 0.49170
+站回 10-01 00:30
+進場 0.50950  停損 0.50620  目標 0.51610
+出場 0.50620  停損</pre><div class='mini-chart'><img src='img/t008_ONDOUSDT_10-01_0115.png' alt='ONDOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · UAIUSDT</span><span class='trade-time'>10-01 01:15 → 10-01 01:45</span></div><div class='card-pnl pnl-loss'>-0.63%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.63%</span><span class='tag tag-info'>破底深 1.93%</span></div><pre class='trade-detail'>破底 09-30 19:00  low 0.28440
+站回 09-30 20:00
+進場 0.29930  停損 0.29740  目標 0.30310
+出場 0.29740  停損</pre><div class='mini-chart'><img src='img/t009_UAIUSDT_10-01_0115.png' alt='UAIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · NOMUSDT</span><span class='trade-time'>10-01 01:30 → 10-01 01:45</span></div><div class='card-pnl pnl-loss'>-0.25%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.25%</span><span class='tag tag-info'>破底深 2.54%</span></div><pre class='trade-detail'>破底 09-30 16:00  low 0.00207900
+站回 09-30 17:30
+進場 0.00242100  停損 0.00241500  目標 0.00243300
+出場 0.00241500  停損</pre><div class='mini-chart'><img src='img/t010_NOMUSDT_10-01_0130.png' alt='NOMUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · RAYSOLUSDT</span><span class='trade-time'>10-01 01:30 → 10-01 01:45</span></div><div class='card-pnl pnl-win'>+0.48%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.24%</span><span class='tag tag-info'>破底深 1.21%</span></div><pre class='trade-detail'>破底 09-30 16:15  low 1.8545
+站回 09-30 16:45
+進場 2.0202  停損 2.0154  目標 2.0298
+出場 2.0298  2R</pre><div class='mini-chart'><img src='img/t011_RAYSOLUSDT_10-01_0130.png' alt='RAYSOLUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · XMRUSDT</span><span class='trade-time'>10-01 01:30 → 10-01 03:45</span></div><div class='card-pnl pnl-loss'>-0.46%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.46%</span><span class='tag tag-info'>破底深 1.20%</span></div><pre class='trade-detail'>破底 09-30 22:30  low 535.91
+站回 10-01 00:00
+進場 544.50  停損 542.00  目標 549.50
+出場 542.00  停損</pre><div class='mini-chart'><img src='img/t012_XMRUSDT_10-01_0130.png' alt='XMRUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · ACEUSDT</span><span class='trade-time'>10-01 01:45 → 10-01 02:00</span></div><div class='card-pnl pnl-loss'>-0.47%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.47%</span><span class='tag tag-info'>破底深 1.21%</span></div><pre class='trade-detail'>破底 09-30 22:30  low 0.17834
+站回 09-30 22:45
+進場 0.18270  停損 0.18184  目標 0.18442
+出場 0.18184  停損</pre><div class='mini-chart'><img src='img/t013_ACEUSDT_10-01_0145.png' alt='ACEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · NVDAUSDT</span><span class='trade-time'>10-01 01:45 → 10-01 03:45</span></div><div class='card-pnl pnl-loss'>-0.24%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.24%</span><span class='tag tag-info'>破底深 0.41%</span></div><pre class='trade-detail'>破底 09-30 20:15  low 227.50
+站回 09-30 20:30
+進場 230.64  停損 230.09  目標 231.74
+出場 230.09  停損</pre><div class='mini-chart'><img src='img/t014_NVDAUSDT_10-01_0145.png' alt='NVDAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · BERAUSDT</span><span class='trade-time'>10-01 02:00 → 10-01 03:30</span></div><div class='card-pnl pnl-win'>+2.04%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.02%</span><span class='tag tag-info'>破底深 4.63%</span></div><pre class='trade-detail'>破底 09-30 19:15  low 0.24060
+站回 09-30 22:30
+進場 0.25490  停損 0.25230  目標 0.26010
+出場 0.26010  2R</pre><div class='mini-chart'><img src='img/t015_BERAUSDT_10-01_0200.png' alt='BERAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · CLOUSDT</span><span class='trade-time'>10-01 02:00 → 10-01 03:00</span></div><div class='card-pnl pnl-loss'>-0.89%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.89%</span><span class='tag tag-info'>破底深 2.01%</span></div><pre class='trade-detail'>破底 09-30 21:30  low 0.05907
+站回 09-30 22:45
+進場 0.06070  停損 0.06016  目標 0.06178
+出場 0.06016  停損</pre><div class='mini-chart'><img src='img/t016_CLOUSDT_10-01_0200.png' alt='CLOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · MUBARAKUSDT</span><span class='trade-time'>10-01 02:30 → 10-01 02:45</span></div><div class='card-pnl pnl-loss'>-0.38%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.38%</span><span class='tag tag-info'>破底深 3.72%</span></div><pre class='trade-detail'>破底 09-30 23:15  low 0.05909
+站回 10-01 02:00
+進場 0.06058  停損 0.06035  目標 0.06104
+出場 0.06035  停損</pre><div class='mini-chart'><img src='img/t017_MUBARAKUSDT_10-01_0230.png' alt='MUBARAKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · TQQQUSDT</span><span class='trade-time'>10-01 02:30 → 10-01 02:45</span></div><div class='card-pnl pnl-loss'>-0.25%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.25%</span><span class='tag tag-info'>破底深 0.91%</span></div><pre class='trade-detail'>破底 09-30 19:15  low 76.8300
+站回 09-30 20:15
+進場 79.1100  停損 78.9100  目標 79.5100
+出場 78.9100  停損</pre><div class='mini-chart'><img src='img/t018_TQQQUSDT_10-01_0230.png' alt='TQQQUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · MRNAUSDT</span><span class='trade-time'>10-01 02:45 → 10-01 03:30</span></div><div class='card-pnl pnl-win'>+0.94%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.47%</span><span class='tag tag-info'>破底深 5.53%</span></div><pre class='trade-detail'>破底 09-30 21:15  low 184.47
+站回 10-01 00:45
+進場 190.37  停損 189.48  目標 192.15
+出場 192.15  2R</pre><div class='mini-chart'><img src='img/t019_MRNAUSDT_10-01_0245.png' alt='MRNAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · PUMPUSDT</span><span class='trade-time'>10-01 03:45 → 10-01 04:15</span></div><div class='card-pnl pnl-win'>+1.04%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.52%</span><span class='tag tag-info'>破底深 4.69%</span></div><pre class='trade-detail'>破底 09-30 22:15  low 0.00546700
+站回 10-01 00:00
+進場 0.00577300  停損 0.00574300  目標 0.00583300
+出場 0.00583300  2R</pre><div class='mini-chart'><img src='img/t020_PUMPUSDT_10-01_0345.png' alt='PUMPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · XLMUSDT</span><span class='trade-time'>10-01 03:45 → 10-01 09:00</span></div><div class='card-pnl pnl-win'>+1.69%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.84%</span><span class='tag tag-info'>破底深 2.82%</span></div><pre class='trade-detail'>破底 09-30 23:15  low 0.22048
+站回 10-01 02:30
+進場 0.22654  停損 0.22463  目標 0.23036
+出場 0.23036  2R</pre><div class='mini-chart'><img src='img/t021_XLMUSDT_10-01_0345.png' alt='XLMUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · AEROUSDT</span><span class='trade-time'>10-01 04:45 → 10-01 06:15</span></div><div class='card-pnl pnl-win'>+1.11%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.56%</span><span class='tag tag-info'>破底深 2.12%</span></div><pre class='trade-detail'>破底 10-01 02:45  low 0.79830
+站回 10-01 04:15
+進場 0.81060  停損 0.80610  目標 0.81960
+出場 0.81960  2R</pre><div class='mini-chart'><img src='img/t022_AEROUSDT_10-01_0445.png' alt='AEROUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · DRAMUSDT</span><span class='trade-time'>10-01 04:45 → 10-01 05:00</span></div><div class='card-pnl pnl-loss'>-0.43%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.43%</span><span class='tag tag-info'>破底深 1.26%</span></div><pre class='trade-detail'>破底 10-01 04:00  low 59.7900
+站回 10-01 04:15
+進場 60.6800  停損 60.4200  目標 61.2000
+出場 60.4200  停損</pre><div class='mini-chart'><img src='img/t023_DRAMUSDT_10-01_0445.png' alt='DRAMUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#24 · MUUSDT</span><span class='trade-time'>10-01 04:45 → 10-01 05:00</span></div><div class='card-pnl pnl-loss'>-0.95%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.95%</span><span class='tag tag-info'>破底深 2.97%</span></div><pre class='trade-detail'>破底 10-01 04:00  low 1040.94
+站回 10-01 04:15
+進場 1075.68  停損 1065.48  目標 1096.08
+出場 1065.48  停損</pre><div class='mini-chart'><img src='img/t024_MUUSDT_10-01_0445.png' alt='MUUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#25 · SKHYNIXUSDT</span><span class='trade-time'>10-01 04:45 → 10-01 05:00</span></div><div class='card-pnl pnl-loss'>-0.46%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.46%</span><span class='tag tag-info'>破底深 1.11%</span></div><pre class='trade-detail'>破底 10-01 04:00  low 1297.74
+站回 10-01 04:15
+進場 1315.76  停損 1309.76  目標 1327.76
+出場 1309.76  停損</pre><div class='mini-chart'><img src='img/t025_SKHYNIXUSDT_10-01_0445.png' alt='SKHYNIXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#26 · SKHYUSDT</span><span class='trade-time'>10-01 04:45 → 10-01 05:00</span></div><div class='card-pnl pnl-loss'>-0.52%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.52%</span><span class='tag tag-info'>破底深 1.26%</span></div><pre class='trade-detail'>破底 10-01 04:00  low 183.17
+站回 10-01 04:15
+進場 185.56  停損 184.59  目標 187.50
+出場 184.59  停損</pre><div class='mini-chart'><img src='img/t026_SKHYUSDT_10-01_0445.png' alt='SKHYUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#27 · LITEUSDT</span><span class='trade-time'>10-01 05:15 → 10-01 10:15</span></div><div class='card-pnl pnl-win'>+1.01%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.50%</span><span class='tag tag-info'>破底深 3.02%</span></div><pre class='trade-detail'>破底 09-30 23:15  low 941.54
+站回 10-01 01:45
+進場 967.26  停損 962.38  目標 977.02
+出場 977.02  2R</pre><div class='mini-chart'><img src='img/t027_LITEUSDT_10-01_0515.png' alt='LITEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#28 · WUSDT</span><span class='trade-time'>10-01 05:45 → 10-01 06:00</span></div><div class='card-pnl pnl-loss'>-0.40%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.40%</span><span class='tag tag-info'>破底深 3.68%</span></div><pre class='trade-detail'>破底 10-01 02:30  low 0.01286
+站回 10-01 03:45
+進場 0.01329  停損 0.01323  目標 0.01339
+出場 0.01323  停損</pre><div class='mini-chart'><img src='img/t028_WUSDT_10-01_0545.png' alt='WUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#29 · PHAUSDT</span><span class='trade-time'>10-01 06:00 → 10-01 08:00</span></div><div class='card-pnl pnl-loss'>-1.91%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.91%</span><span class='tag tag-info'>破底深 7.12%</span></div><pre class='trade-detail'>破底 09-30 22:30  low 0.07097
+站回 09-30 23:45
+進場 0.07873  停損 0.07723  目標 0.08173
+出場 0.07723  停損</pre><div class='mini-chart'><img src='img/t029_PHAUSDT_10-01_0600.png' alt='PHAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#30 · LAUSDT</span><span class='trade-time'>10-01 07:00 → 10-01 07:45</span></div><div class='card-pnl pnl-win'>+0.41%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.20%</span><span class='tag tag-info'>破底深 1.70%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.06752
+站回 10-01 06:30
+進場 0.06862  停損 0.06848  目標 0.06890
+出場 0.06890  2R</pre><div class='mini-chart'><img src='img/t030_LAUSDT_10-01_0700.png' alt='LAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#31 · OPGUSDT</span><span class='trade-time'>10-01 07:00 → 10-01 07:15</span></div><div class='card-pnl pnl-win'>+0.48%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.24%</span><span class='tag tag-info'>破底深 1.03%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.12400
+站回 10-01 06:15
+進場 0.12510  停損 0.12480  目標 0.12570
+出場 0.12570  2R</pre><div class='mini-chart'><img src='img/t031_OPGUSDT_10-01_0700.png' alt='OPGUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#32 · USELESSUSDT</span><span class='trade-time'>10-01 07:00 → 10-01 07:15</span></div><div class='card-pnl pnl-win'>+0.47%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.24%</span><span class='tag tag-info'>破底深 3.19%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.23393
+站回 10-01 06:15
+進場 0.24054  停損 0.23997  目標 0.24168
+出場 0.24168  2R</pre><div class='mini-chart'><img src='img/t032_USELESSUSDT_10-01_0700.png' alt='USELESSUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#33 · CCUSDT</span><span class='trade-time'>10-01 07:15 → 10-01 08:00</span></div><div class='card-pnl pnl-win'>+0.80%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.40%</span><span class='tag tag-info'>破底深 2.10%</span></div><pre class='trade-detail'>破底 10-01 05:45  low 0.12232
+站回 10-01 06:15
+進場 0.12574  停損 0.12524  目標 0.12674
+出場 0.12674  2R</pre><div class='mini-chart'><img src='img/t033_CCUSDT_10-01_0715.png' alt='CCUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#34 · APEUSDT</span><span class='trade-time'>10-01 07:30 → 10-01 09:15</span></div><div class='card-pnl pnl-win'>+1.06%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.53%</span><span class='tag tag-info'>破底深 2.03%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.14750
+站回 10-01 06:30
+進場 0.15070  停損 0.14990  目標 0.15230
+出場 0.15230  2R</pre><div class='mini-chart'><img src='img/t034_APEUSDT_10-01_0730.png' alt='APEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#35 · ENAUSDT</span><span class='trade-time'>10-01 07:30 → 10-01 08:15</span></div><div class='card-pnl pnl-loss'>-0.63%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.63%</span><span class='tag tag-info'>破底深 2.72%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.25801
+站回 10-01 06:30
+進場 0.26494  停損 0.26327  目標 0.26828
+出場 0.26327  停損</pre><div class='mini-chart'><img src='img/t035_ENAUSDT_10-01_0730.png' alt='ENAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#36 · KNCUSDT</span><span class='trade-time'>10-01 07:30 → 10-01 08:00</span></div><div class='card-pnl pnl-loss'>-0.43%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.43%</span><span class='tag tag-info'>破底深 1.52%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.13580
+站回 10-01 07:00
+進場 0.13800  停損 0.13740  目標 0.13920
+出場 0.13740  停損</pre><div class='mini-chart'><img src='img/t036_KNCUSDT_10-01_0730.png' alt='KNCUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#37 · SKYUSDT</span><span class='trade-time'>10-01 07:30 → 10-01 08:00</span></div><div class='card-pnl pnl-loss'>-0.36%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.36%</span><span class='tag tag-info'>破底深 3.01%</span></div><pre class='trade-detail'>破底 10-01 03:45  low 0.07618
+站回 10-01 06:30
+進場 0.07763  停損 0.07735  目標 0.07819
+出場 0.07735  停損</pre><div class='mini-chart'><img src='img/t037_SKYUSDT_10-01_0730.png' alt='SKYUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#38 · LDOUSDT</span><span class='trade-time'>10-01 07:45 → 10-01 08:15</span></div><div class='card-pnl pnl-loss'>-0.37%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.37%</span><span class='tag tag-info'>破底深 3.11%</span></div><pre class='trade-detail'>破底 10-01 04:45  low 0.44680
+站回 10-01 06:30
+進場 0.45740  停損 0.45570  目標 0.46080
+出場 0.45570  停損</pre><div class='mini-chart'><img src='img/t038_LDOUSDT_10-01_0745.png' alt='LDOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#39 · MAGICUSDT</span><span class='trade-time'>10-01 07:45 → 10-01 08:00</span></div><div class='card-pnl pnl-loss'>-0.25%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.25%</span><span class='tag tag-info'>破底深 1.95%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.05204
+站回 10-01 07:15
+進場 0.05301  停損 0.05288  目標 0.05327
+出場 0.05288  停損</pre><div class='mini-chart'><img src='img/t039_MAGICUSDT_10-01_0745.png' alt='MAGICUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#40 · 1000FLOKIUSDT</span><span class='trade-time'>10-01 08:00 → 10-01 09:00</span></div><div class='card-pnl pnl-win'>+0.51%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.25%</span><span class='tag tag-info'>破底深 1.54%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.02730
+站回 10-01 06:30
+進場 0.02767  停損 0.02760  目標 0.02781
+出場 0.02781  2R</pre><div class='mini-chart'><img src='img/t040_1000FLOKIUSDT_10-01_0800.png' alt='1000FLOKIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#41 · GUSDT</span><span class='trade-time'>10-01 08:00 → 10-01 09:00</span></div><div class='card-pnl pnl-win'>+1.57%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.78%</span><span class='tag tag-info'>破底深 2.68%</span></div><pre class='trade-detail'>破底 10-01 05:15  low 0.00463600
+站回 10-01 07:15
+進場 0.00472700  停損 0.00469000  目標 0.00480100
+出場 0.00480100  2R</pre><div class='mini-chart'><img src='img/t041_GUSDT_10-01_0800.png' alt='GUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#42 · POLUSDT</span><span class='trade-time'>10-01 08:00 → 10-01 08:30</span></div><div class='card-pnl pnl-win'>+0.46%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.23%</span><span class='tag tag-info'>破底深 1.97%</span></div><pre class='trade-detail'>破底 10-01 04:00  low 0.11066
+站回 10-01 06:15
+進場 0.11235  停損 0.11209  目標 0.11287
+出場 0.11287  2R</pre><div class='mini-chart'><img src='img/t042_POLUSDT_10-01_0800.png' alt='POLUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#43 · TRUMPUSDT</span><span class='trade-time'>10-01 08:00 → 10-01 08:30</span></div><div class='card-pnl pnl-win'>+0.98%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.49%</span><span class='tag tag-info'>破底深 2.72%</span></div><pre class='trade-detail'>破底 10-01 02:45  low 2.0140
+站回 10-01 06:15
+進場 2.0510  停損 2.0410  目標 2.0710
+出場 2.0710  2R</pre><div class='mini-chart'><img src='img/t043_TRUMPUSDT_10-01_0800.png' alt='TRUMPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#44 · VETUSDT</span><span class='trade-time'>10-01 08:00 → 10-01 08:15</span></div><div class='card-pnl pnl-loss'>-0.22%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.22%</span><span class='tag tag-info'>破底深 2.51%</span></div><pre class='trade-detail'>破底 10-01 03:15  low 0.00870600
+站回 10-01 06:30
+進場 0.00882800  停損 0.00880900  目標 0.00886600
+出場 0.00880900  停損</pre><div class='mini-chart'><img src='img/t044_VETUSDT_10-01_0800.png' alt='VETUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#45 · AAVEUSDT</span><span class='trade-time'>10-01 08:15 → 10-01 09:15</span></div><div class='card-pnl pnl-win'>+0.72%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.36%</span><span class='tag tag-info'>破底深 1.64%</span></div><pre class='trade-detail'>破底 10-01 03:15  low 157.42
+站回 10-01 06:15
+進場 158.93  停損 158.36  目標 160.07
+出場 160.07  2R</pre><div class='mini-chart'><img src='img/t045_AAVEUSDT_10-01_0815.png' alt='AAVEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#46 · JTOUSDT</span><span class='trade-time'>10-01 08:15 → 10-01 10:45</span></div><div class='card-pnl pnl-win'>+1.51%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.75%</span><span class='tag tag-info'>破底深 2.07%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.52010
+站回 10-01 07:30
+進場 0.53130  停損 0.52730  目標 0.53930
+出場 0.53930  2R</pre><div class='mini-chart'><img src='img/t046_JTOUSDT_10-01_0815.png' alt='JTOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#47 · MEGAUSDT</span><span class='trade-time'>10-01 08:15 → 10-01 08:45</span></div><div class='card-pnl pnl-win'>+1.81%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.91%</span><span class='tag tag-info'>破底深 1.60%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.04131
+站回 10-01 07:30
+進場 0.04198  停損 0.04160  目標 0.04274
+出場 0.04274  2R</pre><div class='mini-chart'><img src='img/t047_MEGAUSDT_10-01_0815.png' alt='MEGAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#48 · TUSDT</span><span class='trade-time'>10-01 08:15 → 10-01 08:30</span></div><div class='card-pnl pnl-win'>+0.47%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.24%</span><span class='tag tag-info'>破底深 1.48%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.00545500
+站回 10-01 06:30
+進場 0.00551700  停損 0.00550400  目標 0.00554300
+出場 0.00554300  2R</pre><div class='mini-chart'><img src='img/t048_TUSDT_10-01_0815.png' alt='TUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#49 · BBUSDT</span><span class='trade-time'>10-01 08:30 → 10-01 10:30</span></div><div class='card-pnl pnl-win'>+1.45%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.72%</span><span class='tag tag-info'>破底深 3.18%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.00929100
+站回 10-01 07:30
+進場 0.00953300  停損 0.00946400  目標 0.00967100
+出場 0.00967100  2R</pre><div class='mini-chart'><img src='img/t049_BBUSDT_10-01_0830.png' alt='BBUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#50 · BIOUSDT</span><span class='trade-time'>10-01 08:30 → 10-01 10:00</span></div><div class='card-pnl pnl-loss'>-1.06%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.06%</span><span class='tag tag-info'>破底深 2.31%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.03033
+站回 10-01 07:00
+進場 0.03110  停損 0.03077  目標 0.03176
+出場 0.03077  停損</pre><div class='mini-chart'><img src='img/t050_BIOUSDT_10-01_0830.png' alt='BIOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#51 · CFXUSDT</span><span class='trade-time'>10-01 08:30 → 10-01 09:30</span></div><div class='card-pnl pnl-loss'>-0.33%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.33%</span><span class='tag tag-info'>破底深 1.28%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.05427
+站回 10-01 06:15
+進場 0.05506  停損 0.05488  目標 0.05542
+出場 0.05488  停損</pre><div class='mini-chart'><img src='img/t051_CFXUSDT_10-01_0830.png' alt='CFXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#52 · CRDOUSDT</span><span class='trade-time'>10-01 08:30 → 10-01 11:45</span></div><div class='card-pnl pnl-win'>+1.68%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.84%</span><span class='tag tag-info'>破底深 2.74%</span></div><pre class='trade-detail'>破底 09-30 23:00  low 186.87
+站回 10-01 03:00
+進場 194.56  停損 192.93  目標 197.82
+出場 197.82  2R</pre><div class='mini-chart'><img src='img/t052_CRDOUSDT_10-01_0830.png' alt='CRDOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#53 · REUSDT</span><span class='trade-time'>10-01 08:30 → 10-01 10:30</span></div><div class='card-pnl pnl-win'>+1.74%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.87%</span><span class='tag tag-info'>破底深 1.45%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.47460
+站回 10-01 06:30
+進場 0.48340  停損 0.47920  目標 0.49180
+出場 0.49180  2R</pre><div class='mini-chart'><img src='img/t053_REUSDT_10-01_0830.png' alt='REUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#54 · SMCIUSDT</span><span class='trade-time'>10-01 08:30 → 10-01 11:45</span></div><div class='card-pnl pnl-win'>+0.92%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.46%</span><span class='tag tag-info'>破底深 1.13%</span></div><pre class='trade-detail'>破底 10-01 02:30  low 40.5400
+站回 10-01 03:00
+進場 41.0900  停損 40.9000  目標 41.4700
+出場 41.4700  2R</pre><div class='mini-chart'><img src='img/t054_SMCIUSDT_10-01_0830.png' alt='SMCIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#55 · WIFUSDT</span><span class='trade-time'>10-01 08:30 → 10-01 11:00</span></div><div class='card-pnl pnl-win'>+1.29%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.64%</span><span class='tag tag-info'>破底深 1.96%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.24390
+站回 10-01 06:15
+進場 0.24880  停損 0.24720  目標 0.25200
+出場 0.25200  2R</pre><div class='mini-chart'><img src='img/t055_WIFUSDT_10-01_0830.png' alt='WIFUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#56 · QNTUSDT</span><span class='trade-time'>10-01 08:45 → 10-01 13:45</span></div><div class='card-pnl pnl-loss'>-1.71%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.71%</span><span class='tag tag-info'>破底深 7.18%</span></div><pre class='trade-detail'>破底 10-01 05:45  low 273.35
+站回 10-01 08:15
+進場 293.00  停損 287.98  目標 303.04
+出場 287.98  停損</pre><div class='mini-chart'><img src='img/t056_QNTUSDT_10-01_0845.png' alt='QNTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#57 · RESOLVUSDT</span><span class='trade-time'>10-01 08:45 → 10-01 09:30</span></div><div class='card-pnl pnl-loss'>-0.48%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.48%</span><span class='tag tag-info'>破底深 2.29%</span></div><pre class='trade-detail'>破底 10-01 03:45  low 0.01835
+站回 10-01 06:15
+進場 0.01862  停損 0.01853  目標 0.01880
+出場 0.01853  停損</pre><div class='mini-chart'><img src='img/t057_RESOLVUSDT_10-01_0845.png' alt='RESOLVUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#58 · TIAUSDT</span><span class='trade-time'>10-01 08:45 → 10-01 09:00</span></div><div class='card-pnl pnl-win'>+0.59%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.29%</span><span class='tag tag-info'>破底深 1.88%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.43280
+站回 10-01 06:30
+進場 0.44090  停損 0.43960  目標 0.44350
+出場 0.44350  2R</pre><div class='mini-chart'><img src='img/t058_TIAUSDT_10-01_0845.png' alt='TIAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#59 · ZROUSDT</span><span class='trade-time'>10-01 09:00 → 10-01 09:15</span></div><div class='card-pnl pnl-win'>+0.53%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.26%</span><span class='tag tag-info'>破底深 3.77%</span></div><pre class='trade-detail'>破底 10-01 03:15  low 1.6554
+站回 10-01 05:30
+進場 1.7122  停損 1.7077  目標 1.7212
+出場 1.7212  2R</pre><div class='mini-chart'><img src='img/t059_ZROUSDT_10-01_0900.png' alt='ZROUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#60 · GRASSUSDT</span><span class='trade-time'>10-01 09:30 → 10-01 09:45</span></div><div class='card-pnl pnl-loss'>-0.54%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.54%</span><span class='tag tag-info'>破底深 4.98%</span></div><pre class='trade-detail'>破底 10-01 04:45  low 0.67860
+站回 10-01 08:00
+進場 0.70080  停損 0.69700  目標 0.70840
+出場 0.69700  停損</pre><div class='mini-chart'><img src='img/t060_GRASSUSDT_10-01_0930.png' alt='GRASSUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#61 · OPENUSDT</span><span class='trade-time'>10-01 09:30 → 10-01 17:30</span></div><div class='card-pnl pnl-win'>+0.54%</div></header><div class='tags'><span class='tag'>時間停</span><span class='tag tag-info'>風險 1.17%</span><span class='tag tag-info'>破底深 2.27%</span></div><pre class='trade-detail'>破底 10-01 03:45  low 0.12630
+站回 10-01 06:15
+進場 0.12850  停損 0.12700  目標 0.13150
+出場 0.12920  時間停</pre><div class='mini-chart'><img src='img/t061_OPENUSDT_10-01_0930.png' alt='OPENUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#62 · BEATUSDT</span><span class='trade-time'>10-01 09:45 → 10-01 10:15</span></div><div class='card-pnl pnl-win'>+0.66%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.33%</span><span class='tag tag-info'>破底深 1.92%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.08960
+站回 10-01 07:30
+進場 0.09100  停損 0.09070  目標 0.09160
+出場 0.09160  2R</pre><div class='mini-chart'><img src='img/t062_BEATUSDT_10-01_0945.png' alt='BEATUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#63 · 1000000BOBUSDT</span><span class='trade-time'>10-01 10:00 → 10-01 10:15</span></div><div class='card-pnl pnl-loss'>-0.23%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.23%</span><span class='tag tag-info'>破底深 1.37%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.01715
+站回 10-01 07:30
+進場 0.01733  停損 0.01729  目標 0.01741
+出場 0.01729  停損</pre><div class='mini-chart'><img src='img/t063_1000000BOBUSDT_10-01_1000.png' alt='1000000BOBUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#64 · ALICEUSDT</span><span class='trade-time'>10-01 10:00 → 10-01 10:15</span></div><div class='card-pnl pnl-loss'>-0.30%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.30%</span><span class='tag tag-info'>破底深 2.19%</span></div><pre class='trade-detail'>破底 10-01 02:45  low 0.16030
+站回 10-01 04:15
+進場 0.16720  停損 0.16670  目標 0.16820
+出場 0.16670  停損</pre><div class='mini-chart'><img src='img/t064_ALICEUSDT_10-01_1000.png' alt='ALICEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#65 · ETCUSDT</span><span class='trade-time'>10-01 10:00 → 10-01 10:15</span></div><div class='card-pnl pnl-loss'>-0.44%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.44%</span><span class='tag tag-info'>破底深 2.10%</span></div><pre class='trade-detail'>破底 10-01 03:45  low 8.7640
+站回 10-01 06:30
+進場 8.8910  停損 8.8520  目標 8.9690
+出場 8.8520  停損</pre><div class='mini-chart'><img src='img/t065_ETCUSDT_10-01_1000.png' alt='ETCUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#66 · FILUSDT</span><span class='trade-time'>10-01 10:00 → 10-01 10:15</span></div><div class='card-pnl pnl-loss'>-0.30%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.30%</span><span class='tag tag-info'>破底深 2.94%</span></div><pre class='trade-detail'>破底 10-01 03:15  low 1.0220
+站回 10-01 06:30
+進場 1.0444  停損 1.0413  目標 1.0506
+出場 1.0413  停損</pre><div class='mini-chart'><img src='img/t066_FILUSDT_10-01_1000.png' alt='FILUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#67 · IMXUSDT</span><span class='trade-time'>10-01 10:00 → 10-01 10:15</span></div><div class='card-pnl pnl-loss'>-0.42%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.42%</span><span class='tag tag-info'>破底深 1.51%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.16330
+站回 10-01 06:15
+進場 0.16660  停損 0.16590  目標 0.16800
+出場 0.16590  停損</pre><div class='mini-chart'><img src='img/t067_IMXUSDT_10-01_1000.png' alt='IMXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#68 · LTCUSDT</span><span class='trade-time'>10-01 10:00 → 10-01 10:15</span></div><div class='card-pnl pnl-loss'>-0.27%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.27%</span><span class='tag tag-info'>破底深 2.23%</span></div><pre class='trade-detail'>破底 10-01 02:30  low 65.5900
+站回 10-01 05:45
+進場 67.0700  停損 66.8900  目標 67.4300
+出場 66.8900  停損</pre><div class='mini-chart'><img src='img/t068_LTCUSDT_10-01_1000.png' alt='LTCUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#69 · NEIROUSDT</span><span class='trade-time'>10-01 10:00 → 10-01 11:00</span></div><div class='card-pnl pnl-win'>+1.15%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.58%</span><span class='tag tag-info'>破底深 2.32%</span></div><pre class='trade-detail'>破底 10-01 03:45  low 0.00009051
+站回 10-01 06:30
+進場 0.00009217  停損 0.00009164  目標 0.00009323
+出場 0.00009323  2R</pre><div class='mini-chart'><img src='img/t069_NEIROUSDT_10-01_1000.png' alt='NEIROUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#70 · SANDUSDT</span><span class='trade-time'>10-01 10:00 → 10-01 11:00</span></div><div class='card-pnl pnl-win'>+1.10%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.55%</span><span class='tag tag-info'>破底深 2.31%</span></div><pre class='trade-detail'>破底 10-01 03:45  low 0.04265
+站回 10-01 06:15
+進場 0.04378  停損 0.04354  目標 0.04426
+出場 0.04426  2R</pre><div class='mini-chart'><img src='img/t070_SANDUSDT_10-01_1000.png' alt='SANDUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#71 · SCRUSDT</span><span class='trade-time'>10-01 10:00 → 10-01 10:45</span></div><div class='card-pnl pnl-win'>+1.40%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.70%</span><span class='tag tag-info'>破底深 2.23%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.02385
+站回 10-01 06:30
+進場 0.02434  停損 0.02417  目標 0.02468
+出場 0.02468  2R</pre><div class='mini-chart'><img src='img/t071_SCRUSDT_10-01_1000.png' alt='SCRUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#72 · ZKUSDT</span><span class='trade-time'>10-01 10:00 → 10-01 11:30</span></div><div class='card-pnl pnl-win'>+1.43%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.72%</span><span class='tag tag-info'>破底深 1.74%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.01184
+站回 10-01 06:30
+進場 0.01215  停損 0.01206  目標 0.01232
+出場 0.01232  2R</pre><div class='mini-chart'><img src='img/t072_ZKUSDT_10-01_1000.png' alt='ZKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#73 · ADAUSDT</span><span class='trade-time'>10-01 10:15 → 10-01 11:30</span></div><div class='card-pnl pnl-win'>+1.05%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.53%</span><span class='tag tag-info'>破底深 2.39%</span></div><pre class='trade-detail'>破底 10-01 03:15  low 0.24090
+站回 10-01 06:15
+進場 0.24740  停損 0.24610  目標 0.25000
+出場 0.25000  2R</pre><div class='mini-chart'><img src='img/t073_ADAUSDT_10-01_1015.png' alt='ADAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#74 · BILLUSDT</span><span class='trade-time'>10-01 10:15 → 10-01 11:15</span></div><div class='card-pnl pnl-win'>+0.86%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.43%</span><span class='tag tag-info'>破底深 2.39%</span></div><pre class='trade-detail'>破底 10-01 02:30  low 0.01127
+站回 10-01 06:15
+進場 0.01158  停損 0.01153  目標 0.01168
+出場 0.01168  2R</pre><div class='mini-chart'><img src='img/t074_BILLUSDT_10-01_1015.png' alt='BILLUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#75 · CRCLUSDT</span><span class='trade-time'>10-01 10:15 → 10-01 11:45</span></div><div class='card-pnl pnl-win'>+0.56%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.28%</span><span class='tag tag-info'>破底深 0.69%</span></div><pre class='trade-detail'>破底 10-01 07:45  low 81.7000
+站回 10-01 09:00
+進場 82.2300  停損 82.0000  目標 82.6900
+出場 82.6900  2R</pre><div class='mini-chart'><img src='img/t075_CRCLUSDT_10-01_1015.png' alt='CRCLUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#76 · ETHFIUSDT</span><span class='trade-time'>10-01 10:15 → 10-01 15:15</span></div><div class='card-pnl pnl-loss'>-0.71%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.71%</span><span class='tag tag-info'>破底深 3.67%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.74770
+站回 10-01 07:15
+進場 0.77420  停損 0.76870  目標 0.78520
+出場 0.76870  停損</pre><div class='mini-chart'><img src='img/t076_ETHFIUSDT_10-01_1015.png' alt='ETHFIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#77 · ILVUSDT</span><span class='trade-time'>10-01 10:15 → 10-01 11:00</span></div><div class='card-pnl pnl-win'>+0.72%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.36%</span><span class='tag tag-info'>破底深 1.31%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 3.8240
+站回 10-01 06:30
+進場 3.8920  停損 3.8780  目標 3.9200
+出場 3.9200  2R</pre><div class='mini-chart'><img src='img/t077_ILVUSDT_10-01_1015.png' alt='ILVUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#78 · ONDOUSDT</span><span class='trade-time'>10-01 10:15 → 10-01 12:45</span></div><div class='card-pnl pnl-win'>+1.31%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.66%</span><span class='tag tag-info'>破底深 5.81%</span></div><pre class='trade-detail'>破底 10-01 02:30  low 0.47690
+站回 10-01 06:15
+進場 0.50370  停損 0.50040  目標 0.51030
+出場 0.51030  2R</pre><div class='mini-chart'><img src='img/t078_ONDOUSDT_10-01_1015.png' alt='ONDOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#79 · LYNUSDT</span><span class='trade-time'>10-01 11:00 → 10-01 11:15</span></div><div class='card-pnl pnl-loss'>-2.14%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 2.14%</span><span class='tag tag-info'>破底深 29.84%</span></div><pre class='trade-detail'>破底 10-01 05:00  low 0.02182
+站回 10-01 08:00
+進場 0.02473  停損 0.02420  目標 0.02579
+出場 0.02420  停損</pre><div class='mini-chart'><img src='img/t079_LYNUSDT_10-01_1100.png' alt='LYNUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#80 · SAGAUSDT</span><span class='trade-time'>10-01 11:15 → 10-01 14:30</span></div><div class='card-pnl pnl-loss'>-0.60%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.60%</span><span class='tag tag-info'>破底深 6.16%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.02413
+站回 10-01 10:00
+進場 0.02506  停損 0.02491  目標 0.02536
+出場 0.02491  停損</pre><div class='mini-chart'><img src='img/t080_SAGAUSDT_10-01_1115.png' alt='SAGAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#81 · TUTUSDT</span><span class='trade-time'>10-01 11:15 → 10-01 12:00</span></div><div class='card-pnl pnl-win'>+1.22%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.61%</span><span class='tag tag-info'>破底深 0.83%</span></div><pre class='trade-detail'>破底 10-01 10:00  low 0.02415
+站回 10-01 10:45
+進場 0.02450  停損 0.02435  目標 0.02480
+出場 0.02480  2R</pre><div class='mini-chart'><img src='img/t081_TUTUSDT_10-01_1115.png' alt='TUTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#82 · USUSDT</span><span class='trade-time'>10-01 11:45 → 10-01 12:00</span></div><div class='card-pnl pnl-loss'>-2.37%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 2.37%</span><span class='tag tag-info'>破底深 7.31%</span></div><pre class='trade-detail'>破底 10-01 09:45  low 0.02428
+站回 10-01 10:30
+進場 0.02637  停損 0.02575  目標 0.02763
+出場 0.02575  停損</pre><div class='mini-chart'><img src='img/t082_USUSDT_10-01_1145.png' alt='USUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#83 · JSTUSDT</span><span class='trade-time'>10-01 12:00 → 10-01 12:15</span></div><div class='card-pnl pnl-loss'>-0.30%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.30%</span><span class='tag tag-info'>破底深 0.64%</span></div><pre class='trade-detail'>破底 10-01 10:15  low 0.13210
+站回 10-01 11:30
+進場 0.13307  停損 0.13267  目標 0.13387
+出場 0.13267  停損</pre><div class='mini-chart'><img src='img/t083_JSTUSDT_10-01_1200.png' alt='JSTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#84 · 1000BONKUSDT</span><span class='trade-time'>10-01 12:15 → 10-01 12:30</span></div><div class='card-pnl pnl-loss'>-0.44%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.44%</span><span class='tag tag-info'>破底深 1.98%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.00370600
+站回 10-01 06:30
+進場 0.00384200  停損 0.00382500  目標 0.00387600
+出場 0.00382500  停損</pre><div class='mini-chart'><img src='img/t084_1000BONKUSDT_10-01_1215.png' alt='1000BONKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#85 · HBARUSDT</span><span class='trade-time'>10-01 12:15 → 10-01 12:45</span></div><div class='card-pnl pnl-win'>+1.38%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.69%</span><span class='tag tag-info'>破底深 2.18%</span></div><pre class='trade-detail'>破底 10-01 10:15  low 0.10336
+站回 10-01 11:30
+進場 0.10548  停損 0.10475  目標 0.10694
+出場 0.10694  2R</pre><div class='mini-chart'><img src='img/t085_HBARUSDT_10-01_1215.png' alt='HBARUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#86 · BRUSDT</span><span class='trade-time'>10-01 12:30 → 10-01 15:00</span></div><div class='card-pnl pnl-win'>+4.86%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 2.43%</span><span class='tag tag-info'>破底深 7.28%</span></div><pre class='trade-detail'>破底 10-01 11:15  low 0.65100
+站回 10-01 11:30
+進場 0.70743  停損 0.69025  目標 0.74179
+出場 0.74179  2R</pre><div class='mini-chart'><img src='img/t086_BRUSDT_10-01_1230.png' alt='BRUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#87 · POWERUSDT</span><span class='trade-time'>10-01 12:30 → 10-01 12:45</span></div><div class='card-pnl pnl-loss'>-0.52%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.52%</span><span class='tag tag-info'>破底深 4.28%</span></div><pre class='trade-detail'>破底 10-01 10:15  low 0.07953
+站回 10-01 11:30
+進場 0.08217  停損 0.08174  目標 0.08303
+出場 0.08174  停損</pre><div class='mini-chart'><img src='img/t087_POWERUSDT_10-01_1230.png' alt='POWERUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#88 · ALLOUSDT</span><span class='trade-time'>10-01 13:00 → 10-01 14:45</span></div><div class='card-pnl pnl-win'>+0.98%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.49%</span><span class='tag tag-info'>破底深 2.36%</span></div><pre class='trade-detail'>破底 10-01 04:00  low 0.27408
+站回 10-01 06:15
+進場 0.28454  停損 0.28315  目標 0.28732
+出場 0.28732  2R</pre><div class='mini-chart'><img src='img/t088_ALLOUSDT_10-01_1300.png' alt='ALLOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#89 · AXSUSDT</span><span class='trade-time'>10-01 13:00 → 10-01 14:15</span></div><div class='card-pnl pnl-loss'>-0.42%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.42%</span><span class='tag tag-info'>破底深 1.85%</span></div><pre class='trade-detail'>破底 10-01 03:45  low 1.1301
+站回 10-01 06:30
+進場 1.1602  停損 1.1553  目標 1.1700
+出場 1.1553  停損</pre><div class='mini-chart'><img src='img/t089_AXSUSDT_10-01_1300.png' alt='AXSUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#90 · MOVEUSDT</span><span class='trade-time'>10-01 13:45 → 10-01 14:00</span></div><div class='card-pnl pnl-win'>+1.56%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.78%</span><span class='tag tag-info'>破底深 2.64%</span></div><pre class='trade-detail'>破底 10-01 06:00  low 0.00895600
+站回 10-01 06:30
+進場 0.00986400  停損 0.00978700  目標 0.01002
+出場 0.01002  2R</pre><div class='mini-chart'><img src='img/t090_MOVEUSDT_10-01_1345.png' alt='MOVEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#91 · SPKUSDT</span><span class='trade-time'>10-01 13:45 → 10-01 14:00</span></div><div class='card-pnl pnl-loss'>-0.24%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.24%</span><span class='tag tag-info'>破底深 2.13%</span></div><pre class='trade-detail'>破底 10-01 10:15  low 0.02419
+站回 10-01 13:00
+進場 0.02457  停損 0.02451  目標 0.02469
+出場 0.02451  停損</pre><div class='mini-chart'><img src='img/t091_SPKUSDT_10-01_1345.png' alt='SPKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#92 · 牛来USDT</span><span class='trade-time'>10-01 14:30 → 10-01 15:00</span></div><div class='card-pnl pnl-loss'>-0.30%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.30%</span><span class='tag tag-info'>破底深 1.55%</span></div><pre class='trade-detail'>破底 10-01 13:15  low 0.10254
+站回 10-01 13:45
+進場 0.10426  停損 0.10395  目標 0.10488
+出場 0.10395  停損</pre><div class='mini-chart'><img src='img/t092_牛来USDT_10-01_1430.png' alt='牛来USDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#93 · PHAUSDT</span><span class='trade-time'>10-01 15:15 → 10-01 21:30</span></div><div class='card-pnl pnl-loss'>-2.69%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 2.69%</span><span class='tag tag-info'>破底深 4.61%</span></div><pre class='trade-detail'>破底 10-01 11:45  low 0.07234
+站回 10-01 13:30
+進場 0.07624  停損 0.07419  目標 0.08034
+出場 0.07419  停損</pre><div class='mini-chart'><img src='img/t093_PHAUSDT_10-01_1515.png' alt='PHAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#94 · 1000000BOBUSDT</span><span class='trade-time'>10-01 17:30 → 10-01 17:45</span></div><div class='card-pnl pnl-loss'>-1.32%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.32%</span><span class='tag tag-info'>破底深 24.36%</span></div><pre class='trade-detail'>破底 10-01 11:45  low 0.01262
+站回 10-01 16:45
+進場 0.01441  停損 0.01422  目標 0.01479
+出場 0.01422  停損</pre><div class='mini-chart'><img src='img/t094_1000000BOBUSDT_10-01_1730.png' alt='1000000BOBUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#95 · COTIUSDT</span><span class='trade-time'>10-01 17:30 → 10-01 18:00</span></div><div class='card-pnl pnl-loss'>-0.30%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.30%</span><span class='tag tag-info'>破底深 2.05%</span></div><pre class='trade-detail'>破底 10-01 15:15  low 0.01303
+站回 10-01 16:30
+進場 0.01332  停損 0.01328  目標 0.01340
+出場 0.01328  停損</pre><div class='mini-chart'><img src='img/t095_COTIUSDT_10-01_1730.png' alt='COTIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#96 · RIVERUSDT</span><span class='trade-time'>10-01 18:00 → 10-01 19:00</span></div><div class='card-pnl pnl-loss'>-0.90%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.90%</span><span class='tag tag-info'>破底深 2.51%</span></div><pre class='trade-detail'>破底 10-01 15:15  low 1.1800
+站回 10-01 16:30
+進場 1.2210  停損 1.2100  目標 1.2430
+出場 1.2100  停損</pre><div class='mini-chart'><img src='img/t096_RIVERUSDT_10-01_1800.png' alt='RIVERUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#97 · UNIUSDT</span><span class='trade-time'>10-01 18:00 → 10-01 18:15</span></div><div class='card-pnl pnl-loss'>-0.81%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.81%</span><span class='tag tag-info'>破底深 1.98%</span></div><pre class='trade-detail'>破底 10-01 16:00  low 8.7100
+站回 10-01 16:15
+進場 8.9980  停損 8.9250  目標 9.1440
+出場 8.9250  停損</pre><div class='mini-chart'><img src='img/t097_UNIUSDT_10-01_1800.png' alt='UNIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#98 · ONEUSDT</span><span class='trade-time'>10-01 18:15 → 10-01 20:00</span></div><div class='card-pnl pnl-win'>+1.24%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.62%</span><span class='tag tag-info'>破底深 1.36%</span></div><pre class='trade-detail'>破底 10-01 15:30  low 0.00215250
+站回 10-01 16:00
+進場 0.00220430  停損 0.00219060  目標 0.00223170
+出場 0.00223170  2R</pre><div class='mini-chart'><img src='img/t098_ONEUSDT_10-01_1815.png' alt='ONEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#99 · ACEUSDT</span><span class='trade-time'>10-01 19:00 → 10-01 20:15</span></div><div class='card-pnl pnl-win'>+1.36%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.68%</span><span class='tag tag-info'>破底深 1.54%</span></div><pre class='trade-detail'>破底 10-01 13:45  low 0.17986
+站回 10-01 15:30
+進場 0.18568  停損 0.18442  目標 0.18820
+出場 0.18820  2R</pre><div class='mini-chart'><img src='img/t099_ACEUSDT_10-01_1900.png' alt='ACEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#100 · RUNEUSDT</span><span class='trade-time'>10-01 19:00 → 10-01 19:30</span></div><div class='card-pnl pnl-loss'>-0.34%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.34%</span><span class='tag tag-info'>破底深 2.90%</span></div><pre class='trade-detail'>破底 10-01 16:00  low 0.77390
+站回 10-01 18:30
+進場 0.79270  停損 0.79000  目標 0.79810
+出場 0.79000  停損</pre><div class='mini-chart'><img src='img/t100_RUNEUSDT_10-01_1900.png' alt='RUNEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#101 · CLOUSDT</span><span class='trade-time'>10-01 20:00 → 10-01 20:15</span></div><div class='card-pnl pnl-loss'>-0.27%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.27%</span><span class='tag tag-info'>破底深 2.67%</span></div><pre class='trade-detail'>破底 10-01 18:00  low 0.05691
+站回 10-01 19:30
+進場 0.05830  停損 0.05814  目標 0.05862
+出場 0.05814  停損</pre><div class='mini-chart'><img src='img/t101_CLOUSDT_10-01_2000.png' alt='CLOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#102 · WLFIUSDT</span><span class='trade-time'>10-01 20:00 → 10-01 21:00</span></div><div class='card-pnl pnl-loss'>-0.23%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.23%</span><span class='tag tag-info'>破底深 1.32%</span></div><pre class='trade-detail'>破底 10-01 18:00  low 0.05455
+站回 10-01 19:30
+進場 0.05535  停損 0.05522  目標 0.05561
+出場 0.05522  停損</pre><div class='mini-chart'><img src='img/t102_WLFIUSDT_10-01_2000.png' alt='WLFIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#103 · OPUSDT</span><span class='trade-time'>10-01 20:15 → 10-01 20:30</span></div><div class='card-pnl pnl-loss'>-0.25%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.25%</span><span class='tag tag-info'>破底深 2.08%</span></div><pre class='trade-detail'>破底 10-01 18:00  low 0.12752
+站回 10-01 19:45
+進場 0.12987  停損 0.12955  目標 0.13051
+出場 0.12955  停損</pre><div class='mini-chart'><img src='img/t103_OPUSDT_10-01_2015.png' alt='OPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#104 · INJUSDT</span><span class='trade-time'>10-01 20:45 → 10-01 21:00</span></div><div class='card-pnl pnl-loss'>-0.48%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.48%</span><span class='tag tag-info'>破底深 2.76%</span></div><pre class='trade-detail'>破底 10-01 18:00  low 7.3460
+站回 10-01 19:30
+進場 7.5260  停損 7.4900  目標 7.5980
+出場 7.4900  停損</pre><div class='mini-chart'><img src='img/t104_INJUSDT_10-01_2045.png' alt='INJUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#105 · ROBOUSDT</span><span class='trade-time'>10-01 20:45 → 10-01 21:00</span></div><div class='card-pnl pnl-loss'>-0.76%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.76%</span><span class='tag tag-info'>破底深 1.82%</span></div><pre class='trade-detail'>破底 10-01 18:00  low 0.00889000
+站回 10-01 18:30
+進場 0.00923000  停損 0.00916000  目標 0.00937000
+出場 0.00916000  停損</pre><div class='mini-chart'><img src='img/t105_ROBOUSDT_10-01_2045.png' alt='ROBOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#106 · TRBUSDT</span><span class='trade-time'>10-01 20:45 → 10-01 21:00</span></div><div class='card-pnl pnl-loss'>-0.49%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.49%</span><span class='tag tag-info'>破底深 3.11%</span></div><pre class='trade-detail'>破底 10-01 18:00  low 20.0250
+站回 10-01 19:15
+進場 20.7210  停損 20.6200  目標 20.9230
+出場 20.6200  停損</pre><div class='mini-chart'><img src='img/t106_TRBUSDT_10-01_2045.png' alt='TRBUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#107 · 1000PEPEUSDT</span><span class='trade-time'>10-01 21:00 → 10-01 21:15</span></div><div class='card-pnl pnl-win'>+0.58%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.29%</span><span class='tag tag-info'>破底深 2.10%</span></div><pre class='trade-detail'>破底 10-01 18:00  low 0.00425520
+站回 10-01 19:30
+進場 0.00434080  停損 0.00432820  目標 0.00436600
+出場 0.00436600  2R</pre><div class='mini-chart'><img src='img/t107_1000PEPEUSDT_10-01_2100.png' alt='1000PEPEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#108 · WIFUSDT</span><span class='trade-time'>10-01 21:00 → 10-01 21:30</span></div><div class='card-pnl pnl-win'>+0.97%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.48%</span><span class='tag tag-info'>破底深 1.93%</span></div><pre class='trade-detail'>破底 10-01 18:15  low 0.24310
+站回 10-01 19:30
+進場 0.24800  停損 0.24680  目標 0.25040
+出場 0.25040  2R</pre><div class='mini-chart'><img src='img/t108_WIFUSDT_10-01_2100.png' alt='WIFUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#109 · MORPHOUSDT</span><span class='trade-time'>10-01 22:00 → 10-01 22:15</span></div><div class='card-pnl pnl-win'>+0.70%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.35%</span><span class='tag tag-info'>破底深 2.65%</span></div><pre class='trade-detail'>破底 10-01 18:00  low 2.4363
+站回 10-01 21:30
+進場 2.4746  停損 2.4659  目標 2.4920
+出場 2.4920  2R</pre><div class='mini-chart'><img src='img/t109_MORPHOUSDT_10-01_2200.png' alt='MORPHOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#110 · PUMPBTCUSDT</span><span class='trade-time'>10-01 22:30 → 10-01 22:45</span></div><div class='card-pnl pnl-loss'>-1.90%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.90%</span><span class='tag tag-info'>破底深 36.82%</span></div><pre class='trade-detail'>破底 10-01 10:45  low 0.00690000
+站回 10-01 21:00
+進場 0.00841000  停損 0.00825000  目標 0.00873000
+出場 0.00825000  停損</pre><div class='mini-chart'><img src='img/t110_PUMPBTCUSDT_10-01_2230.png' alt='PUMPBTCUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#111 · AAVEUSDT</span><span class='trade-time'>10-01 22:45 → 10-02 00:30</span></div><div class='card-pnl pnl-win'>+1.64%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.82%</span><span class='tag tag-info'>破底深 1.63%</span></div><pre class='trade-detail'>破底 10-01 21:00  low 162.23
+站回 10-01 21:45
+進場 166.16  停損 164.80  目標 168.88
+出場 168.88  2R</pre><div class='mini-chart'><img src='img/t111_AAVEUSDT_10-01_2245.png' alt='AAVEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#112 · DYDXUSDT</span><span class='trade-time'>10-01 22:45 → 10-01 23:00</span></div><div class='card-pnl pnl-win'>+0.84%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.42%</span><span class='tag tag-info'>破底深 2.81%</span></div><pre class='trade-detail'>破底 10-01 18:00  low 0.13990
+站回 10-01 21:30
+進場 0.14270  停損 0.14210  目標 0.14390
+出場 0.14390  2R</pre><div class='mini-chart'><img src='img/t112_DYDXUSDT_10-01_2245.png' alt='DYDXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#113 · LYNUSDT</span><span class='trade-time'>10-01 22:45 → 10-02 00:00</span></div><div class='card-pnl pnl-win'>+6.02%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 3.01%</span><span class='tag tag-info'>破底深 7.87%</span></div><pre class='trade-detail'>破底 10-01 18:45  low 0.02370
+站回 10-01 21:45
+進場 0.02591  停損 0.02513  目標 0.02747
+出場 0.02747  2R</pre><div class='mini-chart'><img src='img/t113_LYNUSDT_10-01_2245.png' alt='LYNUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#114 · TAOUSDT</span><span class='trade-time'>10-01 22:45 → 10-01 23:00</span></div><div class='card-pnl pnl-loss'>-1.05%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.05%</span><span class='tag tag-info'>破底深 1.79%</span></div><pre class='trade-detail'>破底 10-01 21:15  low 299.50
+站回 10-01 22:15
+進場 307.80  停損 304.58  目標 314.24
+出場 304.58  停損</pre><div class='mini-chart'><img src='img/t114_TAOUSDT_10-01_2245.png' alt='TAOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#115 · KITEUSDT</span><span class='trade-time'>10-01 23:00 → 10-01 23:15</span></div><div class='card-pnl pnl-win'>+1.67%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.84%</span><span class='tag tag-info'>破底深 1.75%</span></div><pre class='trade-detail'>破底 10-01 18:00  low 0.14166
+站回 10-01 18:30
+進場 0.14939  停損 0.14814  目標 0.15189
+出場 0.15189  2R</pre><div class='mini-chart'><img src='img/t115_KITEUSDT_10-01_2300.png' alt='KITEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#116 · NATGASUSDT</span><span class='trade-time'>10-01 23:00 → 10-01 23:45</span></div><div class='card-pnl pnl-loss'>-0.87%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.87%</span><span class='tag tag-info'>破底深 0.83%</span></div><pre class='trade-detail'>破底 10-01 17:15  low 2.9510
+站回 10-01 19:30
+進場 3.0050  停損 2.9790  目標 3.0570
+出場 2.9790  停損</pre><div class='mini-chart'><img src='img/t116_NATGASUSDT_10-01_2300.png' alt='NATGASUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#117 · TSLAUSDT</span><span class='trade-time'>10-01 23:00 → 10-01 23:30</span></div><div class='card-pnl pnl-loss'>-0.48%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.48%</span><span class='tag tag-info'>破底深 0.69%</span></div><pre class='trade-detail'>破底 10-01 22:00  low 354.28
+站回 10-01 22:30
+進場 358.55  停損 356.84  目標 361.97
+出場 356.84  停損</pre><div class='mini-chart'><img src='img/t117_TSLAUSDT_10-01_2300.png' alt='TSLAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#118 · BEATUSDT</span><span class='trade-time'>10-01 23:30 → 10-02 01:15</span></div><div class='card-pnl pnl-win'>+1.09%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.54%</span><span class='tag tag-info'>破底深 1.88%</span></div><pre class='trade-detail'>破底 10-01 22:00  low 0.09030
+站回 10-01 23:00
+進場 0.09180  停損 0.09130  目標 0.09280
+出場 0.09280  2R</pre><div class='mini-chart'><img src='img/t118_BEATUSDT_10-01_2330.png' alt='BEATUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#119 · PIXELUSDT</span><span class='trade-time'>10-01 23:30 → 10-01 23:45</span></div><div class='card-pnl pnl-loss'>-0.24%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.24%</span><span class='tag tag-info'>破底深 1.91%</span></div><pre class='trade-detail'>破底 10-01 22:00  low 0.00570200
+站回 10-01 23:00
+進場 0.00580300  停損 0.00578900  目標 0.00583100
+出場 0.00578900  停損</pre><div class='mini-chart'><img src='img/t119_PIXELUSDT_10-01_2330.png' alt='PIXELUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#120 · POWERUSDT</span><span class='trade-time'>10-01 23:45 → 10-02 00:00</span></div><div class='card-pnl pnl-loss'>-0.39%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.39%</span><span class='tag tag-info'>破底深 3.52%</span></div><pre class='trade-detail'>破底 10-01 20:15  low 0.07985
+站回 10-01 23:00
+進場 0.08233  停損 0.08201  目標 0.08297
+出場 0.08201  停損</pre><div class='mini-chart'><img src='img/t120_POWERUSDT_10-01_2345.png' alt='POWERUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#121 · JSTUSDT</span><span class='trade-time'>10-02 00:00 → 10-02 02:00</span></div><div class='card-pnl pnl-loss'>-0.43%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.43%</span><span class='tag tag-info'>破底深 1.41%</span></div><pre class='trade-detail'>破底 10-01 21:30  low 0.13177
+站回 10-01 23:30
+進場 0.13371  停損 0.13314  目標 0.13485
+出場 0.13314  停損</pre><div class='mini-chart'><img src='img/t121_JSTUSDT_10-02_0000.png' alt='JSTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#122 · MRNAUSDT</span><span class='trade-time'>10-02 00:15 → 10-02 01:30</span></div><div class='card-pnl pnl-win'>+1.22%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.61%</span><span class='tag tag-info'>破底深 1.98%</span></div><pre class='trade-detail'>破底 10-01 20:00  low 184.69
+站回 10-01 21:30
+進場 192.04  停損 190.87  目標 194.38
+出場 194.38  2R</pre><div class='mini-chart'><img src='img/t122_MRNAUSDT_10-02_0015.png' alt='MRNAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#123 · AXSUSDT</span><span class='trade-time'>10-02 00:30 → 10-02 00:45</span></div><div class='card-pnl pnl-loss'>-0.26%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.26%</span><span class='tag tag-info'>破底深 1.15%</span></div><pre class='trade-detail'>破底 10-01 22:45  low 1.1181
+站回 10-01 23:00
+進場 1.1334  停損 1.1304  目標 1.1394
+出場 1.1304  停損</pre><div class='mini-chart'><img src='img/t123_AXSUSDT_10-02_0030.png' alt='AXSUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#124 · EGLDUSDT</span><span class='trade-time'>10-02 00:45 → 10-02 01:00</span></div><div class='card-pnl pnl-win'>+0.54%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.27%</span><span class='tag tag-info'>破底深 2.28%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 4.3720
+站回 10-02 00:00
+進場 4.4650  停損 4.4530  目標 4.4890
+出場 4.4890  2R</pre><div class='mini-chart'><img src='img/t124_EGLDUSDT_10-02_0045.png' alt='EGLDUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#125 · INTCUSDT</span><span class='trade-time'>10-02 00:45 → 10-02 01:00</span></div><div class='card-pnl pnl-win'>+0.40%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.20%</span><span class='tag tag-info'>破底深 2.52%</span></div><pre class='trade-detail'>破底 10-01 21:30  low 117.52
+站回 10-01 23:45
+進場 119.70  停損 119.46  目標 120.18
+出場 120.18  2R</pre><div class='mini-chart'><img src='img/t125_INTCUSDT_10-02_0045.png' alt='INTCUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#126 · INTWUSDT</span><span class='trade-time'>10-02 00:45 → 10-02 01:00</span></div><div class='card-pnl pnl-win'>+0.84%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.42%</span><span class='tag tag-info'>破底深 5.03%</span></div><pre class='trade-detail'>破底 10-01 21:30  low 29.8900
+站回 10-01 23:45
+進場 31.0400  停損 30.9100  目標 31.3000
+出場 31.3000  2R</pre><div class='mini-chart'><img src='img/t126_INTWUSDT_10-02_0045.png' alt='INTWUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#127 · SCRUSDT</span><span class='trade-time'>10-02 01:30 → 10-02 01:45</span></div><div class='card-pnl pnl-win'>+1.03%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.52%</span><span class='tag tag-info'>破底深 4.04%</span></div><pre class='trade-detail'>破底 10-01 23:30  low 0.02417
+站回 10-02 01:00
+進場 0.02513  停損 0.02500  目標 0.02539
+出場 0.02539  2R</pre><div class='mini-chart'><img src='img/t127_SCRUSDT_10-02_0130.png' alt='SCRUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#128 · CRVUSDT</span><span class='trade-time'>10-02 01:45 → 10-02 02:00</span></div><div class='card-pnl pnl-loss'>-0.45%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.45%</span><span class='tag tag-info'>破底深 1.95%</span></div><pre class='trade-detail'>破底 10-01 22:45  low 0.37510
+站回 10-02 01:15
+進場 0.38170  停損 0.38000  目標 0.38510
+出場 0.38000  停損</pre><div class='mini-chart'><img src='img/t128_CRVUSDT_10-02_0145.png' alt='CRVUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#129 · ONDOUSDT</span><span class='trade-time'>10-02 01:45 → 10-02 02:00</span></div><div class='card-pnl pnl-loss'>-0.54%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.54%</span><span class='tag tag-info'>破底深 2.15%</span></div><pre class='trade-detail'>破底 10-02 00:45  low 0.48420
+站回 10-02 01:15
+進場 0.49610  停損 0.49340  目標 0.50150
+出場 0.49340  停損</pre><div class='mini-chart'><img src='img/t129_ONDOUSDT_10-02_0145.png' alt='ONDOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#130 · RAYSOLUSDT</span><span class='trade-time'>10-02 01:45 → 10-02 02:00</span></div><div class='card-pnl pnl-loss'>-0.33%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.33%</span><span class='tag tag-info'>破底深 1.82%</span></div><pre class='trade-detail'>破底 10-02 00:45  low 1.8574
+站回 10-02 01:15
+進場 1.8948  停損 1.8885  目標 1.9074
+出場 1.8885  停損</pre><div class='mini-chart'><img src='img/t130_RAYSOLUSDT_10-02_0145.png' alt='RAYSOLUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#131 · STRKUSDT</span><span class='trade-time'>10-02 01:45 → 10-02 02:00</span></div><div class='card-pnl pnl-loss'>-0.45%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.45%</span><span class='tag tag-info'>破底深 3.21%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 0.04146
+站回 10-02 01:15
+進場 0.04237  停損 0.04218  目標 0.04275
+出場 0.04218  停損</pre><div class='mini-chart'><img src='img/t131_STRKUSDT_10-02_0145.png' alt='STRKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#132 · STXUSDT</span><span class='trade-time'>10-02 01:45 → 10-02 02:45</span></div><div class='card-pnl pnl-loss'>-1.20%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.20%</span><span class='tag tag-info'>破底深 3.06%</span></div><pre class='trade-detail'>破底 10-01 22:15  low 0.36950
+站回 10-01 22:30
+進場 0.38380  停損 0.37920  目標 0.39300
+出場 0.37920  停損</pre><div class='mini-chart'><img src='img/t132_STXUSDT_10-02_0145.png' alt='STXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#133 · XLMUSDT</span><span class='trade-time'>10-02 01:45 → 10-02 02:00</span></div><div class='card-pnl pnl-loss'>-0.37%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.37%</span><span class='tag tag-info'>破底深 2.06%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 0.21670
+站回 10-02 01:15
+進場 0.22034  停損 0.21952  目標 0.22198
+出場 0.21952  停損</pre><div class='mini-chart'><img src='img/t133_XLMUSDT_10-02_0145.png' alt='XLMUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#134 · CRWVUSDT</span><span class='trade-time'>10-02 02:00 → 10-02 02:45</span></div><div class='card-pnl pnl-win'>+1.01%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.50%</span><span class='tag tag-info'>破底深 3.80%</span></div><pre class='trade-detail'>破底 10-01 22:15  low 84.6000
+站回 10-02 01:15
+進場 87.1800  停損 86.7400  目標 88.0600
+出場 88.0600  2R</pre><div class='mini-chart'><img src='img/t134_CRWVUSDT_10-02_0200.png' alt='CRWVUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#135 · ENSUSDT</span><span class='trade-time'>10-02 02:00 → 10-02 02:30</span></div><div class='card-pnl pnl-win'>+0.64%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.32%</span><span class='tag tag-info'>破底深 1.52%</span></div><pre class='trade-detail'>破底 10-02 00:45  low 6.7890
+站回 10-02 01:15
+進場 6.9070  停損 6.8850  目標 6.9510
+出場 6.9510  2R</pre><div class='mini-chart'><img src='img/t135_ENSUSDT_10-02_0200.png' alt='ENSUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#136 · GUSDT</span><span class='trade-time'>10-02 02:00 → 10-02 03:00</span></div><div class='card-pnl pnl-loss'>-0.36%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.36%</span><span class='tag tag-info'>破底深 1.20%</span></div><pre class='trade-detail'>破底 10-02 00:45  low 0.00470700
+站回 10-02 01:15
+進場 0.00477200  停損 0.00475500  目標 0.00480600
+出場 0.00475500  停損</pre><div class='mini-chart'><img src='img/t136_GUSDT_10-02_0200.png' alt='GUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#137 · IRENUSDT</span><span class='trade-time'>10-02 02:00 → 10-02 02:30</span></div><div class='card-pnl pnl-loss'>-0.32%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.32%</span><span class='tag tag-info'>破底深 4.25%</span></div><pre class='trade-detail'>破底 10-01 22:15  low 39.3900
+站回 10-02 01:15
+進場 40.3700  停損 40.2400  目標 40.6300
+出場 40.2400  停損</pre><div class='mini-chart'><img src='img/t137_IRENUSDT_10-02_0200.png' alt='IRENUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#138 · QNTUSDT</span><span class='trade-time'>10-02 02:00 → 10-02 02:30</span></div><div class='card-pnl pnl-loss'>-1.58%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.58%</span><span class='tag tag-info'>破底深 6.56%</span></div><pre class='trade-detail'>破底 10-01 23:30  low 255.05
+站回 10-02 01:30
+進場 269.08  停損 264.84  目標 277.56
+出場 264.84  停損</pre><div class='mini-chart'><img src='img/t138_QNTUSDT_10-02_0200.png' alt='QNTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#139 · TQQQUSDT</span><span class='trade-time'>10-02 02:00 → 10-02 02:30</span></div><div class='card-pnl pnl-win'>+0.64%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.32%</span><span class='tag tag-info'>破底深 2.59%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 77.0000
+站回 10-02 01:15
+進場 78.5500  停損 78.3000  目標 79.0500
+出場 79.0500  2R</pre><div class='mini-chart'><img src='img/t139_TQQQUSDT_10-02_0200.png' alt='TQQQUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#140 · VIRTUALUSDT</span><span class='trade-time'>10-02 02:00 → 10-02 02:30</span></div><div class='card-pnl pnl-win'>+0.53%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.27%</span><span class='tag tag-info'>破底深 2.23%</span></div><pre class='trade-detail'>破底 10-02 00:45  low 0.77130
+站回 10-02 01:15
+進場 0.78850  停損 0.78640  目標 0.79270
+出場 0.79270  2R</pre><div class='mini-chart'><img src='img/t140_VIRTUALUSDT_10-02_0200.png' alt='VIRTUALUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#141 · AVAXUSDT</span><span class='trade-time'>10-02 02:45 → 10-02 05:30</span></div><div class='card-pnl pnl-loss'>-0.66%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.66%</span><span class='tag tag-info'>破底深 2.03%</span></div><pre class='trade-detail'>破底 10-02 00:45  low 10.7230
+站回 10-02 01:15
+進場 10.9940  停損 10.9210  目標 11.1400
+出場 10.9210  停損</pre><div class='mini-chart'><img src='img/t141_AVAXUSDT_10-02_0245.png' alt='AVAXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#142 · BMTUSDT</span><span class='trade-time'>10-02 03:00 → 10-02 03:15</span></div><div class='card-pnl pnl-loss'>-0.43%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.43%</span><span class='tag tag-info'>破底深 1.98%</span></div><pre class='trade-detail'>破底 10-01 22:45  low 0.01840
+站回 10-02 01:00
+進場 0.01868  停損 0.01860  目標 0.01884
+出場 0.01860  停損</pre><div class='mini-chart'><img src='img/t142_BMTUSDT_10-02_0300.png' alt='BMTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#143 · ETHFIUSDT</span><span class='trade-time'>10-02 03:00 → 10-02 03:15</span></div><div class='card-pnl pnl-loss'>-0.65%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.65%</span><span class='tag tag-info'>破底深 2.17%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 0.72240
+站回 10-02 01:15
+進場 0.73470  停損 0.72990  目標 0.74430
+出場 0.72990  停損</pre><div class='mini-chart'><img src='img/t143_ETHFIUSDT_10-02_0300.png' alt='ETHFIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#144 · FARTCOINUSDT</span><span class='trade-time'>10-02 03:00 → 10-02 03:15</span></div><div class='card-pnl pnl-loss'>-0.46%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.46%</span><span class='tag tag-info'>破底深 2.47%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 0.17040
+站回 10-02 01:00
+進場 0.17470  停損 0.17390  目標 0.17630
+出場 0.17390  停損</pre><div class='mini-chart'><img src='img/t144_FARTCOINUSDT_10-02_0300.png' alt='FARTCOINUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#145 · LPTUSDT</span><span class='trade-time'>10-02 03:00 → 10-02 03:15</span></div><div class='card-pnl pnl-loss'>-0.47%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.47%</span><span class='tag tag-info'>破底深 2.12%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 1.6880
+站回 10-02 01:15
+進場 1.7190  停損 1.7110  目標 1.7350
+出場 1.7110  停損</pre><div class='mini-chart'><img src='img/t145_LPTUSDT_10-02_0300.png' alt='LPTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#146 · OPUSDT</span><span class='trade-time'>10-02 03:00 → 10-02 03:15</span></div><div class='card-pnl pnl-loss'>-0.22%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.22%</span><span class='tag tag-info'>破底深 2.21%</span></div><pre class='trade-detail'>破底 10-02 00:45  low 0.12570
+站回 10-02 01:15
+進場 0.12839  停損 0.12811  目標 0.12895
+出場 0.12811  停損</pre><div class='mini-chart'><img src='img/t146_OPUSDT_10-02_0300.png' alt='OPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#147 · ORDIUSDT</span><span class='trade-time'>10-02 03:00 → 10-02 03:15</span></div><div class='card-pnl pnl-loss'>-0.48%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.48%</span><span class='tag tag-info'>破底深 1.84%</span></div><pre class='trade-detail'>破底 10-02 00:45  low 4.4750
+站回 10-02 01:15
+進場 4.5630  停損 4.5410  目標 4.6070
+出場 4.5410  停損</pre><div class='mini-chart'><img src='img/t147_ORDIUSDT_10-02_0300.png' alt='ORDIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#148 · THETAUSDT</span><span class='trade-time'>10-02 03:00 → 10-02 03:15</span></div><div class='card-pnl pnl-loss'>-0.68%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.68%</span><span class='tag tag-info'>破底深 1.49%</span></div><pre class='trade-detail'>破底 10-02 00:45  low 0.21720
+站回 10-02 01:15
+進場 0.22150  停損 0.22000  目標 0.22450
+出場 0.22000  停損</pre><div class='mini-chart'><img src='img/t148_THETAUSDT_10-02_0300.png' alt='THETAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#149 · ZENUSDT</span><span class='trade-time'>10-02 03:00 → 10-02 03:15</span></div><div class='card-pnl pnl-loss'>-0.56%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.56%</span><span class='tag tag-info'>破底深 2.58%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 7.0310
+站回 10-02 01:15
+進場 7.1660  停損 7.1260  目標 7.2460
+出場 7.1260  停損</pre><div class='mini-chart'><img src='img/t149_ZENUSDT_10-02_0300.png' alt='ZENUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#150 · AAPLUSDT</span><span class='trade-time'>10-02 03:15 → 10-02 03:30</span></div><div class='card-pnl pnl-loss'>-0.20%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.20%</span><span class='tag tag-info'>破底深 1.52%</span></div><pre class='trade-detail'>破底 10-01 23:45  low 326.22
+站回 10-02 02:15
+進場 329.96  停損 329.30  目標 331.28
+出場 329.30  停損</pre><div class='mini-chart'><img src='img/t150_AAPLUSDT_10-02_0315.png' alt='AAPLUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#151 · CRDOUSDT</span><span class='trade-time'>10-02 03:15 → 10-02 03:45</span></div><div class='card-pnl pnl-win'>+0.66%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.33%</span><span class='tag tag-info'>破底深 1.78%</span></div><pre class='trade-detail'>破底 10-01 21:30  low 195.60
+站回 10-01 21:45
+進場 205.88  停損 205.20  目標 207.24
+出場 207.24  2R</pre><div class='mini-chart'><img src='img/t151_CRDOUSDT_10-02_0315.png' alt='CRDOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#152 · MOVRUSDT</span><span class='trade-time'>10-02 03:15 → 10-02 04:00</span></div><div class='card-pnl pnl-loss'>-2.69%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 2.69%</span><span class='tag tag-info'>破底深 11.76%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 2.4702
+站回 10-01 23:45
+進場 2.9828  停損 2.9026  目標 3.1432
+出場 2.9026  停損</pre><div class='mini-chart'><img src='img/t152_MOVRUSDT_10-02_0315.png' alt='MOVRUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#153 · BBUSDT</span><span class='trade-time'>10-02 03:30 → 10-02 04:45</span></div><div class='card-pnl pnl-loss'>-0.51%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.51%</span><span class='tag tag-info'>破底深 2.22%</span></div><pre class='trade-detail'>破底 10-01 22:45  low 0.00937600
+站回 10-01 23:30
+進場 0.00969900  停損 0.00965000  目標 0.00979700
+出場 0.00965000  停損</pre><div class='mini-chart'><img src='img/t153_BBUSDT_10-02_0330.png' alt='BBUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#154 · FETUSDT</span><span class='trade-time'>10-02 03:30 → 10-02 05:00</span></div><div class='card-pnl pnl-win'>+1.22%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.61%</span><span class='tag tag-info'>破底深 3.38%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 0.22320
+站回 10-02 01:15
+進場 0.22940  停損 0.22800  目標 0.23220
+出場 0.23220  2R</pre><div class='mini-chart'><img src='img/t154_FETUSDT_10-02_0330.png' alt='FETUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#155 · FILUSDT</span><span class='trade-time'>10-02 03:30 → 10-02 05:30</span></div><div class='card-pnl pnl-loss'>-0.50%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.50%</span><span class='tag tag-info'>破底深 2.62%</span></div><pre class='trade-detail'>破底 10-01 22:45  low 0.98850
+站回 10-02 01:00
+進場 1.0142  停損 1.0091  目標 1.0244
+出場 1.0091  停損</pre><div class='mini-chart'><img src='img/t155_FILUSDT_10-02_0330.png' alt='FILUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#156 · ORCAUSDT</span><span class='trade-time'>10-02 03:30 → 10-02 04:00</span></div><div class='card-pnl pnl-win'>+1.08%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.54%</span><span class='tag tag-info'>破底深 2.38%</span></div><pre class='trade-detail'>破底 10-01 21:15  low 1.6180
+站回 10-02 00:00
+進場 1.6640  停損 1.6550  目標 1.6820
+出場 1.6820  2R</pre><div class='mini-chart'><img src='img/t156_ORCAUSDT_10-02_0330.png' alt='ORCAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#157 · RESOLVUSDT</span><span class='trade-time'>10-02 03:30 → 10-02 04:15</span></div><div class='card-pnl pnl-win'>+2.88%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.44%</span><span class='tag tag-info'>破底深 2.04%</span></div><pre class='trade-detail'>破底 10-01 22:00  low 0.01858
+站回 10-01 23:45
+進場 0.01944  停損 0.01916  目標 0.02000
+出場 0.02000  2R</pre><div class='mini-chart'><img src='img/t157_RESOLVUSDT_10-02_0330.png' alt='RESOLVUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#158 · XPLUSDT</span><span class='trade-time'>10-02 04:30 → 10-02 05:00</span></div><div class='card-pnl pnl-loss'>-0.28%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.28%</span><span class='tag tag-info'>破底深 2.56%</span></div><pre class='trade-detail'>破底 10-01 23:00  low 0.09305
+站回 10-02 01:00
+進場 0.09576  停損 0.09549  目標 0.09630
+出場 0.09549  停損</pre><div class='mini-chart'><img src='img/t158_XPLUSDT_10-02_0430.png' alt='XPLUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#159 · MAGICUSDT</span><span class='trade-time'>10-02 05:00 → 10-02 05:15</span></div><div class='card-pnl pnl-loss'>-0.29%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.29%</span><span class='tag tag-info'>破底深 1.48%</span></div><pre class='trade-detail'>破底 10-01 22:45  low 0.05187
+站回 10-01 23:15
+進場 0.05534  停損 0.05518  目標 0.05566
+出場 0.05518  停損</pre><div class='mini-chart'><img src='img/t159_MAGICUSDT_10-02_0500.png' alt='MAGICUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#160 · AGTUSDT</span><span class='trade-time'>10-02 05:15 → 10-02 05:30</span></div><div class='card-pnl pnl-loss'>-0.48%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.48%</span><span class='tag tag-info'>破底深 11.44%</span></div><pre class='trade-detail'>破底 10-01 22:45  low 0.02310
+站回 10-02 01:15
+進場 0.02556  停損 0.02543  目標 0.02580
+出場 0.02543  停損</pre><div class='mini-chart'><img src='img/t160_AGTUSDT_10-02_0515.png' alt='AGTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#161 · CLOUSDT</span><span class='trade-time'>10-02 05:30 → 10-02 13:30</span></div><div class='card-pnl pnl-win'>+2.07%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.03%</span><span class='tag tag-info'>破底深 1.74%</span></div><pre class='trade-detail'>破底 10-02 03:15  low 0.05650
+站回 10-02 04:00
+進場 0.05798  停損 0.05738  目標 0.05918
+出場 0.05918  2R</pre><div class='mini-chart'><img src='img/t161_CLOUSDT_10-02_0530.png' alt='CLOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#162 · SNXXUSDT</span><span class='trade-time'>10-02 05:45 → 10-02 06:45</span></div><div class='card-pnl pnl-win'>+0.57%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.29%</span><span class='tag tag-info'>破底深 5.21%</span></div><pre class='trade-detail'>破底 10-01 22:15  low 16.1500
+站回 10-02 00:30
+進場 17.4700  停損 17.4200  目標 17.5700
+出場 17.5700  2R</pre><div class='mini-chart'><img src='img/t162_SNXXUSDT_10-02_0545.png' alt='SNXXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#163 · VETUSDT</span><span class='trade-time'>10-02 05:45 → 10-02 06:00</span></div><div class='card-pnl pnl-win'>+0.46%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.23%</span><span class='tag tag-info'>破底深 1.71%</span></div><pre class='trade-detail'>破底 10-02 00:45  low 0.00854400
+站回 10-02 01:15
+進場 0.00873200  停損 0.00871200  目標 0.00877200
+出場 0.00877200  2R</pre><div class='mini-chart'><img src='img/t163_VETUSDT_10-02_0545.png' alt='VETUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#164 · DRAMUSDT</span><span class='trade-time'>10-02 06:45 → 10-02 08:00</span></div><div class='card-pnl pnl-loss'>-0.40%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.40%</span><span class='tag tag-info'>破底深 2.52%</span></div><pre class='trade-detail'>破底 10-01 22:15  low 59.4300
+站回 10-02 01:00
+進場 61.9100  停損 61.6600  目標 62.4100
+出場 61.6600  停損</pre><div class='mini-chart'><img src='img/t164_DRAMUSDT_10-02_0645.png' alt='DRAMUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#165 · ILVUSDT</span><span class='trade-time'>10-02 06:45 → 10-02 08:00</span></div><div class='card-pnl pnl-win'>+0.61%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.31%</span><span class='tag tag-info'>破底深 1.35%</span></div><pre class='trade-detail'>破底 10-01 22:45  low 3.7510
+站回 10-01 23:00
+進場 3.9130  停損 3.9010  目標 3.9370
+出場 3.9370  2R</pre><div class='mini-chart'><img src='img/t165_ILVUSDT_10-02_0645.png' alt='ILVUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#166 · SKHYNIXUSDT</span><span class='trade-time'>10-02 07:00 → 10-02 07:45</span></div><div class='card-pnl pnl-loss'>-0.21%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.21%</span><span class='tag tag-info'>破底深 1.97%</span></div><pre class='trade-detail'>破底 10-01 22:15  low 1304.00
+站回 10-02 01:00
+進場 1356.89  停損 1353.99  目標 1362.69
+出場 1353.99  停損</pre><div class='mini-chart'><img src='img/t166_SKHYNIXUSDT_10-02_0700.png' alt='SKHYNIXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#167 · UBUSDT</span><span class='trade-time'>10-02 07:00 → 10-02 07:30</span></div><div class='card-pnl pnl-loss'>-0.33%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.33%</span><span class='tag tag-info'>破底深 1.49%</span></div><pre class='trade-detail'>破底 10-02 03:30  low 0.14362
+站回 10-02 06:15
+進場 0.14543  停損 0.14495  目標 0.14639
+出場 0.14495  停損</pre><div class='mini-chart'><img src='img/t167_UBUSDT_10-02_0700.png' alt='UBUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#168 · KORUUSDT</span><span class='trade-time'>10-02 07:30 → 10-02 07:45</span></div><div class='card-pnl pnl-loss'>-0.24%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.24%</span><span class='tag tag-info'>破底深 3.75%</span></div><pre class='trade-detail'>破底 10-01 22:15  low 19.7400
+站回 10-02 01:00
+進場 20.9300  停損 20.8800  目標 21.0300
+出場 20.8800  停損</pre><div class='mini-chart'><img src='img/t168_KORUUSDT_10-02_0730.png' alt='KORUUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#169 · MUUUSDT</span><span class='trade-time'>10-02 08:00 → 10-02 08:15</span></div><div class='card-pnl pnl-win'>+0.63%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.31%</span><span class='tag tag-info'>破底深 6.36%</span></div><pre class='trade-detail'>破底 10-01 22:15  low 33.7500
+站回 10-02 00:30
+進場 38.2200  停損 38.1000  目標 38.4600
+出場 38.4600  2R</pre><div class='mini-chart'><img src='img/t169_MUUUSDT_10-02_0800.png' alt='MUUUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#170 · SMCIUSDT</span><span class='trade-time'>10-02 08:00 → 10-02 09:30</span></div><div class='card-pnl pnl-loss'>-0.33%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.33%</span><span class='tag tag-info'>破底深 2.50%</span></div><pre class='trade-detail'>破底 10-01 22:15  low 40.1800
+站回 10-02 00:15
+進場 42.0500  停損 41.9100  目標 42.3300
+出場 41.9100  停損</pre><div class='mini-chart'><img src='img/t170_SMCIUSDT_10-02_0800.png' alt='SMCIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#171 · TSMUSDT</span><span class='trade-time'>10-02 08:00 → 10-02 09:30</span></div><div class='card-pnl pnl-loss'>-0.22%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.22%</span><span class='tag tag-info'>破底深 0.80%</span></div><pre class='trade-detail'>破底 10-01 23:30  low 454.13
+站回 10-02 01:15
+進場 460.19  停損 459.19  目標 462.19
+出場 459.19  停損</pre><div class='mini-chart'><img src='img/t171_TSMUSDT_10-02_0800.png' alt='TSMUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#172 · ZAMAUSDT</span><span class='trade-time'>10-02 08:00 → 10-02 08:45</span></div><div class='card-pnl pnl-win'>+1.99%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.00%</span><span class='tag tag-info'>破底深 3.88%</span></div><pre class='trade-detail'>破底 10-02 03:30  low 0.07479
+站回 10-02 07:15
+進場 0.07735  停損 0.07658  目標 0.07889
+出場 0.07889  2R</pre><div class='mini-chart'><img src='img/t172_ZAMAUSDT_10-02_0800.png' alt='ZAMAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#173 · GRTUSDT</span><span class='trade-time'>10-02 09:00 → 10-02 09:15</span></div><div class='card-pnl pnl-loss'>-0.28%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.28%</span><span class='tag tag-info'>破底深 2.63%</span></div><pre class='trade-detail'>破底 10-02 05:30  low 0.02777
+站回 10-02 08:00
+進場 0.02816  停損 0.02808  目標 0.02832
+出場 0.02808  停損</pre><div class='mini-chart'><img src='img/t173_GRTUSDT_10-02_0900.png' alt='GRTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#174 · ARUSDT</span><span class='trade-time'>10-02 09:15 → 10-02 12:15</span></div><div class='card-pnl pnl-win'>+1.58%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.79%</span><span class='tag tag-info'>破底深 3.80%</span></div><pre class='trade-detail'>破底 10-02 03:15  low 4.1830
+站回 10-02 06:45
+進場 4.2970  停損 4.2630  目標 4.3650
+出場 4.3650  2R</pre><div class='mini-chart'><img src='img/t174_ARUSDT_10-02_0915.png' alt='ARUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#175 · GLWUSDT</span><span class='trade-time'>10-02 09:15 → 10-02 09:30</span></div><div class='card-pnl pnl-loss'>-0.28%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.28%</span><span class='tag tag-info'>破底深 2.57%</span></div><pre class='trade-detail'>破底 10-01 22:00  low 151.29
+站回 10-01 22:15
+進場 160.80  停損 160.35  目標 161.70
+出場 160.35  停損</pre><div class='mini-chart'><img src='img/t175_GLWUSDT_10-02_0915.png' alt='GLWUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#176 · PYTHUSDT</span><span class='trade-time'>10-02 09:15 → 10-02 09:45</span></div><div class='card-pnl pnl-win'>+0.67%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.34%</span><span class='tag tag-info'>破底深 1.57%</span></div><pre class='trade-detail'>破底 10-02 05:30  low 0.07351
+站回 10-02 08:30
+進場 0.07428  停損 0.07403  目標 0.07478
+出場 0.07478  2R</pre><div class='mini-chart'><img src='img/t176_PYTHUSDT_10-02_0915.png' alt='PYTHUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#177 · SUPERUSDT</span><span class='trade-time'>10-02 09:15 → 10-02 10:00</span></div><div class='card-pnl pnl-win'>+3.53%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.77%</span><span class='tag tag-info'>破底深 1.87%</span></div><pre class='trade-detail'>破底 10-01 21:15  low 0.19515
+站回 10-01 22:15
+進場 0.22488  停損 0.22091  目標 0.23282
+出場 0.23282  2R</pre><div class='mini-chart'><img src='img/t177_SUPERUSDT_10-02_0915.png' alt='SUPERUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#178 · CCUSDT</span><span class='trade-time'>10-02 09:45 → 10-02 10:15</span></div><div class='card-pnl pnl-loss'>-0.52%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.52%</span><span class='tag tag-info'>破底深 1.02%</span></div><pre class='trade-detail'>破底 10-02 03:30  low 0.11967
+站回 10-02 08:00
+進場 0.12058  停損 0.11995  目標 0.12184
+出場 0.11995  停損</pre><div class='mini-chart'><img src='img/t178_CCUSDT_10-02_0945.png' alt='CCUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#179 · QNTUSDT</span><span class='trade-time'>10-02 09:45 → 10-02 10:30</span></div><div class='card-pnl pnl-loss'>-1.86%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.86%</span><span class='tag tag-info'>破底深 7.13%</span></div><pre class='trade-detail'>破底 10-02 05:30  low 241.12
+站回 10-02 09:00
+進場 254.19  停損 249.46  目標 263.65
+出場 249.46  停損</pre><div class='mini-chart'><img src='img/t179_QNTUSDT_10-02_0945.png' alt='QNTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#180 · 1000PEPEUSDT</span><span class='trade-time'>10-02 10:30 → 10-02 10:45</span></div><div class='card-pnl pnl-win'>+0.43%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.21%</span><span class='tag tag-info'>破底深 1.05%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 0.00437550
+站回 10-02 09:45
+進場 0.00442210  停損 0.00441270  目標 0.00444090
+出場 0.00444090  2R</pre><div class='mini-chart'><img src='img/t180_1000PEPEUSDT_10-02_1030.png' alt='1000PEPEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#181 · SPKUSDT</span><span class='trade-time'>10-02 10:30 → 10-02 11:00</span></div><div class='card-pnl pnl-win'>+0.42%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.21%</span><span class='tag tag-info'>破底深 1.46%</span></div><pre class='trade-detail'>破底 10-02 07:00  low 0.02343
+站回 10-02 09:15
+進場 0.02367  停損 0.02362  目標 0.02377
+出場 0.02377  2R</pre><div class='mini-chart'><img src='img/t181_SPKUSDT_10-02_1030.png' alt='SPKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#182 · CRVUSDT</span><span class='trade-time'>10-02 11:00 → 10-02 11:45</span></div><div class='card-pnl pnl-loss'>-0.50%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.50%</span><span class='tag tag-info'>破底深 2.21%</span></div><pre class='trade-detail'>破底 10-02 05:30  low 0.37180
+站回 10-02 09:45
+進場 0.37740  停損 0.37550  目標 0.38120
+出場 0.37550  停損</pre><div class='mini-chart'><img src='img/t182_CRVUSDT_10-02_1100.png' alt='CRVUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#183 · 币安人生USDT</span><span class='trade-time'>10-02 11:15 → 10-02 17:00</span></div><div class='card-pnl pnl-loss'>-2.74%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 2.74%</span><span class='tag tag-info'>破底深 1.23%</span></div><pre class='trade-detail'>破底 10-02 08:00  low 0.49520
+站回 10-02 08:15
+進場 0.51770  停損 0.50350  目標 0.54610
+出場 0.50350  停損</pre><div class='mini-chart'><img src='img/t183_币安人生USDT_10-02_1115.png' alt='币安人生USDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#184 · AVAXUSDT</span><span class='trade-time'>10-02 11:30 → 10-02 12:15</span></div><div class='card-pnl pnl-win'>+0.75%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.37%</span><span class='tag tag-info'>破底深 0.96%</span></div><pre class='trade-detail'>破底 10-02 09:45  low 10.8510
+站回 10-02 10:00
+進場 10.9910  停損 10.9500  目標 11.0730
+出場 11.0730  2R</pre><div class='mini-chart'><img src='img/t184_AVAXUSDT_10-02_1130.png' alt='AVAXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#185 · TRUMPUSDT</span><span class='trade-time'>10-02 11:30 → 10-02 12:15</span></div><div class='card-pnl pnl-win'>+0.78%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.39%</span><span class='tag tag-info'>破底深 0.99%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 2.0360
+站回 10-02 10:00
+進場 2.0640  停損 2.0560  目標 2.0800
+出場 2.0800  2R</pre><div class='mini-chart'><img src='img/t185_TRUMPUSDT_10-02_1130.png' alt='TRUMPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#186 · GIGGLEUSDT</span><span class='trade-time'>10-02 11:45 → 10-02 12:00</span></div><div class='card-pnl pnl-loss'>-0.22%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.22%</span><span class='tag tag-info'>破底深 0.66%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 36.8100
+站回 10-02 09:45
+進場 37.1900  停損 37.1100  目標 37.3500
+出場 37.1100  停損</pre><div class='mini-chart'><img src='img/t186_GIGGLEUSDT_10-02_1145.png' alt='GIGGLEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#187 · MEGAUSDT</span><span class='trade-time'>10-02 11:45 → 10-02 12:00</span></div><div class='card-pnl pnl-loss'>-0.46%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.46%</span><span class='tag tag-info'>破底深 4.70%</span></div><pre class='trade-detail'>破底 10-02 08:00  low 0.04958
+站回 10-02 08:15
+進場 0.05262  停損 0.05238  目標 0.05310
+出場 0.05238  停損</pre><div class='mini-chart'><img src='img/t187_MEGAUSDT_10-02_1145.png' alt='MEGAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#188 · PUMPBTCUSDT</span><span class='trade-time'>10-02 11:45 → 10-02 12:15</span></div><div class='card-pnl pnl-win'>+1.23%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.62%</span><span class='tag tag-info'>破底深 3.91%</span></div><pre class='trade-detail'>破底 10-02 05:45  low 0.00762000
+站回 10-02 07:45
+進場 0.00811000  停損 0.00806000  目標 0.00821000
+出場 0.00821000  2R</pre><div class='mini-chart'><img src='img/t188_PUMPBTCUSDT_10-02_1145.png' alt='PUMPBTCUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#189 · ROBOUSDT</span><span class='trade-time'>10-02 11:45 → 10-02 12:00</span></div><div class='card-pnl pnl-loss'>-0.33%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.33%</span><span class='tag tag-info'>破底深 1.06%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 0.00892000
+站回 10-02 09:45
+進場 0.00904000  停損 0.00901000  目標 0.00910000
+出場 0.00901000  停損</pre><div class='mini-chart'><img src='img/t189_ROBOUSDT_10-02_1145.png' alt='ROBOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#190 · CAPUSDT</span><span class='trade-time'>10-02 12:00 → 10-02 13:45</span></div><div class='card-pnl pnl-win'>+2.61%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.31%</span><span class='tag tag-info'>破底深 13.13%</span></div><pre class='trade-detail'>破底 10-02 09:00  low 0.06695
+站回 10-02 10:15
+進場 0.07352  停損 0.07256  目標 0.07544
+出場 0.07544  2R</pre><div class='mini-chart'><img src='img/t190_CAPUSDT_10-02_1200.png' alt='CAPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#191 · ENSUSDT</span><span class='trade-time'>10-02 12:15 → 10-02 20:15</span></div><div class='card-pnl pnl-win'>+0.76%</div></header><div class='tags'><span class='tag'>時間停</span><span class='tag tag-info'>風險 1.60%</span><span class='tag tag-info'>破底深 0.83%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 6.8200
+站回 10-02 10:00
+進場 7.0020  停損 6.8900  目標 7.2260
+出場 7.0550  時間停</pre><div class='mini-chart'><img src='img/t191_ENSUSDT_10-02_1215.png' alt='ENSUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#192 · THETAUSDT</span><span class='trade-time'>10-02 12:15 → 10-02 20:15</span></div><div class='card-pnl pnl-win'>+1.78%</div></header><div class='tags'><span class='tag'>時間停</span><span class='tag tag-info'>風險 2.05%</span><span class='tag tag-info'>破底深 2.13%</span></div><pre class='trade-detail'>破底 10-02 03:30  low 0.21530
+站回 10-02 07:45
+進場 0.22450  停損 0.21990  目標 0.23370
+出場 0.22850  時間停</pre><div class='mini-chart'><img src='img/t192_THETAUSDT_10-02_1215.png' alt='THETAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#193 · HEMIUSDT</span><span class='trade-time'>10-02 13:00 → 10-02 13:15</span></div><div class='card-pnl pnl-loss'>-0.22%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.22%</span><span class='tag tag-info'>破底深 1.62%</span></div><pre class='trade-detail'>破底 10-02 11:45  low 0.00635500
+站回 10-02 12:30
+進場 0.00647600  停損 0.00646200  目標 0.00650400
+出場 0.00646200  停損</pre><div class='mini-chart'><img src='img/t193_HEMIUSDT_10-02_1300.png' alt='HEMIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#194 · MARSCOINUSDT</span><span class='trade-time'>10-02 13:00 → 10-02 13:15</span></div><div class='card-pnl pnl-loss'>-0.79%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.79%</span><span class='tag tag-info'>破底深 5.19%</span></div><pre class='trade-detail'>破底 10-02 11:15  low 0.12046
+站回 10-02 12:15
+進場 0.12799  停損 0.12698  目標 0.13001
+出場 0.12698  停損</pre><div class='mini-chart'><img src='img/t194_MARSCOINUSDT_10-02_1300.png' alt='MARSCOINUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#195 · PHAUSDT</span><span class='trade-time'>10-02 13:00 → 10-02 13:15</span></div><div class='card-pnl pnl-loss'>-0.28%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.28%</span><span class='tag tag-info'>破底深 1.91%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 0.07151
+站回 10-02 12:15
+進場 0.07254  停損 0.07234  目標 0.07294
+出場 0.07234  停損</pre><div class='mini-chart'><img src='img/t195_PHAUSDT_10-02_1300.png' alt='PHAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#196 · MOVEUSDT</span><span class='trade-time'>10-02 13:30 → 10-02 14:00</span></div><div class='card-pnl pnl-loss'>-0.67%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.67%</span><span class='tag tag-info'>破底深 4.14%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 0.00987600
+站回 10-02 10:45
+進場 0.01024  停損 0.01017  目標 0.01038
+出場 0.01017  停損</pre><div class='mini-chart'><img src='img/t196_MOVEUSDT_10-02_1330.png' alt='MOVEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#197 · ATOMUSDT</span><span class='trade-time'>10-02 14:00 → 10-02 15:30</span></div><div class='card-pnl pnl-loss'>-0.69%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.69%</span><span class='tag tag-info'>破底深 0.71%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 1.6950
+站回 10-02 09:45
+進場 1.7320  停損 1.7200  目標 1.7560
+出場 1.7200  停損</pre><div class='mini-chart'><img src='img/t197_ATOMUSDT_10-02_1400.png' alt='ATOMUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#198 · ESPORTSUSDT</span><span class='trade-time'>10-02 14:00 → 10-02 14:15</span></div><div class='card-pnl pnl-loss'>-0.45%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.45%</span><span class='tag tag-info'>破底深 3.93%</span></div><pre class='trade-detail'>破底 10-02 03:30  low 0.01059
+站回 10-02 06:45
+進場 0.01123  停損 0.01118  目標 0.01133
+出場 0.01118  停損</pre><div class='mini-chart'><img src='img/t198_ESPORTSUSDT_10-02_1400.png' alt='ESPORTSUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#199 · LINKUSDT</span><span class='trade-time'>10-02 14:15 → 10-02 15:00</span></div><div class='card-pnl pnl-loss'>-0.39%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.39%</span><span class='tag tag-info'>破底深 1.13%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 14.1550
+站回 10-02 10:00
+進場 14.4410  停損 14.3840  目標 14.5550
+出場 14.3840  停損</pre><div class='mini-chart'><img src='img/t199_LINKUSDT_10-02_1415.png' alt='LINKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#200 · EGLDUSDT</span><span class='trade-time'>10-02 15:00 → 10-02 15:15</span></div><div class='card-pnl pnl-win'>+0.53%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.26%</span><span class='tag tag-info'>破底深 1.29%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 4.4390
+站回 10-02 09:45
+進場 4.5380  停損 4.5260  目標 4.5620
+出場 4.5620  2R</pre><div class='mini-chart'><img src='img/t200_EGLDUSDT_10-02_1500.png' alt='EGLDUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#201 · INJUSDT</span><span class='trade-time'>10-02 15:00 → 10-02 15:15</span></div><div class='card-pnl pnl-loss'>-0.21%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.21%</span><span class='tag tag-info'>破底深 1.59%</span></div><pre class='trade-detail'>破底 10-02 05:30  low 7.2940
+站回 10-02 08:00
+進場 7.5010  停損 7.4850  目標 7.5330
+出場 7.4850  停損</pre><div class='mini-chart'><img src='img/t201_INJUSDT_10-02_1500.png' alt='INJUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#202 · KASUSDT</span><span class='trade-time'>10-02 15:00 → 10-02 16:15</span></div><div class='card-pnl pnl-win'>+1.23%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.62%</span><span class='tag tag-info'>破底深 2.85%</span></div><pre class='trade-detail'>破底 10-02 05:45  low 0.04052
+站回 10-02 09:45
+進場 0.04225  停損 0.04199  目標 0.04277
+出場 0.04277  2R</pre><div class='mini-chart'><img src='img/t202_KASUSDT_10-02_1500.png' alt='KASUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#203 · TRBUSDT</span><span class='trade-time'>10-02 15:00 → 10-02 17:00</span></div><div class='card-pnl pnl-loss'>-0.60%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.60%</span><span class='tag tag-info'>破底深 2.62%</span></div><pre class='trade-detail'>破底 10-02 09:30  low 20.3100
+站回 10-02 12:15
+進場 20.7280  停損 20.6030  目標 20.9780
+出場 20.6030  停損</pre><div class='mini-chart'><img src='img/t203_TRBUSDT_10-02_1500.png' alt='TRBUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#204 · FLOCKUSDT</span><span class='trade-time'>10-02 15:30 → 10-02 19:30</span></div><div class='card-pnl pnl-win'>+2.40%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.20%</span><span class='tag tag-info'>破底深 3.63%</span></div><pre class='trade-detail'>破底 10-02 03:45  low 0.06104
+站回 10-02 07:45
+進場 0.06424  停損 0.06347  目標 0.06578
+出場 0.06578  2R</pre><div class='mini-chart'><img src='img/t204_FLOCKUSDT_10-02_1530.png' alt='FLOCKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#205 · MONUSDT</span><span class='trade-time'>10-02 15:30 → 10-02 15:45</span></div><div class='card-pnl pnl-loss'>-0.30%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.30%</span><span class='tag tag-info'>破底深 2.75%</span></div><pre class='trade-detail'>破底 10-02 13:15  low 0.03275
+站回 10-02 14:15
+進場 0.03372  停損 0.03362  目標 0.03392
+出場 0.03362  停損</pre><div class='mini-chart'><img src='img/t205_MONUSDT_10-02_1530.png' alt='MONUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#206 · ARXUSDT</span><span class='trade-time'>10-02 16:30 → 10-02 16:45</span></div><div class='card-pnl pnl-loss'>-0.91%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.91%</span><span class='tag tag-info'>破底深 2.58%</span></div><pre class='trade-detail'>破底 10-02 15:15  low 0.27700
+站回 10-02 15:30
+進場 0.28640  停損 0.28380  目標 0.29160
+出場 0.28380  停損</pre><div class='mini-chart'><img src='img/t206_ARXUSDT_10-02_1630.png' alt='ARXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#207 · ADAUSDT</span><span class='trade-time'>10-02 17:00 → 10-02 22:30</span></div><div class='card-pnl pnl-loss'>-1.02%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.02%</span><span class='tag tag-info'>破底深 0.95%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 0.24380
+站回 10-02 09:45
+進場 0.25600  停損 0.25340  目標 0.26120
+出場 0.25340  停損</pre><div class='mini-chart'><img src='img/t207_ADAUSDT_10-02_1700.png' alt='ADAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#208 · PONSUSDT</span><span class='trade-time'>10-02 17:00 → 10-02 17:15</span></div><div class='card-pnl pnl-loss'>-0.47%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.47%</span><span class='tag tag-info'>破底深 2.06%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 0.49710
+站回 10-02 09:45
+進場 0.53060  停損 0.52810  目標 0.53560
+出場 0.52810  停損</pre><div class='mini-chart'><img src='img/t208_PONSUSDT_10-02_1700.png' alt='PONSUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#209 · AEROUSDT</span><span class='trade-time'>10-02 18:15 → 10-02 20:30</span></div><div class='card-pnl pnl-win'>+0.88%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.44%</span><span class='tag tag-info'>破底深 1.70%</span></div><pre class='trade-detail'>破底 10-02 15:30  low 0.78200
+站回 10-02 17:45
+進場 0.79390  停損 0.79040  目標 0.80090
+出場 0.80090  2R</pre><div class='mini-chart'><img src='img/t209_AEROUSDT_10-02_1815.png' alt='AEROUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#210 · DOGEUSDT</span><span class='trade-time'>10-02 18:15 → 10-02 20:00</span></div><div class='card-pnl pnl-loss'>-0.50%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.50%</span><span class='tag tag-info'>破底深 1.11%</span></div><pre class='trade-detail'>破底 10-02 09:45  low 0.09311
+站回 10-02 10:45
+進場 0.09680  停損 0.09632  目標 0.09776
+出場 0.09632  停損</pre><div class='mini-chart'><img src='img/t210_DOGEUSDT_10-02_1815.png' alt='DOGEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#211 · ETCUSDT</span><span class='trade-time'>10-02 18:15 → 10-02 19:00</span></div><div class='card-pnl pnl-loss'>-0.35%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.35%</span><span class='tag tag-info'>破底深 0.62%</span></div><pre class='trade-detail'>破底 10-02 09:30  low 8.7760
+站回 10-02 10:00
+進場 9.1350  停損 9.1030  目標 9.1990
+出場 9.1030  停損</pre><div class='mini-chart'><img src='img/t211_ETCUSDT_10-02_1815.png' alt='ETCUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#212 · VIRTUALUSDT</span><span class='trade-time'>10-02 18:15 → 10-02 19:00</span></div><div class='card-pnl pnl-loss'>-0.61%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.61%</span><span class='tag tag-info'>破底深 1.25%</span></div><pre class='trade-detail'>破底 10-02 09:15  low 0.77280
+站回 10-02 09:45
+進場 0.81760  停損 0.81260  目標 0.82760
+出場 0.81260  停損</pre><div class='mini-chart'><img src='img/t212_VIRTUALUSDT_10-02_1815.png' alt='VIRTUALUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#213 · KITEUSDT</span><span class='trade-time'>10-02 20:00 → 10-02 22:00</span></div><div class='card-pnl pnl-loss'>-1.08%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.08%</span><span class='tag tag-info'>破底深 2.22%</span></div><pre class='trade-detail'>破底 10-02 15:15  low 0.14531
+站回 10-02 16:30
+進場 0.15001  停損 0.14839  目標 0.15325
+出場 0.14839  停損</pre><div class='mini-chart'><img src='img/t213_KITEUSDT_10-02_2000.png' alt='KITEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#214 · QUSDT</span><span class='trade-time'>10-02 20:00 → 10-02 20:45</span></div><div class='card-pnl pnl-win'>+4.16%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 2.08%</span><span class='tag tag-info'>破底深 3.33%</span></div><pre class='trade-detail'>破底 10-02 15:15  low 0.01981
+站回 10-02 18:30
+進場 0.02073  停損 0.02030  目標 0.02160
+出場 0.02160  2R</pre><div class='mini-chart'><img src='img/t214_QUSDT_10-02_2000.png' alt='QUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#215 · NILUSDT</span><span class='trade-time'>10-02 20:15 → 10-02 20:45</span></div><div class='card-pnl pnl-win'>+1.08%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.54%</span><span class='tag tag-info'>破底深 2.19%</span></div><pre class='trade-detail'>破底 10-02 17:15  low 0.07972
+站回 10-02 19:00
+進場 0.08122  停損 0.08078  目標 0.08210
+出場 0.08210  2R</pre><div class='mini-chart'><img src='img/t215_NILUSDT_10-02_2015.png' alt='NILUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#216 · ALICEUSDT</span><span class='trade-time'>10-02 21:15 → 10-02 21:45</span></div><div class='card-pnl pnl-loss'>-0.56%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.56%</span><span class='tag tag-info'>破底深 13.59%</span></div><pre class='trade-detail'>破底 10-02 14:30  low 0.16930
+站回 10-02 20:30
+進場 0.17960  停損 0.17860  目標 0.18160
+出場 0.17860  停損</pre><div class='mini-chart'><img src='img/t216_ALICEUSDT_10-02_2115.png' alt='ALICEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#217 · AXTIUSDT</span><span class='trade-time'>10-02 21:15 → 10-02 21:30</span></div><div class='card-pnl pnl-loss'>-0.91%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.91%</span><span class='tag tag-info'>破底深 1.28%</span></div><pre class='trade-detail'>破底 10-02 19:00  low 81.4100
+站回 10-02 20:30
+進場 83.0900  停損 82.3300  目標 84.6100
+出場 82.3300  停損</pre><div class='mini-chart'><img src='img/t217_AXTIUSDT_10-02_2115.png' alt='AXTIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#218 · NBISUSDT</span><span class='trade-time'>10-02 21:15 → 10-02 21:30</span></div><div class='card-pnl pnl-win'>+0.42%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.21%</span><span class='tag tag-info'>破底深 0.97%</span></div><pre class='trade-detail'>破底 10-02 20:15  low 233.07
+站回 10-02 20:30
+進場 236.17  停損 235.67  目標 237.17
+出場 237.17  2R</pre><div class='mini-chart'><img src='img/t218_NBISUSDT_10-02_2115.png' alt='NBISUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#219 · SAGAUSDT</span><span class='trade-time'>10-02 21:15 → 10-02 21:30</span></div><div class='card-pnl pnl-loss'>-0.20%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.20%</span><span class='tag tag-info'>破底深 0.97%</span></div><pre class='trade-detail'>破底 10-02 20:00  low 0.02416
+站回 10-02 20:15
+進場 0.02443  停損 0.02438  目標 0.02453
+出場 0.02438  停損</pre><div class='mini-chart'><img src='img/t219_SAGAUSDT_10-02_2115.png' alt='SAGAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#220 · AAOIUSDT</span><span class='trade-time'>10-02 21:30 → 10-02 22:00</span></div><div class='card-pnl pnl-win'>+4.85%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 2.43%</span><span class='tag tag-info'>破底深 1.04%</span></div><pre class='trade-detail'>破底 10-02 19:00  low 107.49
+站回 10-02 20:30
+進場 109.17  停損 106.52  目標 114.47
+出場 114.47  2R</pre><div class='mini-chart'><img src='img/t220_AAOIUSDT_10-02_2130.png' alt='AAOIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#221 · AAPLUSDT</span><span class='trade-time'>10-02 21:30 → 10-02 21:45</span></div><div class='card-pnl pnl-loss'>-0.25%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.25%</span><span class='tag tag-info'>破底深 0.27%</span></div><pre class='trade-detail'>破底 10-02 19:00  low 330.43
+站回 10-02 19:15
+進場 331.82  停損 331.00  目標 333.46
+出場 331.00  停損</pre><div class='mini-chart'><img src='img/t221_AAPLUSDT_10-02_2130.png' alt='AAPLUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#222 · ARKUSDT</span><span class='trade-time'>10-02 22:00 → 10-02 22:45</span></div><div class='card-pnl pnl-loss'>-0.55%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.55%</span><span class='tag tag-info'>破底深 2.31%</span></div><pre class='trade-detail'>破底 10-02 20:00  low 0.21230
+站回 10-02 21:30
+進場 0.21660  停損 0.21540  目標 0.21900
+出場 0.21540  停損</pre><div class='mini-chart'><img src='img/t222_ARKUSDT_10-02_2200.png' alt='ARKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#223 · JUPUSDT</span><span class='trade-time'>10-02 22:00 → 10-02 22:15</span></div><div class='card-pnl pnl-loss'>-0.30%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.30%</span><span class='tag tag-info'>破底深 1.51%</span></div><pre class='trade-detail'>破底 10-02 18:15  low 0.32750
+站回 10-02 20:45
+進場 0.33110  停損 0.33010  目標 0.33310
+出場 0.33010  停損</pre><div class='mini-chart'><img src='img/t223_JUPUSDT_10-02_2200.png' alt='JUPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#224 · PUMPBTCUSDT</span><span class='trade-time'>10-02 22:00 → 10-03 00:45</span></div><div class='card-pnl pnl-win'>+3.90%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.95%</span><span class='tag tag-info'>破底深 3.69%</span></div><pre class='trade-detail'>破底 10-02 19:15  low 0.00777000
+站回 10-02 20:15
+進場 0.00821000  停損 0.00805000  目標 0.00853000
+出場 0.00853000  2R</pre><div class='mini-chart'><img src='img/t224_PUMPBTCUSDT_10-02_2200.png' alt='PUMPBTCUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#225 · SUIUSDT</span><span class='trade-time'>10-02 22:00 → 10-02 22:15</span></div><div class='card-pnl pnl-loss'>-0.24%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.24%</span><span class='tag tag-info'>破底深 1.22%</span></div><pre class='trade-detail'>破底 10-02 20:00  low 1.1672
+站回 10-02 20:45
+進場 1.1868  停損 1.1839  目標 1.1926
+出場 1.1839  停損</pre><div class='mini-chart'><img src='img/t225_SUIUSDT_10-02_2200.png' alt='SUIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#226 · TRBUSDT</span><span class='trade-time'>10-02 22:00 → 10-02 22:30</span></div><div class='card-pnl pnl-loss'>-0.35%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.35%</span><span class='tag tag-info'>破底深 1.76%</span></div><pre class='trade-detail'>破底 10-02 19:30  low 20.2720
+站回 10-02 21:30
+進場 20.5360  停損 20.4650  目標 20.6780
+出場 20.4650  停損</pre><div class='mini-chart'><img src='img/t226_TRBUSDT_10-02_2200.png' alt='TRBUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#227 · GUSDT</span><span class='trade-time'>10-02 22:15 → 10-02 22:45</span></div><div class='card-pnl pnl-loss'>-0.58%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.58%</span><span class='tag tag-info'>破底深 1.35%</span></div><pre class='trade-detail'>破底 10-02 20:00  low 0.00474900
+站回 10-02 21:30
+進場 0.00482800  停損 0.00480000  目標 0.00488400
+出場 0.00480000  停損</pre><div class='mini-chart'><img src='img/t227_GUSDT_10-02_2215.png' alt='GUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#228 · MEGAUSDT</span><span class='trade-time'>10-02 22:15 → 10-02 22:30</span></div><div class='card-pnl pnl-win'>+0.87%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.43%</span><span class='tag tag-info'>破底深 3.28%</span></div><pre class='trade-detail'>破底 10-02 20:00  low 0.04710
+站回 10-02 20:45
+進場 0.04834  停損 0.04813  目標 0.04876
+出場 0.04876  2R</pre><div class='mini-chart'><img src='img/t228_MEGAUSDT_10-02_2215.png' alt='MEGAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#229 · LAUSDT</span><span class='trade-time'>10-02 22:30 → 10-02 22:45</span></div><div class='card-pnl pnl-loss'>-0.71%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.71%</span><span class='tag tag-info'>破底深 1.03%</span></div><pre class='trade-detail'>破底 10-02 18:15  low 0.06955
+站回 10-02 20:15
+進場 0.07050  停損 0.07000  目標 0.07150
+出場 0.07000  停損</pre><div class='mini-chart'><img src='img/t229_LAUSDT_10-02_2230.png' alt='LAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#230 · TUTUSDT</span><span class='trade-time'>10-02 22:45 → 10-02 23:15</span></div><div class='card-pnl pnl-loss'>-0.49%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.49%</span><span class='tag tag-info'>破底深 2.77%</span></div><pre class='trade-detail'>破底 10-02 20:45  low 0.02383
+站回 10-02 21:00
+進場 0.02466  停損 0.02454  目標 0.02490
+出場 0.02454  停損</pre><div class='mini-chart'><img src='img/t230_TUTUSDT_10-02_2245.png' alt='TUTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#231 · DATAIPUSDT</span><span class='trade-time'>10-02 23:00 → 10-02 23:15</span></div><div class='card-pnl pnl-loss'>-0.28%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.28%</span><span class='tag tag-info'>破底深 1.77%</span></div><pre class='trade-detail'>破底 10-02 19:45  low 0.21140
+站回 10-02 21:45
+進場 0.21530  停損 0.21470  目標 0.21650
+出場 0.21470  停損</pre><div class='mini-chart'><img src='img/t231_DATAIPUSDT_10-02_2300.png' alt='DATAIPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#232 · GLWUSDT</span><span class='trade-time'>10-02 23:15 → 10-03 00:00</span></div><div class='card-pnl pnl-win'>+0.72%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.36%</span><span class='tag tag-info'>破底深 1.69%</span></div><pre class='trade-detail'>破底 10-02 21:45  low 159.80
+站回 10-02 22:15
+進場 163.05  停損 162.46  目標 164.23
+出場 164.23  2R</pre><div class='mini-chart'><img src='img/t232_GLWUSDT_10-02_2315.png' alt='GLWUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#233 · JSTUSDT</span><span class='trade-time'>10-03 00:00 → 10-03 01:30</span></div><div class='card-pnl pnl-win'>+1.18%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.59%</span><span class='tag tag-info'>破底深 1.58%</span></div><pre class='trade-detail'>破底 10-02 23:00  low 0.12585
+站回 10-02 23:30
+進場 0.12831  停損 0.12755  目標 0.12983
+出場 0.12983  2R</pre><div class='mini-chart'><img src='img/t233_JSTUSDT_10-03_0000.png' alt='JSTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#234 · MOVRUSDT</span><span class='trade-time'>10-03 00:00 → 10-03 01:00</span></div><div class='card-pnl pnl-loss'>-1.34%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.34%</span><span class='tag tag-info'>破底深 8.27%</span></div><pre class='trade-detail'>破底 10-02 19:45  low 2.0111
+站回 10-02 22:30
+進場 2.1805  停損 2.1512  目標 2.2391
+出場 2.1512  停損</pre><div class='mini-chart'><img src='img/t234_MOVRUSDT_10-03_0000.png' alt='MOVRUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#235 · DOTUSDT</span><span class='trade-time'>10-03 00:30 → 10-03 01:30</span></div><div class='card-pnl pnl-loss'>-0.62%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.62%</span><span class='tag tag-info'>破底深 1.79%</span></div><pre class='trade-detail'>破底 10-02 23:00  low 1.1962
+站回 10-03 00:00
+進場 1.2193  停損 1.2117  目標 1.2345
+出場 1.2117  停損</pre><div class='mini-chart'><img src='img/t235_DOTUSDT_10-03_0030.png' alt='DOTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#236 · OPUSDT</span><span class='trade-time'>10-03 00:30 → 10-03 00:45</span></div><div class='card-pnl pnl-loss'>-0.56%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.56%</span><span class='tag tag-info'>破底深 1.21%</span></div><pre class='trade-detail'>破底 10-02 22:45  low 0.13112
+站回 10-03 00:00
+進場 0.13302  停損 0.13227  目標 0.13452
+出場 0.13227  停損</pre><div class='mini-chart'><img src='img/t236_OPUSDT_10-03_0030.png' alt='OPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#237 · TAKEUSDT</span><span class='trade-time'>10-03 00:30 → 10-03 01:15</span></div><div class='card-pnl pnl-loss'>-0.48%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.48%</span><span class='tag tag-info'>破底深 3.08%</span></div><pre class='trade-detail'>破底 10-02 17:15  low 0.05718
+站回 10-02 20:45
+進場 0.05863  停損 0.05835  目標 0.05919
+出場 0.05835  停損</pre><div class='mini-chart'><img src='img/t237_TAKEUSDT_10-03_0030.png' alt='TAKEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#238 · QNTUSDT</span><span class='trade-time'>10-03 00:45 → 10-03 01:15</span></div><div class='card-pnl pnl-loss'>-0.70%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.70%</span><span class='tag tag-info'>破底深 10.03%</span></div><pre class='trade-detail'>破底 10-02 15:15  low 222.70
+站回 10-02 19:00
+進場 246.95  停損 245.23  目標 250.39
+出場 245.23  停損</pre><div class='mini-chart'><img src='img/t238_QNTUSDT_10-03_0045.png' alt='QNTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#239 · SQQQUSDT</span><span class='trade-time'>10-03 01:00 → 10-03 09:00</span></div><div class='card-pnl pnl-loss'>-0.15%</div></header><div class='tags'><span class='tag'>時間停</span><span class='tag tag-info'>風險 0.45%</span><span class='tag tag-info'>破底深 2.34%</span></div><pre class='trade-detail'>破底 10-02 22:15  low 32.4700
+站回 10-03 00:15
+進場 33.1900  停損 33.0400  目標 33.4900
+出場 33.1400  時間停</pre><div class='mini-chart'><img src='img/t239_SQQQUSDT_10-03_0100.png' alt='SQQQUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#240 · REUSDT</span><span class='trade-time'>10-03 01:15 → 10-03 01:30</span></div><div class='card-pnl pnl-loss'>-0.43%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.43%</span><span class='tag tag-info'>破底深 1.12%</span></div><pre class='trade-detail'>破底 10-02 22:45  low 0.49810
+站回 10-02 23:45
+進場 0.50670  停損 0.50450  目標 0.51110
+出場 0.50450  停損</pre><div class='mini-chart'><img src='img/t240_REUSDT_10-03_0115.png' alt='REUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#241 · COTIUSDT</span><span class='trade-time'>10-03 01:45 → 10-03 02:15</span></div><div class='card-pnl pnl-loss'>-1.07%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.07%</span><span class='tag tag-info'>破底深 2.42%</span></div><pre class='trade-detail'>破底 10-02 21:45  low 0.01382
+站回 10-03 00:30
+進場 0.01415  停損 0.01400  目標 0.01446
+出場 0.01400  停損</pre><div class='mini-chart'><img src='img/t241_COTIUSDT_10-03_0145.png' alt='COTIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#242 · HUMAUSDT</span><span class='trade-time'>10-03 01:45 → 10-03 02:00</span></div><div class='card-pnl pnl-loss'>-0.40%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.40%</span><span class='tag tag-info'>破底深 3.70%</span></div><pre class='trade-detail'>破底 10-02 20:45  low 0.03274
+站回 10-02 22:45
+進場 0.03369  停損 0.03356  目標 0.03396
+出場 0.03356  停損</pre><div class='mini-chart'><img src='img/t242_HUMAUSDT_10-03_0145.png' alt='HUMAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#243 · INJUSDT</span><span class='trade-time'>10-03 02:00 → 10-03 02:15</span></div><div class='card-pnl pnl-loss'>-0.54%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.54%</span><span class='tag tag-info'>破底深 2.11%</span></div><pre class='trade-detail'>破底 10-02 23:00  low 7.3420
+站回 10-02 23:45
+進場 7.5470  停損 7.5060  目標 7.6290
+出場 7.5060  停損</pre><div class='mini-chart'><img src='img/t243_INJUSDT_10-03_0200.png' alt='INJUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#244 · INITUSDT</span><span class='trade-time'>10-03 02:15 → 10-03 02:30</span></div><div class='card-pnl pnl-loss'>-0.61%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.61%</span><span class='tag tag-info'>破底深 1.40%</span></div><pre class='trade-detail'>破底 10-02 22:45  low 0.10007
+站回 10-02 23:00
+進場 0.10293  停損 0.10230  目標 0.10419
+出場 0.10230  停損</pre><div class='mini-chart'><img src='img/t244_INITUSDT_10-03_0215.png' alt='INITUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#245 · SCRUSDT</span><span class='trade-time'>10-03 02:30 → 10-03 02:45</span></div><div class='card-pnl pnl-win'>+2.38%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.19%</span><span class='tag tag-info'>破底深 6.52%</span></div><pre class='trade-detail'>破底 10-02 21:45  low 0.02725
+站回 10-03 01:30
+進場 0.02855  停損 0.02821  目標 0.02923
+出場 0.02923  2R</pre><div class='mini-chart'><img src='img/t245_SCRUSDT_10-03_0230.png' alt='SCRUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#246 · CAPUSDT</span><span class='trade-time'>10-03 02:45 → 10-03 03:15</span></div><div class='card-pnl pnl-loss'>-0.81%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.81%</span><span class='tag tag-info'>破底深 13.28%</span></div><pre class='trade-detail'>破底 10-02 20:00  low 0.05912
+站回 10-02 21:15
+進場 0.07558  停損 0.07497  目標 0.07680
+出場 0.07497  停損</pre><div class='mini-chart'><img src='img/t246_CAPUSDT_10-03_0245.png' alt='CAPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#247 · MAGMAUSDT</span><span class='trade-time'>10-03 06:00 → 10-03 08:45</span></div><div class='card-pnl pnl-loss'>-2.99%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 2.99%</span><span class='tag tag-info'>破底深 15.08%</span></div><pre class='trade-detail'>破底 10-02 18:00  low 0.21622
+站回 10-02 20:45
+進場 0.34650  停損 0.33613  目標 0.36724
+出場 0.33613  停損</pre><div class='mini-chart'><img src='img/t247_MAGMAUSDT_10-03_0600.png' alt='MAGMAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#248 · GALAUSDT</span><span class='trade-time'>10-03 06:15 → 10-03 07:00</span></div><div class='card-pnl pnl-win'>+2.33%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.16%</span><span class='tag tag-info'>破底深 7.83%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.00241600
+站回 10-03 05:45
+進場 0.00257700  停損 0.00254700  目標 0.00263700
+出場 0.00263700  2R</pre><div class='mini-chart'><img src='img/t248_GALAUSDT_10-03_0615.png' alt='GALAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#249 · ICPUSDT</span><span class='trade-time'>10-03 06:15 → 10-03 07:45</span></div><div class='card-pnl pnl-win'>+0.92%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.46%</span><span class='tag tag-info'>破底深 3.72%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 3.1650
+站回 10-03 05:45
+進場 3.2490  停損 3.2340  目標 3.2790
+出場 3.2790  2R</pre><div class='mini-chart'><img src='img/t249_ICPUSDT_10-03_0615.png' alt='ICPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#250 · PIXELUSDT</span><span class='trade-time'>10-03 06:15 → 10-03 07:15</span></div><div class='card-pnl pnl-win'>+1.24%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.62%</span><span class='tag tag-info'>破底深 5.80%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.00573400
+站回 10-03 05:45
+進場 0.00595300  停損 0.00591600  目標 0.00602700
+出場 0.00602700  2R</pre><div class='mini-chart'><img src='img/t250_PIXELUSDT_10-03_0615.png' alt='PIXELUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#251 · PYTHUSDT</span><span class='trade-time'>10-03 06:15 → 10-03 08:00</span></div><div class='card-pnl pnl-win'>+1.96%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.98%</span><span class='tag tag-info'>破底深 5.75%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.07437
+站回 10-03 05:45
+進場 0.07767  停損 0.07691  目標 0.07919
+出場 0.07919  2R</pre><div class='mini-chart'><img src='img/t251_PYTHUSDT_10-03_0615.png' alt='PYTHUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#252 · DATAIPUSDT</span><span class='trade-time'>10-03 06:30 → 10-03 07:15</span></div><div class='card-pnl pnl-loss'>-1.48%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.48%</span><span class='tag tag-info'>破底深 2.26%</span></div><pre class='trade-detail'>破底 10-03 03:00  low 0.21010
+站回 10-03 06:00
+進場 0.21650  停損 0.21330  目標 0.22290
+出場 0.21330  停損</pre><div class='mini-chart'><img src='img/t252_DATAIPUSDT_10-03_0630.png' alt='DATAIPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#253 · GRAMUSDT</span><span class='trade-time'>10-03 07:00 → 10-03 07:15</span></div><div class='card-pnl pnl-win'>+0.40%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.20%</span><span class='tag tag-info'>破底深 4.06%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 1.4670
+站回 10-03 06:30
+進場 1.4980  停損 1.4950  目標 1.5040
+出場 1.5040  2R</pre><div class='mini-chart'><img src='img/t253_GRAMUSDT_10-03_0700.png' alt='GRAMUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#254 · INJUSDT</span><span class='trade-time'>10-03 07:00 → 10-03 07:15</span></div><div class='card-pnl pnl-win'>+0.54%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.27%</span><span class='tag tag-info'>破底深 4.63%</span></div><pre class='trade-detail'>破底 10-03 03:15  low 7.1220
+站回 10-03 06:30
+進場 7.3740  停損 7.3540  目標 7.4140
+出場 7.4140  2R</pre><div class='mini-chart'><img src='img/t254_INJUSDT_10-03_0700.png' alt='INJUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#255 · IRENUSDT</span><span class='trade-time'>10-03 07:00 → 10-03 08:00</span></div><div class='card-pnl pnl-loss'>-0.36%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.36%</span><span class='tag tag-info'>破底深 2.48%</span></div><pre class='trade-detail'>破底 10-03 01:15  low 41.0200
+站回 10-03 04:00
+進場 41.6400  停損 41.4900  目標 41.9400
+出場 41.4900  停損</pre><div class='mini-chart'><img src='img/t255_IRENUSDT_10-03_0700.png' alt='IRENUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#256 · NMRUSDT</span><span class='trade-time'>10-03 07:45 → 10-03 08:00</span></div><div class='card-pnl pnl-win'>+0.68%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.34%</span><span class='tag tag-info'>破底深 2.80%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 11.1340
+站回 10-03 03:30
+進場 11.8110  停損 11.7710  目標 11.8910
+出場 11.8910  2R</pre><div class='mini-chart'><img src='img/t256_NMRUSDT_10-03_0745.png' alt='NMRUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#257 · BOMEUSDT</span><span class='trade-time'>10-03 08:00 → 10-03 08:30</span></div><div class='card-pnl pnl-loss'>-0.39%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.39%</span><span class='tag tag-info'>破底深 4.68%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.00098740
+站回 10-03 07:30
+進場 0.00102030  停損 0.00101630  目標 0.00102830
+出場 0.00101630  停損</pre><div class='mini-chart'><img src='img/t257_BOMEUSDT_10-03_0800.png' alt='BOMEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#258 · MONUSDT</span><span class='trade-time'>10-03 08:00 → 10-03 08:15</span></div><div class='card-pnl pnl-loss'>-0.28%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.28%</span><span class='tag tag-info'>破底深 11.09%</span></div><pre class='trade-detail'>破底 10-03 02:00  low 0.03046
+站回 10-03 06:30
+進場 0.03207  停損 0.03198  目標 0.03225
+出場 0.03198  停損</pre><div class='mini-chart'><img src='img/t258_MONUSDT_10-03_0800.png' alt='MONUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#259 · OPENAIUSDT</span><span class='trade-time'>10-03 08:00 → 10-03 09:00</span></div><div class='card-pnl pnl-loss'>-0.27%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.27%</span><span class='tag tag-info'>破底深 0.41%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 1572.80
+站回 10-03 03:15
+進場 1599.43  停損 1595.07  目標 1608.15
+出場 1595.07  停損</pre><div class='mini-chart'><img src='img/t259_OPENAIUSDT_10-03_0800.png' alt='OPENAIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#260 · OPGUSDT</span><span class='trade-time'>10-03 08:00 → 10-03 08:15</span></div><div class='card-pnl pnl-loss'>-1.49%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.49%</span><span class='tag tag-info'>破底深 2.41%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.13020
+站回 10-03 06:45
+進場 0.13400  停損 0.13200  目標 0.13800
+出場 0.13200  停損</pre><div class='mini-chart'><img src='img/t260_OPGUSDT_10-03_0800.png' alt='OPGUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#261 · MANAUSDT</span><span class='trade-time'>10-03 08:15 → 10-03 09:00</span></div><div class='card-pnl pnl-win'>+2.95%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.48%</span><span class='tag tag-info'>破底深 4.15%</span></div><pre class='trade-detail'>破底 10-03 04:45  low 0.09524
+站回 10-03 06:30
+進場 0.09823  停損 0.09678  目標 0.10113
+出場 0.10113  2R</pre><div class='mini-chart'><img src='img/t261_MANAUSDT_10-03_0815.png' alt='MANAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#262 · NILUSDT</span><span class='trade-time'>10-03 08:30 → 10-03 08:45</span></div><div class='card-pnl pnl-loss'>-0.31%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.31%</span><span class='tag tag-info'>破底深 4.56%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.07687
+站回 10-03 04:00
+進場 0.08172  停損 0.08147  目標 0.08222
+出場 0.08147  停損</pre><div class='mini-chart'><img src='img/t262_NILUSDT_10-03_0830.png' alt='NILUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#263 · CTUSDT</span><span class='trade-time'>10-03 09:00 → 10-03 09:30</span></div><div class='card-pnl pnl-win'>+2.44%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.22%</span><span class='tag tag-info'>破底深 8.05%</span></div><pre class='trade-detail'>破底 10-03 07:15  low 0.48500
+站回 10-03 08:30
+進場 0.53271  停損 0.52622  目標 0.54569
+出場 0.54569  2R</pre><div class='mini-chart'><img src='img/t263_CTUSDT_10-03_0900.png' alt='CTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#264 · MAGICUSDT</span><span class='trade-time'>10-03 09:00 → 10-03 09:15</span></div><div class='card-pnl pnl-loss'>-0.63%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.63%</span><span class='tag tag-info'>破底深 4.63%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.05738
+站回 10-03 07:15
+進場 0.05862  停損 0.05825  目標 0.05936
+出場 0.05825  停損</pre><div class='mini-chart'><img src='img/t264_MAGICUSDT_10-03_0900.png' alt='MAGICUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#265 · 0GUSDT</span><span class='trade-time'>10-03 09:15 → 10-03 10:00</span></div><div class='card-pnl pnl-loss'>-0.30%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.30%</span><span class='tag tag-info'>破底深 4.93%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.28700
+站回 10-03 06:15
+進場 0.29770  停損 0.29680  目標 0.29950
+出場 0.29680  停損</pre><div class='mini-chart'><img src='img/t265_0GUSDT_10-03_0915.png' alt='0GUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#266 · ARXUSDT</span><span class='trade-time'>10-03 09:15 → 10-03 09:30</span></div><div class='card-pnl pnl-loss'>-0.39%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.39%</span><span class='tag tag-info'>破底深 6.62%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.25450
+站回 10-03 04:30
+進場 0.28000  停損 0.27890  目標 0.28220
+出場 0.27890  停損</pre><div class='mini-chart'><img src='img/t266_ARXUSDT_10-03_0915.png' alt='ARXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#267 · NOMUSDT</span><span class='trade-time'>10-03 09:30 → 10-03 09:45</span></div><div class='card-pnl pnl-loss'>-0.44%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.44%</span><span class='tag tag-info'>破底深 5.34%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.00243200
+站回 10-03 07:00
+進場 0.00251500  停損 0.00250400  目標 0.00253700
+出場 0.00250400  停損</pre><div class='mini-chart'><img src='img/t267_NOMUSDT_10-03_0930.png' alt='NOMUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#268 · AXSUSDT</span><span class='trade-time'>10-03 09:45 → 10-03 10:15</span></div><div class='card-pnl pnl-win'>+0.91%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.46%</span><span class='tag tag-info'>破底深 5.68%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 1.1487
+站回 10-03 05:30
+進場 1.2086  停損 1.2031  目標 1.2196
+出場 1.2196  2R</pre><div class='mini-chart'><img src='img/t268_AXSUSDT_10-03_0945.png' alt='AXSUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#269 · OPENUSDT</span><span class='trade-time'>10-03 09:45 → 10-03 10:00</span></div><div class='card-pnl pnl-win'>+0.48%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.24%</span><span class='tag tag-info'>破底深 6.96%</span></div><pre class='trade-detail'>破底 10-03 03:15  low 0.12260
+站回 10-03 07:15
+進場 0.12570  停損 0.12540  目標 0.12630
+出場 0.12630  2R</pre><div class='mini-chart'><img src='img/t269_OPENUSDT_10-03_0945.png' alt='OPENUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#270 · YGGUSDT</span><span class='trade-time'>10-03 09:45 → 10-03 10:15</span></div><div class='card-pnl pnl-win'>+0.44%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.22%</span><span class='tag tag-info'>破底深 5.93%</span></div><pre class='trade-detail'>破底 10-03 03:15  low 0.02610
+站回 10-03 06:15
+進場 0.02723  停損 0.02717  目標 0.02735
+出場 0.02735  2R</pre><div class='mini-chart'><img src='img/t270_YGGUSDT_10-03_0945.png' alt='YGGUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#271 · APTUSDT</span><span class='trade-time'>10-03 10:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-1.14%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.14%</span><span class='tag tag-info'>破底深 4.50%</span></div><pre class='trade-detail'>破底 10-03 04:45  low 0.76930
+站回 10-03 07:15
+進場 0.79730  停損 0.78820  目標 0.81550
+出場 0.78820  停損</pre><div class='mini-chart'><img src='img/t271_APTUSDT_10-03_1000.png' alt='APTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#272 · HBARUSDT</span><span class='trade-time'>10-03 10:00 → 10-03 10:45</span></div><div class='card-pnl pnl-loss'>-0.43%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.43%</span><span class='tag tag-info'>破底深 8.03%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.09562
+站回 10-03 06:15
+進場 0.10146  停損 0.10102  目標 0.10234
+出場 0.10102  停損</pre><div class='mini-chart'><img src='img/t272_HBARUSDT_10-03_1000.png' alt='HBARUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#273 · LAUSDT</span><span class='trade-time'>10-03 10:00 → 10-03 12:30</span></div><div class='card-pnl pnl-loss'>-0.37%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.37%</span><span class='tag tag-info'>破底深 7.39%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.06411
+站回 10-03 06:45
+進場 0.06727  停損 0.06702  目標 0.06777
+出場 0.06702  停損</pre><div class='mini-chart'><img src='img/t273_LAUSDT_10-03_1000.png' alt='LAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#274 · VVVUSDT</span><span class='trade-time'>10-03 10:00 → 10-03 10:15</span></div><div class='card-pnl pnl-win'>+0.44%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.22%</span><span class='tag tag-info'>破底深 4.32%</span></div><pre class='trade-detail'>破底 10-03 05:15  low 27.5800
+站回 10-03 08:45
+進場 27.9280  停損 27.8670  目標 28.0500
+出場 28.0500  2R</pre><div class='mini-chart'><img src='img/t274_VVVUSDT_10-03_1000.png' alt='VVVUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#275 · ATHUSDT</span><span class='trade-time'>10-03 10:15 → 10-03 10:30</span></div><div class='card-pnl pnl-win'>+1.30%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.65%</span><span class='tag tag-info'>破底深 3.31%</span></div><pre class='trade-detail'>破底 10-03 08:30  low 0.00637800
+站回 10-03 09:00
+進場 0.00663300  停損 0.00659000  目標 0.00671900
+出場 0.00671900  2R</pre><div class='mini-chart'><img src='img/t275_ATHUSDT_10-03_1015.png' alt='ATHUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#276 · ALGOUSDT</span><span class='trade-time'>10-03 11:00 → 10-03 11:30</span></div><div class='card-pnl pnl-loss'>-0.41%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.41%</span><span class='tag tag-info'>破底深 4.52%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.12394
+站回 10-03 07:15
+進場 0.12702  停損 0.12650  目標 0.12806
+出場 0.12650  停損</pre><div class='mini-chart'><img src='img/t276_ALGOUSDT_10-03_1100.png' alt='ALGOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#277 · BERAUSDT</span><span class='trade-time'>10-03 11:00 → 10-03 11:15</span></div><div class='card-pnl pnl-win'>+0.69%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.35%</span><span class='tag tag-info'>破底深 4.97%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.22280
+站回 10-03 06:30
+進場 0.23080  停損 0.23000  目標 0.23240
+出場 0.23240  2R</pre><div class='mini-chart'><img src='img/t277_BERAUSDT_10-03_1100.png' alt='BERAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#278 · ETHFIUSDT</span><span class='trade-time'>10-03 11:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.41%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.41%</span><span class='tag tag-info'>破底深 8.50%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.67170
+站回 10-03 07:15
+進場 0.69930  停損 0.69640  目標 0.70510
+出場 0.69640  停損</pre><div class='mini-chart'><img src='img/t278_ETHFIUSDT_10-03_1100.png' alt='ETHFIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#279 · FARTCOINUSDT</span><span class='trade-time'>10-03 11:00 → 10-03 12:00</span></div><div class='card-pnl pnl-loss'>-0.34%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.34%</span><span class='tag tag-info'>破底深 8.82%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.16780
+站回 10-03 07:15
+進場 0.17640  停損 0.17580  目標 0.17760
+出場 0.17580  停損</pre><div class='mini-chart'><img src='img/t279_FARTCOINUSDT_10-03_1100.png' alt='FARTCOINUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#280 · KAITOUSDT</span><span class='trade-time'>10-03 11:00 → 10-03 12:00</span></div><div class='card-pnl pnl-loss'>-0.21%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.21%</span><span class='tag tag-info'>破底深 7.79%</span></div><pre class='trade-detail'>破底 10-03 03:15  low 0.31740
+站回 10-03 06:45
+進場 0.33060  停損 0.32990  目標 0.33200
+出場 0.32990  停損</pre><div class='mini-chart'><img src='img/t280_KAITOUSDT_10-03_1100.png' alt='KAITOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#281 · SUPERUSDT</span><span class='trade-time'>10-03 11:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.67%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.67%</span><span class='tag tag-info'>破底深 3.20%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.21949
+站回 10-03 04:15
+進場 0.23589  停損 0.23431  目標 0.23905
+出場 0.23431  停損</pre><div class='mini-chart'><img src='img/t281_SUPERUSDT_10-03_1100.png' alt='SUPERUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#282 · BCHUSDT</span><span class='trade-time'>10-03 11:30 → 10-03 12:00</span></div><div class='card-pnl pnl-loss'>-0.29%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.29%</span><span class='tag tag-info'>破底深 5.03%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 295.57
+站回 10-03 05:30
+進場 311.49  停損 310.60  目標 313.27
+出場 310.60  停損</pre><div class='mini-chart'><img src='img/t282_BCHUSDT_10-03_1130.png' alt='BCHUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#283 · GRTUSDT</span><span class='trade-time'>10-03 11:30 → 10-03 11:45</span></div><div class='card-pnl pnl-win'>+0.56%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.28%</span><span class='tag tag-info'>破底深 6.00%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.02720
+站回 10-03 05:45
+進場 0.02865  停損 0.02857  目標 0.02881
+出場 0.02881  2R</pre><div class='mini-chart'><img src='img/t283_GRTUSDT_10-03_1130.png' alt='GRTUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#284 · ARBUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.22%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.22%</span><span class='tag tag-info'>破底深 6.62%</span></div><pre class='trade-detail'>破底 10-03 03:15  low 0.18815
+站回 10-03 07:30
+進場 0.19670  停損 0.19626  目標 0.19758
+出場 0.19626  停損</pre><div class='mini-chart'><img src='img/t284_ARBUSDT_10-03_1200.png' alt='ARBUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#285 · DASHUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.34%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.34%</span><span class='tag tag-info'>破底深 6.85%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 55.3700
+站回 10-03 06:30
+進場 58.9200  停損 58.7200  目標 59.3200
+出場 58.7200  停損</pre><div class='mini-chart'><img src='img/t285_DASHUSDT_10-03_1200.png' alt='DASHUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#286 · ENSUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.25%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.25%</span><span class='tag tag-info'>破底深 6.20%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 6.5870
+站回 10-03 07:15
+進場 6.8100  停損 6.7930  目標 6.8440
+出場 6.7930  停損</pre><div class='mini-chart'><img src='img/t286_ENSUSDT_10-03_1200.png' alt='ENSUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#287 · KITEUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.29%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.29%</span><span class='tag tag-info'>破底深 3.64%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.14343
+站回 10-03 06:15
+進場 0.14998  停損 0.14954  目標 0.15086
+出場 0.14954  停損</pre><div class='mini-chart'><img src='img/t287_KITEUSDT_10-03_1200.png' alt='KITEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#288 · PHAUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.59%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.59%</span><span class='tag tag-info'>破底深 5.68%</span></div><pre class='trade-detail'>破底 10-03 05:30  low 0.06901
+站回 10-03 09:00
+進場 0.07117  停損 0.07075  目標 0.07201
+出場 0.07075  停損</pre><div class='mini-chart'><img src='img/t288_PHAUSDT_10-03_1200.png' alt='PHAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#289 · STRKUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.28%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.28%</span><span class='tag tag-info'>破底深 6.67%</span></div><pre class='trade-detail'>破底 10-03 03:15  low 0.04063
+站回 10-03 06:30
+進場 0.04315  停損 0.04303  目標 0.04339
+出場 0.04303  停損</pre><div class='mini-chart'><img src='img/t289_STRKUSDT_10-03_1200.png' alt='STRKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#290 · SUSHIUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.39%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.39%</span><span class='tag tag-info'>破底深 5.84%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.24470
+站回 10-03 07:15
+進場 0.25330  停損 0.25230  目標 0.25530
+出場 0.25230  停損</pre><div class='mini-chart'><img src='img/t290_SUSHIUSDT_10-03_1200.png' alt='SUSHIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#291 · TIAUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:30</span></div><div class='card-pnl pnl-loss'>-0.63%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.63%</span><span class='tag tag-info'>破底深 6.98%</span></div><pre class='trade-detail'>破底 10-03 03:15  low 0.42660
+站回 10-03 07:15
+進場 0.44710  停損 0.44430  目標 0.45270
+出場 0.44430  停損</pre><div class='mini-chart'><img src='img/t291_TIAUSDT_10-03_1200.png' alt='TIAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#292 · VIRTUALUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.38%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.38%</span><span class='tag tag-info'>破底深 7.93%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.73740
+站回 10-03 07:30
+進場 0.76470  停損 0.76180  目標 0.77050
+出場 0.76180  停損</pre><div class='mini-chart'><img src='img/t292_VIRTUALUSDT_10-03_1200.png' alt='VIRTUALUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#293 · XPLUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.52%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.52%</span><span class='tag tag-info'>破底深 9.48%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.08907
+站回 10-03 07:15
+進場 0.09352  停損 0.09303  目標 0.09450
+出場 0.09303  停損</pre><div class='mini-chart'><img src='img/t293_XPLUSDT_10-03_1200.png' alt='XPLUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#294 · ZAMAUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.30%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.30%</span><span class='tag tag-info'>破底深 4.74%</span></div><pre class='trade-detail'>破底 10-03 03:15  low 0.07331
+站回 10-03 07:45
+進場 0.07594  停損 0.07571  目標 0.07640
+出場 0.07571  停損</pre><div class='mini-chart'><img src='img/t294_ZAMAUSDT_10-03_1200.png' alt='ZAMAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#295 · ZENUSDT</span><span class='trade-time'>10-03 12:00 → 10-03 12:15</span></div><div class='card-pnl pnl-loss'>-0.41%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.41%</span><span class='tag tag-info'>破底深 7.58%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 6.5790
+站回 10-03 07:15
+進場 6.8340  停損 6.8060  目標 6.8900
+出場 6.8060  停損</pre><div class='mini-chart'><img src='img/t295_ZENUSDT_10-03_1200.png' alt='ZENUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#296 · VETUSDT</span><span class='trade-time'>10-03 12:15 → 10-03 12:30</span></div><div class='card-pnl pnl-loss'>-0.28%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.28%</span><span class='tag tag-info'>破底深 6.20%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.00824000
+站回 10-03 06:45
+進場 0.00856500  停損 0.00854100  目標 0.00861300
+出場 0.00854100  停損</pre><div class='mini-chart'><img src='img/t296_VETUSDT_10-03_1215.png' alt='VETUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#297 · JTOUSDT</span><span class='trade-time'>10-03 12:30 → 10-03 13:00</span></div><div class='card-pnl pnl-win'>+0.58%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.29%</span><span class='tag tag-info'>破底深 8.90%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.49570
+站回 10-03 07:15
+進場 0.52020  停損 0.51870  目標 0.52320
+出場 0.52320  2R</pre><div class='mini-chart'><img src='img/t297_JTOUSDT_10-03_1230.png' alt='JTOUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#298 · KASUSDT</span><span class='trade-time'>10-03 12:30 → 10-03 13:00</span></div><div class='card-pnl pnl-loss'>-0.31%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.31%</span><span class='tag tag-info'>破底深 4.40%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.04084
+站回 10-03 07:00
+進場 0.04230  停損 0.04217  目標 0.04256
+出場 0.04217  停損</pre><div class='mini-chart'><img src='img/t298_KASUSDT_10-03_1230.png' alt='KASUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#299 · LINKUSDT</span><span class='trade-time'>10-03 12:30 → 10-03 13:00</span></div><div class='card-pnl pnl-win'>+0.52%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 0.26%</span><span class='tag tag-info'>破底深 7.60%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 13.1250
+站回 10-03 07:15
+進場 13.8980  停損 13.8620  目標 13.9700
+出場 13.9700  2R</pre><div class='mini-chart'><img src='img/t299_LINKUSDT_10-03_1230.png' alt='LINKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#300 · ORCAUSDT</span><span class='trade-time'>10-03 12:30 → 10-03 13:30</span></div><div class='card-pnl pnl-loss'>-0.51%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.51%</span><span class='tag tag-info'>破底深 4.39%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 1.6590
+站回 10-03 05:30
+進場 1.7700  停損 1.7610  目標 1.7880
+出場 1.7610  停損</pre><div class='mini-chart'><img src='img/t300_ORCAUSDT_10-03_1230.png' alt='ORCAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#301 · PEOPLEUSDT</span><span class='trade-time'>10-03 12:30 → 10-03 14:30</span></div><div class='card-pnl pnl-loss'>-0.54%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.54%</span><span class='tag tag-info'>破底深 7.12%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.00863000
+站回 10-03 07:30
+進場 0.00895000  停損 0.00890200  目標 0.00904600
+出場 0.00890200  停損</pre><div class='mini-chart'><img src='img/t301_PEOPLEUSDT_10-03_1230.png' alt='PEOPLEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#302 · SEIUSDT</span><span class='trade-time'>10-03 12:30 → 10-03 13:00</span></div><div class='card-pnl pnl-loss'>-0.37%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.37%</span><span class='tag tag-info'>破底深 5.94%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.06656
+站回 10-03 07:15
+進場 0.07043  停損 0.07017  目標 0.07095
+出場 0.07017  停損</pre><div class='mini-chart'><img src='img/t302_SEIUSDT_10-03_1230.png' alt='SEIUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#303 · WLDUSDT</span><span class='trade-time'>10-03 12:30 → 10-03 13:15</span></div><div class='card-pnl pnl-win'>+2.02%</div></header><div class='tags'><span class='tag'>2R</span><span class='tag tag-info'>風險 1.01%</span><span class='tag tag-info'>破底深 5.00%</span></div><pre class='trade-detail'>破底 10-03 05:15  low 0.52650
+站回 10-03 07:15
+進場 0.56440  停損 0.55870  目標 0.57580
+出場 0.57580  2R</pre><div class='mini-chart'><img src='img/t303_WLDUSDT_10-03_1230.png' alt='WLDUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#304 · COMPUSDT</span><span class='trade-time'>10-03 13:00 → 10-03 13:45</span></div><div class='card-pnl pnl-loss'>-0.33%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.33%</span><span class='tag tag-info'>破底深 7.23%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 22.8200
+站回 10-03 06:45
+進場 24.5100  停損 24.4300  目標 24.6700
+出場 24.4300  停損</pre><div class='mini-chart'><img src='img/t304_COMPUSDT_10-03_1300.png' alt='COMPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#305 · MOVEUSDT</span><span class='trade-time'>10-03 13:15 → 10-03 13:30</span></div><div class='card-pnl pnl-loss'>-0.36%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.36%</span><span class='tag tag-info'>破底深 6.23%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.00951700
+站回 10-03 06:45
+進場 0.01022  停損 0.01018  目標 0.01029
+出場 0.01018  停損</pre><div class='mini-chart'><img src='img/t305_MOVEUSDT_10-03_1315.png' alt='MOVEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#306 · DYDXUSDT</span><span class='trade-time'>10-03 14:00 → 10-03 14:15</span></div><div class='card-pnl pnl-loss'>-0.46%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.46%</span><span class='tag tag-info'>破底深 6.10%</span></div><pre class='trade-detail'>破底 10-03 02:45  low 0.14220
+站回 10-03 07:15
+進場 0.15250  停損 0.15180  目標 0.15390
+出場 0.15180  停損</pre><div class='mini-chart'><img src='img/t306_DYDXUSDT_10-03_1400.png' alt='DYDXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#307 · BIGTIMEUSDT</span><span class='trade-time'>10-03 14:15 → 10-03 15:00</span></div><div class='card-pnl pnl-loss'>-1.01%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 1.01%</span><span class='tag tag-info'>破底深 2.59%</span></div><pre class='trade-detail'>破底 10-03 05:30  low 0.00879100
+站回 10-03 06:45
+進場 0.00940600  停損 0.00931100  目標 0.00959600
+出場 0.00931100  停損</pre><div class='mini-chart'><img src='img/t307_BIGTIMEUSDT_10-03_1415.png' alt='BIGTIMEUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#308 · MAGICUSDT</span><span class='trade-time'>10-03 14:15 → 10-03 14:45</span></div><div class='card-pnl pnl-loss'>-0.69%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.69%</span><span class='tag tag-info'>破底深 1.85%</span></div><pre class='trade-detail'>破底 10-03 09:45  low 0.05706
+站回 10-03 10:45
+進場 0.05905  停損 0.05864  目標 0.05987
+出場 0.05864  停損</pre><div class='mini-chart'><img src='img/t308_MAGICUSDT_10-03_1415.png' alt='MAGICUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#309 · MASKUSDT</span><span class='trade-time'>10-03 14:45 → 10-03 15:00</span></div><div class='card-pnl pnl-loss'>-0.20%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.20%</span><span class='tag tag-info'>破底深 5.56%</span></div><pre class='trade-detail'>破底 10-03 02:30  low 0.46380
+站回 10-03 06:30
+進場 0.49490  停損 0.49390  目標 0.49690
+出場 0.49390  停損</pre><div class='mini-chart'><img src='img/t309_MASKUSDT_10-03_1445.png' alt='MASKUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#310 · IMXUSDT</span><span class='trade-time'>10-03 15:15 → 10-03 15:45</span></div><div class='card-pnl pnl-loss'>-0.96%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.96%</span><span class='tag tag-info'>破底深 3.52%</span></div><pre class='trade-detail'>破底 10-03 05:30  low 0.17090
+站回 10-03 07:00
+進場 0.18740  停損 0.18560  目標 0.19100
+出場 0.18560  停損</pre><div class='mini-chart'><img src='img/t310_IMXUSDT_10-03_1515.png' alt='IMXUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#311 · NEARUSDT</span><span class='trade-time'>10-03 15:15 → 10-03 15:30</span></div><div class='card-pnl pnl-loss'>-0.36%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.36%</span><span class='tag tag-info'>破底深 1.42%</span></div><pre class='trade-detail'>破底 10-03 12:30  low 4.6210
+站回 10-03 13:15
+進場 4.7030  停損 4.6860  目標 4.7370
+出場 4.6860  停損</pre><div class='mini-chart'><img src='img/t311_NEARUSDT_10-03_1515.png' alt='NEARUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#312 · LITUSDT</span><span class='trade-time'>10-03 16:30 → 10-03 17:30</span></div><div class='card-pnl pnl-loss'>-0.68%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.68%</span><span class='tag tag-info'>破底深 2.18%</span></div><pre class='trade-detail'>破底 10-03 14:30  low 3.4151
+站回 10-03 16:00
+進場 3.4888  停損 3.4652  目標 3.5360
+出場 3.4652  停損</pre><div class='mini-chart'><img src='img/t312_LITUSDT_10-03_1630.png' alt='LITUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#313 · POWERUSDT</span><span class='trade-time'>10-03 18:00 → 10-03 19:30</span></div><div class='card-pnl pnl-loss'>-0.64%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.64%</span><span class='tag tag-info'>破底深 2.78%</span></div><pre class='trade-detail'>破底 10-03 16:15  low 0.08511
+站回 10-03 17:15
+進場 0.08742  停損 0.08686  目標 0.08854
+出場 0.08686  停損</pre><div class='mini-chart'><img src='img/t313_POWERUSDT_10-03_1800.png' alt='POWERUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#314 · SCRUSDT</span><span class='trade-time'>10-03 18:00 → 10-03 18:15</span></div><div class='card-pnl pnl-loss'>-0.60%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.60%</span><span class='tag tag-info'>破底深 2.43%</span></div><pre class='trade-detail'>破底 10-03 16:30  low 0.02619
+站回 10-03 17:30
+進場 0.02669  停損 0.02653  目標 0.02701
+出場 0.02653  停損</pre><div class='mini-chart'><img src='img/t314_SCRUSDT_10-03_1800.png' alt='SCRUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#315 · MARSCOINUSDT</span><span class='trade-time'>10-03 19:15 → 10-03 19:30</span></div><div class='card-pnl pnl-loss'>-0.81%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.81%</span><span class='tag tag-info'>破底深 4.17%</span></div><pre class='trade-detail'>破底 10-03 10:45  low 0.10352
+站回 10-03 13:30
+進場 0.11122  停損 0.11032  目標 0.11302
+出場 0.11032  停損</pre><div class='mini-chart'><img src='img/t315_MARSCOINUSDT_10-03_1915.png' alt='MARSCOINUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#316 · NEIROUSDT</span><span class='trade-time'>10-03 19:15 → 10-03 20:30</span></div><div class='card-pnl pnl-loss'>-0.68%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.68%</span><span class='tag tag-info'>破底深 1.89%</span></div><pre class='trade-detail'>破底 10-03 16:00  low 0.00008873
+站回 10-03 18:00
+進場 0.00008986  停損 0.00008925  目標 0.00009108
+出場 0.00008925  停損</pre><div class='mini-chart'><img src='img/t316_NEIROUSDT_10-03_1915.png' alt='NEIROUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#317 · ENAUSDT</span><span class='trade-time'>10-03 19:45 → 10-03 20:15</span></div><div class='card-pnl pnl-loss'>-0.21%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.21%</span><span class='tag tag-info'>破底深 0.97%</span></div><pre class='trade-detail'>破底 10-03 16:30  low 0.23012
+站回 10-03 17:30
+進場 0.23305  停損 0.23256  目標 0.23403
+出場 0.23256  停損</pre><div class='mini-chart'><img src='img/t317_ENAUSDT_10-03_1945.png' alt='ENAUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#318 · CAPUSDT</span><span class='trade-time'>10-03 20:00 → 10-03 20:15</span></div><div class='card-pnl pnl-loss'>-0.60%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.60%</span><span class='tag tag-info'>破底深 1.71%</span></div><pre class='trade-detail'>破底 10-03 18:45  low 0.06991
+站回 10-03 19:30
+進場 0.07127  停損 0.07084  目標 0.07213
+出場 0.07084  停損</pre><div class='mini-chart'><img src='img/t318_CAPUSDT_10-03_2000.png' alt='CAPUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#319 · EGLDUSDT</span><span class='trade-time'>10-03 20:00 → 10-03 20:15</span></div><div class='card-pnl pnl-loss'>-0.22%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.22%</span><span class='tag tag-info'>破底深 2.27%</span></div><pre class='trade-detail'>破底 10-03 16:00  low 4.4350
+站回 10-03 19:15
+進場 4.4860  停損 4.4760  目標 4.5060
+出場 4.4760  停損</pre><div class='mini-chart'><img src='img/t319_EGLDUSDT_10-03_2000.png' alt='EGLDUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#320 · ASTERUSDT</span><span class='trade-time'>10-03 20:15 → 10-03 20:30</span></div><div class='card-pnl pnl-loss'>-0.25%</div></header><div class='tags'><span class='tag'>停損</span><span class='tag tag-info'>風險 0.25%</span><span class='tag tag-info'>破底深 0.98%</span></div><pre class='trade-detail'>破底 10-03 16:15  low 0.70490
+站回 10-03 17:30
+進場 0.71060  停損 0.70880  目標 0.71420
+出場 0.70880  停損</pre><div class='mini-chart'><img src='img/t320_ASTERUSDT_10-03_2015.png' alt='ASTERUSDT'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#321 · EVAAUSDT</span><span class='trade-time'>10-03 20:30 → 10-03 20:30</span></div><div class='card-pnl pnl-flat'>+0.00%</div></header><div class='tags'><span class='tag'>未平倉</span><span class='tag tag-info'>風險 2.03%</span><span class='tag tag-info'>破底深 5.46%</span></div><pre class='trade-detail'>破底 10-03 16:00  low 0.71670
+站回 10-03 18:00
+進場 0.76720  停損 0.75160  目標 0.79840
+出場 0.76720  未平倉</pre><div class='mini-chart'><img src='img/t321_EVAAUSDT_10-03_2030.png' alt='EVAAUSDT'/></div></article>
+</div></body></html>
