@@ -86,18 +86,19 @@ python3 examples/test_tw_1h_reclaim.py
 
 ## 台股 1 小時 K：5/10/20 多頭排列站上 MA240（智原型）
 
-對齊 3035 智原小時 K：收盤同時 **MA5 > MA10 > MA20**，且 **站上 MA240**。上一根還沒同時滿足、這一根才成立才推 Telegram；已經排好且一直站在上面的不會每根都發。
+對齊 3035 智原小時 K：**當下這根**收盤才站上 MA240（上一根還沒站上），且 **MA5 > MA10 > MA20**。已經站在 MA240 上面、只是短均才排好的不算。
 
 預設掃**成交額前 200**（股價 < 1000，固定含智原）。GitHub Actions 在台北 10:03 / 11:03 / 12:03 / 13:03 / 13:33 代跑。`--symbols 3035` 只盯智原。
 
-成交額前 200、2026-09-03 → 10-02：
+成交額前 200、2026-09-03 → 10-02（**當下這根才站上 MA240**）：
 
-- **近 7 日 222 筆 / 159 檔**，+1d 勝率 **63%**、平均 **+2.00%**；+3d 平均 **+7.99%**
-- **近 30 日 725 筆 / 194 檔**，+1d 勝率 **51%**、平均 **+0.82%**；+3d 平均 **+2.11%**
-- 10/02 收盤當下仍符合的有 **135 檔**（含智原）；剛收的最後 2 根小時 K 新形成 **12 筆**（群創、台虹、長榮、玉山金等）
+- **近 7 日 24 筆 / 18 檔**，+1d 勝率 **60%**、平均 **+1.64%**；+3d 平均 **+7.33%**
+- **近 30 日 99 筆 / 71 檔**，+1d 勝率 **40%**、平均 **+0.47%**；+3d 平均 **+2.83%**
+- 10/02 最後一根沒有新站上（智原早已在 MA240 之上，不算）
+- 智原本身近 90 日只有 **9/17 09:00、11:00** 兩筆真的從下方站上（+1d +6.11% / +5.23%）
 
 7 日圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-7d/view.html  
-30 日圖（最近 80 筆有 K 線）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-30d/view.html
+30 日圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-30d/view.html
 
 ```bash
 # 單元測試（不打網路）
@@ -106,7 +107,7 @@ python3 examples/test_tw_1h_stack_ma240.py
 # 測 Telegram（憑證放 tg_config.env，勿提交）
 python3 examples/tw_1h_stack_ma240.py --test
 
-# 成交額前 200 現在誰多頭排列且站上 MA240
+# 成交額前 200：剛收的那根才站上 MA240
 python3 examples/tw_1h_stack_ma240.py --now --dry-run
 
 # 只掃剛收盤的 1～2 根並推播（盤後 / Actions）
