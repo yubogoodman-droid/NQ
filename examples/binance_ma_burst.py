@@ -5,6 +5,7 @@
 
   • 一次突破：開盤在 MA7、MA14、MA25、MA99、MA120、MA200 每一條之下，收盤在每一條之上。
   • 爆量：這根成交量至少是前一根的 10 倍。
+  • 收盤在小時 K 的 MA200 之上。用的是這根 15 分 K 收盤時已經走完的那根小時 K。
 
     python3 examples/binance_ma_burst.py --symbol AINUSDT
     python3 examples/binance_ma_burst.py --days 2
@@ -20,7 +21,9 @@ import requests
 
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
 VOL_MULT = 10.0  # 至少是前一根的 10 倍
+H1_MA = 200
 INTERVAL_MS = 15 * 60_000
+HOUR_MS = 60 * 60_000
 
 TZ = timezone(timedelta(hours=8))
 BASE = "https://www.binance.com"
@@ -74,6 +77,27 @@ def find_bursts(o: np.ndarray, c: np.ndarray, v: np.ndarray) -> list[dict]:
     return [hit for i in range(len(c)) if (hit := burst_at(o, c, v, ma, i))]
 
 
+def hour_ma200_for_bars(bar_open_ms: np.ndarray, hour_open_ms: np.ndarray, hour_close: np.ndarray) -> np.ndarray:
+    """每根 15 分 K 收盤時，已經走完的那根小時 K 的 MA200。"""
+    ma = sma(np.asarray(hour_close, dtype=float), H1_MA)
+    close_ms = np.asarray(bar_open_ms, dtype=np.int64) + INTERVAL_MS
+    last_open = ((close_ms - HOUR_MS) // HOUR_MS) * HOUR_MS
+    hour_open_ms = np.asarray(hour_open_ms, dtype=np.int64)
+    idx = np.searchsorted(hour_open_ms, last_open, side="left")
+    out = np.full(len(bar_open_ms), np.nan)
+    valid = idx < len(hour_open_ms)
+    if not valid.any():
+        return out
+    idx_safe = np.where(valid, idx, 0)
+    match = valid & (hour_open_ms[idx_safe] == last_open)
+    out[match] = ma[idx_safe[match]]
+    return out
+
+
+def above_hour_ma200(close: float, h1_ma: float) -> bool:
+    return bool(np.isfinite(h1_ma) and close > h1_ma)
+
+
 def get_json(path: str, params=None, retries: int = 5):
     last = None
     for i in range(retries):
@@ -90,14 +114,15 @@ def get_json(path: str, params=None, retries: int = 5):
     raise last
 
 
-def fetch_klines(sym: str, limit: int = 1500) -> dict | None:
-    raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": "15m", "limit": limit})
-    if not raw or len(raw) < max(MA_PERIODS) + 1:
+def fetch_klines(sym: str, limit: int = 1500, interval: str = "15m", bar_ms: int = INTERVAL_MS, min_bars: int | None = None) -> dict | None:
+    raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": interval, "limit": limit})
+    need = max(MA_PERIODS) + 1 if min_bars is None else min_bars
+    if not raw or len(raw) < need:
         return None
     now_ms = int(time.time() * 1000)
-    if int(raw[-1][0]) + INTERVAL_MS > now_ms:
+    if int(raw[-1][0]) + bar_ms > now_ms:
         raw = raw[:-1]
-    if len(raw) < max(MA_PERIODS) + 1:
+    if len(raw) < need:
         return None
     return {
         "t": np.array([int(x[0]) for x in raw], np.int64),
@@ -152,14 +177,21 @@ def scan_since(symbols: list[str], since_ms: int, limit: int = 500) -> list[dict
 
     def one(sym: str) -> list[dict]:
         d = fetch_klines(sym, limit=limit)
-        if d is None:
+        h1_limit = min(1500, H1_MA + limit // 4 + 3)
+        h1 = fetch_klines(sym, limit=h1_limit, interval="1h", bar_ms=HOUR_MS, min_bars=H1_MA)
+        if d is None or h1 is None:
             return []
+        d["h1_ma200"] = hour_ma200_for_bars(d["t"], h1["t"], h1["c"])
         found = []
         for hit in find_bursts(d["o"], d["c"], d["v"]):
             ts = int(d["t"][hit["i"]])
             if ts < since_ms:
                 continue
+            h1_ma = float(d["h1_ma200"][hit["i"]])
+            if not above_hour_ma200(hit["close"], h1_ma):
+                continue
             hit = dict(hit)
+            hit["h1_ma200"] = h1_ma
             hit["symbol"] = sym
             hit["time"] = ts
             hit["after_1h"] = path_after(d, hit["i"], 4)
@@ -211,7 +243,8 @@ def fmt_row(row: dict) -> str:
         f"1h {fmt_span(a1, 4):<14}  "
         f"4h {fmt_span(a4, 16):<16}  "
         f"之後高 {fmt_pct(None if a4 is None else a4['mfe'])}  "
-        f"之後低 {fmt_pct(None if a4 is None else a4['mae'])}"
+        f"之後低 {fmt_pct(None if a4 is None else a4['mae'])}  "
+        f"時MA200 {row.get('h1_ma200', float('nan')):.6g}"
     )
 
 
@@ -252,6 +285,9 @@ def draw_burst(row: dict, path: str) -> str:
     full = {n: sma(d["c"], n) for n in MA_PERIODS}
     for n, col in pal.items():
         ax.plot(xs, full[n][sl], color=col, lw=1.05, label=f"MA{n}")
+    h1_line = d.get("h1_ma200")
+    if h1_line is not None:
+        ax.plot(xs, h1_line[sl], color="#ff6b9a", lw=1.15, ls="--", label="1h MA200")
     x = i - a0
     ax.axvline(x, color="#f0c14a", ls="--", lw=0.9)
     ax.scatter([x], [c[x]], s=28, color="#f0c14a", zorder=5)
@@ -259,6 +295,7 @@ def draw_burst(row: dict, path: str) -> str:
     a1r, a4 = row.get("after_1h"), row.get("after_4h")
     ax.set_title(
         f"{row['symbol']}  15m  {ts}    實體 {row['body'] * 100:+.1f}%    量 {row['vol_ratio']:.1f}×前一根\n"
+        f"收 {row['close']:.6g} > 時MA200 {row.get('h1_ma200', float('nan')):.6g}    "
         f"之後 1h {fmt_span(a1r, 4)}    4h {fmt_span(a4, 16)}",
         color="#e8f0ea",
         fontsize=11,
@@ -291,16 +328,25 @@ def fmt_hit(sym: str, d: dict, hit: dict) -> str:
         f"{sym}  15m  {ts}\n"
         f"開 {hit['open']:.6g} → 收 {hit['close']:.6g}  ({hit['body'] * 100:+.2f}%)\n"
         f"量 {fmt_vol(hit['volume'])}，前一根 {fmt_vol(hit['prior_volume'])} 的 {hit['vol_ratio']:.1f} 倍\n"
+        f"收 {hit['close']:.6g} > 小時MA200 {hit.get('h1_ma200', float('nan')):.6g}\n"
         f"{mas}"
     )
 
 
 def check_symbol(sym: str, limit: int = 1500) -> list[str]:
     d = fetch_klines(sym, limit=limit)
-    if d is None:
+    h1_limit = min(1500, H1_MA + limit // 4 + 3)
+    h1 = fetch_klines(sym, limit=h1_limit, interval="1h", bar_ms=HOUR_MS, min_bars=H1_MA) if d is not None else None
+    if d is None or h1 is None:
         return []
+    d["h1_ma200"] = hour_ma200_for_bars(d["t"], h1["t"], h1["c"])
     lines = []
     for hit in find_bursts(d["o"], d["c"], d["v"]):
+        h1_ma = float(d["h1_ma200"][hit["i"]])
+        if not above_hour_ma200(hit["close"], h1_ma):
+            continue
+        hit = dict(hit)
+        hit["h1_ma200"] = h1_ma
         lines.append(fmt_hit(sym, d, hit))
     return lines
 

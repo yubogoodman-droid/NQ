@@ -10,7 +10,18 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from binance_ma_burst import MA_PERIODS, VOL_MULT, burst_at, find_bursts, path_after, sma  # noqa: E402
+from binance_ma_burst import (  # noqa: E402
+    HOUR_MS,
+    INTERVAL_MS,
+    MA_PERIODS,
+    VOL_MULT,
+    above_hour_ma200,
+    burst_at,
+    find_bursts,
+    hour_ma200_for_bars,
+    path_after,
+    sma,
+)
 
 
 def flat(n: int = 260, price: float = 10.0, vol: float = 100.0):
@@ -105,6 +116,25 @@ def test_path_after() -> None:
     assert path_after(d, 4, 4) is None
 
 
+def test_hour_ma200_uses_last_closed_hour() -> None:
+    n = 210
+    hour_open = np.arange(n, dtype=np.int64) * HOUR_MS
+    hour_close = np.full(n, 50.0)
+    hour_close[-1] = 80.0
+    # 收盤正好卡在整點：剛走完的是最後那根小時 K，MA200 被 80 拉高
+    on_hour = np.array([hour_open[-1] + HOUR_MS - INTERVAL_MS], dtype=np.int64)
+    got = hour_ma200_for_bars(on_hour, hour_open, hour_close)
+    expect = (50.0 * 199 + 80.0) / 200
+    assert abs(got[0] - expect) < 1e-9
+    # 收盤在整點後 15 分：最新走完的仍是同一根，不能用還沒走完的下一根
+    inside = np.array([hour_open[-1] + HOUR_MS], dtype=np.int64)
+    got2 = hour_ma200_for_bars(inside, hour_open, hour_close)
+    assert abs(got2[0] - expect) < 1e-9
+    assert above_hour_ma200(expect + 0.01, got[0])
+    assert not above_hour_ma200(expect, got[0])
+    assert not above_hour_ma200(1.0, float("nan"))
+
+
 def test_needs_warmup() -> None:
     o, c, v = flat(n=30)
     i = len(c) - 1
@@ -122,6 +152,7 @@ def main() -> int:
     test_must_clear_every_ma()
     test_only_the_crossing_bar_fires()
     test_path_after()
+    test_hour_ma200_uses_last_closed_hour()
     test_needs_warmup()
     print("ok")
     return 0
