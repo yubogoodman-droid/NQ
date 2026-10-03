@@ -14,6 +14,7 @@ from binance_15m_ma25_retest import (  # noqa: E402
     Params,
     Trade,
     _mas,
+    chart_payload,
     detect_trades,
     manage_exit,
     summarize,
@@ -110,6 +111,24 @@ def test_summarize_splits_open_trades() -> None:
     assert abs(stats["sum_all_pct"] - 1.5) < 1e-9
 
 
+def test_chart_payload_aligns_marks() -> None:
+    o, h, l, c, entry_i = _stand_setup()
+    trades = detect_trades(o, h, l, c, Params())
+    assert trades
+    trade = trades[0]
+    trade.symbol = "TESTUSDT"
+    times = [1_700_000_000_000 + i * 900_000 for i in range(len(c))]
+    bars = {"o": o, "h": h, "l": l, "c": c}
+    payload = chart_payload(bars, trade, times, 1)
+    n = len(payload["c"])
+    assert n == len(payload["o"]) == len(payload["m25"]) == len(payload["m200"])
+    trough_x, entry_x, exit_x = payload["marks"]
+    assert 0 <= trough_x < entry_x < n
+    assert 0 <= exit_x < n
+    assert payload["c"][entry_x] > payload["m25"][entry_x]
+    assert payload["symbol"] == "TESTUSDT"
+
+
 def test_min_entry_index_filters_warmup() -> None:
     o, h, l, c, entry_i = _stand_setup()
     early = detect_trades(o, h, l, c, Params(), min_entry_i=0)
@@ -126,6 +145,7 @@ def main() -> int:
     test_wide_stop_is_skipped()
     test_stop_before_target_on_same_bar()
     test_summarize_splits_open_trades()
+    test_chart_payload_aligns_marks()
     test_min_entry_index_filters_warmup()
     print("ok")
     return 0

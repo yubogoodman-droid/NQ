@@ -245,65 +245,78 @@ def fmt_ts(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, TZ).strftime("%m-%d %H:%M")
 
 
-def draw_trade_png(bars: dict, trade: Trade, path: Path, title: str) -> None:
-    import matplotlib
+PAGE_SIZE = 100
+_MA_CACHE: dict[int, dict[int, np.ndarray]] = {}
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from matplotlib import font_manager
-    from matplotlib.patches import Rectangle
 
-    for font_path in (
-        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-    ):
-        if Path(font_path).exists():
-            font_manager.fontManager.addfont(font_path)
-    plt.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei", "Droid Sans Fallback", "DejaVu Sans"]
-    plt.rcParams["axes.unicode_minus"] = False
+def _mas_cached(c: np.ndarray) -> dict[int, np.ndarray]:
+    key = id(c)
+    hit = _MA_CACHE.get(key)
+    if hit is None:
+        hit = _mas(c)
+        _MA_CACHE[key] = hit
+    return hit
 
+
+def _scale(values: np.ndarray, lo: float, span: float) -> list[int | None]:
+    out: list[int | None] = []
+    for v in values:
+        if np.isnan(v):
+            out.append(None)
+        else:
+            out.append(int(round((float(v) - lo) / span * 1000)))
+    return out
+
+
+def chart_payload(bars: dict, trade: Trade, times: list[int], number: int) -> dict:
+    """給網頁畫圖用的精簡 K 線。價格壓成 0–1000，一頁再組成 JSON。"""
     o, h, l, c = bars["o"], bars["h"], bars["l"], bars["c"]
     a0 = max(0, trade.trough_i - 16)
     a1 = min(len(c), trade.exit_i + 6)
     sl = slice(a0, a1)
-    xs = np.arange(a1 - a0)
-    fig, ax = plt.subplots(figsize=(10.4, 5.2), facecolor="#0c1210")
-    ax.set_facecolor("#101814")
-    ax.tick_params(colors="#8aa193", labelsize=8)
-    for sp in ax.spines.values():
-        sp.set_color("#2a3a33")
-    oo, hh, ll, cc = o[sl], h[sl], l[sl], c[sl]
-    for k in range(len(cc)):
-        up = cc[k] >= oo[k]
-        col = "#3dba7a" if up else "#e35d5d"
-        ax.vlines(xs[k], ll[k], hh[k], color=col, lw=0.7)
-        y0, y1 = min(oo[k], cc[k]), max(oo[k], cc[k])
-        if y1 == y0:
-            y1 = y0 + max(hh[k] - ll[k], 1e-12) * 0.04
-        ax.add_patch(Rectangle((xs[k] - 0.32, y0), 0.64, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
-    full_c = bars["c"]
-    mas = _mas(full_c)
-    palette = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#5fd2c2", 120: "#42a5f5", 200: "#ffffff"}
-    for n, col in palette.items():
-        ax.plot(xs, mas[n][sl], color=col, lw=1.05, label=f"MA{n}")
-    marks = (
-        (trade.trough_i, "破底", "#8ab4ff", trade.trough_low),
-        (trade.entry_i, "站上進", "#3dba7a", trade.entry),
-        (trade.exit_i, trade.reason, "#ff8a80", trade.exit),
-    )
-    for idx, label, col, y in marks:
-        x = idx - a0
-        if 0 <= x < len(cc):
-            ax.scatter([x], [y], s=28, color=col, zorder=5)
-            ax.annotate(label, (x, y), textcoords="offset points", xytext=(0, 8), color=col, fontsize=8, ha="center")
-    ax.axhline(trade.stop, color="#e35d5d", ls="--", lw=0.7)
-    ax.axhline(trade.target, color="#3dba7a", ls="--", lw=0.7)
-    ax.set_title(title, color="#e8f0ea", fontsize=12)
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
-    fig.tight_layout(pad=0.45)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
-    plt.close(fig)
+    mas = _mas_cached(c)
+    stack = [h[sl], l[sl], np.array([trade.stop, trade.target], dtype=float)]
+    for n in mas:
+        stack.append(mas[n][sl])
+    merged = np.concatenate(stack)
+    lo = float(np.nanmin(merged))
+    hi = float(np.nanmax(merged))
+    span = hi - lo
+    if span <= 0:
+        span = 1.0
+
+    def q_px(px: float) -> int:
+        return int(round((px - lo) / span * 1000))
+
+    return {
+        "n": number,
+        "symbol": trade.symbol,
+        "et": fmt_ts(times[trade.entry_i]),
+        "xt": fmt_ts(times[trade.exit_i]),
+        "bt": fmt_ts(times[trade.trough_i]),
+        "reason": trade.reason,
+        "pnl": round(trade.pnl_pct, 2),
+        "risk": round(trade.risk_pct, 2),
+        "depth": round(trade.depth_pct, 2),
+        "entry": fmt_px(trade.entry),
+        "stop": fmt_px(trade.stop),
+        "target": fmt_px(trade.target),
+        "exit": fmt_px(trade.exit),
+        "trough": fmt_px(trade.trough_low),
+        "stopQ": q_px(trade.stop),
+        "targetQ": q_px(trade.target),
+        "marks": [trade.trough_i - a0, trade.entry_i - a0, trade.exit_i - a0],
+        "o": _scale(o[sl], lo, span),
+        "h": _scale(h[sl], lo, span),
+        "l": _scale(l[sl], lo, span),
+        "c": _scale(c[sl], lo, span),
+        "m7": _scale(mas[7][sl], lo, span),
+        "m14": _scale(mas[14][sl], lo, span),
+        "m25": _scale(mas[25][sl], lo, span),
+        "m99": _scale(mas[99][sl], lo, span),
+        "m120": _scale(mas[120][sl], lo, span),
+        "m200": _scale(mas[200][sl], lo, span),
+    }
 
 
 def write_html(
@@ -313,36 +326,26 @@ def write_html(
     funnel: dict,
     meta: dict,
 ) -> Path:
-    cards: list[str] = []
     img_dir = path.parent / "img"
     if img_dir.exists():
         for old in img_dir.glob("*.png"):
             old.unlink()
+    data_dir = path.parent / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    for old in data_dir.glob("p*.json"):
+        old.unlink()
+    _MA_CACHE.clear()
+    pages: list[list[dict]] = []
     for i, (trade, bars, times) in enumerate(rows, 1):
-        et = fmt_ts(times[trade.entry_i])
-        xt = fmt_ts(times[trade.exit_i])
-        bt = fmt_ts(times[trade.trough_i])
-        cls = "pnl-win" if trade.pnl_pct > 0 else ("pnl-flat" if trade.pnl_pct == 0 else "pnl-loss")
-        img_name = f"t{i:03d}_{trade.symbol}_{et.replace(' ', '_').replace(':', '')}.png"
-        title = f"{trade.symbol}  {et}  {trade.pnl_pct:+.2f}%  {trade.reason}"
-        draw_trade_png(bars, trade, img_dir / img_name, title)
-        cards.append(
-            "<article class='trade-card'>"
-            "<header class='card-header'>"
-            f"<div class='card-title'><span class='trade-no'>#{i} · {escape(trade.symbol)}</span>"
-            f"<span class='trade-time'>{escape(et)} → {escape(xt)}</span></div>"
-            f"<div class='card-pnl {cls}'>{trade.pnl_pct:+.2f}%</div>"
-            "</header>"
-            f"<div class='tags'><span class='tag'>{escape(trade.reason)}</span>"
-            f"<span class='tag tag-info'>風險 {trade.risk_pct:.2f}%</span>"
-            f"<span class='tag tag-info'>破底深 {trade.depth_pct:.2f}%</span></div>"
-            "<pre class='trade-detail'>"
-            f"破底 {escape(bt)}  low {fmt_px(trade.trough_low)}\n"
-            f"站上 MA25 進場 {fmt_px(trade.entry)}  停損 {fmt_px(trade.stop)}  目標 {fmt_px(trade.target)}\n"
-            f"出場 {fmt_px(trade.exit)}  {escape(trade.reason)}"
-            "</pre>"
-            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(trade.symbol)}'/></div>"
-            "</article>"
+        if not pages or len(pages[-1]) >= PAGE_SIZE:
+            pages.append([])
+        pages[-1].append(chart_payload(bars, trade, times, i))
+    if not pages:
+        pages = [[]]
+    for i, page in enumerate(pages):
+        (data_dir / f"p{i:03d}.json").write_text(
+            json.dumps(page, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
         )
 
     reason_bits = []
@@ -371,7 +374,10 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 .tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#c9d1d9}}
 .tag-info{{color:#79c0ff}}
 .trade-detail{{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap;margin:0}}
-.mini-chart img{{width:100%;display:block;border-radius:10px;margin-top:8px}}
+.mini-chart canvas{{width:100%;height:260px;display:block;border-radius:10px;margin-top:8px;background:#101814}}
+.pager{{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}}
+.pager button{{background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:6px 8px;font-size:12px}}
+.pager button.on{{border-color:#79c0ff;color:#79c0ff}}
 .empty{{text-align:center;color:#8b949e;padding:40px 12px;border:1px solid #30363d;border-radius:14px}}
 </style></head><body>
 <div class="page">
@@ -390,10 +396,122 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <div class="card">加總<b class="{sum_cls}">{stats['sum_pct']:+.2f}%</b></div>
 <div class="card">未平<b>{stats['open']}</b></div>
 </div>
-<p class="muted">含未平倉的加總 {stats['sum_all_pct']:+.2f}%。這是規則回測，不是進出場建議。</p>
+<p class="muted">含未平倉的加總 {stats['sum_all_pct']:+.2f}%。圖一次載入 100 張，用下面的頁碼往後看。這是規則回測，不是進出場建議。</p>
 </section>
-{''.join(cards) or "<div class='empty'>這段沒有站上 MA25 進場的交易</div>"}
-</div></body></html>
+<div class="pager" id="pager"></div>
+<div id="feed"></div>
+</div>
+<script>
+const PAGES = {len(pages)};
+const TOTAL = {len(rows)};
+const BASE = "";
+const feed = document.getElementById("feed");
+const pager = document.getElementById("pager");
+function cls(pnl) {{ return pnl > 0 ? "pnl-win" : (pnl === 0 ? "pnl-flat" : "pnl-loss"); }}
+function esc(s) {{ return String(s).replace(/[&<>"']/g, (c) => ({{"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}}[c])); }}
+function draw(canvas, row) {{
+  const w = canvas.clientWidth || 520;
+  const h = 260;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#101814";
+  ctx.fillRect(0, 0, w, h);
+  const n = row.c.length;
+  if (!n) return;
+  const pad = 10;
+  const x = (i) => pad + (i + 0.5) * (w - pad * 2) / n;
+  const y = (v) => 22 + (1000 - v) / 1000 * (h - 36);
+  const cw = Math.max(1.2, (w - pad * 2) / n * 0.62);
+  const mas = [["m7","#f0c14a"],["m14","#ff8a4c"],["m25","#d28cff"],["m99","#5fd2c2"],["m120","#42a5f5"],["m200","#ffffff"]];
+  ctx.lineWidth = 1.1;
+  mas.forEach(([key, col]) => {{
+    ctx.beginPath();
+    ctx.strokeStyle = col;
+    let on = false;
+    row[key].forEach((v, i) => {{
+      if (v == null) {{ on = false; return; }}
+      if (!on) {{ ctx.moveTo(x(i), y(v)); on = true; }}
+      else ctx.lineTo(x(i), y(v));
+    }});
+    ctx.stroke();
+  }});
+  ctx.setLineDash([4, 3]);
+  [["#e35d5d", row.stopQ], ["#3dba7a", row.targetQ]].forEach(([col, v]) => {{
+    ctx.strokeStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(pad, y(v));
+    ctx.lineTo(w - pad, y(v));
+    ctx.stroke();
+  }});
+  ctx.setLineDash([]);
+  for (let i = 0; i < n; i++) {{
+    const up = row.c[i] >= row.o[i];
+    ctx.strokeStyle = ctx.fillStyle = up ? "#3dba7a" : "#e35d5d";
+    ctx.beginPath();
+    ctx.moveTo(x(i), y(row.h[i]));
+    ctx.lineTo(x(i), y(row.l[i]));
+    ctx.stroke();
+    const top = y(Math.max(row.o[i], row.c[i]));
+    const bot = y(Math.min(row.o[i], row.c[i]));
+    ctx.fillRect(x(i) - cw / 2, top, cw, Math.max(1, bot - top));
+  }}
+  const labels = [["破底", "#8ab4ff", row.marks[0], row.l[row.marks[0]]], ["站上進", "#3dba7a", row.marks[1], row.c[row.marks[1]]], [row.reason, "#ff8a80", row.marks[2], row.c[row.marks[2]]]];
+  ctx.font = "12px sans-serif";
+  ctx.textAlign = "center";
+  labels.forEach(([text, col, i, v]) => {{
+    if (i < 0 || i >= n || v == null) return;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(x(i), y(v), 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText(text, x(i), y(v) - 8);
+  }});
+  ctx.font = "11px sans-serif";
+  ctx.textAlign = "left";
+  mas.forEach(([key, col], i) => {{
+    ctx.fillStyle = col;
+    ctx.fillText(key.slice(1).toUpperCase() === "7" ? "MA7" : "MA" + key.slice(1), 8 + i * 52, 14);
+  }});
+}}
+function card(row) {{
+  return '<article class="trade-card"><header class="card-header"><div class="card-title"><span class="trade-no">#' + row.n + ' · ' + esc(row.symbol) + '</span><span class="trade-time">' + esc(row.et) + ' → ' + esc(row.xt) + '</span></div><div class="card-pnl ' + cls(row.pnl) + '">' + (row.pnl > 0 ? '+' : '') + row.pnl.toFixed(2) + '%</div></header><div class="tags"><span class="tag">' + esc(row.reason) + '</span><span class="tag tag-info">風險 ' + row.risk.toFixed(2) + '%</span><span class="tag tag-info">破底深 ' + row.depth.toFixed(2) + '%</span></div><pre class="trade-detail">破底 ' + esc(row.bt) + '  low ' + esc(row.trough) + '\\n站上 MA25 進場 ' + esc(row.entry) + '  停損 ' + esc(row.stop) + '  目標 ' + esc(row.target) + '\\n出場 ' + esc(row.exit) + '  ' + esc(row.reason) + '</pre><div class="mini-chart"><canvas id="c' + row.n + '"></canvas></div></article>';
+}}
+async function load(i) {{
+  if (!PAGES) {{
+    feed.innerHTML = '<div class="empty">這段沒有站上 MA25 進場的交易</div>';
+    return;
+  }}
+  const res = await fetch(BASE + "data/p" + String(i).padStart(3, "0") + ".json");
+  const rows = await res.json();
+  feed.innerHTML = rows.map(card).join("");
+  rows.forEach((row) => draw(document.getElementById("c" + row.n), row));
+  pager.innerHTML = "";
+  const prev = document.createElement("button");
+  prev.textContent = "上一頁";
+  prev.disabled = i === 0;
+  prev.onclick = () => load(i - 1);
+  pager.appendChild(prev);
+  for (let p = 0; p < PAGES; p++) {{
+    const b = document.createElement("button");
+    const from = p * 100 + 1;
+    b.textContent = String(p + 1);
+    b.title = from + "–" + Math.min(from + 99, TOTAL);
+    if (p === i) b.className = "on";
+    b.onclick = () => load(p);
+    pager.appendChild(b);
+  }}
+  const next = document.createElement("button");
+  next.textContent = "下一頁";
+  next.disabled = i >= PAGES - 1;
+  next.onclick = () => load(i + 1);
+  pager.appendChild(next);
+  window.scrollTo(0, 0);
+}}
+const start = Math.max(0, Math.min(PAGES - 1, (parseInt((location.hash.match(/p=(\\d+)/) || [])[1] || "1", 10) || 1) - 1));
+load(start);
+</script>
+</body></html>
 """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(html, encoding="utf-8")
@@ -598,23 +716,29 @@ def main(argv: list[str] | None = None) -> int:
     )
     print("[reasons]", stats["by_reason"])
     write_html(path, rows, stats, funnel, meta)
-    preview = write_preview(path)
+    if args.days == 7:
+        page_title = "一個禮拜 · 站上 MA25 就進場"
+    elif args.days >= 28:
+        page_title = "一個月 · 站上 MA25 就進場"
+    else:
+        page_title = f"{args.days} 天 · 站上 MA25 就進場"
+    preview = write_preview(path, page_title)
     print(f"[html] {path}")
     print(f"[web] {preview}")
     return 0
 
 
-def write_preview(index: Path) -> Path:
+def write_preview(index: Path, title: str = "站上 MA25 就進場") -> Path:
     index = index.resolve()
     rel = index.parent.relative_to(ROOT).as_posix()
     base = (
         "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
         f"cursor/binance-15m-ma25-retest-431e/{rel}/"
     )
-    text = index.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    text = index.read_text(encoding="utf-8").replace('const BASE = "";', f'const BASE = "{base}";')
     text = text.replace(
         "<title>幣安 15 分 站上 MA25 就進場</title>",
-        "<title>一個月 · 站上 MA25 就進場</title>",
+        f"<title>{title}</title>",
     )
     out = index.with_name("all.html")
     out.write_text(text, encoding="utf-8")
