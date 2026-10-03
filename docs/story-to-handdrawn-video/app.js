@@ -1,6 +1,12 @@
 (function () {
   "use strict";
 
+  const SUOLONG_TEXT = `鎖龍頭
+
+你知道為什麼綠色頭髮的人，機車不會被偷嗎？
+因為他有鎖龍頭。
+索隆頭。`;
+
   const LIUTI_TEXT = `留體力學
 
 小明是個習武之人。
@@ -26,6 +32,17 @@
 雨停以后，阳光把窗台晒得暖暖的。`;
 
   const REMOTION = {
+    suolong: {
+      video: "assets/suolong-preview.mp4",
+      poster: "assets/suolong-poster.jpg",
+      download: "鎖龍頭.mp4",
+      sheet: "assets/suolong-character-sheet.jpg",
+      sheetAlt: "綠髮主角角色設定",
+      pages: 3,
+      duration: 8.2,
+      storyUrl: "suolong.json",
+      colorOnly: true,
+    },
     liuti: {
       video: "assets/liuti-preview.mp4",
       poster: "assets/liuti-poster.jpg",
@@ -61,6 +78,7 @@
   };
 
   const PRESETS = [
+    { id: "suolong", title: "鎖龍頭", art: "ai", remotion: "suolong", text: SUOLONG_TEXT },
     { id: "liuti", title: "留體力學", art: "ai", remotion: "liuti", text: LIUTI_TEXT },
     { id: "trees", title: "大樹跟小樹", art: "ai", remotion: "trees", text: TREE_TEXT },
     { id: "window", title: "窗边的约定", art: "ai", remotion: "window", text: WINDOW_TEXT },
@@ -94,7 +112,7 @@
   const book = $("book");
   const player = new StoryPlayer(canvas);
   let demoStories = {};
-  let activeRemotion = "liuti";
+  let activeRemotion = "suolong";
   let source = "ai";
   let uploaded = [];
   let view = "video";
@@ -199,7 +217,7 @@
   }
 
   async function loadRemotion(id) {
-    const demo = REMOTION[id] || REMOTION.liuti;
+    const demo = REMOTION[id] || REMOTION.suolong;
     applyRemotionChrome(id);
     if (!demoStories[id] && demo.storyUrl) {
       const res = await fetch(demo.storyUrl);
@@ -380,7 +398,7 @@
     }
   });
 
-  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("liuti")]).catch((err) => {
+  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("suolong")]).catch((err) => {
     setStatus("载入示例失败：" + err.message);
   });
 })();
