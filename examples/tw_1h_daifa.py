@@ -479,7 +479,14 @@ def write_tw_html(
             "</article>"
         )
 
-    cutoff = universe[-1]["amount"] / 1e8 if universe else 0
+    ranked = [r for r in universe if not r.get("pinned")]
+    pinned = [r for r in universe if r.get("pinned")]
+    basis = ranked or list(universe)
+    cutoff = basis[-1]["amount"] / 1e8 if basis else 0
+    head_n = len(ranked) if ranked else len(universe)
+    pin_txt = ""
+    if pinned:
+        pin_txt = "，另列 " + "、".join(f"{r['code']} {r['name']}" for r in pinned)
     fun = funnel or {}
     fwd1 = _fmt_fwd(stats.get("fwd_1d"))
     fwd3 = _fmt_fwd(stats.get("fwd_3d"))
@@ -509,12 +516,12 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>台股 1h 達發多 · 成交額前 {len(universe)}</h1>
-<p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
+<h1>台股 1h 達發多 · 成交額前 {head_n}{escape(pin_txt)}</h1>
+<p class="muted">{escape(period)} · 基準日 {escape(date)} · {head_n} 檔{escape(pin_txt)} · 成交額末名約 {cutoff:.1f} 億
 <br/>開盤那根 60 分 K：低點高於前一根高點（跳空沒補），前收在 MA60 下，低點與收盤都站上 MA60，且 MA5 &gt; MA10 &gt; MA20。
 進場為該根收盤。回測出場：停在這根低點、2R、或 20 根時間停。加總％是各筆報酬相加，不是組合複利。
 樣本對齊 6526 達發 2026-09-18 09:00（開 643 高 648 低 640 收 646）。</p>
-<p class="muted">漏斗：開盤 {fun.get('opens', 0)} → 進場 {fun.get('entry', 0)}
+<p class="muted">漏斗（整段下載；近窗筆數見下方）：開盤 {fun.get('opens', 0)} → 進場 {fun.get('entry', 0)}
 · 沒跳空 {fun.get('no_gap', 0)} · 前收已在均線上 {fun.get('prev_above', 0)}
 · 沒整根站上 {fun.get('not_above_ma60', 0)} · 沒有多頭排列 {fun.get('no_stack', 0)}
 · 暖機 {fun.get('warmup', 0)} · 進場價過高 {fun.get('price_cap', 0)}

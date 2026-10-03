@@ -101,6 +101,10 @@ python3 examples/tw_1h_daifa.py --symbol 6526.TW --days 30 --range 3mo
 python3 examples/test_tw_1h_daifa.py
 ```
 
+近 30 日（基準日 2026-10-02）、成交額前 200 且股價 < 1000（另列 6526）：**26 筆、已平勝率 34.6%、平均 +0.82%**。2R 8 筆、停損 15 筆、時間停 3 筆。停損放在開盤那根低點，很多筆風險很窄，下一根影線就掃掉；收盤後 +3 日、+5 日平均仍約 **+2.2%**。6526 達發 9/18 09:00 進場 646，下一根 2R +1.86%，五個交易日後約 +29%。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-daifa-gap-be19/docs/tw-1h-daifa/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
