@@ -101,16 +101,16 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 對齊 2026-09-07 截圖那筆：18:10 / 21:20 雙頂約 0.0939，頸線貼 MA200，22:15 收盤跌破進場。
 
-`--scan` 掃幣安 USDT 永續 **24h 成交額前 100**（不含股票合約），同一套 **牛來型** 規則回測近 **3 天**。進場仍用五分 K；每筆符合條件的圖下面附同一段 **1 小時 K** 對照。
+`--scan` 掃幣安 USDT 永續 **24h 成交額前 100**（不含股票合約），同一套 **牛來型** 規則回測近 **30 天**。進場仍用五分 K；每筆符合條件的圖下面附同一段 **1 小時 K** 對照。
 
 ```bash
-python3 examples/niulai_m_top.py --days 3 --pages
-python3 examples/niulai_m_top.py --scan --limit 100 --days 3 --pages
+python3 examples/niulai_m_top.py --days 30 --pages
+python3 examples/niulai_m_top.py --scan --limit 100 --days 30 --pages
 python3 examples/test_niulai_m_top.py
 ```
 
 單檔預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/niulai-m-top/view.html  
-成交額前 100 · 三天：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/binance-m-top-3d/view.html
+成交額前 100 · 一個月：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/binance-m-top-30d/view.html
 
 ## 快速開始
 

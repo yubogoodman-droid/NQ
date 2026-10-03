@@ -6,8 +6,8 @@
 
 用法:
   python3 examples/niulai_m_top.py
-  python3 examples/niulai_m_top.py --days 3 --pages
-  python3 examples/niulai_m_top.py --scan --limit 100 --days 3 --pages
+  python3 examples/niulai_m_top.py --days 30 --pages
+  python3 examples/niulai_m_top.py --scan --limit 100 --days 30 --pages
   python3 examples/test_niulai_m_top.py
 """
 
@@ -29,7 +29,7 @@ import requests
 
 REPO = Path(__file__).resolve().parents[1]
 PAGES = REPO / "docs" / "niulai-m-top" / "index.html"
-SCAN_PAGES = REPO / "docs" / "binance-m-top-3d" / "index.html"
+SCAN_PAGES = REPO / "docs" / "binance-m-top-30d" / "index.html"
 CST = ZoneInfo("Asia/Shanghai")
 BINANCE = "https://www.binance.com"
 SYMBOL = "牛来USDT"
@@ -920,7 +920,7 @@ def _idx_at(df: pd.DataFrame, ts: pd.Timestamp) -> Optional[int]:
 def fetch_hourly(symbol: str) -> pd.DataFrame:
     if symbol == SYMBOL:
         return fetch_klines(symbol, interval="1h")
-    return fetch_klines(symbol, interval="1h", lookback_days=32)
+    return fetch_klines(symbol, interval="1h", lookback_days=45)
 
 
 def draw_hourly_png(
@@ -1417,7 +1417,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 
 def run_scan(
     limit: int = 100,
-    days: int = 3,
+    days: int = 30,
     workers: int = 8,
     pages: bool = False,
     html_path: Optional[Path] = None,
@@ -1498,7 +1498,7 @@ def run_scan(
 # ---------------------------------------------------------------------------
 
 
-def run_backtest(days: int = 3, html_path: Optional[Path] = None, pages: bool = False) -> int:
+def run_backtest(days: int = 30, html_path: Optional[Path] = None, pages: bool = False) -> int:
     df = fetch_klines()
     params = niulai_params()
     funnel: Dict[str, int] = {}
@@ -1541,7 +1541,7 @@ def run_backtest(days: int = 3, html_path: Optional[Path] = None, pages: bool = 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="牛来 / 幣安成交額前 N · 五分K M頭跌破 MA200 做空")
-    p.add_argument("--days", type=int, default=None, help="回測進場窗（天）；單檔與 scan 預設 3")
+    p.add_argument("--days", type=int, default=None, help="回測進場窗（天）；單檔與 scan 預設 30")
     p.add_argument("--html", default="", help="輸出 HTML 路徑")
     p.add_argument("--pages", action="store_true", help="寫到 docs/（單檔或 scan 目錄）")
     p.add_argument("--scan", action="store_true", help="掃 USDT 永續成交額前 N 檔")
@@ -1556,13 +1556,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.scan:
         return run_scan(
             limit=100 if args.limit is None else args.limit,
-            days=3 if args.days is None else args.days,
+            days=30 if args.days is None else args.days,
             workers=args.workers,
             pages=args.pages,
             html_path=html_path,
         )
     return run_backtest(
-        days=3 if args.days is None else args.days,
+        days=30 if args.days is None else args.days,
         html_path=html_path,
         pages=args.pages,
     )

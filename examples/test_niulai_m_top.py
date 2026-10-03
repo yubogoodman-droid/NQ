@@ -407,8 +407,8 @@ def test_draw_hourly_png_for_5m_trade() -> None:
         assert path.is_file() and path.stat().st_size > 1000
 
 
-def test_scan_pages_are_3d() -> None:
-    assert SCAN_PAGES.parent.name == "binance-m-top-3d"
+def test_scan_pages_are_30d() -> None:
+    assert SCAN_PAGES.parent.name == "binance-m-top-30d"
 
 
 def test_display_and_fmt() -> None:
@@ -434,7 +434,7 @@ def main() -> int:
         test_rank_usdt_perps_top50,
         test_idx_at_maps_intrabar_to_hourly,
         test_draw_hourly_png_for_5m_trade,
-        test_scan_pages_are_3d,
+        test_scan_pages_are_30d,
         test_display_and_fmt,
     ]
     failed = 0
