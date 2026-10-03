@@ -4,7 +4,7 @@
 條件就這兩句：
 
   • 一次突破：開盤在 MA7、MA14、MA25、MA99、MA120、MA200 每一條之下，收盤在每一條之上。
-  • 爆量：這根成交量大於前 10 根的合計。10 根是圖上的量 MA10。
+  • 爆量：這根成交量至少是前一根的 10 倍。
 
     python3 examples/binance_ma_burst.py --symbol AINUSDT
     python3 examples/binance_ma_burst.py --days 2
@@ -19,7 +19,7 @@ import numpy as np
 import requests
 
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
-VOL_WINDOW = 10  # 圖上的量 MA10
+VOL_MULT = 10.0  # 至少是前一根的 10 倍
 INTERVAL_MS = 15 * 60_000
 
 TZ = timezone(timedelta(hours=8))
@@ -42,8 +42,8 @@ def burst_at(
     ma: dict[int, np.ndarray],
     i: int,
 ) -> dict | None:
-    """同一根 15 分 K：一次穿六條均線，而且量大於前 10 根合計。"""
-    need = max(max(MA_PERIODS) - 1, VOL_WINDOW)
+    """同一根 15 分 K：一次穿六條均線，而且量至少是前一根的 10 倍。"""
+    need = max(MA_PERIODS) - 1
     if i < need or i >= len(c):
         return None
     vals = np.array([ma[n][i] for n in MA_PERIODS], dtype=float)
@@ -51,8 +51,11 @@ def burst_at(
         return None
     if not (c[i] > o[i] and np.all(o[i] <= vals) and np.all(c[i] > vals)):
         return None
-    prior = float(v[i - VOL_WINDOW : i].sum())
-    if not (v[i] > prior):
+    prior = float(v[i - 1])
+    if prior <= 0:
+        return None
+    ratio = float(v[i] / prior)
+    if ratio < VOL_MULT:
         return None
     return {
         "i": i,
@@ -61,6 +64,7 @@ def burst_at(
         "body": float(c[i] / o[i] - 1.0),
         "volume": float(v[i]),
         "prior_volume": prior,
+        "vol_ratio": ratio,
         "mas": {n: float(ma[n][i]) for n in MA_PERIODS},
     }
 
@@ -88,12 +92,12 @@ def get_json(path: str, params=None, retries: int = 5):
 
 def fetch_klines(sym: str, limit: int = 1500) -> dict | None:
     raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": "15m", "limit": limit})
-    if not raw or len(raw) < max(MA_PERIODS) + VOL_WINDOW:
+    if not raw or len(raw) < max(MA_PERIODS) + 1:
         return None
     now_ms = int(time.time() * 1000)
     if int(raw[-1][0]) + INTERVAL_MS > now_ms:
         raw = raw[:-1]
-    if len(raw) < max(MA_PERIODS) + VOL_WINDOW:
+    if len(raw) < max(MA_PERIODS) + 1:
         return None
     return {
         "t": np.array([int(x[0]) for x in raw], np.int64),
@@ -202,7 +206,7 @@ def fmt_row(row: dict) -> str:
     a1, a4 = row["after_1h"], row["after_4h"]
     return (
         f"{row['symbol']:<16} {ts}  實體{row['body'] * 100:+6.1f}%  "
-        f"量 {fmt_vol(row['volume']):>8} / 前10 {fmt_vol(row['prior_volume']):>8}  "
+        f"量 {fmt_vol(row['volume']):>8} / 前一根 {fmt_vol(row['prior_volume']):>8} ={row['vol_ratio']:5.1f}x  "
         f"1h {fmt_span(a1, 4):<14}  "
         f"4h {fmt_span(a4, 16):<16}  "
         f"之後高 {fmt_pct(None if a4 is None else a4['mfe'])}  "
@@ -216,7 +220,7 @@ def fmt_hit(sym: str, d: dict, hit: dict) -> str:
     return (
         f"{sym}  15m  {ts}\n"
         f"開 {hit['open']:.6g} → 收 {hit['close']:.6g}  ({hit['body'] * 100:+.2f}%)\n"
-        f"量 {fmt_vol(hit['volume'])}，前 {VOL_WINDOW} 根合計 {fmt_vol(hit['prior_volume'])}\n"
+        f"量 {fmt_vol(hit['volume'])}，前一根 {fmt_vol(hit['prior_volume'])} 的 {hit['vol_ratio']:.1f} 倍\n"
         f"{mas}"
     )
 
@@ -244,7 +248,7 @@ def main() -> int:
         since_ms = int(since.timestamp() * 1000)
         print(f"載入標的… 自 {since.strftime('%m-%d %H:%M')} 起", flush=True)
         symbols = universe()
-        limit = min(1500, int(args.days * 24 * 60 / 15) + max(MA_PERIODS) + VOL_WINDOW)
+        limit = min(1500, int(args.days * 24 * 60 / 15) + max(MA_PERIODS) + 1)
         t0 = time.time()
         rows = scan_since(symbols, since_ms, limit=limit)
         print(f"掃 {len(symbols)} 檔，{time.time() - t0:.0f}s，{len(rows)} 根\n")
