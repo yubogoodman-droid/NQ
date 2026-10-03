@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """1m 空：4 小時新高後，同一根死亡交叉且破 MA25，形狀對齊 ORCL 22:49。
 
+PyCharm：打開 examples/pycharm_orcl_watch.py，改最上面的設定，按綠三角 Run。
+符合訊號會印出來、電腦彈窗，並推 Telegram。
+
 對 2026-10-02 ORCL：22:44 創四小時高 144.95；22:49（+5 分）同一根收 144.44。
 當根還要：MA7 領先夠久、高點後至少幾分鐘、從高點連陰、收在 K 棒下緣、已經離高點一段。
 
 用法：
-  python3 examples/watch_orcl_death_cross.py --all --scan --date 2026-10-02 --pages
-  python3 examples/watch_orcl_death_cross.py --scan
+  python3 examples/pycharm_orcl_watch.py
   python3 examples/watch_orcl_death_cross.py --all
+  python3 examples/watch_orcl_death_cross.py --all --scan --date 2026-10-02 --pages
   python3 examples/watch_orcl_death_cross.py --test
 """
 from __future__ import annotations
@@ -16,6 +19,8 @@ import base64
 import io
 import json
 import os
+import platform
+import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -28,8 +33,15 @@ from urllib.parse import quote
 import numpy as np
 import requests
 
-# —— 可選：直接填這裡 ——
-TELEGRAM_BOT_TOKEN = ""
+# —— PyCharm：沒帶命令列參數時用這裡；有帶 CLI 則 CLI 優先 ——
+WATCH_ALL = True
+SYMBOLS = "ORCLUSDT"
+DRY_RUN = False
+TEST_ONLY = False
+ONCE = False
+DESKTOP_POPUP = True
+WORKERS = 12
+TELEGRAM_BOT_TOKEN = ""  # BotFather，也可改放專案根目錄 tg_config.env
 TELEGRAM_CHAT_ID = ""
 
 TZ = timezone(timedelta(hours=8))
@@ -463,6 +475,79 @@ def telegram_send(text: str, photo: str | None = None) -> bool:
         return False
 
 
+def _clean_notify_text(s: str, n: int) -> str:
+    out = []
+    for ch in (s or "").replace("\r", " "):
+        if ch == "\n":
+            out.append(" ")
+        elif ch.isprintable() or ch == " ":
+            out.append(ch)
+    return "".join(out).strip()[:n]
+
+
+def chart_tmp_path(sym: str, i: int) -> Path:
+    root = Path(os.environ.get("TEMP") or os.environ.get("TMP") or "/tmp")
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        root = Path.cwd()
+    safe = "".join(c for c in sym if c.isalnum()) or "SYM"
+    return root / f"orcl_dx_{safe}_{i}.png"
+
+
+def desktop_notify(title: str, body: str) -> None:
+    """Windows 氣泡 / macOS 通知 / Linux notify-send；失敗就略過。"""
+    title = _clean_notify_text(title, 72) or "ORCL 1m 空"
+    body = _clean_notify_text(body, 180) or "符合訊號"
+    try:
+        print("\a", end="", flush=True)
+    except Exception:
+        pass
+    try:
+        if platform.system() == "Windows":
+            try:
+                import winsound
+
+                winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+            except Exception:
+                pass
+            ps = (
+                "Add-Type -AssemblyName System.Windows.Forms; "
+                "Add-Type -AssemblyName System.Drawing; "
+                "$n = New-Object System.Windows.Forms.NotifyIcon; "
+                "$n.Icon = [System.Drawing.SystemIcons]::Warning; "
+                "$n.Visible = $true; "
+                f"$n.ShowBalloonTip(10000, {json.dumps(title, ensure_ascii=True)}, "
+                f"{json.dumps(body, ensure_ascii=True)}, "
+                "[System.Windows.Forms.ToolTipIcon]::Warning); "
+                "Start-Sleep 10; $n.Dispose()"
+            )
+            subprocess.Popen(
+                ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return
+        if platform.system() == "Darwin":
+            subprocess.Popen(
+                [
+                    "osascript",
+                    "-e",
+                    f"display notification {json.dumps(body)} with title {json.dumps(title)}",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return
+        subprocess.Popen(
+            ["notify-send", "--app-name=ORCL 1m 空", title, body],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return
+
+
 def _cjk_font():
     try:
         from matplotlib import font_manager
@@ -722,7 +807,7 @@ def scan_universe(
     return rows, bars
 
 
-def notify(sym: str, d: dict, hit: ShortHit, *, dry_run: bool) -> None:
+def notify(sym: str, d: dict, hit: ShortHit, *, dry_run: bool, desktop: bool = True) -> None:
     text = format_hit(sym, d, hit)
     plain = (
         text.replace("<b>", "")
@@ -732,10 +817,16 @@ def notify(sym: str, d: dict, hit: ShortHit, *, dry_run: bool) -> None:
         .strip()
     )
     print("\n" + plain)
+    if desktop:
+        extra = ""
+        if hit.bars_after_high is not None:
+            extra = f" 高點後{hit.bars_after_high}m"
+        desktop_notify(f"{sym} 空 1m", f"{hm(int(d['t'][hit.i]))}  收 {hit.close:g}{extra}  lead {hit.lead}")
+        print("  → 電腦通知已跳")
     if dry_run:
         print("  → dry-run，不送 Telegram")
         return
-    tmp = Path("/tmp") / f"orcl_dx_{sym}_{hit.i}.png"
+    tmp = chart_tmp_path(sym, hit.i)
     photo = draw_chart(sym, d, hit, str(tmp))
     ok = telegram_send(text, photo=photo)
     if ok:
@@ -1117,8 +1208,16 @@ a{{color:#c9a227;text-decoration:none}}
     return out
 
 
-def test_telegram() -> int:
+def test_telegram(*, desktop: bool = True) -> int:
     apply_keys()
+    if desktop:
+        desktop_notify("ORCL 1m 空", "測試通知：電腦彈窗已通。")
+        print("電腦彈窗已送一則測試")
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        print("Telegram 還沒填 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID（腳本最上面或 tg_config.env），先用電腦彈窗。")
+        return 0
     ok = telegram_send("ORCL 1m 死亡交叉監看測試\n如果你看到這則，Telegram 已通。")
     print("Telegram 測試", "成功" if ok else "失敗（檢查 token / chat id）")
     return 0 if ok else 1
@@ -1205,10 +1304,10 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
     return 0
 
 
-def main() -> int:
+def build_parser():
     import argparse
 
-    p = argparse.ArgumentParser(description="1m 4h新高後 MA7/MA14 死亡交叉且破 MA25 → 掃幣安 / Telegram")
+    p = argparse.ArgumentParser(description="1m 4h新高後 MA7/MA14 死亡交叉且破 MA25 → 掃幣安 / 通知")
     p.add_argument("--symbols", default="ORCLUSDT", help="逗號分隔，預設 ORCLUSDT")
     p.add_argument("--all", action="store_true", help="掃幣安所有 USDT 永續（含股票型如 ORCL）")
     p.add_argument("--min-quote-vol", type=float, default=0.0, help="24h 成交額下限，--all 時用")
@@ -1233,24 +1332,53 @@ def main() -> int:
     p.add_argument("--date", default=None, help="台北日 YYYY-MM-DD，只看這一天")
     p.add_argument("--top", type=int, default=40, help="市場掃描列出急殺最深幾筆")
     p.add_argument("--html", default=None, help="寫入 HTML 報告路徑")
-    p.add_argument("--pages", action="store_true", help="寫到 docs/binance/death-cross-1m/（單檔含規則、砸≥1%圖、全部訊號）")
+    p.add_argument("--pages", action="store_true", help="寫到 docs/binance/death-cross-1m/（單檔含規則、砸>=1%%圖、全部訊號）")
     p.add_argument("--no-charts", action="store_true", help="HTML 不嵌圖")
     p.add_argument("--limit", type=int, default=1500, help="K 線根數")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的那一分，然後結束")
-    p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
-    p.add_argument("--dry-run", action="store_true", help="只印不送 Telegram")
-    p.set_defaults(require_cross_ma25=True)
-    args = p.parse_args()
-    if args.loose and "--min-lead" not in sys.argv:
-        args.min_lead = 5
-    apply_keys()
-    if args.test:
-        return test_telegram()
+    p.add_argument("--test", action="store_true", help="只測通知通不通")
+    p.add_argument("--dry-run", action="store_true", help="只印不送 Telegram（電腦彈窗仍會跳）")
+    p.add_argument("--no-desktop", dest="desktop", action="store_false", help="關掉電腦彈窗")
+    p.set_defaults(require_cross_ma25=True, desktop=True)
+    return p
 
-    symbols, vols = load_symbol_list(args)
-    if args.scan:
-        return run_scan(args, symbols, vols)
 
+def apply_pycharm_defaults(args, argv: list[str]):
+    """沒帶命令列參數時，用檔案最上面那組 PyCharm 設定。"""
+    if argv:
+        return args
+    args.all = WATCH_ALL
+    args.symbols = SYMBOLS
+    args.dry_run = DRY_RUN
+    args.once = ONCE
+    args.test = TEST_ONLY
+    args.desktop = DESKTOP_POPUP
+    args.workers = WORKERS
+    return args
+
+
+def watch_args_from_pycharm(
+    *,
+    watch_all: bool = True,
+    symbols: str = "ORCLUSDT",
+    dry_run: bool = False,
+    test_only: bool = False,
+    once: bool = False,
+    desktop: bool = True,
+    workers: int = 12,
+):
+    args = build_parser().parse_args([])
+    args.all = watch_all
+    args.symbols = symbols
+    args.dry_run = dry_run
+    args.test = test_only
+    args.once = once
+    args.desktop = desktop
+    args.workers = workers
+    return args
+
+
+def run_watch(args, symbols: list[str], vols: dict[str, float]) -> int:
     seen = load_seen()
     detect_kw = detect_kw_from_args(args)
     look = detect_kw["high_lookback"] + detect_kw["within_bars"] + 25
@@ -1265,7 +1393,7 @@ def main() -> int:
         flush=True,
     )
     if args.all:
-        print("全市場每分鐘掃一次；報告請用 --scan --pages。", flush=True)
+        print("全市場每分鐘掃一次；符合就跳通知。報告請用 --scan --pages。", flush=True)
     uni_ts = time.time()
 
     def round_once() -> None:
@@ -1301,7 +1429,7 @@ def main() -> int:
                     new = [h for h in fresh if key_of(sym, d, h) not in seen]
                     for hit in new:
                         seen.add(key_of(sym, d, hit))
-                        notify(sym, d, hit, dry_run=args.dry_run)
+                        notify(sym, d, hit, dry_run=args.dry_run, desktop=getattr(args, "desktop", True))
                         n_new += 1
         else:
             for sym in symbols:
@@ -1323,7 +1451,7 @@ def main() -> int:
                 )
                 for hit in new:
                     seen.add(key_of(sym, d, hit))
-                    notify(sym, d, hit, dry_run=args.dry_run)
+                    notify(sym, d, hit, dry_run=args.dry_run, desktop=getattr(args, "desktop", True))
                     n_new += 1
         print(
             f"[{datetime.now(TZ).strftime('%H:%M:%S')}] "
@@ -1336,7 +1464,7 @@ def main() -> int:
     round_once()
     if args.once:
         return 0
-    print("watch 中，每根 1m 收盤掃一次（Ctrl+C 停）", flush=True)
+    print("watch 中，每根 1m 收盤掃一次（PyCharm 按紅方塊 Stop / Ctrl+C）", flush=True)
     try:
         while True:
             wait_next_close()
@@ -1345,6 +1473,55 @@ def main() -> int:
         print("\n已停止。")
         save_seen(seen)
     return 0
+
+
+def run_pycharm(
+    *,
+    watch_all: bool = True,
+    symbols: str = "ORCLUSDT",
+    dry_run: bool = False,
+    test_only: bool = False,
+    once: bool = False,
+    desktop: bool = True,
+    workers: int = 12,
+    telegram_bot_token: str = "",
+    telegram_chat_id: str = "",
+) -> int:
+    if telegram_bot_token.strip():
+        os.environ["TELEGRAM_BOT_TOKEN"] = telegram_bot_token.strip()
+    if telegram_chat_id.strip():
+        os.environ["TELEGRAM_CHAT_ID"] = telegram_chat_id.strip()
+    apply_keys()
+    args = watch_args_from_pycharm(
+        watch_all=watch_all,
+        symbols=symbols,
+        dry_run=dry_run,
+        test_only=test_only,
+        once=once,
+        desktop=desktop,
+        workers=workers,
+    )
+    if args.test:
+        return test_telegram(desktop=args.desktop)
+    names, vols = load_symbol_list(args)
+    return run_watch(args, names, vols)
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    p = build_parser()
+    args = p.parse_args(argv)
+    apply_pycharm_defaults(args, argv)
+    if args.loose and "--min-lead" not in argv:
+        args.min_lead = 5
+    apply_keys()
+    if args.test:
+        return test_telegram(desktop=getattr(args, "desktop", True))
+
+    symbols, vols = load_symbol_list(args)
+    if args.scan:
+        return run_scan(args, symbols, vols)
+    return run_watch(args, symbols, vols)
 
 
 if __name__ == "__main__":

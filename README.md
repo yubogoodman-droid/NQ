@@ -118,12 +118,23 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 對齊 ORCL：22:44 創四小時高 **144.95**，**22:49（+5 分）同一根** 收 144.44。
 
+### PyCharm：符合就跳通知
+
+打開 `examples/pycharm_orcl_watch.py`，改最上面的設定，按綠三角 **Run**。每根 1 分鐘收盤掃一次；符合 ORCL 形會：
+
+1. 終端印出
+2. 電腦右下角彈窗（Windows / macOS / Linux）
+3. 推 Telegram（填 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`，或專案根目錄 `tg_config.env`）
+
+第一次先把 `TEST_ONLY = True` 跑一次，確認彈窗／Telegram 有來，再改回 `False`。`WATCH_ALL = True` 掃幣安所有 USDT 永續；只看 ORCL 就設 `False`。停止按紅方塊 Stop。
+
 `--loose` 關掉形狀條件，只留 4h 新高 + 同根。`--no-same-bar-ma25` / `--no-4h-high` 再往下鬆。
 
 ```bash
+python3 examples/pycharm_orcl_watch.py
+python3 examples/watch_orcl_death_cross.py --all
 python3 examples/watch_orcl_death_cross.py --all --scan --date 2026-10-02 --pages
 python3 examples/watch_orcl_death_cross.py --scan
-python3 examples/watch_orcl_death_cross.py --all
 python3 examples/test_orcl_death_cross.py
 ```
 

@@ -14,8 +14,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from watch_orcl_death_cross import (  # noqa: E402
     ScanRow,
     ShortHit,
+    chart_tmp_path,
     cutoff_ms,
     day_bounds_ms,
+    desktop_notify,
     detect_shorts,
     filter_universe,
     forward_moves,
@@ -27,6 +29,7 @@ from watch_orcl_death_cross import (  # noqa: E402
     pct_move,
     sma,
     taipei_day,
+    watch_args_from_pycharm,
     write_html_report,
 )
 
@@ -431,6 +434,31 @@ def test_orcl_shape_keeps_dump_like_orcl() -> None:
     assert hit.close_loc is not None and hit.close_loc <= 0.25
 
 
+def test_watch_args_from_pycharm() -> None:
+    args = watch_args_from_pycharm(
+        watch_all=True, symbols="ORCLUSDT,BTCUSDT", dry_run=True, once=True, desktop=True, workers=8
+    )
+    assert args.all is True
+    assert args.symbols == "ORCLUSDT,BTCUSDT"
+    assert args.dry_run is True
+    assert args.once is True
+    assert args.desktop is True
+    assert args.workers == 8
+    assert args.scan is False
+    assert args.test is False
+    assert args.require_cross_ma25 is True
+
+
+def test_desktop_notify_does_not_raise() -> None:
+    desktop_notify("ORCL 1m 空", "測試")
+
+
+def test_chart_tmp_path_uses_temp(monkeypatch=None) -> None:
+    p = chart_tmp_path("ORCLUSDT", 12)
+    assert p.name == "orcl_dx_ORCLUSDT_12.png"
+    assert p.parent.exists()
+
+
 def main() -> int:
     test_sma()
     test_death_and_below_fires()
@@ -451,6 +479,9 @@ def main() -> int:
     test_4h_high_too_old_skipped()
     test_orcl_shape_skips_immediate_and_upper_close()
     test_orcl_shape_keeps_dump_like_orcl()
+    test_watch_args_from_pycharm()
+    test_desktop_notify_does_not_raise()
+    test_chart_tmp_path_uses_temp()
     print("ok")
     return 0
 
