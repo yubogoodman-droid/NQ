@@ -50,6 +50,8 @@ python3 examples/nq_ma_reclaim.py alert
 對齊 2026-09-29 01:35 那波（低 30372.25）：跌破近 **4 小時低點**後，**60 根內**收盤站上 1 分 MA200，且 **MA5>MA10>MA20>MA30**，做多並推 Telegram。  
 01:31 破 4h 低 30409.25 → 02:03 站上 MA200（距破底 32 分）。停損在波段低 −12，目標 2R。
 
+近 8 天 Yahoo 1m： **9 筆、勝率 33%、−43 點**。09/29 那筆 02:03 進場、90 分鐘 **+149 點**。這是通知規則，八天樣本優勢不明顯。
+
 ```bash
 python3 examples/nq_4h_ma200.py backtest --period 8d --pages
 python3 examples/nq_4h_ma200.py alert --dry-run --once
