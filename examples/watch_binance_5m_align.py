@@ -277,19 +277,20 @@ def summarize_hits(hits: list[dict]) -> dict:
     return stats
 
 
-def get_json(path: str, params=None, retries: int = 5):
+def get_json(path: str, params=None, retries: int = 8):
     last = None
     for i in range(retries):
         try:
             r = SESSION.get(BASE + path, params=params, timeout=20)
             if r.status_code == 429:
-                time.sleep(1.3 * (i + 1))
+                time.sleep(1.6 * (i + 1))
+                last = RuntimeError(f"429 {path}")
                 continue
             r.raise_for_status()
             return r.json()
         except Exception as e:
             last = e
-            time.sleep(0.4 * (i + 1))
+            time.sleep(0.5 * (i + 1))
     raise last if last is not None else RuntimeError(f"GET {path} failed")
 
 
@@ -585,7 +586,7 @@ def scan_history_symbol(sym: str, start_ms: int, end_ms: int) -> tuple[list[dict
 def backtest_all(symbols: list[str], start_ms: int, end_ms: int) -> tuple[list[dict], dict]:
     hits: list[dict] = []
     funnel = {"symbols": len(symbols), "ok": 0, "five_new": 0, "fifteen": 0, "hits": 0, "errors": 0}
-    with ThreadPoolExecutor(8) as ex:
+    with ThreadPoolExecutor(5) as ex:
         futs = {ex.submit(scan_history_symbol, s, start_ms, end_ms): s for s in symbols}
         done = 0
         for fut in as_completed(futs):

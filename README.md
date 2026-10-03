@@ -97,8 +97,8 @@ python3 examples/watch_binance_5m_align.py --backtest --days 30 --pages
 python3 examples/test_watch_binance_5m_align.py
 ```
 
-只掃 24h 成交額前 100 檔。近一個月（2026-09-03 21:46 → 10-03 21:46）：**2316 筆 / 99 檔**。  
-5m 從 MA200 下站上且多排 5273 → 小時過濾後 2316。持有 60 分鐘勝率 **48.8%、平均 +0.09%**；120 分鐘 **49.7%、平均 +0.14%**。
+只掃 24h 成交額前 100 檔。近一個月（2026-09-03 21:58 → 10-03 21:58）：**190 筆 / 76 檔**。  
+5m 從下站上 5282 → 15m 也從下站上 401 → 小時過濾 190。持有 60 分鐘勝率 **51.6%、平均 +0.62%**；120 分鐘 **51.6%、平均 +0.52%**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-align-7d44/docs/binance-5m-align/view.html
 
