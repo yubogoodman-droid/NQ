@@ -1,31 +1,27 @@
 #!/usr/bin/env python3
-"""台股 1h：突破後回踩 MA60。
-
-對齊討論裡那五張小時圖的結構（中美晶最標準）：
-  • 先在上升／走平的 MA60 上方走出一段延伸（高點距 MA60 ≥ 3%）。
-  • 之後才回踩：低點碰到 MA60 附近（可略刺穿），收盤仍站在均線上。
-  • 進場收盤不能離 MA60 太遠（不是追噴出）。
-  • 同一段突破只吃第一次回踩。
-  • 收盤明顯跌破 MA60 算轉空，不當成回踩。
-  • 從下方站回（破底翻）這套不吃。
-
-回測出場：停在回踩低點（至少距進場 0.8%）、目標 2R、或 20 根時間停。
-"""
+"""台股 1h：晶心科型，突破 MA60 後回測均線附近才通知。"""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
+import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from html import escape
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 import numpy as np
 import pandas as pd
+
+try:
+    import requests
+except ImportError:
+    requests = None  # type: ignore
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -66,9 +62,13 @@ WATCH = [
 @dataclass(frozen=True)
 class RetestParams:
     ma_n: int = 60
+    min_below: int = 12
+    min_depth: float = 0.035
+    max_cross_stretch: float = 0.035
+    require_rising_ma: bool = False
     slope_lookback: int = 10
     min_ext: float = 0.03
-    touch_above: float = 0.01
+    touch_above: float = 0.012
     max_under: float = 0.015
     max_close_below: float = 0.005
     max_entry_stretch: float = 0.025
@@ -92,6 +92,8 @@ class Signal:
     ext_pct: float
     retest_low: float
     run_start: int
+    bars_below: int = 0
+    depth_pct: float = 0.0
 
 
 @dataclass
@@ -122,6 +124,25 @@ def summarize_trades(trades: Sequence[TradeResult]) -> dict:
     return _summarize_trades(trades)
 
 
+def _below_stats(close: np.ndarray, low: np.ndarray, ma: np.ndarray, last_below: int) -> tuple[int, float, float]:
+    """從站上前一根往回數：在 MA60 下面幾根、最低、過程最高均線。"""
+    bars = 0
+    trough = float(low[last_below])
+    max_ma = float(ma[last_below]) if not np.isnan(ma[last_below]) else 0.0
+    k = last_below
+    while k >= 0:
+        if np.isnan(ma[k]):
+            break
+        if close[k] >= ma[k]:
+            break
+        bars += 1
+        trough = min(trough, float(low[k]))
+        max_ma = max(max_ma, float(ma[k]))
+        k -= 1
+    depth = (max_ma - trough) / max_ma if max_ma > 0 else 0.0
+    return bars, trough, depth
+
+
 def detect_signals(
     df: pd.DataFrame,
     params: Optional[RetestParams] = None,
@@ -139,14 +160,32 @@ def detect_signals(
     ma = sma(close, p.ma_n)
     n = len(close)
     signals: List[Signal] = []
-    i = p.ma_n
+    i = max(p.ma_n, 1)
 
     while i < n:
-        if np.isnan(ma[i]) or close[i] <= ma[i]:
+        if np.isnan(ma[i]) or np.isnan(ma[i - 1]):
             i += 1
             continue
+        if not (close[i - 1] <= ma[i - 1] and close[i] > ma[i]):
+            i += 1
+            continue
+        bump("cross")
 
-        bump("above_run")
+        bars_below, _trough, depth = _below_stats(close, low, ma, i - 1)
+        if bars_below < p.min_below:
+            bump("too_short")
+            i += 1
+            continue
+        if depth < p.min_depth:
+            bump("shallow")
+            i += 1
+            continue
+        if float(close[i]) > float(ma[i]) * (1.0 + p.max_cross_stretch):
+            bump("cross_extended")
+            i += 1
+            continue
+        bump("cross_ok")
+
         run_start = i
         peak_high = float(high[i])
         peak_idx = i
@@ -183,10 +222,11 @@ def detect_signals(
                 live_ext = (peak_high / float(ma[j]) - 1.0) if float(ma[j]) > 0 else 0.0
                 if j > peak_idx:
                     rising = True
-                    sl = j - p.slope_lookback
-                    if sl >= 0 and not np.isnan(ma[sl]):
-                        rising = float(ma[j]) >= float(ma[sl]) - 1e-12
-                    if not rising:
+                    if p.require_rising_ma:
+                        sl = j - p.slope_lookback
+                        if sl >= 0 and not np.isnan(ma[sl]):
+                            rising = float(ma[j]) >= float(ma[sl]) - 1e-12
+                    if p.require_rising_ma and not rising:
                         bump("falling_ma")
                     elif live_ext < p.min_ext:
                         bump("ext_faded")
@@ -207,6 +247,8 @@ def detect_signals(
                                     ext_pct=live_ext,
                                     retest_low=float(low[j]),
                                     run_start=run_start,
+                                    bars_below=bars_below,
+                                    depth_pct=depth,
                                 )
                             )
                             bump("entry")
@@ -453,12 +495,13 @@ def write_tw_html(
             f"<div class='tags'><span class='tag tag-info'>{escape(hit.row['symbol'])}</span>"
             f"<span class='tag'>{escape(t.exit_reason)}</span>"
             f"<span class='tag'>延伸 {s.ext_pct*100:.1f}%</span>"
+            f"<span class='tag'>下面 {s.bars_below} 根</span>"
             f"<span class='tag'>距MA60 {(t.entry_price / s.ma60 - 1)*100:+.2f}%</span></div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}  stop {t.stop_price:.2f} (−{risk:.2f})\n"
             f"target {t.target_price:.2f}  exit {t.exit_price:.2f} {t.exit_reason}  {t.pnl_points:+.2f}\n"
             f"突破高 {s.peak_high:.2f} @ {df.index[s.peak_idx].strftime('%m-%d %H:%M')}  "
-            f"MA60 {s.ma60:.2f}\n"
+            f"MA60 {s.ma60:.2f}  破底深度 {s.depth_pct*100:.1f}%\n"
             f"fwd +1d {_fmt_fwd(t.fwd_1d)}  +3d {_fmt_fwd(t.fwd_3d)}  +5d {_fmt_fwd(t.fwd_5d)}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
@@ -498,11 +541,11 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 1h 突破後回踩 MA60 · {escape(period)}</h1>
 <p class="muted">基準日 {escape(date)} · 掃描 {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
-<br/>先在 MA60 上方延伸 ≥ 3%，再回踩均線附近（可刺穿 1.5%），收盤站上且離 MA60 ≤ 2.5%。MA60 不能下彎。同一段只吃第一次回踩。
+<br/>晶心科型：先在 MA60 下面待 ≥ 12 根且深度 ≥ 3.5%，收盤站上（站上那根不能已離開 3.5%），拉開 ≥ 3% 再回踩均線附近。不要右上角追價。
 回測出場：停在回踩低（至少 0.8%）、2R、或 20 根時間停。加總％是各筆報酬相加，不是組合複利。</p>
-<p class="muted">漏斗（Yahoo 全區間，本週只留進場日）：站上 {fun.get('above_run', 0)} → 有延伸 {fun.get('extended', 0)} → 全區間進場 {fun.get('entry', 0)} → 本週 {stats['count']}
-· 轉空 {fun.get('breakdown', 0)} · 回踩逾時 {fun.get('retest_timeout', 0)} · MA60 下彎 {fun.get('falling_ma', 0)}
-· 延伸被均線追上 {fun.get('ext_faded', 0)}
+<p class="muted">漏斗：站上 {fun.get('cross', 0)} → 成波 {fun.get('cross_ok', 0)} → 有延伸 {fun.get('extended', 0)} → 全區間進場 {fun.get('entry', 0)} → 本週 {stats['count']}
+· 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 站上已噴 {fun.get('cross_extended', 0)}
+· 轉空 {fun.get('breakdown', 0)} · 回踩逾時 {fun.get('retest_timeout', 0)} · 延伸被追上 {fun.get('ext_faded', 0)}
 <br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}</p>
 <div class="cards">
@@ -580,6 +623,8 @@ def dump_hits_json(path: Path, hits: List[TwHit], stats: dict, funnel: dict, ext
                 "peak_high": s.peak_high,
                 "peak_time": str(df.index[s.peak_idx]),
                 "retest_low": s.retest_low,
+                "bars_below": s.bars_below,
+                "depth_pct": s.depth_pct,
                 "fwd_1d": t.fwd_1d,
                 "fwd_3d": t.fwd_3d,
                 "fwd_5d": t.fwd_5d,
@@ -623,8 +668,187 @@ def resolve_pool(limit: int, pool: int) -> int:
     return int(limit)
 
 
+CONFIG_ENV = REPO / "tg_config.env"
+if not CONFIG_ENV.exists():
+    CONFIG_ENV = Path(__file__).resolve().parent / "tg_config.env"
+STATE_PATH = REPO / "output" / "tw_1h_ma60_alert_state.json"
+
+
+def load_dotenv() -> None:
+    if not CONFIG_ENV.exists():
+        return
+    for line in CONFIG_ENV.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k, v = k.strip(), v.strip().strip('"').strip("'")
+        if k and k not in os.environ:
+            os.environ[k] = v
+
+
+def _env(name: str, default: Optional[str] = None) -> Optional[str]:
+    v = os.environ.get(name, default)
+    return v if v not in (None, "") else default
+
+
+def tg_send(token: str, chat_id: str, text: str, dry_run: bool = False) -> bool:
+    if dry_run:
+        print("[dry-run]\n" + text)
+        return True
+    if requests is None:
+        print("pip install requests", file=sys.stderr)
+        return False
+    r = requests.post(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        json={"chat_id": chat_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True},
+        timeout=30,
+    )
+    if not r.ok:
+        print(f"[tg] HTTP {r.status_code}: {r.text[:300]}", file=sys.stderr)
+        return False
+    data = r.json()
+    if not data.get("ok"):
+        print(f"[tg] API error: {data}", file=sys.stderr)
+        return False
+    return True
+
+
+def _load_state() -> dict:
+    if not STATE_PATH.exists():
+        return {"alerted": []}
+    try:
+        return json.loads(STATE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {"alerted": []}
+
+
+def _save_state(state: dict) -> None:
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _alert_key(row: dict, df: pd.DataFrame, sig: Signal) -> str:
+    ts = df.index[sig.entry_idx]
+    return f"{row['code']}|{ts.isoformat()}|{sig.entry_price:.2f}"
+
+
+def fmt_alert(row: dict, df: pd.DataFrame, sig: Signal) -> str:
+    ts = df.index[sig.entry_idx]
+    last = float(df["Close"].iloc[-1])
+    dist = (sig.entry_price / sig.ma60 - 1.0) * 100
+    return (
+        f"🟢 <b>突破 MA60 回測</b> {row['code']} {row['name']}\n"
+        f"時間: <code>{ts.strftime('%Y-%m-%d %H:%M')}</code>\n"
+        f"現價/進場: <code>{last:.2f}</code> / <code>{sig.entry_price:.2f}</code>\n"
+        f"MA60: <code>{sig.ma60:.2f}</code> 距均線 {dist:+.2f}%\n"
+        f"突破高: <code>{sig.peak_high:.2f}</code> @ {df.index[sig.peak_idx].strftime('%m-%d %H:%M')}\n"
+        f"下面 {sig.bars_below} 根 · 深度 {sig.depth_pct*100:.1f}% · 延伸 {sig.ext_pct*100:.1f}%\n"
+        f"#晶心科型 #MA60回測 #{row['code']}"
+    )
+
+
+def cmd_alert(args) -> int:
+    load_dotenv()
+    token = _env("TELEGRAM_BOT_TOKEN")
+    chat_id = _env("TELEGRAM_CHAT_ID")
+    if not args.dry_run and (not token or not chat_id):
+        print("Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (see tg_config.env.example)", file=sys.stderr)
+        return 2
+    if args.test:
+        ok = tg_send(
+            token or "",
+            chat_id or "",
+            f"✅ 台股 1h MA60 回測通知測試\n{datetime.now(TPE).strftime('%Y-%m-%d %H:%M:%S')} 台北",
+            dry_run=args.dry_run,
+        )
+        return 0 if ok else 1
+
+    interval = args.interval if args.interval is not None else int(_env("POLL_SECONDS", "60") or 60)
+    lookback_hours = args.lookback_hours if args.lookback_hours is not None else float(_env("LOOKBACK_HOURS", "12") or 12)
+    print(
+        f"TW 1h MA60 回測 TG | interval={interval}s | dry_run={args.dry_run} | "
+        f"lookback={lookback_hours}h | limit={args.limit}"
+    )
+    while True:
+        try:
+            _alert_once(token or "", chat_id or "", args, lookback_hours)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[error] {exc}", file=sys.stderr)
+            traceback.print_exc()
+        if args.once:
+            break
+        time.sleep(max(15, interval))
+    return 0
+
+
+def _alert_once(token: str, chat_id: str, args, lookback_hours: float) -> None:
+    params = loose_params()
+    date = resolve_twse_date(args.date or last_tw_session_yyyymmdd())
+    pool = resolve_pool(args.limit, args.pool)
+    raw = fetch_top_turnover(date, pool)
+    price_cap = None if args.max_price is None or args.max_price <= 0 else float(args.max_price)
+    helper_cap = None if price_cap is None else price_cap - 1e-9
+    keep_n = 0 if pool == args.limit and args.limit > 0 else args.limit
+    universe, _dropped = filter_by_max_price(raw, helper_cap, keep_n)
+    if args.watch:
+        universe = _merge_watch(universe)
+    state = _load_state()
+    alerted: Set[str] = set(state.get("alerted") or [])
+    first_run = not STATE_PATH.exists() or (not alerted and not state.get("initialized"))
+    now = datetime.now(TPE)
+    cutoff = now.timestamp() - lookback_hours * 3600
+    new_hits: List[tuple[str, dict, pd.DataFrame, Signal]] = []
+
+    for row in universe:
+        try:
+            df = fetch_yahoo_1h(row["symbol"], args.range_)
+        except Exception as exc:  # noqa: BLE001
+            print(f"  {row['symbol']} {exc}", file=sys.stderr)
+            continue
+        if len(df) < params.ma_n + 10:
+            continue
+        for sig in detect_signals(df, params):
+            if price_cap is not None and sig.entry_price >= price_cap:
+                continue
+            ts = df.index[sig.entry_idx]
+            ts_utc = ts.tz_convert("UTC") if getattr(ts, "tzinfo", None) else ts
+            if ts_utc.timestamp() < cutoff:
+                continue
+            k = _alert_key(row, df, sig)
+            if k in alerted:
+                continue
+            new_hits.append((k, row, df, sig))
+        time.sleep(max(0.05, args.sleep))
+
+    if first_run and not args.seed_alert:
+        for k, *_ in new_hits:
+            alerted.add(k)
+        state["alerted"] = sorted(alerted)[-400:]
+        state["initialized"] = True
+        state["last_scan"] = now.isoformat()
+        _save_state(state)
+        print(f"[{now.strftime('%H:%M:%S')}] init: marked {len(new_hits)} recent, skip send")
+        return
+
+    sent = 0
+    for k, row, df, sig in new_hits:
+        ok = tg_send(token, chat_id, fmt_alert(row, df, sig), dry_run=args.dry_run)
+        if ok:
+            alerted.add(k)
+            sent += 1
+            ts = df.index[sig.entry_idx]
+            print(f"[alert] {row['code']} {row['name']} {ts.strftime('%m-%d %H:%M')} @{sig.entry_price:.2f}")
+
+    state["alerted"] = sorted(alerted)[-400:]
+    state["initialized"] = True
+    state["last_scan"] = now.isoformat()
+    _save_state(state)
+    print(f"[{now.strftime('%H:%M:%S')}] scan ok new={len(new_hits)} sent={sent}")
+
+
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(description="台股 1h 突破後回踩 MA60 回測")
+    p = argparse.ArgumentParser(description="台股 1h 晶心科型 MA60 突破回測")
     p.add_argument("--date", default="", help="YYYYMMDD，預設上一個交易日")
     p.add_argument("--limit", type=int, default=200, help="成交額前 N；0 = 不限成交額")
     p.add_argument("--pool", type=int, default=0, help="先取成交額前 N 再過濾；0 = 等於 --limit，不往後補")
@@ -636,7 +860,16 @@ def main(argv=None) -> int:
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
     p.add_argument("--json", dest="json_path", default="")
+    p.add_argument("--alert", action="store_true", help="Telegram 輪詢：突破後回測 MA60 才通知")
+    p.add_argument("--once", action="store_true", help="只掃一次")
+    p.add_argument("--dry-run", action="store_true", help="只印通知不送")
+    p.add_argument("--test", action="store_true", help="送一則測試到 Telegram")
+    p.add_argument("--seed-alert", action="store_true", help="第一次就送近期訊號")
+    p.add_argument("--interval", type=int, default=None)
+    p.add_argument("--lookback-hours", type=float, default=None)
     args = p.parse_args(argv)
+    if args.alert or args.test:
+        return cmd_alert(args)
 
     params = loose_params()
     date = resolve_twse_date(args.date or last_tw_session_yyyymmdd())

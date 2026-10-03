@@ -94,6 +94,11 @@ python3 examples/test_tw_1h_reclaim.py
 # 成交額前 200，股價 1000 以上刪掉（不往後補名次）
 python3 examples/tw_1h_ma60_retest.py --days 7 --range 2mo --pages
 
+# Telegram：只在突破 MA60 後回測均線附近通知（晶心科型，不要右上角追價）
+python3 examples/tw_1h_ma60_retest.py --alert --test
+python3 examples/tw_1h_ma60_retest.py --alert --dry-run --once
+python3 examples/tw_1h_ma60_retest.py --alert
+
 # 單元測試（不打網路）
 python3 examples/test_tw_1h_ma60_retest.py
 ```
