@@ -1,7 +1,7 @@
 {
   "stats": {
-    "count": 2,
-    "names": 2,
+    "count": 1,
+    "names": 1,
     "fwd_1d": null,
     "fwd_1d_n": 0,
     "fwd_1d_wr": 0.0,
@@ -18,7 +18,7 @@
     "limit": 200,
     "max_price": 1000.0,
     "symbols": "",
-    "generated": "2026-10-03T15:58:47+08:00",
+    "generated": "2026-10-03T17:46:37+08:00",
     "days": 0,
     "now_only": true
   },
@@ -34,21 +34,6 @@
       "ma20": 120.875,
       "ma240": 121.26875003178914,
       "above_ma240_pct": 0.006029995097823315,
-      "fwd_1d": null,
-      "fwd_3d": null,
-      "fwd_5d": null
-    },
-    {
-      "code": "6285",
-      "name": "啟碁",
-      "symbol": "6285.TW",
-      "time": "2026-10-02 13:30:00+08:00",
-      "close": 238.0,
-      "ma5": 237.8,
-      "ma10": 236.3,
-      "ma20": 235.825,
-      "ma240": 237.19375,
-      "above_ma240_pct": 0.00339911991778874,
       "fwd_1d": null,
       "fwd_3d": null,
       "fwd_5d": null
