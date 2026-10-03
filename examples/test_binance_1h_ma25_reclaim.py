@@ -212,6 +212,17 @@ def test_drawn_w_ok_avgo_like() -> None:
     assert not drawn_w_ok(low_v, high_v, ma, 2, 21, 18)
 
 
+def test_min_quality_keeps_only_a() -> None:
+    df = _make_reclaim_bars()
+    loose = detect_signals(df, min_quality="C")
+    assert loose
+    only_a = detect_signals(df, min_quality="A")
+    assert all(s.quality == "A" for s in only_a)
+    assert len(only_a) <= len(loose)
+    if loose[0].quality != "A":
+        assert not only_a
+
+
 def test_bull_stack() -> None:
     c = np.array([10.5, 10.2])
     m7 = np.array([10.3, 10.1])
@@ -421,6 +432,7 @@ def main() -> int:
     test_shallow_rejected()
     test_slow_grind_rejected()
     test_drawn_w_ok_avgo_like()
+    test_min_quality_keeps_only_a()
     test_bull_stack()
     test_strict_requires_drawn_w()
     test_still_below_no_signal()

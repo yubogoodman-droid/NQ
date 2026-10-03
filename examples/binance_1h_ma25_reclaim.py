@@ -415,6 +415,7 @@ def detect_signals(
     break_lookback: int = 16,
     require_drawn_w: bool = False,
     max_stack_wait: int = 36,
+    min_quality: str = "C",
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """1h 跌破 MA25 破底後，等 MA7>MA14>MA25 多頭排列再進。"""
@@ -526,6 +527,11 @@ def detect_signals(
         shape = classify_shape(low, high, start, end)
         stacked = True
         q_score, q_grade = quality_of(depth_pct, vol_ratio, shape, stacked)
+        rank = {"C": 0, "B": 1, "A": 2}
+        if rank.get(q_grade, 0) < rank.get(min_quality, 0):
+            bump("low_quality")
+            i = reclaim
+            continue
 
         signals.append(
             Signal(
@@ -981,7 +987,8 @@ def write_html_report(
             f"<p class='muted'>漏斗：跌破 {funnel.get('cross_down', 0)} → "
             f"站回 {funnel.get('reclaim', 0)} → 進場 {funnel.get('taken', 0)}"
             f"（太短 {funnel.get('too_short', 0)} · 太長 {funnel.get('too_long', 0)} · "
-            f"太淺 {funnel.get('shallow', 0)} · 急殺不夠 {funnel.get('weak_flush', 0)} · "
+            f"太淺 {funnel.get('shallow', 0)} · 品質不夠 {funnel.get('low_quality', 0)} · "
+            f"急殺不夠 {funnel.get('weak_flush', 0)} · "
             f"未站回 {funnel.get('no_reclaim', 0)}）</p>"
         )
     q_bits = [f"Q{q} {info['n']}筆 {info['pnl']:+.2f}%" for q, info in stats.get("by_quality", {}).items()]
@@ -1023,7 +1030,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上（{'嚴格 · 筆畫 W' if strict else '寬鬆'}）</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 均線對齊你那兩張手機圖：黃7 / 青14 / 粉25 / 紫99 / 綠120 / 酒紅200<br/>
-{'嚴格版 · 在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%。'}破底後等 1h MA7&gt;MA14&gt;MA25 多頭排列才進場。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
+{'嚴格版 · 在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%。進場還要品質 A：深度 ≥ 2.5%、放量 ≥ 1.35 倍、W 型，這三項至少再中兩項。'}破底後等 1h MA7&gt;MA14&gt;MA25 多頭排列才進場。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1400,16 +1407,19 @@ STRICT_DETECT = dict(
 
 def detect_kwargs(args) -> dict:
     if getattr(args, "strict", False):
-        return dict(STRICT_DETECT, target_r=args.target_r)
-    return dict(
-        min_bars_below=args.min_bars,
-        max_bars_below=args.max_bars,
-        min_depth_pct=args.min_depth / 100.0,
-        min_impulse_pct=args.min_impulse / 100.0,
-        min_undercut_pct=args.min_undercut / 100.0,
-        min_flush_atr=args.min_atr,
-        target_r=args.target_r,
-    )
+        kw = dict(STRICT_DETECT, target_r=args.target_r)
+    else:
+        kw = dict(
+            min_bars_below=args.min_bars,
+            max_bars_below=args.max_bars,
+            min_depth_pct=args.min_depth / 100.0,
+            min_impulse_pct=args.min_impulse / 100.0,
+            min_undercut_pct=args.min_undercut / 100.0,
+            min_flush_atr=args.min_atr,
+            target_r=args.target_r,
+        )
+    kw["min_quality"] = getattr(args, "min_quality", "A")
+    return kw
 
 
 # ---------------------------------------------------------------------------
@@ -1475,7 +1485,8 @@ def cmd_run(args) -> int:
             f"down={funnel.get('cross_down', 0)} reclaim={funnel.get('reclaim', 0)} "
             f"taken={funnel.get('taken', 0)} short={funnel.get('too_short', 0)} "
             f"long={funnel.get('too_long', 0)} shallow={funnel.get('shallow', 0)} "
-            f"weak={funnel.get('weak_flush', 0)} notw={funnel.get('not_w', 0)} "
+            f"weak={funnel.get('weak_flush', 0)} lowq={funnel.get('low_quality', 0)} "
+            f"notw={funnel.get('not_w', 0)} "
             f"nostack={funnel.get('no_stack', 0)} noreclaim={funnel.get('no_reclaim', 0)}"
         )
     now = datetime.now(TPE)
@@ -1557,6 +1568,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-bars", type=int, default=4, help="在 MA25 下至少幾根 1h")
     p.add_argument("--max-bars", type=int, default=36, help="在 MA25 下最多幾根 1h")
     p.add_argument("--min-depth", type=float, default=1.8, help="相對 MA25 最低深度 %")
+    p.add_argument("--min-quality", default="A", choices=("A", "B", "C"), help="最低品質；A=深度/放量/W 至少再中兩項")
     p.add_argument("--min-impulse", type=float, default=0.0, help="4 根急殺最低幅度 %（0=寬鬆）")
     p.add_argument("--min-undercut", type=float, default=0.0, help="跌破急殺前平台低點 %（0=寬鬆）")
     p.add_argument("--min-atr", type=float, default=0.0, help="急殺至少幾個 ATR（0=寬鬆）")

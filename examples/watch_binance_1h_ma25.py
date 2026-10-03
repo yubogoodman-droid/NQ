@@ -237,12 +237,15 @@ def pick_symbols(args) -> List[str]:
 
 def detect_kw(args) -> dict:
     if args.strict:
-        return dict(STRICT_DETECT)
-    return dict(
-        min_bars_below=args.min_bars,
-        max_bars_below=args.max_bars,
-        min_depth_pct=args.min_depth / 100.0,
-    )
+        kw = dict(STRICT_DETECT)
+    else:
+        kw = dict(
+            min_bars_below=args.min_bars,
+            max_bars_below=args.max_bars,
+            min_depth_pct=args.min_depth / 100.0,
+        )
+    kw["min_quality"] = "A"
+    return kw
 
 
 def scan_symbol(symbol: str, days: int, kw: dict) -> Tuple[str, Optional[Any], List[Signal], List[TradeResult], str]:
