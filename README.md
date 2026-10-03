@@ -88,11 +88,16 @@ python3 examples/test_tw_1h_reclaim.py
 
 對齊 3035 智原小時 K：收盤同時 **MA5 > MA10 > MA20**，且 **站上 MA240**。上一根還沒同時滿足、這一根才成立才推 Telegram；已經排好且一直站在上面的不會每根都發。
 
-預設只盯智原。GitHub Actions 在台北 10:03 / 11:03 / 12:03 / 13:03 / 13:33 代跑。加 `--universe` 才掃成交額前 200。
+預設掃**成交額前 200**（股價 < 1000，固定含智原）。GitHub Actions 在台北 10:03 / 11:03 / 12:03 / 13:03 / 13:33 代跑。`--symbols 3035` 只盯智原。
 
-Yahoo 1h、近 30 日智原 **4 筆**：+1d 全贏、平均 **+3.73%**；+3d 平均 **+9.09%**（3 筆）。9/17 剛站上 MA240（+0.5%），9/24 與 10/01 是短均再排好（當時已高出 MA240 約 16–18%）。截圖那種 5/10/20 貼在一起、價在 240 之上，對應 9/24 11:00。
+成交額前 200、2026-09-03 → 10-02：
 
-圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-30d/view.html
+- **近 7 日 222 筆 / 159 檔**，+1d 勝率 **63%**、平均 **+2.00%**；+3d 平均 **+7.99%**
+- **近 30 日 725 筆 / 194 檔**，+1d 勝率 **51%**、平均 **+0.82%**；+3d 平均 **+2.11%**
+- 10/02 收盤當下仍符合的有 **135 檔**（含智原）；剛收的最後 2 根小時 K 新形成 **12 筆**（群創、台虹、長榮、玉山金等）
+
+7 日圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-7d/view.html  
+30 日圖（最近 80 筆有 K 線）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-30d/view.html
 
 ```bash
 # 單元測試（不打網路）
@@ -101,21 +106,22 @@ python3 examples/test_tw_1h_stack_ma240.py
 # 測 Telegram（憑證放 tg_config.env，勿提交）
 python3 examples/tw_1h_stack_ma240.py --test
 
-# 智原現在有沒有多頭排列且站上 MA240
+# 成交額前 200 現在誰多頭排列且站上 MA240
 python3 examples/tw_1h_stack_ma240.py --now --dry-run
 
-# 只掃剛收盤的 1～2 根（盤後 / Actions）
+# 只掃剛收盤的 1～2 根並推播（盤後 / Actions）
 python3 examples/tw_1h_stack_ma240.py --dry-run --once
 python3 examples/tw_1h_stack_ma240.py --once
 
 # 等到下一根小時 K 收盤再掃
 python3 examples/tw_1h_stack_ma240.py
 
-# 智原近一個月訊號圖
+# 近一週 / 近一個月回測
+python3 examples/tw_1h_stack_ma240.py scan --days 7 --pages
 python3 examples/tw_1h_stack_ma240.py scan --days 30 --pages
 
-# 成交額前 200 現況（筆數會很多，只宜看名單）
-python3 examples/tw_1h_stack_ma240.py --universe --now --dry-run --no-chart
+# 只盯智原
+python3 examples/tw_1h_stack_ma240.py --symbols 3035 --now --dry-run
 ```
 
 ## 幣安黏帶三幕 Telegram
