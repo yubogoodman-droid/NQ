@@ -129,7 +129,19 @@ python3 examples/chart_today.py --report --days 30 -o output/nq_report_30d.html
 python3 examples/chart_today.py
 ```
 
-### 股市進出簿
+### 破底翻看圖學習
+
+丟 K 線截圖，頁面先猜像不像破底翻，再按「這是破底翻」或「這不是」。教材存在這台瀏覽器，可匯出 JSON；教得越多，越會照你標過的圖來判，不再只靠固定口訣。
+
+```bash
+# 單元測試（不開瀏覽器）
+node docs/podifan/learn.test.js
+```
+
+- 本機：開 `docs/podifan/index.html`
+- GitHub Pages：`https://yubogoodman-droid.github.io/NQ/podifan/`
+
+## 股市進出簿
 
 手機也能用的買賣帳本，資料存在瀏覽器本機，可匯出 JSON / CSV。
 
