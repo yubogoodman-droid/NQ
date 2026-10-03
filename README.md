@@ -101,6 +101,30 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## 幣安 15 分 K · 7/14/25/99 空頭排列跌破 MA200
+
+15m **MA7 < MA14 < MA25 < MA99**，同一根紅 K 收盤跌破 **MA200**（上一根還沒在 200 下）。訊號以**收盤確認**，下一根才決定進不進。  
+回測還可套 1h 過濾（MA25 下、不在 1h MA200 下、離 1h MA99 ≤ 20% 等）。監看則剛收完的 15m 符合就推 Telegram。  
+急殺：實體 ≥ 0.8%、量 ≥ 1.5×成交量 MA20。停在跌破 K 高點／MA200 較高者，目標 2R，或 8 小時時間停。
+
+近一週（2026-09-23 → 09-30 TPE）152 檔：**9 筆、已平勝率 44.4%、平均 −0.42%、加總 −3.82%**（停損 5、時間 3、2R 1）。LSK / CLO 這週沒訊號。
+
+近一個月（2026-09-03 → 10-03 TPE）147 檔：**37 筆、已平勝率 40.5%、平均 −0.20%、加總 −7.32%**（停損 22、時間 10、2R 5）。九月 32 筆 40.6%、−1.54%；十月 5 筆 40.0%、−5.79%。LSK / CLO 沒訊號。
+
+在 `examples/binance_15m_short.py` 最上面填 Telegram，或設環境變數 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`。
+
+```bash
+python3 examples/test_binance_15m_short.py
+python3 examples/binance_15m_short.py --watch --test
+python3 examples/binance_15m_short.py --watch
+python3 examples/binance_15m_short.py --watch --once
+python3 examples/binance_15m_short.py --days 7 --pages
+python3 examples/binance_15m_short.py --days 30 --html docs/binance-15m-short-30d/index.html
+```
+
+預覽（7 日）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short/view.html  
+預覽（30 日）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short-30d/view.html
+
 ## 快速開始
 
 ```bash
