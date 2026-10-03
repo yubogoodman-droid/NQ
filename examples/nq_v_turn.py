@@ -878,7 +878,7 @@ def cmd_backtest(args) -> int:
     elif stats["total_points"] > 0:
         verdict = "邊緣：總點數正，但勝率不高，還不算穩的優勢。"
     else:
-        verdict = "沒料：收復 50% 進場時離 V 底已遠，停損偏寬；假 V 破底會把整段吐回去。"
+        verdict = "沒料：進場後走不出量度，時間到就吐回去。真 V 這個月幾乎沒出現。"
     print(f"verdict: {verdict}")
 
     html_path = args.html
