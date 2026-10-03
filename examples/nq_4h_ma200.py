@@ -3,7 +3,8 @@
 
 對齊 2026-09-29 01:35 那波（低 30372.25）：
   01:31 跌破近 4 小時低 30409.25
-  02:03 收盤站上 1m MA200，且 5/10/20/30 多頭排列（距破底 32 分）
+  02:03 1m 收盤站上 MA200 且 5/10/20/30 多頭
+  再等五分 K 也 5>10>20>30（09/29 在 02:20），才進場／通知
 
 用法:
   python3 examples/nq_4h_ma200.py
@@ -180,6 +181,12 @@ class Signal:
     ma30: float
     ma200: float
     bars_to_entry: int
+    m5_close: float = 0.0
+    m5_ma5: float = 0.0
+    m5_ma10: float = 0.0
+    m5_ma20: float = 0.0
+    m5_ma30: float = 0.0
+    m5_ma200: float = 0.0
     quality: str = "C"
     quality_score: int = 0
 
@@ -206,19 +213,61 @@ def rolling_min_prev(arr, n: int) -> np.ndarray:
     return pd.Series(arr, dtype=float).shift(1).rolling(n, min_periods=n).min().to_numpy(float)
 
 
-def quality_from_setup(depth: float, bars_to_entry: int, over_ma200: float) -> Tuple[int, str]:
+def quality_from_setup(
+    depth: float,
+    bars_to_entry: int,
+    over_ma200: float,
+    m5_over_200: float = 0.0,
+) -> Tuple[int, str]:
     score = 0
     if depth >= 20.0:
         score += 1
-    if bars_to_entry <= 40:
+    if bars_to_entry <= 45:
         score += 1
-    if over_ma200 >= 8.0:
+    if over_ma200 >= 8.0 or m5_over_200 > 0.0:
         score += 1
     if score >= 2:
         return score, "A"
     if score == 1:
         return score, "B"
     return score, "C"
+
+
+def _build_m5_features(df: pd.DataFrame) -> Dict[str, np.ndarray]:
+    """Map each 1m bar to the latest completed 5m bar (no lookahead)."""
+    close = df["Close"].astype(float)
+    m5 = close.resample("5min", label="right", closed="right").last().dropna()
+    feat = {
+        "close": m5.to_numpy(float),
+        "ma5": m5.rolling(5, min_periods=5).mean().to_numpy(float),
+        "ma10": m5.rolling(10, min_periods=10).mean().to_numpy(float),
+        "ma20": m5.rolling(20, min_periods=20).mean().to_numpy(float),
+        "ma30": m5.rolling(30, min_periods=30).mean().to_numpy(float),
+        "ma200": m5.rolling(200, min_periods=200).mean().to_numpy(float),
+    }
+    n = len(df)
+    out = {k: np.full(n, np.nan, dtype=float) for k in feat}
+    stack = np.zeros(n, dtype=bool)
+    above20 = np.zeros(n, dtype=bool)
+    m5_idx = m5.index
+    j = 0
+    for i, ts in enumerate(df.index):
+        while j + 1 < len(m5_idx) and m5_idx[j + 1] <= ts:
+            j += 1
+        if j < len(m5_idx) and m5_idx[j] <= ts:
+            for k in feat:
+                out[k][i] = feat[k][j]
+            if (
+                np.isfinite(out["ma5"][i])
+                and np.isfinite(out["ma30"][i])
+                and out["ma5"][i] > out["ma10"][i] > out["ma20"][i] > out["ma30"][i]
+            ):
+                stack[i] = True
+            if np.isfinite(out["close"][i]) and np.isfinite(out["ma20"][i]) and out["close"][i] > out["ma20"][i]:
+                above20[i] = True
+    out["stack"] = stack
+    out["above20"] = above20
+    return out
 
 
 def detect_signals(
@@ -231,7 +280,7 @@ def detect_signals(
     min_entry_gap: int = 30,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """破近 4 小時低後，60 根內收盤 > MA200 且 MA5>10>20>30。"""
+    """破近 4 小時低後，60 根內 1m 收盤 > MA200 且 5>10>20>30，再等五分也多頭。"""
     close = df["Close"].to_numpy(float)
     low = df["Low"].to_numpy(float)
     ma5 = sma(close, 5)
@@ -240,6 +289,7 @@ def detect_signals(
     ma30 = sma(close, 30)
     ma200 = sma(close, 200)
     four_hr = rolling_min_prev(low, four_hour_bars)
+    m5f = _build_m5_features(df)
     signals: List[Signal] = []
     last_entry = -(10**9)
     n = len(close)
@@ -260,6 +310,7 @@ def detect_signals(
         flush_low = float(low[i])
         flush_idx = i
         entered = False
+        saw_m1 = False
         limit = min(break_idx + reclaim_window, n - 1)
 
         for j in range(break_idx + 1, limit + 1):
@@ -270,7 +321,12 @@ def detect_signals(
                 continue
             stacked = ma5[j] > ma10[j] > ma20[j] > ma30[j]
             above_200 = close[j] > ma200[j]
-            if not (stacked and above_200):
+            m1_ok = stacked and above_200
+            if m1_ok and not saw_m1:
+                bump("m1_setup")
+                saw_m1 = True
+            m5_ok = bool(m5f["stack"][j] and m5f["above20"][j])
+            if not (m1_ok and m5_ok):
                 continue
             bump("setup")
             if j - last_entry < min_entry_gap:
@@ -285,7 +341,12 @@ def detect_signals(
             target = entry + risk * target_r
             depth = support - flush_low
             bars = j - break_idx
-            q_score, q_grade = quality_from_setup(depth, bars, entry - float(ma200[j]))
+            m5_over = (
+                float(m5f["close"][j] - m5f["ma200"][j])
+                if np.isfinite(m5f["ma200"][j])
+                else 0.0
+            )
+            q_score, q_grade = quality_from_setup(depth, bars, entry - float(ma200[j]), m5_over)
             bump("taken")
             signals.append(
                 Signal(
@@ -303,6 +364,12 @@ def detect_signals(
                     float(ma30[j]),
                     float(ma200[j]),
                     bars,
+                    m5_close=float(m5f["close"][j]),
+                    m5_ma5=float(m5f["ma5"][j]),
+                    m5_ma10=float(m5f["ma10"][j]),
+                    m5_ma20=float(m5f["ma20"][j]),
+                    m5_ma30=float(m5f["ma30"][j]),
+                    m5_ma200=float(m5f["ma200"][j]) if np.isfinite(m5f["ma200"][j]) else 0.0,
                     quality=q_grade,
                     quality_score=q_score,
                 )
@@ -313,7 +380,7 @@ def detect_signals(
             break
 
         if not entered:
-            bump("no_reclaim")
+            bump("skip_m5" if saw_m1 else "no_reclaim")
             i = break_idx + reclaim_window + 1
 
     return signals
@@ -544,7 +611,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
     xt = df.index[trade.exit_idx]
     sign = "+" if trade.pnl_points >= 0 else ""
     ax.set_title(
-        f"#{trade_no}  破4h→MA200  Q{trade.quality}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
+        f"#{trade_no}  破4h→MA200+5m  Q{trade.quality}  {et.strftime('%m-%d %H:%M')} → {xt.strftime('%H:%M')}  "
         f"{trade.exit_reason}  {sign}{trade.pnl_points:.1f}pt",
         color="#e8f0ea",
         fontsize=11,
@@ -593,7 +660,7 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: 
             "</header>"
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            "<span class='tag tag-info'>1m 破4h→MA200</span>"
+            "<span class='tag tag-info'>1m+5m</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
             f"{ref}"
             "</div>"
@@ -604,9 +671,10 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: 
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破4h {bt.strftime('%H:%M')}  低點 {ft.strftime('%H:%M')} {t.signal.break_low:.2f}\n"
             f"4h低 {t.signal.four_hr_low:.2f}  距破底 {t.signal.bars_to_entry} 分\n"
-            f"MA5 {t.signal.ma5:.1f} / MA10 {t.signal.ma10:.1f} / "
-            f"MA20 {t.signal.ma20:.1f} / MA30 {t.signal.ma30:.1f}\n"
-            f"MA200 {t.signal.ma200:.1f}  收盤高出 {t.entry_price - t.signal.ma200:.1f}"
+            f"1m MA5 {t.signal.ma5:.1f} > 10 {t.signal.ma10:.1f} > 20 {t.signal.ma20:.1f} > 30 {t.signal.ma30:.1f}\n"
+            f"1m MA200 {t.signal.ma200:.1f}  收盤高出 {t.entry_price - t.signal.ma200:.1f}\n"
+            f"5m C {t.signal.m5_close:.1f}  MA5 {t.signal.m5_ma5:.1f} > 10 {t.signal.m5_ma10:.1f} "
+            f"> 20 {t.signal.m5_ma20:.1f} > 30 {t.signal.m5_ma30:.1f}"
             "</pre>"
             f"<div class='mini-chart'>{svg}</div>"
             "</article>"
@@ -637,9 +705,11 @@ def write_html_report(
     if funnel:
         funnel_line = (
             f"<p class='muted'>漏斗：破4h低 {funnel.get('break', 0)} → "
-            f"一小時內站上MA200+排列 {funnel.get('setup', 0)} → "
+            f"1m站上MA200+排列 {funnel.get('m1_setup', 0)} → "
+            f"五分也多頭 {funnel.get('setup', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
-            f"（沒站上 {funnel.get('no_reclaim', 0)} · 間隔 {funnel.get('skip_gap', 0)}）</p>"
+            f"（沒站上 {funnel.get('no_reclaim', 0)} · 等不到5m {funnel.get('skip_m5', 0)} · "
+            f"間隔 {funnel.get('skip_gap', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
@@ -679,9 +749,9 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{escape(symbol)} 破4小時低 → 站上 1m MA200</h1>
+<h1>{escape(symbol)} 破4小時低 → 1m MA200 + 五分多頭</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">跌破近 4 小時低點後，60 根內收盤站上 1 分 MA200，且 MA5&gt;MA10&gt;MA20&gt;MA30。停損在波段低 −12，目標 2R。對齊 09/29 01:35 低 30372.25 → 02:03 進場。</p>
+<p class="muted">跌破近 4 小時低點後，60 根內 1 分收盤站上 MA200 且 MA5&gt;10&gt;20&gt;30，再等<strong>五分 K 也 5&gt;10&gt;20&gt;30</strong> 才進場。停損在波段低 −12，目標 2R。09/29：01:35 低 30372.25 → 02:03 一分條件到 → 02:20 五分排列後進場。</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -788,10 +858,11 @@ def fmt_entry(df, sig: Signal) -> str:
         f"目標: <code>{sig.target_price:.2f}</code> (2R)\n"
         f"破底: <code>{br.strftime('%H:%M')}</code> 低點 <code>{fl.strftime('%H:%M')}</code> {sig.break_low:.2f}\n"
         f"4h低: <code>{sig.four_hr_low:.2f}</code> · 距破底 {sig.bars_to_entry} 分\n"
-        f"排列: MA5 {sig.ma5:.1f} &gt; 10 {sig.ma10:.1f} &gt; 20 {sig.ma20:.1f} &gt; 30 {sig.ma30:.1f}\n"
-        f"MA200: <code>{sig.ma200:.2f}</code>  現價 <code>{last:.2f}</code>\n"
+        f"1m排列: 5 {sig.ma5:.1f} &gt; 10 {sig.ma10:.1f} &gt; 20 {sig.ma20:.1f} &gt; 30 {sig.ma30:.1f}\n"
+        f"5m排列: 5 {sig.m5_ma5:.1f} &gt; 10 {sig.m5_ma10:.1f} &gt; 20 {sig.m5_ma20:.1f} &gt; 30 {sig.m5_ma30:.1f}\n"
+        f"1m MA200: <code>{sig.ma200:.2f}</code>  現價 <code>{last:.2f}</code>\n"
         f"品質: Q{sig.quality}\n"
-        f"#破底反彈 #NQ #MA200"
+        f"#破底反彈 #NQ #MA200 #5m"
     )
 
 
@@ -884,9 +955,14 @@ def cmd_backtest(args) -> int:
     _print_trades(df, trades)
 
     if stats["count"] == 0:
-        verdict = "這段樣本有破 4h 低，但一小時內沒同時站上 MA200 且 5/10/20/30 多頭。"
+        verdict = "這段樣本有破 4h 低，但一小時內沒等到 1m 站上 MA200 且五分也多頭。"
     elif any(abs(t.signal.break_low - 30372.25) < 0.3 for t in trades):
-        verdict = "抓得到 09/29 01:35 那波：01:31 破 4h 低，02:03 站上 MA200 且短均多頭。"
+        verdict = (
+            "抓得到 09/29：01:31 破 4h 低，02:03 一分站上 MA200，02:20 五分 5>10>20>30 才進場。"
+            "五分過濾後勝率比單看一分高。"
+        )
+    elif stats["win_rate"] >= 60 and stats["total_points"] > 0:
+        verdict = "五分確認後樣本較少，勝率上來了。通知仍不是保證優勢。"
     elif stats["total_points"] > 0:
         verdict = "有訊號，總點數為正。這是通知規則，不是保證優勢。"
     else:

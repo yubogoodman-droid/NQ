@@ -43,28 +43,28 @@ def test_sma() -> None:
     assert abs(out[2] - 2.0) < 1e-9
 
 
-def _make_sep29_like(n: int = 420) -> pd.DataFrame:
-    """Range, flush a 4h low, then climb back through MA200 with a 5/10/20/30 stack."""
+def _make_sep29_like(n: int = 520) -> pd.DataFrame:
+    """Slow grind so 5m MAs are stacked, flush a 4h low, then climb back through MA200."""
     close = np.zeros(n, dtype=float)
-    close[0] = 30440.0
-    for i in range(1, 300):
-        close[i] = 30440.0 + (3.0 if i % 2 == 0 else -2.0)
-    # pin a 4h floor near 30410
-    low = close - 2.0
-    high = close + 2.0
-    for i in range(80, 300):
-        low[i] = min(close[i] - 1.0, 30410.0)
+    close[0] = 30380.0
     break_i = 310
-    close[break_i] = 30395.0
-    low[break_i] = 30372.25
-    high[break_i] = 30400.0
-    close[break_i + 1] = 30382.0
-    low[break_i + 1] = 30374.0
-    high[break_i + 1] = 30390.0
-    # grind back above MA200 (~30440 area after 200-bar average)
-    px = 30390.0
+    for i in range(1, break_i):
+        close[i] = close[i - 1] + 0.22 + (0.8 if i % 2 == 0 else -0.5)
+    low = close.copy() - 2.0
+    high = close.copy() + 2.0
+    floor = float(np.min(close[80:break_i])) - 8.0
+    for i in range(80, break_i):
+        low[i] = min(float(close[i] - 1.0), floor)
+    flush = floor - 28.0
+    close[break_i] = flush + 18.0
+    low[break_i] = flush
+    high[break_i] = close[break_i] + 6.0
+    close[break_i + 1] = flush + 10.0
+    low[break_i + 1] = flush + 2.0
+    high[break_i + 1] = close[break_i + 1] + 5.0
+    px = float(close[break_i + 1])
     for i in range(break_i + 2, n):
-        px += 4.2
+        px += 6.5
         close[i] = px
         low[i] = px - 3.0
         high[i] = px + 3.0
@@ -90,6 +90,7 @@ def test_detects_sep29_like() -> None:
     assert sig.bars_to_entry <= 60
     assert sig.entry_price > sig.ma200
     assert sig.ma5 > sig.ma10 > sig.ma20 > sig.ma30
+    assert sig.m5_ma5 > sig.m5_ma10 > sig.m5_ma20 > sig.m5_ma30
     assert sig.break_low <= 30380.0
 
 
@@ -98,6 +99,19 @@ def test_no_signal_without_ma200() -> None:
     # flatten the bounce so price never recaptures MA200
     close = df["Close"].to_numpy(float).copy()
     close[312:] = 30390.0
+    df["Close"] = close
+    df["High"] = np.maximum(df["High"].to_numpy(float), close)
+    df["Low"] = np.minimum(df["Low"].to_numpy(float), close)
+    sigs = detect_signals(df)
+    assert not sigs
+
+
+def test_no_signal_without_5m_stack() -> None:
+    """1m 很快站上 MA200，但反彈太短，五分均線排不起來。"""
+    df = _make_sep29_like(n=360).copy()
+    close = df["Close"].to_numpy(float).copy()
+    # after a brief pop, flatten so 5m MAs stay tangled / not stacked
+    close[322:] = 30420.0
     df["Close"] = close
     df["High"] = np.maximum(df["High"].to_numpy(float), close)
     df["Low"] = np.minimum(df["Low"].to_numpy(float), close)
@@ -118,9 +132,10 @@ def test_simulate_and_html(tmp_path: Path | None = None) -> None:
     text = path.read_text(encoding="utf-8")
     assert "破4小時低" in text
     assert "MA200" in text
+    assert "五分" in text
     msg = fmt_entry(df, sigs[0])
     assert "破4h低" in msg
-    assert "MA200" in msg
+    assert "5m排列" in msg
 
 
 def main() -> int:
@@ -129,6 +144,7 @@ def main() -> int:
     test_sma()
     test_detects_sep29_like()
     test_no_signal_without_ma200()
+    test_no_signal_without_5m_stack()
     test_simulate_and_html()
     print("ok")
     return 0
