@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "story-handdrawn-video": {
+      "source": "liangdabiao/story-handdrawn-video",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "495891d261c744d21f556bf983a5241538cabe503f78c377ff69dc5f14c66c30"
+    }
+  }
+}
