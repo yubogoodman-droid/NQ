@@ -10,7 +10,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from binance_ma_burst import MA_PERIODS, VOL_WINDOW, burst_at, find_bursts, sma  # noqa: E402
+from binance_ma_burst import MA_PERIODS, VOL_WINDOW, burst_at, find_bursts, path_after, sma  # noqa: E402
 
 
 def flat(n: int = 260, price: float = 10.0, vol: float = 100.0):
@@ -90,6 +90,21 @@ def test_only_the_crossing_bar_fires() -> None:
     assert [h["i"] for h in hits] == [i]
 
 
+def test_path_after() -> None:
+    d = {
+        "c": np.array([10.0, 10.2, 11.0, 10.5, 11.0]),
+        "h": np.array([10.1, 10.4, 12.0, 10.8, 11.2]),
+        "l": np.array([9.8, 9.9, 10.1, 9.0, 10.4]),
+    }
+    got = path_after(d, 0, 4)
+    assert got is not None
+    assert got["bars"] == 4
+    assert abs(got["ret"] - 0.10) < 1e-9
+    assert abs(got["mfe"] - 0.20) < 1e-9
+    assert abs(got["mae"] - (-0.10)) < 1e-9
+    assert path_after(d, 4, 4) is None
+
+
 def test_needs_warmup() -> None:
     o, c, v = flat(n=VOL_WINDOW + 5)
     i = len(c) - 1
@@ -106,6 +121,7 @@ def main() -> int:
     test_follow_through_above_the_ribbon_is_not_a_cross()
     test_must_clear_every_ma()
     test_only_the_crossing_bar_fires()
+    test_path_after()
     test_needs_warmup()
     print("ok")
     return 0
