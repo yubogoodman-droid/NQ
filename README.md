@@ -103,6 +103,8 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 近一週（2026-09-23 → 09-30 TPE）152 檔：**9 筆、已平勝率 44.4%、平均 −0.42%、加總 −3.82%**（停損 5、時間 3、2R 1）。LSK / CLO 這週沒訊號。
 
+近一個月（2026-09-03 → 10-03 TPE）147 檔：**37 筆、已平勝率 40.5%、平均 −0.20%、加總 −7.32%**（停損 22、時間 10、2R 5）。九月 32 筆 40.6%、−1.54%；十月 5 筆 40.0%、−5.79%。LSK / CLO 沒訊號。
+
 在 `examples/binance_15m_short.py` 最上面填 Telegram，或設環境變數 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`。
 
 ```bash
