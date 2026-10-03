@@ -84,6 +84,33 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## 台股 1 小時 K：5/10/20 多頭排列站上 MA240（智原型）
+
+對齊 3035 智原小時 K：收盤同時 **MA5 > MA10 > MA20**，且 **站上 MA240**。上一根還沒同時滿足、這一根才成立才推 Telegram；已經排好且一直站在上面的不會每根都發。
+
+池子跟破底翻一樣（成交額前 200、股價 < 1000），並固定把智原放進池子。GitHub Actions 在台北 10:03 / 11:03 / 12:03 / 13:03 / 13:33 代跑。
+
+```bash
+# 單元測試（不打網路）
+python3 examples/test_tw_1h_stack_ma240.py
+
+# 測 Telegram（憑證放 tg_config.env，勿提交）
+python3 examples/tw_1h_stack_ma240.py --test
+
+# 智原現在有沒有多頭排列且站上 MA240
+python3 examples/tw_1h_stack_ma240.py --symbols 3035 --now --dry-run
+
+# 只掃剛收盤的 1～2 根（盤後 / Actions）
+python3 examples/tw_1h_stack_ma240.py --dry-run --once
+python3 examples/tw_1h_stack_ma240.py --once
+
+# 等到下一根小時 K 收盤再掃
+python3 examples/tw_1h_stack_ma240.py
+
+# 近一個月回測 + 手機版 HTML
+python3 examples/tw_1h_stack_ma240.py scan --days 30 --pages
+```
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
