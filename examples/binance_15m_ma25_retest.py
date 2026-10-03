@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
-"""幣安 15 分 K：破底 → 站上 NB 圖上的六條均線 → 等回測 MA25 做多。
+"""幣安 15 分 K：破底 → 收盤站上 MA25 就做多。
 
 圖上的均線：MA7、MA14、MA25、MA99、MA120、MA200。
 
 進場
   1. 破底：最低價跌破前 32 根，而且收盤同時低於這六條。
-  2. 站回：48 根內，第一根收盤同時高於這六條，且 MA7 > MA14 > MA25。
-  3. 先離開：之後至少一根 K 的最低價也在 MA7 之上。
-  4. 回測進場：再下來第一根最低價觸到 MA25，收盤站回 MA25，
-     同時收盤仍高於 MA99、MA120、MA200，短均維持 7 > 14 > 25。
-     先收盤跌破 MA25、MA99、MA120、MA200 任一條，這波作廢。
+  2. 站上就進：48 根內，低點不再創新低之後，第一根收盤站上 MA25，
+     就以該收盤做多。不等回測，也不要求同時站上另外五條。
 
 出場（這次沒指定，回測用）
-  停損＝回測那根的低點。目標＝2R。32 根（8 小時）都沒碰到就用收盤時間停。
+  停損＝進場那根的低點。目標＝2R。32 根（8 小時）都沒碰到就用收盤時間停。
   進場這根不再用它的高低點出場。同一根同時碰到停損和目標，算停損。
   停損距離小於 0.2% 或大於 4% 不做。
 
@@ -46,7 +43,6 @@ class Params:
     ma: int = 25
     break_lookback: int = 32
     reclaim_window: int = 48
-    retest_window: int = 48
     target_r: float = 2.0
     time_stop_bars: int = 32
     min_risk_pct: float = 0.002
@@ -129,18 +125,6 @@ def _under_all(c: np.ndarray, mas: dict[int, np.ndarray], i: int) -> bool:
     return all(c[i] < mas[n][i] for n in mas)
 
 
-def _above_all(c: np.ndarray, mas: dict[int, np.ndarray], i: int) -> bool:
-    return all(c[i] > mas[n][i] for n in mas)
-
-
-def _fan(mas: dict[int, np.ndarray], i: int) -> bool:
-    return mas[7][i] > mas[14][i] > mas[25][i]
-
-
-def _holds_long(c: np.ndarray, mas: dict[int, np.ndarray], i: int) -> bool:
-    return c[i] > mas[25][i] and c[i] > mas[99][i] and c[i] > mas[120][i] and c[i] > mas[200][i]
-
-
 def detect_trades(
     o: np.ndarray,
     h: np.ndarray,
@@ -166,56 +150,21 @@ def detect_trades(
             _bump(fun, "break")
         trough_i = i
         trough_low = float(l[i])
-        reclaim_i = None
+        entry_i = None
         j = i + 1
         j_end = min(n, i + 1 + p.reclaim_window)
         while j < j_end:
             if l[j] < trough_low:
                 trough_low = float(l[j])
                 trough_i = j
-            if j > trough_i and _ready(mas, j) and _above_all(c, mas, j) and _fan(mas, j):
-                reclaim_i = j
+            if j > trough_i and _ready(mas, j) and c[j] > ma[j]:
+                entry_i = j
                 break
             j += 1
-        if reclaim_i is None:
+        if entry_i is None:
             if i >= min_entry_i:
                 _bump(fun, "no_reclaim")
             i = max(j, i + 1)
-            continue
-        if reclaim_i >= min_entry_i:
-            _bump(fun, "reclaim")
-
-        held = False
-        entry_i = None
-        fail_i = None
-        k = reclaim_i + 1
-        k_end = min(n, reclaim_i + 1 + p.retest_window)
-        while k < k_end:
-            if not _ready(mas, k):
-                k += 1
-                continue
-            if c[k] < ma[k] or c[k] < mas[99][k] or c[k] < mas[120][k] or c[k] < mas[200][k]:
-                fail_i = k
-                break
-            if not held:
-                if l[k] > mas[7][k]:
-                    held = True
-                k += 1
-                continue
-            if l[k] <= ma[k] and _holds_long(c, mas, k) and _fan(mas, k):
-                entry_i = k
-                break
-            k += 1
-
-        if entry_i is None:
-            if reclaim_i >= min_entry_i:
-                if not held:
-                    _bump(fun, "no_stand")
-                elif fail_i is not None:
-                    _bump(fun, "lost_before_retest")
-                else:
-                    _bump(fun, "no_retest")
-            i = max((fail_i if fail_i is not None else k), reclaim_i + 1)
             continue
 
         entry = float(c[entry_i])
@@ -223,7 +172,7 @@ def detect_trades(
         risk = entry - stop
         risk_pct = risk / entry if entry > 0 else 0.0
         if entry_i >= min_entry_i:
-            _bump(fun, "retest")
+            _bump(fun, "reclaim")
         if risk <= 0 or not (p.min_risk_pct <= risk_pct <= p.max_risk_pct):
             if entry_i >= min_entry_i:
                 _bump(fun, "risk_skip")
@@ -240,7 +189,7 @@ def detect_trades(
                 Trade(
                     symbol="",
                     trough_i=trough_i,
-                    reclaim_i=reclaim_i,
+                    reclaim_i=entry_i,
                     entry_i=entry_i,
                     exit_i=exit_i,
                     trough_low=trough_low,
@@ -339,8 +288,7 @@ def draw_trade_png(bars: dict, trade: Trade, path: Path, title: str) -> None:
         ax.plot(xs, mas[n][sl], color=col, lw=1.05, label=f"MA{n}")
     marks = (
         (trade.trough_i, "破底", "#8ab4ff", trade.trough_low),
-        (trade.reclaim_i, "站回", "#f0c14a", c[trade.reclaim_i]),
-        (trade.entry_i, "回測進", "#3dba7a", trade.entry),
+        (trade.entry_i, "站上進", "#3dba7a", trade.entry),
         (trade.exit_i, trade.reason, "#ff8a80", trade.exit),
     )
     for idx, label, col, y in marks:
@@ -374,7 +322,6 @@ def write_html(
         et = fmt_ts(times[trade.entry_i])
         xt = fmt_ts(times[trade.exit_i])
         bt = fmt_ts(times[trade.trough_i])
-        rt = fmt_ts(times[trade.reclaim_i])
         cls = "pnl-win" if trade.pnl_pct > 0 else ("pnl-flat" if trade.pnl_pct == 0 else "pnl-loss")
         img_name = f"t{i:03d}_{trade.symbol}_{et.replace(' ', '_').replace(':', '')}.png"
         title = f"{trade.symbol}  {et}  {trade.pnl_pct:+.2f}%  {trade.reason}"
@@ -391,8 +338,7 @@ def write_html(
             f"<span class='tag tag-info'>破底深 {trade.depth_pct:.2f}%</span></div>"
             "<pre class='trade-detail'>"
             f"破底 {escape(bt)}  low {fmt_px(trade.trough_low)}\n"
-            f"站回 {escape(rt)}\n"
-            f"進場 {fmt_px(trade.entry)}  停損 {fmt_px(trade.stop)}  目標 {fmt_px(trade.target)}\n"
+            f"站上 MA25 進場 {fmt_px(trade.entry)}  停損 {fmt_px(trade.stop)}  目標 {fmt_px(trade.target)}\n"
             f"出場 {fmt_px(trade.exit)}  {escape(trade.reason)}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(trade.symbol)}'/></div>"
@@ -408,7 +354,7 @@ def write_html(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>幣安 15 分 破底站回 MA25 回測</title>
+<title>幣安 15 分 站上 MA25 就進場</title>
 <style>
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -430,12 +376,12 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安 15 分 · 六條均線站回後，等回測 MA25</h1>
+<h1>幣安 15 分 · 破底後站上 MA25 就進場</h1>
 <p class="muted">{escape(meta['period'])} · 掃描 {meta['symbols']} 檔 U 本位永續（24h 成交額 ≥ 500 萬 USDT）· 進場 {meta['entries']} 筆
-<br/>均線用 NB 圖上那六條：MA7、MA14、MA25、MA99、MA120、MA200。破底＝收盤同時低於這六條，且低點跌破前 32 根。48 根內收盤同時站上六條，且 MA7 &gt; MA14 &gt; MA25。先有一根低點也在 MA7 上，之後觸到 MA25、收盤仍站上 MA25 / MA99 / MA120 / MA200，短均排列還在，才做多。
-<br/>出場：停損在回測低點，目標 2R，或 32 根時間停。停損距離 0.2%–4%。加總％是各筆報酬相加，不是組合複利。未平倉不計勝率，用最後一根收盤估。沒扣手續費與滑價。
-<br/>漏斗：破底 {funnel.get('break', 0)} → 站上六條 {funnel.get('reclaim', 0)} → 回測 {funnel.get('retest', 0)} → 風險過濾掉 {funnel.get('risk_skip', 0)} → 成交 {funnel.get('trades', 0)}
-<br/>沒站上六條 {funnel.get('no_reclaim', 0)} · 沒離開 MA7 {funnel.get('no_stand', 0)} · 回測前失守 {funnel.get('lost_before_retest', 0)} · 等到超時 {funnel.get('no_retest', 0)}
+<br/>均線仍畫 NB 圖上那六條：MA7、MA14、MA25、MA99、MA120、MA200。破底＝收盤同時低於這六條，且低點跌破前 32 根。48 根內，低點不再創新低之後，第一根收盤站上 MA25 就做多。不等回測。
+<br/>出場：停損在進場那根低點，目標 2R，或 32 根時間停。停損距離 0.2%–4%。加總％是各筆報酬相加，不是組合複利。未平倉不計勝率，用最後一根收盤估。沒扣手續費與滑價。
+<br/>漏斗：破底 {funnel.get('break', 0)} → 站上 MA25 {funnel.get('reclaim', 0)} → 風險過濾掉 {funnel.get('risk_skip', 0)} → 成交 {funnel.get('trades', 0)}
+<br/>48 根內沒站上 MA25 {funnel.get('no_reclaim', 0)}
 <br/>{reason_line}</p>
 <div class="cards">
 <div class="card">已平<b>{stats['count']}</b></div>
@@ -446,7 +392,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </div>
 <p class="muted">含未平倉的加總 {stats['sum_all_pct']:+.2f}%。這是規則回測，不是進出場建議。</p>
 </section>
-{''.join(cards) or "<div class='empty'>這三天沒有走完回測進場的交易</div>"}
+{''.join(cards) or "<div class='empty'>這段沒有站上 MA25 進場的交易</div>"}
 </div></body></html>
 """
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -614,7 +560,7 @@ def run_scan(days: int = 3, workers: int = 12, params: Params | None = None) -> 
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="幣安 15 分破底站回 MA25 回測")
+    parser = argparse.ArgumentParser(description="幣安 15 分破底後站上 MA25 進場")
     parser.add_argument("--days", type=int, default=3)
     parser.add_argument("--workers", type=int, default=12)
     parser.add_argument("--html", default=str(ROOT / "docs" / "binance" / "ma25-retest-3d" / "index.html"))
@@ -667,8 +613,8 @@ def write_preview(index: Path) -> Path:
     )
     text = index.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
     text = text.replace(
-        "<title>幣安 15 分 破底站回 MA25 回測</title>",
-        "<title>一個月 · 六條均線回測 MA25</title>",
+        "<title>幣安 15 分 站上 MA25 就進場</title>",
+        "<title>一個月 · 站上 MA25 就進場</title>",
     )
     out = index.with_name("all.html")
     out.write_text(text, encoding="utf-8")
