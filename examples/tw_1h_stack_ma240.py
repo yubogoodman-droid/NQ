@@ -7,17 +7,17 @@
 上一根還沒同時滿足、這一根才成立才推播（短均剛排好、或剛站上 MA240 都算）。
 已經排好且一直站在 MA240 上面的，不會每根都發。
 
-預設只盯 3035 智原。加 `--universe` 才掃成交額前 200（股價 < 1000，仍固定含智原）。
-每根小時 K 收盤後掃一次；GitHub Actions 在盤中整點代跑。
+預設掃成交額前 200、股價 < 1000，並固定把 3035 智原放進池子。
+`--symbols 3035` 只盯智原。每根小時 K 收盤後掃一次；GitHub Actions 在盤中整點代跑。
 
     python3 examples/tw_1h_stack_ma240.py --test
     python3 examples/tw_1h_stack_ma240.py --dry-run --once
     python3 examples/tw_1h_stack_ma240.py --once
     python3 examples/tw_1h_stack_ma240.py              # 等到下一根 1h 收盤再掃
-    python3 examples/tw_1h_stack_ma240.py --now        # 現在已站上的名單（含智原）
-    python3 examples/tw_1h_stack_ma240.py --now
+    python3 examples/tw_1h_stack_ma240.py --now        # 成交額前 200 現在已站上
+    python3 examples/tw_1h_stack_ma240.py --symbols 3035 --now
+    python3 examples/tw_1h_stack_ma240.py scan --days 7 --pages
     python3 examples/tw_1h_stack_ma240.py scan --days 30 --pages
-    python3 examples/tw_1h_stack_ma240.py --universe --now   # 成交額前 200 現況
 """
 
 from __future__ import annotations
@@ -483,8 +483,27 @@ def fmt_hit(hit: Hit) -> str:
         f"MA5 <code>{sig.ma5:.2f}</code> &gt; "
         f"MA10 <code>{sig.ma10:.2f}</code> &gt; "
         f"MA20 <code>{sig.ma20:.2f}</code>\n"
-        f"#台股 #1h #MA240 #智原"
+        f"#台股 #1h #MA240"
     )
+
+
+def fmt_batch(hits: Sequence[Hit]) -> str:
+    lines = [f"🟢 <b>1h 多頭排列站上 MA240</b> · {len(hits)} 筆"]
+    for hit in hits[:25]:
+        sig = hit.signal
+        ts = pd.Timestamp(hit.df.index[sig.idx]).tz_convert(TPE)
+        name = escape(str(hit.row.get("name") or ""))
+        code = escape(str(hit.row.get("code") or ""))
+        ext = (sig.close / sig.ma240 - 1.0) * 100 if sig.ma240 else 0.0
+        lines.append(
+            f"• {code} {name}  {ts.strftime('%m-%d %H:%M')}  "
+            f"{sig.close:.2f} ({ext:+.1f}%)"
+        )
+    extra = len(hits) - 25
+    if extra > 0:
+        lines.append(f"…還有 {extra} 筆")
+    lines.append("#台股 #1h #MA240")
+    return "\n".join(lines)
 
 
 def _git_branch() -> str:
@@ -551,14 +570,30 @@ def dump_hits_json(path: Path, hits: List[Hit], stats: dict, extra: dict) -> Pat
     return path
 
 
-def write_html(path: Path, hits: List[Hit], universe: List[dict], period: str, date: str) -> Path:
+def write_html(
+    path: Path,
+    hits: List[Hit],
+    universe: List[dict],
+    period: str,
+    date: str,
+    max_charts: int = 0,
+) -> Path:
     stats = summarize_fwd(hits)
+    n = len(hits)
+    # 最近的訊號優先畫圖；0 = 全畫。
+    chart_from = 0 if max_charts <= 0 or n <= max_charts else n - max_charts
     cards: List[str] = []
     for i, hit in enumerate(hits, 1):
         sig = hit.signal
         ts = hit.df.index[sig.idx]
-        img_name = f"t{i:03d}_{hit.row['code']}_{ts.strftime('%m%d_%H%M')}.png"
-        draw_hit_png(hit, path.parent / "img" / img_name)
+        img_html = ""
+        if i > chart_from:
+            img_name = f"t{i:03d}_{hit.row['code']}_{ts.strftime('%m%d_%H%M')}.png"
+            draw_hit_png(hit, path.parent / "img" / img_name)
+            img_html = (
+                f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(str(hit.row.get('name') or hit.row['code']))}' "
+                "style='width:100%;display:block;border-radius:10px'/></div>"
+            )
         ext = (sig.close / sig.ma240 - 1.0) * 100 if sig.ma240 else 0.0
         label = f"{hit.row['code']} {hit.row.get('name', '')}".strip()
         show_fwd = hit.fwd_1d is not None
@@ -580,8 +615,7 @@ def write_html(path: Path, hits: List[Hit], universe: List[dict], period: str, d
             f"MA5 {sig.ma5:.2f} > MA10 {sig.ma10:.2f} > MA20 {sig.ma20:.2f}  MA240 {sig.ma240:.2f}\n"
             f"fwd +1d {_fmt_fwd(hit.fwd_1d)}  +3d {_fmt_fwd(hit.fwd_3d)}  +5d {_fmt_fwd(hit.fwd_5d)}"
             "</pre>"
-            f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
-            "style='width:100%;display:block;border-radius:10px'/></div>"
+            f"{img_html}"
             "</article>"
         )
     cutoff = universe[-1].get("amount", 0) / 1e8 if universe else 0
@@ -682,11 +716,10 @@ def ensure_watch(universe: List[dict], codes: Sequence[str] = WATCH_CODES) -> Li
 
 
 def resolve_symbols(args) -> str:
-    """Alert/scan 預設智原；--universe 改成交額池；--symbols 可另指定。"""
+    """預設成交額池；--symbols 只掃指定代號。--universe 明確走池子。"""
     if getattr(args, "universe", False):
         return ""
-    text = (getattr(args, "symbols", "") or "").strip()
-    return text or "3035"
+    return (getattr(args, "symbols", "") or "").strip()
 
 
 def load_universe(
@@ -798,6 +831,10 @@ def notify_hits(
     with_chart: bool = True,
 ) -> int:
     sent = 0
+    fresh = [hit for hit in hits if hit_key(hit) not in seen]
+    if len(fresh) > 1:
+        tg_send(token, chat_id, fmt_batch(fresh), dry_run=dry_run)
+        time.sleep(0.2)
     for hit in hits:
         key = hit_key(hit)
         if key in seen:
@@ -948,7 +985,12 @@ def run_scan_round(
         period = f"{'now' if now_only else (str(days or 'live') + 'd')} · Yahoo {args.range_} 1h"
         if args.max_price:
             period += f" · 股價<{args.max_price:g}"
-        write_html(html_path, hits, universe, period, date)
+        max_charts = int(getattr(args, "max_charts", 0) or 0)
+        if max_charts == 0 and now_only:
+            max_charts = 40
+        elif max_charts == 0 and not now_only and days >= 28:
+            max_charts = 80
+        write_html(html_path, hits, universe, period, date, max_charts=max_charts)
         write_view_html(html_path)
         extra = {
             "date": date,
@@ -981,8 +1023,8 @@ def cmd_alert(args) -> int:
 
     lookback = args.lookback_bars
     print(
-        f"台股 1h MA5>MA10>MA20 站上 MA240 | once={args.once} dry_run={args.dry_run} "
-        f"lookback={lookback} bars",
+        f"台股成交額前 {args.limit} · 1h MA5>MA10>MA20 站上 MA240 | once={args.once} "
+        f"dry_run={args.dry_run} lookback={lookback} bars",
         flush=True,
     )
     while True:
@@ -1021,8 +1063,9 @@ def add_common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--pages", action="store_true")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--no-chart", action="store_true")
-    p.add_argument("--symbols", default="", help="只掃這些代號，逗號分隔；預設 3035 智原")
-    p.add_argument("--universe", action="store_true", help="改掃成交額前 N（仍固定含智原）")
+    p.add_argument("--symbols", default="", help="只掃這些代號，逗號分隔；空=成交額前 N + 智原")
+    p.add_argument("--universe", action="store_true", help="明確掃成交額池（預設就是）")
+    p.add_argument("--max-charts", type=int, default=0, help="HTML 最多畫幾張圖；0=自動（30 日報告最近 80 筆）")
 
 
 def build_parser() -> argparse.ArgumentParser:

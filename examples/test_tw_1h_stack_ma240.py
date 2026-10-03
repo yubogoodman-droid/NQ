@@ -222,11 +222,11 @@ def test_rows_from_symbols_and_watch() -> None:
     assert "2330" in {r["code"] for r in uni}
 
 
-def test_resolve_symbols_defaults_to_guc() -> None:
+def test_resolve_symbols_defaults_to_universe() -> None:
     from argparse import Namespace
     from tw_1h_stack_ma240 import resolve_symbols
 
-    assert resolve_symbols(Namespace(symbols="", universe=False)) == "3035"
+    assert resolve_symbols(Namespace(symbols="", universe=False)) == ""
     assert resolve_symbols(Namespace(symbols="2330", universe=False)) == "2330"
     assert resolve_symbols(Namespace(symbols="2330", universe=True)) == ""
 
@@ -246,7 +246,7 @@ def main() -> int:
         test_hit_key_stable,
         test_fill_fwd_uses_next_sessions,
         test_rows_from_symbols_and_watch,
-        test_resolve_symbols_defaults_to_guc,
+        test_resolve_symbols_defaults_to_universe,
     ]
     failed = 0
     for fn in tests:
