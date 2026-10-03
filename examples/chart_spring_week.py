@@ -24,7 +24,7 @@ def _local(ts):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="近一週假跌破訊號圖")
-    parser.add_argument("--json", default="output/spring_scan_week_20260922_0930.json")
+    parser.add_argument("--json", default="output/spring_scan_week_20260924_1002.json")
     parser.add_argument("--pages-html", default="docs/spring/week/index.html")
     parser.add_argument("--png-dir", default="output/spring_charts/week")
     parser.add_argument("--yahoo-range", default="8d")
