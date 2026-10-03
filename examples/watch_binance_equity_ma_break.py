@@ -61,6 +61,7 @@ MAX_OFF_HOUR_HIGH_PCT = 5.00
 HOUR_HIGH_LOOKBACK = 24
 BINANCE_KLINE_MAX = 1500
 KLINE_CAP = 4000
+HORIZONS = ((1, "15m"), (2, "30m"), (4, "1h"), (8, "2h"), (16, "4h"))
 PAGES_HTML = REPO / "docs" / "binance" / "ma-break-7d.html"
 PAGES_HTML_ALL = REPO / "docs" / "binance" / "ma-break-7d-allhours.html"
 CHART_DIR = REPO / "docs" / "binance" / "img" / "ma-break"
