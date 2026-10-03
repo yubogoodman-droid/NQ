@@ -495,21 +495,50 @@ def universe(session: requests.Session) -> list[tuple[str, float]]:
     return out
 
 
-def fetch_klines(session: requests.Session, symbol: str, limit: int = 500) -> dict | None:
-    raw = get_json(session, "/fapi/v1/klines", {"symbol": symbol, "interval": "15m", "limit": limit})
-    if not raw or len(raw) < 80:
+BAR_MS = 15 * 60 * 1000
+
+
+def fetch_klines(session: requests.Session, symbol: str, start_ms: int, end_ms: int) -> dict | None:
+    """15 分 K 分頁抓。幣安單次最多 1500 根，一個月要連抓幾次。"""
+    merged: dict[int, list] = {}
+    cursor = start_ms
+    for _ in range(8):
+        if cursor >= end_ms:
+            break
+        batch = get_json(
+            session,
+            "/fapi/v1/klines",
+            {
+                "symbol": symbol,
+                "interval": "15m",
+                "startTime": cursor,
+                "endTime": end_ms,
+                "limit": 1500,
+            },
+        )
+        if not batch:
+            break
+        for row in batch:
+            merged[int(row[0])] = row
+        last_open = int(batch[-1][0])
+        nxt = last_open + BAR_MS
+        if nxt <= cursor or len(batch) < 1500:
+            break
+        cursor = nxt
+    if not merged:
         return None
+    rows = [merged[k] for k in sorted(merged)]
     now_ms = int(time.time() * 1000)
-    if int(raw[-1][0]) + 15 * 60 * 1000 > now_ms:
-        raw = raw[:-1]
-    if len(raw) < 80:
+    if int(rows[-1][0]) + BAR_MS > now_ms:
+        rows = rows[:-1]
+    if len(rows) < 220:
         return None
     return {
-        "t": [int(x[0]) for x in raw],
-        "o": np.array([float(x[1]) for x in raw]),
-        "h": np.array([float(x[2]) for x in raw]),
-        "l": np.array([float(x[3]) for x in raw]),
-        "c": np.array([float(x[4]) for x in raw]),
+        "t": [int(x[0]) for x in rows],
+        "o": np.array([float(x[1]) for x in rows]),
+        "h": np.array([float(x[2]) for x in rows]),
+        "l": np.array([float(x[3]) for x in rows]),
+        "c": np.array([float(x[4]) for x in rows]),
     }
 
 
@@ -521,8 +550,10 @@ def window_start_ms(days: int, last_ms: int) -> int:
 
 def scan_symbol(symbol: str, qv: float, days: int, params: Params) -> tuple[list[tuple[Trade, dict, list[int]]], dict, str]:
     session = _session()
+    end_ms = int(time.time() * 1000)
+    start_ms = window_start_ms(days, end_ms) - 10 * 24 * 60 * 60 * 1000
     try:
-        bars = fetch_klines(session, symbol)
+        bars = fetch_klines(session, symbol, start_ms, end_ms)
     except Exception as exc:  # noqa: BLE001
         return [], {}, str(exc)[:80]
     if bars is None:
@@ -621,8 +652,27 @@ def main(argv: list[str] | None = None) -> int:
     )
     print("[reasons]", stats["by_reason"])
     write_html(path, rows, stats, funnel, meta)
+    preview = write_preview(path)
     print(f"[html] {path}")
+    print(f"[web] {preview}")
     return 0
+
+
+def write_preview(index: Path) -> Path:
+    index = index.resolve()
+    rel = index.parent.relative_to(ROOT).as_posix()
+    base = (
+        "https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
+        f"cursor/binance-15m-ma25-retest-431e/{rel}/"
+    )
+    text = index.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
+    text = text.replace(
+        "<title>幣安 15 分 破底站回 MA25 回測</title>",
+        "<title>一個月 · 六條均線回測 MA25</title>",
+    )
+    out = index.with_name("all.html")
+    out.write_text(text, encoding="utf-8")
+    return out
 
 
 if __name__ == "__main__":
