@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""幣安 15 分 K：破底 → 站回 MA25 → 等回測 MA25 做多。
+"""幣安 15 分 K：破底 → 站上 NB 圖上的六條均線 → 等回測 MA25 做多。
 
-進場（你的規則）
-  1. 破底：收盤在 MA25 下，最低價跌破前 32 根（8 小時）低點。同一波更低的低點會更新。
-  2. 站回：破底後 48 根內，第一根收盤站上 MA25。最低點那根不算。
-  3. 先站穩：站回之後，至少一根 K 的最低價也在 MA25 之上。
-  4. 回測進場：站穩後 48 根內，第一根最低價觸到 MA25、收盤仍站在上面。進場價＝該根收盤。
-     若先收盤跌回 MA25 下，這波作廢，不接。
+圖上的均線：MA7、MA14、MA25、MA99、MA120、MA200。
+
+進場
+  1. 破底：最低價跌破前 32 根，而且收盤同時低於這六條。
+  2. 站回：48 根內，第一根收盤同時高於這六條，且 MA7 > MA14 > MA25。
+  3. 先離開：之後至少一根 K 的最低價也在 MA7 之上。
+  4. 回測進場：再下來第一根最低價觸到 MA25，收盤站回 MA25，
+     同時收盤仍高於 MA99、MA120、MA200，短均維持 7 > 14 > 25。
+     先收盤跌破 MA25、MA99、MA120、MA200 任一條，這波作廢。
 
 出場（這次沒指定，回測用）
   停損＝回測那根的低點。目標＝2R。32 根（8 小時）都沒碰到就用收盤時間停。
@@ -114,6 +117,30 @@ def manage_exit(
     return end, float(c[end]), "時間停"
 
 
+def _mas(c: np.ndarray) -> dict[int, np.ndarray]:
+    return {n: sma(c, n) for n in (7, 14, 25, 99, 120, 200)}
+
+
+def _ready(mas: dict[int, np.ndarray], i: int) -> bool:
+    return not any(np.isnan(mas[n][i]) for n in mas)
+
+
+def _under_all(c: np.ndarray, mas: dict[int, np.ndarray], i: int) -> bool:
+    return all(c[i] < mas[n][i] for n in mas)
+
+
+def _above_all(c: np.ndarray, mas: dict[int, np.ndarray], i: int) -> bool:
+    return all(c[i] > mas[n][i] for n in mas)
+
+
+def _fan(mas: dict[int, np.ndarray], i: int) -> bool:
+    return mas[7][i] > mas[14][i] > mas[25][i]
+
+
+def _holds_long(c: np.ndarray, mas: dict[int, np.ndarray], i: int) -> bool:
+    return c[i] > mas[25][i] and c[i] > mas[99][i] and c[i] > mas[120][i] and c[i] > mas[200][i]
+
+
 def detect_trades(
     o: np.ndarray,
     h: np.ndarray,
@@ -127,11 +154,12 @@ def detect_trades(
     p = params or Params()
     fun = funnel if funnel is not None else {}
     n = len(c)
-    ma = sma(c, p.ma)
+    mas = _mas(c)
+    ma = mas[25]
     trades: list[Trade] = []
-    i = max(p.ma, p.break_lookback)
+    i = max(200, p.break_lookback)
     while i < n:
-        if np.isnan(ma[i]) or not (l[i] < np.min(l[i - p.break_lookback : i]) and c[i] < ma[i]):
+        if not _ready(mas, i) or not (l[i] < np.min(l[i - p.break_lookback : i]) and _under_all(c, mas, i)):
             i += 1
             continue
         if i >= min_entry_i:
@@ -145,7 +173,7 @@ def detect_trades(
             if l[j] < trough_low:
                 trough_low = float(l[j])
                 trough_i = j
-            if j > trough_i and not np.isnan(ma[j]) and c[j] > ma[j]:
+            if j > trough_i and _ready(mas, j) and _above_all(c, mas, j) and _fan(mas, j):
                 reclaim_i = j
                 break
             j += 1
@@ -163,18 +191,18 @@ def detect_trades(
         k = reclaim_i + 1
         k_end = min(n, reclaim_i + 1 + p.retest_window)
         while k < k_end:
-            if np.isnan(ma[k]):
+            if not _ready(mas, k):
                 k += 1
                 continue
-            if c[k] < ma[k]:
+            if c[k] < ma[k] or c[k] < mas[99][k] or c[k] < mas[120][k] or c[k] < mas[200][k]:
                 fail_i = k
                 break
             if not held:
-                if l[k] > ma[k]:
+                if l[k] > mas[7][k]:
                     held = True
                 k += 1
                 continue
-            if l[k] <= ma[k] and c[k] > ma[k]:
+            if l[k] <= ma[k] and _holds_long(c, mas, k) and _fan(mas, k):
                 entry_i = k
                 break
             k += 1
@@ -286,7 +314,6 @@ def draw_trade_png(bars: dict, trade: Trade, path: Path, title: str) -> None:
     plt.rcParams["axes.unicode_minus"] = False
 
     o, h, l, c = bars["o"], bars["h"], bars["l"], bars["c"]
-    ma = sma(c, 25)
     a0 = max(0, trade.trough_i - 16)
     a1 = min(len(c), trade.exit_i + 6)
     sl = slice(a0, a1)
@@ -305,7 +332,11 @@ def draw_trade_png(bars: dict, trade: Trade, path: Path, title: str) -> None:
         if y1 == y0:
             y1 = y0 + max(hh[k] - ll[k], 1e-12) * 0.04
         ax.add_patch(Rectangle((xs[k] - 0.32, y0), 0.64, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
-    ax.plot(xs, ma[sl], color="#d28cff", lw=1.15, label="MA25")
+    full_c = bars["c"]
+    mas = _mas(full_c)
+    palette = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#5fd2c2", 120: "#42a5f5", 200: "#ffffff"}
+    for n, col in palette.items():
+        ax.plot(xs, mas[n][sl], color=col, lw=1.05, label=f"MA{n}")
     marks = (
         (trade.trough_i, "破底", "#8ab4ff", trade.trough_low),
         (trade.reclaim_i, "站回", "#f0c14a", c[trade.reclaim_i]),
@@ -320,7 +351,7 @@ def draw_trade_png(bars: dict, trade: Trade, path: Path, title: str) -> None:
     ax.axhline(trade.stop, color="#e35d5d", ls="--", lw=0.7)
     ax.axhline(trade.target, color="#3dba7a", ls="--", lw=0.7)
     ax.set_title(title, color="#e8f0ea", fontsize=12)
-    ax.legend(loc="upper left", fontsize=8, frameon=False, labelcolor="#c8d5cc")
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     fig.tight_layout(pad=0.45)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
@@ -336,6 +367,9 @@ def write_html(
 ) -> Path:
     cards: list[str] = []
     img_dir = path.parent / "img"
+    if img_dir.exists():
+        for old in img_dir.glob("*.png"):
+            old.unlink()
     for i, (trade, bars, times) in enumerate(rows, 1):
         et = fmt_ts(times[trade.entry_i])
         xt = fmt_ts(times[trade.exit_i])
@@ -396,12 +430,12 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安 15 分 · 破底站回 MA25，等回測做多</h1>
+<h1>幣安 15 分 · 六條均線站回後，等回測 MA25</h1>
 <p class="muted">{escape(meta['period'])} · 掃描 {meta['symbols']} 檔 U 本位永續（24h 成交額 ≥ 500 萬 USDT）· 進場 {meta['entries']} 筆
-<br/>破底＝收盤在 MA25 下，且低點跌破前 32 根。48 根內收盤站回。先有一根完全站在均線上，之後 48 根內第一根觸到 MA25、收盤仍站上，用收盤價做多。
+<br/>均線用 NB 圖上那六條：MA7、MA14、MA25、MA99、MA120、MA200。破底＝收盤同時低於這六條，且低點跌破前 32 根。48 根內收盤同時站上六條，且 MA7 &gt; MA14 &gt; MA25。先有一根低點也在 MA7 上，之後觸到 MA25、收盤仍站上 MA25 / MA99 / MA120 / MA200，短均排列還在，才做多。
 <br/>出場：停損在回測低點，目標 2R，或 32 根時間停。停損距離 0.2%–4%。加總％是各筆報酬相加，不是組合複利。未平倉不計勝率，用最後一根收盤估。沒扣手續費與滑價。
-<br/>漏斗：破底 {funnel.get('break', 0)} → 站回 {funnel.get('reclaim', 0)} → 回測 {funnel.get('retest', 0)} → 風險過濾掉 {funnel.get('risk_skip', 0)} → 成交 {funnel.get('trades', 0)}
-<br/>沒站回 {funnel.get('no_reclaim', 0)} · 沒站穩 {funnel.get('no_stand', 0)} · 回測前跌回 {funnel.get('lost_before_retest', 0)} · 等到超時 {funnel.get('no_retest', 0)}
+<br/>漏斗：破底 {funnel.get('break', 0)} → 站上六條 {funnel.get('reclaim', 0)} → 回測 {funnel.get('retest', 0)} → 風險過濾掉 {funnel.get('risk_skip', 0)} → 成交 {funnel.get('trades', 0)}
+<br/>沒站上六條 {funnel.get('no_reclaim', 0)} · 沒離開 MA7 {funnel.get('no_stand', 0)} · 回測前失守 {funnel.get('lost_before_retest', 0)} · 等到超時 {funnel.get('no_retest', 0)}
 <br/>{reason_line}</p>
 <div class="cards">
 <div class="card">已平<b>{stats['count']}</b></div>
