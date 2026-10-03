@@ -72,6 +72,9 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 # 寬鬆 · 近一週
 python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 7 --pages
 
+# 寬鬆 · 一個月
+python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 30 --html docs/binance-1h-ma25-30d/index.html
+
 # 寬鬆 · 兩個月
 python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 60 --html docs/binance-1h-ma25-60d/index.html
 
