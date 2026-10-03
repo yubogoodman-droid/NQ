@@ -59,7 +59,8 @@ MIN_PREV_VS_MA200_PCT = -0.20
 MIN_PRIOR_VS_MA200_PCT = -0.50
 MAX_OFF_HOUR_HIGH_PCT = 5.00
 HOUR_HIGH_LOOKBACK = 24
-HORIZONS = ((1, "15m"), (2, "30m"), (4, "1h"), (8, "2h"), (16, "4h"))
+BINANCE_KLINE_MAX = 1500
+KLINE_CAP = 4000
 PAGES_HTML = REPO / "docs" / "binance" / "ma-break-7d.html"
 PAGES_HTML_ALL = REPO / "docs" / "binance" / "ma-break-7d-allhours.html"
 CHART_DIR = REPO / "docs" / "binance" / "img" / "ma-break"
@@ -135,10 +136,29 @@ def universe() -> list[str]:
 
 
 def fetch_klines(sym: str, limit: int = 260) -> dict | None:
-    raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": INTERVAL, "limit": limit})
+    need = max(210, min(int(limit), KLINE_CAP))
+    raw: list = []
+    end_time = None
+    now_ms = int(time.time() * 1000)
+    while len(raw) < need:
+        take = min(BINANCE_KLINE_MAX, need - len(raw) + 1)
+        params = {"symbol": sym, "interval": INTERVAL, "limit": take}
+        if end_time is not None:
+            params["endTime"] = end_time
+        chunk = get_json("/fapi/v1/klines", params=params)
+        if not chunk:
+            break
+        if raw:
+            first = int(raw[0][0])
+            chunk = [x for x in chunk if int(x[0]) < first]
+        if not chunk:
+            break
+        raw = chunk + raw
+        end_time = int(chunk[0][0]) - 1
+        if len(chunk) < take:
+            break
     if not raw or len(raw) < 210:
         return None
-    now_ms = int(time.time() * 1000)
     if int(raw[-1][0]) + INTERVAL_MS > now_ms:
         raw = raw[:-1]
     if len(raw) < 210:
@@ -512,8 +532,8 @@ def trade_from_bar(sym: str, d: dict, i: int) -> dict:
     }
 
 
-def backtest_symbol(sym: str, cutoff_ms: int) -> list[dict]:
-    raw = fetch_klines(sym, limit=1000)
+def backtest_symbol(sym: str, cutoff_ms: int, kline_limit: int = 1000) -> list[dict]:
+    raw = fetch_klines(sym, limit=kline_limit)
     if raw is None:
         return []
     d = indicators(raw)
@@ -552,15 +572,20 @@ def _pnl_stats(xs: list[float]) -> dict | None:
     }
 
 
+def kline_limit_for_days(days: int) -> int:
+    return min(KLINE_CAP, days * (86_400_000 // INTERVAL_MS) + 250)
+
+
 def collect_backtest(days: int) -> tuple[list[str], list[dict], int]:
     symbols = universe()
     start = datetime.now(ET) - timedelta(days=days)
     if REQUIRE_SESSION:
         start = start.replace(hour=SESSION_START[0], minute=SESSION_START[1], second=0, microsecond=0)
     cutoff_ms = int(start.timestamp() * 1000)
+    klimit = kline_limit_for_days(days)
     trades: list[dict] = []
     with ThreadPoolExecutor(8) as ex:
-        futs = {ex.submit(backtest_symbol, s, cutoff_ms): s for s in symbols}
+        futs = {ex.submit(backtest_symbol, s, cutoff_ms, klimit): s for s in symbols}
         for fut in as_completed(futs):
             try:
                 trades.extend(fut.result())
@@ -715,13 +740,9 @@ def print_backtest(trades: list[dict]) -> None:
         bits = "  ".join(f"{h:02d}時 {n}" for h, n in sorted(by_hour.items()))
         print(f"  美東小時：{bits}", flush=True)
     for t in trades:
-        if t["symbol"] != "VRTUSDT":
-            continue
-        h1s = ""
-        if t.get("h1m7") is not None:
-            h1s = f"  1h均 {t['h1m7']:.2f}<{t['h1m14']:.2f}<{t['h1m25']:.2f}"
+        name = t["symbol"].replace("USDT", "")
         print(
-            f"  VRT {t['et']} 實體 {t['body']:.2f}% 振幅 {t['rng']:.2f}% 回撤 {t['drop']:.2f}%{h1s}  15m {_fmt_plain(t['fwd']['15m'])}  1h {_fmt_plain(t['fwd']['1h'])}  2h {_fmt_plain(t['fwd']['2h'])}",
+            f"  {name} {t['et']}  15m {_fmt_plain(t['fwd']['15m'])}  1h {_fmt_plain(t['fwd']['1h'])}  2h {_fmt_plain(t['fwd']['2h'])}  當日 {_fmt_plain(t['eod'])}",
             flush=True,
         )
 
@@ -735,6 +756,19 @@ def configure_session(*, all_hours: bool) -> None:
     else:
         CHART_DIR = REPO / "docs" / "binance" / "img" / "ma-break"
         CHART_WEB = "./img/ma-break"
+
+
+def configure_outputs(*, all_hours: bool, days: int) -> Path:
+    global CHART_DIR, CHART_WEB
+    configure_session(all_hours=all_hours)
+    suffix = "-allhours" if all_hours else ""
+    if days == 7 and not all_hours:
+        return PAGES_HTML
+    if days == 7 and all_hours:
+        return PAGES_HTML_ALL
+    CHART_DIR = REPO / "docs" / "binance" / "img" / f"ma-break-{days}d{suffix}"
+    CHART_WEB = f"./img/ma-break-{days}d{suffix}"
+    return REPO / "docs" / "binance" / f"ma-break-{days}d{suffix}.html"
 
 
 def run_backtest(days: int, html_path: Path) -> int:
@@ -966,12 +1000,13 @@ def main() -> int:
     p.add_argument("--html", default="", help="回測 HTML 路徑")
     args = p.parse_args()
     apply_keys()
-    configure_session(all_hours=args.all_hours)
+    days = max(1, args.days)
+    html_default = configure_outputs(all_hours=args.all_hours, days=days)
     if args.test:
         return test_telegram()
     if args.backtest:
-        html_path = Path(args.html) if args.html else (PAGES_HTML_ALL if args.all_hours else PAGES_HTML)
-        return run_backtest(max(1, args.days), html_path)
+        html_path = Path(args.html) if args.html else html_default
+        return run_backtest(days, html_path)
 
     seen = load_seen()
     print("載入美股永續…", flush=True)

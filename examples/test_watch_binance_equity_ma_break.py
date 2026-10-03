@@ -18,6 +18,7 @@ from watch_binance_equity_ma_break import (  # noqa: E402
     below_all,
     configure_session,
     in_signal_window,
+    kline_limit_for_days,
     hourly_bearish,
     hourly_closes_asof,
     hourly_mas_asof,
@@ -260,7 +261,14 @@ def test_now_should_scan_and_next_window() -> None:
     assert nxt.weekday() == 0 and nxt.hour == 9  # 下週一
 
 
+def test_kline_limit_for_days() -> None:
+    assert kline_limit_for_days(7) == 7 * 96 + 250
+    assert kline_limit_for_days(30) == 30 * 96 + 250
+    assert kline_limit_for_days(90) == 4000
+
+
 def main() -> int:
+    test_kline_limit_for_days()
     test_sma()
     test_fresh_break_first_close_below_all()
     test_already_below_is_not_fresh()
