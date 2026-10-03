@@ -127,7 +127,7 @@ python3 examples/watch_orcl_death_cross.py --all
 python3 examples/test_orcl_death_cross.py
 ```
 
-報告：`docs/binance/death-cross-1m/`
+報告是單檔網頁：規則、砸 ≥1% 每一筆圖、當天全部訊號表，寫在 `docs/binance/death-cross-1m/index.html`。`--no-charts` 可關掉嵌圖。
 
 ## 快速開始
 

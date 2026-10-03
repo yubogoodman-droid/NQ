@@ -12,6 +12,8 @@
 """
 from __future__ import annotations
 
+import base64
+import io
 import json
 import os
 import sys
@@ -461,7 +463,21 @@ def telegram_send(text: str, photo: str | None = None) -> bool:
         return False
 
 
-def draw_chart(sym: str, d: dict, hit: ShortHit, path: str) -> str | None:
+def _cjk_font():
+    try:
+        from matplotlib import font_manager
+    except Exception:
+        return None
+    for p in (
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ):
+        if Path(p).exists():
+            return font_manager.FontProperties(fname=p)
+    return None
+
+
+def render_chart_png(sym: str, d: dict, hit: ShortHit, *, before: int = 70, after: int = 28) -> bytes | None:
     try:
         import matplotlib
 
@@ -470,12 +486,12 @@ def draw_chart(sym: str, d: dict, hit: ShortHit, path: str) -> str | None:
         from matplotlib.patches import Rectangle
     except Exception:
         return None
-    a0 = max(0, hit.i - 80)
-    a1 = min(len(d["c"]), hit.i + 8)
+    a0 = max(0, hit.i - before)
+    a1 = min(len(d["c"]), hit.i + after + 1)
     sl = slice(a0, a1)
     xs = np.arange(a1 - a0)
     o, h, l, c = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl]
-    fig, ax = plt.subplots(figsize=(10.4, 5.2), facecolor="#0c1210")
+    fig, ax = plt.subplots(figsize=(10.2, 4.6), facecolor="#0c1210")
     ax.set_facecolor("#101814")
     ax.tick_params(colors="#8aa193", labelsize=8)
     for sp in ax.spines.values():
@@ -495,17 +511,63 @@ def draw_chart(sym: str, d: dict, hit: ShortHit, path: str) -> str | None:
     if 0 <= x < len(c):
         ax.axvline(x, color="#e35d5d", ls="--", lw=0.95)
         ax.scatter([x], [c[x]], s=38, color="#e35d5d", zorder=5)
-    ax.set_title(f"{sym}  1m  空  4h新高後死亡交叉且破 MA25", color="#e8f0ea", fontsize=12)
+    extra = ""
+    if hit.drop_from_high is not None:
+        extra += f"  離高 {hit.drop_from_high:+.2f}%"
+    if hit.bars_after_high is not None:
+        extra += f"  +{hit.bars_after_high}m"
+    title = f"{sym}  1m  {hm(int(d['t'][hit.i]))}{extra}"
+    fp = _cjk_font()
+    if fp is not None:
+        ax.set_title(title, color="#e8f0ea", fontsize=11, fontproperties=fp)
+    else:
+        ax.set_title(title, color="#e8f0ea", fontsize=11)
     if hit.peak_i is not None:
         px = hit.peak_i - a0
         if 0 <= px < len(c):
             ax.axvline(px, color="#c9a227", ls=":", lw=0.9)
             ax.scatter([px], [d["h"][hit.peak_i]], s=28, color="#c9a227", zorder=5, marker="^")
+    times = d["t"][sl]
+    step = max(1, len(xs) // 6)
+    ax.set_xticks(xs[::step])
+    ax.set_xticklabels(
+        [datetime.fromtimestamp(int(t) / 1000, TZ).strftime("%H:%M") for t in times[::step]],
+        color="#8aa193",
+        fontsize=8,
+    )
     ax.legend(loc="upper left", fontsize=8, frameon=False, labelcolor="#c8d5cc", ncol=3)
-    fig.tight_layout(pad=0.5)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    fig.tight_layout(pad=0.45)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=96, facecolor=fig.get_facecolor())
     plt.close(fig)
+    return buf.getvalue()
+
+
+def draw_chart(sym: str, d: dict, hit: ShortHit, path: str) -> str | None:
+    raw = render_chart_png(sym, d, hit, before=80, after=8)
+    if not raw:
+        return None
+    Path(path).write_bytes(raw)
     return path
+
+
+def chart_data_uri(sym: str, d: dict, hit: ShortHit) -> str | None:
+    raw = render_chart_png(sym, d, hit)
+    if not raw:
+        return None
+    return "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
+
+
+def charts_for_like(like: list[ScanRow], bars: dict[str, dict]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for r in like:
+        d = bars.get(r.symbol)
+        if not d:
+            continue
+        uri = chart_data_uri(r.symbol, d, r.hit)
+        if uri:
+            out[f"{r.symbol}:{r.ts_ms}"] = uri
+    return out
 
 
 def format_hit(sym: str, d: dict, hit: ShortHit) -> str:
@@ -652,7 +714,7 @@ def scan_universe(
                 print("err", sym, e, flush=True)
                 continue
             rows.extend(rs)
-            if keep_bars and d:
+            if keep_bars and d and rs:
                 bars[s] = d
             if n % 80 == 0 or n == len(symbols):
                 print(f"  … {n}/{len(symbols)}  訊號 {len(rows)}  失敗 {err}", flush=True)
@@ -805,7 +867,9 @@ def write_html_report(
     n_symbols: int,
     title: str,
     top: int = 50,
+    charts: dict[str, str] | None = None,
 ) -> Path:
+    del top  # 網頁一律寫完整清單，不再截前 N 筆
     recent = [r for r in rows if in_window(r.ts_ms, start_ms, end_ms)]
     ranked = sorted(
         recent,
@@ -817,6 +881,7 @@ def write_html_report(
     same = sum(1 for r in recent if r.hit.crossed_ma25)
     names = sorted({r.symbol for r in recent})
     like = orcl_like(recent)
+    charts = charts or {}
     by_sym: dict[str, list[ScanRow]] = {}
     for r in recent:
         by_sym.setdefault(r.symbol, []).append(r)
@@ -836,30 +901,69 @@ def write_html_report(
         cls = "dn" if v < 0 else "up"
         return f'<td class="{cls}">{v:+.2f}%</td>'
 
-    def row_tr(r: ScanRow, extra: str) -> str:
+    def loc_txt(v: float | None) -> str:
+        if v is None:
+            return "—"
+        return f"{v:.2f}"
+
+    def row_tr(r: ScanRow, extra: str, *, href: str | None = None) -> str:
+        name = escape(r.symbol)
+        link = f"<a href='{escape(binance_href(r.symbol))}'>{name}</a>"
+        if href:
+            link += f" <a class='jump' href='{escape(href)}'>圖</a>"
         return (
             "<tr>"
-            f"<td><a href='{escape(binance_href(r.symbol))}'>{escape(r.symbol)}</a></td>"
+            f"<td>{link}</td>"
             f"<td>{escape(hm(r.ts_ms))}</td>"
             f"<td>{r.hit.close:g}</td>"
             f"{pct_cell(r.low30)}{pct_cell(r.fwd15)}{pct_cell(r.fwd30)}"
             f"<td>{r.hit.lead}</td>"
             f"<td>{r.hit.bars_after_high if r.hit.bars_after_high is not None else '—'}</td>"
             f"{pct_cell(r.hit.drop_from_high)}"
+            f"<td>{r.hit.reds_from_high if r.hit.reds_from_high is not None else '—'}</td>"
+            f"<td>{loc_txt(r.hit.close_loc)}</td>"
             f"<td>{extra}</td>"
             "</tr>"
         )
 
-    top_html = [
+    def like_card(i: int, r: ScanRow) -> str:
+        aid = f"hit-{i:02d}"
+        uri = charts.get(f"{r.symbol}:{r.ts_ms}", "")
+        img = f'<img src="{uri}" alt="{escape(r.symbol)} {escape(hm(r.ts_ms))}"/>' if uri else ""
+        loc = loc_txt(r.hit.close_loc)
+        reds = r.hit.reds_from_high if r.hit.reds_from_high is not None else "—"
+        after = r.hit.bars_after_high if r.hit.bars_after_high is not None else "—"
+        return (
+            f'<article class="card" id="{aid}">'
+            '<div class="card-h">'
+            f"<div><a href='{escape(binance_href(r.symbol))}'>{escape(r.symbol)}</a>"
+            f" <span class='muted'>{escape(hm(r.ts_ms))}</span></div>"
+            f'<div class="dn">{fmt_pct(r.low30)}</div>'
+            "</div>"
+            '<div class="meta">'
+            f"收 {r.hit.close:g}　lead {r.hit.lead}　高點後 {after}m　"
+            f"離高 {fmt_pct(r.hit.drop_from_high)}　連陰 {reds}　收位 {loc}　"
+            f"15m {fmt_pct(r.fwd15)}　30m收 {fmt_pct(r.fwd30)}"
+            "</div>"
+            f"{img}"
+            "</article>"
+        )
+
+    like_html = [
+        row_tr(r, f"#{i:02d}", href=f"#hit-{i:02d}")
+        for i, r in enumerate(like, 1)
+    ]
+    all_html = [
         row_tr(
             r,
-            f"連陰{r.hit.reds_from_high}" if r.hit.reds_from_high is not None else "ORCL形",
+            "砸≥1%" if r.low30 is not None and r.low30 <= -1.0 else "",
         )
-        for r in ranked[:top]
+        for r in ranked
     ]
-    like_html = [row_tr(r, f"lead {r.hit.lead}") for r in like[:top]]
+    cards = [like_card(i, r) for i, r in enumerate(like, 1)]
+    n_charts = sum(1 for r in like if f"{r.symbol}:{r.ts_ms}" in charts)
     sym_html = []
-    for _w, sym, n, dump, last in sym_rows[:200]:
+    for _w, sym, n, dump, last in sym_rows:
         x = "同根破25" if dump.hit.crossed_ma25 else "已在25下"
         sym_html.append(
             "<tr>"
@@ -881,54 +985,105 @@ def write_html_report(
 <title>{escape(title)}</title>
 <style>
 body{{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}}
-.wrap{{max-width:980px;margin:0 auto;padding:18px 14px 48px}}
+.wrap{{max-width:1080px;margin:0 auto;padding:18px 14px 56px}}
 h1{{font-size:1.35rem;margin:0 0 8px}}
-h2{{font-size:1.02rem;margin:22px 0 8px}}
+h2{{font-size:1.05rem;margin:28px 0 10px}}
 .sub{{color:#8aa193;line-height:1.55;margin:0 0 14px;font-size:.92rem}}
-.chips{{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}}
+.chips{{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}}
 .chip{{border:1px solid rgba(232,240,234,.12);background:#14201b;border-radius:999px;padding:7px 12px;font-size:.82rem}}
 .chip b{{color:#c9a227}}
-table{{width:100%;border-collapse:collapse;font-size:.82rem}}
-th,td{{padding:7px 6px;border-bottom:1px solid rgba(232,240,234,.1);text-align:left}}
+.toc{{display:flex;flex-wrap:wrap;gap:10px 14px;margin:0 0 18px;font-size:.86rem}}
+.toc a{{color:#c9a227}}
+.rules{{margin:0 0 8px;padding:0 0 0 1.2em;color:#c8d5cc;line-height:1.7;font-size:.9rem}}
+.rules li{{margin:2px 0}}
+.scroll{{overflow-x:auto}}
+table{{width:100%;border-collapse:collapse;font-size:.8rem}}
+th,td{{padding:6px 6px;border-bottom:1px solid rgba(232,240,234,.1);text-align:left;white-space:nowrap}}
 th{{color:#8aa193;font-weight:500}}
 a{{color:#c9a227;text-decoration:none}}
+.jump{{font-size:.75rem;margin-left:4px;color:#8aa193}}
 .dn{{color:#e35d5d}} .up{{color:#3dba7a}} .muted{{color:#8aa193}}
 .note{{margin-top:16px;color:#8aa193;font-size:.8rem;line-height:1.5}}
+.filter{{margin:0 0 10px;padding:8px 10px;width:min(320px,100%);border:1px solid rgba(232,240,234,.14);border-radius:8px;background:#101814;color:#e8f0ea}}
+.card{{border:1px solid rgba(232,240,234,.12);background:#101814;border-radius:12px;padding:12px;margin:0 0 14px}}
+.card-h{{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:1.02rem;font-weight:600}}
+.card-h .dn{{font-variant-numeric:tabular-nums}}
+.meta{{color:#8aa193;font-size:.8rem;margin:6px 0 8px;line-height:1.5}}
+.card img{{width:100%;border-radius:8px;display:block;background:#0c1210}}
 </style>
 </head>
 <body>
 <div class="wrap">
 <h1>{escape(title)}</h1>
-<p class="sub">創下過去 4 小時新高後 30 分鐘內，<b>同一根</b> 1 分鐘 K：MA7 下穿 MA14 且收盤跌破 MA25。再壓成 ORCL 22:49 那種：領先 ≥15 根、高點後 ≥4 分、從高點至少 3 根陰、收在 K 棒下緣、離高點 ≥0.25%。急殺深度是訊號後 30 根最低點。不是進出場建議。</p>
+<p class="sub">單檔把規則、砸 ≥1% 的每一筆圖、以及當天全部 ORCL 形訊號都寫在裡面。急殺深度是訊號後 30 根最低點。不是進出場建議。</p>
 <div class="chips">
   <div class="chip">掃 <b>{n_symbols}</b> 檔</div>
   <div class="chip">訊號 <b>{len(recent)}</b> 筆</div>
   <div class="chip">有訊號 <b>{len(names)}</b> 檔</div>
   <div class="chip">之後砸 ≥1% <b>{len(like)}</b></div>
+  <div class="chip">圖 <b>{n_charts}</b></div>
 </div>
-<h2>之後砸得比較深（30m ≥1%，前 {min(top, len(like))}）</h2>
+<nav class="toc">
+  <a href="#rules">規則</a>
+  <a href="#dump">砸 ≥1%（{len(like)}）</a>
+  <a href="#all">全部 {len(ranked)} 筆</a>
+  <a href="#syms">{len(sym_rows)} 檔</a>
+</nav>
+<h2 id="rules">規則（對齊 ORCL 22:49）</h2>
+<ol class="rules">
+  <li>創下過去 <b>4 小時新高</b></li>
+  <li>之後 <b>30 分鐘內</b>，<b>同一根</b> 1 分鐘 K：MA7 下穿 MA14（死亡交叉）<b>且</b>收盤由上跌破 MA25</li>
+  <li>交叉前 MA7 領先 ≥ <b>15</b> 根（ORCL 是 22）</li>
+  <li>高點後至少 <b>4</b> 分鐘（ORCL 是 +5，不是新高當根）</li>
+  <li>從高點到訊號至少 <b>3</b> 根陰線（ORCL 是 4）</li>
+  <li>收盤在 K 棒下緣（位置 ≤ 0.25，ORCL 收在最低）</li>
+  <li>收盤已離 4h 高 ≥ <b>0.25%</b>（ORCL 約 −0.35%）</li>
+</ol>
+<p class="note">漏斗：同根死亡交叉且破 MA25 約 1070 → 壓成 ORCL 形 {len(recent)} → 之後 30 分鐘砸過 1% 剩 {len(like)}。金點線是 4 小時高，紅虛線是訊號根。</p>
+<h2 id="dump">之後砸 ≥1%（全部 {len(like)} 筆{f'，{n_charts} 張圖' if n_charts else ''}）</h2>
+<div class="scroll">
 <table>
-<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th>離高</th><th></th></tr></thead>
+<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th>離高</th><th>連陰</th><th>收位</th><th></th></tr></thead>
 <tbody>
-{"".join(like_html) or "<tr><td colspan='10' class='muted'>沒有訊號</td></tr>"}
+{"".join(like_html) or "<tr><td colspan='12' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
-<h2>全部 ORCL 形（前 {min(top, len(ranked))}）</h2>
+</div>
+{"".join(cards)}
+<h2 id="all">全部 ORCL 形（{len(ranked)} 筆）</h2>
+<input class="filter" id="q" placeholder="篩選標的或時間…" autocomplete="off"/>
+<div class="scroll">
 <table>
-<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th>離高</th><th></th></tr></thead>
-<tbody>
-{"".join(top_html) or "<tr><td colspan='10' class='muted'>沒有訊號</td></tr>"}
+<thead><tr><th>標的</th><th>時間</th><th>收</th><th>30m低</th><th>15m</th><th>30m收</th><th>lead</th><th>高點後</th><th>離高</th><th>連陰</th><th>收位</th><th></th></tr></thead>
+<tbody id="all-body">
+{"".join(all_html) or "<tr><td colspan='12' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
-<h2>有訊號的標的</h2>
+</div>
+<h2 id="syms">有訊號的標的（{len(sym_rows)} 檔）</h2>
+<div class="scroll">
 <table>
 <thead><tr><th>標的</th><th>筆數</th><th>最深那筆</th><th>收</th><th>30m低</th><th>破25</th><th>最後一筆</th></tr></thead>
 <tbody>
 {"".join(sym_html) or "<tr><td colspan='7' class='muted'>沒有訊號</td></tr>"}
 </tbody>
 </table>
+</div>
 <p class="note">ORCL 10-02：22:44 創四小時高 144.95；22:49（+5 分）同一根死亡交叉且跌破 MA25，lead 22、連陰 4、收在下緣、離高 −0.35%，之後砸到 141。</p>
 </div>
+<script>
+(function(){{
+  var q = document.getElementById('q');
+  var rows = document.querySelectorAll('#all-body tr');
+  if (!q) return;
+  q.addEventListener('input', function(){{
+    var s = (q.value || '').toUpperCase();
+    rows.forEach(function(tr){{
+      tr.style.display = !s || tr.textContent.toUpperCase().indexOf(s) >= 0 ? '' : 'none';
+    }});
+  }});
+}})();
+</script>
 </body>
 </html>
 """
@@ -943,8 +1098,9 @@ a{{color:#c9a227;text-decoration:none}}
         "symbols_hit": len(names),
         "same_bar_ma25": same,
         "orcl_like": len(like),
-        "top": [row_to_json(r) for r in ranked[:200]],
-        "like": [row_to_json(r) for r in like[:200]],
+        "all": [row_to_json(r) for r in ranked],
+        "top": [row_to_json(r) for r in ranked],
+        "like": [row_to_json(r) for r in like],
         "by_symbol": [
             {
                 "symbol": sym,
@@ -1004,21 +1160,27 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
             f"掃 {len(symbols)} 檔 1m　{label}　min_lead={args.min_lead}　{extra}",
             flush=True,
         )
-        rows, _ = scan_universe(
+        html_path = args.html
+        if args.pages:
+            html_path = html_path or str(PAGES_HTML)
+        want_charts = bool(html_path) and not args.no_charts
+        rows, bars = scan_universe(
             symbols,
             limit=args.limit,
             workers=args.workers,
             vols=vols,
+            keep_bars=want_charts,
             start_ms=start - (detect_kw["high_lookback"] + 25) * 60_000,
             end_ms=end + 40 * 60_000,
             **detect_kw,
         )
         print(f"掃完 {time.time()-t0:.1f}s", flush=True)
         print_market_scan(rows, start_ms=start, end_ms=end, n_symbols=len(symbols), top=args.top)
-        html_path = args.html
-        if args.pages:
-            html_path = html_path or str(PAGES_HTML)
         if html_path:
+            like = orcl_like([r for r in rows if in_window(r.ts_ms, start, end)])
+            charts = charts_for_like(like, bars) if want_charts else {}
+            if want_charts:
+                print(f"嵌入砸≥1% 圖 {len(charts)}/{len(like)}", flush=True)
             out = write_html_report(
                 html_path,
                 rows,
@@ -1027,6 +1189,7 @@ def run_scan(args, symbols: list[str], vols: dict[str, float]) -> int:
                 n_symbols=len(symbols),
                 title=f"幣安 1m 空 · ORCL 形（同根死亡交叉且破 MA25）· {label}",
                 top=args.top,
+                charts=charts,
             )
             print(f"html={out}")
         return 0
@@ -1070,7 +1233,8 @@ def main() -> int:
     p.add_argument("--date", default=None, help="台北日 YYYY-MM-DD，只看這一天")
     p.add_argument("--top", type=int, default=40, help="市場掃描列出急殺最深幾筆")
     p.add_argument("--html", default=None, help="寫入 HTML 報告路徑")
-    p.add_argument("--pages", action="store_true", help="寫到 docs/binance/death-cross-1m/")
+    p.add_argument("--pages", action="store_true", help="寫到 docs/binance/death-cross-1m/（單檔含規則、砸≥1%圖、全部訊號）")
+    p.add_argument("--no-charts", action="store_true", help="HTML 不嵌圖")
     p.add_argument("--limit", type=int, default=1500, help="K 線根數")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的那一分，然後結束")
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")

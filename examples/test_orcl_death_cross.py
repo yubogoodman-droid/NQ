@@ -201,10 +201,59 @@ def test_write_html_report(tmp_path=None) -> None:
         html = out.read_text(encoding="utf-8")
         assert "ORCLUSDT" in html
         assert "22:49" in html
+        assert "規則" in html
+        assert "死亡交叉" in html
         payload = json.loads((out.parent / "hits.json").read_text())
         assert payload["count"] == 1
         assert payload["top"][0]["symbol"] == "ORCLUSDT"
+        assert payload["all"][0]["symbol"] == "ORCLUSDT"
         assert payload["orcl_like"] == 1
+
+
+def test_write_html_report_keeps_all_hits() -> None:
+    from pathlib import Path
+    import tempfile
+
+    start, end = day_bounds_ms("2026-10-02")
+    rows = []
+    for i, name in enumerate(["AAAUSDT", "BBBUSDT", "CCCUSDT"]):
+        hit = ShortHit(
+            i=10,
+            close=1.0 + i,
+            m7=1,
+            m14=1,
+            m25=1,
+            lead=22,
+            crossed_ma25=True,
+            drop_from_high=-0.4,
+            reds_from_high=4,
+            close_loc=0.1,
+            bars_after_high=5,
+        )
+        ts = start + (i + 1) * 60_000
+        rows.append(ScanRow(name, ts, hit, -1, -2, -1.5, -1.2 - i, 0))
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "index.html"
+        fake = "data:image/png;base64,AAA"
+        out = write_html_report(
+            path,
+            rows,
+            start_ms=start,
+            end_ms=end,
+            n_symbols=3,
+            title="test",
+            top=1,
+            charts={f"AAAUSDT:{rows[0].ts_ms}": fake},
+        )
+        html = out.read_text(encoding="utf-8")
+        for name in ("AAAUSDT", "BBBUSDT", "CCCUSDT"):
+            assert name in html
+        assert fake in html
+        assert "前 1" not in html
+        payload = json.loads((out.parent / "hits.json").read_text())
+        assert payload["count"] == 3
+        assert len(payload["all"]) == 3
+        assert payload["orcl_like"] == 3
 
 
 def test_orcl_like_needs_same_bar_and_lead() -> None:
@@ -395,6 +444,7 @@ def main() -> int:
     test_day_window()
     test_forward_moves_dump()
     test_write_html_report()
+    test_write_html_report_keeps_all_hits()
     test_orcl_like_needs_same_bar_and_lead()
     test_new_high_mask()
     test_4h_high_then_death_within_30()
