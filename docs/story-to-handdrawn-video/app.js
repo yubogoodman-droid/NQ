@@ -43,7 +43,7 @@
       poster: "assets/xiaohuang-poster.jpg",
       download: "蕭煌車.mp4",
       sheet: "assets/xiaohuang-character-sheet.jpg",
-      sheetAlt: "黃外套主角角色設定",
+      sheetAlt: "藍西裝墨鏡主角角色設定",
       pages: 3,
       duration: 13.6,
       storyUrl: "xiaohuang.json",
