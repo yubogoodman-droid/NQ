@@ -16,6 +16,7 @@ from watch_binance_5m_align import (  # noqa: E402
     collect_signals,
     detect_new_align,
     drop_unclosed,
+    fifteen_reclaim_ok,
     five_align_ok,
     format_alert,
     forward_pct,
@@ -146,6 +147,19 @@ def test_detect_reclaim_bar() -> None:
     assert detect_new_align(d5, 230, h1, hi) is None
 
 
+def test_fifteen_reclaim_and_blocks() -> None:
+    d5, h1 = reclaim_5m(), hour_ok_hi()
+    hi = len(h1["c"]) - 1
+    t = int(d5["t"][229])
+    px = float(d5["c"][229])
+    good15 = add_mas(_bars(reclaim_closes(), t0=t - 229 * 3 * MS, step=3 * MS), (7, 14, 25, 200))
+    flat15 = add_mas(_bars(rising(260), t0=t - 229 * 3 * MS, step=3 * MS), (7, 14, 25, 200))
+    assert fifteen_reclaim_ok(good15, t, px)
+    assert not fifteen_reclaim_ok(flat15, t, px)
+    assert detect_new_align(d5, 229, h1, hi, d15=good15) is not None
+    assert detect_new_align(d5, 229, h1, hi, d15=flat15) is None
+
+
 def test_detect_blocks_without_hour_filter() -> None:
     d5 = reclaim_5m()
     weak = add_mas(_bars(np.concatenate([rising(200, 100.0, 0.2), np.full(40, 80.0)]), step=3_600_000), (99, 200))
@@ -206,6 +220,12 @@ def test_format_and_key() -> None:
     assert "多頭排列" in text
     assert "MA200 下" in text
     assert key_of(ev) == f"BTCUSDT:{sig['t']}"
+    t = int(d5["t"][229])
+    px = float(d5["c"][229])
+    good15 = add_mas(_bars(reclaim_closes(), t0=t - 229 * 3 * MS, step=3 * MS), (7, 14, 25, 200))
+    sig15 = detect_new_align(d5, 229, h1, hi, d15=good15)
+    text15 = format_alert({"symbol": "BTCUSDT", "sig": sig15, "d5": d5, "h1": h1})
+    assert "15m" in text15
 
 
 if __name__ == "__main__":

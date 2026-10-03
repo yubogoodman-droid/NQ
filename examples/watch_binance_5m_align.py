@@ -2,6 +2,7 @@
 """幣安 5m 多頭排列 Telegram 監看。
 
 五分 K：MA7 > MA14 > MA25，且前一根收在 MA200 下、這一根收盤才站上。
+同一時刻 15m 也要從 MA200 下站上（用形成中的 15m，不算未來收盤）。
 同時小時 K 收盤要在 MA99 與 MA200 之上。
 預設只掃 24h 成交額前 100 檔。同一根不重發。
 
@@ -39,6 +40,7 @@ if not CONFIG_ENV.exists():
     CONFIG_ENV = Path(__file__).resolve().parent / "tg_config.env"
 
 MS_5M = 5 * 60_000
+MS_15M = 15 * 60_000
 MS_1H = 60 * 60_000
 HORIZONS = (("15m", 3), ("30m", 6), ("60m", 12), ("120m", 24))
 UNIVERSE_LIMIT = 100
@@ -139,11 +141,36 @@ def hour_above_ok(h: dict, i: int) -> bool:
     return h["c"][i] > m99 and h["c"][i] > m200
 
 
+def bar_index_at(d: dict, t_ms: int) -> int:
+    """已開出、且開盤時間 ≤ t_ms 的最後一根。"""
+    if len(d["t"]) == 0:
+        return -1
+    return int(np.searchsorted(d["t"], t_ms, side="right") - 1)
+
+
 def hour_index_at(h: dict, t_ms: int) -> int:
     """已開出、且開盤時間 ≤ t_ms 的最後一根小時 K。"""
-    if len(h["t"]) == 0:
-        return -1
-    return int(np.searchsorted(h["t"], t_ms, side="right") - 1)
+    return bar_index_at(h, t_ms)
+
+
+def tf_mas_at(d: dict, t_ms: int, px: float, n: int) -> float | None:
+    """用當下價格當形成中 K 的收盤算均線，不看這根之後的收盤。"""
+    i = bar_index_at(d, t_ms)
+    if i < n - 1:
+        return None
+    return float(np.mean(np.append(d["c"][i - (n - 1) : i], px)))
+
+
+def fifteen_reclaim_ok(d15: dict, t_ms: int, px: float) -> bool:
+    """形成中的 15m：前一根收在 MA200 下，這一根用當下價站上。"""
+    i = bar_index_at(d15, t_ms)
+    if i < 200:
+        return False
+    prev, prev_m = float(d15["c"][i - 1]), float(d15["m200"][i - 1])
+    if np.isnan(prev_m):
+        return False
+    m200 = tf_mas_at(d15, t_ms, px, 200)
+    return bool(m200 is not None and prev < prev_m and px > m200)
 
 
 def hour_mas_at(h: dict, t_ms: int, px: float) -> tuple[float, float] | None:
@@ -161,12 +188,19 @@ def hour_above_at(h: dict, t_ms: int, px: float) -> bool:
     return bool(mas and px > mas[0] and px > mas[1])
 
 
-def detect_new_align(d5: dict, i: int, h1: dict, hi: int | None = None) -> dict | None:
-    """5m 7>14>25，且這一根才從 MA200 下收盤站上；小時也在 99/200 上。"""
+def detect_new_align(
+    d5: dict, i: int, h1: dict, hi: int | None = None, d15: dict | None = None
+) -> dict | None:
+    """5m 7>14>25 且從 MA200 下站上；15m 同時也從下站上；小時在 99/200 上。"""
     if not five_align_ok(d5, i) or not reclaim_ma200(d5, i):
         return None
     px = float(d5["c"][i])
     t = int(d5["t"][i])
+    m15 = None
+    if d15 is not None:
+        if not fifteen_reclaim_ok(d15, t, px):
+            return None
+        m15 = tf_mas_at(d15, t, px, 200)
     if hi is None:
         mas = hour_mas_at(h1, t, px)
         if mas is None or not (px > mas[0] and px > mas[1]):
@@ -191,17 +225,18 @@ def detect_new_align(d5: dict, i: int, h1: dict, hi: int | None = None) -> dict 
         "h_close": h_close,
         "h_m99": h_m99,
         "h_m200": h_m200,
+        "m15_200": m15,
         "t": t,
     }
 
 
-def collect_signals(d5: dict, h1: dict, start_ms: int, end_ms: int) -> list[dict]:
+def collect_signals(d5: dict, h1: dict, start_ms: int, end_ms: int, d15: dict | None = None) -> list[dict]:
     out = []
     for i in range(len(d5["c"])):
         t = int(d5["t"][i])
         if t < start_ms or t > end_ms:
             continue
-        sig = detect_new_align(d5, i, h1)
+        sig = detect_new_align(d5, i, h1, d15=d15)
         if sig:
             out.append(sig)
     return out
@@ -255,7 +290,7 @@ def get_json(path: str, params=None, retries: int = 5):
         except Exception as e:
             last = e
             time.sleep(0.4 * (i + 1))
-    raise last
+    raise last if last is not None else RuntimeError(f"GET {path} failed")
 
 
 def rank_universe(rows: list[tuple[str, float]], limit: int = UNIVERSE_LIMIT) -> list[str]:
@@ -446,30 +481,35 @@ def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4) -> str |
 
 def scan_symbol(sym: str) -> list[dict]:
     raw5 = fetch_klines(sym, "5m", 260, MS_5M, keep_forming=False)
+    raw15 = fetch_klines(sym, "15m", 260, MS_15M, keep_forming=True)
     raw1 = fetch_klines(sym, "1h", 260, MS_1H, keep_forming=True)
-    if raw5 is None or raw1 is None:
+    if raw5 is None or raw15 is None or raw1 is None:
         return []
     d5 = add_mas(raw5, (7, 14, 25, 200))
+    d15 = add_mas(raw15, (7, 14, 25, 200))
     h1 = add_mas(raw1, (99, 200))
     last5 = len(d5["c"]) - 1
     events = []
     for closed in (last5, last5 - 1):
-        sig = detect_new_align(d5, closed, h1)
+        sig = detect_new_align(d5, closed, h1, d15=d15)
         if not sig:
             continue
-        events.append({"symbol": sym, "sig": sig, "d5": d5, "h1": h1})
+        events.append({"symbol": sym, "sig": sig, "d5": d5, "h1": h1, "d15": d15})
     return events
 
 
 def format_alert(ev: dict) -> str:
     sig, sym = ev["sig"], ev["symbol"]
     ext = (sig["close"] / sig["m200"] - 1) * 100
+    m15 = sig.get("m15_200")
+    m15_txt = "" if m15 is None else f" {m15:g}"
     return (
         f"📈 <b>5m 多頭排列</b>  {sym}\n"
         f"時間 {hm(sig['t'])}\n"
         f"收盤 {sig['close']:g}\n"
         f"5m MA7 {sig['m7']:g} &gt; MA14 {sig['m14']:g} &gt; MA25 {sig['m25']:g}\n"
         f"前一根在 MA200 下，這根站上 {sig['m200']:g}（{ext:+.2f}%）\n"
+        f"15m 也從 MA200 下站上{m15_txt}\n"
         f"1h 收盤 {sig['h_close']:g} &gt; MA99 {sig['h_m99']:g} / MA200 {sig['h_m200']:g}"
     )
 
@@ -512,13 +552,15 @@ def notify(ev: dict, *, dry_run: bool = False) -> None:
 
 
 def scan_history_symbol(sym: str, start_ms: int, end_ms: int) -> tuple[list[dict], dict]:
-    meta = {"symbol": sym, "five_new": 0, "hits": 0, "error": ""}
+    meta = {"symbol": sym, "five_new": 0, "fifteen": 0, "hits": 0, "error": ""}
     raw5 = fetch_klines_range(sym, "5m", start_ms - WARMUP_BARS * MS_5M, end_ms, MS_5M, keep_forming=False)
+    raw15 = fetch_klines_range(sym, "15m", start_ms - WARMUP_BARS * MS_15M, end_ms, MS_15M, keep_forming=True)
     raw1 = fetch_klines_range(sym, "1h", start_ms - WARMUP_BARS * MS_1H, end_ms, MS_1H, keep_forming=True)
-    if raw5 is None or raw1 is None:
+    if raw5 is None or raw15 is None or raw1 is None:
         meta["error"] = "too_few_bars"
         return [], meta
     d5 = add_mas(raw5, (7, 14, 25, 200))
+    d15 = add_mas(raw15, (7, 14, 25, 200))
     h1 = add_mas(raw1, (99, 200))
     hits = []
     for i in range(len(d5["c"])):
@@ -527,7 +569,10 @@ def scan_history_symbol(sym: str, start_ms: int, end_ms: int) -> tuple[list[dict
             continue
         if five_align_ok(d5, i) and reclaim_ma200(d5, i):
             meta["five_new"] += 1
-            sig = detect_new_align(d5, i, h1)
+            px = float(d5["c"][i])
+            if fifteen_reclaim_ok(d15, t, px):
+                meta["fifteen"] += 1
+            sig = detect_new_align(d5, i, h1, d15=d15)
             if sig:
                 row = attach_forwards(d5, sig)
                 row["symbol"] = sym
@@ -539,7 +584,7 @@ def scan_history_symbol(sym: str, start_ms: int, end_ms: int) -> tuple[list[dict
 
 def backtest_all(symbols: list[str], start_ms: int, end_ms: int) -> tuple[list[dict], dict]:
     hits: list[dict] = []
-    funnel = {"symbols": len(symbols), "ok": 0, "five_new": 0, "hits": 0, "errors": 0}
+    funnel = {"symbols": len(symbols), "ok": 0, "five_new": 0, "fifteen": 0, "hits": 0, "errors": 0}
     with ThreadPoolExecutor(8) as ex:
         futs = {ex.submit(scan_history_symbol, s, start_ms, end_ms): s for s in symbols}
         done = 0
@@ -553,6 +598,7 @@ def backtest_all(symbols: list[str], start_ms: int, end_ms: int) -> tuple[list[d
                 continue
             funnel["ok"] += 1
             funnel["five_new"] += meta["five_new"]
+            funnel["fifteen"] += meta.get("fifteen", 0)
             funnel["hits"] += meta["hits"]
             hits.extend(rows)
             if done % 40 == 0 or done == len(symbols):
@@ -649,6 +695,7 @@ def write_report(path: Path, hits: list[dict], stats: dict, funnel: dict, period
             "<pre class='trade-detail'>"
             f"收盤 {h['close']:g}  MA7 {h['m7']:g} > MA14 {h['m14']:g} > MA25 {h['m25']:g}\n"
             f"前一根在 MA200 下，這根站上 {h['m200']:g}（{ext:+.2f}%）\n"
+            f"15m 也從 MA200 下站上\n"
             f"1h {h['h_close']:g} > MA99 {h['h_m99']:g} / MA200 {h['h_m200']:g}"
             "</pre>"
             f"{img_html}"
@@ -700,9 +747,9 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left
 <h1>幣安 5m 多頭排列 · {escape(period)}</h1>
 <p class="muted">USDT 永續成交額前 {funnel.get('symbols', 0)} 檔。
 5m <b>MA7&gt;MA14&gt;MA25</b>，且前一根收在 MA200 下、這一根收盤才站上。
-同時 1h 收盤在 MA99 / MA200 之上。已在 MA200 上只是短均排好的不算。
-報酬從訊號收盤算到之後 15/30/60/120 分鐘收盤，不是進出場建議。</p>
-<p class="muted">漏斗：5m 從 MA200 下站上且多排 {funnel.get('five_new', 0)} → 加上小時過濾 {funnel.get('hits', 0)}
+同一時刻 15m 也要從 MA200 下站上。同時 1h 收盤在 MA99 / MA200 之上。
+已在均線上只是短均排好的不算。報酬從訊號收盤算到之後 15/30/60/120 分鐘，不是進出場建議。</p>
+<p class="muted">漏斗：5m 從下站上且多排 {funnel.get('five_new', 0)} → 15m 也從下站上 {funnel.get('fifteen', 0)} → 小時過濾 {funnel.get('hits', 0)}
 · 讀檔失敗 {funnel.get('errors', 0)}</p>
 <p class="muted">15m 勝率 {stats['15m']['win_rate']:.1f}% 均 {_fmt(stats['15m']['avg'])}
 · 30m {stats['30m']['win_rate']:.1f}% 均 {_fmt(stats['30m']['avg'])}
@@ -786,7 +833,7 @@ def cmd_backtest(args) -> int:
     hits, funnel = backtest_all(symbols, start_ms, end_ms)
     stats = summarize_hits(hits)
     print(
-        f"完成 {time.time()-t0:.1f}s　5m 從 MA200 下站上 {funnel['five_new']} → 訊號 {stats['count']} / {stats['symbols']} 檔\n"
+        f"完成 {time.time()-t0:.1f}s　5m 站上 {funnel['five_new']} → 15m 也站上 {funnel.get('fifteen', 0)} → 訊號 {stats['count']} / {stats['symbols']} 檔\n"
         f"15m {stats['15m']['win_rate']:.1f}% 均 {stats['15m']['avg']:+.2f}%　"
         f"30m {stats['30m']['win_rate']:.1f}% 均 {stats['30m']['avg']:+.2f}%　"
         f"60m {stats['60m']['win_rate']:.1f}% 均 {stats['60m']['avg']:+.2f}%　"
@@ -842,7 +889,7 @@ def main() -> int:
         print("載入標的…", flush=True)
         symbols = universe(args.limit)
         print(
-            f"監看成交額前 {len(symbols)} 檔。5m 7>14>25，且從 MA200 下那根收盤站上，1h 在 MA99/200 上才推。",
+            f"監看成交額前 {len(symbols)} 檔。5m 站上且 15m 也從 MA200 下站上，1h 在 MA99/200 上才推。",
             flush=True,
         )
     uni_ts = time.time()
