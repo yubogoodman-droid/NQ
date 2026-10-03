@@ -98,6 +98,30 @@ def above_hour_ma200(close: float, h1_ma: float) -> bool:
     return bool(np.isfinite(h1_ma) and close > h1_ma)
 
 
+def signal_hour_index(signal_open_ms: int, hour_open_ms: np.ndarray) -> int:
+    """小時圖上要標的那一根：15 分訊號落在哪一根小時 K。還沒收到就退回已收盤的那根。"""
+    hour_open_ms = np.asarray(hour_open_ms, dtype=np.int64)
+    contain = (int(signal_open_ms) // HOUR_MS) * HOUR_MS
+    idx = int(np.searchsorted(hour_open_ms, contain, side="left"))
+    if idx < len(hour_open_ms) and int(hour_open_ms[idx]) == contain:
+        return idx
+    close_ms = int(signal_open_ms) + INTERVAL_MS
+    last_open = ((close_ms - HOUR_MS) // HOUR_MS) * HOUR_MS
+    idx = int(np.searchsorted(hour_open_ms, last_open, side="left"))
+    if idx < len(hour_open_ms) and int(hour_open_ms[idx]) == last_open:
+        return idx
+    return -1
+
+
+def hour_view(hour_open_ms: np.ndarray, signal_open_ms: int, before: int = 48, after: int = 12) -> tuple[int, int, int] | None:
+    """小時圖視窗：訊號那根前面 before 根、後面 after 根。回傳 [start, end) 與標記位置。"""
+    mark = signal_hour_index(signal_open_ms, hour_open_ms)
+    if mark < 0:
+        return None
+    n = len(hour_open_ms)
+    return max(0, mark - before), min(n, mark + after + 1), mark
+
+
 def get_json(path: str, params=None, retries: int = 5):
     last = None
     for i in range(retries):
@@ -197,6 +221,7 @@ def scan_since(symbols: list[str], since_ms: int, limit: int = 500) -> list[dict
             hit["after_1h"] = path_after(d, hit["i"], 4)
             hit["after_4h"] = path_after(d, hit["i"], 16)
             hit["d"] = d
+            hit["h1"] = h1
             found.append(hit)
         return found
 
@@ -248,7 +273,7 @@ def fmt_row(row: dict) -> str:
     )
 
 
-def draw_burst(row: dict, path: str) -> str:
+def _mpl():
     import matplotlib
 
     matplotlib.use("Agg")
@@ -257,21 +282,19 @@ def draw_burst(row: dict, path: str) -> str:
 
     plt.rcParams["font.sans-serif"] = ["WenQuanYi Micro Hei", "Droid Sans Fallback", "DejaVu Sans"]
     plt.rcParams["axes.unicode_minus"] = False
-    d = row["d"]
-    i = row["i"]
-    a0 = max(0, i - 48)
-    a1 = min(len(d["c"]), i + 17)
-    sl = slice(a0, a1)
-    xs = np.arange(a1 - a0)
-    o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
-    fig, (ax, axv) = plt.subplots(
-        2, 1, figsize=(10.4, 5.6), sharex=True, gridspec_kw={"height_ratios": [3.2, 1]}, facecolor="#0c1210"
-    )
-    for a in (ax, axv):
+    return plt, Rectangle
+
+
+def _style_axes(axes) -> None:
+    for a in axes:
         a.set_facecolor("#101814")
         a.tick_params(colors="#8aa193", labelsize=8)
         for sp in a.spines.values():
             sp.set_color("#2a3a33")
+
+
+def _draw_candles(ax, axv, o, h, l, c, v, rectangle) -> np.ndarray:
+    xs = np.arange(len(c))
     for k in range(len(c)):
         up = c[k] >= o[k]
         col = "#3dba7a" if up else "#e35d5d"
@@ -279,8 +302,48 @@ def draw_burst(row: dict, path: str) -> str:
         y0, y1 = min(o[k], c[k]), max(o[k], c[k])
         if y1 == y0:
             y1 = y0 + max(h[k] - l[k], c[k] * 1e-6) * 0.02
-        ax.add_patch(Rectangle((xs[k] - 0.32, y0), 0.64, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
+        ax.add_patch(rectangle((xs[k] - 0.32, y0), 0.64, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
         axv.bar(xs[k], v[k], width=0.72, color="#3dba7a99" if up else "#e35d5d99", linewidth=0)
+    return xs
+
+
+def _time_ticks(ax, opens_ms: np.ndarray, n_labels: int = 6) -> None:
+    if len(opens_ms) == 0:
+        return
+    idx = np.unique(np.linspace(0, len(opens_ms) - 1, n_labels, dtype=int))
+    ax.set_xticks(idx)
+    ax.set_xticklabels(
+        [datetime.fromtimestamp(int(opens_ms[i]) / 1000, TZ).strftime("%m-%d %H:%M") for i in idx],
+        fontsize=7,
+    )
+
+
+def draw_burst(row: dict, path: str) -> str:
+    plt, rectangle = _mpl()
+    d = row["d"]
+    i = row["i"]
+    a0 = max(0, i - 48)
+    a1 = min(len(d["c"]), i + 17)
+    sl = slice(a0, a1)
+    h1 = row.get("h1")
+    view = None if h1 is None else hour_view(h1["t"], int(row["time"]))
+    if view is None:
+        fig, (ax, axv) = plt.subplots(
+            2, 1, figsize=(10.4, 5.6), sharex=True, gridspec_kw={"height_ratios": [3.2, 1]}, facecolor="#0c1210"
+        )
+        panels = (ax, axv)
+    else:
+        fig, (ax, axv, axh, axhv) = plt.subplots(
+            4,
+            1,
+            figsize=(10.4, 10.8),
+            gridspec_kw={"height_ratios": [3.15, 0.85, 3.15, 0.85]},
+            facecolor="#0c1210",
+        )
+        panels = (ax, axv, axh, axhv)
+    _style_axes(panels)
+    o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
+    xs = _draw_candles(ax, axv, o, h, l, c, v, rectangle)
     pal = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
     full = {n: sma(d["c"], n) for n in MA_PERIODS}
     for n, col in pal.items():
@@ -294,14 +357,36 @@ def draw_burst(row: dict, path: str) -> str:
     ts = datetime.fromtimestamp(row["time"] / 1000, TZ).strftime("%m-%d %H:%M")
     a1r, a4 = row.get("after_1h"), row.get("after_4h")
     ax.set_title(
-        f"{row['symbol']}  15m  {ts}    實體 {row['body'] * 100:+.1f}%    量 {row['vol_ratio']:.1f}×前一根\n"
+        f"{row['symbol']}  15分  {ts}    實體 {row['body'] * 100:+.1f}%    量 {row['vol_ratio']:.1f}×前一根\n"
         f"收 {row['close']:.6g} > 時MA200 {row.get('h1_ma200', float('nan')):.6g}    "
         f"之後 1h {fmt_span(a1r, 4)}    4h {fmt_span(a4, 16)}",
         color="#e8f0ea",
         fontsize=11,
         loc="left",
     )
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=7)
+    ax.tick_params(axis="x", labelbottom=False)
+    _time_ticks(axv, d["t"][sl])
+    if view is not None:
+        h0, h1_end, mark = view
+        hsl = slice(h0, h1_end)
+        ho, hh, hl, hc, hv = h1["o"][hsl], h1["h"][hsl], h1["l"][hsl], h1["c"][hsl], h1["v"][hsl]
+        hxs = _draw_candles(axh, axhv, ho, hh, hl, hc, hv, rectangle)
+        ma200 = sma(h1["c"], H1_MA)
+        axh.plot(hxs, ma200[hsl], color="#ff6b9a", lw=1.35, label="MA200")
+        hx = mark - h0
+        axh.axvline(hx, color="#f0c14a", ls="--", lw=0.9)
+        axh.scatter([hx], [row["close"]], s=28, color="#f0c14a", zorder=5)
+        hour_ts = datetime.fromtimestamp(int(h1["t"][mark]) / 1000, TZ).strftime("%m-%d %H:%M")
+        axh.set_title(
+            f"小時 K    黃虛線 {hour_ts}    MA200 {row.get('h1_ma200', float('nan')):.6g}",
+            color="#e8f0ea",
+            fontsize=11,
+            loc="left",
+        )
+        axh.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc")
+        axh.tick_params(axis="x", labelbottom=False)
+        _time_ticks(axhv, h1["t"][hsl])
     fig.tight_layout(pad=0.45)
     fig.savefig(path, dpi=120, facecolor=fig.get_facecolor())
     plt.close(fig)
@@ -319,6 +404,84 @@ def write_charts(rows: list[dict], directory: str) -> list[str]:
         path = out / f"{n:02d}_{row['symbol']}_{ts}.png"
         paths.append(draw_burst(row, str(path)))
     return paths
+
+
+def write_gallery_html(rows: list[dict], paths: list[str], dest: str, *, since_label: str, scanned: int) -> str:
+    """單檔 HTML，圖內嵌，手機開 htmlpreview 不會漏圖。每張上面是 15 分、下面是小時。"""
+    import base64
+    from pathlib import Path
+
+    def cls(x: float | None) -> str:
+        if x is None:
+            return ""
+        return "up" if x >= 0 else "dn"
+
+    cards = []
+    for row, path in zip(rows, paths):
+        ts = datetime.fromtimestamp(row["time"] / 1000, TZ).strftime("%m-%d %H:%M")
+        a1, a4 = row.get("after_1h"), row.get("after_4h")
+        raw = Path(path).read_bytes()
+        b64 = base64.b64encode(raw).decode()
+        cards.append(
+            "\n".join(
+                [
+                    '<article class="card">',
+                    '  <div class="head">',
+                    "    <div>",
+                    f'      <div class="sym">{row["symbol"]}</div>',
+                    f'      <div class="when">{ts} 台北</div>',
+                    "    </div>",
+                    '    <div class="nums">',
+                    f'      <span>實體 <b class="{cls(row["body"])}">{row["body"] * 100:+.1f}%</b></span>',
+                    f'      <span>量 <b>{row["vol_ratio"]:.1f}×</b></span>',
+                    f'      <span>1h <b class="{cls(None if a1 is None else a1["ret"])}">{fmt_span(a1, 4)}</b></span>',
+                    f'      <span>4h <b class="{cls(None if a4 is None else a4["ret"])}">{fmt_span(a4, 16)}</b></span>',
+                    "    </div>",
+                    "  </div>",
+                    f'  <img alt="{row["symbol"]} {ts} 15分與小時" src="data:image/png;base64,{b64}" />',
+                    "</article>",
+                ]
+            )
+        )
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>15 分爆量穿六均線 · 近三天</title>
+<style>
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; background: #0b0e11; color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+  }}
+  .page {{ max-width: 920px; margin: 0 auto; padding: 16px 12px 40px; }}
+  h1 {{ margin: 0 0 8px; font-size: 22px; }}
+  .sub {{ margin: 0 0 16px; color: #8b949e; font-size: 14px; line-height: 1.55; }}
+  .card {{ background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 12px; margin-bottom: 14px; }}
+  .head {{ display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }}
+  .sym {{ font-size: 18px; font-weight: 700; }}
+  .when {{ color: #8b949e; font-size: 13px; margin-top: 2px; }}
+  .nums {{ display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 13px; color: #8b949e; align-items: center; }}
+  .nums b {{ font-weight: 650; }}
+  .up {{ color: #3dba7a; }}
+  .dn {{ color: #e35d5d; }}
+  img {{ width: 100%; height: auto; border-radius: 8px; display: block; background: #0c1210; }}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>15 分爆量穿六均線 · 近三天</h1>
+  <p class="sub">{since_label} 起，24 小時成交額 500 萬 USDT 以上的永續 {scanned} 檔，{len(rows)} 根。同一根 15 分 K：開盤在 MA7、14、25、99、120、200 每一條下面，收盤在每一條上面，量至少是前一根的 10 倍，而且收盤在小時 K 的 MA200 之上。每張圖上面是 15 分，下面是小時 K。粉紅是小時 MA200，黃虛線是訊號。1h、4h 用訊號收盤當進場。</p>
+  {"".join(cards)}
+</div>
+</body>
+</html>
+"""
+    out = Path(dest)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html)
+    return str(out)
 
 
 def fmt_hit(sym: str, d: dict, hit: dict) -> str:
@@ -359,6 +522,7 @@ def main() -> int:
     p.add_argument("--limit", type=int, default=1500, help="單幣往回看幾根 15 分 K，最多 1500")
     p.add_argument("--days", type=float, default=0, help="掃成交額夠的永續，只留最近幾天的訊號")
     p.add_argument("--charts", default="", help="把訊號圖存到這個資料夾")
+    p.add_argument("--page", default="", help="把 15 分圖和下面的小時圖寫成一頁 HTML")
     args = p.parse_args()
     if args.days > 0:
         since = datetime.now(TZ) - timedelta(days=args.days)
@@ -374,9 +538,20 @@ def main() -> int:
             return 0
         for row in rows:
             print(fmt_row(row))
-        if args.charts:
-            paths = write_charts(rows, args.charts)
-            print(f"\n圖 {len(paths)} 張 → {args.charts}")
+        paths: list[str] = []
+        if args.charts or args.page:
+            chart_dir = args.charts or "output/ma_burst_charts"
+            paths = write_charts(rows, chart_dir)
+            print(f"\n圖 {len(paths)} 張 → {chart_dir}")
+        if args.page:
+            page = write_gallery_html(
+                rows,
+                paths,
+                args.page,
+                since_label=since.strftime("%Y-%m-%d %H:%M"),
+                scanned=len(symbols),
+            )
+            print(f"頁面 → {page}")
         return 0
     sym = args.symbol.upper()
     lines = check_symbol(sym, limit=args.limit)

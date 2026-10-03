@@ -19,7 +19,9 @@ from binance_ma_burst import (  # noqa: E402
     burst_at,
     find_bursts,
     hour_ma200_for_bars,
+    hour_view,
     path_after,
+    signal_hour_index,
     sma,
 )
 
@@ -135,6 +137,20 @@ def test_hour_ma200_uses_last_closed_hour() -> None:
     assert not above_hour_ma200(1.0, float("nan"))
 
 
+def test_signal_hour_index_marks_the_hour_that_holds_the_bar() -> None:
+    hour_open = np.arange(5, dtype=np.int64) * HOUR_MS
+    # 22:15 那根 15 分（開盤在整點後 15 分）仍落在同一根小時 K
+    inside = int(hour_open[3] + INTERVAL_MS)
+    assert signal_hour_index(inside, hour_open) == 3
+    # 訊號落在還沒走完、資料裡還沒有的那根小時，標已經收盤的前一根
+    forming = int(hour_open[-1] + HOUR_MS)
+    assert signal_hour_index(forming, hour_open) == 4
+    view = hour_view(hour_open, int(hour_open[3]), before=2, after=1)
+    assert view == (1, 5, 3)
+    assert signal_hour_index(0, np.array([], dtype=np.int64)) == -1
+    assert hour_view(np.array([], dtype=np.int64), 0) is None
+
+
 def test_needs_warmup() -> None:
     o, c, v = flat(n=30)
     i = len(c) - 1
@@ -153,6 +169,7 @@ def main() -> int:
     test_only_the_crossing_bar_fires()
     test_path_after()
     test_hour_ma200_uses_last_closed_hour()
+    test_signal_hour_index_marks_the_hour_that_holds_the_bar()
     test_needs_warmup()
     print("ok")
     return 0
