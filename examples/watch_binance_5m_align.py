@@ -42,6 +42,8 @@ MS_5M = 5 * 60_000
 MS_1H = 60 * 60_000
 HORIZONS = (("15m", 3), ("30m", 6), ("60m", 12), ("120m", 24))
 UNIVERSE_LIMIT = 100
+MAX_KLINES = 1500
+WARMUP_BARS = 220
 PAGES = ROOT / "docs" / "binance-5m-align" / "index.html"
 
 
@@ -282,10 +284,61 @@ def universe(limit: int = UNIVERSE_LIMIT) -> list[str]:
     return rank_universe(rows, limit)
 
 
+def merge_kline_rows(rows: list) -> list:
+    by_t = {}
+    for row in rows:
+        by_t[int(row[0])] = row
+    return [by_t[t] for t in sorted(by_t)]
+
+
 def fetch_klines(sym: str, interval: str, limit: int, interval_ms: int, *, keep_forming: bool = False) -> dict | None:
-    raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": interval, "limit": limit})
+    raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": interval, "limit": min(int(limit), MAX_KLINES)})
     if not raw:
         return None
+    if not keep_forming:
+        raw = drop_unclosed(raw, interval_ms)
+    if len(raw) < 210:
+        return None
+    return parse_klines(raw)
+
+
+def fetch_klines_range(
+    sym: str,
+    interval: str,
+    start_ms: int,
+    end_ms: int,
+    interval_ms: int,
+    *,
+    keep_forming: bool = False,
+) -> dict | None:
+    """從 start 翻到 end，超過單次 1500 根就分頁。"""
+    raw: list = []
+    cursor = int(start_ms)
+    stop = int(end_ms)
+    while cursor <= stop:
+        batch = get_json(
+            "/fapi/v1/klines",
+            params={
+                "symbol": sym,
+                "interval": interval,
+                "startTime": cursor,
+                "endTime": stop,
+                "limit": MAX_KLINES,
+            },
+        )
+        if not batch:
+            break
+        raw.extend(batch)
+        last = int(batch[-1][0])
+        nxt = last + interval_ms
+        if nxt <= cursor:
+            break
+        cursor = nxt
+        if len(batch) < MAX_KLINES:
+            break
+    if not raw:
+        return None
+    raw = merge_kline_rows(raw)
     if not keep_forming:
         raw = drop_unclosed(raw, interval_ms)
     if len(raw) < 210:
@@ -460,8 +513,8 @@ def notify(ev: dict, *, dry_run: bool = False) -> None:
 
 def scan_history_symbol(sym: str, start_ms: int, end_ms: int) -> tuple[list[dict], dict]:
     meta = {"symbol": sym, "five_new": 0, "hits": 0, "error": ""}
-    raw5 = fetch_klines(sym, "5m", 1500, MS_5M, keep_forming=False)
-    raw1 = fetch_klines(sym, "1h", 500, MS_1H, keep_forming=True)
+    raw5 = fetch_klines_range(sym, "5m", start_ms - WARMUP_BARS * MS_5M, end_ms, MS_5M, keep_forming=False)
+    raw1 = fetch_klines_range(sym, "1h", start_ms - WARMUP_BARS * MS_1H, end_ms, MS_1H, keep_forming=True)
     if raw5 is None or raw1 is None:
         meta["error"] = "too_few_bars"
         return [], meta
@@ -664,7 +717,7 @@ th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){{text-align:left
 <div class="equity">{eq}</div>
 <p class="muted">下圖累積的是各筆 60 分鐘報酬相加，不是組合複利。圖卡只放 60m 最好/最差各一部分。</p>
 </section>
-{''.join(cards) or "<div class='empty'>這三天沒有符合的訊號</div>"}
+{''.join(cards) or "<div class='empty'>這段期間沒有符合的訊號</div>"}
 <section class="summary">
 <h1>全部訊號</h1>
 <table>

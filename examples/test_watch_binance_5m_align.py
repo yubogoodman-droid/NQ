@@ -23,6 +23,7 @@ from watch_binance_5m_align import (  # noqa: E402
     hour_above_ok,
     hour_mas_at,
     key_of,
+    merge_kline_rows,
     parse_klines,
     pick_chart_hits,
     rank_universe,
@@ -50,6 +51,16 @@ def test_rank_universe_top_n() -> None:
     rows = [("AAAUSDT", 10.0), ("BBBUSDT", 30.0), ("CCCUSDT", 20.0), ("DDDUSDT", 5.0)]
     assert rank_universe(rows, 2) == ["BBBUSDT", "CCCUSDT"]
     assert rank_universe(rows, 100) == ["BBBUSDT", "CCCUSDT", "AAAUSDT", "DDDUSDT"]
+
+
+def test_merge_kline_rows() -> None:
+    a = [0, 1, 1, 1, 1, 1]
+    b = [300_000, 2, 2, 2, 2, 2]
+    c = [600_000, 3, 3, 3, 3, 3]
+    dup = [300_000, 9, 9, 9, 9, 9]
+    out = merge_kline_rows([c, a, dup, b])
+    assert [row[0] for row in out] == [0, 300_000, 600_000]
+    assert out[1][1] == 2
 
 
 def test_parse_klines() -> None:
