@@ -1,0 +1,110 @@
+{
+  "title": "雨霖铃 · 柳永",
+  "lang": "zh",
+  "style": "crayon",
+  "width": 720,
+  "height": 1280,
+  "fps": 30,
+  "frame_rate_video": 24,
+  "scenes": [
+    {
+      "id": "s01",
+      "caption": "寒蝉凄切，对长亭晚，骤雨初歇。",
+      "narration": "寒蝉凄切，对长亭晚，骤雨初歇。",
+      "text": "寒蝉凄切，对长亭晚，骤雨初歇。",
+      "narration_audio": "audio/narration/s01.mp3",
+      "motion_video": "assets/stills/s01.jpg",
+      "duration_sec": 4.25,
+      "num_frames": 105,
+      "prompt_snapshot": "modern Q-version hand-drawn crayon illustration, vertical 9:16, solid warm-white canvas background with exact base color #F8F6EF, only extremely subtle low-contrast paper grain, thick imperfect black hand-drawn marker/crayon outlines, bold flat wax-crayon blocks in sunflower yellow, saturated cobalt blue, vivid tomato red with a small muted-green accent, natural restrained Q-version proportions, simple hand-drawn composition, 2-4 large readable visual groups, generous breathing room, no glossy rendering, no realistic lighting, no 3D, no watermark\n\nLate autumn dusk at a long roadside pavilion after a sudden rain has just stopped. A cicada rests on a wet willow twig while drops fall from the dark eaves onto glistening flagstones. A small traveler in a loose indigo robe stands under the pavilion, body small in the frame, face not filling the picture. Cobalt puddles, a tomato-red pillar, muted green willow leaves.\n\nlocked flat frontal camera, rigid paper cutouts, tactile 10-12 fps paper stop-motion, one or two small object bounces or a short hinge-like hand movement, no zoom, no parallax, no camera drift, no liquid morphing, no lip sync, no new characters, no added logos or text, settle and hold the final composition naturally"
+    },
+    {
+      "id": "s02",
+      "caption": "都门帐饮无绪，留恋处，兰舟催发。",
+      "narration": "都门帐饮无绪，留恋处，兰舟催发。",
+      "text": "都门帐饮无绪，留恋处，兰舟催发。",
+      "narration_audio": "audio/narration/s02.mp3",
+      "motion_video": "assets/stills/s02.jpg",
+      "duration_sec": 4.32,
+      "num_frames": 105,
+      "prompt_snapshot": "modern Q-version hand-drawn crayon illustration, vertical 9:16, solid warm-white canvas background with exact base color #F8F6EF, only extremely subtle low-contrast paper grain, thick imperfect black hand-drawn marker/crayon outlines, bold flat wax-crayon blocks in sunflower yellow, saturated cobalt blue, vivid tomato red with a small muted-green accent, natural restrained Q-version proportions, simple hand-drawn composition, 2-4 large readable visual groups, generous breathing room, no glossy rendering, no realistic lighting, no 3D, no watermark\n\nOutside an ancient city gate, a farewell canopy with wine cups left untouched on a low table. Beside the river an orchid-painted wooden boat waits, and a boatman lifts one hand urging departure. A traveler and a companion linger, reluctant to part, shown from the side at a distance so faces stay small.\n\nlocked flat frontal camera, rigid paper cutouts, tactile 10-12 fps paper stop-motion, one or two small object bounces or a short hinge-like hand movement, no zoom, no parallax, no camera drift, no liquid morphing, no lip sync, no new characters, no added logos or text, settle and hold the final composition naturally"
+    },
+    {
+      "id": "s03",
+      "caption": "执手相看泪眼，竟无语凝噎。",
+      "narration": "执手相看泪眼，竟无语凝噎。",
+      "text": "执手相看泪眼，竟无语凝噎。",
+      "narration_audio": "audio/narration/s03.mp3",
+      "motion_video": "assets/stills/s03.jpg",
+      "duration_sec": 3.72,
+      "num_frames": 89,
+      "prompt_snapshot": "modern Q-version hand-drawn crayon illustration, vertical 9:16, solid warm-white canvas background with exact base color #F8F6EF, only extremely subtle low-contrast paper grain, thick imperfect black hand-drawn marker/crayon outlines, bold flat wax-crayon blocks in sunflower yellow, saturated cobalt blue, vivid tomato red with a small muted-green accent, natural restrained Q-version proportions, simple hand-drawn composition, 2-4 large readable visual groups, generous breathing room, no glossy rendering, no realistic lighting, no 3D, no watermark\n\nClose view of clasped hands and teary eyes looking at each other, mouths closed, unable to speak. Loose Song-style sleeves in tomato red and cobalt blue, one tear on a cheek, generous empty space around them, no face filling the whole frame.\n\nlocked flat frontal camera, rigid paper cutouts, tactile 10-12 fps paper stop-motion, one or two small object bounces or a short hinge-like hand movement, no zoom, no parallax, no camera drift, no liquid morphing, no lip sync, no new characters, no added logos or text, settle and hold the final composition naturally"
+    },
+    {
+      "id": "s04",
+      "caption": "念去去，千里烟波，暮霭沉沉楚天阔。",
+      "narration": "念去去，千里烟波，暮霭沉沉楚天阔。",
+      "text": "念去去，千里烟波，暮霭沉沉楚天阔。",
+      "narration_audio": "audio/narration/s04.mp3",
+      "motion_video": "assets/stills/s04.jpg",
+      "duration_sec": 4.56,
+      "num_frames": 113,
+      "prompt_snapshot": "modern Q-version hand-drawn crayon illustration, vertical 9:16, solid warm-white canvas background with exact base color #F8F6EF, only extremely subtle low-contrast paper grain, thick imperfect black hand-drawn marker/crayon outlines, bold flat wax-crayon blocks in sunflower yellow, saturated cobalt blue, vivid tomato red with a small muted-green accent, natural restrained Q-version proportions, simple hand-drawn composition, 2-4 large readable visual groups, generous breathing room, no glossy rendering, no realistic lighting, no 3D, no watermark\n\nA tiny wooden boat drifting into a vast misty river at dusk, heavy evening clouds, a wide southern sky. Willow haze along the far bank. The traveler seen from behind, very small against the huge sky and smoke-colored water.\n\nlocked flat frontal camera, rigid paper cutouts, tactile 10-12 fps paper stop-motion, one or two small object bounces or a short hinge-like hand movement, no zoom, no parallax, no camera drift, no liquid morphing, no lip sync, no new characters, no added logos or text, settle and hold the final composition naturally"
+    },
+    {
+      "id": "s05",
+      "caption": "多情自古伤离别，更那堪，冷落清秋节！",
+      "narration": "多情自古伤离别，更那堪，冷落清秋节！",
+      "text": "多情自古伤离别，更那堪，冷落清秋节！",
+      "narration_audio": "audio/narration/s05.mp3",
+      "motion_video": "assets/stills/s05.jpg",
+      "duration_sec": 4.73,
+      "num_frames": 121,
+      "prompt_snapshot": "modern Q-version hand-drawn crayon illustration, vertical 9:16, solid warm-white canvas background with exact base color #F8F6EF, only extremely subtle low-contrast paper grain, thick imperfect black hand-drawn marker/crayon outlines, bold flat wax-crayon blocks in sunflower yellow, saturated cobalt blue, vivid tomato red with a small muted-green accent, natural restrained Q-version proportions, simple hand-drawn composition, 2-4 large readable visual groups, generous breathing room, no glossy rendering, no realistic lighting, no 3D, no watermark\n\nA cold clear autumn evening. Yellow fallen leaves, an empty roadside pavilion, one lonely wine cup, bare branches and a few muted-green chrysanthemums. A solitary traveler sits with sleeves wrapped tight, quiet and sorrowful.\n\nlocked flat frontal camera, rigid paper cutouts, tactile 10-12 fps paper stop-motion, one or two small object bounces or a short hinge-like hand movement, no zoom, no parallax, no camera drift, no liquid morphing, no lip sync, no new characters, no added logos or text, settle and hold the final composition naturally"
+    },
+    {
+      "id": "s06",
+      "caption": "今宵酒醒何处？",
+      "narration": "今宵酒醒何处？",
+      "text": "今宵酒醒何处？",
+      "narration_audio": "audio/narration/s06.mp3",
+      "motion_video": "assets/stills/s06.jpg",
+      "duration_sec": 2.28,
+      "num_frames": 57,
+      "prompt_snapshot": "modern Q-version hand-drawn crayon illustration, vertical 9:16, solid warm-white canvas background with exact base color #F8F6EF, only extremely subtle low-contrast paper grain, thick imperfect black hand-drawn marker/crayon outlines, bold flat wax-crayon blocks in sunflower yellow, saturated cobalt blue, vivid tomato red with a small muted-green accent, natural restrained Q-version proportions, simple hand-drawn composition, 2-4 large readable visual groups, generous breathing room, no glossy rendering, no realistic lighting, no 3D, no watermark\n\nNight inside a small boat cabin. The traveler has just woken, an overturned wine cup nearby, pale moonlight through a round window. He looks around, unsure where the boat has stopped.\n\nlocked flat frontal camera, rigid paper cutouts, tactile 10-12 fps paper stop-motion, one or two small object bounces or a short hinge-like hand movement, no zoom, no parallax, no camera drift, no liquid morphing, no lip sync, no new characters, no added logos or text, settle and hold the final composition naturally"
+    },
+    {
+      "id": "s07",
+      "caption": "杨柳岸，晓风残月。",
+      "narration": "杨柳岸，晓风残月。",
+      "text": "杨柳岸，晓风残月。",
+      "narration_audio": "audio/narration/s07.mp3",
+      "motion_video": "assets/stills/s07.jpg",
+      "duration_sec": 2.86,
+      "num_frames": 73,
+      "prompt_snapshot": "modern Q-version hand-drawn crayon illustration, vertical 9:16, solid warm-white canvas background with exact base color #F8F6EF, only extremely subtle low-contrast paper grain, thick imperfect black hand-drawn marker/crayon outlines, bold flat wax-crayon blocks in sunflower yellow, saturated cobalt blue, vivid tomato red with a small muted-green accent, natural restrained Q-version proportions, simple hand-drawn composition, 2-4 large readable visual groups, generous breathing room, no glossy rendering, no realistic lighting, no 3D, no watermark\n\nDawn along a willow-lined riverbank. Morning wind bends long willow branches. A thin crescent moon still hangs in the pale sky. The wooden boat rests quietly against the bank.\n\nlocked flat frontal camera, rigid paper cutouts, tactile 10-12 fps paper stop-motion, one or two small object bounces or a short hinge-like hand movement, no zoom, no parallax, no camera drift, no liquid morphing, no lip sync, no new characters, no added logos or text, settle and hold the final composition naturally"
+    },
+    {
+      "id": "s08",
+      "caption": "此去经年，应是良辰好景虚设。",
+      "narration": "此去经年，应是良辰好景虚设。",
+      "text": "此去经年，应是良辰好景虚设。",
+      "narration_audio": "audio/narration/s08.mp3",
+      "motion_video": "assets/stills/s08.jpg",
+      "duration_sec": 3.86,
+      "num_frames": 97,
+      "prompt_snapshot": "modern Q-version hand-drawn crayon illustration, vertical 9:16, solid warm-white canvas background with exact base color #F8F6EF, only extremely subtle low-contrast paper grain, thick imperfect black hand-drawn marker/crayon outlines, bold flat wax-crayon blocks in sunflower yellow, saturated cobalt blue, vivid tomato red with a small muted-green accent, natural restrained Q-version proportions, simple hand-drawn composition, 2-4 large readable visual groups, generous breathing room, no glossy rendering, no realistic lighting, no 3D, no watermark\n\nA fine day long after the parting: flowering branches, clear warm light, a beautiful riverside path. The traveler walks alone, the place beside him empty, the lovely view feeling hollow.\n\nlocked flat frontal camera, rigid paper cutouts, tactile 10-12 fps paper stop-motion, one or two small object bounces or a short hinge-like hand movement, no zoom, no parallax, no camera drift, no liquid morphing, no lip sync, no new characters, no added logos or text, settle and hold the final composition naturally"
+    },
+    {
+      "id": "s09",
+      "caption": "便纵有千种风情，更与何人说？",
+      "narration": "便纵有千种风情，更与何人说？",
+      "text": "便纵有千种风情，更与何人说？",
+      "narration_audio": "audio/narration/s09.mp3",
+      "motion_video": "assets/stills/s09.jpg",
+      "duration_sec": 3.79,
+      "num_frames": 97,
+      "prompt_snapshot": "modern Q-version hand-drawn crayon illustration, vertical 9:16, solid warm-white canvas background with exact base color #F8F6EF, only extremely subtle low-contrast paper grain, thick imperfect black hand-drawn marker/crayon outlines, bold flat wax-crayon blocks in sunflower yellow, saturated cobalt blue, vivid tomato red with a small muted-green accent, natural restrained Q-version proportions, simple hand-drawn composition, 2-4 large readable visual groups, generous breathing room, no glossy rendering, no realistic lighting, no 3D, no watermark\n\nThe traveler stands alone at night beneath the moon, one hand half raised as if about to speak, with nobody beside him to listen. Quiet sorrow.\n\nlocked flat frontal camera, rigid paper cutouts, tactile 10-12 fps paper stop-motion, one or two small object bounces or a short hinge-like hand movement, no zoom, no parallax, no camera drift, no liquid morphing, no lip sync, no new characters, no added logos or text, settle and hold the final composition naturally"
+    }
+  ]
+}
