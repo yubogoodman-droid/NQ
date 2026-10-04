@@ -44,7 +44,7 @@
 
   const REMOTION = {
     yijianmei: {
-      video: "assets/yijianmei-preview.mp4",
+      video: "assets/yijianmei-preview.mp4?v=2",
       poster: "assets/yijianmei-poster.jpg",
       download: "一剪梅.mp4",
       sheet: "assets/yijianmei-character-sheet.jpg",
@@ -53,6 +53,7 @@
       duration: 22.8,
       storyUrl: "yijianmei.json",
       colorOnly: true,
+      voiced: true,
     },
     suolong: {
       video: "assets/suolong-preview.mp4",
@@ -217,6 +218,14 @@
     return $("transSel").value;
   }
 
+  function applyRemotionAudio(demo) {
+    const voiced = !!(demo && demo.voiced);
+    video.muted = !voiced;
+    video.volume = 1;
+    if (voiced) video.removeAttribute("muted");
+    else video.setAttribute("muted", "");
+  }
+
   function applyRemotionChrome(id) {
     const demo = REMOTION[id];
     if (!demo) return;
@@ -227,6 +236,7 @@
       video.poster = demo.poster;
       video.load();
     }
+    applyRemotionAudio(demo);
     const dl = $("demoDl");
     if (dl) {
       dl.href = demo.video;
@@ -258,7 +268,8 @@
     const note = demo.colorOnly
       ? "彩图直出，无黑白上色。"
       : "文字 → 黑白 → 彩色。";
-    setStatus("GitHub 源项目 Remotion 成片已载入：" + note);
+    const voice = demo.voiced ? "这一条有原词旁白。" : "这一条是静音画面。";
+    setStatus("GitHub 源项目 Remotion 成片已载入：" + note + voice);
   }
 
   function generateFromText() {
@@ -276,7 +287,12 @@
       source = "ai";
       setView("video");
       return loadRemotion(remotionPreset.remotion).then(() => {
-        setStatus("使用 GitHub Remotion 示例成片。");
+        const demo = REMOTION[remotionPreset.remotion];
+        setStatus(
+          demo && demo.voiced
+            ? "使用 GitHub Remotion 示例成片，含原词旁白。"
+            : "使用 GitHub Remotion 示例成片。"
+        );
       });
     }
     source = "doodle";
@@ -302,6 +318,7 @@
 
   $("playBtn").addEventListener("click", () => {
     if (view === "video") {
+      applyRemotionAudio(remotionMeta());
       if (video.paused) video.play();
       else video.pause();
       updateMeta();
@@ -363,6 +380,7 @@
   $("demoBtn").addEventListener("click", () => {
     loadRemotion(activeRemotion).then(() => {
       video.currentTime = 0;
+      applyRemotionAudio(remotionMeta());
       video.play();
       updateMeta();
     });

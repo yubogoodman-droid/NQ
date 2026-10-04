@@ -8,7 +8,8 @@
   "height": 960,
   "durationSec": 22.8,
   "text": "一剪梅\n李清照\n\n紅藕香殘玉簟秋。\n輕解羅裳，獨上蘭舟。\n雲中誰寄錦書來？\n雁字回時，月滿西樓。\n花自飄零水自流。\n一種相思，兩處閒愁。\n此情無計可消除，才下眉頭，卻上心頭。",
-  "video": "assets/yijianmei-preview.mp4",
+  "video": "assets/yijianmei-preview.mp4?v=2",
+  "voiceover": "zh-TW-HsiaoChenNeural",
   "poster": "assets/yijianmei-poster.jpg",
   "pages": [
     { "id": "01", "kind": "beat", "caption": "紅藕香殘玉簟秋。" },
