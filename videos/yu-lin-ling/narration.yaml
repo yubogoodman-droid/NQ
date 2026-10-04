@@ -1,0 +1,22 @@
+lang: zh
+voice: zh-CN-XiaoyiNeural
+speed: 1.0
+scenes:
+  - id: s01
+    text: "寒蝉凄切，对长亭晚，骤雨初歇。"
+  - id: s02
+    text: "都门帐饮无绪，留恋处，兰舟催发。"
+  - id: s03
+    text: "执手相看泪眼，竟无语凝噎。"
+  - id: s04
+    text: "念去去，千里烟波，暮霭沉沉楚天阔。"
+  - id: s05
+    text: "多情自古伤离别，更那堪，冷落清秋节！"
+  - id: s06
+    text: "今宵酒醒何处？"
+  - id: s07
+    text: "杨柳岸，晓风残月。"
+  - id: s08
+    text: "此去经年，应是良辰好景虚设。"
+  - id: s09
+    text: "便纵有千种风情，更与何人说？"

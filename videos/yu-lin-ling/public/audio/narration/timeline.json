@@ -1,0 +1,56 @@
+[
+  {
+    "id": "s01",
+    "file": "public/audio/narration/s01.mp3",
+    "text": "寒蝉凄切，对长亭晚，骤雨初歇。",
+    "seconds": 4.25
+  },
+  {
+    "id": "s02",
+    "file": "public/audio/narration/s02.mp3",
+    "text": "都门帐饮无绪，留恋处，兰舟催发。",
+    "seconds": 4.32
+  },
+  {
+    "id": "s03",
+    "file": "public/audio/narration/s03.mp3",
+    "text": "执手相看泪眼，竟无语凝噎。",
+    "seconds": 3.72
+  },
+  {
+    "id": "s04",
+    "file": "public/audio/narration/s04.mp3",
+    "text": "念去去，千里烟波，暮霭沉沉楚天阔。",
+    "seconds": 4.56
+  },
+  {
+    "id": "s05",
+    "file": "public/audio/narration/s05.mp3",
+    "text": "多情自古伤离别，更那堪，冷落清秋节！",
+    "seconds": 4.73
+  },
+  {
+    "id": "s06",
+    "file": "public/audio/narration/s06.mp3",
+    "text": "今宵酒醒何处？",
+    "seconds": 2.28
+  },
+  {
+    "id": "s07",
+    "file": "public/audio/narration/s07.mp3",
+    "text": "杨柳岸，晓风残月。",
+    "seconds": 2.86
+  },
+  {
+    "id": "s08",
+    "file": "public/audio/narration/s08.mp3",
+    "text": "此去经年，应是良辰好景虚设。",
+    "seconds": 3.86
+  },
+  {
+    "id": "s09",
+    "file": "public/audio/narration/s09.mp3",
+    "text": "便纵有千种风情，更与何人说？",
+    "seconds": 3.79
+  }
+]
