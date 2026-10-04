@@ -13,7 +13,10 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from tw_1h_daifa import (  # noqa: E402
+    bars_to_daily,
+    daily_bounds,
     detect_signals,
+    draw_trade_png,
     filter_entry_window,
     simulate,
     summarize_trades,
@@ -188,6 +191,46 @@ def test_ten_percent_stop() -> None:
     assert trades[0].pnl_points < 0
 
 
+def test_daily_bounds_keeps_entry_day() -> None:
+    idx = pd.date_range("2026-01-05 09:00", periods=100, freq="B", tz=TPE)
+    daily = pd.DataFrame(
+        {"Open": 10.0, "High": 11.0, "Low": 9.0, "Close": 10.5, "Volume": 100.0},
+        index=idx,
+    )
+    entry = idx[80]
+    exit_ = idx[84]
+    bounds = daily_bounds(daily, entry, exit_, left=64, right=10)
+    assert bounds is not None
+    start, end, entry_i, exit_i = bounds
+    assert entry_i == 80
+    assert exit_i == 84
+    assert start == 16
+    assert end == 94
+    assert daily_bounds(daily.iloc[0:0], entry, exit_) is None
+
+
+def test_bars_to_daily_collapses_session() -> None:
+    opens, highs, lows, closes = flat(10)
+    df = make_df(opens, highs, lows, closes)
+    daily = bars_to_daily(df)
+    assert len(daily) == 2
+    assert float(daily["High"].iloc[0]) >= float(df["High"].iloc[:5].max()) - 1e-9
+    assert float(daily["Close"].iloc[0]) == float(df["Close"].iloc[4])
+
+
+def test_draw_includes_daily_panel(tmp_path=None) -> None:
+    opens, highs, lows, closes = flat(110)
+    paint_daifa(opens, highs, lows, closes, 70)
+    _fill_after(opens, highs, lows, closes, 71, 110.0)
+    df = make_df(opens, highs, lows, closes)
+    trades = simulate(df, detect_signals(df))
+    assert trades and trades[0].exit_reason == "time"
+    daily = bars_to_daily(df)
+    out = Path("/tmp/daifa_daily_panel.png")
+    draw_trade_png(df, trades[0], out, 1, title_extra="測試", daily=daily)
+    assert out.exists() and out.stat().st_size > 1000
+
+
 def test_filter_and_summary() -> None:
     opens, highs, lows, closes = flat()
     paint_daifa(opens, highs, lows, closes, 70)
@@ -209,6 +252,9 @@ def main() -> int:
     test_stack_required()
     test_shallow_wick_holds_five_sessions()
     test_ten_percent_stop()
+    test_daily_bounds_keeps_entry_day()
+    test_bars_to_daily_collapses_session()
+    test_draw_includes_daily_panel()
     test_filter_and_summary()
     print("ok")
     return 0

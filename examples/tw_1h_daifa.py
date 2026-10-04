@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from scan_tw_ma_reclaim import (  # noqa: E402
     REPO,
     TPE,
+    _get_json,
     fetch_top_turnover,
     filter_by_max_price,
     last_tw_session_yyyymmdd,
@@ -102,6 +103,7 @@ class TwHit:
     row: dict
     trade: TradeResult
     df: pd.DataFrame
+    daily: Optional[pd.DataFrame] = None
 
 
 def _session_open_indices(index: pd.DatetimeIndex) -> List[int]:
@@ -307,41 +309,93 @@ def _trade_window(df: pd.DataFrame, trade: TradeResult, pad_left: int = 36, pad_
     return start, end
 
 
-def draw_trade_png(
-    df: pd.DataFrame,
-    trade: TradeResult,
-    path: Path,
-    trade_no: int,
-    title_extra: str = "",
-) -> Path:
-    import matplotlib
+def fetch_yahoo_1d(symbol: str, range_: str = "2y") -> pd.DataFrame:
+    """日 K。不套用分 K 的 09:00–13:30 遮罩。"""
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        f"?interval=1d&range={range_}&includePrePost=false"
+    )
+    payload = _get_json(url)
+    result = (payload.get("chart") or {}).get("result") or []
+    if not result:
+        return pd.DataFrame()
+    ts = result[0].get("timestamp") or []
+    quote = result[0]["indicators"]["quote"][0]
+    df = pd.DataFrame(
+        {
+            "Open": quote.get("open"),
+            "High": quote.get("high"),
+            "Low": quote.get("low"),
+            "Close": quote.get("close"),
+            "Volume": quote.get("volume"),
+        },
+        index=pd.to_datetime(ts, unit="s", utc=True).tz_convert(TPE),
+    )
+    df = df.dropna(subset=["Open", "High", "Low", "Close"])
+    df["Volume"] = df["Volume"].fillna(0)
+    return df[~df.index.duplicated(keep="last")].sort_index()
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+
+def bars_to_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """沒有日 K 時，用 60 分 K 收成每天一根。"""
+    if df is None or df.empty:
+        return pd.DataFrame()
+    grouped = df.groupby(df.index.date, sort=True)
+    out = pd.DataFrame(
+        {
+            "Open": grouped["Open"].first(),
+            "High": grouped["High"].max(),
+            "Low": grouped["Low"].min(),
+            "Close": grouped["Close"].last(),
+            "Volume": grouped["Volume"].sum() if "Volume" in df.columns else 0,
+        }
+    )
+    out.index = pd.to_datetime(out.index).tz_localize(TPE) + pd.Timedelta(hours=9)
+    return out
+
+
+def daily_bounds(
+    daily: pd.DataFrame,
+    entry_ts,
+    exit_ts,
+    left: int = 64,
+    right: int = 10,
+) -> Optional[tuple[int, int, int, int]]:
+    """日 K 視窗：進場日前 left 根，出場日後 right 根。回傳 start, end, entry_i, exit_i。"""
+    if daily is None or len(daily) == 0:
+        return None
+    entry_day = pd.Timestamp(entry_ts).date()
+    exit_day = pd.Timestamp(exit_ts).date()
+    dates = [ts.date() for ts in daily.index]
+    entry_i = None
+    exit_i = None
+    for i, day in enumerate(dates):
+        if day <= entry_day:
+            entry_i = i
+        if day <= exit_day:
+            exit_i = i
+    if entry_i is None:
+        return None
+    if exit_i is None or exit_i < entry_i:
+        exit_i = entry_i
+    start = max(0, entry_i - left)
+    end = min(len(daily) - 1, max(exit_i, entry_i) + right)
+    return start, end, entry_i, exit_i
+
+
+def _style_ax(ax) -> None:
+    ax.set_facecolor("#101814")
+    ax.tick_params(colors="#8aa193", labelsize=8)
+    for sp in ax.spines.values():
+        sp.set_color("#2a3a33")
+
+
+def _paint_ohlc(ax, axv, window: pd.DataFrame) -> None:
     from matplotlib.patches import Rectangle
 
-    _setup_cjk()
-    start, end = _trade_window(df, trade)
-    window = df.iloc[start : end + 1]
     xs = range(len(window))
     o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
     vol = window["Volume"] if "Volume" in window.columns else None
-    close_full = df["Close"].astype(float)
-
-    fig, (ax, axv) = plt.subplots(
-        2,
-        1,
-        figsize=(10.4, 5.6),
-        sharex=True,
-        gridspec_kw={"height_ratios": [3.2, 1]},
-        facecolor="#0c1210",
-    )
-    for a in (ax, axv):
-        a.set_facecolor("#101814")
-        a.tick_params(colors="#8aa193", labelsize=8)
-        for sp in a.spines.values():
-            sp.set_color("#2a3a33")
-
     colors_v = []
     for k in range(len(window)):
         up = float(c.iloc[k]) >= float(o.iloc[k])
@@ -352,12 +406,56 @@ def draw_trade_png(
             y1 = y0 + max(float(h.iloc[k]) - float(l.iloc[k]), 1e-12) * 0.02
         ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.25))
         colors_v.append("#3dba7a99" if up else "#e35d5d99")
-    if vol is not None:
+    if vol is not None and axv is not None:
         axv.bar(list(xs), vol.astype(float), width=0.8, color=colors_v, linewidth=0)
 
+
+def _plot_mas(ax, close_full: pd.Series, start: int, end: int) -> None:
     for n, col in MA_COLORS.items():
         ma = close_full.rolling(n, min_periods=n).mean().iloc[start : end + 1]
-        ax.plot(list(xs), ma, color=col, lw=1.15 if n < 60 else 1.35, label=f"MA{n}")
+        ax.plot(range(end - start + 1), ma, color=col, lw=1.15 if n < 60 else 1.35, label=f"MA{n}")
+
+
+def draw_trade_png(
+    df: pd.DataFrame,
+    trade: TradeResult,
+    path: Path,
+    trade_no: int,
+    title_extra: str = "",
+    daily: Optional[pd.DataFrame] = None,
+) -> Path:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    _setup_cjk()
+    start, end = _trade_window(df, trade)
+    window = df.iloc[start : end + 1]
+    et = df.index[trade.entry_idx]
+    xt = df.index[trade.exit_idx]
+    daily_src = daily if daily is not None and len(daily) else bars_to_daily(df)
+    bounds = daily_bounds(daily_src, et, xt)
+
+    fig = plt.figure(figsize=(10.4, 8.4 if bounds else 5.6), facecolor="#0c1210")
+    if bounds:
+        gs = fig.add_gridspec(4, 1, height_ratios=[3.2, 0.85, 2.5, 0.75], hspace=0.16)
+        ax = fig.add_subplot(gs[0])
+        axv = fig.add_subplot(gs[1], sharex=ax)
+        axd = fig.add_subplot(gs[2])
+        axdv = fig.add_subplot(gs[3], sharex=axd)
+        panels = (ax, axv, axd, axdv)
+    else:
+        gs = fig.add_gridspec(2, 1, height_ratios=[3.2, 1], hspace=0.08)
+        ax = fig.add_subplot(gs[0])
+        axv = fig.add_subplot(gs[1], sharex=ax)
+        axd = axdv = None
+        panels = (ax, axv)
+    for a in panels:
+        _style_ax(a)
+
+    _paint_ohlc(ax, axv, window)
+    _plot_mas(ax, df["Close"].astype(float), start, end)
 
     ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
     if trade.target_price is not None:
@@ -389,8 +487,6 @@ def draw_trade_png(
             zorder=6,
         )
 
-    et = df.index[trade.entry_idx]
-    xt = df.index[trade.exit_idx]
     extra = f"{title_extra}  " if title_extra else ""
     ax.set_title(
         f"#{trade_no}  {extra}{et.strftime('%m-%d %H:%M')} → {xt.strftime('%m-%d %H:%M')}  "
@@ -399,11 +495,40 @@ def draw_trade_png(
         fontsize=11,
     )
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
+    ax.tick_params(labelbottom=False)
     step = max(1, len(window) // 6)
     ticks = list(range(0, len(window), step))
     axv.set_xticks(ticks)
     axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
-    fig.tight_layout(pad=0.45)
+    axv.set_ylabel("60分", color="#8aa193", fontsize=8)
+
+    if bounds and axd is not None and axdv is not None:
+        d0, d1, entry_i, exit_i = bounds
+        dwin = daily_src.iloc[d0 : d1 + 1]
+        _paint_ohlc(axd, axdv, dwin)
+        _plot_mas(axd, daily_src["Close"].astype(float), d0, d1)
+        rel_entry = entry_i - d0
+        rel_exit = exit_i - d0
+        if 0 <= rel_entry < len(dwin):
+            axd.axvline(rel_entry, color="#3dba7a", ls="--", lw=0.9)
+            axd.scatter(
+                [rel_entry],
+                [float(dwin["Close"].iloc[rel_entry])],
+                s=36,
+                color="#00e676",
+                marker="^",
+                zorder=6,
+            )
+        if 0 <= rel_exit < len(dwin) and rel_exit != rel_entry:
+            axd.axvline(rel_exit, color="#f0c14b", ls=":", lw=0.9)
+        axd.tick_params(labelbottom=False)
+        axd.set_ylabel("日線", color="#e8f0ea", fontsize=9)
+        dstep = max(1, len(dwin) // 6)
+        dticks = list(range(0, len(dwin), dstep))
+        axdv.set_xticks(dticks)
+        axdv.set_xticklabels([dwin.index[i].strftime("%m-%d") for i in dticks], color="#8aa193")
+
+    fig.subplots_adjust(left=0.07, right=0.98, top=0.93, bottom=0.05, hspace=0.22)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
     plt.close(fig)
@@ -458,7 +583,7 @@ def write_tw_html(
         sig = t.signal
         img_name = f"t{i:02d}_{hit.row['code']}_{et.strftime('%m%d_%H%M')}.png"
         label = f"{hit.row['code']} {hit.row['name']}"
-        draw_trade_png(df, t, path.parent / "img" / img_name, i, title_extra=label)
+        draw_trade_png(df, t, path.parent / "img" / img_name, i, title_extra=label, daily=hit.daily)
         cards.append(
             "<article class='trade-card'>"
             "<header class='card-header'>"
@@ -594,7 +719,15 @@ def scan_symbol(
     trades = simulate(df, sigs, params)
     meta["n_sig"] = len(sigs)
     meta["n_trade"] = len(trades)
-    return [TwHit(row, t, df) for t in trades], meta
+    daily = None
+    if trades:
+        try:
+            fetched = fetch_yahoo_1d(row["symbol"])
+            if fetched is not None and len(fetched):
+                daily = fetched
+        except Exception:  # noqa: BLE001
+            daily = None
+    return [TwHit(row, t, df, daily) for t in trades], meta
 
 
 def dump_hits_json(path: Path, hits: List[TwHit], stats: dict, funnel: dict, extra: dict) -> Path:
