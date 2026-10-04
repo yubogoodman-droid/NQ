@@ -51,7 +51,7 @@
 
   const REMOTION = {
     collection: {
-      video: "assets/all-stories.mp4",
+      video: "assets/all-stories.mp4?v=2",
       poster: "assets/all-stories-poster.jpg",
       download: "手繪故事合集.mp4",
       sheet: "assets/yijianmei-character-sheet.jpg",
@@ -61,7 +61,7 @@
       storyUrl: "all-stories.json",
       colorOnly: true,
       voiced: true,
-      note: "四个故事接成一支，一剪梅那段有原词旁白，其余三段安静。",
+      note: "四个故事接成一支，一剪梅和鎖龍頭有旁白，后两段安静。",
       chapters: [
         { title: "一剪梅", start: 0 },
         { title: "鎖龍頭", start: 22.8 },
@@ -82,7 +82,7 @@
       voiced: true,
     },
     suolong: {
-      video: "assets/suolong-preview.mp4",
+      video: "assets/suolong-preview.mp4?v=2",
       poster: "assets/suolong-poster.jpg",
       download: "鎖龍頭.mp4",
       sheet: "assets/suolong-character-sheet.jpg",
@@ -91,6 +91,7 @@
       duration: 8.2,
       storyUrl: "suolong.json",
       colorOnly: true,
+      voiced: true,
     },
     liuti: {
       video: "assets/liuti-preview.mp4",

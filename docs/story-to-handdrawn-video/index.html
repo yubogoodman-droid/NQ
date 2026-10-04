@@ -243,7 +243,7 @@
             <input id="fileInput" type="file" accept="image/*" multiple />
           </label>
           <button type="button" id="dlBtn">下载成片</button>
-          <a class="file-btn" id="demoDl" href="assets/all-stories.mp4" download="手繪故事合集.mp4">示例 MP4</a>
+          <a class="file-btn" id="demoDl" href="assets/all-stories.mp4?v=2" download="手繪故事合集.mp4">示例 MP4</a>
         </div>
         <div class="meta">
           <span id="pageCount">—</span>
@@ -254,12 +254,12 @@
           <img id="castImg" src="assets/yijianmei-character-sheet.jpg" alt="李清照角色設定" />
           <p>示例成片用 GitHub 上的 Remotion 渲染器导出。默认锁定彩铅日记漫画；自定义故事用画布手绘，上传图按原顺序 contain 不裁切。</p>
         </div>
-        <p class="hint">每句一个节拍，保留原文。合集把四个故事接成一个文件，进度点按故事跳段；一剪梅那段有原词旁白，其余是静音画面。空格键播放／暂停。</p>
+        <p class="hint">每句一个节拍，保留原文。合集把四个故事接成一个文件，进度点按故事跳段；一剪梅和鎖龍頭配了旁白，其余是静音画面。空格键播放／暂停。</p>
       </section>
 
       <div class="stage-col">
         <div class="book mode-video" id="book">
-          <video id="demoVideo" playsinline loop preload="metadata" poster="assets/all-stories-poster.jpg" src="assets/all-stories.mp4" aria-label="四故事合集成片"></video>
+          <video id="demoVideo" playsinline loop preload="metadata" poster="assets/all-stories-poster.jpg" src="assets/all-stories.mp4?v=2" aria-label="四故事合集成片"></video>
           <canvas id="stage" width="720" height="960" aria-label="故事画布"></canvas>
         </div>
         <div class="transport">

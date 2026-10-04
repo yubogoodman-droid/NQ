@@ -8,11 +8,11 @@
   "height": 960,
   "durationSec": 61.7,
   "text": "四故事合集\n\n一剪梅 · 李清照\n鎖龍頭\n留體力學\n大樹跟小樹",
-  "video": "assets/all-stories.mp4",
+  "video": "assets/all-stories.mp4?v=2",
   "poster": "assets/all-stories-poster.jpg",
   "chapters": [
     { "title": "一剪梅", "start": 0.0, "end": 22.8, "storyUrl": "yijianmei.json", "voiceover": "zh-TW-HsiaoChenNeural" },
-    { "title": "鎖龍頭", "start": 22.8, "end": 31.0, "storyUrl": "suolong.json" },
+    { "title": "鎖龍頭", "start": 22.8, "end": 31.0, "storyUrl": "suolong.json", "voiceover": "zh-TW-HsiaoYuNeural" },
     { "title": "留體力學", "start": 31.0, "end": 48.0, "storyUrl": "liuti.json" },
     { "title": "大樹跟小樹", "start": 48.0, "end": 61.7, "storyUrl": "trees.json" }
   ]
