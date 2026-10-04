@@ -1,6 +1,17 @@
 (function () {
   "use strict";
 
+  const YIJIANMEI_TEXT = `一剪梅
+李清照
+
+紅藕香殘玉簟秋。
+輕解羅裳，獨上蘭舟。
+雲中誰寄錦書來？
+雁字回時，月滿西樓。
+花自飄零水自流。
+一種相思，兩處閒愁。
+此情無計可消除，才下眉頭，卻上心頭。`;
+
   const SUOLONG_TEXT = `鎖龍頭
 
 你知道為什麼綠色頭髮的人，機車不會被偷嗎？
@@ -32,6 +43,17 @@
 雨停以后，阳光把窗台晒得暖暖的。`;
 
   const REMOTION = {
+    yijianmei: {
+      video: "assets/yijianmei-preview.mp4",
+      poster: "assets/yijianmei-poster.jpg",
+      download: "一剪梅.mp4",
+      sheet: "assets/yijianmei-character-sheet.jpg",
+      sheetAlt: "李清照角色設定",
+      pages: 7,
+      duration: 22.8,
+      storyUrl: "yijianmei.json",
+      colorOnly: true,
+    },
     suolong: {
       video: "assets/suolong-preview.mp4",
       poster: "assets/suolong-poster.jpg",
@@ -78,6 +100,7 @@
   };
 
   const PRESETS = [
+    { id: "yijianmei", title: "一剪梅", art: "ai", remotion: "yijianmei", text: YIJIANMEI_TEXT },
     { id: "suolong", title: "鎖龍頭", art: "ai", remotion: "suolong", text: SUOLONG_TEXT },
     { id: "liuti", title: "留體力學", art: "ai", remotion: "liuti", text: LIUTI_TEXT },
     { id: "trees", title: "大樹跟小樹", art: "ai", remotion: "trees", text: TREE_TEXT },
@@ -112,7 +135,7 @@
   const book = $("book");
   const player = new StoryPlayer(canvas);
   let demoStories = {};
-  let activeRemotion = "suolong";
+  let activeRemotion = "yijianmei";
   let source = "ai";
   let uploaded = [];
   let view = "video";
@@ -398,7 +421,7 @@
     }
   });
 
-  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("suolong")]).catch((err) => {
+  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("yijianmei")]).catch((err) => {
     setStatus("载入示例失败：" + err.message);
   });
 })();
