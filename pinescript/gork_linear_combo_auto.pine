@@ -1,0 +1,216 @@
+//@version=5
+strategy("Gork多＋線性空｜自動版（含風險上限／MA200斜率門檻）", overlay=true,
+     initial_capital=100000,
+     default_qty_type=strategy.fixed, default_qty_value=1,
+     commission_type=strategy.commission.cash_per_contract, commission_value=0,
+     pyramiding=0, calc_on_every_tick=false,
+     process_orders_on_close=true)
+
+// 掛在 NQ1! / MNQ1! 一分圖。對齊 examples/nq_gork_linear_combo.py。
+//
+// 本檔相對於原本的自動版，只多了兩個門檻，預設都開：
+//   1. 線性空「進場風險上限」：peakHigh − 進場收盤 > linMaxRisk 就跳過（0=關）。
+//   2. Gork 多「MA200 必須下彎」：1m MA200 − MA200[gorkMa200SlopeBars] ≥ 0 就跳過（0=關）。
+// 其他規則與數字都維持原本的自動版；若你手上的 Pine 與這裡有出入，以你的為準，
+// 只需把標有 ★ 的兩段貼過去即可。
+
+// ---------------------------------------------------------------------------
+// 參數
+// ---------------------------------------------------------------------------
+gAll = "共用"
+gLin = "線性空"
+gL15 = "線性空 15m 過濾"
+gGk  = "Gork 多"
+gNew = "★ 新增門檻"
+
+cooldownBars = input.int(5, "平倉後冷卻（根）", minval=0, group=gAll)
+
+lookback4h       = input.int(240, "四小時高回看（1m 根）", minval=60, group=gLin)
+minPeakDistMa200 = input.float(100, "創高距 MA200 至少（點）", minval=0, step=5, group=gLin)
+slopeBars        = input.int(5, "MA10 斜率回看（根）", minval=1, group=gLin)
+minMa10Slope     = input.float(6, "創高當下 MA10 斜率至少（點）", minval=0, step=0.5, group=gLin)
+nearRisingMa60   = input.float(20, "靠近上升 MA60 不做（點，0=關）", minval=0, step=1, group=gLin)
+maxFan           = input.float(180, "MA20 − MA200 上限（點，0=關）", minval=0, step=5, group=gLin)
+tpBuf            = input.float(5, "停利：MA200 上方（點）", minval=0, step=0.5, group=gLin)
+nearMa200        = input.float(15, "長下影停利：距 MA200（點）", minval=1, step=1, group=gLin)
+minLowerWick     = input.float(3, "長下影最小長度（點）", minval=1, step=0.5, group=gLin)
+wickBodyRatio    = input.float(3.0, "下影／實體 倍數", minval=1, step=0.5, group=gLin)
+wickRangeRatio   = input.float(0.55, "下影／振幅 比例", minval=0.3, step=0.05, group=gLin)
+
+f15SlopeMax = input.float(120, "15m MA10 − MA10[5] 超過不做（0=關）", minval=0, step=5, group=gL15)
+f15DistMin  = input.float(120, "15m close − MA60 低於不做（0=關）", minval=0, step=5, group=gL15)
+
+gorkDeep        = input.float(50, "跌破 MA200 至少（點）", minval=1, step=5, group=gGk)
+gorkWindow      = input.int(60, "跌破後可進場（根）", minval=1, group=gGk)
+gorkStreak      = input.int(3, "站上 MA200 連幾根", minval=1, group=gGk)
+gorkMaxDist     = input.float(30, "進場距 MA200 上限（點）", minval=1, step=1, group=gGk)
+gorkUnderNeed   = input.int(15, "前 60 根內連收 MA200 下至少（根）", minval=0, group=gGk)
+gorkSlBelow     = input.float(10, "停損：MA200 下方（點）", minval=0, step=1, group=gGk)
+gorkTp          = input.float(100, "停利（點）", minval=1, step=5, group=gGk)
+gorkBeAfter     = input.float(60, "浮盈幾點改保本", minval=0, step=5, group=gGk)
+
+// ★ 新增門檻
+linMaxRisk         = input.float(55, "★ 線性空進場風險上限（peakHigh − 進場，點，0=關）", minval=0, step=1, group=gNew)
+gorkMa200SlopeBars = input.int(30, "★ Gork：MA200 需低於幾根前（0=關）", minval=0, group=gNew)
+
+// ---------------------------------------------------------------------------
+// 均線與時段
+// ---------------------------------------------------------------------------
+ma5   = ta.sma(close, 5)
+ma10  = ta.sma(close, 10)
+ma20  = ta.sma(close, 20)
+ma30  = ta.sma(close, 30)
+ma60  = ta.sma(close, 60)
+ma120 = ta.sma(close, 120)
+ma200 = ta.sma(close, 200)
+
+plot(ma10,  "MA10",  color=color.new(#ff7a00, 0))
+plot(ma20,  "MA20",  color=color.new(#e63946, 0))
+plot(ma60,  "MA60",  color=color.new(#9b5de5, 40))
+plot(ma200, "MA200", color=color.new(#264653, 0), linewidth=2)
+
+etMins = hour(time, "America/New_York") * 60 + minute(time, "America/New_York")
+noEntryHour = (etMins >= 16 * 60 and etMins < 17 * 60) or (etMins >= 18 * 60 and etMins < 19 * 60)
+
+// 已收盤 15m（[1]），不偷看
+m15Close    = request.security(syminfo.tickerid, "15", close[1], barmerge.gaps_off, barmerge.lookahead_off)
+m15Ma10     = request.security(syminfo.tickerid, "15", ta.sma(close, 10)[1], barmerge.gaps_off, barmerge.lookahead_off)
+m15Ma10Prev = request.security(syminfo.tickerid, "15", ta.sma(close, 10)[6], barmerge.gaps_off, barmerge.lookahead_off)
+m15Ma60     = request.security(syminfo.tickerid, "15", ta.sma(close, 60)[1], barmerge.gaps_off, barmerge.lookahead_off)
+m15Slope    = m15Ma10 - m15Ma10Prev
+m15Dist     = m15Close - m15Ma60
+
+flat = strategy.position_size == 0
+lastExitBar = strategy.closedtrades > 0 ? strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) : -100000
+cooled = bar_index - lastExitBar > cooldownBars
+canEnter = flat and cooled and not noEntryHour
+
+// ---------------------------------------------------------------------------
+// 線性空：創 4H 高 + 全多頭排列 → 回測 MA10 → 收盤跌破 MA20
+// ---------------------------------------------------------------------------
+bullStack = ma5 > ma10 and ma10 > ma20 and ma20 > ma30 and ma30 > ma60 and ma60 > ma120 and ma120 > ma200
+high4h = ta.highest(high, lookback4h)
+made4hHigh = high == high4h and high > nz(high[1])
+ma10Slope = ma10 - ma10[slopeBars]
+
+var int   st        = 0
+var float peakHigh  = na
+var float peakMa200 = na
+var float peakSlope = na
+
+resetLin() =>
+    st := 0
+    peakHigh := na
+    peakMa200 := na
+    peakSlope := na
+
+if flat and st == 3
+    resetLin()
+
+linEnter = false
+if flat
+    if st == 0
+        if made4hHigh and bullStack
+            st := 1
+            peakHigh := high
+            peakMa200 := ma200
+            peakSlope := ma10Slope
+    else if st == 1
+        if made4hHigh and bullStack and high > peakHigh
+            peakHigh := high
+            peakMa200 := ma200
+            peakSlope := ma10Slope
+        if low <= ma10
+            st := 2
+        if close < ma60 and not bullStack
+            resetLin()
+    else if st == 2
+        if high > peakHigh
+            resetLin()
+        else if ta.crossunder(close, ma20)
+            peakDistOk = (peakHigh - peakMa200) >= minPeakDistMa200
+            slopeOk    = peakSlope >= minMa10Slope
+            fanOk      = maxFan <= 0 or (ma20 - ma200) <= maxFan
+            near60     = nearRisingMa60 > 0 and ma60 > ma60[5] and (close - ma60) >= 0 and (close - ma60) <= nearRisingMa60
+            f15Ok      = not ((f15SlopeMax > 0 and m15Slope > f15SlopeMax) or (f15DistMin > 0 and m15Dist < f15DistMin))
+            // ★ 進場風險上限：停損距離太寬（最差的風報比）就放過這次
+            riskOk     = linMaxRisk <= 0 or (peakHigh - close) <= linMaxRisk
+            if peakDistOk and slopeOk and fanOk and not near60 and f15Ok and riskOk and canEnter
+                linEnter := true
+                st := 3
+            else
+                resetLin()
+
+if linEnter
+    strategy.entry("線性空", strategy.short)
+
+body = math.max(math.abs(close - open), 0.25)
+lowerWick = math.min(open, close) - low
+barRange = math.max(high - low, 0.25)
+longLowerWick = lowerWick >= minLowerWick and (lowerWick >= wickBodyRatio * body or lowerWick / barRange >= wickRangeRatio)
+nearBand = low >= ma200 and (low - ma200) <= nearMa200
+
+if strategy.position_size < 0
+    strategy.exit("線性空出", from_entry="線性空", stop=peakHigh, limit=ma200 + tpBuf)
+    if nearBand and longLowerWick
+        strategy.close("線性空", comment="長下影")
+
+// ---------------------------------------------------------------------------
+// Gork 多：跌破 MA200 超過 gorkDeep → 站回 MA200（連 gorkStreak 根）＋五線多頭排列
+// ---------------------------------------------------------------------------
+var int deepBar = -100000
+if low < ma200 - gorkDeep
+    deepBar := bar_index
+inWindow = bar_index - deepBar >= 1 and bar_index - deepBar <= gorkWindow
+
+aboveStreak = true
+for k = 0 to gorkStreak - 1
+    if na(ma200[k]) or close[k] <= ma200[k]
+        aboveStreak := false
+
+stackOk = ma5 > ma10 and ma10 > ma20 and ma20 > ma30 and ma30 > ma60
+distMa200 = close - ma200
+distOk = distMa200 > 0 and distMa200 <= gorkMaxDist
+
+maxUnder = 0
+runUnder = 0
+for k = 1 to 60
+    if not na(ma200[k]) and close[k] < ma200[k]
+        runUnder += 1
+        maxUnder := math.max(maxUnder, runUnder)
+    else
+        runUnder := 0
+underOk = maxUnder >= gorkUnderNeed
+
+// ★ MA200 還在走平／上升，代表那 50 點只是一根針，不是洗盤；跳過
+ma200FallingOk = gorkMa200SlopeBars <= 0 or ma200 < ma200[gorkMa200SlopeBars]
+
+gorkEnter = canEnter and not linEnter and inWindow and aboveStreak and stackOk and close > ma60 and distOk and underOk and ma200FallingOk
+
+var float gorkEntry = na
+var float gorkStop  = na
+var bool  gorkBe    = false
+if gorkEnter
+    strategy.entry("Gork多", strategy.long)
+    gorkEntry := close
+    gorkStop := ma200 - gorkSlBelow
+    gorkBe := false
+    deepBar := -100000
+
+if strategy.position_size > 0
+    if not gorkBe and high >= gorkEntry + gorkBeAfter
+        gorkBe := true
+        gorkStop := gorkEntry
+    strategy.exit("Gork出", from_entry="Gork多", stop=gorkStop, limit=gorkEntry + gorkTp)
+
+// ---------------------------------------------------------------------------
+// 視覺／警報
+// ---------------------------------------------------------------------------
+plot(st > 0 and not na(peakHigh) ? peakHigh : na, "四小時高/停損", color=color.maroon, style=plot.style_linebr)
+bgcolor(st == 1 ? color.new(color.orange, 92) : st == 2 ? color.new(color.red, 92) : na)
+plotshape(linEnter, "線性空進場", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, text="空")
+plotshape(gorkEnter, "Gork多進場", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, text="多")
+
+alertcondition(linEnter, "線性空｜進場", "線性空進場（含風險上限）")
+alertcondition(gorkEnter, "Gork多｜進場", "Gork多進場（MA200 下彎）")
+alertcondition(linEnter or gorkEnter, "任一進場", "Gork多＋線性空 有進場訊號")
