@@ -1,0 +1,18 @@
+{
+  "id": "suolong-head",
+  "title": "鎖龍頭",
+  "style": "colored-pencil-diary",
+  "styleName": "彩铅日记漫画",
+  "aspect": "3:4",
+  "width": 720,
+  "height": 960,
+  "durationSec": 8.2,
+  "text": "鎖龍頭\n\n你知道為什麼綠色頭髮的人，機車不會被偷嗎？\n因為他有鎖龍頭。\n索隆頭。",
+  "video": "assets/suolong-preview.mp4",
+  "poster": "assets/suolong-poster.jpg",
+  "pages": [
+    { "id": "01", "kind": "beat", "caption": "你知道為什麼綠色頭髮的人，機車不會被偷嗎？" },
+    { "id": "02", "kind": "beat", "caption": "因為他有鎖龍頭。" },
+    { "id": "03", "kind": "beat", "caption": "索隆頭。" }
+  ]
+}
