@@ -54,9 +54,10 @@
       sheet: "assets/yuanxi-character-sheet.jpg",
       sheetAlt: "元夕尋人角色設定",
       pages: 7,
-      duration: 34.9,
+      duration: 38.7,
       storyUrl: "yuanxi.json",
       colorOnly: true,
+      narrated: true,
     },
     xiaohuang: {
       video: "assets/xiaohuang-preview.mp4",
@@ -243,6 +244,7 @@
       video.poster = demo.poster;
       video.load();
     }
+    video.muted = !demo.narrated;
     const dl = $("demoDl");
     if (dl) {
       dl.href = demo.video;
@@ -271,9 +273,9 @@
       await player.loadAiPages(story);
     }
     updateMeta();
-    const note = demo.colorOnly
+    const note = (demo.colorOnly
       ? "彩图直出，无黑白上色。"
-      : "文字 → 黑白 → 彩色。";
+      : "文字 → 黑白 → 彩色。") + (demo.narrated ? " 含唸詞旁白。" : "");
     setStatus("GitHub 源项目 Remotion 成片已载入：" + note);
   }
 
