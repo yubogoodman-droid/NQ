@@ -1,0 +1,22 @@
+{
+  "id": "qingyu-an-yuanxi",
+  "title": "青玉案·元夕",
+  "style": "colored-pencil-diary",
+  "styleName": "彩铅日记漫画",
+  "aspect": "3:4",
+  "width": 720,
+  "height": 960,
+  "durationSec": 34.9,
+  "text": "青玉案·元夕\n\n東風夜放花千樹，更吹落、星如雨。\n寶馬雕車香滿路。\n鳳簫聲動，玉壺光轉，一夜魚龍舞。\n蛾兒雪柳黃金縷，笑語盈盈暗香去。\n眾裡尋他千百度；\n驀然回首，那人卻在，燈火闌珊處。",
+  "video": "assets/yuanxi-preview.mp4",
+  "poster": "assets/yuanxi-poster.jpg",
+  "pages": [
+    { "id": "01", "kind": "beat", "caption": "青玉案·元夕。" },
+    { "id": "02", "kind": "beat", "caption": "東風夜放花千樹，更吹落、星如雨。" },
+    { "id": "03", "kind": "beat", "caption": "寶馬雕車香滿路。" },
+    { "id": "04", "kind": "beat", "caption": "鳳簫聲動，玉壺光轉，一夜魚龍舞。" },
+    { "id": "05", "kind": "beat", "caption": "蛾兒雪柳黃金縷，笑語盈盈暗香去。" },
+    { "id": "06", "kind": "beat", "caption": "眾裡尋他千百度；" },
+    { "id": "07", "kind": "beat", "caption": "驀然回首，那人卻在，燈火闌珊處。" }
+  ]
+}
