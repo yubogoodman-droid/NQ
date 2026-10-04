@@ -59,7 +59,7 @@ export const Scene: React.FC<{scene: SceneData}> = ({scene}) => {
       {has('color') && scene.assets.color ? (
         <LayerWipe
           src={scene.assets.color}
-          startFrame={staticColor ? 0 : at(speedMode ? 0.52 : 0.65)}
+          startFrame={staticColor ? -1 : at(speedMode ? 0.52 : 0.65)}
           durationFrames={staticColor ? 1 : at(speedMode ? 0.36 : 0.23)}
           zIndex={30}
           treatment="color"
