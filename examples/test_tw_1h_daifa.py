@@ -153,27 +153,39 @@ def test_stack_required() -> None:
     assert funnel.get("no_stack", 0) >= 1
 
 
-def test_simulate_stop_and_target() -> None:
-    opens, highs, lows, closes = flat(82)
-    paint_daifa(opens, highs, lows, closes, 70)
-    # 下一根打到停損（低點 104）
-    opens[71], highs[71], lows[71], closes[71] = 104.5, 105.0, 103.0, 103.5
-    df = make_df(opens, highs, lows, closes)
-    sigs = detect_signals(df)
-    assert len(sigs) == 1
-    trades = simulate(df, sigs)
-    assert trades[0].exit_reason == "stop"
-    assert trades[0].pnl_points < 0
+def _fill_after(opens, highs, lows, closes, start: int, px: float) -> None:
+    for j in range(start, len(closes)):
+        opens[j], highs[j], lows[j], closes[j] = px, px + 1.0, px - 1.0, px
 
-    opens, highs, lows, closes = flat(82)
+
+def test_shallow_wick_holds_five_sessions() -> None:
+    """開盤低點被刺破，但沒跌到進場價的 10%，繼續抱到第 5 個收盤。"""
+    opens, highs, lows, closes = flat(110)
     paint_daifa(opens, highs, lows, closes, 70)
-    # 風險 = 105-104 = 1，2R = 107
-    opens[71], highs[71], lows[71], closes[71] = 105.2, 108.0, 104.5, 107.5
+    _fill_after(opens, highs, lows, closes, 71, 110.0)
+    lows[71] = 100.0  # 低於開盤低點 104，仍高於 105*0.9
     df = make_df(opens, highs, lows, closes)
     trades = simulate(df, detect_signals(df))
-    assert trades[0].exit_reason == "target"
-    assert abs(trades[0].target_price - 107.0) < 1e-9
-    assert trades[0].pnl_points > 0
+    assert len(trades) == 1
+    t = trades[0]
+    assert t.exit_reason == "time"
+    assert abs(t.stop_price - 105.0 * 0.9) < 1e-9
+    assert t.pnl_points > 0
+    after = [i for i, ts in enumerate(df.index) if i > t.entry_idx and ts.hour == 13]
+    assert t.exit_idx == after[4]
+    assert df.index[t.exit_idx].hour == 13
+
+
+def test_ten_percent_stop() -> None:
+    opens, highs, lows, closes = flat(110)
+    paint_daifa(opens, highs, lows, closes, 70)
+    _fill_after(opens, highs, lows, closes, 71, 110.0)
+    lows[71] = 90.0  # 105 * 0.9 = 94.5
+    df = make_df(opens, highs, lows, closes)
+    trades = simulate(df, detect_signals(df))
+    assert trades[0].exit_reason == "stop"
+    assert abs(trades[0].exit_price - 94.5) < 1e-9
+    assert trades[0].pnl_points < 0
 
 
 def test_filter_and_summary() -> None:
@@ -195,7 +207,8 @@ def main() -> int:
     test_wick_through_ma60_rejected()
     test_already_above_ma60_rejected()
     test_stack_required()
-    test_simulate_stop_and_target()
+    test_shallow_wick_holds_five_sessions()
+    test_ten_percent_stop()
     test_filter_and_summary()
     print("ok")
     return 0

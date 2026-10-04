@@ -7,7 +7,8 @@
   這根低點 640 高於前高，也高於當根 MA60（約 638），缺口沒補、整根站上。
   同根 MA5 > MA10 > MA20。
 
-進場用這根收盤（10:00 已知）。停損在這根低點；目標 2R，或 20 根時間停。
+進場用這根收盤（10:00 已知）。持有到之後第 5 個時段收盤；
+盤中跌破進場價 10% 才停損。開盤那根低點太貼，下一根影線就會把勝率打掉。
 """
 
 from __future__ import annotations
@@ -51,8 +52,8 @@ PINNED = ("6526", "達發", "tse")
 
 @dataclass(frozen=True)
 class DaifaParams:
-    target_r: float = 2.0
-    time_bars: int = 20
+    stop_pct: float = 0.10
+    hold_sessions: int = 5
 
 
 def default_params(**overrides: object) -> DaifaParams:
@@ -87,7 +88,7 @@ class TradeResult:
     entry_price: float
     exit_price: float
     stop_price: float
-    target_price: float
+    target_price: Optional[float]
     pnl_points: float
     pnl_pct: float
     exit_reason: str
@@ -179,6 +180,14 @@ def detect_signals(
     return signals
 
 
+def _hold_exit_index(ends: Sequence[int], entry_idx: int, sessions: int, n: int) -> tuple[int, bool]:
+    """進場後第 N 個時段收盤。當天 13:00 算第 1 個。資料不夠就停在最後一根。"""
+    after = [i for i in ends if i > entry_idx]
+    if sessions > 0 and len(after) >= sessions:
+        return after[sessions - 1], True
+    return n - 1, False
+
+
 def simulate(
     df: pd.DataFrame,
     signals: Sequence[Signal],
@@ -187,7 +196,6 @@ def simulate(
     p = params or default_params()
     close = df["Close"].to_numpy(float)
     low = df["Low"].to_numpy(float)
-    high = df["High"].to_numpy(float)
     ends = _session_close_indices(df.index)
     n = len(close)
     trades: List[TradeResult] = []
@@ -195,28 +203,22 @@ def simulate(
     for sig in signals:
         entry_idx = sig.entry_idx
         entry = float(sig.entry_price)
-        stop = float(sig.bar_low)
-        risk = entry - stop
-        if risk <= 0:
+        stop = entry * (1.0 - p.stop_pct)
+        if stop >= entry:
             stop = entry * 0.99
-            risk = entry - stop
-        target = entry + p.target_r * risk
         exit_idx = entry_idx
         exit_px = entry
         reason = "open"
-        last = min(n - 1, entry_idx + p.time_bars)
+        last, complete = _hold_exit_index(ends, entry_idx, p.hold_sessions, n)
         for k in range(entry_idx + 1, last + 1):
             if float(low[k]) <= stop:
                 exit_idx, exit_px, reason = k, stop, "stop"
                 break
-            if float(high[k]) >= target:
-                exit_idx, exit_px, reason = k, target, "target"
-                break
         else:
-            if last > entry_idx:
+            if last > entry_idx and complete:
                 exit_idx, exit_px, reason = last, float(close[last]), "time"
-                if last == n - 1 and last < entry_idx + p.time_bars:
-                    reason = "open"
+            elif last > entry_idx:
+                exit_idx, exit_px, reason = last, float(close[last]), "open"
             else:
                 exit_idx, exit_px, reason = entry_idx, entry, "open"
         trades.append(
@@ -227,7 +229,7 @@ def simulate(
                 entry_price=entry,
                 exit_price=exit_px,
                 stop_price=stop,
-                target_price=target,
+                target_price=None,
                 pnl_points=exit_px - entry,
                 pnl_pct=(exit_px / entry - 1.0) if entry else 0.0,
                 exit_reason=reason,
@@ -358,7 +360,8 @@ def draw_trade_png(
         ax.plot(list(xs), ma, color=col, lw=1.15 if n < 60 else 1.35, label=f"MA{n}")
 
     ax.axhline(trade.stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.85)
-    ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
+    if trade.target_price is not None:
+        ax.axhline(trade.target_price, color="#3dba7a", ls=":", lw=1.0, alpha=0.8)
     ax.axhline(trade.signal.ma60, color="#e6edf3", ls="--", lw=0.7, alpha=0.35)
 
     ex = trade.entry_idx - start
@@ -468,8 +471,8 @@ def write_tw_html(
             f"<span class='tag'>跳空 {sig.gap_pct * 100:.1f}%</span>"
             f"<span class='tag'>MA60 {sig.ma60:.2f}</span></div>"
             "<pre class='trade-detail'>"
-            f"entry {t.entry_price:.2f}  stop {t.stop_price:.2f} (−{risk:.2f})\n"
-            f"target {t.target_price:.2f}  exit {t.exit_price:.2f} {t.exit_reason}  {t.pnl_points:+.2f}\n"
+            f"entry {t.entry_price:.2f}  stop {t.stop_price:.2f} (−{risk:.2f}，跌破 10% 出場)\n"
+            f"exit {t.exit_price:.2f} {t.exit_reason}  {t.pnl_points:+.2f}  持有到第 5 個收盤\n"
             f"開 {sig.open_price:.2f} 低 {sig.bar_low:.2f}  前高 {sig.prev_high:.2f} 前收 {sig.prev_close:.2f}\n"
             f"MA5 {sig.ma5:.2f} / MA10 {sig.ma10:.2f} / MA20 {sig.ma20:.2f} / MA60 {sig.ma60:.2f}\n"
             f"fwd +1d {_fmt_fwd(t.fwd_1d)}  +3d {_fmt_fwd(t.fwd_3d)}  +5d {_fmt_fwd(t.fwd_5d)}"
@@ -519,13 +522,14 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <h1>台股 1h 達發多 · 成交額前 {head_n}{escape(pin_txt)}</h1>
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {head_n} 檔{escape(pin_txt)} · 成交額末名約 {cutoff:.1f} 億
 <br/>開盤那根 60 分 K：低點高於前一根高點（跳空沒補），前收在 MA60 下，低點與收盤都站上 MA60，且 MA5 &gt; MA10 &gt; MA20。
-進場為該根收盤。回測出場：停在這根低點、2R、或 20 根時間停。加總％是各筆報酬相加，不是組合複利。
+進場為該根收盤。回測出場：持有到進場後第 5 個時段收盤（含當天），盤中跌破進場價 10% 停損。
+不再把開盤那根低點當停損。加總％是各筆報酬相加，不是組合複利。
 樣本對齊 6526 達發 2026-09-18 09:00（開 643 高 648 低 640 收 646）。</p>
 <p class="muted">漏斗（整段下載；近窗筆數見下方）：開盤 {fun.get('opens', 0)} → 進場 {fun.get('entry', 0)}
 · 沒跳空 {fun.get('no_gap', 0)} · 前收已在均線上 {fun.get('prev_above', 0)}
 · 沒整根站上 {fun.get('not_above_ma60', 0)} · 沒有多頭排列 {fun.get('no_stack', 0)}
 · 暖機 {fun.get('warmup', 0)} · 進場價過高 {fun.get('price_cap', 0)}
-<br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
+<br/>出場：持有到期 {reasons.get('time', 0)} · 跌破 10% {reasons.get('stop', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
