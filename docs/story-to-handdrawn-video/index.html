@@ -199,7 +199,7 @@
   <div class="wrap">
     <header>
       <h1 class="logo">手绘故事</h1>
-      <p class="subtitle">3:4 竖屏 · 手绘彩图直出 · 一剪梅带旁白</p>
+      <p class="subtitle">3:4 竖屏 · 手绘彩图直出 · 四故事合集 1 分钟</p>
       <p class="source">源项目
         <a href="https://github.com/gnipbao/story-to-handdrawn-video" target="_blank" rel="noopener">gnipbao/story-to-handdrawn-video</a>
         · Remotion 4.0 · MIT
@@ -210,7 +210,8 @@
       <section class="panel">
         <h2>STORY</h2>
         <div class="chips">
-          <button type="button" data-preset="yijianmei" class="on">一剪梅</button>
+          <button type="button" data-preset="collection" class="on">合集</button>
+          <button type="button" data-preset="yijianmei">一剪梅</button>
           <button type="button" data-preset="suolong">鎖龍頭</button>
           <button type="button" data-preset="liuti">留體力學</button>
           <button type="button" data-preset="trees">大樹跟小樹</button>
@@ -242,7 +243,7 @@
             <input id="fileInput" type="file" accept="image/*" multiple />
           </label>
           <button type="button" id="dlBtn">下载成片</button>
-          <a class="file-btn" id="demoDl" href="assets/yijianmei-preview.mp4?v=2" download="一剪梅.mp4">示例 MP4</a>
+          <a class="file-btn" id="demoDl" href="assets/all-stories.mp4" download="手繪故事合集.mp4">示例 MP4</a>
         </div>
         <div class="meta">
           <span id="pageCount">—</span>
@@ -253,12 +254,12 @@
           <img id="castImg" src="assets/yijianmei-character-sheet.jpg" alt="李清照角色設定" />
           <p>示例成片用 GitHub 上的 Remotion 渲染器导出。默认锁定彩铅日记漫画；自定义故事用画布手绘，上传图按原顺序 contain 不裁切。</p>
         </div>
-        <p class="hint">每句一个节拍，保留原文。一剪梅示例含原词旁白，其余示例仍是静音画面。空格键播放／暂停。</p>
+        <p class="hint">每句一个节拍，保留原文。合集把四个故事接成一个文件，进度点按故事跳段；一剪梅那段有原词旁白，其余是静音画面。空格键播放／暂停。</p>
       </section>
 
       <div class="stage-col">
         <div class="book mode-video" id="book">
-          <video id="demoVideo" playsinline loop preload="metadata" poster="assets/yijianmei-poster.jpg" src="assets/yijianmei-preview.mp4?v=2" aria-label="一剪梅旁白成片"></video>
+          <video id="demoVideo" playsinline loop preload="metadata" poster="assets/all-stories-poster.jpg" src="assets/all-stories.mp4" aria-label="四故事合集成片"></video>
           <canvas id="stage" width="720" height="960" aria-label="故事画布"></canvas>
         </div>
         <div class="transport">

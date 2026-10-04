@@ -42,7 +42,33 @@
 小鸟歪了歪头，好像听懂了。
 雨停以后，阳光把窗台晒得暖暖的。`;
 
+  const COLLECTION_TEXT = `四故事合集
+
+一剪梅 · 李清照
+鎖龍頭
+留體力學
+大樹跟小樹`;
+
   const REMOTION = {
+    collection: {
+      video: "assets/all-stories.mp4",
+      poster: "assets/all-stories-poster.jpg",
+      download: "手繪故事合集.mp4",
+      sheet: "assets/yijianmei-character-sheet.jpg",
+      sheetAlt: "合集角色設定",
+      pages: 20,
+      duration: 61.7,
+      storyUrl: "all-stories.json",
+      colorOnly: true,
+      voiced: true,
+      note: "四个故事接成一支，一剪梅那段有原词旁白，其余三段安静。",
+      chapters: [
+        { title: "一剪梅", start: 0 },
+        { title: "鎖龍頭", start: 22.8 },
+        { title: "留體力學", start: 31.0 },
+        { title: "大樹跟小樹", start: 48.0 },
+      ],
+    },
     yijianmei: {
       video: "assets/yijianmei-preview.mp4?v=2",
       poster: "assets/yijianmei-poster.jpg",
@@ -101,6 +127,7 @@
   };
 
   const PRESETS = [
+    { id: "collection", title: "合集", art: "ai", remotion: "collection", text: COLLECTION_TEXT },
     { id: "yijianmei", title: "一剪梅", art: "ai", remotion: "yijianmei", text: YIJIANMEI_TEXT },
     { id: "suolong", title: "鎖龍頭", art: "ai", remotion: "suolong", text: SUOLONG_TEXT },
     { id: "liuti", title: "留體力學", art: "ai", remotion: "liuti", text: LIUTI_TEXT },
@@ -136,7 +163,7 @@
   const book = $("book");
   const player = new StoryPlayer(canvas);
   let demoStories = {};
-  let activeRemotion = "yijianmei";
+  let activeRemotion = "collection";
   let source = "ai";
   let uploaded = [];
   let view = "video";
@@ -171,16 +198,32 @@
     return REMOTION[activeRemotion] || REMOTION.liuti;
   }
 
+  function chapterAt(chapters, t) {
+    let index = 0;
+    for (let i = 0; i < chapters.length; i++) {
+      if (t >= chapters[i].start - 0.001) index = i;
+    }
+    return index;
+  }
+
   function updateMeta() {
     if (view === "video") {
       const demo = remotionMeta();
       const dur = video.duration && isFinite(video.duration) ? video.duration : demo.duration;
-      $("pageCount").textContent = demo.pages + " 页 · Remotion";
+      const chapters = demo.chapters;
+      $("pageCount").textContent = chapters
+        ? chapters.length + " 段 · " + demo.pages + " 页 · Remotion"
+        : demo.pages + " 页 · Remotion";
       $("durationLabel").textContent = fmt(dur);
       $("timeLabel").textContent = fmt(video.currentTime || 0);
       $("seek").max = String(dur);
       $("seek").value = String(video.currentTime || 0);
       $("playBtn").textContent = video.paused ? "播放" : "暂停";
+      if (chapters) {
+        const i = chapterAt(chapters, video.currentTime || 0);
+        renderDots(i, chapters.length, chapters.map((c) => c.title));
+        return;
+      }
       const pageSec = dur / Math.max(1, demo.pages);
       const page = Math.min(demo.pages - 1, Math.floor((video.currentTime || 0) / pageSec));
       renderDots(page, demo.pages);
@@ -196,12 +239,13 @@
     renderDots(player.pageAt(player.elapsed).index, n);
   }
 
-  function renderDots(active, count) {
+  function renderDots(active, count, labels) {
     const n = count == null ? player.pages.length : count;
     const el = $("dots");
-    el.innerHTML = Array.from({ length: n }, (_, i) =>
-      `<button type="button" class="dot${i === active ? " on" : ""}" data-i="${i}" aria-label="第 ${i + 1} 页"></button>`
-    ).join("");
+    el.innerHTML = Array.from({ length: n }, (_, i) => {
+      const label = labels && labels[i] ? labels[i] : "第 " + (i + 1) + " 页";
+      return `<button type="button" class="dot${i === active ? " on" : ""}" data-i="${i}" aria-label="${label}" title="${label}"></button>`;
+    }).join("");
   }
 
   player.onFrame = () => updateMeta();
@@ -268,7 +312,7 @@
     const note = demo.colorOnly
       ? "彩图直出，无黑白上色。"
       : "文字 → 黑白 → 彩色。";
-    const voice = demo.voiced ? "这一条有原词旁白。" : "这一条是静音画面。";
+    const voice = demo.note || (demo.voiced ? "这一条有原词旁白。" : "这一条是静音画面。");
     setStatus("GitHub 源项目 Remotion 成片已载入：" + note + voice);
   }
 
@@ -289,9 +333,8 @@
       return loadRemotion(remotionPreset.remotion).then(() => {
         const demo = REMOTION[remotionPreset.remotion];
         setStatus(
-          demo && demo.voiced
-            ? "使用 GitHub Remotion 示例成片，含原词旁白。"
-            : "使用 GitHub Remotion 示例成片。"
+          "使用 GitHub Remotion 示例成片。" +
+            (demo ? demo.note || (demo.voiced ? "含原词旁白。" : "") : "")
         );
       });
     }
@@ -356,7 +399,9 @@
     if (view === "video") {
       const demo = remotionMeta();
       const dur = video.duration && isFinite(video.duration) ? video.duration : demo.duration;
-      video.currentTime = i * (dur / Math.max(1, demo.pages));
+      video.currentTime = demo.chapters
+        ? demo.chapters[i].start
+        : i * (dur / Math.max(1, demo.pages));
       updateMeta();
       return;
     }
@@ -439,7 +484,7 @@
     }
   });
 
-  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("yijianmei")]).catch((err) => {
+  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("collection")]).catch((err) => {
     setStatus("载入示例失败：" + err.message);
   });
 })();
