@@ -1,6 +1,15 @@
 (function () {
   "use strict";
 
+  const YUANXI_TEXT = `青玉案·元夕
+
+東風夜放花千樹，更吹落、星如雨。
+寶馬雕車香滿路。
+鳳簫聲動，玉壺光轉，一夜魚龍舞。
+蛾兒雪柳黃金縷，笑語盈盈暗香去。
+眾裡尋他千百度；
+驀然回首，那人卻在，燈火闌珊處。`;
+
   const XIAOHUANG_TEXT = `蕭煌車
 
 蕭煌奇開什麼車？
@@ -38,6 +47,17 @@
 雨停以后，阳光把窗台晒得暖暖的。`;
 
   const REMOTION = {
+    yuanxi: {
+      video: "assets/yuanxi-preview.mp4",
+      poster: "assets/yuanxi-poster.jpg",
+      download: "青玉案·元夕.mp4",
+      sheet: "assets/yuanxi-character-sheet.jpg",
+      sheetAlt: "元夕尋人角色設定",
+      pages: 7,
+      duration: 34.9,
+      storyUrl: "yuanxi.json",
+      colorOnly: true,
+    },
     xiaohuang: {
       video: "assets/xiaohuang-preview.mp4",
       poster: "assets/xiaohuang-poster.jpg",
@@ -95,6 +115,7 @@
   };
 
   const PRESETS = [
+    { id: "yuanxi", title: "青玉案·元夕", art: "ai", remotion: "yuanxi", text: YUANXI_TEXT },
     { id: "xiaohuang", title: "蕭煌車", art: "ai", remotion: "xiaohuang", text: XIAOHUANG_TEXT },
     { id: "suolong", title: "鎖龍頭", art: "ai", remotion: "suolong", text: SUOLONG_TEXT },
     { id: "liuti", title: "留體力學", art: "ai", remotion: "liuti", text: LIUTI_TEXT },
@@ -130,7 +151,7 @@
   const book = $("book");
   const player = new StoryPlayer(canvas);
   let demoStories = {};
-  let activeRemotion = "xiaohuang";
+  let activeRemotion = "yuanxi";
   let source = "ai";
   let uploaded = [];
   let view = "video";
@@ -416,7 +437,7 @@
     }
   });
 
-  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("xiaohuang")]).catch((err) => {
+  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("yuanxi")]).catch((err) => {
     setStatus("载入示例失败：" + err.message);
   });
 })();
