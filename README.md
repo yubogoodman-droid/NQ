@@ -76,7 +76,7 @@ python3 examples/watch_tw_5m_fade.py alert
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 鎖定 MA60：`pinescript/tw_5m_fade_ma60.pine`。可調均線版：`pinescript/tw_5m_fade_ma_stack.pine`。
 
-近一個月（2026-08-31 起，成交額前 80、700 以上拿掉）：5m 破 **MA60** 比破年線賺。同濾網破 MA240 是 31 筆、64.5%、+28.0%。垂直空砸距線 >3% 不追。
+近一個月（2026-08-31–09-30，成交額前 80、700 以上拿掉、實掃 46 檔）：5m 破 **MA60** **23 筆、勝率 65.2%、合計 +32.8%**。同濾網破 MA240 是 31 筆、64.5%、+28.0%。垂直空砸距線 >3% 不追。
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-fade-short-9faf/docs/tw-5m-fade/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
