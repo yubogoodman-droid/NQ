@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic tests for TW 5m 國巨-style 空排跌破 MA240 (no network)."""
+"""Synthetic tests for TW 5m 國巨-style 空排跌破均線 (default MA60; MA240 still covered)."""
 
 from __future__ import annotations
 
@@ -67,14 +67,16 @@ def _ohlc_from_close(close: np.ndarray, index: pd.DatetimeIndex | None = None) -
     )
 
 
-def make_ma240_break_bars(*, n_days: int = 7, dump_offset: int = 0) -> pd.DataFrame:
+def make_ma240_break_bars(*, n_days: int = 7, dump_offset: int = 0, dump_pct: float = 0.012) -> pd.DataFrame:
     """前幾日緩升站在年線上，最後一盤 dump_offset 根後急殺跌破 MA240。"""
     idx = _tw_session_index(n_days)
     n = len(idx)
     dump_i = (n_days - 1) * BARS_PER_DAY + dump_offset
     climb = np.linspace(90.0, 118.0, dump_i)
-    rest = np.full(n - dump_i, 100.0)
-    close = np.r_[climb, rest]
+    probe = np.r_[climb, np.full(n - dump_i, climb[-1])]
+    ma240 = sma(probe, 240)
+    dump_px = float(ma240[dump_i]) * (1.0 - dump_pct)
+    close = np.r_[climb, np.full(n - dump_i, dump_px)]
     df = _ohlc_from_close(close, idx)
     df.iloc[dump_i, df.columns.get_loc("Volume")] = 4800.0
     return df
@@ -122,7 +124,7 @@ def make_same_day_recross() -> pd.DataFrame:
     ma240 = sma(close, 240)
     k_up, k_dn = dump_i + 2, dump_i + 3
     close[k_up] = float(ma240[k_up]) * 1.012
-    close[k_dn:] = 100.0
+    close[k_dn:] = float(ma240[k_dn]) * 0.988
     return _ohlc_from_close(close, df.index)
 
 
@@ -156,11 +158,12 @@ def test_ribbon_down() -> None:
 
 def test_detect_ma240_break() -> None:
     df = make_ma240_break_bars()
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, ma_n=240)
     assert sigs, "箱體站上後急殺跌破 MA240 應出訊號"
     sig = sigs[0]
     assert sig.entry_idx == sig.break_idx
     assert sig.entry_price < sig.ma240
+    assert sig.ma_n == 240
     assert sig.dist_pct >= MIN_BREAK_PCT
     assert sig.prior_over >= 0.005
     ma240s = sma(df["Close"].to_numpy(float), 240)
@@ -174,31 +177,56 @@ def test_detect_ma240_break() -> None:
 def test_yangming_like_open_dump_not_skipped() -> None:
     """開盤後不久跌破也要抓（陽明 09:05），前一盤箱體站上，不要擋 09:30 前。"""
     df = make_ma240_break_bars(dump_offset=1)
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, ma_n=240)
     assert sigs
     ts = df.index[sigs[0].entry_idx]
     assert (ts.hour, ts.minute) == (9, 5)
-    early = detect_signals(df, skip_before=(9, 30))
-    late = detect_signals(df, skip_before=None)
+    early = detect_signals(df, ma_n=240, skip_before=(9, 30))
+    late = detect_signals(df, ma_n=240, skip_before=None)
     assert len(late) >= len(early)
+
+
+def test_detect_ma60_break() -> None:
+    idx = _tw_session_index(7)
+    n = len(idx)
+    dump_i = 6 * BARS_PER_DAY
+    climb = np.linspace(90.0, 118.0, dump_i)
+    climb[-30:] = np.linspace(118.0, 116.2, 30)
+    probe = np.r_[climb, np.full(n - dump_i, climb[-1])]
+    ma60 = sma(probe, 60)
+    dump_px = float(ma60[dump_i]) * (1.0 - 0.012)
+    close = np.r_[climb, np.full(n - dump_i, dump_px)]
+    df = _ohlc_from_close(close, idx)
+    sigs = detect_signals(df)
+    assert sigs
+    assert sigs[0].ma_n == 60
+    assert sigs[0].entry_price < sigs[0].ma240
+    assert MIN_BREAK_PCT <= sigs[0].dist_pct <= 0.03
+
+
+def test_air_pocket_rejected() -> None:
+    """垂直空砸超過 3% 不追（停損會被拉太寬）。"""
+    df = make_ma240_break_bars(dump_pct=0.07)
+    assert detect_signals(df, ma_n=240) == []
+    assert detect_signals(df, ma_n=240, max_break_pct=0.0)
 
 
 def test_hairline_nick_rejected() -> None:
     df = make_hairline_ma240_nick()
-    assert detect_signals(df) == []
-    loose = detect_signals(df, min_break_pct=0.0, min_prior_over_pct=0.0, one_per_day=False)
+    assert detect_signals(df, ma_n=240) == []
+    loose = detect_signals(df, ma_n=240, min_break_pct=0.0, min_prior_over_pct=0.0, one_per_day=False)
     assert loose, "關掉國巨濾網時貼線刺一下仍會出"
 
 
 def test_prior_session_already_broken_rejected() -> None:
     df = make_prior_session_already_broken()
-    assert detect_signals(df) == []
+    assert detect_signals(df, ma_n=240) == []
 
 
 def test_one_signal_per_day() -> None:
     df = make_same_day_recross()
-    once = detect_signals(df)
-    many = detect_signals(df, one_per_day=False)
+    once = detect_signals(df, ma_n=240)
+    many = detect_signals(df, ma_n=240, one_per_day=False)
     assert once
     assert len(once) == 1
     assert len(many) >= 2
@@ -208,7 +236,7 @@ def test_one_signal_per_day() -> None:
 def test_prior_session_ignores_today() -> None:
     """陽明 09:05：前一根 09:00 可能只貼 0.5%，要用前一交易日。"""
     df = make_ma240_break_bars(dump_offset=1)
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, ma_n=240)
     assert sigs
     i = sigs[0].entry_idx
     close = df["Close"].to_numpy(float)
@@ -220,13 +248,13 @@ def test_prior_session_ignores_today() -> None:
 
 
 def test_flat_market_has_no_signal() -> None:
-    assert detect_signals(make_flat_above_ma240()) == []
+    assert detect_signals(make_flat_above_ma240(), ma_n=240) == []
 
 
 def test_skip_before_filters_all_morning() -> None:
     df = make_ma240_break_bars()
-    assert detect_signals(df)
-    assert detect_signals(df, skip_before=(23, 59)) == []
+    assert detect_signals(df, ma_n=240)
+    assert detect_signals(df, ma_n=240, skip_before=(23, 59)) == []
 
 
 def test_drop_incomplete_5m() -> None:
@@ -249,7 +277,7 @@ def test_drop_incomplete_5m() -> None:
 
 def test_simulate_short_and_summarize() -> None:
     df = make_ma240_break_bars()
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, ma_n=240)
     trades = simulate(df, sigs)
     assert trades
     t = trades[0]
@@ -262,7 +290,7 @@ def test_simulate_short_and_summarize() -> None:
 
 def test_signal_key_and_alert_text() -> None:
     df = make_ma240_break_bars()
-    sig = detect_signals(df)[0]
+    sig = detect_signals(df, ma_n=240)[0]
     row = {"code": "2609", "name": "陽明", "symbol": "2609.TW"}
     key = signal_key(row, df, sig)
     assert key.startswith("2609.TW|")
@@ -279,7 +307,7 @@ def test_merge_universe_and_day_filter() -> None:
     merged = merge_universe(base, extra)
     assert [r["code"] for r in merged] == ["2330", "2609"]
     df = make_ma240_break_bars()
-    sig = detect_signals(df)[0]
+    sig = detect_signals(df, ma_n=240)[0]
     assert hit_on_day(df, sig, df.index[sig.entry_idx].date())
     assert not hit_on_day(df, sig, datetime(2026, 1, 1).date())
     day = df.index[sig.entry_idx].date()
@@ -302,13 +330,13 @@ def test_in_tw_session() -> None:
 
 def test_write_html(tmp_path: Path | None = None) -> None:
     df = make_ma240_break_bars()
-    sigs = detect_signals(df)
+    sigs = detect_signals(df, ma_n=240)
     trades = simulate(df, sigs)
     out_dir = tmp_path or Path("/tmp/tw5m_ma240_short_test")
     html = out_dir / "index.html"
     row = {"code": "2327", "name": "國巨", "symbol": "2327.TW"}
     hits = [(row, sigs[0], trades[0], df)]
-    path = write_html_report(html, hits, [row], "7d · 國巨濾網")
+    path = write_html_report(html, hits, [row], "7d · 國巨濾網", ma_n=240)
     text = path.read_text(encoding="utf-8")
     assert "MA240" in text
     assert "2327" in text
@@ -323,6 +351,8 @@ def main() -> int:
     test_ribbon_down()
     test_detect_ma240_break()
     test_yangming_like_open_dump_not_skipped()
+    test_detect_ma60_break()
+    test_air_pocket_rejected()
     test_hairline_nick_rejected()
     test_prior_session_already_broken_rejected()
     test_one_signal_per_day()

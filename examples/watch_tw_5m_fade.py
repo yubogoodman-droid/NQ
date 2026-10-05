@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""台股 5 分 K：5/10/20 空頭排列且收盤剛跌破 MA240 就推 Telegram。
+"""台股 5 分 K：5/10/20 空頭排列且收盤剛跌破 MA60 就推 Telegram。
 
-對齊國巨 2327 2026-09-29 09:00、陽明 2609 2026-08-26 09:05：前一盤箱體站在
-MA240 上，當根真下穿（不是貼年線刺一下）。5<10<20 下彎，收盤也低於 5/10/20。
-開盤第一根也算。一天只取第一筆。
+前一盤箱體站在 MA60 上，當根真下穿（距線 0.7%–3%）。5<10<20 下彎。
+開盤第一根也算。一天只取第一筆。國巨年線版用 --ma 240。
 
 用法:
-  python3 examples/watch_tw_5m_fade.py scan --symbols 2609 --range 7d --pages
   python3 examples/watch_tw_5m_fade.py scan --limit 80 --range 7d --pages
+  python3 examples/watch_tw_5m_fade.py scan --ma 240 --range 7d --pages
   python3 examples/watch_tw_5m_fade.py alert --test
-  python3 examples/watch_tw_5m_fade.py alert --dry-run --once
   python3 examples/watch_tw_5m_fade.py alert
 
 Telegram 憑證放 tg_config.env（勿提交）:
@@ -63,9 +61,12 @@ SEEN_PATH = REPO / "output" / "tw_5m_fade_seen.json"
 STATE_PATH = Path(__file__).resolve().parent / "tw_5m_fade_state.json"
 BRANCH = "cursor/tw-5m-fade-short-9faf"
 
-# 國巨濾網：真下穿 + 前一盤站在年線上。華新科／順達那種貼線 0.1% 不算。
+# 國巨濾網：真下穿 + 前一盤站在均線上。華新科／順達那種貼線 0.1% 不算。
+# 預設破 MA60（這一個月比較會賺）；國巨年線模板用 --ma 240。
+DEFAULT_MA_N = 60
 MIN_BREAK_PCT = 0.007
 MIN_PRIOR_OVER_PCT = 0.005
+MAX_BREAK_PCT = 0.03  # 垂直空砸（距線 >3%）停損會被拉太寬，不追
 PRIOR_LOOKBACK = 12
 PRIOR_MIN_BARS = 8
 
@@ -95,6 +96,7 @@ class FadeSignal:
     ma20: float
     volume_ratio: float
     prior_over: float
+    ma_n: int = DEFAULT_MA_N
 
 
 @dataclass
@@ -211,9 +213,9 @@ def prior_session_min_over(
     lookback: int = PRIOR_LOOKBACK,
     min_bars: int = PRIOR_MIN_BARS,
 ) -> float | None:
-    """前一交易日最後 lookback 根，(收盤−MA240)/MA240 的最小值。
+    """前一交易日最後 lookback 根，(收盤−均線)/均線 的最小值。
 
-    只用前一個日曆交易日，不含當天（陽明 09:05 的前一根 09:00 可能已貼近年線）。
+    只用前一個日曆交易日，不含當天（陽明 09:05 的前一根 09:00 可能已貼近均線）。
     有效均線根數不足則回 None。
     """
     sess = index[i].date()
@@ -248,9 +250,11 @@ def detect_signals(
     prior_lookback: int = PRIOR_LOOKBACK,
     prior_min_bars: int = PRIOR_MIN_BARS,
     one_per_day: bool = True,
+    ma_n: int = DEFAULT_MA_N,
+    max_break_pct: float = MAX_BREAK_PCT,
 ) -> list[FadeSignal]:
-    """國巨邏輯：前一盤箱體站在 MA240 上，當根真下穿，5/10/20 空排。一天一筆。"""
-    if df is None or len(df) < 241:
+    """國巨邏輯：前一盤箱體站在指定均線上，當根真下穿，5/10/20 空排。一天一筆。"""
+    if df is None or len(df) < ma_n + 1:
         return []
     close = df["Close"].to_numpy(float)
     high = df["High"].to_numpy(float)
@@ -258,36 +262,39 @@ def detect_signals(
     ma5 = sma(close, 5)
     ma10 = sma(close, 10)
     ma20 = sma(close, 20)
-    ma240 = sma(close, 240)
+    man = sma(close, ma_n)
     n = len(close)
     signals: list[FadeSignal] = []
     last_day = None
+    start = max(ma_n, 20)
 
-    for i in range(240, n):
+    for i in range(start, n):
         ts = df.index[i]
         if skip_before and (ts.hour, ts.minute) < skip_before:
             continue
-        if not _finite(ma5[i], ma10[i], ma20[i], ma240[i], ma240[i - 1], close[i], close[i - 1]):
+        if not _finite(ma5[i], ma10[i], ma20[i], man[i], man[i - 1], close[i], close[i - 1]):
             continue
         stacked = ribbon_down(ma5, ma10, ma20, i, require_falling=require_pretty)
-        crossed = float(close[i]) < float(ma240[i]) and float(close[i - 1]) >= float(ma240[i - 1])
+        crossed = float(close[i]) < float(man[i]) and float(close[i - 1]) >= float(man[i - 1])
         below_all = (
             float(close[i]) < float(ma5[i])
             and float(close[i]) < float(ma10[i])
             and float(close[i]) < float(ma20[i])
-            and float(close[i]) < float(ma240[i])
+            and float(close[i]) < float(man[i])
         )
         if not (stacked and crossed and below_all):
             continue
-        m240 = float(ma240[i])
+        mline = float(man[i])
         px = float(close[i])
-        dist = (m240 - px) / m240 if m240 else 0.0
+        dist = (mline - px) / mline if mline else 0.0
         if dist < min_break_pct:
+            continue
+        if max_break_pct > 0 and dist > max_break_pct:
             continue
         prior = prior_session_min_over(
             df.index,
             close,
-            ma240,
+            man,
             i,
             lookback=prior_lookback,
             min_bars=prior_min_bars,
@@ -304,7 +311,7 @@ def detect_signals(
                 entry_idx=i,
                 entry_price=px,
                 break_high=float(high[i]),
-                ma240=m240,
+                ma240=mline,
                 prev_close=float(close[i - 1]),
                 dist_pct=dist,
                 ma5=float(ma5[i]),
@@ -312,6 +319,7 @@ def detect_signals(
                 ma20=float(ma20[i]),
                 volume_ratio=vol_ratio,
                 prior_over=float(prior) if prior is not None else 0.0,
+                ma_n=ma_n,
             )
         )
         last_day = ts.date()
@@ -451,10 +459,11 @@ def draw_signal_png(
         ax.plot(list(xs), ma, color=col, lw=1.45 if n <= 20 else 1.05, label=f"{n}MA")
 
     bx, ex = sig.break_idx - start, sig.entry_idx - start
+    line_col = MA_COLORS.get(sig.ma_n, "#f472b6")
     if 0 <= bx < len(window):
-        ax.scatter([bx], [sig.ma240], s=42, color="#f472b6", zorder=6)
+        ax.scatter([bx], [sig.ma240], s=42, color=line_col, zorder=6)
         ax.annotate(
-            f"破MA240 {sig.ma240:.1f}",
+            f"破MA{sig.ma_n} {sig.ma240:.1f}",
             (bx, sig.ma240),
             textcoords="offset points",
             xytext=(0, 10),
@@ -469,7 +478,7 @@ def draw_signal_png(
     ts = df.index[sig.entry_idx]
     ax.set_title(
         f"{title}  {ts.strftime('%m-%d %H:%M')}  "
-        f"破 MA240 {sig.ma240:.1f} → {sig.entry_price:.1f}  5<10<20",
+        f"破 MA{sig.ma_n} {sig.ma240:.1f} → {sig.entry_price:.1f}  5<10<20",
         color="#e8f0ea",
         fontsize=11,
     )
@@ -490,8 +499,11 @@ def write_html_report(
     hits: list[tuple[dict, FadeSignal, FadeTrade | None, pd.DataFrame]],
     universe: list[dict],
     period: str,
+    *,
+    ma_n: int = DEFAULT_MA_N,
 ) -> Path:
     stats = summarize_trades([h[2] for h in hits if h[2] is not None])
+    ma_tag = f"MA{ma_n}"
     cards = []
     for i, (row, sig, trade, df) in enumerate(hits, 1):
         et = df.index[sig.entry_idx]
@@ -512,13 +524,13 @@ def write_html_report(
             "</header>"
             f"<div class='tags'><span class='tag tag-info'>{escape(row['symbol'])}</span>"
             f"<span class='tag'>5分K</span><span class='tag'>5&lt;10&lt;20</span>"
-            f"<span class='tag'>破MA240</span></div>"
+            f"<span class='tag'>破{escape(ma_tag)}</span></div>"
             "<pre class='trade-detail'>"
-            f"進場 {sig.entry_price:.2f}  破 MA240 {sig.ma240:.2f} @ {bt.strftime('%H:%M')}\n"
-            f"前收 {sig.prev_close:.2f}  距年線 {sig.dist_pct*100:.2f}%  "
+            f"進場 {sig.entry_price:.2f}  破 {ma_tag} {sig.ma240:.2f} @ {bt.strftime('%H:%M')}\n"
+            f"前收 {sig.prev_close:.2f}  距線 {sig.dist_pct*100:.2f}%  "
             f"前一盤 {sig.prior_over*100:+.2f}%\n"
             f"MA5 {sig.ma5:.2f}  MA10 {sig.ma10:.2f}  MA20 {sig.ma20:.2f}"
-            f"  MA240 {sig.ma240:.2f}"
+            f"  {ma_tag} {sig.ma240:.2f}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(label)}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -528,7 +540,7 @@ def write_html_report(
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>台股 5分K 空頭排列跌破 MA240</title>
+<title>台股 5分K 空頭排列跌破 {escape(ma_tag)}</title>
 <style>
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}}
 .page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
@@ -548,9 +560,9 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>台股 5分K 空頭排列跌破 MA240</h1>
+<h1>台股 5分K 空頭排列跌破 {escape(ma_tag)}</h1>
 <p class="muted">{escape(period)} · {len(universe)} 檔
-<br/>國巨邏輯：前一盤箱體站在 MA240 上，當根真下穿（距年線 ≥0.7%），5&lt;10&lt;20 下彎。開盤第一根也算，一天一筆。</p>
+<br/>國巨邏輯：前一盤箱體站在 {escape(ma_tag)} 上，當根真下穿（距線 0.7%–3%），5&lt;10&lt;20 下彎。開盤第一根也算，一天一筆。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(hits)}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -558,7 +570,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <div class="card">標的<b>{len({h[0]['code'] for h in hits})}</b></div>
 </div>
 </section>
-{''.join(cards) or "<div class='empty'>這段期間沒有 5/10/20 空排跌破 MA240</div>"}
+{''.join(cards) or f"<div class='empty'>這段期間沒有 5/10/20 空排跌破 {escape(ma_tag)}</div>"}
 </div></body></html>
 """
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -665,15 +677,15 @@ def fmt_alert(row: dict, df: pd.DataFrame, sig: FadeSignal) -> str:
     last = float(df["Close"].iloc[-1])
     name = row.get("name") or row["code"]
     return (
-        f"🟢 <b>5/10/20 空頭排列跌破 MA240</b>\n"
+        f"🟢 <b>5/10/20 空頭排列跌破 MA{sig.ma_n}</b>\n"
         f"{escape(str(name))} <code>{escape(row['code'])}</code>\n"
         f"時間: <code>{et.strftime('%Y-%m-%d %H:%M')} 台北</code>\n"
         f"現價: <code>{sig.entry_price:.2f}</code>（最新 {last:.2f}）\n"
-        f"破線: <code>{bt.strftime('%H:%M')}</code> MA240={sig.ma240:.2f}\n"
-        f"前收 {sig.prev_close:.2f} → 收 {sig.entry_price:.2f}（距年線 {sig.dist_pct*100:.2f}%）\n"
-        f"前一盤相對年線 {sig.prior_over*100:+.2f}%\n"
+        f"破線: <code>{bt.strftime('%H:%M')}</code> MA{sig.ma_n}={sig.ma240:.2f}\n"
+        f"前收 {sig.prev_close:.2f} → 收 {sig.entry_price:.2f}（距線 {sig.dist_pct*100:.2f}%）\n"
+        f"前一盤相對均線 {sig.prior_over*100:+.2f}%\n"
         f"MA5 {sig.ma5:.2f} &lt; MA10 {sig.ma10:.2f} &lt; MA20 {sig.ma20:.2f}\n"
-        f"#台股 #五分K #空頭排列 #MA240 #{row['code']}"
+        f"#台股 #五分K #空頭排列 #MA{sig.ma_n} #{row['code']}"
     )
 
 
@@ -782,12 +794,23 @@ def resolve_universe(args) -> list[dict]:
 
 def detect_kwargs_from_args(args) -> dict:
     any_nick = bool(getattr(args, "any_nick", False))
+    max_break = getattr(args, "max_break", MAX_BREAK_PCT)
+    if max_break is None:
+        max_break = MAX_BREAK_PCT
     return {
         "require_pretty": not bool(getattr(args, "loose", False)),
         "min_break_pct": 0.0 if any_nick else MIN_BREAK_PCT,
         "min_prior_over_pct": 0.0 if any_nick else MIN_PRIOR_OVER_PCT,
         "one_per_day": not any_nick,
+        "ma_n": int(getattr(args, "ma", DEFAULT_MA_N) or DEFAULT_MA_N),
+        "max_break_pct": float(max_break),
     }
+
+
+def report_html_path(ma_n: int) -> Path:
+    if ma_n == DEFAULT_MA_N:
+        return PAGES
+    return REPO / "docs" / f"tw-5m-ma{ma_n}" / "index.html"
 
 
 def scan_symbol(
@@ -798,6 +821,8 @@ def scan_symbol(
     min_break_pct: float = MIN_BREAK_PCT,
     min_prior_over_pct: float = MIN_PRIOR_OVER_PCT,
     one_per_day: bool = True,
+    ma_n: int = DEFAULT_MA_N,
+    max_break_pct: float = MAX_BREAK_PCT,
 ) -> tuple[list[tuple[FadeSignal, pd.DataFrame]], dict]:
     meta = {**row, "bars": 0, "error": "", "n_sig": 0}
     try:
@@ -806,7 +831,7 @@ def scan_symbol(
         meta["error"] = str(exc)[:80]
         return [], meta
     meta["bars"] = int(len(df))
-    if len(df) < 241:
+    if len(df) < ma_n + 1:
         meta["error"] = "too_few_bars"
         return [], meta
     if row.get("close") is None and len(df):
@@ -817,6 +842,8 @@ def scan_symbol(
         min_break_pct=min_break_pct,
         min_prior_over_pct=min_prior_over_pct,
         one_per_day=one_per_day,
+        ma_n=ma_n,
+        max_break_pct=max_break_pct,
     )
     meta["n_sig"] = len(sigs)
     return [(s, df) for s in sigs], meta
@@ -870,11 +897,11 @@ def cmd_scan(args) -> int:
         extra = f" {trade.exit_reason} {trade.pnl_pct*100:+.2f}%" if trade else ""
         print(
             f"  [{i}] {row['code']} {row.get('name','')} {ts.strftime('%m-%d %H:%M')} "
-            f"MA240 {sig.ma240:.2f} dist {sig.dist_pct*100:.2f}% "
+            f"MA{sig.ma_n} {sig.ma240:.2f} dist {sig.dist_pct*100:.2f}% "
             f"prior {sig.prior_over*100:+.2f}%{extra}"
         )
 
-    html_path = Path(args.html) if args.html else (PAGES if args.pages else None)
+    html_path = Path(args.html) if args.html else (report_html_path(dkw["ma_n"]) if args.pages else None)
     if html_path:
         period = args.range_
         on_day = resolve_on_day(args)
@@ -883,13 +910,14 @@ def cmd_scan(args) -> int:
             period = f"{on_day.isoformat()} · {args.range_}資料"
         elif since is not None:
             period = f"{since.isoformat()}起 · {args.range_}資料"
+        period += f" · MA{dkw['ma_n']}"
         if args.max_price is not None:
             period += f" · 股價≤{args.max_price:g}"
         if pretty:
             period += " · 均線下彎"
         if not getattr(args, "any_nick", False):
             period += " · 國巨濾網"
-        out = write_html_report(html_path, hits, universe, period)
+        out = write_html_report(html_path, hits, universe, period, ma_n=dkw["ma_n"])
         write_view_html(out)
         print(f"html={out}")
     return 0
@@ -908,6 +936,8 @@ def scan_once(
     min_break_pct: float = MIN_BREAK_PCT,
     min_prior_over_pct: float = MIN_PRIOR_OVER_PCT,
     one_per_day: bool = True,
+    ma_n: int = DEFAULT_MA_N,
+    max_break_pct: float = MAX_BREAK_PCT,
 ) -> None:
     state = load_state()
     alerted = set(state.get("alerted") or [])
@@ -921,6 +951,8 @@ def scan_once(
             min_break_pct=min_break_pct,
             min_prior_over_pct=min_prior_over_pct,
             one_per_day=one_per_day,
+            ma_n=ma_n,
+            max_break_pct=max_break_pct,
         )
         if meta["error"]:
             print(f"  skip {row['symbol']} {meta['error']}", file=sys.stderr)
@@ -974,7 +1006,7 @@ def cmd_alert(args) -> int:
         ok = tg_send(
             token,
             chat_id,
-            f"✅ 台股 5分K 空排跌破 MA240 bot 測試\n{datetime.now(TPE).strftime('%Y-%m-%d %H:%M:%S')} 台北",
+            f"✅ 台股 5分K 空排跌破 MA{DEFAULT_MA_N} bot 測試\n{datetime.now(TPE).strftime('%Y-%m-%d %H:%M:%S')} 台北",
             dry_run=args.dry_run,
         )
         return 0 if ok else 1
@@ -1013,7 +1045,7 @@ def cmd_alert(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="台股 5分K 空頭排列跌破 MA240 通知")
+    p = argparse.ArgumentParser(description="台股 5分K 空頭排列跌破 MA60 通知")
     sub = p.add_subparsers(dest="cmd")
 
     def add_universe(sp: argparse.ArgumentParser) -> None:
@@ -1028,19 +1060,31 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument(
             "--loose",
             action="store_true",
-            help="不要求均線下彎，只要 5<10<20 且跌破 MA240",
+            help="不要求均線下彎，只要 5<10<20 且跌破均線",
         )
         sp.add_argument(
             "--any-nick",
             action="store_true",
             help="關掉國巨濾網（不要求跌破深度、前一盤站上、一天一筆）",
         )
+        sp.add_argument(
+            "--ma",
+            type=int,
+            default=DEFAULT_MA_N,
+            help="要跌破的均線。預設 MA60；國巨年線模板用 --ma 240",
+        )
+        sp.add_argument(
+            "--max-break",
+            type=float,
+            default=MAX_BREAK_PCT,
+            help="跌破均線最大幅度（預設 0.03；0=不限）",
+        )
 
     s = sub.add_parser("scan", help="回看近幾日並可出 HTML")
     add_universe(s)
     s.add_argument("--today", action="store_true", help="只留台北今天的訊號")
     s.add_argument("--on", default="", help="只留這一天 YYYY-MM-DD")
-    s.add_argument("--since", default="", help="只留這天起的訊號 YYYY-MM-DD（資料仍用 --range，給 MA240 預熱）")
+    s.add_argument("--since", default="", help="只留這天起的訊號 YYYY-MM-DD（資料仍用 --range，給均線預熱）")
     s.add_argument("--pages", action="store_true")
     s.add_argument("--html", default="")
     s.set_defaults(func=cmd_scan)
