@@ -1,6 +1,18 @@
 (function () {
   "use strict";
 
+  const CRACK_TEXT = `螢幕裂痕
+
+今天發現我的手機螢幕上多了一道裂痕
+看著螢幕中的自己 提醒了我心中也有一道裂痕
+好痛苦 不知道該怎麼修補
+這道裂痕是由許多錯誤產生的
+一次挖掘一點 一次挖掘一點
+平常也總是在後悔這些錯誤
+但後悔又再次喚醒了痛苦
+滿身泥濘
+痛苦不已`;
+
   const YIJIANMEI_TEXT = `一剪梅
 李清照
 
@@ -50,6 +62,17 @@
 大樹跟小樹`;
 
   const REMOTION = {
+    crack: {
+      video: "assets/crack-preview.mp4",
+      poster: "assets/crack-poster.jpg",
+      download: "螢幕裂痕.mp4",
+      sheet: "assets/crack-character-sheet.jpg",
+      sheetAlt: "裂痕故事角色設定",
+      pages: 9,
+      duration: 28.2,
+      storyUrl: "crack.json",
+      colorOnly: true,
+    },
     collection: {
       video: "assets/all-stories.mp4?v=2",
       poster: "assets/all-stories-poster.jpg",
@@ -128,6 +151,7 @@
   };
 
   const PRESETS = [
+    { id: "crack", title: "螢幕裂痕", art: "ai", remotion: "crack", text: CRACK_TEXT },
     { id: "collection", title: "合集", art: "ai", remotion: "collection", text: COLLECTION_TEXT },
     { id: "yijianmei", title: "一剪梅", art: "ai", remotion: "yijianmei", text: YIJIANMEI_TEXT },
     { id: "suolong", title: "鎖龍頭", art: "ai", remotion: "suolong", text: SUOLONG_TEXT },
@@ -164,7 +188,7 @@
   const book = $("book");
   const player = new StoryPlayer(canvas);
   let demoStories = {};
-  let activeRemotion = "collection";
+  let activeRemotion = "crack";
   let source = "ai";
   let uploaded = [];
   let view = "video";
@@ -485,7 +509,7 @@
     }
   });
 
-  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("collection")]).catch((err) => {
+  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("crack")]).catch((err) => {
     setStatus("载入示例失败：" + err.message);
   });
 })();
