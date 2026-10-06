@@ -1,6 +1,16 @@
 (function () {
   "use strict";
 
+  const SHINIAN_TEXT = `十年
+
+多久沒在拉屎的時候不滑手機了
+十年 可能十五年
+記憶的畫面是在老家 馬桶的顏色還是最流行的iPhone勃根地紅
+蹲著馬桶 看著偷偷帶進廁所的火影漫畫
+那是平凡高中生的假日時光
+可惜讀的是男校 三年時間讓我喪失了跟女生溝通的能力
+少了這個能力 人生好像就沒那麼有趣了`;
+
   const CRACK_TEXT = `螢幕裂痕
 
 今天發現我的手機螢幕上多了一道裂痕
@@ -62,6 +72,17 @@
 大樹跟小樹`;
 
   const REMOTION = {
+    shinian: {
+      video: "assets/shinian-preview.mp4",
+      poster: "assets/shinian-poster.jpg",
+      download: "十年.mp4",
+      sheet: "assets/shinian-character-sheet.jpg",
+      sheetAlt: "十年故事角色設定",
+      pages: 7,
+      duration: 23.6,
+      storyUrl: "shinian.json",
+      colorOnly: true,
+    },
     crack: {
       video: "assets/crack-preview.mp4",
       poster: "assets/crack-poster.jpg",
@@ -151,6 +172,7 @@
   };
 
   const PRESETS = [
+    { id: "shinian", title: "十年", art: "ai", remotion: "shinian", text: SHINIAN_TEXT },
     { id: "crack", title: "螢幕裂痕", art: "ai", remotion: "crack", text: CRACK_TEXT },
     { id: "collection", title: "合集", art: "ai", remotion: "collection", text: COLLECTION_TEXT },
     { id: "yijianmei", title: "一剪梅", art: "ai", remotion: "yijianmei", text: YIJIANMEI_TEXT },
@@ -188,7 +210,7 @@
   const book = $("book");
   const player = new StoryPlayer(canvas);
   let demoStories = {};
-  let activeRemotion = "crack";
+  let activeRemotion = "shinian";
   let source = "ai";
   let uploaded = [];
   let view = "video";
@@ -509,7 +531,7 @@
     }
   });
 
-  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("crack")]).catch((err) => {
+  Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadRemotion("shinian")]).catch((err) => {
     setStatus("载入示例失败：" + err.message);
   });
 })();
