@@ -60,8 +60,8 @@ python3 examples/nq_ma_reclaim.py alert
 | 做空 | 停損在跌破那根高點與 MA60 較高者上方 0.3%；目標 2R；收到收 |
 
 ```bash
-# 近一週、700 以上拿掉
-python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 7d --pages
+# 近兩個禮拜
+python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 60d --since 2026-09-22 --until 2026-10-06 --html docs/tw-5m-fade-2w/index.html
 
 # 近一個月（60d 養均線，只計近 30 天）
 python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 60d --since 2026-08-31 --pages
