@@ -45,6 +45,40 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## 台股 5 分 K 空頭排列跌破 MA60
+
+前一盤箱體站在 **MA60** 上，當根真下穿（距線 0.7%–3%）。五分圖 **MA5 < MA10 < MA20 且三條下彎**。開盤第一根也算，一天只取第一筆。國巨 09-29 那種破年線用 `--ma 240`。
+
+| 條件 | 預設 |
+|------|------|
+| 週期 | 5 分 K |
+| 空排 | MA5 < MA10 < MA20，且三條都比前一根低 |
+| 跌破 | 前一根收盤 ≥ MA60，當根收盤跌破，距線 0.7%–3% |
+| 前一盤 | 前一交易日最後 12 根裡，收盤相對 MA60 最少 +0.5%（不含當天） |
+| 收盤 | 低於 MA5 / MA10 / MA20 / MA60 |
+| 次數 | 同一標的同一天只取第一筆 |
+| 做空 | 停損在跌破那根高點與 MA60 較高者上方 0.3%；目標 2R；收到收 |
+
+```bash
+# 近兩個禮拜
+python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 60d --since 2026-09-22 --until 2026-10-06 --html docs/tw-5m-fade-2w/index.html
+
+# 近一個月（60d 養均線，只計近 30 天）
+python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 60d --since 2026-08-31 --pages
+
+# 國巨年線版
+python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 60d --since 2026-08-31 --ma 240 --pages
+
+# Telegram（憑證放 tg_config.env）
+python3 examples/watch_tw_5m_fade.py alert --test
+python3 examples/watch_tw_5m_fade.py alert
+```
+
+盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 鎖定 MA60：`pinescript/tw_5m_fade_ma60.pine`。可調均線版：`pinescript/tw_5m_fade_ma_stack.pine`。
+
+近一個月（2026-08-31–09-30，成交額前 80、700 以上拿掉、實掃 46 檔）：5m 破 **MA60** **23 筆、勝率 65.2%、合計 +32.8%**。同濾網破 MA240 是 31 筆、64.5%、+28.0%。垂直空砸距線 >3% 不追。
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-fade-short-9faf/docs/tw-5m-fade/view.html
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash
