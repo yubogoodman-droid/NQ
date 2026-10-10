@@ -1,0 +1,30 @@
+{
+  "id": "trees-riddle",
+  "title": "大樹跟小樹",
+  "style": "colored-pencil-diary",
+  "styleName": "彩铅日记漫画",
+  "aspect": "3:4",
+  "width": 720,
+  "height": 960,
+  "durationSec": 13.7,
+  "text": "大樹跟小樹\n\n大樹跟小樹。\n大樹跟小樹差在那裏？\n答案是插在土裡。",
+  "video": "assets/tree-riddle-preview.mp4",
+  "poster": "assets/tree-poster.jpg",
+  "pages": [
+    {
+      "id": "01",
+      "kind": "beat",
+      "caption": "大樹跟小樹。"
+    },
+    {
+      "id": "02",
+      "kind": "beat",
+      "caption": "大樹跟小樹差在那裏？"
+    },
+    {
+      "id": "03",
+      "kind": "beat",
+      "caption": "答案是插在土裡。"
+    }
+  ]
+}

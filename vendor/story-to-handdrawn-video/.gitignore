@@ -1,0 +1,25 @@
+node_modules/
+build/
+out/
+release/
+public/assets/generated/
+prompts/generated/
+codex-image-jobs.json
+storyboard.generated.json
+uploaded-pages.json
+.env
+.env.*
+*.log
+*.tgz
+*.zip
+.DS_Store
+.npm-cache/
+
+# Private reference profiles, images and local evolution evidence
+.story-video/
+.dao/
+.media/
+
+# Independent public gallery deployment
+site-dist/
+.vercel/
