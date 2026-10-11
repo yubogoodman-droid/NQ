@@ -1,0 +1,24 @@
+{
+  "id": "screen-crack",
+  "title": "螢幕裂痕",
+  "style": "colored-pencil-diary",
+  "styleName": "彩铅日记漫画",
+  "aspect": "3:4",
+  "width": 720,
+  "height": 960,
+  "durationSec": 28.2,
+  "text": "螢幕裂痕\n\n今天發現我的手機螢幕上多了一道裂痕\n看著螢幕中的自己 提醒了我心中也有一道裂痕\n好痛苦 不知道該怎麼修補\n這道裂痕是由許多錯誤產生的\n一次挖掘一點 一次挖掘一點\n平常也總是在後悔這些錯誤\n但後悔又再次喚醒了痛苦\n滿身泥濘\n痛苦不已",
+  "video": "assets/crack-preview.mp4",
+  "poster": "assets/crack-poster.jpg",
+  "pages": [
+    { "id": "01", "kind": "beat", "caption": "今天發現我的手機螢幕上多了一道裂痕" },
+    { "id": "02", "kind": "beat", "caption": "看著螢幕中的自己 提醒了我心中也有一道裂痕" },
+    { "id": "03", "kind": "beat", "caption": "好痛苦 不知道該怎麼修補" },
+    { "id": "04", "kind": "beat", "caption": "這道裂痕是由許多錯誤產生的" },
+    { "id": "05", "kind": "beat", "caption": "一次挖掘一點 一次挖掘一點" },
+    { "id": "06", "kind": "beat", "caption": "平常也總是在後悔這些錯誤" },
+    { "id": "07", "kind": "beat", "caption": "但後悔又再次喚醒了痛苦" },
+    { "id": "08", "kind": "beat", "caption": "滿身泥濘" },
+    { "id": "09", "kind": "beat", "caption": "痛苦不已" }
+  ]
+}
