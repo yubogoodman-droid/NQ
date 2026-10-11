@@ -84,6 +84,29 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## 台股 1 小時 K 達發多
+
+1 小時圖，對齊 6526 達發 2026-09-18 開盤那根（9:00–10:00，部分看盤軟體標成 10:00）：
+
+- 只看每個交易日第一根。
+- 跳空：這根低點高於前一根高點。
+- 站上 MA60：前一根收盤還在 MA60 下面，這根低點與收盤都在 MA60 上面。
+- MA5 > MA10 > MA20。
+
+進場為這根收盤。持有到之後第 5 個時段收盤；盤中跌破進場價 10% 才停損。
+
+```bash
+python3 examples/tw_1h_daifa.py --days 30 --range 3mo --pages
+python3 examples/tw_1h_daifa.py --symbol 6526.TW --days 30 --range 3mo
+python3 examples/test_tw_1h_daifa.py
+```
+
+近 30 日（基準日 2026-10-02）、成交額前 200 且股價 < 1000（另列 6526）：**26 筆、已平勝率 52.0%、平均 +2.37%**。持有到期 23 筆、跌破 10% 2 筆、未平 1 筆。先前停在開盤低點、目標 2R 時，同一批是勝率 34.6%、平均 +0.82%。6526 達發 9/18 09:00 進場 646，抱到 9/24 收盤 **+29.4%**。
+
+六個月、同一批股票 147 筆拿來對過出場：停在開盤低點勝率 44%、平均 +0.7%；改成持有 5 個收盤、跌 10% 才停，勝率 **56.5%**、平均 **+3.2%**，最差停在 −10%（不設停損的話最差約 −26%）。10% 再放寬，勝率幾乎不再升。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-daifa-gap-be19/docs/tw-1h-daifa/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
