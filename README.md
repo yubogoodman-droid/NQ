@@ -45,6 +45,24 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## NQ 一分 K Gork多＋線性空｜自動版（含兩個新門檻）
+
+`pinescript/gork_linear_combo_auto.pine` 掛 NQ1! / MNQ1! 一分圖；`examples/nq_gork_linear_combo.py` 同一套規則的 Yahoo 1m 回測。  
+在原本自動版之上只加兩個門檻（Pine 內標 ★，各有 input，0=關）：
+
+- 線性空進場風險上限：`peakHigh − 進場收盤 > 55` 就跳過。贏單的風險最高只到 48.25，>50 的全是停損。
+- Gork 多只在 1m MA200 下彎時做：`MA200 ≥ MA200[30]` 就跳過。MA200 還在升代表那 50 點只是一根針，不是洗盤。
+
+```bash
+python3 examples/nq_gork_linear_combo.py --compare      # 基準 vs 優化，逐筆／逐日
+python3 examples/nq_gork_linear_combo.py --baseline     # 原規則
+python3 examples/nq_gork_linear_combo.py --csv my_1m.csv --lin-max-risk 60 --gork-ma200-slope 0
+```
+
+Yahoo 1m（2026-09-08 → 10-02 ET，25,674 根）：**基準 47 筆 +296 → 優化 41 筆 +523，最大回撤 −363 → −208**。  
+擋掉 6 筆、全是停損（線性空 −74.75、−62.25；Gork −11、−33、−24、−22），沒有任何一筆 +100／+111 被砍。  
+線性空這腿逐筆對得上實盤 10/1–10/2 的五筆；Gork 腿是依舊版 `nq_ma200_stand.pine` 骨架重建的近似版，筆數比實盤多，月度數字只看方向。
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash
