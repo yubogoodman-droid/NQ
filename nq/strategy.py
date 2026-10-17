@@ -1,4 +1,4 @@
-"""NQ 五分 K W 底進場策略。"""
+"""NQ 五分 K：破三小時低點後一小時內 MA5/MA20 多排站上 MA60 做多。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from enum import Enum
 
 import pandas as pd
 
-from nq.patterns import WBottomPattern, detect_w_bottoms
+from nq.patterns import ReclaimPattern, detect_reclaims
 
 
 class Side(str, Enum):
@@ -16,14 +16,12 @@ class Side(str, Enum):
 
 @dataclass(frozen=True)
 class Signal:
-    """進場訊號。"""
-
     timestamp: pd.Timestamp
     side: Side
     entry: float
     stop_loss: float
     target: float
-    pattern: WBottomPattern
+    pattern: ReclaimPattern
     bar_idx: int
 
     @property
@@ -38,42 +36,40 @@ class Signal:
 @dataclass
 class NQWBottomStrategy:
     """
-    NQ（那斯達克期貨）五分 K W 底做多策略。
-
-    進場：第二低點確認且收盤突破頸線
-    停損：第二低點
-    停利：量度漲幅（頸線 - 最低點）投射至突破點上方
+    五分 K 跌破近 3 小時低點後，1 小時內（12 根）
+    收盤站上 MA60，且 MA5 > MA20 > MA60，做多。
+    停損：破底低點下方 20 點
+    停利：2R
     """
 
-    swing_lookback: int = 3
-    low_tolerance_pct: float = 0.001
-    min_bars_between_lows: int = 5
-    max_bars_between_lows: int = 60
+    lookback_bars: int = 36
+    reclaim_bars: int = 12
+    ma5_period: int = 5
+    ma20_period: int = 20
+    ma60_period: int = 60
+    stop_below_break_points: float = 20.0
+    reward_risk: float = 2.0
     tick_size: float = 0.25
-    point_value: float = 20.0  # NQ 每點 $20
+    point_value: float = 20.0
 
     def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
-        patterns = detect_w_bottoms(
+        patterns = detect_reclaims(
             df,
-            swing_lookback=self.swing_lookback,
-            low_tolerance_pct=self.low_tolerance_pct,
-            min_bars_between_lows=self.min_bars_between_lows,
-            max_bars_between_lows=self.max_bars_between_lows,
-            require_neckline_break=True,
+            lookback_bars=self.lookback_bars,
+            reclaim_bars=self.reclaim_bars,
+            ma5_period=self.ma5_period,
+            ma20_period=self.ma20_period,
+            ma60_period=self.ma60_period,
         )
-
         signals: list[Signal] = []
         for pattern in patterns:
-            if pattern.breakout_idx is None:
-                continue
-            idx = pattern.breakout_idx
-            entry = self._round_tick(df["close"].iloc[idx])
-            stop = self._round_tick(pattern.stop_loss)
-            target = self._round_tick(pattern.target)
-
+            idx = pattern.entry_idx
+            entry = self._round_tick(float(df["close"].iloc[idx]))
+            stop = self._round_tick(pattern.break_low - self.stop_below_break_points)
             if entry <= stop:
                 continue
-
+            risk = entry - stop
+            target = self._round_tick(entry + self.reward_risk * risk)
             signals.append(
                 Signal(
                     timestamp=df.index[idx],
@@ -85,7 +81,6 @@ class NQWBottomStrategy:
                     bar_idx=idx,
                 )
             )
-
         return signals
 
     def _round_tick(self, price: float) -> float:
