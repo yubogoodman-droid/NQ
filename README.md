@@ -22,6 +22,32 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 一分 K 破底站上 MA200
+
+1 分鐘圖，無五分 MA60。你的基準一個月 **55 筆 / 約 +1301**。  
+Yahoo 1m 目前約 **2026-08-07 03:17 → 09-04**：**40 筆 / 勝率 42.5% / +1299**（再進 1 筆）。進場收盤必須在 MA60 上。停損為 **MA200−10**；進場在 15m MA200 上被停損後，30 分鐘內站回原進場價再進一次（再進也要距 MA200 ≤30）。五分全均帶寬 <28，或再進時五分 MA5–30 <20，視為糾結不進。十五分 MA20 明顯下彎且收盤貼在其下 ≤15 不進。每筆圖有 **5m / 15m / 1h 對照**，並附成交量與 MACD(12/26/9)。
+
+1. MA5>10>20>30>60，且收盤在 MA60 上
+2. 站上 MA200 連 ≥3，且距離 ≤30
+3. 破兩小時低後 1 小時內
+4. 進場前 1 小時曾連續 ≥15 根在 MA200 下
+5. 美東 9:30–10:00 不進
+6. 紅 K 長上影跳過
+7. 停損 MA200−10，停利 +100
+8. 浮盈先到 +60，停損提到進場價
+9. 進場在 15m MA200 上被停損後，30 分鐘內站回原進場價再進一次（只一次，停損同上；再進也要距 MA200 ≤30）
+10. 五分全均帶寬 <28 不進；再進另看五分 MA5–30 <20
+11. 十五分 MA20 明顯下彎（1 小時至少掉 20）且收盤在其下 ≤15 不進；同一破底不再往後找
+
+```bash
+python3 examples/nq_ma200_stand.py backtest --period 30d --pages
+python3 examples/nq_ma200_stand.py backtest --period 8d --html output/nq_ma200_stand.html
+```
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma200-stand-1bd0/docs/nq-ma200-stand/view.html
+
+Pine / Telegram Alert 之後再掛。
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
