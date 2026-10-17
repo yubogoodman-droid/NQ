@@ -78,6 +78,40 @@ python3 examples/tw_1h_reclaim.py --limit 0 --days 7 --range 1mo
 
 # 單元測試（不打網路）
 python3 examples/test_tw_1h_reclaim.py
+python3 examples/test_watch_tw_1h_reclaim.py
+```
+
+### Telegram 監看（只通知、不下單）
+
+把 `examples/tw_1h_reclaim.py` 的同一套 1h 破底翻做成盤中監看：只推 Telegram，**不下單、沒有 Shioaji**。  
+規則與回測預設相同（成交額前 200、股價 1000 以上刪掉、6～36 根元晶型）。  
+只在台北時間**平日 09:00–13:30** 評估與發送；08:30–09:00 盤前試撮／測試撮合忽略。只用**已收完的 1h K**（09:00 那根要 10:00 才算、13:00 那根 13:30 收完），進行中的蠟燭不會觸發。每個訊號寫入 `output/tw_1h_reclaim_alert_state.json`（gitignored），重啟不會重發。
+
+這個 repo **沒有常駐主機**。GitHub Pages workflow 只部署 `docs/`，不會跑監看、也不會發 Telegram。要收訊請在一台維持台北時區的機器自己跑（本機或 VPS）。
+
+```bash
+cp tg_config.env.example tg_config.env   # 勿提交
+# TELEGRAM_BOT_TOKEN=（BotFather 給 @Tw6688bot 的 token）
+# TELEGRAM_CHAT_ID=1297264584
+
+python3 examples/watch_tw_1h_reclaim.py --dry-run --once   # 不呼叫 Telegram
+python3 examples/watch_tw_1h_reclaim.py --test --dry-run   # 只印測試文案
+python3 examples/watch_tw_1h_reclaim.py                    # 實盤監看（需要憑證）
+# Yahoo 被擋時改單執行緒：
+python3 examples/watch_tw_1h_reclaim.py --workers 1 --sleep 0.18
+```
+
+第一次在盤中啟動時，**當天已收完、且狀態檔還沒記過的訊號會補推**；更早的歷史只記進狀態、不發。`--dry-run` 成功視同已送，也會寫狀態。
+
+systemd 範例（把路徑換成你的 clone；憑證用 `EnvironmentFile`，不要寫進 unit 檔）：
+
+```
+[Service]
+WorkingDirectory=/opt/NQ
+EnvironmentFile=/opt/NQ/tg_config.env
+ExecStart=/usr/bin/python3 examples/watch_tw_1h_reclaim.py
+Restart=always
+RestartSec=30
 ```
 
 2026-08-26 → 09-24、成交額前 200 且**股價 < 1000**：元晶型 **149 筆、104 檔**。已平 142 筆勝率 **50.7%**，平均 **+1.30%**；2R 16 筆平均 +12.7%，停損 39 筆平均 −4.8%。6443 元晶 9/16 進場，次日 2R +5.98%。
