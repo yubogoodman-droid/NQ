@@ -84,6 +84,36 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## 台股 1 小時 K 突破後回踩 MA60
+
+對齊晶心科：先在 MA60 下面待 ≥ 12 根且夠深，收盤站上（站上那根不能已噴離均線），拉開後再回測均線附近才通知。已經在圖表右上角的不報。
+
+回測出場：停在回踩低（至少 0.8%）、目標 2R、或 20 根時間停。
+
+```bash
+# 成交額前 200，股價 1000 以上刪掉（不往後補名次）
+python3 examples/tw_1h_ma60_retest.py --days 3 --range 2mo --pages --html docs/tw-1h-ma60-retest-3d/index.html
+python3 examples/tw_1h_ma60_retest.py --days 7 --range 2mo --pages
+
+# Telegram：只在突破 MA60 後回測均線附近通知（晶心科型，不要右上角追價）
+python3 examples/tw_1h_ma60_retest.py --alert --test
+python3 examples/tw_1h_ma60_retest.py --alert --dry-run --once
+python3 examples/tw_1h_ma60_retest.py --alert
+
+# 單元測試（不打網路）
+python3 examples/test_tw_1h_ma60_retest.py
+```
+
+晶心科 2026-09-23 11:00 回測 MA60 **252**（均線 248），之後 2R **+3.53%**；333 漲停是通知之後才走的。右上角追價不再報。
+
+Telegram 憑證放 `tg_config.env`（勿提交）。
+
+近三天（9/30–10/2）**7 筆**：停損 1、2R 1、未平 5，平均 +0.37%。
+
+三天圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-ma60-retest-3376/docs/tw-1h-ma60-retest-3d/view.html
+
+週報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-ma60-retest-3376/docs/tw-1h-ma60-retest-7d/view.html
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  

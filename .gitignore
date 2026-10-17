@@ -7,4 +7,6 @@ output/*.json
 tg_config.env
 tg_alert_state.json
 examples/tg_alert_state.json
+examples/tg_tw_1h_ma60_state.json
+output/tw_1h_ma60_alert_state.json
 examples/tg_config.env
