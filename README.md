@@ -22,6 +22,51 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 五分 K 打底後 5/10/20 多排
+
+五分鐘圖：急跌、低點短打底或急殺 V，然後 **MA5 > MA10 > MA20 散開上攻**才做多。  
+對齊三張截圖：08-25 22:20、07-22 19:50、07-28 11:05。  
+收盤剛站上 MA30、這根低點還在線下的不進（06-23 那種貼著壓力）。
+
+近一個月 Yahoo 5m（07-23 → 08-26）：嚴格 **4 筆、勝率 100%、+327**（含 07-28 V 和 08-25 U；07-22 夜盤在 30 天窗外）。  
+近兩個月（06-16 → 08-26）：嚴格 **9 筆、勝率 77.8%、+747**。濾掉 06-23 / 06-28 / 07-17 / 07-30 四筆貼 MA30 的。  
+近一週（08-28 → 09-04）：嚴格 **0 筆**。放寬版 2 筆、勝率 0%、−76。09-03 07:20 有一筆散開但貼 MA30，濾掉的話是 −39。
+
+```bash
+python3 examples/nq_5m_base_stack.py backtest --period 7d --pages
+python3 examples/nq_5m_base_stack.py backtest --period 30d --pages
+python3 examples/nq_5m_base_stack.py backtest --period 60d --pages
+python3 examples/nq_5m_base_stack.py backtest --period 30d --pages --loose
+python3 examples/nq_5m_base_stack.py alert --test
+python3 examples/nq_5m_base_stack.py alert --dry-run --once
+```
+
+預覽（近一週）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/one-week.html
+
+預覽（兩個月 9 筆，濾掉貼 MA30）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/no-ma30.html
+
+TradingView：`pinescript/nq_5m_base_stack.pine`
+
+## NQ 五分 K 破兩小時低後 1 小時內 5/10/20 多排
+
+五分鐘圖：跌破近 **2 小時低點**後，**1 小時內**（12 根）收盤站回且 **MA5>MA10>MA20 多排**才做多。  
+停損破底低下方 −8；目標 2R（保本 / 移動 / 12 根後跌破 MA20）。
+
+近一週 Yahoo 5m（08-28 → 09-04）：**4 筆、勝率 75%、+102**。  
+近一個月（08-02 → 09-04）：**26 筆、勝率 46%、+300、均 +12**。  
+破底夠深 96 → 站回但沒多排 252 → 風險太大 39 → 進場 26。
+
+```bash
+python3 examples/nq_5m_reclaim.py backtest --period 7d --pages
+python3 examples/nq_5m_reclaim.py backtest --period 30d --pages
+```
+
+預覽（一個月）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-month-1h.html
+
+預覽（一週）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-week-1h.html
+
+TradingView：`pinescript/nq_5m_reclaim.pine`
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
