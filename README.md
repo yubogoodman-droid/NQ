@@ -84,6 +84,47 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## 台股 1 小時 K：5/10/20 多頭排列站上 MA240（智原型）
+
+對齊 3035 智原小時 K：**當下這根**收盤才站上 MA240（至少高出一個跳動點；上一根還沒站上），且 **MA5 > MA10 > MA20**。已經站在 MA240 上面、只是短均才排好的不算。貼線不到 1 檔（例如 2317 鴻海 10/02 收 251.50、MA240 251.49）不算站上。
+
+預設只掃**成交額前 200**，股價達 1000 的剔除、不從第 201 名遞補（固定含智原）。GitHub Actions 在台北 10:03 / 11:03 / 12:03 / 13:03 / 13:33 代跑。`--symbols 3035` 只盯智原。
+
+成交額前 200、股價未達 1000（10/02 留下 **155 檔**，1000 元以上 45 檔剔除、不遞補）。2026-09-03 → 10-02，**當下這根才站上 MA240，且至少 1 檔**：
+
+- **近 7 日 21 筆 / 15 檔**，+1d 勝率 **69%**、平均 **+2.35%**；+3d 平均 **+2.48%**
+- **近 30 日 78 筆 / 55 檔**，+1d 勝率 **37%**、平均 **+0.29%**；+3d 平均 **+2.78%**
+- 10/02 最後一根：2337 旺宏（鴻海貼線、第 201 名以後的票都已排除）
+- 智原本身近 90 日只有 **9/17 09:00、11:00** 兩筆真的從下方站上（+1d +6.11% / +5.23%）
+
+7 日圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-7d/view.html  
+30 日圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-30d/view.html
+
+```bash
+# 單元測試（不打網路）
+python3 examples/test_tw_1h_stack_ma240.py
+
+# 測 Telegram（憑證放 tg_config.env，勿提交）
+python3 examples/tw_1h_stack_ma240.py --test
+
+# 成交額前 200：剛收的那根才站上 MA240
+python3 examples/tw_1h_stack_ma240.py --now --dry-run
+
+# 只掃剛收盤的 1～2 根並推播（盤後 / Actions）
+python3 examples/tw_1h_stack_ma240.py --dry-run --once
+python3 examples/tw_1h_stack_ma240.py --once
+
+# 等到下一根小時 K 收盤再掃
+python3 examples/tw_1h_stack_ma240.py
+
+# 近一週 / 近一個月回測
+python3 examples/tw_1h_stack_ma240.py scan --days 7 --pages
+python3 examples/tw_1h_stack_ma240.py scan --days 30 --pages
+
+# 只盯智原
+python3 examples/tw_1h_stack_ma240.py --symbols 3035 --now --dry-run
+```
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  

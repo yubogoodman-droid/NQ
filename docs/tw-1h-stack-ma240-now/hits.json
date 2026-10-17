@@ -1,0 +1,42 @@
+{
+  "stats": {
+    "count": 1,
+    "names": 1,
+    "fwd_1d": null,
+    "fwd_1d_n": 0,
+    "fwd_1d_wr": 0.0,
+    "fwd_3d": null,
+    "fwd_3d_n": 0,
+    "fwd_3d_wr": 0.0,
+    "fwd_5d": null,
+    "fwd_5d_n": 0,
+    "fwd_5d_wr": 0.0
+  },
+  "extra": {
+    "date": "20261002",
+    "range": "6mo",
+    "limit": 200,
+    "max_price": 1000.0,
+    "symbols": "",
+    "generated": "2026-10-03T17:46:37+08:00",
+    "days": 0,
+    "now_only": true
+  },
+  "hits": [
+    {
+      "code": "2337",
+      "name": "旺宏",
+      "symbol": "2337.TW",
+      "time": "2026-10-02 13:30:00+08:00",
+      "close": 122.0,
+      "ma5": 121.8,
+      "ma10": 121.65,
+      "ma20": 120.875,
+      "ma240": 121.26875003178914,
+      "above_ma240_pct": 0.006029995097823315,
+      "fwd_1d": null,
+      "fwd_3d": null,
+      "fwd_5d": null
+    }
+  ]
+}
