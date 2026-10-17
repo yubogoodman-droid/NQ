@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>幣安成交額前 100 · 牛來型 M 頭做空</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}
+.page{max-width:560px;margin:0 auto;padding:14px 12px 32px}
+h1{font-size:18px;margin:0 0 6px}
+.muted{color:#8b949e;font-size:13px;line-height:1.5}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.equity{margin:10px 0 4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}
+.trade-no{font-size:15px;font-weight:700}
+.trade-time{font-size:12px;color:#8b949e}
+.card-pnl{font-size:16px;font-weight:700;white-space:nowrap}
+.pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}
+.tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
+.tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
+.tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.tag-info{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}
+.trade-detail{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}
+.mini-chart{margin:0 -6px -4px;border-radius:10px;overflow:hidden}
+.chart-cap{font-size:11px;color:#8b949e;margin:10px 0 4px}
+.empty{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安成交額前 100 · 牛來型 M 頭做空</h1>
+<p class="muted">USDT 永續（不含股票合約）· 24h 成交額前 100 · 近 30 天 · 末名約 24M USDT · 只掃牛來那種 M 頭
+<br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4%、雙峰明顯站上 MA200、頸線回測均線（不深跌穿）、成形期間多數收盤在均線上，收盤同時跌破 MA200 與 MA25 才空。貼均線亂鑽的小 M 不畫。停損雙頂高點、2R、或 48 根時間停。每筆下面附同一段一小時 K。加總％是各筆報酬相加，不是複利。</p>
+<p class="muted">漏斗：轉折高 78951 → 配對 201104 → M形 692
+→ 峰在均線上 121 → 跌破 MA200 56 → 訊號 48
+<br/>出場：2R 3 · 停損 15 · 時間 30 · 未平 0</p>
+<div class="cards">
+<div class="card">筆數<b>48</b></div>
+<div class="card">勝率<b>37.5%</b></div>
+<div class="card">加總<b class="pnl-loss">-20.81%</b></div>
+<div class="card">標的<b>30</b></div>
+</div>
+<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="48.8" x2="720" y2="48.8" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#dc2626" stroke-width="2" points="0.0,48.8 15.0,24.8 30.0,34.0 45.0,35.6 60.0,29.7 75.0,24.3 90.0,17.4 105.0,25.3 120.0,37.1 135.0,37.4 150.0,40.1 165.0,47.7 180.0,47.9 195.0,56.4 210.0,57.0 225.0,66.8 240.0,73.1 255.0,84.1 270.0,84.1 285.0,102.1 300.0,108.5 315.0,103.6 330.0,112.7 345.0,112.6 360.0,119.1 375.0,114.3 390.0,113.8 405.0,125.1 420.0,116.8 435.0,127.9 450.0,142.5 465.0,153.9 480.0,160.7 495.0,162.6 510.0,161.4 525.0,154.2 540.0,133.1 555.0,140.6 570.0,141.4 585.0,147.8 600.0,145.7 615.0,147.5 630.0,149.8 645.0,156.3 660.0,151.5 675.0,150.9 690.0,145.3 705.0,126.7 720.0,103.1"/></svg></div>
+</section>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · 牛来 · 做空</span><span class='trade-time'>2026-09-07 22:15 → 09-07 23:15</span></div><div class='card-pnl pnl-win'>+9.18%</div></header><div class='tags'><span class='tag tag-info'>#55 牛来USDT</span><span class='tag tag-tp'>target</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.4%</span><span class='tag tag-info'>54M</span></div><pre class='trade-detail'>entry 0.08978  MA200 0.08980
+stop  0.09390  （M頭高 −0.004120）
+target 0.08154  （2R）
+exit  0.08154  target  +9.18%
+H1 09-07 18:10 0.09390
+H2 09-07 21:20 0.09380
+頸線 09-07 20:05 0.08881</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t01_牛来USDT_0907_2215.png' alt='牛来' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t01_牛来USDT_0907_2215_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · LIT · 做空</span><span class='trade-time'>2026-09-08 23:20 → 09-09 00:20</span></div><div class='card-pnl pnl-loss'>-3.53%</div></header><div class='tags'><span class='tag tag-info'>#43 LITUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.4%</span><span class='tag tag-info'>78M</span></div><pre class='trade-detail'>entry 4.6975  MA200 4.7059
+stop  4.8631  （M頭高 −0.16560）
+target 4.3663  （2R）
+exit  4.8631  stop  -3.53%
+H1 09-08 17:45 4.8631
+H2 09-08 21:00 4.8539
+頸線 09-08 20:25 4.6019</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t02_LITUSDT_0908_2320.png' alt='LIT' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t02_LITUSDT_0908_2320_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · BR · 做空</span><span class='trade-time'>2026-09-10 07:00 → 09-10 11:00</span></div><div class='card-pnl pnl-loss'>-0.63%</div></header><div class='tags'><span class='tag tag-info'>#86 BRUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 6.4%</span><span class='tag tag-info'>29M</span></div><pre class='trade-detail'>entry 0.31387  MA200 0.31394
+stop  0.32266  （M頭高 −0.008790）
+target 0.29629  （2R）
+exit  0.31586  time  -0.63%
+H1 09-09 23:30 0.32266
+H2 09-10 03:25 0.32119
+頸線 09-10 01:15 0.30194</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t03_BRUSDT_0910_0700.png' alt='BR' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t03_BRUSDT_0910_0700_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · 龙虾 · 做空</span><span class='trade-time'>2026-09-13 13:00 → 09-13 17:00</span></div><div class='card-pnl pnl-win'>+2.27%</div></header><div class='tags'><span class='tag tag-info'>#10 龙虾USDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 12.2%</span><span class='tag tag-info'>454M</span></div><pre class='trade-detail'>entry 0.14815  MA200 0.14886
+stop  0.16287  （M頭高 −0.01472）
+target 0.11871  （2R）
+exit  0.14478  time  +2.27%
+H1 09-13 07:05 0.16273
+H2 09-13 09:20 0.16287
+頸線 09-13 08:45 0.14300</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t04_龙虾USDT_0913_1300.png' alt='龙虾' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t04_龙虾USDT_0913_1300_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · AKE · 做空</span><span class='trade-time'>2026-09-13 13:20 → 09-13 17:20</span></div><div class='card-pnl pnl-win'>+2.05%</div></header><div class='tags'><span class='tag tag-info'>#65 AKEUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.0%</span><span class='tag tag-info'>42M</span></div><pre class='trade-detail'>entry 0.01526  MA200 0.01600
+stop  0.01667  （M頭高 −0.001405）
+target 0.01245  （2R）
+exit  0.01495  time  +2.05%
+H1 09-13 06:45 0.01667
+H2 09-13 10:35 0.01650
+頸線 09-13 10:15 0.01583</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t05_AKEUSDT_0913_1320.png' alt='AKE' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t05_AKEUSDT_0913_1320_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · FIL · 做空</span><span class='trade-time'>2026-09-14 22:55 → 09-15 02:55</span></div><div class='card-pnl pnl-win'>+2.65%</div></header><div class='tags'><span class='tag tag-info'>#33 FILUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 6.2%</span><span class='tag tag-info'>117M</span></div><pre class='trade-detail'>entry 0.98500  MA200 0.98654
+stop  1.0399  （M頭高 −0.05490）
+target 0.87520  （2R）
+exit  0.95890  time  +2.65%
+H1 09-14 18:45 1.0385
+H2 09-14 22:30 1.0399
+頸線 09-14 21:05 0.97590</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t06_FILUSDT_0914_2255.png' alt='FIL' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t06_FILUSDT_0914_2255_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · 龙虾 · 做空</span><span class='trade-time'>2026-09-16 20:30 → 09-17 00:30</span></div><div class='card-pnl pnl-loss'>-3.01%</div></header><div class='tags'><span class='tag tag-info'>#10 龙虾USDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 7.0%</span><span class='tag tag-info'>454M</span></div><pre class='trade-detail'>entry 0.20209  MA200 0.20407
+stop  0.21555  （M頭高 −0.01346）
+target 0.17517  （2R）
+exit  0.20817  time  -3.01%
+H1 09-16 17:35 0.21555
+H2 09-16 19:20 0.21442
+頸線 09-16 18:55 0.20041</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t07_龙虾USDT_0916_2030.png' alt='龙虾' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t07_龙虾USDT_0916_2030_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · ARB · 做空</span><span class='trade-time'>2026-09-17 11:15 → 09-17 13:00</span></div><div class='card-pnl pnl-loss'>-4.53%</div></header><div class='tags'><span class='tag tag-info'>#34 ARBUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.3%</span><span class='tag tag-info'>117M</span></div><pre class='trade-detail'>entry 0.16263  MA200 0.16281
+stop  0.17000  （M頭高 −0.007370）
+target 0.14789  （2R）
+exit  0.17000  stop  -4.53%
+H1 09-17 07:50 0.16970
+H2 09-17 09:35 0.17000
+頸線 09-17 09:15 0.16275</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t08_ARBUSDT_0917_1115.png' alt='ARB' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t08_ARBUSDT_0917_1115_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · VVV · 做空</span><span class='trade-time'>2026-09-17 22:40 → 09-18 02:40</span></div><div class='card-pnl pnl-loss'>-0.12%</div></header><div class='tags'><span class='tag tag-info'>#72 VVVUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.4%</span><span class='tag tag-info'>36M</span></div><pre class='trade-detail'>entry 24.5980  MA200 24.6337
+stop  25.5680  （M頭高 −0.97000）
+target 22.6580  （2R）
+exit  24.6280  time  -0.12%
+H1 09-17 19:15 25.5680
+H2 09-17 22:10 25.3360
+頸線 09-17 21:20 24.4370</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t09_VVVUSDT_0917_2240.png' alt='VVV' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t09_VVVUSDT_0917_2240_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · RAYSOL · 做空</span><span class='trade-time'>2026-09-18 04:00 → 09-18 08:00</span></div><div class='card-pnl pnl-loss'>-1.03%</div></header><div class='tags'><span class='tag tag-info'>#87 RAYSOLUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.6%</span><span class='tag tag-info'>29M</span></div><pre class='trade-detail'>entry 1.4516  MA200 1.4522
+stop  1.5089  （M頭高 −0.05730）
+target 1.3370  （2R）
+exit  1.4665  time  -1.03%
+H1 09-17 22:25 1.5089
+H2 09-18 01:55 1.4988
+頸線 09-17 23:10 1.4400</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t10_RAYSOLUSDT_0918_0400.png' alt='RAYSOL' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t10_RAYSOLUSDT_0918_0400_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · ENA · 做空</span><span class='trade-time'>2026-09-19 01:00 → 09-19 03:40</span></div><div class='card-pnl pnl-loss'>-2.90%</div></header><div class='tags'><span class='tag tag-info'>#19 ENAUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.6%</span><span class='tag tag-info'>219M</span></div><pre class='trade-detail'>entry 0.16411  MA200 0.16413
+stop  0.16887  （M頭高 −0.004760）
+target 0.15459  （2R）
+exit  0.16887  stop  -2.90%
+H1 09-18 18:40 0.16887
+H2 09-18 21:50 0.16811
+頸線 09-18 19:10 0.16113</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t11_ENAUSDT_0919_0100.png' alt='ENA' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t11_ENAUSDT_0919_0100_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · DOT · 做空</span><span class='trade-time'>2026-09-19 01:00 → 09-19 05:00</span></div><div class='card-pnl pnl-loss'>-0.09%</div></header><div class='tags'><span class='tag tag-info'>#49 DOTUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.7%</span><span class='tag tag-info'>70M</span></div><pre class='trade-detail'>entry 1.1327  MA200 1.1331
+stop  1.1715  （M頭高 −0.03880）
+target 1.0551  （2R）
+exit  1.1337  time  -0.09%
+H1 09-18 17:40 1.1715
+H2 09-18 21:35 1.1708
+頸線 09-18 19:40 1.1161</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t12_DOTUSDT_0919_0100.png' alt='DOT' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t12_DOTUSDT_0919_0100_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · VELVET · 做空</span><span class='trade-time'>2026-09-19 13:25 → 09-19 16:35</span></div><div class='card-pnl pnl-loss'>-3.26%</div></header><div class='tags'><span class='tag tag-info'>#30 VELVETUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.6%</span><span class='tag tag-info'>132M</span></div><pre class='trade-detail'>entry 0.05957  MA200 0.05966
+stop  0.06151  （M頭高 −0.001940）
+target 0.05569  （2R）
+exit  0.06151  stop  -3.26%
+H1 09-19 08:35 0.06151
+H2 09-19 11:30 0.06110
+頸線 09-19 09:20 0.05869</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t13_VELVETUSDT_0919_1325.png' alt='VELVET' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t13_VELVETUSDT_0919_1325_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · ATH · 做空</span><span class='trade-time'>2026-09-20 09:35 → 09-20 13:35</span></div><div class='card-pnl pnl-loss'>-0.23%</div></header><div class='tags'><span class='tag tag-info'>#62 ATHUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.1%</span><span class='tag tag-info'>46M</span></div><pre class='trade-detail'>entry 0.005275  MA200 0.005290
+stop  0.005474  （M頭高 −0.000199）
+target 0.004877  （2R）
+exit  0.005287  time  -0.23%
+H1 09-20 04:25 0.005472
+H2 09-20 06:50 0.005474
+頸線 09-20 05:35 0.005250</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t14_ATHUSDT_0920_0935.png' alt='ATH' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t14_ATHUSDT_0920_0935_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · 龙虾 · 做空</span><span class='trade-time'>2026-09-20 10:30 → 09-20 12:00</span></div><div class='card-pnl pnl-loss'>-3.72%</div></header><div class='tags'><span class='tag tag-info'>#10 龙虾USDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.2%</span><span class='tag tag-info'>454M</span></div><pre class='trade-detail'>entry 0.22650  MA200 0.22672
+stop  0.23492  （M頭高 −0.008420）
+target 0.20966  （2R）
+exit  0.23492  stop  -3.72%
+H1 09-20 06:40 0.23492
+H2 09-20 08:35 0.23491
+頸線 09-20 07:45 0.22501</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t15_龙虾USDT_0920_1030.png' alt='龙虾' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t15_龙虾USDT_0920_1030_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · 龙虾 · 做空</span><span class='trade-time'>2026-09-20 12:15 → 09-20 16:15</span></div><div class='card-pnl pnl-loss'>-2.41%</div></header><div class='tags'><span class='tag tag-info'>#10 龙虾USDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.2%</span><span class='tag tag-info'>454M</span></div><pre class='trade-detail'>entry 0.22770  MA200 0.22773
+stop  0.23557  （M頭高 −0.007870）
+target 0.21196  （2R）
+exit  0.23319  time  -2.41%
+H1 09-20 08:55 0.23557
+H2 09-20 12:00 0.23496
+頸線 09-20 11:15 0.22560</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t16_龙虾USDT_0920_1215.png' alt='龙虾' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t16_龙虾USDT_0920_1215_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · BR · 做空</span><span class='trade-time'>2026-09-20 14:00 → 09-20 16:10</span></div><div class='card-pnl pnl-loss'>-4.23%</div></header><div class='tags'><span class='tag tag-info'>#86 BRUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 6.2%</span><span class='tag tag-info'>29M</span></div><pre class='trade-detail'>entry 1.1160  MA200 1.1166
+stop  1.1632  （M頭高 −0.04716）
+target 1.0217  （2R）
+exit  1.1632  stop  -4.23%
+H1 09-20 10:05 1.1632
+H2 09-20 11:45 1.1577
+頸線 09-20 10:35 1.0909</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t17_BRUSDT_0920_1400.png' alt='BR' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t17_BRUSDT_0920_1400_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · BR · 做空</span><span class='trade-time'>2026-09-21 02:45 → 09-21 06:45</span></div><div class='card-pnl pnl-loss'>-0.01%</div></header><div class='tags'><span class='tag tag-info'>#86 BRUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 11.4%</span><span class='tag tag-info'>29M</span></div><pre class='trade-detail'>entry 1.1549  MA200 1.1645
+stop  1.2660  （M頭高 −0.11106）
+target 0.93277  （2R）
+exit  1.1550  time  -0.01%
+H1 09-20 21:35 1.2659
+H2 09-21 00:55 1.2648
+頸線 09-20 22:05 1.1214</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t18_BRUSDT_0921_0245.png' alt='BR' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t18_BRUSDT_0921_0245_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · BTW · 做空</span><span class='trade-time'>2026-09-21 14:30 → 09-21 15:50</span></div><div class='card-pnl pnl-loss'>-6.90%</div></header><div class='tags'><span class='tag tag-info'>#39 BTWUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.4%</span><span class='tag tag-info'>93M</span></div><pre class='trade-detail'>entry 0.71640  MA200 0.74210
+stop  0.76580  （M頭高 −0.04940）
+target 0.61760  （2R）
+exit  0.76580  stop  -6.90%
+H1 09-21 10:15 0.76580
+H2 09-21 12:10 0.76100
+頸線 09-21 11:35 0.73180</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t19_BTWUSDT_0921_1430.png' alt='BTW' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t19_BTWUSDT_0921_1430_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · ZEC · 做空</span><span class='trade-time'>2026-09-21 15:20 → 09-21 19:20</span></div><div class='card-pnl pnl-loss'>-2.45%</div></header><div class='tags'><span class='tag tag-info'>#4 ZECUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.1%</span><span class='tag tag-info'>1485M</span></div><pre class='trade-detail'>entry 1495.16  MA200 1496.48
+stop  1547.99  （M頭高 −52.8300）
+target 1389.50  （2R）
+exit  1531.75  time  -2.45%
+H1 09-21 09:10 1547.99
+H2 09-21 12:45 1537.81
+頸線 09-21 10:30 1485.00</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t20_ZECUSDT_0921_1520.png' alt='ZEC' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t20_ZECUSDT_0921_1520_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · 牛来 · 做空</span><span class='trade-time'>2026-09-22 00:35 → 09-22 04:35</span></div><div class='card-pnl pnl-win'>+1.89%</div></header><div class='tags'><span class='tag tag-info'>#55 牛来USDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 7.6%</span><span class='tag tag-info'>54M</span></div><pre class='trade-detail'>entry 0.10810  MA200 0.10891
+stop  0.11488  （M頭高 −0.006780）
+target 0.09454  （2R）
+exit  0.10606  time  +1.89%
+H1 09-21 21:05 0.11486
+H2 09-21 23:10 0.11488
+頸線 09-21 22:05 0.10613</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t21_牛来USDT_0922_0035.png' alt='牛来' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t21_牛来USDT_0922_0035_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · TRUMP · 做空</span><span class='trade-time'>2026-09-22 01:50 → 09-22 04:50</span></div><div class='card-pnl pnl-loss'>-3.49%</div></header><div class='tags'><span class='tag tag-info'>#28 TRUMPUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.3%</span><span class='tag tag-info'>139M</span></div><pre class='trade-detail'>entry 2.1220  MA200 2.1232
+stop  2.1960  （M頭高 −0.07400）
+target 1.9740  （2R）
+exit  2.1960  stop  -3.49%
+H1 09-21 19:10 2.1930
+H2 09-21 23:10 2.1960
+頸線 09-21 22:05 2.1020</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t22_TRUMPUSDT_0922_0150.png' alt='TRUMP' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t22_TRUMPUSDT_0922_0150_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · FET · 做空</span><span class='trade-time'>2026-09-22 11:20 → 09-22 15:20</span></div><div class='card-pnl pnl-win'>+0.05%</div></header><div class='tags'><span class='tag tag-info'>#58 FETUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.3%</span><span class='tag tag-info'>52M</span></div><pre class='trade-detail'>entry 0.20100  MA200 0.20132
+stop  0.20830  （M頭高 −0.007300）
+target 0.18640  （2R）
+exit  0.20090  time  +0.05%
+H1 09-22 08:25 0.20830
+H2 09-22 10:35 0.20750
+頸線 09-22 09:15 0.19940</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t23_FETUSDT_0922_1120.png' alt='FET' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t23_FETUSDT_0922_1120_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#24 · HBAR · 做空</span><span class='trade-time'>2026-09-22 19:05 → 09-22 21:00</span></div><div class='card-pnl pnl-loss'>-2.51%</div></header><div class='tags'><span class='tag tag-info'>#47 HBARUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.2%</span><span class='tag tag-info'>75M</span></div><pre class='trade-detail'>entry 0.09293  MA200 0.09294
+stop  0.09526  （M頭高 −0.002330）
+target 0.08827  （2R）
+exit  0.09526  stop  -2.51%
+H1 09-22 12:25 0.09526
+H2 09-22 15:40 0.09523
+頸線 09-22 13:30 0.09128</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t24_HBARUSDT_0922_1905.png' alt='HBAR' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t24_HBARUSDT_0922_1905_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#25 · TAO · 做空</span><span class='trade-time'>2026-09-22 22:30 → 09-23 02:30</span></div><div class='card-pnl pnl-win'>+1.86%</div></header><div class='tags'><span class='tag tag-info'>#24 TAOUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.2%</span><span class='tag tag-info'>192M</span></div><pre class='trade-detail'>entry 316.2400  MA200 316.6173
+stop  324.9900  （M頭高 −8.7500）
+target 298.7400  （2R）
+exit  310.3500  time  +1.86%
+H1 09-22 16:55 324.9900
+H2 09-22 19:45 323.3500
+頸線 09-22 19:05 311.4700</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t25_TAOUSDT_0922_2230.png' alt='TAO' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t25_TAOUSDT_0922_2230_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#26 · FET · 做空</span><span class='trade-time'>2026-09-22 22:30 → 09-23 02:30</span></div><div class='card-pnl pnl-win'>+0.20%</div></header><div class='tags'><span class='tag tag-info'>#58 FETUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.5%</span><span class='tag tag-info'>52M</span></div><pre class='trade-detail'>entry 0.20410  MA200 0.20443
+stop  0.21260  （M頭高 −0.008500）
+target 0.18710  （2R）
+exit  0.20370  time  +0.20%
+H1 09-22 17:00 0.21260
+H2 09-22 19:55 0.21160
+頸線 09-22 19:05 0.20300</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t26_FETUSDT_0922_2230.png' alt='FET' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t26_FETUSDT_0922_2230_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#27 · BR · 做空</span><span class='trade-time'>2026-09-23 12:05 → 09-23 15:40</span></div><div class='card-pnl pnl-loss'>-4.36%</div></header><div class='tags'><span class='tag tag-info'>#86 BRUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.2%</span><span class='tag tag-info'>29M</span></div><pre class='trade-detail'>entry 1.1256  MA200 1.1328
+stop  1.1747  （M頭高 −0.04904）
+target 1.0276  （2R）
+exit  1.1747  stop  -4.36%
+H1 09-23 08:50 1.1747
+H2 09-23 11:30 1.1685
+頸線 09-23 11:15 1.1256</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t27_BRUSDT_0923_1205.png' alt='BR' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t27_BRUSDT_0923_1205_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#28 · MARSCOIN · 做空</span><span class='trade-time'>2026-09-23 13:00 → 09-23 17:00</span></div><div class='card-pnl pnl-win'>+3.18%</div></header><div class='tags'><span class='tag tag-info'>#51 MARSCOINUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 8.6%</span><span class='tag tag-info'>63M</span></div><pre class='trade-detail'>entry 0.13286  MA200 0.13314
+stop  0.14399  （M頭高 −0.01113）
+target 0.11060  （2R）
+exit  0.12864  time  +3.18%
+H1 09-23 08:05 0.14399
+H2 09-23 10:40 0.14364
+頸線 09-23 10:00 0.13164</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t28_MARSCOINUSDT_0923_1300.png' alt='MARSCOIN' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t28_MARSCOINUSDT_0923_1300_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#29 · US · 做空</span><span class='trade-time'>2026-09-23 22:10 → 09-24 00:10</span></div><div class='card-pnl pnl-loss'>-4.22%</div></header><div class='tags'><span class='tag tag-info'>#54 USUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.9%</span><span class='tag tag-info'>56M</span></div><pre class='trade-detail'>entry 0.01809  MA200 0.01816
+stop  0.01885  （M頭高 −0.000764）
+target 0.01656  （2R）
+exit  0.01885  stop  -4.22%
+H1 09-23 16:25 0.01885
+H2 09-23 18:20 0.01877
+頸線 09-23 16:50 0.01793</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t29_USUSDT_0923_2210.png' alt='US' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t29_USUSDT_0923_2210_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#30 · GRASS · 做空</span><span class='trade-time'>2026-09-23 23:20 → 09-24 03:15</span></div><div class='card-pnl pnl-loss'>-5.61%</div></header><div class='tags'><span class='tag tag-info'>#85 GRASSUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.7%</span><span class='tag tag-info'>29M</span></div><pre class='trade-detail'>entry 0.44890  MA200 0.45493
+stop  0.47410  （M頭高 −0.02520）
+target 0.39850  （2R）
+exit  0.47410  stop  -5.61%
+H1 09-23 20:55 0.47360
+H2 09-23 23:00 0.47410
+頸線 09-23 22:20 0.44720</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t30_GRASSUSDT_0923_2320.png' alt='GRASS' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t30_GRASSUSDT_0923_2320_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#31 · ZRO · 做空</span><span class='trade-time'>2026-09-23 23:30 → 09-24 00:05</span></div><div class='card-pnl pnl-loss'>-4.35%</div></header><div class='tags'><span class='tag tag-info'>#32 ZROUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.5%</span><span class='tag tag-info'>120M</span></div><pre class='trade-detail'>entry 1.4351  MA200 1.4380
+stop  1.4975  （M頭高 −0.06240）
+target 1.3103  （2R）
+exit  1.4975  stop  -4.35%
+H1 09-23 19:00 1.4975
+H2 09-23 22:00 1.4870
+頸線 09-23 21:10 1.4157</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t31_ZROUSDT_0923_2330.png' alt='ZRO' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t31_ZROUSDT_0923_2330_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#32 · LIT · 做空</span><span class='trade-time'>2026-09-24 05:20 → 09-24 09:20</span></div><div class='card-pnl pnl-loss'>-2.61%</div></header><div class='tags'><span class='tag tag-info'>#43 LITUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 7.5%</span><span class='tag tag-info'>78M</span></div><pre class='trade-detail'>entry 5.2514  MA200 5.2596
+stop  5.5000  （M頭高 −0.24860）
+target 4.7542  （2R）
+exit  5.3883  time  -2.61%
+H1 09-23 22:00 5.5000
+H2 09-24 01:55 5.4530
+頸線 09-24 00:00 5.0891</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t32_LITUSDT_0924_0520.png' alt='LIT' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t32_LITUSDT_0924_0520_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#33 · PENGU · 做空</span><span class='trade-time'>2026-09-24 16:45 → 09-24 20:45</span></div><div class='card-pnl pnl-loss'>-0.71%</div></header><div class='tags'><span class='tag tag-info'>#38 PENGUUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.3%</span><span class='tag tag-info'>98M</span></div><pre class='trade-detail'>entry 0.009669  MA200 0.009772
+stop  0.01021  （M頭高 −0.000543）
+target 0.008583  （2R）
+exit  0.009738  time  -0.71%
+H1 09-24 13:10 0.01021
+H2 09-24 15:35 0.01014
+頸線 09-24 15:05 0.009777</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t33_PENGUUSDT_0924_1645.png' alt='PENGU' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t33_PENGUUSDT_0924_1645_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#34 · APT · 做空</span><span class='trade-time'>2026-09-26 11:10 → 09-26 15:10</span></div><div class='card-pnl pnl-win'>+0.45%</div></header><div class='tags'><span class='tag tag-info'>#52 APTUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.7%</span><span class='tag tag-info'>58M</span></div><pre class='trade-detail'>entry 0.84980  MA200 0.85114
+stop  0.88710  （M頭高 −0.03730）
+target 0.77520  （2R）
+exit  0.84600  time  +0.45%
+H1 09-26 04:40 0.88710
+H2 09-26 07:20 0.87920
+頸線 09-26 05:55 0.84500</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t34_APTUSDT_0926_1110.png' alt='APT' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t34_APTUSDT_0926_1110_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#35 · AKE · 做空</span><span class='trade-time'>2026-09-27 03:10 → 09-27 07:10</span></div><div class='card-pnl pnl-win'>+2.75%</div></header><div class='tags'><span class='tag tag-info'>#65 AKEUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.4%</span><span class='tag tag-info'>42M</span></div><pre class='trade-detail'>entry 0.03380  MA200 0.03387
+stop  0.03503  （M頭高 −0.001235）
+target 0.03133  （2R）
+exit  0.03287  time  +2.75%
+H1 09-26 19:55 0.03503
+H2 09-26 23:20 0.03481
+頸線 09-26 20:25 0.03315</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t35_AKEUSDT_0927_0310.png' alt='AKE' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t35_AKEUSDT_0927_0310_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#36 · 龙虾 · 做空</span><span class='trade-time'>2026-09-27 23:20 → 09-28 03:20</span></div><div class='card-pnl pnl-win'>+8.08%</div></header><div class='tags'><span class='tag tag-info'>#10 龙虾USDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.5%</span><span class='tag tag-info'>454M</span></div><pre class='trade-detail'>entry 0.10129  MA200 0.10230
+stop  0.10866  （M頭高 −0.007370）
+target 0.08655  （2R）
+exit  0.09311  time  +8.08%
+H1 09-27 20:05 0.10866
+H2 09-27 22:35 0.10785
+頸線 09-27 21:05 0.10264</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t36_龙虾USDT_0927_2320.png' alt='龙虾' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t36_龙虾USDT_0927_2320_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#37 · MON · 做空</span><span class='trade-time'>2026-09-28 17:40 → 09-28 20:00</span></div><div class='card-pnl pnl-loss'>-2.86%</div></header><div class='tags'><span class='tag tag-info'>#56 MONUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.9%</span><span class='tag tag-info'>52M</span></div><pre class='trade-detail'>entry 0.02767  MA200 0.02775
+stop  0.02846  （M頭高 −0.000790）
+target 0.02609  （2R）
+exit  0.02846  stop  -2.86%
+H1 09-28 13:00 0.02843
+H2 09-28 15:00 0.02846
+頸線 09-28 14:30 0.02707</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t37_MONUSDT_0928_1740.png' alt='MON' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t37_MONUSDT_0928_1740_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#38 · VIRTUAL · 做空</span><span class='trade-time'>2026-09-29 09:05 → 09-29 13:05</span></div><div class='card-pnl pnl-loss'>-0.31%</div></header><div class='tags'><span class='tag tag-info'>#79 VIRTUALUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.7%</span><span class='tag tag-info'>34M</span></div><pre class='trade-detail'>entry 0.80330  MA200 0.80677
+stop  0.84000  （M頭高 −0.03670）
+target 0.72990  （2R）
+exit  0.80580  time  -0.31%
+H1 09-29 05:00 0.84000
+H2 09-29 07:30 0.83340
+頸線 09-29 06:05 0.80020</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t38_VIRTUALUSDT_0929_0905.png' alt='VIRTUAL' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t38_VIRTUALUSDT_0929_0905_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#39 · LIT · 做空</span><span class='trade-time'>2026-09-30 06:30 → 09-30 07:05</span></div><div class='card-pnl pnl-loss'>-2.45%</div></header><div class='tags'><span class='tag tag-info'>#43 LITUSDT</span><span class='tag tag-sl'>stop</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.2%</span><span class='tag tag-info'>78M</span></div><pre class='trade-detail'>entry 4.4507  MA200 4.4507
+stop  4.5597  （M頭高 −0.10900）
+target 4.2327  （2R）
+exit  4.5597  stop  -2.45%
+H1 09-29 22:40 4.5597
+H2 09-30 02:40 4.5492
+頸線 09-30 01:15 4.3682</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t39_LITUSDT_0930_0630.png' alt='LIT' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t39_LITUSDT_0930_0630_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#40 · SUI · 做空</span><span class='trade-time'>2026-10-01 02:10 → 10-01 06:10</span></div><div class='card-pnl pnl-win'>+0.81%</div></header><div class='tags'><span class='tag tag-info'>#11 SUIUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.4%</span><span class='tag tag-info'>432M</span></div><pre class='trade-detail'>entry 1.1647  MA200 1.1655
+stop  1.2119  （M頭高 −0.04720）
+target 1.0703  （2R）
+exit  1.1553  time  +0.81%
+H1 09-30 21:05 1.2119
+H2 10-01 00:15 1.2072
+頸線 09-30 22:40 1.1464</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t40_SUIUSDT_1001_0210.png' alt='SUI' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t40_SUIUSDT_1001_0210_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#41 · ZEC · 做空</span><span class='trade-time'>2026-10-01 02:35 → 10-01 06:35</span></div><div class='card-pnl pnl-loss'>-0.68%</div></header><div class='tags'><span class='tag tag-info'>#4 ZECUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.7%</span><span class='tag tag-info'>1485M</span></div><pre class='trade-detail'>entry 1421.04  MA200 1424.97
+stop  1494.19  （M頭高 −73.1500）
+target 1274.74  （2R）
+exit  1430.69  time  -0.68%
+H1 09-30 21:30 1494.19
+H2 10-01 00:45 1480.95
+頸線 09-30 23:25 1408.49</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t41_ZECUSDT_1001_0235.png' alt='ZEC' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t41_ZECUSDT_1001_0235_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#42 · DOT · 做空</span><span class='trade-time'>2026-10-01 02:45 → 10-01 06:45</span></div><div class='card-pnl pnl-loss'>-0.90%</div></header><div class='tags'><span class='tag tag-info'>#49 DOTUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.3%</span><span class='tag tag-info'>70M</span></div><pre class='trade-detail'>entry 1.2229  MA200 1.2234
+stop  1.2628  （M頭高 −0.03990）
+target 1.1431  （2R）
+exit  1.2339  time  -0.90%
+H1 09-30 21:30 1.2628
+H2 10-01 01:10 1.2588
+頸線 09-30 23:25 1.2082</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t42_DOTUSDT_1001_0245.png' alt='DOT' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t42_DOTUSDT_1001_0245_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#43 · VIRTUAL · 做空</span><span class='trade-time'>2026-10-01 02:45 → 10-01 06:45</span></div><div class='card-pnl pnl-loss'>-2.46%</div></header><div class='tags'><span class='tag tag-info'>#79 VIRTUALUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.3%</span><span class='tag tag-info'>34M</span></div><pre class='trade-detail'>entry 0.79170  MA200 0.79200
+stop  0.82590  （M頭高 −0.03420）
+target 0.72330  （2R）
+exit  0.81120  time  -2.46%
+H1 09-30 20:55 0.82590
+H2 10-01 00:45 0.81780
+頸線 09-30 22:35 0.78200</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t43_VIRTUALUSDT_1001_0245.png' alt='VIRTUAL' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t43_VIRTUALUSDT_1001_0245_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#44 · US · 做空</span><span class='trade-time'>2026-10-01 12:15 → 10-01 16:15</span></div><div class='card-pnl pnl-win'>+1.82%</div></header><div class='tags'><span class='tag tag-info'>#54 USUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 10.4%</span><span class='tag tag-info'>56M</span></div><pre class='trade-detail'>entry 0.02310  MA200 0.02572
+stop  0.02710  （M頭高 −0.004000）
+target 0.01510  （2R）
+exit  0.02268  time  +1.82%
+H1 10-01 08:00 0.02704
+H2 10-01 11:20 0.02710
+頸線 10-01 09:55 0.02428</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t44_USUSDT_1001_1215.png' alt='US' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t44_USUSDT_1001_1215_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#45 · XPL · 做空</span><span class='trade-time'>2026-10-01 18:00 → 10-01 22:00</span></div><div class='card-pnl pnl-win'>+0.22%</div></header><div class='tags'><span class='tag tag-info'>#44 XPLUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.0%</span><span class='tag tag-info'>77M</span></div><pre class='trade-detail'>entry 0.09481  MA200 0.09512
+stop  0.09867  （M頭高 −0.003860）
+target 0.08709  （2R）
+exit  0.09460  time  +0.22%
+H1 10-01 14:10 0.09867
+H2 10-01 17:20 0.09798
+頸線 10-01 15:25 0.09470</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t45_XPLUSDT_1001_1800.png' alt='XPL' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t45_XPLUSDT_1001_1800_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#46 · GRASS · 做空</span><span class='trade-time'>2026-10-02 15:25 → 10-02 19:25</span></div><div class='card-pnl pnl-win'>+2.15%</div></header><div class='tags'><span class='tag tag-info'>#85 GRASSUSDT</span><span class='tag tag-time'>time</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 5.0%</span><span class='tag tag-info'>29M</span></div><pre class='trade-detail'>entry 0.70340  MA200 0.70428
+stop  0.73770  （M頭高 −0.03430）
+target 0.63480  （2R）
+exit  0.68830  time  +2.15%
+H1 10-02 10:15 0.73770
+H2 10-02 12:55 0.73110
+頸線 10-02 12:10 0.70100</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t46_GRASSUSDT_1002_1525.png' alt='GRASS' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t46_GRASSUSDT_1002_1525_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#47 · MARSCOIN · 做空</span><span class='trade-time'>2026-10-03 00:45 → 10-03 02:35</span></div><div class='card-pnl pnl-win'>+7.12%</div></header><div class='tags'><span class='tag tag-info'>#51 MARSCOINUSDT</span><span class='tag tag-tp'>target</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 4.3%</span><span class='tag tag-info'>63M</span></div><pre class='trade-detail'>entry 0.12619  MA200 0.12621
+stop  0.13068  （M頭高 −0.004490）
+target 0.11721  （2R）
+exit  0.11721  target  +7.12%
+H1 10-02 21:10 0.13068
+H2 10-02 22:50 0.12995
+頸線 10-02 22:10 0.12500</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t47_MARSCOINUSDT_1003_0045.png' alt='MARSCOIN' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t47_MARSCOINUSDT_1003_0045_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#48 · PUMPBTC · 做空</span><span class='trade-time'>2026-10-03 02:30 → 10-03 02:35</span></div><div class='card-pnl pnl-win'>+9.02%</div></header><div class='tags'><span class='tag tag-info'>#84 PUMPBTCUSDT</span><span class='tag tag-tp'>target</span><span class='tag tag-info'>5m</span><span class='tag tag-info'>深度 6.1%</span><span class='tag tag-info'>30M</span></div><pre class='trade-detail'>entry 0.008200  MA200 0.008234
+stop  0.008570  （M頭高 −0.000370）
+target 0.007460  （2R）
+exit  0.007460  target  +9.02%
+H1 10-02 20:25 0.008570
+H2 10-02 23:00 0.008530
+頸線 10-02 22:00 0.008050</pre><p class='chart-cap'>五分K</p><div class='mini-chart'><img src='img/t48_PUMPBTCUSDT_1003_0230.png' alt='PUMPBTC' style='width:100%;display:block;border-radius:10px'/></div><p class='chart-cap'>1小時K · 同一段</p><div class='mini-chart'><img src='img/t48_PUMPBTCUSDT_1003_0230_1h.png' alt='1h' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div></body></html>
