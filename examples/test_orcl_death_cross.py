@@ -1,0 +1,510 @@
+#!/usr/bin/env python3
+"""ORCL 1m MA7/MA14 死亡交叉且破 MA25（不打網路）。"""
+from __future__ import annotations
+
+import json
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from watch_orcl_death_cross import (  # noqa: E402
+    ScanRow,
+    ShortHit,
+    chart_tmp_path,
+    cutoff_ms,
+    day_bounds_ms,
+    desktop_notify,
+    detect_shorts,
+    filter_universe,
+    forward_moves,
+    in_window,
+    latest_high_in_window,
+    lead_bars,
+    new_high_mask,
+    orcl_like,
+    pct_move,
+    sma,
+    summarize_rows,
+    taipei_day,
+    watch_args_from_pycharm,
+    write_html_report,
+)
+
+
+def test_sma() -> None:
+    arr = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    out = sma(arr, 3)
+    assert np.isnan(out[1])
+    assert abs(out[2] - 2.0) < 1e-9
+    assert abs(out[4] - 4.0) < 1e-9
+
+
+def _mas(close: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    return sma(close, 7), sma(close, 14), sma(close, 25)
+
+
+def test_death_and_below_fires() -> None:
+    n = 80
+    close = np.linspace(100.0, 110.0, n)
+    # 最後幾根急殺，讓 MA7 下穿 MA14，收盤掉到 MA25 下
+    close[-8:] = np.array([109.2, 108.4, 107.2, 105.8, 104.1, 102.4, 100.6, 99.0])
+    m7, m14, m25 = _mas(close)
+    hits = detect_shorts(close, m7, m14, m25, min_lead=3, require_cross_ma25=False)
+    assert hits, "急殺應出現死亡交叉且破 MA25"
+    hit = hits[-1]
+    assert close[hit.i] < m25[hit.i]
+    assert m7[hit.i] < m14[hit.i]
+    assert m7[hit.i - 1] >= m14[hit.i - 1]
+
+
+def test_death_above_ma25_skipped() -> None:
+    n = 60
+    close = np.linspace(100.0, 108.0, n)
+    # 輕微回檔：7/14 交叉但價格仍在 MA25 上
+    close[-4:] = np.array([107.85, 107.70, 107.55, 107.45])
+    m7, m14, m25 = _mas(close)
+    raw = detect_shorts(close, m7, m14, m25, min_lead=0, require_cross_ma25=False)
+    for h in raw:
+        assert close[h.i] < m25[h.i]
+
+
+def test_only_the_cross_bar() -> None:
+    n = 80
+    close = np.linspace(100.0, 110.0, n)
+    close[-10:] = np.array([109.4, 108.6, 107.0, 105.2, 103.4, 102.0, 101.2, 100.8, 100.5, 100.3])
+    m7, m14, m25 = _mas(close)
+    hits = detect_shorts(close, m7, m14, m25, min_lead=0, require_cross_ma25=False)
+    assert hits
+    # 交叉後持續 7<14 且收在 25 下，不應每根都發
+    idxs = [h.i for h in hits]
+    assert idxs == sorted(set(idxs))
+    for i in idxs:
+        assert m7[i - 1] >= m14[i - 1] and m7[i] < m14[i]
+
+
+def test_min_lead_filters_flicker() -> None:
+    close = np.array(
+        [10.0] * 20
+        + [10.2, 10.4, 10.6, 10.8, 11.0, 11.1, 11.2, 11.0, 10.4, 9.6, 9.0],
+        dtype=float,
+    )
+    # 補到夠算 MA25
+    close = np.concatenate([np.full(20, 10.0), close])
+    m7, m14, m25 = _mas(close)
+    loose = detect_shorts(close, m7, m14, m25, min_lead=0, require_cross_ma25=False)
+    tight = detect_shorts(close, m7, m14, m25, min_lead=20, require_cross_ma25=False)
+    assert len(tight) <= len(loose)
+
+
+def test_require_cross_ma25() -> None:
+    n = 80
+    close = np.linspace(100.0, 110.0, n)
+    close[-12:-6] = np.array([108.0, 106.5, 105.0, 103.5, 102.0, 101.0])
+    close[-6:] = np.array([100.5, 100.2, 100.0, 99.8, 99.6, 99.4])
+    m7, m14, m25 = _mas(close)
+    any_below = detect_shorts(close, m7, m14, m25, min_lead=0, require_cross_ma25=False)
+    same_bar = detect_shorts(close, m7, m14, m25, min_lead=0, require_cross_ma25=True)
+    assert all(h.crossed_ma25 for h in same_bar)
+    assert len(same_bar) <= len(any_below)
+
+
+def test_lead_bars_counts_pre_cross() -> None:
+    m7 = np.array([1.0, 2.0, 3.0, 4.0, 3.5, 2.0])
+    m14 = np.array([1.5, 1.8, 2.5, 3.2, 3.4, 3.0])
+    # i=5: 2.0 < 3.0 death; prior 3.5>=3.4 (1 bar), 4>=3.2, 3>=2.5, 2>=1.8 → 4 bars
+    assert lead_bars(m7, m14, 5) == 4
+
+
+def test_dump_like_screenshot() -> None:
+    """高點後急殺：同一根死亡交叉且收盤跌破 MA25（對齊 ORCL 22:49）。"""
+    close = np.full(80, 144.50)
+    close[:40] = np.linspace(140.0, 144.50, 40)
+    close[77] = 144.55
+    close[78] = 144.58
+    close[79] = 143.70
+    m7, m14, m25 = _mas(close)
+    hits = detect_shorts(close, m7, m14, m25, min_lead=5)
+    assert hits, "這波急殺應抓得到"
+    hit = hits[-1]
+    assert hit.i == 79
+    assert hit.crossed_ma25, "ORCL 那波是同一根跌破 MA25"
+    assert m7[hit.i] < m14[hit.i]
+    assert m7[hit.i - 1] >= m14[hit.i - 1]
+
+
+def test_filter_universe_keeps_orcl_drops_index() -> None:
+    info = [
+        {"symbol": "BTCUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL", "underlyingType": "COIN"},
+        {"symbol": "ORCLUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "TRADIFI_PERPETUAL", "underlyingType": "EQUITY"},
+        {"symbol": "DEADUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL", "underlyingType": "COIN"},
+        {"symbol": "IDXUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL", "underlyingType": "INDEX"},
+        {"symbol": "ETHBTC", "quoteAsset": "BTC", "status": "TRADING", "contractType": "PERPETUAL", "underlyingType": "COIN"},
+    ]
+    tickers = {
+        "BTCUSDT": {"quoteVolume": "10000000"},
+        "ORCLUSDT": {"quoteVolume": "100"},
+        "DEADUSDT": {"quoteVolume": "1"},
+        "IDXUSDT": {"quoteVolume": "99999999"},
+    }
+    out = filter_universe(info, tickers, min_quote_vol=5_000_000, keep={"ORCLUSDT"})
+    assert out == ["BTCUSDT", "ORCLUSDT"]
+    all_usdt = filter_universe(info, tickers, min_quote_vol=0)
+    assert "DEADUSDT" in all_usdt
+    assert "IDXUSDT" not in all_usdt
+    assert "ETHBTC" not in all_usdt
+
+
+def test_day_window() -> None:
+    start, end = day_bounds_ms("2026-10-02")
+    # 22:49 台北 should be inside
+    ts = int(datetime(2026, 10, 2, 22, 49, tzinfo=timezone(timedelta(hours=8))).timestamp() * 1000)
+    assert in_window(ts, start, end)
+    assert taipei_day(ts) == "2026-10-02"
+    assert not in_window(start - 1, start, end)
+    assert not in_window(end, start, end)
+    s2, e2 = cutoff_ms(day="2026-10-02", hours=24)
+    assert (s2, e2) == (start, end)
+    now = int(datetime(2026, 10, 3, 14, 0, tzinfo=timezone(timedelta(hours=8))).timestamp() * 1000)
+    s7, e7 = cutoff_ms(day=None, hours=24, days=7, now_ms=now)
+    assert e7 - s7 == 7 * 86_400_000 + 1
+
+
+def test_summarize_rows_short_pnl() -> None:
+    ts = int(datetime(2026, 10, 2, 22, 49, tzinfo=timezone(timedelta(hours=8))).timestamp() * 1000)
+    hit = ShortHit(i=10, close=1, m7=1, m14=1, m25=1, lead=22, crossed_ma25=True)
+    a = ScanRow("A", ts, hit, -1, -2, -1.5, -2.5, 0)
+    b = ScanRow("B", ts, hit, 0.5, 1.0, -0.2, -0.3, 0)
+    st = summarize_rows([a, b])
+    assert st["n"] == 2
+    assert abs(st["pnl30_avg"] - 0.5) < 1e-9  # -(-2) and -(+1) → +2 and -1 → avg 0.5
+    assert st["win"] == 1
+    assert st["dump1"] == 1
+    assert st["by_day"][0]["day"] == "2026-10-02"
+
+
+def test_forward_moves_dump() -> None:
+    close = np.array([100.0, 99.0, 98.0, 97.0, 96.0], dtype=float)
+    low = np.array([99.5, 98.5, 97.5, 96.5, 95.0], dtype=float)
+    f15, f30, l15, l30 = forward_moves(close, low, 0, n15=2, n30=4)
+    assert f15 is not None and abs(f15 - pct_move(100, 98)) < 1e-9
+    assert l30 is not None and abs(l30 - pct_move(100, 95)) < 1e-9
+    empty = forward_moves(close, low, 4, n15=2, n30=4)
+    assert empty == (None, None, None, None)
+
+
+def test_write_html_report(tmp_path=None) -> None:
+    from pathlib import Path
+    import tempfile
+
+    hit = ShortHit(i=10, close=144.44, m7=144.63, m14=144.65, m25=144.55, lead=22, crossed_ma25=True)
+    ts = int(datetime(2026, 10, 2, 22, 49, tzinfo=timezone(timedelta(hours=8))).timestamp() * 1000)
+    row = ScanRow(
+        symbol="ORCLUSDT",
+        ts_ms=ts,
+        hit=hit,
+        fwd15=-1.2,
+        fwd30=-2.4,
+        low15=-1.5,
+        low30=-2.8,
+        quote_vol=1.0,
+    )
+    start, end = day_bounds_ms("2026-10-02")
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "index.html"
+        out = write_html_report(
+            path, [row], start_ms=start, end_ms=end, n_symbols=1, title="test", top=10
+        )
+        html = out.read_text(encoding="utf-8")
+        assert "ORCLUSDT" in html
+        assert "22:49" in html
+        assert "規則" in html
+        assert "空30m均" in html
+        payload = json.loads((out.parent / "hits.json").read_text())
+        assert payload["count"] == 1
+        assert payload["stats"]["n"] == 1
+        assert payload["stats"]["dump1"] == 1
+        assert payload["top"][0]["symbol"] == "ORCLUSDT"
+        assert payload["all"][0]["symbol"] == "ORCLUSDT"
+        assert payload["orcl_like"] == 1
+
+
+def test_write_html_report_keeps_all_hits() -> None:
+    from pathlib import Path
+    import tempfile
+
+    start, end = day_bounds_ms("2026-10-02")
+    rows = []
+    for i, name in enumerate(["AAAUSDT", "BBBUSDT", "CCCUSDT"]):
+        hit = ShortHit(
+            i=10,
+            close=1.0 + i,
+            m7=1,
+            m14=1,
+            m25=1,
+            lead=22,
+            crossed_ma25=True,
+            drop_from_high=-0.4,
+            reds_from_high=4,
+            close_loc=0.1,
+            bars_after_high=5,
+        )
+        ts = start + (i + 1) * 60_000
+        rows.append(ScanRow(name, ts, hit, -1, -2, -1.5, -1.2 - i, 0))
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "index.html"
+        fake = "data:image/png;base64,AAA"
+        out = write_html_report(
+            path,
+            rows,
+            start_ms=start,
+            end_ms=end,
+            n_symbols=3,
+            title="test",
+            top=1,
+            charts={f"AAAUSDT:{rows[0].ts_ms}": fake},
+        )
+        html = out.read_text(encoding="utf-8")
+        for name in ("AAAUSDT", "BBBUSDT", "CCCUSDT"):
+            assert name in html
+        assert fake in html
+        assert "前 1" not in html
+        payload = json.loads((out.parent / "hits.json").read_text())
+        assert payload["count"] == 3
+        assert len(payload["all"]) == 3
+        assert payload["orcl_like"] == 3
+
+
+def test_orcl_like_needs_same_bar_and_lead() -> None:
+    ts = 1
+    a = ScanRow(
+        "A", ts, ShortHit(1, 1, 1, 1, 1, 22, True), -1, -2, -1.5, -2.5, 0
+    )
+    b = ScanRow(
+        "B", ts, ShortHit(1, 1, 1, 1, 1, 22, False), -3, -4, -3, -5, 0
+    )
+    c = ScanRow(
+        "C", ts, ShortHit(1, 1, 1, 1, 1, 3, True), -4, -6, -4, -7, 0
+    )
+    got = orcl_like([a, b, c])
+    assert [r.symbol for r in got] == ["A"]
+    shallow = ScanRow(
+        "D", ts, ShortHit(1, 1, 1, 1, 1, 22, True), -0.2, -0.1, -0.2, -0.3, 0
+    )
+    assert orcl_like([a, shallow]) == [a]
+
+
+def test_new_high_mask() -> None:
+    high = np.array([1.0, 2.0, 3.0, 2.0, 4.0, 3.0])
+    mask = new_high_mask(high, lookback=2)
+    assert list(mask) == [False, False, True, False, True, False]
+    assert latest_high_in_window(mask, 5, 1) == 4
+    assert latest_high_in_window(mask, 5, 0) is None
+    assert latest_high_in_window(mask, 4, 0) == 4
+    assert latest_high_in_window(mask, 3, 0) is None
+    assert latest_high_in_window(mask, 3, 1) == 2
+
+
+def test_4h_high_then_death_within_30() -> None:
+    rise = np.linspace(100.0, 144.50, 250)
+    wait = np.full(20, 144.50)
+    tail = np.array([144.55, 144.58, 143.70])
+    close = np.concatenate([rise, wait, tail])
+    high = close + 0.15
+    peak = 249
+    high[peak] = 150.0
+    m7, m14, m25 = _mas(close)
+    hits = detect_shorts(
+        close,
+        m7,
+        m14,
+        m25,
+        high=high,
+        min_lead=3,
+        require_4h_high=True,
+        high_lookback=240,
+        within_bars=30,
+    )
+    assert hits, "4h 新高後 30 分內急殺應抓得到"
+    hit = hits[-1]
+    assert hit.crossed_ma25, "條件2要同一根跌破 MA25"
+    assert hit.bars_after_high is not None and hit.bars_after_high <= 30
+    assert hit.peak_i is not None
+    assert high[hit.peak_i] >= 150.0 - 1e-9
+
+
+def test_4h_high_too_old_skipped() -> None:
+    rise = np.linspace(100.0, 144.50, 250)
+    wait = np.full(45, 144.50)
+    tail = np.array([144.55, 144.58, 143.70])
+    close = np.concatenate([rise, wait, tail])
+    high = close + 0.15
+    high[249] = 150.0
+    m7, m14, m25 = _mas(close)
+    raw = detect_shorts(close, m7, m14, m25, min_lead=0, require_4h_high=False)
+    gated = detect_shorts(
+        close,
+        m7,
+        m14,
+        m25,
+        high=high,
+        min_lead=0,
+        require_4h_high=True,
+        high_lookback=240,
+        within_bars=30,
+    )
+    assert raw, "沒加 4h 條件時急殺仍應有死亡交叉"
+    late = [h for h in raw if h.i >= 249 + 40]
+    assert late, "死亡交叉發生在新高 40 根之後"
+    for h in gated:
+        assert h.bars_after_high is not None and h.bars_after_high <= 30
+    assert all(h.i <= 249 + 30 for h in gated)
+
+
+def test_orcl_shape_skips_immediate_and_upper_close() -> None:
+    """高點太近、或收在 K 棒上緣，不該算 ORCL 形。"""
+    rise = np.linspace(100.0, 144.50, 250)
+    wait = np.full(20, 144.50)
+    tail = np.array([144.55, 144.58, 143.70])
+    close = np.concatenate([rise, wait, tail])
+    open_ = np.empty_like(close)
+    open_[0] = close[0]
+    open_[1:] = close[:-1]
+    high = np.maximum(open_, close)
+    low = np.minimum(open_, close)
+    peak = len(close) - 3  # 訊號前 2 根才新高
+    high[peak] = 150.0
+    m7, m14, m25 = _mas(close)
+    base = dict(
+        high=high,
+        low=low,
+        open_=open_,
+        min_lead=0,
+        require_4h_high=True,
+        high_lookback=240,
+        within_bars=30,
+    )
+    loose = detect_shorts(close, m7, m14, m25, orcl_shape=False, **base)
+    tight = detect_shorts(close, m7, m14, m25, orcl_shape=True, **base)
+    assert loose, "關掉形狀時這波急殺應還在"
+    assert any(h.crossed_ma25 for h in loose)
+    assert not tight, "高點後不到 4 根不該過 ORCL 形"
+
+    # 同一條走勢，高點拉遠，但訊號根收在上緣
+    high2 = high.copy()
+    high2[249] = 150.0
+    high2[peak] = close[peak]  # 取消近端假高
+    low2 = low.copy()
+    sig = len(close) - 1
+    low2[sig] = close[sig] - 2.0  # 長下影，收在相對高位
+    high2[sig] = close[sig] + 0.01
+    loc_skip = detect_shorts(
+        close, m7, m14, m25, high=high2, low=low2, open_=open_,
+        min_lead=0, require_4h_high=True, high_lookback=240, within_bars=30,
+        orcl_shape=True, min_after_high=4, min_drop_from_high=0.0,
+        min_reds_from_high=0, max_close_loc=0.25,
+    )
+    assert not loc_skip, "收在 K 棒上緣不該過 ORCL 形"
+
+
+def test_orcl_shape_keeps_dump_like_orcl() -> None:
+    """高點後數根連陰、收在下緣、離高一段，應對齊 ORCL 22:49。"""
+    rise = np.linspace(140.0, 144.50, 250)
+    wait = np.full(4, 144.50)
+    # 先連陰再一根大陰：同一根死亡交叉且破 MA25
+    dump = np.array([144.48, 144.46, 144.44, 144.42, 143.55])
+    close = np.concatenate([rise, wait, dump])
+    open_ = np.empty_like(close)
+    open_[0] = close[0]
+    open_[1:] = close[:-1]
+    high = np.maximum(open_, close)
+    low = np.minimum(open_, close)
+    peak = 249
+    high[peak] = 144.95
+    low[-1] = close[-1]
+    m7, m14, m25 = _mas(close)
+    hits = detect_shorts(
+        close,
+        m7,
+        m14,
+        m25,
+        high=high,
+        low=low,
+        open_=open_,
+        min_lead=5,
+        require_4h_high=True,
+        high_lookback=240,
+        within_bars=30,
+        orcl_shape=True,
+        min_after_high=4,
+        min_drop_from_high=0.25,
+        min_reds_from_high=3,
+        max_close_loc=0.25,
+    )
+    assert hits, "ORCL 那種連陰急殺應抓得到"
+    hit = hits[-1]
+    assert hit.crossed_ma25
+    assert hit.bars_after_high is not None and hit.bars_after_high >= 4
+    assert hit.drop_from_high is not None and hit.drop_from_high <= -0.25
+    assert hit.reds_from_high is not None and hit.reds_from_high >= 3
+    assert hit.close_loc is not None and hit.close_loc <= 0.25
+
+
+def test_watch_args_from_pycharm() -> None:
+    args = watch_args_from_pycharm(
+        watch_all=True, symbols="ORCLUSDT,BTCUSDT", dry_run=True, once=True, desktop=True, workers=8
+    )
+    assert args.all is True
+    assert args.symbols == "ORCLUSDT,BTCUSDT"
+    assert args.dry_run is True
+    assert args.once is True
+    assert args.desktop is True
+    assert args.workers == 8
+    assert args.scan is False
+    assert args.test is False
+    assert args.require_cross_ma25 is True
+
+
+def test_desktop_notify_does_not_raise() -> None:
+    desktop_notify("ORCL 1m 空", "測試")
+
+
+def test_chart_tmp_path_uses_temp(monkeypatch=None) -> None:
+    p = chart_tmp_path("ORCLUSDT", 12)
+    assert p.name == "orcl_dx_ORCLUSDT_12.png"
+    assert p.parent.exists()
+
+
+def main() -> int:
+    test_sma()
+    test_death_and_below_fires()
+    test_death_above_ma25_skipped()
+    test_only_the_cross_bar()
+    test_min_lead_filters_flicker()
+    test_require_cross_ma25()
+    test_lead_bars_counts_pre_cross()
+    test_dump_like_screenshot()
+    test_filter_universe_keeps_orcl_drops_index()
+    test_day_window()
+    test_summarize_rows_short_pnl()
+    test_forward_moves_dump()
+    test_write_html_report()
+    test_write_html_report_keeps_all_hits()
+    test_orcl_like_needs_same_bar_and_lead()
+    test_new_high_mask()
+    test_4h_high_then_death_within_30()
+    test_4h_high_too_old_skipped()
+    test_orcl_shape_skips_immediate_and_upper_close()
+    test_orcl_shape_keeps_dump_like_orcl()
+    test_watch_args_from_pycharm()
+    test_desktop_notify_does_not_raise()
+    test_chart_tmp_path_uses_temp()
+    print("ok")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
