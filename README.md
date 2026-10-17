@@ -84,6 +84,44 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## 台股 1 小時 K：5/10/20 多頭排列站上 MA60
+
+小時 K 收盤同時滿足 **MA5 > MA10 > MA20**，且 **上一根還沒站上 MA60、這一根收盤才站上**，才推 Telegram。已經站在 MA60 上面、只是短均才排好的不算。
+
+池子跟破底翻一樣：成交額前 200、股價 < 1000。GitHub Actions 在台北 10:03 / 11:03 / 12:03 / 13:03 / 13:33 代跑；本機也可以自己掛著。
+
+```bash
+# 測 Telegram（憑證放 tg_config.env，勿提交）
+python3 examples/tw_1h_stack_ma60.py --test
+
+# 只掃剛收盤的 1～2 根（盤後 / Actions）
+python3 examples/tw_1h_stack_ma60.py --dry-run --once
+python3 examples/tw_1h_stack_ma60.py --once
+
+# 等到下一根小時 K 收盤再掃
+python3 examples/tw_1h_stack_ma60.py
+
+# 現在已經多頭排列且站上 MA60 的名單
+python3 examples/tw_1h_stack_ma60.py --now
+
+# 近一週 / 近一個月回測（每筆一張圖）
+python3 examples/tw_1h_stack_ma60.py scan --days 7 --pages
+python3 examples/tw_1h_stack_ma60.py scan --days 30 --pages
+
+# 單元測試（不打網路）
+python3 examples/test_tw_1h_stack_ma60.py
+```
+
+2026-09-23 → 09-29、成交額前 200 且**股價 < 1000**：**6 筆、6 檔**（上一根沒站上 MA60、這一根才站上）。已走完隔日的 5 筆勝率 **40%**，平均 **+0.17%**。
+
+週報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma60-20bb/docs/tw-1h-stack-ma60-7d/view.html
+
+2026-08-31 → 09-29 近一個月：**154 筆、109 檔**。已走完隔日勝率 **50.3%**，平均 **+0.86%**；+3d 勝率 **56.1%** 平均 **+1.77%**；+5d 勝率 **64.4%** 平均 **+3.77%**。
+
+月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma60-20bb/docs/tw-1h-stack-ma60-30d/view.html
+
+排程推播請在 repo 設定 GitHub Secrets：`TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID`（跟 NQ 破底翻同一組即可）。沒填的話 Actions 仍會掃，只印在 log。
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
