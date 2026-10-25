@@ -1,0 +1,5000 @@
+{
+  "window": {
+    "start": "2026-07-18",
+    "end": "2026-08-16",
+    "days": [
+      "2026-07-18",
+      "2026-07-19",
+      "2026-07-20",
+      "2026-07-21",
+      "2026-07-22",
+      "2026-07-23",
+      "2026-07-24",
+      "2026-07-25",
+      "2026-07-26",
+      "2026-07-27",
+      "2026-07-28",
+      "2026-07-29",
+      "2026-07-30",
+      "2026-07-31",
+      "2026-08-01",
+      "2026-08-02",
+      "2026-08-03",
+      "2026-08-04",
+      "2026-08-05",
+      "2026-08-06",
+      "2026-08-07",
+      "2026-08-08",
+      "2026-08-09",
+      "2026-08-10",
+      "2026-08-11",
+      "2026-08-12",
+      "2026-08-13",
+      "2026-08-14",
+      "2026-08-15",
+      "2026-08-16"
+    ],
+    "warmups": [
+      "2026-07-15",
+      "2026-07-16",
+      "2026-07-17"
+    ]
+  },
+  "source": "binance_vision_um_5m_bingx_fallback",
+  "universe": "prior_day_top30_candidates__rolling_24h_top10_hourly",
+  "top_n": 10,
+  "candidate_n": 30,
+  "candidate_by_day": {
+    "2026-07-18": [
+      {
+        "symbol": "AKEUSDT",
+        "prior_day_pct": 40.76
+      },
+      {
+        "symbol": "ESPORTSUSDT",
+        "prior_day_pct": 37.09
+      },
+      {
+        "symbol": "1000XECUSDT",
+        "prior_day_pct": 30.89
+      },
+      {
+        "symbol": "STARUSDT",
+        "prior_day_pct": 28.52
+      },
+      {
+        "symbol": "AVAAIUSDT",
+        "prior_day_pct": 23.65
+      },
+      {
+        "symbol": "BULLAUSDT",
+        "prior_day_pct": 16.74
+      },
+      {
+        "symbol": "TAGUSDT",
+        "prior_day_pct": 16.63
+      },
+      {
+        "symbol": "BANKUSDT",
+        "prior_day_pct": 15.14
+      },
+      {
+        "symbol": "USUSDT",
+        "prior_day_pct": 12.79
+      },
+      {
+        "symbol": "IDOLUSDT",
+        "prior_day_pct": 12.12
+      },
+      {
+        "symbol": "UBUSDT",
+        "prior_day_pct": 10.74
+      },
+      {
+        "symbol": "BLUAIUSDT",
+        "prior_day_pct": 10.22
+      },
+      {
+        "symbol": "EDGEUSDT",
+        "prior_day_pct": 8.54
+      },
+      {
+        "symbol": "OUSDT",
+        "prior_day_pct": 8.34
+      },
+      {
+        "symbol": "DODOXUSDT",
+        "prior_day_pct": 8.27
+      },
+      {
+        "symbol": "ASTSUSDT",
+        "prior_day_pct": 7.94
+      },
+      {
+        "symbol": "AERGOUSDT",
+        "prior_day_pct": 7.87
+      },
+      {
+        "symbol": "STXXUSDT",
+        "prior_day_pct": 7.71
+      },
+      {
+        "symbol": "AGTUSDT",
+        "prior_day_pct": 7.69
+      },
+      {
+        "symbol": "ENSUSDT",
+        "prior_day_pct": 7.5
+      },
+      {
+        "symbol": "ONEUSDT",
+        "prior_day_pct": 7.49
+      },
+      {
+        "symbol": "PTBUSDT",
+        "prior_day_pct": 6.83
+      },
+      {
+        "symbol": "USUALUSDT",
+        "prior_day_pct": 6.39
+      },
+      {
+        "symbol": "NBISUSDT",
+        "prior_day_pct": 6.36
+      },
+      {
+        "symbol": "INJUSDT",
+        "prior_day_pct": 5.91
+      },
+      {
+        "symbol": "BANANAUSDT",
+        "prior_day_pct": 5.88
+      },
+      {
+        "symbol": "BRUSDT",
+        "prior_day_pct": 5.83
+      },
+      {
+        "symbol": "XVSUSDT",
+        "prior_day_pct": 5.66
+      },
+      {
+        "symbol": "ZETAUSDT",
+        "prior_day_pct": 5.62
+      },
+      {
+        "symbol": "GPSUSDT",
+        "prior_day_pct": 5.61
+      }
+    ],
+    "2026-07-19": [
+      {
+        "symbol": "BANKUSDT",
+        "prior_day_pct": 57.64
+      },
+      {
+        "symbol": "BUSDT",
+        "prior_day_pct": 45.38
+      },
+      {
+        "symbol": "AKEUSDT",
+        "prior_day_pct": 39.08
+      },
+      {
+        "symbol": "SYNUSDT",
+        "prior_day_pct": 27.78
+      },
+      {
+        "symbol": "TLMUSDT",
+        "prior_day_pct": 24.62
+      },
+      {
+        "symbol": "ARIAUSDT",
+        "prior_day_pct": 21.46
+      },
+      {
+        "symbol": "TRADOORUSDT",
+        "prior_day_pct": 19.49
+      },
+      {
+        "symbol": "ALLOUSDT",
+        "prior_day_pct": 13.65
+      },
+      {
+        "symbol": "TRUTHUSDT",
+        "prior_day_pct": 13.39
+      },
+      {
+        "symbol": "BRUSDT",
+        "prior_day_pct": 12.83
+      },
+      {
+        "symbol": "AVAAIUSDT",
+        "prior_day_pct": 12.7
+      },
+      {
+        "symbol": "AIOTUSDT",
+        "prior_day_pct": 12.67
+      },
+      {
+        "symbol": "ALCHUSDT",
+        "prior_day_pct": 11.9
+      },
+      {
+        "symbol": "ZBTUSDT",
+        "prior_day_pct": 11.59
+      },
+      {
+        "symbol": "PHAUSDT",
+        "prior_day_pct": 11.27
+      },
+      {
+        "symbol": "TOSHIUSDT",
+        "prior_day_pct": 11.16
+      },
+      {
+        "symbol": "COLLECTUSDT",
+        "prior_day_pct": 11.03
+      },
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 9.5
+      },
+      {
+        "symbol": "SWARMSUSDT",
+        "prior_day_pct": 9.08
+      },
+      {
+        "symbol": "WOOUSDT",
+        "prior_day_pct": 9.04
+      },
+      {
+        "symbol": "BILLUSDT",
+        "prior_day_pct": 8.32
+      },
+      {
+        "symbol": "PUMPBTCUSDT",
+        "prior_day_pct": 7.87
+      },
+      {
+        "symbol": "MAGMAUSDT",
+        "prior_day_pct": 7.32
+      },
+      {
+        "symbol": "AIOUSDT",
+        "prior_day_pct": 7.06
+      },
+      {
+        "symbol": "CTRUSDT",
+        "prior_day_pct": 6.78
+      },
+      {
+        "symbol": "BULLAUSDT",
+        "prior_day_pct": 6.51
+      },
+      {
+        "symbol": "METUSDT",
+        "prior_day_pct": 6.43
+      },
+      {
+        "symbol": "JASMYUSDT",
+        "prior_day_pct": 6.31
+      },
+      {
+        "symbol": "BTRUSDT",
+        "prior_day_pct": 6.28
+      },
+      {
+        "symbol": "SPORTFUNUSDT",
+        "prior_day_pct": 6.27
+      }
+    ],
+    "2026-07-20": [
+      {
+        "symbol": "BANKUSDT",
+        "prior_day_pct": 103.27
+      },
+      {
+        "symbol": "BUSDT",
+        "prior_day_pct": 51.08
+      },
+      {
+        "symbol": "ACEUSDT",
+        "prior_day_pct": 33.8
+      },
+      {
+        "symbol": "ZEREBROUSDT",
+        "prior_day_pct": 29.95
+      },
+      {
+        "symbol": "TLMUSDT",
+        "prior_day_pct": 28.48
+      },
+      {
+        "symbol": "PROMUSDT",
+        "prior_day_pct": 21.34
+      },
+      {
+        "symbol": "PUMPUSDT",
+        "prior_day_pct": 20.16
+      },
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 19.36
+      },
+      {
+        "symbol": "AVAAIUSDT",
+        "prior_day_pct": 18.36
+      },
+      {
+        "symbol": "YBUSDT",
+        "prior_day_pct": 16.51
+      },
+      {
+        "symbol": "KAITOUSDT",
+        "prior_day_pct": 15.58
+      },
+      {
+        "symbol": "TAGUSDT",
+        "prior_day_pct": 14.33
+      },
+      {
+        "symbol": "JCTUSDT",
+        "prior_day_pct": 14.03
+      },
+      {
+        "symbol": "ROBOUSDT",
+        "prior_day_pct": 11.91
+      },
+      {
+        "symbol": "AIOUSDT",
+        "prior_day_pct": 10.78
+      },
+      {
+        "symbol": "KGENUSDT",
+        "prior_day_pct": 10.76
+      },
+      {
+        "symbol": "TOWNSUSDT",
+        "prior_day_pct": 8.83
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 8.62
+      },
+      {
+        "symbol": "BLESSUSDT",
+        "prior_day_pct": 8.38
+      },
+      {
+        "symbol": "ICNTUSDT",
+        "prior_day_pct": 7.78
+      },
+      {
+        "symbol": "WETUSDT",
+        "prior_day_pct": 7.4
+      },
+      {
+        "symbol": "XVGUSDT",
+        "prior_day_pct": 7.24
+      },
+      {
+        "symbol": "SKLUSDT",
+        "prior_day_pct": 6.89
+      },
+      {
+        "symbol": "JELLYJELLYUSDT",
+        "prior_day_pct": 6.65
+      },
+      {
+        "symbol": "ATHUSDT",
+        "prior_day_pct": 6.57
+      },
+      {
+        "symbol": "PARTIUSDT",
+        "prior_day_pct": 6.04
+      },
+      {
+        "symbol": "METUSDT",
+        "prior_day_pct": 5.17
+      },
+      {
+        "symbol": "GLWUSDT",
+        "prior_day_pct": 5.0
+      },
+      {
+        "symbol": "MVLLUSDT",
+        "prior_day_pct": 4.95
+      },
+      {
+        "symbol": "MUUUSDT",
+        "prior_day_pct": 4.95
+      }
+    ],
+    "2026-07-21": [
+      {
+        "symbol": "HEMIUSDT",
+        "prior_day_pct": 51.57
+      },
+      {
+        "symbol": "ACEUSDT",
+        "prior_day_pct": 33.42
+      },
+      {
+        "symbol": "BULLAUSDT",
+        "prior_day_pct": 30.58
+      },
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 29.98
+      },
+      {
+        "symbol": "IRENUSDT",
+        "prior_day_pct": 21.75
+      },
+      {
+        "symbol": "ZESTUSDT",
+        "prior_day_pct": 21.37
+      },
+      {
+        "symbol": "PROMUSDT",
+        "prior_day_pct": 21.23
+      },
+      {
+        "symbol": "PTBUSDT",
+        "prior_day_pct": 20.36
+      },
+      {
+        "symbol": "SIRENUSDT",
+        "prior_day_pct": 18.71
+      },
+      {
+        "symbol": "BANKUSDT",
+        "prior_day_pct": 18.28
+      },
+      {
+        "symbol": "HANAUSDT",
+        "prior_day_pct": 17.64
+      },
+      {
+        "symbol": "EVAAUSDT",
+        "prior_day_pct": 17.43
+      },
+      {
+        "symbol": "XANUSDT",
+        "prior_day_pct": 17.18
+      },
+      {
+        "symbol": "METUSDT",
+        "prior_day_pct": 16.8
+      },
+      {
+        "symbol": "1000BONKUSDT",
+        "prior_day_pct": 14.41
+      },
+      {
+        "symbol": "KOMAUSDT",
+        "prior_day_pct": 13.77
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 13.71
+      },
+      {
+        "symbol": "ZAMAUSDT",
+        "prior_day_pct": 12.39
+      },
+      {
+        "symbol": "AINUSDT",
+        "prior_day_pct": 11.49
+      },
+      {
+        "symbol": "USELESSUSDT",
+        "prior_day_pct": 10.46
+      },
+      {
+        "symbol": "HAEDALUSDT",
+        "prior_day_pct": 10.43
+      },
+      {
+        "symbol": "COAIUSDT",
+        "prior_day_pct": 10.03
+      },
+      {
+        "symbol": "AIOTUSDT",
+        "prior_day_pct": 9.72
+      },
+      {
+        "symbol": "TUTUSDT",
+        "prior_day_pct": 9.37
+      },
+      {
+        "symbol": "JTOUSDT",
+        "prior_day_pct": 8.85
+      },
+      {
+        "symbol": "SAPIENUSDT",
+        "prior_day_pct": 8.59
+      },
+      {
+        "symbol": "ACTUSDT",
+        "prior_day_pct": 8.49
+      },
+      {
+        "symbol": "SWARMSUSDT",
+        "prior_day_pct": 8.47
+      },
+      {
+        "symbol": "BLUAIUSDT",
+        "prior_day_pct": 8.13
+      },
+      {
+        "symbol": "FHEUSDT",
+        "prior_day_pct": 8.04
+      }
+    ],
+    "2026-07-22": [
+      {
+        "symbol": "ESPORTSUSDT",
+        "prior_day_pct": 53.79
+      },
+      {
+        "symbol": "ERAUSDT",
+        "prior_day_pct": 44.58
+      },
+      {
+        "symbol": "ZHIPUUSDT",
+        "prior_day_pct": 36.26
+      },
+      {
+        "symbol": "NIGHTUSDT",
+        "prior_day_pct": 32.93
+      },
+      {
+        "symbol": "SNXXUSDT",
+        "prior_day_pct": 32.35
+      },
+      {
+        "symbol": "SMCIUSDT",
+        "prior_day_pct": 28.36
+      },
+      {
+        "symbol": "MUUUSDT",
+        "prior_day_pct": 26.26
+      },
+      {
+        "symbol": "ONEUSDT",
+        "prior_day_pct": 23.82
+      },
+      {
+        "symbol": "EPICUSDT",
+        "prior_day_pct": 22.04
+      },
+      {
+        "symbol": "KORUUSDT",
+        "prior_day_pct": 21.83
+      },
+      {
+        "symbol": "AAOIUSDT",
+        "prior_day_pct": 19.62
+      },
+      {
+        "symbol": "AXTIUSDT",
+        "prior_day_pct": 18.15
+      },
+      {
+        "symbol": "MVLLUSDT",
+        "prior_day_pct": 17.79
+      },
+      {
+        "symbol": "CBRSUSDT",
+        "prior_day_pct": 17.39
+      },
+      {
+        "symbol": "INTWUSDT",
+        "prior_day_pct": 17.21
+      },
+      {
+        "symbol": "SOXLUSDT",
+        "prior_day_pct": 16.46
+      },
+      {
+        "symbol": "NBISUSDT",
+        "prior_day_pct": 16.13
+      },
+      {
+        "symbol": "SNDKUSDT",
+        "prior_day_pct": 15.86
+      },
+      {
+        "symbol": "BEUSDT",
+        "prior_day_pct": 14.85
+      },
+      {
+        "symbol": "WDCUSDT",
+        "prior_day_pct": 14.26
+      },
+      {
+        "symbol": "AGTUSDT",
+        "prior_day_pct": 14.15
+      },
+      {
+        "symbol": "MUUSDT",
+        "prior_day_pct": 13.0
+      },
+      {
+        "symbol": "ONDSUSDT",
+        "prior_day_pct": 12.64
+      },
+      {
+        "symbol": "MINIMAXUSDT",
+        "prior_day_pct": 12.63
+      },
+      {
+        "symbol": "STXXUSDT",
+        "prior_day_pct": 12.59
+      },
+      {
+        "symbol": "DRAMUSDT",
+        "prior_day_pct": 12.58
+      },
+      {
+        "symbol": "SKHYUSDT",
+        "prior_day_pct": 12.54
+      },
+      {
+        "symbol": "MITOUSDT",
+        "prior_day_pct": 12.42
+      },
+      {
+        "symbol": "ASTSUSDT",
+        "prior_day_pct": 12.33
+      },
+      {
+        "symbol": "ONDOUSDT",
+        "prior_day_pct": 12.24
+      }
+    ],
+    "2026-07-23": [
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 41.07
+      },
+      {
+        "symbol": "BROCCOLIF3BUSDT",
+        "prior_day_pct": 40.14
+      },
+      {
+        "symbol": "BANKUSDT",
+        "prior_day_pct": 26.33
+      },
+      {
+        "symbol": "REUSDT",
+        "prior_day_pct": 19.94
+      },
+      {
+        "symbol": "ZAMAUSDT",
+        "prior_day_pct": 19.05
+      },
+      {
+        "symbol": "DODOXUSDT",
+        "prior_day_pct": 18.43
+      },
+      {
+        "symbol": "UAIUSDT",
+        "prior_day_pct": 17.05
+      },
+      {
+        "symbol": "MIRAUSDT",
+        "prior_day_pct": 16.02
+      },
+      {
+        "symbol": "AIAUSDT",
+        "prior_day_pct": 14.94
+      },
+      {
+        "symbol": "UBUSDT",
+        "prior_day_pct": 13.73
+      },
+      {
+        "symbol": "LABUSDT",
+        "prior_day_pct": 12.6
+      },
+      {
+        "symbol": "STBLUSDT",
+        "prior_day_pct": 11.76
+      },
+      {
+        "symbol": "ARXUSDT",
+        "prior_day_pct": 10.89
+      },
+      {
+        "symbol": "EPICUSDT",
+        "prior_day_pct": 10.72
+      },
+      {
+        "symbol": "AIOUSDT",
+        "prior_day_pct": 9.11
+      },
+      {
+        "symbol": "USUSDT",
+        "prior_day_pct": 8.63
+      },
+      {
+        "symbol": "INXUSDT",
+        "prior_day_pct": 7.63
+      },
+      {
+        "symbol": "BASUSDT",
+        "prior_day_pct": 7.34
+      },
+      {
+        "symbol": "BLUAIUSDT",
+        "prior_day_pct": 7.08
+      },
+      {
+        "symbol": "SAFEUSDT",
+        "prior_day_pct": 6.83
+      },
+      {
+        "symbol": "SAPIENUSDT",
+        "prior_day_pct": 6.79
+      },
+      {
+        "symbol": "PHAROSUSDT",
+        "prior_day_pct": 6.77
+      },
+      {
+        "symbol": "TOWNSUSDT",
+        "prior_day_pct": 6.45
+      },
+      {
+        "symbol": "ERAUSDT",
+        "prior_day_pct": 6.13
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 5.99
+      },
+      {
+        "symbol": "LIGHTUSDT",
+        "prior_day_pct": 5.52
+      },
+      {
+        "symbol": "DYDXUSDT",
+        "prior_day_pct": 5.46
+      },
+      {
+        "symbol": "SLXUSDT",
+        "prior_day_pct": 5.35
+      },
+      {
+        "symbol": "SIRENUSDT",
+        "prior_day_pct": 5.08
+      },
+      {
+        "symbol": "NXPCUSDT",
+        "prior_day_pct": 5.07
+      }
+    ],
+    "2026-07-24": [
+      {
+        "symbol": "RIFUSDT",
+        "prior_day_pct": 77.06
+      },
+      {
+        "symbol": "AKEUSDT",
+        "prior_day_pct": 46.53
+      },
+      {
+        "symbol": "ESPORTSUSDT",
+        "prior_day_pct": 35.0
+      },
+      {
+        "symbol": "BILLUSDT",
+        "prior_day_pct": 26.32
+      },
+      {
+        "symbol": "BANKUSDT",
+        "prior_day_pct": 19.12
+      },
+      {
+        "symbol": "LAUSDT",
+        "prior_day_pct": 17.29
+      },
+      {
+        "symbol": "PROMUSDT",
+        "prior_day_pct": 17.04
+      },
+      {
+        "symbol": "REUSDT",
+        "prior_day_pct": 16.57
+      },
+      {
+        "symbol": "BEATUSDT",
+        "prior_day_pct": 14.49
+      },
+      {
+        "symbol": "UBUSDT",
+        "prior_day_pct": 13.87
+      },
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 12.97
+      },
+      {
+        "symbol": "CLOUSDT",
+        "prior_day_pct": 12.22
+      },
+      {
+        "symbol": "币安人生USDT",
+        "prior_day_pct": 11.94
+      },
+      {
+        "symbol": "ZAMAUSDT",
+        "prior_day_pct": 11.7
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 11.36
+      },
+      {
+        "symbol": "MAGMAUSDT",
+        "prior_day_pct": 11.11
+      },
+      {
+        "symbol": "ZBTUSDT",
+        "prior_day_pct": 9.61
+      },
+      {
+        "symbol": "COLLECTUSDT",
+        "prior_day_pct": 8.55
+      },
+      {
+        "symbol": "HEIUSDT",
+        "prior_day_pct": 8.44
+      },
+      {
+        "symbol": "ANTHROPICUSDT",
+        "prior_day_pct": 7.85
+      },
+      {
+        "symbol": "EPICUSDT",
+        "prior_day_pct": 7.49
+      },
+      {
+        "symbol": "ZESTUSDT",
+        "prior_day_pct": 6.9
+      },
+      {
+        "symbol": "UVXYUSDT",
+        "prior_day_pct": 6.68
+      },
+      {
+        "symbol": "FLUIDUSDT",
+        "prior_day_pct": 6.66
+      },
+      {
+        "symbol": "POWERUSDT",
+        "prior_day_pct": 5.66
+      },
+      {
+        "symbol": "BRUSDT",
+        "prior_day_pct": 5.19
+      },
+      {
+        "symbol": "STABLEUSDT",
+        "prior_day_pct": 5.14
+      },
+      {
+        "symbol": "CLUSDT",
+        "prior_day_pct": 5.12
+      },
+      {
+        "symbol": "CYSUSDT",
+        "prior_day_pct": 4.82
+      },
+      {
+        "symbol": "SQQQUSDT",
+        "prior_day_pct": 4.78
+      }
+    ],
+    "2026-07-25": [
+      {
+        "symbol": "DEXEUSDT",
+        "prior_day_pct": 159.72
+      },
+      {
+        "symbol": "ACEUSDT",
+        "prior_day_pct": 31.34
+      },
+      {
+        "symbol": "GWEIUSDT",
+        "prior_day_pct": 28.26
+      },
+      {
+        "symbol": "B2USDT",
+        "prior_day_pct": 23.96
+      },
+      {
+        "symbol": "ESPORTSUSDT",
+        "prior_day_pct": 18.98
+      },
+      {
+        "symbol": "XNYUSDT",
+        "prior_day_pct": 17.24
+      },
+      {
+        "symbol": "SLXUSDT",
+        "prior_day_pct": 17.15
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 14.81
+      },
+      {
+        "symbol": "SOXSUSDT",
+        "prior_day_pct": 14.33
+      },
+      {
+        "symbol": "TOWNSUSDT",
+        "prior_day_pct": 14.24
+      },
+      {
+        "symbol": "CHILLGUYUSDT",
+        "prior_day_pct": 14.02
+      },
+      {
+        "symbol": "BROCCOLIF3BUSDT",
+        "prior_day_pct": 13.23
+      },
+      {
+        "symbol": "AGTUSDT",
+        "prior_day_pct": 12.74
+      },
+      {
+        "symbol": "BEAMXUSDT",
+        "prior_day_pct": 11.98
+      },
+      {
+        "symbol": "AIAUSDT",
+        "prior_day_pct": 11.97
+      },
+      {
+        "symbol": "PLAYUSDT",
+        "prior_day_pct": 11.79
+      },
+      {
+        "symbol": "SAGAUSDT",
+        "prior_day_pct": 11.6
+      },
+      {
+        "symbol": "BASEDUSDT",
+        "prior_day_pct": 11.31
+      },
+      {
+        "symbol": "ORDERUSDT",
+        "prior_day_pct": 10.38
+      },
+      {
+        "symbol": "EULUSDT",
+        "prior_day_pct": 9.84
+      },
+      {
+        "symbol": "HEMIUSDT",
+        "prior_day_pct": 9.84
+      },
+      {
+        "symbol": "BANKUSDT",
+        "prior_day_pct": 9.78
+      },
+      {
+        "symbol": "CLOUSDT",
+        "prior_day_pct": 9.72
+      },
+      {
+        "symbol": "HOMEUSDT",
+        "prior_day_pct": 9.7
+      },
+      {
+        "symbol": "ZHIPUUSDT",
+        "prior_day_pct": 9.6
+      },
+      {
+        "symbol": "TRADOORUSDT",
+        "prior_day_pct": 9.0
+      },
+      {
+        "symbol": "LABUSDT",
+        "prior_day_pct": 8.91
+      },
+      {
+        "symbol": "TLMUSDT",
+        "prior_day_pct": 8.78
+      },
+      {
+        "symbol": "AKEUSDT",
+        "prior_day_pct": 8.77
+      },
+      {
+        "symbol": "TAIKOUSDT",
+        "prior_day_pct": 8.14
+      }
+    ],
+    "2026-07-26": [
+      {
+        "symbol": "EULUSDT",
+        "prior_day_pct": 79.14
+      },
+      {
+        "symbol": "ESPORTSUSDT",
+        "prior_day_pct": 37.77
+      },
+      {
+        "symbol": "QUSDT",
+        "prior_day_pct": 24.83
+      },
+      {
+        "symbol": "SYNUSDT",
+        "prior_day_pct": 19.21
+      },
+      {
+        "symbol": "DEXEUSDT",
+        "prior_day_pct": 17.24
+      },
+      {
+        "symbol": "1000SHIBUSDT",
+        "prior_day_pct": 17.07
+      },
+      {
+        "symbol": "LIGHTUSDT",
+        "prior_day_pct": 16.32
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 15.99
+      },
+      {
+        "symbol": "PTBUSDT",
+        "prior_day_pct": 15.4
+      },
+      {
+        "symbol": "BANKUSDT",
+        "prior_day_pct": 15.0
+      },
+      {
+        "symbol": "1000CATUSDT",
+        "prior_day_pct": 14.43
+      },
+      {
+        "symbol": "LISTAUSDT",
+        "prior_day_pct": 13.19
+      },
+      {
+        "symbol": "AKEUSDT",
+        "prior_day_pct": 11.99
+      },
+      {
+        "symbol": "龙虾USDT",
+        "prior_day_pct": 11.85
+      },
+      {
+        "symbol": "LQTYUSDT",
+        "prior_day_pct": 10.47
+      },
+      {
+        "symbol": "DIAUSDT",
+        "prior_day_pct": 9.09
+      },
+      {
+        "symbol": "EDUUSDT",
+        "prior_day_pct": 8.95
+      },
+      {
+        "symbol": "BLESSUSDT",
+        "prior_day_pct": 8.93
+      },
+      {
+        "symbol": "CHILLGUYUSDT",
+        "prior_day_pct": 8.73
+      },
+      {
+        "symbol": "TURTLEUSDT",
+        "prior_day_pct": 8.51
+      },
+      {
+        "symbol": "PEOPLEUSDT",
+        "prior_day_pct": 7.86
+      },
+      {
+        "symbol": "ARIAUSDT",
+        "prior_day_pct": 7.68
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "prior_day_pct": 7.54
+      },
+      {
+        "symbol": "WIFUSDT",
+        "prior_day_pct": 7.5
+      },
+      {
+        "symbol": "AZTECUSDT",
+        "prior_day_pct": 7.46
+      },
+      {
+        "symbol": "VVVUSDT",
+        "prior_day_pct": 7.13
+      },
+      {
+        "symbol": "PROMUSDT",
+        "prior_day_pct": 6.92
+      },
+      {
+        "symbol": "ALPINEUSDT",
+        "prior_day_pct": 6.9
+      },
+      {
+        "symbol": "TAKEUSDT",
+        "prior_day_pct": 6.8
+      },
+      {
+        "symbol": "BROCCOLI714USDT",
+        "prior_day_pct": 6.67
+      }
+    ],
+    "2026-07-27": [
+      {
+        "symbol": "ESPUSDT",
+        "prior_day_pct": 46.64
+      },
+      {
+        "symbol": "DIAUSDT",
+        "prior_day_pct": 28.61
+      },
+      {
+        "symbol": "CROSSUSDT",
+        "prior_day_pct": 28.21
+      },
+      {
+        "symbol": "SAFEUSDT",
+        "prior_day_pct": 26.13
+      },
+      {
+        "symbol": "UBUSDT",
+        "prior_day_pct": 22.71
+      },
+      {
+        "symbol": "SOONUSDT",
+        "prior_day_pct": 20.71
+      },
+      {
+        "symbol": "BOMEUSDT",
+        "prior_day_pct": 18.48
+      },
+      {
+        "symbol": "EULUSDT",
+        "prior_day_pct": 17.34
+      },
+      {
+        "symbol": "KAITOUSDT",
+        "prior_day_pct": 17.05
+      },
+      {
+        "symbol": "LAUSDT",
+        "prior_day_pct": 16.92
+      },
+      {
+        "symbol": "4USDT",
+        "prior_day_pct": 13.35
+      },
+      {
+        "symbol": "BUSDT",
+        "prior_day_pct": 13.3
+      },
+      {
+        "symbol": "PUMPUSDT",
+        "prior_day_pct": 13.26
+      },
+      {
+        "symbol": "PIEVERSEUSDT",
+        "prior_day_pct": 12.23
+      },
+      {
+        "symbol": "龙虾USDT",
+        "prior_day_pct": 10.9
+      },
+      {
+        "symbol": "MERLUSDT",
+        "prior_day_pct": 10.5
+      },
+      {
+        "symbol": "PEOPLEUSDT",
+        "prior_day_pct": 10.32
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "prior_day_pct": 10.29
+      },
+      {
+        "symbol": "METUSDT",
+        "prior_day_pct": 10.0
+      },
+      {
+        "symbol": "BANKUSDT",
+        "prior_day_pct": 9.44
+      },
+      {
+        "symbol": "HANAUSDT",
+        "prior_day_pct": 8.81
+      },
+      {
+        "symbol": "1000PEPEUSDT",
+        "prior_day_pct": 8.7
+      },
+      {
+        "symbol": "LQTYUSDT",
+        "prior_day_pct": 8.54
+      },
+      {
+        "symbol": "1000SHIBUSDT",
+        "prior_day_pct": 8.54
+      },
+      {
+        "symbol": "NILUSDT",
+        "prior_day_pct": 7.92
+      },
+      {
+        "symbol": "CFGUSDT",
+        "prior_day_pct": 7.81
+      },
+      {
+        "symbol": "USELESSUSDT",
+        "prior_day_pct": 7.75
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 7.73
+      },
+      {
+        "symbol": "KORUUSDT",
+        "prior_day_pct": 7.41
+      },
+      {
+        "symbol": "STXUSDT",
+        "prior_day_pct": 7.39
+      }
+    ],
+    "2026-07-28": [
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 48.45
+      },
+      {
+        "symbol": "COTIUSDT",
+        "prior_day_pct": 43.88
+      },
+      {
+        "symbol": "AKEUSDT",
+        "prior_day_pct": 28.7
+      },
+      {
+        "symbol": "BULLAUSDT",
+        "prior_day_pct": 23.04
+      },
+      {
+        "symbol": "TAGUSDT",
+        "prior_day_pct": 21.01
+      },
+      {
+        "symbol": "SOXSUSDT",
+        "prior_day_pct": 18.67
+      },
+      {
+        "symbol": "SOONUSDT",
+        "prior_day_pct": 15.65
+      },
+      {
+        "symbol": "IDOLUSDT",
+        "prior_day_pct": 15.61
+      },
+      {
+        "symbol": "MINIMAXUSDT",
+        "prior_day_pct": 14.13
+      },
+      {
+        "symbol": "COLLECTUSDT",
+        "prior_day_pct": 11.99
+      },
+      {
+        "symbol": "PEOPLEUSDT",
+        "prior_day_pct": 9.15
+      },
+      {
+        "symbol": "KAITOUSDT",
+        "prior_day_pct": 9.04
+      },
+      {
+        "symbol": "DODOXUSDT",
+        "prior_day_pct": 8.34
+      },
+      {
+        "symbol": "IRYSUSDT",
+        "prior_day_pct": 7.52
+      },
+      {
+        "symbol": "COAIUSDT",
+        "prior_day_pct": 6.81
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 6.73
+      },
+      {
+        "symbol": "KGENUSDT",
+        "prior_day_pct": 6.52
+      },
+      {
+        "symbol": "NOWUSDT",
+        "prior_day_pct": 6.2
+      },
+      {
+        "symbol": "SAPIENUSDT",
+        "prior_day_pct": 5.99
+      },
+      {
+        "symbol": "PLTRUSDT",
+        "prior_day_pct": 5.91
+      },
+      {
+        "symbol": "CRMUSDT",
+        "prior_day_pct": 5.75
+      },
+      {
+        "symbol": "SQQQUSDT",
+        "prior_day_pct": 5.66
+      },
+      {
+        "symbol": "ADBEUSDT",
+        "prior_day_pct": 5.55
+      },
+      {
+        "symbol": "PHAROSUSDT",
+        "prior_day_pct": 5.34
+      },
+      {
+        "symbol": "MMTUSDT",
+        "prior_day_pct": 5.01
+      },
+      {
+        "symbol": "PUMPUSDT",
+        "prior_day_pct": 5.01
+      },
+      {
+        "symbol": "WENUSDT",
+        "prior_day_pct": 4.99
+      },
+      {
+        "symbol": "SONYUSDT",
+        "prior_day_pct": 4.91
+      },
+      {
+        "symbol": "HK1810USDT",
+        "prior_day_pct": 4.9
+      },
+      {
+        "symbol": "HIMSUSDT",
+        "prior_day_pct": 4.78
+      }
+    ],
+    "2026-07-29": [
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 83.89
+      },
+      {
+        "symbol": "BULLAUSDT",
+        "prior_day_pct": 34.73
+      },
+      {
+        "symbol": "BEATUSDT",
+        "prior_day_pct": 28.97
+      },
+      {
+        "symbol": "ZILUSDT",
+        "prior_day_pct": 24.28
+      },
+      {
+        "symbol": "RIFUSDT",
+        "prior_day_pct": 23.53
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 21.46
+      },
+      {
+        "symbol": "SOONUSDT",
+        "prior_day_pct": 17.62
+      },
+      {
+        "symbol": "BOTUSDT",
+        "prior_day_pct": 17.0
+      },
+      {
+        "symbol": "DEXEUSDT",
+        "prior_day_pct": 14.63
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 13.43
+      },
+      {
+        "symbol": "UBUSDT",
+        "prior_day_pct": 12.51
+      },
+      {
+        "symbol": "AIAUSDT",
+        "prior_day_pct": 12.07
+      },
+      {
+        "symbol": "VANRYUSDT",
+        "prior_day_pct": 10.96
+      },
+      {
+        "symbol": "SOXSUSDT",
+        "prior_day_pct": 10.55
+      },
+      {
+        "symbol": "OPENUSDT",
+        "prior_day_pct": 10.29
+      },
+      {
+        "symbol": "1000CHEEMSUSDT",
+        "prior_day_pct": 9.08
+      },
+      {
+        "symbol": "FLOWUSDT",
+        "prior_day_pct": 8.85
+      },
+      {
+        "symbol": "TERUSDT",
+        "prior_day_pct": 8.78
+      },
+      {
+        "symbol": "ZESTUSDT",
+        "prior_day_pct": 8.58
+      },
+      {
+        "symbol": "TOWNSUSDT",
+        "prior_day_pct": 8.39
+      },
+      {
+        "symbol": "LITUSDT",
+        "prior_day_pct": 8.03
+      },
+      {
+        "symbol": "GTCUSDT",
+        "prior_day_pct": 7.94
+      },
+      {
+        "symbol": "COAIUSDT",
+        "prior_day_pct": 7.78
+      },
+      {
+        "symbol": "GWEIUSDT",
+        "prior_day_pct": 7.76
+      },
+      {
+        "symbol": "PLUMEUSDT",
+        "prior_day_pct": 7.54
+      },
+      {
+        "symbol": "TAIKOUSDT",
+        "prior_day_pct": 7.44
+      },
+      {
+        "symbol": "PHAROSUSDT",
+        "prior_day_pct": 7.15
+      },
+      {
+        "symbol": "KMNOUSDT",
+        "prior_day_pct": 7.0
+      },
+      {
+        "symbol": "龙虾USDT",
+        "prior_day_pct": 6.86
+      },
+      {
+        "symbol": "HOLOUSDT",
+        "prior_day_pct": 6.16
+      }
+    ],
+    "2026-07-30": [
+      {
+        "symbol": "COTIUSDT",
+        "prior_day_pct": 57.13
+      },
+      {
+        "symbol": "UAIUSDT",
+        "prior_day_pct": 42.76
+      },
+      {
+        "symbol": "BEATUSDT",
+        "prior_day_pct": 17.47
+      },
+      {
+        "symbol": "SOXSUSDT",
+        "prior_day_pct": 16.84
+      },
+      {
+        "symbol": "PRLUSDT",
+        "prior_day_pct": 16.65
+      },
+      {
+        "symbol": "SKYAIUSDT",
+        "prior_day_pct": 13.39
+      },
+      {
+        "symbol": "ACHUSDT",
+        "prior_day_pct": 13.21
+      },
+      {
+        "symbol": "VELVETUSDT",
+        "prior_day_pct": 12.81
+      },
+      {
+        "symbol": "DODOXUSDT",
+        "prior_day_pct": 10.97
+      },
+      {
+        "symbol": "LABUSDT",
+        "prior_day_pct": 10.46
+      },
+      {
+        "symbol": "HOLOUSDT",
+        "prior_day_pct": 10.09
+      },
+      {
+        "symbol": "REUSDT",
+        "prior_day_pct": 9.69
+      },
+      {
+        "symbol": "SNOWUSDT",
+        "prior_day_pct": 9.38
+      },
+      {
+        "symbol": "HK1810USDT",
+        "prior_day_pct": 9.0
+      },
+      {
+        "symbol": "UVXYUSDT",
+        "prior_day_pct": 8.04
+      },
+      {
+        "symbol": "FLOWUSDT",
+        "prior_day_pct": 7.51
+      },
+      {
+        "symbol": "SAFEUSDT",
+        "prior_day_pct": 7.45
+      },
+      {
+        "symbol": "MSFTUSDT",
+        "prior_day_pct": 7.41
+      },
+      {
+        "symbol": "IRYSUSDT",
+        "prior_day_pct": 7.29
+      },
+      {
+        "symbol": "TAKEUSDT",
+        "prior_day_pct": 7.27
+      },
+      {
+        "symbol": "SENTUSDT",
+        "prior_day_pct": 6.68
+      },
+      {
+        "symbol": "龙虾USDT",
+        "prior_day_pct": 6.44
+      },
+      {
+        "symbol": "EULUSDT",
+        "prior_day_pct": 6.31
+      },
+      {
+        "symbol": "ADBEUSDT",
+        "prior_day_pct": 6.26
+      },
+      {
+        "symbol": "SQQQUSDT",
+        "prior_day_pct": 6.13
+      },
+      {
+        "symbol": "NOWUSDT",
+        "prior_day_pct": 6.11
+      },
+      {
+        "symbol": "MINIMAXUSDT",
+        "prior_day_pct": 5.93
+      },
+      {
+        "symbol": "B2USDT",
+        "prior_day_pct": 5.91
+      },
+      {
+        "symbol": "KGENUSDT",
+        "prior_day_pct": 5.6
+      },
+      {
+        "symbol": "RAVEUSDT",
+        "prior_day_pct": 5.45
+      }
+    ],
+    "2026-07-31": [
+      {
+        "symbol": "KOMAUSDT",
+        "prior_day_pct": 81.03
+      },
+      {
+        "symbol": "SNXXUSDT",
+        "prior_day_pct": 72.66
+      },
+      {
+        "symbol": "AXTIUSDT",
+        "prior_day_pct": 53.62
+      },
+      {
+        "symbol": "MUUUSDT",
+        "prior_day_pct": 47.84
+      },
+      {
+        "symbol": "MVLLUSDT",
+        "prior_day_pct": 40.43
+      },
+      {
+        "symbol": "KORUUSDT",
+        "prior_day_pct": 37.21
+      },
+      {
+        "symbol": "INTWUSDT",
+        "prior_day_pct": 35.01
+      },
+      {
+        "symbol": "SOXLUSDT",
+        "prior_day_pct": 34.75
+      },
+      {
+        "symbol": "SNDKUSDT",
+        "prior_day_pct": 33.85
+      },
+      {
+        "symbol": "MMTUSDT",
+        "prior_day_pct": 32.31
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 32.19
+      },
+      {
+        "symbol": "NBISUSDT",
+        "prior_day_pct": 31.9
+      },
+      {
+        "symbol": "IRENUSDT",
+        "prior_day_pct": 31.81
+      },
+      {
+        "symbol": "BEUSDT",
+        "prior_day_pct": 31.48
+      },
+      {
+        "symbol": "ALABUSDT",
+        "prior_day_pct": 27.55
+      },
+      {
+        "symbol": "ROBOUSDT",
+        "prior_day_pct": 25.48
+      },
+      {
+        "symbol": "AAOIUSDT",
+        "prior_day_pct": 24.9
+      },
+      {
+        "symbol": "SHAZUSDT",
+        "prior_day_pct": 24.11
+      },
+      {
+        "symbol": "CRWVUSDT",
+        "prior_day_pct": 22.88
+      },
+      {
+        "symbol": "MUUSDT",
+        "prior_day_pct": 22.79
+      },
+      {
+        "symbol": "SKHYUSDT",
+        "prior_day_pct": 22.06
+      },
+      {
+        "symbol": "WDCUSDT",
+        "prior_day_pct": 21.58
+      },
+      {
+        "symbol": "PENGUSDT",
+        "prior_day_pct": 20.91
+      },
+      {
+        "symbol": "CRDOUSDT",
+        "prior_day_pct": 20.17
+      },
+      {
+        "symbol": "DRAMUSDT",
+        "prior_day_pct": 19.71
+      },
+      {
+        "symbol": "CBRSUSDT",
+        "prior_day_pct": 19.6
+      },
+      {
+        "symbol": "MRVLUSDT",
+        "prior_day_pct": 19.51
+      },
+      {
+        "symbol": "UBUSDT",
+        "prior_day_pct": 19.39
+      },
+      {
+        "symbol": "LITEUSDT",
+        "prior_day_pct": 19.21
+      },
+      {
+        "symbol": "EVAAUSDT",
+        "prior_day_pct": 18.15
+      }
+    ],
+    "2026-08-01": [
+      {
+        "symbol": "1000RATSUSDT",
+        "prior_day_pct": 124.97
+      },
+      {
+        "symbol": "KOMAUSDT",
+        "prior_day_pct": 100.48
+      },
+      {
+        "symbol": "GIGGLEUSDT",
+        "prior_day_pct": 60.69
+      },
+      {
+        "symbol": "USUSDT",
+        "prior_day_pct": 26.69
+      },
+      {
+        "symbol": "TAGUSDT",
+        "prior_day_pct": 23.76
+      },
+      {
+        "symbol": "XNYUSDT",
+        "prior_day_pct": 22.66
+      },
+      {
+        "symbol": "TLMUSDT",
+        "prior_day_pct": 21.88
+      },
+      {
+        "symbol": "PTBUSDT",
+        "prior_day_pct": 21.66
+      },
+      {
+        "symbol": "COTIUSDT",
+        "prior_day_pct": 20.89
+      },
+      {
+        "symbol": "BROCCOLI714USDT",
+        "prior_day_pct": 20.49
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 19.87
+      },
+      {
+        "symbol": "1000SATSUSDT",
+        "prior_day_pct": 18.87
+      },
+      {
+        "symbol": "TAKEUSDT",
+        "prior_day_pct": 16.85
+      },
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 16.52
+      },
+      {
+        "symbol": "DIAUSDT",
+        "prior_day_pct": 15.82
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 13.68
+      },
+      {
+        "symbol": "DEXEUSDT",
+        "prior_day_pct": 13.44
+      },
+      {
+        "symbol": "ORDIUSDT",
+        "prior_day_pct": 13.11
+      },
+      {
+        "symbol": "MUSDT",
+        "prior_day_pct": 12.46
+      },
+      {
+        "symbol": "1000XECUSDT",
+        "prior_day_pct": 11.93
+      },
+      {
+        "symbol": "SOXSUSDT",
+        "prior_day_pct": 11.09
+      },
+      {
+        "symbol": "4USDT",
+        "prior_day_pct": 10.49
+      },
+      {
+        "symbol": "LIGHTUSDT",
+        "prior_day_pct": 9.8
+      },
+      {
+        "symbol": "BIRBUSDT",
+        "prior_day_pct": 9.8
+      },
+      {
+        "symbol": "IDOLUSDT",
+        "prior_day_pct": 9.79
+      },
+      {
+        "symbol": "BROCCOLIF3BUSDT",
+        "prior_day_pct": 9.66
+      },
+      {
+        "symbol": "CATIUSDT",
+        "prior_day_pct": 9.52
+      },
+      {
+        "symbol": "CLANKERUSDT",
+        "prior_day_pct": 9.45
+      },
+      {
+        "symbol": "我踏马来了USDT",
+        "prior_day_pct": 9.34
+      },
+      {
+        "symbol": "MUBARAKUSDT",
+        "prior_day_pct": 9.26
+      }
+    ],
+    "2026-08-02": [
+      {
+        "symbol": "IDOLUSDT",
+        "prior_day_pct": 46.96
+      },
+      {
+        "symbol": "UAIUSDT",
+        "prior_day_pct": 44.17
+      },
+      {
+        "symbol": "BLESSUSDT",
+        "prior_day_pct": 39.6
+      },
+      {
+        "symbol": "AKEUSDT",
+        "prior_day_pct": 36.43
+      },
+      {
+        "symbol": "PROMUSDT",
+        "prior_day_pct": 20.48
+      },
+      {
+        "symbol": "APRUSDT",
+        "prior_day_pct": 18.49
+      },
+      {
+        "symbol": "HOMEUSDT",
+        "prior_day_pct": 16.6
+      },
+      {
+        "symbol": "BEATUSDT",
+        "prior_day_pct": 13.84
+      },
+      {
+        "symbol": "KAITOUSDT",
+        "prior_day_pct": 12.93
+      },
+      {
+        "symbol": "EULUSDT",
+        "prior_day_pct": 12.15
+      },
+      {
+        "symbol": "QUSDT",
+        "prior_day_pct": 12.1
+      },
+      {
+        "symbol": "ELSAUSDT",
+        "prior_day_pct": 11.92
+      },
+      {
+        "symbol": "EPICUSDT",
+        "prior_day_pct": 11.69
+      },
+      {
+        "symbol": "BRUSDT",
+        "prior_day_pct": 10.07
+      },
+      {
+        "symbol": "AKTUSDT",
+        "prior_day_pct": 9.97
+      },
+      {
+        "symbol": "HEIUSDT",
+        "prior_day_pct": 9.22
+      },
+      {
+        "symbol": "HUSDT",
+        "prior_day_pct": 8.89
+      },
+      {
+        "symbol": "TUTUSDT",
+        "prior_day_pct": 8.82
+      },
+      {
+        "symbol": "ROSEUSDT",
+        "prior_day_pct": 8.21
+      },
+      {
+        "symbol": "MYXUSDT",
+        "prior_day_pct": 7.62
+      },
+      {
+        "symbol": "AEVOUSDT",
+        "prior_day_pct": 7.44
+      },
+      {
+        "symbol": "ICNTUSDT",
+        "prior_day_pct": 6.97
+      },
+      {
+        "symbol": "XANUSDT",
+        "prior_day_pct": 6.83
+      },
+      {
+        "symbol": "ESPORTSUSDT",
+        "prior_day_pct": 6.72
+      },
+      {
+        "symbol": "AVAUSDT",
+        "prior_day_pct": 6.53
+      },
+      {
+        "symbol": "KSMUSDT",
+        "prior_day_pct": 6.32
+      },
+      {
+        "symbol": "PIEVERSEUSDT",
+        "prior_day_pct": 6.27
+      },
+      {
+        "symbol": "AGTUSDT",
+        "prior_day_pct": 5.89
+      },
+      {
+        "symbol": "BANDUSDT",
+        "prior_day_pct": 5.88
+      },
+      {
+        "symbol": "AIAUSDT",
+        "prior_day_pct": 5.87
+      }
+    ],
+    "2026-08-03": [
+      {
+        "symbol": "BLESSUSDT",
+        "prior_day_pct": 80.32
+      },
+      {
+        "symbol": "TAKEUSDT",
+        "prior_day_pct": 38.69
+      },
+      {
+        "symbol": "BICOUSDT",
+        "prior_day_pct": 37.0
+      },
+      {
+        "symbol": "STARUSDT",
+        "prior_day_pct": 25.24
+      },
+      {
+        "symbol": "EDENUSDT",
+        "prior_day_pct": 22.69
+      },
+      {
+        "symbol": "FHEUSDT",
+        "prior_day_pct": 17.89
+      },
+      {
+        "symbol": "MANTRAUSDT",
+        "prior_day_pct": 15.45
+      },
+      {
+        "symbol": "PTBUSDT",
+        "prior_day_pct": 14.52
+      },
+      {
+        "symbol": "HOMEUSDT",
+        "prior_day_pct": 13.97
+      },
+      {
+        "symbol": "SKYAIUSDT",
+        "prior_day_pct": 12.93
+      },
+      {
+        "symbol": "ENAUSDT",
+        "prior_day_pct": 12.74
+      },
+      {
+        "symbol": "HYPERUSDT",
+        "prior_day_pct": 11.87
+      },
+      {
+        "symbol": "HUSDT",
+        "prior_day_pct": 11.3
+      },
+      {
+        "symbol": "GWEIUSDT",
+        "prior_day_pct": 10.94
+      },
+      {
+        "symbol": "PRLUSDT",
+        "prior_day_pct": 10.09
+      },
+      {
+        "symbol": "MUSDT",
+        "prior_day_pct": 9.6
+      },
+      {
+        "symbol": "SOXLUSDT",
+        "prior_day_pct": 9.51
+      },
+      {
+        "symbol": "MVLLUSDT",
+        "prior_day_pct": 9.42
+      },
+      {
+        "symbol": "PIEVERSEUSDT",
+        "prior_day_pct": 9.4
+      },
+      {
+        "symbol": "NILUSDT",
+        "prior_day_pct": 9.16
+      },
+      {
+        "symbol": "ALGOUSDT",
+        "prior_day_pct": 8.91
+      },
+      {
+        "symbol": "XANUSDT",
+        "prior_day_pct": 8.74
+      },
+      {
+        "symbol": "ADAUSDT",
+        "prior_day_pct": 8.66
+      },
+      {
+        "symbol": "KORUUSDT",
+        "prior_day_pct": 8.37
+      },
+      {
+        "symbol": "PEOPLEUSDT",
+        "prior_day_pct": 8.3
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 8.16
+      },
+      {
+        "symbol": "MUUUSDT",
+        "prior_day_pct": 8.13
+      },
+      {
+        "symbol": "NBISUSDT",
+        "prior_day_pct": 7.69
+      },
+      {
+        "symbol": "DUSKUSDT",
+        "prior_day_pct": 7.5
+      },
+      {
+        "symbol": "PORTALUSDT",
+        "prior_day_pct": 7.37
+      }
+    ],
+    "2026-08-04": [
+      {
+        "symbol": "VICUSDT",
+        "prior_day_pct": 53.35
+      },
+      {
+        "symbol": "SKYAIUSDT",
+        "prior_day_pct": 38.36
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 32.1
+      },
+      {
+        "symbol": "PIPPINUSDT",
+        "prior_day_pct": 19.86
+      },
+      {
+        "symbol": "CRWVUSDT",
+        "prior_day_pct": 18.94
+      },
+      {
+        "symbol": "AAOIUSDT",
+        "prior_day_pct": 17.3
+      },
+      {
+        "symbol": "TUTUSDT",
+        "prior_day_pct": 15.99
+      },
+      {
+        "symbol": "PLTRUSDT",
+        "prior_day_pct": 15.8
+      },
+      {
+        "symbol": "SNXXUSDT",
+        "prior_day_pct": 15.15
+      },
+      {
+        "symbol": "AXTIUSDT",
+        "prior_day_pct": 15.05
+      },
+      {
+        "symbol": "PTBUSDT",
+        "prior_day_pct": 14.23
+      },
+      {
+        "symbol": "AKTUSDT",
+        "prior_day_pct": 13.51
+      },
+      {
+        "symbol": "DRIFTUSDT",
+        "prior_day_pct": 13.4
+      },
+      {
+        "symbol": "UBUSDT",
+        "prior_day_pct": 12.91
+      },
+      {
+        "symbol": "MINIMAXUSDT",
+        "prior_day_pct": 12.39
+      },
+      {
+        "symbol": "CBRSUSDT",
+        "prior_day_pct": 11.88
+      },
+      {
+        "symbol": "ROBOUSDT",
+        "prior_day_pct": 11.27
+      },
+      {
+        "symbol": "TOWNSUSDT",
+        "prior_day_pct": 11.25
+      },
+      {
+        "symbol": "ONDSUSDT",
+        "prior_day_pct": 10.99
+      },
+      {
+        "symbol": "SOFIUSDT",
+        "prior_day_pct": 10.81
+      },
+      {
+        "symbol": "HIMSUSDT",
+        "prior_day_pct": 10.56
+      },
+      {
+        "symbol": "SHAZUSDT",
+        "prior_day_pct": 10.18
+      },
+      {
+        "symbol": "MYXUSDT",
+        "prior_day_pct": 10.13
+      },
+      {
+        "symbol": "WAXPUSDT",
+        "prior_day_pct": 9.66
+      },
+      {
+        "symbol": "NILUSDT",
+        "prior_day_pct": 9.45
+      },
+      {
+        "symbol": "VRTUSDT",
+        "prior_day_pct": 9.23
+      },
+      {
+        "symbol": "COHRUSDT",
+        "prior_day_pct": 8.83
+      },
+      {
+        "symbol": "ORCLUSDT",
+        "prior_day_pct": 8.68
+      },
+      {
+        "symbol": "RKLBUSDT",
+        "prior_day_pct": 8.45
+      },
+      {
+        "symbol": "OPNUSDT",
+        "prior_day_pct": 8.31
+      }
+    ],
+    "2026-08-05": [
+      {
+        "symbol": "CYSUSDT",
+        "prior_day_pct": 98.53
+      },
+      {
+        "symbol": "HEIUSDT",
+        "prior_day_pct": 48.61
+      },
+      {
+        "symbol": "SKYAIUSDT",
+        "prior_day_pct": 29.98
+      },
+      {
+        "symbol": "TAKEUSDT",
+        "prior_day_pct": 29.98
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 27.06
+      },
+      {
+        "symbol": "BICOUSDT",
+        "prior_day_pct": 25.51
+      },
+      {
+        "symbol": "HFTUSDT",
+        "prior_day_pct": 25.03
+      },
+      {
+        "symbol": "BANKUSDT",
+        "prior_day_pct": 18.64
+      },
+      {
+        "symbol": "MVLLUSDT",
+        "prior_day_pct": 17.96
+      },
+      {
+        "symbol": "COTIUSDT",
+        "prior_day_pct": 16.29
+      },
+      {
+        "symbol": "SNXXUSDT",
+        "prior_day_pct": 15.95
+      },
+      {
+        "symbol": "AAOIUSDT",
+        "prior_day_pct": 15.76
+      },
+      {
+        "symbol": "HOMEUSDT",
+        "prior_day_pct": 14.13
+      },
+      {
+        "symbol": "ARMUSDT",
+        "prior_day_pct": 13.55
+      },
+      {
+        "symbol": "PUMPUSDT",
+        "prior_day_pct": 13.5
+      },
+      {
+        "symbol": "SOXLUSDT",
+        "prior_day_pct": 13.21
+      },
+      {
+        "symbol": "STOUSDT",
+        "prior_day_pct": 12.5
+      },
+      {
+        "symbol": "GWEIUSDT",
+        "prior_day_pct": 12.19
+      },
+      {
+        "symbol": "KORUUSDT",
+        "prior_day_pct": 11.67
+      },
+      {
+        "symbol": "MUUUSDT",
+        "prior_day_pct": 11.53
+      },
+      {
+        "symbol": "ZEREBROUSDT",
+        "prior_day_pct": 11.25
+      },
+      {
+        "symbol": "PLTRUSDT",
+        "prior_day_pct": 11.03
+      },
+      {
+        "symbol": "SYNUSDT",
+        "prior_day_pct": 10.68
+      },
+      {
+        "symbol": "INTWUSDT",
+        "prior_day_pct": 10.64
+      },
+      {
+        "symbol": "COHRUSDT",
+        "prior_day_pct": 10.3
+      },
+      {
+        "symbol": "EPICUSDT",
+        "prior_day_pct": 10.14
+      },
+      {
+        "symbol": "AIOUSDT",
+        "prior_day_pct": 9.77
+      },
+      {
+        "symbol": "ASTSUSDT",
+        "prior_day_pct": 9.66
+      },
+      {
+        "symbol": "SMCIUSDT",
+        "prior_day_pct": 9.52
+      },
+      {
+        "symbol": "XNYUSDT",
+        "prior_day_pct": 9.43
+      }
+    ],
+    "2026-08-06": [
+      {
+        "symbol": "BLESSUSDT",
+        "prior_day_pct": 135.44
+      },
+      {
+        "symbol": "HEIUSDT",
+        "prior_day_pct": 107.76
+      },
+      {
+        "symbol": "HFTUSDT",
+        "prior_day_pct": 56.07
+      },
+      {
+        "symbol": "SYNUSDT",
+        "prior_day_pct": 50.69
+      },
+      {
+        "symbol": "CYSUSDT",
+        "prior_day_pct": 48.87
+      },
+      {
+        "symbol": "DODOXUSDT",
+        "prior_day_pct": 42.77
+      },
+      {
+        "symbol": "龙虾USDT",
+        "prior_day_pct": 35.31
+      },
+      {
+        "symbol": "TUTUSDT",
+        "prior_day_pct": 32.88
+      },
+      {
+        "symbol": "BICOUSDT",
+        "prior_day_pct": 28.55
+      },
+      {
+        "symbol": "SKYAIUSDT",
+        "prior_day_pct": 27.83
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 20.51
+      },
+      {
+        "symbol": "ZBTUSDT",
+        "prior_day_pct": 17.84
+      },
+      {
+        "symbol": "HMSTRUSDT",
+        "prior_day_pct": 17.55
+      },
+      {
+        "symbol": "BSPUSDT",
+        "prior_day_pct": 17.31
+      },
+      {
+        "symbol": "FIDAUSDT",
+        "prior_day_pct": 17.05
+      },
+      {
+        "symbol": "GUAUSDT",
+        "prior_day_pct": 16.15
+      },
+      {
+        "symbol": "SKRUSDT",
+        "prior_day_pct": 15.58
+      },
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 15.58
+      },
+      {
+        "symbol": "LIGHTUSDT",
+        "prior_day_pct": 15.33
+      },
+      {
+        "symbol": "GRVTUSDT",
+        "prior_day_pct": 14.78
+      },
+      {
+        "symbol": "NOMUSDT",
+        "prior_day_pct": 14.76
+      },
+      {
+        "symbol": "JCTUSDT",
+        "prior_day_pct": 14.14
+      },
+      {
+        "symbol": "1000RATSUSDT",
+        "prior_day_pct": 13.91
+      },
+      {
+        "symbol": "PTBUSDT",
+        "prior_day_pct": 13.19
+      },
+      {
+        "symbol": "TAGUSDT",
+        "prior_day_pct": 11.64
+      },
+      {
+        "symbol": "UBUSDT",
+        "prior_day_pct": 11.31
+      },
+      {
+        "symbol": "BIRBUSDT",
+        "prior_day_pct": 11.04
+      },
+      {
+        "symbol": "4USDT",
+        "prior_day_pct": 10.85
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 9.85
+      },
+      {
+        "symbol": "RESOLVUSDT",
+        "prior_day_pct": 9.32
+      }
+    ],
+    "2026-08-07": [
+      {
+        "symbol": "TAKEUSDT",
+        "prior_day_pct": 79.72
+      },
+      {
+        "symbol": "HFTUSDT",
+        "prior_day_pct": 65.81
+      },
+      {
+        "symbol": "SKYAIUSDT",
+        "prior_day_pct": 58.16
+      },
+      {
+        "symbol": "ACEUSDT",
+        "prior_day_pct": 54.79
+      },
+      {
+        "symbol": "ZBTUSDT",
+        "prior_day_pct": 47.83
+      },
+      {
+        "symbol": "BICOUSDT",
+        "prior_day_pct": 43.79
+      },
+      {
+        "symbol": "CTSIUSDT",
+        "prior_day_pct": 42.09
+      },
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 38.54
+      },
+      {
+        "symbol": "TRADOORUSDT",
+        "prior_day_pct": 29.02
+      },
+      {
+        "symbol": "STGUSDT",
+        "prior_day_pct": 28.55
+      },
+      {
+        "symbol": "RIVERUSDT",
+        "prior_day_pct": 27.64
+      },
+      {
+        "symbol": "GWEIUSDT",
+        "prior_day_pct": 25.69
+      },
+      {
+        "symbol": "COOKIEUSDT",
+        "prior_day_pct": 25.56
+      },
+      {
+        "symbol": "FLNCUSDT",
+        "prior_day_pct": 22.98
+      },
+      {
+        "symbol": "UBUSDT",
+        "prior_day_pct": 20.35
+      },
+      {
+        "symbol": "ARIAUSDT",
+        "prior_day_pct": 20.11
+      },
+      {
+        "symbol": "RESOLVUSDT",
+        "prior_day_pct": 19.12
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 19.04
+      },
+      {
+        "symbol": "BSBUSDT",
+        "prior_day_pct": 18.87
+      },
+      {
+        "symbol": "PLUMEUSDT",
+        "prior_day_pct": 18.62
+      },
+      {
+        "symbol": "ACTUSDT",
+        "prior_day_pct": 17.06
+      },
+      {
+        "symbol": "FRAXUSDT",
+        "prior_day_pct": 16.61
+      },
+      {
+        "symbol": "MINIMAXUSDT",
+        "prior_day_pct": 16.34
+      },
+      {
+        "symbol": "ALLOUSDT",
+        "prior_day_pct": 14.87
+      },
+      {
+        "symbol": "ROBOUSDT",
+        "prior_day_pct": 14.79
+      },
+      {
+        "symbol": "DIAUSDT",
+        "prior_day_pct": 14.3
+      },
+      {
+        "symbol": "MAVIAUSDT",
+        "prior_day_pct": 13.6
+      },
+      {
+        "symbol": "FHEUSDT",
+        "prior_day_pct": 13.2
+      },
+      {
+        "symbol": "ENSOUSDT",
+        "prior_day_pct": 12.17
+      },
+      {
+        "symbol": "AXTIUSDT",
+        "prior_day_pct": 11.87
+      }
+    ],
+    "2026-08-08": [
+      {
+        "symbol": "TUTUSDT",
+        "prior_day_pct": 59.04
+      },
+      {
+        "symbol": "GWEIUSDT",
+        "prior_day_pct": 55.63
+      },
+      {
+        "symbol": "BICOUSDT",
+        "prior_day_pct": 38.91
+      },
+      {
+        "symbol": "EPICUSDT",
+        "prior_day_pct": 30.53
+      },
+      {
+        "symbol": "C98USDT",
+        "prior_day_pct": 23.07
+      },
+      {
+        "symbol": "SIRENUSDT",
+        "prior_day_pct": 21.38
+      },
+      {
+        "symbol": "TSTUSDT",
+        "prior_day_pct": 20.54
+      },
+      {
+        "symbol": "ZHIPUUSDT",
+        "prior_day_pct": 18.89
+      },
+      {
+        "symbol": "RECALLUSDT",
+        "prior_day_pct": 18.72
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 17.62
+      },
+      {
+        "symbol": "AXTIUSDT",
+        "prior_day_pct": 17.38
+      },
+      {
+        "symbol": "SPCXUSDT",
+        "prior_day_pct": 17.12
+      },
+      {
+        "symbol": "AIOUSDT",
+        "prior_day_pct": 16.37
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 15.7
+      },
+      {
+        "symbol": "ICNTUSDT",
+        "prior_day_pct": 15.06
+      },
+      {
+        "symbol": "CYSUSDT",
+        "prior_day_pct": 15.02
+      },
+      {
+        "symbol": "BROCCOLI714USDT",
+        "prior_day_pct": 14.89
+      },
+      {
+        "symbol": "HEIUSDT",
+        "prior_day_pct": 14.44
+      },
+      {
+        "symbol": "SLXUSDT",
+        "prior_day_pct": 14.04
+      },
+      {
+        "symbol": "MINIMAXUSDT",
+        "prior_day_pct": 12.35
+      },
+      {
+        "symbol": "AINUSDT",
+        "prior_day_pct": 12.01
+      },
+      {
+        "symbol": "DKNGUSDT",
+        "prior_day_pct": 11.46
+      },
+      {
+        "symbol": "COHRUSDT",
+        "prior_day_pct": 11.3
+      },
+      {
+        "symbol": "MUBARAKUSDT",
+        "prior_day_pct": 10.93
+      },
+      {
+        "symbol": "KOMAUSDT",
+        "prior_day_pct": 10.89
+      },
+      {
+        "symbol": "AVAUSDT",
+        "prior_day_pct": 10.57
+      },
+      {
+        "symbol": "ESPUSDT",
+        "prior_day_pct": 10.25
+      },
+      {
+        "symbol": "USARUSDT",
+        "prior_day_pct": 10.18
+      },
+      {
+        "symbol": "MMTUSDT",
+        "prior_day_pct": 10.14
+      },
+      {
+        "symbol": "RKLBUSDT",
+        "prior_day_pct": 9.6
+      }
+    ],
+    "2026-08-09": [
+      {
+        "symbol": "TUTUSDT",
+        "prior_day_pct": 179.95
+      },
+      {
+        "symbol": "BLUAIUSDT",
+        "prior_day_pct": 65.01
+      },
+      {
+        "symbol": "COOKIEUSDT",
+        "prior_day_pct": 39.7
+      },
+      {
+        "symbol": "1000CATUSDT",
+        "prior_day_pct": 34.73
+      },
+      {
+        "symbol": "BEATUSDT",
+        "prior_day_pct": 34.61
+      },
+      {
+        "symbol": "龙虾USDT",
+        "prior_day_pct": 33.78
+      },
+      {
+        "symbol": "ACEUSDT",
+        "prior_day_pct": 33.38
+      },
+      {
+        "symbol": "TSTUSDT",
+        "prior_day_pct": 24.78
+      },
+      {
+        "symbol": "ARCUSDT",
+        "prior_day_pct": 20.93
+      },
+      {
+        "symbol": "SAGAUSDT",
+        "prior_day_pct": 20.66
+      },
+      {
+        "symbol": "IOTXUSDT",
+        "prior_day_pct": 19.88
+      },
+      {
+        "symbol": "LIGHTUSDT",
+        "prior_day_pct": 18.42
+      },
+      {
+        "symbol": "BICOUSDT",
+        "prior_day_pct": 16.56
+      },
+      {
+        "symbol": "MERLUSDT",
+        "prior_day_pct": 14.67
+      },
+      {
+        "symbol": "RAVEUSDT",
+        "prior_day_pct": 14.43
+      },
+      {
+        "symbol": "DEEPUSDT",
+        "prior_day_pct": 13.5
+      },
+      {
+        "symbol": "我踏马来了USDT",
+        "prior_day_pct": 13.11
+      },
+      {
+        "symbol": "MUBARAKUSDT",
+        "prior_day_pct": 12.61
+      },
+      {
+        "symbol": "LISTAUSDT",
+        "prior_day_pct": 11.41
+      },
+      {
+        "symbol": "DODOXUSDT",
+        "prior_day_pct": 11.24
+      },
+      {
+        "symbol": "4USDT",
+        "prior_day_pct": 10.78
+      },
+      {
+        "symbol": "BROCCOLIF3BUSDT",
+        "prior_day_pct": 10.63
+      },
+      {
+        "symbol": "BROCCOLI714USDT",
+        "prior_day_pct": 10.56
+      },
+      {
+        "symbol": "XAIUSDT",
+        "prior_day_pct": 9.63
+      },
+      {
+        "symbol": "FHEUSDT",
+        "prior_day_pct": 9.12
+      },
+      {
+        "symbol": "CUSDT",
+        "prior_day_pct": 9.1
+      },
+      {
+        "symbol": "ATUSDT",
+        "prior_day_pct": 9.03
+      },
+      {
+        "symbol": "SUSDT",
+        "prior_day_pct": 9.01
+      },
+      {
+        "symbol": "DYMUSDT",
+        "prior_day_pct": 8.53
+      },
+      {
+        "symbol": "FORMUSDT",
+        "prior_day_pct": 8.5
+      }
+    ],
+    "2026-08-10": [
+      {
+        "symbol": "BMTUSDT",
+        "prior_day_pct": 151.87
+      },
+      {
+        "symbol": "TUTUSDT",
+        "prior_day_pct": 85.08
+      },
+      {
+        "symbol": "MUBARAKUSDT",
+        "prior_day_pct": 63.0
+      },
+      {
+        "symbol": "XANUSDT",
+        "prior_day_pct": 54.06
+      },
+      {
+        "symbol": "BANANAS31USDT",
+        "prior_day_pct": 35.04
+      },
+      {
+        "symbol": "BOMEUSDT",
+        "prior_day_pct": 34.57
+      },
+      {
+        "symbol": "TSTUSDT",
+        "prior_day_pct": 30.01
+      },
+      {
+        "symbol": "BEATUSDT",
+        "prior_day_pct": 27.64
+      },
+      {
+        "symbol": "NILUSDT",
+        "prior_day_pct": 22.44
+      },
+      {
+        "symbol": "CGPTUSDT",
+        "prior_day_pct": 21.57
+      },
+      {
+        "symbol": "PEOPLEUSDT",
+        "prior_day_pct": 21.0
+      },
+      {
+        "symbol": "ACUUSDT",
+        "prior_day_pct": 20.08
+      },
+      {
+        "symbol": "COOKIEUSDT",
+        "prior_day_pct": 17.27
+      },
+      {
+        "symbol": "NEIROUSDT",
+        "prior_day_pct": 16.31
+      },
+      {
+        "symbol": "CTSIUSDT",
+        "prior_day_pct": 15.62
+      },
+      {
+        "symbol": "CYSUSDT",
+        "prior_day_pct": 14.89
+      },
+      {
+        "symbol": "THEUSDT",
+        "prior_day_pct": 14.81
+      },
+      {
+        "symbol": "BROCCOLI714USDT",
+        "prior_day_pct": 14.64
+      },
+      {
+        "symbol": "4USDT",
+        "prior_day_pct": 14.35
+      },
+      {
+        "symbol": "JOEUSDT",
+        "prior_day_pct": 13.83
+      },
+      {
+        "symbol": "BBUSDT",
+        "prior_day_pct": 13.8
+      },
+      {
+        "symbol": "SCRUSDT",
+        "prior_day_pct": 12.92
+      },
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 11.84
+      },
+      {
+        "symbol": "INXUSDT",
+        "prior_day_pct": 11.46
+      },
+      {
+        "symbol": "REZUSDT",
+        "prior_day_pct": 11.45
+      },
+      {
+        "symbol": "ESPUSDT",
+        "prior_day_pct": 11.35
+      },
+      {
+        "symbol": "SHELLUSDT",
+        "prior_day_pct": 11.04
+      },
+      {
+        "symbol": "PUMPUSDT",
+        "prior_day_pct": 11.01
+      },
+      {
+        "symbol": "PARTIUSDT",
+        "prior_day_pct": 10.98
+      },
+      {
+        "symbol": "SOLVUSDT",
+        "prior_day_pct": 10.67
+      }
+    ],
+    "2026-08-11": [
+      {
+        "symbol": "DOSUSDT",
+        "prior_day_pct": 84.51
+      },
+      {
+        "symbol": "GUAUSDT",
+        "prior_day_pct": 69.35
+      },
+      {
+        "symbol": "BLUAIUSDT",
+        "prior_day_pct": 67.51
+      },
+      {
+        "symbol": "龙虾USDT",
+        "prior_day_pct": 32.8
+      },
+      {
+        "symbol": "GWEIUSDT",
+        "prior_day_pct": 23.99
+      },
+      {
+        "symbol": "SQDUSDT",
+        "prior_day_pct": 23.19
+      },
+      {
+        "symbol": "BSPUSDT",
+        "prior_day_pct": 18.45
+      },
+      {
+        "symbol": "ARIAUSDT",
+        "prior_day_pct": 16.61
+      },
+      {
+        "symbol": "CYSUSDT",
+        "prior_day_pct": 16.45
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 16.23
+      },
+      {
+        "symbol": "DODOXUSDT",
+        "prior_day_pct": 13.65
+      },
+      {
+        "symbol": "PROMUSDT",
+        "prior_day_pct": 12.83
+      },
+      {
+        "symbol": "BUSDT",
+        "prior_day_pct": 12.53
+      },
+      {
+        "symbol": "CRVUSDT",
+        "prior_day_pct": 10.98
+      },
+      {
+        "symbol": "BLESSUSDT",
+        "prior_day_pct": 10.95
+      },
+      {
+        "symbol": "PRLUSDT",
+        "prior_day_pct": 10.81
+      },
+      {
+        "symbol": "LIGHTUSDT",
+        "prior_day_pct": 10.44
+      },
+      {
+        "symbol": "BULLAUSDT",
+        "prior_day_pct": 9.61
+      },
+      {
+        "symbol": "WLDUSDT",
+        "prior_day_pct": 8.99
+      },
+      {
+        "symbol": "CUSDT",
+        "prior_day_pct": 8.66
+      },
+      {
+        "symbol": "BRUSDT",
+        "prior_day_pct": 8.64
+      },
+      {
+        "symbol": "CVXUSDT",
+        "prior_day_pct": 7.77
+      },
+      {
+        "symbol": "SOXSUSDT",
+        "prior_day_pct": 7.42
+      },
+      {
+        "symbol": "TOWNSUSDT",
+        "prior_day_pct": 7.21
+      },
+      {
+        "symbol": "RIVERUSDT",
+        "prior_day_pct": 6.91
+      },
+      {
+        "symbol": "SHAZUSDT",
+        "prior_day_pct": 6.8
+      },
+      {
+        "symbol": "MEUSDT",
+        "prior_day_pct": 6.64
+      },
+      {
+        "symbol": "UAIUSDT",
+        "prior_day_pct": 6.49
+      },
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 6.24
+      },
+      {
+        "symbol": "CRWDUSDT",
+        "prior_day_pct": 5.69
+      }
+    ],
+    "2026-08-12": [
+      {
+        "symbol": "BTRUSDT",
+        "prior_day_pct": 42.3
+      },
+      {
+        "symbol": "VELVETUSDT",
+        "prior_day_pct": 40.48
+      },
+      {
+        "symbol": "CLOUSDT",
+        "prior_day_pct": 22.1
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 19.75
+      },
+      {
+        "symbol": "CRWVUSDT",
+        "prior_day_pct": 19.18
+      },
+      {
+        "symbol": "HOLOUSDT",
+        "prior_day_pct": 18.18
+      },
+      {
+        "symbol": "LUNAUSDT",
+        "prior_day_pct": 17.16
+      },
+      {
+        "symbol": "LUNA2USDT",
+        "prior_day_pct": 17.13
+      },
+      {
+        "symbol": "FHEUSDT",
+        "prior_day_pct": 15.52
+      },
+      {
+        "symbol": "BOTUSDT",
+        "prior_day_pct": 13.84
+      },
+      {
+        "symbol": "NBISUSDT",
+        "prior_day_pct": 12.96
+      },
+      {
+        "symbol": "OPENUSDT",
+        "prior_day_pct": 12.86
+      },
+      {
+        "symbol": "GIGGLEUSDT",
+        "prior_day_pct": 12.04
+      },
+      {
+        "symbol": "SQDUSDT",
+        "prior_day_pct": 10.85
+      },
+      {
+        "symbol": "HUSDT",
+        "prior_day_pct": 9.64
+      },
+      {
+        "symbol": "USARUSDT",
+        "prior_day_pct": 9.33
+      },
+      {
+        "symbol": "AINUSDT",
+        "prior_day_pct": 8.66
+      },
+      {
+        "symbol": "PRLUSDT",
+        "prior_day_pct": 8.38
+      },
+      {
+        "symbol": "COOKIEUSDT",
+        "prior_day_pct": 8.32
+      },
+      {
+        "symbol": "KORUUSDT",
+        "prior_day_pct": 8.32
+      },
+      {
+        "symbol": "AKEUSDT",
+        "prior_day_pct": 7.56
+      },
+      {
+        "symbol": "CTRUSDT",
+        "prior_day_pct": 7.36
+      },
+      {
+        "symbol": "RKLBUSDT",
+        "prior_day_pct": 7.29
+      },
+      {
+        "symbol": "SHAZUSDT",
+        "prior_day_pct": 7.19
+      },
+      {
+        "symbol": "GUNUSDT",
+        "prior_day_pct": 7.19
+      },
+      {
+        "symbol": "SYNUSDT",
+        "prior_day_pct": 7.12
+      },
+      {
+        "symbol": "FLOWUSDT",
+        "prior_day_pct": 6.98
+      },
+      {
+        "symbol": "SMCIUSDT",
+        "prior_day_pct": 6.84
+      },
+      {
+        "symbol": "SAMSUNGUSDT",
+        "prior_day_pct": 6.63
+      },
+      {
+        "symbol": "CRCLUSDT",
+        "prior_day_pct": 6.62
+      }
+    ],
+    "2026-08-13": [
+      {
+        "symbol": "APRUSDT",
+        "prior_day_pct": 192.58
+      },
+      {
+        "symbol": "BRUSDT",
+        "prior_day_pct": 77.6
+      },
+      {
+        "symbol": "CYSUSDT",
+        "prior_day_pct": 54.89
+      },
+      {
+        "symbol": "PROMUSDT",
+        "prior_day_pct": 43.37
+      },
+      {
+        "symbol": "AVAAIUSDT",
+        "prior_day_pct": 33.38
+      },
+      {
+        "symbol": "QNTXUSDT",
+        "prior_day_pct": 27.62
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 26.69
+      },
+      {
+        "symbol": "COTIUSDT",
+        "prior_day_pct": 22.88
+      },
+      {
+        "symbol": "NILUSDT",
+        "prior_day_pct": 22.87
+      },
+      {
+        "symbol": "NBISUSDT",
+        "prior_day_pct": 21.83
+      },
+      {
+        "symbol": "SHAZUSDT",
+        "prior_day_pct": 20.55
+      },
+      {
+        "symbol": "CSOPSKHYNIX2LUSDT",
+        "prior_day_pct": 16.8
+      },
+      {
+        "symbol": "KORUUSDT",
+        "prior_day_pct": 15.01
+      },
+      {
+        "symbol": "VELVETUSDT",
+        "prior_day_pct": 14.91
+      },
+      {
+        "symbol": "龙虾USDT",
+        "prior_day_pct": 14.62
+      },
+      {
+        "symbol": "WENUSDT",
+        "prior_day_pct": 14.1
+      },
+      {
+        "symbol": "CSOPSAMSUNG2LUSDT",
+        "prior_day_pct": 13.93
+      },
+      {
+        "symbol": "SNXXUSDT",
+        "prior_day_pct": 13.35
+      },
+      {
+        "symbol": "MUUUSDT",
+        "prior_day_pct": 12.63
+      },
+      {
+        "symbol": "BEUSDT",
+        "prior_day_pct": 12.23
+      },
+      {
+        "symbol": "CIENUSDT",
+        "prior_day_pct": 11.18
+      },
+      {
+        "symbol": "LITEUSDT",
+        "prior_day_pct": 11.04
+      },
+      {
+        "symbol": "VIRTUALUSDT",
+        "prior_day_pct": 10.65
+      },
+      {
+        "symbol": "KOMAUSDT",
+        "prior_day_pct": 10.3
+      },
+      {
+        "symbol": "SPCXUSDT",
+        "prior_day_pct": 10.24
+      },
+      {
+        "symbol": "AIOTUSDT",
+        "prior_day_pct": 10.11
+      },
+      {
+        "symbol": "MINIMAXUSDT",
+        "prior_day_pct": 10.07
+      },
+      {
+        "symbol": "SMCIUSDT",
+        "prior_day_pct": 9.78
+      },
+      {
+        "symbol": "AGTUSDT",
+        "prior_day_pct": 9.78
+      },
+      {
+        "symbol": "ARCUSDT",
+        "prior_day_pct": 9.61
+      }
+    ],
+    "2026-08-14": [
+      {
+        "symbol": "AKEUSDT",
+        "prior_day_pct": 66.28
+      },
+      {
+        "symbol": "EDENUSDT",
+        "prior_day_pct": 56.96
+      },
+      {
+        "symbol": "SNXXUSDT",
+        "prior_day_pct": 30.93
+      },
+      {
+        "symbol": "AVAAIUSDT",
+        "prior_day_pct": 30.61
+      },
+      {
+        "symbol": "SCRTUSDT",
+        "prior_day_pct": 30.38
+      },
+      {
+        "symbol": "HUSDT",
+        "prior_day_pct": 19.54
+      },
+      {
+        "symbol": "AVNTUSDT",
+        "prior_day_pct": 19.38
+      },
+      {
+        "symbol": "ETHFIUSDT",
+        "prior_day_pct": 17.17
+      },
+      {
+        "symbol": "ACUUSDT",
+        "prior_day_pct": 16.55
+      },
+      {
+        "symbol": "BRUSDT",
+        "prior_day_pct": 16.09
+      },
+      {
+        "symbol": "RDDTUSDT",
+        "prior_day_pct": 15.54
+      },
+      {
+        "symbol": "SNDKUSDT",
+        "prior_day_pct": 15.24
+      },
+      {
+        "symbol": "GPSUSDT",
+        "prior_day_pct": 13.97
+      },
+      {
+        "symbol": "STORJUSDT",
+        "prior_day_pct": 12.94
+      },
+      {
+        "symbol": "ACEUSDT",
+        "prior_day_pct": 12.9
+      },
+      {
+        "symbol": "USELESSUSDT",
+        "prior_day_pct": 12.42
+      },
+      {
+        "symbol": "CSOPSKHYNIX2LUSDT",
+        "prior_day_pct": 11.59
+      },
+      {
+        "symbol": "PLUMEUSDT",
+        "prior_day_pct": 11.07
+      },
+      {
+        "symbol": "ZHIPUUSDT",
+        "prior_day_pct": 10.48
+      },
+      {
+        "symbol": "CATIUSDT",
+        "prior_day_pct": 9.86
+      },
+      {
+        "symbol": "MUUUSDT",
+        "prior_day_pct": 9.74
+      },
+      {
+        "symbol": "BUSDT",
+        "prior_day_pct": 8.55
+      },
+      {
+        "symbol": "INTWUSDT",
+        "prior_day_pct": 8.45
+      },
+      {
+        "symbol": "WDCUSDT",
+        "prior_day_pct": 8.19
+      },
+      {
+        "symbol": "GRASSUSDT",
+        "prior_day_pct": 8.18
+      },
+      {
+        "symbol": "SKHYUSDT",
+        "prior_day_pct": 7.92
+      },
+      {
+        "symbol": "METUSDT",
+        "prior_day_pct": 7.76
+      },
+      {
+        "symbol": "NOTUSDT",
+        "prior_day_pct": 7.75
+      },
+      {
+        "symbol": "BULLAUSDT",
+        "prior_day_pct": 7.74
+      },
+      {
+        "symbol": "ROBOUSDT",
+        "prior_day_pct": 7.58
+      }
+    ],
+    "2026-08-15": [
+      {
+        "symbol": "ACEUSDT",
+        "prior_day_pct": 107.32
+      },
+      {
+        "symbol": "AKEUSDT",
+        "prior_day_pct": 56.29
+      },
+      {
+        "symbol": "VELVETUSDT",
+        "prior_day_pct": 41.03
+      },
+      {
+        "symbol": "ALICEUSDT",
+        "prior_day_pct": 39.06
+      },
+      {
+        "symbol": "HEIUSDT",
+        "prior_day_pct": 27.49
+      },
+      {
+        "symbol": "AIOUSDT",
+        "prior_day_pct": 25.31
+      },
+      {
+        "symbol": "PRLUSDT",
+        "prior_day_pct": 16.58
+      },
+      {
+        "symbol": "ROBOUSDT",
+        "prior_day_pct": 14.22
+      },
+      {
+        "symbol": "AAOIUSDT",
+        "prior_day_pct": 14.06
+      },
+      {
+        "symbol": "CAPUSDT",
+        "prior_day_pct": 13.67
+      },
+      {
+        "symbol": "BTWUSDT",
+        "prior_day_pct": 13.4
+      },
+      {
+        "symbol": "ILVUSDT",
+        "prior_day_pct": 12.03
+      },
+      {
+        "symbol": "GUNUSDT",
+        "prior_day_pct": 10.78
+      },
+      {
+        "symbol": "SNXXUSDT",
+        "prior_day_pct": 10.46
+      },
+      {
+        "symbol": "DOLOUSDT",
+        "prior_day_pct": 10.02
+      },
+      {
+        "symbol": "AIOTUSDT",
+        "prior_day_pct": 9.72
+      },
+      {
+        "symbol": "HUSDT",
+        "prior_day_pct": 9.27
+      },
+      {
+        "symbol": "ACUUSDT",
+        "prior_day_pct": 8.71
+      },
+      {
+        "symbol": "MOVEUSDT",
+        "prior_day_pct": 8.3
+      },
+      {
+        "symbol": "GRIFFAINUSDT",
+        "prior_day_pct": 8.12
+      },
+      {
+        "symbol": "LAUSDT",
+        "prior_day_pct": 7.93
+      },
+      {
+        "symbol": "YGGUSDT",
+        "prior_day_pct": 7.84
+      },
+      {
+        "symbol": "BBUSDT",
+        "prior_day_pct": 7.64
+      },
+      {
+        "symbol": "USARUSDT",
+        "prior_day_pct": 7.51
+      },
+      {
+        "symbol": "IOTXUSDT",
+        "prior_day_pct": 7.26
+      },
+      {
+        "symbol": "XAIUSDT",
+        "prior_day_pct": 7.0
+      },
+      {
+        "symbol": "SLPUSDT",
+        "prior_day_pct": 6.92
+      },
+      {
+        "symbol": "EULUSDT",
+        "prior_day_pct": 6.86
+      },
+      {
+        "symbol": "B2USDT",
+        "prior_day_pct": 6.69
+      },
+      {
+        "symbol": "HYUNDAIUSDT",
+        "prior_day_pct": 6.68
+      }
+    ],
+    "2026-08-16": [
+      {
+        "symbol": "SPORTFUNUSDT",
+        "prior_day_pct": 48.45
+      },
+      {
+        "symbol": "HEMIUSDT",
+        "prior_day_pct": 43.23
+      },
+      {
+        "symbol": "COWUSDT",
+        "prior_day_pct": 35.39
+      },
+      {
+        "symbol": "HUSDT",
+        "prior_day_pct": 28.95
+      },
+      {
+        "symbol": "AIOUSDT",
+        "prior_day_pct": 21.55
+      },
+      {
+        "symbol": "CHIPUSDT",
+        "prior_day_pct": 19.15
+      },
+      {
+        "symbol": "WALUSDT",
+        "prior_day_pct": 17.53
+      },
+      {
+        "symbol": "XNYUSDT",
+        "prior_day_pct": 17.14
+      },
+      {
+        "symbol": "ENSOUSDT",
+        "prior_day_pct": 15.46
+      },
+      {
+        "symbol": "STARUSDT",
+        "prior_day_pct": 12.09
+      },
+      {
+        "symbol": "TUTUSDT",
+        "prior_day_pct": 11.97
+      },
+      {
+        "symbol": "ONGUSDT",
+        "prior_day_pct": 10.02
+      },
+      {
+        "symbol": "TAKEUSDT",
+        "prior_day_pct": 8.88
+      },
+      {
+        "symbol": "FHEUSDT",
+        "prior_day_pct": 8.56
+      },
+      {
+        "symbol": "QUSDT",
+        "prior_day_pct": 8.08
+      },
+      {
+        "symbol": "ONUSDT",
+        "prior_day_pct": 7.95
+      },
+      {
+        "symbol": "OPNUSDT",
+        "prior_day_pct": 7.89
+      },
+      {
+        "symbol": "HUMAUSDT",
+        "prior_day_pct": 7.69
+      },
+      {
+        "symbol": "BRUSDT",
+        "prior_day_pct": 7.19
+      },
+      {
+        "symbol": "SOPHUSDT",
+        "prior_day_pct": 7.14
+      },
+      {
+        "symbol": "BOMEUSDT",
+        "prior_day_pct": 7.0
+      },
+      {
+        "symbol": "TACUSDT",
+        "prior_day_pct": 6.4
+      },
+      {
+        "symbol": "ETHFIUSDT",
+        "prior_day_pct": 6.32
+      },
+      {
+        "symbol": "NXPCUSDT",
+        "prior_day_pct": 6.19
+      },
+      {
+        "symbol": "SOMIUSDT",
+        "prior_day_pct": 6.17
+      },
+      {
+        "symbol": "BASEDUSDT",
+        "prior_day_pct": 6.14
+      },
+      {
+        "symbol": "NOTUSDT",
+        "prior_day_pct": 5.86
+      },
+      {
+        "symbol": "LINKUSDT",
+        "prior_day_pct": 5.58
+      },
+      {
+        "symbol": "RVNUSDT",
+        "prior_day_pct": 5.55
+      },
+      {
+        "symbol": "SYRUPUSDT",
+        "prior_day_pct": 5.49
+      }
+    ]
+  },
+  "tier": "structure",
+  "params": {
+    "min_span": 9,
+    "max_span": 30,
+    "shoulder_sym": 0.15,
+    "min_bias": 0.05,
+    "max_bias": 0.65,
+    "use_close_break": true,
+    "min_break_pct": 0.0,
+    "require_red": false,
+    "require_prev_close_below": false,
+    "min_body_pct": 0.0,
+    "sma25_soft": false,
+    "require_sma25_hard": false,
+    "min_abs_dist_ma99": 1.5,
+    "max_near_above_ma99": 0.0,
+    "min_abs_dist_ma200": 0.0,
+    "max_near_above_ma200": 0.0,
+    "max_ext_ma200_pct": 40.0,
+    "reject_below_ma99": true,
+    "min_vol_ratio": 0.0,
+    "vol_lookback": 20,
+    "vol_spike_window": 48,
+    "reject_rising_neck": true,
+    "reject_near_rising_sma200": true,
+    "sma200_slope_bars": 24,
+    "near_sma200_pct": 4.0,
+    "reject_15m_pierce_sma200": true,
+    "reject_near_sma200_15m": true,
+    "near_sma200_15m_pct": 1.5,
+    "reject_deep_below_sma200_15m": true,
+    "max_below_sma200_15m_pct": 3.0,
+    "max_chg24": 99.0,
+    "cooldown_min": 30
+  },
+  "candidates_by_day": {
+    "2026-07-18": [
+      "1000XECUSDT",
+      "AERGOUSDT",
+      "AGTUSDT",
+      "AKEUSDT",
+      "ASTSUSDT",
+      "AVAAIUSDT",
+      "BANANAUSDT",
+      "BANKUSDT",
+      "BLUAIUSDT",
+      "BRUSDT",
+      "BULLAUSDT",
+      "DODOXUSDT",
+      "EDGEUSDT",
+      "ENSUSDT",
+      "ESPORTSUSDT",
+      "GPSUSDT",
+      "IDOLUSDT",
+      "INJUSDT",
+      "NBISUSDT",
+      "ONEUSDT",
+      "OUSDT",
+      "PTBUSDT",
+      "STARUSDT",
+      "STXXUSDT",
+      "TAGUSDT",
+      "UBUSDT",
+      "USUALUSDT",
+      "USUSDT",
+      "XVSUSDT",
+      "ZETAUSDT"
+    ],
+    "2026-07-19": [
+      "AIOTUSDT",
+      "AIOUSDT",
+      "AKEUSDT",
+      "ALCHUSDT",
+      "ALLOUSDT",
+      "ARIAUSDT",
+      "AVAAIUSDT",
+      "BANKUSDT",
+      "BILLUSDT",
+      "BRUSDT",
+      "BTRUSDT",
+      "BULLAUSDT",
+      "BUSDT",
+      "COLLECTUSDT",
+      "CTRUSDT",
+      "JASMYUSDT",
+      "MAGMAUSDT",
+      "METUSDT",
+      "ONUSDT",
+      "PHAUSDT",
+      "PUMPBTCUSDT",
+      "SPORTFUNUSDT",
+      "SWARMSUSDT",
+      "SYNUSDT",
+      "TLMUSDT",
+      "TOSHIUSDT",
+      "TRADOORUSDT",
+      "TRUTHUSDT",
+      "WOOUSDT",
+      "ZBTUSDT"
+    ],
+    "2026-07-20": [
+      "ACEUSDT",
+      "AIOUSDT",
+      "ATHUSDT",
+      "AVAAIUSDT",
+      "BANKUSDT",
+      "BLESSUSDT",
+      "BTWUSDT",
+      "BUSDT",
+      "GLWUSDT",
+      "ICNTUSDT",
+      "JCTUSDT",
+      "JELLYJELLYUSDT",
+      "KAITOUSDT",
+      "KGENUSDT",
+      "METUSDT",
+      "MUUUSDT",
+      "MVLLUSDT",
+      "ONUSDT",
+      "PARTIUSDT",
+      "PROMUSDT",
+      "PUMPUSDT",
+      "ROBOUSDT",
+      "SKLUSDT",
+      "TAGUSDT",
+      "TLMUSDT",
+      "TOWNSUSDT",
+      "WETUSDT",
+      "XVGUSDT",
+      "YBUSDT",
+      "ZEREBROUSDT"
+    ],
+    "2026-07-21": [
+      "1000BONKUSDT",
+      "ACEUSDT",
+      "ACTUSDT",
+      "AINUSDT",
+      "AIOTUSDT",
+      "BANKUSDT",
+      "BLUAIUSDT",
+      "BULLAUSDT",
+      "CAPUSDT",
+      "COAIUSDT",
+      "EVAAUSDT",
+      "FHEUSDT",
+      "HAEDALUSDT",
+      "HANAUSDT",
+      "HEMIUSDT",
+      "IRENUSDT",
+      "JTOUSDT",
+      "KOMAUSDT",
+      "METUSDT",
+      "ONUSDT",
+      "PROMUSDT",
+      "PTBUSDT",
+      "SAPIENUSDT",
+      "SIRENUSDT",
+      "SWARMSUSDT",
+      "TUTUSDT",
+      "USELESSUSDT",
+      "XANUSDT",
+      "ZAMAUSDT",
+      "ZESTUSDT"
+    ],
+    "2026-07-22": [
+      "AAOIUSDT",
+      "AGTUSDT",
+      "ASTSUSDT",
+      "AXTIUSDT",
+      "BEUSDT",
+      "CBRSUSDT",
+      "DRAMUSDT",
+      "EPICUSDT",
+      "ERAUSDT",
+      "ESPORTSUSDT",
+      "INTWUSDT",
+      "KORUUSDT",
+      "MINIMAXUSDT",
+      "MITOUSDT",
+      "MUUSDT",
+      "MUUUSDT",
+      "MVLLUSDT",
+      "NBISUSDT",
+      "NIGHTUSDT",
+      "ONDOUSDT",
+      "ONDSUSDT",
+      "ONEUSDT",
+      "SKHYUSDT",
+      "SMCIUSDT",
+      "SNDKUSDT",
+      "SNXXUSDT",
+      "SOXLUSDT",
+      "STXXUSDT",
+      "WDCUSDT",
+      "ZHIPUUSDT"
+    ],
+    "2026-07-23": [
+      "AIAUSDT",
+      "AIOUSDT",
+      "ARXUSDT",
+      "BANKUSDT",
+      "BASUSDT",
+      "BLUAIUSDT",
+      "BROCCOLIF3BUSDT",
+      "CAPUSDT",
+      "DODOXUSDT",
+      "DYDXUSDT",
+      "EPICUSDT",
+      "ERAUSDT",
+      "INXUSDT",
+      "LABUSDT",
+      "LIGHTUSDT",
+      "MIRAUSDT",
+      "NXPCUSDT",
+      "ONUSDT",
+      "PHAROSUSDT",
+      "REUSDT",
+      "SAFEUSDT",
+      "SAPIENUSDT",
+      "SIRENUSDT",
+      "SLXUSDT",
+      "STBLUSDT",
+      "TOWNSUSDT",
+      "UAIUSDT",
+      "UBUSDT",
+      "USUSDT",
+      "ZAMAUSDT"
+    ],
+    "2026-07-24": [
+      "AKEUSDT",
+      "ANTHROPICUSDT",
+      "BANKUSDT",
+      "BEATUSDT",
+      "BILLUSDT",
+      "BRUSDT",
+      "CAPUSDT",
+      "CLOUSDT",
+      "CLUSDT",
+      "COLLECTUSDT",
+      "CYSUSDT",
+      "EPICUSDT",
+      "ESPORTSUSDT",
+      "FLUIDUSDT",
+      "HEIUSDT",
+      "LAUSDT",
+      "MAGMAUSDT",
+      "ONUSDT",
+      "POWERUSDT",
+      "PROMUSDT",
+      "REUSDT",
+      "RIFUSDT",
+      "SQQQUSDT",
+      "STABLEUSDT",
+      "UBUSDT",
+      "UVXYUSDT",
+      "ZAMAUSDT",
+      "ZBTUSDT",
+      "ZESTUSDT",
+      "币安人生USDT"
+    ],
+    "2026-07-25": [
+      "ACEUSDT",
+      "AGTUSDT",
+      "AIAUSDT",
+      "AKEUSDT",
+      "B2USDT",
+      "BANKUSDT",
+      "BASEDUSDT",
+      "BEAMXUSDT",
+      "BROCCOLIF3BUSDT",
+      "CAPUSDT",
+      "CHILLGUYUSDT",
+      "CLOUSDT",
+      "DEXEUSDT",
+      "ESPORTSUSDT",
+      "EULUSDT",
+      "GWEIUSDT",
+      "HEMIUSDT",
+      "HOMEUSDT",
+      "LABUSDT",
+      "ORDERUSDT",
+      "PLAYUSDT",
+      "SAGAUSDT",
+      "SLXUSDT",
+      "SOXSUSDT",
+      "TAIKOUSDT",
+      "TLMUSDT",
+      "TOWNSUSDT",
+      "TRADOORUSDT",
+      "XNYUSDT",
+      "ZHIPUUSDT"
+    ],
+    "2026-07-26": [
+      "1000CATUSDT",
+      "1000SHIBUSDT",
+      "AKEUSDT",
+      "ALPINEUSDT",
+      "ARIAUSDT",
+      "AVAXUSDT",
+      "AZTECUSDT",
+      "BANKUSDT",
+      "BLESSUSDT",
+      "BROCCOLI714USDT",
+      "BTWUSDT",
+      "CHILLGUYUSDT",
+      "DEXEUSDT",
+      "DIAUSDT",
+      "EDUUSDT",
+      "ESPORTSUSDT",
+      "EULUSDT",
+      "LIGHTUSDT",
+      "LISTAUSDT",
+      "LQTYUSDT",
+      "PEOPLEUSDT",
+      "PROMUSDT",
+      "PTBUSDT",
+      "QUSDT",
+      "SYNUSDT",
+      "TAKEUSDT",
+      "TURTLEUSDT",
+      "VVVUSDT",
+      "WIFUSDT",
+      "龙虾USDT"
+    ],
+    "2026-07-27": [
+      "1000PEPEUSDT",
+      "1000SHIBUSDT",
+      "4USDT",
+      "AAVEUSDT",
+      "BANKUSDT",
+      "BOMEUSDT",
+      "BUSDT",
+      "CAPUSDT",
+      "CFGUSDT",
+      "CROSSUSDT",
+      "DIAUSDT",
+      "ESPUSDT",
+      "EULUSDT",
+      "HANAUSDT",
+      "KAITOUSDT",
+      "KORUUSDT",
+      "LAUSDT",
+      "LQTYUSDT",
+      "MERLUSDT",
+      "METUSDT",
+      "NILUSDT",
+      "PEOPLEUSDT",
+      "PIEVERSEUSDT",
+      "PUMPUSDT",
+      "SAFEUSDT",
+      "SOONUSDT",
+      "STXUSDT",
+      "UBUSDT",
+      "USELESSUSDT",
+      "龙虾USDT"
+    ],
+    "2026-07-28": [
+      "ADBEUSDT",
+      "AKEUSDT",
+      "BULLAUSDT",
+      "CAPUSDT",
+      "COAIUSDT",
+      "COLLECTUSDT",
+      "COTIUSDT",
+      "CRMUSDT",
+      "DODOXUSDT",
+      "HIMSUSDT",
+      "HK1810USDT",
+      "IDOLUSDT",
+      "IRYSUSDT",
+      "KAITOUSDT",
+      "KGENUSDT",
+      "MINIMAXUSDT",
+      "MMTUSDT",
+      "NOWUSDT",
+      "ONUSDT",
+      "PEOPLEUSDT",
+      "PHAROSUSDT",
+      "PLTRUSDT",
+      "PUMPUSDT",
+      "SAPIENUSDT",
+      "SONYUSDT",
+      "SOONUSDT",
+      "SOXSUSDT",
+      "SQQQUSDT",
+      "TAGUSDT",
+      "WENUSDT"
+    ],
+    "2026-07-29": [
+      "1000CHEEMSUSDT",
+      "AIAUSDT",
+      "BEATUSDT",
+      "BOTUSDT",
+      "BTWUSDT",
+      "BULLAUSDT",
+      "CAPUSDT",
+      "COAIUSDT",
+      "DEXEUSDT",
+      "FLOWUSDT",
+      "GTCUSDT",
+      "GWEIUSDT",
+      "HOLOUSDT",
+      "KMNOUSDT",
+      "LITUSDT",
+      "ONUSDT",
+      "OPENUSDT",
+      "PHAROSUSDT",
+      "PLUMEUSDT",
+      "RIFUSDT",
+      "SOONUSDT",
+      "SOXSUSDT",
+      "TAIKOUSDT",
+      "TERUSDT",
+      "TOWNSUSDT",
+      "UBUSDT",
+      "VANRYUSDT",
+      "ZESTUSDT",
+      "ZILUSDT",
+      "龙虾USDT"
+    ],
+    "2026-07-30": [
+      "ACHUSDT",
+      "ADBEUSDT",
+      "B2USDT",
+      "BEATUSDT",
+      "COTIUSDT",
+      "DODOXUSDT",
+      "EULUSDT",
+      "FLOWUSDT",
+      "HK1810USDT",
+      "HOLOUSDT",
+      "IRYSUSDT",
+      "KGENUSDT",
+      "LABUSDT",
+      "MINIMAXUSDT",
+      "MSFTUSDT",
+      "NOWUSDT",
+      "PRLUSDT",
+      "RAVEUSDT",
+      "REUSDT",
+      "SAFEUSDT",
+      "SENTUSDT",
+      "SKYAIUSDT",
+      "SNOWUSDT",
+      "SOXSUSDT",
+      "SQQQUSDT",
+      "TAKEUSDT",
+      "UAIUSDT",
+      "UVXYUSDT",
+      "VELVETUSDT",
+      "龙虾USDT"
+    ],
+    "2026-07-31": [
+      "AAOIUSDT",
+      "ALABUSDT",
+      "AXTIUSDT",
+      "BEUSDT",
+      "CAPUSDT",
+      "CBRSUSDT",
+      "CRDOUSDT",
+      "CRWVUSDT",
+      "DRAMUSDT",
+      "EVAAUSDT",
+      "INTWUSDT",
+      "IRENUSDT",
+      "KOMAUSDT",
+      "KORUUSDT",
+      "LITEUSDT",
+      "MMTUSDT",
+      "MRVLUSDT",
+      "MUUSDT",
+      "MUUUSDT",
+      "MVLLUSDT",
+      "NBISUSDT",
+      "PENGUSDT",
+      "ROBOUSDT",
+      "SHAZUSDT",
+      "SKHYUSDT",
+      "SNDKUSDT",
+      "SNXXUSDT",
+      "SOXLUSDT",
+      "UBUSDT",
+      "WDCUSDT"
+    ],
+    "2026-08-01": [
+      "1000RATSUSDT",
+      "1000SATSUSDT",
+      "1000XECUSDT",
+      "4USDT",
+      "BIRBUSDT",
+      "BROCCOLI714USDT",
+      "BROCCOLIF3BUSDT",
+      "BTWUSDT",
+      "CAPUSDT",
+      "CATIUSDT",
+      "CLANKERUSDT",
+      "COTIUSDT",
+      "DEXEUSDT",
+      "DIAUSDT",
+      "GIGGLEUSDT",
+      "IDOLUSDT",
+      "KOMAUSDT",
+      "LIGHTUSDT",
+      "MUBARAKUSDT",
+      "MUSDT",
+      "ONUSDT",
+      "ORDIUSDT",
+      "PTBUSDT",
+      "SOXSUSDT",
+      "TAGUSDT",
+      "TAKEUSDT",
+      "TLMUSDT",
+      "USUSDT",
+      "XNYUSDT",
+      "我踏马来了USDT"
+    ],
+    "2026-08-02": [
+      "AEVOUSDT",
+      "AGTUSDT",
+      "AIAUSDT",
+      "AKEUSDT",
+      "AKTUSDT",
+      "APRUSDT",
+      "AVAUSDT",
+      "BANDUSDT",
+      "BEATUSDT",
+      "BLESSUSDT",
+      "BRUSDT",
+      "ELSAUSDT",
+      "EPICUSDT",
+      "ESPORTSUSDT",
+      "EULUSDT",
+      "HEIUSDT",
+      "HOMEUSDT",
+      "HUSDT",
+      "ICNTUSDT",
+      "IDOLUSDT",
+      "KAITOUSDT",
+      "KSMUSDT",
+      "MYXUSDT",
+      "PIEVERSEUSDT",
+      "PROMUSDT",
+      "QUSDT",
+      "ROSEUSDT",
+      "TUTUSDT",
+      "UAIUSDT",
+      "XANUSDT"
+    ],
+    "2026-08-03": [
+      "ADAUSDT",
+      "ALGOUSDT",
+      "BICOUSDT",
+      "BLESSUSDT",
+      "CAPUSDT",
+      "DUSKUSDT",
+      "EDENUSDT",
+      "ENAUSDT",
+      "FHEUSDT",
+      "GWEIUSDT",
+      "HOMEUSDT",
+      "HUSDT",
+      "HYPERUSDT",
+      "KORUUSDT",
+      "MANTRAUSDT",
+      "MUSDT",
+      "MUUUSDT",
+      "MVLLUSDT",
+      "NBISUSDT",
+      "NILUSDT",
+      "PEOPLEUSDT",
+      "PIEVERSEUSDT",
+      "PORTALUSDT",
+      "PRLUSDT",
+      "PTBUSDT",
+      "SKYAIUSDT",
+      "SOXLUSDT",
+      "STARUSDT",
+      "TAKEUSDT",
+      "XANUSDT"
+    ],
+    "2026-08-04": [
+      "AAOIUSDT",
+      "AKTUSDT",
+      "AXTIUSDT",
+      "BTWUSDT",
+      "CBRSUSDT",
+      "COHRUSDT",
+      "CRWVUSDT",
+      "DRIFTUSDT",
+      "HIMSUSDT",
+      "MINIMAXUSDT",
+      "MYXUSDT",
+      "NILUSDT",
+      "ONDSUSDT",
+      "OPNUSDT",
+      "ORCLUSDT",
+      "PIPPINUSDT",
+      "PLTRUSDT",
+      "PTBUSDT",
+      "RKLBUSDT",
+      "ROBOUSDT",
+      "SHAZUSDT",
+      "SKYAIUSDT",
+      "SNXXUSDT",
+      "SOFIUSDT",
+      "TOWNSUSDT",
+      "TUTUSDT",
+      "UBUSDT",
+      "VICUSDT",
+      "VRTUSDT",
+      "WAXPUSDT"
+    ],
+    "2026-08-05": [
+      "AAOIUSDT",
+      "AIOUSDT",
+      "ARMUSDT",
+      "ASTSUSDT",
+      "BANKUSDT",
+      "BICOUSDT",
+      "BTWUSDT",
+      "COHRUSDT",
+      "COTIUSDT",
+      "CYSUSDT",
+      "EPICUSDT",
+      "GWEIUSDT",
+      "HEIUSDT",
+      "HFTUSDT",
+      "HOMEUSDT",
+      "INTWUSDT",
+      "KORUUSDT",
+      "MUUUSDT",
+      "MVLLUSDT",
+      "PLTRUSDT",
+      "PUMPUSDT",
+      "SKYAIUSDT",
+      "SMCIUSDT",
+      "SNXXUSDT",
+      "SOXLUSDT",
+      "STOUSDT",
+      "SYNUSDT",
+      "TAKEUSDT",
+      "XNYUSDT",
+      "ZEREBROUSDT"
+    ],
+    "2026-08-06": [
+      "1000RATSUSDT",
+      "4USDT",
+      "BICOUSDT",
+      "BIRBUSDT",
+      "BLESSUSDT",
+      "BSPUSDT",
+      "BTWUSDT",
+      "CAPUSDT",
+      "CYSUSDT",
+      "DODOXUSDT",
+      "FIDAUSDT",
+      "GRVTUSDT",
+      "GUAUSDT",
+      "HEIUSDT",
+      "HFTUSDT",
+      "HMSTRUSDT",
+      "JCTUSDT",
+      "LIGHTUSDT",
+      "NOMUSDT",
+      "ONUSDT",
+      "PTBUSDT",
+      "RESOLVUSDT",
+      "SKRUSDT",
+      "SKYAIUSDT",
+      "SYNUSDT",
+      "TAGUSDT",
+      "TUTUSDT",
+      "UBUSDT",
+      "ZBTUSDT",
+      "龙虾USDT"
+    ],
+    "2026-08-07": [
+      "ACEUSDT",
+      "ACTUSDT",
+      "ALLOUSDT",
+      "ARIAUSDT",
+      "AXTIUSDT",
+      "BICOUSDT",
+      "BSBUSDT",
+      "BTWUSDT",
+      "COOKIEUSDT",
+      "CTSIUSDT",
+      "DIAUSDT",
+      "ENSOUSDT",
+      "FHEUSDT",
+      "FLNCUSDT",
+      "FRAXUSDT",
+      "GWEIUSDT",
+      "HFTUSDT",
+      "MAVIAUSDT",
+      "MINIMAXUSDT",
+      "ONUSDT",
+      "PLUMEUSDT",
+      "RESOLVUSDT",
+      "RIVERUSDT",
+      "ROBOUSDT",
+      "SKYAIUSDT",
+      "STGUSDT",
+      "TAKEUSDT",
+      "TRADOORUSDT",
+      "UBUSDT",
+      "ZBTUSDT"
+    ],
+    "2026-08-08": [
+      "AINUSDT",
+      "AIOUSDT",
+      "AVAUSDT",
+      "AXTIUSDT",
+      "BICOUSDT",
+      "BROCCOLI714USDT",
+      "BTWUSDT",
+      "C98USDT",
+      "CAPUSDT",
+      "COHRUSDT",
+      "CYSUSDT",
+      "DKNGUSDT",
+      "EPICUSDT",
+      "ESPUSDT",
+      "GWEIUSDT",
+      "HEIUSDT",
+      "ICNTUSDT",
+      "KOMAUSDT",
+      "MINIMAXUSDT",
+      "MMTUSDT",
+      "MUBARAKUSDT",
+      "RECALLUSDT",
+      "RKLBUSDT",
+      "SIRENUSDT",
+      "SLXUSDT",
+      "SPCXUSDT",
+      "TSTUSDT",
+      "TUTUSDT",
+      "USARUSDT",
+      "ZHIPUUSDT"
+    ],
+    "2026-08-09": [
+      "1000CATUSDT",
+      "4USDT",
+      "ACEUSDT",
+      "ARCUSDT",
+      "ATUSDT",
+      "BEATUSDT",
+      "BICOUSDT",
+      "BLUAIUSDT",
+      "BROCCOLI714USDT",
+      "BROCCOLIF3BUSDT",
+      "COOKIEUSDT",
+      "CUSDT",
+      "DEEPUSDT",
+      "DODOXUSDT",
+      "DYMUSDT",
+      "FHEUSDT",
+      "FORMUSDT",
+      "IOTXUSDT",
+      "LIGHTUSDT",
+      "LISTAUSDT",
+      "MERLUSDT",
+      "MUBARAKUSDT",
+      "RAVEUSDT",
+      "SAGAUSDT",
+      "SUSDT",
+      "TSTUSDT",
+      "TUTUSDT",
+      "XAIUSDT",
+      "我踏马来了USDT",
+      "龙虾USDT"
+    ],
+    "2026-08-10": [
+      "4USDT",
+      "ACUUSDT",
+      "BANANAS31USDT",
+      "BBUSDT",
+      "BEATUSDT",
+      "BMTUSDT",
+      "BOMEUSDT",
+      "BROCCOLI714USDT",
+      "CGPTUSDT",
+      "COOKIEUSDT",
+      "CTSIUSDT",
+      "CYSUSDT",
+      "ESPUSDT",
+      "INXUSDT",
+      "JOEUSDT",
+      "MUBARAKUSDT",
+      "NEIROUSDT",
+      "NILUSDT",
+      "ONUSDT",
+      "PARTIUSDT",
+      "PEOPLEUSDT",
+      "PUMPUSDT",
+      "REZUSDT",
+      "SCRUSDT",
+      "SHELLUSDT",
+      "SOLVUSDT",
+      "THEUSDT",
+      "TSTUSDT",
+      "TUTUSDT",
+      "XANUSDT"
+    ],
+    "2026-08-11": [
+      "ARIAUSDT",
+      "BLESSUSDT",
+      "BLUAIUSDT",
+      "BRUSDT",
+      "BSPUSDT",
+      "BULLAUSDT",
+      "BUSDT",
+      "CAPUSDT",
+      "CRVUSDT",
+      "CRWDUSDT",
+      "CUSDT",
+      "CVXUSDT",
+      "CYSUSDT",
+      "DODOXUSDT",
+      "DOSUSDT",
+      "GUAUSDT",
+      "GWEIUSDT",
+      "LIGHTUSDT",
+      "MEUSDT",
+      "ONUSDT",
+      "PRLUSDT",
+      "PROMUSDT",
+      "RIVERUSDT",
+      "SHAZUSDT",
+      "SOXSUSDT",
+      "SQDUSDT",
+      "TOWNSUSDT",
+      "UAIUSDT",
+      "WLDUSDT",
+      "龙虾USDT"
+    ],
+    "2026-08-12": [
+      "AINUSDT",
+      "AKEUSDT",
+      "BOTUSDT",
+      "BTRUSDT",
+      "CAPUSDT",
+      "CLOUSDT",
+      "COOKIEUSDT",
+      "CRCLUSDT",
+      "CRWVUSDT",
+      "CTRUSDT",
+      "FHEUSDT",
+      "FLOWUSDT",
+      "GIGGLEUSDT",
+      "GUNUSDT",
+      "HOLOUSDT",
+      "HUSDT",
+      "KORUUSDT",
+      "LUNA2USDT",
+      "LUNAUSDT",
+      "NBISUSDT",
+      "OPENUSDT",
+      "PRLUSDT",
+      "RKLBUSDT",
+      "SAMSUNGUSDT",
+      "SHAZUSDT",
+      "SMCIUSDT",
+      "SQDUSDT",
+      "SYNUSDT",
+      "USARUSDT",
+      "VELVETUSDT"
+    ],
+    "2026-08-13": [
+      "AGTUSDT",
+      "AIOTUSDT",
+      "APRUSDT",
+      "ARCUSDT",
+      "AVAAIUSDT",
+      "BEUSDT",
+      "BRUSDT",
+      "BTWUSDT",
+      "CIENUSDT",
+      "COTIUSDT",
+      "CSOPSAMSUNG2LUSDT",
+      "CSOPSKHYNIX2LUSDT",
+      "CYSUSDT",
+      "KOMAUSDT",
+      "KORUUSDT",
+      "LITEUSDT",
+      "MINIMAXUSDT",
+      "MUUUSDT",
+      "NBISUSDT",
+      "NILUSDT",
+      "PROMUSDT",
+      "QNTXUSDT",
+      "SHAZUSDT",
+      "SMCIUSDT",
+      "SNXXUSDT",
+      "SPCXUSDT",
+      "VELVETUSDT",
+      "VIRTUALUSDT",
+      "WENUSDT",
+      "龙虾USDT"
+    ],
+    "2026-08-14": [
+      "ACEUSDT",
+      "ACUUSDT",
+      "AKEUSDT",
+      "AVAAIUSDT",
+      "AVNTUSDT",
+      "BRUSDT",
+      "BULLAUSDT",
+      "BUSDT",
+      "CATIUSDT",
+      "CSOPSKHYNIX2LUSDT",
+      "EDENUSDT",
+      "ETHFIUSDT",
+      "GPSUSDT",
+      "GRASSUSDT",
+      "HUSDT",
+      "INTWUSDT",
+      "METUSDT",
+      "MUUUSDT",
+      "NOTUSDT",
+      "PLUMEUSDT",
+      "RDDTUSDT",
+      "ROBOUSDT",
+      "SCRTUSDT",
+      "SKHYUSDT",
+      "SNDKUSDT",
+      "SNXXUSDT",
+      "STORJUSDT",
+      "USELESSUSDT",
+      "WDCUSDT",
+      "ZHIPUUSDT"
+    ],
+    "2026-08-15": [
+      "AAOIUSDT",
+      "ACEUSDT",
+      "ACUUSDT",
+      "AIOTUSDT",
+      "AIOUSDT",
+      "AKEUSDT",
+      "ALICEUSDT",
+      "B2USDT",
+      "BBUSDT",
+      "BTWUSDT",
+      "CAPUSDT",
+      "DOLOUSDT",
+      "EULUSDT",
+      "GRIFFAINUSDT",
+      "GUNUSDT",
+      "HEIUSDT",
+      "HUSDT",
+      "HYUNDAIUSDT",
+      "ILVUSDT",
+      "IOTXUSDT",
+      "LAUSDT",
+      "MOVEUSDT",
+      "PRLUSDT",
+      "ROBOUSDT",
+      "SLPUSDT",
+      "SNXXUSDT",
+      "USARUSDT",
+      "VELVETUSDT",
+      "XAIUSDT",
+      "YGGUSDT"
+    ],
+    "2026-08-16": [
+      "AIOUSDT",
+      "BASEDUSDT",
+      "BOMEUSDT",
+      "BRUSDT",
+      "CHIPUSDT",
+      "COWUSDT",
+      "ENSOUSDT",
+      "ETHFIUSDT",
+      "FHEUSDT",
+      "HEMIUSDT",
+      "HUMAUSDT",
+      "HUSDT",
+      "LINKUSDT",
+      "NOTUSDT",
+      "NXPCUSDT",
+      "ONGUSDT",
+      "ONUSDT",
+      "OPNUSDT",
+      "QUSDT",
+      "RVNUSDT",
+      "SOMIUSDT",
+      "SOPHUSDT",
+      "SPORTFUNUSDT",
+      "STARUSDT",
+      "SYRUPUSDT",
+      "TACUSDT",
+      "TAKEUSDT",
+      "TUTUSDT",
+      "WALUSDT",
+      "XNYUSDT"
+    ]
+  },
+  "summary": {
+    "n": 142,
+    "symbols": 73,
+    "reclaim_3_rate": 37.3,
+    "by_horizon": {
+      "15m": {
+        "n": 142,
+        "win_rate": 56.3,
+        "avg": 0.51,
+        "median": 0.182
+      },
+      "30m": {
+        "n": 142,
+        "win_rate": 46.5,
+        "avg": 0.172,
+        "median": -0.172
+      },
+      "1h": {
+        "n": 142,
+        "win_rate": 45.1,
+        "avg": 0.033,
+        "median": -0.338
+      },
+      "2h": {
+        "n": 142,
+        "win_rate": 54.9,
+        "avg": 0.42,
+        "median": 0.627
+      },
+      "4h": {
+        "n": 142,
+        "win_rate": 48.6,
+        "avg": -0.206,
+        "median": -0.084
+      },
+      "8h": {
+        "n": 142,
+        "win_rate": 49.3,
+        "avg": -0.349,
+        "median": -0.056
+      },
+      "12h": {
+        "n": 141,
+        "win_rate": 55.3,
+        "avg": 0.036,
+        "median": 1.456
+      }
+    },
+    "by_day": {
+      "2026-07-18": {
+        "n": 4,
+        "symbols": 2,
+        "win_1h": 25.0,
+        "avg_1h": -0.768
+      },
+      "2026-07-19": {
+        "n": 7,
+        "symbols": 7,
+        "win_1h": 57.1,
+        "avg_1h": 1.302
+      },
+      "2026-07-20": {
+        "n": 7,
+        "symbols": 5,
+        "win_1h": 28.6,
+        "avg_1h": -0.215
+      },
+      "2026-07-21": {
+        "n": 1,
+        "symbols": 1,
+        "win_1h": 100.0,
+        "avg_1h": 0.38
+      },
+      "2026-07-22": {
+        "n": 3,
+        "symbols": 2,
+        "win_1h": 66.7,
+        "avg_1h": 1.683
+      },
+      "2026-07-23": {
+        "n": 9,
+        "symbols": 4,
+        "win_1h": 33.3,
+        "avg_1h": -1.483
+      },
+      "2026-07-24": {
+        "n": 6,
+        "symbols": 4,
+        "win_1h": 66.7,
+        "avg_1h": 2.01
+      },
+      "2026-07-25": {
+        "n": 7,
+        "symbols": 5,
+        "win_1h": 14.3,
+        "avg_1h": -2.328
+      },
+      "2026-07-26": {
+        "n": 8,
+        "symbols": 5,
+        "win_1h": 50.0,
+        "avg_1h": -0.356
+      },
+      "2026-07-28": {
+        "n": 6,
+        "symbols": 6,
+        "win_1h": 16.7,
+        "avg_1h": -1.765
+      },
+      "2026-07-29": {
+        "n": 4,
+        "symbols": 3,
+        "win_1h": 50.0,
+        "avg_1h": -0.06
+      },
+      "2026-07-30": {
+        "n": 2,
+        "symbols": 2,
+        "win_1h": 100.0,
+        "avg_1h": 4.297
+      },
+      "2026-07-31": {
+        "n": 6,
+        "symbols": 5,
+        "win_1h": 50.0,
+        "avg_1h": -0.118
+      },
+      "2026-08-01": {
+        "n": 3,
+        "symbols": 3,
+        "win_1h": 66.7,
+        "avg_1h": 3.152
+      },
+      "2026-08-02": {
+        "n": 9,
+        "symbols": 5,
+        "win_1h": 44.4,
+        "avg_1h": -0.755
+      },
+      "2026-08-03": {
+        "n": 2,
+        "symbols": 1,
+        "win_1h": 50.0,
+        "avg_1h": -0.187
+      },
+      "2026-08-04": {
+        "n": 9,
+        "symbols": 7,
+        "win_1h": 44.4,
+        "avg_1h": -0.488
+      },
+      "2026-08-05": {
+        "n": 1,
+        "symbols": 1,
+        "win_1h": 0.0,
+        "avg_1h": -4.436
+      },
+      "2026-08-06": {
+        "n": 7,
+        "symbols": 5,
+        "win_1h": 57.1,
+        "avg_1h": 1.338
+      },
+      "2026-08-07": {
+        "n": 5,
+        "symbols": 4,
+        "win_1h": 0.0,
+        "avg_1h": -3.958
+      },
+      "2026-08-08": {
+        "n": 5,
+        "symbols": 4,
+        "win_1h": 80.0,
+        "avg_1h": 5.201
+      },
+      "2026-08-09": {
+        "n": 7,
+        "symbols": 5,
+        "win_1h": 42.9,
+        "avg_1h": -0.579
+      },
+      "2026-08-10": {
+        "n": 2,
+        "symbols": 2,
+        "win_1h": 0.0,
+        "avg_1h": -9.651
+      },
+      "2026-08-11": {
+        "n": 3,
+        "symbols": 3,
+        "win_1h": 100.0,
+        "avg_1h": 1.088
+      },
+      "2026-08-12": {
+        "n": 8,
+        "symbols": 6,
+        "win_1h": 25.0,
+        "avg_1h": -1.73
+      },
+      "2026-08-13": {
+        "n": 6,
+        "symbols": 3,
+        "win_1h": 66.7,
+        "avg_1h": 1.317
+      },
+      "2026-08-14": {
+        "n": 1,
+        "symbols": 1,
+        "win_1h": 100.0,
+        "avg_1h": 29.581
+      },
+      "2026-08-15": {
+        "n": 4,
+        "symbols": 4,
+        "win_1h": 50.0,
+        "avg_1h": 1.384
+      }
+    },
+    "symbols_list": [
+      "1000SATS/USDT",
+      "1000SHIB/USDT",
+      "1000XEC/USDT",
+      "AAOI/USDT",
+      "ACE/USDT",
+      "ACH/USDT",
+      "AIOT/USDT",
+      "AKE/USDT",
+      "APR/USDT",
+      "ARIA/USDT",
+      "AXTI/USDT",
+      "BANK/USDT",
+      "BEAT/USDT",
+      "BICO/USDT",
+      "BLESS/USDT",
+      "BMT/USDT",
+      "BROCCOLI714/USDT",
+      "BTW/USDT",
+      "BULLA/USDT",
+      "CAP/USDT",
+      "CHILLGUY/USDT",
+      "COOKIE/USDT",
+      "COTI/USDT",
+      "CRWV/USDT",
+      "CYS/USDT",
+      "DEXE/USDT",
+      "DODOX/USDT",
+      "ESPORTS/USDT",
+      "EUL/USDT",
+      "GIGGLE/USDT",
+      "GWEI/USDT",
+      "H/USDT",
+      "HOLO/USDT",
+      "KOMA/USDT",
+      "KORU/USDT",
+      "LA/USDT",
+      "MET/USDT",
+      "MMT/USDT",
+      "MUBARAK/USDT",
+      "MUU/USDT",
+      "MVLL/USDT",
+      "NBIS/USDT",
+      "ON/USDT",
+      "ONDS/USDT",
+      "OPEN/USDT",
+      "OPN/USDT",
+      "PEOPLE/USDT",
+      "PHA/USDT",
+      "PHAROS/USDT",
+      "PLTR/USDT",
+      "PRL/USDT",
+      "PROM/USDT",
+      "PTB/USDT",
+      "RECALL/USDT",
+      "RESOLV/USDT",
+      "RIVER/USDT",
+      "ROBO/USDT",
+      "SHAZ/USDT",
+      "SKYAI/USDT",
+      "SLX/USDT",
+      "SMCI/USDT",
+      "SNXX/USDT",
+      "SOXS/USDT",
+      "THE/USDT",
+      "TLM/USDT",
+      "TST/USDT",
+      "TUT/USDT",
+      "UB/USDT",
+      "VELVET/USDT",
+      "XAN/USDT",
+      "ZAMA/USDT",
+      "ZBT/USDT",
+      "龙虾/USDT"
+    ]
+  }
+}
