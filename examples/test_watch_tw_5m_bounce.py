@@ -23,6 +23,7 @@ from watch_tw_5m_bounce import (  # noqa: E402
     entry_volume_ratio,
     fmt_alert,
     hit_on_day,
+    hit_since,
     hit_within_max_price,
     in_tw_session,
     merge_universe,
@@ -145,6 +146,8 @@ def test_merge_universe_and_day_filter() -> None:
     sig = detect(df)[0]
     assert hit_on_day(df, sig, df.index[sig.entry_idx].date())
     assert not hit_on_day(df, sig, datetime(2026, 1, 1).date())
+    assert hit_since(df, sig, df.index[sig.entry_idx].date())
+    assert not hit_since(df, sig, df.index[sig.entry_idx].date() + pd.Timedelta(days=1))
     row = {"code": "6239", "close": 269.0}
     assert hit_within_max_price(row, sig, df, 400.0)
     assert not hit_within_max_price(row, sig, df, 100.0)
