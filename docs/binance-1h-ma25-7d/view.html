@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>幣安 1h MA25 下破底再站上</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}
+.page{max-width:560px;margin:0 auto;padding:14px 12px 32px}
+h1{font-size:18px;margin:0 0 6px}
+.muted{color:#8b949e;font-size:13px;line-height:1.5}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.equity{margin:10px 0 4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}
+.trade-no{font-size:15px;font-weight:700}
+.trade-time{font-size:12px;color:#8b949e}
+.card-pnl{font-size:16px;font-weight:700;white-space:nowrap}
+.pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}
+.tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
+.tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
+.tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.tag-info{background:rgba(210,140,255,0.12);color:#e2b6ff;border-color:rgba(210,140,255,0.28)}
+.tag-fresh{background:rgba(88,166,255,0.16);color:#79c0ff;border-color:rgba(88,166,255,0.35)}
+.trade-detail{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}
+.mini-chart{margin:0 -6px -4px;border-radius:10px;overflow:hidden}
+.empty{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安 1h · MA25 下破底再站上（寬鬆）</h1>
+<p class="muted">近 7 天 · 掃 80 檔 U 本位永續 · 均線對齊你那兩張手機圖：黃7 / 青14 / 粉25 / 紫99 / 綠120 / 酒紅200<br/>
+寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%。進場還要品質 A：深度 ≥ 2.5%、放量 ≥ 1.35 倍、W 型，這三項至少再中兩項。破底後等 1h MA7&gt;MA14&gt;MA25 多頭排列才進場。停損等收盤跌破破底那根 K，目標 2R。每張卡底下附 4h K 對照。</p>
+<div class="cards">
+<div class="card">筆數<b>98</b></div>
+<div class="card">勝率<b>24.5%</b></div>
+<div class="card">加總<b class="pnl-win">+78.11%</b></div>
+<div class="card">均筆<b>+0.80%</b></div>
+</div>
+<p class="muted">QA 98筆 +78.11%</p>
+<p class='muted'>漏斗：跌破 2560 → 站回 918 → 進場 564（太短 621 · 太長 366 · 太淺 581 · 品質不夠 250 · 急殺不夠 56 · 未站回 15）</p>
+<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="92.4" x2="720" y2="92.4" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,92.4 7.3,94.2 14.7,94.7 22.0,94.7 29.4,97.9 36.7,98.9 44.1,100.7 51.4,99.2 58.8,99.8 66.1,103.2 73.5,106.1 80.8,108.3 88.2,107.5 95.5,109.1 102.9,109.8 110.2,112.3 117.6,110.3 124.9,116.4 132.2,101.6 139.6,102.9 146.9,90.6 154.3,91.9 161.6,111.6 169.0,116.4 176.3,126.3 183.7,114.4 191.0,115.4 198.4,116.6 205.7,117.0 213.1,118.5 220.4,120.4 227.8,120.7 235.1,121.6 242.4,121.2 249.8,122.2 257.1,122.9 264.5,122.6 271.8,124.3 279.2,125.0 286.5,126.9 293.9,127.9 301.2,129.2 308.6,130.3 315.9,131.3 323.3,132.2 330.6,134.7 338.0,135.5 345.3,136.7 352.7,137.1 360.0,138.3 367.3,142.0 374.7,146.0 382.0,146.6 389.4,147.7 396.7,151.9 404.1,151.8 411.4,152.1 418.8,151.8 426.1,153.6 433.5,162.6 440.8,149.4 448.2,150.1 455.5,151.3 462.9,151.8 470.2,154.8 477.6,137.5 484.9,138.0 492.2,139.0 499.6,140.0 506.9,141.0 514.3,143.0 521.6,143.2 529.0,143.8 536.3,145.7 543.7,146.1 551.0,147.7 558.4,149.3 565.7,150.2 573.1,141.5 580.4,122.9 587.8,124.8 595.1,118.8 602.4,121.3 609.8,115.1 617.1,110.1 624.5,113.3 631.8,110.5 639.2,28.3 646.5,21.1 653.9,17.4 661.2,19.4 668.6,18.7 675.9,23.8 683.3,30.1 690.6,32.1 698.0,31.8 705.3,31.8 712.7,31.8 720.0,31.8"/></svg></div>
+</section>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · INTCUSDT · QA · W</span><span class='trade-time'>2026-10-21 04:00 → 10-21 21:00</span></div><div class='card-pnl pnl-loss'>-2.36%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 93.97
+stop  88.97  收盤跌破破底K  (−5.32%)
+target 103.97  (2.0R)
+exit  91.75  lost_ma25
+破底 88.97  深度 4.31%  在下 19h
+急殺 2.6% / 2.3ATR  破前低 1.4%
+量比 1.70x  MA25 91.8704
+進場 1h MA7>MA14>MA25  MA7 93.0214  MA14 91.9  MA25 91.8704</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t01_INTCUSDT_1021_0400_qa.png' alt='#1 INTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · QNTUSDT · QA · W</span><span class='trade-time'>2026-10-21 04:00 → 10-21 22:00</span></div><div class='card-pnl pnl-loss'>-0.73%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 197.17
+stop  189.3  收盤跌破破底K  (−3.99%)
+target 212.91  (2.0R)
+exit  195.74  lost_ma25
+破底 189.3  深度 3.74%  在下 19h
+急殺 3.2% / 2.2ATR  破前低 0.7%
+量比 1.09x  MA25 194.797
+進場 1h MA7>MA14>MA25  MA7 196.571  MA14 194.815  MA25 194.797</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t02_QNTUSDT_1021_0400_qa.png' alt='#2 QNTUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · UNIUSDT · QA · W</span><span class='trade-time'>2026-10-21 04:00 → 10-22 07:00</span></div><div class='card-pnl pnl-win'>+0.05%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 7.446
+stop  7.089  收盤跌破破底K  (−4.79%)
+target 8.16  (2.0R)
+exit  7.45  lost_ma25
+破底 7.089  深度 3.09%  在下 19h
+急殺 2.9% / 2.5ATR  破前低 1.2%
+量比 0.56x  MA25 7.27008
+進場 1h MA7>MA14>MA25  MA7 7.38943  MA14 7.27629  MA25 7.27008</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t03_UNIUSDT_1021_0400_qa.png' alt='#3 UNIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · CRWVUSDT · QA · W</span><span class='trade-time'>2026-10-21 04:00 → 10-21 22:00</span></div><div class='card-pnl pnl-loss'>-4.13%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 64.35
+stop  57.34  收盤跌破破底K  (−10.89%)
+target 78.37  (2.0R)
+exit  61.69  lost_ma25
+破底 57.34  深度 8.45%  在下 22h
+急殺 4.5% / 2.8ATR  破前低 2.2%
+量比 1.24x  MA25 60.838
+進場 1h MA7>MA14>MA25  MA7 62.9686  MA14 61.0436  MA25 60.838</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t04_CRWVUSDT_1021_0400_qa.png' alt='#4 CRWVUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · AVAXUSDT · QA · W</span><span class='trade-time'>2026-10-21 04:00 → 10-21 21:00</span></div><div class='card-pnl pnl-loss'>-1.26%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 9.773
+stop  9.382  收盤跌破破底K  (−4.00%)
+target 10.555  (2.0R)
+exit  9.65  lost_ma25
+破底 9.382  深度 3.06%  在下 22h
+急殺 1.3% / 1.5ATR  破前低 0.4%
+量比 0.69x  MA25 9.57956
+進場 1h MA7>MA14>MA25  MA7 9.70886  MA14 9.58629  MA25 9.57956</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t05_AVAXUSDT_1021_0400_qa.png' alt='#5 AVAXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · SOXLUSDT · QA · W</span><span class='trade-time'>2026-10-21 05:00 → 10-21 22:00</span></div><div class='card-pnl pnl-loss'>-2.41%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 103.87
+stop  91.56  收盤跌破破底K  (−11.85%)
+target 128.49  (2.0R)
+exit  101.37  lost_ma25
+破底 91.56  深度 9.08%  在下 19h
+急殺 5.4% / 2.0ATR  破前低 0.8%
+量比 0.36x  MA25 97.8376
+進場 1h MA7>MA14>MA25  MA7 100.59  MA14 98.2843  MA25 97.8376</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t06_SOXLUSDT_1021_0500_qa.png' alt='#6 SOXLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · SPCXUSDT · QA · V</span><span class='trade-time'>2026-10-21 05:00 → 10-22 02:00</span></div><div class='card-pnl pnl-win'>+1.95%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 155.7
+stop  143.62  收盤跌破破底K  (−7.76%)
+target 179.86  (2.0R)
+exit  158.74  lost_ma25
+破底 143.62  深度 3.26%  在下 19h
+急殺 2.7% / 3.6ATR  破前低 1.9%
+量比 2.24x  MA25 148.391
+進場 1h MA7>MA14>MA25  MA7 149.857  MA14 148.427  MA25 148.391</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t07_SPCXUSDT_1021_0500_qa.png' alt='#7 SPCXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · NVDAUSDT · QA · W</span><span class='trade-time'>2026-10-21 05:00 → 10-22 07:00</span></div><div class='card-pnl pnl-loss'>-0.79%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 221.3
+stop  213.17  收盤跌破破底K  (−3.67%)
+target 237.56  (2.0R)
+exit  219.55  lost_ma25
+破底 213.17  深度 2.09%  在下 21h
+急殺 1.8% / 3.3ATR  破前低 1.3%
+量比 1.69x  MA25 217.376
+進場 1h MA7>MA14>MA25  MA7 218.401  MA14 217.415  MA25 217.376</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t08_NVDAUSDT_1021_0500_qa.png' alt='#8 NVDAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · NBISUSDT · QA · W</span><span class='trade-time'>2026-10-21 05:00 → 10-21 22:00</span></div><div class='card-pnl pnl-loss'>-4.36%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 180.42
+stop  160.6  收盤跌破破底K  (−10.99%)
+target 220.06  (2.0R)
+exit  172.56  lost_ma25
+破底 160.6  深度 6.52%  在下 22h
+急殺 3.9% / 2.5ATR  破前低 2.0%
+量比 1.21x  MA25 168.886
+進場 1h MA7>MA14>MA25  MA7 172.996  MA14 169.298  MA25 168.886</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t09_NBISUSDT_1021_0500_qa.png' alt='#9 NBISUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · CBRSUSDT · QA · W</span><span class='trade-time'>2026-10-21 05:00 → 10-21 21:00</span></div><div class='card-pnl pnl-loss'>-3.78%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 122.57
+stop  116.27  收盤跌破破底K  (−5.14%)
+target 135.17  (2.0R)
+exit  117.94  lost_ma25
+破底 116.27  深度 8.64%  在下 24h
+急殺 2.2% / 1.9ATR  破前低 1.4%
+量比 0.31x  MA25 120.06
+進場 1h MA7>MA14>MA25  MA7 121.334  MA14 120.321  MA25 120.06</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t10_CBRSUSDT_1021_0500_qa.png' alt='#10 CBRSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · KORUUSDT · QA · W</span><span class='trade-time'>2026-10-21 06:00 → 10-21 22:00</span></div><div class='card-pnl pnl-loss'>-2.80%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 12.15
+stop  10.58  收盤跌破破底K  (−12.92%)
+target 15.29  (2.0R)
+exit  11.81  lost_ma25
+破底 10.58  深度 12.40%  在下 18h
+急殺 3.5% / 1.1ATR  破前低 2.1%
+量比 0.42x  MA25 11.3648
+進場 1h MA7>MA14>MA25  MA7 11.7057  MA14 11.3864  MA25 11.3648</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t11_KORUUSDT_1021_0600_qa.png' alt='#11 KORUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · SKHYNIXUSDT · QA · W</span><span class='trade-time'>2026-10-21 06:00 → 10-22 03:00</span></div><div class='card-pnl pnl-win'>+1.00%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 957.59
+stop  897.34  收盤跌破破底K  (−6.29%)
+target 1078.09  (2.0R)
+exit  967.12  lost_ma25
+破底 897.34  深度 6.60%  在下 21h
+急殺 8.0% / 5.2ATR  破前低 6.6%
+量比 0.37x  MA25 930.917
+進場 1h MA7>MA14>MA25  MA7 942.427  MA14 931.286  MA25 930.917</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t12_SKHYNIXUSDT_1021_0600_qa.png' alt='#12 SKHYNIXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · LITEUSDT · QA · W</span><span class='trade-time'>2026-10-21 06:00 → 10-22 02:00</span></div><div class='card-pnl pnl-loss'>-1.97%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 868.17
+stop  786.75  收盤跌破破底K  (−9.38%)
+target 1031.01  (2.0R)
+exit  851.06  lost_ma25
+破底 786.75  深度 7.36%  在下 26h
+急殺 4.6% / 3.2ATR  破前低 3.4%
+量比 1.14x  MA25 828.205
+進場 1h MA7>MA14>MA25  MA7 838.549  MA14 829.849  MA25 828.205</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t13_LITEUSDT_1021_0600_qa.png' alt='#13 LITEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · EWYUSDT · QA · W</span><span class='trade-time'>2026-10-21 06:00 → 10-21 22:00</span></div><div class='card-pnl pnl-loss'>-0.94%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 157.87
+stop  150.87  收盤跌破破底K  (−4.43%)
+target 171.87  (2.0R)
+exit  156.39  lost_ma25
+破底 150.87  深度 4.17%  在下 15h
+急殺 1.0% / 1.1ATR  破前低 0.6%
+量比 0.92x  MA25 154.314
+進場 1h MA7>MA14>MA25  MA7 155.84  MA14 154.436  MA25 154.314</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t14_EWYUSDT_1021_0600_qa.png' alt='#14 EWYUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · CAPUSDT · QA · W</span><span class='trade-time'>2026-10-21 07:00 → 10-21 09:00</span></div><div class='card-pnl pnl-loss'>-3.23%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.06874
+stop  0.06404  收盤跌破破底K  (−6.84%)
+target 0.07814  (2.0R)
+exit  0.06652  lost_ma25
+破底 0.06404  深度 8.59%  在下 17h
+急殺 9.0% / 4.1ATR  破前低 7.8%
+量比 0.47x  MA25 0.0678632
+進場 1h MA7>MA14>MA25  MA7 0.0684829  MA14 0.0684021  MA25 0.0678632</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t15_CAPUSDT_1021_0700_qa.png' alt='#15 CAPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · NEARUSDT · QA · W</span><span class='trade-time'>2026-10-21 08:00 → 10-22 11:00</span></div><div class='card-pnl pnl-win'>+2.56%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 4.995
+stop  4.628  收盤跌破破底K  (−7.35%)
+target 5.729  (2.0R)
+exit  5.123  lost_ma25
+破底 4.628  深度 7.16%  在下 23h
+急殺 3.3% / 2.1ATR  破前低 2.5%
+量比 0.70x  MA25 4.8466
+進場 1h MA7>MA14>MA25  MA7 4.93857  MA14 4.89286  MA25 4.8466</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t16_NEARUSDT_1021_0800_qa.png' alt='#16 NEARUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · ZHIPUUSDT · QA · W</span><span class='trade-time'>2026-10-21 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-loss'>-7.86%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 64.49
+stop  60.84  收盤跌破破底K  (−5.66%)
+target 71.79  (2.0R)
+exit  59.42  stop
+破底 60.84  深度 5.24%  在下 19h
+急殺 4.9% / 2.6ATR  破前低 3.5%
+量比 10.02x  MA25 62.61
+進場 1h MA7>MA14>MA25  MA7 63.1629  MA14 62.7157  MA25 62.61</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t17_ZHIPUUSDT_1021_0900_qa.png' alt='#17 ZHIPUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · BULLAUSDT · QA · W</span><span class='trade-time'>2026-10-21 10:00 → 10-22 02:00</span></div><div class='card-pnl pnl-win'>+19.08%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.07558
+stop  0.06837  收盤跌破破底K  (−9.54%)
+target 0.09  (2.0R)
+exit  0.09  target
+破底 0.06837  深度 5.82%  在下 34h
+急殺 5.1% / 3.5ATR  破前低 3.1%
+量比 8.31x  MA25 0.0708616
+進場 1h MA7>MA14>MA25  MA7 0.0712957  MA14 0.0709479  MA25 0.0708616</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t18_BULLAUSDT_1021_1000_qa.png' alt='#18 BULLAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · CAPUSDT · QA · W</span><span class='trade-time'>2026-10-22 00:00 → 10-22 14:00</span></div><div class='card-pnl pnl-loss'>-1.68%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.06968
+stop  0.0663  收盤跌破破底K  (−4.85%)
+target 0.07644  (2.0R)
+exit  0.06851  lost_ma25
+破底 0.0663  深度 2.61%  在下 9h
+急殺 1.6% / 0.9ATR  破前低 0.2%
+量比 1.74x  MA25 0.0679632
+進場 1h MA7>MA14>MA25  MA7 0.0686986  MA14 0.0679736  MA25 0.0679632</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t19_CAPUSDT_1022_0000_qa.png' alt='#19 CAPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · SOXSUSDT · QA · W</span><span class='trade-time'>2026-10-22 07:00 → 10-23 03:00</span></div><div class='card-pnl pnl-win'>+15.89%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 46.44
+stop  42.75  收盤跌破破底K  (−7.95%)
+target 53.82  (2.0R)
+exit  53.82  target
+破底 42.75  深度 9.62%  在下 30h
+急殺 5.1% / 1.6ATR  破前低 4.6%
+量比 0.47x  MA25 44.6012
+進場 1h MA7>MA14>MA25  MA7 45.0814  MA14 44.9479  MA25 44.6012</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t20_SOXSUSDT_1022_0700_qa.png' alt='#20 SOXSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · UNITREEUSDT · QA · V</span><span class='trade-time'>2026-10-22 11:00 → 10-23 00:00</span></div><div class='card-pnl pnl-loss'>-1.67%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 77.91
+stop  74.56  收盤跌破破底K  (−4.30%)
+target 84.61  (2.0R)
+exit  76.61  lost_ma25
+破底 74.56  深度 3.27%  在下 12h
+急殺 4.0% / 4.0ATR  破前低 2.0%
+量比 2.91x  MA25 76.7604
+進場 1h MA7>MA14>MA25  MA7 77.0029  MA14 76.9271  MA25 76.7604</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t21_UNITREEUSDT_1022_1100_qa.png' alt='#21 UNITREEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · BTWUSDT · QA · W</span><span class='trade-time'>2026-10-22 17:00 → 10-23 04:00</span></div><div class='card-pnl pnl-loss'>-25.46%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 1.7348
+stop  1.3  收盤跌破破底K  (−25.06%)
+target 2.6044  (2.0R)
+exit  1.2931  stop
+破底 1.3  深度 31.37%  在下 23h
+急殺 27.5% / 2.9ATR  破前低 16.4%
+量比 1.15x  MA25 1.67067
+進場 1h MA7>MA14>MA25  MA7 1.7081  MA14 1.67575  MA25 1.67067</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t22_BTWUSDT_1022_1700_qa.png' alt='#22 BTWUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · QUSDT · QA · W</span><span class='trade-time'>2026-10-22 20:00 → 10-23 01:00</span></div><div class='card-pnl pnl-loss'>-6.14%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.125622
+stop  0.1085  收盤跌破破底K  (−13.63%)
+target 0.159866  (2.0R)
+exit  0.117911  lost_ma25
+破底 0.1085  深度 12.54%  在下 32h
+急殺 7.2% / 2.3ATR  破前低 3.4%
+量比 0.76x  MA25 0.116859
+進場 1h MA7>MA14>MA25  MA7 0.122854  MA14 0.117207  MA25 0.116859</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t23_QUSDT_1022_2000_qa.png' alt='#23 QUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#24 · JCTUSDT · QA · W</span><span class='trade-time'>2026-10-22 22:00 → 10-23 10:00</span></div><div class='card-pnl pnl-loss'>-12.83%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.00501
+stop  0.00375  收盤跌破破底K  (−25.15%)
+target 0.00753  (2.0R)
+exit  0.004367  lost_ma25
+破底 0.00375  深度 18.40%  在下 17h
+急殺 12.5% / 1.9ATR  破前低 6.3%
+量比 1.83x  MA25 0.00430544
+進場 1h MA7>MA14>MA25  MA7 0.004518  MA14 0.00443357  MA25 0.00430544</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t24_JCTUSDT_1022_2200_qa.png' alt='#24 JCTUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#25 · AKEUSDT · QA · W</span><span class='trade-time'>2026-10-22 22:00 → 10-24 10:00</span></div><div class='card-pnl pnl-win'>+15.36%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.031195
+stop  0.021035  收盤跌破破底K  (−32.57%)
+target 0.051515  (2.0R)
+exit  0.035985  timeout
+破底 0.021035  深度 35.17%  在下 21h
+急殺 11.6% / 2.5ATR  破前低 10.0%
+量比 1.66x  MA25 0.0255934
+進場 1h MA7>MA14>MA25  MA7 0.0287219  MA14 0.0257044  MA25 0.0255934</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t25_AKEUSDT_1022_2200_qa.png' alt='#25 AKEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#26 · CRCLUSDT · QA · W</span><span class='trade-time'>2026-10-23 12:00 → 10-24 02:00</span></div><div class='card-pnl pnl-loss'>-1.19%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 86.62
+stop  84.76  收盤跌破破底K  (−2.15%)
+target 90.34  (2.0R)
+exit  85.59  lost_ma25
+破底 84.76  深度 4.12%  在下 25h
+急殺 3.5% / 3.2ATR  破前低 0.3%
+量比 0.26x  MA25 86.2464
+進場 1h MA7>MA14>MA25  MA7 86.4129  MA14 86.2521  MA25 86.2464</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t26_CRCLUSDT_1023_1200_qa.png' alt='#26 CRCLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#27 · BCHUSDT · QA · W</span><span class='trade-time'>2026-10-23 12:00 → 10-24 07:00</span></div><div class='card-pnl pnl-loss'>-1.56%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 286.69
+stop  271.6  收盤跌破破底K  (−5.26%)
+target 316.87  (2.0R)
+exit  282.23  lost_ma25
+破底 271.6  深度 5.30%  在下 26h
+急殺 1.9% / 2.2ATR  破前低 0.5%
+量比 2.84x  MA25 276.644
+進場 1h MA7>MA14>MA25  MA7 279.921  MA14 276.949  MA25 276.644</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t27_BCHUSDT_1023_1200_qa.png' alt='#27 BCHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#28 · CHIPUSDT · QA · W</span><span class='trade-time'>2026-10-23 12:00 → 10-24 00:00</span></div><div class='card-pnl pnl-loss'>-0.60%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.04478
+stop  0.04265  收盤跌破破底K  (−4.76%)
+target 0.04904  (2.0R)
+exit  0.04451  lost_ma25
+破底 0.04265  深度 9.16%  在下 19h
+急殺 5.1% / 2.7ATR  破前低 0.2%
+量比 0.62x  MA25 0.044278
+進場 1h MA7>MA14>MA25  MA7 0.0446814  MA14 0.0442943  MA25 0.044278</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t28_CHIPUSDT_1023_1200_qa.png' alt='#28 CHIPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#29 · ENAUSDT · QA · W</span><span class='trade-time'>2026-10-23 13:00 → 10-23 18:00</span></div><div class='card-pnl pnl-loss'>-1.89%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.20246
+stop  0.19452  收盤跌破破底K  (−3.92%)
+target 0.21834  (2.0R)
+exit  0.19863  lost_ma25
+破底 0.19452  深度 7.36%  在下 24h
+急殺 4.5% / 2.6ATR  破前低 0.6%
+量比 0.98x  MA25 0.199055
+進場 1h MA7>MA14>MA25  MA7 0.199723  MA14 0.199155  MA25 0.199055</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t29_ENAUSDT_1023_1300_qa.png' alt='#29 ENAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#30 · WLDUSDT · QA · W</span><span class='trade-time'>2026-10-23 13:00 → 10-23 18:00</span></div><div class='card-pnl pnl-loss'>-2.52%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.5517
+stop  0.5224  收盤跌破破底K  (−5.31%)
+target 0.6103  (2.0R)
+exit  0.5378  lost_ma25
+破底 0.5224  深度 10.47%  在下 35h
+急殺 5.2% / 2.4ATR  破前低 2.4%
+量比 0.42x  MA25 0.545636
+進場 1h MA7>MA14>MA25  MA7 0.5515  MA14 0.546929  MA25 0.545636</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t30_WLDUSDT_1023_1300_qa.png' alt='#30 WLDUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#31 · HAEDALUSDT · QA · W</span><span class='trade-time'>2026-10-23 13:00 → 10-24 09:00</span></div><div class='card-pnl pnl-loss'>-0.32%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.01899
+stop  0.01759  收盤跌破破底K  (−7.37%)
+target 0.02179  (2.0R)
+exit  0.01893  lost_ma25
+破底 0.01759  深度 5.22%  在下 24h
+急殺 2.0% / 2.3ATR  破前低 0.9%
+量比 1.51x  MA25 0.0180504
+進場 1h MA7>MA14>MA25  MA7 0.01846  MA14 0.0180836  MA25 0.0180504</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t31_HAEDALUSDT_1023_1300_qa.png' alt='#31 HAEDALUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#32 · BNBUSDT · QA · W</span><span class='trade-time'>2026-10-23 14:00 → 10-24 06:00</span></div><div class='card-pnl pnl-loss'>-1.15%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 745.19
+stop  725.53  收盤跌破破底K  (−2.64%)
+target 784.51  (2.0R)
+exit  736.59  lost_ma25
+破底 725.53  深度 2.85%  在下 25h
+急殺 1.3% / 2.9ATR  破前低 0.6%
+量比 1.16x  MA25 734.543
+進場 1h MA7>MA14>MA25  MA7 738.997  MA14 735.086  MA25 734.543</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t32_BNBUSDT_1023_1400_qa.png' alt='#32 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#33 · ZHIPUUSDT · QA · W</span><span class='trade-time'>2026-10-23 14:00 → 10-24 16:00</span></div><div class='card-pnl pnl-win'>+0.45%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 62.81
+stop  55.9  收盤跌破破底K  (−11.00%)
+target 76.63  (2.0R)
+exit  63.09  lost_ma25
+破底 55.9  深度 11.78%  在下 24h
+急殺 2.1% / 1.9ATR  破前低 1.0%
+量比 1.67x  MA25 58.16
+進場 1h MA7>MA14>MA25  MA7 60.2286  MA14 58.2807  MA25 58.16</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t33_ZHIPUUSDT_1023_1400_qa.png' alt='#33 ZHIPUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#34 · SKHYNIXUSDT · QA · W</span><span class='trade-time'>2026-10-23 15:00 → 10-24 07:00</span></div><div class='card-pnl pnl-loss'>-1.27%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 958.63
+stop  890.17  收盤跌破破底K  (−7.14%)
+target 1095.55  (2.0R)
+exit  946.47  lost_ma25
+破底 890.17  深度 8.26%  在下 30h
+急殺 2.4% / 1.9ATR  破前低 1.4%
+量比 0.37x  MA25 924.208
+進場 1h MA7>MA14>MA25  MA7 947.163  MA14 925.92  MA25 924.208</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t34_SKHYNIXUSDT_1023_1500_qa.png' alt='#34 SKHYNIXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#35 · MSTRUSDT · QA · W</span><span class='trade-time'>2026-10-23 15:00 → 10-23 19:00</span></div><div class='card-pnl pnl-loss'>-0.84%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 147.46
+stop  143.58  收盤跌破破底K  (−2.63%)
+target 155.22  (2.0R)
+exit  146.22  lost_ma25
+破底 143.58  深度 4.25%  在下 24h
+急殺 3.6% / 3.1ATR  破前低 0.2%
+量比 0.28x  MA25 146.074
+進場 1h MA7>MA14>MA25  MA7 147.227  MA14 146.172  MA25 146.074</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t35_MSTRUSDT_1023_1500_qa.png' alt='#35 MSTRUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#36 · 1000PEPEUSDT · QA · W</span><span class='trade-time'>2026-10-23 15:00 → 10-24 05:00</span></div><div class='card-pnl pnl-win'>+0.30%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.0046321
+stop  0.0043307  收盤跌破破底K  (−6.51%)
+target 0.0052349  (2.0R)
+exit  0.004646  lost_ma25
+破底 0.0043307  深度 5.86%  在下 25h
+急殺 4.4% / 3.2ATR  破前低 1.0%
+量比 0.76x  MA25 0.00446239
+進場 1h MA7>MA14>MA25  MA7 0.00454504  MA14 0.00446989  MA25 0.00446239</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t36_1000PEPEUSDT_1023_1500_qa.png' alt='#36 1000PEPEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#37 · SUIUSDT · QA · W</span><span class='trade-time'>2026-10-23 15:00 → 10-24 03:00</span></div><div class='card-pnl pnl-loss'>-2.08%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.994
+stop  0.9653  收盤跌破破底K  (−2.89%)
+target 1.0514  (2.0R)
+exit  0.9733  lost_ma25
+破底 0.9653  深度 6.67%  在下 28h
+急殺 2.5% / 2.4ATR  破前低 1.2%
+量比 0.64x  MA25 0.983436
+進場 1h MA7>MA14>MA25  MA7 0.992443  MA14 0.983607  MA25 0.983436</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t37_SUIUSDT_1023_1500_qa.png' alt='#37 SUIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#38 · DOGEUSDT · QA · W</span><span class='trade-time'>2026-10-23 15:00 → 10-24 03:00</span></div><div class='card-pnl pnl-loss'>-0.91%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.07984
+stop  0.0778  收盤跌破破底K  (−2.56%)
+target 0.08392  (2.0R)
+exit  0.07911  lost_ma25
+破底 0.0778  深度 5.42%  在下 28h
+急殺 2.6% / 3.2ATR  破前低 1.2%
+量比 0.51x  MA25 0.0791564
+進場 1h MA7>MA14>MA25  MA7 0.0796443  MA14 0.0791636  MA25 0.0791564</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t38_DOGEUSDT_1023_1500_qa.png' alt='#38 DOGEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#39 · UNIUSDT · QA · W</span><span class='trade-time'>2026-10-23 15:00 → 10-24 03:00</span></div><div class='card-pnl pnl-loss'>-2.53%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 7.242
+stop  6.884  收盤跌破破底K  (−4.94%)
+target 7.958  (2.0R)
+exit  7.059  lost_ma25
+破底 6.884  深度 8.64%  在下 28h
+急殺 4.2% / 3.1ATR  破前低 1.6%
+量比 0.97x  MA25 7.0856
+進場 1h MA7>MA14>MA25  MA7 7.17643  MA14 7.09671  MA25 7.0856</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t39_UNIUSDT_1023_1500_qa.png' alt='#39 UNIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#40 · AAVEUSDT · QA · W</span><span class='trade-time'>2026-10-23 15:00 → 10-23 23:00</span></div><div class='card-pnl pnl-loss'>-1.27%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 149.59
+stop  144.15  收盤跌破破底K  (−3.64%)
+target 160.47  (2.0R)
+exit  147.69  lost_ma25
+破底 144.15  深度 7.69%  在下 28h
+急殺 4.6% / 4.0ATR  破前低 1.6%
+量比 0.46x  MA25 147.649
+進場 1h MA7>MA14>MA25  MA7 149.004  MA14 147.924  MA25 147.649</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t40_AAVEUSDT_1023_1500_qa.png' alt='#40 AAVEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#41 · TAOUSDT · QA · W</span><span class='trade-time'>2026-10-23 15:00 → 10-24 03:00</span></div><div class='card-pnl pnl-loss'>-1.70%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 261.75
+stop  252.46  收盤跌破破底K  (−3.55%)
+target 280.33  (2.0R)
+exit  257.29  lost_ma25
+破底 252.46  深度 7.76%  在下 28h
+急殺 3.6% / 3.2ATR  破前低 1.6%
+量比 0.82x  MA25 259.265
+進場 1h MA7>MA14>MA25  MA7 261.56  MA14 259.484  MA25 259.265</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t41_TAOUSDT_1023_1500_qa.png' alt='#41 TAOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#42 · FILUSDT · QA · W</span><span class='trade-time'>2026-10-23 16:00 → 10-24 01:00</span></div><div class='card-pnl pnl-loss'>-1.34%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.9954
+stop  0.9428  收盤跌破破底K  (−5.28%)
+target 1.1006  (2.0R)
+exit  0.9821  lost_ma25
+破底 0.9428  深度 10.03%  在下 24h
+急殺 6.5% / 3.8ATR  破前低 4.2%
+量比 0.55x  MA25 0.9835
+進場 1h MA7>MA14>MA25  MA7 0.994214  MA14 0.985671  MA25 0.9835</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t42_FILUSDT_1023_1600_qa.png' alt='#42 FILUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#43 · AVAXUSDT · QA · W</span><span class='trade-time'>2026-10-23 16:00 → 10-23 21:00</span></div><div class='card-pnl pnl-loss'>-1.28%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 9.295
+stop  9.046  收盤跌破破底K  (−2.68%)
+target 9.793  (2.0R)
+exit  9.176  lost_ma25
+破底 9.046  深度 7.29%  在下 28h
+急殺 2.4% / 2.5ATR  破前低 1.3%
+量比 0.55x  MA25 9.19648
+進場 1h MA7>MA14>MA25  MA7 9.28214  MA14 9.20257  MA25 9.19648</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t43_AVAXUSDT_1023_1600_qa.png' alt='#43 AVAXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#44 · LINKUSDT · QA · W</span><span class='trade-time'>2026-10-23 16:00 → 10-24 01:00</span></div><div class='card-pnl pnl-loss'>-1.23%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 12.193
+stop  11.765  收盤跌破破底K  (−3.51%)
+target 13.049  (2.0R)
+exit  12.043  lost_ma25
+破底 11.765  深度 5.69%  在下 25h
+急殺 2.9% / 3.0ATR  破前低 1.8%
+量比 0.42x  MA25 12.0406
+進場 1h MA7>MA14>MA25  MA7 12.1926  MA14 12.0747  MA25 12.0406</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t44_LINKUSDT_1023_1600_qa.png' alt='#44 LINKUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#45 · BANKUSDT · QA · W</span><span class='trade-time'>2026-10-23 17:00 → 10-24 03:00</span></div><div class='card-pnl pnl-loss'>-3.27%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.02599
+stop  0.02479  收盤跌破破底K  (−4.62%)
+target 0.02839  (2.0R)
+exit  0.02514  lost_ma25
+破底 0.02479  深度 7.63%  在下 34h
+急殺 2.3% / 2.6ATR  破前低 1.1%
+量比 1.00x  MA25 0.0253808
+進場 1h MA7>MA14>MA25  MA7 0.02579  MA14 0.0254321  MA25 0.0253808</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t45_BANKUSDT_1023_1700_qa.png' alt='#45 BANKUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#46 · SOLUSDT · QA · W</span><span class='trade-time'>2026-10-23 19:00 → 10-24 03:00</span></div><div class='card-pnl pnl-loss'>-0.93%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 104.49
+stop  102.97  收盤跌破破底K  (−1.45%)
+target 107.53  (2.0R)
+exit  103.52  lost_ma25
+破底 102.97  深度 3.82%  在下 30h
+急殺 1.0% / 1.3ATR  破前低 0.0%
+量比 0.96x  MA25 104.114
+進場 1h MA7>MA14>MA25  MA7 104.377  MA14 104.166  MA25 104.114</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t46_SOLUSDT_1023_1900_qa.png' alt='#46 SOLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#47 · ADAUSDT · QA · W</span><span class='trade-time'>2026-10-23 19:00 → 10-24 03:00</span></div><div class='card-pnl pnl-loss'>-1.57%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.2167
+stop  0.2093  收盤跌破破底K  (−3.41%)
+target 0.2315  (2.0R)
+exit  0.2133  lost_ma25
+破底 0.2093  深度 7.26%  在下 27h
+急殺 3.9% / 3.5ATR  破前低 2.2%
+量比 0.79x  MA25 0.214432
+進場 1h MA7>MA14>MA25  MA7 0.216286  MA14 0.215043  MA25 0.214432</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t47_ADAUSDT_1023_1900_qa.png' alt='#47 ADAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#48 · BTCUSDT · QA · W</span><span class='trade-time'>2026-10-23 20:00 → 10-24 03:00</span></div><div class='card-pnl pnl-loss'>-0.56%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 81711.2
+stop  80888.9  收盤跌破破底K  (−1.01%)
+target 83355.8  (2.0R)
+exit  81255  lost_ma25
+破底 80888.9  深度 3.38%  在下 31h
+急殺 1.4% / 2.8ATR  破前低 0.8%
+量比 2.08x  MA25 81565.9
+進場 1h MA7>MA14>MA25  MA7 81687.3  MA14 81650.7  MA25 81565.9</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t48_BTCUSDT_1023_2000_qa.png' alt='#48 BTCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#49 · ETHUSDT · QA · W</span><span class='trade-time'>2026-10-23 20:00 → 10-24 06:00</span></div><div class='card-pnl pnl-loss'>-1.51%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 2402.13
+stop  2359.02  收盤跌破破底K  (−1.79%)
+target 2488.35  (2.0R)
+exit  2365.97  lost_ma25
+破底 2359.02  深度 4.54%  在下 28h
+急殺 2.5% / 3.4ATR  破前低 1.4%
+量比 0.64x  MA25 2396.53
+進場 1h MA7>MA14>MA25  MA7 2401.78  MA14 2400.54  MA25 2396.53</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t49_ETHUSDT_1023_2000_qa.png' alt='#49 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#50 · ZECUSDT · QA · W</span><span class='trade-time'>2026-10-23 20:00 → 10-24 06:00</span></div><div class='card-pnl pnl-loss'>-4.80%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 1230.34
+stop  1187.2  收盤跌破破底K  (−3.51%)
+target 1316.62  (2.0R)
+exit  1171.24  stop
+破底 1187.2  深度 9.33%  在下 33h
+急殺 4.6% / 2.2ATR  破前低 3.1%
+量比 0.89x  MA25 1223.34
+進場 1h MA7>MA14>MA25  MA7 1224.39  MA14 1223.4  MA25 1223.34</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t50_ZECUSDT_1023_2000_qa.png' alt='#50 ZECUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#51 · HUMAUSDT · QA · W</span><span class='trade-time'>2026-10-23 20:00 → 10-24 04:00</span></div><div class='card-pnl pnl-loss'>-5.21%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.027916
+stop  0.025577  收盤跌破破底K  (−8.38%)
+target 0.032594  (2.0R)
+exit  0.026461  lost_ma25
+破底 0.025577  深度 15.24%  在下 26h
+急殺 3.0% / 1.3ATR  破前低 0.3%
+量比 2.10x  MA25 0.0265222
+進場 1h MA7>MA14>MA25  MA7 0.027157  MA14 0.0266953  MA25 0.0265222</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t51_HUMAUSDT_1023_2000_qa.png' alt='#51 HUMAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#52 · XRPUSDT · QA · W</span><span class='trade-time'>2026-10-23 21:00 → 10-23 23:00</span></div><div class='card-pnl pnl-loss'>-0.67%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 1.3216
+stop  1.2942  收盤跌破破底K  (−2.07%)
+target 1.3764  (2.0R)
+exit  1.3127  lost_ma25
+破底 1.2942  深度 5.01%  在下 28h
+急殺 1.8% / 2.3ATR  破前低 0.9%
+量比 1.37x  MA25 1.31684
+進場 1h MA7>MA14>MA25  MA7 1.32063  MA14 1.32041  MA25 1.31684</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t52_XRPUSDT_1023_2100_qa.png' alt='#52 XRPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#53 · HYPEUSDT · QA · W</span><span class='trade-time'>2026-10-23 21:00 → 10-24 03:00</span></div><div class='card-pnl pnl-loss'>-1.47%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 78.336
+stop  76.603  收盤跌破破底K  (−2.21%)
+target 81.802  (2.0R)
+exit  77.182  lost_ma25
+破底 76.603  深度 5.71%  在下 31h
+急殺 2.7% / 2.9ATR  破前低 1.4%
+量比 2.11x  MA25 77.8844
+進場 1h MA7>MA14>MA25  MA7 78.1264  MA14 78.0621  MA25 77.8844</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t53_HYPEUSDT_1023_2100_qa.png' alt='#53 HYPEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#54 · BULLAUSDT · QA · W</span><span class='trade-time'>2026-10-23 21:00 → 10-24 04:00</span></div><div class='card-pnl pnl-loss'>-5.37%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.08565
+stop  0.07505  收盤跌破破底K  (−12.38%)
+target 0.10685  (2.0R)
+exit  0.08105  lost_ma25
+破底 0.07505  深度 15.89%  在下 23h
+急殺 23.7% / 2.2ATR  破前低 5.8%
+量比 0.68x  MA25 0.0823368
+進場 1h MA7>MA14>MA25  MA7 0.0829714  MA14 0.0828036  MA25 0.0823368</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t54_BULLAUSDT_1023_2100_qa.png' alt='#54 BULLAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#55 · SAMSUNGUSDT · QA · W</span><span class='trade-time'>2026-10-23 21:00 → 10-24 17:00</span></div><div class='card-pnl pnl-win'>+0.09%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 161.55
+stop  153.88  收盤跌破破底K  (−4.75%)
+target 176.89  (2.0R)
+exit  161.7  lost_ma25
+破底 153.88  深度 8.42%  在下 33h
+急殺 3.4% / 2.4ATR  破前低 1.2%
+量比 1.15x  MA25 159.634
+進場 1h MA7>MA14>MA25  MA7 161.404  MA14 160.809  MA25 159.634</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t55_SAMSUNGUSDT_1023_2100_qa.png' alt='#55 SAMSUNGUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#56 · DRAMUSDT · QA · W</span><span class='trade-time'>2026-10-23 21:00 → 10-24 16:00</span></div><div class='card-pnl pnl-loss'>-0.46%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 47.39
+stop  44.72  收盤跌破破底K  (−5.63%)
+target 52.73  (2.0R)
+exit  47.17  lost_ma25
+破底 44.72  深度 9.17%  在下 33h
+急殺 3.4% / 2.1ATR  破前低 0.7%
+量比 3.26x  MA25 46.5232
+進場 1h MA7>MA14>MA25  MA7 47.23  MA14 46.9921  MA25 46.5232</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t56_DRAMUSDT_1023_2100_qa.png' alt='#56 DRAMUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#57 · ONDSUSDT · QA · W</span><span class='trade-time'>2026-10-23 22:00 → 10-24 21:00</span></div><div class='card-pnl pnl-win'>+0.39%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 6.17
+stop  5.906  收盤跌破破底K  (−4.28%)
+target 6.698  (2.0R)
+exit  6.194  lost_ma25
+破底 5.906  深度 4.99%  在下 36h
+急殺 3.9% / 2.6ATR  破前低 2.4%
+量比 3.59x  MA25 6.03264
+進場 1h MA7>MA14>MA25  MA7 6.055  MA14 6.03786  MA25 6.03264</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t57_ONDSUSDT_1023_2200_qa.png' alt='#57 ONDSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#58 · NILUSDT · QA · W</span><span class='trade-time'>2026-10-24 17:00 → 10-25 22:00</span></div><div class='card-pnl pnl-loss'>-2.23%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.08714
+stop  0.07522  收盤跌破破底K  (−13.68%)
+target 0.11098  (2.0R)
+exit  0.0852  lost_ma25
+破底 0.07522  深度 6.00%  在下 12h
+急殺 5.0% / 2.3ATR  破前低 2.3%
+量比 2.77x  MA25 0.0804612
+進場 1h MA7>MA14>MA25  MA7 0.0838857  MA14 0.0809879  MA25 0.0804612</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t58_NILUSDT_1024_1700_qa.png' alt='#58 NILUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#59 · JCTUSDT · QA · W</span><span class='trade-time'>2026-10-24 22:00 → 10-26 07:00</span></div><div class='card-pnl pnl-loss'>-11.63%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.006932
+stop  0.001885  收盤跌破破底K  (−72.81%)
+target 0.017026  (2.0R)
+exit  0.006126  lost_ma25
+破底 0.001885  深度 57.87%  在下 30h
+急殺 70.4% / 6.2ATR  破前低 53.4%
+量比 3.87x  MA25 0.0034952
+進場 1h MA7>MA14>MA25  MA7 0.00457943  MA14 0.00369243  MA25 0.0034952</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t59_JCTUSDT_1024_2200_qa.png' alt='#59 JCTUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#60 · CAPUSDT · QA · W</span><span class='trade-time'>2026-10-25 00:00 → 10-25 15:00</span></div><div class='card-pnl pnl-win'>+16.96%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.07511
+stop  0.06874  收盤跌破破底K  (−8.48%)
+target 0.08785  (2.0R)
+exit  0.08785  target
+破底 0.06874  深度 2.91%  在下 12h
+急殺 2.1% / 1.1ATR  破前低 0.1%
+量比 2.39x  MA25 0.0710236
+進場 1h MA7>MA14>MA25  MA7 0.0731514  MA14 0.0712036  MA25 0.0710236</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t60_CAPUSDT_1025_0000_qa.png' alt='#60 CAPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#61 · SOXLUSDT · QA · W</span><span class='trade-time'>2026-10-25 05:00 → 10-25 17:00</span></div><div class='card-pnl pnl-loss'>-0.84%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 84.68
+stop  81.17  收盤跌破破底K  (−4.15%)
+target 91.7  (2.0R)
+exit  83.97  lost_ma25
+破底 81.17  深度 4.01%  在下 23h
+急殺 4.6% / 5.0ATR  破前低 1.3%
+量比 0.36x  MA25 83.77
+進場 1h MA7>MA14>MA25  MA7 84.0343  MA14 83.7957  MA25 83.77</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t61_SOXLUSDT_1025_0500_qa.png' alt='#61 SOXLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#62 · ZECUSDT · QA · W</span><span class='trade-time'>2026-10-25 07:00 → 10-26 10:00</span></div><div class='card-pnl pnl-loss'>-1.56%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 1207.17
+stop  1118.8  收盤跌破破底K  (−7.32%)
+target 1383.91  (2.0R)
+exit  1188.33  lost_ma25
+破底 1118.8  深度 8.84%  在下 23h
+急殺 4.0% / 2.9ATR  破前低 2.0%
+量比 0.74x  MA25 1171.06
+進場 1h MA7>MA14>MA25  MA7 1191.98  MA14 1172.22  MA25 1171.06</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t62_ZECUSDT_1025_0700_qa.png' alt='#62 ZECUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#63 · LITEUSDT · QA · W</span><span class='trade-time'>2026-10-25 07:00 → 10-25 15:00</span></div><div class='card-pnl pnl-loss'>-0.67%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 762.42
+stop  745.86  收盤跌破破底K  (−2.17%)
+target 795.54  (2.0R)
+exit  757.34  lost_ma25
+破底 745.86  深度 3.10%  在下 25h
+急殺 1.6% / 3.5ATR  破前低 0.1%
+量比 0.72x  MA25 757.182
+進場 1h MA7>MA14>MA25  MA7 759.629  MA14 757.229  MA25 757.182</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t63_LITEUSDT_1025_0700_qa.png' alt='#63 LITEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#64 · CHIPUSDT · QA · W</span><span class='trade-time'>2026-10-25 07:00 → 10-26 05:00</span></div><div class='card-pnl pnl-loss'>-3.79%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.04562
+stop  0.04085  收盤跌破破底K  (−10.46%)
+target 0.05516  (2.0R)
+exit  0.04389  lost_ma25
+破底 0.04085  深度 8.63%  在下 29h
+急殺 4.4% / 2.2ATR  破前低 2.2%
+量比 1.22x  MA25 0.0430184
+進場 1h MA7>MA14>MA25  MA7 0.0438614  MA14 0.0430836  MA25 0.0430184</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t64_CHIPUSDT_1025_0700_qa.png' alt='#64 CHIPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#65 · TAGUSDT · QA · W</span><span class='trade-time'>2026-10-25 08:00 → 10-25 16:00</span></div><div class='card-pnl pnl-win'>+22.24%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.0004891
+stop  0.0004347  收盤跌破破底K  (−11.12%)
+target 0.0005979  (2.0R)
+exit  0.0005979  target
+破底 0.0004347  深度 6.93%  在下 25h
+急殺 3.7% / 2.6ATR  破前低 2.9%
+量比 6.65x  MA25 0.000458516
+進場 1h MA7>MA14>MA25  MA7 0.000471243  MA14 0.000458736  MA25 0.000458516</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t65_TAGUSDT_1025_0800_qa.png' alt='#65 TAGUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#66 · XRPUSDT · QA · W</span><span class='trade-time'>2026-10-25 09:00 → 10-26 06:00</span></div><div class='card-pnl pnl-loss'>-0.60%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 1.307
+stop  1.2535  收盤跌破破底K  (−4.09%)
+target 1.414  (2.0R)
+exit  1.2992  lost_ma25
+破底 1.2535  深度 4.77%  在下 29h
+急殺 2.6% / 3.9ATR  破前低 1.5%
+量比 0.60x  MA25 1.28669
+進場 1h MA7>MA14>MA25  MA7 1.29649  MA14 1.28731  MA25 1.28669</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t66_XRPUSDT_1025_0900_qa.png' alt='#66 XRPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#67 · AAOIUSDT · QA · W</span><span class='trade-time'>2026-10-25 10:00 → 10-25 14:00</span></div><div class='card-pnl pnl-loss'>-1.32%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 67.56
+stop  65.83  收盤跌破破底K  (−2.56%)
+target 71.02  (2.0R)
+exit  66.67  lost_ma25
+破底 65.83  深度 4.94%  在下 27h
+急殺 2.3% / 3.9ATR  破前低 1.1%
+量比 0.29x  MA25 67.1648
+進場 1h MA7>MA14>MA25  MA7 67.4971  MA14 67.1671  MA25 67.1648</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t67_AAOIUSDT_1025_1000_qa.png' alt='#67 AAOIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#68 · BNBUSDT · QA · W</span><span class='trade-time'>2026-10-25 12:00 → 10-26 05:00</span></div><div class='card-pnl pnl-loss'>-1.29%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 748.64
+stop  717.65  收盤跌破破底K  (−4.14%)
+target 810.62  (2.0R)
+exit  738.98  lost_ma25
+破底 717.65  深度 3.49%  在下 25h
+急殺 2.1% / 4.7ATR  破前低 1.8%
+量比 1.05x  MA25 734.989
+進場 1h MA7>MA14>MA25  MA7 743.304  MA14 735.721  MA25 734.989</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t68_BNBUSDT_1025_1200_qa.png' alt='#68 BNBUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#69 · HYPEUSDT · QA · W</span><span class='trade-time'>2026-10-25 12:00 → 10-25 17:00</span></div><div class='card-pnl pnl-loss'>-1.27%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 76.74
+stop  74.413  收盤跌破破底K  (−3.03%)
+target 81.394  (2.0R)
+exit  75.767  lost_ma25
+破底 74.413  深度 4.56%  在下 28h
+急殺 2.2% / 2.7ATR  破前低 1.0%
+量比 0.53x  MA25 76.161
+進場 1h MA7>MA14>MA25  MA7 76.6281  MA14 76.2486  MA25 76.161</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t69_HYPEUSDT_1025_1200_qa.png' alt='#69 HYPEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#70 · ENAUSDT · QA · W</span><span class='trade-time'>2026-10-25 12:00 → 10-25 17:00</span></div><div class='card-pnl pnl-loss'>-2.55%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 0.19511
+stop  0.18365  收盤跌破破底K  (−5.87%)
+target 0.21803  (2.0R)
+exit  0.19013  lost_ma25
+破底 0.18365  深度 9.39%  在下 24h
+急殺 3.1% / 1.8ATR  破前低 2.6%
+量比 0.53x  MA25 0.191448
+進場 1h MA7>MA14>MA25  MA7 0.194989  MA14 0.191536  MA25 0.191448</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t70_ENAUSDT_1025_1200_qa.png' alt='#70 ENAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#71 · SNDKUSDT · QA · W</span><span class='trade-time'>2026-10-25 13:00 → 10-26 09:00</span></div><div class='card-pnl pnl-loss'>-0.36%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 1246.81
+stop  1194.8  收盤跌破破底K  (−4.17%)
+target 1350.83  (2.0R)
+exit  1242.36  lost_ma25
+破底 1194.8  深度 6.13%  在下 31h
+急殺 3.9% / 6.5ATR  破前低 3.0%
+量比 0.77x  MA25 1237.27
+進場 1h MA7>MA14>MA25  MA7 1243.76  MA14 1238.03  MA25 1237.27</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t71_SNDKUSDT_1025_1300_qa.png' alt='#71 SNDKUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#72 · SNXXUSDT · QA · W</span><span class='trade-time'>2026-10-25 13:00 → 10-26 09:00</span></div><div class='card-pnl pnl-loss'>-0.73%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 8.24
+stop  7.81  收盤跌破破底K  (−5.22%)
+target 9.1  (2.0R)
+exit  8.18  lost_ma25
+破底 7.81  深度 9.24%  在下 31h
+急殺 4.5% / 4.6ATR  破前低 3.0%
+量比 0.50x  MA25 8.1108
+進場 1h MA7>MA14>MA25  MA7 8.19857  MA14 8.12214  MA25 8.1108</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t72_SNXXUSDT_1025_1300_qa.png' alt='#72 SNXXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#73 · NBISUSDT · QA · W</span><span class='trade-time'>2026-10-25 23:00 → 10-26 09:00</span></div><div class='card-pnl pnl-loss'>-2.51%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 159.55
+stop  154.17  收盤跌破破底K  (−3.37%)
+target 170.31  (2.0R)
+exit  155.54  lost_ma25
+破底 154.17  深度 4.20%  在下 27h
+急殺 2.8% / 4.2ATR  破前低 1.8%
+量比 1.52x  MA25 158.004
+進場 1h MA7>MA14>MA25  MA7 158.246  MA14 158.059  MA25 158.004</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t73_NBISUSDT_1025_2300_qa.png' alt='#73 NBISUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#74 · CRCLUSDT · QA · W</span><span class='trade-time'>2026-10-26 00:00 → 10-26 06:00</span></div><div class='card-pnl pnl-loss'>-0.47%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 85.66
+stop  83.15  收盤跌破破底K  (−2.93%)
+target 90.68  (2.0R)
+exit  85.26  lost_ma25
+破底 83.15  深度 4.10%  在下 29h
+急殺 2.5% / 4.0ATR  破前低 1.4%
+量比 1.25x  MA25 85.2308
+進場 1h MA7>MA14>MA25  MA7 85.2971  MA14 85.2386  MA25 85.2308</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t74_CRCLUSDT_1026_0000_qa.png' alt='#74 CRCLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#75 · UNIUSDT · QA · W</span><span class='trade-time'>2026-10-26 04:00 → 10-26 11:00</span></div><div class='card-pnl pnl-loss'>-2.09%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 6.969
+stop  6.496  收盤跌破破底K  (−6.79%)
+target 7.915  (2.0R)
+exit  6.823  lost_ma25
+破底 6.496  深度 8.93%  在下 29h
+急殺 5.3% / 4.1ATR  破前低 4.3%
+量比 0.75x  MA25 6.8158
+進場 1h MA7>MA14>MA25  MA7 6.92271  MA14 6.81971  MA25 6.8158</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t75_UNIUSDT_1026_0400_qa.png' alt='#75 UNIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#76 · TAOUSDT · QA · W</span><span class='trade-time'>2026-10-26 04:00 → 10-26 11:00</span></div><div class='card-pnl pnl-loss'>-2.02%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 253.86
+stop  242.4  收盤跌破破底K  (−4.51%)
+target 276.78  (2.0R)
+exit  248.74  lost_ma25
+破底 242.4  深度 6.80%  在下 29h
+急殺 3.2% / 3.4ATR  破前低 1.7%
+量比 0.73x  MA25 250.47
+進場 1h MA7>MA14>MA25  MA7 253.191  MA14 250.54  MA25 250.47</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t76_TAOUSDT_1026_0400_qa.png' alt='#76 TAOUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#77 · AKEUSDT · QA · W</span><span class='trade-time'>2026-10-26 07:00 → 10-27 00:00</span></div><div class='card-pnl pnl-loss'>-1.15%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.031221
+stop  0.028418  收盤跌破破底K  (−8.98%)
+target 0.036827  (2.0R)
+exit  0.030862  lost_ma25
+破底 0.028418  深度 20.80%  在下 34h
+急殺 4.5% / 1.3ATR  破前低 0.4%
+量比 0.40x  MA25 0.0302322
+進場 1h MA7>MA14>MA25  MA7 0.0311873  MA14 0.0303241  MA25 0.0302322</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t77_AKEUSDT_1026_0700_qa.png' alt='#77 AKEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#78 · HAEDALUSDT · QA · W</span><span class='trade-time'>2026-10-26 12:00 → 10-27 04:00</span></div><div class='card-pnl pnl-win'>+11.24%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.02029
+stop  0.01915  收盤跌破破底K  (−5.62%)
+target 0.02257  (2.0R)
+exit  0.02257  target
+破底 0.01915  深度 3.28%  在下 26h
+急殺 1.8% / 1.5ATR  破前低 0.7%
+量比 6.37x  MA25 0.0195096
+進場 1h MA7>MA14>MA25  MA7 0.0196529  MA14 0.01954  MA25 0.0195096</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t78_HAEDALUSDT_1026_1200_qa.png' alt='#78 HAEDALUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#79 · TAGUSDT · QA · W</span><span class='trade-time'>2026-10-26 21:00 → 10-27 05:00</span></div><div class='card-pnl pnl-win'>+23.97%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.0005399
+stop  0.0004752  收盤跌破破底K  (−11.98%)
+target 0.0006693  (2.0R)
+exit  0.0006693  target
+破底 0.0004752  深度 8.10%  在下 22h
+急殺 4.9% / 2.1ATR  破前低 1.2%
+量比 2.84x  MA25 0.000499116
+進場 1h MA7>MA14>MA25  MA7 0.000507814  MA14 0.000499336  MA25 0.000499116</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t79_TAGUSDT_1026_2100_qa.png' alt='#79 TAGUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#80 · ZECUSDT · QA · V</span><span class='trade-time'>2026-10-26 22:00 → 10-27 12:00</span></div><div class='card-pnl pnl-loss'>-2.49%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 1252
+stop  1177.22  收盤跌破破底K  (−5.97%)
+target 1401.56  (2.0R)
+exit  1220.84  lost_ma25
+破底 1177.22  深度 2.64%  在下 7h
+急殺 3.5% / 2.1ATR  破前低 0.4%
+量比 1.80x  MA25 1215.86
+進場 1h MA7>MA14>MA25  MA7 1230.98  MA14 1216.13  MA25 1215.86</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t80_ZECUSDT_1026_2200_qa.png' alt='#80 ZECUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#81 · LITEUSDT · QA · W</span><span class='trade-time'>2026-10-26 22:00 → 10-27 23:00</span></div><div class='card-pnl pnl-win'>+7.79%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 817.56
+stop  744  收盤跌破破底K  (−9.00%)
+target 964.68  (2.0R)
+exit  881.27  timeout
+破底 744  深度 2.40%  在下 12h
+急殺 2.5% / 2.2ATR  破前低 0.4%
+量比 4.98x  MA25 765.375
+進場 1h MA7>MA14>MA25  MA7 777.463  MA14 765.697  MA25 765.375</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t81_LITEUSDT_1026_2200_qa.png' alt='#81 LITEUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#82 · SOXLUSDT · QA · W</span><span class='trade-time'>2026-10-27 00:00 → 10-27 15:00</span></div><div class='card-pnl pnl-loss'>-3.28%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 91.35
+stop  81.57  收盤跌破破底K  (−10.71%)
+target 110.91  (2.0R)
+exit  88.35  lost_ma25
+破底 81.57  深度 4.01%  在下 11h
+急殺 4.1% / 2.0ATR  破前低 0.6%
+量比 0.80x  MA25 85.5236
+進場 1h MA7>MA14>MA25  MA7 87.9729  MA14 85.8157  MA25 85.5236</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t82_SOXLUSDT_1027_0000_qa.png' alt='#82 SOXLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#83 · JCTUSDT · QA · W</span><span class='trade-time'>2026-10-27 00:00 → 10-27 23:00</span></div><div class='card-pnl pnl-win'>+8.06%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.007011
+stop  0.003891  收盤跌破破底K  (−44.50%)
+target 0.013251  (2.0R)
+exit  0.007576  timeout
+破底 0.003891  深度 42.53%  在下 14h
+急殺 39.9% / 5.3ATR  破前低 36.2%
+量比 0.33x  MA25 0.00626356
+進場 1h MA7>MA14>MA25  MA7 0.00660286  MA14 0.00627857  MA25 0.00626356</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t83_JCTUSDT_1027_0000_qa.png' alt='#83 JCTUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#84 · AAOIUSDT · QA · W</span><span class='trade-time'>2026-10-27 00:00 → 10-27 23:00</span></div><div class='card-pnl pnl-win'>+6.50%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 72.2
+stop  65.23  收盤跌破破底K  (−9.65%)
+target 86.14  (2.0R)
+exit  76.89  timeout
+破底 65.23  深度 3.30%  在下 11h
+急殺 3.2% / 2.3ATR  破前低 0.7%
+量比 1.06x  MA25 67.9116
+進場 1h MA7>MA14>MA25  MA7 69.5271  MA14 68.1207  MA25 67.9116</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t84_AAOIUSDT_1027_0000_qa.png' alt='#84 AAOIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#85 · SNXXUSDT · QA · V</span><span class='trade-time'>2026-10-27 01:00 → 10-27 15:00</span></div><div class='card-pnl pnl-loss'>-4.21%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 8.78
+stop  8.04  收盤跌破破底K  (−8.43%)
+target 10.26  (2.0R)
+exit  8.41  lost_ma25
+破底 8.04  深度 2.67%  在下 8h
+急殺 5.2% / 3.0ATR  破前低 0.9%
+量比 1.38x  MA25 8.3312
+進場 1h MA7>MA14>MA25  MA7 8.48714  MA14 8.35214  MA25 8.3312</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t85_SNXXUSDT_1027_0100_qa.png' alt='#85 SNXXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#86 · MUUUSDT · QA · W</span><span class='trade-time'>2026-10-27 01:00 → 10-27 23:00</span></div><div class='card-pnl pnl-win'>+3.60%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 26.1
+stop  23.62  收盤跌破破底K  (−9.50%)
+target 31.06  (2.0R)
+exit  27.04  timeout
+破底 23.62  深度 4.53%  在下 11h
+急殺 4.3% / 2.4ATR  破前低 1.3%
+量比 0.78x  MA25 24.8084
+進場 1h MA7>MA14>MA25  MA7 25.44  MA14 24.8957  MA25 24.8084</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t86_MUUUSDT_1027_0100_qa.png' alt='#86 MUUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#87 · QUSDT · QA · W</span><span class='trade-time'>2026-10-27 02:00 → 10-27 10:00</span></div><div class='card-pnl pnl-win'>+106.20%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.110945
+stop  0.052033  收盤跌破破底K  (−53.10%)
+target 0.228769  (2.0R)
+exit  0.228769  target
+破底 0.052033  深度 34.08%  在下 27h
+急殺 14.3% / 1.9ATR  破前低 6.1%
+量比 8.98x  MA25 0.0595645
+進場 1h MA7>MA14>MA25  MA7 0.0653373  MA14 0.0610989  MA25 0.0595645</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t87_QUSDT_1027_0200_qa.png' alt='#87 QUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#88 · KORUUSDT · QA · W</span><span class='trade-time'>2026-10-27 02:00 → 10-27 23:00</span></div><div class='card-pnl pnl-win'>+9.17%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 11.01
+stop  10.22  收盤跌破破底K  (−7.18%)
+target 12.59  (2.0R)
+exit  12.02  timeout
+破底 10.22  深度 4.20%  在下 15h
+急殺 5.8% / 2.5ATR  破前低 1.1%
+量比 0.33x  MA25 10.6912
+進場 1h MA7>MA14>MA25  MA7 10.8771  MA14 10.695  MA25 10.6912</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t88_KORUUSDT_1027_0200_qa.png' alt='#88 KORUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#89 · CRWVUSDT · QA · W</span><span class='trade-time'>2026-10-27 02:00 → 10-27 23:00</span></div><div class='card-pnl pnl-win'>+4.81%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 56.33
+stop  51.31  收盤跌破破底K  (−8.91%)
+target 66.37  (2.0R)
+exit  59.04  timeout
+破底 51.31  深度 6.15%  在下 17h
+急殺 3.5% / 1.9ATR  破前低 0.9%
+量比 0.76x  MA25 53.9844
+進場 1h MA7>MA14>MA25  MA7 55.7157  MA14 54.0107  MA25 53.9844</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t89_CRWVUSDT_1027_0200_qa.png' alt='#89 CRWVUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#90 · INJUSDT · QA · W</span><span class='trade-time'>2026-10-27 04:00 → 10-27 13:00</span></div><div class='card-pnl pnl-loss'>-2.56%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 7.975
+stop  7.526  收盤跌破破底K  (−5.63%)
+target 8.873  (2.0R)
+exit  7.771  lost_ma25
+破底 7.526  深度 2.90%  在下 12h
+急殺 2.6% / 1.2ATR  破前低 1.1%
+量比 0.55x  MA25 7.7988
+進場 1h MA7>MA14>MA25  MA7 7.94543  MA14 7.821  MA25 7.7988</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t90_INJUSDT_1027_0400_qa.png' alt='#90 INJUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#91 · XRPUSDT · QA · W</span><span class='trade-time'>2026-10-27 07:00 → 10-27 23:00</span></div><div class='card-pnl pnl-win'>+0.92%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 1.3086
+stop  1.2722  收盤跌破破底K  (−2.78%)
+target 1.3814  (2.0R)
+exit  1.3206  timeout
+破底 1.2722  深度 2.17%  在下 17h
+急殺 2.1% / 2.8ATR  破前低 0.9%
+量比 2.61x  MA25 1.29157
+進場 1h MA7>MA14>MA25  MA7 1.29503  MA14 1.29456  MA25 1.29157</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t91_XRPUSDT_1027_0700_qa.png' alt='#91 XRPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#92 · APRUSDT · QA · W</span><span class='trade-time'>2026-10-27 17:00 → 10-27 19:00</span></div><div class='card-pnl pnl-loss'>-6.62%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.03535
+stop  0.03055  收盤跌破破底K  (−13.58%)
+target 0.04495  (2.0R)
+exit  0.03301  lost_ma25
+破底 0.03055  深度 23.51%  在下 29h
+急殺 9.8% / 1.7ATR  破前低 1.1%
+量比 0.72x  MA25 0.0334988
+進場 1h MA7>MA14>MA25  MA7 0.0345057  MA14 0.0335336  MA25 0.0334988</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t92_APRUSDT_1027_1700_qa.png' alt='#92 APRUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#93 · NILUSDT · QA · W</span><span class='trade-time'>2026-10-27 17:00 → 10-27 22:00</span></div><div class='card-pnl pnl-loss'>-8.10%</div></header><div class='tags'><span class='tag tag-sl'>lost_ma25</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.09899
+stop  0.0862  收盤跌破破底K  (−12.92%)
+target 0.12457  (2.0R)
+exit  0.09097  lost_ma25
+破底 0.0862  深度 4.58%  在下 17h
+急殺 11.3% / 3.0ATR  破前低 2.3%
+量比 2.11x  MA25 0.091278
+進場 1h MA7>MA14>MA25  MA7 0.0938143  MA14 0.09161  MA25 0.091278</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t93_NILUSDT_1027_1700_qa.png' alt='#93 NILUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#94 · CAPUSDT · QA · W</span><span class='trade-time'>2026-10-27 17:00 → 10-27 23:00</span></div><div class='card-pnl pnl-loss'>-2.63%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 0.10102
+stop  0.07074  收盤跌破破底K  (−29.97%)
+target 0.16158  (2.0R)
+exit  0.09836  timeout
+破底 0.07074  深度 32.06%  在下 13h
+急殺 22.5% / 2.3ATR  破前低 18.8%
+量比 1.52x  MA25 0.0952184
+進場 1h MA7>MA14>MA25  MA7 0.0975186  MA14 0.0974714  MA25 0.0952184</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t94_CAPUSDT_1027_1700_qa.png' alt='#94 CAPUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#95 · SPCXUSDT · QA · V</span><span class='trade-time'>2026-10-27 21:00 → 10-27 23:00</span></div><div class='card-pnl pnl-win'>+0.39%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 149.71
+stop  144.92  收盤跌破破底K  (−3.20%)
+target 159.29  (2.0R)
+exit  150.3  timeout
+破底 144.92  深度 2.58%  在下 12h
+急殺 3.0% / 3.9ATR  破前低 1.8%
+量比 17.94x  MA25 148.203
+進場 1h MA7>MA14>MA25  MA7 148.67  MA14 148.235  MA25 148.203</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t95_SPCXUSDT_1027_2100_qa.png' alt='#95 SPCXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#96 · ETHUSDT · QA · W</span><span class='trade-time'>2026-10-27 23:00 → 10-27 23:00</span></div><div class='card-pnl pnl-flat'>+0.00%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 2346.13
+stop  2292  收盤跌破破底K  (−2.31%)
+target 2454.39  (2.0R)
+exit  2346.13  timeout
+破底 2292  深度 2.36%  在下 27h
+急殺 1.9% / 2.5ATR  破前低 0.6%
+量比 3.37x  MA25 2318.76
+進場 1h MA7>MA14>MA25  MA7 2325.6  MA14 2318.91  MA25 2318.76</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t96_ETHUSDT_1027_2300_qa.png' alt='#96 ETHUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#97 · GOOGLUSDT · QA · W</span><span class='trade-time'>2026-10-27 23:00 → 10-27 23:00</span></div><div class='card-pnl pnl-flat'>+0.00%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 321.22
+stop  314.86  收盤跌破破底K  (−1.98%)
+target 333.94  (2.0R)
+exit  321.22  timeout
+破底 314.86  深度 2.20%  在下 32h
+急殺 1.8% / 4.6ATR  破前低 0.9%
+量比 2.32x  MA25 318.969
+進場 1h MA7>MA14>MA25  MA7 319.461  MA14 319.099  MA25 318.969</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t97_GOOGLUSDT_1027_2300_qa.png' alt='#97 GOOGLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#98 · NBISUSDT · QA · W</span><span class='trade-time'>2026-10-27 23:00 → 10-27 23:00</span></div><div class='card-pnl pnl-flat'>+0.00%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 169.2
+stop  149.8  收盤跌破破底K  (−11.47%)
+target 208  (2.0R)
+exit  169.2  timeout
+破底 149.8  深度 5.62%  在下 14h
+急殺 6.9% / 3.2ATR  破前低 0.0%
+量比 0.78x  MA25 158.259
+進場 1h MA7>MA14>MA25  MA7 162.497  MA14 158.55  MA25 158.259</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/img/t98_NBISUSDT_1027_2300_qa.png' alt='#98 NBISUSDT' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div>
+</body></html>

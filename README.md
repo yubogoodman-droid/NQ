@@ -70,7 +70,7 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 ```bash
 # 寬鬆 · 近一週
-python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 7 --pages
+python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 7 --html docs/binance-1h-ma25-7d/index.html
 
 # 寬鬆 · 一個月
 python3 examples/binance_1h_ma25_reclaim.py --limit 80 --days 30 --html docs/binance-1h-ma25-30d/index.html
@@ -92,7 +92,7 @@ TradingView：`pinescript/binance_1h_ma25_reclaim.pine` 貼到 1 小時圖。
 預覽（近 30 天寬鬆）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-30d/view.html  
 一個月一次一單權益：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-30d/seq.html  
 預覽（近 2 天寬鬆）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-2d/view.html  
-預覽（近 7 天寬鬆）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25/view.html  
+預覽（近 7 天寬鬆，品質 A）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-7d/view.html  
 一個月嚴格筆畫 W：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-strict-30d/view.html  
 兩個月權益 + 重點 K 棒：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/seq.html  
 兩個月做成單全部 K 棒：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/seq-k.html  
