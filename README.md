@@ -138,8 +138,9 @@ python3 examples/scan_binance_15m_align.py --watch
 python3 examples/scan_binance_15m_align.py --backtest --days 3 --pages --html docs/binance/ma200-squeeze-15m-3d/index.html
 python3 examples/scan_binance_15m_align.py --backtest --days 7 --pages --html docs/binance/ma200-squeeze-15m-7d/index.html
 
-# 近 7 日全部 U 本位永續（幣+股，不限成交額）
+# 近 7 日 / 近 30 日全部 U 本位永續（幣+股，不限成交額）
 python3 examples/scan_binance_15m_align.py --backtest --days 7 --all --pages --html docs/binance/ma200-squeeze-15m-7d-all/index.html
+python3 examples/scan_binance_15m_align.py --backtest --days 30 --all --pages --html docs/binance/ma200-squeeze-15m-30d-all/index.html
 ```
 
 舊檔名 `scan_binance_15m_ma200.py` 也會轉到同一套。Telegram 憑證放 `tg_config.env`（`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`）。
@@ -149,6 +150,8 @@ python3 examples/scan_binance_15m_align.py --backtest --days 7 --all --pages --h
 近 7 日（2026-09-12 → 09-19）成交額前 100：**9 筆、勝率 55.6%、−0.39%**。ETH 9/3 那張已超出這週。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d/view.html
 
 近 7 日全部永續（2026-09-20 → 09-27，725 檔、幣+股）：**18 筆、勝率 61.1%、+6.19%**。振幅放到 5×、99/120 脫層 0.45%。GS / EWZ / ETH 9/25 / BTC 9/21 仍不進。ETH 9/27、BTC 9/27 還在。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d-all/view.html
+
+近 30 日全部永續（2026-09-28 → 10-28，749 檔、幣+股）：**94 筆、勝率 47.9%、+3.34%**。ETH 10/14 16:00 有一筆，這段沒有 BTC。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-30d-all/view.html
 
 ## 幣安 15m 黏帶擠壓參數
 
