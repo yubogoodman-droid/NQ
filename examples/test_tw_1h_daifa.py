@@ -17,6 +17,7 @@ from tw_1h_daifa import (  # noqa: E402
     daily_bounds,
     detect_signals,
     draw_trade_png,
+    filter_entry_dates,
     filter_entry_window,
     simulate,
     summarize_trades,
@@ -231,6 +232,18 @@ def test_draw_includes_daily_panel(tmp_path=None) -> None:
     assert out.exists() and out.stat().st_size > 1000
 
 
+def test_filter_entry_dates() -> None:
+    opens, highs, lows, closes = flat(110)
+    paint_daifa(opens, highs, lows, closes, 70)
+    _fill_after(opens, highs, lows, closes, 71, 110.0)
+    df = make_df(opens, highs, lows, closes)
+    sigs = detect_signals(df)
+    assert sigs
+    day = df.index[sigs[0].entry_idx].date().isoformat()
+    assert filter_entry_dates(df, sigs, day, day) == sigs
+    assert filter_entry_dates(df, sigs, "2099-01-01", "2099-01-02") == []
+
+
 def test_filter_and_summary() -> None:
     opens, highs, lows, closes = flat()
     paint_daifa(opens, highs, lows, closes, 70)
@@ -255,6 +268,7 @@ def main() -> int:
     test_daily_bounds_keeps_entry_day()
     test_bars_to_daily_collapses_session()
     test_draw_includes_daily_panel()
+    test_filter_entry_dates()
     test_filter_and_summary()
     print("ok")
     return 0
