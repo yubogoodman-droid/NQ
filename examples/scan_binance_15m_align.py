@@ -229,7 +229,7 @@ def use_cjk_font(plt) -> None:
         return
 
 
-def draw_chart(sym: str, d: dict, sig: SqueezeSignal, path: Path) -> Path | None:
+def draw_chart(sym: str, d: dict, sig: SqueezeSignal, path: Path, trade=None) -> Path | None:
     try:
         import matplotlib
 
@@ -240,8 +240,11 @@ def draw_chart(sym: str, d: dict, sig: SqueezeSignal, path: Path) -> Path | None
         return None
     use_cjk_font(plt)
     i = sig.idx
+    last = i + FWD_BARS
+    if trade is not None:
+        last = max(last, int(trade.exit_idx) + 2)
     a0 = max(0, i - PRE_BARS)
-    a1 = min(len(d["c"]), i + FWD_BARS + 1)
+    a1 = min(len(d["c"]), last + 1)
     sl = slice(a0, a1)
     xs = np.arange(a1 - a0)
     o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
@@ -264,18 +267,32 @@ def draw_chart(sym: str, d: dict, sig: SqueezeSignal, path: Path) -> Path | None
         ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
         colors_v.append("#3dba7a99" if up else "#e35d5d99")
     axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
+    ax.plot(xs, sma(d["c"], 5)[sl], color="#ffffff", lw=1.0, label="MA5")
+    ax.plot(xs, sma(d["c"], 20)[sl], color="#ffcc80", lw=1.0, label="MA20")
     for n, col in MA_COLORS.items():
         ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.6 if n == 200 else 1.1, label=f"MA{n}")
     x = i - a0
     if 0 <= x < len(c):
         ax.axvline(x, color="#3dba7a", ls="--", lw=0.9)
-        ax.scatter([x], [c[x]], s=40, color="#00e676", marker="^", zorder=6)
+        ax.scatter([x], [c[x]], s=36, color="#00e676", marker="^", zorder=6)
+        ax.annotate("訊號", (x, c[x]), textcoords="offset points", xytext=(0, 8), color="#00e676", fontsize=8, ha="center")
+    if trade is not None:
+        xe = int(trade.entry_idx) - a0
+        if 0 <= xe < len(c):
+            ax.scatter([xe], [trade.entry_price], s=42, color="#b9f6ca", marker="o", zorder=7)
+            ax.annotate("進場", (xe, trade.entry_price), textcoords="offset points", xytext=(0, -12), color="#b9f6ca", fontsize=8, ha="center")
+        xx = int(trade.exit_idx) - a0
+        reason_zh = {"stop": "停損", "target": "停利", "time": "時間出場"}.get(trade.exit_reason, trade.exit_reason)
+        col = {"stop": "#ff8a80", "target": "#ffe082", "time": "#90caf9"}.get(trade.exit_reason, "#e8f0ea")
+        if 0 <= xx < len(c):
+            ax.scatter([xx], [trade.exit_price], s=46, color=col, marker="v", zorder=7)
+            ax.annotate(reason_zh, (xx, trade.exit_price), textcoords="offset points", xytext=(0, 8), color=col, fontsize=8, ha="center")
     ax.set_title(
         f"{sym}  15m  200附近  帶寬 {sig.ribbon*100:.2f}%  離200 {sig.ext*100:+.2f}%  量 {sig.vol_ratio:.1f}x",
         color="#e8f0ea",
         fontsize=12,
     )
-    ax.legend(loc="upper left", fontsize=8, frameon=False, labelcolor="#c8d5cc", ncol=3)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
     fig.tight_layout(pad=0.5)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
