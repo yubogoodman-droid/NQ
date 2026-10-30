@@ -17,6 +17,7 @@ import argparse
 import base64
 import subprocess
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -188,19 +189,55 @@ def sma(arr: np.ndarray, n: int) -> np.ndarray:
     return out
 
 
-def get_json(path: str, params: Optional[dict] = None, retries: int = 5) -> Any:
+_NEXT_REQUEST_AT = 0.0
+_REQUEST_LOCK = threading.Lock()
+
+
+def _ban_sleep(response: requests.Response) -> None:
+    """418/429：若訊息有 banned until，就睡到解禁，不再連打。"""
+    text = ""
+    try:
+        body = response.json()
+        text = str(body.get("msg") or body)
+    except Exception:  # noqa: BLE001
+        text = response.text or ""
+    marker = "banned until "
+    wait = 2.0
+    if marker in text:
+        digits = []
+        for ch in text[text.index(marker) + len(marker) :]:
+            if ch.isdigit():
+                digits.append(ch)
+            else:
+                break
+        if digits:
+            until = int("".join(digits)) / 1000.0
+            wait = max(1.0, until - time.time() + 5.0)
+    else:
+        wait = 3.0
+    print(f"binance {response.status_code} sleep {wait:.0f}s", flush=True)
+    time.sleep(wait)
+
+
+def get_json(path: str, params: Optional[dict] = None, retries: int = 6) -> Any:
+    global _NEXT_REQUEST_AT
     last: Exception | None = None
     for i in range(retries):
+        with _REQUEST_LOCK:
+            delay = _NEXT_REQUEST_AT - time.time()
+            if delay > 0:
+                time.sleep(delay)
+            _NEXT_REQUEST_AT = time.time() + 0.35
         try:
-            r = SESSION.get(BINANCE + path, params=params, timeout=20)
-            if r.status_code == 429:
-                time.sleep(1.3 * (i + 1))
+            r = SESSION.get(BINANCE + path, params=params, timeout=40)
+            if r.status_code in (418, 429):
+                _ban_sleep(r)
                 continue
             r.raise_for_status()
             return r.json()
         except Exception as exc:  # noqa: BLE001
             last = exc
-            time.sleep(0.4 * (i + 1))
+            time.sleep(0.8 * (i + 1))
     raise RuntimeError(f"GET {path} failed: {last}")
 
 
@@ -1536,7 +1573,7 @@ def _rules_html(limit: int) -> str:
 <ul class="rules">
 <li><b>週期</b>：幣安 U 本位永續 <span class="k">5m</span> 已收盤 K。K 線開盤時間轉成 Asia/Shanghai。</li>
 <li><b>標的</b>：<span class="k">quoteAsset=USDT</span>、<span class="k">status=TRADING</span>、<span class="k">contractType=PERPETUAL</span>，排除 <span class="k">underlyingType=INDEX</span>。依<b>跑回測當下</b>的 24h <span class="k">quoteVolume</span> 取前 {limit}。程式沒有歷史排名，所以不是 10/17 當天的成交額前 {limit}。</li>
-<li><b>均線</b>：進場用收盤 SMA{p.ma_period}，以及 SMA25。圖上另外畫 MA7 / 14 / 25 / 99 / 120 / 200，那四條不參與條件。</li>
+<li><b>均線</b>：進場用收盤 SMA{p.ma_period}，以及 SMA25。圖上也畫 MA7、MA14、MA99、MA120，這四條不參與進場條件。</li>
 <li><b>波段高</b>：左右各 {p.swing_lookback} 根裡，最高價唯一最大，才算轉折高。</li>
 <li><b>雙峰</b>：兩峰相隔 {p.min_bars_between}～{p.max_bars_between} 根（含）。兩峰價差 / 均價 ≤ {p.high_tolerance_pct:.0%}。右峰不得高過左峰 × {1 + p.second_high_max_overshoot:.3f}。</li>
 <li><b>局部高點</b>：左峰前 {p.local_high_pad} 根到右峰確認端，區間最高價不得超過兩峰。</li>
@@ -1644,14 +1681,16 @@ def write_embedded_range_html(
         ts = hit.df.index[trade.entry_idx].strftime("%m-%d %H:%M")
         return f"{display_name(hit.row.symbol)} {ts} {trade.exit_reason} {trade.pnl_pct*100:+.2f}%"
 
-    total_cls = "pnl-win" if stats["total_pct"] >= 0 else "pnl-loss"
+    avg_cls = "pnl-win" if stats["avg_pct"] >= 0 else "pnl-loss"
+    med_cls = "pnl-win" if stats["median_pct"] >= 0 else "pnl-loss"
+    title_end = (entry_end - pd.Timedelta(days=1)).strftime("%m-%d")
     start_s = entry_start.strftime("%Y-%m-%d %H:%M")
     end_s = (entry_end - pd.Timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M")
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>幣安 M 頭跌破 MA200 · 2026-10-17～10-30</title>
+<title>幣安 M 頭跌破 MA200 · {entry_start.strftime('%Y-%m-%d')}～{title_end}</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -1692,8 +1731,8 @@ img{{width:100%;height:auto;display:block;border-radius:10px}}
 <div class="cards">
 <div class="card">訊號<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['closed_win_rate']:.1f}%</b></div>
-<div class="card">平均<b class="{total_cls}">{stats['avg_pct']*100:+.2f}%</b></div>
-<div class="card">中位數<b class="{total_cls}">{stats['median_pct']*100:+.2f}%</b></div>
+<div class="card">平均<b class="{avg_cls}">{stats['avg_pct']*100:+.2f}%</b></div>
+<div class="card">中位數<b class="{med_cls}">{stats['median_pct']*100:+.2f}%</b></div>
 </div>
 <div class="equity">{_equity_svg([t.pnl_pct for t in trades])}</div>
 </section>
