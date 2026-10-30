@@ -105,6 +105,8 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 近一個月（2026-09-03 → 10-03 TPE）147 檔：**37 筆、已平勝率 40.5%、平均 −0.20%、加總 −7.32%**（停損 22、時間 10、2R 5）。九月 32 筆 40.6%、−1.54%；十月 5 筆 40.0%、−5.79%。LSK / CLO 沒訊號。
 
+近兩週（2026-10-17 → 10-30 TPE）194 檔：**16 筆、已平勝率 37.5%、平均 −0.69%、中位數 −1.67%、加總 −10.98%**（停損 9、2R 4、時間 3）。最好 DOS +8.84%、最差 Q −9.22%。未扣手續費與稅。LSK / CLO 沒訊號。
+
 在 `examples/binance_15m_short.py` 最上面填 Telegram，或設環境變數 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`。
 
 ```bash
@@ -114,10 +116,12 @@ python3 examples/binance_15m_short.py --watch
 python3 examples/binance_15m_short.py --watch --once
 python3 examples/binance_15m_short.py --days 7 --pages
 python3 examples/binance_15m_short.py --days 30 --html docs/binance-15m-short-30d/index.html
+python3 examples/binance_15m_short.py --days 14 --from-date 2026-10-17 --to-date 2026-10-30 --html docs/binance-15m-short-2w/index.html --embed
 ```
 
 預覽（7 日）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short/view.html  
-預覽（30 日）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short-30d/view.html
+預覽（30 日）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short-30d/view.html  
+預覽（兩週 10-17→10-30）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short-2w/index.html
 
 ## 快速開始
 
