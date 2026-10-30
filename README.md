@@ -95,6 +95,9 @@ python3 examples/test_tw_1h_reclaim.py
 python3 examples/tw_1h_ma60_retest.py --days 3 --range 2mo --pages --html docs/tw-1h-ma60-retest-3d/index.html
 python3 examples/tw_1h_ma60_retest.py --days 7 --range 2mo --pages
 
+# 指定進場窗、單檔內嵌圖
+python3 examples/tw_1h_ma60_retest.py --from-date 2026-10-17 --to-date 2026-10-30 --date 20261030 --range 3mo --embed --html docs/tw-1h-ma60-retest-2w/index.html
+
 # Telegram：只在突破 MA60 後回測均線附近通知（晶心科型，不要右上角追價）
 python3 examples/tw_1h_ma60_retest.py --alert --test
 python3 examples/tw_1h_ma60_retest.py --alert --dry-run --once
@@ -107,6 +110,10 @@ python3 examples/test_tw_1h_ma60_retest.py
 晶心科 2026-09-23 11:00 回測 MA60 **252**（均線 248），之後 2R **+3.53%**；333 漲停是通知之後才走的。右上角追價不再報。
 
 Telegram 憑證放 `tg_config.env`（勿提交）。
+
+近兩週（2026-10-17～10-30，正規盤 09:00–13:30；10/23、10/26 無 K 略過）**20 筆**：勝率 35%、中位數 −1.11%、平均 +0.36%。最好 華邦電 +5.16%，最差 鈞寶 −1.86%。未扣手續費與稅。
+
+兩週自包含 HTML：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-ma60-retest-3376/docs/tw-1h-ma60-retest-2w/index.html
 
 近三天（9/30–10/2）**7 筆**：停損 1、2R 1、未平 5，平均 +0.37%。
 

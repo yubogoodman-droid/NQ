@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from tw_1h_ma60_retest import (  # noqa: E402
     detect_signals,
+    filter_entry_dates,
     filter_entry_window,
     loose_params,
     resolve_pool,
@@ -212,6 +213,15 @@ def test_filter_entry_window() -> None:
     assert filter_entry_window(df, sigs, 0) == list(sigs)
 
 
+def test_filter_entry_dates() -> None:
+    df = andes_shape()
+    sigs = detect_signals(df, loose_params())
+    assert sigs
+    entry_day = df.index[sigs[0].entry_idx].date()
+    assert len(filter_entry_dates(df, sigs, entry_day, entry_day)) == 1
+    assert filter_entry_dates(df, sigs, date(1999, 1, 1), date(1999, 1, 2)) == []
+
+
 def test_summarize_empty() -> None:
     stats = summarize_trades([])
     assert stats["count"] == 0
@@ -235,6 +245,7 @@ def main() -> int:
     test_falling_ma60_still_ok()
     test_simulate_stop_and_target()
     test_filter_entry_window()
+    test_filter_entry_dates()
     test_summarize_empty()
     test_resolve_pool_does_not_refill()
     print("ok")
