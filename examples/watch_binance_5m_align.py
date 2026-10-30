@@ -431,7 +431,31 @@ def telegram_send(text: str, photo: str | None = None) -> bool:
         return False
 
 
-def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4) -> str | None:
+_CJK_FONT_READY = False
+
+
+def _setup_cjk_font() -> None:
+    global _CJK_FONT_READY
+    if _CJK_FONT_READY:
+        return
+    try:
+        import matplotlib.pyplot as plt
+        from matplotlib import font_manager
+    except Exception:
+        return
+    for fp in (
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    ):
+        if Path(fp).exists():
+            font_manager.fontManager.addfont(fp)
+            plt.rcParams["font.sans-serif"] = [font_manager.FontProperties(fname=fp).get_name(), "DejaVu Sans"]
+            plt.rcParams["axes.unicode_minus"] = False
+            _CJK_FONT_READY = True
+            return
+
+
+def draw_chart(sym: str, d: dict, i: int, path, *, ahead: int = 4, exit_i: int | None = None):
     try:
         import matplotlib
 
@@ -441,6 +465,7 @@ def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4) -> str |
     except Exception as e:
         print("chart skip", sym, e, flush=True)
         return None
+    _setup_cjk_font()
     a0 = max(0, i - 80)
     a1 = min(len(d["c"]), i + max(4, ahead))
     sl = slice(a0, a1)
@@ -471,11 +496,19 @@ def draw_chart(sym: str, d: dict, i: int, path: str, *, ahead: int = 4) -> str |
     x = i - a0
     if 0 <= x < len(c):
         ax.axvline(x, color="#3dba7a", ls="--", lw=0.9)
-        ax.scatter([x], [c[x]], s=36, color="#3dba7a", zorder=5)
+        ax.scatter([x], [c[x]], s=36, color="#3dba7a", zorder=5, label="進場")
+    if exit_i is not None:
+        xe = exit_i - a0
+        if 0 <= xe < len(c):
+            ax.axvline(xe, color="#79c0ff", ls="--", lw=0.9)
+            ax.scatter([xe], [c[xe]], s=36, color="#79c0ff", zorder=5, label="60m 出場")
     ax.set_title(f"{sym}  5m align", color="#e8f0ea", fontsize=12)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
     fig.tight_layout(pad=0.5)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    save_kw = {"dpi": 110, "facecolor": fig.get_facecolor()}
+    if hasattr(path, "write"):
+        save_kw["format"] = "png"
+    fig.savefig(path, **save_kw)
     plt.close(fig)
     return path
 
@@ -554,9 +587,10 @@ def notify(ev: dict, *, dry_run: bool = False) -> None:
 
 def scan_history_symbol(sym: str, start_ms: int, end_ms: int) -> tuple[list[dict], dict]:
     meta = {"symbol": sym, "five_new": 0, "fifteen": 0, "hits": 0, "error": ""}
-    raw5 = fetch_klines_range(sym, "5m", start_ms - WARMUP_BARS * MS_5M, end_ms, MS_5M, keep_forming=False)
-    raw15 = fetch_klines_range(sym, "15m", start_ms - WARMUP_BARS * MS_15M, end_ms, MS_15M, keep_forming=True)
-    raw1 = fetch_klines_range(sym, "1h", start_ms - WARMUP_BARS * MS_1H, end_ms, MS_1H, keep_forming=True)
+    fetch_end = end_ms + 24 * MS_5M
+    raw5 = fetch_klines_range(sym, "5m", start_ms - WARMUP_BARS * MS_5M, fetch_end, MS_5M, keep_forming=False)
+    raw15 = fetch_klines_range(sym, "15m", start_ms - WARMUP_BARS * MS_15M, fetch_end, MS_15M, keep_forming=True)
+    raw1 = fetch_klines_range(sym, "1h", start_ms - WARMUP_BARS * MS_1H, fetch_end, MS_1H, keep_forming=True)
     if raw5 is None or raw15 is None or raw1 is None:
         meta["error"] = "too_few_bars"
         return [], meta
@@ -817,12 +851,25 @@ def dump_hits_json(path: Path, hits: list[dict], stats: dict, funnel: dict, peri
     return path
 
 
+def parse_day_ms(text: str, *, end_of_day: bool = False) -> int:
+    dt = datetime.strptime(text.strip(), "%Y-%m-%d").replace(tzinfo=TZ)
+    if end_of_day:
+        dt = dt.replace(hour=23, minute=59, second=59, microsecond=999000)
+    return int(dt.timestamp() * 1000)
+
+
 def cmd_backtest(args) -> int:
-    days = max(1, int(args.days))
     now = datetime.now(TZ)
-    end_ms = int(now.timestamp() * 1000)
-    start_ms = end_ms - days * 24 * 60 * 60 * 1000
-    period = f"{datetime.fromtimestamp(start_ms / 1000, TZ).strftime('%Y-%m-%d %H:%M')} → {now.strftime('%Y-%m-%d %H:%M')} ({days}d)"
+    now_ms = int(now.timestamp() * 1000)
+    if args.start and args.end:
+        start_ms = parse_day_ms(args.start)
+        end_ms = min(parse_day_ms(args.end, end_of_day=True), now_ms)
+        period = f"{datetime.fromtimestamp(start_ms / 1000, TZ).strftime('%Y-%m-%d')} → {datetime.fromtimestamp(end_ms / 1000, TZ).strftime('%Y-%m-%d')}"
+    else:
+        days = max(1, int(args.days))
+        end_ms = now_ms
+        start_ms = end_ms - days * 24 * 60 * 60 * 1000
+        period = f"{datetime.fromtimestamp(start_ms / 1000, TZ).strftime('%Y-%m-%d %H:%M')} → {now.strftime('%Y-%m-%d %H:%M')} ({days}d)"
     if args.symbol:
         symbols = [s.strip().upper() for s in args.symbol]
         print(f"回測指定 {len(symbols)} 個：{', '.join(symbols)}", flush=True)
@@ -875,6 +922,8 @@ def main() -> int:
     p.add_argument("--html", default="", help="回測 HTML 路徑")
     p.add_argument("--chart-limit", type=int, default=30, help="報告圖卡最多幾張")
     p.add_argument("--limit", type=int, default=UNIVERSE_LIMIT, help="只掃 24h 成交額前 N 檔（預設 100）")
+    p.add_argument("--start", default="", help="回測起始日 YYYY-MM-DD（台北）")
+    p.add_argument("--end", default="", help="回測結束日 YYYY-MM-DD（台北，含當日）")
     args = p.parse_args()
     apply_keys()
     if args.test:
