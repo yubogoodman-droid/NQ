@@ -153,7 +153,7 @@ python3 examples/scan_binance_15m_align.py --backtest --days 30 --all --pages --
 
 近 30 日全部永續（2026-09-28 → 10-28，749 檔、幣+股）：**94 筆、勝率 47.9%、+3.34%**。ETH 10/14 16:00 有一筆，這段沒有 BTC。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-30d-all/view.html
 
-2026-10-17 → 10-30（台北，含 10/30 全日；幣安不是台股現股，10/23 照算）全部永續 754 檔：**41 筆全部成交、勝率 56.1%、平均 +0.06%、中位數 +0.05%**。最好 LLY 10/20 19:00 停利 +2.49%，最差 KAVA 10/29 08:15 停損 −0.87%。未扣手續費與稅。`docs/binance/ma200-squeeze-15m-20261017-1030/index.html`
+2026-10-17 → 10-30（台北，含 10/30 全日；幣安不是台股現股，10/23 照算）全部永續 754 檔：**41 筆全部成交、勝率 56.1%、平均 +0.06%、中位數 +0.05%**。最好 LLY 10/20 19:00 停利 +2.49%，最差 KAVA 10/29 08:15 停損 −0.87%。未扣手續費與稅。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/b594aecd9f407fecb709f23b7675b7ffb1688824/docs/binance/ma200-squeeze-15m-20261017-1030/index.html
 
 ## 幣安 15m 黏帶擠壓參數
 
