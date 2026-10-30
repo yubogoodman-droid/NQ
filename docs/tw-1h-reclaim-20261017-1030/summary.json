@@ -1,0 +1,54 @@
+{
+  "stats": {
+    "count": 137,
+    "wins": 24,
+    "win_rate": 17.51824817518248,
+    "total_points": -1892.5500144958496,
+    "total_pct": -5.249914244577191,
+    "avg_pct": -0.03832054193122037,
+    "closed": 119,
+    "open": 18,
+    "closed_win_rate": 18.48739495798319,
+    "closed_avg_pct": -0.03807314015497258,
+    "reasons": {
+      "stop": 78,
+      "time": 35,
+      "target": 6,
+      "open": 18
+    },
+    "fwd_1d": -0.004653982335172132,
+    "fwd_3d": -0.0471622486174418,
+    "fwd_5d": -0.015546516986273838
+  },
+  "extra_stats": {
+    "median_pct": -0.0471976401179941,
+    "best_pct": 0.16216212163147947,
+    "worst_pct": -0.12772925764192145
+  },
+  "funnel": {
+    "cross_below": 1985,
+    "too_short": 1097,
+    "not_16h_low": 100,
+    "wave_ok": 418,
+    "entry": 406,
+    "timeout": 212,
+    "price_cap": 3,
+    "shallow": 158,
+    "weak_bounce": 12
+  },
+  "extra": {
+    "date": "20261030",
+    "window": "2026-10-17..2026-10-30",
+    "skip_dates": [
+      "2026-10-23",
+      "2026-10-26"
+    ],
+    "strict": false,
+    "range": "2mo",
+    "limit": 200,
+    "max_price": 1000.0,
+    "generated": "2026-10-30T22:20:24+08:00",
+    "note": "alerts/backtest only, no orders, no fees"
+  },
+  "n_hits": 137
+}
