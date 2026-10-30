@@ -20,6 +20,7 @@ from niulai_m_top import (  # noqa: E402
     display_name,
     draw_hourly_png,
     filter_entry_window,
+    filter_signals_between,
     fmt_px,
     generate_signals,
     niulai_params,
@@ -258,6 +259,22 @@ def test_one_position_at_a_time() -> None:
         assert b.entry_idx > a.exit_idx
 
 
+def test_filter_signals_between_calendar() -> None:
+    close, marks = _m_top_series()
+    df = _ohlc(close)
+    df.loc[df.index[marks["h1"]], "high"] = 0.1068
+    df.loc[df.index[marks["h2"]], "high"] = 0.1066
+    df.loc[df.index[marks["neck"]], "low"] = 0.1016
+    params = default_params(min_depth_pct=0.015, high_tolerance_pct=0.03)
+    sigs = generate_signals(df, params)
+    assert sigs
+    ts = sigs[-1].timestamp
+    kept = filter_signals_between(sigs, ts, ts + pd.Timedelta(minutes=5))
+    assert sigs[-1] in kept
+    assert filter_signals_between(sigs, ts + pd.Timedelta(days=1), ts + pd.Timedelta(days=2)) == []
+    assert filter_signals_between(sigs, ts - pd.Timedelta(minutes=5), ts) == []
+
+
 def test_filter_entry_window() -> None:
     close = np.linspace(0.10, 0.09, 40)
     df = _ohlc(close)
@@ -429,6 +446,7 @@ def main() -> int:
         test_rejects_higher_high_between_peaks,
         test_simulate_target_and_stop,
         test_one_position_at_a_time,
+        test_filter_signals_between_calendar,
         test_filter_entry_window,
         test_summarize,
         test_rank_usdt_perps_top50,

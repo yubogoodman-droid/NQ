@@ -14,7 +14,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import subprocess
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -552,6 +554,15 @@ def filter_entry_window(df: pd.DataFrame, signals: Sequence[Signal], days: int) 
     return [s for s in signals if s.timestamp >= start]
 
 
+def filter_signals_between(
+    signals: Sequence[Signal],
+    start: pd.Timestamp,
+    end_exclusive: pd.Timestamp,
+) -> list[Signal]:
+    """進場時間落在 [start, end_exclusive)。時區跟 K 線 index 一樣，是 Asia/Shanghai。"""
+    return [s for s in signals if start <= s.timestamp < end_exclusive]
+
+
 def simulate(
     df: pd.DataFrame,
     signals: Sequence[Signal],
@@ -791,7 +802,7 @@ def draw_trade_png(
     if 0 <= ex < len(window):
         ax.axvline(ex, color="#e35d5d", ls="--", lw=0.9)
         ax.scatter([ex], [trade.entry_price], s=52, color="#e35d5d", marker="v", zorder=6)
-        ax.annotate("S", (ex, trade.entry_price), textcoords="offset points", xytext=(8, -10),
+        ax.annotate("進場", (ex, trade.entry_price), textcoords="offset points", xytext=(8, -10),
                     ha="left", color="#ff7b72", fontsize=9)
     if 0 <= xx < len(window):
         ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
@@ -803,6 +814,9 @@ def draw_trade_png(
             marker="x",
             zorder=6,
         )
+        exit_label = "未平" if trade.exit_reason == "open" else "出場"
+        ax.annotate(exit_label, (xx, trade.exit_price), textcoords="offset points", xytext=(8, 8),
+                    ha="left", color="#f0c14b", fontsize=9)
 
     et = df.index[trade.entry_idx]
     xt = df.index[trade.exit_idx]
@@ -1493,6 +1507,277 @@ def run_scan(
     return 0
 
 
+def _png_data_uri(df: pd.DataFrame, trade: TradeResult, trade_no: int, title_extra: str) -> str:
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "trade.png"
+        draw_trade_png(df, trade, path, trade_no, title_extra=title_extra)
+        raw = path.read_bytes()
+    return "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
+
+
+def _distribution(trades: Sequence[TradeResult]) -> dict:
+    stats = summarize_trades(trades)
+    if not trades:
+        stats.update({"median_pct": 0.0, "best": None, "worst": None})
+        return stats
+    pnls = [t.pnl_pct for t in trades]
+    stats["median_pct"] = float(np.median(pnls))
+    stats["best"] = max(trades, key=lambda t: t.pnl_pct)
+    stats["worst"] = min(trades, key=lambda t: t.pnl_pct)
+    return stats
+
+
+def _rules_html(limit: int) -> str:
+    p = niulai_params()
+    return f"""
+<section class="summary">
+<h2>觸發規則（照 examples/niulai_m_top.py）</h2>
+<p class="muted">做空。報酬 = (進場價 − 出場價) / 進場價。未扣手續費、資金費率與稅。同一檔在上一筆出場前不再進場；不同檔可以同時持有。進場窗以外的訊號先拿掉，不佔用這段持倉。</p>
+<ul class="rules">
+<li><b>週期</b>：幣安 U 本位永續 <span class="k">5m</span> 已收盤 K。K 線開盤時間轉成 Asia/Shanghai。</li>
+<li><b>標的</b>：<span class="k">quoteAsset=USDT</span>、<span class="k">status=TRADING</span>、<span class="k">contractType=PERPETUAL</span>，排除 <span class="k">underlyingType=INDEX</span>。依<b>跑回測當下</b>的 24h <span class="k">quoteVolume</span> 取前 {limit}。程式沒有歷史排名，所以不是 10/17 當天的成交額前 {limit}。</li>
+<li><b>均線</b>：進場用收盤 SMA{p.ma_period}，以及 SMA25。圖上另外畫 MA7 / 14 / 25 / 99 / 120 / 200，那四條不參與條件。</li>
+<li><b>波段高</b>：左右各 {p.swing_lookback} 根裡，最高價唯一最大，才算轉折高。</li>
+<li><b>雙峰</b>：兩峰相隔 {p.min_bars_between}～{p.max_bars_between} 根（含）。兩峰價差 / 均價 ≤ {p.high_tolerance_pct:.0%}。右峰不得高過左峰 × {1 + p.second_high_max_overshoot:.3f}。</li>
+<li><b>局部高點</b>：左峰前 {p.local_high_pad} 根到右峰確認端，區間最高價不得超過兩峰。</li>
+<li><b>頸線</b>：兩峰之間（各讓出 {p.swing_lookback} 根）最低的 low，而且離兩峰都超過 2 根。深度 (較高峰 − 頸線) / 較高峰 ≥ {p.min_depth_pct:.0%}。</li>
+<li><b>站在 MA200 上</b>：兩峰那根收盤都 &gt; MA200，而且峰的 high ≥ 該根 MA200 × {1 + p.min_peak_above_ma_pct:.2f}。頸線須落在該根 MA200 的 {p.max_neck_below_ma_pct:.1%} 下到 {p.max_neck_above_ma_pct:.1%} 上。H1 到 H2（含）收盤有 ≥ {p.min_frac_closes_above_ma:.0%} 仍在 MA200 上。</li>
+<li><b>跌破進場</b>：右峰再等 {p.swing_lookback} 根確認後，往後最多 {p.max_bars_to_break} 根。某一根前收 ≥ 前一根 MA200、這根收盤 &lt; 這根 MA200，而且收盤 &lt; MA25。不看跌破當根的量（倍數 {p.min_break_volume_mult:g}）。同一根跌破若配到多個 M，留「深度 + 兩峰對稱」分數較高的那個。</li>
+<li><b>進場價</b>：跌破那根的收盤，依該合約 <span class="k">PRICE_FILTER.tickSize</span> 四捨五入到 tick。</li>
+<li><b>停損</b>：兩峰較高價，同樣四捨五入到 tick。進場後下一根起，若 high ≥ 停損，出場價 = 停損（同一根先看停損、再看停利）。</li>
+<li><b>停利</b>：進場價 − {p.target_r:g} × (停損 − 進場價)，四捨五入到 tick。low ≤ 目標則出場價 = 目標。</li>
+<li><b>時間出場</b>：進場後 {p.time_bars} 根（5 分 K 即 {p.time_bars * 5} 分鐘）都沒碰到停損或停利，用那根收盤出場。資料在第 {p.time_bars} 根之前結束，則停在最後一根已收盤 K，原因記 <span class="k">open</span>（未平）。</li>
+<li><b>這次回測窗</b>：進場時間 2026-10-17 00:00 ≤ t &lt; 2026-10-31 00:00（Asia/Shanghai）。K 線從 2026-10-14 00:00 起抓，讓 MA200 與 M 頭有預熱。只讀公開 K 線，不下單。</li>
+</ul>
+</section>
+"""
+
+
+def scan_symbol_between(
+    row: CoinRow,
+    fetch_start: pd.Timestamp,
+    entry_start: pd.Timestamp,
+    entry_end: pd.Timestamp,
+) -> tuple[list[ScanHit], dict]:
+    meta = {
+        "symbol": row.symbol,
+        "bars": 0,
+        "error": "",
+        "n_trade": 0,
+        "quote_volume": row.quote_volume,
+    }
+    try:
+        df = fetch_klines(row.symbol, start_ms=int(fetch_start.timestamp() * 1000))
+    except Exception as exc:  # noqa: BLE001
+        meta["error"] = str(exc)[:100]
+        return [], meta
+    meta["bars"] = int(len(df))
+    if len(df) < 220:
+        meta["error"] = "too_few_bars"
+        return [], meta
+    params = niulai_params(tick_size=row.tick_size)
+    funnel: Dict[str, int] = {}
+    sigs = generate_signals(df, params, funnel=funnel)
+    sigs = filter_signals_between(sigs, entry_start, entry_end)
+    trades = simulate(df, sigs, params)
+    meta["n_trade"] = len(trades)
+    meta["funnel"] = funnel
+    return [ScanHit(row, t, df) for t in trades], meta
+
+
+def write_embedded_range_html(
+    path: Path,
+    hits: List[ScanHit],
+    universe: List[CoinRow],
+    *,
+    entry_start: pd.Timestamp,
+    entry_end: pd.Timestamp,
+    limit: int,
+) -> Path:
+    trades = [h.trade for h in hits]
+    stats = _distribution(trades)
+    reasons = stats.get("reasons") or {}
+    cards: List[str] = []
+    for i, hit in enumerate(hits, 1):
+        t = hit.trade
+        df = hit.df
+        et = df.index[t.entry_idx]
+        xt = df.index[t.exit_idx]
+        cls = "pnl-win" if t.pnl_pct > 0 else ("pnl-flat" if t.pnl_pct == 0 else "pnl-loss")
+        reason_cls = {"target": "tag-tp", "stop": "tag-sl", "open": "tag-info"}.get(t.exit_reason, "tag-time")
+        label = display_name(hit.row.symbol)
+        uri = _png_data_uri(df, t, i, label)
+        p = t.signal.pattern
+        cards.append(
+            "<article class='trade-card'>"
+            "<header class='card-header'>"
+            f"<div class='card-title'><span class='trade-no'>#{i} · {escape(label)} · 做空</span>"
+            f"<span class='trade-time'>{escape(et.strftime('%Y-%m-%d %H:%M'))} → {escape(xt.strftime('%Y-%m-%d %H:%M'))}</span></div>"
+            f"<div class='card-pnl {cls}'>{t.pnl_pct*100:+.2f}%</div>"
+            "</header>"
+            "<div class='tags'>"
+            f"<span class='tag tag-info'>#{hit.row.rank} {escape(hit.row.symbol)}</span>"
+            f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
+            f"<span class='tag tag-info'>5m</span>"
+            f"<span class='tag tag-info'>深度 {p.depth_pct*100:.1f}%</span>"
+            "</div>"
+            "<pre class='trade-detail'>"
+            f"entry {fmt_px(t.entry_price)}  MA200 {fmt_px(t.signal.ma200)}\n"
+            f"stop  {fmt_px(t.stop_price)}\n"
+            f"target {fmt_px(t.target_price)}  （2R）\n"
+            f"exit  {fmt_px(t.exit_price)}  {t.exit_reason}  {t.pnl_pct*100:+.2f}%\n"
+            f"H1 {df.index[p.first_high_idx].strftime('%m-%d %H:%M')} {fmt_px(p.first_high)}\n"
+            f"H2 {df.index[p.second_high_idx].strftime('%m-%d %H:%M')} {fmt_px(p.second_high)}\n"
+            f"頸線 {df.index[p.neckline_idx].strftime('%m-%d %H:%M')} {fmt_px(p.neckline)}"
+            "</pre>"
+            f"<img alt='{escape(label)}' src='{uri}'/>"
+            "</article>"
+        )
+
+    best = stats.get("best")
+    worst = stats.get("worst")
+
+    def _extreme(trade: Optional[TradeResult], hits_list: List[ScanHit]) -> str:
+        if trade is None:
+            return "—"
+        hit = next(h for h in hits_list if h.trade is trade)
+        ts = hit.df.index[trade.entry_idx].strftime("%m-%d %H:%M")
+        return f"{display_name(hit.row.symbol)} {ts} {trade.exit_reason} {trade.pnl_pct*100:+.2f}%"
+
+    total_cls = "pnl-win" if stats["total_pct"] >= 0 else "pnl-loss"
+    start_s = entry_start.strftime("%Y-%m-%d %H:%M")
+    end_s = (entry_end - pd.Timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M")
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>幣安 M 頭跌破 MA200 · 2026-10-17～10-30</title>
+<style>
+*{{box-sizing:border-box}}
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
+.page{{max-width:720px;margin:0 auto;padding:14px 12px 40px}}
+h1{{font-size:18px;margin:0 0 6px}}
+h2{{font-size:15px;margin:0 0 8px}}
+.muted{{color:#8b949e;font-size:13px;line-height:1.55}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
+.cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
+.card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}}
+.card b{{display:block;font-size:18px;margin-top:4px}}
+.rules{{margin:8px 0 0;padding-left:18px;color:#c9d1d9;font-size:13px;line-height:1.55}}
+.rules li{{margin:6px 0}}
+.k{{font-family:ui-monospace,Menlo,Consolas,monospace}}
+.equity{{margin:10px 0 4px}}
+.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}}
+.card-header{{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}}
+.trade-no{{font-size:15px;font-weight:700}}
+.trade-time{{font-size:12px;color:#8b949e}}
+.card-pnl{{font-size:16px;font-weight:700;white-space:nowrap}}
+.pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}} .pnl-flat{{color:#8b949e}}
+.tags{{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}}
+.tag{{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}}
+.tag-tp{{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}}
+.tag-sl{{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}}
+.tag-time{{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}}
+.tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
+.trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
+img{{width:100%;height:auto;display:block;border-radius:10px}}
+.empty{{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安成交額前 {limit} · 五分 K · M 頭跌破 MA200 做空</h1>
+<p class="muted">進場窗 {escape(start_s)} → {escape(end_s)}（Asia/Shanghai，含 10/17 與 10/30）。宇宙 {len(universe)} 檔。訊號 {stats['count']}。已平倉勝率 {stats['closed_win_rate']:.1f}%（報酬 &gt; 0；未平倉不計入勝率）。平均 {stats['avg_pct']*100:+.2f}%，中位數 {stats['median_pct']*100:+.2f}%。加總 {stats['total_pct']*100:+.2f}% 是各筆相加，不是複利。未扣手續費、資金費率與稅。</p>
+<p class="muted">最好：{escape(_extreme(best, hits))}<br/>最差：{escape(_extreme(worst, hits))}</p>
+<p class="muted">出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
+<div class="cards">
+<div class="card">訊號<b>{stats['count']}</b></div>
+<div class="card">勝率<b>{stats['closed_win_rate']:.1f}%</b></div>
+<div class="card">平均<b class="{total_cls}">{stats['avg_pct']*100:+.2f}%</b></div>
+<div class="card">中位數<b class="{total_cls}">{stats['median_pct']*100:+.2f}%</b></div>
+</div>
+<div class="equity">{_equity_svg([t.pnl_pct for t in trades])}</div>
+</section>
+{_rules_html(limit)}
+{''.join(cards) or "<div class='empty'>這段進場窗沒有 M 頭跌破 MA200 訊號</div>"}
+</div></body></html>
+"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    return path
+
+
+def run_scan_between(
+    entry_start: pd.Timestamp,
+    entry_end: pd.Timestamp,
+    *,
+    limit: int = 100,
+    workers: int = 8,
+    html_path: Optional[Path] = None,
+) -> int:
+    universe = fetch_top_universe(limit)
+    if not universe:
+        print("no universe")
+        return 1
+    fetch_start = entry_start - pd.Timedelta(days=3)
+    print(
+        f"universe {len(universe)}  #{universe[0].rank} {universe[0].symbol} "
+        f"{universe[0].quote_volume/1e6:.0f}M · 末 {universe[-1].symbol} "
+        f"{universe[-1].quote_volume/1e6:.0f}M"
+    )
+    print(f"entries {entry_start} → {entry_end} (exclusive)  fetch from {fetch_start}")
+    hits: list[ScanHit] = []
+    errors = 0
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        futs = {
+            pool.submit(scan_symbol_between, row, fetch_start, entry_start, entry_end): row
+            for row in universe
+        }
+        done = 0
+        for fut in as_completed(futs):
+            row = futs[fut]
+            done += 1
+            try:
+                coin_hits, meta = fut.result()
+            except Exception as exc:  # noqa: BLE001
+                errors += 1
+                print(f"[{done:2d}/{len(universe)}] {row.symbol} FAIL {exc}")
+                continue
+            if meta.get("error"):
+                errors += 1
+            hits.extend(coin_hits)
+            flag = f" trades={meta['n_trade']}" if meta.get("n_trade") else ""
+            err = f" {meta.get('error')}" if meta.get("error") else ""
+            print(f"[{done:2d}/{len(universe)}] {row.symbol} bars={meta.get('bars', 0)}{flag}{err}")
+
+    hits.sort(key=lambda h: h.df.index[h.trade.entry_idx])
+    stats = _distribution([h.trade for h in hits])
+    print(
+        f"done errors={errors} trades={stats['count']} symbols={len({h.row.symbol for h in hits})} "
+        f"WR={stats['closed_win_rate']:.1f}% avg={stats['avg_pct']*100:+.2f}% "
+        f"med={stats['median_pct']*100:+.2f}% sum={stats['total_pct']*100:+.2f}%"
+    )
+    best, worst = stats.get("best"), stats.get("worst")
+    if best is not None and worst is not None:
+        print(f"best {best.pnl_pct*100:+.2f}%  worst {worst.pnl_pct*100:+.2f}%")
+    for i, hit in enumerate(hits, 1):
+        t = hit.trade
+        print(
+            f"  [{i}] {hit.row.symbol} {hit.df.index[t.entry_idx].strftime('%m-%d %H:%M')} "
+            f"{t.exit_reason:6} {t.pnl_pct*100:+.2f}%"
+        )
+    if html_path:
+        write_embedded_range_html(
+            Path(html_path),
+            hits,
+            universe,
+            entry_start=entry_start,
+            entry_end=entry_end,
+            limit=limit,
+        )
+        print(f"html={Path(html_path).resolve()}")
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -1547,12 +1832,35 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--scan", action="store_true", help="掃 USDT 永續成交額前 N 檔")
     p.add_argument("--limit", type=int, default=None, help="scan 檔數；成交額預設 100")
     p.add_argument("--workers", type=int, default=8, help="scan 並行數")
+    p.add_argument("--start", default="", help="進場日起 YYYY-MM-DD（Asia/Shanghai，含當天）；需搭配 --end")
+    p.add_argument("--end", default="", help="進場日迄 YYYY-MM-DD（Asia/Shanghai，含當天）")
     return p
+
+
+def _cst_day(text: str) -> pd.Timestamp:
+    return pd.Timestamp(text, tz=CST)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     html_path = Path(args.html) if args.html else None
+    if args.start or args.end:
+        if not args.scan or not args.start or not args.end:
+            raise SystemExit("--start / --end 要一起用，而且要加 --scan")
+        entry_start = _cst_day(args.start)
+        entry_end = _cst_day(args.end) + pd.Timedelta(days=1)
+        if entry_end <= entry_start:
+            raise SystemExit("--end 必須不早於 --start")
+        if html_path is None and args.pages:
+            tag = f"{args.start.replace('-', '')}-{args.end.replace('-', '')}"
+            html_path = REPO / "docs" / f"binance-m-top-{tag}" / "index.html"
+        return run_scan_between(
+            entry_start,
+            entry_end,
+            limit=100 if args.limit is None else args.limit,
+            workers=args.workers,
+            html_path=html_path,
+        )
     if args.scan:
         return run_scan(
             limit=100 if args.limit is None else args.limit,
