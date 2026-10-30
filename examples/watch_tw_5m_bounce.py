@@ -741,6 +741,27 @@ def draw_signal_png(
     if 0 <= ex < len(window):
         ax.axvline(ex, color="#f87171", ls="--", lw=0.9)
         ax.scatter([ex], [sig.entry_price], s=44, color="#f87171", marker="^", zorder=6)
+        ax.annotate(
+            f"進場 {sig.entry_price:.1f}",
+            (ex, sig.entry_price),
+            textcoords="offset points",
+            xytext=(8, 8),
+            color="#fecaca",
+            fontsize=8,
+        )
+    if trade is not None:
+        xx = trade.exit_idx - start
+        if 0 <= xx < len(window):
+            ax.axvline(xx, color="#38bdf8", ls=":", lw=0.9)
+            ax.scatter([xx], [trade.exit_price], s=44, color="#38bdf8", marker="v", zorder=6)
+            ax.annotate(
+                f"出場 {trade.exit_price:.1f}",
+                (xx, trade.exit_price),
+                textcoords="offset points",
+                xytext=(8, -12),
+                color="#bae6fd",
+                fontsize=8,
+            )
 
     ts = df.index[sig.entry_idx]
     ax.set_title(
