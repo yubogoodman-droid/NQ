@@ -17,8 +17,11 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
+import re
+import statistics
 import subprocess
 import sys
 import time
@@ -308,6 +311,9 @@ def summarize_trades(trades: Sequence[TradeResult]) -> dict:
         "win_rate": 100.0 * wins / n if n else 0.0,
         "total_pct": float(sum(pcts)),
         "avg_pct": float(sum(pcts) / n) if n else 0.0,
+        "median_pct": float(statistics.median(pcts)) if n else 0.0,
+        "best_pct": float(max(pcts)) if n else 0.0,
+        "worst_pct": float(min(pcts)) if n else 0.0,
         "closed": len(closed),
         "open": n - len(closed),
         "closed_win_rate": 100.0 * closed_wins / len(closed) if closed else 0.0,
@@ -316,7 +322,33 @@ def summarize_trades(trades: Sequence[TradeResult]) -> dict:
     }
 
 
-def filter_entry_window(df: pd.DataFrame, signals: Sequence[Signal], days: int) -> List[Signal]:
+def parse_tpe_day(text: str, *, end_exclusive: bool = False) -> Optional[pd.Timestamp]:
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    ts = pd.Timestamp(datetime.strptime(raw, "%Y-%m-%d"), tz=TPE)
+    if end_exclusive:
+        return ts + pd.Timedelta(days=1)
+    return ts
+
+
+def filter_entry_window(
+    df: pd.DataFrame,
+    signals: Sequence[Signal],
+    days: int,
+    start_ts: Optional[pd.Timestamp] = None,
+    end_ts: Optional[pd.Timestamp] = None,
+) -> List[Signal]:
+    if start_ts is not None or end_ts is not None:
+        kept: List[Signal] = []
+        for s in signals:
+            ts = df.index[s.entry_idx]
+            if start_ts is not None and ts < start_ts:
+                continue
+            if end_ts is not None and ts >= end_ts:
+                continue
+            kept.append(s)
+        return kept
     if not len(df) or days <= 0:
         return list(signals)
     end = df.index[-1]
@@ -940,6 +972,8 @@ def scan_symbol(
     min_1h_ma99_room: float = MIN_1H_MA99_ROOM,
     min_1h_support_near: float = MIN_1H_SUPPORT_NEAR,
     min_1h_support_count: int = MIN_1H_SUPPORT_COUNT,
+    start_ts: Optional[pd.Timestamp] = None,
+    end_ts: Optional[pd.Timestamp] = None,
 ) -> tuple[List[Hit], dict]:
     meta = {"symbol": sym, "bars": 0, "error": "", "n_sig": 0, "n_trade": 0}
     try:
@@ -956,7 +990,7 @@ def scan_symbol(
     if funnel is not None:
         for k, v in local.items():
             funnel[k] = funnel.get(k, 0) + v
-    sigs = filter_entry_window(df, sigs, days)
+    sigs = filter_entry_window(df, sigs, days, start_ts=start_ts, end_ts=end_ts)
     if min_15m_ma_spread > 0:
         sigs = filter_untangled_15m_mas(sigs, min_spread=min_15m_ma_spread, funnel=funnel)
     if min_15m_ma200_open > 0:
@@ -1172,6 +1206,23 @@ def _git_branch() -> str:
         return "main"
 
 
+def embed_html_images(src: Path) -> Path:
+    """把 img/ 相對路徑改成 data URI，讓 HTML 單檔可開。"""
+    src = src.expanduser().resolve()
+    text = src.read_text(encoding="utf-8")
+
+    def _repl(match: re.Match[str]) -> str:
+        rel = match.group(1)
+        fp = src.parent / rel
+        if not fp.is_file():
+            return match.group(0)
+        b64 = base64.standard_b64encode(fp.read_bytes()).decode("ascii")
+        return f"src='data:image/png;base64,{b64}'"
+
+    src.write_text(re.sub(r"src='(img/[^']+)'", _repl, text), encoding="utf-8")
+    return src
+
+
 def write_view_html(src: Path) -> Path:
     src = src.expanduser()
     if not src.is_absolute():
@@ -1346,6 +1397,9 @@ def write_html(
     reasons = stats.get("reasons") or {}
     total_cls = "pnl-win" if stats["total_pct"] >= 0 else "pnl-loss"
     avg_cls = "pnl-win" if stats["avg_pct"] >= 0 else "pnl-loss"
+    med_cls = "pnl-win" if stats.get("median_pct", 0) >= 0 else "pnl-loss"
+    best_cls = "pnl-win" if stats.get("best_pct", 0) >= 0 else "pnl-loss"
+    worst_cls = "pnl-win" if stats.get("worst_pct", 0) >= 0 else "pnl-loss"
     feat_line = (
         f"{featured} {len(featured_hits)} 筆"
         if featured_hits
@@ -1406,8 +1460,14 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <h1>幣安 15m · 7/14/25/99 空頭排列跌破 MA200 做空</h1>
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
 <br/>進場：收盤 <b>MA7&lt;MA14&lt;MA25&lt;MA99</b>，上一根還沒低於 MA200、這一根紅 K 收盤跌破 <b>MA200</b>，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 <b>15m 的 MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_15m_ma_spread*100:.1f}%，ZEN/XMR 那種中均黏成麵條不空），且進場 K 若還在 <b>15m MA200 上方</b>則開盤須高於 200 至少 <b>{min_15m_ma200_open*100:.0f}%</b>（貼著 200 沒肉不空；已跌破 200 仍可）{attack_clause}{sit_clause}{support_clause}，且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破 MA200 的 0.3%。訊號以<b>收盤確認</b>，下一根才決定進不進；均線距離只看這根收盤，不偷看後面。
-<br/>出場：停在跌破 K 高點與 <b>MA200</b> 的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費。
+<br/>出場：停在跌破 K 高點與 <b>MA200</b> 的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費與稅。
 <br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120/200）。卡片 <b>虧損在前</b>（虧最多先看），賺錢的按進場時間。股票／ETF 永續預設不掃。</p>
+<ol class="muted" style="padding-left:18px;margin:8px 0 0">
+<li>週期：幣安 U 永續 <b>15m</b> 訊號；<b>1h</b> 只做過濾。均線皆為收盤 SMA。</li>
+<li>標的：USDT、TRADING、永續／TradFi 永續、非指數、非股票／ETF，24h 成交額 ≥ 1000 萬；CLOUSDT 固定納入。</li>
+<li>進場（當根收盤確認，進場價＝該根收盤）：MA7&lt;14&lt;25&lt;99，上一根還沒收在 MA200 下、這一根紅 K 收盤跌破 MA200 至少 0.3%，實體 ≥ 0.8%，量 ≥ 1.5×量 SMA20。</li>
+<li>停損＝max(訊號 K 高點, MA200)，風險須在 0.5%–18%；停利＝進場 − 2×風險。從<b>下一根</b>起算，同一根先停損再停利；最多 32 根（8 小時）用該根收盤時間停。同標的同時只一筆。</li>
+</ol>
 <p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 7&lt;14&lt;25&lt;99 {fun.get('stack', 0)} → 跌破MA200 {fun.get('cross', 0)}
 → 紅 K {fun.get('red', 0)} → 進場 {fun.get('entry', 0)}
 · 太淺 {fun.get('shallow', 0)} · 實體不夠 {fun.get('thin', 0)} · 量不夠 {fun.get('quiet', 0)}
@@ -1419,6 +1479,9 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">已平勝率<b>{stats['closed_win_rate']:.1f}%</b></div>
 <div class="card">平均<b class="{avg_cls}">{stats['avg_pct']*100:+.2f}%</b></div>
+<div class="card">中位數<b class="{med_cls}">{stats.get('median_pct', 0)*100:+.2f}%</b></div>
+<div class="card">最好<b class="{best_cls}">{stats.get('best_pct', 0)*100:+.2f}%</b></div>
+<div class="card">最差<b class="{worst_cls}">{stats.get('worst_pct', 0)*100:+.2f}%</b></div>
 <div class="card">加總<b class="{total_cls}">{stats['total_pct']*100:+.2f}%</b></div>
 </div>
 <div class="equity">{_equity_svg([h.trade.pnl_pct * 100 for h in hits])}</div>
@@ -1682,7 +1745,9 @@ def cmd_watch(args) -> int:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description="幣安 15m 7/14/25/99 空頭排列跌破 MA200 做空回測／通知")
     p.add_argument("--symbol", default="", help="單一標的，例如 CLOUSDT；空白則掃流動永續")
-    p.add_argument("--days", type=int, default=7, help="只統計進場落在最近 N 日")
+    p.add_argument("--days", type=int, default=7, help="只統計進場落在最近 N 日（有 --from-date 時改為日曆窗）")
+    p.add_argument("--from-date", default="", help="進場起始日 YYYY-MM-DD（台北，含當天）")
+    p.add_argument("--to-date", default="", help="進場結束日 YYYY-MM-DD（台北，含當天）")
     p.add_argument("--min-quote-vol", type=float, default=10_000_000)
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--loose", action="store_true", help="不做實體/量能過濾，只看均線排列與跌破")
@@ -1750,6 +1815,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     p.add_argument("--pages", action="store_true")
     p.add_argument("--html", default="")
+    p.add_argument("--embed", action="store_true", help="HTML 把圖內嵌成 data URI，單檔可開")
     p.add_argument("--json", dest="json_path", default="")
     p.add_argument("--max-charts", type=int, default=80)
     p.add_argument("--watch", action="store_true", help="每根 15m 收盤掃一次，符合就推 Telegram")
@@ -1759,6 +1825,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.watch or args.test:
         return cmd_watch(args)
 
+    start_ts = parse_tpe_day(args.from_date)
+    end_ts = parse_tpe_day(args.to_date, end_exclusive=True)
+    if start_ts is not None:
+        span = int((pd.Timestamp.now(tz=TPE) - start_ts) / pd.Timedelta(days=1)) + 2
+        args.days = max(int(args.days), max(1, span))
+
     params = default_params()
     if args.loose:
         params = default_params(min_body_pct=0.0, min_vol_ratio=0.0, min_break_pct=0.002, min_risk_pct=0.004)
@@ -1767,8 +1839,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     else:
         print("載入標的…", flush=True)
         symbols = universe(args.min_quote_vol, include_stocks=args.include_stocks)
+    window = ""
+    if start_ts is not None or end_ts is not None:
+        a = start_ts.strftime("%Y-%m-%d") if start_ts is not None else "…"
+        b = (end_ts - pd.Timedelta(days=1)).strftime("%Y-%m-%d") if end_ts is not None else "…"
+        window = f" window={a}→{b}"
     print(
-        f"symbols={len(symbols)} days={args.days} interval=15m loose={args.loose} "
+        f"symbols={len(symbols)} days={args.days}{window} interval=15m loose={args.loose} "
         f"stocks={'on' if args.include_stocks else 'off'} "
         f"h1_ma25={'off' if args.no_1h_ma25 else 'on'} "
         f"h1_ma200={'off' if args.no_1h_ma200 else 'on'} "
@@ -1808,6 +1885,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             min_1h_ma99_room=float(args.min_1h_ma99_room),
             min_1h_support_near=float(args.min_1h_support_near),
             min_1h_support_count=int(args.min_1h_support_count),
+            start_ts=start_ts,
+            end_ts=end_ts,
         )
         return stock_hits, meta, local
 
@@ -1867,6 +1946,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "min_1h_ma99_room": float(args.min_1h_ma99_room),
         "min_1h_support_near": float(args.min_1h_support_near),
         "min_1h_support_count": int(args.min_1h_support_count),
+        "from_date": args.from_date,
+        "to_date": args.to_date,
     }
     html_path = Path(args.html) if args.html else None
     if html_path is not None and not html_path.is_absolute():
@@ -1874,7 +1955,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if html_path is None and args.pages:
         html_path = PAGES
     if html_path:
-        label = f"{args.days}d · 幣安 U 永續 15m"
+        if start_ts is not None or end_ts is not None:
+            a = start_ts.strftime("%Y-%m-%d") if start_ts is not None else "…"
+            b = (end_ts - pd.Timedelta(days=1)).strftime("%Y-%m-%d") if end_ts is not None else "…"
+            label = f"{a} → {b} TPE · 幣安 U 永續 15m"
+        else:
+            label = f"{args.days}d · 幣安 U 永續 15m"
         if args.symbol:
             label += f" · {args.symbol.upper()}"
         if args.loose:
@@ -1921,7 +2007,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             min_1h_support_near=float(args.min_1h_support_near),
             min_1h_support_count=int(args.min_1h_support_count),
         )
-        write_view_html(out)
+        if args.embed:
+            embed_html_images(out)
+        else:
+            write_view_html(out)
         print(f"html={out}", flush=True)
     json_path = Path(args.json_path) if args.json_path else None
     if json_path is None and html_path:

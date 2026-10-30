@@ -22,6 +22,7 @@ from binance_15m_short import (  # noqa: E402
     detect_signals,
     filter_below_1h_ma25,
     filter_entry_window,
+    parse_tpe_day,
     filter_near_1h_ma99,
     filter_untangled_1h_mas,
     filter_untangled_15m_mas,
@@ -258,6 +259,14 @@ def test_filter_entry_window() -> None:
     assert len(all_) == len(sigs)
     empty = filter_entry_window(df, sigs, days=0)
     assert len(empty) == len(sigs)
+    ts = df.index[sigs[0].entry_idx]
+    day = ts.strftime("%Y-%m-%d")
+    start = parse_tpe_day(day)
+    end = parse_tpe_day(day, end_exclusive=True)
+    hit = filter_entry_window(df, sigs, days=30, start_ts=start, end_ts=end)
+    assert any(df.index[s.entry_idx].strftime("%Y-%m-%d") == day for s in hit)
+    miss = filter_entry_window(df, sigs, days=30, start_ts=end, end_ts=None)
+    assert all(df.index[s.entry_idx] >= end for s in miss)
 
 
 def test_volume_and_body_filters() -> None:
