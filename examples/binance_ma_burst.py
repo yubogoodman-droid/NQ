@@ -349,10 +349,10 @@ def horizon_stats(rows: list[dict], key: str, bars: int) -> dict:
     }
 
 
-def fmt_pct(x: float | None) -> str:
+def fmt_pct(x: float | None, digits: int = 1) -> str:
     if x is None:
         return "—"
-    return f"{x * 100:+.1f}%"
+    return f"{x * 100:+.{digits}f}%"
 
 
 def fmt_vol(x: float) -> str:
@@ -615,7 +615,7 @@ def _stat_cell(stats: dict, start_label: str) -> str:
 
     def who(row: dict) -> str:
         ts = datetime.fromtimestamp(row["time"] / 1000, TZ).strftime("%m-%d %H:%M")
-        return f"{row['symbol']} {ts} {fmt_pct(row[key]['ret'])}"
+        return f"{row['symbol']} {ts} {fmt_pct(row[key]['ret'], 2)}"
 
     return (
         "<tr>"
@@ -623,8 +623,8 @@ def _stat_cell(stats: dict, start_label: str) -> str:
         f"<td>{stats['n']}</td>"
         f"<td>{stats['incomplete']}</td>"
         f"<td>{stats['win'] * 100:.1f}%</td>"
-        f"<td>{fmt_pct(stats['mean'])}</td>"
-        f"<td>{fmt_pct(stats['median'])}</td>"
+        f"<td>{fmt_pct(stats['mean'], 2)}</td>"
+        f"<td>{fmt_pct(stats['median'], 2)}</td>"
         f"<td>{who(best)}</td>"
         f"<td>{who(worst)}</td>"
         "</tr>"
@@ -757,11 +757,11 @@ def print_stats(label: str, stats: dict) -> None:
 
     def who(row: dict) -> str:
         ts = datetime.fromtimestamp(row["time"] / 1000, TZ).strftime("%m-%d %H:%M")
-        return f"{row['symbol']} {ts} {fmt_pct(row[key]['ret'])}"
+        return f"{row['symbol']} {ts} {fmt_pct(row[key]['ret'], 2)}"
 
     print(
         f"{label} 走完 {stats['n']}  未走完 {stats['incomplete']}  "
-        f"勝率 {stats['win'] * 100:.1f}%  平均 {fmt_pct(stats['mean'])}  中位數 {fmt_pct(stats['median'])}  "
+        f"勝率 {stats['win'] * 100:.1f}%  平均 {fmt_pct(stats['mean'], 2)}  中位數 {fmt_pct(stats['median'], 2)}  "
         f"最好 {who(best)}  最差 {who(worst)}"
     )
 

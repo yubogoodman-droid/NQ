@@ -119,6 +119,8 @@ AINUSDT 永續、2026-08-02 → 10-04：**2026-10-03 22:00**（台北）。開 0
 
 近三天、收在小時 MA200 上的清單（每張上面是 15 分，下面是小時 K）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/ain-15m-ma-burst-e874/docs/ma-burst-3d/index.html
 
+2026-10-17 → 10-30 回測（未扣手續費與稅，固定 1 小時 / 4 小時出場）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/ain-15m-ma-burst-e874/docs/ma-burst-2w/index.html
+
 ## 快速開始
 
 ```bash
