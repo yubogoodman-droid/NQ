@@ -18,11 +18,14 @@ from binance_ma_burst import (  # noqa: E402
     above_hour_ma200,
     burst_at,
     find_bursts,
+    horizon_stats,
     hour_ma200_for_bars,
     hour_view,
+    klines_to_arrays,
     path_after,
     signal_hour_index,
     sma,
+    taipei_day_range,
 )
 
 
@@ -151,6 +154,41 @@ def test_signal_hour_index_marks_the_hour_that_holds_the_bar() -> None:
     assert hour_view(np.array([], dtype=np.int64), 0) is None
 
 
+def test_taipei_day_range_includes_both_dates() -> None:
+    start, end = taipei_day_range("2026-10-17", "2026-10-30")
+    assert end - start == 14 * 24 * 60 * 60 * 1000
+
+
+def test_horizon_stats_skips_incomplete_and_zero_is_not_a_win() -> None:
+    rows = [
+        {"symbol": "A", "time": 0, "after_1h": {"bars": 4, "ret": 0.1}},
+        {"symbol": "B", "time": 1, "after_1h": {"bars": 4, "ret": 0.0}},
+        {"symbol": "C", "time": 2, "after_1h": {"bars": 4, "ret": -0.2}},
+        {"symbol": "D", "time": 3, "after_1h": {"bars": 2, "ret": 0.5}},
+        {"symbol": "E", "time": 4, "after_1h": None},
+    ]
+    got = horizon_stats(rows, "after_1h", 4)
+    assert got["n"] == 3 and got["incomplete"] == 2
+    assert abs(got["win"] - (1 / 3)) < 1e-9
+    assert abs(got["mean"] - ((0.1 - 0.2) / 3)) < 1e-9
+    assert got["median"] == 0.0
+    assert got["best"]["symbol"] == "A" and got["worst"]["symbol"] == "C"
+    assert horizon_stats([], "after_4h", 16)["n"] == 0
+
+
+def test_klines_to_arrays_drops_duplicate_opens() -> None:
+    raw = [
+        [200, "2", "3", "1", "2.5", "8"],
+        [100, "1", "2", "0.5", "1.5", "4"],
+        [100, "9", "9", "9", "9", "9"],
+    ]
+    got = klines_to_arrays(raw)
+    assert got is not None
+    assert list(got["t"]) == [100, 200]
+    assert got["c"][0] == 9.0 and got["v"][1] == 8.0
+    assert klines_to_arrays([]) is None
+
+
 def test_needs_warmup() -> None:
     o, c, v = flat(n=30)
     i = len(c) - 1
@@ -170,6 +208,9 @@ def main() -> int:
     test_path_after()
     test_hour_ma200_uses_last_closed_hour()
     test_signal_hour_index_marks_the_hour_that_holds_the_bar()
+    test_taipei_day_range_includes_both_dates()
+    test_horizon_stats_skips_incomplete_and_zero_is_not_a_win()
+    test_klines_to_arrays_drops_duplicate_opens()
     test_needs_warmup()
     print("ok")
     return 0

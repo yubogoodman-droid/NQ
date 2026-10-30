@@ -138,6 +138,23 @@ def get_json(path: str, params=None, retries: int = 5):
     raise last
 
 
+def klines_to_arrays(raw: list) -> dict | None:
+    if not raw:
+        return None
+    by_t: dict[int, list] = {}
+    for x in raw:
+        by_t[int(x[0])] = x
+    ordered = [by_t[t] for t in sorted(by_t)]
+    return {
+        "t": np.array([int(x[0]) for x in ordered], np.int64),
+        "o": np.array([float(x[1]) for x in ordered]),
+        "h": np.array([float(x[2]) for x in ordered]),
+        "l": np.array([float(x[3]) for x in ordered]),
+        "c": np.array([float(x[4]) for x in ordered]),
+        "v": np.array([float(x[5]) for x in ordered]),
+    }
+
+
 def fetch_klines(sym: str, limit: int = 1500, interval: str = "15m", bar_ms: int = INTERVAL_MS, min_bars: int | None = None) -> dict | None:
     raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": interval, "limit": limit})
     need = max(MA_PERIODS) + 1 if min_bars is None else min_bars
@@ -148,14 +165,44 @@ def fetch_klines(sym: str, limit: int = 1500, interval: str = "15m", bar_ms: int
         raw = raw[:-1]
     if len(raw) < need:
         return None
-    return {
-        "t": np.array([int(x[0]) for x in raw], np.int64),
-        "o": np.array([float(x[1]) for x in raw]),
-        "h": np.array([float(x[2]) for x in raw]),
-        "l": np.array([float(x[3]) for x in raw]),
-        "c": np.array([float(x[4]) for x in raw]),
-        "v": np.array([float(x[5]) for x in raw]),
-    }
+    return klines_to_arrays(raw)
+
+
+def fetch_klines_range(sym: str, start_ms: int, end_ms: int, interval: str, bar_ms: int) -> dict | None:
+    """分頁抓 [start_ms, end_ms)。單次最多 1500 根，所以兩週加均線暖機要接起來。未收盤的一根丟掉。"""
+    now_ms = int(time.time() * 1000)
+    end_ms = min(int(end_ms), now_ms)
+    cursor = int(start_ms)
+    raw: list = []
+    while cursor < end_ms:
+        page = get_json(
+            "/fapi/v1/klines",
+            params={"symbol": sym, "interval": interval, "startTime": cursor, "endTime": end_ms, "limit": 1500},
+        )
+        if not page:
+            break
+        if int(page[-1][0]) + bar_ms > now_ms:
+            page = page[:-1]
+        page = [x for x in page if cursor <= int(x[0]) < end_ms and int(x[0]) + bar_ms <= now_ms]
+        if not page:
+            break
+        raw.extend(page)
+        nxt = int(page[-1][0]) + bar_ms
+        if nxt <= cursor:
+            break
+        cursor = nxt
+        if len(page) < 1500:
+            break
+    return klines_to_arrays(raw)
+
+
+def taipei_day_range(start_date: str, end_date: str) -> tuple[int, int]:
+    """台北日期，含起日、含迄日。回傳 [start, end) 毫秒。"""
+    start = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=TZ)
+    end = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=TZ) + timedelta(days=1)
+    if end <= start:
+        raise ValueError(f"日期顛倒：{start_date} → {end_date}")
+    return int(start.timestamp() * 1000), int(end.timestamp() * 1000)
 
 
 def path_after(d: dict, i: int, bars: int) -> dict | None:
@@ -234,6 +281,72 @@ def scan_since(symbols: list[str], since_ms: int, limit: int = 500) -> list[dict
                 print("err", e, flush=True)
     rows.sort(key=lambda r: (r["time"], r["symbol"]))
     return rows
+
+
+def scan_between(symbols: list[str], start_ms: int, end_ms: int) -> list[dict]:
+    """同一套條件，只留開盤時間在 [start_ms, end_ms) 的 15 分 K。暖機多抓 220 根，避免窗起點 MA200 還沒有值。"""
+    rows = []
+    fetch_from_15 = start_ms - 220 * INTERVAL_MS
+    fetch_from_h = start_ms - 220 * HOUR_MS
+    done = 0
+
+    def one(sym: str) -> list[dict]:
+        d = fetch_klines_range(sym, fetch_from_15, end_ms, "15m", INTERVAL_MS)
+        h1 = fetch_klines_range(sym, fetch_from_h, end_ms, "1h", HOUR_MS)
+        if d is None or h1 is None or len(d["c"]) < max(MA_PERIODS) + 1 or len(h1["c"]) < H1_MA:
+            return []
+        d["h1_ma200"] = hour_ma200_for_bars(d["t"], h1["t"], h1["c"])
+        found = []
+        for hit in find_bursts(d["o"], d["c"], d["v"]):
+            ts = int(d["t"][hit["i"]])
+            if ts < start_ms or ts >= end_ms:
+                continue
+            h1_ma = float(d["h1_ma200"][hit["i"]])
+            if not above_hour_ma200(hit["close"], h1_ma):
+                continue
+            hit = dict(hit)
+            hit["h1_ma200"] = h1_ma
+            hit["symbol"] = sym
+            hit["time"] = ts
+            hit["after_1h"] = path_after(d, hit["i"], 4)
+            hit["after_4h"] = path_after(d, hit["i"], 16)
+            hit["d"] = d
+            hit["h1"] = h1
+            found.append(hit)
+        return found
+
+    with ThreadPoolExecutor(8) as ex:
+        futs = [ex.submit(one, sym) for sym in symbols]
+        for fut in as_completed(futs):
+            done += 1
+            if done % 40 == 0 or done == len(symbols):
+                print(f"  {done}/{len(symbols)}", flush=True)
+            try:
+                rows.extend(fut.result())
+            except Exception as e:
+                print("err", e, flush=True)
+    rows.sort(key=lambda r: (r["time"], r["symbol"]))
+    return rows
+
+
+def horizon_stats(rows: list[dict], key: str, bars: int) -> dict:
+    """固定根數走完的前瞻報酬。報酬剛好是 0 不算勝。未走完的不進平均。"""
+    done = [r for r in rows if r.get(key) is not None and r[key]["bars"] >= bars]
+    incomplete = len(rows) - len(done)
+    if not done:
+        return {"n": 0, "incomplete": incomplete, "win": None, "mean": None, "median": None, "best": None, "worst": None}
+    rets = np.array([r[key]["ret"] for r in done], dtype=float)
+    best = max(done, key=lambda r: r[key]["ret"])
+    worst = min(done, key=lambda r: r[key]["ret"])
+    return {
+        "n": len(done),
+        "incomplete": incomplete,
+        "win": float(np.mean(rets > 0)),
+        "mean": float(rets.mean()),
+        "median": float(np.median(rets)),
+        "best": best,
+        "worst": worst,
+    }
 
 
 def fmt_pct(x: float | None) -> str:
@@ -353,7 +466,17 @@ def draw_burst(row: dict, path: str) -> str:
         ax.plot(xs, h1_line[sl], color="#ff6b9a", lw=1.15, ls="--", label="1h MA200")
     x = i - a0
     ax.axvline(x, color="#f0c14a", ls="--", lw=0.9)
-    ax.scatter([x], [c[x]], s=28, color="#f0c14a", zorder=5)
+    ax.scatter([x], [c[x]], s=28, color="#f0c14a", zorder=6)
+    ax.annotate("進", (x, c[x]), textcoords="offset points", xytext=(3, 6), color="#f0c14a", fontsize=8)
+    for bars, text, color in ((4, "1h", "#7ec8ff"), (16, "4h", "#ffffff")):
+        j = i + bars
+        if j < a0 or j >= a1 or j >= len(d["c"]):
+            continue
+        after = row.get("after_1h" if bars == 4 else "after_4h")
+        if after is None or after["bars"] < bars:
+            continue
+        ax.scatter([j - a0], [d["c"][j]], s=26, marker="s", color=color, zorder=6)
+        ax.annotate(text, (j - a0, d["c"][j]), textcoords="offset points", xytext=(3, 6), color=color, fontsize=8)
     ts = datetime.fromtimestamp(row["time"] / 1000, TZ).strftime("%m-%d %H:%M")
     a1r, a4 = row.get("after_1h"), row.get("after_4h")
     ax.set_title(
@@ -484,6 +607,165 @@ def write_gallery_html(rows: list[dict], paths: list[str], dest: str, *, since_l
     return str(out)
 
 
+def _stat_cell(stats: dict, start_label: str) -> str:
+    if stats["n"] == 0:
+        return f"<tr><td>{start_label}</td><td colspan=\"6\">走完 0 筆（未走完 {stats['incomplete']}）</td></tr>"
+    best, worst = stats["best"], stats["worst"]
+    key = "after_1h" if "1 小時" in start_label else "after_4h"
+
+    def who(row: dict) -> str:
+        ts = datetime.fromtimestamp(row["time"] / 1000, TZ).strftime("%m-%d %H:%M")
+        return f"{row['symbol']} {ts} {fmt_pct(row[key]['ret'])}"
+
+    return (
+        "<tr>"
+        f"<td>{start_label}</td>"
+        f"<td>{stats['n']}</td>"
+        f"<td>{stats['incomplete']}</td>"
+        f"<td>{stats['win'] * 100:.1f}%</td>"
+        f"<td>{fmt_pct(stats['mean'])}</td>"
+        f"<td>{fmt_pct(stats['median'])}</td>"
+        f"<td>{who(best)}</td>"
+        f"<td>{who(worst)}</td>"
+        "</tr>"
+    )
+
+
+def write_backtest_html(
+    rows: list[dict],
+    paths: list[str],
+    dest: str,
+    *,
+    start_label: str,
+    end_label: str,
+    scanned: int,
+    stats_1h: dict,
+    stats_4h: dict,
+) -> str:
+    """兩週回測單頁：規則、固定時間出場統計、每根訊號的圖。圖片內嵌。"""
+    import base64
+    from pathlib import Path
+
+    def cls(x: float | None) -> str:
+        if x is None:
+            return ""
+        return "up" if x >= 0 else "dn"
+
+    periods = "、".join(str(n) for n in MA_PERIODS)
+    cards = []
+    for row, path in zip(rows, paths):
+        ts = datetime.fromtimestamp(row["time"] / 1000, TZ).strftime("%m-%d %H:%M")
+        a1, a4 = row.get("after_1h"), row.get("after_4h")
+        b64 = base64.b64encode(Path(path).read_bytes()).decode()
+        cards.append(
+            "\n".join(
+                [
+                    '<article class="card">',
+                    '  <div class="head">',
+                    "    <div>",
+                    f'      <div class="sym">{row["symbol"]}</div>',
+                    f'      <div class="when">{ts} 台北 · 進場 {row["close"]:.6g}</div>',
+                    "    </div>",
+                    '    <div class="nums">',
+                    f'      <span>實體 <b class="{cls(row["body"])}">{row["body"] * 100:+.1f}%</b></span>',
+                    f'      <span>量 <b>{row["vol_ratio"]:.1f}×</b></span>',
+                    f'      <span>1h <b class="{cls(None if a1 is None else a1["ret"])}">{fmt_span(a1, 4)}</b></span>',
+                    f'      <span>4h <b class="{cls(None if a4 is None else a4["ret"])}">{fmt_span(a4, 16)}</b></span>',
+                    "    </div>",
+                    "  </div>",
+                    f'  <img alt="{row["symbol"]} {ts} 進場與 1h、4h 出場" src="data:image/png;base64,{b64}" />',
+                    "</article>",
+                ]
+            )
+        )
+    body_cards = "\n".join(cards) if cards else '<p class="sub">這段沒有訊號。</p>'
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>15 分爆量穿六均線 · {start_label}–{end_label}</title>
+<style>
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; background: #0b0e11; color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+  }}
+  .page {{ max-width: 920px; margin: 0 auto; padding: 16px 12px 40px; }}
+  h1 {{ margin: 0 0 8px; font-size: 22px; }}
+  h2 {{ margin: 22px 0 8px; font-size: 16px; }}
+  .sub {{ margin: 0 0 12px; color: #8b949e; font-size: 14px; line-height: 1.55; }}
+  ol {{ margin: 0 0 12px; padding-left: 1.2em; color: #c9d1d9; font-size: 14px; line-height: 1.55; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 13px; margin: 0 0 8px; }}
+  th, td {{ border-bottom: 1px solid #30363d; padding: 6px 4px; text-align: left; vertical-align: top; }}
+  th {{ color: #8b949e; font-weight: 600; }}
+  .card {{ background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 12px; margin-bottom: 14px; }}
+  .head {{ display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }}
+  .sym {{ font-size: 18px; font-weight: 700; }}
+  .when {{ color: #8b949e; font-size: 13px; margin-top: 2px; }}
+  .nums {{ display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 13px; color: #8b949e; align-items: center; }}
+  .nums b {{ font-weight: 650; }}
+  .up {{ color: #3dba7a; }}
+  .dn {{ color: #e35d5d; }}
+  img {{ width: 100%; height: auto; border-radius: 8px; display: block; background: #0c1210; }}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>15 分爆量穿六均線 · {start_label}–{end_label}</h1>
+  <p class="sub">幣安 U 本位永續，只讀公開 K 線，沒有下單。未扣手續費與稅。程式沒有停損、沒有停利。</p>
+  <h2>觸發規則</h2>
+  <ol>
+    <li>週期：15 分 K，只算已經收盤的。還在走的最後一根丟掉。時間用台北（UTC+8）。幣安全天交易，沒有台股 09:00–13:30 的盤別。</li>
+    <li>區間：15 分 K 的開盤時間在 {start_label} 00:00 到 {end_label} 23:45（台北），含這兩天。</li>
+    <li>標的：quoteAsset 是 USDT、status 是 TRADING、contractType 是 PERPETUAL 或 TRADIFI_PERPETUAL、underlyingType 不是 INDEX，而且跑這次回測當下的 24 小時 quoteVolume ≥ 5,000,000。這是當下清單，不是每一天的歷史成交額。這次 {scanned} 檔。</li>
+    <li>陽線：這根 close &gt; open。</li>
+    <li>一次突破：開盤 ≤ SMA(收盤, {periods}) 的每一條，收盤 &gt; 每一條。SMA 要滿那一期才有值，不滿的不算。</li>
+    <li>爆量：這根成交量 ≥ 前一根的 {VOL_MULT:g} 倍。前一根 ≤ 0 直接不算。量是 K 線的基礎幣量，不是報價幣成交額。</li>
+    <li>小時濾網：收盤 &gt; 小時 K 的 SMA(收盤, {H1_MA})。用的是這根 15 分 K 收盤時已經走完的那根小時 K：收盤時刻往前，最後一個已走完的整點。收盤等於均線不算在上。均線還沒有值也不算。</li>
+    <li>進場價：訊號那根 15 分 K 的收盤價。沒有改用下一根開盤。</li>
+    <li>停損：沒有。停利：沒有。</li>
+    <li>時間出場：沒有下單出場。下面的報酬是固定時間的前瞻。1 小時 = 往後 4 根 15 分的收盤；4 小時 = 往後 16 根的收盤。報酬 = 出場收盤 / 進場收盤 − 1。還沒走完的只在圖上註明實際時數，不進勝率、平均、中位數、最好、最差。</li>
+  </ol>
+  <h2>統計</h2>
+  <p class="sub">訊號 {len(rows)} 根。勝率是報酬 &gt; 0 的比例，剛好 0 不算勝。未扣手續費與稅。</p>
+  <table>
+    <thead><tr><th>出場</th><th>走完</th><th>未走完</th><th>勝率</th><th>平均</th><th>中位數</th><th>最好</th><th>最差</th></tr></thead>
+    <tbody>
+      {_stat_cell(stats_1h, "1 小時 · 4 根")}
+      {_stat_cell(stats_4h, "4 小時 · 16 根")}
+    </tbody>
+  </table>
+  <p class="sub">圖上面是 15 分，黃點「進」是進場收盤，藍點「1h」、白點「4h」是走完的固定時間出場。下面是小時 K，粉紅是小時 MA200。</p>
+  {body_cards}
+</div>
+</body>
+</html>
+"""
+    out = Path(dest)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html)
+    return str(out)
+
+
+def print_stats(label: str, stats: dict) -> None:
+    if stats["n"] == 0:
+        print(f"{label} 走完 0，未走完 {stats['incomplete']}")
+        return
+    best, worst = stats["best"], stats["worst"]
+    key = "after_1h" if label == "1h" else "after_4h"
+
+    def who(row: dict) -> str:
+        ts = datetime.fromtimestamp(row["time"] / 1000, TZ).strftime("%m-%d %H:%M")
+        return f"{row['symbol']} {ts} {fmt_pct(row[key]['ret'])}"
+
+    print(
+        f"{label} 走完 {stats['n']}  未走完 {stats['incomplete']}  "
+        f"勝率 {stats['win'] * 100:.1f}%  平均 {fmt_pct(stats['mean'])}  中位數 {fmt_pct(stats['median'])}  "
+        f"最好 {who(best)}  最差 {who(worst)}"
+    )
+
+
 def fmt_hit(sym: str, d: dict, hit: dict) -> str:
     ts = datetime.fromtimestamp(int(d["t"][hit["i"]]) / 1000, TZ).strftime("%Y-%m-%d %H:%M")
     mas = "  ".join(f"MA{n} {hit['mas'][n]:.6g}" for n in MA_PERIODS)
@@ -521,9 +803,45 @@ def main() -> int:
     p.add_argument("--symbol", default="AINUSDT", help="永續代號，例如 AINUSDT")
     p.add_argument("--limit", type=int, default=1500, help="單幣往回看幾根 15 分 K，最多 1500")
     p.add_argument("--days", type=float, default=0, help="掃成交額夠的永續，只留最近幾天的訊號")
+    p.add_argument("--from-date", default="", help="回測起日，台北，例如 2026-10-17")
+    p.add_argument("--to-date", default="", help="回測迄日，台北，含這一天，例如 2026-10-30")
     p.add_argument("--charts", default="", help="把訊號圖存到這個資料夾")
     p.add_argument("--page", default="", help="把 15 分圖和下面的小時圖寫成一頁 HTML")
     args = p.parse_args()
+    if args.from_date or args.to_date:
+        if not args.from_date or not args.to_date:
+            print("回測要同時給 --from-date 和 --to-date")
+            return 2
+        start_ms, end_ms = taipei_day_range(args.from_date, args.to_date)
+        print(f"載入標的… {args.from_date} → {args.to_date} 台北", flush=True)
+        symbols = universe()
+        t0 = time.time()
+        rows = scan_between(symbols, start_ms, end_ms)
+        s1, s4 = horizon_stats(rows, "after_1h", 4), horizon_stats(rows, "after_4h", 16)
+        print(f"掃 {len(symbols)} 檔，{time.time() - t0:.0f}s，{len(rows)} 根\n")
+        for row in rows:
+            print(fmt_row(row))
+        print()
+        print_stats("1h", s1)
+        print_stats("4h", s4)
+        paths: list[str] = []
+        if args.charts or args.page:
+            chart_dir = args.charts or "output/ma_burst_charts"
+            paths = write_charts(rows, chart_dir)
+            print(f"\n圖 {len(paths)} 張 → {chart_dir}")
+        if args.page:
+            page = write_backtest_html(
+                rows,
+                paths,
+                args.page,
+                start_label=args.from_date,
+                end_label=args.to_date,
+                scanned=len(symbols),
+                stats_1h=s1,
+                stats_4h=s4,
+            )
+            print(f"頁面 → {page}")
+        return 0
     if args.days > 0:
         since = datetime.now(TZ) - timedelta(days=args.days)
         since_ms = int(since.timestamp() * 1000)
