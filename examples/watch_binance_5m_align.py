@@ -282,9 +282,9 @@ def get_json(path: str, params=None, retries: int = 8):
     for i in range(retries):
         try:
             r = SESSION.get(BASE + path, params=params, timeout=20)
-            if r.status_code == 429:
-                time.sleep(1.6 * (i + 1))
-                last = RuntimeError(f"429 {path}")
+            if r.status_code in (418, 429):
+                time.sleep(2.4 * (i + 1))
+                last = RuntimeError(f"{r.status_code} {path}")
                 continue
             r.raise_for_status()
             return r.json()
