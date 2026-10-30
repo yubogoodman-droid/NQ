@@ -16,6 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tw_1h_reclaim import (  # noqa: E402
     TPE,
     detect_signals,
+    drop_skip_dates,
+    filter_entry_range,
     filter_entry_window,
     loose_params,
     simulate,
@@ -316,6 +318,25 @@ def test_filter_entry_window() -> None:
     assert filter_entry_window(df, sigs, 0) == list(sigs)
 
 
+def test_filter_entry_range_and_skip() -> None:
+    closes, lows = valid_closes()
+    df = ohlc_from_close(closes, lows=lows)
+    sigs = detect_signals(df, loose_params())
+    assert sigs
+    entry_day = df.index[sigs[0].entry_idx].strftime("%Y-%m-%d")
+    # 合成資料從 2026-06-01 起
+    assert filter_entry_range(df, sigs, start="2026-06-01", end="2026-06-30")
+    assert filter_entry_range(df, sigs, start="2026-10-17", end="2026-10-30") == []
+    skipped = filter_entry_range(
+        df, sigs, start="2026-06-01", end="2026-06-30", skip_dates=[entry_day]
+    )
+    assert skipped == []
+    n_before = len(df)
+    dropped = drop_skip_dates(df, [entry_day])
+    assert len(dropped) < n_before
+    assert all(ts.strftime("%Y-%m-%d") != entry_day for ts in dropped.index)
+
+
 def test_price_cap_keeps_cheap_entry() -> None:
     closes, lows = valid_closes()
     df = ohlc_from_close(closes, lows=lows)
@@ -329,6 +350,9 @@ def test_summarize() -> None:
     stats = summarize_trades([])
     assert stats["count"] == 0
     assert stats["win_rate"] == 0.0
+    assert stats["median_pct"] == 0.0
+    assert stats["best_pct"] == 0.0
+    assert stats["worst_pct"] == 0.0
 
 
 def main() -> int:
@@ -349,6 +373,7 @@ def main() -> int:
     test_same_bar_trough_skipped()
     test_simulate_stop_and_target()
     test_filter_entry_window()
+    test_filter_entry_range_and_skip()
     test_price_cap_keeps_cheap_entry()
     test_summarize()
     print("ok")

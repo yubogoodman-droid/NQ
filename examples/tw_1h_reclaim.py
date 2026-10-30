@@ -18,9 +18,12 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import io
 import json
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
@@ -409,6 +412,9 @@ def summarize_trades(trades: Sequence[TradeResult]) -> dict:
         "fwd_1d": _avg_fwd("fwd_1d"),
         "fwd_3d": _avg_fwd("fwd_3d"),
         "fwd_5d": _avg_fwd("fwd_5d"),
+        "median_pct": float(np.median(pcts)) if n else 0.0,
+        "best_pct": float(max(pcts)) if n else 0.0,
+        "worst_pct": float(min(pcts)) if n else 0.0,
     }
 
 
@@ -418,6 +424,55 @@ def filter_entry_window(df: pd.DataFrame, signals: Sequence[Signal], days: int) 
     end = df.index[-1]
     start = end - pd.Timedelta(days=days)
     return [s for s in signals if df.index[s.entry_idx] >= start]
+
+
+def _parse_ymd_dates(values: Optional[Sequence[str]]) -> List[datetime]:
+    out: List[datetime] = []
+    if not values:
+        return out
+    for raw in values:
+        text = str(raw).strip()
+        if not text:
+            continue
+        out.append(datetime.strptime(text[:10], "%Y-%m-%d"))
+    return out
+
+
+def drop_skip_dates(df: pd.DataFrame, skip_dates: Optional[Sequence[str]] = None) -> pd.DataFrame:
+    """休市日的 1h K 直接拿掉，不計入波段根數。"""
+    if df.empty or not skip_dates:
+        return df
+    skip = {d.date() for d in _parse_ymd_dates(skip_dates)}
+    if not skip:
+        return df
+    keep = [ts.date() not in skip for ts in df.index]
+    return df.loc[keep].copy()
+
+
+def filter_entry_range(
+    df: pd.DataFrame,
+    signals: Sequence[Signal],
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    skip_dates: Optional[Sequence[str]] = None,
+) -> List[Signal]:
+    """只留進場日落在 [start, end]（含）且不在休市日的訊號。日期用 K 線時區。"""
+    if not len(df):
+        return []
+    start_d = datetime.strptime(start[:10], "%Y-%m-%d").date() if start else None
+    end_d = datetime.strptime(end[:10], "%Y-%m-%d").date() if end else None
+    skip = {d.date() for d in _parse_ymd_dates(skip_dates)}
+    kept: List[Signal] = []
+    for sig in signals:
+        day = df.index[sig.entry_idx].date()
+        if start_d is not None and day < start_d:
+            continue
+        if end_d is not None and day > end_d:
+            continue
+        if day in skip:
+            continue
+        kept.append(sig)
+    return kept
 
 
 # ---------------------------------------------------------------------------
@@ -568,10 +623,26 @@ def draw_trade_png(
     axv.set_xticks(ticks)
     axv.set_xticklabels([window.index[i].strftime("%m-%d %H:%M") for i in ticks], color="#8aa193")
     fig.tight_layout(pad=0.45)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=110, facecolor=fig.get_facecolor())
+    buf = io.BytesIO()
+    fig.savefig(buf, dpi=110, facecolor=fig.get_facecolor(), format="png")
     plt.close(fig)
+    data = buf.getvalue()
+    if path is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
     return path
+
+
+def draw_trade_b64(
+    df: pd.DataFrame,
+    trade: TradeResult,
+    trade_no: int,
+    title_extra: str = "",
+) -> str:
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "t.png"
+        draw_trade_png(df, trade, p, trade_no, title_extra=title_extra)
+        return base64.b64encode(p.read_bytes()).decode("ascii")
 
 
 def _git_branch() -> str:
@@ -706,6 +777,192 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
     return path
 
 
+def _params_rules_html(
+    params: ReclaimParams,
+    universe_n: int,
+    max_price: Optional[float],
+    start: Optional[str],
+    end: Optional[str],
+    skip_dates: Optional[Sequence[str]],
+    date: str,
+    strict: bool,
+) -> str:
+    skip_txt = "、".join(skip_dates) if skip_dates else "無"
+    cap = f"收盤價與進場價均須 &lt; {max_price:g}" if max_price else "不限股價"
+    mode = "嚴格（--strict）" if strict else "元晶型預設（未加 --strict）"
+    window = f"{start or '—'} ～ {end or '—'}（含）"
+    return f"""
+<ol class="rules">
+<li><b>週期</b>：Yahoo Finance <code>interval=60m</code> 一小時 K；時區 Asia/Taipei。
+<code>_chart_payload_to_df</code> 再套 <code>session_mask</code>：只留 <code>09:00–13:30</code>（含）正規盤，
+<code>includePrePost=false</code>，試搓／盤前集合競價不進資料。</li>
+<li><b>回測窗</b>：進場日 {window}。休市日 {escape(skip_txt)} 的 K 線先刪掉（不計波段根數），週末本來就沒盤。</li>
+<li><b>標的範圍</b>：上市（TWSE MI_INDEX ALLBUT0999）＋上櫃（TPEx 主板報價）四位數字普通股。
+基準日 {escape(date)} 先取成交額前 400，再套 {cap}，最後留成交額前 {universe_n}。
+進場當根收盤 ≥ 股價上限者再剔除（<code>price_cap</code>）。</li>
+<li><b>均線</b>：收盤價簡單移動平均 MA5／MA10／MA20（<code>sma</code>）。熱身 <code>max(20, lookback={params.lookback})</code> 根後才開始找跌破。</li>
+<li><b>波段起點</b>：前一根 <code>close ≥ MA20</code> 且當根 <code>close &lt; MA20</code>。</li>
+<li><b>待在均線下</b>：從跌破根起，<code>close ≤ MA20</code> 計入 <code>bars_below</code>，須 <code>{params.min_below} ≤ bars_below ≤ {params.max_below}</code>。
+超過 {params.max_below} 根仍未成波 → timeout。搜尋跨度 <code>max_below + max_fakes = {params.max_below + params.max_fakes}</code>。</li>
+<li><b>假站上</b>：<code>max_fakes={params.max_fakes}</code>。未達成波條件就收盤站上 MA20，計一次假站；超過則失敗
+（太短／不夠深／非 16 根新低／假站過多）。</li>
+<li><b>成波確認</b>：之後第一根 <code>close &gt; MA20</code> 才算站回。同時要
+深度 <code>(過程最高 MA20 − 波谷低) / 過程最高 MA20 ≥ {params.min_depth*100:.1f}%</code>，
+且波谷低 &lt; 前 {params.lookback} 根最低價（16 根新低；波谷 index &lt; {params.lookback} 直接否決）。</li>
+<li><b>破底與翻上不同根</b>：<code>separate_trough={params.separate_trough}</code>，進場根不可等於波谷根（排除單根錘）。</li>
+<li><b>進場</b>：站回後、波谷起 {params.entry_window} 根內（含站回根），第一根同時
+<code>close &gt; MA5</code> 且 <code>close &gt; MA10</code> 且 <code>close &gt; MA20</code>。
+彈回 <code>close / 波谷低 − 1 ≥ {params.min_bounce*100:.1f}%</code>。
+本回測模式：{mode}；<code>require_stack={params.require_stack}</code>
+（True 才再要求 MA5&gt;MA10&gt;MA20）。</li>
+<li><b>進場價</b>：進場那根<strong>收盤價</strong>（<code>Signal.entry_price = close[e]</code>）。</li>
+<li><b>停損</b>：波谷低 <code>wave.trough_low</code>。若進場價 − 停損 ≤ 0，改用進場價 × 0.99。
+進場後每一根先看 <code>low ≤ 停損</code>，打到則以停損價出場（<code>stop</code>）。</li>
+<li><b>停利</b>：<code>進場價 + {params.target_r:g} × (進場價 − 停損)</code>。同一根停損沒打到才看
+<code>high ≥ 停利</code>，打到則以停利價出場（<code>target</code>）。</li>
+<li><b>時間出場</b>：從進場根起最多再看 {params.time_bars} 根。都沒打到停損／停利，出場價＝該根收盤（<code>time</code>）。
+若資料已到最後一根且尚未滿 {params.time_bars} 根，以最後收盤標記未平（<code>open</code>）。</li>
+<li><b>報酬</b>：<code>pnl_pct = 出場價 / 進場價 − 1</code>。未扣手續費、交易稅、滑價。加總％是各筆相加，不是組合複利。</li>
+</ol>
+"""
+
+
+def write_embed_html(
+    path: Path,
+    hits: List[TwHit],
+    universe: List[dict],
+    period: str,
+    date: str,
+    params: ReclaimParams,
+    funnel: Optional[Dict[str, int]] = None,
+    strict: bool = False,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    skip_dates: Optional[Sequence[str]] = None,
+    max_price: Optional[float] = None,
+) -> Path:
+    stats = summarize_trades([h.trade for h in hits])
+    best_hit = max(hits, key=lambda h: h.trade.pnl_pct) if hits else None
+    worst_hit = min(hits, key=lambda h: h.trade.pnl_pct) if hits else None
+
+    def _hit_label(hit: Optional[TwHit]) -> str:
+        if hit is None:
+            return "—"
+        t = hit.trade
+        et = hit.df.index[t.entry_idx]
+        return (
+            f"{hit.row['code']} {hit.row['name']} "
+            f"{et.strftime('%Y-%m-%d %H:%M')} {t.pnl_pct*100:+.2f}%"
+        )
+
+    cards: List[str] = []
+    for i, hit in enumerate(hits, 1):
+        t = hit.trade
+        df = hit.df
+        et = df.index[t.entry_idx]
+        xt = df.index[t.exit_idx]
+        cls = "pnl-win" if t.pnl_points > 0 else ("pnl-flat" if t.pnl_points == 0 else "pnl-loss")
+        risk = t.entry_price - t.stop_price
+        label = f"{hit.row['code']} {hit.row['name']}"
+        b64 = draw_trade_b64(df, t, i, title_extra=label)
+        w = t.signal.wave
+        cards.append(
+            "<article class='trade-card'>"
+            "<header class='card-header'>"
+            f"<div class='card-title'><span class='trade-no'>#{i} · {escape(label)}</span>"
+            f"<span class='trade-time'>{escape(et.strftime('%Y-%m-%d %H:%M'))} → {escape(xt.strftime('%m-%d %H:%M'))}</span></div>"
+            f"<div class='card-pnl {cls}'>{t.pnl_pct*100:+.2f}%</div>"
+            "</header>"
+            f"<div class='tags'><span class='tag tag-info'>{escape(hit.row['symbol'])}</span>"
+            f"<span class='tag'>{escape(t.exit_reason)}</span>"
+            f"<span class='tag'>深度 {w.depth_pct*100:.1f}%</span>"
+            f"<span class='tag'>下面 {w.bars_below} 根</span>"
+            f"<span class='tag'>彈 {t.entry_price / w.trough_low * 100 - 100:.1f}%</span></div>"
+            "<pre class='trade-detail'>"
+            f"entry {t.entry_price:.2f}  stop {t.stop_price:.2f} (−{risk:.2f})\n"
+            f"target {t.target_price:.2f}  exit {t.exit_price:.2f} {t.exit_reason}  {t.pnl_points:+.2f}\n"
+            f"破底 {w.trough_low:.2f} @ {df.index[w.trough_idx].strftime('%m-%d %H:%M')}  "
+            f"站回 {df.index[w.reclaim_idx].strftime('%m-%d %H:%M')}\n"
+            f"MA5 {t.signal.ma5:.2f} / MA10 {t.signal.ma10:.2f} / MA20 {t.signal.ma20:.2f}\n"
+            f"fwd +1d {_fmt_fwd(t.fwd_1d)}  +3d {_fmt_fwd(t.fwd_3d)}  +5d {_fmt_fwd(t.fwd_5d)}"
+            "</pre>"
+            f"<div class='mini-chart'><img src='data:image/png;base64,{b64}' alt='{escape(label)}' "
+            "style='width:100%;display:block;border-radius:10px'/></div>"
+            "</article>"
+        )
+
+    cutoff = universe[-1]["amount"] / 1e8 if universe else 0
+    mode = "嚴格" if strict else "元晶型"
+    fun = funnel or {}
+    fwd1 = _fmt_fwd(stats.get("fwd_1d"))
+    fwd3 = _fmt_fwd(stats.get("fwd_3d"))
+    fwd5 = _fmt_fwd(stats.get("fwd_5d"))
+    reasons = stats.get("reasons") or {}
+    rules = _params_rules_html(
+        params, len(universe), max_price, start, end, skip_dates, date, strict
+    )
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>台股 1h 破底翻 · {mode}版 · {escape(start or '')}–{escape(end or '')}</title>
+<style>
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}}
+.page{{max-width:720px;margin:0 auto;padding:14px 12px 32px}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
+h1{{font-size:18px;margin:0 0 6px}} h2{{font-size:15px;margin:16px 0 8px}}
+.muted{{color:#8b949e;font-size:13px;line-height:1.55}}
+.cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
+.card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}}
+.card b{{display:block;font-size:18px;margin-top:4px}}
+.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}}
+.card-header{{display:flex;justify-content:space-between;gap:10px}}
+.trade-no{{font-weight:700}} .trade-time{{font-size:12px;color:#8b949e;display:block}}
+.card-pnl{{font-weight:700}} .pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}} .pnl-flat{{color:#8b949e}}
+.tags{{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}}
+.tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#79c0ff}}
+.trade-detail{{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}}
+.empty{{text-align:center;color:#8b949e;padding:40px 12px;border:1px solid #30363d;border-radius:14px}}
+.rules{{margin:0;padding-left:1.2em;color:#c9d1d9;font-size:13px;line-height:1.65}}
+.rules li{{margin-bottom:6px}}
+code{{font-size:12px;background:#0d1117;padding:1px 4px;border-radius:4px}}
+.note{{margin-top:8px;padding:8px 10px;background:#0d1117;border-radius:8px;color:#f0c14b;font-size:12px}}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>台股 1h 破底翻 · {mode}版 · 成交額前 {len(universe)}</h1>
+<p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億</p>
+<h2>觸發規則（對齊 repo 程式，不是口頭版）</h2>
+{rules}
+<p class="note">報酬未扣手續費與交易稅。圖：綠虛線＋▲＝進場；黃點線＋×＝出場；粉點＝破底／停損；黃／藍／粉線＝MA5／MA10／MA20；紅點橫線＝停損；綠點橫線＝2R。</p>
+<h2>回測統計</h2>
+<p class="muted">漏斗：跌破 {fun.get('cross_below', 0)} → 成波 {fun.get('wave_ok', 0)} → 進場 {fun.get('entry', 0)}
+· 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 非破底 {fun.get('not_16h_low', 0)}
+· 假站過多 {fun.get('too_many_fakes', 0)} · 逾時 {fun.get('timeout', 0)} · 沒站上均線 {fun.get('entry_timeout', 0)}
+· 同根錘 {fun.get('same_bar', 0)} · 彈太弱 {fun.get('weak_bounce', 0)} · 進場價過高 {fun.get('price_cap', 0)}
+<br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
+· 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}
+<br/>最好一筆：{escape(_hit_label(best_hit))}
+<br/>最差一筆：{escape(_hit_label(worst_hit))}</p>
+<div class="cards">
+<div class="card">訊號數<b>{stats['count']}</b></div>
+<div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
+<div class="card">已平勝率<b>{stats['closed_win_rate']:.1f}%</b></div>
+<div class="card">平均<b class="{'pnl-win' if stats['avg_pct']>=0 else 'pnl-loss'}">{stats['avg_pct']*100:+.2f}%</b></div>
+<div class="card">中位數<b class="{'pnl-win' if stats['median_pct']>=0 else 'pnl-loss'}">{stats['median_pct']*100:+.2f}%</b></div>
+<div class="card">最好<b class="pnl-win">{stats['best_pct']*100:+.2f}%</b></div>
+<div class="card">最差<b class="pnl-loss">{stats['worst_pct']*100:+.2f}%</b></div>
+<div class="card">標的<b>{len({h.row['code'] for h in hits})}</b></div>
+</div>
+</section>
+{''.join(cards) or "<div class='empty'>這段期間沒有破底翻訊號</div>"}
+</div></body></html>
+"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    return path
+
+
 # ---------------------------------------------------------------------------
 # Scan
 # ---------------------------------------------------------------------------
@@ -718,6 +975,9 @@ def scan_symbol(
     days: int,
     funnel: Optional[Dict[str, int]] = None,
     max_price: Optional[float] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    skip_dates: Optional[Sequence[str]] = None,
 ) -> tuple[List[TwHit], dict]:
     meta = {**row, "bars": 0, "error": "", "n_sig": 0, "n_trade": 0}
     try:
@@ -725,6 +985,7 @@ def scan_symbol(
     except Exception as exc:  # noqa: BLE001
         meta["error"] = str(exc)[:80]
         return [], meta
+    df = drop_skip_dates(df, skip_dates)
     meta["bars"] = int(len(df))
     if len(df) < 40:
         meta["error"] = "too_few_bars"
@@ -735,6 +996,8 @@ def scan_symbol(
         for k, v in local_fun.items():
             funnel[k] = funnel.get(k, 0) + v
     sigs = filter_entry_window(df, sigs, days)
+    if start or end or skip_dates:
+        sigs = filter_entry_range(df, sigs, start=start, end=end, skip_dates=skip_dates)
     if max_price is not None:
         n_hi = sum(1 for s in sigs if s.entry_price >= max_price)
         if n_hi and funnel is not None:
@@ -792,11 +1055,15 @@ def main(argv=None) -> int:
     p.add_argument("--limit", type=int, default=200, help="成交額前 N；0 = 不限成交額")
     p.add_argument("--pool", type=int, default=400, help="先取成交額前 N 再套股價過濾")
     p.add_argument("--max-price", type=float, default=1000, help="股價達此值以上剔除，預設 1000；0 不過濾")
-    p.add_argument("--days", type=int, default=14, help="只統計進場落在最近 N 日的訊號")
+    p.add_argument("--days", type=int, default=14, help="只統計進場落在最近 N 日的訊號；有 --start/--end 時忽略")
+    p.add_argument("--start", default="", help="進場日起 YYYY-MM-DD（含）")
+    p.add_argument("--end", default="", help="進場日迄 YYYY-MM-DD（含）")
+    p.add_argument("--skip-dates", default="", help="休市日 YYYY-MM-DD，逗號分隔")
     p.add_argument("--range", dest="range_", default="2mo", help="Yahoo 1h 下載區間")
     p.add_argument("--sleep", type=float, default=0.18)
     p.add_argument("--strict", action="store_true", help="不准假站上，進場要 MA5>MA10>MA20")
     p.add_argument("--pages", action="store_true")
+    p.add_argument("--embed", action="store_true", help="單一 HTML 內嵌 K 線圖")
     p.add_argument("--html", default="")
     p.add_argument("--json", dest="json_path", default="")
     args = p.parse_args(argv)
@@ -804,9 +1071,13 @@ def main(argv=None) -> int:
     params = strict_params() if args.strict else loose_params()
     date = resolve_twse_date(args.date or last_tw_session_yyyymmdd())
     pool = 0 if args.limit <= 0 else max(args.limit, args.pool if args.max_price else args.limit)
+    start = args.start.strip() or None
+    end = args.end.strip() or None
+    skip_dates = [x.strip() for x in args.skip_dates.split(",") if x.strip()]
+    days = 0 if (start or end) else args.days
     print(
-        f"universe date={date} limit={args.limit} days={args.days} range={args.range_} "
-        f"strict={args.strict} max_price={args.max_price}"
+        f"universe date={date} limit={args.limit} days={days} start={start} end={end} "
+        f"skip={skip_dates} range={args.range_} strict={args.strict} max_price={args.max_price}"
     )
     raw = fetch_top_turnover(date, pool)
     # 預設刪 1000 以上（含 1000）。共用 helper 是「> 才刪」，所以 cap 往下壓一點。
@@ -837,7 +1108,15 @@ def main(argv=None) -> int:
     scanned = 0
     for i, row in enumerate(universe, 1):
         stock_hits, meta = scan_symbol(
-            row, args.range_, params, args.days, funnel=funnel, max_price=price_cap
+            row,
+            args.range_,
+            params,
+            days,
+            funnel=funnel,
+            max_price=price_cap,
+            start=start,
+            end=end,
+            skip_dates=skip_dates,
         )
         scanned += 1
         if meta["error"]:
@@ -864,7 +1143,10 @@ def main(argv=None) -> int:
 
     extra = {
         "date": date,
-        "days": args.days,
+        "days": days,
+        "start": start,
+        "end": end,
+        "skip_dates": skip_dates,
         "strict": args.strict,
         "range": args.range_,
         "limit": args.limit,
@@ -875,11 +1157,32 @@ def main(argv=None) -> int:
     if html_path is None and args.pages:
         html_path = PAGES
     if html_path:
-        period_label = f"{args.days}d · Yahoo {args.range_} 1h"
+        if start or end:
+            period_label = f"{start or '—'}～{end or '—'} · Yahoo {args.range_} 1h"
+        else:
+            period_label = f"{days}d · Yahoo {args.range_} 1h"
+        if skip_dates:
+            period_label += " · 略過 " + ",".join(skip_dates)
         if args.max_price is not None:
             period_label += f" · 股價<{args.max_price:g}"
-        out = write_tw_html(html_path, hits, universe, period_label, date, funnel=funnel, strict=args.strict)
-        write_view_html(out)
+        if args.embed:
+            out = write_embed_html(
+                html_path,
+                hits,
+                universe,
+                period_label,
+                date,
+                params,
+                funnel=funnel,
+                strict=args.strict,
+                start=start,
+                end=end,
+                skip_dates=skip_dates,
+                max_price=args.max_price,
+            )
+        else:
+            out = write_tw_html(html_path, hits, universe, period_label, date, funnel=funnel, strict=args.strict)
+            write_view_html(out)
         print(f"html={out}")
     json_path = Path(args.json_path).resolve() if args.json_path else None
     if json_path is None and html_path:
