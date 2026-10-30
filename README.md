@@ -60,8 +60,8 @@ python3 examples/nq_ma_reclaim.py alert
 | 做空 | 停損在跌破那根高點與 MA60 較高者上方 0.3%；目標 2R；收到收 |
 
 ```bash
-# 近兩個禮拜
-python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 60d --since 2026-09-22 --until 2026-10-06 --html docs/tw-5m-fade-2w/index.html
+# 近兩個禮拜（自包含 HTML）
+python3 examples/backtest_tw_5m_fade_standalone.py --since 2026-10-17 --until 2026-10-30 --html docs/tw-5m-fade-2w-1017-1030/index.html
 
 # 近一個月（60d 養均線，只計近 30 天）
 python3 examples/watch_tw_5m_fade.py scan --limit 80 --pool 80 --max-price 700 --range 60d --since 2026-08-31 --pages
@@ -75,6 +75,9 @@ python3 examples/watch_tw_5m_fade.py alert
 ```
 
 盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 鎖定 MA60：`pinescript/tw_5m_fade_ma60.pine`。可調均線版：`pinescript/tw_5m_fade_ma_stack.pine`。
+
+近兩個禮拜（2026-10-17–10-30，正規盤 09:00–13:30、略過 10/23 颱風休市，成交額前 80、股價 ≤700、實掃 42 檔）：**8 筆、勝率 37.5%、平均 +0.51%、中位數 −1.43%、最好 +6.44%、最差 −2.95%、合計 +4.07%**（未扣手續費與稅）。
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-fade-short-9faf/docs/tw-5m-fade-2w-1017-1030/index.html
 
 近一個月（2026-08-31–09-30，成交額前 80、700 以上拿掉、實掃 46 檔）：5m 破 **MA60** **23 筆、勝率 65.2%、合計 +32.8%**。同濾網破 MA240 是 31 筆、64.5%、+28.0%。垂直空砸距線 >3% 不追。
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-fade-short-9faf/docs/tw-5m-fade/view.html
