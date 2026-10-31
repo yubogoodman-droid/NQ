@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import base64
 import json
 import sys
 from datetime import date
@@ -14,8 +13,8 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from optimize_tw_1h_reclaim import CACHE, build_rows, load_cache, metrics  # noqa: E402
-from tw_1h_reclaim import loose_params, write_view_html  # noqa: E402
+from optimize_tw_1h_reclaim import CACHE, CLOSED_DAYS, build_rows, load_cache, metrics  # noqa: E402
+from tw_1h_reclaim import detect_signals, draw_trade_png, loose_params, simulate, write_view_html  # noqa: E402
 from watch_tw_1h_reclaim import daily_market_regime, regular_session_bars  # noqa: E402
 
 WINDOW_LO = date(2026, 8, 3)
@@ -58,6 +57,61 @@ def stat_row(title: str, rows) -> str:
         f"<td>{pct(m['best'])}</td><td>{pct(m['worst'])}</td>"
         f"<td>{m['sum'] * 100:+.0f}</td><td>{pct(m['avg'] - ROUND_TRIP_FEE)}</td></tr>"
     )
+
+
+REASON = {"stop": "停損", "target": "停利 2R", "time": "時間出場", "open": "未平"}
+
+
+def trade_cards(cache: dict, rows, img_dir: Path) -> str:
+    """One candlestick PNG per filtered trade. Images stay as files, not base64."""
+    import tw_1h_reclaim as tw
+
+    setup = tw._setup_cjk
+    ready = {"ok": False}
+
+    def setup_once() -> None:
+        if not ready["ok"]:
+            setup()
+            ready["ok"] = True
+
+    tw._setup_cjk = setup_once  # type: ignore[method-assign]
+    by_symbol: dict = {}
+    for row in rows:
+        by_symbol.setdefault(row.symbol, set()).add(row.entry_ts)
+    found = {}
+    params = loose_params()
+    for sym, stamps in by_symbol.items():
+        df = cache["data"][sym]
+        df = df.loc[[ts.date() not in CLOSED_DAYS for ts in df.index]]
+        for trade in simulate(df, detect_signals(df, params), params):
+            ts = df.index[trade.entry_idx]
+            if ts in stamps:
+                found[(sym, ts)] = (df, trade)
+    missing = [r for r in rows if (r.symbol, r.entry_ts) not in found]
+    if missing:
+        raise SystemExit(f"missing trade match {missing[0].code} {missing[0].entry_ts} ({len(missing)})")
+    cards = [
+        "<section><h2>每一筆進場的 K 線</h2>"
+        "<p class='muted'>下面每一筆都是濾網放行的成交。綠三角進場、黃叉出場、黃／藍／粉是 MA5／10／20、"
+        "粉點是破底、紅虛線停損、綠虛線 2R。</p></section>"
+    ]
+    for i, row in enumerate(rows, 1):
+        df, trade = found[(row.symbol, row.entry_ts)]
+        name = f"t{i:03d}_{row.code}_{row.entry_ts.strftime('%m%d_%H%M')}.png"
+        draw_trade_png(df, trade, img_dir / name, i, title_extra=f"{row.code} {row.name}")
+        cls = "pnl-win" if row.pnl_pct > 0 else "pnl-loss"
+        reason = REASON.get(row.reason, row.reason)
+        cards.append(
+            "<article class='trade-card'><header class='card-header'>"
+            f"<span>#{i} · {escape(row.code)} {escape(row.name)}</span>"
+            f"<span class='{cls}'>{row.pnl_pct * 100:+.2f}%</span></header>"
+            f"<p class='muted'>{row.entry_ts.strftime('%m-%d %H:%M')} 進 {row.entry:.2f} → "
+            f"{row.exit_ts.strftime('%m-%d %H:%M')} {escape(reason)} {row.exit_px:.2f}</p>"
+            f"<img src='img/{name}' alt='{escape(row.code)} {escape(row.name)}'/></article>"
+        )
+        if i % 40 == 0:
+            print(f"charts {i}/{len(rows)}", flush=True)
+    return "".join(cards)
 
 
 def draw(path: Path, days, base_rows, filt_rows, on: set, daily_close, daily_ma) -> None:
@@ -183,6 +237,8 @@ th,td{{border-bottom:1px solid #21262d;padding:6px 4px;text-align:right;white-sp
 th:first-child,td:first-child{{text-align:left}} th{{color:#8b949e;font-weight:500}}
 .pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}}
 img{{width:100%;border-radius:10px;display:block}}
+.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:12px;margin-bottom:12px}}
+.card-header{{display:flex;justify-content:space-between;gap:8px;font-weight:700}}
 code{{font-size:12px}}
 </style></head><body><div class="page">
 <section>
@@ -226,11 +282,9 @@ code{{font-size:12px}}
 <p class="muted">濾網與監看 <code>--market-filter daily-ma20</code> 相同：當天開盤前，看<b>前一個完整交易日</b>加權（^TWII）日線收盤是否高於該日的 20 日均線。日線收盤用當天最後一根盤中 1h。當天的 K 不納入。不成立的日子，進場不計入濾網版（實盤則寫狀態、不推播）。</p>
 <p class="muted">這條濾網是看過 10 月之後才提出的，8–9 月又落在當初挑規則的訓練期裡，所以這份三個月結果不是樣本外驗證。</p>
 </section>
+{trade_cards(cache, filt, out / "img")}
 </div></body></html>
 """
-    png = (out / "img" / "equity.png").read_bytes()
-    data_uri = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
-    html = html.replace("src='img/equity.png'", f"src='{data_uri}'")
     index = out / "index.html"
     index.write_text(html, encoding="utf-8")
     (out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
