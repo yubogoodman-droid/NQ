@@ -59,6 +59,7 @@ python3 examples/nq_ma_reclaim.py alert
 | 量 / 60MA | 破底段爆量 ≥ 2x、反彈段帶量 ≥ 1x、進場價站回 60MA。`--min-climax-vol 0 --min-bounce-vol 0 --no-ma60` 可關 |
 | 當日跌幅 | 卡片上寫的「當日高點→破底」也要 ≥ 2%。48 根視窗跨到昨天的慢跌、今早只小跳空的不算急殺 |
 | 蓋子 | 進場價上方 0.5% 內有 60/120/200/240 就算蓋子。弱彈不追；當日急殺 ≥ 5% 允許穿蓋（國巨／鼎元那種）。`--min-lid-pct 0` 關掉 |
+| 不追 | 進場時離破底低點已彈超過 7% 就不進（台虹 17%、光鼎 9% 那種停損太遠）。`--max-bounce 0` 關掉 |
 
 ```bash
 # 先看力成近 5 日有沒有這種圖
@@ -93,6 +94,12 @@ python3 examples/watch_tw_5m_bounce.py alert
 近一週 7 日 K 會多出 09-22 南茂（−2.3%）：7 日還沒畫出 120/200/240，破底那根底下看起來是空的；一個月資料這三條長均墊在 99.5 底下，所以不算。  
 
 https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
+
+近兩週（2026-10-17→10-30，只算 09:00–13:30）前 80 檔是 **0 筆**：`docs/tw-5m-bounce-20261017-1030/`。
+
+優化（2026-08-04→10-30，成交額前 200、股價 ≤ 700）：加了「反彈 ≤ 7% 才進」。樣本內（08-04→10-16）26 筆平均 +0.39% → **20 筆平均 +1.12%**，前段 +0.80% → +1.66%、後段 −0.08% → +0.45%。放寬其他門檻、改 1R／1.5R／3R 或收破均線出場都比較差。近兩週只有 10-21 聯強 −0.1%。未扣手續費與稅。
+
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce-opt-20261031/view.html
 
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
