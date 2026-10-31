@@ -48,7 +48,7 @@ EXCLUDE_INVERSE = True
 
 # pretty ON + 與 1H破底翻TG / 訓練破底翻 對齊
 DETECT_KW = dict(
-    min_bars_below=4,
+    min_bars_below=8,  # v10：在 MA25 下方至少 8 根（排除 CRCL/AXTI 等僅 4~6 根短暫急刺假底）
     max_bars_below=36,
     min_depth_pct=0.018,
     min_impulse_pct=0.0,
@@ -60,7 +60,14 @@ DETECT_KW = dict(
     retest_tag_atr=0.4,
     max_ma_drift_pct=1.5,
     min_ribbon_atr=0.50,
-    ma200_near_pct=0.0,  # v2：破底低須 < MA200（%，原 1.0）
+    # v10（跨平台防停損特徵優化）：
+    # 1. 破底低點須比 1H MA200 低至少 2.5%（ma200_near_pct=-2.5，排除剛跌破 MA200 的初跌段淺刺假破底）
+    # 2. 進場時 4H MA60 近 12 根斜率 <= 0%（h4_ma60_max_rise_pct=0.0，排除 4H 仍在高檔上揚的初跌段閃崩接刀）
+    # 3. 進場回測棒高低振幅 >= 0.45%（min_entry_rng_pct=0.45，排除極窄幅無力小十字星）
+    ma200_near_pct=-2.5,
+    h4_ma60_max_rise_pct=0.0,
+    min_entry_rng_pct=0.45,
+)
     min_ma_cluster_atr=1.0,
     min_break_vol=2.2,  # v9（半年優化）：破底恐慌出量 ≥ 2.2x 20h均量（原 0.8x，剔除無量陰跌破底）
     min_mid_ma_atr=0.50,
@@ -188,13 +195,14 @@ def fmt_sig(symbol: str, df, sig) -> str:
     arm_15r = sig.entry_price + 1.5 * risk
     exit_24h = ts + timedelta(hours=24)
     return (
-        f"股票永續 1H 破底翻 v9 · 回測進場\n"
+        f"股票永續 1H 破底翻 v10 · 回測進場\n"
         f"{symbol}\n"
         f"時間 {ts.strftime('%m-%d %H:%M')} 台北\n"
         f"進場 {sig.entry_price:.6g}（MA25 {sig.ma25:.6g}）\n"
-        f"出場① 停損：{sig.stop_price:.6g}（1H收盤跌破破底 {br.strftime('%m-%d %H:%M')}，-{risk_pct:.2f}%）\n"
-        f"出場② 停利：1H收盤≥{arm_15r:.6g} (+1.5R) 後，五分K M頭破頸線≥1%出場\n"
-        f"出場③ 時間：滿 24h 到期出場（{exit_24h.strftime('%m-%d %H:%M')} 台北 1H收盤）\n"
+        f"出場① 破底停損：{sig.stop_price:.6g}（1H收盤跌破破底 {br.strftime('%m-%d %H:%M')}，-{risk_pct:.2f}%）\n"
+        f"出場② 結構止損：進場後若連 5 根 1H 收盤掉回 MA25 下方，即提前止損出場\n"
+        f"出場③ 破頸停利：1H收盤≥{arm_15r:.6g} (+1.5R) 後，五分K M頭破頸線≥1%出場\n"
+        f"出場④ 時間到期：滿 24h 到期出場（{exit_24h.strftime('%m-%d %H:%M')} 台北 1H收盤）\n"
         f"品質 Q{sig.quality} {sig.shape}  破底量 {sig.break_vol_ratio:.2f}x  進場量 {sig.vol_ratio:.2f}x"
     )
 

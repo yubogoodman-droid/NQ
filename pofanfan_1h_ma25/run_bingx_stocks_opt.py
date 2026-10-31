@@ -107,9 +107,10 @@ OPT_V9_STRICT_KW = dict(
     min_overhead_ma_atr=0.8,
 )
 
-# v10 防停損版：深破 MA200 ≥ 2.5% + 4h MA60 未處於高檔上揚 (≤ 0%) + 進場棒振幅 ≥ 0.45%
+# v10 防停損版：在 MA25 下方至少 8 根（排除 CRCL/AXTI 等 4~6 根短暫急刺假底）+ 深破 MA200 ≥ 2.5% + 4h MA60 斜率 ≤ 0% + 進場棒振幅 ≥ 0.45%
 OPT_V10_KW = dict(
     OPT_V8_KW,
+    min_bars_below=8,
     ma200_near_pct=-2.5,
     h4_ma60_max_rise_pct=0.0,
     min_entry_rng_pct=0.45,
@@ -294,12 +295,14 @@ def write_compare_html(
                 why.append("進場量<0.15x")
             if not (ma7 > ma14):
                 why.append("MA7≤MA14")
+            if s7.bars_below < 8:
+                why.append(f"在下僅{s7.bars_below}h&lt;8h")
             if bot_vs_200 > -2.5:
                 why.append(f"破MA200僅{bot_vs_200:.1f}%")
             if np.isfinite(h4_s60) and h4_s60 > 0.0:
                 why.append(f"4hMA60+{h4_s60:.1f}%")
             if e_rng_pct < 0.45:
-                why.append(f"進場振幅{e_rng_pct:.2f}%<0.45%")
+                why.append(f"進場振幅{e_rng_pct:.2f}%&lt;0.45%")
             v10_cell = f"<span class='muted'>已過濾（{'、'.join(why)}）</span>"
             status_badge = "<span class='tag tag-sl'>v10 剔除</span>"
 
@@ -473,7 +476,9 @@ def main() -> int:
     hits_v10_s1, v10_s1_e, v10_s1_2m = run_sim(
         dict(OPT_V8_KW, ma200_near_pct=-2.5, h4_ma60_max_rise_pct=0.0), 24, 0
     )
-    hits_v10_s2, v10_s2_e, v10_s2_2m = run_sim(OPT_V10_KW, 24, 0)
+    hits_v10_s2, v10_s2_e, v10_s2_2m = run_sim(
+        dict(OPT_V8_KW, ma200_near_pct=-2.5, h4_ma60_max_rise_pct=0.0, min_entry_rng_pct=0.45), 24, 5
+    )
     hits_v10, v10_e, v10_2m = run_sim(OPT_V10_KW, 24, 5)
 
     ablation = [
@@ -482,8 +487,8 @@ def main() -> int:
         ("v8 優化（進場量≥0.15x + MA7>14 + 24h）", calc_metrics(hits_v8), calc_metrics(v8_e), calc_metrics(v8_2m)),
         ("v9-B 嚴選版（v8 + BingX破底量≥1.10x + 上方均線≥0.8ATR）", calc_metrics(hits_v9b), calc_metrics(v9b_e), calc_metrics(v9b_2m)),
         ("v10-Step1（v8 + 破MA200≥2.5% + 4hMA60斜率≤0%）", calc_metrics(hits_v10_s1), calc_metrics(v10_s1_e), calc_metrics(v10_s1_2m)),
-        ("v10-Step2（Step1 + 進場棒振幅≥0.45%）", calc_metrics(hits_v10_s2), calc_metrics(v10_s2_e), calc_metrics(v10_s2_2m)),
-        ("v10 終極防停損版（Step2 + 連5根掉MA25提早止損 + 24h）", calc_metrics(hits_v10), calc_metrics(v10_e), calc_metrics(v10_2m)),
+        ("v10-Step2（Step1 + 進場振幅≥0.45% + 連5掉MA25止損）", calc_metrics(hits_v10_s2), calc_metrics(v10_s2_e), calc_metrics(v10_s2_2m)),
+        ("v10 終極防停損版（Step2 + 在MA25下≥8h 排除急刺假底）", calc_metrics(hits_v10), calc_metrics(v10_e), calc_metrics(v10_2m)),
     ]
 
     for lbl, sta, ste, st2 in ablation:
