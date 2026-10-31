@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>台股 5分K 破底反彈 · 2026-10-17 至 10-30</title>
+<style>
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}
+.page{max-width:720px;margin:0 auto;padding:14px 12px 40px}
+h1{font-size:20px;margin:0 0 8px} h2{font-size:16px;margin:18px 0 8px}
+.muted{color:#8b949e;font-size:13px;line-height:1.55}
+.summary,.rules,.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:18px;margin-top:4px}
+.card-header{display:flex;justify-content:space-between;gap:10px}
+.trade-no{font-weight:700} .trade-time{font-size:12px;color:#8b949e}
+.pnl-win{color:#ef4444} .pnl-loss{color:#22c55e} .pnl-flat{color:#8b949e}
+.card-pnl{font-weight:700}
+.trade-detail{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}
+.mini-chart img{width:100%;display:block;border-radius:10px}
+ol{margin:8px 0 0;padding-left:1.2em} li{margin:6px 0;line-height:1.5}
+code{font-size:12px}
+.empty{text-align:center;color:#8b949e;padding:28px 12px}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>台股 5 分 K 破底反彈 · 近兩週</h1>
+<p class="muted">進場日 2026-10-17 至 2026-10-30。只留 09:00–13:30 正規盤；09:00 前的試搓／盤前集合競價不進資料。未扣手續費與稅。不做單。</p>
+<p class="muted">Yahoo 有正規盤 K 的日子：10/19、10/20、10/21、10/22、10/27、10/28、10/29、10/30。10/17、10/18、10/24、10/25 是週末。10/23 沒有 K（颱風休市）。10/26 這批標的的 5 分 K Yahoo 也沒有，一併略過。</p>
+<p class="muted">標的 43 檔：2026-10-30 成交額前 80 裡股價 ≤ 700 的 42 檔，再併入 1815 富喬、3042 晶技（已在池內的不重複）。拉 K 用 60 日，讓 200MA 在這兩週之前就畫得出來。這是掃描當下的成交額排序，不是每個歷史交易日各自重排。</p>
+<div class="cards">
+<div class="card">訊號<b>0</b></div>
+<div class="card">勝率<b>無</b></div>
+<div class="card">平均<b>無</b></div>
+<div class="card">中位數<b>無</b></div>
+</div>
+<p class="muted">最好：沒有成交<br/>最差：沒有成交<br/>這段沒有進場，所以沒有勝率或報酬分布。出場規則仍是停損、2R 停利，或當日最後一根收盤。</p>
+</section>
+<section class="rules">
+<h2>觸發規則（程式預設）</h2>
+<ol>
+<li>週期：Yahoo 5 分 K，<code>includePrePost=false</code>。再丟掉非整 5 分、以及 09:00 前或 13:30 後的 K。均線只在這些正規盤 K 上計算。</li>
+<li>標的：<code>detect_signals</code> 本身不挑股票。這次回測沿用此分支的掃描範圍：2026-10-30 成交額前 80，股價 ≤ 700 的留下，再併入 1815 富喬、3042 晶技，共 43 檔。</li>
+<li>破底：當根低點跌破前 48 根低點，且自前 48 根高點回檔 ≥ 2%；或開盤滿 8 根後，跌破當日至今低點且自當日高點回檔 ≥ 2%。破底只留在當天，隔夜不把昨天的低點帶過來。破底後 24 根內沒有進場就作廢。</li>
+<li>破底那根的低點下方不能有任何已算出的均線（5/10/20/60/120/200/240）。還沒畫出來的長均（NaN）不擋。</li>
+<li>進場根 5MA &gt; 10MA &gt; 20MA，而且要分開、上彎、張開：MA5−MA10 ≥ 0.15%、MA10−MA20 ≥ 0.12%、MA5−MA20 ≥ 0.30%（都除以收盤）。回看 3 根，MA5 斜率 ≥ 0.20%、MA10 ≥ 0.15%、MA20 ≥ 0.05%，且 5 與 20 的間隔要比 3 根前更開。近 8 根 MA5/MA10 穿越不超過 2 次。收盤要在 MA5 之上。上一根若已經同時滿足排列與量能，這根不再進（只吃第一次）。</li>
+<li>09:30 前不進場。同一檔兩筆進場至少隔 12 根。</li>
+<li>墊底：破底後到進場前，至少 40% 的 K 收在 20MA 下面。算不出來（沒有墊底 K）就不進。</li>
+<li>進場量：進場根成交量 ≥ 前 20 根均量的 2 倍。突破量：進場根 ≥ 破底後、進場前均量的 3 倍。</li>
+<li>破底段爆量：破底根含前 2 根的最大量 ≥ 再往前 20 根均量的 2 倍。反彈段：破底後到進場的均量 ≥ 破底前 12 根均量的 1 倍。</li>
+<li>進場價（收盤）要高於 60MA。200MA 必須已經畫出來。</li>
+<li>當日高點到破底低點的跌幅 ≥ 2%。這也是卡片上的跌幅。</li>
+<li>蓋子：進場價上方最近的 60/120/200/240，距離 &lt; 0.5% 就不進；當日跌幅 ≥ 5% 則允許貼著蓋子進。沒有壓在上面的均線就不算蓋子。貼蓋失敗會把這次破底作廢，不再追。</li>
+<li>反彈：進場收盤相對破底低點 ≥ 1%。進場當下 MA5 要高於 3 根前的 MA5。</li>
+<li>進場價：訊號那根的收盤價。</li>
+<li>停損：破底低點 × 0.997。風險 = 進場價 − 停損；風險 ≤ 0 的訊號不模擬。</li>
+<li>停利：進場價 + 2 × 風險（2R）。進場之後每一根先看低點是否碰到停損，再看高點是否碰到停利。</li>
+<li>時間出場：同一天沒碰到停損或停利，就以當天最後一根正規盤的收盤出場。</li>
+<li>報酬未扣手續費與證交稅。</li>
+</ol>
+</section>
+<div class='empty'>這兩週沒有符合上述規則的進場。</div>
+</div></body></html>

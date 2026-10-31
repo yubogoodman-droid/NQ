@@ -45,6 +45,62 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## 台股 5 分 K 破底反彈 → 5/10/20 多頭排列通知
+
+對齊力成（6239）那種五分圖：急殺破近期低點後 V 彈，**5MA > 10MA > 20MA 明顯分開、往上張開**才推 Telegram。均線黏在一起、橫盤糾結的不算。
+
+| 條件 | 預設 |
+|------|------|
+| 週期 | 5 分 K |
+| 破底 | 跌破近 48 根（約 4 小時）低點，且自該段高點跌幅 ≥ 2%；**破底那根下方不能有任何均線**（5/10/20/60/120/200/240） |
+| 反彈視窗 | 破底後 24 根內 |
+| 通知 | 5/10/20 三條都要看得見、往上張開（MA5−MA10 ≥ 0.15%、MA10−MA20 ≥ 0.12%、MA5−MA20 ≥ 0.30%），MA20 也要上彎；黏帶／糾結不算。09:30 前不報 |
+| 晶技標準 | 對齊晶技 3042 09-23 11:10：破底要在**當天**、**200MA 要畫得出來**，先縮量墊在 20MA 底下（破底後到進場前至少 40% 的 K 收在 20MA 下），**進場根相對墊底段爆量**（≥ 破底後均量 3 倍，且 ≥ 前 20 根均量 2 倍）。立刻拉回站上均線的 V 彈、一路帶量、隔夜洗盤都不算。`--min-entry-vol 0 --min-breakout-vol 0 --min-base-under 0 --no-ma200` 關掉 |
+| 量 / 60MA | 破底段爆量 ≥ 2x、反彈段帶量 ≥ 1x、進場價站回 60MA。`--min-climax-vol 0 --min-bounce-vol 0 --no-ma60` 可關 |
+| 當日跌幅 | 卡片上寫的「當日高點→破底」也要 ≥ 2%。48 根視窗跨到昨天的慢跌、今早只小跳空的不算急殺 |
+| 蓋子 | 進場價上方 0.5% 內有 60/120/200/240 就算蓋子。弱彈不追；當日急殺 ≥ 5% 允許穿蓋（國巨／鼎元那種）。`--min-lid-pct 0` 關掉 |
+| 不追 | 進場時離破底低點已彈超過 7% 就不進（台虹 17%、光鼎 9% 那種停損太遠）。`--max-bounce 0` 關掉 |
+
+```bash
+# 先看力成近 5 日有沒有這種圖
+python3 examples/watch_tw_5m_bounce.py scan --symbols 6239 --range 5d --pages
+
+# 成交額前 80 回看 + 手機版 HTML
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --pages
+
+# 只看今天（台北）的訊號，並把力成併進去
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --today --also 6239 --pages
+
+# 近一週 / 近一個月 / 近兩個月（Yahoo 5分K 最長 60d）、700 以上拿掉；套晶技標準
+# 近一週要用較長 K 讓 200MA 熱完，再只留這週的進場
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 60d --since 2026-10-16 --also 1815.TWO,3042 --pages
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 60d --since 2026-09-28 --also 1815.TWO,3042 --pages
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 1mo --also 1815.TWO,3042 --pages
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --pool 80 --max-price 700 --range 60d --also 1815.TWO,3042 --pages
+
+# 不要量的門檻，只看均線排列
+python3 examples/watch_tw_5m_bounce.py scan --limit 80 --range 5d --min-climax-vol 0 --min-bounce-vol 0 --no-ma60 --pages
+
+# Telegram（憑證放 tg_config.env）
+python3 examples/watch_tw_5m_bounce.py alert --test
+python3 examples/watch_tw_5m_bounce.py alert --dry-run --once
+python3 examples/watch_tw_5m_bounce.py alert
+```
+
+盤中每根 5 分 K 收盤掃一次；第一次啟動只記歷史、不洗版。TradingView 單檔可套 `pinescript/tw_5m_bounce_ma_stack.pine`。
+
+近一個月（2026-09-28→10-27）成交額前 80、**700 以上拿掉**、60 日 K 把 200MA 熱完再只留這月進場： **2 筆**、勝率 0%、合計 **−3.3%**。10-01 富喬收盤 −2.9%、10-06 京元電子收盤 −0.3%。09-23 晶技在這個窗口之前。圖庫目前是這一個月。  
+近一週（2026-10-16→10-27，交易日 10/16、10/19、10/20、10/21、10/22、10/27）同一套規則是 **0 筆**。10/23、10/26 的 5 分 K Yahoo 沒有。  
+近一週 7 日 K 會多出 09-22 南茂（−2.3%）：7 日還沒畫出 120/200/240，破底那根底下看起來是空的；一個月資料這三條長均墊在 99.5 底下，所以不算。  
+
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/view.html
+
+近兩週（2026-10-17→10-30，只算 09:00–13:30）前 80 檔是 **0 筆**：`docs/tw-5m-bounce-20261017-1030/`。
+
+優化（2026-08-04→10-30，成交額前 200、股價 ≤ 700）：加了「反彈 ≤ 7% 才進」。樣本內（08-04→10-16）26 筆平均 +0.39% → **20 筆平均 +1.12%**，前段 +0.80% → +1.66%、後段 −0.08% → +0.45%。放寬其他門檻、改 1R／1.5R／3R 或收破均線出場都比較差。近兩週只有 10-21 聯強 −0.1%。未扣手續費與稅。
+
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce-opt-20261031/view.html
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash
