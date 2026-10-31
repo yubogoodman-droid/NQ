@@ -1,0 +1,73 @@
+//@version=5
+indicator("台股 5分K 空排跌破均線", overlay=true)
+
+requireFalling = input.bool(true, "5/10/20 都要下彎")
+minBreakPct = input.float(0.7, "跌破均線最小幅度 %", minval=0.0, step=0.1) / 100.0
+maxBreakPct = input.float(3.0, "跌破均線最大幅度 %（0=不限）", minval=0.0, step=0.1) / 100.0
+maN = input.int(60, "跌破哪一條均線", minval=20, step=10)
+minPriorOverPct = input.float(0.5, "前一盤相對均線最少 %", minval=0.0, step=0.1) / 100.0
+priorLookback = input.int(12, "前一盤回看根數", minval=4, maxval=54)
+priorMinBars = input.int(8, "前一盤最少有效根", minval=4, maxval=54)
+onePerDay = input.bool(true, "一天只取第一筆")
+
+ma5  = ta.sma(close, 5)
+ma10 = ta.sma(close, 10)
+ma20 = ta.sma(close, 20)
+ma60 = ta.sma(close, 60)
+ma120 = ta.sma(close, 120)
+ma240 = ta.sma(close, 240)
+
+maLine = ta.sma(close, maN)
+
+stacked = ma5 < ma10 and ma10 < ma20
+falling = ma5 < ma5[1] and ma10 < ma10[1] and ma20 < ma20[1]
+ribbon  = requireFalling ? (stacked and falling) : stacked
+crossed = close < maLine and close[1] >= maLine[1]
+belowAll = close < ma5 and close < ma10 and close < ma20 and close < maLine
+dist = maLine > 0 ? (maLine - close) / maLine : 0.0
+distOk = dist >= minBreakPct and (maxBreakPct <= 0 or dist <= maxBreakPct)
+
+prevDayMinOver = 10.0
+prevDayBars = 0
+foundPrevDay = false
+prevY = 0
+prevM = 0
+prevD = 0
+for i = 1 to 120
+    if prevDayBars >= priorLookback
+        break
+    sameToday = year[i] == year and month[i] == month and dayofmonth[i] == dayofmonth
+    if sameToday
+        continue
+    if not foundPrevDay
+        foundPrevDay := true
+        prevY := year[i]
+        prevM := month[i]
+        prevD := dayofmonth[i]
+    if year[i] != prevY or month[i] != prevM or dayofmonth[i] != prevD
+        break
+    if not na(maLine[i]) and maLine[i] != 0
+        ov = (close[i] - maLine[i]) / maLine[i]
+        prevDayMinOver := math.min(prevDayMinOver, ov)
+        prevDayBars += 1
+
+priorOk = minPriorOverPct <= 0 or (prevDayBars >= priorMinBars and prevDayMinOver >= minPriorOverPct)
+
+var bool firedToday = false
+if ta.change(time("D")) != 0
+    firedToday := false
+
+raw = ribbon and crossed and belowAll and distOk and priorOk
+sig = raw and (not onePerDay or not firedToday)
+if sig
+    firedToday := true
+
+plot(ma5, "5MA", color=color.new(#3b82f6, 0), linewidth=2)
+plot(ma10, "10MA", color=color.new(#22c55e, 0), linewidth=2)
+plot(ma20, "20MA", color=color.new(#f59e0b, 0), linewidth=2)
+plot(ma60, "60MA", color=color.new(#14b8a6, 0), linewidth=2)
+plot(ma120, "120MA", color=color.new(#a855f7, 0))
+plot(ma240, "240MA", color=color.new(#f472b6, 0))
+
+plotshape(sig, title="空排跌破均線", style=shape.triangledown, location=location.abovebar, color=color.green, size=size.small)
+alertcondition(sig, title="空排跌破均線", message="五分K：箱體站上後 5<10<20 真下穿均線")
