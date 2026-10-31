@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>幣安 1h MA25 品質 A · 2026-10-17 至 2026-10-30</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}
+.page{max-width:720px;margin:0 auto;padding:16px 14px 48px}
+h1{font-size:20px;margin:0 0 8px}
+h2{font-size:16px;margin:22px 0 8px}
+p,li{font-size:14px;line-height:1.55}
+.muted{color:#8b949e}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.stat{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:10px 12px;min-width:120px}
+.stat b{display:block;font-size:18px;margin-top:4px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:12px;margin:14px 0}
+.card header{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.meta{color:#8b949e;font-size:13px}
+pre{white-space:pre-wrap;background:#0d1117;border-radius:8px;padding:10px;font-size:12px;line-height:1.5}
+img{width:100%;border-radius:8px;display:block}
+.win{color:#00c805;font-weight:700} .loss{color:#ff5252;font-weight:700} .flat{color:#8b949e;font-weight:700}
+ol{padding-left:1.2em}
+</style></head><body><div class="page">
+<h1>幣安 1 小時 MA25 下破底 · 品質 A</h1>
+<p class="muted">回測區間：2026-10-17 00:00 至 2026-10-30 23:59（台北時間）。只統計進場落在這段的訊號。最後一根已收盤 1h：2026-10-30 21:00。未下單。未扣手續費、資金費與稅。</p>
+<h2>觸發規則（照 examples/binance_1h_ma25_reclaim.py 寬鬆預設）</h2>
+<ol>
+<li>週期：幣安 U 本位永續 1 小時 K。均線用收盤價 SMA。尚未收盤的當根 K 丟掉。</li>
+<li>標的：回測當下狀態為 TRADING、報價 USDT、契約為 PERPETUAL 或 TRADIFI_PERPETUAL、且不是 INDEX 的永續。24 小時成交額 ≥ 800 萬 USDT。再取成交額最高的 80 檔；AVGOUSDT、ONDSUSDT、BTCUSDT、ETHUSDT、SOLUSDT、BNBUSDT 一定保留。這份名單用的是執行當下的 24 小時成交額，不是 10 月 17 日當時的排名。本次 80 檔：BTCUSDT、ETHUSDT、BNBUSDT、SOLUSDT、AVGOUSDT、ONDSUSDT、SOXLUSDT、SNDKUSDT、ZECUSDT、HYPEUSDT、XAUUSDT、SKHYNIXUSDT、1000PEPEUSDT、CLUSDT、INTCUSDT、XRPUSDT、XAGUSDT、KORUUSDT、NEARUSDT、GOOGLUSDT、SKHYUSDT、ENAUSDT、BZUSDT、MUUSDT、DOGEUSDT、SNXXUSDT、UNIUSDT、SPCXUSDT、TRXUSDT、SOXSUSDT、MSTRUSDT、PARTIUSDT、CRCLUSDT、SUIUSDT、WLDUSDT、INTWUSDT、LINKUSDT、ADAUSDT、AAVEUSDT、NVDAUSDT、PUMPUSDT、IDOLUSDT、QUSDT、AVAXUSDT、QQQUSDT、TAOUSDT、SAMSUNGUSDT、DRAMUSDT、MUUUSDT、LITUSDT、XMRUSDT、EWYUSDT、FILUSDT、ONDOUSDT、LSKUSDT、TSLAUSDT、BCHUSDT、AMZNUSDT、BLESSUSDT、ARBUSDT、BEAMXUSDT、AMDUSDT、TRUMPUSDT、AINUSDT、TQQQUSDT、COINUSDT、PENGUUSDT、ZROUSDT、MRVLUSDT、LTCUSDT、SPYUSDT、INJUSDT、QNTUSDT、APRUSDT、LITEUSDT、PAXGUSDT、ASTERUSDT、EVAAUSDT、AAPLUSDT、MVLLUSDT。</li>
+<li>一波的起點：某一根 1h 收盤 &lt; MA25，而且前一根收盤 ≥ 前一根 MA25。</li>
+<li>在 MA25 下停留 4 到 36 根（含）。中間最多連續 2 根收盤站上 MA25，不算這波結束；第 3 根仍在上方才結束。</li>
+<li>這波之後要有一根收盤重新站上 MA25，才繼續往下看。沒有站回就沒有訊號。</li>
+<li>深度：這波起點到破底棒之間，MA25 的最高值減去最低價，再除以該 MA25，必須 ≥ 1.8%。</li>
+<li>破底棒是這波最低價那根。它的低點必須 ≤ 含自己在內往前 16 根的最低價（近 16 小時新低）。</li>
+<li>急殺幅度、急殺 ATR 倍數的門檻是 0，所以這兩項寬鬆版不擋。破前低門檻也是 0：破底低點若高於急殺前 12 根的最低價（under cut 為負），這筆會被丟掉。</li>
+<li>不要求「先做一腳、吻回 MA25、再破底」的嚴格 W。圖上的 V / W 只用來算品質：區間至少 6 根、兩個擺動低點相隔至少 3 根、中間反彈至少 0.8%，才標成 W。</li>
+<li>進場：破底棒的下一根起、36 根以內，第一根同時滿足收盤 &gt; MA7 &gt; MA14 &gt; MA25。進場價是該根收盤。同一檔兩筆進場至少相隔 8 根。</li>
+<li>品質 A：多頭排列先得 1 分，再從「深度 ≥ 2.5%」「進場量 ÷ 前 20 根均量 ≥ 1.35」「型態是 W」裡至少再拿 2 分（總分 ≥ 3）。不到 A 不進。MA99、MA120、MA200 只畫在圖上，不參與條件。</li>
+<li>停損價是破底那根的低點。進場之後，第一根收盤低於這個價就停損，成交價用那根收盤，不是停損價本身。影線刺破不算。</li>
+<li>停利是 2R：進場價 + 2 ×（進場價 − 破底低點）。之後若某根最高價碰到目標，成交價記在目標價。</li>
+<li>同一根若收盤已跌破停損、高點又碰到 2R，先算停損。</li>
+<li>連兩根收盤又低於 MA25，用第二根收盤出場（lost_ma25）。中間有一根收盤回到 MA25 上，連續計數歸零。</li>
+<li>以上都沒發生，進場後第 36 根用該根收盤出場（timeout）。若 K 線資料在滿 36 根前結束，程式仍把最後一根收盤記成 timeout。</li>
+</ol>
+<h2>統計</h2>
+<p class="muted">每筆獨立計算，沒有一次一單、沒有複利。勝率只算報酬 &gt; 0。報酬 = 出場價 / 進場價 − 1。未扣手續費、資金費與稅。讀取失敗：無。</p>
+<div class="stats">
+<div class="stat">訊號數<b>162</b></div>
+<div class="stat">勝率<b>21.0%</b></div>
+<div class="stat">平均報酬<b>-0.46%</b></div>
+<div class="stat">中位數<b>-1.27%</b></div>
+<div class="stat">最好<b>QUSDT 10-27 02:00 +106.20%</b></div>
+<div class="stat">最差<b>QUSDT 10-28 23:00 -21.77%</b></div>
+</div>
+<h2>每一筆</h2>
+<p class="muted">上圖是 1h，下圖是 4h 對照。黃 MA7、青 MA14、粉 MA25、紫 MA99、綠 MA120、酒紅 MA200。粉點是破底，綠三角是進場，出場在圖上的出場棒。</p>
+<article class='card'><header><b>#1 BZUSDT</b> <span class='win'>+0.60%</span></header><p class='meta'>2026-10-17 00:00 進 → 10-18 07:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 106.15（排列那根 1h 收盤）
+停損 101.24（破底低點；收盤跌破才出，距離 4.63%）
+停利 115.97（2R）
+出場 106.79
+破底 101.24  深度 2.22%  在下 19h  量比 5.31x
+進場均線 MA7 103.79  MA14 103.224  MA25 103.148</pre><img alt='#1 BZUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t001.png'/></article><article class='card'><header><b>#2 LSKUSDT</b> <span class='loss'>-4.26%</span></header><p class='meta'>2026-10-17 20:00 進 → 10-18 14:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.21376（排列那根 1h 收盤）
+停損 0.18975（破底低點；收盤跌破才出，距離 11.23%）
+停利 0.26178（2R）
+出場 0.20465
+破底 0.18975  深度 5.33%  在下 20h  量比 5.42x
+進場均線 MA7 0.200753  MA14 0.196934  MA25 0.19692</pre><img alt='#2 LSKUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t002.png'/></article><article class='card'><header><b>#3 ONDSUSDT</b> <span class='loss'>-1.54%</span></header><p class='meta'>2026-10-17 23:00 進 → 10-18 06:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 6.095（排列那根 1h 收盤）
+停損 5.919（破底低點；收盤跌破才出，距離 2.89%）
+停利 6.447（2R）
+出場 6.001
+破底 5.919  深度 6.74%  在下 26h  量比 1.48x
+進場均線 MA7 6.08914  MA14 6.08636  MA25 6.07536</pre><img alt='#3 ONDSUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t003.png'/></article><article class='card'><header><b>#4 MSTRUSDT</b> <span class='loss'>-1.62%</span></header><p class='meta'>2026-10-18 17:00 進 → 10-18 22:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 137.91（排列那根 1h 收盤）
+停損 133.1（破底低點；收盤跌破才出，距離 3.49%）
+停利 147.53（2R）
+出場 135.67
+破底 133.1  深度 9.96%  在下 35h  量比 1.22x
+進場均線 MA7 137.256  MA14 136.811  MA25 136.517</pre><img alt='#4 MSTRUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t004.png'/></article><article class='card'><header><b>#5 UNIUSDT</b> <span class='loss'>-3.86%</span></header><p class='meta'>2026-10-18 17:00 進 → 10-18 22:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 7.305（排列那根 1h 收盤）
+停損 6.983（破底低點；收盤跌破才出，距離 4.41%）
+停利 7.949（2R）
+出場 7.023
+破底 6.983  深度 4.33%  在下 14h  量比 1.54x
+進場均線 MA7 7.24657  MA14 7.21129  MA25 7.1978</pre><img alt='#5 UNIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t005.png'/></article><article class='card'><header><b>#6 PARTIUSDT</b> <span class='loss'>-4.23%</span></header><p class='meta'>2026-10-18 19:00 進 → 10-18 22:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.03001（排列那根 1h 收盤）
+停損 0.02823（破底低點；收盤跌破才出，距離 5.93%）
+停利 0.03357（2R）
+出場 0.02874
+破底 0.02823  深度 16.52%  在下 26h  量比 0.41x
+進場均線 MA7 0.0300071  MA14 0.0296314  MA25 0.0295976</pre><img alt='#6 PARTIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t006.png'/></article><article class='card'><header><b>#7 ETHUSDT</b> <span class='loss'>-1.70%</span></header><p class='meta'>2026-10-18 20:00 進 → 10-18 22:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 2416.89（排列那根 1h 收盤）
+停損 2355（破底低點；收盤跌破才出，距離 2.56%）
+停利 2540.67（2R）
+出場 2375.73
+破底 2355  深度 3.04%  在下 21h  量比 0.47x
+進場均線 MA7 2414.74  MA14 2413.06  MA25 2412.26</pre><img alt='#7 ETHUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t007.png'/></article><article class='card'><header><b>#8 AVGOUSDT</b> <span class='win'>+0.54%</span></header><p class='meta'>2026-10-19 08:00 進 → 10-20 04:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 334.05（排列那根 1h 收盤）
+停損 323.93（破底低點；收盤跌破才出，距離 3.03%）
+停利 354.29（2R）
+出場 335.85
+破底 323.93  深度 2.05%  在下 24h  量比 9.16x
+進場均線 MA7 329.584  MA14 328.81  MA25 328.736</pre><img alt='#8 AVGOUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t008.png'/></article><article class='card'><header><b>#9 ONDSUSDT</b> <span class='loss'>-1.55%</span></header><p class='meta'>2026-10-19 10:00 進 → 10-20 04:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 6.182（排列那根 1h 收盤）
+停損 5.893（破底低點；收盤跌破才出，距離 4.67%）
+停利 6.76（2R）
+出場 6.086
+破底 5.893  深度 3.11%  在下 25h  量比 0.87x
+進場均線 MA7 6.047  MA14 6.00686  MA25 6.00568</pre><img alt='#9 ONDSUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t009.png'/></article><article class='card'><header><b>#10 KORUUSDT</b> <span class='loss'>-4.41%</span></header><p class='meta'>2026-10-19 10:00 進 → 10-20 08:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 11.78（排列那根 1h 收盤）
+停損 10.01（破底低點；收盤跌破才出，距離 15.03%）
+停利 15.32（2R）
+出場 11.26
+破底 10.01  深度 4.59%  在下 8h  量比 2.97x
+進場均線 MA7 10.9229  MA14 10.555  MA25 10.5396</pre><img alt='#10 KORUUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t010.png'/></article><article class='card'><header><b>#11 LITEUSDT</b> <span class='loss'>-1.87%</span></header><p class='meta'>2026-10-19 10:00 進 → 10-20 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 851.56（排列那根 1h 收盤）
+停損 816.22（破底低點；收盤跌破才出，距離 4.15%）
+停利 922.24（2R）
+出場 835.67
+破底 816.22  深度 6.17%  在下 31h  量比 1.35x
+進場均線 MA7 830.457  MA14 818.54  MA25 817.772</pre><img alt='#11 LITEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t011.png'/></article><article class='card'><header><b>#12 SKHYNIXUSDT</b> <span class='loss'>-3.65%</span></header><p class='meta'>2026-10-19 11:00 進 → 10-20 08:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 950.21（排列那根 1h 收盤）
+停損 882.17（破底低點；收盤跌破才出，距離 7.16%）
+停利 1086.29（2R）
+出場 915.56
+破底 882.17  深度 2.86%  在下 8h  量比 2.41x
+進場均線 MA7 924.983  MA14 909.123  MA25 908.221</pre><img alt='#12 SKHYNIXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t012.png'/></article><article class='card'><header><b>#13 QUSDT</b> <span class='loss'>-16.94%</span></header><p class='meta'>2026-10-19 11:00 進 → 10-19 22:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 0.148842（排列那根 1h 收盤）
+停損 0.087012（破底低點；收盤跌破才出，距離 41.54%）
+停利 0.272502（2R）
+出場 0.123634
+破底 0.087012  深度 22.30%  在下 5h  量比 2.19x
+進場均線 MA7 0.119919  MA14 0.119536  MA25 0.118844</pre><img alt='#13 QUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t013.png'/></article><article class='card'><header><b>#14 SOLUSDT</b> <span class='loss'>-1.61%</span></header><p class='meta'>2026-10-19 13:00 進 → 10-20 02:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 105.66（排列那根 1h 收盤）
+停損 101.16（破底低點；收盤跌破才出，距離 4.26%）
+停利 114.66（2R）
+出場 103.96
+破底 101.16  深度 3.19%  在下 21h  量比 0.55x
+進場均線 MA7 105.017  MA14 103.519  MA25 103.431</pre><img alt='#14 SOLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t014.png'/></article><article class='card'><header><b>#15 ZECUSDT</b> <span class='loss'>-3.09%</span></header><p class='meta'>2026-10-19 13:00 進 → 10-20 02:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1165.43（排列那根 1h 收盤）
+停損 1048.09（破底低點；收盤跌破才出，距離 10.07%）
+停利 1400.11（2R）
+出場 1129.36
+破底 1048.09  深度 10.01%  在下 34h  量比 0.73x
+進場均線 MA7 1161.26  MA14 1121.66  MA25 1121.57</pre><img alt='#15 ZECUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t015.png'/></article><article class='card'><header><b>#16 XRPUSDT</b> <span class='loss'>-0.93%</span></header><p class='meta'>2026-10-19 13:00 進 → 10-20 04:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1.3128（排列那根 1h 收盤）
+停損 1.2553（破底低點；收盤跌破才出，距離 4.38%）
+停利 1.4278（2R）
+出場 1.3006
+破底 1.2553  深度 3.13%  在下 10h  量比 0.53x
+進場均線 MA7 1.31011  MA14 1.29185  MA25 1.29116</pre><img alt='#16 XRPUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t016.png'/></article><article class='card'><header><b>#17 LITUSDT</b> <span class='loss'>-3.71%</span></header><p class='meta'>2026-10-19 13:00 進 → 10-20 00:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 3.1688（排列那根 1h 收盤）
+停損 2.8258（破底低點；收盤跌破才出，距離 10.82%）
+停利 3.8548（2R）
+出場 3.0512
+破底 2.8258  深度 11.14%  在下 34h  量比 0.64x
+進場均線 MA7 3.1422  MA14 3.02633  MA25 3.0238</pre><img alt='#17 LITUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t017.png'/></article><article class='card'><header><b>#18 NEARUSDT</b> <span class='loss'>-2.14%</span></header><p class='meta'>2026-10-19 14:00 進 → 10-20 02:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 5.049（排列那根 1h 收盤）
+停損 4.616（破底低點；收盤跌破才出，距離 8.58%）
+停利 5.915（2R）
+出場 4.941
+破底 4.616  深度 9.24%  在下 34h  量比 0.44x
+進場均線 MA7 5.04271  MA14 4.9195  MA25 4.90632</pre><img alt='#18 NEARUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t018.png'/></article><article class='card'><header><b>#19 BCHUSDT</b> <span class='loss'>-0.56%</span></header><p class='meta'>2026-10-19 14:00 進 → 10-20 14:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 279.2（排列那根 1h 收盤）
+停損 270.3（破底低點；收盤跌破才出，距離 3.19%）
+停利 297（2R）
+出場 277.63
+破底 270.3  深度 2.90%  在下 19h  量比 0.57x
+進場均線 MA7 277.674  MA14 273.716  MA25 273.426</pre><img alt='#19 BCHUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t019.png'/></article><article class='card'><header><b>#20 AINUSDT</b> <span class='loss'>-1.93%</span></header><p class='meta'>2026-10-19 14:00 進 → 10-19 22:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.04042（排列那根 1h 收盤）
+停損 0.03838（破底低點；收盤跌破才出，距離 5.05%）
+停利 0.0445（2R）
+出場 0.03964
+破底 0.03838  深度 8.91%  在下 26h  量比 0.65x
+進場均線 MA7 0.0402543  MA14 0.0398479  MA25 0.0396908</pre><img alt='#20 AINUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t020.png'/></article><article class='card'><header><b>#21 ETHUSDT</b> <span class='loss'>-1.15%</span></header><p class='meta'>2026-10-19 15:00 進 → 10-20 00:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 2429.45（排列那根 1h 收盤）
+停損 2327.32（破底低點；收盤跌破才出，距離 4.20%）
+停利 2633.71（2R）
+出場 2401.63
+破底 2327.32  深度 3.47%  在下 10h  量比 1.00x
+進場均線 MA7 2427.18  MA14 2402.21  MA25 2400.26</pre><img alt='#21 ETHUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t021.png'/></article><article class='card'><header><b>#22 UNIUSDT</b> <span class='loss'>-3.31%</span></header><p class='meta'>2026-10-19 15:00 進 → 10-20 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 7.437（排列那根 1h 收盤）
+停損 6.806（破底低點；收盤跌破才出，距離 8.48%）
+停利 8.699（2R）
+出場 7.191
+破底 6.806  深度 5.34%  在下 9h  量比 1.26x
+進場均線 MA7 7.34829  MA14 7.18229  MA25 7.1688</pre><img alt='#22 UNIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t022.png'/></article><article class='card'><header><b>#23 WLDUSDT</b> <span class='win'>+11.33%</span></header><p class='meta'>2026-10-19 16:00 進 → 10-20 22:00 出 · 2R 停利 · QA · W</p><pre>進場 0.5065（排列那根 1h 收盤）
+停損 0.4778（破底低點；收盤跌破才出，距離 5.67%）
+停利 0.5639（2R）
+出場 0.5639
+破底 0.4778  深度 7.76%  在下 22h  量比 1.22x
+進場均線 MA7 0.497757  MA14 0.486993  MA25 0.48682</pre><img alt='#23 WLDUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t023.png'/></article><article class='card'><header><b>#24 APRUSDT</b> <span class='loss'>-15.15%</span></header><p class='meta'>2026-10-19 16:00 進 → 10-19 19:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.02925（排列那根 1h 收盤）
+停損 0.02279（破底低點；收盤跌破才出，距離 22.09%）
+停利 0.04217（2R）
+出場 0.02482
+破底 0.02279  深度 50.22%  在下 36h  量比 0.60x
+進場均線 MA7 0.0288929  MA14 0.0288043  MA25 0.027752</pre><img alt='#24 APRUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t024.png'/></article><article class='card'><header><b>#25 ASTERUSDT</b> <span class='loss'>-1.28%</span></header><p class='meta'>2026-10-19 17:00 進 → 10-20 18:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 0.709（排列那根 1h 收盤）
+停損 0.6784（破底低點；收盤跌破才出，距離 4.32%）
+停利 0.7702（2R）
+出場 0.6999
+破底 0.6784  深度 3.89%  在下 13h  量比 2.29x
+進場均線 MA7 0.705171  MA14 0.700686  MA25 0.700232</pre><img alt='#25 ASTERUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t025.png'/></article><article class='card'><header><b>#26 LSKUSDT</b> <span class='loss'>-4.39%</span></header><p class='meta'>2026-10-19 18:00 進 → 10-20 09:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.2022（排列那根 1h 收盤）
+停損 0.18045（破底低點；收盤跌破才出，距離 10.76%）
+停利 0.2457（2R）
+出場 0.19333
+破底 0.18045  深度 12.88%  在下 24h  量比 0.90x
+進場均線 MA7 0.201777  MA14 0.194141  MA25 0.193324</pre><img alt='#26 LSKUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t026.png'/></article><article class='card'><header><b>#27 SOXSUSDT</b> <span class='loss'>-5.14%</span></header><p class='meta'>2026-10-20 08:00 進 → 10-20 23:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 48.09（排列那根 1h 收盤）
+停損 43.37（破底低點；收盤跌破才出，距離 9.81%）
+停利 57.53（2R）
+出場 45.62
+破底 43.37  深度 14.66%  在下 22h  量比 1.84x
+進場均線 MA7 46.6257  MA14 45.815  MA25 45.716</pre><img alt='#27 SOXSUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t027.png'/></article><article class='card'><header><b>#28 PARTIUSDT</b> <span class='loss'>-1.64%</span></header><p class='meta'>2026-10-20 08:00 進 → 10-20 18:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.0298（排列那根 1h 收盤）
+停損 0.02828（破底低點；收盤跌破才出，距離 5.10%）
+停利 0.03284（2R）
+出場 0.02931
+破底 0.02828  深度 4.31%  在下 28h  量比 0.78x
+進場均線 MA7 0.02977  MA14 0.029365  MA25 0.0293452</pre><img alt='#28 PARTIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t028.png'/></article><article class='card'><header><b>#29 BLESSUSDT</b> <span class='win'>+7.46%</span></header><p class='meta'>2026-10-20 20:00 進 → 10-22 08:00 出 · 持有滿 36 小時 · QA · W</p><pre>進場 0.007511（排列那根 1h 收盤）
+停損 0.00693（破底低點；收盤跌破才出，距離 7.74%）
+停利 0.008673（2R）
+出場 0.008071
+破底 0.00693  深度 4.17%  在下 26h  量比 4.95x
+進場均線 MA7 0.007144  MA14 0.00710293  MA25 0.00709696</pre><img alt='#29 BLESSUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t029.png'/></article><article class='card'><header><b>#30 ETHUSDT</b> <span class='loss'>-1.24%</span></header><p class='meta'>2026-10-20 22:00 進 → 10-22 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 2471.45（排列那根 1h 收盤）
+停損 2370.74（破底低點；收盤跌破才出，距離 4.07%）
+停利 2672.87（2R）
+出場 2440.84
+破底 2370.74  深度 1.81%  在下 24h  量比 8.44x
+進場均線 MA7 2401.98  MA14 2401.45  MA25 2401.27</pre><img alt='#30 ETHUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t030.png'/></article><article class='card'><header><b>#31 SUIUSDT</b> <span class='loss'>-1.12%</span></header><p class='meta'>2026-10-20 22:00 進 → 10-22 07:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1.0405（排列那根 1h 收盤）
+停損 0.9755（破底低點；收盤跌破才出，距離 6.25%）
+停利 1.1705（2R）
+出場 1.0288
+破底 0.9755  深度 2.29%  在下 19h  量比 6.20x
+進場均線 MA7 1.00139  MA14 0.99835  MA25 0.995408</pre><img alt='#31 SUIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t031.png'/></article><article class='card'><header><b>#32 LINKUSDT</b> <span class='loss'>-0.84%</span></header><p class='meta'>2026-10-20 22:00 進 → 10-22 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 12.42（排列那根 1h 收盤）
+停損 11.83（破底低點；收盤跌破才出，距離 4.75%）
+停利 13.6（2R）
+出場 12.316
+破底 11.83  深度 1.89%  在下 21h  量比 6.59x
+進場均線 MA7 12.0291  MA14 12.0198  MA25 11.9939</pre><img alt='#32 LINKUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t032.png'/></article><article class='card'><header><b>#33 ADAUSDT</b> <span class='loss'>-1.99%</span></header><p class='meta'>2026-10-20 22:00 進 → 10-22 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.2257（排列那根 1h 收盤）
+停損 0.2145（破底低點；收盤跌破才出，距離 4.96%）
+停利 0.2481（2R）
+出場 0.2212
+破底 0.2145  深度 2.14%  在下 26h  量比 8.22x
+進場均線 MA7 0.2179  MA14 0.217721  MA25 0.217588</pre><img alt='#33 ADAUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t033.png'/></article><article class='card'><header><b>#34 FILUSDT</b> <span class='loss'>-3.28%</span></header><p class='meta'>2026-10-20 22:00 進 → 10-21 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1.0638（排列那根 1h 收盤）
+停損 0.9962（破底低點；收盤跌破才出，距離 6.35%）
+停利 1.199（2R）
+出場 1.0289
+破底 0.9962  深度 3.86%  在下 26h  量比 5.88x
+進場均線 MA7 1.01744  MA14 1.01566  MA25 1.01421</pre><img alt='#34 FILUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t034.png'/></article><article class='card'><header><b>#35 MSTRUSDT</b> <span class='win'>+2.80%</span></header><p class='meta'>2026-10-20 23:00 進 → 10-22 11:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 144.39（排列那根 1h 收盤）
+停損 133.54（破底低點；收盤跌破才出，距離 7.51%）
+停利 166.09（2R）
+出場 148.43
+破底 133.54  深度 3.89%  在下 21h  量比 3.19x
+進場均線 MA7 138.03  MA14 136.949  MA25 136.878</pre><img alt='#35 MSTRUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t035.png'/></article><article class='card'><header><b>#36 CRCLUSDT</b> <span class='win'>+2.40%</span></header><p class='meta'>2026-10-20 23:00 進 → 10-22 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 85.3（排列那根 1h 收盤）
+停損 80.02（破底低點；收盤跌破才出，距離 6.19%）
+停利 95.86（2R）
+出場 87.35
+破底 80.02  深度 4.21%  在下 24h  量比 2.91x
+進場均線 MA7 82.6171  MA14 82.1764  MA25 82.0808</pre><img alt='#36 CRCLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t036.png'/></article><article class='card'><header><b>#37 AAVEUSDT</b> <span class='win'>+1.84%</span></header><p class='meta'>2026-10-20 23:00 進 → 10-22 07:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 152.04（排列那根 1h 收盤）
+停損 146.71（破底低點；收盤跌破才出，距離 3.51%）
+停利 162.7（2R）
+出場 154.83
+破底 146.71  深度 3.06%  在下 16h  量比 4.22x
+進場均線 MA7 150.677  MA14 150.374  MA25 149.57</pre><img alt='#37 AAVEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t037.png'/></article><article class='card'><header><b>#38 TRUMPUSDT</b> <span class='win'>+1.53%</span></header><p class='meta'>2026-10-20 23:00 進 → 10-22 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1.768（排列那根 1h 收盤）
+停損 1.664（破底低點；收盤跌破才出，距離 5.88%）
+停利 1.976（2R）
+出場 1.795
+破底 1.664  深度 2.94%  在下 20h  量比 2.79x
+進場均線 MA7 1.71571  MA14 1.70529  MA25 1.70428</pre><img alt='#38 TRUMPUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t038.png'/></article><article class='card'><header><b>#39 AINUSDT</b> <span class='loss'>-1.83%</span></header><p class='meta'>2026-10-20 23:00 進 → 10-21 14:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.04054（排列那根 1h 收盤）
+停損 0.03499（破底低點；收盤跌破才出，距離 13.69%）
+停利 0.05164（2R）
+出場 0.0398
+破底 0.03499  深度 12.76%  在下 20h  量比 1.48x
+進場均線 MA7 0.0391214  MA14 0.0380007  MA25 0.0380004</pre><img alt='#39 AINUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t039.png'/></article><article class='card'><header><b>#40 TAOUSDT</b> <span class='loss'>-0.42%</span></header><p class='meta'>2026-10-21 00:00 進 → 10-22 07:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 272.92（排列那根 1h 收盤）
+停損 261.81（破底低點；收盤跌破才出，距離 4.07%）
+停利 295.14（2R）
+出場 271.77
+破底 261.81  深度 3.02%  在下 20h  量比 1.56x
+進場均線 MA7 268.449  MA14 266.797  MA25 266.688</pre><img alt='#40 TAOUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t040.png'/></article><article class='card'><header><b>#41 COINUSDT</b> <span class='win'>+0.56%</span></header><p class='meta'>2026-10-21 01:00 進 → 10-22 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 171.98（排列那根 1h 收盤）
+停損 166（破底低點；收盤跌破才出，距離 3.48%）
+停利 183.94（2R）
+出場 172.94
+破底 166  深度 4.79%  在下 24h  量比 0.77x
+進場均線 MA7 170.586  MA14 169.105  MA25 169.071</pre><img alt='#41 COINUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t041.png'/></article><article class='card'><header><b>#42 INTCUSDT</b> <span class='loss'>-2.36%</span></header><p class='meta'>2026-10-21 04:00 進 → 10-21 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 93.97（排列那根 1h 收盤）
+停損 88.97（破底低點；收盤跌破才出，距離 5.32%）
+停利 103.97（2R）
+出場 91.75
+破底 88.97  深度 4.31%  在下 19h  量比 1.70x
+進場均線 MA7 93.0214  MA14 91.9  MA25 91.8704</pre><img alt='#42 INTCUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t042.png'/></article><article class='card'><header><b>#43 UNIUSDT</b> <span class='win'>+0.05%</span></header><p class='meta'>2026-10-21 04:00 進 → 10-22 07:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 7.446（排列那根 1h 收盤）
+停損 7.089（破底低點；收盤跌破才出，距離 4.79%）
+停利 8.16（2R）
+出場 7.45
+破底 7.089  深度 3.09%  在下 19h  量比 0.56x
+進場均線 MA7 7.38943  MA14 7.27629  MA25 7.27008</pre><img alt='#43 UNIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t043.png'/></article><article class='card'><header><b>#44 INTWUSDT</b> <span class='loss'>-4.60%</span></header><p class='meta'>2026-10-21 04:00 進 → 10-21 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 18.68（排列那根 1h 收盤）
+停損 16.73（破底低點；收盤跌破才出，距離 10.44%）
+停利 22.58（2R）
+出場 17.82
+破底 16.73  深度 8.62%  在下 19h  量比 1.17x
+進場均線 MA7 18.3157  MA14 17.8857  MA25 17.872</pre><img alt='#44 INTWUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t044.png'/></article><article class='card'><header><b>#45 AVAXUSDT</b> <span class='loss'>-1.26%</span></header><p class='meta'>2026-10-21 04:00 進 → 10-21 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 9.773（排列那根 1h 收盤）
+停損 9.382（破底低點；收盤跌破才出，距離 4.00%）
+停利 10.555（2R）
+出場 9.65
+破底 9.382  深度 3.06%  在下 22h  量比 0.69x
+進場均線 MA7 9.70886  MA14 9.58629  MA25 9.57956</pre><img alt='#45 AVAXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t045.png'/></article><article class='card'><header><b>#46 QNTUSDT</b> <span class='loss'>-0.73%</span></header><p class='meta'>2026-10-21 04:00 進 → 10-21 22:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 197.17（排列那根 1h 收盤）
+停損 189.3（破底低點；收盤跌破才出，距離 3.99%）
+停利 212.91（2R）
+出場 195.74
+破底 189.3  深度 3.74%  在下 19h  量比 1.09x
+進場均線 MA7 196.571  MA14 194.815  MA25 194.797</pre><img alt='#46 QNTUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t046.png'/></article><article class='card'><header><b>#47 SOXLUSDT</b> <span class='loss'>-2.41%</span></header><p class='meta'>2026-10-21 05:00 進 → 10-21 22:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 103.87（排列那根 1h 收盤）
+停損 91.56（破底低點；收盤跌破才出，距離 11.85%）
+停利 128.49（2R）
+出場 101.37
+破底 91.56  深度 9.08%  在下 19h  量比 0.36x
+進場均線 MA7 100.59  MA14 98.2843  MA25 97.8376</pre><img alt='#47 SOXLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t047.png'/></article><article class='card'><header><b>#48 SPCXUSDT</b> <span class='win'>+1.95%</span></header><p class='meta'>2026-10-21 05:00 進 → 10-22 02:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 155.7（排列那根 1h 收盤）
+停損 143.62（破底低點；收盤跌破才出，距離 7.76%）
+停利 179.86（2R）
+出場 158.74
+破底 143.62  深度 3.26%  在下 19h  量比 2.24x
+進場均線 MA7 149.857  MA14 148.427  MA25 148.391</pre><img alt='#48 SPCXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t048.png'/></article><article class='card'><header><b>#49 NVDAUSDT</b> <span class='loss'>-0.79%</span></header><p class='meta'>2026-10-21 05:00 進 → 10-22 07:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 221.3（排列那根 1h 收盤）
+停損 213.17（破底低點；收盤跌破才出，距離 3.67%）
+停利 237.56（2R）
+出場 219.55
+破底 213.17  深度 2.09%  在下 21h  量比 1.69x
+進場均線 MA7 218.401  MA14 217.415  MA25 217.376</pre><img alt='#49 NVDAUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t049.png'/></article><article class='card'><header><b>#50 SKHYNIXUSDT</b> <span class='win'>+1.00%</span></header><p class='meta'>2026-10-21 06:00 進 → 10-22 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 957.59（排列那根 1h 收盤）
+停損 897.34（破底低點；收盤跌破才出，距離 6.29%）
+停利 1078.09（2R）
+出場 967.12
+破底 897.34  深度 6.60%  在下 21h  量比 0.37x
+進場均線 MA7 942.427  MA14 931.286  MA25 930.917</pre><img alt='#50 SKHYNIXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t050.png'/></article><article class='card'><header><b>#51 KORUUSDT</b> <span class='loss'>-2.80%</span></header><p class='meta'>2026-10-21 06:00 進 → 10-21 22:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 12.15（排列那根 1h 收盤）
+停損 10.58（破底低點；收盤跌破才出，距離 12.92%）
+停利 15.29（2R）
+出場 11.81
+破底 10.58  深度 12.40%  在下 18h  量比 0.42x
+進場均線 MA7 11.7057  MA14 11.3864  MA25 11.3648</pre><img alt='#51 KORUUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t051.png'/></article><article class='card'><header><b>#52 EWYUSDT</b> <span class='loss'>-0.94%</span></header><p class='meta'>2026-10-21 06:00 進 → 10-21 22:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 157.87（排列那根 1h 收盤）
+停損 150.87（破底低點；收盤跌破才出，距離 4.43%）
+停利 171.87（2R）
+出場 156.39
+破底 150.87  深度 4.17%  在下 15h  量比 0.92x
+進場均線 MA7 155.84  MA14 154.436  MA25 154.314</pre><img alt='#52 EWYUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t052.png'/></article><article class='card'><header><b>#53 LITEUSDT</b> <span class='loss'>-1.97%</span></header><p class='meta'>2026-10-21 06:00 進 → 10-22 02:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 868.17（排列那根 1h 收盤）
+停損 786.75（破底低點；收盤跌破才出，距離 9.38%）
+停利 1031.01（2R）
+出場 851.06
+破底 786.75  深度 7.36%  在下 26h  量比 1.14x
+進場均線 MA7 838.549  MA14 829.849  MA25 828.205</pre><img alt='#53 LITEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t053.png'/></article><article class='card'><header><b>#54 LSKUSDT</b> <span class='loss'>-3.28%</span></header><p class='meta'>2026-10-21 07:00 進 → 10-21 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.1983（排列那根 1h 收盤）
+停損 0.18939（破底低點；收盤跌破才出，距離 4.49%）
+停利 0.21612（2R）
+出場 0.19179
+破底 0.18939  深度 5.72%  在下 20h  量比 0.53x
+進場均線 MA7 0.19679  MA14 0.196035  MA25 0.195885</pre><img alt='#54 LSKUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t054.png'/></article><article class='card'><header><b>#55 NEARUSDT</b> <span class='win'>+2.56%</span></header><p class='meta'>2026-10-21 08:00 進 → 10-22 11:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 4.995（排列那根 1h 收盤）
+停損 4.628（破底低點；收盤跌破才出，距離 7.35%）
+停利 5.729（2R）
+出場 5.123
+破底 4.628  深度 7.16%  在下 23h  量比 0.70x
+進場均線 MA7 4.93857  MA14 4.89286  MA25 4.8466</pre><img alt='#55 NEARUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t055.png'/></article><article class='card'><header><b>#56 ARBUSDT</b> <span class='loss'>-2.32%</span></header><p class='meta'>2026-10-21 20:00 進 → 10-22 07:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.19238（排列那根 1h 收盤）
+停損 0.18619（破底低點；收盤跌破才出，距離 3.22%）
+停利 0.20476（2R）
+出場 0.18791
+破底 0.18619  深度 5.36%  在下 27h  量比 0.70x
+進場均線 MA7 0.190814  MA14 0.190456  MA25 0.190354</pre><img alt='#56 ARBUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t056.png'/></article><article class='card'><header><b>#57 XMRUSDT</b> <span class='win'>+0.14%</span></header><p class='meta'>2026-10-22 03:00 進 → 10-22 23:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 611.94（排列那根 1h 收盤）
+停損 571.02（破底低點；收盤跌破才出，距離 6.69%）
+停利 693.78（2R）
+出場 612.81
+破底 571.02  深度 6.76%  在下 18h  量比 0.37x
+進場均線 MA7 605.603  MA14 599.174  MA25 597.301</pre><img alt='#57 XMRUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t057.png'/></article><article class='card'><header><b>#58 SOXSUSDT</b> <span class='win'>+15.89%</span></header><p class='meta'>2026-10-22 07:00 進 → 10-23 03:00 出 · 2R 停利 · QA · W</p><pre>進場 46.44（排列那根 1h 收盤）
+停損 42.75（破底低點；收盤跌破才出，距離 7.95%）
+停利 53.82（2R）
+出場 53.82
+破底 42.75  深度 9.62%  在下 30h  量比 0.47x
+進場均線 MA7 45.0814  MA14 44.9479  MA25 44.6012</pre><img alt='#58 SOXSUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t058.png'/></article><article class='card'><header><b>#59 QUSDT</b> <span class='loss'>-6.14%</span></header><p class='meta'>2026-10-22 20:00 進 → 10-23 01:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.125622（排列那根 1h 收盤）
+停損 0.1085（破底低點；收盤跌破才出，距離 13.63%）
+停利 0.159866（2R）
+出場 0.117911
+破底 0.1085  深度 12.54%  在下 32h  量比 0.76x
+進場均線 MA7 0.122854  MA14 0.117207  MA25 0.116859</pre><img alt='#59 QUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t059.png'/></article><article class='card'><header><b>#60 PARTIUSDT</b> <span class='loss'>-1.23%</span></header><p class='meta'>2026-10-23 11:00 進 → 10-23 18:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.03326（排列那根 1h 收盤）
+停損 0.0315（破底低點；收盤跌破才出，距離 5.29%）
+停利 0.03678（2R）
+出場 0.03285
+破底 0.0315  深度 9.82%  在下 33h  量比 0.29x
+進場均線 MA7 0.0329414  MA14 0.0328729  MA25 0.0328628</pre><img alt='#60 PARTIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t060.png'/></article><article class='card'><header><b>#61 BLESSUSDT</b> <span class='loss'>-2.74%</span></header><p class='meta'>2026-10-23 11:00 進 → 10-24 04:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.008（排列那根 1h 收盤）
+停損 0.007526（破底低點；收盤跌破才出，距離 5.93%）
+停利 0.008948（2R）
+出場 0.007781
+破底 0.007526  深度 5.92%  在下 23h  量比 4.29x
+進場均線 MA7 0.00781286  MA14 0.00774007  MA25 0.00773572</pre><img alt='#61 BLESSUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t061.png'/></article><article class='card'><header><b>#62 CRCLUSDT</b> <span class='loss'>-1.19%</span></header><p class='meta'>2026-10-23 12:00 進 → 10-24 02:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 86.62（排列那根 1h 收盤）
+停損 84.76（破底低點；收盤跌破才出，距離 2.15%）
+停利 90.34（2R）
+出場 85.59
+破底 84.76  深度 4.12%  在下 25h  量比 0.26x
+進場均線 MA7 86.4129  MA14 86.2521  MA25 86.2464</pre><img alt='#62 CRCLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t062.png'/></article><article class='card'><header><b>#63 BCHUSDT</b> <span class='loss'>-1.56%</span></header><p class='meta'>2026-10-23 12:00 進 → 10-24 07:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 286.69（排列那根 1h 收盤）
+停損 271.6（破底低點；收盤跌破才出，距離 5.26%）
+停利 316.87（2R）
+出場 282.23
+破底 271.6  深度 5.30%  在下 26h  量比 2.84x
+進場均線 MA7 279.921  MA14 276.949  MA25 276.644</pre><img alt='#63 BCHUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t063.png'/></article><article class='card'><header><b>#64 ENAUSDT</b> <span class='loss'>-1.89%</span></header><p class='meta'>2026-10-23 13:00 進 → 10-23 18:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.20246（排列那根 1h 收盤）
+停損 0.19452（破底低點；收盤跌破才出，距離 3.92%）
+停利 0.21834（2R）
+出場 0.19863
+破底 0.19452  深度 7.36%  在下 24h  量比 0.98x
+進場均線 MA7 0.199723  MA14 0.199155  MA25 0.199055</pre><img alt='#64 ENAUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t064.png'/></article><article class='card'><header><b>#65 WLDUSDT</b> <span class='loss'>-2.52%</span></header><p class='meta'>2026-10-23 13:00 進 → 10-23 18:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.5517（排列那根 1h 收盤）
+停損 0.5224（破底低點；收盤跌破才出，距離 5.31%）
+停利 0.6103（2R）
+出場 0.5378
+破底 0.5224  深度 10.47%  在下 35h  量比 0.42x
+進場均線 MA7 0.5515  MA14 0.546929  MA25 0.545636</pre><img alt='#65 WLDUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t065.png'/></article><article class='card'><header><b>#66 LSKUSDT</b> <span class='loss'>-0.55%</span></header><p class='meta'>2026-10-23 13:00 進 → 10-23 19:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.18501（排列那根 1h 收盤）
+停損 0.17874（破底低點；收盤跌破才出，距離 3.39%）
+停利 0.19755（2R）
+出場 0.184
+破底 0.17874  深度 10.16%  在下 28h  量比 0.50x
+進場均線 MA7 0.184927  MA14 0.1841  MA25 0.184032</pre><img alt='#66 LSKUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t066.png'/></article><article class='card'><header><b>#67 BNBUSDT</b> <span class='loss'>-1.15%</span></header><p class='meta'>2026-10-23 14:00 進 → 10-24 06:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 745.19（排列那根 1h 收盤）
+停損 725.53（破底低點；收盤跌破才出，距離 2.64%）
+停利 784.51（2R）
+出場 736.59
+破底 725.53  深度 2.85%  在下 25h  量比 1.16x
+進場均線 MA7 738.997  MA14 735.086  MA25 734.543</pre><img alt='#67 BNBUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t067.png'/></article><article class='card'><header><b>#68 PENGUUSDT</b> <span class='loss'>-1.86%</span></header><p class='meta'>2026-10-23 14:00 進 → 10-24 05:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.007957（排列那根 1h 收盤）
+停損 0.007603（破底低點；收盤跌破才出，距離 4.45%）
+停利 0.008665（2R）
+出場 0.007809
+破底 0.007603  深度 6.50%  在下 25h  量比 1.85x
+進場均線 MA7 0.00788971  MA14 0.00782686  MA25 0.00781544</pre><img alt='#68 PENGUUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t068.png'/></article><article class='card'><header><b>#69 SKHYNIXUSDT</b> <span class='loss'>-1.27%</span></header><p class='meta'>2026-10-23 15:00 進 → 10-24 07:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 958.63（排列那根 1h 收盤）
+停損 890.17（破底低點；收盤跌破才出，距離 7.14%）
+停利 1095.55（2R）
+出場 946.47
+破底 890.17  深度 8.26%  在下 30h  量比 0.37x
+進場均線 MA7 947.163  MA14 925.92  MA25 924.208</pre><img alt='#69 SKHYNIXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t069.png'/></article><article class='card'><header><b>#70 1000PEPEUSDT</b> <span class='win'>+0.30%</span></header><p class='meta'>2026-10-23 15:00 進 → 10-24 05:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.0046321（排列那根 1h 收盤）
+停損 0.0043307（破底低點；收盤跌破才出，距離 6.51%）
+停利 0.0052349（2R）
+出場 0.004646
+破底 0.0043307  深度 5.86%  在下 25h  量比 0.76x
+進場均線 MA7 0.00454504  MA14 0.00446989  MA25 0.00446239</pre><img alt='#70 1000PEPEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t070.png'/></article><article class='card'><header><b>#71 DOGEUSDT</b> <span class='loss'>-0.91%</span></header><p class='meta'>2026-10-23 15:00 進 → 10-24 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.07984（排列那根 1h 收盤）
+停損 0.0778（破底低點；收盤跌破才出，距離 2.56%）
+停利 0.08392（2R）
+出場 0.07911
+破底 0.0778  深度 5.42%  在下 28h  量比 0.51x
+進場均線 MA7 0.0796443  MA14 0.0791636  MA25 0.0791564</pre><img alt='#71 DOGEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t071.png'/></article><article class='card'><header><b>#72 MSTRUSDT</b> <span class='loss'>-0.84%</span></header><p class='meta'>2026-10-23 15:00 進 → 10-23 19:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 147.46（排列那根 1h 收盤）
+停損 143.58（破底低點；收盤跌破才出，距離 2.63%）
+停利 155.22（2R）
+出場 146.22
+破底 143.58  深度 4.25%  在下 24h  量比 0.28x
+進場均線 MA7 147.227  MA14 146.172  MA25 146.074</pre><img alt='#72 MSTRUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t072.png'/></article><article class='card'><header><b>#73 UNIUSDT</b> <span class='loss'>-2.53%</span></header><p class='meta'>2026-10-23 15:00 進 → 10-24 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 7.242（排列那根 1h 收盤）
+停損 6.884（破底低點；收盤跌破才出，距離 4.94%）
+停利 7.958（2R）
+出場 7.059
+破底 6.884  深度 8.64%  在下 28h  量比 0.97x
+進場均線 MA7 7.17643  MA14 7.09671  MA25 7.0856</pre><img alt='#73 UNIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t073.png'/></article><article class='card'><header><b>#74 SUIUSDT</b> <span class='loss'>-2.08%</span></header><p class='meta'>2026-10-23 15:00 進 → 10-24 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.994（排列那根 1h 收盤）
+停損 0.9653（破底低點；收盤跌破才出，距離 2.89%）
+停利 1.0514（2R）
+出場 0.9733
+破底 0.9653  深度 6.67%  在下 28h  量比 0.64x
+進場均線 MA7 0.992443  MA14 0.983607  MA25 0.983436</pre><img alt='#74 SUIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t074.png'/></article><article class='card'><header><b>#75 AAVEUSDT</b> <span class='loss'>-1.27%</span></header><p class='meta'>2026-10-23 15:00 進 → 10-23 23:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 149.59（排列那根 1h 收盤）
+停損 144.15（破底低點；收盤跌破才出，距離 3.64%）
+停利 160.47（2R）
+出場 147.69
+破底 144.15  深度 7.69%  在下 28h  量比 0.46x
+進場均線 MA7 149.004  MA14 147.924  MA25 147.649</pre><img alt='#75 AAVEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t075.png'/></article><article class='card'><header><b>#76 TAOUSDT</b> <span class='loss'>-1.70%</span></header><p class='meta'>2026-10-23 15:00 進 → 10-24 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 261.75（排列那根 1h 收盤）
+停損 252.46（破底低點；收盤跌破才出，距離 3.55%）
+停利 280.33（2R）
+出場 257.29
+破底 252.46  深度 7.76%  在下 28h  量比 0.82x
+進場均線 MA7 261.56  MA14 259.484  MA25 259.265</pre><img alt='#76 TAOUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t076.png'/></article><article class='card'><header><b>#77 TRUMPUSDT</b> <span class='loss'>-1.96%</span></header><p class='meta'>2026-10-23 15:00 進 → 10-24 04:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1.782（排列那根 1h 收盤）
+停損 1.716（破底低點；收盤跌破才出，距離 3.70%）
+停利 1.914（2R）
+出場 1.747
+破底 1.716  深度 6.42%  在下 25h  量比 0.75x
+進場均線 MA7 1.77486  MA14 1.75529  MA25 1.75452</pre><img alt='#77 TRUMPUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t077.png'/></article><article class='card'><header><b>#78 LINKUSDT</b> <span class='loss'>-1.23%</span></header><p class='meta'>2026-10-23 16:00 進 → 10-24 01:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 12.193（排列那根 1h 收盤）
+停損 11.765（破底低點；收盤跌破才出，距離 3.51%）
+停利 13.049（2R）
+出場 12.043
+破底 11.765  深度 5.69%  在下 25h  量比 0.42x
+進場均線 MA7 12.1926  MA14 12.0747  MA25 12.0406</pre><img alt='#78 LINKUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t078.png'/></article><article class='card'><header><b>#79 AVAXUSDT</b> <span class='loss'>-1.28%</span></header><p class='meta'>2026-10-23 16:00 進 → 10-23 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 9.295（排列那根 1h 收盤）
+停損 9.046（破底低點；收盤跌破才出，距離 2.68%）
+停利 9.793（2R）
+出場 9.176
+破底 9.046  深度 7.29%  在下 28h  量比 0.55x
+進場均線 MA7 9.28214  MA14 9.20257  MA25 9.19648</pre><img alt='#79 AVAXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t079.png'/></article><article class='card'><header><b>#80 ONDOUSDT</b> <span class='loss'>-1.35%</span></header><p class='meta'>2026-10-23 16:00 進 → 10-23 23:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.438（排列那根 1h 收盤）
+停損 0.4209（破底低點；收盤跌破才出，距離 3.90%）
+停利 0.4722（2R）
+出場 0.4321
+破底 0.4209  深度 8.32%  在下 26h  量比 0.69x
+進場均線 MA7 0.437243  MA14 0.433629  MA25 0.433184</pre><img alt='#80 ONDOUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t080.png'/></article><article class='card'><header><b>#81 FILUSDT</b> <span class='loss'>-1.34%</span></header><p class='meta'>2026-10-23 16:00 進 → 10-24 01:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.9954（排列那根 1h 收盤）
+停損 0.9428（破底低點；收盤跌破才出，距離 5.28%）
+停利 1.1006（2R）
+出場 0.9821
+破底 0.9428  深度 10.03%  在下 24h  量比 0.55x
+進場均線 MA7 0.994214  MA14 0.985671  MA25 0.9835</pre><img alt='#81 FILUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t081.png'/></article><article class='card'><header><b>#82 LTCUSDT</b> <span class='loss'>-0.96%</span></header><p class='meta'>2026-10-23 16:00 進 → 10-23 19:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 59.55（排列那根 1h 收盤）
+停損 58.06（破底低點；收盤跌破才出，距離 2.50%）
+停利 62.53（2R）
+出場 58.98
+破底 58.06  深度 5.84%  在下 28h  量比 0.48x
+進場均線 MA7 59.5114  MA14 59.1121  MA25 59.0756</pre><img alt='#82 LTCUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t082.png'/></article><article class='card'><header><b>#83 COINUSDT</b> <span class='loss'>-0.86%</span></header><p class='meta'>2026-10-23 18:00 進 → 10-23 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 170.38（排列那根 1h 收盤）
+停損 167.05（破底低點；收盤跌破才出，距離 1.95%）
+停利 177.04（2R）
+出場 168.92
+破底 167.05  深度 4.62%  在下 28h  量比 0.37x
+進場均線 MA7 170.269  MA14 169.796  MA25 169.731</pre><img alt='#83 COINUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t083.png'/></article><article class='card'><header><b>#84 ASTERUSDT</b> <span class='loss'>-1.01%</span></header><p class='meta'>2026-10-23 18:00 進 → 10-24 04:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.7059（排列那根 1h 收盤）
+停損 0.6895（破底低點；收盤跌破才出，距離 2.32%）
+停利 0.7387（2R）
+出場 0.6988
+破底 0.6895  深度 4.19%  在下 35h  量比 0.74x
+進場均線 MA7 0.702243  MA14 0.699514  MA25 0.699328</pre><img alt='#84 ASTERUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t084.png'/></article><article class='card'><header><b>#85 SOLUSDT</b> <span class='loss'>-0.93%</span></header><p class='meta'>2026-10-23 19:00 進 → 10-24 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 104.49（排列那根 1h 收盤）
+停損 102.97（破底低點；收盤跌破才出，距離 1.45%）
+停利 107.53（2R）
+出場 103.52
+破底 102.97  深度 3.82%  在下 30h  量比 0.96x
+進場均線 MA7 104.377  MA14 104.166  MA25 104.114</pre><img alt='#85 SOLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t085.png'/></article><article class='card'><header><b>#86 ADAUSDT</b> <span class='loss'>-1.57%</span></header><p class='meta'>2026-10-23 19:00 進 → 10-24 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.2167（排列那根 1h 收盤）
+停損 0.2093（破底低點；收盤跌破才出，距離 3.41%）
+停利 0.2315（2R）
+出場 0.2133
+破底 0.2093  深度 7.26%  在下 27h  量比 0.79x
+進場均線 MA7 0.216286  MA14 0.215043  MA25 0.214432</pre><img alt='#86 ADAUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t086.png'/></article><article class='card'><header><b>#87 EVAAUSDT</b> <span class='loss'>-0.80%</span></header><p class='meta'>2026-10-23 19:00 進 → 10-24 07:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.5233（排列那根 1h 收盤）
+停損 0.5025（破底低點；收盤跌破才出，距離 3.97%）
+停利 0.5649（2R）
+出場 0.5191
+破底 0.5025  深度 10.50%  在下 31h  量比 0.68x
+進場均線 MA7 0.522571  MA14 0.519729  MA25 0.5195</pre><img alt='#87 EVAAUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t087.png'/></article><article class='card'><header><b>#88 ETHUSDT</b> <span class='loss'>-1.51%</span></header><p class='meta'>2026-10-23 20:00 進 → 10-24 06:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 2402.13（排列那根 1h 收盤）
+停損 2359.02（破底低點；收盤跌破才出，距離 1.79%）
+停利 2488.35（2R）
+出場 2365.97
+破底 2359.02  深度 4.54%  在下 28h  量比 0.64x
+進場均線 MA7 2401.78  MA14 2400.54  MA25 2396.53</pre><img alt='#88 ETHUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t088.png'/></article><article class='card'><header><b>#89 BTCUSDT</b> <span class='loss'>-0.56%</span></header><p class='meta'>2026-10-23 20:00 進 → 10-24 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 81711.2（排列那根 1h 收盤）
+停損 80888.9（破底低點；收盤跌破才出，距離 1.01%）
+停利 83355.8（2R）
+出場 81255
+破底 80888.9  深度 3.38%  在下 31h  量比 2.08x
+進場均線 MA7 81687.3  MA14 81650.7  MA25 81565.9</pre><img alt='#89 BTCUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t089.png'/></article><article class='card'><header><b>#90 ZECUSDT</b> <span class='loss'>-4.80%</span></header><p class='meta'>2026-10-23 20:00 進 → 10-24 06:00 出 · 收盤跌破破底 · QA · W</p><pre>進場 1230.34（排列那根 1h 收盤）
+停損 1187.2（破底低點；收盤跌破才出，距離 3.51%）
+停利 1316.62（2R）
+出場 1171.24
+破底 1187.2  深度 9.33%  在下 33h  量比 0.89x
+進場均線 MA7 1224.39  MA14 1223.4  MA25 1223.34</pre><img alt='#90 ZECUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t090.png'/></article><article class='card'><header><b>#91 BEAMXUSDT</b> <span class='win'>+10.22%</span></header><p class='meta'>2026-10-23 20:00 進 → 10-24 02:00 出 · 2R 停利 · QA · W</p><pre>進場 0.003151（排列那根 1h 收盤）
+停損 0.00299（破底低點；收盤跌破才出，距離 5.11%）
+停利 0.003473（2R）
+出場 0.003473
+破底 0.00299  深度 4.79%  在下 14h  量比 0.77x
+進場均線 MA7 0.00314714  MA14 0.0031175  MA25 0.00310404</pre><img alt='#91 BEAMXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t091.png'/></article><article class='card'><header><b>#92 HYPEUSDT</b> <span class='loss'>-1.47%</span></header><p class='meta'>2026-10-23 21:00 進 → 10-24 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 78.336（排列那根 1h 收盤）
+停損 76.603（破底低點；收盤跌破才出，距離 2.21%）
+停利 81.802（2R）
+出場 77.182
+破底 76.603  深度 5.71%  在下 31h  量比 2.11x
+進場均線 MA7 78.1264  MA14 78.0621  MA25 77.8844</pre><img alt='#92 HYPEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t092.png'/></article><article class='card'><header><b>#93 XRPUSDT</b> <span class='loss'>-0.67%</span></header><p class='meta'>2026-10-23 21:00 進 → 10-23 23:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1.3216（排列那根 1h 收盤）
+停損 1.2942（破底低點；收盤跌破才出，距離 2.07%）
+停利 1.3764（2R）
+出場 1.3127
+破底 1.2942  深度 5.01%  在下 28h  量比 1.37x
+進場均線 MA7 1.32063  MA14 1.32041  MA25 1.31684</pre><img alt='#93 XRPUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t093.png'/></article><article class='card'><header><b>#94 SAMSUNGUSDT</b> <span class='win'>+0.09%</span></header><p class='meta'>2026-10-23 21:00 進 → 10-24 17:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 161.55（排列那根 1h 收盤）
+停損 153.88（破底低點；收盤跌破才出，距離 4.75%）
+停利 176.89（2R）
+出場 161.7
+破底 153.88  深度 8.42%  在下 33h  量比 1.15x
+進場均線 MA7 161.404  MA14 160.809  MA25 159.634</pre><img alt='#94 SAMSUNGUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t094.png'/></article><article class='card'><header><b>#95 DRAMUSDT</b> <span class='loss'>-0.46%</span></header><p class='meta'>2026-10-23 21:00 進 → 10-24 16:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 47.39（排列那根 1h 收盤）
+停損 44.72（破底低點；收盤跌破才出，距離 5.63%）
+停利 52.73（2R）
+出場 47.17
+破底 44.72  深度 9.17%  在下 33h  量比 3.26x
+進場均線 MA7 47.23  MA14 46.9921  MA25 46.5232</pre><img alt='#95 DRAMUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t095.png'/></article><article class='card'><header><b>#96 ONDSUSDT</b> <span class='win'>+0.39%</span></header><p class='meta'>2026-10-23 22:00 進 → 10-24 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 6.17（排列那根 1h 收盤）
+停損 5.906（破底低點；收盤跌破才出，距離 4.28%）
+停利 6.698（2R）
+出場 6.194
+破底 5.906  深度 4.99%  在下 36h  量比 3.59x
+進場均線 MA7 6.055  MA14 6.03786  MA25 6.03264</pre><img alt='#96 ONDSUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t096.png'/></article><article class='card'><header><b>#97 IDOLUSDT</b> <span class='win'>+7.41%</span></header><p class='meta'>2026-10-23 23:00 進 → 10-24 00:00 出 · 2R 停利 · QA · W</p><pre>進場 0.007911（排列那根 1h 收盤）
+停損 0.007618（破底低點；收盤跌破才出，距離 3.70%）
+停利 0.008497（2R）
+出場 0.008497
+破底 0.007618  深度 3.51%  在下 32h  量比 2.18x
+進場均線 MA7 0.00774714  MA14 0.0077375  MA25 0.00772472</pre><img alt='#97 IDOLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t097.png'/></article><article class='card'><header><b>#98 PARTIUSDT</b> <span class='loss'>-2.02%</span></header><p class='meta'>2026-10-24 15:00 進 → 10-25 04:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 0.03471（排列那根 1h 收盤）
+停損 0.03106（破底低點；收盤跌破才出，距離 10.52%）
+停利 0.04201（2R）
+出場 0.03401
+破底 0.03106  深度 6.05%  在下 8h  量比 1.98x
+進場均線 MA7 0.0341086  MA14 0.0332314  MA25 0.0331868</pre><img alt='#98 PARTIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t098.png'/></article><article class='card'><header><b>#99 BLESSUSDT</b> <span class='loss'>-1.60%</span></header><p class='meta'>2026-10-24 20:00 進 → 10-25 15:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 0.008101（排列那根 1h 收盤）
+停損 0.007639（破底低點；收盤跌破才出，距離 5.70%）
+停利 0.009025（2R）
+出場 0.007971
+破底 0.007639  深度 3.56%  在下 10h  量比 2.07x
+進場均線 MA7 0.00802643  MA14 0.00797086  MA25 0.00795716</pre><img alt='#99 BLESSUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t099.png'/></article><article class='card'><header><b>#100 ZROUSDT</b> <span class='loss'>-2.17%</span></header><p class='meta'>2026-10-25 04:00 進 → 10-25 17:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1.7349（排列那根 1h 收盤）
+停損 1.636（破底低點；收盤跌破才出，距離 5.70%）
+停利 1.9327（2R）
+出場 1.6972
+破底 1.636  深度 8.89%  在下 23h  量比 0.85x
+進場均線 MA7 1.71573  MA14 1.70259  MA25 1.7025</pre><img alt='#100 ZROUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t100.png'/></article><article class='card'><header><b>#101 SOXLUSDT</b> <span class='loss'>-0.84%</span></header><p class='meta'>2026-10-25 05:00 進 → 10-25 17:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 84.68（排列那根 1h 收盤）
+停損 81.17（破底低點；收盤跌破才出，距離 4.15%）
+停利 91.7（2R）
+出場 83.97
+破底 81.17  深度 4.01%  在下 23h  量比 0.36x
+進場均線 MA7 84.0343  MA14 83.7957  MA25 83.77</pre><img alt='#101 SOXLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t101.png'/></article><article class='card'><header><b>#102 ZECUSDT</b> <span class='loss'>-1.56%</span></header><p class='meta'>2026-10-25 07:00 進 → 10-26 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1207.17（排列那根 1h 收盤）
+停損 1118.8（破底低點；收盤跌破才出，距離 7.32%）
+停利 1383.91（2R）
+出場 1188.33
+破底 1118.8  深度 8.84%  在下 23h  量比 0.74x
+進場均線 MA7 1191.98  MA14 1172.22  MA25 1171.06</pre><img alt='#102 ZECUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t102.png'/></article><article class='card'><header><b>#103 LITEUSDT</b> <span class='loss'>-0.67%</span></header><p class='meta'>2026-10-25 07:00 進 → 10-25 15:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 762.42（排列那根 1h 收盤）
+停損 745.86（破底低點；收盤跌破才出，距離 2.17%）
+停利 795.54（2R）
+出場 757.34
+破底 745.86  深度 3.10%  在下 25h  量比 0.72x
+進場均線 MA7 759.629  MA14 757.229  MA25 757.182</pre><img alt='#103 LITEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t103.png'/></article><article class='card'><header><b>#104 ASTERUSDT</b> <span class='loss'>-1.10%</span></header><p class='meta'>2026-10-25 08:00 進 → 10-26 00:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.7115（排列那根 1h 收盤）
+停損 0.6829（破底低點；收盤跌破才出，距離 4.02%）
+停利 0.7687（2R）
+出場 0.7037
+破底 0.6829  深度 2.88%  在下 23h  量比 0.73x
+進場均線 MA7 0.705786  MA14 0.699436  MA25 0.69878</pre><img alt='#104 ASTERUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t104.png'/></article><article class='card'><header><b>#105 XRPUSDT</b> <span class='loss'>-0.60%</span></header><p class='meta'>2026-10-25 09:00 進 → 10-26 06:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1.307（排列那根 1h 收盤）
+停損 1.2535（破底低點；收盤跌破才出，距離 4.09%）
+停利 1.414（2R）
+出場 1.2992
+破底 1.2535  深度 4.77%  在下 29h  量比 0.60x
+進場均線 MA7 1.29649  MA14 1.28731  MA25 1.28669</pre><img alt='#105 XRPUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t105.png'/></article><article class='card'><header><b>#106 INTWUSDT</b> <span class='loss'>-1.26%</span></header><p class='meta'>2026-10-25 10:00 進 → 10-25 15:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 15.89（排列那根 1h 收盤）
+停損 15.32（破底低點；收盤跌破才出，距離 3.59%）
+停利 17.03（2R）
+出場 15.69
+破底 15.32  深度 3.36%  在下 20h  量比 0.71x
+進場均線 MA7 15.85  MA14 15.7479  MA25 15.7468</pre><img alt='#106 INTWUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t106.png'/></article><article class='card'><header><b>#107 BNBUSDT</b> <span class='loss'>-1.29%</span></header><p class='meta'>2026-10-25 12:00 進 → 10-26 05:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 748.64（排列那根 1h 收盤）
+停損 717.65（破底低點；收盤跌破才出，距離 4.14%）
+停利 810.62（2R）
+出場 738.98
+破底 717.65  深度 3.49%  在下 25h  量比 1.05x
+進場均線 MA7 743.304  MA14 735.721  MA25 734.989</pre><img alt='#107 BNBUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t107.png'/></article><article class='card'><header><b>#108 HYPEUSDT</b> <span class='loss'>-1.27%</span></header><p class='meta'>2026-10-25 12:00 進 → 10-25 17:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 76.74（排列那根 1h 收盤）
+停損 74.413（破底低點；收盤跌破才出，距離 3.03%）
+停利 81.394（2R）
+出場 75.767
+破底 74.413  深度 4.56%  在下 28h  量比 0.53x
+進場均線 MA7 76.6281  MA14 76.2486  MA25 76.161</pre><img alt='#108 HYPEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t108.png'/></article><article class='card'><header><b>#109 ENAUSDT</b> <span class='loss'>-2.55%</span></header><p class='meta'>2026-10-25 12:00 進 → 10-25 17:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.19511（排列那根 1h 收盤）
+停損 0.18365（破底低點；收盤跌破才出，距離 5.87%）
+停利 0.21803（2R）
+出場 0.19013
+破底 0.18365  深度 9.39%  在下 24h  量比 0.53x
+進場均線 MA7 0.194989  MA14 0.191536  MA25 0.191448</pre><img alt='#109 ENAUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t109.png'/></article><article class='card'><header><b>#110 COINUSDT</b> <span class='loss'>-1.02%</span></header><p class='meta'>2026-10-25 12:00 進 → 10-25 18:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 165.38（排列那根 1h 收盤）
+停損 161.7（破底低點；收盤跌破才出，距離 2.23%）
+停利 172.74（2R）
+出場 163.7
+破底 161.7  深度 4.73%  在下 34h  量比 0.19x
+進場均線 MA7 164.85  MA14 164.11  MA25 164.064</pre><img alt='#110 COINUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t110.png'/></article><article class='card'><header><b>#111 EVAAUSDT</b> <span class='loss'>-1.83%</span></header><p class='meta'>2026-10-25 12:00 進 → 10-25 17:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.5247（排列那根 1h 收盤）
+停損 0.4914（破底低點；收盤跌破才出，距離 6.35%）
+停利 0.5913（2R）
+出場 0.5151
+破底 0.4914  深度 5.81%  在下 24h  量比 1.00x
+進場均線 MA7 0.520971  MA14 0.515921  MA25 0.515688</pre><img alt='#111 EVAAUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t111.png'/></article><article class='card'><header><b>#112 SNDKUSDT</b> <span class='loss'>-0.36%</span></header><p class='meta'>2026-10-25 13:00 進 → 10-26 09:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1246.81（排列那根 1h 收盤）
+停損 1194.8（破底低點；收盤跌破才出，距離 4.17%）
+停利 1350.83（2R）
+出場 1242.36
+破底 1194.8  深度 6.13%  在下 31h  量比 0.77x
+進場均線 MA7 1243.76  MA14 1238.03  MA25 1237.27</pre><img alt='#112 SNDKUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t112.png'/></article><article class='card'><header><b>#113 SNXXUSDT</b> <span class='loss'>-0.73%</span></header><p class='meta'>2026-10-25 13:00 進 → 10-26 09:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 8.24（排列那根 1h 收盤）
+停損 7.81（破底低點；收盤跌破才出，距離 5.22%）
+停利 9.1（2R）
+出場 8.18
+破底 7.81  深度 9.24%  在下 31h  量比 0.50x
+進場均線 MA7 8.19857  MA14 8.12214  MA25 8.1108</pre><img alt='#113 SNXXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t113.png'/></article><article class='card'><header><b>#114 CRCLUSDT</b> <span class='loss'>-0.47%</span></header><p class='meta'>2026-10-26 00:00 進 → 10-26 06:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 85.66（排列那根 1h 收盤）
+停損 83.15（破底低點；收盤跌破才出，距離 2.93%）
+停利 90.68（2R）
+出場 85.26
+破底 83.15  深度 4.10%  在下 29h  量比 1.25x
+進場均線 MA7 85.2971  MA14 85.2386  MA25 85.2308</pre><img alt='#114 CRCLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t114.png'/></article><article class='card'><header><b>#115 UNIUSDT</b> <span class='loss'>-2.09%</span></header><p class='meta'>2026-10-26 04:00 進 → 10-26 11:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 6.969（排列那根 1h 收盤）
+停損 6.496（破底低點；收盤跌破才出，距離 6.79%）
+停利 7.915（2R）
+出場 6.823
+破底 6.496  深度 8.93%  在下 29h  量比 0.75x
+進場均線 MA7 6.92271  MA14 6.81971  MA25 6.8158</pre><img alt='#115 UNIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t115.png'/></article><article class='card'><header><b>#116 TAOUSDT</b> <span class='loss'>-2.02%</span></header><p class='meta'>2026-10-26 04:00 進 → 10-26 11:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 253.86（排列那根 1h 收盤）
+停損 242.4（破底低點；收盤跌破才出，距離 4.51%）
+停利 276.78（2R）
+出場 248.74
+破底 242.4  深度 6.80%  在下 29h  量比 0.73x
+進場均線 MA7 253.191  MA14 250.54  MA25 250.47</pre><img alt='#116 TAOUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t116.png'/></article><article class='card'><header><b>#117 ONDOUSDT</b> <span class='loss'>-1.28%</span></header><p class='meta'>2026-10-26 08:00 進 → 10-26 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.4077（排列那根 1h 收盤）
+停損 0.3963（破底低點；收盤跌破才出，距離 2.80%）
+停利 0.4305（2R）
+出場 0.4025
+破底 0.3963  深度 8.44%  在下 33h  量比 1.08x
+進場均線 MA7 0.407557  MA14 0.406586  MA25 0.406268</pre><img alt='#117 ONDOUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t117.png'/></article><article class='card'><header><b>#118 LTCUSDT</b> <span class='loss'>-1.04%</span></header><p class='meta'>2026-10-26 08:00 進 → 10-26 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 56.89（排列那根 1h 收盤）
+停損 55.04（破底低點；收盤跌破才出，距離 3.25%）
+停利 60.59（2R）
+出場 56.3
+破底 55.04  深度 6.79%  在下 36h  量比 1.37x
+進場均線 MA7 56.8857  MA14 56.7786  MA25 56.6936</pre><img alt='#118 LTCUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t118.png'/></article><article class='card'><header><b>#119 PARTIUSDT</b> <span class='win'>+12.62%</span></header><p class='meta'>2026-10-26 21:00 進 → 10-26 23:00 出 · 2R 停利 · QA · W</p><pre>進場 0.03456（排列那根 1h 收盤）
+停損 0.03238（破底低點；收盤跌破才出，距離 6.31%）
+停利 0.03892（2R）
+出場 0.03892
+破底 0.03238  深度 6.16%  在下 36h  量比 7.27x
+進場均線 MA7 0.0337029  MA14 0.0334286  MA25 0.0333972</pre><img alt='#119 PARTIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t119.png'/></article><article class='card'><header><b>#120 ZECUSDT</b> <span class='loss'>-2.49%</span></header><p class='meta'>2026-10-26 22:00 進 → 10-27 12:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 1252（排列那根 1h 收盤）
+停損 1177.22（破底低點；收盤跌破才出，距離 5.97%）
+停利 1401.56（2R）
+出場 1220.84
+破底 1177.22  深度 2.64%  在下 7h  量比 1.80x
+進場均線 MA7 1230.98  MA14 1216.13  MA25 1215.86</pre><img alt='#120 ZECUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t120.png'/></article><article class='card'><header><b>#121 LITEUSDT</b> <span class='win'>+7.23%</span></header><p class='meta'>2026-10-26 22:00 進 → 10-28 10:00 出 · 持有滿 36 小時 · QA · W</p><pre>進場 817.56（排列那根 1h 收盤）
+停損 744（破底低點；收盤跌破才出，距離 9.00%）
+停利 964.68（2R）
+出場 876.7
+破底 744  深度 2.40%  在下 12h  量比 4.98x
+進場均線 MA7 777.463  MA14 765.697  MA25 765.375</pre><img alt='#121 LITEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t121.png'/></article><article class='card'><header><b>#122 INTWUSDT</b> <span class='loss'>-2.90%</span></header><p class='meta'>2026-10-26 23:00 進 → 10-27 15:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 17.26（排列那根 1h 收盤）
+停損 15.37（破底低點；收盤跌破才出，距離 10.95%）
+停利 21.04（2R）
+出場 16.76
+破底 15.37  深度 2.98%  在下 11h  量比 3.04x
+進場均線 MA7 16.35  MA14 16.0271  MA25 15.9884</pre><img alt='#122 INTWUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t122.png'/></article><article class='card'><header><b>#123 TRUMPUSDT</b> <span class='loss'>-0.83%</span></header><p class='meta'>2026-10-26 23:00 進 → 10-27 17:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 1.689（排列那根 1h 收盤）
+停損 1.629（破底低點；收盤跌破才出，距離 3.55%）
+停利 1.809（2R）
+出場 1.675
+破底 1.629  深度 2.97%  在下 14h  量比 2.44x
+進場均線 MA7 1.67257  MA14 1.65764  MA25 1.65728</pre><img alt='#123 TRUMPUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t123.png'/></article><article class='card'><header><b>#124 SOXLUSDT</b> <span class='loss'>-3.28%</span></header><p class='meta'>2026-10-27 00:00 進 → 10-27 15:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 91.35（排列那根 1h 收盤）
+停損 81.57（破底低點；收盤跌破才出，距離 10.71%）
+停利 110.91（2R）
+出場 88.35
+破底 81.57  深度 4.01%  在下 11h  量比 0.80x
+進場均線 MA7 87.9729  MA14 85.8157  MA25 85.5236</pre><img alt='#124 SOXLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t124.png'/></article><article class='card'><header><b>#125 SNXXUSDT</b> <span class='loss'>-4.21%</span></header><p class='meta'>2026-10-27 01:00 進 → 10-27 15:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 8.78（排列那根 1h 收盤）
+停損 8.04（破底低點；收盤跌破才出，距離 8.43%）
+停利 10.26（2R）
+出場 8.41
+破底 8.04  深度 2.67%  在下 8h  量比 1.38x
+進場均線 MA7 8.48714  MA14 8.35214  MA25 8.3312</pre><img alt='#125 SNXXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t125.png'/></article><article class='card'><header><b>#126 IDOLUSDT</b> <span class='win'>+5.65%</span></header><p class='meta'>2026-10-27 01:00 進 → 10-27 23:00 出 · 2R 停利 · QA · W</p><pre>進場 0.007793（排列那根 1h 收盤）
+停損 0.007573（破底低點；收盤跌破才出，距離 2.82%）
+停利 0.008233（2R）
+出場 0.008233
+破底 0.007573  深度 5.87%  在下 35h  量比 0.84x
+進場均線 MA7 0.00776829  MA14 0.00774657  MA25 0.00773692</pre><img alt='#126 IDOLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t126.png'/></article><article class='card'><header><b>#127 MUUUSDT</b> <span class='win'>+11.34%</span></header><p class='meta'>2026-10-27 01:00 進 → 10-28 13:00 出 · 持有滿 36 小時 · QA · W</p><pre>進場 26.1（排列那根 1h 收盤）
+停損 23.62（破底低點；收盤跌破才出，距離 9.50%）
+停利 31.06（2R）
+出場 29.06
+破底 23.62  深度 4.53%  在下 11h  量比 0.78x
+進場均線 MA7 25.44  MA14 24.8957  MA25 24.8084</pre><img alt='#127 MUUUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t127.png'/></article><article class='card'><header><b>#128 BLESSUSDT</b> <span class='win'>+0.08%</span></header><p class='meta'>2026-10-27 01:00 進 → 10-28 03:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.008256（排列那根 1h 收盤）
+停損 0.007783（破底低點；收盤跌破才出，距離 5.73%）
+停利 0.009202（2R）
+出場 0.008263
+破底 0.007783  深度 4.37%  在下 20h  量比 0.75x
+進場均線 MA7 0.00816586  MA14 0.00806621  MA25 0.00806592</pre><img alt='#128 BLESSUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t128.png'/></article><article class='card'><header><b>#129 MVLLUSDT</b> <span class='loss'>-6.57%</span></header><p class='meta'>2026-10-27 01:00 進 → 10-27 14:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 27.85（排列那根 1h 收盤）
+停損 24.69（破底低點；收盤跌破才出，距離 11.35%）
+停利 34.17（2R）
+出場 26.02
+破底 24.69  深度 4.39%  在下 15h  量比 1.40x
+進場均線 MA7 26.5814  MA14 25.9571  MA25 25.8516</pre><img alt='#129 MVLLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t129.png'/></article><article class='card'><header><b>#130 KORUUSDT</b> <span class='win'>+14.35%</span></header><p class='meta'>2026-10-27 02:00 進 → 10-28 08:00 出 · 2R 停利 · QA · W</p><pre>進場 11.01（排列那根 1h 收盤）
+停損 10.22（破底低點；收盤跌破才出，距離 7.18%）
+停利 12.59（2R）
+出場 12.59
+破底 10.22  深度 4.20%  在下 15h  量比 0.33x
+進場均線 MA7 10.8771  MA14 10.695  MA25 10.6912</pre><img alt='#130 KORUUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t130.png'/></article><article class='card'><header><b>#131 QUSDT</b> <span class='win'>+106.20%</span></header><p class='meta'>2026-10-27 02:00 進 → 10-27 10:00 出 · 2R 停利 · QA · W</p><pre>進場 0.110945（排列那根 1h 收盤）
+停損 0.052033（破底低點；收盤跌破才出，距離 53.10%）
+停利 0.228769（2R）
+出場 0.228769
+破底 0.052033  深度 34.08%  在下 27h  量比 8.98x
+進場均線 MA7 0.0653373  MA14 0.0610989  MA25 0.0595645</pre><img alt='#131 QUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t131.png'/></article><article class='card'><header><b>#132 INJUSDT</b> <span class='loss'>-2.56%</span></header><p class='meta'>2026-10-27 04:00 進 → 10-27 13:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 7.975（排列那根 1h 收盤）
+停損 7.526（破底低點；收盤跌破才出，距離 5.63%）
+停利 8.873（2R）
+出場 7.771
+破底 7.526  深度 2.90%  在下 12h  量比 0.55x
+進場均線 MA7 7.94543  MA14 7.821  MA25 7.7988</pre><img alt='#132 INJUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t132.png'/></article><article class='card'><header><b>#133 XMRUSDT</b> <span class='loss'>-0.08%</span></header><p class='meta'>2026-10-27 05:00 進 → 10-27 18:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 594.84（排列那根 1h 收盤）
+停損 583.02（破底低點；收盤跌破才出，距離 1.99%）
+停利 618.48（2R）
+出場 594.34
+破底 583.02  深度 4.21%  在下 25h  量比 0.56x
+進場均線 MA7 594.676  MA14 593.117  MA25 592.586</pre><img alt='#133 XMRUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t133.png'/></article><article class='card'><header><b>#134 XRPUSDT</b> <span class='win'>+1.22%</span></header><p class='meta'>2026-10-27 07:00 進 → 10-28 19:00 出 · 持有滿 36 小時 · QA · W</p><pre>進場 1.3086（排列那根 1h 收盤）
+停損 1.2722（破底低點；收盤跌破才出，距離 2.78%）
+停利 1.3814（2R）
+出場 1.3245
+破底 1.2722  深度 2.17%  在下 17h  量比 2.61x
+進場均線 MA7 1.29503  MA14 1.29456  MA25 1.29157</pre><img alt='#134 XRPUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t134.png'/></article><article class='card'><header><b>#135 APRUSDT</b> <span class='loss'>-6.62%</span></header><p class='meta'>2026-10-27 17:00 進 → 10-27 19:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.03535（排列那根 1h 收盤）
+停損 0.03055（破底低點；收盤跌破才出，距離 13.58%）
+停利 0.04495（2R）
+出場 0.03301
+破底 0.03055  深度 23.51%  在下 29h  量比 0.72x
+進場均線 MA7 0.0345057  MA14 0.0335336  MA25 0.0334988</pre><img alt='#135 APRUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t135.png'/></article><article class='card'><header><b>#136 EVAAUSDT</b> <span class='win'>+9.77%</span></header><p class='meta'>2026-10-27 18:00 進 → 10-27 21:00 出 · 2R 停利 · QA · W</p><pre>進場 0.5263（排列那根 1h 收盤）
+停損 0.5006（破底低點；收盤跌破才出，距離 4.88%）
+停利 0.5777（2R）
+出場 0.5777
+破底 0.5006  深度 4.24%  在下 26h  量比 1.53x
+進場均線 MA7 0.5243  MA14 0.516814  MA25 0.514676</pre><img alt='#136 EVAAUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t136.png'/></article><article class='card'><header><b>#137 SPCXUSDT</b> <span class='loss'>-0.59%</span></header><p class='meta'>2026-10-27 21:00 進 → 10-28 20:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 149.71（排列那根 1h 收盤）
+停損 144.92（破底低點；收盤跌破才出，距離 3.20%）
+停利 159.29（2R）
+出場 148.82
+破底 144.92  深度 2.58%  在下 12h  量比 17.94x
+進場均線 MA7 148.67  MA14 148.235  MA25 148.203</pre><img alt='#137 SPCXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t137.png'/></article><article class='card'><header><b>#138 ETHUSDT</b> <span class='loss'>-0.46%</span></header><p class='meta'>2026-10-27 23:00 進 → 10-28 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 2346.13（排列那根 1h 收盤）
+停損 2292（破底低點；收盤跌破才出，距離 2.31%）
+停利 2454.39（2R）
+出場 2335.23
+破底 2292  深度 2.36%  在下 27h  量比 3.37x
+進場均線 MA7 2325.6  MA14 2318.91  MA25 2318.76</pre><img alt='#138 ETHUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t138.png'/></article><article class='card'><header><b>#139 GOOGLUSDT</b> <span class='loss'>-7.28%</span></header><p class='meta'>2026-10-27 23:00 進 → 10-29 04:00 出 · 收盤跌破破底 · QA · W</p><pre>進場 321.22（排列那根 1h 收盤）
+停損 314.86（破底低點；收盤跌破才出，距離 1.98%）
+停利 333.94（2R）
+出場 297.83
+破底 314.86  深度 2.20%  在下 32h  量比 2.32x
+進場均線 MA7 319.461  MA14 319.099  MA25 318.969</pre><img alt='#139 GOOGLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t139.png'/></article><article class='card'><header><b>#140 ZROUSDT</b> <span class='win'>+0.56%</span></header><p class='meta'>2026-10-27 23:00 進 → 10-28 22:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 1.6855（排列那根 1h 收盤）
+停損 1.5968（破底低點；收盤跌破才出，距離 5.26%）
+停利 1.8629（2R）
+出場 1.6949
+破底 1.5968  深度 8.06%  在下 33h  量比 1.06x
+進場均線 MA7 1.66086  MA14 1.6397  MA25 1.63858</pre><img alt='#140 ZROUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t140.png'/></article><article class='card'><header><b>#141 NEARUSDT</b> <span class='loss'>-0.20%</span></header><p class='meta'>2026-10-28 00:00 進 → 10-28 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 4.607（排列那根 1h 收盤）
+停損 4.384（破底低點；收盤跌破才出，距離 4.84%）
+停利 5.053（2R）
+出場 4.598
+破底 4.384  深度 3.69%  在下 23h  量比 2.04x
+進場均線 MA7 4.53557  MA14 4.48686  MA25 4.48196</pre><img alt='#141 NEARUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t141.png'/></article><article class='card'><header><b>#142 PENGUUSDT</b> <span class='loss'>-0.84%</span></header><p class='meta'>2026-10-28 00:00 進 → 10-28 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.007751（排列那根 1h 收盤）
+停損 0.007369（破底低點；收盤跌破才出，距離 4.93%）
+停利 0.008515（2R）
+出場 0.007686
+破底 0.007369  深度 1.80%  在下 18h  量比 1.74x
+進場均線 MA7 0.007559  MA14 0.00749529  MA25 0.00749452</pre><img alt='#142 PENGUUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t142.png'/></article><article class='card'><header><b>#143 TAOUSDT</b> <span class='loss'>-0.43%</span></header><p class='meta'>2026-10-28 03:00 進 → 10-28 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 253.5（排列那根 1h 收盤）
+停損 245.54（破底低點；收盤跌破才出，距離 3.14%）
+停利 269.42（2R）
+出場 252.42
+破底 245.54  深度 2.55%  在下 21h  量比 0.87x
+進場均線 MA7 251.209  MA14 249.936  MA25 249.89</pre><img alt='#143 TAOUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t143.png'/></article><article class='card'><header><b>#144 AVAXUSDT</b> <span class='loss'>-0.80%</span></header><p class='meta'>2026-10-28 06:00 進 → 10-28 21:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 8.928（排列那根 1h 收盤）
+停損 8.656（破底低點；收盤跌破才出，距離 3.05%）
+停利 9.472（2R）
+出場 8.857
+破底 8.656  深度 2.91%  在下 21h  量比 0.71x
+進場均線 MA7 8.88129  MA14 8.83736  MA25 8.83624</pre><img alt='#144 AVAXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t144.png'/></article><article class='card'><header><b>#145 ARBUSDT</b> <span class='loss'>-3.12%</span></header><p class='meta'>2026-10-28 11:00 進 → 10-28 20:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.16981（排列那根 1h 收盤）
+停損 0.16412（破底低點；收盤跌破才出，距離 3.35%）
+停利 0.18119（2R）
+出場 0.16451
+破底 0.16412  深度 3.10%  在下 22h  量比 0.74x
+進場均線 MA7 0.168357  MA14 0.168156  MA25 0.167678</pre><img alt='#145 ARBUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t145.png'/></article><article class='card'><header><b>#146 CLUSDT</b> <span class='loss'>-0.18%</span></header><p class='meta'>2026-10-28 16:00 進 → 10-29 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 101.78（排列那根 1h 收盤）
+停損 99.53（破底低點；收盤跌破才出，距離 2.21%）
+停利 106.28（2R）
+出場 101.6
+破底 99.53  深度 2.05%  在下 15h  量比 1.39x
+進場均線 MA7 101.539  MA14 100.987  MA25 100.96</pre><img alt='#146 CLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t146.png'/></article><article class='card'><header><b>#147 QUSDT</b> <span class='loss'>-21.77%</span></header><p class='meta'>2026-10-28 23:00 進 → 10-29 14:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 0.06225（排列那根 1h 收盤）
+停損 0.047559（破底低點；收盤跌破才出，距離 23.60%）
+停利 0.091632（2R）
+出場 0.0487
+破底 0.047559  深度 62.35%  在下 30h  量比 1.23x
+進場均線 MA7 0.0570529  MA14 0.0566069  MA25 0.055998</pre><img alt='#147 QUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t147.png'/></article><article class='card'><header><b>#148 ARBUSDT</b> <span class='loss'>-5.99%</span></header><p class='meta'>2026-10-29 04:00 進 → 10-29 10:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 0.17566（排列那根 1h 收盤）
+停損 0.16313（破底低點；收盤跌破才出，距離 7.13%）
+停利 0.20072（2R）
+出場 0.16513
+破底 0.16313  深度 3.09%  在下 7h  量比 3.07x
+進場均線 MA7 0.169544  MA14 0.168646  MA25 0.168538</pre><img alt='#148 ARBUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t148.png'/></article><article class='card'><header><b>#149 COINUSDT</b> <span class='loss'>-1.98%</span></header><p class='meta'>2026-10-29 04:00 進 → 10-29 10:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 160.85（排列那根 1h 收盤）
+停損 156.5（破底低點；收盤跌破才出，距離 2.70%）
+停利 169.55（2R）
+出場 157.66
+破底 156.5  深度 2.35%  在下 21h  量比 1.96x
+進場均線 MA7 159.87  MA14 159.508  MA25 159.45</pre><img alt='#149 COINUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t149.png'/></article><article class='card'><header><b>#150 HYPEUSDT</b> <span class='win'>+1.96%</span></header><p class='meta'>2026-10-29 20:00 進 → 10-30 20:00 出 · 連兩根掉回 MA25 · QA · V</p><pre>進場 89.657（排列那根 1h 收盤）
+停損 78.143（破底低點；收盤跌破才出，距離 12.84%）
+停利 112.685（2R）
+出場 91.411
+破底 78.143  深度 3.72%  在下 22h  量比 4.09x
+進場均線 MA7 82.7829  MA14 81.0356  MA25 80.8359</pre><img alt='#150 HYPEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t150.png'/></article><article class='card'><header><b>#151 1000PEPEUSDT</b> <span class='loss'>-15.39%</span></header><p class='meta'>2026-10-29 23:00 進 → 10-30 05:00 出 · 收盤跌破破底 · QA · V</p><pre>進場 0.005499（排列那根 1h 收盤）
+停損 0.0047795（破底低點；收盤跌破才出，距離 13.08%）
+停利 0.006938（2R）
+出場 0.0046527
+破底 0.0047795  深度 3.83%  在下 7h  量比 3.55x
+進場均線 MA7 0.00500837  MA14 0.00500513  MA25 0.00499005</pre><img alt='#151 1000PEPEUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t151.png'/></article><article class='card'><header><b>#152 LITUSDT</b> <span class='loss'>-14.24%</span></header><p class='meta'>2026-10-29 23:00 進 → 10-30 06:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 3.2562（排列那根 1h 收盤）
+停損 2.7464（破底低點；收盤跌破才出，距離 15.66%）
+停利 4.2758（2R）
+出場 2.7925
+破底 2.7464  深度 9.82%  在下 31h  量比 3.05x
+進場均線 MA7 3.06431  MA14 2.94785  MA25 2.94427</pre><img alt='#152 LITUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t152.png'/></article><article class='card'><header><b>#153 TSLAUSDT</b> <span class='loss'>-2.01%</span></header><p class='meta'>2026-10-29 23:00 進 → 10-30 05:00 出 · 連兩根掉回 MA25 · QA · W</p><pre>進場 406.45（排列那根 1h 收盤）
+停損 397.93（破底低點；收盤跌破才出，距離 2.10%）
+停利 423.49（2R）
+出場 398.3
+破底 397.93  深度 2.49%  在下 21h  量比 1.38x
+進場均線 MA7 404.504  MA14 402.699  MA25 402.681</pre><img alt='#153 TSLAUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t153.png'/></article><article class='card'><header><b>#154 ASTERUSDT</b> <span class='loss'>-4.59%</span></header><p class='meta'>2026-10-30 00:00 進 → 10-30 04:00 出 · 收盤跌破破底 · QA · W</p><pre>進場 0.7187（排列那根 1h 收盤）
+停損 0.692（破底低點；收盤跌破才出，距離 3.72%）
+停利 0.7721（2R）
+出場 0.6857
+破底 0.692  深度 2.70%  在下 25h  量比 2.82x
+進場均線 MA7 0.709914  MA14 0.704564  MA25 0.704484</pre><img alt='#154 ASTERUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t154.png'/></article><article class='card'><header><b>#155 PARTIUSDT</b> <span class='loss'>-6.49%</span></header><p class='meta'>2026-10-30 01:00 進 → 10-30 21:00 出 · 持有滿 36 小時（資料只到最後一根已收盤 K，未滿 36 小時） · QA · V</p><pre>進場 0.05642（排列那根 1h 收盤）
+停損 0.03111（破底低點；收盤跌破才出，距離 44.86%）
+停利 0.10704（2R）
+出場 0.05276
+破底 0.03111  深度 20.05%  在下 5h  量比 14.71x
+進場均線 MA7 0.03993  MA14 0.0394186  MA25 0.0392464</pre><img alt='#155 PARTIUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t155.png'/></article><article class='card'><header><b>#156 XMRUSDT</b> <span class='win'>+7.49%</span></header><p class='meta'>2026-10-30 01:00 進 → 10-30 04:00 出 · 2R 停利 · QA · W</p><pre>進場 606.1（排列那根 1h 收盤）
+停損 583.39（破底低點；收盤跌破才出，距離 3.75%）
+停利 651.52（2R）
+出場 651.52
+破底 583.39  深度 3.55%  在下 21h  量比 5.29x
+進場均線 MA7 603.944  MA14 599.301  MA25 598.262</pre><img alt='#156 XMRUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t156.png'/></article><article class='card'><header><b>#157 ZECUSDT</b> <span class='loss'>-5.70%</span></header><p class='meta'>2026-10-30 02:00 進 → 10-30 04:00 出 · 收盤跌破破底 · QA · V</p><pre>進場 1323.86（排列那根 1h 收盤）
+停損 1263.33（破底低點；收盤跌破才出，距離 4.57%）
+停利 1444.92（2R）
+出場 1248.46
+破底 1263.33  深度 3.02%  在下 9h  量比 1.45x
+進場均線 MA7 1315.5  MA14 1284.57  MA25 1282.9</pre><img alt='#157 ZECUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t157.png'/></article><article class='card'><header><b>#158 SOXLUSDT</b> <span class='loss'>-10.88%</span></header><p class='meta'>2026-10-30 03:00 進 → 10-30 04:00 出 · 收盤跌破破底 · QA · W</p><pre>進場 102.45（排列那根 1h 收盤）
+停損 96.13（破底低點；收盤跌破才出，距離 6.17%）
+停利 115.09（2R）
+出場 91.3
+破底 96.13  深度 7.26%  在下 18h  量比 1.06x
+進場均線 MA7 102.057  MA14 101.04  MA25 101.006</pre><img alt='#158 SOXLUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t158.png'/></article><article class='card'><header><b>#159 BLESSUSDT</b> <span class='win'>+4.93%</span></header><p class='meta'>2026-10-30 03:00 進 → 10-30 21:00 出 · 持有滿 36 小時（資料只到最後一根已收盤 K，未滿 36 小時） · QA · W</p><pre>進場 0.01322（排列那根 1h 收盤）
+停損 0.009359（破底低點；收盤跌破才出，距離 29.21%）
+停利 0.020942（2R）
+出場 0.013872
+破底 0.009359  深度 14.90%  在下 15h  量比 1.08x
+進場均線 MA7 0.0115473  MA14 0.0107037  MA25 0.0105885</pre><img alt='#159 BLESSUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t159.png'/></article><article class='card'><header><b>#160 QUSDT</b> <span class='loss'>-16.19%</span></header><p class='meta'>2026-10-30 13:00 進 → 10-30 21:00 出 · 持有滿 36 小時（資料只到最後一根已收盤 K，未滿 36 小時） · QA · W</p><pre>進場 0.05517（排列那根 1h 收盤）
+停損 0.03518（破底低點；收盤跌破才出，距離 36.23%）
+停利 0.09515（2R）
+出場 0.04624
+破底 0.03518  深度 44.17%  在下 20h  量比 1.62x
+進場均線 MA7 0.0508414  MA14 0.0461829  MA25 0.045412</pre><img alt='#160 QUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t160.png'/></article><article class='card'><header><b>#161 BEAMXUSDT</b> <span class='win'>+32.59%</span></header><p class='meta'>2026-10-30 13:00 進 → 10-30 21:00 出 · 持有滿 36 小時（資料只到最後一根已收盤 K，未滿 36 小時） · QA · V</p><pre>進場 0.003946（排列那根 1h 收盤）
+停損 0.003225（破底低點；收盤跌破才出，距離 18.27%）
+停利 0.005388（2R）
+出場 0.005232
+破底 0.003225  深度 4.95%  在下 7h  量比 7.43x
+進場均線 MA7 0.003446  MA14 0.00341693  MA25 0.00340348</pre><img alt='#161 BEAMXUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t161.png'/></article><article class='card'><header><b>#162 EVAAUSDT</b> <span class='loss'>-2.40%</span></header><p class='meta'>2026-10-30 16:00 進 → 10-30 21:00 出 · 持有滿 36 小時（資料只到最後一根已收盤 K，未滿 36 小時） · QA · W</p><pre>進場 1.328（排列那根 1h 收盤）
+停損 1.0054（破底低點；收盤跌破才出，距離 24.29%）
+停利 1.9732（2R）
+出場 1.2961
+破底 1.0054  深度 25.32%  在下 26h  量比 1.14x
+進場均線 MA7 1.22141  MA14 1.18148  MA25 1.17872</pre><img alt='#162 EVAAUSDT' src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-20261017-1030/img/t162.png'/></article>
+</div></body></html>
