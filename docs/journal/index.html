@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="description" content="股市進出簿 — 紀錄買賣、持倉與損益，資料存在本機。" />
+  <meta name="description" content="股市進出簿 — 只記台股買賣、持倉與損益，資料存在本機。" />
   <title>股市進出簿</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -337,7 +337,7 @@
   <header class="app-header">
     <div class="brand">
       <h1>股市進出簿</h1>
-      <p>買賣、持倉、損益 · 資料只存在這台裝置</p>
+      <p>只記台股 · 資料只存在這台裝置</p>
     </div>
     <button class="icon-btn primary" id="btnAdd" aria-label="新增進出">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
@@ -390,9 +390,7 @@
       ["1326", "台化"], ["2002", "中鋼"], ["1101", "台泥"], ["3045", "台灣大"],
       ["4904", "遠傳"], ["5871", "中租-KY"], ["6505", "台塑化"], ["9910", "豐泰"],
       ["8454", "富邦媒"], ["3037", "欣興"], ["8046", "南電"], ["2408", "南亞科"],
-      ["3017", "奇鋐"], ["3653", "健策"], ["2633", "台灣高鐵"], ["2801", "彰銀"],
-      ["AAPL", "蘋果"], ["MSFT", "微軟"], ["NVDA", "輝達"], ["AMZN", "亞馬遜"],
-      ["GOOG", "Alphabet"], ["META", "Meta"], ["TSLA", "特斯拉"], ["TSM", "TSMC ADR"]
+      ["3017", "奇鋐"], ["3653", "健策"], ["2633", "台灣高鐵"], ["2801", "彰銀"]
     ];
 
     const DEFAULT_SETTINGS = {
@@ -466,6 +464,9 @@
         .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
     const Ledger = window.StockJournalLedger;
+    function bookTrades() {
+      return state.trades.filter((t) => !t.market || t.market === "TW");
+    }
     function tradeKey(t) { return Ledger.tradeKey(t); }
     function posKey(p) { return `${p.market}:${p.symbol}`; }
     function calcFee(price, qty, market) {
@@ -500,15 +501,15 @@
 
     function render() {
       applyColor();
-      const { books, realizedByTrade } = buildBooks(state.trades);
+      const { books, realizedByTrade } = buildBooks(bookTrades());
       const positions = positionsFrom(books);
       const open = positions.filter((p) => Math.abs(p.qty) > 1e-9);
       const realized = positions.reduce((s, p) => s + p.realized, 0);
       const unrealized = open.reduce((s, p) => s + (p.unrealized || 0), 0);
       const cost = open.reduce((s, p) => s + (p.qty > 0 ? p.cost : 0), 0);
       const mkt = open.reduce((s, p) => s + (p.marketValue || 0), 0);
-      const wins = state.trades.filter((t) => (realizedByTrade[t.id] || 0) > 0.5).length;
-      const losses = state.trades.filter((t) => (realizedByTrade[t.id] || 0) < -0.5).length;
+      const wins = bookTrades().filter((t) => (realizedByTrade[t.id] || 0) > 0.5).length;
+      const losses = bookTrades().filter((t) => (realizedByTrade[t.id] || 0) < -0.5).length;
       const closed = wins + losses;
       const winRate = closed ? (wins / closed) * 100 : 0;
 
@@ -522,9 +523,9 @@
     }
 
     function renderHome(s) {
-      const recent = [...state.trades].sort((a, b) => `${b.date}${b.time || ""}`.localeCompare(`${a.date}${a.time || ""}`)).slice(0, 5);
-      const months = monthlyRealized(state.trades, s.realizedByTrade);
-      if (!state.trades.length) {
+      const recent = [...bookTrades()].sort((a, b) => `${b.date}${b.time || ""}`.localeCompare(`${a.date}${a.time || ""}`)).slice(0, 5);
+      const months = monthlyRealized(bookTrades(), s.realizedByTrade);
+      if (!bookTrades().length) {
         return `<div class="empty">
           <strong>還沒有任何進出紀錄</strong>
           點右上角 ＋ 記下第一筆買進或賣出。<br/>資料存在瀏覽器本機，可到設定匯出備份。
@@ -569,7 +570,7 @@
         <div class="pos-top">
           <div>
             <div class="sym">${esc(p.symbol)} <span class="name">${esc(p.name)}</span></div>
-            <div class="name">${p.market === "US" ? "美股" : "台股"} · ${short ? "空單" : "多單"} ${money(Math.abs(p.qty), 0)} 股</div>
+            <div class="name">${short ? "空單" : "多單"} ${money(Math.abs(p.qty), 0)} 股</div>
           </div>
           ${short ? `<span class="badge short">空</span>` : `<span class="badge buy">持有</span>`}
         </div>
@@ -590,8 +591,8 @@
     }
 
     function renderPos(open) {
-      if (!state.trades.length) return `<div class="empty"><strong>尚無持倉</strong>先新增一筆買進。</div>`;
-      const closed = positionsFrom(buildBooks(state.trades).books).filter((p) => Math.abs(p.qty) <= 1e-9 && (p.buyQty || p.sellQty));
+      if (!bookTrades().length) return `<div class="empty"><strong>尚無持倉</strong>先新增一筆買進。</div>`;
+      const closed = positionsFrom(buildBooks(bookTrades()).books).filter((p) => Math.abs(p.qty) <= 1e-9 && (p.buyQty || p.sellQty));
       return `
         ${open.length ? open.map(posCard).join("") : `<div class="card empty">目前沒有未平倉部位。</div>`}
         ${closed.length ? `<div class="section-title">已平倉</div>${closed.map((p) => `<div class="card"><div class="pos-top"><div><div class="sym">${esc(p.symbol)} <span class="name">${esc(p.name)}</span></div><div class="name">已出清 · 已實現損益</div></div><div class="mono ${clsPnl(p.realized)}">${signed(p.realized, 0)}</div></div></div>`).join("")}` : ""}
@@ -604,7 +605,7 @@
         <div class="trade-top">
           <div>
             <div class="sym">${esc(t.symbol)} <span class="name">${esc(t.name || "")}</span></div>
-            <div class="name">${esc(t.date)}${t.time ? " " + esc(t.time) : ""} · ${t.market === "US" ? "美股" : "台股"} · ${money(t.qty, 0)} 股 @ ${money(t.price, 2)}</div>
+            <div class="name">${esc(t.date)}${t.time ? " " + esc(t.time) : ""} · ${money(t.qty, 0)} 股 @ ${money(t.price, 2)}</div>
           </div>
           <span class="badge ${side}">${side === "buy" ? "買進" : "賣出"}</span>
         </div>
@@ -619,10 +620,9 @@
 
     function renderLog(realizedByTrade) {
       const q = state.filter.q.trim().toLowerCase();
-      let list = [...state.trades].sort((a, b) => `${b.date}${b.time || ""}`.localeCompare(`${a.date}${a.time || ""}`));
+      let list = [...bookTrades()].sort((a, b) => `${b.date}${b.time || ""}`.localeCompare(`${a.date}${a.time || ""}`));
       if (q) list = list.filter((t) => `${t.symbol} ${t.name || ""}`.toLowerCase().includes(q));
       if (state.filter.side !== "all") list = list.filter((t) => t.side === state.filter.side);
-      if (state.filter.market !== "all") list = list.filter((t) => t.market === state.filter.market);
       return `
         <div class="filters">
           <input class="search" id="logSearch" placeholder="搜尋代碼或名稱" value="${esc(state.filter.q)}" />
@@ -631,8 +631,6 @@
           <button class="chip ${state.filter.side === "all" ? "on" : ""}" data-side="all">全部</button>
           <button class="chip ${state.filter.side === "buy" ? "on" : ""}" data-side="buy">買進</button>
           <button class="chip ${state.filter.side === "sell" ? "on" : ""}" data-side="sell">賣出</button>
-          <button class="chip ${state.filter.market === "TW" ? "on" : ""}" data-market="TW">台股</button>
-          <button class="chip ${state.filter.market === "US" ? "on" : ""}" data-market="US">美股</button>
         </div>
         ${list.length ? list.map((t) => tradeCard(t, realizedByTrade[t.id])).join("") : `<div class="empty">沒有符合的紀錄</div>`}
       `;
@@ -647,7 +645,7 @@
             <button class="switch ${s.autoFee ? "on" : ""}" id="swFee" aria-label="自動費用"><i></i></button>
           </div>
           <div class="setting-row">
-            <div>漲跌顏色<small>${s.colorMode === "us" ? "美股慣例：綠漲紅跌" : "台股慣例：紅漲綠跌"}</small></div>
+            <div>漲跌顏色<small>${s.colorMode === "us" ? "綠漲紅跌" : "紅漲綠跌"}</small></div>
             <button class="switch ${s.colorMode === "us" ? "on" : ""}" id="swColor" aria-label="顏色慣例"><i></i></button>
           </div>
         </div>
@@ -685,7 +683,7 @@
           state.filter.q = search.value;
           const keep = search;
           const start = keep.selectionStart;
-          document.getElementById("page-log").innerHTML = renderLog(buildBooks(state.trades).realizedByTrade);
+          document.getElementById("page-log").innerHTML = renderLog(buildBooks(bookTrades()).realizedByTrade);
           bindPageEvents();
           const el = document.getElementById("logSearch");
           el.focus();
@@ -702,7 +700,7 @@
 
     function askQuote(key) {
       const cur = state.quotes[key];
-      const pos = positionsFrom(buildBooks(state.trades).books).find((p) => posKey(p) === key);
+      const pos = positionsFrom(buildBooks(bookTrades()).books).find((p) => posKey(p) === key);
       document.getElementById("sheetCard").innerHTML = `
         <div class="grab"></div>
         <div class="sheet-title">設定現價</div>
@@ -742,7 +740,6 @@
       state.editingId = preset && preset.id ? preset.id : null;
       const t = preset || {};
       const side = t.side || "buy";
-      const market = t.market || "TW";
       const date = t.date || today();
       const time = t.time || "";
       document.getElementById("sheetCard").innerHTML = `
@@ -760,10 +757,8 @@
             </div>
             <div>
               <label>市場</label>
-              <select class="field" name="market">
-                <option value="TW" ${market === "TW" ? "selected" : ""}>台股</option>
-                <option value="US" ${market === "US" ? "selected" : ""}>美股</option>
-              </select>
+              <input class="field" value="台股" disabled />
+              <input type="hidden" name="market" value="TW" />
             </div>
             <div class="rel">
               <label>代碼</label>
@@ -843,7 +838,6 @@
         suggest.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
           form.elements.symbol.value = b.dataset.code;
           form.elements.name.value = b.dataset.cname;
-          if (/^[A-Z.]+$/.test(b.dataset.code) && !/^\d/.test(b.dataset.code)) form.elements.market.value = "US";
           suggest.style.display = "none";
           autofillFees();
         }));
@@ -898,7 +892,7 @@
         id: state.editingId || uid(),
         date: raw.date,
         time: raw.time || "",
-        market: raw.market === "US" ? "US" : "TW",
+        market: "TW",
         symbol: String(raw.symbol || "").trim().toUpperCase(),
         name: String(raw.name || "").trim() || lookupName(raw.symbol, raw.market),
         side: raw.side === "sell" ? "sell" : "buy",
@@ -1035,12 +1029,6 @@
       const side = e.target.closest("[data-side]");
       if (side) {
         state.filter.side = side.dataset.side;
-        render();
-        return go("log");
-      }
-      const market = e.target.closest("[data-market]");
-      if (market) {
-        state.filter.market = state.filter.market === market.dataset.market ? "all" : market.dataset.market;
         render();
         return go("log");
       }
