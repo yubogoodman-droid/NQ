@@ -938,6 +938,8 @@ def detect_signals(
     h4_drop_bars: int = 24,
     max_entry_ext_atr: float = 0.0,
     max_overhead_knot_atr: float = 0.0,
+    min_entry_vol: float = 0.0,
+    require_ma7_above_ma14: bool = False,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """1h 跌破 MA25，做出 W、收盤站回後，等回測 MA25 再進。max_stack_wait 只留給舊呼叫。
@@ -1182,6 +1184,19 @@ def detect_signals(
 
         vol_avg = float(np.mean(volume[max(0, entry_idx - vol_lookback) : entry_idx]) or 1.0)
         vol_ratio = float(volume[entry_idx] / vol_avg) if vol_avg > 0 else 1.0
+        if min_entry_vol > 0 and vol_ratio < float(min_entry_vol):
+            bump("quiet_entry")
+            i = reclaim
+            continue
+
+        if require_ma7_above_ma14:
+            m7_e = float(ma7[entry_idx]) if entry_idx < len(ma7) else float("nan")
+            m14_e = float(ma14[entry_idx]) if entry_idx < len(ma14) else float("nan")
+            if not (np.isfinite(m7_e) and np.isfinite(m14_e) and m7_e > m14_e):
+                bump("ma7_below_ma14")
+                i = reclaim
+                continue
+
         shape = classify_shape(low, high, start, end)
         if w_pts is not None:
             shape = "W"
@@ -1902,6 +1917,7 @@ def write_html_report(
     strict: bool = False,
     m5_exit: bool = True,
     lose_ma_closes: int = 0,
+    max_hold: int = 36,
 ) -> Path:
     stats = all_stats or summarize_trades([h.trade for h in hits])
     cards: List[str] = []
@@ -1939,9 +1955,9 @@ def write_html_report(
             )
         if m5_exit or t.exit_reason in {"m5_neck", "m5_m"}:
             if lose_ma_closes > 0:
-                tgt_line = f"出場 五分 M 破頸線（無 2R；備援 MA25×{lose_ma_closes} / 36h）"
+                tgt_line = f"出場 五分 M 破頸線（無 2R；備援 MA25×{lose_ma_closes} / {max_hold}h）"
             else:
-                tgt_line = "出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；36h）"
+                tgt_line = f"出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；{max_hold}h）"
         else:
             tgt_line = f"target {t.target_price:.6g}  ({r_mult:.1f}R)"
         exit_line = f"exit  {t.exit_price:.6g}  {t.exit_reason}"
@@ -1993,7 +2009,9 @@ def write_html_report(
             f"破底在MA200上 {funnel.get('above_ma200', 0)} · "
             f"破底沒放量 {funnel.get('quiet_break', 0)} · "
             f"追價 {funnel.get('entry_ext', 0)} · "
-            f"頭上均線結 {funnel.get('overhead_knot', 0)}）</p>"
+            f"頭上均線結 {funnel.get('overhead_knot', 0)} · "
+            f"進場縮量 {funnel.get('quiet_entry', 0)} · "
+            f"MA7未過MA14 {funnel.get('ma7_below_ma14', 0)}）</p>"
         )
     q_bits = [f"Q{q} {info['n']}筆 {info['pnl']:+.2f}%" for q, info in stats.get("by_quality", {}).items()]
     total_cls = "pnl-win" if stats["total_pct"] >= 0 else "pnl-loss"
@@ -2034,7 +2052,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上（{'嚴格 · 筆畫 W' if strict else '寬鬆'}）</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 均線對齊你那兩張手機圖：黃7 / 青14 / 粉25 / 紫99 / 綠120 / 酒紅200<br/>
-{'嚴格版 · 在下至少 10 小時、急殺破底。圖上藍線照手機畫法：摔到破底、彈起、回踩 MA25、再往上。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%、破前低 ≥ 1.4%（影線輕點不算）。'}破底後先收盤站回 MA25，離開均線後回測吻到再進（沒回測就放棄）。圖上藍線是筆畫 W。停損＝收盤跌破破底低點（影線不算）。{'出場＝五分 M 破頸。' if m5_exit else '目標 2R。'}{'不再用連兩根掉 MA25。' if lose_ma_closes <= 0 else f'備援連 {lose_ma_closes} 根收盤掉 MA25。'}最長 36h。每張卡底下附 4h K 對照。{card_note}</p>
+{'嚴格版 · 在下至少 10 小時、急殺破底。圖上藍線照手機畫法：摔到破底、彈起、回踩 MA25、再往上。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%、破前低 ≥ 1.4%（影線輕點不算）。'}破底後先收盤站回 MA25，離開均線後回測吻到再進（沒回測就放棄）。圖上藍線是筆畫 W。停損＝收盤跌破破底低點（影線不算）。{'出場＝五分 M 破頸。' if m5_exit else '目標 2R。'}{'不再用連兩根掉 MA25。' if lose_ma_closes <= 0 else f'備援連 {lose_ma_closes} 根收盤掉 MA25。'}最長 {max_hold}h。每張卡底下附 4h K 對照。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -2449,6 +2467,8 @@ def detect_kwargs(args) -> dict:
         h4_drop_bars=int(getattr(args, "h4_drop_bars", 24)),
         max_entry_ext_atr=float(getattr(args, "max_entry_ext_atr", 0.0)),
         max_overhead_knot_atr=float(getattr(args, "max_overhead_knot_atr", 0.0)),
+        min_entry_vol=float(getattr(args, "min_entry_vol", 0.0)),
+        require_ma7_above_ma14=bool(getattr(args, "require_ma7_above_ma14", False)),
     )
     if getattr(args, "strict", False):
         return dict(STRICT_DETECT, **extra)
@@ -2552,7 +2572,8 @@ def cmd_run(args) -> int:
             f"h4bear={funnel.get('h4_bear', 0)} h4drop={funnel.get('h4_ma_drop', 0)} spike={funnel.get('prior_spike', 0)} "
             f"early={funnel.get('early_retest', 0)} late={funnel.get('late_retest', 0)} "
             f"smalldecl={funnel.get('small_decline', 0)} dead={funnel.get('dead_tape', 0)} "
-            f"ext={funnel.get('entry_ext', 0)} knot={funnel.get('overhead_knot', 0)}"
+            f"ext={funnel.get('entry_ext', 0)} knot={funnel.get('overhead_knot', 0)} "
+            f"qentry={funnel.get('quiet_entry', 0)} ma7lt14={funnel.get('ma7_below_ma14', 0)}"
         )
     now = datetime.now(TPE)
     for i, hit in enumerate(hits, 1):
@@ -2595,6 +2616,7 @@ def cmd_run(args) -> int:
             strict=bool(args.strict),
             m5_exit=m5_exit,
             lose_ma_closes=lose_ma_closes,
+            max_hold=max_hold,
         )
         view = write_view_html(out)
         print(f"html={out}")
@@ -2764,6 +2786,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help="MA60/99/120 全在進場收盤之上且三線帶寬<=此 ATR 則丟（0=關；1.5＝頭上中期均線結）",
+    )
+    p.add_argument(
+        "--min-entry-vol",
+        type=float,
+        default=0.0,
+        help="進場那根量 / 前 20 根均量最低倍數（0=關；0.15＝拒休市/極度縮量回測）",
+    )
+    p.add_argument(
+        "--require-ma7-above-ma14",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="進場時要求 1h MA7 > MA14（短均線已黃金交叉；預設關）",
     )
     p.add_argument(
         "--w-overlay",

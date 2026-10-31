@@ -1,3 +1,4 @@
-執行: python3 run_90d_20261028_stocks_v7.py
-需要: numpy pandas requests matplotlib
-路徑寫死在 /workspace，請改成你的資料夾。規則核心在 binance_1h_ma25_reclaim.py (detect 的 v7 參數在 runner 內)。
+執行兩月回測與 v8 優化對照: python3 pofanfan_1h_ma25/run_60d_20261031_stocks_v8.py
+執行舊版 v7 回測: python3 pofanfan_1h_ma25/run_90d_20261028_stocks_v7.py
+需要: numpy pandas requests matplotlib pillow
+規則核心在 binance_1h_ma25_reclaim.py，詳細規則與兩月優化結果請見 RULES.md。

@@ -12,10 +12,9 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, "/workspace/binance-1h-ma25/examples")
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 import binance_1h_ma25_reclaim as m
-
-sys.path.insert(0, "/workspace/ma25-retest")
 import stamp_pnl_badges as stamp  # noqa: E402
 
 TPE = ZoneInfo("Asia/Taipei")

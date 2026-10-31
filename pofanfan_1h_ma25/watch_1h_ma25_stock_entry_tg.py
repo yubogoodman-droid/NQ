@@ -80,6 +80,9 @@ DETECT_KW = dict(
     # v7：HIMS 2026-10-02 收盤高出 MA25 2.91 ATR；ANET 2026-09-29 頭上 MA60/99/120 帶寬 0.61 ATR
     max_entry_ext_atr=2.0,
     max_overhead_knot_atr=1.5,
+    # v8（兩月回測優化）：剔除休市/極度縮量回測（進場量 < 0.15x 20h均量）與短均未翻多（MA7 <= MA14）
+    min_entry_vol=0.15,
+    require_ma7_above_ma14=True,
 )
 
 

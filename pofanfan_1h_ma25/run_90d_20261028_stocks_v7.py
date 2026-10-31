@@ -13,28 +13,27 @@ from __future__ import annotations
 import json
 import sys
 from collections import Counter
-from datetime import datetime as _dt
+from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, "/workspace/binance-1h-ma25/examples")
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 import binance_1h_ma25_reclaim as m  # noqa: E402
-
-sys.path.insert(0, "/workspace/ma25-retest")
 import stamp_pnl_badges as stamp  # noqa: E402
 from run_7d_20260927_stocks import parse_detailed  # noqa: E402
 
 TPE = ZoneInfo("Asia/Taipei")
 ROOT = Path("/workspace/ma25-retest")
 OUT = ROOT / "90d-20261028-stocks-v7"
-FROZEN = _dt(2026, 10, 28, 15, 0, 0, tzinfo=TPE)
+FROZEN = datetime(2026, 10, 28, 15, 0, 0, tzinfo=TPE)
 WIN_START = "2026-07-28 00:00"
 SRC = ROOT / "7d-20260927-stocks" / "symbols.txt"
 DAYS = 93
 
 
-def freeze(frozen: _dt) -> None:
-    class FrozenDT(_dt):
+def freeze(frozen: datetime) -> None:
+    class FrozenDT(datetime):
         @classmethod
         def now(cls, tz=None):
             return frozen if tz is None else frozen.astimezone(tz)
@@ -122,8 +121,8 @@ def main() -> int:
     for t in detailed:
         held_h = None
         try:
-            e = _dt.strptime(t["entry_tpe"], "%Y-%m-%d %H:%M")
-            x = _dt.strptime(t["exit_tpe"], "%Y-%m-%d %H:%M")
+            e = datetime.strptime(t["entry_tpe"], "%Y-%m-%d %H:%M")
+            x = datetime.strptime(t["exit_tpe"], "%Y-%m-%d %H:%M")
             held_h = int((x - e).total_seconds() // 3600)
         except ValueError:
             pass
@@ -157,7 +156,7 @@ def main() -> int:
             w.writerow(row)
 
     summary = {
-        "scanned_at_real_tpe": _dt.now(TPE).strftime("%Y-%m-%d %H:%M:%S TPE"),
+        "scanned_at_real_tpe": datetime.now(TPE).strftime("%Y-%m-%d %H:%M:%S TPE"),
         "frozen_clock_tpe": FROZEN.strftime("%Y-%m-%d %H:%M:%S"),
         "window_requested": "2026-07-28 00:00 .. 2026-10-28 15:00 TPE",
         "window": "entries >= 2026-10-21 00:00 TPE (--days 93 + filter, clock frozen 2026-10-28 15:00 TPE)",
