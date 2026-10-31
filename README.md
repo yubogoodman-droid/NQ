@@ -64,7 +64,7 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 1 小時圖，對齊 6443 元晶 2026-09-16 那波：收盤從 MA20 上方跌到下方後，在下面待 6～36 根（不准假站上），相對過程中最高 MA20 深度 ≥ 3.5%，且最低點是近 16 根新低；破底與翻上不能同一根，從低點至少彈回 3%，再站回 MA20 這波才算。破底後 36 根內，第一根收盤同時大於 MA5 / MA10 / MA20 進場。下面天數放寬是為了 6456 GIS-KY 那種先磨再翻。
 
-回測出場（方便看兩個禮拜成績）：停在破底低、目標 2R、或 20 根時間停。
+回測出場：停損放在破底低，但離進場超過 4% 就改停在進場下方 4%；停利 1R；否則 20 根時間停。進場條件沒改。2R、停損掛在很遠的破底，在 2026-10 這種回檔週會把單筆虧損放大到 10% 以上，而且 2R 幾乎打不到。
 
 ```bash
 # 成交額前 200、近一週
@@ -86,6 +86,8 @@ python3 examples/test_tw_1h_reclaim.py
 2026-08-26 → 09-24、成交額前 200 且**股價 < 1000**：元晶型 **149 筆、104 檔**。已平 142 筆勝率 **50.7%**，平均 **+1.30%**；2R 16 筆平均 +12.7%，停損 39 筆平均 −4.8%。6443 元晶 9/16 進場，次日 2R +5.98%。
 
 近一週（2026-10-21 → 10-27、成交額前 200、股價 < 1000）：**66 筆**，已平 26 筆（2R 3、停損 23），未平 40。週報：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-7d/view.html
+
+2026-10-17 → 10-30 同一 137 筆，只改出場（停利 1R、停損最多離進場 4%）：勝率 **37.2%**、平均 **−0.97%**（原本 2R、停在破底是 17.5%、−3.83%）。用 10/30 成交額前 200 回看 8/26–9/24，平均從 +1.62% 降到 +0.99%，仍是正的。這兩週還是小虧，大贏的單（例如濱川 +16%）會被停利截成 +4%，GIS-KY 那種先洗再走會在 −4% 出場。預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261017-1030-opt/view.html
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 

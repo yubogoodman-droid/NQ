@@ -63,12 +63,15 @@ class ReclaimParams:
     max_fakes: int = 0
     min_depth: float = 0.035
     min_bounce: float = 0.03
+    max_bounce: float = 10.0
     separate_trough: bool = True
     lookback: int = 16
     entry_window: int = 36
     require_stack: bool = False
-    target_r: float = 2.0
+    target_r: float = 1.0
     time_bars: int = 20
+    # 停損最多離進場這段%。破底低更遠時改停在進場價下方這段，避免單筆虧 10% 以上。
+    stop_cap: Optional[float] = 0.04
 
 
 def loose_params(**overrides: Any) -> ReclaimParams:
@@ -276,8 +279,8 @@ def detect_signals(
                         if confirmed.trough_low > 0
                         else 0.0
                     )
-                    if bounce < p.min_bounce:
-                        fail_entry = "weak_bounce"
+                    if bounce < p.min_bounce or bounce > p.max_bounce:
+                        fail_entry = "weak_bounce" if bounce < p.min_bounce else "chase"
                         continue
                     signals.append(
                         Signal(
@@ -341,6 +344,9 @@ def simulate(
         risk = entry - stop
         if risk <= 0:
             stop = entry * 0.99
+            risk = entry - stop
+        if p.stop_cap is not None and p.stop_cap > 0 and risk > entry * p.stop_cap:
+            stop = entry * (1.0 - p.stop_cap)
             risk = entry - stop
         target = entry + p.target_r * risk
         exit_idx = entry_idx
@@ -755,12 +761,12 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
 <br/>跌破 MA20 後待 6～36 根（不准假站上），深度 ≥ 3.5%，最低點為近 16 根新低，破底與翻上不同根，從低點至少彈 3%，再站回 MA20。
 破底後 36 根內第一根收盤 &gt; MA5 / MA10 / MA20 進場。
-回測出場：停在破底低、2R、或 20 根時間停。加總％是各筆報酬相加，不是組合複利。</p>
+回測出場：停損在破底低，但離進場超過 4% 就改停在進場下方 4%；停利 1R；或 20 根時間停。加總％是各筆報酬相加，不是組合複利。</p>
 <p class="muted">漏斗：跌破 {fun.get('cross_below', 0)} → 成波 {fun.get('wave_ok', 0)} → 進場 {fun.get('entry', 0)}
 · 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 非破底 {fun.get('not_16h_low', 0)}
 · 假站過多 {fun.get('too_many_fakes', 0)} · 逾時 {fun.get('timeout', 0)} · 沒站上均線 {fun.get('entry_timeout', 0)}
 · 同根錘 {fun.get('same_bar', 0)} · 彈太弱 {fun.get('weak_bounce', 0)} · 進場價過高 {fun.get('price_cap', 0)}
-<br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
+<br/>出場：停利 {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -816,9 +822,10 @@ def _params_rules_html(
 本回測模式：{mode}；<code>require_stack={params.require_stack}</code>
 （True 才再要求 MA5&gt;MA10&gt;MA20）。</li>
 <li><b>進場價</b>：進場那根<strong>收盤價</strong>（<code>Signal.entry_price = close[e]</code>）。</li>
-<li><b>停損</b>：波谷低 <code>wave.trough_low</code>。若進場價 − 停損 ≤ 0，改用進場價 × 0.99。
+<li><b>停損</b>：先放在波谷低 <code>wave.trough_low</code>。若進場價 − 停損 ≤ 0，改用進場價 × 0.99。
+{("若這樣離進場仍超過 %.0f%%，停損改收在進場價下方 %.0f%%（<code>stop_cap</code>）。" % (params.stop_cap*100, params.stop_cap*100)) if params.stop_cap else "不另收緊。"}
 進場後每一根先看 <code>low ≤ 停損</code>，打到則以停損價出場（<code>stop</code>）。</li>
-<li><b>停利</b>：<code>進場價 + {params.target_r:g} × (進場價 − 停損)</code>。同一根停損沒打到才看
+<li><b>停利</b>：<code>進場價 + {params.target_r:g} × (進場價 − 停損)</code>（{params.target_r:g}R）。同一根停損沒打到才看
 <code>high ≥ 停利</code>，打到則以停利價出場（<code>target</code>）。</li>
 <li><b>時間出場</b>：從進場根起最多再看 {params.time_bars} 根。都沒打到停損／停利，出場價＝該根收盤（<code>time</code>）。
 若資料已到最後一根且尚未滿 {params.time_bars} 根，以最後收盤標記未平（<code>open</code>）。</li>
@@ -934,13 +941,13 @@ code{{font-size:12px;background:#0d1117;padding:1px 4px;border-radius:4px}}
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億</p>
 <h2>觸發規則（對齊 repo 程式，不是口頭版）</h2>
 {rules}
-<p class="note">報酬未扣手續費與交易稅。圖：綠虛線＋▲＝進場；黃點線＋×＝出場；粉點＝破底／停損；黃／藍／粉線＝MA5／MA10／MA20；紅點橫線＝停損；綠點橫線＝2R。</p>
+<p class="note">報酬未扣手續費與交易稅。圖：綠虛線＋▲＝進場；黃點線＋×＝出場；粉點＝破底；黃／藍／粉線＝MA5／MA10／MA20；紅點橫線＝停損；綠點橫線＝停利。</p>
 <h2>回測統計</h2>
 <p class="muted">漏斗：跌破 {fun.get('cross_below', 0)} → 成波 {fun.get('wave_ok', 0)} → 進場 {fun.get('entry', 0)}
 · 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 非破底 {fun.get('not_16h_low', 0)}
 · 假站過多 {fun.get('too_many_fakes', 0)} · 逾時 {fun.get('timeout', 0)} · 沒站上均線 {fun.get('entry_timeout', 0)}
 · 同根錘 {fun.get('same_bar', 0)} · 彈太弱 {fun.get('weak_bounce', 0)} · 進場價過高 {fun.get('price_cap', 0)}
-<br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
+<br/>出場：停利 {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}
 <br/>最好一筆：{escape(_hit_label(best_hit))}
 <br/>最差一筆：{escape(_hit_label(worst_hit))}</p>

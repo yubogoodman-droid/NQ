@@ -346,6 +346,22 @@ def test_price_cap_keeps_cheap_entry() -> None:
     assert [s for s in sigs if s.entry_price >= 50] == sigs
 
 
+def test_stop_cap_cuts_wide_trough() -> None:
+    closes, lows = valid_closes()
+    # 進場約 101，破底 95.4（風險 > 4%）。下一根低點 96.5 還沒摸到破底，但已跌超過 4%。
+    closes = list(closes) + [100.0, 100.5]
+    lows = list(lows) + [96.5, 99.0]
+    df = ohlc_from_close(closes, lows=lows)
+    sigs = detect_signals(df, loose_params())
+    assert len(sigs) == 1
+    wide = simulate(df, sigs, loose_params(time_bars=8, stop_cap=None, target_r=2.0))
+    assert wide[0].exit_reason != "stop"
+    capped = simulate(df, sigs, loose_params(time_bars=8, stop_cap=0.04, target_r=1.0))
+    assert capped[0].exit_reason == "stop"
+    assert abs(capped[0].stop_price - capped[0].entry_price * 0.96) < 1e-6
+    assert capped[0].pnl_pct > -0.041
+
+
 def test_summarize() -> None:
     stats = summarize_trades([])
     assert stats["count"] == 0
@@ -372,6 +388,7 @@ def main() -> int:
     test_bounce_too_small()
     test_same_bar_trough_skipped()
     test_simulate_stop_and_target()
+    test_stop_cap_cuts_wide_trough()
     test_filter_entry_window()
     test_filter_entry_range_and_skip()
     test_price_cap_keeps_cheap_entry()
