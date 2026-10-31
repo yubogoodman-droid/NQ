@@ -52,7 +52,7 @@ DETECT_KW = dict(
     max_bars_below=36,
     min_depth_pct=0.018,
     min_impulse_pct=0.0,
-    min_undercut_pct=0.014,
+    min_undercut_pct=0.016,  # v9（半年優化）：破前低 ≥ 1.6%（原 1.4%）
     min_flush_atr=0.0,
     target_r=2.0,
     max_retest_wait=18,
@@ -62,7 +62,7 @@ DETECT_KW = dict(
     min_ribbon_atr=0.50,
     ma200_near_pct=0.0,  # v2：破底低須 < MA200（%，原 1.0）
     min_ma_cluster_atr=1.0,
-    min_break_vol=0.8,
+    min_break_vol=2.2,  # v9（半年優化）：破底恐慌出量 ≥ 2.2x 20h均量（原 0.8x，剔除無量陰跌破底）
     min_mid_ma_atr=0.50,
     require_h4_ma25=True,
     h4_ma25_tol_pct=2.0,  # %（原 1.5）
@@ -186,7 +186,7 @@ def fmt_sig(symbol: str, df, sig) -> str:
     arm_15r = sig.entry_price + 1.5 * risk
     exit_24h = ts + timedelta(hours=24)
     return (
-        f"股票永續 1H 破底翻 v8 · 回測進場\n"
+        f"股票永續 1H 破底翻 v9 · 回測進場\n"
         f"{symbol}\n"
         f"時間 {ts.strftime('%m-%d %H:%M')} 台北\n"
         f"進場 {sig.entry_price:.6g}（MA25 {sig.ma25:.6g}）\n"
