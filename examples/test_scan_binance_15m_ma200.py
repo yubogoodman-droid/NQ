@@ -96,6 +96,21 @@ def test_coil_break_near_200_hits() -> None:
     assert 99.0 < h.ma200 < 101.5
 
 
+def test_tight_stop_skips() -> None:
+    """停損離收盤太近（風險低於 MIN_RISK）不進：雜訊就掃掉，手續費又吃掉一大塊 R。"""
+    import nq.ma200_squeeze as sq
+
+    d = _coil_then_break()
+    h = detect_signals(d)[0]
+    assert h.risk_pct >= sq.MIN_RISK
+    old = sq.MIN_RISK
+    try:
+        sq.MIN_RISK = h.risk_pct + 0.0005
+        assert sq.signal_at(d, h.idx) is None
+    finally:
+        sq.MIN_RISK = old
+
+
 def test_too_far_from_200_skips() -> None:
     """一根就直豎離開 200，不是「在 200 附近進場」。"""
     d = _coil_then_break(break_close=104.0)

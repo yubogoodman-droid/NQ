@@ -31,11 +31,11 @@ MAX_ABOVE_BARS = 14  # 盤整 24 根裡，嚴格站上 200 不能超過 14（BTC
 MAX_MA200_ABOVE_OTHERS = 0.0015  # 200 要纏在其餘均線裡，不能單獨掛在上面（ETH 9/25）
 MAX_LONG_DETACH = 0.0045  # 99/120 可略低一層（BZ/AAOI 約 0.40% 放回；再鬆就變兩條帶）
 MIN_BODY_FRAC = 0.35
-MIN_RISK = 0.004
+MIN_RISK = 0.007  # 0.4～0.7% 的窄停損被雜訊掃掉，且來回手續費約吃掉 R 的 1/5
 MAX_RISK = 0.018
 STOP_BUFFER = 0.002
-TARGET_R = 2.0
-HOLD_BARS = 16
+TARGET_R = 1.0  # 2R 在 16 根內很少到；1R＋持 48 根在 9/3～10/16 與 10/17～10/30 扣費後都為正
+HOLD_BARS = 48
 MIN_GAP_BARS = 16
 
 

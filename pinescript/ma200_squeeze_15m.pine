@@ -19,9 +19,10 @@ maxAboveBars = input.int(14, "盤整已站上 200 的上限根數", minval=4, ma
 max200AbovePct = input.float(0.15, "MA200 高於其餘均線上限 %", minval=0.05, step=0.05)
 maxLongDetachPct = input.float(0.45, "99/120 掉在短均下的上限 %", minval=0.10, step=0.05)
 minBodyFrac  = input.float(0.35, "實體 / 振幅", minval=0.1, step=0.05)
-targetR      = input.float(2.0, "停利 R", minval=1.0, step=0.5)
+targetR      = input.float(1.0, "停利 R", minval=0.5, step=0.25)
+holdBars     = input.int(48, "最多持有 K 數", minval=4, maxval=200)
 stopBufPct   = input.float(0.2, "停損緩衝 %", minval=0.0, step=0.05)
-minRiskPct   = input.float(0.4, "最小風險 %", minval=0.1, step=0.1)
+minRiskPct   = input.float(0.7, "最小風險 %", minval=0.1, step=0.1)
 maxRiskPct   = input.float(1.8, "最大風險 %", minval=0.5, step=0.1)
 
 ma7   = ta.sma(close, 7)
@@ -89,6 +90,9 @@ if longSignal
     tgt = close + targetR * (close - stopLevel)
     strategy.entry("200擠壓多", strategy.long)
     strategy.exit("200擠壓出", "200擠壓多", stop=stopLevel, limit=tgt)
+
+if strategy.position_size > 0 and bar_index - strategy.opentrades.entry_bar_index(0) >= holdBars
+    strategy.close("200擠壓多", comment="時間出場")
 
 plot(ma7,   "MA7",   color=color.new(#f0c14a, 0), linewidth=1)
 plot(ma14,  "MA14",  color=color.new(#64b5f6, 0), linewidth=1)
