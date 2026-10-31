@@ -22,6 +22,25 @@
 | 停損 | 第二低點 |
 | 停利 | 量度漲幅：目標 = 頸線 + (頸線 − 最低點) |
 
+## NQ 五分 K 雙底 · 兩小時低回測守三根
+
+對齊 09-04 **圖 29**：創下兩小時低點 → 收盤站上 MA20 → 再跌破 MA20 → 回到兩小時低點附近（可略破 20 點）→ **連續三根沒新低** 才做多。  
+圖 29 是 11:30 兩小時低 29478 → 12:05 站上 → 13:05 跌破 → 13:45 回測 29468 → **14:00 進場**。每筆下面加一張 **五分滿足當下的 15 分 K**（只畫到進場那根五分，藍框是當下這根 15 分，未走完）。停損在回測低下方 4 點；目標取量度或 2R 較遠者。
+
+```bash
+python3 examples/nq_w_ma20.py backtest --period 7d --pages
+python3 examples/nq_w_ma20.py backtest --period 60d --pages
+python3 examples/test_nq_w_ma20.py
+```
+
+TradingView：`pinescript/nq_w_ma20_5m.pine` 貼到 NQ1! / MNQ1! 五分圖。
+
+近一週 Yahoo 五分（2026-08-28 → 09-04）：**9 筆、勝率 33.3%、+193.8 點**（均筆 +21.5）。圖 29 那筆 14:00 進、16:55 時間停 **+89.2**。  
+漏斗：兩小時低 24 → 站上 24 → 跌破 23 → 回測 18 → 進場 9。  
+近兩月（2026-06-26 → 09-04）：**56 筆、勝率 19.6%、−205.8 點**。回測守三根之後仍常再破，停損被掃。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-w-ma20-26e0/docs/nq-w-ma20/view.html
+
 ## NQ 一分 K 破底翻 MA Reclaim
 
 1 分鐘圖：跌破近 2 小時低點後，15 根內收復 MA20/MA30，且 MA5>MA10>MA20，做多 NQ。  
