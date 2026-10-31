@@ -23,6 +23,7 @@ MONTH_END = pd.Timestamp("2026-10-31 09:30", tz=TPE)
 class Params:
     lookback: int = 90          # bars for the reference high H (window i-lookback+1 .. i)
     drop: float = 0.025         # L1 <= H * (1 - drop)
+    hl_min: float = 0.0         # L2 >= L1 * (1 + hl_min) (in addition to L2 > L1; e.g. 0.0005 = +5 bp to reject 1-tick noise)
     l2_ma_buf: float = 0.015    # L2 >= MA200[l2] * (1 - l2_ma_buf)
     band: float = 0.01          # |close / MA200 - 1| <= band
     band_side: str = "both"     # "both" | "above" (close >= MA200) | "below" (close <= MA200)
@@ -100,8 +101,8 @@ def signals(df, p=DEFAULT, start=None, end=None):
             band_ok = (dist <= 0) & (dist >= -p.band)
         else:
             band_ok = np.abs(dist) <= p.band
-        cand = ((s["L1"] <= s["H"] * (1 - p.drop)) & (s["L2"] > s["L1"]) & ~np.isnan(s["ma_l2"])
-                & (s["L2"] >= s["ma_l2"] * (1 - p.l2_ma_buf)) & (cl > s["B"]) & (prev <= s["B"])
+        cand = ((s["L1"] <= s["H"] * (1 - p.drop)) & (s["L2"] > s["L1"]) & (s["L2"] >= s["L1"] * (1 + p.hl_min))
+                & ~np.isnan(s["ma_l2"]) & (s["L2"] >= s["ma_l2"] * (1 - p.l2_ma_buf)) & (cl > s["B"]) & (prev <= s["B"])
                 & band_ok & ~np.isnan(ma))
     if p.session != "all":
         cand &= df[p.session].values
