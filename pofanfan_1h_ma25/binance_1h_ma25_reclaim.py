@@ -946,6 +946,7 @@ def detect_signals(
     h4_ma60_max_rise_pct: float = 999.0,
     h4_ma60_bars: int = 12,
     min_entry_rng_pct: float = 0.0,
+    exclude_weekend: bool = False,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """1h 跌破 MA25，做出 W、收盤站回後，等回測 MA25 再進。max_stack_wait 只留給舊呼叫。
@@ -1192,6 +1193,17 @@ def detect_signals(
             bump("dead_tape")
             i = reclaim
             continue
+
+        if exclude_weekend:
+            ts_e = df.index[entry_idx]
+            ts_tpe = ts_e.tz_convert(TPE) if getattr(ts_e, "tzinfo", None) is not None else ts_e
+            dow = ts_tpe.weekday()
+            hr = ts_tpe.hour
+            # 美股週五盤後於台北週六 08:00 結束，至週一 08:00 亞股/美股夜盤開盤前為週末休市
+            if (dow == 5 and hr >= 8) or (dow == 6) or (dow == 0 and hr < 8):
+                bump("weekend")
+                i = reclaim
+                continue
 
         if max_entry_ext_atr > 0 and np.isfinite(atr_e) and atr_e > 0 and np.isfinite(m25_e):
             if (entry - m25_e) / atr_e > float(max_entry_ext_atr):
@@ -2530,6 +2542,7 @@ def detect_kwargs(args) -> dict:
         h4_max_ma_rise_pct=float(getattr(args, "h4_max_ma_rise", 999.0)),
         h4_ma60_max_rise_pct=float(getattr(args, "h4_ma60_max_rise", 999.0)),
         min_entry_rng_pct=float(getattr(args, "min_entry_rng_pct", 0.0)),
+        exclude_weekend=bool(getattr(args, "exclude_weekend", False)),
     )
     if getattr(args, "strict", False):
         return dict(STRICT_DETECT, **extra)
@@ -2883,6 +2896,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help="回測進場棒高低振幅 (High/Low-1) 最低 %%（0=關；0.45＝拒極窄幅無力小十字星回測）",
+    )
+    p.add_argument(
+        "--exclude-weekend",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="排除週末休市時段進場（台北時間週六 08:00 ～ 週一 08:00；預設關）",
     )
     p.add_argument(
         "--w-overlay",

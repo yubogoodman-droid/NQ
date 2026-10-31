@@ -92,6 +92,7 @@ DETECT_KW = dict(
     h4_ma60_max_rise_pct=0.0,
     min_entry_rng_pct=0.45,
     min_overhead_ma_atr=0.25,
+    exclude_weekend=True,
 )
 
 

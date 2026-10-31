@@ -116,10 +116,11 @@ OPT_V10_KW = dict(
     min_entry_rng_pct=0.45,
 )
 
-# v11 天花板淨空終極版：在 v10 基礎上要求距離上方最近長均線 (MA60/99/120/200) ≥ 0.25 ATR + 1.2R 提早武裝 5m M 頭
+# v11 天花板淨空終極版：在 v10 基礎上要求距離上方最近長均線 (MA60/99/120/200) ≥ 0.25 ATR + 排除週末休市進場 + 1.2R 提早武裝 5m M 頭
 OPT_V11_KW = dict(
     OPT_V10_KW,
     min_overhead_ma_atr=0.25,
+    exclude_weekend=True,
 )
 
 
@@ -318,6 +319,9 @@ def write_compare_html(
                 why.append(f"進場振幅{e_rng_pct:.2f}%&lt;0.45%")
             if ceil_atr < 0.25:
                 why.append(f"上方長均線僅{ceil_atr:.2f}ATR&lt;0.25ATR")
+            ts_e = h7.df.index[t7.entry_idx]
+            if (ts_e.weekday() == 5 and ts_e.hour >= 8) or (ts_e.weekday() == 6) or (ts_e.weekday() == 0 and ts_e.hour < 8):
+                why.append("週末休市時段")
             v10_cell = f"<span class='muted'>已過濾（{'、'.join(why)}）</span>"
             status_badge = "<span class='tag tag-sl'>v11 剔除</span>"
 
