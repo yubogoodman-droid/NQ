@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>台股 1h 破底翻 · 三個月大盤日線濾網</title>
+<style>
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}
+.page{max-width:820px;margin:0 auto;padding:14px 12px 48px}
+section{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+h1{font-size:19px;margin:0 0 8px} h2{font-size:16px;margin:0 0 8px}
+.muted{color:#8b949e;font-size:13px;line-height:1.65}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border-bottom:1px solid #21262d;padding:6px 4px;text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left} th{color:#8b949e;font-weight:500}
+.pnl-win{color:#00c805} .pnl-loss{color:#ff5252}
+img{width:100%;border-radius:10px;display:block}
+code{font-size:12px}
+</style></head><body><div class="page">
+<section>
+<h1>台股 1h 破底翻 · 三個月大盤日線濾網</h1>
+<p class="muted">2026-08-03～10-30，60 個有成交的交易日。只回測、不下單。報酬<b>未扣</b>手續費與稅；最右欄是每筆再扣滿額成本 0.585%（手續費 0.1425%×2 + 證交稅 0.3%）的粗估。累積是各筆報酬相加，不是實際資金曲線。</p>
+</section>
+<section>
+<h2>累積報酬與加權日線</h2>
+<img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-telegram-watcher-935b/docs/tw-1h-reclaim-3m-20260803-1030/img/equity.png' alt='三個月累積報酬與加權日線'/>
+<p class="muted">上圖黃線是濾網版。灰底三段濾網不進場：8/3–8/5、9/15–9/17 是反彈剛起步，原規則賺最多的地方被擋掉；10/16–10/30 大盤跌破日 MA20，原規則從高點回吐，濾網整段沒有新單。</p>
+</section>
+<section>
+<h2>三個月合計</h2>
+<table>
+<tr><th></th><th>筆數</th><th>勝率</th><th>平均</th><th>中位數</th><th>最好</th><th>最差</th><th>累積</th><th>扣 0.585%</th></tr>
+<tr><td>原規則</td><td>758</td><td>48.7%</td><td class='pnl-win'>+1.03%</td><td>-0.06%</td><td>+27.16%</td><td>-12.77%</td><td>+784</td><td>+0.45%</td></tr>
+<tr><td>前日加權 &gt; 日 MA20</td><td>468</td><td>51.1%</td><td class='pnl-win'>+1.34%</td><td>+0.30%</td><td>+27.16%</td><td>-11.83%</td><td>+626</td><td>+0.75%</td></tr>
+</table>
+<p class="muted">原規則最大回撤 -669 個百分點（高點 10/06），濾網 -178。
+原規則有 19 筆到 10/30 13:30 還沒滿 20 根，用最後收盤計價；濾網這段沒有未平倉。
+放行 45 天、擋下 15 天。濾網少做 290 筆，平均從 +1.03% 升到 +1.34%，累積從 +784 降到 +626。</p>
+</section>
+<section>
+<h2>逐月</h2>
+<table>
+<tr><th></th><th>筆數</th><th>勝率</th><th>平均</th><th>中位數</th><th>最好</th><th>最差</th><th>累積</th><th>扣 0.585%</th></tr>
+<tr><td>8 月 · 原規則</td><td>264</td><td>64.4%</td><td class='pnl-win'>+3.87%</td><td>+2.60%</td><td>+27.16%</td><td>-11.83%</td><td>+1023</td><td>+3.29%</td></tr><tr><td>8 月 · 濾網</td><td>223</td><td>58.7%</td><td class='pnl-win'>+2.58%</td><td>+1.32%</td><td>+27.16%</td><td>-11.83%</td><td>+575</td><td>+2.00%</td></tr><tr><td>9 月 · 原規則</td><td>249</td><td>52.6%</td><td class='pnl-win'>+1.30%</td><td>+0.60%</td><td>+25.22%</td><td>-9.66%</td><td>+324</td><td>+0.71%</td></tr><tr><td>9 月 · 濾網</td><td>160</td><td>42.5%</td><td class='pnl-win'>+0.16%</td><td>-1.23%</td><td>+25.22%</td><td>-9.66%</td><td>+26</td><td>-0.42%</td></tr><tr><td>10 月 · 原規則</td><td>245</td><td>27.8%</td><td class='pnl-loss'>-2.30%</td><td>-4.02%</td><td>+22.39%</td><td>-12.77%</td><td>-563</td><td>-2.88%</td></tr><tr><td>10 月 · 濾網</td><td>85</td><td>47.1%</td><td class='pnl-win'>+0.29%</td><td>-1.25%</td><td>+22.39%</td><td>-11.44%</td><td>+25</td><td>-0.29%</td></tr>
+</table>
+<p class="muted">濾網的改善幾乎都在 10 月。8 月、9 月平均比原規則差，因為兩段反彈的頭幾天還在日 MA20 下方。</p>
+</section>
+<section>
+<h2>濾網擋下的日子（這些筆數只在原規則）</h2>
+<table>
+<tr><th>區間</th><th>交易日</th><th>筆數</th><th>勝率</th><th>平均</th><th>中位數</th></tr>
+<tr><td>08/03–08/05</td><td>3</td><td>41</td><td>95.1%</td><td class='pnl-win'>+10.91%</td><td>+12.22%</td></tr><tr><td>09/15–09/17</td><td>3</td><td>89</td><td>70.8%</td><td class='pnl-win'>+3.35%</td><td>+2.70%</td></tr><tr><td>10/16–10/30</td><td>9</td><td>160</td><td>17.5%</td><td class='pnl-loss'>-3.67%</td><td>-4.64%</td></tr>
+</table>
+</section>
+<section>
+<h2>規則</h2>
+<p class="muted">偵測、進場、停損、2R、20 根時間出場沿用 <code>examples/tw_1h_reclaim.py</code> 預設（寬鬆版，不要求均線多頭排列）。標的是 2026-10-30 成交額前 200、股價 &lt; 1000，同一批股票回推，有倖存者偏差。只算 09:00–13:30 的 1h K，週末與無成交日略過。</p>
+<p class="muted">濾網與監看 <code>--market-filter daily-ma20</code> 相同：當天開盤前，看<b>前一個完整交易日</b>加權（^TWII）日線收盤是否高於該日的 20 日均線。日線收盤用當天最後一根盤中 1h。當天的 K 不納入。不成立的日子，進場不計入濾網版（實盤則寫狀態、不推播）。</p>
+<p class="muted">這條濾網是看過 10 月之後才提出的，8–9 月又落在當初挑規則的訓練期裡，所以這份三個月結果不是樣本外驗證。</p>
+</section>
+</div></body></html>
