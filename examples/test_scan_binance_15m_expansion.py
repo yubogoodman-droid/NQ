@@ -120,6 +120,21 @@ def test_too_far_from_ma200_skips() -> None:
     assert detect_expansion(d) == []
 
 
+def test_single_wick_near_200_skips() -> None:
+    """高檔走勢只插 1 根針碰 MA200（不像 GTC 在 200 附近盤過），不進。"""
+    n_coil = 255
+    coil = 100.0 * (1.0 + 0.0005 * np.sin(np.arange(n_coil) / 4.0))
+    # 先拉到 101.6（> MA200*1.01），只有 1 根掉回 100.2，再緩推接長陽
+    floating = np.full(14, 101.6)
+    floating[5] = 100.2
+    grind_px = np.array([101.65, 101.7, 101.8, 101.9])
+    close = np.concatenate([coil, floating, grind_px, np.array([103.5, 103.6, 103.6])])
+    vol = np.full(len(close), 1_000.0)
+    vol[len(coil) + len(floating) + len(grind_px)] = 4_000.0
+    d = indicators(_bars(len(close), close, vol))
+    assert detect_expansion(d) == []
+
+
 def test_chop_does_not_hit() -> None:
     rng = np.random.default_rng(7)
     close = 100.0 * (1.0 + rng.uniform(-0.0015, 0.0015, 280))
@@ -224,6 +239,7 @@ def main() -> int:
     test_pre_pump_volume_skips()
     test_no_grind_skips()
     test_too_far_from_ma200_skips()
+    test_single_wick_near_200_skips()
     test_chop_does_not_hit()
     test_collapse_keeps_best_of_run()
     test_select_alerts_debounce()

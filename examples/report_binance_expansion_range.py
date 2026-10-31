@@ -150,9 +150,9 @@ def rules_html() -> str:
     <li>收盤創近 {S.LOOKBACK_BREAK} 根最高價新高（比前 {S.LOOKBACK_BREAK} 根的 high 最大值還高）。</li>
     <li>MA7 &gt; MA14 &gt; MA25；MA7/MA14−1 ≥ {S.MIN_STACK_7_14:.3f}；MA7/MA25−1 ≥ {S.MIN_STACK_7_25:.3f}。</li>
     <li>收盤站上整疊均線 max(MA7,14,25,99,120,200)。</li>
-    <li>近 {S.SQUEEZE_LOOKBACK} 根裡，六條均線帶寬 min(max/min−1) ≤ {S.MAX_SQUEEZE_RIBBON:.2f}（曾經擠過）。</li>
+    <li>近 {S.SQUEEZE_LOOKBACK} 根裡，六條均線帶寬 min(max/min−1) ≤ {S.MAX_SQUEEZE_RIBBON:.2f}（曾經擠過）；且當根長均線 MA99/120/200 帶寬 ≤ {S.MAX_LONG_RIBBON * 100:.1f}%（像 GTC 那樣長均線收緊，不是大空頭剛反彈）。</li>
     <li>收盤 &gt; MA200，且離 MA200 ≤ {S.MAX_MARK_EXT:.0%}。</li>
-    <li>近 {S.NEAR_200_LOOKBACK} 根（4 小時）內，曾有收盤 ≤ MA200 × {1 + S.NEAR_200_BAND:.2f}（從 200 附近起來，不是天上掉下來）。</li>
+    <li>近 {S.NEAR_200_LOOKBACK} 根（4 小時）內，至少 <b>{S.MIN_NEAR_200_BARS} 根</b>收盤 ≤ MA200 × {1 + S.NEAR_200_BAND:.2f}（在 200 附近盤過才出去，不是高檔插一根針就跑）。</li>
   </ul>
 </li>
 <li><b>去重</b>：同一檔以記號時間 ÷ {S.ALERT_BUCKET_MS // 3600000} 小時分桶，一桶只留時間序第一根（<code>select_alerts</code>）。</li>

@@ -39,7 +39,7 @@ SEEN_PATH = REPO / "output" / "binance_15m_expansion_seen.json"
 CONFIG_ENV = REPO / "tg_config.env"
 
 # 基準圖一定進宇宙
-KEEP = {"ETHUSDT", "FILUSDT", "PIPPINUSDT", "SNDKUSDT", "CRCLUSDT"}
+KEEP = {"ETHUSDT", "FILUSDT", "PIPPINUSDT", "SNDKUSDT", "CRCLUSDT", "GTCUSDT"}
 
 PRE_BARS = 12
 CONFIRM_BARS = 0         # 擴張棒本身就是訊號，下一根開盤進
@@ -49,9 +49,11 @@ MIN_BODY = 0.007         # ETH 22:45 +1.32%；FIL 19:45 +0.77%；ETH 21:30 +0.62
 MIN_RANGE_ATR = 2.50     # ETH 22:45 約 3.5×；21:30 約 2.38× 不夠
 MIN_CLOSE_POS = 0.78     # ETH 22:45 0.98；FIL 0.79
 LOOKBACK_BREAK = 20      # 收盤創近 20 根新高
-MAX_MARK_EXT = 0.05      # 允許 ETH 22:45 那種離開 200 約 +3.45% 的長陽
-NEAR_200_LOOKBACK = 16   # 近 4 小時內必須曾經貼過／跌破 200（從 200 起漲，不是天上掉下來）
+MAX_MARK_EXT = 0.05      # 允許 ETH 22:45 (+3.45%)、GTC (+4.84%) 那種離開 200 的長陽
+NEAR_200_LOOKBACK = 16   # 近 4 小時內要在 200 附近盤過，不是只插一根針就跑
 NEAR_200_BAND = 0.01
+MIN_NEAR_200_BARS = 6    # GTC 14/16、ETH 12/16、FIL 16/16、CRCL 16/16；擋掉高檔跌下來只碰一下的假反彈
+MAX_LONG_RIBBON = 0.018  # MA99/120/200 帶寬 ≤1.8%（GTC 0.75%、ETH 0.39%、FIL 1.00%、CRCL 1.53%）
 MAX_PRIOR_ATR_PCT = 0.012
 SQUEEZE_LOOKBACK = 24
 MAX_SQUEEZE_RIBBON = 0.05
@@ -98,6 +100,14 @@ VERIFY_CASES = [
         "fetch_end": "2026-08-20 08:00",
         "expect_start": "2026-08-19 20:15",
         "expect_end": "2026-08-19 21:00",
+    },
+    {
+        "symbol": "GTCUSDT",
+        "title": "GTC 貼 200 盤整後長陽（+19.6%）",
+        "fetch_start": "2026-10-12 00:00",
+        "fetch_end": "2026-10-18 08:00",
+        "expect_start": "2026-10-17 10:45",
+        "expect_end": "2026-10-17 11:30",
     },
 ]
 
@@ -335,17 +345,18 @@ def _hit_at(d: dict, i: int) -> dict | None:
     ext = float(c[i] / m200[i] - 1.0)
     if ext > MAX_MARK_EXT:
         return None
-    near_200 = False
+    near_200 = 0
     lo = max(0, i - NEAR_200_LOOKBACK)
     for j in range(lo, i):
         if np.isnan(m200[j]) or float(m200[j]) <= 0:
             continue
         if float(c[j]) <= float(m200[j]) * (1.0 + NEAR_200_BAND):
-            near_200 = True
-            break
-    if not near_200:
+            near_200 += 1
+    if near_200 < MIN_NEAR_200_BARS:
         return None
     ribbon = float(max(m99[i], m120[i], m200[i]) / min(m99[i], m120[i], m200[i]) - 1.0)
+    if ribbon > MAX_LONG_RIBBON:
+        return None
     return {
         "i": i,
         "mark_i": i,
