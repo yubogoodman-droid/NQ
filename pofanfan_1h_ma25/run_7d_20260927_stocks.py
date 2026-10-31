@@ -25,7 +25,7 @@ STAMPED = OUT / "stamped"
 SUMMARY = OUT / "summary.json"
 
 CARD_RE = re.compile(
-    r"<article class='trade-card'>.*?"
+    r"<article class='trade-card'[^>]*>.*?"
     r"<span class='trade-no'>#(\d+)\s*·\s*([^·<]+).*?</span>"
     r"<span class='trade-time'>([^<]+)</span>.*?"
     r"class='card-pnl (pnl-\w+)'>([^<]+)</div>.*?"

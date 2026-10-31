@@ -32,7 +32,7 @@ REASON_MAP = {
 
 # First tag after card-pnl that is tag-time / tag-sl / tag-tp is the exit reason.
 ARTICLE_RE = re.compile(
-    r"<article class='trade-card'>.*?"
+    r"<article class='trade-card'[^>]*>.*?"
     r"class='card-pnl (pnl-\w+)'>([^<]+)</div>.*?"
     r"<span class='tag tag-(?:time|sl|tp)'>([^<]+)</span>.*?"
     r"<img src='img/([^']+)'",
