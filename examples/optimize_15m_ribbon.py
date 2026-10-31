@@ -204,6 +204,13 @@ def main() -> int:
     for names, k, tr, te in both[:15]:
         label = " + ".join(names) or "原始"
         print(f"{label:<28} {EXITS[k]:<10} 前週 {fmt(tr)} | 後週 {fmt(te)}")
+
+    wr_pick = [r for r in results if r[1] == "hold4h" and r[2]["n"] >= 35]
+    wr_pick.sort(key=lambda x: (x[2]["wr"], x[2]["avg"]), reverse=True)
+    print("\n=== 依前週勝率挑（抱 4 小時，前週 ≥35 筆），看後週勝率與中位數 ===")
+    for names, k, tr, te in wr_pick[:12]:
+        label = " + ".join(names) or "原始"
+        print(f"{label:<28} 前週 {fmt(tr)} | 後週 {fmt(te)}")
     return 0
 
 
