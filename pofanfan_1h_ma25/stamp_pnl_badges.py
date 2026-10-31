@@ -32,7 +32,7 @@ REASON_MAP = {
 
 # First tag after card-pnl that is tag-time / tag-sl / tag-tp is the exit reason.
 ARTICLE_RE = re.compile(
-    r"<article class='trade-card'>.*?"
+    r"<article class='trade-card'[^>]*>.*?"
     r"class='card-pnl (pnl-\w+)'>([^<]+)</div>.*?"
     r"<span class='tag tag-(?:time|sl|tp)'>([^<]+)</span>.*?"
     r"<img src='img/([^']+)'",
@@ -89,7 +89,12 @@ def make_badge(pct: str, reason: str, fill: tuple, img_w: int) -> Image.Image:
 
     def fonts(ps: int, rs: int):
         pf = ImageFont.truetype(FONT_PATH, ps)
-        rf = ImageFont.truetype(CJK_FONT, rs, index=CJK_INDEX)
+        if Path(CJK_FONT).exists():
+            rf = ImageFont.truetype(CJK_FONT, rs, index=CJK_INDEX)
+        elif Path("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc").exists():
+            rf = ImageFont.truetype("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", rs)
+        else:
+            rf = ImageFont.truetype("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf", rs)
         return pf, rf
 
     pct_font, reason_font = fonts(pct_size, reason_size)
