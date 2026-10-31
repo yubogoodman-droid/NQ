@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -15,7 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_tw_1h_reclaim import ohlc_from_close, valid_closes  # noqa: E402
 from tw_1h_reclaim import TPE, detect_signals, loose_params  # noqa: E402
 from watch_tw_1h_reclaim import (  # noqa: E402
+    MarketRegime,
     bar_close_time,
+    daily_market_regime,
     drop_incomplete_1h_bars,
     format_alert,
     in_regular_session,
@@ -285,6 +287,92 @@ def test_load_seen_corrupt(tmp_path: Path) -> None:
     assert data["initialized"] is False
 
 
+def index_bars(daily_closes: list[float], start: str = "2026-09-01") -> pd.DataFrame:
+    """Five 1h session bars per weekday; each day's last bar closes at the given value."""
+    rows, idx = [], []
+    for day, close in zip(pd.bdate_range(start, periods=len(daily_closes)), daily_closes):
+        for hour in (9, 10, 11, 12, 13):
+            idx.append(pd.Timestamp(day.year, day.month, day.day, hour, tz=TPE))
+            rows.append(close if hour == 13 else close - 1)
+    return pd.DataFrame({"Open": rows, "High": rows, "Low": rows, "Close": rows, "Volume": 1}, index=pd.DatetimeIndex(idx))
+
+
+def test_daily_market_regime_uses_prior_days_only() -> None:
+    closes = [100.0] * 19 + [120.0] + [50.0]
+    df = index_bars(closes)
+    days = sorted({t.date() for t in df.index})
+    # On the last day, today's crash (50) must not be visible; prior day 120 > MA20.
+    regime = daily_market_regime(df, days[-1])
+    assert regime.ok is True
+    assert regime.day == days[-2]
+    assert regime.close == 120.0
+    assert abs(regime.ma20 - 101.0) < 1e-9
+    # Evaluated the day after the crash: 50 < MA20.
+    after = daily_market_regime(df, days[-1] + timedelta(days=1))
+    assert after.ok is False and after.day == days[-1]
+    # Pre-open bars are ignored.
+    pre = df.copy()
+    pre.loc[pd.Timestamp(days[-2].year, days[-2].month, days[-2].day, 8, 30, tz=TPE)] = [1, 1, 1, 1, 1]
+    assert daily_market_regime(pre.sort_index(), days[-1]).close == 120.0
+
+
+def test_daily_market_regime_insufficient_data() -> None:
+    assert daily_market_regime(pd.DataFrame(), date(2026, 10, 1)).ok is None
+    short = index_bars([100.0] * 10)
+    assert daily_market_regime(short, date(2026, 12, 1)).ok is None
+    assert "資料不足" in MarketRegime(ok=None).note()
+
+
+def _scan_with_market(market):
+    closes, lows = valid_closes()
+    df = ohlc_from_close(closes, lows=lows)
+    sigs = detect_signals(df, loose_params())
+    now = bar_close_time(df.index[sigs[0].entry_idx]).to_pydatetime()
+    row = {"code": "6443", "name": "元晶", "symbol": "6443.TW"}
+    seen_order: list[str] = []
+    seen_keys: set[str] = set()
+    texts: list[str] = []
+    import watch_tw_1h_reclaim as w
+
+    orig = w.tg_send
+    w.tg_send = lambda token, chat_id, text, dry_run=False: texts.append(text) or True  # type: ignore[method-assign]
+    try:
+        _s, _e, sent = scan_once(
+            token="",
+            chat_id="",
+            now=now,
+            universe=[row],
+            seen_order=seen_order,
+            seen_keys=seen_keys,
+            params=loose_params(),
+            range_="2mo",
+            dry_run=True,
+            workers=1,
+            sleep_s=0,
+            fetch_symbol=lambda _row: df,
+            market=market,
+        )
+    finally:
+        w.tg_send = orig  # type: ignore[method-assign]
+    return sent, texts, seen_keys
+
+
+def test_market_filter_blocks_and_fails_open() -> None:
+    bad = MarketRegime(ok=False, day=date(2026, 10, 1), close=100.0, ma20=110.0)
+    sent, texts, seen = _scan_with_market(bad)
+    assert sent == 0 and texts == [] and len(seen) == 1  # logged, consumed, not pushed
+
+    good = MarketRegime(ok=True, day=date(2026, 10, 1), close=120.0, ma20=110.0)
+    sent, texts, _seen = _scan_with_market(good)
+    assert sent == 1 and "&gt; 日MA20" in texts[0]
+
+    sent, texts, _seen = _scan_with_market(MarketRegime(ok=None))
+    assert sent == 1 and "資料不足" in texts[0]
+
+    sent, texts, _seen = _scan_with_market(None)
+    assert sent == 1 and "大盤" not in texts[0]
+
+
 def main() -> int:
     from tempfile import TemporaryDirectory
 
@@ -301,6 +389,9 @@ def main() -> int:
     test_failed_send_not_marked_seen()
     test_format_is_alert_only()
     test_next_eval_skips_weekend()
+    test_daily_market_regime_uses_prior_days_only()
+    test_daily_market_regime_insufficient_data()
+    test_market_filter_blocks_and_fails_open()
     print("ok")
     return 0
 

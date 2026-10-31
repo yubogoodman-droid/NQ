@@ -26,7 +26,7 @@ import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from html import escape
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
@@ -299,7 +299,43 @@ def tg_send(token: str, chat_id: str, text: str, dry_run: bool = False) -> bool:
     return True
 
 
-def format_alert(row: dict, df: pd.DataFrame, sig: Signal) -> str:
+MARKET_SYMBOL = "^TWII"
+MARKET_RANGE = "3mo"
+MARKET_MA = 20
+
+
+@dataclass(frozen=True)
+class MarketRegime:
+    """前一個完整交易日的加權日線收盤 vs 日 MA20。ok=None 表示資料不足。"""
+
+    ok: Optional[bool]
+    day: Optional[date] = None
+    close: Optional[float] = None
+    ma20: Optional[float] = None
+
+    def note(self) -> str:
+        if self.ok is None or self.day is None:
+            return "大盤濾網：資料不足，未套用"
+        mark = ">" if self.ok else "≤"
+        return f"大盤 {self.day:%m-%d} 加權 {self.close:,.0f} {mark} 日MA20 {self.ma20:,.0f}"
+
+
+def daily_market_regime(index_1h: pd.DataFrame, today: date) -> MarketRegime:
+    if index_1h is None or index_1h.empty:
+        return MarketRegime(ok=None)
+    df = regular_session_bars(index_1h)
+    df = df.loc[[ts.date() < today for ts in df.index]]
+    if df.empty:
+        return MarketRegime(ok=None)
+    daily = df["Close"].groupby([ts.date() for ts in df.index]).last()
+    if len(daily) < MARKET_MA:
+        return MarketRegime(ok=None)
+    ma = daily.rolling(MARKET_MA).mean()
+    close, ma20 = float(daily.iloc[-1]), float(ma.iloc[-1])
+    return MarketRegime(ok=close > ma20, day=daily.index[-1], close=close, ma20=ma20)
+
+
+def format_alert(row: dict, df: pd.DataFrame, sig: Signal, market: Optional[MarketRegime] = None) -> str:
     ts = to_tpe(df.index[sig.entry_idx])
     w = sig.wave
     entry = float(sig.entry_price)
@@ -323,7 +359,8 @@ def format_alert(row: dict, df: pd.DataFrame, sig: Signal) -> str:
         f"破底: <code>{w.trough_low:.2f}</code> @ {trough_ts.strftime('%m-%d %H:%M')}\n"
         f"深度 {w.depth_pct * 100:.1f}% · 下面 {w.bars_below} 根 · 彈 {bounce * 100:.1f}%\n"
         f"MA5 {sig.ma5:.2f} / MA10 {sig.ma10:.2f} / MA20 {sig.ma20:.2f}\n"
-        f"#破底翻 #台股 #1h"
+        + (f"{escape(market.note())}\n" if market is not None else "")
+        + "#破底翻 #台股 #1h"
     )
 
 
@@ -388,8 +425,15 @@ def scan_once(
     workers: int,
     sleep_s: float,
     fetch_symbol=None,
+    market: Optional[MarketRegime] = None,
 ) -> Tuple[int, int, int]:
-    """Scan universe. Returns (scanned, errors, sent). Mutates seen_* on success."""
+    """Scan universe. Returns (scanned, errors, sent). Mutates seen_* on success.
+
+    ``market`` is set only when the daily market filter is on. If ``market.ok`` is
+    False, today's signals are marked seen and logged but not sent; unknown
+    regime (``ok is None``) fails open and the alert carries a note.
+    """
+    blocked = market is not None and market.ok is False
     fetch_symbol = fetch_symbol or (lambda row: fetch_yahoo_1h(row["symbol"], range_))
     scanned = 0
     errors = 0
@@ -428,8 +472,16 @@ def scan_once(
             consume_key(seen_order, seen_keys, alert.key)
             if not alert.send:
                 continue
-            text = format_alert(item.row, item.df, alert.signal)
             ts = to_tpe(item.df.index[alert.signal.entry_idx])
+            if blocked:
+                print(
+                    f"[{to_tpe(now).strftime('%H:%M:%S')} TPE] market-filter blocked "
+                    f"{item.row.get('code')} {item.row.get('name')} @ {alert.signal.entry_price:.2f} "
+                    f"{ts.strftime('%Y-%m-%d %H:%M')} ({market.note()})",
+                    flush=True,
+                )
+                continue
+            text = format_alert(item.row, item.df, alert.signal, market)
             ok = tg_send(token, chat_id, text, dry_run=dry_run)
             if ok:
                 sent += 1
@@ -500,9 +552,29 @@ def run_loop(args: argparse.Namespace) -> int:
         "TW 1h 破底翻 TG | alerts-only, no orders | "
         f"session=09:00-13:30 TPE | completed-1h-bars | "
         f"dry_run={args.dry_run} limit={args.limit} max_price={price_cap} "
-        f"strict={args.strict} state={state_path}",
+        f"strict={args.strict} market_filter={args.market_filter} state={state_path}",
         flush=True,
     )
+
+    market_regime: Optional[MarketRegime] = None
+    market_day = ""
+
+    def refresh_market(now: datetime) -> Optional[MarketRegime]:
+        nonlocal market_regime, market_day
+        if args.market_filter != "daily-ma20":
+            return None
+        day = to_tpe(now).strftime("%Y-%m-%d")
+        if market_regime is not None and market_regime.ok is not None and market_day == day:
+            return market_regime
+        try:
+            index_1h = fetch_yahoo_1h(MARKET_SYMBOL, MARKET_RANGE)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[error] market {MARKET_SYMBOL}: {exc}", file=sys.stderr)
+            index_1h = pd.DataFrame()
+        market_regime = daily_market_regime(index_1h, to_tpe(now).date())
+        market_day = day
+        print(f"[{to_tpe(now).strftime('%H:%M:%S')} TPE] {market_regime.note()}", flush=True)
+        return market_regime
 
     universe: List[dict] = []
     universe_day = ""
@@ -564,6 +636,7 @@ def run_loop(args: argparse.Namespace) -> int:
             dry_run=args.dry_run,
             workers=args.workers,
             sleep_s=args.sleep,
+            market=refresh_market(now),
         )
         persist(now)
         print(
@@ -613,6 +686,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--sleep", type=float, default=0.0, help="workers=1 時，檔與檔之間的間隔秒")
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--grace", type=int, default=DEFAULT_GRACE_SECONDS, help="收盤後等多久再抓 Yahoo（秒）")
+    p.add_argument(
+        "--market-filter",
+        choices=["off", "daily-ma20"],
+        default="off",
+        help="daily-ma20：前一交易日加權收盤 ≤ 日MA20 時只記錄不推播（事後挑出、未經樣本外驗證）；預設 off",
+    )
     p.add_argument("--state", default="", help="去重狀態檔，預設 output/tw_1h_reclaim_alert_state.json")
     return p
 
