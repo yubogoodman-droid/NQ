@@ -169,7 +169,7 @@ def write_compare_html(
     v8_hits: list[m.Hit],
 ) -> None:
     v8_keys = {(h.symbol, h.df.index[h.trade.entry_idx]) for h in v8_hits}
-    v8_map = {(h.symbol, h.df.index[h.trade.entry_idx]): h for h in v8_hits}
+    v8_map = {(h.symbol, h.df.index[h.trade.entry_idx]): (idx8, h) for idx8, h in enumerate(v8_hits, 1)}
 
     abl_tr = []
     for label, st in ablation_rows:
@@ -193,31 +193,45 @@ def write_compare_html(
         s7 = t7.signal
         key = (h7.symbol, h7.df.index[t7.entry_idx])
         et = h7.df.index[t7.entry_idx].strftime("%Y-%m-%d %H:%M")
+        xt7 = h7.df.index[t7.exit_idx].strftime("%m-%d %H:%M")
         close = h7.df["Close"].to_numpy(float)
         ma7 = m.sma(close, 7)[t7.entry_idx]
         ma14 = m.sma(close, 14)[t7.entry_idx]
+        risk = t7.entry_price - t7.stop_price
+        risk_pct = (risk / t7.entry_price * 100.0) if t7.entry_price else 0.0
+        arm_15r = t7.entry_price + 1.5 * risk
         kept = key in v8_keys
         if kept:
-            t8 = v8_map[key].trade
+            idx8, h8 = v8_map[key]
+            t8 = h8.trade
+            xt8 = h8.df.index[t8.exit_idx].strftime("%Y-%m-%d %H:%M")
+            if getattr(t8, "exit_ts_5m", None) is not None:
+                xt8_5m = t8.exit_ts_5m.tz_convert(TPE).strftime("%m-%d %H:%M")
+                xt8_disp = f"{xt8} (5m:{xt8_5m})"
+            else:
+                xt8_disp = xt8
             c8 = "pnl-win" if t8.pnl_pct > 0 else "pnl-loss"
-            v8_cell = f"<span class='{c8}'><b>{t8.pnl_pct:+.2f}%</b></span> ({t8.exit_reason})"
-            status_badge = "<span class='tag tag-tp'>v8 保留</span>"
+            exit_pt_cell = f"<b>{t8.exit_price:.6g}</b><br/><span class='muted'>{xt8_disp} · {t8.exit_reason}</span>"
+            v8_cell = f"<span class='{c8}'><b>{t8.pnl_pct:+.2f}%</b></span><br/><a href='view.html#t{idx8}' style='font-size:11px'>看K線圖 #{idx8}</a>"
+            status_badge = f"<span class='tag tag-tp'>v8 #{idx8}</span>"
         else:
             why = []
             if s7.vol_ratio < 0.15:
                 why.append(f"進場量 {s7.vol_ratio:.2f}x &lt; 0.15x")
             if not (ma7 > ma14):
                 why.append(f"MA7({ma7:.4g}) &le; MA14({ma14:.4g})")
+            exit_pt_cell = "<span class='muted'>—</span>"
             v8_cell = f"<span class='muted'>已過濾（{'、'.join(why)}）</span>"
             status_badge = "<span class='tag tag-sl'>v8 剔除</span>"
         c7 = "pnl-win" if t7.pnl_pct > 0 else "pnl-loss"
         trade_tr.append(
-            f"<tr><td>{i}</td><td><b>{escape(h7.symbol)}</b></td><td>{et}</td>"
-            f"<td>Q{t7.quality}·{s7.shape}</td>"
-            f"<td>{s7.vol_ratio:.2f}x</td>"
-            f"<td>{'是' if ma7 > ma14 else '否'}</td>"
-            f"<td class='{c7}'>{t7.pnl_pct:+.2f}% ({t7.exit_reason})</td>"
+            f"<tr><td>{i}</td><td><b>{escape(h7.symbol)}</b><br/><span class='muted'>Q{t7.quality}·{s7.shape}</span></td>"
+            f"<td><b>{t7.entry_price:.6g}</b><br/><span class='muted'>{et}</span></td>"
+            f"<td>{t7.stop_price:.6g} (−{risk_pct:.2f}%)<br/><span class='muted'>1.5R啟動: {arm_15r:.6g}</span></td>"
+            f"<td>{s7.vol_ratio:.2f}x / {'是' if ma7 > ma14 else '否'}</td>"
+            f"<td class='{c7}'>{t7.pnl_pct:+.2f}% ({t7.exit_reason})<br/><span class='muted'>出 {t7.exit_price:.6g} @ {xt7}</span></td>"
             f"<td>{status_badge}</td>"
+            f"<td>{exit_pt_cell}</td>"
             f"<td>{v8_cell}</td></tr>"
         )
 
@@ -249,7 +263,16 @@ a{{color:#79c0ff;text-decoration:none}}
 <section class="box">
 <h1>幣安股票永續 1H MA25 破底翻 · 兩個月回測與優化（2026-09-01 ～ 2026-10-31 台北時間）</h1>
 <p class="muted">掃描範圍：216 檔幣安 TRADIFI_PERPETUAL 股票永續（已排除反向 ETF）。資料區間：2026-09-01 00:00 ～ 2026-10-31 12:00 TPE（完整兩個月）。<br/>
-相關連結：<a href="index.html">v8 優化版全交易 K 線卡片報告 (index.html)</a> · <a href="seq.html">100U × 3倍 一次一單複利報告 (seq.html)</a></p>
+相關連結：<a href="view.html">v8 優化版全交易 K 線卡片報告（含進出場圓圈標記）</a> · <a href="seq-view.html">100U × 3倍 一次一單複利報告</a></p>
+<h2>v8 優化版 · 完整出場點規則（三種出場條件，先觸發者先出）</h2>
+<ul>
+<li><b>出場點 ① · 破底收盤停損（<code>stop</code>，K 線圖標示「出·停損」）</b>：<br/>
+停損價設在該波「破底最低點」<code>bottom</code>。進場後任一根 1H K <b>收盤價 &lt; 破底低點</b>（下影線刺破不算），即以該根 1H 收盤價停損出場。</li>
+<li><b>出場點 ② · 1.5R 武裝後五分 K M 頭破頸線停利（<code>m5_neck</code>，K 線圖標示「出·M破頸」）</b>：<br/>
+令初始風險 <code>R = 進場價 − 破底低點</code>。當進場後任一根 1H 收盤價 &ge; <code>進場價 + 1.5R</code> 時，從下一小時起在 5m K 線監控 M 頭（左肩在進場後最高點 0.3% 內、雙峰間隔 3～24 根 5m、頸線深度 &ge; 1.5%）；一旦 <b>5m 收盤跌破頸線 &ge; 1.0%</b>，立即以該根 5m 收盤價停利出場（如 v8 #37 UVXY 於第 19h 觸發 5m M 破頸 +9.49% 出場）。</li>
+<li><b>出場點 ③ · 24 小時時間到期出場（<code>timeout</code>，K 線圖標示「出·24h」）</b>：<br/>
+進場後滿 <b>24 根 1H（24 小時）</b>仍未觸發上述停損或五分 M 破頸，則在第 24 根 1H 收盤價強制出場（避免跨第 2 個隔夜盤盤整吐回獲利）。</li>
+</ul>
 <h2>為什麼這樣優化？（問題診斷與三項改進）</h2>
 <ul>
 <li><b>問題 1：休市／極度縮量的假回測（進場量比 &lt; 0.15x）</b><br/>
@@ -277,10 +300,10 @@ a{{color:#79c0ff;text-decoration:none}}
 </section>
 
 <section class="box">
-<h2>逐筆對照：v7 基準（51 筆）vs v8 優化（37 筆）</h2>
+<h2>逐筆對照：v7 基準（51 筆）vs v8 優化（37 筆 · 含完整進出場點與價格）</h2>
 <table>
 <thead>
-<tr><th>#</th><th>標的</th><th>進場時間 (TPE)</th><th>型態</th><th>進場量比</th><th>MA7&gt;MA14</th><th>v7 結果 (36h)</th><th>v8 狀態</th><th>v8 結果 (24h)</th></tr>
+<tr><th>#</th><th>標的 / 型態</th><th>進場點 (價格 / TPE)</th><th>停損價 / 1.5R啟動價</th><th>量比 / MA7&gt;14</th><th>v7 出場點與結果 (36h)</th><th>v8 狀態</th><th>v8 出場點 (價格 / TPE / 原因)</th><th>v8 報酬</th></tr>
 </thead>
 <tbody>
 {''.join(trade_tr)}
@@ -427,7 +450,7 @@ def main() -> int:
     m.write_view_html(OUT / "seq.html", branch=branch_name, out_name="seq-view.html")
     m.write_view_html(OUT / "seq-k.html", branch=branch_name, out_name="seq-k-view.html")
 
-    # Stamp PnL badges onto v8 card images
+    # Stamp PnL badges onto v8 card images (both stamped/ and img/ so view.html shows badges + exit circle)
     stamp.REASON_MAP["timeout"] = "抱24h"
     text = html_p.read_text(encoding="utf-8")
     trades_parsed = stamp.parse_trades(text)
@@ -437,6 +460,7 @@ def main() -> int:
         if src.is_file():
             dst = stamped_dir / t["fname"]
             stamp.stamp(src, dst, t["display"], t["reason"], t["cls"])
+            src.write_bytes(dst.read_bytes())
             stamped_paths.append(str(dst))
 
     write_csv(OUT / "trades_v7.csv", hits_v7_36)

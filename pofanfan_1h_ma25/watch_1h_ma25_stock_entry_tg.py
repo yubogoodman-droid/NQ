@@ -183,15 +183,17 @@ def fmt_sig(symbol: str, df, sig) -> str:
         br = br.tz_convert(TPE)
     risk = sig.entry_price - sig.stop_price
     risk_pct = (risk / sig.entry_price * 100) if sig.entry_price else 0
+    arm_15r = sig.entry_price + 1.5 * risk
+    exit_24h = ts + timedelta(hours=24)
     return (
-        f"股票永續 1H 破底翻 · 回測進場\n"
+        f"股票永續 1H 破底翻 v8 · 回測進場\n"
         f"{symbol}\n"
         f"時間 {ts.strftime('%m-%d %H:%M')} 台北\n"
-        f"進場 {sig.entry_price:.6g}\n"
-        f"參考停損 {sig.stop_price:.6g}  （破底 {br.strftime('%m-%d %H:%M')}）\n"
-        f"風險 {risk_pct:.2f}%（僅參考，本監控不出場）\n"
-        f"MA25 {sig.ma25:.6g}\n"
-        f"品質 Q{sig.quality} {sig.shape}  破底量 {sig.break_vol_ratio:.2f}x"
+        f"進場 {sig.entry_price:.6g}（MA25 {sig.ma25:.6g}）\n"
+        f"出場① 停損：{sig.stop_price:.6g}（1H收盤跌破破底 {br.strftime('%m-%d %H:%M')}，-{risk_pct:.2f}%）\n"
+        f"出場② 停利：1H收盤≥{arm_15r:.6g} (+1.5R) 後，五分K M頭破頸線≥1%出場\n"
+        f"出場③ 時間：滿 24h 到期出場（{exit_24h.strftime('%m-%d %H:%M')} 台北 1H收盤）\n"
+        f"品質 Q{sig.quality} {sig.shape}  破底量 {sig.break_vol_ratio:.2f}x  進場量 {sig.vol_ratio:.2f}x"
     )
 
 

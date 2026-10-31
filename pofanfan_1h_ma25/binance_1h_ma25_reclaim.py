@@ -1751,25 +1751,46 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             fontweight="bold",
         )
     if 0 <= xx < len(window):
-        ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
+        exit_col = "#0284c7" if trade.pnl_pct >= 0 else "#dc2626"
+        ax.axvline(xx, color=exit_col, ls="--", lw=1.0, alpha=0.85)
         ax.scatter(
             [xx],
             [trade.exit_price],
-            s=40,
+            s=46,
             color="#00c805" if trade.pnl_pct > 0 else "#ff5252",
-            marker="x",
+            marker="v",
             zorder=6,
         )
+        ax.scatter(
+            [xx],
+            [trade.exit_price],
+            s=220,
+            facecolors="none",
+            edgecolors=exit_col,
+            linewidths=2.4,
+            zorder=7,
+        )
+        held_bars = max(0, int(trade.exit_idx - trade.entry_idx))
         if trade.exit_reason in {"m5_neck", "m5_m"}:
-            ax.annotate(
-                "M破頸",
-                (xx, trade.exit_price),
-                textcoords="offset points",
-                xytext=(8, -12),
-                ha="left",
-                color="#c2410c",
-                fontsize=8,
-            )
+            exit_lbl = "出·M破頸"
+        elif trade.exit_reason == "stop":
+            exit_lbl = "出·停損"
+        elif trade.exit_reason == "target":
+            exit_lbl = "出·停利"
+        elif trade.exit_reason == "lost_ma25":
+            exit_lbl = "出·掉MA25"
+        else:
+            exit_lbl = f"出·{held_bars}h"
+        ax.annotate(
+            exit_lbl,
+            (xx, trade.exit_price),
+            textcoords="offset points",
+            xytext=(10, -14),
+            ha="left",
+            color=exit_col,
+            fontsize=9,
+            fontweight="bold",
+        )
 
     et = df.index[trade.entry_idx]
     xt = df.index[trade.exit_idx]
@@ -1819,7 +1840,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         for ts, col, mark in (
             (df.index[sig.break_idx], "#f472b6", "破底"),
             (et, "#00c853", "回測"),
-            (xt, "#f0c14b", None),
+            (xt, "#0284c7", "出"),
         ):
             px = _loc_on_tf(w4.index, ts)
             if px is not None:
@@ -1967,7 +1988,7 @@ def write_html_report(
                 xt5 = xt5.tz_convert(TPE)
             exit_line += f"  5m {xt5.strftime('%m-%d %H:%M')}"
         cards.append(
-            "<article class='trade-card'>"
+            "<article class='trade-card' id='t" + str(i) + "'>"
             "<header class='card-header'>"
             f"<div class='card-title'><span class='trade-no'>#{i} · {escape(hit.symbol)} · Q{escape(t.quality)} · {escape(t.signal.shape)}</span>"
             f"<span class='trade-time'>{escape(et.strftime('%Y-%m-%d %H:%M'))} → {escape(xt.strftime('%m-%d %H:%M'))}</span></div>"
