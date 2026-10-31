@@ -1,0 +1,148 @@
+//@version=5
+strategy("線性空 · 峰距MA200≥100｜長下影/MA200停利", overlay=true,
+     initial_capital=100000,
+     default_qty_type=strategy.fixed, default_qty_value=1,
+     commission_type=strategy.commission.cash_per_contract, commission_value=2.5,
+     pyramiding=0, calc_on_every_tick=false,
+     process_orders_on_close=true)
+
+// === 參數 ===
+ma5Len   = input.int(5,   "MA5")
+ma10Len  = input.int(10,  "MA10（回測線）")
+ma20Len  = input.int(20,  "MA20（進場跌破）")
+ma30Len  = input.int(30,  "MA30")
+ma60Len  = input.int(60,  "MA60")
+ma120Len = input.int(120, "MA120")
+ma200Len = input.int(200, "MA200（停利）")
+lookback4h = input.int(240, "四小時高回看（一分K=240根）", minval=60)
+stopBuf = input.float(0, "停損緩衝（點，加在四小時高上方）", minval=0, step=1)
+minPeakDistMa200 = input.float(100, "創高距MA200至少（點）", minval=0, step=5)
+nearMa200 = input.float(15, "靠近MA200（點）", minval=1, step=1)
+minLowerWick = input.float(3, "長下影最小長度（點）", minval=1, step=0.5)
+wickBodyRatio = input.float(3.0, "下影／實體 倍數", minval=1, step=0.5)
+wickRangeRatio = input.float(0.55, "下影／振幅 比例", minval=0.3, step=0.05)
+
+// === 均線 ===
+ma5   = ta.sma(close, ma5Len)
+ma10  = ta.sma(close, ma10Len)
+ma20  = ta.sma(close, ma20Len)
+ma30  = ta.sma(close, ma30Len)
+ma60  = ta.sma(close, ma60Len)
+ma120 = ta.sma(close, ma120Len)
+ma200 = ta.sma(close, ma200Len)
+
+plot(ma5,   "MA5",   color=color.new(#f0b429, 0))
+plot(ma10,  "MA10",  color=color.new(#ff7a00, 0), linewidth=2)
+plot(ma20,  "MA20",  color=color.new(#e63946, 0), linewidth=2)
+plot(ma30,  "MA30",  color=color.new(#00b4d8, 50))
+plot(ma60,  "MA60",  color=color.new(#9b5de5, 50))
+plot(ma120, "MA120", color=color.new(#2a9d8f, 50))
+plot(ma200, "MA200", color=color.new(#264653, 0), linewidth=2)
+
+// 一小時K：畫在一分圖上（已收盤才更新，半透明避免蓋過 1m）
+[h1o, h1h, h1l, h1c] = request.security(syminfo.tickerid, "60", [open, high, low, close], lookahead=barmerge.lookahead_off)
+h1Up = h1c >= h1o
+plotcandle(h1o, h1h, h1l, h1c, title="1H K",
+     color = h1Up ? color.new(#22c55e, 72) : color.new(#ef4444, 72),
+     wickcolor = h1Up ? color.new(#86efac, 40) : color.new(#fca5a5, 40),
+     bordercolor = h1Up ? color.new(#22c55e, 50) : color.new(#ef4444, 50))
+plot(h1c, "1H", color=color.new(#94a3b8, 20), style=plot.style_stepline, linewidth=1)
+
+bullStack = ma5 > ma10 and ma10 > ma20 and ma20 > ma30 and ma30 > ma60 and ma60 > ma120 and ma120 > ma200
+
+high4h = ta.highest(high, lookback4h)
+made4hHigh = high == high4h and high > nz(high[1])
+
+// 狀態：0等待 / 1已創高等回測MA10 / 2已回測等破MA20 / 3持倉中
+var int   st        = 0
+var float peakHigh  = na
+var float peakMa200 = na
+var float bounceHi  = na
+
+justClosed = strategy.position_size == 0 and strategy.position_size[1] < 0
+if justClosed
+    st := 0
+    peakHigh := na
+    peakMa200 := na
+    bounceHi := na
+
+if strategy.position_size == 0 and not justClosed
+    if st == 0
+        if made4hHigh and bullStack
+            st := 1
+            peakHigh := high
+            peakMa200 := ma200
+            bounceHi := na
+    else if st == 1
+        if made4hHigh and bullStack and high > peakHigh
+            peakHigh := high
+            peakMa200 := ma200
+        if low <= ma10
+            st := 2
+            bounceHi := high
+        if close < ma60 and not bullStack
+            st := 0
+            peakHigh := na
+            peakMa200 := na
+            bounceHi := na
+    else if st == 2
+        bounceHi := math.max(nz(bounceHi, high), high)
+        if high > peakHigh
+            st := 0
+            peakHigh := na
+            peakMa200 := na
+            bounceHi := na
+        else
+            brokeMa20 = ta.crossunder(close, ma20)
+            peakDistOk = not na(peakHigh) and not na(peakMa200) and (peakHigh - peakMa200) >= minPeakDistMa200
+            if brokeMa20 and peakDistOk
+                strategy.entry("線性空", strategy.short)
+                strategy.exit("停損", from_entry="線性空", stop=peakHigh + stopBuf)
+                st := 3
+            else if brokeMa20 and not peakDistOk
+                // 距離不夠，作廢這次結構
+                st := 0
+                peakHigh := na
+                peakMa200 := na
+                bounceHi := na
+
+// 長下影判斷
+body = math.max(math.abs(close - open), 0.25)
+bodyBot = math.min(open, close)
+lowerWick = bodyBot - low
+barRange = math.max(high - low, 0.25)
+longLowerWick = lowerWick >= minLowerWick and (lowerWick >= wickBodyRatio * body or lowerWick / barRange >= wickRangeRatio)
+nearBand = low >= ma200 and (low - ma200) <= nearMa200
+
+exitWick = false
+exitMa200 = false
+if strategy.position_size < 0
+    if low <= ma200
+        strategy.close("線性空", comment="停利MA200")
+        exitMa200 := true
+    else if nearBand and longLowerWick
+        strategy.close("線性空", comment="靠近MA200長下影")
+        exitWick := true
+
+// === 視覺 ===
+plot(st > 0 and not na(peakHigh) ? peakHigh : na, "四小時高/停損",
+     color=color.maroon, style=plot.style_linebr, linewidth=2)
+bgcolor(st == 1 ? color.new(color.orange, 92) : st == 2 ? color.new(color.red, 92) : na)
+
+plotshape(st == 1 and st[1] == 0, title="創四小時高", style=shape.diamond,
+     location=location.abovebar, color=color.orange, size=size.tiny, text="4H高")
+plotshape(st == 2 and st[1] == 1, title="回測MA10", style=shape.circle,
+     location=location.belowbar, color=color.blue, size=size.tiny, text="回測")
+enterNow = strategy.position_size < 0 and strategy.position_size[1] == 0
+plotshape(enterNow, title="空進場", style=shape.triangledown,
+     location=location.abovebar, color=color.red, size=size.small, text="空")
+
+// === 警報（TradingView 請用這些條件建 Alert）===
+alertcondition(enterNow, title="線性空｜進場",
+     message="線性空進場：峰距MA200≥100，回測MA10不過高後破MA20做空。停損看四小時高。")
+alertcondition(exitMa200, title="線性空｜停利MA200",
+     message="線性空平倉：碰到MA200停利")
+alertcondition(exitWick, title="線性空｜長下影停利",
+     message="線性空平倉：靠近MA200出現長下影")
+alertcondition(enterNow or exitMa200 or exitWick, title="線性空｜任一進出",
+     message="線性空有進出場訊號，請看圖")
