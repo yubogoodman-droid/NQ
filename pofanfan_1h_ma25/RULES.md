@@ -49,9 +49,10 @@
 | **v9 全歷史優化版（v8 + 破底量≥2.2x + 破前低≥1.6% + 24h）** | **52** | **0 筆** | **86.5%** | **+158.81%** | **+3.05%** | **11.03** | **−4.92%** | **+476.4U** | **674.6U（DD 25.0%）** | **3筆(sl=0) · +5.44%** | **21筆(sl=0) · +41.09%** | **28筆(sl=0) · +112.28%** |
 
 ## 檔案
-- `binance_1h_ma25_reclaim.py`：核心策略與 CLI（支援 `--min-entry-vol`、`--require-ma7-above-ma14`、`--min-break-vol`、`--min-undercut`、`--max-hold`）
-- `run_full_20261031_stocks_v9.py`：全歷史極限（2026-01-28 ～ 2026-10-31，共 276 天）回測與 v7 vs v8 vs v9 消融對照腳本（輸出至 `docs/pofanfan-1h-ma25-full-opt/`）
-- `run_180d_20261031_stocks_v9.py`：半年回測與 v7 vs v8 vs v9 消融對照腳本（輸出至 `docs/pofanfan-1h-ma25-180d-opt/`）
-- `run_60d_20261031_stocks_v8.py`：兩個月回測與 v7 vs v8 消融對照腳本（輸出至 `docs/pofanfan-1h-ma25-60d-opt/`）
-- `run_90d_20261028_stocks_v7.py`、`run_7d_20260927_stocks.py`：舊版回測腳本（已修正相對路徑）
-- `watch_1h_ma25_stock_entry_tg.py`：訊號推播腳本（已同步升級 v9 濾網並附完整三個出場點），只推進場、不下單；Telegram 金鑰從本機設定檔讀，不在倉庫內
+- `binance_1h_ma25_reclaim.py`：核心策略與 CLI（支援 `--min-entry-vol`、`--require-ma7-above-ma14`、`--min-break-vol`、`--min-undercut`、`--min-overhead-ma-atr`、`--h4-max-ma-rise`、`--max-hold`）
+- `shared/bingx_fapi.py`：BingX Swap V2（`NCSK*` 股票永續，共 383 檔）API 轉接模組
+- `run_bingx_stocks_opt.py`：BingX 383 檔股票池全歷史（250 天）與近兩月回測優化腳本（輸出至 `docs/pofanfan-1h-ma25-bingx-opt/`）
+- `run_full_20261031_stocks_v9.py`：幣安 216 檔股票池全歷史（276 天）回測與 v9 對照腳本（輸出至 `docs/pofanfan-1h-ma25-full-opt/`）
+- `run_180d_20261031_stocks_v9.py`：幣安半年回測與 v9 對照腳本（輸出至 `docs/pofanfan-1h-ma25-180d-opt/`）
+- `run_60d_20261031_stocks_v8.py`：幣安兩個月回測與 v8 對照腳本（輸出至 `docs/pofanfan-1h-ma25-60d-opt/`）
+- `watch_1h_ma25_stock_entry_tg.py`：訊號推播腳本（預設連幣安，設 `USE_BINGX_SHIM=1` 可切換連 BingX），只推進場、不下單；Telegram 金鑰從本機設定檔讀，不在倉庫內

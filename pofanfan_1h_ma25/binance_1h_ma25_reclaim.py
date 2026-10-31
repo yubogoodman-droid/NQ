@@ -943,6 +943,9 @@ def detect_signals(
     require_ma7_above_ma14: bool = False,
     min_overhead_ma_atr: float = 0.0,
     h4_max_ma_rise_pct: float = 999.0,
+    h4_ma60_max_rise_pct: float = 999.0,
+    h4_ma60_bars: int = 12,
+    min_entry_rng_pct: float = 0.0,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """1h 跌破 MA25，做出 W、收盤站回後，等回測 MA25 再進。max_stack_wait 只留給舊呼叫。
@@ -1150,6 +1153,21 @@ def detect_signals(
                 continue
             if h4_max_ma_rise_pct < 900.0 and np.isfinite(drop) and drop > float(h4_max_ma_rise_pct):
                 bump("h4_ma_rise")
+                i = reclaim
+                continue
+
+        if h4_ma60_max_rise_pct < 900.0:
+            s60 = h4_ma_slope_pct(df, entry_idx, ma_period=60, bars=h4_ma60_bars)
+            if np.isfinite(s60) and s60 > float(h4_ma60_max_rise_pct):
+                bump("h4_ma60_rise")
+                i = reclaim
+                continue
+
+        if min_entry_rng_pct > 0:
+            lo_e = float(low[entry_idx])
+            hi_e = float(high[entry_idx])
+            if lo_e <= 0 or (hi_e / lo_e - 1.0) * 100.0 < float(min_entry_rng_pct):
+                bump("narrow_entry")
                 i = reclaim
                 continue
 
@@ -2508,6 +2526,8 @@ def detect_kwargs(args) -> dict:
         require_ma7_above_ma14=bool(getattr(args, "require_ma7_above_ma14", False)),
         min_overhead_ma_atr=float(getattr(args, "min_overhead_ma_atr", 0.0)),
         h4_max_ma_rise_pct=float(getattr(args, "h4_max_ma_rise", 999.0)),
+        h4_ma60_max_rise_pct=float(getattr(args, "h4_ma60_max_rise", 999.0)),
+        min_entry_rng_pct=float(getattr(args, "min_entry_rng_pct", 0.0)),
     )
     if getattr(args, "strict", False):
         return dict(STRICT_DETECT, **extra)
@@ -2849,6 +2869,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=999.0,
         help="進場時 4h MA(--h4-drop-ma) 近 N 根 4h 漲幅上限 %%（999=關；0.5＝拒高位暴漲後主跌段接刀）",
+    )
+    p.add_argument(
+        "--h4-ma60-max-rise",
+        type=float,
+        default=999.0,
+        help="進場時 4h MA60 近 12 根 4h 漲幅上限 %%（999=關；0.0＝拒 4h 中期均線仍高檔上揚的初跌段假破底）",
+    )
+    p.add_argument(
+        "--min-entry-rng-pct",
+        type=float,
+        default=0.0,
+        help="回測進場棒高低振幅 (High/Low-1) 最低 %%（0=關；0.45＝拒極窄幅無力小十字星回測）",
     )
     p.add_argument(
         "--w-overlay",

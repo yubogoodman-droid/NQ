@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""BingX 股票永續池（383 檔 NCSK* 合約）全歷史（2026-02-23 ～ 2026-10-31，250 天）與近兩月回測優化報告。
+"""BingX 股票永續池（383 檔 NCSK* 合約）全歷史（2026-02-23 ～ 2026-10-31，250 天）與近兩月回測優化報告（含 v10 防停損特徵版）。
 
 透過 `shared/bingx_fapi.py` 轉接 BingX Swap V2 `/openApi/swap/v2/quote/contracts` 與 `/klines`：
   - BingX 共有 618 檔 `NCSK*` 股票合約，其中當前狀態 `status=1`（正常交易且提供 K 線）共 389 檔，
     排除 6 檔反向 ETF（SQQQ, SOXS, SKDD, TBT, TZA, NVD）後共 **383 檔**（比幣安 216 檔多出 167 檔）。
   - 總計抓取 381 檔有效標的、**796,097 根 1H K 線**（最早自 `2026-02-23 22:00 TPE` 起算）。
 
+針對「停損單的四大共同特徵」設計 v10 優化：
+  1. 淺刺 MA200 假破底：停損單破底低點常僅低於 MA200 0%~2.5%（剛跌破 MA200 初跌段）→ 改為 `--ma200-near -2.5`（破底須深於 MA200 至少 2.5%）。
+  2. 4H MA60 仍高檔上揚的初跌段接刀：停損單常發生在 4H MA60 近 12 根仍在上升（>0%）的高位崩跌第一波 → 新增 `--h4-ma60-max-rise 0.0`（要求 4H MA60 近 12 根變化 ≤ 0%，確認中期已築底走平）。
+  3. 回測棒極窄幅無力小十字星：停損單進場那根紅 K 常是振幅 <0.45% 的極窄幅鈍化棒（無主動買盤拒絕）→ 新增 `--min-entry-rng-pct 0.45`（進場棒 High/Low-1 ≥ 0.45%）。
+  4. 進場後連掉 MA25 死抱到底部大停損：91% 的破底停損單在打穿破底前，會先連續 5~20 小時收盤掉在 MA25 下方一路陰跌 → 啟用 `--lose-ma-closes 5`（連 5 根 1H 收盤掉回 MA25 下即提前止損出場，將 -5%~-8% 破底大停損壓縮至 -1%~-2%）。
+
 輸出：
-  - docs/pofanfan-1h-ma25-bingx-opt/compare.html / compare-view.html（BingX 383 檔消融、逐月拆解、幣安 vs BingX 雙交易所特性比較與全訊號逐筆對照）
-  - docs/pofanfan-1h-ma25-bingx-opt/index.html / view.html（BingX 嚴選版 21 筆全歷史 K 線卡片報告，含進出場圓圈標記）
-  - docs/pofanfan-1h-ma25-bingx-opt/seq.html / seq-view.html（100U × 3倍 一次一單複利報告）
-  - docs/pofanfan-1h-ma25-bingx-opt/summary.json & trades_v7.csv / trades_v8.csv / trades_v9_trend.csv / trades_v9_strict.csv
+  - docs/pofanfan-1h-ma25-bingx-opt/compare.html / compare-view.html
+  - docs/pofanfan-1h-ma25-bingx-opt/index.html / view.html（BingX v10 防停損版 45 筆全交易 K 線卡片報告）
+  - docs/pofanfan-1h-ma25-bingx-opt/seq.html / seq-view.html（100U × 3倍 一次一單複利報告：100U → 548.1U，MaxDD 16.5%）
 """
 from __future__ import annotations
 
@@ -18,7 +23,6 @@ import csv
 import json
 import sys
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -36,7 +40,6 @@ sys.path.insert(0, str(HERE))
 import binance_1h_ma25_reclaim as m  # noqa: E402
 import stamp_pnl_badges as stamp  # noqa: E402
 
-# Route reclaim module through BingX API
 m.get_json = bingx_fapi.get_json
 m._REST_BANNED = False
 m._fetch_klines_vision = lambda *a, **k: m._klines_to_df([])
@@ -98,18 +101,18 @@ OPT_V8_KW = dict(
     require_ma7_above_ma14=True,
 )
 
-# v9-A (BingX 波段多單版): 4h MA120 未處於末升段過熱 (<= +0.5%) + 破前低 >= 1.8%
-OPT_V9_TREND_KW = dict(
-    OPT_V8_KW,
-    min_undercut_pct=0.018,
-    h4_max_ma_rise_pct=0.5,
-)
-
-# v9-B (BingX 嚴選防禦版): 針對 BingX 平滑造市量能校準破底量 >= 1.10x + 頭上長均線距離 >= 0.8 ATR
 OPT_V9_STRICT_KW = dict(
     OPT_V8_KW,
     min_break_vol=1.10,
     min_overhead_ma_atr=0.8,
+)
+
+# v10 防停損版：深破 MA200 ≥ 2.5% + 4h MA60 未處於高檔上揚 (≤ 0%) + 進場棒振幅 ≥ 0.45%
+OPT_V10_KW = dict(
+    OPT_V8_KW,
+    ma200_near_pct=-2.5,
+    h4_ma60_max_rise_pct=0.0,
+    min_entry_rng_pct=0.45,
 )
 
 
@@ -202,16 +205,14 @@ def write_compare_html(
     ablation_rows: list[tuple[str, dict, dict, dict]],
     m_v7: dict[str, dict],
     m_v8: dict[str, dict],
-    m_v9a: dict[str, dict],
     m_v9b: dict[str, dict],
+    m_v10: dict[str, dict],
     v7_hits: list[m.Hit],
     v8_hits: list[m.Hit],
-    v9a_hits: list[m.Hit],
-    v9b_hits: list[m.Hit],
+    v10_hits: list[m.Hit],
 ) -> None:
     v8_map = {(h.symbol, h.df.index[h.trade.entry_idx]): (idx, h) for idx, h in enumerate(v8_hits, 1)}
-    v9a_map = {(h.symbol, h.df.index[h.trade.entry_idx]): (idx, h) for idx, h in enumerate(v9a_hits, 1)}
-    v9b_map = {(h.symbol, h.df.index[h.trade.entry_idx]): (idx, h) for idx, h in enumerate(v9b_hits, 1)}
+    v10_map = {(h.symbol, h.df.index[h.trade.entry_idx]): (idx, h) for idx, h in enumerate(v10_hits, 1)}
 
     abl_tr = []
     for label, st_all, st_early, st_2m in ablation_rows:
@@ -232,21 +233,21 @@ def write_compare_html(
 
     month_tr = []
     for ym in ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]:
-        s7, s8, s9a, s9b = m_v7[ym], m_v8[ym], m_v9a[ym], m_v9b[ym]
+        s7, s8, s9b, s10 = m_v7[ym], m_v8[ym], m_v9b[ym], m_v10[ym]
         c7 = "pnl-win" if s7["sum_pct"] >= 0 else "pnl-loss"
         c8 = "pnl-win" if s8["sum_pct"] >= 0 else "pnl-loss"
-        c9a = "pnl-win" if s9a["sum_pct"] >= 0 else "pnl-loss"
         c9b = "pnl-win" if s9b["sum_pct"] >= 0 else "pnl-loss"
+        c10 = "pnl-win" if s10["sum_pct"] >= 0 else "pnl-loss"
         month_tr.append(
             f"<tr><td><b>{ym}</b></td>"
             f"<td>{s7['n']}筆(sl={s7['reasons'].get('stop',0)}) · {s7['winrate_pct']:.1f}%</td>"
             f"<td class='{c7}'><b>{s7['sum_pct']:+.2f}%</b></td>"
             f"<td>{s8['n']}筆(sl={s8['reasons'].get('stop',0)}) · {s8['winrate_pct']:.1f}%</td>"
             f"<td class='{c8}'><b>{s8['sum_pct']:+.2f}%</b></td>"
-            f"<td>{s9a['n']}筆(sl={s9a['reasons'].get('stop',0)}) · {s9a['winrate_pct']:.1f}%</td>"
-            f"<td class='{c9a}'><b>{s9a['sum_pct']:+.2f}%</b></td>"
             f"<td>{s9b['n']}筆(sl={s9b['reasons'].get('stop',0)}) · {s9b['winrate_pct']:.1f}%</td>"
-            f"<td class='{c9b}'><b>{s9b['sum_pct']:+.2f}%</b></td></tr>"
+            f"<td class='{c9b}'><b>{s9b['sum_pct']:+.2f}%</b></td>"
+            f"<td><b>{s10['n']}筆(sl={s10['reasons'].get('stop',0)}) · {s10['winrate_pct']:.1f}%</b></td>"
+            f"<td class='{c10}'><b>{s10['sum_pct']:+.2f}%</b></td></tr>"
         )
 
     trade_tr = []
@@ -261,14 +262,10 @@ def write_compare_html(
         low = h7.df["Low"].to_numpy(float)
         ma7 = m.sma(close, 7)[t7.entry_idx]
         ma14 = m.sma(close, 14)[t7.entry_idx]
-        ma60 = m.sma(close, 60)[t7.entry_idx]
-        ma99 = m.sma(close, 99)[t7.entry_idx]
-        ma120 = m.sma(close, 120)[t7.entry_idx]
-        ma200 = m.sma(close, 200)[t7.entry_idx]
-        atr_e = m.atr(high, low, close, 14)[t7.entry_idx]
-        ceils = [mv for mv in (ma60, ma99, ma120, ma200) if np.isfinite(mv) and mv > t7.entry_price]
-        ceil_atr = min((mv - t7.entry_price) / atr_e for mv in ceils) if ceils and atr_e > 0 else 99.0
-        h4_slp120 = m.h4_ma_slope_pct(h7.df, t7.entry_idx, ma_period=120, bars=24)
+        ma200_b = m.sma(close, 200)[s7.break_idx]
+        bot_vs_200 = (s7.bottom / ma200_b - 1.0) * 100.0 if np.isfinite(ma200_b) and ma200_b > 0 else 0.0
+        h4_s60 = m.h4_ma_slope_pct(h7.df, t7.entry_idx, ma_period=60, bars=12)
+        e_rng_pct = (high[t7.entry_idx] / low[t7.entry_idx] - 1.0) * 100.0 if low[t7.entry_idx] > 0 else 0.0
         risk = t7.entry_price - t7.stop_price
         risk_pct = (risk / t7.entry_price * 100.0) if t7.entry_price else 0.0
 
@@ -280,46 +277,50 @@ def write_compare_html(
         else:
             v8_cell = "<span class='muted'>v8剔除</span>"
 
-        if key in v9a_map:
-            _, h9a = v9a_map[key]
-            t9a = h9a.trade
-            c9a = "pnl-win" if t9a.pnl_pct > 0 else "pnl-loss"
-            v9a_cell = f"<span class='{c9a}'><b>{t9a.pnl_pct:+.2f}%</b></span> ({t9a.exit_reason})"
-        else:
-            v9a_cell = "<span class='muted'>—</span>"
-
-        if key in v9b_map:
-            idx9b, h9b = v9b_map[key]
-            t9b = h9b.trade
-            xt9b = h9b.df.index[t9b.exit_idx].strftime("%Y-%m-%d %H:%M")
-            c9b = "pnl-win" if t9b.pnl_pct > 0 else "pnl-loss"
-            v9b_cell = (
-                f"<span class='{c9b}'><b>{t9b.pnl_pct:+.2f}%</b></span><br/>"
-                f"<span class='muted'>出 {t9b.exit_price:.6g} @ {xt9b} ({t9b.exit_reason})</span><br/>"
-                f"<a href='view.html#t{idx9b}' style='font-size:11px'>看K線圖 #{idx9b}</a>"
+        if key in v10_map:
+            idx10, h10 = v10_map[key]
+            t10 = h10.trade
+            xt10 = h10.df.index[t10.exit_idx].strftime("%Y-%m-%d %H:%M")
+            c10 = "pnl-win" if t10.pnl_pct > 0 else "pnl-loss"
+            v10_cell = (
+                f"<span class='{c10}'><b>{t10.pnl_pct:+.2f}%</b></span><br/>"
+                f"<span class='muted'>出 {t10.exit_price:.6g} @ {xt10} ({t10.exit_reason})</span><br/>"
+                f"<a href='view.html#t{idx10}' style='font-size:11px'>看K線圖 #{idx10}</a>"
             )
+            status_badge = f"<span class='tag tag-tp'>v10 #{idx10}</span>"
         else:
-            v9b_cell = "<span class='muted'>—</span>"
+            why = []
+            if s7.vol_ratio < 0.15:
+                why.append("進場量<0.15x")
+            if not (ma7 > ma14):
+                why.append("MA7≤MA14")
+            if bot_vs_200 > -2.5:
+                why.append(f"破MA200僅{bot_vs_200:.1f}%")
+            if np.isfinite(h4_s60) and h4_s60 > 0.0:
+                why.append(f"4hMA60+{h4_s60:.1f}%")
+            if e_rng_pct < 0.45:
+                why.append(f"進場振幅{e_rng_pct:.2f}%<0.45%")
+            v10_cell = f"<span class='muted'>已過濾（{'、'.join(why)}）</span>"
+            status_badge = "<span class='tag tag-sl'>v10 剔除</span>"
 
         c7 = "pnl-win" if t7.pnl_pct > 0 else "pnl-loss"
-        ceil_str = "無" if ceil_atr > 50 else f"{ceil_atr:.2f}ATR"
-        slp_str = "N/A" if not np.isfinite(h4_slp120) else f"{h4_slp120:+.1f}%"
+        s60_str = "N/A" if not np.isfinite(h4_s60) else f"{h4_s60:+.2f}%"
         trade_tr.append(
             f"<tr><td>{i}</td><td><b>{escape(h7.symbol)}</b><br/><span class='muted'>Q{t7.quality}·{s7.shape}</span></td>"
             f"<td><b>{t7.entry_price:.6g}</b><br/><span class='muted'>{et}</span></td>"
             f"<td>{t7.stop_price:.6g} (−{risk_pct:.2f}%)</td>"
-            f"<td>破底量 {s7.break_vol_ratio:.2f}x · 破前低 {s7.undercut_pct*100:.1f}%<br/><span class='muted'>上方均線:{ceil_str} · 4hMA120:{slp_str}</span></td>"
+            f"<td>破MA200:{bot_vs_200:+.1f}% · 4hMA60:{s60_str}<br/><span class='muted'>進場振幅:{e_rng_pct:.2f}% · MA7&gt;14:{'是' if ma7>ma14 else '否'}</span></td>"
             f"<td class='{c7}'>{t7.pnl_pct:+.2f}% ({t7.exit_reason})<br/><span class='muted'>出 {t7.exit_price:.6g} @ {xt7}</span></td>"
             f"<td>{v8_cell}</td>"
-            f"<td>{v9a_cell}</td>"
-            f"<td>{v9b_cell}</td></tr>"
+            f"<td>{status_badge}</td>"
+            f"<td>{v10_cell}</td></tr>"
         )
 
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>BingX 股票永續池（383 檔）1H MA25 破底翻 · 全歷史與近兩月回測優化報告</title>
+<title>BingX 股票永續池（383 檔）1H MA25 破底翻 · 停損特徵分析與 v10 優化報告</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif;line-height:1.55}}
@@ -341,28 +342,35 @@ a{{color:#79c0ff;text-decoration:none}}
 </style></head><body>
 <div class="page">
 <section class="box">
-<h1>BingX 股票永續池（383 檔 NCSK 合約）· 1H MA25 破底翻全歷史與兩月回測優化報告</h1>
-<p class="muted">資料來源：BingX Swap V2 API（<code>/openApi/swap/v2/quote/contracts</code> 與 <code>/klines</code>）。<br/>
-相關連結：<a href="view.html">BingX v9-B 嚴選版 21 筆全交易 K 線卡片報告（含進出場圓圈標記）</a> · <a href="seq-view.html">BingX 100U × 3倍 一次一單複利報告</a></p>
+<h1>BingX 股票永續池（383 檔）· 停損單四大特徵剖析與 v10 終極優化報告</h1>
+<p class="muted">資料來源：BingX Swap V2 API（383 檔活躍股票永續，796,097 根 1H K 線，2026-02-23 ～ 2026-10-31 TPE）。<br/>
+相關連結：<a href="view.html">v10 防停損版 45 筆全交易 K 線卡片報告（含進出場圓圈標記）</a> · <a href="seq-view.html">v10 100U × 3倍 一次一單複利報告（100U → 548.1U，MaxDD 16.5%）</a></p>
 
-<h2>一、BingX vs 幣安（Binance）股票永續池關鍵差異診斷</h2>
+<h2>一、停損單到底有什麼共同特點？（解剖 BingX 33 筆與幣安 13 筆破底停損單）</h2>
 <ul>
-<li><b>1. 股票池規模（BingX 383 檔 vs 幣安 216 檔）</b>：<br/>
-BingX 上共有 618 檔 <code>NCSK*2USD-USDT</code> 股票合約，其中當前活躍可交易（<code>status=1</code>）共 389 檔，剔除 6 檔反向 ETF（<code>SQQQ</code>, <code>SOXS</code>, <code>SKDD</code>, <code>TBT</code>, <code>TZA</code>, <code>NVD</code>）後共 <b>383 檔</b>（包含大量幣安沒有的美股中小型股、航太軍工、量子電腦與生技股，如 <code>ASTS</code>, <code>RKLB</code>, <code>IONQ</code>, <code>QBTS</code>, <code>RGTI</code>, <code>OKLO</code>, <code>AXON</code>, <code>VRT</code>, <code>VST</code>, <code>CEG</code> 等），共抓取 <b>796,097 根 1H K 線</b>（最早自 <code>2026-02-23 22:00 TPE</code> 起算，共 250 天）。</li>
-<li><b>2. 成交量結構的關鍵差異（為什麼幣安的 <code>break_vol &ge; 2.2x</code> 不能直接照搬到 BingX？）</b>：<br/>
-實測數據顯示，幣安股票永續的每小時成交量是真實散戶/機構撮合量（恐慌破底時會爆出 4x～20x 均量）；而 <b>BingX 的 <code>NCSK*</code> 股票合約採用平滑造市商報價量（例如 TSLA 每小時成交量幾乎恆定在 250～295 張之間）</b>，全市場 130 筆訊號的 <code>break_vol_ratio</code> 四分位數僅落在 <code>1.006x ～ 1.132x</code>（中位數 1.055x）。因此若直接套用幣安的 <code>break_vol &ge; 2.2x</code>，在 BingX 上會把 97% 的訊號都濾掉！</li>
-<li><b>3. 針對 BingX 量價特性的三階段優化方案</b>：<br/>
-  - <b>v8 基礎優化（<code>進場量 &ge; 0.15x</code> + <code>1H MA7 &gt; MA14</code> + <code>24h 出場</code>）</b>：在 BingX 全歷史（112 筆）將總報酬從原版 v7 的 <b>+4.93%</b> 大幅拉升至 <b>+101.21%</b>；近兩個月（9～10 月，66 筆）勝率達 <b>69.7%</b>、累積 <b>+107.67%</b>（PF 4.11，一次一單 3x 複利由 100U 成長至 <b>449.0U</b>，MaxDD 僅 11.4%）。<br/>
-  - <b>v9-A 波段多單版（v8 + <code>--h4-max-ma-rise 0.5</code> + <code>--min-undercut 1.8</code>）</b>：避開 4h MA120 末升段過熱高位崩跌接刀（要求 4h MA120 近 24 根漲幅 &le; +0.5%）並要求破前低 &ge; 1.8%。全歷史 62 筆勝率提升至 <b>69.4%</b>、總報酬 <b>+104.20%</b>（PF 3.28）；近兩月 39 筆勝率 <b>74.4%</b>、累積 <b>+75.54%</b>（PF 5.31，停損僅 2 筆）。<br/>
-  - <b>v9-B 嚴選防禦版（v8 + <code>--min-break-vol 1.10</code> + <code>--min-overhead-ma-atr 0.8</code>）</b>：針對 BingX 平滑量能校準破底量門檻為 <code>&ge; 1.10x</code>（在 BingX 約等於前 25% 出量棒），且要求進場價距離上方最近長均線（MA60/99/120/200）至少 <code>&ge; 0.8 ATR</code>（不買在長均線天花板正下方）。全歷史 21 筆勝率達 <b>76.2%</b>、單筆平均 <b>+2.70%</b>、獲利因子高達 <b>8.81</b>（全歷史僅 1 筆停損，近兩月 **0 筆停損**、PF 13.68）。</li>
+<li><b>特點 1：淺刺 MA200 的「初跌段假破底」（破底低點離 1H MA200 不到 2.5%）</b><br/>
+原版 <code>ma200_near=0</code> 只要求 <code>破底低點 &le; MA200</code>。但解剖停損單發現，多達 <b>42% 的停損單在破底時，1H MA25 甚至還在 MA200 上方，且破底低點僅比 MA200 低 0.1%～2.4%</b>！這代表股價剛從 MA200 上方高檔跌破、正處於剛轉空的「初跌段」，根本還沒經歷深度洗盤。<br/>
+&rarr; <b>v10 濾網 ①（<code>--ma200-near -2.5</code>）</b>：要求<b>破底低點必須比當時 1H MA200 低至少 2.5%</b>（真正深洗至 MA200 下方超跌區）。光這一條在 BingX 與幣安同時砍掉近半數停損，且兩邊總報酬雙雙上升（BingX 由 +101.2% 升至 +109.4%，幣安由 +171.7% 升至 +179.6%）！</li>
+
+<li><b>特點 2：4H 中期均線仍在高檔上揚時的「高檔崩跌接刀」（<code>4H MA60 近 12 根斜率 &gt; 0%</code>）</b><br/>
+解剖 5～6 月與 10 月的大停損單（如 <code>ARM −7.92%</code>、<code>SOXL −7.58%</code>、<code>MRVL −4.00%</code>、<code>RDDT −4.91%</code>、<code>AXTI −4.26%</code>、<code>IONQ −5.06%</code>），發現它們在進場時 <b>4H MA60 近 12 根（2 天）斜率全部為正（正在高檔加速上揚或剛見頂）</b>！大級別高檔剛開始閃崩的第一腳，反彈站上 1H MA25 往往只是逃命波（Dead Cat Bounce）。<br/>
+&rarr; <b>v10 濾網 ②（<code>--h4-ma60-max-rise 0.0</code>）</b>：要求進場時 <b>4H MA60 近 12 根變化 &le; 0%</b>（確認 4H 中期波段已經歷過回檔沉澱、進入底部打底期）。結合濾網 ① 後，BingX 總報酬跳升至 <b>+131.05%</b>（停損由 33 筆驟降至 6 筆），幣安僅剩 2 筆停損！</li>
+
+<li><b>特點 3：回測 MA25 那根進場棒是「極窄幅無力小十字星」（<code>進場棒高低振幅 &lt; 0.45%</code>）</b><br/>
+檢視剩餘停損單（如 <code>LRCX</code> 進場棒低點到收盤僅 0.16%、<code>RUM</code> 僅 0.16%、<code>IONQ</code> 僅 0.05%、<code>RDDT</code> 僅 0.06%），發現它們回測 MA25 時<b>只是縮在均線上的一根極窄幅小十字星（高低差 &lt; 0.45%），完全沒有下影線或實體紅棒的主動買盤攻擊</b>，下一根立刻直接灌破。<br/>
+&rarr; <b>v10 濾網 ③（<code>--min-entry-rng-pct 0.45</code>）</b>：要求回測進場那根 1H K 的高低振幅 <code>(High/Low − 1) &ge; 0.45%</code>，確認回測均線時有真實波動與買盤推升。</li>
+
+<li><b>特點 4：進場後「連續掉回 MA25 下方盤跌」卻死抱到破底大停損（<code>lose_ma_closes = 5</code>）</b><br/>
+追蹤全部停損單進場後的逐小時路徑發現：<b>高達 91% 的破底停損單，在打到破底低點（−4%～−8%）之前，會先在 1H MA25 下方連續收盤 7～24 個小時！</b>反觀真正的獲利單，回測進場後極少連續 5 個小時都收在 MA25 下方。<br/>
+&rarr; <b>v10 出場優化 ④（<code>--lose-ma-closes 5</code>）</b>：若進場後<b>連續 5 根 1H 收盤價都掉回 MA25 下方</b>，代表「回測站穩 MA25」的假設已經失效（結構破壞），立即以第 5 根收盤價提前小賠出場（<code>lost_ma25</code>，平均僅 −1.0%～−2.3%），不再死抱到 −5%～−8% 的破底深淵！</li>
 </ul>
 </section>
 
 <section class="box">
-<h2>二、BingX 383 檔股票池 · 全歷史（250 天）與近兩月（60 天）消融對照表</h2>
+<h2>二、BingX（383 檔）與幣安（216 檔）跨平台消融對照表</h2>
 <table>
 <thead>
-<tr><th>版本 / 設定</th><th>全期筆數</th><th>全期停損</th><th>全期勝率</th><th>全期總報酬</th><th>平均單筆</th><th>全期 PF</th><th>最差單筆</th><th>100U×3單利</th><th>100U×3複利(MaxDD)</th><th>前半段 (4～8月)</th><th>近兩個月 (9～10月)</th></tr>
+<tr><th>版本 / 設定</th><th>全期筆數</th><th>破底停損</th><th>全期勝率</th><th>全期總報酬</th><th>平均單筆</th><th>全期 PF</th><th>最差單筆</th><th>100U×3單利</th><th>100U×3複利(MaxDD)</th><th>前半段 (4～8月)</th><th>近兩個月 (9～10月)</th></tr>
 </thead>
 <tbody>
 {''.join(abl_tr)}
@@ -374,7 +382,7 @@ BingX 上共有 618 檔 <code>NCSK*2USD-USDT</code> 股票合約，其中當前�
 <h2>三、BingX 逐月績效拆解（2026 年 4 月 ～ 10 月）</h2>
 <table>
 <thead>
-<tr><th>月份</th><th>v7 基準 (36h)</th><th>v7 單月報酬</th><th>v8 優化 (24h)</th><th>v8 單月報酬</th><th>v9-A 波段版 (24h)</th><th>v9-A 單月報酬</th><th>v9-B 嚴選版 (24h)</th><th>v9-B 單月報酬</th></tr>
+<tr><th>月份</th><th>v7 基準 (36h)</th><th>v7 報酬</th><th>v8 優化 (24h)</th><th>v8 報酬</th><th>v9-B 嚴選版</th><th>v9-B 報酬</th><th>v10 防停損版 (24h)</th><th>v10 單月報酬</th></tr>
 </thead>
 <tbody>
 {''.join(month_tr)}
@@ -383,10 +391,10 @@ BingX 上共有 618 檔 <code>NCSK*2USD-USDT</code> 股票合約，其中當前�
 </section>
 
 <section class="box">
-<h2>四、BingX 全歷史 130 筆訊號逐筆對照（v7 vs v8 vs v9-A vs v9-B）</h2>
+<h2>四、BingX 全歷史 130 筆訊號逐筆對照（v7 vs v8 vs v10 防停損版）</h2>
 <table>
 <thead>
-<tr><th>#</th><th>標的 / 型態</th><th>進場點 (價格 / TPE)</th><th>停損價 (破底低)</th><th>BingX 量價特徵</th><th>v7 結果 (36h)</th><th>v8 結果 (24h)</th><th>v9-A 波段版</th><th>v9-B 嚴選版 (含K線圖連結)</th></tr>
+<tr><th>#</th><th>標的 / 型態</th><th>進場點 (價格 / TPE)</th><th>停損價 (破底低)</th><th>停損四大特徵檢驗</th><th>v7 結果 (36h)</th><th>v8 結果 (24h)</th><th>v10 狀態</th><th>v10 結果與出場點 (含K線圖連結)</th></tr>
 </thead>
 <tbody>
 {''.join(trade_tr)}
@@ -433,23 +441,19 @@ def main() -> int:
 
     cutoff_2m = datetime(2026, 9, 1, 0, 0, tzinfo=TPE)
 
-    funnel_v7: dict[str, int] = {}
-    funnel_v8: dict[str, int] = {}
-    funnel_v9a: dict[str, int] = {}
-    funnel_v9b: dict[str, int] = {}
+    funnel_v10: dict[str, int] = {}
     for sym, df in sorted(dfs_1h.items()):
-        m.detect_signals(df, funnel=funnel_v7, **BASE_V7_KW)
-        m.detect_signals(df, funnel=funnel_v8, **OPT_V8_KW)
-        m.detect_signals(df, funnel=funnel_v9a, **OPT_V9_TREND_KW)
-        m.detect_signals(df, funnel=funnel_v9b, **OPT_V9_STRICT_KW)
+        m.detect_signals(df, funnel=funnel_v10, **OPT_V10_KW)
 
-    def run_sim(kw_detect: dict, max_hold: int) -> tuple[list[m.Hit], list[m.Hit], list[m.Hit]]:
+    def run_sim(kw_detect: dict, max_hold: int, lose_ma_closes: int = 0) -> tuple[list[m.Hit], list[m.Hit], list[m.Hit]]:
         h_all, h_early, h_2m = [], [], []
         for sym, df in sorted(dfs_1h.items()):
             sigs = m.detect_signals(df, **kw_detect)
             if not sigs:
                 continue
-            trades = m.simulate(df, sigs, df_5m=dfs_5m.get(sym), m5_exit=True, max_hold=max_hold, lose_ma_closes=0)
+            trades = m.simulate(
+                df, sigs, df_5m=dfs_5m.get(sym), m5_exit=True, max_hold=max_hold, lose_ma_closes=lose_ma_closes
+            )
             for t in trades:
                 et = df.index[t.entry_idx]
                 h = m.Hit(sym, df, t)
@@ -462,66 +466,75 @@ def main() -> int:
             hs.sort(key=lambda h: (h.df.index[h.trade.entry_idx], h.symbol))
         return h_all, h_early, h_2m
 
-    hits_v7, v7_e, v7_2m = run_sim(BASE_V7_KW, 36)
-    hits_v7_24, v7_24_e, v7_24_2m = run_sim(BASE_V7_KW, 24)
-    hits_v8, v8_e, v8_2m = run_sim(OPT_V8_KW, 24)
-    hits_v9a, v9a_e, v9a_2m = run_sim(OPT_V9_TREND_KW, 24)
-    hits_v9b, v9b_e, v9b_2m = run_sim(OPT_V9_STRICT_KW, 24)
+    hits_v7, v7_e, v7_2m = run_sim(BASE_V7_KW, 36, 0)
+    hits_v7_24, v7_24_e, v7_24_2m = run_sim(BASE_V7_KW, 24, 0)
+    hits_v8, v8_e, v8_2m = run_sim(OPT_V8_KW, 24, 0)
+    hits_v9b, v9b_e, v9b_2m = run_sim(OPT_V9_STRICT_KW, 24, 0)
+    hits_v10_s1, v10_s1_e, v10_s1_2m = run_sim(
+        dict(OPT_V8_KW, ma200_near_pct=-2.5, h4_ma60_max_rise_pct=0.0), 24, 0
+    )
+    hits_v10_s2, v10_s2_e, v10_s2_2m = run_sim(OPT_V10_KW, 24, 0)
+    hits_v10, v10_e, v10_2m = run_sim(OPT_V10_KW, 24, 5)
 
     ablation = [
         ("v7 基準（36h 出場）", calc_metrics(hits_v7), calc_metrics(v7_e), calc_metrics(v7_2m)),
         ("v7 + 縮短持有至 24h", calc_metrics(hits_v7_24), calc_metrics(v7_24_e), calc_metrics(v7_24_2m)),
         ("v8 優化（進場量≥0.15x + MA7>14 + 24h）", calc_metrics(hits_v8), calc_metrics(v8_e), calc_metrics(v8_2m)),
-        ("v9-A 波段版（v8 + 4hMA120漲幅≤0.5% + 破前低≥1.8% + 24h）", calc_metrics(hits_v9a), calc_metrics(v9a_e), calc_metrics(v9a_2m)),
-        ("v9-B 嚴選版（v8 + BingX破底量≥1.10x + 上方均線≥0.8ATR + 24h）", calc_metrics(hits_v9b), calc_metrics(v9b_e), calc_metrics(v9b_2m)),
+        ("v9-B 嚴選版（v8 + BingX破底量≥1.10x + 上方均線≥0.8ATR）", calc_metrics(hits_v9b), calc_metrics(v9b_e), calc_metrics(v9b_2m)),
+        ("v10-Step1（v8 + 破MA200≥2.5% + 4hMA60斜率≤0%）", calc_metrics(hits_v10_s1), calc_metrics(v10_s1_e), calc_metrics(v10_s1_2m)),
+        ("v10-Step2（Step1 + 進場棒振幅≥0.45%）", calc_metrics(hits_v10_s2), calc_metrics(v10_s2_e), calc_metrics(v10_s2_2m)),
+        ("v10 終極防停損版（Step2 + 連5根掉MA25提早止損 + 24h）", calc_metrics(hits_v10), calc_metrics(v10_e), calc_metrics(v10_2m)),
     ]
 
     for lbl, sta, ste, st2 in ablation:
         print(
-            f"{lbl:<58} | All: n={sta['n']:3d}(sl={sta['reasons'].get('stop',0):2d}) "
-            f"WR={sta['winrate_pct']:5.1f}% sum={sta['sum_pct']:+7.2f}% PF={sta['profit_factor']:5.2f} | "
+            f"{lbl:<56} | All: n={sta['n']:3d}(sl={sta['reasons'].get('stop',0):2d}) "
+            f"WR={sta['winrate_pct']:5.1f}% sum={sta['sum_pct']:+7.2f}% PF={sta['profit_factor']:5.2f} "
+            f"seq={sta['seq_final_usdt']:6.1f}U(DD {sta['seq_max_dd_pct']:4.1f}%) | "
             f"2M: n={st2['n']:2d}(sl={st2['reasons'].get('stop',0):2d}) WR={st2['winrate_pct']:5.1f}% sum={st2['sum_pct']:+7.2f}% PF={st2['profit_factor']:5.2f}",
             flush=True,
         )
 
     m_v7 = monthly_breakdown(hits_v7)
     m_v8 = monthly_breakdown(hits_v8)
-    m_v9a = monthly_breakdown(hits_v9a)
     m_v9b = monthly_breakdown(hits_v9b)
+    m_v10 = monthly_breakdown(hits_v10)
 
-    stats_v9b = m.summarize_trades([h.trade for h in hits_v9b])
+    stats_v10 = m.summarize_trades([h.trade for h in hits_v10])
     card_note = (
-        "<br/><b>BingX 嚴選版（v9-B，針對 BingX 383 檔股票池平滑量能校準）</b>：破底量 ≥ 1.10x 均量、上方最近長均線 ≥ 0.8 ATR、"
-        "進場量 ≥ 0.15x 均量、1H MA7 &gt; MA14、最長持有 24h。<a href='compare-view.html' style='color:#79c0ff'>查看 BingX 383 檔完整消融與 130 筆對照表</a>"
+        "<br/><b>v10 終極防停損版（BingX 383 檔 & 幣安 216 檔跨平台通用）</b>：破底低於 MA200 ≥ 2.5%、"
+        "4H MA60 近 12 根斜率 ≤ 0%（拒高檔初跌段）、進場棒高低振幅 ≥ 0.45%（拒極窄十字星）、"
+        "1H MA7 &gt; MA14、連 5 根收盤掉 MA25 提早止損、最長持有 24h。"
+        "<a href='compare-view.html' style='color:#79c0ff'>查看停損四大特徵與 130 筆完整對照表</a>"
     )
     m.write_html_report(
         html_p,
-        hits_v9b,
+        hits_v10,
         days=250,
         scanned=len(dfs_1h),
-        funnel=funnel_v9b,
+        funnel=funnel_v10,
         recent_hours=48,
-        all_stats=stats_v9b,
+        all_stats=stats_v10,
         card_note=card_note,
         strict=False,
         m5_exit=True,
-        lose_ma_closes=0,
+        lose_ma_closes=5,
         max_hold=24,
     )
     m.write_view_html(html_p, branch=BRANCH, out_name="view.html")
 
-    taken_v9b = m.one_at_a_time_path(hits_v9b, start=100.0, lev=3.0)
-    m.draw_seq_pngs(taken_v9b, OUT / "seq-img")
+    taken_v10 = m.one_at_a_time_path(hits_v10, start=100.0, lev=3.0)
+    m.draw_seq_pngs(taken_v10, OUT / "seq-img")
     m.write_seq_html(
         OUT / "seq.html",
-        taken_v9b,
+        taken_v10,
         days=250,
         scanned=len(dfs_1h),
-        pool=len(hits_v9b),
-        featured_html=m._featured_k_html(taken_v9b),
+        pool=len(hits_v10),
+        featured_html=m._featured_k_html(taken_v10),
         more_k_href="seq-k.html",
     )
-    m.write_seq_k_html(OUT / "seq-k.html", taken_v9b, days=250)
+    m.write_seq_k_html(OUT / "seq-k.html", taken_v10, days=250)
     m.write_view_html(OUT / "seq.html", branch=BRANCH, out_name="seq-view.html")
     m.write_view_html(OUT / "seq-k.html", branch=BRANCH, out_name="seq-k-view.html")
 
@@ -539,9 +552,8 @@ def main() -> int:
 
     write_csv(OUT / "trades_v7.csv", hits_v7)
     write_csv(OUT / "trades_v8.csv", hits_v8)
-    write_csv(OUT / "trades_v9_trend.csv", hits_v9a)
-    write_csv(OUT / "trades_v9_strict.csv", hits_v9b)
-    write_compare_html(OUT / "compare.html", ablation, m_v7, m_v8, m_v9a, m_v9b, hits_v7, hits_v8, hits_v9a, hits_v9b)
+    write_csv(OUT / "trades_v10.csv", hits_v10)
+    write_compare_html(OUT / "compare.html", ablation, m_v7, m_v8, m_v9b, m_v10, hits_v7, hits_v8, hits_v10)
     m.write_view_html(OUT / "compare.html", branch=BRANCH, out_name="compare-view.html")
 
     summary = {
@@ -551,15 +563,13 @@ def main() -> int:
         "total_1h_bars": int(sum(len(df) for df in dfs_1h.values())),
         "baseline_v7": ablation[0][1],
         "v8_opt": ablation[2][1],
-        "v9a_trend": ablation[3][1],
-        "v9b_strict": ablation[4][1],
+        "v10_anti_sl": ablation[-1][1],
         "monthly_v7": m_v7,
         "monthly_v8": m_v8,
-        "monthly_v9a": m_v9a,
-        "monthly_v9b": m_v9b,
+        "monthly_v10": m_v10,
     }
     (OUT / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Done! BingX reports written to {OUT} (stamped {len(stamped_paths)} images)", flush=True)
+    print(f"Done! BingX v10 reports written to {OUT} (stamped {len(stamped_paths)} images)", flush=True)
     return 0
 
 
