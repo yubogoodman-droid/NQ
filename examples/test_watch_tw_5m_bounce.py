@@ -173,6 +173,15 @@ def test_detect_v_bounce_like_6239() -> None:
     assert sig.entry_idx - sig.break_idx <= 24
 
 
+def test_bounce_past_cap_not_chased() -> None:
+    df = make_v_bounce_bars()
+    sig = detect(df)[0]
+    assert sig.bounce_pct < 0.07
+    assert detect(df, max_bounce_pct=sig.bounce_pct + 0.001)
+    assert not detect(df, max_bounce_pct=sig.bounce_pct - 0.001)
+    assert detect(df, max_bounce_pct=0.0)
+
+
 def test_skip_before_filters_open() -> None:
     df = make_v_bounce_bars()
     assert detect(df)
@@ -508,6 +517,7 @@ def main() -> int:
     test_session_drop_must_meet_floor()
     test_drop_incomplete_5m()
     test_shallow_dip_ignored()
+    test_bounce_past_cap_not_chased()
     test_simulate_and_summarize()
     test_signal_key_and_alert_text()
     test_in_tw_session()

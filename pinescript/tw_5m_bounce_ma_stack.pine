@@ -4,6 +4,7 @@ indicator("台股 5分K 破底反彈 · 5/10/20 多頭排列", overlay=true)
 lookback    = input.int(48, "破底回看 K 數", minval=12)
 minDropPct  = input.float(2.0, "最小跌幅 %", minval=0.5, step=0.1)
 minBouncePct = input.float(1.0, "最小反彈 %", minval=0.3, step=0.1)
+maxBouncePct = input.float(7.0, "最大反彈 %，超過不追（0=不檢查）", minval=0.0, step=0.5)
 reboundBars = input.int(24, "反彈視窗（根）", minval=6)
 slopeBars   = input.int(3, "均線上彎回看", minval=1)
 minGap5_10  = input.float(0.15, "MA5-MA10 最小間隔 %", minval=0.0, step=0.025)
@@ -126,7 +127,7 @@ lidGap(src) =>
 lid = math.min(nz(lidGap(ma60), 1e9), nz(lidGap(ma120), 1e9), nz(lidGap(ma200), 1e9), nz(lidGap(ma240), 1e9))
 noLid = lid >= 1e8
 lidOk = minLidPct <= 0 or noLid or lid >= minLidPct or dayDrop >= punchDrop
-cand = readyNew and not na(trough) and bouncePct >= minBouncePct and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and ma60Ok and dayDropOk and ma200Ok
+cand = readyNew and not na(trough) and bouncePct >= minBouncePct and (maxBouncePct <= 0 or bouncePct <= maxBouncePct) and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and ma60Ok and dayDropOk and ma200Ok
 sig = cand and lidOk
 
 if cand and not lidOk

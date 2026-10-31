@@ -402,6 +402,7 @@ def detect_signals(
     min_breakout_vol: float = 3.0,
     min_base_under: float = 0.40,
     require_ma200: bool = True,
+    max_bounce_pct: float = 0.07,
 ) -> list[BounceSignal]:
     """急殺破近期低點後，等 5>10>20 排漂亮（分開、上彎）才出訊號。
 
@@ -412,6 +413,7 @@ def detect_signals(
     立刻拉回站上均線的（強茂／台勝科那種）不算。
     破底段仍要爆量、反彈段要帶量、進場價站回 60MA；當日跌幅 ≥ min_drop_pct；
     頭上 0.5% 內有均線蓋子的，除非急殺 ≥ punch_drop_pct 否則不算。
+    離破底低點已彈超過 max_bounce_pct 的不追（台虹 17%、光鼎 9% 那種停損太遠）。
     門檻設 0 / False 就不檢查。
     """
     if df is None or len(df) < lookback + 20:
@@ -536,6 +538,8 @@ def detect_signals(
             continue
         bounce = (float(close[i]) - trough_low) / trough_low
         if bounce < min_bounce_pct:
+            continue
+        if max_bounce_pct > 0 and bounce > max_bounce_pct:
             continue
         if i >= slope_bars and not np.isnan(ma5[i - slope_bars]) and ma5[i] <= ma5[i - slope_bars]:
             continue
@@ -1109,6 +1113,7 @@ def detect_kwargs_from_args(args) -> dict[str, Any]:
         "min_breakout_vol": float(getattr(args, "min_breakout_vol", 3.0)),
         "min_base_under": float(getattr(args, "min_base_under", 40.0)) / 100.0,
         "require_ma200": not getattr(args, "no_ma200", False),
+        "max_bounce_pct": float(getattr(args, "max_bounce", 7.0)) / 100.0,
     }
 
 
@@ -1293,7 +1298,7 @@ def cmd_alert(args) -> int:
         f"ma60={detect_kw['require_above_ma60']} lid>={detect_kw['min_lid_pct']*100:g}% "
         f"punch={detect_kw['punch_drop_pct']*100:g}% entry_vol>={detect_kw['min_entry_vol']:g} "
         f"breakout>={detect_kw['min_breakout_vol']:g} under>={detect_kw['min_base_under']*100:g}% "
-        f"ma200={detect_kw['require_ma200']} | "
+        f"ma200={detect_kw['require_ma200']} max_bounce={detect_kw['max_bounce_pct']*100:g}% | "
         f"session_only={not args.all_hours}"
     )
     while True:
@@ -1355,13 +1360,13 @@ def build_parser() -> argparse.ArgumentParser:
             "--min-lid-pct",
             type=float,
             default=0.5,
-            help="進場價上方最近均線至少要空出多少 %（0 = 不檢查蓋子）",
+            help="進場價上方最近均線至少要空出多少 %%（0 = 不檢查蓋子）",
         )
         sp.add_argument(
             "--punch-drop",
             type=float,
             default=5.0,
-            help="當日急殺達此 % 時允許穿蓋（頭上均線可以貼著）",
+            help="當日急殺達此 %% 時允許穿蓋（頭上均線可以貼著）",
         )
         sp.add_argument(
             "--min-entry-vol",
@@ -1379,9 +1384,15 @@ def build_parser() -> argparse.ArgumentParser:
             "--min-base-under",
             type=float,
             default=40.0,
-            help="破底後到進場前，至少幾 % 的 K 要收在 20MA 下面（0 = 不檢查）",
+            help="破底後到進場前，至少幾 %% 的 K 要收在 20MA 下面（0 = 不檢查）",
         )
         sp.add_argument("--no-ma200", action="store_true", help="不要求 200MA 已經畫出來")
+        sp.add_argument(
+            "--max-bounce",
+            type=float,
+            default=7.0,
+            help="進場時離破底低點最多彈幾 %%，超過不追（0 = 不檢查）",
+        )
 
     s = sub.add_parser("scan", help="回看近幾日並可出 HTML")
     add_universe(s)
