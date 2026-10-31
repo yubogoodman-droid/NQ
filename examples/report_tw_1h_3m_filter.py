@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
 from datetime import date
@@ -227,6 +228,9 @@ code{{font-size:12px}}
 </section>
 </div></body></html>
 """
+    png = (out / "img" / "equity.png").read_bytes()
+    data_uri = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+    html = html.replace("src='img/equity.png'", f"src='{data_uri}'")
     index = out / "index.html"
     index.write_text(html, encoding="utf-8")
     (out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
