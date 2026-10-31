@@ -57,6 +57,8 @@ TZ = scan.TZ
 OUT = REPO / "docs" / "binance" / "ma200-squeeze-15m-20261017-1030" / "index.html"
 START = datetime(2026, 10, 17, tzinfo=TZ)
 END = datetime(2026, 10, 31, tzinfo=TZ)  # 含 10/30 全日，不含 10/31
+TITLE = "幣安 15m 黏帶 · 2026-10-17 到 10-30"
+EXTRA_HTML = ""
 
 
 def _trim_unclosed(raw: dict) -> dict:
@@ -127,7 +129,7 @@ def _rules_html() -> str:
 <ol>
 <li><b>週期</b>：幣安 U 本位 15 分 K。時間以訊號 K 的開盤時間、台北時間（UTC+8）計。</li>
 <li><b>標的</b>：<code>universe(0)</code>，目前 TRADING 的 USDT <code>PERPETUAL</code> 與 <code>TRADIFI_PERPETUAL</code>，排除 <code>underlyingType == INDEX</code>。這不是台股現股，所以 10/23 休市不另外跳過；幣安這天有 K 線就照算。</li>
-<li><b>區間</b>：訊號 K 開盤時間落在 2026-10-17 00:00（含）到 2026-10-31 00:00（不含），也就是含 10/30 全日。尚未收盤的那一根不計。暖機從 10/07 起抓，只為了讓 MA200 有夠長的歷史，暖機段不算出訊號。</li>
+<li><b>區間</b>：訊號 K 開盤時間落在 2026-10-17 00:00（含）到 2026-10-31 00:00（不含），也就是含 10/30 全日。尚未收盤的那一根不計。K 線從區間前至少 10 天開始抓，只為了讓 MA200 有夠長的歷史，暖機段不算出訊號；區間結束後的 K 線只用來走完持有窗口。</li>
 <li><b>均線</b>：SMA 7 / 14 / 25 / 99 / 120 / 200，量能用 20 根均量。另外要當根 <b>MA5 &gt; MA20 &gt; MA99</b>（<code>is_stacked</code>）。</li>
 <li><b>黏帶</b>（看訊號前一根）：六條均線最高/最低 − 1 ≤ {MAX_RIBBON*100:.1f}%。MA7 離 MA200 的絕對差距 ≤ {MAX_MA7_VS_200*100:.1f}%。MA200 不能高於其餘五條最高值的 {MAX_MA200_ABOVE_OTHERS*100:.2f}% 以上。MA99 與 MA120 的較低者，不能讓短均與 MA200 的較低者高出它 {MAX_LONG_DETACH*100:.2f}% 以上。</li>
 <li><b>箱體</b>：回看 {LOOKBACK} 根（不含當根）。高低差 / 中價 ≤ {MAX_BOX*100:.1f}%。前一根 MA200 要在箱底×0.995 之上，且不高於箱頂×{1+MAX_MA200_ABOVE_BOX:.3f}。</li>
@@ -228,12 +230,13 @@ def _write_html(cards, *, universe_n, errors, stats, best_s, worst_s, note: str)
             + "</p>"
         )
     note_html = f"<p class='muted'>{escape(note)}</p>" if note else ""
+    note_html += EXTRA_HTML
 
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>15m 黏帶 · 2026-10-17 到 10-30</title>
+<title>{escape(TITLE)}</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -256,11 +259,15 @@ code{{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}}
 .pnl-win{{color:#00c805}}
 .pnl-loss{{color:#f85149}}
 .pnl-flat{{color:#8b949e}}
+table.cmp{{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0 4px}}
+table.cmp th,table.cmp td{{border:1px solid #30363d;padding:6px 8px;text-align:right}}
+table.cmp th:first-child,table.cmp td:first-child{{text-align:left}}
+table.cmp th{{background:#161b22;color:#8b949e;font-weight:600}}
 .trade-detail{{margin:10px 0;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;white-space:pre-wrap}}
 img{{width:100%;display:block;border-radius:10px}}
 </style></head><body>
 <div class="page">
-<h1>幣安 15m 黏帶 · 2026-10-17 到 10-30</h1>
+<h1>{escape(TITLE)}</h1>
 <p class="muted">全部 U 本位永續（幣＋股，排除指數）。進場是下一根開盤。報酬未扣手續費與稅。</p>
 <div class="cards">
 <div class="card"><span>標的</span><b>{universe_n}</b></div>
@@ -460,7 +467,137 @@ def retry_failed() -> int:
     return 0
 
 
+FEE_RT = 0.10  # 幣安 U 本位一般帳戶 taker 0.05% × 進出兩次，單位 %
+OLD_RULES = {"min_risk": 0.004, "target_r": 2.0, "hold": 16}
+
+
+def run_cached(out: Path) -> int:
+    """用 examples/cache_binance_15m.py 的快取重跑，並和優化前的出場比較。"""
+    global OUT, TITLE, EXTRA_HTML
+    import nq.ma200_squeeze as sq
+
+    spec = importlib.util.spec_from_file_location("kcache", REPO / "examples" / "cache_binance_15m.py")
+    kcache = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(kcache)
+    c0 = datetime(2026, 8, 31, tzinfo=TZ)
+    s_ms, e_ms = int(c0.timestamp() * 1000), int(END.timestamp() * 1000)
+    files = sorted((kcache.CACHE / f"{s_ms}_{e_ms}").glob("*.npz"))
+    new_rules = {"min_risk": sq.MIN_RISK, "target_r": sq.TARGET_R, "hold": sq.HOLD_BARS}
+
+    def detect(d: dict, rules: dict) -> list:
+        keep = (sq.MIN_RISK, sq.TARGET_R)
+        sq.MIN_RISK, sq.TARGET_R = rules["min_risk"], rules["target_r"]
+        try:
+            return [s for s in sq.detect_signals(d) if scan.is_stacked(d, s.idx)]
+        finally:
+            sq.MIN_RISK, sq.TARGET_R = keep
+
+    datas: dict[str, dict] = {}
+    extend_end = min(END + timedelta(hours=13), datetime.now(TZ))
+    for f in files:
+        raw = kcache.load(f.stem, s_ms, e_ms)
+        if not raw or len(raw["c"]) < scan.MIN_BARS:
+            continue
+        d = scan.prepare(raw)
+        n = len(d["c"])
+        tail = any(s.idx >= n - (r["hold"] + 2) for r in (OLD_RULES, new_rules) for s in detect(d, r))
+        if tail:
+            more = scan.fetch_klines(
+                f.stem, limit=1000, start_ms=e_ms, end_ms=int(extend_end.timestamp() * 1000), min_bars=1
+            )
+            if more is not None:
+                raw = {k: np.concatenate([raw[k], more[k]]) for k in raw}
+                d = scan.prepare(raw)
+                print(f"延長 {f.stem} +{len(more['c'])} 根", flush=True)
+        datas[f.stem] = d
+    print(f"快取 {len(files)} 檔，可用 {len(datas)}", flush=True)
+
+    memo: dict[tuple, list] = {}
+
+    def collect(lo: datetime, hi: datetime, rules: dict) -> list[dict]:
+        a, b = int(lo.timestamp() * 1000), int(hi.timestamp() * 1000)
+        rows = []
+        for sym, d in datas.items():
+            key = (sym, rules["min_risk"], rules["target_r"])
+            if key not in memo:
+                memo[key] = detect(d, rules)
+            for s in memo[key]:
+                if a <= int(d["t"][s.idx]) < b:
+                    rows.append({"symbol": sym, "d": d, "sig": s})
+        return rows
+
+    def pnls(rows: list[dict], hold: int) -> list[float]:
+        by: dict[str, list] = {}
+        for r in rows:
+            by.setdefault(r["symbol"], []).append(r)
+        out_p = []
+        for rs in by.values():
+            rs.sort(key=lambda r: r["sig"].idx)
+            out_p += [t.pnl_pct for t in sq.simulate_trades(rs[0]["d"], [r["sig"] for r in rs], hold_bars=hold)]
+        return out_p
+
+    periods = [
+        ("9/3～10/16（挑參數）", datetime(2026, 9, 3, tzinfo=TZ), START),
+        ("10/17～10/30（驗證）", START, END),
+    ]
+    trs = []
+    for label, lo, hi in periods:
+        for name, rules in (("優化前", OLD_RULES), ("優化後", new_rules)):
+            rows = collect(lo, hi, rules)
+            p = pnls(rows, rules["hold"])
+            st = _stats(p)
+            net = [x - FEE_RT for x in p]
+            trs.append(
+                f"<tr><td>{escape(label)} {name}</td><td>{len(rows)}</td><td>{st['n']}</td>"
+                f"<td>{st['win_rate']:.1f}%</td><td>{st['avg']:+.2f}%</td><td>{st['median']:+.2f}%</td>"
+                f"<td>{(sum(net) / len(net) if net else 0):+.2f}%</td><td>{sum(net):+.1f}%</td></tr>"
+            )
+            print(label, name, len(rows), st, flush=True)
+    pos = {"優化前": 0, "優化後": 0}
+    n_weeks = 0
+    w0 = periods[0][1]
+    while w0 < END:
+        w1 = min(w0 + timedelta(days=7), END)
+        n_weeks += 1
+        for name, rules in (("優化前", OLD_RULES), ("優化後", new_rules)):
+            p = pnls(collect(w0, w1, rules), rules["hold"])
+            if p and sum(x - FEE_RT for x in p) > 0:
+                pos[name] += 1
+        w0 = w1
+    print("扣費後為正的週數", pos, "/", n_weeks, flush=True)
+    EXTRA_HTML = (
+        "<h2>優化了什麼</h2>"
+        "<p class='muted'>進場型態不變，只改兩件事。"
+        f"<br/>① 最小風險 {OLD_RULES['min_risk']*100:.1f}% → {new_rules['min_risk']*100:.1f}%："
+        "停損離收盤太近的單，雜訊就掃掉，來回手續費又吃掉 R 的五分之一左右。"
+        f"<br/>② 出場 {OLD_RULES['target_r']:.0f}R／持 {OLD_RULES['hold']} 根 → "
+        f"{new_rules['target_r']:.0f}R／持 {new_rules['hold']} 根：2R 在 4 小時內很少到，多數單在時間出場時只剩零頭。"
+        "<br/>參數只用 9/3～10/16 挑，10/17～10/30 沒有拿來調。"
+        f"從 9/3 起每 7 天一段，{n_weeks} 段裡扣費後為正：優化後 {pos['優化後']} 段，優化前 {pos['優化前']} 段。</p>"
+        "<table class='cmp'><tr><th>區間</th><th>訊號</th><th>成交</th><th>勝率</th><th>平均</th><th>中位數</th>"
+        f"<th>扣費後平均</th><th>扣費後合計</th></tr>{''.join(trs)}</table>"
+        f"<p class='muted'>扣費後欄位假設來回 {FEE_RT:.2f}%（taker 0.05% × 2），不含資金費率與滑價；其餘欄位都未扣手續費與稅。</p>"
+    )
+    OUT = out
+    TITLE = "幣安 15m 黏帶（優化後）· 2026-10-17 到 10-30"
+    rows = collect(START, END, new_rules)
+    scan._attach_trades(rows)
+    path = write_report(rows, universe_n=len(datas), errors=[])
+    filled = [r["trade"].pnl_pct for r in rows if r.get("trade") is not None]
+    st = _stats(filled)
+    print(
+        f"訊號 {len(rows)}  成交 {st['n']}  勝率 {st['win_rate']:.1f}%  平均 {st['avg']:+.2f}%  "
+        f"中位 {st['median']:+.2f}%  最好 {st['best']:+.2f}%  最差 {st['worst']:+.2f}%",
+        flush=True,
+    )
+    print(f"HTML {path}", flush=True)
+    return 0
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--retry":
         raise SystemExit(retry_failed())
+    if len(sys.argv) > 1 and sys.argv[1] == "--cached":
+        dest = Path(sys.argv[2]) if len(sys.argv) > 2 else OUT.parent.parent / "ma200-squeeze-15m-20261017-1030-opt" / "index.html"
+        raise SystemExit(run_cached(dest.resolve()))
     raise SystemExit(main())
