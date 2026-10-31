@@ -62,6 +62,7 @@ INVERSE_SYMBOLS = frozenset({
     "SKDDUSDT",  # 放空 SK hynix 槓桿
     "TBTUSDT",   # -2x 20Y+ 美債
     "TZAUSDT",   # -3x Russell 2000
+    "NVDUSDT",   # -2x NVDA (GraniteShares 2x Short NVDA Daily ETF on BingX)
 })
 # 波動率商品（做多 VIX 期貨，對股市反向、長期衰減）；--exclude-vol 另外拿掉。
 VOL_SYMBOLS = frozenset({"UVXYUSDT"})
@@ -940,6 +941,8 @@ def detect_signals(
     max_overhead_knot_atr: float = 0.0,
     min_entry_vol: float = 0.0,
     require_ma7_above_ma14: bool = False,
+    min_overhead_ma_atr: float = 0.0,
+    h4_max_ma_rise_pct: float = 999.0,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """1h 跌破 MA25，做出 W、收盤站回後，等回測 MA25 再進。max_stack_wait 只留給舊呼叫。
@@ -1139,10 +1142,14 @@ def detect_signals(
                 i = reclaim
                 continue
 
-        if h4_max_ma_drop_pct > 0:
+        if h4_max_ma_drop_pct > 0 or h4_max_ma_rise_pct < 900.0:
             drop = h4_ma_slope_pct(df, entry_idx, ma_period=h4_drop_ma, bars=h4_drop_bars)
-            if np.isfinite(drop) and drop < -float(h4_max_ma_drop_pct):
+            if h4_max_ma_drop_pct > 0 and np.isfinite(drop) and drop < -float(h4_max_ma_drop_pct):
                 bump("h4_ma_drop")
+                i = reclaim
+                continue
+            if h4_max_ma_rise_pct < 900.0 and np.isfinite(drop) and drop > float(h4_max_ma_rise_pct):
+                bump("h4_ma_rise")
                 i = reclaim
                 continue
 
@@ -1179,6 +1186,15 @@ def detect_signals(
             knot = overhead_knot_span_atr(m60_e, m99_e, m120_e, entry, atr_e)
             if np.isfinite(knot) and knot <= float(max_overhead_knot_atr):
                 bump("overhead_knot")
+                i = reclaim
+                continue
+
+        if min_overhead_ma_atr > 0 and np.isfinite(atr_e) and atr_e > 0:
+            m60_e = float(ma60[entry_idx]) if entry_idx < len(ma60) else float("nan")
+            m200_e = float(ma200[entry_idx]) if entry_idx < len(ma200) else float("nan")
+            ceils = [mv for mv in (m60_e, m99_e, m120_e, m200_e) if np.isfinite(mv) and mv > entry]
+            if ceils and min((mv - entry) / atr_e for mv in ceils) < float(min_overhead_ma_atr):
+                bump("overhead_ceil")
                 i = reclaim
                 continue
 
@@ -2490,6 +2506,8 @@ def detect_kwargs(args) -> dict:
         max_overhead_knot_atr=float(getattr(args, "max_overhead_knot_atr", 0.0)),
         min_entry_vol=float(getattr(args, "min_entry_vol", 0.0)),
         require_ma7_above_ma14=bool(getattr(args, "require_ma7_above_ma14", False)),
+        min_overhead_ma_atr=float(getattr(args, "min_overhead_ma_atr", 0.0)),
+        h4_max_ma_rise_pct=float(getattr(args, "h4_max_ma_rise", 999.0)),
     )
     if getattr(args, "strict", False):
         return dict(STRICT_DETECT, **extra)
@@ -2819,6 +2837,18 @@ def build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=False,
         help="進場時要求 1h MA7 > MA14（短均線已黃金交叉；預設關）",
+    )
+    p.add_argument(
+        "--min-overhead-ma-atr",
+        type=float,
+        default=0.0,
+        help="進場上方最近的長均線（MA60/99/120/200）距離至少幾個 ATR（0=關；0.8＝拒買在長均線天花板正下方）",
+    )
+    p.add_argument(
+        "--h4-max-ma-rise",
+        type=float,
+        default=999.0,
+        help="進場時 4h MA(--h4-drop-ma) 近 N 根 4h 漲幅上限 %%（999=關；0.5＝拒高位暴漲後主跌段接刀）",
     )
     p.add_argument(
         "--w-overlay",
