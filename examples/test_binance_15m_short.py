@@ -212,10 +212,44 @@ def test_green_candle_skipped() -> None:
     assert all(s.entry_idx != i for s in sigs)
 
 
+def test_wide_risk_skipped() -> None:
+    idx = pd.date_range("2026-10-01", periods=4, freq="15min", tz=TPE)
+    df = pd.DataFrame(
+        {
+            "open": [1.05, 1.0, 1.0, 1.0],
+            "high": [1.12, 1.01, 1.0, 1.0],
+            "low": [0.98, 0.90, 0.90, 0.90],
+            "close": [1.0, 0.95, 0.94, 0.93],
+            "volume": [1000.0, 1000.0, 1000.0, 1000.0],
+        },
+        index=idx,
+    )
+    wide = Signal(
+        entry_idx=0,
+        entry_price=1.0,
+        ma7=1.1,
+        ma14=1.2,
+        ma25=1.3,
+        ma99=1.4,
+        ma120=1.5,
+        ma200=1.05,
+        ma_high=1.05,
+        body_pct=0.05,
+        vol_ratio=2.0,
+    )
+    assert simulate(df, [wide]) == []
+    df.iat[0, df.columns.get_loc("high")] = 1.04
+    tight = replace(wide, ma_high=1.03)
+    trades = simulate(df, [tight])
+    assert len(trades) == 1
+    assert trades[0].stop_price == 1.04
+    assert trades[0].pnl_pct > 0
+
+
 def test_short_profit_and_stop() -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
-    trades = simulate(df, sigs)
+    trades = simulate(df, sigs, default_params(max_risk_pct=0.50))
     assert trades
     t = trades[0]
     assert t.pnl_pct > 0
@@ -236,7 +270,7 @@ def test_stop_on_rally() -> None:
         df.iat[j, df.columns.get_loc("high")] = bounce
         df.iat[j, df.columns.get_loc("low")] = bounce * 0.98
         df.iat[j, df.columns.get_loc("close")] = bounce
-    trades = simulate(df, sigs, default_params(stop_lookback=1, min_risk_pct=0.0001))
+    trades = simulate(df, sigs, default_params(stop_lookback=1, min_risk_pct=0.0001, max_risk_pct=0.50))
     assert trades
     assert trades[0].exit_reason == "stop"
     assert trades[0].pnl_pct < 0
@@ -782,7 +816,7 @@ def test_1h_ma200_missing_data_skips() -> None:
 def test_summarize_and_html(tmp_path: Path | None = None) -> None:
     df = bars(dump_closes(n_flat=220))
     sigs = detect_signals(df, LOOSE)
-    trades = simulate(df, sigs)
+    trades = simulate(df, sigs, default_params(max_risk_pct=0.50))
     stats = summarize_trades(trades)
     assert stats["count"] == len(trades)
     assert "win_rate" in stats
@@ -836,7 +870,7 @@ def test_write_view_html_relative_under_repo() -> None:
 def test_charts_put_losses_first() -> None:
     df = bars(dump_closes())
     sigs = detect_signals(df, LOOSE)
-    trades = simulate(df, sigs)
+    trades = simulate(df, sigs, default_params(max_risk_pct=0.50))
     assert trades
     win = trades[0]
     lose = TradeResult(
@@ -895,6 +929,7 @@ def main() -> int:
     test_no_signal_if_99_not_in_stack()
     test_rebreak_after_reclaim()
     test_green_candle_skipped()
+    test_wide_risk_skipped()
     test_short_profit_and_stop()
     test_stop_on_rally()
     test_one_position_skips_overlap()
