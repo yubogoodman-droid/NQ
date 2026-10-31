@@ -65,7 +65,7 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 基準是你那張 ETH 15m：**09-03 22:45 那根長陽要進**（收 2488，離 200 約 +3.45%），下一根 23:00 開盤做多。不是 21:30 那根較早的緩推。
 
 1. **記號**：近 4 小時內曾經貼過／跌破 MA200，然後一根放量長陽——實體 ≥0.7%、振幅 ≥2.5×ATR、量比 ≥2.5×、收在棒子上方 78%、創 20 根新高、MA7>MA14>MA25。離 200 最多 5%（蓋得住 ETH 那根）。
-2. **進場**：擴張棒收完，下一根開盤做多。同一檔 8 小時只算一次。
+2. **進場**：擴張棒收完，下一根開盤做多。同一檔 8 小時只算一次。同一根 15m 若有 20 檔以上一起出現，當成大盤一起爆，整批不進，之後 3 小時的跟風也不進。ETH 09-03 22:45 那晚是 14 檔，仍會進。
 3. **出場**：收盤跌破 MA200，或 4 小時到期。
 
 ```bash
@@ -86,10 +86,12 @@ Telegram 填法與下面黏帶腳本相同。合成測試：`python3 examples/te
 python3 examples/scan_binance_15m_expansion.py --backtest --days 7 --pages
 ```
 
-近一週（2026-10-19 → 10-25，235 檔）：**141 筆、勝率 31.9%、等權合計 −37.8%、均筆 −0.27%**。15 分鐘純續走勝率 72%、均 +0.58%。大賺 TAG +8.2%、SOON +7.4%、1000PEPE +6.5%、UNITREE +6.1%。
+近一週（2026-10-19 → 10-25，235 檔，當時還沒擋大盤）：**141 筆、勝率 31.9%、等權合計 −37.8%、均筆 −0.27%**。虧損主要是 10-20 22:00 那一根有 67 檔一起爆。
+
+兩週（2026-10-17 → 10-30，272 檔，同一根 ≥20 檔不進）：**176 筆、勝率 47.7%、等權合計 +87.2%、均筆 +0.50%、中位數 −0.22%**。未扣手續費／資金費。最好 GTC +19.6%，最差 CT −6.6%。同一份舊成交只套這個門檻（不重抓名單）會從 334 筆、−40.6% 變成約 209 筆、+75%。
 
 先看圖：
-https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-7d/view.html
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-20261017-1030/index.html
 
 ## 幣安黏帶三幕 Telegram
 

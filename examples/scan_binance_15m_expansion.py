@@ -58,8 +58,9 @@ MAX_SQUEEZE_RIBBON = 0.05
 MIN_STACK_7_14 = 0.001
 MIN_STACK_7_25 = 0.004
 SESSION_HOURS = range(0, 24)
-# ETH 22:45 當晚會有一堆標的一起噴，不能整批丟掉。
-MAX_SAME_MARK = 99
+# 同一根 15m 到達這個檔數就是大盤一起爆，整批不進，之後 3 小時跟風也不進。
+# ETH 09-03 22:45 那晚是 14 檔，門檻要留在那之上，那根才不會被濾掉。
+MAX_SAME_MARK = 20
 CLUSTER_COOLDOWN_MS = 3 * 3600 * 1000
 MIN_BARS = 220
 KLINE_LIMIT = 500

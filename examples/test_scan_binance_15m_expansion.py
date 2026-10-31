@@ -199,6 +199,13 @@ def test_small_pack_kept() -> None:
     assert drop_market_cluster(pack) == pack
 
 
+def test_eth_night_sized_pack_kept() -> None:
+    """09-03 22:45 那晚 14 檔要留着，不能被大盤濾網整批丟掉。"""
+    assert MAX_SAME_MARK > 14
+    pack = [{"t_mark": 5_000, "symbol": f"S{i}"} for i in range(14)]
+    assert len(drop_market_cluster(pack)) == 14
+
+
 def test_bar_index_at() -> None:
     d = _bars(10, np.linspace(1, 10, 10))
     ts = int(d["t"][3])

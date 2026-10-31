@@ -156,7 +156,7 @@ def rules_html() -> str:
   </ul>
 </li>
 <li><b>去重</b>：同一檔以記號時間 ÷ {S.ALERT_BUCKET_MS // 3600000} 小時分桶，一桶只留時間序第一根（<code>select_alerts</code>）。</li>
-<li><b>大盤叢集</b>：同一根 15m 記號 ≥ {S.MAX_SAME_MARK} 檔才整批丟掉，之後 {S.CLUSTER_COOLDOWN_MS // 3600000} 小時跟風也丟。{S.MAX_SAME_MARK} 等於幾乎不濾。</li>
+<li><b>大盤叢集</b>：同一根 15m 記號 ≥ {S.MAX_SAME_MARK} 檔就整批不進，之後 {S.CLUSTER_COOLDOWN_MS // 3600000} 小時的跟風也不進。ETH 09-03 22:45 那晚是 14 檔，低於這個門檻，仍會進。</li>
 <li><b>進場價</b>：擴張棒收完，<b>下一根 15m 開盤</b>做多。沒有下一根就不做。</li>
 <li><b>停損</b>：沒有掛價停損。持有期間若某根 <b>收盤跌破當根 MA200</b>，以該根收盤出場（reason=<code>ma_break</code>）。記號棒的 MA200 只拿來算 R，不是實際停損價。</li>
 <li><b>停利</b>：<b>沒有</b>。<code>TARGET_R</code>／<code>MAX_RISK</code> 寫在檔頭但 <code>simulate_trade</code> 沒用到。</li>
