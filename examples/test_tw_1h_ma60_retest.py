@@ -67,7 +67,7 @@ def ohlc_from_close(closes, lows=None, highs=None) -> pd.DataFrame:
 
 
 def andes_shape() -> pd.DataFrame:
-    """70 根在 100、12 根跌到 92、站回 101、拉開 108、再踩回均線。"""
+    """70 根在 100、12 根跌到 92、站回 101、拉開 108、再踩回均線止跌。"""
     base = [100.0] * 70
     below = [98.0, 97.0, 96.0, 95.0, 94.0, 93.5, 93.0, 92.5, 92.0, 92.2, 92.6, 93.0]
     cross = [101.0]
@@ -79,7 +79,7 @@ def andes_shape() -> pd.DataFrame:
     pb_l = m * 0.997
     closes = base + below + cross + ext + [pb_c]
     lows = list(df0["Low"]) + [pb_l]
-    highs = list(df0["High"]) + [max(pb_c, m * 1.012)]
+    highs = list(df0["High"]) + [pb_c + 0.1]
     return ohlc_from_close(closes, lows=lows, highs=highs)
 
 
@@ -170,10 +170,40 @@ def test_first_retest_only() -> None:
     s = detect_signals(df, loose_params())[0]
     extra_c = list(df["Close"]) + [s.ma60 * 1.02, s.ma60 * 1.006]
     extra_l = list(df["Low"]) + [s.ma60 * 1.01, s.ma60 * 0.997]
-    extra_h = list(df["High"]) + [s.ma60 * 1.03, s.ma60 * 1.012]
+    extra_h = list(df["High"]) + [s.ma60 * 1.03, s.ma60 * 1.007]
     df2 = ohlc_from_close(extra_c, lows=extra_l, highs=extra_h)
     sigs = detect_signals(df2, loose_params())
     assert len(sigs) == 1
+
+
+def test_falling_knife_waits_for_stabilize() -> None:
+    """回踩第一根是收在最低點的長黑，不馬上接；等隔根止跌收紅才進。"""
+    base = [100.0] * 70
+    below = [98.0, 97.0, 96.0, 95.0, 94.0, 93.5, 93.0, 92.5, 92.0, 92.2, 92.6, 93.0]
+    cross = [101.0]
+    ext = [103.0, 106.0, 108.0, 107.0]
+    df0 = ohlc_from_close(base + below + cross + ext)
+    m = float(sma(df0["Close"].to_numpy(float), 60)[-1])
+    # 第一根碰到均線但收最低（長黑），第二根收紅且高於前收
+    knife_c = m * 1.001
+    knife_l = m * 1.000
+    knife_h = m * 1.040
+    df_knife = ohlc_from_close(
+        base + below + cross + ext + [knife_c],
+        lows=list(df0["Low"]) + [knife_l],
+        highs=list(df0["High"]) + [knife_h],
+    )
+    assert detect_signals(df_knife, loose_params()) == []
+
+    turn_c = m * 1.008
+    df_turn = ohlc_from_close(
+        base + below + cross + ext + [knife_c, turn_c],
+        lows=list(df0["Low"]) + [knife_l, m * 1.001],
+        highs=list(df0["High"]) + [knife_h, turn_c + 0.2],
+    )
+    sigs = detect_signals(df_turn, loose_params())
+    assert len(sigs) == 1
+    assert sigs[0].entry_idx == len(df_turn) - 1
 
 
 def test_falling_ma60_still_ok() -> None:
@@ -242,6 +272,7 @@ def main() -> int:
     test_cross_already_extended_rejected()
     test_chase_extended_close_rejected()
     test_first_retest_only()
+    test_falling_knife_waits_for_stabilize()
     test_falling_ma60_still_ok()
     test_simulate_stop_and_target()
     test_filter_entry_window()

@@ -75,7 +75,11 @@ class RetestParams:
     max_close_below: float = 0.005
     max_entry_stretch: float = 0.025
     max_retest_bars: int = 30
-    min_risk_pct: float = 0.008
+    require_confirm: bool = True
+    confirm_bars: int = 4
+    min_close_pos: float = 0.60
+    stop_buffer_pct: float = 0.005
+    min_risk_pct: float = 0.01
     target_r: float = 2.0
     time_bars: int = 20
 
@@ -205,6 +209,7 @@ def detect_signals(
         fun[key] = fun.get(key, 0) + 1
 
     close = df["Close"].to_numpy(float)
+    open_ = df["Open"].to_numpy(float) if "Open" in df.columns else close
     high = df["High"].to_numpy(float)
     low = df["Low"].to_numpy(float)
     ma = sma(close, p.ma_n)
@@ -241,6 +246,9 @@ def detect_signals(
         peak_idx = i
         peak_ma = float(ma[i])
         extended = False
+        touched = False
+        first_touch_idx = -1
+        retest_low = float("inf")
         j = i
         ended = n
 
@@ -257,6 +265,9 @@ def detect_signals(
                 peak_high = float(high[j])
                 peak_idx = j
                 peak_ma = float(ma[j])
+                touched = False
+                first_touch_idx = -1
+                retest_low = float("inf")
 
             ext_pct = (peak_high / peak_ma - 1.0) if peak_ma > 0 else 0.0
             if ext_pct >= p.min_ext:
@@ -281,29 +292,48 @@ def detect_signals(
                     elif live_ext < p.min_ext:
                         bump("ext_faded")
                     else:
-                        touched = (float(low[j]) <= float(ma[j]) * (1.0 + p.touch_above)) and (
+                        touch_now = (float(low[j]) <= float(ma[j]) * (1.0 + p.touch_above)) and (
                             float(low[j]) >= float(ma[j]) * (1.0 - p.max_under)
                         )
                         held = float(close[j]) >= float(ma[j]) * (1.0 - p.max_close_below)
                         near = float(close[j]) <= float(ma[j]) * (1.0 + p.max_entry_stretch)
-                        if touched and held and near:
-                            signals.append(
-                                Signal(
-                                    entry_idx=j,
-                                    entry_price=float(close[j]),
-                                    ma60=float(ma[j]),
-                                    peak_idx=peak_idx,
-                                    peak_high=peak_high,
-                                    ext_pct=live_ext,
-                                    retest_low=float(low[j]),
-                                    run_start=run_start,
-                                    bars_below=bars_below,
-                                    depth_pct=depth,
+                        if touch_now and held:
+                            if not touched:
+                                touched = True
+                                first_touch_idx = j
+                                bump("touched")
+                            retest_low = min(retest_low, float(low[j]))
+                        elif touched and held:
+                            retest_low = min(retest_low, float(low[j]))
+
+                        if touched and j - first_touch_idx <= p.confirm_bars and held and near:
+                            confirmed = True
+                            if p.require_confirm:
+                                rng = max(float(high[j]) - float(low[j]), 1e-9)
+                                cpos = (float(close[j]) - float(low[j])) / rng
+                                confirmed = (float(close[j]) >= float(open_[j])) or (cpos >= p.min_close_pos)
+                                if confirmed and j > first_touch_idx and float(close[j]) < float(close[j - 1]):
+                                    confirmed = False
+                            if not confirmed:
+                                bump("wait_confirm")
+                            else:
+                                signals.append(
+                                    Signal(
+                                        entry_idx=j,
+                                        entry_price=float(close[j]),
+                                        ma60=float(ma[j]),
+                                        peak_idx=peak_idx,
+                                        peak_high=peak_high,
+                                        ext_pct=live_ext,
+                                        retest_low=float(retest_low),
+                                        run_start=run_start,
+                                        bars_below=bars_below,
+                                        depth_pct=depth,
+                                    )
                                 )
-                            )
-                            bump("entry")
-                            ended = j + 1
-                            break
+                                bump("entry")
+                                ended = j + 1
+                                break
             j += 1
         else:
             ended = n
@@ -316,7 +346,7 @@ def detect_signals(
 def _stop_price(sig: Signal, params: RetestParams) -> float:
     """停在回踩低／MA60 下方一點；風險太窄就拉到 min_risk_pct。"""
     entry = sig.entry_price
-    stop = min(float(sig.retest_low), float(sig.ma60)) * 0.997
+    stop = min(float(sig.retest_low), float(sig.ma60)) * (1.0 - params.stop_buffer_pct)
     min_stop = entry * (1.0 - params.min_risk_pct)
     if stop > min_stop:
         stop = min_stop
@@ -535,12 +565,13 @@ def _rules_html(params: RetestParams) -> str:
         f"<li><b>站上那根不能已噴</b>：收盤不得高於 MA60 的 <b>{p.max_cross_stretch*100:.1f}%</b>。</li>"
         f"<li><b>延伸</b>：站上後波段最高價相對當時 MA60 至少拉開 <b>{p.min_ext*100:.1f}%</b>。"
         "中途若收盤跌破 MA60 超過 0.5% 則這波作廢。</li>"
-        f"<li><b>回踩進場</b>：延伸達成後、距突破高不超過 <b>{p.max_retest_bars} 根</b>，第一根同時滿足："
-        f"低點在 MA60 的 −{p.max_under*100:.1f}%～+{p.touch_above*100:.1f}%；"
-        f"收盤 ≥ MA60−{p.max_close_below*100:.1f}% 且 ≤ MA60+{p.max_entry_stretch*100:.1f}%。"
-        "只取第一個回踩。</li>"
-        "<li><b>進場價</b>：回踩那根的 <b>收盤價</b>。</li>"
-        f"<li><b>停損</b>：min(回踩低, MA60)×0.997；若風險 &lt; {p.min_risk_pct*100:.1f}%，改為進場價×(1−{p.min_risk_pct*100:.1f}%)。"
+        f"<li><b>回踩止跌進場</b>：延伸達成後、距突破高不超過 <b>{p.max_retest_bars} 根</b>，先碰到 MA60 附近"
+        f"（低點在 MA60 的 −{p.max_under*100:.1f}%～+{p.touch_above*100:.1f}%、收盤 ≥ MA60−{p.max_close_below*100:.1f}%），"
+        f"觸碰後 <b>{p.confirm_bars} 根內</b>第一根止跌確認（<b>收紅 K</b> 或下影線收在 K 棒前 {100-p.min_close_pos*100:.0f}%；"
+        f"若非觸碰當根，收盤還要 ≥ 前一根收盤），且收盤 ≤ MA60+{p.max_entry_stretch*100:.1f}% 才進場。不直接接長黑刀。</li>"
+        "<li><b>進場價</b>：止跌確認那根的 <b>收盤價</b>。</li>"
+        f"<li><b>停損</b>：min(回踩期間最低, MA60)×(1−{p.stop_buffer_pct*100:.1f}%)；"
+        f"若風險 &lt; {p.min_risk_pct*100:.1f}%，改為進場價×(1−{p.min_risk_pct*100:.1f}%)。"
         "下一根起，低點碰到停損價就出場。</li>"
         f"<li><b>停利</b>：進場價 + {p.target_r:.0f}×風險（{p.target_r:.0f}R）。下一根起，高點碰到目標價就出場。</li>"
         f"<li><b>時間出場</b>：進場後第 {p.time_bars} 根收盤；資料不夠長則記為未平，用最後一根收盤計帳面。</li>"

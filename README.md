@@ -111,7 +111,7 @@ python3 examples/test_tw_1h_ma60_retest.py
 
 Telegram 憑證放 `tg_config.env`（勿提交）。
 
-近兩週（2026-10-17～10-30，正規盤 09:00–13:30；10/23、10/26 無 K 略過）**20 筆**：勝率 35%、中位數 −1.11%、平均 +0.36%。最好 華邦電 +5.16%，最差 鈞寶 −1.86%。未扣手續費與稅。
+近兩週（2026-10-17～10-30，正規盤 09:00–13:30；10/23、10/26 無 K 略過）**18 筆**：勝率 **55.6%**（已平 50.0%）、中位數 **+0.52%**、平均 **+1.04%**。最好 華邦電 +5.55%，最差 力積電 −2.52%。未扣手續費與稅。
 
 兩週自包含 HTML：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-ma60-retest-3376/docs/tw-1h-ma60-retest-2w/index.html
 
