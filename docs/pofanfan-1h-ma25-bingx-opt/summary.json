@@ -67,6 +67,28 @@
       "m5_neck": 2
     }
   },
+  "v11_final": {
+    "n": 31,
+    "wins": 27,
+    "losses": 4,
+    "winrate_pct": 87.1,
+    "sum_pct": 81.6457,
+    "avg_pct": 2.6337,
+    "median_pct": 2.3663,
+    "profit_factor": 10.85,
+    "best_pct": 12.75,
+    "worst_pct": -2.5,
+    "usdt_100x3_additive": 244.94,
+    "seq_trades": 21,
+    "seq_final_usdt": 441.13,
+    "seq_max_dd_pct": 7.49,
+    "reasons": {
+      "timeout": 23,
+      "lost_ma25": 5,
+      "m5_neck": 2,
+      "stop": 1
+    }
+  },
   "monthly_v7": {
     "2026-04": {
       "n": 1,
@@ -490,6 +512,145 @@
         "lost_ma25": 4,
         "stop": 1,
         "m5_neck": 1
+      }
+    }
+  },
+  "monthly_v11": {
+    "2026-04": {
+      "n": 0,
+      "wins": 0,
+      "losses": 0,
+      "winrate_pct": 0.0,
+      "sum_pct": 0.0,
+      "avg_pct": 0.0,
+      "median_pct": 0.0,
+      "profit_factor": 999.0,
+      "best_pct": 0.0,
+      "worst_pct": 0.0,
+      "usdt_100x3_additive": 0.0,
+      "seq_trades": 0,
+      "seq_final_usdt": 100.0,
+      "seq_max_dd_pct": 0.0,
+      "reasons": {}
+    },
+    "2026-05": {
+      "n": 1,
+      "wins": 1,
+      "losses": 0,
+      "winrate_pct": 100.0,
+      "sum_pct": 1.385,
+      "avg_pct": 1.385,
+      "median_pct": 1.385,
+      "profit_factor": 999.0,
+      "best_pct": 1.38,
+      "worst_pct": 1.38,
+      "usdt_100x3_additive": 4.15,
+      "seq_trades": 1,
+      "seq_final_usdt": 104.15,
+      "seq_max_dd_pct": 0.0,
+      "reasons": {
+        "timeout": 1
+      }
+    },
+    "2026-06": {
+      "n": 1,
+      "wins": 0,
+      "losses": 1,
+      "winrate_pct": 0.0,
+      "sum_pct": -2.3346,
+      "avg_pct": -2.3346,
+      "median_pct": -2.3346,
+      "profit_factor": 0.0,
+      "best_pct": -2.33,
+      "worst_pct": -2.33,
+      "usdt_100x3_additive": -7.0,
+      "seq_trades": 1,
+      "seq_final_usdt": 93.0,
+      "seq_max_dd_pct": 7.0,
+      "reasons": {
+        "lost_ma25": 1
+      }
+    },
+    "2026-07": {
+      "n": 3,
+      "wins": 2,
+      "losses": 1,
+      "winrate_pct": 66.67,
+      "sum_pct": 4.7458,
+      "avg_pct": 1.5819,
+      "median_pct": 3.3483,
+      "profit_factor": 2.9,
+      "best_pct": 3.89,
+      "worst_pct": -2.5,
+      "usdt_100x3_additive": 14.24,
+      "seq_trades": 3,
+      "seq_final_usdt": 113.7,
+      "seq_max_dd_pct": 7.49,
+      "reasons": {
+        "timeout": 2,
+        "lost_ma25": 1
+      }
+    },
+    "2026-08": {
+      "n": 3,
+      "wins": 3,
+      "losses": 0,
+      "winrate_pct": 100.0,
+      "sum_pct": 22.3229,
+      "avg_pct": 7.441,
+      "median_pct": 5.63,
+      "profit_factor": 999.0,
+      "best_pct": 12.75,
+      "worst_pct": 3.94,
+      "usdt_100x3_additive": 66.97,
+      "seq_trades": 2,
+      "seq_final_usdt": 154.6,
+      "seq_max_dd_pct": 0.0,
+      "reasons": {
+        "timeout": 3
+      }
+    },
+    "2026-09": {
+      "n": 11,
+      "wins": 11,
+      "losses": 0,
+      "winrate_pct": 100.0,
+      "sum_pct": 36.9415,
+      "avg_pct": 3.3583,
+      "median_pct": 4.301,
+      "profit_factor": 999.0,
+      "best_pct": 6.89,
+      "worst_pct": 0.25,
+      "usdt_100x3_additive": 110.82,
+      "seq_trades": 8,
+      "seq_final_usdt": 206.9,
+      "seq_max_dd_pct": 0.0,
+      "reasons": {
+        "timeout": 9,
+        "lost_ma25": 1,
+        "m5_neck": 1
+      }
+    },
+    "2026-10": {
+      "n": 12,
+      "wins": 10,
+      "losses": 2,
+      "winrate_pct": 83.33,
+      "sum_pct": 18.5851,
+      "avg_pct": 1.5488,
+      "median_pct": 1.2977,
+      "profit_factor": 6.38,
+      "best_pct": 5.48,
+      "worst_pct": -2.39,
+      "usdt_100x3_additive": 55.76,
+      "seq_trades": 6,
+      "seq_final_usdt": 125.23,
+      "seq_max_dd_pct": 7.17,
+      "reasons": {
+        "timeout": 8,
+        "lost_ma25": 2,
+        "m5_neck": 1,
+        "stop": 1
       }
     }
   }

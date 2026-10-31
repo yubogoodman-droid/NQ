@@ -107,13 +107,19 @@ OPT_V9_STRICT_KW = dict(
     min_overhead_ma_atr=0.8,
 )
 
-# v10 防停損版：在 MA25 下方至少 8 根（排除 CRCL/AXTI 等 4~6 根短暫急刺假底）+ 深破 MA200 ≥ 2.5% + 4h MA60 斜率 ≤ 0% + 進場棒振幅 ≥ 0.45%
+# v10 防停損版：在 MA25 下方至少 8 根 + 深破 MA200 ≥ 2.5% + 4h MA60 斜率 ≤ 0% + 進場棒振幅 ≥ 0.45%
 OPT_V10_KW = dict(
     OPT_V8_KW,
     min_bars_below=8,
     ma200_near_pct=-2.5,
     h4_ma60_max_rise_pct=0.0,
     min_entry_rng_pct=0.45,
+)
+
+# v11 天花板淨空終極版：在 v10 基礎上要求距離上方最近長均線 (MA60/99/120/200) ≥ 0.25 ATR + 1.2R 提早武裝 5m M 頭
+OPT_V11_KW = dict(
+    OPT_V10_KW,
+    min_overhead_ma_atr=0.25,
 )
 
 
@@ -263,6 +269,13 @@ def write_compare_html(
         low = h7.df["Low"].to_numpy(float)
         ma7 = m.sma(close, 7)[t7.entry_idx]
         ma14 = m.sma(close, 14)[t7.entry_idx]
+        ma60 = m.sma(close, 60)[t7.entry_idx]
+        ma99 = m.sma(close, 99)[t7.entry_idx]
+        ma120 = m.sma(close, 120)[t7.entry_idx]
+        ma200 = m.sma(close, 200)[t7.entry_idx]
+        atr_e = m.atr(high, low, close, 14)[t7.entry_idx]
+        ceils = [mv for mv in (ma60, ma99, ma120, ma200) if np.isfinite(mv) and mv > t7.entry_price]
+        ceil_atr = min((mv - t7.entry_price) / atr_e for mv in ceils) if ceils and atr_e > 0 else 99.0
         ma200_b = m.sma(close, 200)[s7.break_idx]
         bot_vs_200 = (s7.bottom / ma200_b - 1.0) * 100.0 if np.isfinite(ma200_b) and ma200_b > 0 else 0.0
         h4_s60 = m.h4_ma_slope_pct(h7.df, t7.entry_idx, ma_period=60, bars=12)
@@ -288,7 +301,7 @@ def write_compare_html(
                 f"<span class='muted'>出 {t10.exit_price:.6g} @ {xt10} ({t10.exit_reason})</span><br/>"
                 f"<a href='view.html#t{idx10}' style='font-size:11px'>看K線圖 #{idx10}</a>"
             )
-            status_badge = f"<span class='tag tag-tp'>v10 #{idx10}</span>"
+            status_badge = f"<span class='tag tag-tp'>v11 #{idx10}</span>"
         else:
             why = []
             if s7.vol_ratio < 0.15:
@@ -303,8 +316,10 @@ def write_compare_html(
                 why.append(f"4hMA60+{h4_s60:.1f}%")
             if e_rng_pct < 0.45:
                 why.append(f"進場振幅{e_rng_pct:.2f}%&lt;0.45%")
+            if ceil_atr < 0.25:
+                why.append(f"上方長均線僅{ceil_atr:.2f}ATR&lt;0.25ATR")
             v10_cell = f"<span class='muted'>已過濾（{'、'.join(why)}）</span>"
-            status_badge = "<span class='tag tag-sl'>v10 剔除</span>"
+            status_badge = "<span class='tag tag-sl'>v11 剔除</span>"
 
         c7 = "pnl-win" if t7.pnl_pct > 0 else "pnl-loss"
         s60_str = "N/A" if not np.isfinite(h4_s60) else f"{h4_s60:+.2f}%"
@@ -444,18 +459,18 @@ def main() -> int:
 
     cutoff_2m = datetime(2026, 9, 1, 0, 0, tzinfo=TPE)
 
-    funnel_v10: dict[str, int] = {}
+    funnel_v11: dict[str, int] = {}
     for sym, df in sorted(dfs_1h.items()):
-        m.detect_signals(df, funnel=funnel_v10, **OPT_V10_KW)
+        m.detect_signals(df, funnel=funnel_v11, **OPT_V11_KW)
 
-    def run_sim(kw_detect: dict, max_hold: int, lose_ma_closes: int = 0) -> tuple[list[m.Hit], list[m.Hit], list[m.Hit]]:
+    def run_sim(kw_detect: dict, max_hold: int, lose_ma_closes: int = 0, m5_arm_r: float = 1.5) -> tuple[list[m.Hit], list[m.Hit], list[m.Hit]]:
         h_all, h_early, h_2m = [], [], []
         for sym, df in sorted(dfs_1h.items()):
             sigs = m.detect_signals(df, **kw_detect)
             if not sigs:
                 continue
             trades = m.simulate(
-                df, sigs, df_5m=dfs_5m.get(sym), m5_exit=True, max_hold=max_hold, lose_ma_closes=lose_ma_closes
+                df, sigs, df_5m=dfs_5m.get(sym), m5_exit=True, max_hold=max_hold, lose_ma_closes=lose_ma_closes, m5_arm_r=m5_arm_r
             )
             for t in trades:
                 et = df.index[t.entry_idx]
@@ -469,31 +484,27 @@ def main() -> int:
             hs.sort(key=lambda h: (h.df.index[h.trade.entry_idx], h.symbol))
         return h_all, h_early, h_2m
 
-    hits_v7, v7_e, v7_2m = run_sim(BASE_V7_KW, 36, 0)
-    hits_v7_24, v7_24_e, v7_24_2m = run_sim(BASE_V7_KW, 24, 0)
-    hits_v8, v8_e, v8_2m = run_sim(OPT_V8_KW, 24, 0)
-    hits_v9b, v9b_e, v9b_2m = run_sim(OPT_V9_STRICT_KW, 24, 0)
+    hits_v7, v7_e, v7_2m = run_sim(BASE_V7_KW, 36, 0, 1.5)
+    hits_v7_24, v7_24_e, v7_24_2m = run_sim(BASE_V7_KW, 24, 0, 1.5)
+    hits_v8, v8_e, v8_2m = run_sim(OPT_V8_KW, 24, 0, 1.5)
     hits_v10_s1, v10_s1_e, v10_s1_2m = run_sim(
-        dict(OPT_V8_KW, ma200_near_pct=-2.5, h4_ma60_max_rise_pct=0.0), 24, 0
+        dict(OPT_V8_KW, ma200_near_pct=-2.5, h4_ma60_max_rise_pct=0.0), 24, 0, 1.5
     )
-    hits_v10_s2, v10_s2_e, v10_s2_2m = run_sim(
-        dict(OPT_V8_KW, ma200_near_pct=-2.5, h4_ma60_max_rise_pct=0.0, min_entry_rng_pct=0.45), 24, 5
-    )
-    hits_v10, v10_e, v10_2m = run_sim(OPT_V10_KW, 24, 5)
+    hits_v10, v10_e, v10_2m = run_sim(OPT_V10_KW, 24, 5, 1.5)
+    hits_v11, v11_e, v11_2m = run_sim(OPT_V11_KW, 24, 5, 1.2)
 
     ablation = [
         ("v7 基準（36h 出場）", calc_metrics(hits_v7), calc_metrics(v7_e), calc_metrics(v7_2m)),
         ("v7 + 縮短持有至 24h", calc_metrics(hits_v7_24), calc_metrics(v7_24_e), calc_metrics(v7_24_2m)),
         ("v8 優化（進場量≥0.15x + MA7>14 + 24h）", calc_metrics(hits_v8), calc_metrics(v8_e), calc_metrics(v8_2m)),
-        ("v9-B 嚴選版（v8 + BingX破底量≥1.10x + 上方均線≥0.8ATR）", calc_metrics(hits_v9b), calc_metrics(v9b_e), calc_metrics(v9b_2m)),
         ("v10-Step1（v8 + 破MA200≥2.5% + 4hMA60斜率≤0%）", calc_metrics(hits_v10_s1), calc_metrics(v10_s1_e), calc_metrics(v10_s1_2m)),
-        ("v10-Step2（Step1 + 進場振幅≥0.45% + 連5掉MA25止損）", calc_metrics(hits_v10_s2), calc_metrics(v10_s2_e), calc_metrics(v10_s2_2m)),
-        ("v10 終極防停損版（Step2 + 在MA25下≥8h 排除急刺假底）", calc_metrics(hits_v10), calc_metrics(v10_e), calc_metrics(v10_2m)),
+        ("v10 防停損版（Step1 + 在下≥8h + 振幅≥0.45% + 連5掉MA25）", calc_metrics(hits_v10), calc_metrics(v10_e), calc_metrics(v10_2m)),
+        ("v11 終極天花板淨空版（v10 + 上方長均線≥0.25ATR + 1.2R破頸停利）", calc_metrics(hits_v11), calc_metrics(v11_e), calc_metrics(v11_2m)),
     ]
 
     for lbl, sta, ste, st2 in ablation:
         print(
-            f"{lbl:<56} | All: n={sta['n']:3d}(sl={sta['reasons'].get('stop',0):2d}) "
+            f"{lbl:<60} | All: n={sta['n']:3d}(sl={sta['reasons'].get('stop',0):2d}) "
             f"WR={sta['winrate_pct']:5.1f}% sum={sta['sum_pct']:+7.2f}% PF={sta['profit_factor']:5.2f} "
             f"seq={sta['seq_final_usdt']:6.1f}U(DD {sta['seq_max_dd_pct']:4.1f}%) | "
             f"2M: n={st2['n']:2d}(sl={st2['reasons'].get('stop',0):2d}) WR={st2['winrate_pct']:5.1f}% sum={st2['sum_pct']:+7.2f}% PF={st2['profit_factor']:5.2f}",
@@ -502,24 +513,24 @@ def main() -> int:
 
     m_v7 = monthly_breakdown(hits_v7)
     m_v8 = monthly_breakdown(hits_v8)
-    m_v9b = monthly_breakdown(hits_v9b)
-    m_v10 = monthly_breakdown(hits_v10)
+    m_v9b = monthly_breakdown(hits_v10)
+    m_v10 = monthly_breakdown(hits_v11)
 
-    stats_v10 = m.summarize_trades([h.trade for h in hits_v10])
+    stats_v11 = m.summarize_trades([h.trade for h in hits_v11])
     card_note = (
-        "<br/><b>v10 終極防停損版（BingX 383 檔 & 幣安 216 檔跨平台通用）</b>：破底低於 MA200 ≥ 2.5%、"
-        "4H MA60 近 12 根斜率 ≤ 0%（拒高檔初跌段）、進場棒高低振幅 ≥ 0.45%（拒極窄十字星）、"
-        "1H MA7 &gt; MA14、連 5 根收盤掉 MA25 提早止損、最長持有 24h。"
-        "<a href='compare-view.html' style='color:#79c0ff'>查看停損四大特徵與 130 筆完整對照表</a>"
+        "<br/><b>v11 終極天花板淨空版（BingX 383 檔 & 幣安 216 檔通用）</b>：在 MA25 下 ≥ 8h、破底低於 MA200 ≥ 2.5%、"
+        "4H MA60 斜率 ≤ 0%、進場棒振幅 ≥ 0.45%、上方最近長均線（MA60/99/120/200）距離 ≥ 0.25 ATR（拒買在長均線天花板正下方）、"
+        "1.2R 武裝五分 M 頭停利、連 5 根掉 MA25 提早止損、最長 24h。"
+        "<a href='compare-view.html' style='color:#79c0ff'>查看 130 筆完整消融對照表</a>"
     )
     m.write_html_report(
         html_p,
-        hits_v10,
+        hits_v11,
         days=250,
         scanned=len(dfs_1h),
-        funnel=funnel_v10,
+        funnel=funnel_v11,
         recent_hours=48,
-        all_stats=stats_v10,
+        all_stats=stats_v11,
         card_note=card_note,
         strict=False,
         m5_exit=True,
@@ -528,18 +539,18 @@ def main() -> int:
     )
     m.write_view_html(html_p, branch=BRANCH, out_name="view.html")
 
-    taken_v10 = m.one_at_a_time_path(hits_v10, start=100.0, lev=3.0)
-    m.draw_seq_pngs(taken_v10, OUT / "seq-img")
+    taken_v11 = m.one_at_a_time_path(hits_v11, start=100.0, lev=3.0)
+    m.draw_seq_pngs(taken_v11, OUT / "seq-img")
     m.write_seq_html(
         OUT / "seq.html",
-        taken_v10,
+        taken_v11,
         days=250,
         scanned=len(dfs_1h),
-        pool=len(hits_v10),
-        featured_html=m._featured_k_html(taken_v10),
+        pool=len(hits_v11),
+        featured_html=m._featured_k_html(taken_v11),
         more_k_href="seq-k.html",
     )
-    m.write_seq_k_html(OUT / "seq-k.html", taken_v10, days=250)
+    m.write_seq_k_html(OUT / "seq-k.html", taken_v11, days=250)
     m.write_view_html(OUT / "seq.html", branch=BRANCH, out_name="seq-view.html")
     m.write_view_html(OUT / "seq-k.html", branch=BRANCH, out_name="seq-k-view.html")
 
@@ -558,7 +569,8 @@ def main() -> int:
     write_csv(OUT / "trades_v7.csv", hits_v7)
     write_csv(OUT / "trades_v8.csv", hits_v8)
     write_csv(OUT / "trades_v10.csv", hits_v10)
-    write_compare_html(OUT / "compare.html", ablation, m_v7, m_v8, m_v9b, m_v10, hits_v7, hits_v8, hits_v10)
+    write_csv(OUT / "trades_v11.csv", hits_v11)
+    write_compare_html(OUT / "compare.html", ablation, m_v7, m_v8, m_v9b, m_v10, hits_v7, hits_v8, hits_v11)
     m.write_view_html(OUT / "compare.html", branch=BRANCH, out_name="compare-view.html")
 
     summary = {
@@ -568,13 +580,15 @@ def main() -> int:
         "total_1h_bars": int(sum(len(df) for df in dfs_1h.values())),
         "baseline_v7": ablation[0][1],
         "v8_opt": ablation[2][1],
-        "v10_anti_sl": ablation[-1][1],
+        "v10_anti_sl": ablation[-2][1],
+        "v11_final": ablation[-1][1],
         "monthly_v7": m_v7,
         "monthly_v8": m_v8,
-        "monthly_v10": m_v10,
+        "monthly_v10": m_v9b,
+        "monthly_v11": m_v10,
     }
     (OUT / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Done! BingX v10 reports written to {OUT} (stamped {len(stamped_paths)} images)", flush=True)
+    print(f"Done! BingX v11 reports written to {OUT} (stamped {len(stamped_paths)} images)", flush=True)
     return 0
 
 

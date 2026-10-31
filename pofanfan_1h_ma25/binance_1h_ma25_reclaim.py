@@ -83,7 +83,7 @@ M5_MAX_PEAK_SEP = 24
 M5_RIGHT_OVERSHOOT = 0.003
 M5_MIN_NECK_DEPTH = 0.015
 M5_HH_TOL = 0.003
-M5_ARM_R = 1.5
+M5_ARM_R = 1.2
 M5_MIN_BREAK_PCT = 0.01
 
 
@@ -1421,6 +1421,7 @@ def simulate(
     lose_ma_closes: int = 0,
     df_5m: Optional[pd.DataFrame] = None,
     m5_exit: Optional[bool] = None,
+    m5_arm_r: float = M5_ARM_R,
 ) -> List[TradeResult]:
     use_m5 = bool(m5_exit) if m5_exit is not None else df_5m is not None
     close = df["Close"].to_numpy(float)
@@ -1449,7 +1450,7 @@ def simulate(
             risk = float(entry) - float(stop)
             arm_after = None
             if risk > 0:
-                thresh = float(entry) + M5_ARM_R * risk
+                thresh = float(entry) + float(m5_arm_r) * risk
                 for k0 in range(entry_idx, limit + 1):
                     if float(close[k0]) >= thresh:
                         arm_after = pd.Timestamp(idx[k0]) + pd.Timedelta(hours=1)
@@ -1463,6 +1464,7 @@ def simulate(
                     stop_price=stop,
                     end_ts=end_ts,
                     arm_after_ts=arm_after,
+                    arm_r=float(m5_arm_r),
                 )
 
         for k in range(entry_idx + 1, limit + 1):
