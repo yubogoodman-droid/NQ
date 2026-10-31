@@ -103,7 +103,7 @@ python3 examples/watch_tw_1h_reclaim.py --workers 1 --sleep 0.18
 
 第一次在盤中啟動時，**當天已收完、且狀態檔還沒記過的訊號會補推**；更早的歷史只記進狀態、不發。`--dry-run` 成功視同已送，也會寫狀態。
 
-可選大盤濾網（預設關閉）：`--market-filter daily-ma20` 每天抓一次 `^TWII`，只看**前一個完整交易日**的加權日線收盤是否 > 日 MA20（不看當天盤中，無偷看）。不成立時訊號照樣寫進狀態、只印 `market-filter blocked …`，不推播；成立時推播並附上大盤那一行。抓不到或資料不足時不擋（fail-open），訊息會註明「資料不足，未套用」。這條規則是從 [優化報告](docs/tw-1h-reclaim-opt-20261031/index.html) 事後挑出來的，**沒有經過樣本外驗證**，不會改動偵測參數。
+可選大盤濾網（預設關閉）：`--market-filter daily-ma20` 每天抓一次 `^TWII`，只看**前一個完整交易日**的加權日線收盤是否 > 日 MA20（不看當天盤中，無偷看）。不成立時訊號照樣寫進狀態、只印 `market-filter blocked …`，不推播；成立時推播並附上大盤那一行。抓不到或資料不足時不擋（fail-open），訊息會註明「資料不足，未套用」。這條規則是從 [優化報告](docs/tw-1h-reclaim-opt-20261031/index.html) 事後挑出來的，**沒有經過樣本外驗證**，不會改動偵測參數。三個月對照（2026-08-03～10-30）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-telegram-watcher-935b/docs/tw-1h-reclaim-3m-20260803-1030/view.html
 
 ```bash
 python3 examples/watch_tw_1h_reclaim.py --dry-run --once --market-filter daily-ma20
