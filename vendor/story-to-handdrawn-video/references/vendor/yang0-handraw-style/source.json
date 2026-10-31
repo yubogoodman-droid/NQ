@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/yang0/handraw-style",
+  "commit": "ebfeaa54953dee0fe3be01e28e6c591f30530242",
+  "retrieved": "2026-09-22",
+  "license": "MIT",
+  "files": {
+    "styles.json": "8688cb0289d983d4f09099a3fcf4ad8efd33445be8ab41d3b7a660ec7e7d5497",
+    "colors.json": "c525cd81baacd44b28a208d232aaa6062a3b2273e42c54310e4927b0398d73e5",
+    "LICENSE": "7af45d0332fe85bd08e4b5f5f9094b1ed94a86046541a04bfbdc0775743b11b5"
+  },
+  "scope": "Style and palette text metadata only. No upstream sample images, executable code or layout is imported into the distributed project."
+}

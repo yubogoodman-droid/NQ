@@ -1,0 +1,55 @@
+{
+  "id": "window-promise",
+  "title": "窗边的约定",
+  "style": "colored-pencil-diary",
+  "styleName": "彩铅日记漫画",
+  "aspect": "3:4",
+  "width": 720,
+  "height": 960,
+  "text": "窗边的约定\n\n小猫坐在窗边，看着下雨的街道。\n一只小鸟停在湿漉漉的枝头，抖了抖羽毛。\n小猫轻轻抬起爪子，隔着玻璃打招呼。\n小鸟歪了歪头，好像听懂了。\n雨停以后，阳光把窗台晒得暖暖的。",
+  "pages": [
+    {
+      "id": "00",
+      "kind": "cover",
+      "caption": "窗边的约定",
+      "sub": "彩铅日记漫画",
+      "color": "assets/scenes/00-cover.jpg",
+      "bw": "assets/scenes/00-cover-bw.jpg"
+    },
+    {
+      "id": "01",
+      "kind": "beat",
+      "caption": "小猫坐在窗边，看着下雨的街道。",
+      "color": "assets/scenes/01.jpg",
+      "bw": "assets/scenes/01-bw.jpg"
+    },
+    {
+      "id": "02",
+      "kind": "beat",
+      "caption": "一只小鸟停在湿漉漉的枝头，抖了抖羽毛。",
+      "color": "assets/scenes/02.jpg",
+      "bw": "assets/scenes/02-bw.jpg"
+    },
+    {
+      "id": "03",
+      "kind": "beat",
+      "caption": "小猫轻轻抬起爪子，隔着玻璃打招呼。",
+      "color": "assets/scenes/03.jpg",
+      "bw": "assets/scenes/03-bw.jpg"
+    },
+    {
+      "id": "04",
+      "kind": "beat",
+      "caption": "小鸟歪了歪头，好像听懂了。",
+      "color": "assets/scenes/04.jpg",
+      "bw": "assets/scenes/04-bw.jpg"
+    },
+    {
+      "id": "05",
+      "kind": "beat",
+      "caption": "雨停以后，阳光把窗台晒得暖暖的。",
+      "color": "assets/scenes/05.jpg",
+      "bw": "assets/scenes/05-bw.jpg"
+    }
+  ]
+}
