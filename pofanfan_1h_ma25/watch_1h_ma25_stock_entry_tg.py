@@ -114,17 +114,19 @@ def apply_keys() -> None:
 def load_reclaim():
     try:
         import binance_1h_ma25_reclaim as m  # noqa: WPS433
-        # BingX port: Binance is HTTP 451 here. Route REST through the BingX shim, no vision fallback.
+    except ImportError:
+        print("找不到 binance_1h_ma25_reclaim.py，請跟本檔放同一層。", file=sys.stderr)
+        raise
+    # 預設直接連幣安 https://www.binance.com/fapi/v1/...
+    # 若在特定被幣安擋 HTTP 451 的環境且本機有提供 /workspace/shared/bingx_fapi.py 才切換
+    if os.environ.get("USE_BINGX_SHIM") == "1":
         sys.path.insert(0, "/workspace/shared")
         import bingx_fapi  # noqa: WPS433
         m.get_json = bingx_fapi.get_json
         m._REST_BANNED = False
         m._fetch_klines_vision = lambda *a, **k: m._klines_to_df([])
         m.BASE = bingx_fapi.BASE
-        return m
-    except ImportError:
-        print("找不到 binance_1h_ma25_reclaim.py，請跟本檔放同一層。", file=sys.stderr)
-        raise
+    return m
 
 
 def tg_send(text: str) -> bool:
