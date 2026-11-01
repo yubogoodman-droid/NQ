@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>回測進場邏輯總表</title>
+  <meta name="description" content="這個 repo 裡各份回測的進場邏輯索引。同一套規則的不同天數併成一張卡，句子取自程式或報告，不另外編。" />
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --ink: #1c1915;
+      --muted: #5c564c;
+      --card: #fffdf8;
+      --line: #e4dccf;
+      --nq: #1d4e89;
+      --tw: #8a3d12;
+      --bn: #0f6e56;
+      --chip: #efe8db;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      font-size: 16.5px;
+      line-height: 1.65;
+    }
+    header, main { width: min(920px, 100%); margin: 0 auto; padding: 0 16px; }
+    header { padding-top: 28px; }
+    h1 { font-size: 1.7rem; line-height: 1.3; margin: 0 0 8px; }
+    .lead { color: var(--muted); margin: 0 0 16px; }
+    .bar {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: rgba(244, 241, 234, 0.94);
+      backdrop-filter: blur(8px);
+      padding: 10px 0 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    input[type="search"] {
+      width: 100%;
+      font: inherit;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      color: inherit;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .chips button {
+      font: inherit;
+      border: 1px solid var(--line);
+      background: var(--chip);
+      color: inherit;
+      border-radius: 999px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    .chips button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+    #count { color: var(--muted); font-size: 0.92rem; margin: 14px 0; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px 16px 14px;
+      margin: 0 0 12px;
+    }
+    .card h2 { font-size: 1.12rem; margin: 8px 0 6px; line-height: 1.35; }
+    .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+    .badge {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      color: #fff;
+    }
+    .nq { background: var(--nq); }
+    .tw { background: var(--tw); }
+    .bn { background: var(--bn); }
+    .tf { background: #5c564c; }
+    .entry { margin: 0 0 8px; }
+    .exit { margin: 0 0 8px; color: #3f3a33; }
+    .links { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 0; padding: 0; list-style: none; }
+    .links a { color: #1d4e89; }
+    .src { margin: 8px 0 0; font-size: 0.86rem; color: var(--muted); }
+    .empty { display: none; color: var(--muted); }
+    footer { color: var(--muted); font-size: 0.86rem; padding: 8px 0 36px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>回測進場邏輯總表</h1>
+    <p class="lead">同一套規則的 7 日、14 日、30 日放在同一張卡，各自留連結。進場句子取自程式註解或該份報告，沒有寫停損或出場的就不補。</p>
+  </header>
+  <div class="bar">
+    <header>
+      <input id="q" type="search" placeholder="搜尋名稱、市場、均線" autocomplete="off" enterkeyhint="search" />
+      <div class="chips" role="group" aria-label="市場">
+        <button type="button" data-market="all" aria-pressed="true">全部</button>
+        <button type="button" data-market="nq" aria-pressed="false">NQ</button>
+        <button type="button" data-market="tw" aria-pressed="false">台股</button>
+        <button type="button" data-market="bn" aria-pressed="false">幣安</button>
+      </div>
+    </header>
+  </div>
+  <main>
+    <p id="count"></p>
+    <p id="empty" class="empty">沒有符合的回測。</p>
+
+    <article class="card" id="nq-1m-reclaim" data-market="nq" data-text="破底翻一分k nq ma reclaim ma20 ma30">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>破底翻一分 K</h2>
+      <p class="entry">跌破近 2 小時低點後，15 根內收復 MA20 與 MA30，而且 MA5 大於 MA10、MA10 大於 MA20，才做多。預設再擋貼著均線磨、貼著下彎的 MA60，以及美東 09:30–10:00。消融頁改成允許 09–10 進場，或只要求收復 MA20。</p>
+      <p class="exit">停損在破底低點下方。目標 2R；MA20 上彎時改 3R。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/nq-ma-reclaim/index.html">30 日報告</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim-0910/index.html">允許 09–10</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-30d-ablation-2484/docs/nq-ma-reclaim-ma20/index.html">只收復 MA20</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/main/examples/nq_ma_reclaim.py">examples/nq_ma_reclaim.py</a></p>
+    </article>
+
+    <article class="card" id="nq-w" data-market="nq" data-text="w底 雙底 頸線 五分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>W 底，收盤突破頸線</h2>
+      <p class="entry">左右各 3 根確認波段低點。兩個低點價差不超過 0.1%，間隔 5 到 60 根，中間的最高波段高點當頸線。第二低點確認後，收盤突破頸線做多。</p>
+      <p class="exit">停損在第二低點。主線停利是量度漲幅：頸線加上頸線與最低點的距離。截圖形週報與月報把停利寫成這個距離的 2 倍。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/nq-w-bottom/index.html">近 7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-w-ma20-alert-a91a/docs/nq-w-week/index.html">截圖形一週</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-w-ma20-alert-a91a/docs/nq-w-month/index.html">截圖形一個月</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/main/nq/strategy.py">nq/strategy.py</a></p>
+    </article>
+
+    <article class="card" id="nq-w-l3" data-market="nq" data-text="破底w l3 收盤 五分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>破底 W，L3 收盤進場</h2>
+      <p class="entry">五分 K 的破底 W，L1 到 L3 要在 2 小時內，在 L3 收盤進場。後面的頁是同一個進場點再加過濾：均線差至少 40 點、避開美東 04:00–10:30 與 14:00–15:00、不追 MA200、或不遠低於 MA60、或下彎的 MA200 在 60 點內。</p>
+      <p class="exit">停損在 L3 下方 20 點。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/l3close.html">基本 7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/0828ma.html">均線差 7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/30d-circ.html">均線差 30 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/0830f.html">避開時段 7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/30d-filt.html">避開時段 30 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/0904.html">不追 MA200 7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/30d-notime.html">不追 MA200 30 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/30d-ma200.html">下彎 MA200 30 日</a></li>
+      </ul>
+      <p class="src">報告在分支 <code>cursor/spring-w-bottom-55a6</code> 的 <code>docs/nq-w-bottom/</code></p>
+    </article>
+
+    <article class="card" id="nq-3h-ma30" data-market="nq" data-text="三小時低 ma30 五分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>破三小時低，半小時內站上 MA30</h2>
+      <p class="entry">五分 K 跌破近三小時低點後，半小時內收盤站上 MA30 做多。報告沒有再要求短均排列。</p>
+      <p class="exit">停損在破底低點下方 20 點，停利 2R。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/0905-7d.html">7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/0905-30d.html">30 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="nq-3h-ma60-half" data-market="nq" data-text="三小時低 ma60 半小時">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>破三小時低，半小時內站上 MA60</h2>
+      <p class="entry">五分 K 跌破近三小時低點後，半小時內收盤站上 MA60 做多。這兩頁沒有要求 MA5 大於 MA20。</p>
+      <p class="exit">停損在破底低點下方 20 點，停利 2R。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/0905-ma60-7d.html">7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/0905-ma60-30d.html">30 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="nq-3h-stack" data-market="nq" data-text="三小時低 ma5 ma20 ma60 多排">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>破三小時低，一小時內 5/20 站上 MA60</h2>
+      <p class="entry">當根低點跌破前 36 根（三小時）的最低點，而且前一根還沒跌破。破底起 12 根內（一小時）收盤高於 MA60，同時 MA5 大於 MA20、MA20 大於 MA60，才做多。</p>
+      <p class="exit">停損在破底低點下方 20 點，停利 2R。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/index.html">7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/0905-stack-7d.html">7 日（stack）</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/0905-stack-30d.html">30 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/spring-w-bottom-55a6/docs/nq-w-bottom/30d.html">30 日另一頁</a></li>
+      </ul>
+      <p class="src">說明在該分支 README。程式表是 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/spring-w-bottom-55a6/pinescript/nq_w_bottom_5m.pine">pinescript/nq_w_bottom_5m.pine</a></p>
+    </article>
+
+    <article class="card" id="nq-right-shoulder" data-market="nq" data-text="右肩 ma20 破底翻 一分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>破底翻後，右肩踩回 MA20</h2>
+      <p class="entry">只做美東日盤。先跌破近 2 小時低點，約 20 分鐘內收復粉紅 MA20，離開均線之後，右肩從反彈高點至少拉回 25 點再踩回 MA20，收盤貼著 MA20（高出不超過 20 點）才做多。13:00 後不進。貼下彎的 5 分 MA60、被下彎的 5 分 MA20／MA30 蓋住、或五分均線糾結，整波略過。</p>
+      <p class="exit">停損在右肩低點下方。5 分 MA20 上彎時目標 2R，否則 1.5R。持有滿 60 根若收盤跌破 MA20 出場。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest/index.html">較長樣本</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest-7d/index.html">7 日</a></li>
+      </ul>
+      <p class="src">程式在分支 <code>cursor/1m-right-shoulder-ma20-d3c2</code></p>
+    </article>
+
+    <article class="card" id="nq-m-head-k60" data-market="nq" data-text="m頭 右肩 一分 k60 ma60 做空">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>M 頭右肩破一分 K60</h2>
+      <p class="entry">高檔雙頂確認後才空。M 頭要坐在 MA60 上方，頸線當時仍高於 MA60。右肩這一段走完，收盤同時跌破頸線與 MA60，而且至少低 8 點，才進場。MA5／10／20／30／60 帶寬還不到 28 點就先等打開。收盤夾在 MA120 與 MA200 中間、或已遠離 MA200 且小時圖條件不符合的，不做。</p>
+      <p class="exit">1 分停損在頭頂上方 8 點，1.6R 鎖 1.2R，鎖利下一根才生效。5 分對照頁停損在頭頂上方，並用 2R 與時間停。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-mhead-ma60-2c5d/docs/nq-m-head/index.html">1 分／5 分／1 小時對照</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/nq-1m-mhead-ma60-2c5d/examples/nq_m_head.py">examples/nq_m_head.py</a></p>
+    </article>
+
+    <article class="card" id="nq-4h-ma200" data-market="nq" data-text="四小時低 ma200 一分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>破四小時低，一小時內站上 MA200</h2>
+      <p class="entry">一分 K 跌破近 4 小時低點後，一小時內收盤站上 MA200，而且 MA5 大於 MA10、大於 MA20、大於 MA30。再等五分 K 也排成 5 大於 10、20、30 才進場。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-break-bounce-365c/docs/nq-4h-ma200/index.html">30 日報告</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/nq-1m-break-bounce-365c/examples/nq_4h_ma200.py">examples/nq_4h_ma200.py</a>。這份報告頁沒有寫停損價。</p>
+    </article>
+
+    <article class="card" id="nq-linear-short" data-market="nq" data-text="線性空 ma10 ma20 ma200 一分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>線性空</h2>
+      <p class="entry">多頭排列創四小時高之後，回測 MA10 不過高，再收盤跌破 MA20，而且峰離 MA200 至少 100 點，做空。</p>
+      <p class="exit">停損在四小時高。停利是碰到 MA200，或靠近 MA200 出現長下影。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/linear-short-1w-84e8/docs/nq-linear-short/index.html">7 日報告</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/linear-short-1w-84e8/examples/nq_linear_short.py">examples/nq_linear_short.py</a></p>
+    </article>
+
+    <article class="card" id="nq-base-stack" data-market="nq" data-text="打底 5 10 20 五分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>急跌打底後，5/10/20 散開多排</h2>
+      <p class="entry">急跌之後低點短打底，等 MA5、MA10、MA20 散開成多頭排列才做多。短均黏在一起翻一下，或打底後橫很久才排好，都不算。寬鬆模式會關掉散開與急跌集中的門檻，只留有跌、打底、翻成 5／10／20。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/index.html">60 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/one-week.html">一週</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/two-month.html">兩個月</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-base-stack/no-ma30.html">不含 MA30</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/nq-5m-base-stack-95d5/examples/nq_5m_base_stack.py">examples/nq_5m_base_stack.py</a>。報告頁沒有另寫停損價。</p>
+    </article>
+
+    <article class="card" id="nq-5m-reclaim" data-market="nq" data-text="五分 破兩小時 5 10 20">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>破兩小時低，一小時內站回 5/10/20</h2>
+      <p class="entry">五分 K 跌破近 2 小時低點後，12 根（1 小時）內收盤站回，而且 MA5 大於 MA10、大於 MA20，才做多。</p>
+      <p class="exit">停損在破底低點下方，目標 2R。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/index.html">30 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-week-1h.html">一週，附 1 小時</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-month-1h.html">一個月，附 1 小時</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/nq-5m-base-stack-95d5/examples/nq_5m_reclaim.py">examples/nq_5m_reclaim.py</a></p>
+    </article>
+
+    <article class="card" id="nq-ma200-stand" data-market="nq" data-text="站上 ma200 兩小時低 一分 gork">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>破兩小時低後站上 MA200</h2>
+      <p class="entry">MA5 到 MA60 多頭排列且收盤在 MA60 上。站上 MA200 要連續至少 3 根、距離不超過 30 點，而且發生在破兩小時低之後的 1 小時內。若之後出現離破底低 10 點以內的相對低，從那根重開 1 小時窗。進場前 1 小時要有連續至少 15 根收在 MA200 下。美東 9:30–10:00 不進，紅 K 長上影跳過。五分全均帶寬小於 28 點當糾結，不進。十五分 MA20 明顯下彎且收盤在其下 15 點內，也不進。</p>
+      <p class="exit">停損在 MA200 下方 10 點，停利 +100。浮盈先到 +60 後，停損提到進場價。若進場在 15 分 MA200 上被停損，30 分鐘內站回原進場價可以再進一次。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/gork-rel-low-window-b382/docs/nq-ma200-stand/index.html">30 日</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/gork-rel-low-window-b382/examples/nq_ma200_stand.py">examples/nq_ma200_stand.py</a></p>
+    </article>
+
+    <article class="card" id="nq-ma60-limit" data-market="nq" data-text="掛單 ma60 破底 一分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>破底後，回踩 MA60 掛限價</h2>
+      <p class="entry">跌破近兩小時低點。之後 30 根內 MA5 大於 MA20，而且收盤突破 1 分 MA60。突破後前 5 根的回踩不算，第 6 根起才在 MA60 掛限價，再留 5 分鐘，逾時取消。</p>
+      <p class="exit">停損在破底低點，目標 2R。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-ma60-limit-63a8/docs/nq-ma60-limit/index.html">30 日</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/nq-ma60-limit-63a8/examples/nq_ma60_limit.py">examples/nq_ma60_limit.py</a></p>
+    </article>
+
+    <article class="card" id="nq-ma60-retest" data-market="nq" data-text="回踩 ma60 綠線 一分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>MA60 下探底後，回踩綠線做多</h2>
+      <p class="entry">MA60 下面先探一個底，收盤站回綠線上，綠線變成地板。回踩或貼著綠線走就進。一種是翻上後回來坐在綠線上，一種是翻上當下就貼著綠線。</p>
+      <p class="exit">停損在回踩那根下方，目標 2R。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma60-retest-8fa0/docs/nq-ma60-retest/index.html">30 日</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/nq-1m-ma60-retest-8fa0/examples/nq_ma60_retest.py">examples/nq_ma60_retest.py</a></p>
+    </article>
+
+    <article class="card" id="nq-ma60-stand" data-market="nq" data-text="站上季線 ma60 一分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>一分 K 站上季線</h2>
+      <p class="entry">預設進場：上一根收盤還在一分 MA60 下，這一根陽線收盤站上，距離 1 到 40 點，低點離季線不超過 22 點。站上前至少連續 40 根收在季線下，而且 MA5 大於 MA10。MACD 柱要大於 0，量至少是 20 根均量的 1.2 倍。近 60 根的高點到這根低點至少跌 60 點，五分收盤仍要比五分 MA60 低至少 60 點。只做美東 10 點到 16 點。</p>
+      <p class="exit">停損是進場 K 低點與季線較低的那個，再減 12 點。目標 2R。風險超過 80 點不做。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma60-stand-fbcb/docs/nq-ma60-stand/index.html">30 日報告</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/nq-1m-ma60-stand-fbcb/examples/nq_ma60_stand.py">examples/nq_ma60_stand.py</a></p>
+    </article>
+
+    <article class="card" id="nq-sharp" data-market="nq" data-text="急跌 ma20 五分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>急跌後站上 MA20</h2>
+      <p class="entry">灌殺前 5／10／20 帶寬要窄，價格貼著 MA20。約 6 根內從窗口高點灌下去，深度至少是 40 點、2 倍 ATR、0.15% 裡較大的那個，量能放大，收盤跌破 MA20。之後 18 根內收紅站上 MA20 才進。只做日盤，美東 9 點到 10 點不進。</p>
+      <p class="exit">停損在急跌低下方，目標 1.5R。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-sharp-drop-2f6f/docs/nq-sharp-drop/index.html">60 日</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/nq-sharp-drop-2f6f/examples/nq_sharp_drop.py">examples/nq_sharp_drop.py</a></p>
+    </article>
+
+    <article class="card" id="nq-v" data-market="nq" data-text="v轉 五分 急跌">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>五分 K V 轉</h2>
+      <p class="entry">16 到 28 根內從左側高點灌到右側低點，深度至少 120 點或 4 倍 ATR。底部幾乎不盤，中途不能出現大陽反包。右腿第一次回到起跌高點（回補至少 98%）時，右腿根數要是左腿的 0.50 到 1.60 倍，收紅站上 MA5 做多。美東 09:00–10:00 不進。</p>
+      <p class="exit">停損用右腿回撤低。目標是頸線再延伸這段跌幅的 0.7 倍。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-v-turn-4941/docs/nq-v-turn/index.html">30 日</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/nq-5m-v-turn-4941/examples/nq_v_turn.py">examples/nq_v_turn.py</a></p>
+    </article>
+
+    <article class="card" id="nq-5m-ma20" data-market="nq" data-text="五分 回踩 ma20 破翻">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>五分破底翻，回踩 MA20</h2>
+      <p class="entry">只做美東 09:30–15:45。破底後約 100 分鐘內收復粉紅 MA20，離開之後回踩進場。進場若貼著下彎的 5 分 MA60（40 點內）則略過。</p>
+      <p class="exit">停損在破底下方，目標 1.5R。持有滿 12 根若收盤跌破 MA20 出場。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-ma20-retest-8357/docs/nq-5m-ma20-retest/index.html">報告</a></li>
+      </ul>
+      <p class="src">分支 <code>cursor/nq-5m-ma20-retest-8357</code></p>
+    </article>
+
+    <article class="card" id="nq-ma-short" data-market="nq" data-text="跌破六均 做空 五分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>一根收盤跌破六條均線做空</h2>
+      <p class="entry">上一根還在 MA5、10、20、30、60、120 每一條之上，這一根收盤才一次跌破這六條，做空。報告頁沒有寫停損。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-ma10-retest-59b8/docs/nq-ma-breakdown-short/index.html">60 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="nq-coil" data-market="nq" data-text="起漲 糾結 ma200 一分">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>均線糾結後，連兩根剛站上 MA200</h2>
+      <p class="entry">下跌後短均收到一束（MA5 到 MA60 不超過 20 點），近 12 根箱子約 10 到 40 點，收盤剛站上 MA200（高出不超過 15）。MA5 大於 MA10、20、30。連續兩根收在 MA200 上才進，第一根還不進。MA200 上面不能再掛 MA100 或 MA120。當時五分要站上 MA20 與 MA30，而且不能比五分 MA200 低超過 25 點。開盤追價、急殺後的寬箱不進。</p>
+      <p class="exit">停損是進場前 20 根修剪低點再減 5 點，停利 2R。走到 1R 後停損移到 +0.3R。連續 2 根收回進場時的 MA200 下方，收盤離場。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout/index.html">較短樣本</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-coil-breakout-36d9/docs/nq-coil-breakout-30d/index.html">30 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="nq-1m-v" data-market="nq" data-text="急跌 均線排列 一分 90">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">1 分 K</span></div>
+      <h2>急跌後 90 分鐘不破低，再走出 5/10/20</h2>
+      <p class="entry">只記急跌之後 90 分鐘內不破低、再走出 MA5 大於 MA10、大於 MA20 的命中，綠圈是進場。</p>
+      <p class="exit">出場是急跌低點停損、收盤跌破 MA20，或持滿 90 分。</p>
+      <ul class="links">
+        <li><a href="https://yubogoodman-droid.github.io/NQ/nq-1m-v/">已上線 31 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-v-recovery-week-43cf/docs/nq-1m-v/index.html">原始報告</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="nq-w-ma20" data-market="nq" data-text="雙底 守三根 ma20 兩小時">
+      <div class="badges"><span class="badge nq">NQ</span><span class="badge tf">5 分 K</span></div>
+      <h2>兩小時低之後，回測 MA20 守三根</h2>
+      <p class="entry">先看到兩小時低，站上 MA20，再跌破，然後回測附近守三根才進。報告沒有寫停損價。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-w-ma20-26e0/docs/nq-w-ma20/index.html">7 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="tw-1m-reclaim" data-market="tw" data-text="台股 破底翻 一分 成交額">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 分 K</span></div>
+      <h2>台股一分破底翻</h2>
+      <p class="entry">規則與 NQ 破底翻一分 K 相同：跌破近 2 小時低，15 根內收復 MA20 與 MA30，MA5 大於 MA10、大於 MA20，美東時段對應的 09–10 不進。掃成交額前 100。30 日那頁另外刪掉股價 600 以上。</p>
+      <p class="exit">停損與目標沿用 NQ 那套：停在破底下方，目標 2R（MA20 上彎時 3R）。點數再乘上股價除以 20000。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-ma-reclaim/index.html">7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-ma-reclaim-30d/index.html">30 日，股價 ≤ 600</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/main/examples/scan_tw_ma_reclaim.py">examples/scan_tw_ma_reclaim.py</a></p>
+    </article>
+
+    <article class="card" id="tw-1h-loose" data-market="tw" data-text="台股 一小時 破底翻 寬鬆 ma20">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 小時</span></div>
+      <h2>台股 1 小時破底翻（寬鬆）</h2>
+      <p class="entry">收盤跌破 MA20 後，在下面待 4 到 36 根，中間最多 2 根假站上。深度至少 1.8%，最低點是近 16 根新低，再站回 MA20。破底後 36 根內，第一根收盤同時大於 MA5、MA10、MA20 進場。股價 1000 以上刪掉。</p>
+      <p class="exit">回測停在破底低、目標 2R，或 20 根時間停。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-2d/index.html">9/17–9/18</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim/index.html">14 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-w0921/index.html">9/21–9/24</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/main/examples/tw_1h_reclaim.py">examples/tw_1h_reclaim.py</a></p>
+    </article>
+
+    <article class="card" id="tw-1h-yj" data-market="tw" data-text="元晶 一小時 破底翻 嚴格">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 小時</span></div>
+      <h2>台股 1 小時破底翻（元晶型）</h2>
+      <p class="entry">現行程式：跌破 MA20 後在下面待 6 到 36 根，不准假站上，深度至少 3.5%，最低點是近 16 根新低。破底與翻上不能同一根，從低點至少彈回 3% 再站回 MA20。破底後 36 根內，第一根收盤同時大於 MA5、MA10、MA20 進場。已發布的月報與上週頁內文仍寫「待 6 到 16 根」。</p>
+      <p class="exit">回測停在破底低、目標 2R，或 20 根時間停。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-yj/index.html">上週</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/index.html">30 日</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/main/examples/tw_1h_reclaim.py">examples/tw_1h_reclaim.py</a></p>
+    </article>
+
+    <article class="card" id="tw-1h-retest" data-market="tw" data-text="晶心科 回踩 ma60 一小時">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 小時</span></div>
+      <h2>突破後回踩 MA60（晶心科型）</h2>
+      <p class="entry">先在 MA60 下面待至少 12 根，深度至少 3.5%，然後收盤站上。站上那根不能已經離開 3.5%。拉開至少 3% 之後，再回踩均線附近才進。不要右上角追價。</p>
+      <p class="exit">停在回踩低（至少 0.8%）、目標 2R，或 20 根時間停。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-ma60-retest-3376/docs/tw-1h-ma60-retest-3d/index.html">3 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-ma60-retest-3376/docs/tw-1h-ma60-retest-7d/index.html">7 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="tw-1h-cross60" data-market="tw" data-text="站上 60ma 一小時 富喬">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 小時</span></div>
+      <h2>一小時 K 收盤站上 MA60</h2>
+      <p class="entry">上一根收在 60MA 下面，這一根一小時 K 收盤站上。成交額前 200、股價 700 以內、不含金融股。報告沒有寫停損。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma240-alert-61bd/docs/tw-1h-ma60/index.html">近 10 個交易日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="tw-1h-stack60" data-market="tw" data-text="多頭排列 站上 ma60 一小時">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 小時</span></div>
+      <h2>MA5/10/20 多排，這一根才站上 MA60</h2>
+      <p class="entry">小時 K 收盤時 MA5 大於 MA10、大於 MA20，上一根還沒站上 MA60，這一根才站上。已經站在上面、只是短均才排好的不算。股價 1000 以上刪掉。</p>
+      <p class="exit">頁面右上角是訊號後下一個交易日收盤報酬，沒有另設停損單。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma60-20bb/docs/tw-1h-stack-ma60-7d/index.html">7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma60-20bb/docs/tw-1h-stack-ma60-30d/index.html">30 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="tw-1h-stack240" data-market="tw" data-text="智原 ma240 一小時 多排">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 小時</span></div>
+      <h2>MA5/10/20 多排，這一根才站上 MA240</h2>
+      <p class="entry">小時 K 收盤 MA5 大於 MA10、大於 MA20，而且當下這根收盤才站上 MA240，至少高出一個跳動點，上一根還沒站上。已經站在上面、只是短均才排好的不算。貼線不到 1 檔不算。</p>
+      <p class="exit">頁面右上角是訊號後下一個交易日收盤報酬，沒有另設停損單。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-now/index.html">當下</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-7d/index.html">7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-30d/index.html">30 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma240-76fc/docs/tw-1h-stack-ma240-guc/index.html">智原 90 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="tw-daifa" data-market="tw" data-text="達發 跳空 ma60 一小時">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 小時</span></div>
+      <h2>開盤跳空站上 MA60（達發多）</h2>
+      <p class="entry">開盤那根 60 分 K：低點高於前一根高點（跳空沒補），前收在 MA60 下，低點與收盤都站上 MA60，而且 MA5 大於 MA10、大於 MA20。進場是該根收盤。</p>
+      <p class="exit">回測停在這根低點、目標 2R，或 20 根時間停。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-daifa-gap-be19/docs/tw-1h-daifa/index.html">30 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="tw-w" data-market="tw" data-text="五分 w底 國巨 南亞科 多排">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">5 分 K</span></div>
+      <h2>五分 K W 底，等 5/10/20 多排</h2>
+      <p class="entry">先大跌，做出兩個相近低點的 W，等五分 MA5 大於 MA10、大於 MA20 才進場。嚴格頁還要求同一天、09:15 後、當天先跌至少 3.5%、回看出發高點至少跌 5.5%、頸線深度至少 1.25%、兩低點價差不超過 1%、第二腳不能更低、右腳從頸線回落至少 1%、從低點彈回 1.1% 到 3.5%、收盤站上 MA20 至少 0.45%。缺口後貼箱、開盤當根當第一低、頸線幾乎漲回起跌點的 V，都不算。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-w-ma20-alert-a91a/docs/tw-w-ma20-today/index.html">單日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-w-ma20-alert-a91a/docs/tw-w-ma20/index.html">10 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-w-ma20-alert-a91a/docs/tw-w-ma20-week/index.html">一週</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-w-ma20-alert-a91a/docs/tw-w-ma20-month/index.html">60 日</a></li>
+      </ul>
+      <p class="src">報告沒有寫停損價。</p>
+    </article>
+
+    <article class="card" id="tw-bounce" data-market="tw" data-text="破底反彈 晶技 五分">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">5 分 K</span></div>
+      <h2>五分破底反彈，5/10/20 張開</h2>
+      <p class="entry">急殺破近 4 小時低或今日低，跌幅至少 2%，破底那根下方不能有均線。24 根內 MA5 大於 MA10、大於 MA20，而且要明顯分開。晶技標準：破底在當天，200MA 要畫得出來；墊底時至少四成 K 收在 MA20 下，進場根相對墊底段爆量（至少是破底後均量的 3 倍，也至少是前 20 根均量的 2 倍）。立刻拉回的 V 彈、一路帶量、隔夜把昨天洗盤帶過來的不算。進場價要站回 MA60。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-bounce-alert-c176/docs/tw-5m-bounce/index.html">60 日</a></li>
+      </ul>
+      <p class="src">報告沒有寫停損價。</p>
+    </article>
+
+    <article class="card" id="tw-fade" data-market="tw" data-text="國巨 空頭 ma240 五分">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">5 分 K</span></div>
+      <h2>五分空頭排列，跌破 MA240</h2>
+      <p class="entry">前一盤箱體站在 MA240 上，當根真下穿，距離年線至少 0.7%，而且 MA5 小於 MA10、小於 MA20，三條下彎。開盤第一根也算，一天一筆。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-fade-short-9faf/docs/tw-5m-fade/index.html">60 日資料</a></li>
+      </ul>
+      <p class="src">報告沒有寫停損價。</p>
+    </article>
+
+    <article class="card" id="tw-5m-short200" data-market="tw" data-text="五分 空頭 ma200">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">5 分 K</span></div>
+      <h2>五分 5/10/20 空排，跌破 MA200</h2>
+      <p class="entry">每天上市加上櫃成交額前 300，濾掉 ETF、金融股、電信股與收盤價 650 以上。五分 K MA5 小於 MA10、小於 MA20，當根收盤剛跌破五分 MA200（前一根還沒跌破），而且十五分與小時收盤都在各自的 MA20 之下。開盤第一根因隔夜跳空不算。後續報酬用做空計算。報告沒有寫停損價。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma-short-ddce/docs/tw/backtest-5m-short-7d.html">7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma-short-ddce/docs/tw/index.html">即時頁</a></li>
+      </ul>
+      <p class="src">掃描池與進場句子來自該頁。程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/tw-5m-ma-short-ddce/tw/signals.py">tw/signals.py</a></p>
+    </article>
+
+    <article class="card" id="tw-1m-short" data-market="tw" data-text="一分 空頭 ma200 做空">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 分 K</span></div>
+      <h2>一分 5/10/20 空排，跌破 MA200</h2>
+      <p class="entry">成交額前 100，濾掉 ETF 與股價 600 以上。一分 K MA5 小於 MA10、小於 MA20，當根收盤跌破 MA200 做空。13:00 後不再進場。</p>
+      <p class="exit">停利 1.2%、停損 0.8%、收盤站回 MA200、持有滿 30 分，或當日收盤回補。</p>
+      <ul class="links">
+        <li><a href="https://yubogoodman-droid.github.io/NQ/tw-ma-short/">已上線</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-ma200-short-91bb/docs/tw-ma-short/index.html">原始報告</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="tw-1m-long" data-market="tw" data-text="頎邦 一分 站上 ma200 五分">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 分 K</span></div>
+      <h2>一分多排拉開，從下穿上 MA200</h2>
+      <p class="entry">成交額前 100，濾掉 ETF、金融股與股價 650 以上。一分 K MA5 大於 MA10、大於 MA20，而且 MA5 減 MA20 至少 0.4%。MA20 與 MA200 差距 0.4% 到 1.0%。從 200 下面穿上，連續兩根收盤站穩，時間 09:10 以後，開盤跳空不算。含該根的五分 K 收盤也必須高於五分 MA200。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/index.html">說明頁</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/backtest-2026-08-14.html">8/14</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1m-ma-alert-120c/docs/tw/backtest-2026-08-18-20.html">8/18–8/20</a></li>
+      </ul>
+      <p class="src">報告沒有寫停損價。同目錄還有其他單日頁，規則相同。</p>
+    </article>
+
+    <article class="card" id="tw-ma240" data-market="tw" data-text="五分 十五分 ma240 站上">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">5 分／15 分</span></div>
+      <h2>剛站上 MA240，短均要散開</h2>
+      <p class="entry">同一交易日的連續 K。多方：MA5 大於 MA10、大於 MA20，而且往上散開（MA5 相對 MA20 至少 0.5%，相鄰兩條相對收盤至少 0.1%），這一根才站上 MA240，含開盤第一根。十五分還要求收盤在 MA240 上連續至少 30 分鐘。空方是鏡像，剛跌破。</p>
+      <ul class="links">
+        <li><a href="https://yubogoodman-droid.github.io/NQ/tw/">已上線目錄</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/backtest-5m-5d.html">五分 5 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/backtest-15m-1h.html">十五分</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-5m-ma200-5d-327f/docs/tw/backtest-5m-15m-1h.html">五分＋十五分＋一小時</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/tw-5m-ma200-5d-327f/tw/signals.py">tw/signals.py</a>。報告沒有寫停損價。</p>
+    </article>
+
+    <article class="card" id="tw-nanya" data-market="tw" data-text="南亞科 扇開 ma200 一分">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 分 K</span></div>
+      <h2>短均扇開，價剛離開 MA200</h2>
+      <p class="entry">均線用 MA5／10／20／60／120／200。盤整時短均要黏，進場是 5 大於 10、大於 20 剛扇開，價格剛離開 MA200。已經排成末端多頭的不追。跌破 MA20 要連續兩根收盤。前 100 那頁是同一套掃成交額前 100、股價 600 以下、近一週。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-candle-pattern-backtest-60f5/docs/nanya-ma/index.html">南亞科</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-candle-pattern-backtest-60f5/docs/backtest/index.html">南亞科另一頁</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-candle-pattern-backtest-60f5/docs/align200/index.html">前 100、近一週</a></li>
+      </ul>
+      <p class="src">報告沒有寫停損價。</p>
+    </article>
+
+    <article class="card" id="tw-spring" data-market="tw" data-text="假跌破 spring 箱體 一分">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 分 K</span></div>
+      <h2>假跌破後放量站回箱頂</h2>
+      <p class="entry">先有盤整箱，跌破支撐後迅速站回，再放量上拉。允許跨夜箱。站回後最多等 24 根才算突破。上面一分 K 是進場訊號。</p>
+      <p class="exit">停損在假跌破最低點。量度目標是箱體高加上箱體高與假跌破低的距離。</p>
+      <ul class="links">
+        <li><a href="https://yubogoodman-droid.github.io/NQ/spring/">已上線</a></li>
+        <li><a href="https://yubogoodman-droid.github.io/NQ/spring/week/">近一週圖</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/fake-breakdown-spring-b99b/docs/spring/index.html">原始頁</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/fake-breakdown-spring-b99b/nq/spring.py">nq/spring.py</a></p>
+    </article>
+
+    <article class="card" id="tw-candles" data-market="tw" data-text="k棒 型態 一分 錘子">
+      <div class="badges"><span class="badge tw">台股</span><span class="badge tf">1 分 K</span></div>
+      <h2>一分 K 棒型態</h2>
+      <p class="entry">教科書單根、雙根、三根 K，以及盤整後放量長紅突破。型態在收盤那根確認，進場等到下一根開盤。</p>
+      <p class="exit">停損在型態極值，停利 1.5R，最多抱 20 根一分 K。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-candle-pattern-backtest-60f5/docs/1m-candles/index.html">報告</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/1m-candle-pattern-backtest-60f5/nq/candles.py">nq/candles.py</a></p>
+    </article>
+
+    <article class="card" id="bn-ma25" data-market="bn" data-text="幣安 1小時 ma25 破底 7 14 25">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">1 小時</span></div>
+      <h2>1 小時跌破 MA25，等 7/14/25 多排</h2>
+      <p class="entry">寬鬆版：收盤跌破 MA25，在均線下至少 4 小時、深度至少 1.8%，之後等 1 小時 MA7 大於 MA14、大於 MA25 才進場。30 日寬鬆頁再加品質 A：深度至少 2.5%、放量至少 1.35 倍、W 型，三項至少再中兩項。嚴格版改成在下至少 10 小時、急殺破底，而且要先做一腳、反彈吻到 MA25 附近、再破底，同樣等 7／14／25 多排。60 日頁的內文寫的是再收盤站回，沒有寫必須等到多排。</p>
+      <p class="exit">停損等收盤跌破破底那根 K，目標 2R。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-2d/index.html">2 日寬鬆</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25/index.html">7 日寬鬆</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-30d/index.html">30 日寬鬆＋品質</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-60d/index.html">60 日站回</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1h-ma25-reclaim-2a6a/docs/binance-1h-ma25-strict-30d/index.html">30 日嚴格</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-fake-ma25" data-market="bn" data-text="hbar 假突破 ma25 一小時">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">1 小時</span></div>
+      <h2>箱體假突破後跌破 MA25</h2>
+      <p class="entry">對齊 HBAR 那種箱體假突破：高點離 MA25 15% 到 40%，從箱體再高出至少 18%，回落 8% 到 18% 之後，隔 6 到 18 根，陰線剛跌破 MA25（離均線不超過 2.5%）才算。MA25 仍向上，尖峰要放量。收盤做空。</p>
+      <p class="exit">停在假突破高，目標 2R，或 24 根時間停。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-7d/index.html">全市場 7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-30d/index.html">全市場 30 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/hbar-1h-ma25/index.html">HBAR 60 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-burst" data-market="bn" data-text="多頭爆發 一小時 放量">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">1 小時</span></div>
+      <h2>1 小時多頭爆發</h2>
+      <p class="entry">MA7 大於 14、25、99、120、200，收盤量大於前一根的 2 倍，而且是收漲陽線。收盤進場。</p>
+      <p class="exit">停在訊號 K 低點，太窄則用 0.5%。目標 2R，或 8 根時間停。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-1h-bull-burst-ee86/docs/binance-1h-burst/index.html">7 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-15m-triple" data-market="bn" data-text="15分 跌破 99 120 200 做空">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>15 分同時跌破 99/120/200</h2>
+      <p class="entry">15 分同時跌破 MA99、MA120、MA200，而且 MA7 小於 MA14、小於 MA25。短均黏住時要放量，進場前多數還在長均之上。再看 1 小時與 4 小時：上一根已收盤仍在該週期 MA99 上，這根 15 分第一次打穿該週期 MA99，上一根不是明顯的 7 大於 14、大於 25。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-3d/index.html">3 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/index.html">7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-30d/index.html">30 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-60d/index.html">60 日</a></li>
+      </ul>
+      <p class="src">報告頁把進場寫在頁首，沒有另寫停損價。</p>
+    </article>
+
+    <article class="card" id="bn-15m-short" data-market="bn" data-text="15分 空頭排列 跌破 ma200">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>15 分空頭排列，紅 K 跌破 MA200</h2>
+      <p class="entry">收盤 MA7 小於 MA14、小於 MA25、小於 MA99。上一根還沒低於 MA200，這一根紅 K 收盤跌破 MA200。進場價要在 1 小時 MA25 下方，還不能掉到 1 小時 MA200 下面。與 1 小時 MA99 距離不超過 20%，離 1 小時 MA120 至少 2%。15 分 MA7／14／25／99／120 要張開至少 1.5%。若進場 K 還在 15 分 MA200 上方，開盤須高於 200 至少 4%。頁面還有 2R 與 200 的相對位置、以及 1 小時 99／120／200 不能兩條貼在 3% 以內等過濾。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short/index.html">7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-short-ma-1db4/docs/binance-15m-short-30d/index.html">30 日</a></li>
+      </ul>
+      <p class="src">出場條件寫在該頁進場段落裡（含 2R 與 MA200 的位置）。完整句子以報告為準。</p>
+    </article>
+
+    <article class="card" id="bn-5m-long" data-market="bn" data-text="5分 多頭排列 ma200 15分">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">5 分 K</span></div>
+      <h2>5 分多排，這一根才站上 MA200</h2>
+      <p class="entry">5 分 MA7 大於 MA14、大於 MA25，前一根收在 MA200 下，這一根收盤才站上。同一時刻 15 分也要從 MA200 下站上。1 小時收盤要在 MA99 與 MA200 之上。已經在均線上、只是短均排好的不算。報酬從訊號收盤看到之後 15／30／60／120 分鐘，頁面寫明不是進出場建議，沒有停損單。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-align-7d44/docs/binance-5m-align/index.html">30 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-5m-short" data-market="bn" data-text="5分 空頭排列 ma200">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">5 分 K</span></div>
+      <h2>5 分空排，這一根才跌破 MA200</h2>
+      <p class="entry">5 分 MA7 小於 MA14、小於 MA25，前一根收在 MA200 上，這一根收盤才跌破。跌破時 MA14 離 MA200 不超過 3%。已經在 MA200 下、只是短均排好的不算。報酬用空頭方向，從訊號收盤看到之後 15 到 120 分鐘。沒有停損單。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-5m-short-align-5ca1/docs/binance-5m-short/index.html">2 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-m-top" data-market="bn" data-text="牛來 m頭 ma200 五分 做空">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">5 分 K</span></div>
+      <h2>牛來型 M 頭，跌破 MA200 做空</h2>
+      <p class="entry">雙峰幾乎等高（價差不超過 1%，右峰不得明顯更高），間隔約 1.5 到 4 小時，中間至少跌 4%。兩個峰都明顯站在 MA200 上方至少 3%。頸線回測 MA200，不得遠高或深跌穿。成形期間多數收盤仍在均線上。然後收盤同時跌破 MA200 與 MA25 才空。貼均線亂鑽的小 M 不畫。</p>
+      <p class="exit">停損在雙頂高點，目標 2R，或 48 根時間停。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/niulai-m-top/index.html">牛來 30 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/niulai-m-top-ma200-8003/docs/binance-m-top-30d/index.html">成交額前 100、30 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-w" data-market="bn" data-text="w底 uai 五分 幣安">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">5 分 K</span></div>
+      <h2>5 分 W 底，對照 UAI</h2>
+      <p class="entry">只留長得像 UAI 的：急殺至少 10%、較高的第二底、間隔 40 到 100 分、頸線深度 6% 到 14%，W 底附近要踩住 MA99／120／200。頁面寫明是型態對照，不是進出場建議，沒有定義下單與停損。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-w-bottom-html-18d2/docs/binance-w-bottom/index.html">近兩天</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-burst15" data-market="bn" data-text="15分 爆量 六均線">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>15 分爆量，一根穿過六條均線</h2>
+      <p class="entry">同一根 15 分 K：開盤在 MA7、14、25、99、120、200 每一條下面，收盤在每一條上面，量至少是前一根的 10 倍，而且收盤在小時 K 的 MA200 之上。1 小時、4 小時用訊號收盤當進場來看後續。報告沒有寫停損單。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/ain-15m-ma-burst-e874/docs/ma-burst-3d/index.html">近三天</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-ma25-retest" data-market="bn" data-text="15分 破底 回測 ma25 六條">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>15 分破六條均線後，回測 MA25</h2>
+      <p class="entry">破底是收盤同時低於 MA7、14、25、99、120、200，而且低點跌破前 32 根。48 根內收盤同時站上六條，且 MA7 大於 MA14、大於 MA25。先有一根低點也在 MA7 上，之後觸到 MA25，收盤仍站上 MA25、MA99、MA120、MA200，短均排列還在，才做多。</p>
+      <p class="exit">停損在回測低點，目標 2R，或 32 根時間停。停損距離限制在 0.2% 到 4%。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-ma25-retest-431e/docs/binance/ma25-retest-3d/index.html">3 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-ma25-retest-431e/docs/binance/ma25-retest-30d/index.html">30 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-ma25-stand6" data-market="bn" data-text="15分 站上六條">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>15 分站上六條就進，不等回測</h2>
+      <p class="entry">破底定義與上一張相同。48 根內，低點不再創新低之後，第一根陽線收盤站上六條，而且 MA7 大於 MA14、大於 MA25，就做多。</p>
+      <p class="exit">停損在進場那根低點，目標 2R，或 32 根時間停。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-ma25-retest-431e/docs/binance/ma25-stand-2d/index.html">2 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-ma25-stand" data-market="bn" data-text="15分 站上 ma25">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>15 分站上 MA25 就進</h2>
+      <p class="entry">破底定義與上兩張相同。48 根內，低點不再創新低之後，第一根收盤站上 MA25 就做多，不等回測，也不要求站上其餘五條。</p>
+      <p class="exit">停損在進場那根低點，目標 2R，或 32 根時間停。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-ma25-retest-431e/docs/binance/ma25-stand-7d/index.html">7 日</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-ribbon" data-market="bn" data-text="15分 穿越 均線帶 7 14 25 99 120">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>15 分一根 K 穿過 7/14/25/99/120</h2>
+      <p class="entry">前一根收盤完全在 MA7、14、25、99、120 下方，這一根收盤完全站上這些均線。預設不含 MA200。進場用訊號下一根開盤。</p>
+      <p class="exit">程式把下一根收盤又跌回最高均線下方記成假突破。頁面本身是穿越統計，沒有另寫停損價。</p>
+      <ul class="links">
+        <li><a href="https://yubogoodman-droid.github.io/NQ/binance/ma-ribbon-15m.html">已上線</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-ribbon-breakout-731b/docs/binance/ma-ribbon-15m-stocks.html">只留股票</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/15m-ma-ribbon-breakout-731b/nq/ribbon15.py">nq/ribbon15.py</a></p>
+    </article>
+
+    <article class="card" id="bn-squeeze" data-market="bn" data-text="黏帶 擠壓 ma200 15分 eth">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>15 分六均黏在 MA200，放量打出箱頂</h2>
+      <p class="entry">近 24 根把 MA7／14／25／99／120／200 黏在一起（寬度不超過 0.6%），箱體高低差不超過 1.8%，價格在 MA200 附近。然後一根放量陽線打出箱頂，收盤離 200 仍近（不超過約 0.55%）才進，不追已經直豎的那一段。量約 3 到 6.5 倍，振幅約 2 到 5 倍。</p>
+      <p class="exit">程式設目標 2R，最多抱 16 根。停損用箱體與 0.2% 緩衝，風險限制在 0.4% 到 1.8%。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m/index.html">基準</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-3d/index.html">3 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-5d/index.html">5 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d/index.html">7 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma200-squeeze-15m-7d-all/index.html">7 日全市場</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/15m-ma200-squeeze-b030/nq/ma200_squeeze.py">nq/ma200_squeeze.py</a></p>
+    </article>
+
+    <article class="card" id="bn-align" data-market="bn" data-text="15分 ma5 ma20 ma99 站上 ma200">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>15 分 5/20/99 剛排好並站上 MA200</h2>
+      <p class="entry">MA5、MA20、MA99 多頭排列，而且那根剛收盤站上 MA200 才算。四條均線寬度不超過 0.8%，MA99 與 MA200 距離不超過 0.7%，收盤離 200 仍近（不超過 1%）。已經散開的趨勢帶不算。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma-align-15m/index.html">5 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma200-squeeze-b030/docs/binance/ma-align-15m-3d/index.html">3 日</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/15m-ma200-squeeze-b030/nq/ma_align.py">nq/ma_align.py</a>。報告沒有寫停損價。</p>
+    </article>
+
+    <article class="card" id="bn-15bull" data-market="bn" data-text="15分 1小時 連三根 ma200">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分／1 小時</span></div>
+      <h2>剛站上 MA200，15 分要連 3 根</h2>
+      <p class="entry">15 分：收盤同時高於 MA7、MA25、MA200，而且 SMA7 大於 SMA25。剛站上之後連續 3 根收盤都在 MA200 上。當時 1 小時 MA25 未下彎，而且 1 小時收盤大於 MA7、大於 MA25。1 小時訊號是本根剛站上 1 小時 MA200，且 1 小時 MA25 未下彎。MA14 只畫圖，不擋單。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull.html">15 分</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma15-bull-stocks.html">15 分股票</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull.html">1 小時</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-bull-ma200-e2b2/docs/binance/ma1h-bull-stocks.html">1 小時股票</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/15m-bull-ma200-e2b2/nq/watch_ma_bull.py">nq/watch_ma_bull.py</a>。報告沒有寫停損價。</p>
+    </article>
+
+    <article class="card" id="bn-expansion" data-market="bn" data-text="15分 擴張 eth 長陽 ma200">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>MA200 附近盤整後的放量長陽</h2>
+      <p class="entry">價格先在 MA200 附近盤整，再出一根放量長陽：實體至少 0.7%、振幅至少 2.5 倍 ATR、量至少 2.5 倍、收在棒子上方 78%、創近 20 根新高。離 200 可以到 5%。下一根開盤做多。</p>
+      <p class="exit">收盤跌破 MA200 出場，最多抱 4 小時。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-15m-expansion-c066/docs/binance/expansion-15m-7d/index.html">7 日</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/binance-15m-expansion-c066/examples/scan_binance_15m_expansion.py">examples/scan_binance_15m_expansion.py</a></p>
+    </article>
+
+    <article class="card" id="bn-1m-stack" data-market="bn" data-text="一分 黏帶 ma200 sndk">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">1 分 K</span></div>
+      <h2>一分黏帶放量，連兩根站上 MA200</h2>
+      <p class="entry">短均先黏成帶，價格在 MA200 下，放量上站後連收至少 2 根站穩再進。排列是收盤大於 MA200，而且 MA200 大於 7、大於 14、大於 25、大於 99、大於 120。進場用確認根的下一根開盤。再看五分：收盤站上 5 分 MA200，MA7 大於 MA14、MA7 向上、收盤站上 5 分 MA7。</p>
+      <ul class="links">
+        <li><a href="https://yubogoodman-droid.github.io/NQ/binance/ma1m-bull.html">已上線</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-1m-ma-stack-4908/docs/binance/ma1m-bull-view.html">檢視頁</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/binance-1m-ma-stack-4908/nq/ma1m_bull.py">nq/ma1m_bull.py</a>。報告沒有寫停損價。</p>
+    </article>
+
+    <article class="card" id="bn-three-act" data-market="bn" data-text="三幕 黏帶 u底 nbis 一分">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">1 分 K</span></div>
+      <h2>圓 U 吻上黏帶，放量離開</h2>
+      <p class="entry">一分圖上圓 U 吻上 MA99／120／200 黏帶，在帶子上趴一下，再放量離開。強訊號是離開之後長均更黏、短均被帶走。主頁另外用較嚴的黏度挑出像 NBIS 截圖的幾筆。這幾頁是當下圖，不是完整的下單回測，沒有寫停損。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/binance/index.html">U 底快照</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/binance/nbis-like-1m.html">完整三幕</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/binance/three-act-5d.html">近五天離開</a></li>
+        <li><a href="https://yubogoodman-droid.github.io/NQ/charts/three-act-5d/">已上線五天圖</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/main/examples/watch_binance_ribbon.py">examples/watch_binance_ribbon.py</a></p>
+    </article>
+
+    <article class="card" id="bn-ma200-1m" data-market="bn" data-text="一分 ma5 ma10 ma20 剛站上 ma200">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">1 分 K</span></div>
+      <h2>一分 MA5/10/20 多頭，剛站上 MA200</h2>
+      <p class="entry">頁面標題只寫到這裡：1 分鐘 MA5／10／20 多頭，剛站上 MA200，標成今日回測。沒有寫停損，也沒有把「剛」定義成幾根，這張卡不補。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/binance/ma200-1m.html">今日頁</a></li>
+        <li><a href="https://yubogoodman-droid.github.io/NQ/charts/ma200-1m/">已上線目錄</a></li>
+      </ul>
+    </article>
+
+    <article class="card" id="bn-open-dump" data-market="bn" data-text="開盤瀑布 美股永續 vrt 15分">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">15 分 K</span></div>
+      <h2>美股永續開盤瀑布</h2>
+      <p class="entry">只掃幣安美股永續，美東 09:00–10:00。隔夜貼著均線盤整，開盤長陰放量摔出 MA7／14／25／99／120／200。1 小時仍在近日高，而且 MA7 小於 MA14、小於 MA25，才在訊號收盤做空。VRT 那頁是單檔快照，不是另一套規則。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/vrt-short-b741/docs/binance/ma-break-7d.html">7 日開盤窗</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/vrt-short-b741/docs/binance/ma-break-7d-allhours.html">7 日全時段</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/vrt-short-b741/docs/binance/ma-break-30d.html">30 日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/vrt-short-b741/docs/binance/vrt-short.html">VRT 快照</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/vrt-short-b741/examples/watch_binance_equity_ma_break.py">examples/watch_binance_equity_ma_break.py</a>。報告沒有寫停損價。</p>
+    </article>
+
+    <article class="card" id="bn-death" data-market="bn" data-text="orcl 死亡交叉 ma25 一分">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">1 分 K</span></div>
+      <h2>四小時新高後，同根死亡交叉並破 MA25</h2>
+      <p class="entry">對齊 ORCL 22:49 那種空：先創 4 小時新高，幾分鐘後同一根既死亡交叉又跌破 MA25。當根還要 MA7 領先夠久、高點後至少幾分鐘、從高點連陰、收在 K 棒下緣、已經離高點一段。頁面用訊號後 30 根的最低點看急殺深度，沒有另設停損單。</p>
+      <ul class="links">
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/orcl-1m-death-cross-602b/docs/binance/death-cross-1m/index.html">單日</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/orcl-1m-death-cross-602b/docs/binance/death-cross-1m-7d/index.html">7 日</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/orcl-1m-death-cross-602b/examples/watch_orcl_death_cross.py">examples/watch_orcl_death_cross.py</a></p>
+    </article>
+
+    <article class="card" id="bn-shadow" data-market="bn" data-text="影線頸線 頭肩 sma14">
+      <div class="badges"><span class="badge bn">幣安</span><span class="badge tf">5 分 K</span></div>
+      <h2>影線跌破頸線</h2>
+      <p class="entry">原始結構是低點跌破頸線，同時跌破 SMA14。實盤頁寫的是漲幅榜前 10，結構條件滿足就發通知，不看量。量能版才另加至少 2.5 倍爆量。停損沒有寫成一個固定價。</p>
+      <ul class="links">
+        <li><a href="https://yubogoodman-droid.github.io/NQ/charts/">已上線目錄</a></li>
+        <li><a href="https://yubogoodman-droid.github.io/NQ/charts/seven_day/">7 日</a></li>
+        <li><a href="https://yubogoodman-droid.github.io/NQ/charts/ten_day/">10 日</a></li>
+        <li><a href="https://yubogoodman-droid.github.io/NQ/charts/thirty_day/">30 日</a></li>
+        <li><a href="https://yubogoodman-droid.github.io/NQ/charts/strict/">嚴格</a></li>
+        <li><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/shadow-neckline-backtest-bdfc/docs/charts/index.html">原始說明</a></li>
+      </ul>
+      <p class="src">程式 <a href="https://github.com/yubogoodman-droid/NQ/blob/cursor/shadow-neckline-backtest-bdfc/scripts/shadow_neckline_logic.py">scripts/shadow_neckline_logic.py</a></p>
+    </article>
+
+    <footer>
+      <p>站內搜尋只過濾這頁的卡片。連結若指向尚未合併的分支，開啟的是該分支上的報告，不是 main。</p>
+    </footer>
+  </main>
+  <script>
+    (function () {
+      var q = document.getElementById("q");
+      var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
+      var buttons = Array.prototype.slice.call(document.querySelectorAll(".chips button"));
+      var count = document.getElementById("count");
+      var empty = document.getElementById("empty");
+      var market = "all";
+
+      function apply() {
+        var words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        var shown = 0;
+        cards.forEach(function (card) {
+          var text = (card.dataset.text + " " + card.textContent).toLowerCase();
+          var okMarket = market === "all" || card.dataset.market === market;
+          var okText = words.every(function (word) { return text.indexOf(word) !== -1; });
+          var show = okMarket && okText;
+          card.hidden = !show;
+          if (show) shown += 1;
+        });
+        count.textContent = "顯示 " + shown + " / " + cards.length + " 套";
+        empty.style.display = shown ? "none" : "block";
+      }
+
+      buttons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          market = button.dataset.market;
+          buttons.forEach(function (item) {
+            item.setAttribute("aria-pressed", item === button ? "true" : "false");
+          });
+          apply();
+        });
+      });
+      q.addEventListener("input", apply);
+      apply();
+    })();
+  </script>
+</body>
+</html>
