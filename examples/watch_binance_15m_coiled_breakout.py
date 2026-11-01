@@ -31,15 +31,18 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import csv
 import io
 import json
 import os
+import subprocess
 import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
+from html import escape
 from pathlib import Path
 from urllib.parse import quote
 
@@ -578,14 +581,37 @@ def simulate_trades(
     return trades
 
 
-def draw_chart(sym: str, d: dict, sig: BreakoutSignal, path: str) -> str | None:
-    """繪製對齊幣安配色（MA7/14/25/30/60/99/120/200）的 K 線圖並圈出起漲區。"""
+def draw_chart(
+    sym: str,
+    d: dict,
+    sig: BreakoutSignal,
+    path: str,
+    *,
+    trade: BacktestTrade | None = None,
+    trade_no: int | None = None,
+) -> str | None:
+    """繪製對齊幣安配色（MA7/14/25/30/60/99/120/200）的 K 線圖並圈出起漲區，若有 trade 則加畫進出場與停損線。"""
     try:
         import matplotlib
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        from matplotlib import font_manager
         from matplotlib.patches import Ellipse, Rectangle
+
+        for fp in (
+            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+            "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        ):
+            if Path(fp).exists():
+                font_manager.fontManager.addfont(fp)
+                plt.rcParams["font.sans-serif"] = [
+                    font_manager.FontProperties(fname=fp).get_name(),
+                    "DejaVu Sans",
+                ]
+                plt.rcParams["axes.unicode_minus"] = False
+                break
     except Exception:
         return None
 
@@ -594,7 +620,8 @@ def draw_chart(sym: str, d: dict, sig: BreakoutSignal, path: str) -> str | None:
 
     i = sig.breakout_idx
     a0 = max(0, i - 65)
-    a1 = min(len(d["c"]), i + 55)
+    right_anchor = max(i + 55, (trade.exit_idx + 12) if trade is not None else i + 55)
+    a1 = min(len(d["c"]), min(i + 140, right_anchor))
     sl = slice(a0, a1)
     xs = np.arange(a1 - a0)
     o, h, l, c, v = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["v"][sl]
@@ -602,7 +629,7 @@ def draw_chart(sym: str, d: dict, sig: BreakoutSignal, path: str) -> str | None:
     fig, (ax, axv) = plt.subplots(
         2,
         1,
-        figsize=(11.2, 6.4),
+        figsize=(11.2, 6.2),
         sharex=True,
         gridspec_kw={"height_ratios": [3.2, 1]},
         facecolor="#ffffff",
@@ -626,7 +653,6 @@ def draw_chart(sym: str, d: dict, sig: BreakoutSignal, path: str) -> str | None:
         colors_v.append("#2ebd85aa" if up else "#f6465daa")
     axv.bar(xs, v, width=0.75, color=colors_v, linewidth=0)
 
-    # 對齊幣安 App 均線顏色
     pal = {
         7: ("#e6b800", "MA(7)"),
         14: ("#2bbbad", "MA(14)"),
@@ -660,10 +686,22 @@ def draw_chart(sym: str, d: dict, sig: BreakoutSignal, path: str) -> str | None:
         zorder=6,
     )
     ax.add_patch(ellipse)
-    ax.axvline(bx, color="#2ebd85", ls="--", lw=1.0, alpha=0.8)
-    ax.scatter([bx], [c[bx]], s=42, color="#111111", zorder=7)
+    ax.axhline(sig.stop_price, color="#f6465d", ls=":", lw=1.0, alpha=0.85, label="Stop")
 
-    # X 軸時間刻度
+    if trade is not None:
+        ex = trade.entry_idx - a0
+        xx = min(len(c) - 1, trade.exit_idx - a0)
+        if 0 <= ex < len(c):
+            ax.axvline(ex, color="#2ebd85", ls="--", lw=1.0, alpha=0.85)
+            ax.scatter([ex], [trade.entry_price], s=55, color="#00a86b", marker="^", zorder=7, label="Entry")
+        if 0 <= xx < len(c):
+            xcol = "#00a86b" if trade.pnl_pct >= 0 else "#f6465d"
+            ax.axvline(xx, color=xcol, ls=":", lw=1.0, alpha=0.8)
+            ax.scatter([xx], [trade.exit_price], s=55, color=xcol, marker="x", zorder=7, label="Exit")
+    else:
+        ax.axvline(bx, color="#2ebd85", ls="--", lw=1.0, alpha=0.8)
+        ax.scatter([bx], [c[bx]], s=42, color="#111111", zorder=7)
+
     tick_step = max(1, len(xs) // 6)
     tick_idxs = list(range(0, len(xs), tick_step))
     axv.set_xticks(tick_idxs)
@@ -672,15 +710,22 @@ def draw_chart(sym: str, d: dict, sig: BreakoutSignal, path: str) -> str | None:
         fontsize=8,
     )
 
-    title = (
-        f"{sym} 15m  Breakout @ {sig.breakout_time} (C={sig.breakout_close:g}, "
-        f"7-120={sig.coil_7_120_pct:.2f}%, Vol={sig.vol_ratio:.1f}x)"
-    )
-    ax.set_title(title, color="#111111", fontsize=11, fontweight="bold")
-    ax.legend(loc="upper left", fontsize=7.5, frameon=True, facecolor="#ffffff", edgecolor="#e0e0e0", ncol=4)
+    prefix = f"#{trade_no}  " if trade_no is not None else ""
+    if trade is not None:
+        title = (
+            f"{prefix}{sym} 15m  {trade.entry_time} -> {trade.exit_time}  "
+            f"[{trade.exit_reason}]  {trade.pnl_pct:+.2f}%  (24h MFE +{trade.max_24h_pct:.1f}%)"
+        )
+    else:
+        title = (
+            f"{prefix}{sym} 15m  Breakout @ {sig.breakout_time} (C={sig.breakout_close:g}, "
+            f"7-120={sig.coil_7_120_pct:.2f}%, Vol={sig.vol_ratio:.1f}x)"
+        )
+    ax.set_title(title, color="#111111", fontsize=10.5, fontweight="bold")
+    ax.legend(loc="upper left", fontsize=7.2, frameon=True, facecolor="#ffffff", edgecolor="#e0e0e0", ncol=5)
     fig.tight_layout(pad=0.6)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=130, facecolor=fig.get_facecolor())
+    fig.savefig(path, dpi=125, facecolor=fig.get_facecolor())
     plt.close(fig)
     return path
 
@@ -757,6 +802,348 @@ def save_seen(seen: set[str]) -> None:
     SEEN_PATH.write_text(json.dumps(sorted(seen), ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _git_branch() -> str:
+    try:
+        out = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=REPO, text=True)
+        return out.strip() or "main"
+    except Exception:  # noqa: BLE001
+        return "main"
+
+
+def write_backtest_html(
+    html_path: Path,
+    *,
+    days: int,
+    universe_n: int,
+    min_qv: float,
+    params: CoiledBreakoutParams,
+    records: list[dict],
+) -> Path:
+    """輸出近 N 天回測 HTML 總結（同時產生 index.html 內嵌圖、pages.html 相對路徑圖、view.html GitHub raw 圖與 hits.json）。"""
+    out_dir = html_path.resolve().parent
+    img_dir = out_dir / "img"
+    img_dir.mkdir(parents=True, exist_ok=True)
+
+    # 統計各策略
+    b60_list = [r["t_b60"] for r in records]
+    b25_list = [r["t_b25"] for r in records]
+    f25_records = [r for r in records if r["t_f25"] is not None]
+    f25_list = [r["t_f25"] for r in f25_records]
+    f60_list = [r["t_f60"] for r in f25_records]
+
+    def _calc_stats(trs: list[BacktestTrade]) -> dict:
+        if not trs:
+            return {
+                "count": 0,
+                "wins": 0,
+                "win_rate": 0.0,
+                "total_pct": 0.0,
+                "avg_pct": 0.0,
+                "median_pct": 0.0,
+                "best_pct": 0.0,
+                "worst_pct": 0.0,
+                "u_3x": 0.0,
+                "m24_avg": 0.0,
+                "m24_med": 0.0,
+                "m48_avg": 0.0,
+                "m48_med": 0.0,
+            }
+        pnls = [t.pnl_pct for t in trs]
+        wins = sum(1 for p in pnls if p > 0)
+        m24 = [t.max_24h_pct for t in trs]
+        m48 = [t.max_48h_pct for t in trs]
+        return {
+            "count": len(trs),
+            "wins": wins,
+            "win_rate": wins / len(trs) * 100.0,
+            "total_pct": float(sum(pnls)),
+            "avg_pct": float(np.mean(pnls)),
+            "median_pct": float(np.median(pnls)),
+            "best_pct": float(max(pnls)),
+            "worst_pct": float(min(pnls)),
+            "u_3x": float(sum(pnls) * 3.0),
+            "m24_avg": float(np.mean(m24)),
+            "m24_med": float(np.median(m24)),
+            "m48_avg": float(np.mean(m48)),
+            "m48_med": float(np.median(m48)),
+        }
+
+    st_f25 = _calc_stats(f25_list)
+    st_f60 = _calc_stats(f60_list)
+    st_b60 = _calc_stats(b60_list)
+    st_b25 = _calc_stats(b25_list)
+
+    # 為 11 筆 ★強確認 繪製專屬 K 線圖卡片
+    f_cards_embed: list[str] = []
+    f_cards_rel: list[str] = []
+    for idx_no, rec in enumerate(f25_records, 1):
+        sig: BreakoutSignal = rec["sig"]
+        d: dict = rec["d"]
+        t25: BacktestTrade = rec["t_f25"]
+        t60: BacktestTrade = rec["t_f60"]
+        tb60: BacktestTrade = rec["t_b60"]
+        ts_slug = t25.entry_time.replace("-", "").replace(":", "").replace(" ", "_")[4:]
+        img_name = f"f{idx_no:02d}_{sig.symbol}_{ts_slug}.png"
+        img_path = img_dir / img_name
+        draw_chart(sig.symbol, d, sig, str(img_path), trade=t25, trade_no=idx_no)
+        b64 = base64.b64encode(img_path.read_bytes()).decode("ascii") if img_path.exists() else ""
+
+        cls25 = "pnl-win" if t25.pnl_pct >= 0 else "pnl-loss"
+        cls60 = "pnl-win" if t60.pnl_pct >= 0 else "pnl-loss"
+        card_head = (
+            "<article class='trade-card'>"
+            "<header class='card-header'>"
+            f"<div class='card-title'><span class='trade-no'>#{idx_no} · {escape(sig.symbol)}</span>"
+            f"<span class='trade-time'>突破 {escape(sig.breakout_time)} → 強確認進場 {escape(t25.entry_time)} → 出場 {escape(t25.exit_time)} (UTC+8)</span></div>"
+            f"<div class='card-pnl {cls25}'>MA25: {t25.pnl_pct:+.2f}%<br/><span class='{cls60}' style='font-size:12px'>MA60: {t60.pnl_pct:+.2f}%</span></div>"
+            "</header>"
+            f"<div class='tags'>"
+            f"<span class='tag tag-strong'>★ 第二拍強確認</span>"
+            f"<span class='tag'>7線黏度 {sig.coil_7_120_pct:.2f}%</span>"
+            f"<span class='tag'>長均簇 {sig.coil_long_pct:.2f}%</span>"
+            f"<span class='tag'>突破量 {sig.vol_ratio:.1f}x → 確認量 {sig.follow_vol_ratio or 0:.1f}x</span>"
+            f"<span class='tag'>24h最高 +{t25.max_24h_pct:.1f}%</span>"
+            f"<span class='tag'>48h最高 +{t25.max_48h_pct:.1f}%</span>"
+            f"</div>"
+            "<pre class='trade-detail'>"
+            f"第一拍突破價 {sig.breakout_close:g} (@ {sig.breakout_time})  |  第二拍確認進場 {t25.entry_price:g} (@ {t25.entry_time})\n"
+            f"防守停損價   {t25.stop_price:g} (風險 -{t25.risk_pct:.2f}%, MA200下方築底 {sig.bars_below_ma200} 根)\n"
+            f"MA25 移動停利：{t25.exit_price:g} ({t25.exit_reason})  報酬 {t25.pnl_pct:+.2f}%  |  "
+            f"MA60 移動停利：{t60.exit_price:g} ({t60.exit_reason})  報酬 {t60.pnl_pct:+.2f}%  |  "
+            f"若第一拍即進(MA60)：{tb60.pnl_pct:+.2f}%"
+            "</pre>"
+        )
+        f_cards_embed.append(
+            card_head
+            + f"<div class='mini-chart'><img src='data:image/png;base64,{b64}' alt='{escape(sig.symbol)}' style='width:100%;display:block;border-radius:10px'/></div></article>"
+        )
+        f_cards_rel.append(
+            card_head
+            + f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(sig.symbol)}' style='width:100%;display:block;border-radius:10px'/></div></article>"
+        )
+
+    # 全部 58 筆第一拍突破明細表
+    table_rows: list[str] = []
+    for k, rec in enumerate(records, 1):
+        sig = rec["sig"]
+        tb60 = rec["t_b60"]
+        tb25 = rec["t_b25"]
+        has_ft = rec["t_f25"] is not None
+        c25 = "pnl-win" if tb25.pnl_pct >= 0 else "pnl-loss"
+        c60 = "pnl-win" if tb60.pnl_pct >= 0 else "pnl-loss"
+        ft_badge = "<span class='badge-ft'>★強確認</span>" if has_ft else "<span class='badge-norm'>第一拍</span>"
+        table_rows.append(
+            "<tr>"
+            f"<td>{k}</td>"
+            f"<td><b>{escape(sig.symbol)}</b></td>"
+            f"<td>{escape(sig.breakout_time)}</td>"
+            f"<td>{ft_badge}</td>"
+            f"<td>{sig.breakout_close:g}</td>"
+            f"<td>{sig.stop_price:g} (-{tb60.risk_pct:.2f}%)</td>"
+            f"<td>{sig.coil_7_120_pct:.2f}% / {sig.coil_long_pct:.2f}%</td>"
+            f"<td>{sig.vol_ratio:.1f}x</td>"
+            f"<td>+{tb60.max_24h_pct:.1f}%</td>"
+            f"<td>+{tb60.max_48h_pct:.1f}%</td>"
+            f"<td class='{c25}'>{tb25.pnl_pct:+.2f}% <small>({escape(tb25.exit_reason)})</small></td>"
+            f"<td class='{c60}'><b>{tb60.pnl_pct:+.2f}%</b> <small>({escape(tb60.exit_reason)})</small></td>"
+            "</tr>"
+        )
+
+    now_str = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
+
+    def _build_doc(cards_html: str) -> str:
+        return f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>幣安 15m 底部七線黏帶突破 MA200 · 近 {days} 天回測總結</title>
+<style>
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}}
+.page{{max-width:920px;margin:0 auto;padding:16px 14px 40px}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:16px 18px;margin-bottom:16px}}
+h1{{font-size:20px;margin:0 0 6px;color:#f0f6fc}}
+h2{{font-size:15px;margin:18px 0 8px;color:#79c0ff}}
+.muted{{color:#8b949e;font-size:13px;line-height:1.6}}
+.cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
+.card{{background:#0d1117;padding:10px 14px;border-radius:10px;min-width:110px;border:1px solid #21262d;flex:1}}
+.card span{{font-size:12px;color:#8b949e}}
+.card b{{display:block;font-size:19px;margin-top:4px}}
+.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}}
+.card-header{{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}}
+.trade-no{{font-weight:700;font-size:15px;color:#f0f6fc}}
+.trade-time{{font-size:12px;color:#8b949e;display:block;margin-top:2px}}
+.card-pnl{{font-weight:700;text-align:right;font-size:15px}}
+.pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}} .pnl-flat{{color:#8b949e}}
+.tags{{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}}
+.tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#79c0ff;background:#0d1117}}
+.tag-strong{{border-color:#f0c14b;color:#f0c14b;font-weight:600}}
+.trade-detail{{background:#0d1117;padding:10px 12px;border-radius:10px;font-size:12px;white-space:pre-wrap;line-height:1.55;color:#c9d1d9;border:1px solid #21262d}}
+.rules{{margin:0;padding-left:1.25em;color:#c9d1d9;font-size:13px;line-height:1.68}}
+.rules li{{margin-bottom:6px}}
+code{{font-size:12px;background:#0d1117;padding:2px 5px;border-radius:4px;color:#ffab70}}
+.note{{margin-top:10px;padding:9px 12px;background:#0d1117;border-radius:8px;color:#f0c14b;font-size:12px;border:1px solid #21262d}}
+table.bt-table{{width:100%;border-collapse:collapse;font-size:12px;background:#0d1117;border-radius:10px;overflow:hidden}}
+table.bt-table th,table.bt-table td{{padding:8px 8px;border-bottom:1px solid #21262d;text-align:left}}
+table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
+.badge-ft{{background:#2d2208;color:#f0c14b;border:1px solid #f0c14b;padding:1px 6px;border-radius:999px;font-size:11px}}
+.badge-norm{{background:#161b22;color:#8b949e;border:1px solid #30363d;padding:1px 6px;border-radius:999px;font-size:11px}}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安 15m「底部七線黏帶 · 倍量穿 MA200」近 {days} 天回測總結</h1>
+<p class="muted">回測區間：近 {days} 天（約三個月） · 標的池：{universe_n} 檔流動 USDT 永續（24h 成交額 ≥ {min_qv/1e6:.0f}M USDT） · 產出時間：{escape(now_str)} (UTC+8)</p>
+
+<h2>一、圈選起漲點量化規則（對齊 ESPORTSUSDT 2026-10-31 17:30 UTC+8）</h2>
+<ol class="rules">
+<li><b>長壓築底</b>：突破前連續 <code>≥ {params.min_bars_below_ma200} 根</code> 15m K 線收在 <code>MA200</code> 下方（至少約 9 小時以上壓在生命線下洗盤築底）。</li>
+<li><b>七線極致黏帶</b>：突破前 {params.coil_lookback} 根內，<code>MA7 / 14 / 25 / 30 / 60 / 99 / 120</code> 七條均線最大帶寬 <code>≤ {params.max_coil_7_120_pct:.2f}%</code>，且底部長均線簇 <code>MA60 / 99 / 120</code> 帶寬 <code>≤ {params.max_coil_long_pct:.2f}%</code>。</li>
+<li><b>長均走平翻揚</b>：<code>MA60</code> 近 {params.slope_lookback} 根（4 小時）斜率 <code>≥ {params.min_ma60_slope_pct:+.2f}%</code>（止跌翻揚），<code>MA200</code> 斜率 <code>≥ {params.min_ma200_slope_pct:+.2f}%</code>（下彎趨緩走平）。</li>
+<li><b>短均多頭疊在長均簇上</b>：<code>MA7 &gt; MA14 &gt; MA25 ≥ MA30</code>，且 <code>MA25 &gt; max(MA60, MA99, MA120)</code>。</li>
+<li><b>第一拍「🟢 破帶穿 MA200」</b>：當根收實體紅 K（單根漲幅 <code>≥ {params.min_bar_chg_pct:.2f}%</code>、實體佔振幅 <code>≥ {params.min_body_ratio:.2f}</code>），收盤正式站上 <code>MA200</code>（離 MA200 乖離 <code>{params.min_ext_ma200_pct:.2f}% ～ {params.max_ext_ma200_pct:.2f}%</code>），且成交量 <code>≥ 20 根均量 × {params.min_vol_ratio:.1f}</code>。</li>
+<li><b>第二拍「★ 扇形展開（強確認）」</b>：突破後 <code>{params.follow_min_bars}～{params.follow_max_bars} 根</code>內不跌回 <code>MA200</code>、收盤離 <code>MA200</code> 擴大至 <code>≥ {params.follow_min_ext_ma200_pct:.2f}%</code>、量能 <code>≥ {params.follow_min_vol_ratio:.1f}x</code>，且同步站上 <code>15m MA240</code>（即 <code>1H MA60</code> 多週期共振）。</li>
+<li><b>回測出場（100% 因果無未來函數）</b>：防守停損設在「黏帶下緣 <code>stop_price</code>」（15m 收盤跌破即停損）；最高價達 <code>1.2R～1.5R</code> 後啟動移動停利（15m 收盤跌破 <code>MA25</code> 或 <code>MA60</code> 出場）。</li>
+</ol>
+<p class="note">圖例說明：黑色橢圓圈＝底部七線黏帶突破起漲區；綠色虛線＋▲＝進場；紅/綠點線＋×＝出場；紅色水平點線＝黏帶下緣停損價；8 條均線顏色完全對齊幣安 App。</p>
+
+<h2>二、四種進出場策略 · 近 {days} 天回測統計對照</h2>
+<table class="bt-table">
+<thead>
+<tr>
+<th>策略模式</th><th>筆數</th><th>勝率</th><th>累計報酬 (1x)</th><th>平均每筆</th><th>中位數</th><th>100U×3x槓桿(單利)</th><th>24h最大漲幅(均/中)</th><th>48h最大漲幅(均/中)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><b>策略 B1：第二拍 ★強確認進場 + MA25 移動停利</b></td>
+<td><b>{st_f25['count']}</b></td>
+<td class="pnl-win"><b>{st_f25['win_rate']:.1f}% ({st_f25['wins']}勝{st_f25['count']-st_f25['wins']}敗)</b></td>
+<td class="pnl-win"><b>{st_f25['total_pct']:+.2f}%</b></td>
+<td class="pnl-win"><b>{st_f25['avg_pct']:+.2f}%</b></td>
+<td class="pnl-win">{st_f25['median_pct']:+.2f}%</td>
+<td class="pnl-win"><b>{st_f25['u_3x']:+.1f} U</b></td>
+<td>+{st_f25['m24_avg']:.2f}% / +{st_f25['m24_med']:.2f}%</td>
+<td>+{st_f25['m48_avg']:.2f}% / +{st_f25['m48_med']:.2f}%</td>
+</tr>
+<tr>
+<td><b>策略 B2：第二拍 ★強確認進場 + MA60 移動停利</b></td>
+<td><b>{st_f60['count']}</b></td>
+<td class="pnl-win"><b>{st_f60['win_rate']:.1f}% ({st_f60['wins']}勝{st_f60['count']-st_f60['wins']}敗)</b></td>
+<td class="pnl-win"><b>{st_f60['total_pct']:+.2f}%</b></td>
+<td class="pnl-win"><b>{st_f60['avg_pct']:+.2f}%</b></td>
+<td class="pnl-win">{st_f60['median_pct']:+.2f}%</td>
+<td class="pnl-win"><b>{st_f60['u_3x']:+.1f} U</b></td>
+<td>+{st_f60['m24_avg']:.2f}% / +{st_f60['m24_med']:.2f}%</td>
+<td>+{st_f60['m48_avg']:.2f}% / +{st_f60['m48_med']:.2f}%</td>
+</tr>
+<tr>
+<td><b>策略 A1：第一拍突破即進場 + MA60 移動停利</b></td>
+<td><b>{st_b60['count']}</b></td>
+<td>{st_b60['win_rate']:.1f}% ({st_b60['wins']}勝{st_b60['count']-st_b60['wins']}敗)</td>
+<td class="pnl-win"><b>{st_b60['total_pct']:+.2f}%</b></td>
+<td class="pnl-win"><b>{st_b60['avg_pct']:+.2f}%</b></td>
+<td>{st_b60['median_pct']:+.2f}%</td>
+<td class="pnl-win"><b>{st_b60['u_3x']:+.1f} U</b></td>
+<td>+{st_b60['m24_avg']:.2f}% / +{st_b60['m24_med']:.2f}%</td>
+<td>+{st_b60['m48_avg']:.2f}% / +{st_b60['m48_med']:.2f}%</td>
+</tr>
+<tr>
+<td><b>策略 A2：第一拍突破即進場 + MA25 移動停利</b></td>
+<td><b>{st_b25['count']}</b></td>
+<td>{st_b25['win_rate']:.1f}% ({st_b25['wins']}勝{st_b25['count']-st_b25['wins']}敗)</td>
+<td class="pnl-win"><b>{st_b25['total_pct']:+.2f}%</b></td>
+<td class="pnl-win"><b>{st_b25['avg_pct']:+.2f}%</b></td>
+<td>{st_b25['median_pct']:+.2f}%</td>
+<td class="pnl-win"><b>{st_b25['u_3x']:+.1f} U</b></td>
+<td>+{st_b25['m24_avg']:.2f}% / +{st_b25['m24_med']:.2f}%</td>
+<td>+{st_b25['m48_avg']:.2f}% / +{st_b25['m48_med']:.2f}%</td>
+</tr>
+</tbody>
+</table>
+
+<div class="cards">
+<div class="card"><span>★強確認訊號數</span><b>{st_f25['count']} 筆</b></div>
+<div class="card"><span>★強確認勝率 (MA25)</span><b class="pnl-win">{st_f25['win_rate']:.1f}%</b></div>
+<div class="card"><span>★強確認累計 (MA60)</span><b class="pnl-win">{st_f60['total_pct']:+.2f}%</b></div>
+<div class="card"><span>第一拍總訊號數</span><b>{st_b60['count']} 筆</b></div>
+<div class="card"><span>第一拍累計 (MA60)</span><b class="pnl-win">{st_b60['total_pct']:+.2f}%</b></div>
+<div class="card"><span>第一拍 3x 槓桿獲利</span><b class="pnl-win">{st_b60['u_3x']:+.1f} U</b></div>
+</div>
+</section>
+
+<section class="summary">
+<h2>三、第二拍「★ 扇形展開（強確認）」全部 {len(f25_records)} 筆逐筆 K 線圖與明細</h2>
+</section>
+{''.join(cards_html)}
+
+<section class="summary">
+<h2>四、第一拍「🟢 破帶穿 MA200」全部 {len(records)} 筆完整歷史明細表</h2>
+<div style="overflow-x:auto">
+<table class="bt-table">
+<thead>
+<tr>
+<th>#</th><th>標的</th><th>突破時間 (UTC+8)</th><th>階段</th><th>突破價</th><th>防守價 (風險)</th><th>7線黏度 / 長均簇</th><th>倍量</th><th>24h最高</th><th>48h最高</th><th>MA25移動停利</th><th>MA60移動停利</th>
+</tr>
+</thead>
+<tbody>
+{''.join(table_rows)}
+</tbody>
+</table>
+</div>
+</section>
+</div></body></html>
+"""
+
+    html_embed = _build_doc(f_cards_embed)
+    html_rel = _build_doc(f_cards_rel)
+
+    html_path.parent.mkdir(parents=True, exist_ok=True)
+    html_path.write_text(html_embed, encoding="utf-8")
+
+    pages_path = out_dir / "pages.html"
+    pages_path.write_text(html_rel, encoding="utf-8")
+
+    try:
+        rel_dir = out_dir.relative_to(REPO).as_posix()
+    except ValueError:
+        rel_dir = out_dir.name
+    raw_base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{_git_branch()}/{rel_dir}/"
+    view_path = out_dir / "view.html"
+    view_path.write_text(html_rel.replace("src='img/", f"src='{raw_base}img/"), encoding="utf-8")
+
+    hits_json = out_dir / "hits.json"
+    hits_payload = {
+        "generated_at_tpe": now_str,
+        "days": days,
+        "universe_count": universe_n,
+        "stats": {
+            "follow_ma25": st_f25,
+            "follow_ma60": st_f60,
+            "breakout_ma60": st_b60,
+            "breakout_ma25": st_b25,
+        },
+        "signals": [
+            {
+                "symbol": r["sig"].symbol,
+                "breakout_time": r["sig"].breakout_time,
+                "breakout_close": r["sig"].breakout_close,
+                "stop_price": r["sig"].stop_price,
+                "coil_7_120_pct": r["sig"].coil_7_120_pct,
+                "coil_long_pct": r["sig"].coil_long_pct,
+                "vol_ratio": r["sig"].vol_ratio,
+                "follow_time": r["sig"].follow_time,
+                "follow_close": r["sig"].follow_close,
+                "breakout_ma25_pnl_pct": r["t_b25"].pnl_pct,
+                "breakout_ma60_pnl_pct": r["t_b60"].pnl_pct,
+                "follow_ma25_pnl_pct": r["t_f25"].pnl_pct if r["t_f25"] else None,
+                "follow_ma60_pnl_pct": r["t_f60"].pnl_pct if r["t_f60"] else None,
+            }
+            for r in records
+        ],
+    }
+    hits_json.write_text(json.dumps(hits_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return html_path
+
+
 def scan_live_symbol(sym: str, params: CoiledBreakoutParams) -> list[tuple[str, BreakoutSignal, dict]]:
     raw = fetch_klines(sym, interval="15m", limit=360, drop_forming=True)
     if raw is None:
@@ -803,6 +1190,7 @@ def main() -> int:
     p.add_argument("--plot", type=str, default="", help="輸出 K 線圖路徑（配合 --symbol 或 --scan）")
     p.add_argument("--scan", action="store_true", help="回掃全市場近期 500 根 15m K 線符合的訊號")
     p.add_argument("--backtest-days", type=int, default=0, help="回測全市場近 N 天（例如 90 代表三個月）")
+    p.add_argument("--html", type=str, default="", help="輸出回測 HTML 總結報告路徑（配合 --backtest-days）")
     p.add_argument("--min-qv", type=float, default=5_000_000, help="24h 最低成交額門檻 (USDT)")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的那一根 15m K 線後結束")
     p.add_argument("--test", action="store_true", help="測試 Telegram 推播")
@@ -879,29 +1267,50 @@ def main() -> int:
         trades_b_m25: list[BacktestTrade] = []
         trades_f_m25: list[BacktestTrade] = []
         trades_f_m60: list[BacktestTrade] = []
+        records: list[dict] = []
 
         def _bt_worker(s: str):
             raw = fetch_klines_days(s, days=days, use_cache=True)
             if raw is None:
-                return [], [], [], []
+                return [], [], [], [], []
             d = compute_indicators(raw)
             sigs = detect_signals(d, symbol=s, params=params)
             if not sigs:
-                return [], [], [], []
-            return (
-                simulate_trades(d, sigs, stage="breakout", trail_ma="m60", arm_r=1.5, max_hold_bars=288),
-                simulate_trades(d, sigs, stage="breakout", trail_ma="m25", arm_r=1.5, max_hold_bars=192),
-                simulate_trades(d, sigs, stage="follow", trail_ma="m25", arm_r=1.2, max_hold_bars=192),
-                simulate_trades(d, sigs, stage="follow", trail_ma="m60", arm_r=1.2, max_hold_bars=288),
-            )
+                return [], [], [], [], []
+            recs = []
+            b60_all, b25_all, f25_all, f60_all = [], [], [], []
+            for sig in sigs:
+                tb60 = simulate_trades(d, [sig], stage="breakout", trail_ma="m60", arm_r=1.5, max_hold_bars=288)
+                tb25 = simulate_trades(d, [sig], stage="breakout", trail_ma="m25", arm_r=1.5, max_hold_bars=192)
+                tf25 = simulate_trades(d, [sig], stage="follow", trail_ma="m25", arm_r=1.2, max_hold_bars=192)
+                tf60 = simulate_trades(d, [sig], stage="follow", trail_ma="m60", arm_r=1.2, max_hold_bars=288)
+                if not tb60 or not tb25:
+                    continue
+                b60_all.extend(tb60)
+                b25_all.extend(tb25)
+                f25_all.extend(tf25)
+                f60_all.extend(tf60)
+                recs.append(
+                    {
+                        "sig": sig,
+                        "d": d,
+                        "t_b60": tb60[0],
+                        "t_b25": tb25[0],
+                        "t_f25": tf25[0] if tf25 else None,
+                        "t_f60": tf60[0] if tf60 else None,
+                    }
+                )
+            return b60_all, b25_all, f25_all, f60_all, recs
 
         with ThreadPoolExecutor(6) as ex:
-            for b60, b25, f25, f60 in ex.map(_bt_worker, syms):
+            for b60, b25, f25, f60, recs in ex.map(_bt_worker, syms):
                 trades_b_m60.extend(b60)
                 trades_b_m25.extend(b25)
                 trades_f_m25.extend(f25)
                 trades_f_m60.extend(f60)
+                records.extend(recs)
 
+        records.sort(key=lambda r: (r["sig"].breakout_time, r["sig"].symbol))
         trades_b_m60.sort(key=lambda x: (x.entry_time, x.symbol))
         trades_b_m25.sort(key=lambda x: (x.entry_time, x.symbol))
         trades_f_m25.sort(key=lambda x: (x.entry_time, x.symbol))
@@ -937,6 +1346,17 @@ def main() -> int:
         _print_summary("策略 A2：第一拍突破即進場 + MA25 移動停利", trades_b_m25)
         _print_summary("策略 B1：第二拍 ★強確認進場 + MA25 移動停利", trades_f_m25)
         _print_summary("策略 B2：第二拍 ★強確認進場 + MA60 移動停利", trades_f_m60)
+
+        if args.html:
+            out_html = write_backtest_html(
+                Path(args.html),
+                days=days,
+                universe_n=len(syms),
+                min_qv=args.min_qv,
+                params=params,
+                records=records,
+            )
+            print(f"\n已輸出 HTML 總結報告：{out_html}")
         return 0
 
     seen = load_seen()
