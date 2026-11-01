@@ -45,6 +45,24 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## NQ 一分 K 破四小時低 → 站上 MA200
+
+對齊 2026-09-29 01:35 那波（低 30372.25）：跌破近 **4 小時低點**後，**60 根內** 1 分收盤站上 MA200 且 **MA5>10>20>30**，再等 **五分 K 也 5>10>20>30** 才進場／推 Telegram。  
+01:31 破 4h 低 → 02:03 一分條件到 → **02:20 五分排列**後才通知。停損在波段低 −12，目標 2R，**回測 30 分鐘出場**。
+
+抱滿 90 分鐘會把先走出來的利潤吐回去。改 30 分鐘後，五分 K 能拉到的最長樣本（Yahoo 約 60 天，2026-09-03 → 10-30）是 **15 筆、勝率 86.7%、+473 點**（抱 90 分鐘是 60%、+356）。09/29 仍在，30 分鐘先鎖 **+5.5**。一分 K Yahoo 只留約 30 天（這次 10/05–10/30）：**7 筆、勝率 42.9%、+107 點**；同一批若抱 90 分鐘是 **−250 點**。再早的分鐘資料沒有，做不到完整三個月。
+
+```bash
+python3 examples/nq_4h_ma200.py backtest --period 8d --pages
+python3 examples/nq_4h_ma200.py backtest --period 30d --pages
+python3 examples/nq_4h_ma200.py backtest --period 90d --pages
+python3 examples/nq_4h_ma200.py alert --dry-run --once
+python3 examples/nq_4h_ma200.py alert
+python3 examples/test_nq_4h_ma200.py
+```
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-break-bounce-365c/docs/nq-4h-ma200/view.html
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash
