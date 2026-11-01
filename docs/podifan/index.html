@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0e11" />
+  <meta name="description" content="丟 K 線截圖，辨識破底翻。你標是或不是，它會記在這台裝置上慢慢學。" />
+  <title>破底翻辨識</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b0e11;
+      --panel: #161b22;
+      --card: #1c222b;
+      --line: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --yes: #3ddc84;
+      --no: #ff6b6b;
+      --accent: #79c0ff;
+      --warn: #e3b341;
+      --nav-h: calc(62px + env(safe-area-inset-bottom, 0px));
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Noto Sans TC", -apple-system, BlinkMacSystemFont, sans-serif;
+      padding-bottom: var(--nav-h);
+    }
+    button, input, textarea { font-family: inherit; color: inherit; }
+    button { cursor: pointer; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px 24px; }
+    header.top {
+      position: sticky; top: 0; z-index: 5;
+      background: rgba(11, 14, 17, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .top-inner { max-width: 560px; margin: 0 auto; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px; }
+    h1 { margin: 0; font-size: 20px; font-weight: 900; letter-spacing: 0.02em; }
+    .sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .view { display: none; padding-top: 16px; }
+    .view.on { display: block; }
+    .drop {
+      border: 1.5px dashed #3d4654;
+      background: var(--panel);
+      border-radius: 16px;
+      min-height: 168px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; text-align: center; padding: 22px 16px;
+    }
+    .drop.over { border-color: var(--accent); background: #122033; }
+    .drop strong { font-size: 16px; }
+    .drop p { margin: 0; color: var(--muted); font-size: 13px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .btn {
+      border: 1px solid var(--line); background: var(--card); color: var(--text);
+      border-radius: 12px; padding: 12px 14px; font-size: 15px; font-weight: 700;
+    }
+    .btn.yes { background: #123524; border-color: #1f7a45; color: var(--yes); }
+    .btn.no { background: #3a1717; border-color: #8a3030; color: #ffb4b4; }
+    .btn.ghost { background: transparent; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn.block { width: 100%; }
+    .preview {
+      margin-top: 14px; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 16px; overflow: hidden;
+    }
+    .preview img { display: block; width: 100%; max-height: 420px; object-fit: contain; background: #090b0e; }
+    .card {
+      margin-top: 12px; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 16px; padding: 14px;
+    }
+    .verdict { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .verdict h2 { margin: 0; font-size: 22px; font-weight: 900; }
+    .pct { font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .pct.yes { color: var(--yes); }
+    .pct.no { color: var(--no); }
+    .pct.mid { color: var(--warn); }
+    .hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .bar { margin-top: 10px; height: 8px; border-radius: 99px; background: #0e1318; overflow: hidden; }
+    .bar > span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--no), var(--warn), var(--yes)); }
+    .cues { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .cues li { font-size: 14px; line-height: 1.45; padding-left: 22px; position: relative; }
+    .cues li::before { position: absolute; left: 0; top: 0; }
+    .cues li.ok::before { content: "✓"; color: var(--yes); }
+    .cues li.bad::before { content: "·"; color: var(--muted); }
+    label.field { display: block; margin-top: 12px; font-size: 13px; color: var(--muted); }
+    textarea, input[type="text"] {
+      width: 100%; margin-top: 6px; border-radius: 12px; border: 1px solid var(--line);
+      background: #0e1318; padding: 10px 12px; font-size: 15px; resize: vertical;
+    }
+    .spark { width: 100%; height: 72px; display: block; margin-top: 8px; }
+    .neighbors { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .neighbors figure { margin: 0; width: 108px; flex: 0 0 auto; }
+    .neighbors img, .neighbors .ph {
+      width: 108px; height: 72px; object-fit: cover; border-radius: 8px; background: #0e1318; display: block;
+    }
+    .neighbors figcaption { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .tag { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 99px; padding: 2px 6px; }
+    .tag.yes { color: var(--yes); background: #123524; }
+    .tag.no { color: #ffb4b4; background: #3a1717; }
+    .grid { display: flex; flex-direction: column; gap: 10px; }
+    .lesson {
+      display: grid; grid-template-columns: 96px 1fr auto; gap: 10px; align-items: center;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px;
+    }
+    .lesson img, .lesson .ph { width: 96px; height: 68px; object-fit: cover; border-radius: 8px; background: #0e1318; }
+    .lesson p { margin: 4px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+    .icon-x { border: 0; background: transparent; color: var(--muted); font-size: 18px; padding: 8px; }
+    .stats { display: flex; gap: 8px; }
+    .stat { flex: 1; background: var(--card); border-radius: 12px; padding: 10px; }
+    .stat b { display: block; font-size: 20px; }
+    .stat span { color: var(--muted); font-size: 12px; }
+    .empty { color: var(--muted); text-align: center; padding: 28px 8px; line-height: 1.5; }
+    nav.bottom {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      display: flex; gap: 6px; justify-content: center;
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+      background: rgba(11, 14, 17, 0.94);
+      border-top: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+    nav.bottom button {
+      flex: 1; max-width: 180px; border: 0; background: transparent; color: var(--muted);
+      border-radius: 12px; padding: 10px 8px; font-weight: 700; font-size: 14px;
+    }
+    nav.bottom button.on { background: var(--card); color: var(--text); }
+    .toast {
+      position: fixed; left: 50%; bottom: calc(var(--nav-h) + 8px); transform: translateX(-50%);
+      background: #243044; color: white; border-radius: 999px; padding: 10px 14px;
+      font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .toast.on { opacity: 1; }
+    .file { display: none; }
+    .chips { display: flex; gap: 8px; margin: 12px 0; }
+    .chips button.on { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <h1>破底翻辨識</h1>
+      <p class="sub" id="learnedLine">丟一張 K 線截圖。先猜，你再教它是或不是。</p>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="view on" id="view-scan" aria-label="辨識">
+      <div class="drop" id="drop">
+        <strong>把截圖丟這裡</strong>
+        <p>也可以貼上，或從相簿選。圖只留在這台裝置。</p>
+      </div>
+      <div class="row">
+        <button class="btn" id="pickBtn" type="button">選圖片</button>
+        <button class="btn ghost" id="demoYes" type="button">示範：像</button>
+        <button class="btn ghost" id="demoNo" type="button">示範：不像</button>
+      </div>
+      <input class="file" id="file" type="file" accept="image/*" multiple />
+      <div id="result"></div>
+    </section>
+
+    <section class="view" id="view-lessons" aria-label="教材">
+      <div class="stats" id="stats"></div>
+      <div class="chips">
+        <button class="btn on" type="button" data-filter="all">全部</button>
+        <button class="btn" type="button" data-filter="1">是破底翻</button>
+        <button class="btn" type="button" data-filter="0">不是</button>
+      </div>
+      <div class="grid" id="lessonList"></div>
+      <label class="field">口訣（可改，存在這台裝置）
+        <textarea id="rules" rows="6"></textarea>
+      </label>
+    </section>
+
+    <section class="view" id="view-backup" aria-label="備份">
+      <div class="card">
+        <p class="hint" style="margin-top:0">教材在這台瀏覽器裡。換手機或清掉網站資料就沒了，記得匯出。</p>
+        <div class="row">
+          <button class="btn" id="exportBtn" type="button">匯出 JSON</button>
+          <button class="btn" id="importBtn" type="button">匯入</button>
+        </div>
+        <input class="file" id="importFile" type="file" accept="application/json,.json" />
+        <button class="btn no block" id="wipeBtn" type="button" style="margin-top:16px">清空這台的教材</button>
+      </div>
+    </section>
+  </main>
+  <nav class="bottom">
+    <button type="button" class="on" data-view="scan">辨識</button>
+    <button type="button" data-view="lessons">教材</button>
+    <button type="button" data-view="backup">備份</button>
+  </nav>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="./learn.js"></script>
+  <script>
+    const Learn = window.PodifanLearn;
+    const DB_NAME = "podifan-learn";
+    const DB_STORE = "kv";
+
+    const state = {
+      model: Learn.createModel(),
+      rules: Learn.DEFAULT_RULES,
+      hidden: [],
+      queue: [],
+      current: null,
+      filter: "all",
+      ready: false
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function toast(text) {
+      const el = $("toast");
+      el.textContent = text;
+      el.classList.add("on");
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => el.classList.remove("on"), 2200);
+    }
+
+    function openDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    function idbGet(db, key) {
+      return new Promise((resolve, reject) => {
+        const req = db.transaction(DB_STORE, "readonly").objectStore(DB_STORE).get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    function idbSet(db, key, value) {
+      return new Promise((resolve, reject) => {
+        const req = db.transaction(DB_STORE, "readwrite").objectStore(DB_STORE).put(value, key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function persistLocal() {
+      const local = state.model.examples.filter((ex) => ex.source !== "shared");
+      await idbSet(state.db, "examples", local);
+      await idbSet(state.db, "rules", state.rules);
+      await idbSet(state.db, "hidden", state.hidden);
+    }
+
+    async function loadShared() {
+      try {
+        const res = await fetch("./memory.json", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!state.rulesCustom && data.rules) state.rules = data.rules;
+        const hidden = new Set(state.hidden);
+        const examples = (data.examples || []).filter((ex) => !hidden.has(ex.id)).map((ex) => ({
+          ...ex,
+          source: "shared"
+        }));
+        Learn.importExamples(state.model, examples);
+      } catch (err) {
+        /* 本機直接開檔時讀不到共享記憶，仍可用教材庫。 */
+      }
+    }
+
+    function counts() {
+      let pos = 0;
+      let neg = 0;
+      state.model.examples.forEach((ex) => { if (ex.label) pos += 1; else neg += 1; });
+      return { total: state.model.examples.length, pos, neg };
+    }
+
+    function refreshHeader() {
+      const c = counts();
+      $("learnedLine").textContent = c.total
+        ? `已學 ${c.total} 張（是 ${c.pos} · 不是 ${c.neg}）。圖只留在這台裝置。`
+        : "丟一張 K 線截圖。先猜，你再教它是或不是。";
+    }
+
+    function sparkline(path) {
+      if (!path || !path.length) return "";
+      const w = 320;
+      const h = 72;
+      const min = Math.min.apply(null, path);
+      const max = Math.max.apply(null, path);
+      const span = max - min || 1;
+      const pts = path.map((v, i) => {
+        const x = (i / (path.length - 1)) * (w - 8) + 4;
+        const y = 8 + (1 - (v - min) / span) * (h - 16);
+        return x.toFixed(1) + "," + y.toFixed(1);
+      }).join(" ");
+      const minI = path.indexOf(min);
+      const mx = (minI / (path.length - 1)) * (w - 8) + 4;
+      const my = 8 + (1 - (min - min) / span) * (h - 16);
+      return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+        <polyline fill="none" stroke="#79c0ff" stroke-width="2.5" points="${pts}" />
+        <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="4" fill="#ff6b6b" />
+      </svg>`;
+    }
+
+    function verdictCopy(pred) {
+      if (pred.status === "unreadable") return { title: "這張看不懂", cls: "mid" };
+      if (pred.prob >= 0.62 && pred.status !== "unsure") return { title: "像破底翻", cls: "yes" };
+      if (pred.prob <= 0.38 && pred.status !== "unsure") return { title: "不像破底翻", cls: "no" };
+      if (pred.status === "learning") return { title: "先按形狀猜", cls: "mid" };
+      return { title: "不好說", cls: "mid" };
+    }
+
+    function renderResult() {
+      const cur = state.current;
+      const host = $("result");
+      if (!cur) { host.innerHTML = ""; return; }
+      const pred = cur.pred;
+      const v = verdictCopy(pred);
+      const pct = Math.round(pred.prob * 100);
+      const c = pred.counts;
+      let extra = "";
+      if (pred.status === "learning") {
+        extra = "教材還少於 4 張，數字主要來自形狀口訣，標完會開始靠你教的圖。";
+      } else if (c.pos === 0 || c.neg === 0) {
+        extra = c.pos === 0
+          ? "還沒有「是破底翻」的教材，有些像的圖可能被看成不是。"
+          : "還沒有「不是」的教材，容易把普通圖也說成像。";
+      }
+      const cues = (pred.cues || []).map((cue) =>
+        `<li class="${cue.ok ? "ok" : "bad"}">${escapeHtml(cue.text)}</li>`
+      ).join("");
+      const neighbors = (pred.neighbors || []).map((n) => {
+        const img = n.thumb
+          ? `<img src="${n.thumb}" alt="" />`
+          : `<div class="ph"></div>`;
+        return `<figure>${img}<figcaption><span class="tag ${n.label ? "yes" : "no"}">${n.label ? "是" : "不是"}</span> ${Math.round(n.sim * 100)}%</figcaption></figure>`;
+      }).join("");
+      const queueNote = state.queue.length
+        ? `<p class="hint">後面還有 ${state.queue.length} 張。</p>` : "";
+      host.innerHTML = `
+        <div class="preview"><img src="${cur.url}" alt="準備辨識的 K 線截圖" /></div>
+        <section class="card">
+          <div class="verdict">
+            <h2>${v.title}</h2>
+            <div class="pct ${v.cls}">${pct}%</div>
+          </div>
+          <div class="bar"><span style="width:${pct}%"></span></div>
+          ${extra ? `<p class="hint">${extra}</p>` : ""}
+          ${sparkline(pred.path)}
+          ${pred.path && pred.path.length ? `<p class="hint">藍線是我從圖上讀到的價格，紅點是低點。如果這條線跟 K 線差很多，先不要教這張。</p>` : ""}
+          <ul class="cues">${cues}</ul>
+          ${neighbors ? `<p class="hint">最像的教材</p><div class="neighbors">${neighbors}</div>` : ""}
+          <label class="field">這張要記住的原因
+            <textarea id="note" rows="2" placeholder="例如：破了前低又站回 MA20">${escapeHtml(cur.note || "")}</textarea>
+          </label>
+          <div class="row">
+            <button class="btn yes" type="button" id="teachYes" ${pred.unreadable ? "disabled" : ""}>這是破底翻</button>
+            <button class="btn no" type="button" id="teachNo" ${pred.unreadable ? "disabled" : ""}>這不是</button>
+          </div>
+          ${queueNote}
+        </section>`;
+      $("teachYes").onclick = () => teach(1);
+      $("teachNo").onclick = () => teach(0);
+      $("note").oninput = (e) => { state.current.note = e.target.value; };
+    }
+
+    function escapeHtml(s) {
+      return String(s || "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+
+    async function teach(label) {
+      const cur = state.current;
+      if (!cur || cur.pred.unreadable) return;
+      const note = $("note") ? $("note").value : cur.note;
+      Learn.addExample(state.model, {
+        label,
+        note,
+        name: cur.name,
+        vector: cur.feature.vector,
+        thumb: cur.thumb,
+        source: "local"
+      });
+      await persistLocal();
+      refreshHeader();
+      renderLessons();
+      toast(label ? "已記成破底翻" : "已記成不是");
+      if (state.queue.length) await showImage(state.queue.shift());
+      else {
+        state.current = null;
+        $("result").innerHTML = `<div class="card"><p class="hint" style="margin:0">已學 ${counts().total} 張。再丟下一張，它會用你剛教的來比。</p></div>`;
+      }
+    }
+
+    function fileToImage(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => resolve({ img, url, name: file.name || "截圖" });
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("讀不到這張圖"));
+        };
+        img.src = url;
+      });
+    }
+
+    function canvasImage(canvas, name) {
+      return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => resolve({ img, url, name });
+          img.src = url;
+        }, "image/png");
+      });
+    }
+
+    function readPixels(img) {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      return { width: canvas.width, height: canvas.height, data: frame.data };
+    }
+
+    function makeThumb(img) {
+      const scale = Math.min(1, 480 / (img.naturalWidth || img.width));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
+      canvas.height = Math.max(1, Math.round((img.naturalHeight || img.height) * scale));
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/jpeg", 0.72);
+    }
+
+    async function showImage(item) {
+      if (state.current && state.current.url && state.current.url.startsWith("blob:")) {
+        URL.revokeObjectURL(state.current.url);
+      }
+      const feature = Learn.extractChartFeatures(readPixels(item.img));
+      const pred = Learn.predict(state.model, feature);
+      state.current = {
+        url: item.url,
+        name: item.name,
+        note: "",
+        thumb: makeThumb(item.img),
+        feature,
+        pred
+      };
+      renderResult();
+    }
+
+    async function ingestFiles(files) {
+      const list = Array.from(files || []).filter((f) => /^image\//.test(f.type) || !f.type);
+      if (!list.length) { toast("沒有圖片"); return; }
+      const items = [];
+      for (const file of list) {
+        try { items.push(await fileToImage(file)); }
+        catch (err) { toast("有圖讀不到，請改存 JPG 或 PNG"); }
+      }
+      if (!items.length) return;
+      const first = items.shift();
+      state.queue = state.queue.concat(items);
+      await showImage(first);
+    }
+
+    function drawDemo(kind) {
+      const w = 360;
+      const h = 220;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#0b0e11";
+      ctx.fillRect(0, 0, w, h);
+      const n = 36;
+      const prices = [];
+      const turn = Math.floor(n * 0.62);
+      for (let i = 0; i < n; i++) {
+        if (kind === "yes") {
+          prices.push(i <= turn ? 100 - i * 2.1 : 100 - turn * 2.1 + (i - turn) * 4.6);
+        } else {
+          prices.push(100 - i * 2.2);
+        }
+      }
+      const min = Math.min.apply(null, prices);
+      const max = Math.max.apply(null, prices);
+      for (let i = 0; i < n; i++) {
+        const x = 16 + (i / (n - 1)) * (w - 40);
+        const y = 16 + (1 - (prices[i] - min) / (max - min)) * 150;
+        ctx.fillStyle = i === 0 || prices[i] >= prices[i - 1] ? "#089981" : "#f23645";
+        ctx.fillRect(x, y - 2, 4, 14);
+      }
+      return canvasImage(canvas, kind === "yes" ? "示範-像破底翻.png" : "示範-只跌不翻.png");
+    }
+
+    function renderLessons() {
+      const c = counts();
+      $("stats").innerHTML = `
+        <div class="stat"><b>${c.total}</b><span>教材</span></div>
+        <div class="stat"><b>${c.pos}</b><span>是破底翻</span></div>
+        <div class="stat"><b>${c.neg}</b><span>不是</span></div>`;
+      const list = state.model.examples.filter((ex) => {
+        if (state.filter === "all") return true;
+        return String(ex.label) === state.filter;
+      }).slice().reverse();
+      const host = $("lessonList");
+      if (!list.length) {
+        host.innerHTML = `<div class="empty">還沒有教材。回辨識頁丟圖，按「這是破底翻」或「這不是」。</div>`;
+        return;
+      }
+      host.innerHTML = list.map((ex) => {
+        const img = ex.thumb ? `<img src="${ex.thumb}" alt="" />` : `<div class="ph"></div>`;
+        const when = (ex.createdAt || "").slice(0, 16).replace("T", " ");
+        return `<article class="lesson">
+          ${img}
+          <div>
+            <span class="tag ${ex.label ? "yes" : "no"}">${ex.label ? "是破底翻" : "不是"}</span>
+            <p>${escapeHtml(ex.note || ex.name || "沒有備註")}</p>
+            <p>${escapeHtml(when)}${ex.source === "shared" ? " · 內建" : ""}</p>
+          </div>
+          <button class="icon-x" type="button" data-del="${escapeHtml(ex.id)}" aria-label="刪除這張教材">×</button>
+        </article>`;
+      }).join("");
+      host.querySelectorAll("[data-del]").forEach((btn) => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute("data-del");
+          const ex = state.model.examples.find((row) => row.id === id);
+          if (!ex) return;
+          if (!confirm("刪掉這張教材？")) return;
+          if (ex.source === "shared") state.hidden.push(id);
+          Learn.removeExample(state.model, id);
+          await persistLocal();
+          refreshHeader();
+          renderLessons();
+          if (state.current) {
+            state.current.pred = Learn.predict(state.model, state.current.feature);
+            renderResult();
+          }
+        };
+      });
+    }
+
+    function showView(name) {
+      document.querySelectorAll(".view").forEach((el) => el.classList.remove("on"));
+      document.querySelectorAll("nav.bottom button").forEach((el) => {
+        el.classList.toggle("on", el.getAttribute("data-view") === name);
+      });
+      $("view-" + name).classList.add("on");
+      if (name === "lessons") {
+        $("rules").value = state.rules;
+        renderLessons();
+      }
+    }
+
+    async function boot() {
+      state.db = await openDb();
+      const savedExamples = await idbGet(state.db, "examples");
+      const savedRules = await idbGet(state.db, "rules");
+      const savedHidden = await idbGet(state.db, "hidden");
+      state.hidden = Array.isArray(savedHidden) ? savedHidden : [];
+      state.rulesCustom = typeof savedRules === "string" && savedRules.length > 0;
+      if (state.rulesCustom) state.rules = savedRules;
+      if (Array.isArray(savedExamples)) Learn.importExamples(state.model, savedExamples);
+      await loadShared();
+      $("rules").value = state.rules;
+      refreshHeader();
+      renderLessons();
+      state.ready = true;
+    }
+
+    $("pickBtn").onclick = () => $("file").click();
+    $("file").onchange = (e) => {
+      ingestFiles(e.target.files);
+      e.target.value = "";
+    };
+    $("demoYes").onclick = async () => { state.queue = []; await showImage(await drawDemo("yes")); };
+    $("demoNo").onclick = async () => { state.queue = []; await showImage(await drawDemo("no")); };
+
+    const drop = $("drop");
+    ["dragenter", "dragover"].forEach((name) => drop.addEventListener(name, (e) => {
+      e.preventDefault();
+      drop.classList.add("over");
+    }));
+    ["dragleave", "drop"].forEach((name) => drop.addEventListener(name, (e) => {
+      e.preventDefault();
+      drop.classList.remove("over");
+    }));
+    drop.addEventListener("drop", (e) => ingestFiles(e.dataTransfer.files));
+    drop.addEventListener("click", () => $("file").click());
+
+    document.addEventListener("paste", (e) => {
+      const files = [];
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type && item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      if (files.length) ingestFiles(files);
+    });
+
+    document.querySelectorAll("nav.bottom button").forEach((btn) => {
+      btn.onclick = () => showView(btn.getAttribute("data-view"));
+    });
+    document.querySelectorAll(".chips button").forEach((btn) => {
+      btn.onclick = () => {
+        state.filter = btn.getAttribute("data-filter");
+        document.querySelectorAll(".chips button").forEach((el) => el.classList.toggle("on", el === btn));
+        renderLessons();
+      };
+    });
+    $("rules").addEventListener("change", async () => {
+      state.rules = $("rules").value;
+      state.rulesCustom = true;
+      await persistLocal();
+      toast("口訣已存");
+    });
+
+    $("exportBtn").onclick = () => {
+      const payload = Learn.exportState(state.model, state.rules);
+      const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "podifan-memory.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+    $("importBtn").onclick = () => $("importFile").click();
+    $("importFile").onchange = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        const added = Learn.importExamples(state.model, data);
+        if (data.rules) {
+          state.rules = data.rules;
+          state.rulesCustom = true;
+          $("rules").value = state.rules;
+        }
+        state.model.examples.forEach((ex) => {
+          if (ex.source === "import") ex.source = "local";
+        });
+        await persistLocal();
+        refreshHeader();
+        renderLessons();
+        toast(added ? `匯入 ${added} 張` : "沒有新的教材");
+      } catch (err) {
+        toast("這個 JSON 讀不起來");
+      }
+    };
+    $("wipeBtn").onclick = async () => {
+      if (!confirm("清空這台瀏覽器裡的教材？匯出檔不會被刪。")) return;
+      state.hidden = state.hidden.concat(
+        state.model.examples.filter((ex) => ex.source === "shared").map((ex) => ex.id)
+      );
+      state.model.examples = [];
+      Learn.refit(state.model);
+      await persistLocal();
+      await loadShared();
+      refreshHeader();
+      renderLessons();
+      toast("已清空");
+    };
+
+    boot().catch((err) => {
+      console.error(err);
+      toast("教材庫開不起來");
+    });
+  </script>
+</body>
+</html>
