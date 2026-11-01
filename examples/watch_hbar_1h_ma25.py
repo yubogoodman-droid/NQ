@@ -13,6 +13,7 @@
   6. 相對拉升前箱體（高點往前 48 根、扣掉最後 10 根尖峰）再高出 ≥ 18%
   7. 收盤離 MA25 不超過 2.5%（第一根跌破，不要追低）
   8. MA25 仍在上（近 6 根至少 +1%），尖峰附近量能 ≥ 均量 1.8 倍
+  9. 右肩已被短均壓住：跌破時 MA7 比 MA14 低至少 1%，且連 4 根收在 MA14 下（過濾暴拉後直接插針洗盤）
 
 用法:
   python3 examples/watch_hbar_1h_ma25.py --test
@@ -70,6 +71,8 @@ MIN_MA25_SLOPE = 0.01
 MA25_SLOPE_BARS = 6
 MIN_VOL_RATIO = 1.8
 VOL_LOOKBACK = 12
+MIN_MA14_STREAK = 4
+MIN_MA7_BELOW_MA14 = 0.01
 TARGET_R = 2.0
 TIME_BARS = 24
 
@@ -104,6 +107,8 @@ class Params:
     require_red: bool = True
     min_vol_ratio: float = MIN_VOL_RATIO
     vol_lookback: int = VOL_LOOKBACK
+    min_ma14_streak: int = MIN_MA14_STREAK
+    min_ma7_below_ma14: float = MIN_MA7_BELOW_MA14
     target_r: float = TARGET_R
     time_bars: int = TIME_BARS
 
@@ -122,6 +127,7 @@ class Signal:
     range_break: float = 0.0
     close_below: float = 0.0
     vol_ratio: float = 0.0
+    ma7_below_ma14: float = 0.0
 
 
 @dataclass
@@ -205,12 +211,16 @@ def bars_from_raw(raw: list) -> dict | None:
         "l": np.array([float(x[3]) for x in raw]),
         "c": np.array([float(x[4]) for x in raw]),
         "v": np.array([float(x[5]) for x in raw]),
+        "qv": np.array([float(x[7]) for x in raw]) if len(raw[0]) > 7 else np.zeros(len(raw)),
     }
 
 
-def fetch_klines(sym: str, limit: int = 1500) -> dict | None:
-    raw = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": INTERVAL, "limit": limit})
-    return bars_from_raw(drop_unclosed(raw))
+def fetch_klines(sym: str, limit: int = 1500, end_ms: int | None = None) -> dict | None:
+    params: dict[str, Any] = {"symbol": sym, "interval": INTERVAL, "limit": limit}
+    if end_ms is not None:
+        params["endTime"] = end_ms
+    raw = get_json("/fapi/v1/klines", params=params)
+    return bars_from_raw(raw if end_ms is not None else drop_unclosed(raw))
 
 
 def filter_universe(
@@ -239,10 +249,10 @@ def filter_universe(
     return out
 
 
-def universe(min_quote_vol: float = MIN_QUOTE_VOL) -> list[str]:
+def universe(min_quote_vol: float = MIN_QUOTE_VOL, all_perps: bool = False) -> list[str]:
     info = get_json("/fapi/v1/exchangeInfo")
-    tickers = get_json("/fapi/v1/ticker/24hr")
-    return filter_universe(info, tickers, min_quote_vol=min_quote_vol)
+    tickers = [] if all_perps else get_json("/fapi/v1/ticker/24hr")
+    return filter_universe(info, tickers, min_quote_vol=0 if all_perps else min_quote_vol)
 
 
 def skip_overlap(trades: list[Trade]) -> list[Trade]:
@@ -387,9 +397,23 @@ def detect_at(d: dict, i: int, p: Params | None = None) -> Signal | None:
         return None
     if ma25 / float(d["m25"][slope_i]) - 1.0 < p.min_ma25_slope:
         return None
+    m7 = float(d["m7"][i]) if "m7" in d else float("nan")
+    m14 = float(d["m14"][i]) if "m14" in d else float("nan")
+    if np.isnan(m7) or np.isnan(m14):
+        return None
+    ma7_below_ma14 = (m14 - m7) / ma25
+    if ma7_below_ma14 < p.min_ma7_below_ma14:
+        return None
     peak = find_fake_peak(d, i, p)
     if peak is None:
         return None
+    if p.min_ma14_streak > 0:
+        s0 = max(peak + 1, i - p.min_ma14_streak + 1)
+        if i - s0 + 1 < p.min_ma14_streak:
+            return None
+        for k in range(s0, i + 1):
+            if np.isnan(d["m14"][k]) or float(d["c"][k]) >= float(d["m14"][k]):
+                return None
     rb = _range_break(d, peak, p)
     if rb is None or rb < p.min_range_break:
         return None
@@ -411,6 +435,7 @@ def detect_at(d: dict, i: int, p: Params | None = None) -> Signal | None:
         range_break=rb,
         close_below=close_below,
         vol_ratio=vr,
+        ma7_below_ma14=ma7_below_ma14,
     )
 
 
@@ -820,7 +845,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <h1>{escape(str(title_scope))} 1h 假突破跌破 MA25 · 近 {extra['days']} 天</h1>
 <p class="muted">對齊 2026-09-29 HBAR 箱體假突破：高點離 MA25 {extra['min_ext']*100:g}～{extra.get('max_ext', 0.4)*100:g}%，
 從箱體再高出 ≥ {extra.get('min_range_break', 0.18)*100:g}%，回落 {extra['min_fail']*100:g}～{extra.get('max_fail', 0.18)*100:g}% 後，
-隔 6～18 根、陰線剛跌破 MA25（離均線 ≤ 2.5%）才算。MA25 仍上、尖峰放量。
+隔 6～18 根、右肩連 4 根壓在 MA14 下且 MA7 死叉 MA14 ≥ 1%，陰線剛跌破 MA25（離均線 ≤ 2.5%）才算。MA25 仍上、尖峰放量。
 <br/>收盤空；停在假突破高、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。同標的重疊不重做。加總％是各筆相加。
 <br/>{scanned_line}進場 {stats['count']} · 標的 {stats.get('symbols', extra.get('symbol', ''))}
 · 出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)}
@@ -876,16 +901,27 @@ def dump_hits(path: Path, trades: list[Trade], stats: dict, extra: dict) -> Path
     return path
 
 
-def backtest_one(sym: str, days: int, p: Params, limit: int) -> tuple[str, list[Trade], int, str]:
-    raw = fetch_klines(sym, limit=limit)
+def backtest_one(
+    sym: str,
+    days: int,
+    p: Params,
+    limit: int,
+    end_ms: int | None = None,
+    min_quote_vol: float = 0.0,
+) -> tuple[str, list[Trade], int, str, bool]:
+    raw = fetch_klines(sym, limit=limit, end_ms=end_ms)
     if raw is None:
-        return sym, [], 0, "no data"
+        return sym, [], 0, "no data", False
+    if min_quote_vol > 0 and sym not in KEEP:
+        qv24 = float(np.sum(raw["qv"][-24:])) if "qv" in raw else 0.0
+        if qv24 < min_quote_vol:
+            return sym, [], 0, "", False
     d = indicators(raw)
     cutoff = int(d["t"][-1]) - days * 24 * INTERVAL_MS
     start = next((i for i, ts in enumerate(d["t"]) if int(ts) >= cutoff), 0)
     sigs = detect_signals(d, start=start, p=p)
     trades = simulate(d, sigs, p=p, symbol=sym)
-    return sym, trades, len(sigs), hm(int(d["t"][start])) + " → " + hm(int(d["t"][-1]))
+    return sym, trades, len(sigs), hm(int(d["t"][start])) + " → " + hm(int(d["t"][-1])), True
 
 
 def cmd_backtest(args) -> int:
@@ -898,28 +934,38 @@ def cmd_backtest(args) -> int:
         target_r=args.target_r,
         time_bars=args.time_bars,
     )
+    end_ms: int | None = None
+    if getattr(args, "end_date", ""):
+        dt = datetime.fromisoformat(args.end_date)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=TZ)
+        end_ms = int(dt.timestamp() * 1000)
     limit = min(1500, max(260, args.days * 24 + 220))
     if args.universe:
         print("載入標的…", flush=True)
-        symbols = universe(min_quote_vol=args.min_quote_vol)
+        symbols = universe(min_quote_vol=args.min_quote_vol, all_perps=end_ms is not None)
     else:
         symbols = [s.upper() for s in (args.symbols or [args.symbol])]
     print(f"回測 {len(symbols)} 檔 1h × {limit}，近 {args.days} 天…", flush=True)
     trades: list[Trade] = []
     raw_hits = 0
+    scanned = 0
     span = ""
     t0 = time.time()
     workers = 1 if len(symbols) == 1 else 8
+    hist_qv = args.min_quote_vol if (args.universe and end_ms is not None) else 0.0
     with ThreadPoolExecutor(workers) as ex:
-        futs = {ex.submit(backtest_one, s, args.days, p, limit): s for s in symbols}
+        futs = {ex.submit(backtest_one, s, args.days, p, limit, end_ms, hist_qv): s for s in symbols}
         done = 0
         for fut in as_completed(futs):
             done += 1
             try:
-                sym, ts, nsig, sp = fut.result()
+                sym, ts, nsig, sp, kept = fut.result()
             except Exception as e:
                 print("err", futs[fut], e, flush=True)
                 continue
+            if kept:
+                scanned += 1
             trades.extend(ts)
             raw_hits += nsig
             if sp:
@@ -940,7 +986,7 @@ def cmd_backtest(args) -> int:
         "min_range_break": p.min_range_break,
         "target_r": p.target_r,
         "time_bars": p.time_bars,
-        "scanned": len(symbols),
+        "scanned": scanned or len(symbols),
         "raw_hits": raw_hits,
         "overlap_dropped": before - len(trades),
         "start": span.split(" → ")[0] if " → " in span else "",
@@ -1047,6 +1093,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--universe", action="store_true", help="掃幣安流動 USDT 永續（全幣種）")
     p.add_argument("--min-quote-vol", type=float, default=MIN_QUOTE_VOL, help="24h 成交額門檻，預設 500 萬")
     p.add_argument("--days", type=int, default=60)
+    p.add_argument("--end-date", default="", help="回測截止時間（ISO，預設抓最新）")
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true", help="寫到 docs/…/index.html")
     p.add_argument("--symbol", default=DEFAULT_SYMBOL, help="回測代號（沒開 --universe 時）")

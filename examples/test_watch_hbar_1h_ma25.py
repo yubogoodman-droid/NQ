@@ -70,24 +70,24 @@ def _bars(
     }
 
 
-def fake_break_then_fail(n: int = 90) -> dict:
-    """長時間在 1.00，拉到高點 1.20，再收跌破 MA25，之後停在下面。"""
+def fake_break_then_fail(n: int = 100) -> dict:
+    """長時間在 1.00，拉到高點 1.21，右肩壓在 MA14 下後跌破 MA25。"""
     c = np.full(n, 1.00)
     h = c + 0.003
     l = c - 0.003
-    pump = [1.03, 1.07, 1.11, 1.14, 1.16, 1.155]
-    pump_h = [1.04, 1.09, 1.13, 1.17, 1.20, 1.17]
+    pump = [1.03, 1.07, 1.11, 1.15, 1.18, 1.17]
+    pump_h = [1.04, 1.09, 1.13, 1.17, 1.21, 1.18]
     a = 50
     for k, px in enumerate(pump):
         c[a + k] = px
         h[a + k] = pump_h[k]
         l[a + k] = px - 0.01
-    fade = [1.14, 1.12, 1.09, 1.06, 1.04]
-    fade_h = [1.15, 1.13, 1.10, 1.07, 1.05]
+    fade = [1.15, 1.13, 1.105, 1.09, 1.085, 1.08, 1.078, 1.075, 1.055]
+    fade_h = [x + 0.006 for x in fade]
     for k, px in enumerate(fade):
         c[a + 6 + k] = px
         h[a + 6 + k] = fade_h[k]
-        l[a + 6 + k] = px - 0.008
+        l[a + k + 6] = px - 0.006
     # 跌破後整段留在 MA25 下，避免再交叉
     fail_i = a + 6 + len(fade) - 1
     for k in range(fail_i + 1, n):
@@ -130,6 +130,7 @@ def test_detects_hbar_style_dump() -> None:
     assert sig.range_break >= 0.18
     assert sig.close_below <= 0.025
     assert sig.vol_ratio >= 1.8
+    assert sig.ma7_below_ma14 >= 0.01
     assert 0.15 <= sig.ext <= 0.40
     assert detect_at(d, sig.i + 1) is None
 
@@ -165,6 +166,15 @@ def test_rejects_meme_extension() -> None:
     d = fake_break_then_fail()
     peak = detect_signals(d)[0].peak_i
     d["h"][peak] = float(d["m25"][peak]) * 1.80
+    d = indicators(d)
+    assert detect_signals(d) == []
+
+
+def test_rejects_without_ma14_cap() -> None:
+    d = fake_break_then_fail()
+    sig = detect_signals(d)[0]
+    d["c"][sig.i - 1] = float(d["m14"][sig.i - 1]) + 0.01
+    d["h"][sig.i - 1] = d["c"][sig.i - 1] + 0.005
     d = indicators(d)
     assert detect_signals(d) == []
 
@@ -283,6 +293,7 @@ def main() -> int:
     test_already_below_does_not_refire()
     test_tight_ext_filter()
     test_rejects_meme_extension()
+    test_rejects_without_ma14_cap()
     test_simulate_short_and_html()
     test_filter_universe_keeps_liquid_and_hbar()
     test_skip_overlap_and_chart_pick()
