@@ -13,7 +13,8 @@
   6. 相對拉升前箱體（高點往前 48 根、扣掉最後 10 根尖峰）再高出 ≥ 18%
   7. 收盤離 MA25 不超過 2.5%（第一根跌破，不要追低）
   8. MA25 仍在上（近 6 根至少 +1%），尖峰附近量能 ≥ 均量 1.8 倍
-  9. 右肩已被短均壓住：跌破時 MA7 比 MA14 低至少 1%，且連 4 根收在 MA14 下（過濾暴拉後直接插針洗盤）
+  9. 右肩已被短均壓住：MA7 比 MA14 低至少 1%、MA14 已下彎、連 4 根收在 MA14 下且近 2 根連上影都不過 MA14 +0.5%
+ 10. 尖峰到跌破中間沒提前跌破過 MA25，且下方離 MA99 還有 ≥ 7% 空間
 
 用法:
   python3 examples/watch_hbar_1h_ma25.py --test
@@ -22,6 +23,7 @@
   python3 examples/watch_hbar_1h_ma25.py --backtest --days 60 --pages
   python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
   python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 30 --pages
+  python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 180 --pages
   python3 examples/test_watch_hbar_1h_ma25.py
 """
 from __future__ import annotations
@@ -73,6 +75,9 @@ MIN_VOL_RATIO = 1.8
 VOL_LOOKBACK = 12
 MIN_MA14_STREAK = 4
 MIN_MA7_BELOW_MA14 = 0.01
+MA14_HIGH_BARS = 2
+MAX_HIGH_ABOVE_MA14 = 0.005
+MIN_ROOM_MA99 = 0.07
 TARGET_R = 2.0
 TIME_BARS = 24
 
@@ -109,6 +114,11 @@ class Params:
     vol_lookback: int = VOL_LOOKBACK
     min_ma14_streak: int = MIN_MA14_STREAK
     min_ma7_below_ma14: float = MIN_MA7_BELOW_MA14
+    require_ma14_falling: bool = True
+    ma14_high_bars: int = MA14_HIGH_BARS
+    max_high_above_ma14: float = MAX_HIGH_ABOVE_MA14
+    require_clean_ma25: bool = True
+    min_room_ma99: float = MIN_ROOM_MA99
     target_r: float = TARGET_R
     time_bars: int = TIME_BARS
 
@@ -128,6 +138,7 @@ class Signal:
     close_below: float = 0.0
     vol_ratio: float = 0.0
     ma7_below_ma14: float = 0.0
+    room_ma99: float = 0.0
 
 
 @dataclass
@@ -177,11 +188,12 @@ def sma(a: np.ndarray, n: int) -> np.ndarray:
 
 
 def get_json(path: str, params=None, retries: int = 5):
-    last = None
+    last: Exception | None = None
     for i in range(retries):
         try:
             r = SESSION.get(BASE + path, params=params, timeout=20)
             if r.status_code == 429:
+                last = RuntimeError("HTTP 429")
                 time.sleep(1.3 * (i + 1))
                 continue
             r.raise_for_status()
@@ -189,7 +201,7 @@ def get_json(path: str, params=None, retries: int = 5):
         except Exception as e:
             last = e
             time.sleep(0.4 * (i + 1))
-    raise last
+    raise last or RuntimeError("get_json failed")
 
 
 def drop_unclosed(raw: list, now_ms: int | None = None) -> list:
@@ -215,12 +227,48 @@ def bars_from_raw(raw: list) -> dict | None:
     }
 
 
-def fetch_klines(sym: str, limit: int = 1500, end_ms: int | None = None) -> dict | None:
-    params: dict[str, Any] = {"symbol": sym, "interval": INTERVAL, "limit": limit}
-    if end_ms is not None:
-        params["endTime"] = end_ms
-    raw = get_json("/fapi/v1/klines", params=params)
-    return bars_from_raw(raw if end_ms is not None else drop_unclosed(raw))
+def fetch_klines(
+    sym: str,
+    limit: int = 1500,
+    end_ms: int | None = None,
+    min_quote_vol: float = 0.0,
+) -> dict | None:
+    rem = max(1, limit)
+    cur_end = end_ms
+    chunks: list[list] = []
+    while rem > 0:
+        req = min(1500, rem)
+        params: dict[str, Any] = {"symbol": sym, "interval": INTERVAL, "limit": req}
+        if cur_end is not None:
+            params["endTime"] = cur_end
+        raw = get_json("/fapi/v1/klines", params=params)
+        if not raw:
+            break
+        if cur_end is None:
+            raw = drop_unclosed(raw)
+        if not raw:
+            break
+        if not chunks and min_quote_vol > 0 and sym not in KEEP:
+            if len(raw) < 24 or sum(float(x[7]) for x in raw[-24:]) < min_quote_vol:
+                return None
+        chunks.append(raw)
+        rem -= len(raw)
+        if len(raw) < req - 10:
+            break
+        cur_end = int(raw[0][0]) - 1
+    if not chunks:
+        return None
+    if len(chunks) == 1:
+        return bars_from_raw(chunks[0])
+    merged = []
+    seen = set()
+    for ch in reversed(chunks):
+        for r in ch:
+            t0 = int(r[0])
+            if t0 not in seen:
+                seen.add(t0)
+                merged.append(r)
+    return bars_from_raw(merged)
 
 
 def filter_universe(
@@ -404,15 +452,35 @@ def detect_at(d: dict, i: int, p: Params | None = None) -> Signal | None:
     ma7_below_ma14 = (m14 - m7) / ma25
     if ma7_below_ma14 < p.min_ma7_below_ma14:
         return None
+    if p.require_ma14_falling:
+        if np.isnan(d["m14"][i - 1]) or m14 >= float(d["m14"][i - 1]):
+            return None
+    room_ma99 = 0.0
+    if p.min_room_ma99 > 0:
+        m99 = float(d["m99"][i]) if "m99" in d else float("nan")
+        if np.isnan(m99) or m99 <= 0:
+            return None
+        room_ma99 = (close - m99) / close
+        if room_ma99 < p.min_room_ma99:
+            return None
     peak = find_fake_peak(d, i, p)
     if peak is None:
         return None
+    if p.require_clean_ma25:
+        for k in range(peak, i):
+            if np.isnan(d["m25"][k]) or float(d["c"][k]) < float(d["m25"][k]):
+                return None
     if p.min_ma14_streak > 0:
         s0 = max(peak + 1, i - p.min_ma14_streak + 1)
         if i - s0 + 1 < p.min_ma14_streak:
             return None
         for k in range(s0, i + 1):
             if np.isnan(d["m14"][k]) or float(d["c"][k]) >= float(d["m14"][k]):
+                return None
+    if p.ma14_high_bars > 0:
+        h0 = max(peak + 1, i - p.ma14_high_bars + 1)
+        for k in range(h0, i + 1):
+            if np.isnan(d["m14"][k]) or float(d["h"][k]) > float(d["m14"][k]) * (1.0 + p.max_high_above_ma14):
                 return None
     rb = _range_break(d, peak, p)
     if rb is None or rb < p.min_range_break:
@@ -436,6 +504,7 @@ def detect_at(d: dict, i: int, p: Params | None = None) -> Signal | None:
         close_below=close_below,
         vol_ratio=vr,
         ma7_below_ma14=ma7_below_ma14,
+        room_ma99=room_ma99,
     )
 
 
@@ -845,7 +914,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <h1>{escape(str(title_scope))} 1h 假突破跌破 MA25 · 近 {extra['days']} 天</h1>
 <p class="muted">對齊 2026-09-29 HBAR 箱體假突破：高點離 MA25 {extra['min_ext']*100:g}～{extra.get('max_ext', 0.4)*100:g}%，
 從箱體再高出 ≥ {extra.get('min_range_break', 0.18)*100:g}%，回落 {extra['min_fail']*100:g}～{extra.get('max_fail', 0.18)*100:g}% 後，
-隔 6～18 根、右肩連 4 根壓在 MA14 下且 MA7 死叉 MA14 ≥ 1%，陰線剛跌破 MA25（離均線 ≤ 2.5%）才算。MA25 仍上、尖峰放量。
+隔 6～18 根、右肩連 4 根壓在 MA14 下（近 2 根上影不過 MA14 +0.5%、MA14 下彎、MA7 死叉 MA14 ≥ 1%），且離 MA99 ≥ 7%，陰線第一次跌破 MA25（離均線 ≤ 2.5%）才算。
 <br/>收盤空；停在假突破高、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。同標的重疊不重做。加總％是各筆相加。
 <br/>{scanned_line}進場 {stats['count']} · 標的 {stats.get('symbols', extra.get('symbol', ''))}
 · 出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)}
@@ -909,13 +978,9 @@ def backtest_one(
     end_ms: int | None = None,
     min_quote_vol: float = 0.0,
 ) -> tuple[str, list[Trade], int, str, bool]:
-    raw = fetch_klines(sym, limit=limit, end_ms=end_ms)
+    raw = fetch_klines(sym, limit=limit, end_ms=end_ms, min_quote_vol=min_quote_vol)
     if raw is None:
         return sym, [], 0, "no data", False
-    if min_quote_vol > 0 and sym not in KEEP:
-        qv24 = float(np.sum(raw["qv"][-24:])) if "qv" in raw else 0.0
-        if qv24 < min_quote_vol:
-            return sym, [], 0, "", False
     d = indicators(raw)
     cutoff = int(d["t"][-1]) - days * 24 * INTERVAL_MS
     start = next((i for i, ts in enumerate(d["t"]) if int(ts) >= cutoff), 0)
@@ -940,7 +1005,7 @@ def cmd_backtest(args) -> int:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=TZ)
         end_ms = int(dt.timestamp() * 1000)
-    limit = min(1500, max(260, args.days * 24 + 220))
+    limit = max(260, args.days * 24 + 220)
     if args.universe:
         print("載入標的…", flush=True)
         symbols = universe(min_quote_vol=args.min_quote_vol, all_perps=end_ms is not None)
@@ -952,7 +1017,7 @@ def cmd_backtest(args) -> int:
     scanned = 0
     span = ""
     t0 = time.time()
-    workers = 1 if len(symbols) == 1 else 8
+    workers = 1 if len(symbols) == 1 else (5 if limit > 1500 else 8)
     hist_qv = args.min_quote_vol if (args.universe and end_ms is not None) else 0.0
     with ThreadPoolExecutor(workers) as ex:
         futs = {ex.submit(backtest_one, s, args.days, p, limit, end_ms, hist_qv): s for s in symbols}
@@ -968,7 +1033,7 @@ def cmd_backtest(args) -> int:
                 scanned += 1
             trades.extend(ts)
             raw_hits += nsig
-            if sp:
+            if sp and (not span or sym == DEFAULT_SYMBOL):
                 span = sp
             if done % 40 == 0 or done == len(symbols):
                 print(f"  {done}/{len(symbols)}  訊號 {raw_hits}  {time.time()-t0:.0f}s", flush=True)

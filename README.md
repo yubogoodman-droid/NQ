@@ -90,7 +90,8 @@ python3 examples/test_tw_1h_reclaim.py
 
 - 伸 15%～40%，回落 8%～18%，隔 6～18 根
 - 相對拉升前箱體再高出 ≥ 18%
-- 右肩連 4 根收在 MA14 下，且跌破時 MA7 比 MA14 低 ≥ 1%（先死叉壓住再破 MA25）
+- 右肩壓制：連 4 根收在 MA14 下、近 2 根連上影都不過 MA14 +0.5%、MA14 已下彎、且 MA7 比 MA14 低 ≥ 1%
+- 尖峰到跌破中間沒提前跌破過 MA25，且下方離 MA99 還有 ≥ 7% 空間
 - 陰線第一根跌破 MA25（離均線 ≤ 2.5%），MA25 仍上、尖峰放量
 
 同一根 K 不重發。沒填 token 時只印在終端。
@@ -104,6 +105,7 @@ python3 examples/watch_hbar_1h_ma25.py --lookback 48 --once   # 把 09-29 那筆
 python3 examples/watch_hbar_1h_ma25.py --backtest --days 60 --pages
 python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
 python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 30 --pages
+python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 180 --pages
 ```
 
 憑證放 `tg_config.env`，或在 `examples/watch_hbar_1h_ma25.py` 最上面填 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`。
@@ -112,13 +114,17 @@ python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 30 --pages
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/hbar-1h-ma25/view.html
 
-全幣種近 1 週（流動 USDT 永續 282 檔，09-23 → 09-30）：加上右肩 MA7/MA14 壓制後 **6 筆 / 6 檔**（停損 0 筆，GRASS 那筆插針洗盤已濾掉）。已平勝率 **83.3%**，平均 **+4.51%**，加總 +27.08%。HBAR +11.10%、MARSCOIN +6.85%、ARK +5.87%、BEAT +5.64%、MET +1.10%；只虧 ACE −3.47%。
+全幣種近 1 週（流動 USDT 永續 282 檔，09-23 → 09-30）：半年版再優化後 **3 筆 / 3 檔**，全勝 **100%**（停損 0 筆），平均 **+6.02%**，加總 +18.06%。HBAR +11.10%、ARK +5.87%、MET +1.10%。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-7d/view.html
 
-全幣種近 1 個月（同一套、08-31 23:00 → 09-30 23:00）：從 41 筆（11 停損、平均 −0.61%）壓到 **19 筆 / 18 檔**（停損只剩 2 筆，濾掉 REZ −20.17%、SAGA −19.74%、NIL −19.60%、USELESS −18.10%、BR −16.06%、GRASS −14.13% 等 9 筆剛從高點急殺但 MA7 還在 MA14 上的假跌破）。已平勝率 **68.4%**，平均 **+2.69%**，加總 **+51.02%**（不做空只看訊號後 24h 平均也轉正 +2.48%）。HBAR 仍在最後一筆 **+11.10%**；最好 MARSCOIN +24.09%、4USDT +12.25%、HBAR +11.10%、ARB +9.18%、ZAMA +7.54%。
+全幣種近 1 個月（同一套、08-31 23:00 → 09-30 23:00）：從 19 筆（2 停損、平均 +2.69%）再壓到 **10 筆 / 10 檔**（停損只剩 1 筆 IOST −13.37%，把 AR −13.71% 那種連上影又戳過 MA14 的也擋掉）。已平勝率 **80.0%**，平均 **+4.13%**，加總 **+41.32%**（訊號後 +24h 平均 +3.10%）。HBAR 仍在最後一筆 **+11.10%**；最好 MARSCOIN +24.09%、HBAR +11.10%、ARB +9.18%、ARK +5.87%。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-30d/view.html
+
+全幣種近半年（同一套、04-03 23:00 → 09-30 23:00，掃 282 檔 × 4500 根 1h）：從未加右肩條件的 155 筆（26 停損、勝率 56.1%、平均 +0.40%）→ 加 MA7<MA14 的 72 筆（6 停損、勝率 63.9%、平均 +2.04%）→ 再加「離 MA99 ≥ 7% + MA14 下彎 + 近 2 根上影不過 MA14 +0.5%」後剩 **31 筆 / 30 檔**，半年只有 **1 筆停損**（30 筆時間停、1 筆停損）。已平勝率 **67.7%**，平均 **+3.60%**，加總 **+111.53%**（訊號後 +24h 平均 +3.26%）。最好 MARSCOIN +24.09%、PROM +18.47%、EDGE +14.10%、RUNE +12.15%、HBAR +11.10%、XPL +11.09%。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-180d/view.html
 
 ## 幣安黏帶三幕 Telegram
 

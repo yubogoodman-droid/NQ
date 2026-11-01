@@ -70,19 +70,20 @@ def _bars(
     }
 
 
-def fake_break_then_fail(n: int = 100) -> dict:
-    """長時間在 1.00，拉到高點 1.21，右肩壓在 MA14 下後跌破 MA25。"""
-    c = np.full(n, 1.00)
+def fake_break_then_fail(n: int = 150) -> dict:
+    """箱體整理後拉到高點 1.21，右肩壓在 MA14 下（MA14 下彎、離 MA99 ≥ 7%）後跌破 MA25。"""
+    c = np.full(n, 0.90)
+    c[50:90] = 1.00
     h = c + 0.003
     l = c - 0.003
     pump = [1.03, 1.07, 1.11, 1.15, 1.18, 1.17]
     pump_h = [1.04, 1.09, 1.13, 1.17, 1.21, 1.18]
-    a = 50
+    a = 90
     for k, px in enumerate(pump):
         c[a + k] = px
         h[a + k] = pump_h[k]
         l[a + k] = px - 0.01
-    fade = [1.15, 1.13, 1.105, 1.09, 1.085, 1.08, 1.078, 1.075, 1.055]
+    fade = [1.15, 1.13, 1.105, 1.09, 1.085, 1.08, 1.078, 1.075, 1.072, 1.055]
     fade_h = [x + 0.006 for x in fade]
     for k, px in enumerate(fade):
         c[a + 6 + k] = px
@@ -131,6 +132,7 @@ def test_detects_hbar_style_dump() -> None:
     assert sig.close_below <= 0.025
     assert sig.vol_ratio >= 1.8
     assert sig.ma7_below_ma14 >= 0.01
+    assert sig.room_ma99 >= 0.07
     assert 0.15 <= sig.ext <= 0.40
     assert detect_at(d, sig.i + 1) is None
 
@@ -177,6 +179,11 @@ def test_rejects_without_ma14_cap() -> None:
     d["h"][sig.i - 1] = d["c"][sig.i - 1] + 0.005
     d = indicators(d)
     assert detect_signals(d) == []
+
+
+def test_rejects_without_ma99_room() -> None:
+    d = fake_break_then_fail()
+    assert detect_signals(d, p=Params(min_room_ma99=0.35)) == []
 
 
 def test_simulate_short_and_html(tmp_path: Path | None = None) -> None:
@@ -294,6 +301,7 @@ def main() -> int:
     test_tight_ext_filter()
     test_rejects_meme_extension()
     test_rejects_without_ma14_cap()
+    test_rejects_without_ma99_room()
     test_simulate_short_and_html()
     test_filter_universe_keeps_liquid_and_hbar()
     test_skip_overlap_and_chart_pick()
