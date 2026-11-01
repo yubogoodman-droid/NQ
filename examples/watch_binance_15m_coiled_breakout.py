@@ -22,19 +22,26 @@
   # 回掃全市場近期符合「圈起來位置」的標的
   python3 examples/watch_binance_15m_coiled_breakout.py --scan
 
+  # 回測近 90 天（三個月）全市場績效（支援第一拍突破進場 & 第二拍強確認進場）
+  python3 examples/watch_binance_15m_coiled_breakout.py --backtest-days 90
+
   # 持續監看每根 15m 收盤並推播 Telegram（含 K 線圖）
   python3 examples/watch_binance_15m_coiled_breakout.py
 """
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
 import os
 import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 import numpy as np
 import requests
@@ -99,6 +106,26 @@ class BreakoutSignal:
     follow_close: float | None = None
     follow_ext_ma200_pct: float | None = None
     follow_vol_ratio: float | None = None
+
+
+@dataclass
+class BacktestTrade:
+    symbol: str
+    stage: str
+    entry_idx: int
+    entry_time: str
+    entry_price: float
+    stop_price: float
+    risk_pct: float
+    exit_idx: int
+    exit_time: str
+    exit_price: float
+    exit_reason: str
+    pnl_pct: float
+    max_24h_pct: float
+    max_48h_pct: float
+    coil_7_120_pct: float
+    vol_ratio: float
 
 
 def load_dotenv(path: Path = CONFIG_ENV) -> None:
@@ -186,6 +213,103 @@ def fetch_klines(sym: str, interval: str = "15m", limit: int = 500, drop_forming
         "c": np.array([float(x[4]) for x in raw], dtype=float),
         "v": np.array([float(x[5]) for x in raw], dtype=float),
     }
+
+
+CACHE_90D_DIR = Path("/tmp/binance_15m_90d_cache")
+
+
+def _parse_vision_zip(blob: bytes) -> list[tuple[int, float, float, float, float, float]]:
+    z = zipfile.ZipFile(io.BytesIO(blob))
+    text = z.read(z.namelist()[0]).decode("utf-8", errors="replace")
+    out: list[tuple[int, float, float, float, float, float]] = []
+    for row in csv.reader(io.StringIO(text)):
+        if not row or len(row) < 6 or row[0].lower().startswith("open"):
+            continue
+        try:
+            out.append(
+                (int(float(row[0])), float(row[1]), float(row[2]), float(row[3]), float(row[4]), float(row[5]))
+            )
+        except ValueError:
+            continue
+    return out
+
+
+def fetch_klines_days(sym: str, days: int = 90, use_cache: bool = True) -> dict | None:
+    """抓取近 N 天 15m K 線（自動結合 data.binance.vision 月度壓縮檔 + REST 近期 K 線，低權重快速回測）。"""
+    CACHE_90D_DIR.mkdir(parents=True, exist_ok=True)
+    cache_file = CACHE_90D_DIR / f"{sym}_{days}d.npz"
+    if use_cache and cache_file.exists() and time.time() - cache_file.stat().st_mtime < 3600:
+        z = np.load(cache_file)
+        return {k: z[k] for k in ("t", "o", "h", "l", "c", "v")}
+
+    rows_by_ts: dict[int, tuple[float, float, float, float, float]] = {}
+    now_dt = datetime.now(timezone.utc)
+    start_dt = now_dt - timedelta(days=days + 4)
+
+    # 先從 data.binance.vision 抓完整過往月份（0 API 權重）
+    qsym = quote(sym, safe="")
+    cur_y, cur_m = start_dt.year, start_dt.month
+    while (cur_y, cur_m) < (now_dt.year, now_dt.month):
+        ym = f"{cur_y:04d}-{cur_m:02d}"
+        url = f"https://data.binance.vision/data/futures/um/monthly/klines/{qsym}/15m/{qsym}-15m-{ym}.zip"
+        try:
+            r = SESSION.get(url, timeout=15)
+            if r.status_code == 200 and r.content[:2] == b"PK":
+                for ts, o, h, l, c, v in _parse_vision_zip(r.content):
+                    rows_by_ts[ts] = (o, h, l, c, v)
+        except Exception:  # noqa: BLE001
+            pass
+        if cur_m == 12:
+            cur_y, cur_m = cur_y + 1, 1
+        else:
+            cur_m += 1
+
+    # 再用 REST 補齊最近尚未出月度檔的區間
+    end_ms = int(time.time() * 1000)
+    if rows_by_ts:
+        target_start_ms = max(rows_by_ts.keys()) + 15 * 60_000
+    else:
+        target_start_ms = int(start_dt.timestamp() * 1000)
+
+    while end_ms >= target_start_ms:
+        r = SESSION.get(
+            BASE + "/fapi/v1/klines",
+            params={"symbol": sym, "interval": "15m", "limit": 1000, "endTime": end_ms},
+            timeout=20,
+        )
+        if r.status_code in (429, 418):
+            time.sleep(2.5)
+            continue
+        if not r.ok:
+            break
+        chunk = r.json()
+        if not chunk:
+            break
+        for x in chunk:
+            rows_by_ts[int(x[0])] = (float(x[1]), float(x[2]), float(x[3]), float(x[4]), float(x[5]))
+        first_ts = int(chunk[0][0])
+        if first_ts <= target_start_ms or len(chunk) < 1000:
+            break
+        end_ms = first_ts - 1
+
+    if len(rows_by_ts) < 250:
+        return None
+    now_ms = int(time.time() * 1000)
+    cutoff_ms = int(start_dt.timestamp() * 1000)
+    sorted_ts = [ts for ts in sorted(rows_by_ts.keys()) if ts >= cutoff_ms and ts + 15 * 60_000 <= now_ms]
+    if len(sorted_ts) < 250:
+        return None
+    d = {
+        "t": np.array(sorted_ts, dtype=np.int64),
+        "o": np.array([rows_by_ts[ts][0] for ts in sorted_ts], dtype=float),
+        "h": np.array([rows_by_ts[ts][1] for ts in sorted_ts], dtype=float),
+        "l": np.array([rows_by_ts[ts][2] for ts in sorted_ts], dtype=float),
+        "c": np.array([rows_by_ts[ts][3] for ts in sorted_ts], dtype=float),
+        "v": np.array([rows_by_ts[ts][4] for ts in sorted_ts], dtype=float),
+    }
+    if use_cache:
+        np.savez_compressed(cache_file, **d)
+    return d
 
 
 def compute_indicators(d: dict) -> dict:
@@ -366,6 +490,92 @@ def detect_signals(
                 break
         signals.append(sig)
     return signals
+
+
+def simulate_trades(
+    d: dict,
+    signals: list[BreakoutSignal],
+    *,
+    stage: str = "breakout",
+    trail_ma: str = "m60",
+    arm_r: float = 1.5,
+    max_hold_bars: int = 288,
+) -> list[BacktestTrade]:
+    """回測模擬出場（100% 因果無未來函數）：
+    - stage="breakout"：在第一拍突破收盤 (breakout_idx) 進場
+    - stage="follow"：在第二拍扇形展開確認收盤 (follow_idx) 進場
+    - 出場規則：
+      1) 15m 收盤跌破黏帶下緣防守價 stop_price → 停損 (stop)
+      2) 最高價曾達 >= entry + arm_r * risk 後，15m 收盤跌破 trail_ma (預設 MA60) → 移動停利 (trail_m60)
+      3) 持有滿 max_hold_bars (預設 288 根 = 72h) → 到期出場 (time)
+    """
+    if "m200" not in d:
+        d = compute_indicators(d)
+    c, h = d["c"], d["h"]
+    ma_arr = d[trail_ma]
+    trades: list[BacktestTrade] = []
+
+    for sig in signals:
+        if stage == "follow":
+            if sig.follow_idx is None or sig.follow_close is None or sig.follow_time is None:
+                continue
+            entry_idx = sig.follow_idx
+            entry_px = sig.follow_close
+            entry_time = sig.follow_time
+        else:
+            entry_idx = sig.breakout_idx
+            entry_px = sig.breakout_close
+            entry_time = sig.breakout_time
+
+        stop_px = sig.stop_price
+        risk = entry_px - stop_px
+        if risk <= 0 or entry_idx >= len(c) - 1:
+            continue
+        risk_pct = float(risk / entry_px * 100.0)
+
+        end24 = min(len(c), entry_idx + 97)
+        end48 = min(len(c), entry_idx + 193)
+        max_24h_pct = float((h[entry_idx + 1 : end24].max() / entry_px - 1.0) * 100.0) if entry_idx + 1 < end24 else 0.0
+        max_48h_pct = float((h[entry_idx + 1 : end48].max() / entry_px - 1.0) * 100.0) if entry_idx + 1 < end48 else 0.0
+
+        armed = False
+        limit = min(len(c) - 1, entry_idx + max_hold_bars)
+        exit_idx = limit
+        exit_px = float(c[limit])
+        exit_reason = "time"
+
+        for k in range(entry_idx + 1, limit + 1):
+            if c[k] < stop_px:
+                exit_idx, exit_px, exit_reason = k, float(c[k]), "stop"
+                break
+            if h[k] >= entry_px + arm_r * risk:
+                armed = True
+            if armed and not np.isnan(ma_arr[k]) and c[k] < ma_arr[k]:
+                exit_idx, exit_px, exit_reason = k, float(c[k]), f"trail_{trail_ma}"
+                break
+
+        pnl_pct = float((exit_px / entry_px - 1.0) * 100.0)
+        trades.append(
+            BacktestTrade(
+                symbol=sig.symbol,
+                stage=stage,
+                entry_idx=entry_idx,
+                entry_time=entry_time,
+                entry_price=entry_px,
+                stop_price=stop_px,
+                risk_pct=risk_pct,
+                exit_idx=exit_idx,
+                exit_time=hm(int(d["t"][exit_idx])),
+                exit_price=exit_px,
+                exit_reason=exit_reason,
+                pnl_pct=pnl_pct,
+                max_24h_pct=max_24h_pct,
+                max_48h_pct=max_48h_pct,
+                coil_7_120_pct=sig.coil_7_120_pct,
+                vol_ratio=sig.vol_ratio,
+            )
+        )
+    return trades
 
 
 def draw_chart(sym: str, d: dict, sig: BreakoutSignal, path: str) -> str | None:
@@ -592,6 +802,7 @@ def main() -> int:
     p.add_argument("--symbol", type=str, default="", help="指定單一標的回掃（如 ESPORTSUSDT）")
     p.add_argument("--plot", type=str, default="", help="輸出 K 線圖路徑（配合 --symbol 或 --scan）")
     p.add_argument("--scan", action="store_true", help="回掃全市場近期 500 根 15m K 線符合的訊號")
+    p.add_argument("--backtest-days", type=int, default=0, help="回測全市場近 N 天（例如 90 代表三個月）")
     p.add_argument("--min-qv", type=float, default=5_000_000, help="24h 最低成交額門檻 (USDT)")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的那一根 15m K 線後結束")
     p.add_argument("--test", action="store_true", help="測試 Telegram 推播")
@@ -658,6 +869,74 @@ def main() -> int:
             )
             if args.plot and sig.symbol == "ESPORTSUSDT":
                 draw_chart(sig.symbol, d, sig, args.plot)
+        return 0
+
+    if args.backtest_days > 0:
+        days = args.backtest_days
+        syms = universe(args.min_qv)
+        print(f"回測全市場 {len(syms)} 檔 USDT 永續（近 {days} 天 15m K 線）…", flush=True)
+        trades_b_m60: list[BacktestTrade] = []
+        trades_b_m25: list[BacktestTrade] = []
+        trades_f_m25: list[BacktestTrade] = []
+        trades_f_m60: list[BacktestTrade] = []
+
+        def _bt_worker(s: str):
+            raw = fetch_klines_days(s, days=days, use_cache=True)
+            if raw is None:
+                return [], [], [], []
+            d = compute_indicators(raw)
+            sigs = detect_signals(d, symbol=s, params=params)
+            if not sigs:
+                return [], [], [], []
+            return (
+                simulate_trades(d, sigs, stage="breakout", trail_ma="m60", arm_r=1.5, max_hold_bars=288),
+                simulate_trades(d, sigs, stage="breakout", trail_ma="m25", arm_r=1.5, max_hold_bars=192),
+                simulate_trades(d, sigs, stage="follow", trail_ma="m25", arm_r=1.2, max_hold_bars=192),
+                simulate_trades(d, sigs, stage="follow", trail_ma="m60", arm_r=1.2, max_hold_bars=288),
+            )
+
+        with ThreadPoolExecutor(6) as ex:
+            for b60, b25, f25, f60 in ex.map(_bt_worker, syms):
+                trades_b_m60.extend(b60)
+                trades_b_m25.extend(b25)
+                trades_f_m25.extend(f25)
+                trades_f_m60.extend(f60)
+
+        trades_b_m60.sort(key=lambda x: (x.entry_time, x.symbol))
+        trades_b_m25.sort(key=lambda x: (x.entry_time, x.symbol))
+        trades_f_m25.sort(key=lambda x: (x.entry_time, x.symbol))
+        trades_f_m60.sort(key=lambda x: (x.entry_time, x.symbol))
+
+        print(f"\n=== 【二階段 ★強確認進場】明細（近 {days} 天，共 {len(trades_f_m25)} 筆）===")
+        for t25, t60 in zip(trades_f_m25, trades_f_m60):
+            print(
+                f"  {t25.entry_time} | {t25.symbol:14s} | 進:{t25.entry_price:<9g} 防守:{t25.stop_price:<9g} "
+                f"(風險 {t25.risk_pct:.2f}%) | 24h最高:+{t25.max_24h_pct:5.1f}% 48h最高:+{t25.max_48h_pct:5.1f}% | "
+                f"MA25出場:{t25.pnl_pct:+6.2f}%({t25.exit_reason}) | MA60出場:{t60.pnl_pct:+6.2f}%({t60.exit_reason})"
+            )
+
+        def _print_summary(title: str, trs: list[BacktestTrade]) -> None:
+            if not trs:
+                return
+            pnls = [t.pnl_pct for t in trs]
+            wins = sum(1 for p in pnls if p > 0)
+            m24 = [t.max_24h_pct for t in trs]
+            m48 = [t.max_48h_pct for t in trs]
+            print(f"\n📊 {title}（共 {len(trs)} 筆）")
+            print(
+                f"  • 勝率：{wins}/{len(trs)} ({wins / len(trs) * 100:.1f}%) | "
+                f"累計報酬：{sum(pnls):+.2f}% | 平均每筆：{np.mean(pnls):+.2f}% "
+                f"（100U 保證金 × 3x 槓桿單利 = {sum(pnls) * 3:+.1f}U）"
+            )
+            print(
+                f"  • 爆發力：24h 最大漲幅平均 +{np.mean(m24):.2f}%（中位數 +{np.median(m24):.2f}%） | "
+                f"48h 最大漲幅平均 +{np.mean(m48):.2f}%（中位數 +{np.median(m48):.2f}%）"
+            )
+
+        _print_summary("策略 A1：第一拍突破即進場 + MA60 移動停利", trades_b_m60)
+        _print_summary("策略 A2：第一拍突破即進場 + MA25 移動停利", trades_b_m25)
+        _print_summary("策略 B1：第二拍 ★強確認進場 + MA25 移動停利", trades_f_m25)
+        _print_summary("策略 B2：第二拍 ★強確認進場 + MA60 移動停利", trades_f_m60)
         return 0
 
     seen = load_seen()

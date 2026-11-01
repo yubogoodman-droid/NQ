@@ -8,6 +8,7 @@ from examples.watch_binance_15m_coiled_breakout import (
     compute_indicators,
     detect_signals,
     follow_through_at,
+    simulate_trades,
 )
 
 
@@ -73,3 +74,15 @@ def test_detect_signals_rejects_low_volume_breakout():
     d = compute_indicators(d)
     sigs = detect_signals(d, symbol="ESPORTSUSDT")
     assert all(s.breakout_idx != 235 for s in sigs)
+
+
+def test_simulate_trades_breakout_and_follow():
+    d = _make_synthetic_esports_data()
+    sigs = detect_signals(d, symbol="ESPORTSUSDT")
+    assert len(sigs) == 1
+    trades_b = simulate_trades(d, sigs, stage="breakout", trail_ma="m25", arm_r=1.2)
+    trades_f = simulate_trades(d, sigs, stage="follow", trail_ma="m25", arm_r=1.2)
+    assert len(trades_b) == 1
+    assert len(trades_f) == 1
+    assert trades_b[0].pnl_pct > 0
+    assert trades_f[0].pnl_pct > 0
