@@ -107,6 +107,8 @@ python3 examples/watch_tw_1h_reclaim.py --workers 1 --sleep 0.18
 
 勝率優化（下面待滿 21 根）：訓練 53.8%→61.4%、驗證 41.9%→57.9%，但 10/17～10/30 是 17.1%→16.2%，沒有採用，監看預設不變。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-telegram-watcher-935b/docs/tw-1h-reclaim-winrate-20261031/view.html
 
+半年（2026-05～10）：前半年挑出「1R + 加權 1h 站上 MA20 + 深度 ≥ 10%」。這半年勝率 51.7%→64.5%、平均 +1.58%→+2.70%，但 9 月、10 月沒有比較好，監看預設不變。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-telegram-watcher-935b/docs/tw-1h-reclaim-halfyear-202605-1030/view.html
+
 ```bash
 python3 examples/watch_tw_1h_reclaim.py --dry-run --once --market-filter daily-ma20
 ```
