@@ -62,6 +62,7 @@ INVERSE_SYMBOLS = frozenset({
     "SKDDUSDT",  # 放空 SK hynix 槓桿
     "TBTUSDT",   # -2x 20Y+ 美債
     "TZAUSDT",   # -3x Russell 2000
+    "NVDUSDT",   # -2x NVDA (GraniteShares 2x Short NVDA Daily ETF on BingX)
 })
 # 波動率商品（做多 VIX 期貨，對股市反向、長期衰減）；--exclude-vol 另外拿掉。
 VOL_SYMBOLS = frozenset({"UVXYUSDT"})
@@ -82,7 +83,7 @@ M5_MAX_PEAK_SEP = 24
 M5_RIGHT_OVERSHOOT = 0.003
 M5_MIN_NECK_DEPTH = 0.015
 M5_HH_TOL = 0.003
-M5_ARM_R = 1.5
+M5_ARM_R = 1.2
 M5_MIN_BREAK_PCT = 0.01
 
 
@@ -938,6 +939,14 @@ def detect_signals(
     h4_drop_bars: int = 24,
     max_entry_ext_atr: float = 0.0,
     max_overhead_knot_atr: float = 0.0,
+    min_entry_vol: float = 0.0,
+    require_ma7_above_ma14: bool = False,
+    min_overhead_ma_atr: float = 0.0,
+    h4_max_ma_rise_pct: float = 999.0,
+    h4_ma60_max_rise_pct: float = 999.0,
+    h4_ma60_bars: int = 12,
+    min_entry_rng_pct: float = 0.0,
+    exclude_weekend: bool = False,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """1h 跌破 MA25，做出 W、收盤站回後，等回測 MA25 再進。max_stack_wait 只留給舊呼叫。
@@ -1137,10 +1146,29 @@ def detect_signals(
                 i = reclaim
                 continue
 
-        if h4_max_ma_drop_pct > 0:
+        if h4_max_ma_drop_pct > 0 or h4_max_ma_rise_pct < 900.0:
             drop = h4_ma_slope_pct(df, entry_idx, ma_period=h4_drop_ma, bars=h4_drop_bars)
-            if np.isfinite(drop) and drop < -float(h4_max_ma_drop_pct):
+            if h4_max_ma_drop_pct > 0 and np.isfinite(drop) and drop < -float(h4_max_ma_drop_pct):
                 bump("h4_ma_drop")
+                i = reclaim
+                continue
+            if h4_max_ma_rise_pct < 900.0 and np.isfinite(drop) and drop > float(h4_max_ma_rise_pct):
+                bump("h4_ma_rise")
+                i = reclaim
+                continue
+
+        if h4_ma60_max_rise_pct < 900.0:
+            s60 = h4_ma_slope_pct(df, entry_idx, ma_period=60, bars=h4_ma60_bars)
+            if np.isfinite(s60) and s60 > float(h4_ma60_max_rise_pct):
+                bump("h4_ma60_rise")
+                i = reclaim
+                continue
+
+        if min_entry_rng_pct > 0:
+            lo_e = float(low[entry_idx])
+            hi_e = float(high[entry_idx])
+            if lo_e <= 0 or (hi_e / lo_e - 1.0) * 100.0 < float(min_entry_rng_pct):
+                bump("narrow_entry")
                 i = reclaim
                 continue
 
@@ -1166,6 +1194,17 @@ def detect_signals(
             i = reclaim
             continue
 
+        if exclude_weekend:
+            ts_e = df.index[entry_idx]
+            ts_tpe = ts_e.tz_convert(TPE) if getattr(ts_e, "tzinfo", None) is not None else ts_e
+            dow = ts_tpe.weekday()
+            hr = ts_tpe.hour
+            # 美股週五盤後於台北週六 08:00 結束，至週一 08:00 亞股/美股夜盤開盤前為週末休市
+            if (dow == 5 and hr >= 8) or (dow == 6) or (dow == 0 and hr < 8):
+                bump("weekend")
+                i = reclaim
+                continue
+
         if max_entry_ext_atr > 0 and np.isfinite(atr_e) and atr_e > 0 and np.isfinite(m25_e):
             if (entry - m25_e) / atr_e > float(max_entry_ext_atr):
                 bump("entry_ext")
@@ -1180,8 +1219,30 @@ def detect_signals(
                 i = reclaim
                 continue
 
+        if min_overhead_ma_atr > 0 and np.isfinite(atr_e) and atr_e > 0:
+            m60_e = float(ma60[entry_idx]) if entry_idx < len(ma60) else float("nan")
+            m200_e = float(ma200[entry_idx]) if entry_idx < len(ma200) else float("nan")
+            ceils = [mv for mv in (m60_e, m99_e, m120_e, m200_e) if np.isfinite(mv) and mv > entry]
+            if ceils and min((mv - entry) / atr_e for mv in ceils) < float(min_overhead_ma_atr):
+                bump("overhead_ceil")
+                i = reclaim
+                continue
+
         vol_avg = float(np.mean(volume[max(0, entry_idx - vol_lookback) : entry_idx]) or 1.0)
         vol_ratio = float(volume[entry_idx] / vol_avg) if vol_avg > 0 else 1.0
+        if min_entry_vol > 0 and vol_ratio < float(min_entry_vol):
+            bump("quiet_entry")
+            i = reclaim
+            continue
+
+        if require_ma7_above_ma14:
+            m7_e = float(ma7[entry_idx]) if entry_idx < len(ma7) else float("nan")
+            m14_e = float(ma14[entry_idx]) if entry_idx < len(ma14) else float("nan")
+            if not (np.isfinite(m7_e) and np.isfinite(m14_e) and m7_e > m14_e):
+                bump("ma7_below_ma14")
+                i = reclaim
+                continue
+
         shape = classify_shape(low, high, start, end)
         if w_pts is not None:
             shape = "W"
@@ -1372,6 +1433,7 @@ def simulate(
     lose_ma_closes: int = 0,
     df_5m: Optional[pd.DataFrame] = None,
     m5_exit: Optional[bool] = None,
+    m5_arm_r: float = M5_ARM_R,
 ) -> List[TradeResult]:
     use_m5 = bool(m5_exit) if m5_exit is not None else df_5m is not None
     close = df["Close"].to_numpy(float)
@@ -1400,7 +1462,7 @@ def simulate(
             risk = float(entry) - float(stop)
             arm_after = None
             if risk > 0:
-                thresh = float(entry) + M5_ARM_R * risk
+                thresh = float(entry) + float(m5_arm_r) * risk
                 for k0 in range(entry_idx, limit + 1):
                     if float(close[k0]) >= thresh:
                         arm_after = pd.Timestamp(idx[k0]) + pd.Timedelta(hours=1)
@@ -1414,6 +1476,7 @@ def simulate(
                     stop_price=stop,
                     end_ts=end_ts,
                     arm_after_ts=arm_after,
+                    arm_r=float(m5_arm_r),
                 )
 
         for k in range(entry_idx + 1, limit + 1):
@@ -1736,25 +1799,46 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
             fontweight="bold",
         )
     if 0 <= xx < len(window):
-        ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
+        exit_col = "#0284c7" if trade.pnl_pct >= 0 else "#dc2626"
+        ax.axvline(xx, color=exit_col, ls="--", lw=1.0, alpha=0.85)
         ax.scatter(
             [xx],
             [trade.exit_price],
-            s=40,
+            s=46,
             color="#00c805" if trade.pnl_pct > 0 else "#ff5252",
-            marker="x",
+            marker="v",
             zorder=6,
         )
+        ax.scatter(
+            [xx],
+            [trade.exit_price],
+            s=220,
+            facecolors="none",
+            edgecolors=exit_col,
+            linewidths=2.4,
+            zorder=7,
+        )
+        held_bars = max(0, int(trade.exit_idx - trade.entry_idx))
         if trade.exit_reason in {"m5_neck", "m5_m"}:
-            ax.annotate(
-                "M破頸",
-                (xx, trade.exit_price),
-                textcoords="offset points",
-                xytext=(8, -12),
-                ha="left",
-                color="#c2410c",
-                fontsize=8,
-            )
+            exit_lbl = "出·M破頸"
+        elif trade.exit_reason == "stop":
+            exit_lbl = "出·停損"
+        elif trade.exit_reason == "target":
+            exit_lbl = "出·停利"
+        elif trade.exit_reason == "lost_ma25":
+            exit_lbl = "出·掉MA25"
+        else:
+            exit_lbl = f"出·{held_bars}h"
+        ax.annotate(
+            exit_lbl,
+            (xx, trade.exit_price),
+            textcoords="offset points",
+            xytext=(10, -14),
+            ha="left",
+            color=exit_col,
+            fontsize=9,
+            fontweight="bold",
+        )
 
     et = df.index[trade.entry_idx]
     xt = df.index[trade.exit_idx]
@@ -1804,7 +1888,7 @@ def draw_trade_png(df: pd.DataFrame, trade: TradeResult, path: Path, trade_no: i
         for ts, col, mark in (
             (df.index[sig.break_idx], "#f472b6", "破底"),
             (et, "#00c853", "回測"),
-            (xt, "#f0c14b", None),
+            (xt, "#0284c7", "出"),
         ):
             px = _loc_on_tf(w4.index, ts)
             if px is not None:
@@ -1902,6 +1986,7 @@ def write_html_report(
     strict: bool = False,
     m5_exit: bool = True,
     lose_ma_closes: int = 0,
+    max_hold: int = 36,
 ) -> Path:
     stats = all_stats or summarize_trades([h.trade for h in hits])
     cards: List[str] = []
@@ -1939,9 +2024,9 @@ def write_html_report(
             )
         if m5_exit or t.exit_reason in {"m5_neck", "m5_m"}:
             if lose_ma_closes > 0:
-                tgt_line = f"出場 五分 M 破頸線（無 2R；備援 MA25×{lose_ma_closes} / 36h）"
+                tgt_line = f"出場 五分 M 破頸線（無 2R；備援 MA25×{lose_ma_closes} / {max_hold}h）"
             else:
-                tgt_line = "出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；36h）"
+                tgt_line = f"出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；{max_hold}h）"
         else:
             tgt_line = f"target {t.target_price:.6g}  ({r_mult:.1f}R)"
         exit_line = f"exit  {t.exit_price:.6g}  {t.exit_reason}"
@@ -1951,7 +2036,7 @@ def write_html_report(
                 xt5 = xt5.tz_convert(TPE)
             exit_line += f"  5m {xt5.strftime('%m-%d %H:%M')}"
         cards.append(
-            "<article class='trade-card'>"
+            "<article class='trade-card' id='t" + str(i) + "'>"
             "<header class='card-header'>"
             f"<div class='card-title'><span class='trade-no'>#{i} · {escape(hit.symbol)} · Q{escape(t.quality)} · {escape(t.signal.shape)}</span>"
             f"<span class='trade-time'>{escape(et.strftime('%Y-%m-%d %H:%M'))} → {escape(xt.strftime('%m-%d %H:%M'))}</span></div>"
@@ -1993,7 +2078,9 @@ def write_html_report(
             f"破底在MA200上 {funnel.get('above_ma200', 0)} · "
             f"破底沒放量 {funnel.get('quiet_break', 0)} · "
             f"追價 {funnel.get('entry_ext', 0)} · "
-            f"頭上均線結 {funnel.get('overhead_knot', 0)}）</p>"
+            f"頭上均線結 {funnel.get('overhead_knot', 0)} · "
+            f"進場縮量 {funnel.get('quiet_entry', 0)} · "
+            f"MA7未過MA14 {funnel.get('ma7_below_ma14', 0)}）</p>"
         )
     q_bits = [f"Q{q} {info['n']}筆 {info['pnl']:+.2f}%" for q, info in stats.get("by_quality", {}).items()]
     total_cls = "pnl-win" if stats["total_pct"] >= 0 else "pnl-loss"
@@ -2034,7 +2121,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>幣安 1h · MA25 下破底再站上（{'嚴格 · 筆畫 W' if strict else '寬鬆'}）</h1>
 <p class="muted">近 {days} 天 · 掃 {scanned} 檔 U 本位永續 · 均線對齊你那兩張手機圖：黃7 / 青14 / 粉25 / 紫99 / 綠120 / 酒紅200<br/>
-{'嚴格版 · 在下至少 10 小時、急殺破底。圖上藍線照手機畫法：摔到破底、彈起、回踩 MA25、再往上。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%、破前低 ≥ 1.4%（影線輕點不算）。'}破底後先收盤站回 MA25，離開均線後回測吻到再進（沒回測就放棄）。圖上藍線是筆畫 W。停損＝收盤跌破破底低點（影線不算）。{'出場＝五分 M 破頸。' if m5_exit else '目標 2R。'}{'不再用連兩根掉 MA25。' if lose_ma_closes <= 0 else f'備援連 {lose_ma_closes} 根收盤掉 MA25。'}最長 36h。每張卡底下附 4h K 對照。{card_note}</p>
+{'嚴格版 · 在下至少 10 小時、急殺破底。圖上藍線照手機畫法：摔到破底、彈起、回踩 MA25、再往上。' if strict else '寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%、破前低 ≥ 1.4%（影線輕點不算）。'}破底後先收盤站回 MA25，離開均線後回測吻到再進（沒回測就放棄）。圖上藍線是筆畫 W。停損＝收盤跌破破底低點（影線不算）。{'出場＝五分 M 破頸。' if m5_exit else '目標 2R。'}{'不再用連兩根掉 MA25。' if lose_ma_closes <= 0 else f'備援連 {lose_ma_closes} 根收盤掉 MA25。'}最長 {max_hold}h。每張卡底下附 4h K 對照。{card_note}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -2449,6 +2536,13 @@ def detect_kwargs(args) -> dict:
         h4_drop_bars=int(getattr(args, "h4_drop_bars", 24)),
         max_entry_ext_atr=float(getattr(args, "max_entry_ext_atr", 0.0)),
         max_overhead_knot_atr=float(getattr(args, "max_overhead_knot_atr", 0.0)),
+        min_entry_vol=float(getattr(args, "min_entry_vol", 0.0)),
+        require_ma7_above_ma14=bool(getattr(args, "require_ma7_above_ma14", False)),
+        min_overhead_ma_atr=float(getattr(args, "min_overhead_ma_atr", 0.0)),
+        h4_max_ma_rise_pct=float(getattr(args, "h4_max_ma_rise", 999.0)),
+        h4_ma60_max_rise_pct=float(getattr(args, "h4_ma60_max_rise", 999.0)),
+        min_entry_rng_pct=float(getattr(args, "min_entry_rng_pct", 0.0)),
+        exclude_weekend=bool(getattr(args, "exclude_weekend", False)),
     )
     if getattr(args, "strict", False):
         return dict(STRICT_DETECT, **extra)
@@ -2552,7 +2646,8 @@ def cmd_run(args) -> int:
             f"h4bear={funnel.get('h4_bear', 0)} h4drop={funnel.get('h4_ma_drop', 0)} spike={funnel.get('prior_spike', 0)} "
             f"early={funnel.get('early_retest', 0)} late={funnel.get('late_retest', 0)} "
             f"smalldecl={funnel.get('small_decline', 0)} dead={funnel.get('dead_tape', 0)} "
-            f"ext={funnel.get('entry_ext', 0)} knot={funnel.get('overhead_knot', 0)}"
+            f"ext={funnel.get('entry_ext', 0)} knot={funnel.get('overhead_knot', 0)} "
+            f"qentry={funnel.get('quiet_entry', 0)} ma7lt14={funnel.get('ma7_below_ma14', 0)}"
         )
     now = datetime.now(TPE)
     for i, hit in enumerate(hits, 1):
@@ -2595,6 +2690,7 @@ def cmd_run(args) -> int:
             strict=bool(args.strict),
             m5_exit=m5_exit,
             lose_ma_closes=lose_ma_closes,
+            max_hold=max_hold,
         )
         view = write_view_html(out)
         print(f"html={out}")
@@ -2764,6 +2860,48 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help="MA60/99/120 全在進場收盤之上且三線帶寬<=此 ATR 則丟（0=關；1.5＝頭上中期均線結）",
+    )
+    p.add_argument(
+        "--min-entry-vol",
+        type=float,
+        default=0.0,
+        help="進場那根量 / 前 20 根均量最低倍數（0=關；0.15＝拒休市/極度縮量回測）",
+    )
+    p.add_argument(
+        "--require-ma7-above-ma14",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="進場時要求 1h MA7 > MA14（短均線已黃金交叉；預設關）",
+    )
+    p.add_argument(
+        "--min-overhead-ma-atr",
+        type=float,
+        default=0.0,
+        help="進場上方最近的長均線（MA60/99/120/200）距離至少幾個 ATR（0=關；0.8＝拒買在長均線天花板正下方）",
+    )
+    p.add_argument(
+        "--h4-max-ma-rise",
+        type=float,
+        default=999.0,
+        help="進場時 4h MA(--h4-drop-ma) 近 N 根 4h 漲幅上限 %%（999=關；0.5＝拒高位暴漲後主跌段接刀）",
+    )
+    p.add_argument(
+        "--h4-ma60-max-rise",
+        type=float,
+        default=999.0,
+        help="進場時 4h MA60 近 12 根 4h 漲幅上限 %%（999=關；0.0＝拒 4h 中期均線仍高檔上揚的初跌段假破底）",
+    )
+    p.add_argument(
+        "--min-entry-rng-pct",
+        type=float,
+        default=0.0,
+        help="回測進場棒高低振幅 (High/Low-1) 最低 %%（0=關；0.45＝拒極窄幅無力小十字星回測）",
+    )
+    p.add_argument(
+        "--exclude-weekend",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="排除週末休市時段進場（台北時間週六 08:00 ～ 週一 08:00；預設關）",
     )
     p.add_argument(
         "--w-overlay",

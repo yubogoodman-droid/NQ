@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>幣安 1h MA25 下破底再站上</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}
+.page{max-width:560px;margin:0 auto;padding:14px 12px 32px}
+h1{font-size:18px;margin:0 0 6px}
+.muted{color:#8b949e;font-size:13px;line-height:1.5}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.equity{margin:10px 0 4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}
+.trade-no{font-size:15px;font-weight:700}
+.trade-time{font-size:12px;color:#8b949e}
+.card-pnl{font-size:16px;font-weight:700;white-space:nowrap}
+.pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}
+.tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
+.tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
+.tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.tag-info{background:rgba(210,140,255,0.12);color:#e2b6ff;border-color:rgba(210,140,255,0.28)}
+.tag-fresh{background:rgba(88,166,255,0.16);color:#79c0ff;border-color:rgba(88,166,255,0.35)}
+.trade-detail{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}
+.mini-chart{margin:0 -6px -4px;border-radius:10px;overflow:hidden}
+.empty{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安 1h · MA25 下破底再站上（寬鬆）</h1>
+<p class="muted">近 60 天 · 掃 216 檔 U 本位永續 · 均線對齊你那兩張手機圖：黃7 / 青14 / 粉25 / 紫99 / 綠120 / 酒紅200<br/>
+寬鬆版 · 收盤跌破 MA25，在下至少 4 小時、深度 ≥ 1.8%、破前低 ≥ 1.4%（影線輕點不算）。破底後先收盤站回 MA25，離開均線後回測吻到再進（沒回測就放棄）。圖上藍線是筆畫 W。停損＝收盤跌破破底低點（影線不算）。出場＝五分 M 破頸。不再用連兩根掉 MA25。最長 24h。每張卡底下附 4h K 對照。<br/><b>v8 優化條件</b>：進場回測棒量比 ≥ 0.15x 前20根均量（拒休市縮量）、進場時 1H MA7 &gt; MA14（短均翻多）、最長持有 24h。<a href='compare.html' style='color:#79c0ff'>查看 v7 vs v8 完整對照表</a></p>
+<div class="cards">
+<div class="card">筆數<b>37</b></div>
+<div class="card">勝率<b>91.9%</b></div>
+<div class="card">加總<b class="pnl-win">+138.93%</b></div>
+<div class="card">均筆<b>+3.75%</b></div>
+</div>
+<p class="muted">QA 12筆 +40.61% · QB 11筆 +45.75% · QC 14筆 +52.57%</p>
+<p class='muted'>漏斗：跌破 12491 → 站回 376 → 回測進場 57（太短 3373 · 太長 184 · 太淺 3836 · 急殺不夠 0 · 破底不夠 350 · 未站回 194 · 沒回測 164 · MA漂移 2988 · 均線糾結 316 · 長均線糾結 214 · 中均線糾結 18 · 破底在MA200上 649 · 破底沒放量 11 · 追價 5 · 頭上均線結 11 · 進場縮量 10 · MA7未過MA14 8）</p>
+<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="162.6" x2="720" y2="162.6" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,162.6 19.5,154.2 38.9,147.0 58.4,145.5 77.8,134.0 97.3,129.3 116.8,129.6 136.2,128.1 155.7,128.5 175.1,128.6 194.6,122.9 214.1,115.4 233.5,104.6 253.0,101.4 272.4,97.5 291.9,92.9 311.4,89.7 330.8,83.4 350.3,82.5 369.7,79.0 389.2,76.0 408.6,75.3 428.1,69.6 447.6,68.5 467.0,68.0 486.5,67.2 505.9,67.1 525.4,62.7 544.9,57.5 564.3,56.1 583.8,54.3 603.2,52.3 622.7,50.4 642.2,43.3 661.6,39.1 681.1,30.9 700.5,27.3 720.0,17.4"/></svg></div>
+</section>
+<article class='trade-card' id='t1'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · SOXLUSDT · QC · V</span><span class='trade-time'>2026-09-04 02:00 → 09-05 02:00</span></div><div class='card-pnl pnl-win'>+8.06%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 107.33
+stop  98.72  收盤跌破破底K  (−8.02%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  115.98  timeout
+破底 98.72  深度 6.31%  在下 6h
+急殺 6.1% / 3.1ATR  破前低 4.4%
+量比 0.47x  破底量 8.91x  MA25 105.356
+進場 回測 MA25  MA7 105.056  MA14 104.799  MA25 105.356</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t01_SOXLUSDT_0904_0200_qc.png' alt='#1 SOXLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t2'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · SKHYNIXUSDT · QB · W</span><span class='trade-time'>2026-09-04 04:00 → 09-05 04:00</span></div><div class='card-pnl pnl-win'>+6.89%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 1194.02
+stop  1148.39  收盤跌破破底K  (−3.82%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  1276.3  timeout
+破底 1148.39  深度 3.85%  在下 12h
+急殺 5.0% / 4.4ATR  破前低 3.2%
+量比 0.19x  破底量 8.19x  MA25 1188.72
+進場 回測 MA25  MA7 1188.78  MA14 1180.39  MA25 1188.72</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t02_SKHYNIXUSDT_0904_0400_qb.png' alt='#2 SKHYNIXUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t3'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · TXNUSDT · QC · V</span><span class='trade-time'>2026-09-04 06:00 → 09-05 06:00</span></div><div class='card-pnl pnl-win'>+1.36%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 254.92
+stop  248.6  收盤跌破破底K  (−2.48%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  258.39  timeout
+破底 248.6  深度 2.30%  在下 15h
+急殺 2.2% / 3.5ATR  破前低 1.5%
+量比 1.07x  破底量 4.08x  MA25 253.796
+進場 回測 MA25  MA7 254.079  MA14 253.442  MA25 253.796</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t03_TXNUSDT_0904_0600_qc.png' alt='#3 TXNUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t4'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · CSOPSAMSUNG2LUSDT · QC · V</span><span class='trade-time'>2026-09-04 07:00 → 09-05 07:00</span></div><div class='card-pnl pnl-win'>+11.07%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 8.85
+stop  8.23  收盤跌破破底K  (−7.01%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  9.83  timeout
+破底 8.23  深度 7.15%  在下 12h
+急殺 8.8% / 4.9ATR  破前低 6.7%
+量比 0.49x  破底量 11.94x  MA25 8.7636
+進場 回測 MA25  MA7 8.87143  MA14 8.76143  MA25 8.7636</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t04_CSOPSAMSUNG2LUSDT_0904_0700_qc.png' alt='#4 CSOPSAMSUNG2LUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t5'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · COHRUSDT · QB · W</span><span class='trade-time'>2026-09-04 12:00 → 09-05 12:00</span></div><div class='card-pnl pnl-win'>+4.44%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 269.44
+stop  254.53  收盤跌破破底K  (−5.53%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  281.39  timeout
+破底 254.53  深度 5.22%  在下 17h
+急殺 5.9% / 4.5ATR  破前低 4.3%
+量比 0.16x  破底量 11.09x  MA25 266.856
+進場 回測 MA25  破底 254.53  彈 271.23  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t05_COHRUSDT_0904_1200_qb.png' alt='#5 COHRUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t6'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · RIVNUSDT · QA · W</span><span class='trade-time'>2026-09-11 00:00 → 09-12 00:00</span></div><div class='card-pnl pnl-loss'>-0.24%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 16.33
+stop  15.59  收盤跌破破底K  (−4.53%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  16.29  timeout
+破底 15.59  深度 3.46%  在下 21h
+急殺 2.9% / 5.7ATR  破前低 2.3%
+量比 0.90x  破底量 3.83x  MA25 16.0484
+進場 回測 MA25  破底 15.59  彈 16.1  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t06_RIVNUSDT_0911_0000_qa.png' alt='#6 RIVNUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t7'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · SAMSUNGEMUSDT · QC · V</span><span class='trade-time'>2026-09-11 12:00 → 09-12 12:00</span></div><div class='card-pnl pnl-win'>+1.41%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 1037.58
+stop  990.6  收盤跌破破底K  (−4.53%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  1052.16  timeout
+破底 990.6  深度 4.02%  在下 14h
+急殺 2.5% / 2.7ATR  破前低 1.5%
+量比 0.62x  破底量 4.14x  MA25 1022.52
+進場 回測 MA25  MA7 1024.37  MA14 1017.2  MA25 1022.52</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t07_SAMSUNGEMUSDT_0911_1200_qc.png' alt='#7 SAMSUNGEMUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t8'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · URNMUSDT · QC · W</span><span class='trade-time'>2026-09-16 13:00 → 09-17 13:00</span></div><div class='card-pnl pnl-loss'>-0.35%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 51
+stop  49.9  收盤跌破破底K  (−2.16%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  50.82  timeout
+破底 49.9  深度 2.23%  在下 20h
+急殺 2.6% / 4.3ATR  破前低 1.5%
+量比 0.75x  破底量 4.24x  MA25 50.6768
+進場 回測 MA25  MA7 50.6943  MA14 50.6014  MA25 50.6768</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t08_URNMUSDT_0916_1300_qc.png' alt='#8 URNMUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t9'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · SNDKUSDT · QB · W</span><span class='trade-time'>2026-09-16 17:00 → 09-17 17:00</span></div><div class='card-pnl pnl-loss'>-0.08%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 1547.89
+stop  1512  收盤跌破破底K  (−2.32%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  1546.67  timeout
+破底 1512  深度 3.18%  在下 17h
+急殺 2.3% / 2.3ATR  破前低 1.9%
+量比 0.27x  破底量 1.80x  MA25 1541.38
+進場 回測 MA25  破底 1512  彈 1581.65  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t09_SNDKUSDT_0916_1700_qb.png' alt='#9 SNDKUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t10'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · ASTSUSDT · QA · W</span><span class='trade-time'>2026-09-16 21:00 → 09-17 21:00</span></div><div class='card-pnl pnl-win'>+5.45%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 59.6
+stop  57.83  收盤跌破破底K  (−2.97%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  62.85  timeout
+破底 57.83  深度 3.69%  在下 22h
+急殺 5.1% / 4.8ATR  破前低 2.2%
+量比 9.60x  破底量 2.45x  MA25 59.0624
+進場 回測 MA25  破底 57.83  彈 60.92  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t10_ASTSUSDT_0916_2100_qa.png' alt='#10 ASTSUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t11'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · SOXLUSDT · QB · V</span><span class='trade-time'>2026-09-17 11:00 → 09-18 11:00</span></div><div class='card-pnl pnl-win'>+7.17%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 107.42
+stop  101.3  收盤跌破破底K  (−5.70%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  115.12  timeout
+破底 101.3  深度 3.72%  在下 4h
+急殺 7.5% / 4.5ATR  破前低 2.4%
+量比 0.26x  破底量 4.01x  MA25 106.424
+進場 回測 MA25  MA7 106.633  MA14 106.544  MA25 106.424</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t11_SOXLUSDT_0917_1100_qb.png' alt='#11 SOXLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t12'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · GIGADEVUSDT · QC · V</span><span class='trade-time'>2026-09-17 14:00 → 09-18 14:00</span></div><div class='card-pnl pnl-win'>+10.33%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 57.48
+stop  55.66  收盤跌破破底K  (−3.17%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  63.42  timeout
+破底 55.66  深度 1.92%  在下 9h
+急殺 3.4% / 4.2ATR  破前低 2.0%
+量比 0.75x  破底量 1.43x  MA25 57.1324
+進場 回測 MA25  MA7 57.2129  MA14 56.9771  MA25 57.1324</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t12_GIGADEVUSDT_0917_1400_qc.png' alt='#12 GIGADEVUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t13'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · USARUSDT · QB · W</span><span class='trade-time'>2026-09-17 16:00 → 09-18 16:00</span></div><div class='card-pnl pnl-win'>+3.03%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 15.53
+stop  14.9  收盤跌破破底K  (−4.06%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  16  timeout
+破底 14.9  深度 3.77%  在下 17h
+急殺 3.2% / 3.6ATR  破前低 2.0%
+量比 0.70x  破底量 4.10x  MA25 15.3744
+進場 回測 MA25  破底 14.9  彈 15.71  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t13_USARUSDT_0917_1600_qb.png' alt='#13 USARUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t14'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · SKHYUSDT · QC · V</span><span class='trade-time'>2026-09-17 18:00 → 09-18 18:00</span></div><div class='card-pnl pnl-win'>+3.78%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 179.46
+stop  172.92  收盤跌破破底K  (−3.64%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  186.25  timeout
+破底 172.92  深度 2.76%  在下 14h
+急殺 3.7% / 3.6ATR  破前低 3.0%
+量比 0.22x  破底量 2.30x  MA25 178.221
+進場 回測 MA25  MA7 178.456  MA14 178.17  MA25 178.221</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t14_SKHYUSDT_0917_1800_qc.png' alt='#14 SKHYUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t15'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · AAOIUSDT · QA · W</span><span class='trade-time'>2026-09-18 21:00 → 09-19 21:00</span></div><div class='card-pnl pnl-win'>+4.38%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 100.16
+stop  96.64  收盤跌破破底K  (−3.51%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  104.55  timeout
+破底 96.64  深度 2.54%  在下 14h
+急殺 5.9% / 4.9ATR  破前低 2.0%
+量比 13.44x  破底量 4.54x  MA25 99.424
+進場 回測 MA25  MA7 100.474  MA14 99.86  MA25 99.424</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t15_AAOIUSDT_0918_2100_qa.png' alt='#15 AAOIUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t16'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · PANWUSDT · QC · V</span><span class='trade-time'>2026-09-30 14:00 → 10-01 14:00</span></div><div class='card-pnl pnl-win'>+3.07%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 388.91
+stop  377.89  收盤跌破破底K  (−2.83%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  400.85  timeout
+破底 377.89  深度 3.17%  在下 14h
+急殺 4.2% / 6.4ATR  破前低 3.0%
+量比 0.60x  破底量 12.87x  MA25 388.429
+進場 回測 MA25  MA7 388.77  MA14 388.096  MA25 388.429</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t16_PANWUSDT_0930_1400_qc.png' alt='#16 PANWUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t17'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · RAMUSDT · QB · W</span><span class='trade-time'>2026-10-01 17:00 → 10-02 17:00</span></div><div class='card-pnl pnl-win'>+6.00%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 14.01
+stop  13.46  收盤跌破破底K  (−3.93%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  14.85  timeout
+破底 13.46  深度 4.08%  在下 24h
+急殺 4.4% / 2.9ATR  破前低 1.6%
+量比 0.99x  破底量 6.50x  MA25 13.9068
+進場 回測 MA25  破底 13.46  彈 14.17  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t17_RAMUSDT_1001_1700_qb.png' alt='#17 RAMUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t18'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · RDDTUSDT · QA · W</span><span class='trade-time'>2026-10-01 23:00 → 10-02 23:00</span></div><div class='card-pnl pnl-win'>+0.91%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 145.93
+stop  142.7  收盤跌破破底K  (−2.21%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  147.26  timeout
+破底 142.7  深度 2.36%  在下 20h
+急殺 3.4% / 2.9ATR  破前低 1.8%
+量比 1.83x  破底量 0.93x  MA25 144.449
+進場 回測 MA25  MA7 144.851  MA14 144.556  MA25 144.449</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t18_RDDTUSDT_1001_2300_qa.png' alt='#18 RDDTUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t19'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · MVLLUSDT · QB · V</span><span class='trade-time'>2026-10-02 04:00 → 10-03 04:00</span></div><div class='card-pnl pnl-win'>+3.29%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 36.79
+stop  34.01  收盤跌破破底K  (−7.56%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  38  timeout
+破底 34.01  深度 5.51%  在下 5h
+急殺 8.4% / 3.9ATR  破前低 3.5%
+量比 0.16x  破底量 7.25x  MA25 36.4196
+進場 回測 MA25  MA7 36.5857  MA14 36.4943  MA25 36.4196</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t19_MVLLUSDT_1002_0400_qb.png' alt='#19 MVLLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t20'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · DELLUSDT · QB · W</span><span class='trade-time'>2026-10-02 08:00 → 10-03 08:00</span></div><div class='card-pnl pnl-win'>+2.93%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 544.57
+stop  520.66  收盤跌破破底K  (−4.39%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  560.55  timeout
+破底 520.66  深度 4.40%  在下 14h
+急殺 4.9% / 5.2ATR  破前低 3.4%
+量比 0.39x  破底量 8.22x  MA25 542.689
+進場 回測 MA25  破底 520.66  彈 550.46  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t20_DELLUSDT_1002_0800_qb.png' alt='#20 DELLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t21'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · AAPLUSDT · QA · W</span><span class='trade-time'>2026-10-02 19:00 → 10-03 19:00</span></div><div class='card-pnl pnl-win'>+0.62%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 331.56
+stop  326.22  收盤跌破破底K  (−1.61%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  333.6  timeout
+破底 326.22  深度 2.43%  在下 24h
+急殺 2.0% / 4.5ATR  破前低 1.6%
+量比 1.56x  破底量 2.99x  MA25 330.739
+進場 回測 MA25  破底 326.22  彈 335.09  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t21_AAPLUSDT_1002_1900_qa.png' alt='#21 AAPLUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t22'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · AMCUSDT · QB · W</span><span class='trade-time'>2026-10-06 04:00 → 10-07 04:00</span></div><div class='card-pnl pnl-win'>+5.48%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 2.792
+stop  2.702  收盤跌破破底K  (−3.22%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  2.945  timeout
+破底 2.702  深度 3.15%  在下 22h
+急殺 3.0% / 3.8ATR  破前低 1.7%
+量比 0.71x  破底量 6.78x  MA25 2.78288
+進場 回測 MA25  MA7 2.82257  MA14 2.791  MA25 2.78288</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t22_AMCUSDT_1006_0400_qb.png' alt='#22 AMCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t23'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · USARUSDT · QC · V</span><span class='trade-time'>2026-10-06 06:00 → 10-07 06:00</span></div><div class='card-pnl pnl-win'>+1.02%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 13.72
+stop  13.3  收盤跌破破底K  (−3.06%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  13.86  timeout
+破底 13.3  深度 3.35%  在下 18h
+急殺 3.4% / 4.1ATR  破前低 2.5%
+量比 0.48x  破底量 8.70x  MA25 13.6784
+進場 回測 MA25  MA7 13.6471  MA14 13.6329  MA25 13.6784</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t23_USARUSDT_1006_0600_qc.png' alt='#23 USARUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t24'><header class='card-header'><div class='card-title'><span class='trade-no'>#24 · WENUSDT · QC · V</span><span class='trade-time'>2026-10-06 11:00 → 10-07 11:00</span></div><div class='card-pnl pnl-win'>+0.52%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 6.153
+stop  5.937  收盤跌破破底K  (−3.51%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  6.185  timeout
+破底 5.937  深度 3.73%  在下 17h
+急殺 4.1% / 6.8ATR  破前低 3.4%
+量比 0.64x  破底量 21.00x  MA25 6.12836
+進場 回測 MA25  MA7 6.14186  MA14 6.11221  MA25 6.12836</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t24_WENUSDT_1006_1100_qc.png' alt='#24 WENUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t25'><header class='card-header'><div class='card-title'><span class='trade-no'>#25 · ACNUSDT · QC · V</span><span class='trade-time'>2026-10-13 20:00 → 10-14 20:00</span></div><div class='card-pnl pnl-win'>+0.74%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 216.69
+stop  203.76  收盤跌破破底K  (−5.97%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  218.3  timeout
+破底 203.76  深度 4.18%  在下 5h
+急殺 6.7% / 4.9ATR  破前低 2.8%
+量比 0.20x  破底量 11.29x  MA25 213.938
+進場 回測 MA25  MA7 214.837  MA14 212.9  MA25 213.938</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t25_ACNUSDT_1013_2000_qc.png' alt='#25 ACNUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t26'><header class='card-header'><div class='card-title'><span class='trade-no'>#26 · BABAUSDT · QA · W</span><span class='trade-time'>2026-10-14 02:00 → 10-15 02:00</span></div><div class='card-pnl pnl-win'>+0.07%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 110.92
+stop  107.33  收盤跌破破底K  (−3.24%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  111  timeout
+破底 107.33  深度 3.59%  在下 35h
+急殺 3.1% / 4.9ATR  破前低 2.1%
+量比 0.42x  破底量 3.44x  MA25 109.98
+進場 回測 MA25  破底 107.33  彈 111.18  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t26_BABAUSDT_1014_0200_qa.png' alt='#26 BABAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t27'><header class='card-header'><div class='card-title'><span class='trade-no'>#27 · WENUSDT · QA · W</span><span class='trade-time'>2026-10-15 12:00 → 10-16 12:00</span></div><div class='card-pnl pnl-win'>+4.27%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 6.414
+stop  6.19  收盤跌破破底K  (−3.49%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  6.688  timeout
+破底 6.19  深度 2.53%  在下 7h
+急殺 3.6% / 4.7ATR  破前低 2.0%
+量比 1.83x  破底量 0.98x  MA25 6.3664
+進場 回測 MA25  破底 6.19  彈 6.424  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t27_WENUSDT_1015_1200_qa.png' alt='#27 WENUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t28'><header class='card-header'><div class='card-title'><span class='trade-no'>#28 · BNCUSDT · QB · W</span><span class='trade-time'>2026-10-19 14:00 → 10-20 14:00</span></div><div class='card-pnl pnl-win'>+4.91%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 4.501
+stop  4.303  收盤跌破破底K  (−4.40%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  4.722  timeout
+破底 4.303  深度 4.57%  在下 12h
+急殺 3.9% / 5.2ATR  破前低 3.4%
+量比 0.36x  破底量 16.93x  MA25 4.48608
+進場 回測 MA25  破底 4.303  彈 4.555  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t28_BNCUSDT_1019_1400_qb.png' alt='#28 BNCUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t29'><header class='card-header'><div class='card-title'><span class='trade-no'>#29 · RIVNUSDT · QA · W</span><span class='trade-time'>2026-10-21 00:00 → 10-22 00:00</span></div><div class='card-pnl pnl-win'>+1.36%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 12.48
+stop  12.15  收盤跌破破底K  (−2.64%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  12.65  timeout
+破底 12.15  深度 2.68%  在下 25h
+急殺 3.6% / 6.1ATR  破前低 2.5%
+量比 9.44x  破底量 4.91x  MA25 12.3632
+進場 回測 MA25  MA7 12.3886  MA14 12.3707  MA25 12.3632</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t29_RIVNUSDT_1021_0000_qa.png' alt='#29 RIVNUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t30'><header class='card-header'><div class='card-title'><span class='trade-no'>#30 · GLWUSDT · QB · W</span><span class='trade-time'>2026-10-21 01:00 → 10-22 01:00</span></div><div class='card-pnl pnl-win'>+1.70%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QB</span></div><pre class='trade-detail'>entry 133.01
+stop  127.89  收盤跌破破底K  (−3.85%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  135.27  timeout
+破底 127.89  深度 5.14%  在下 21h
+急殺 2.4% / 2.2ATR  破前低 1.6%
+量比 0.47x  破底量 6.71x  MA25 131.892
+進場 回測 MA25  破底 127.89  彈 132.97  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t30_GLWUSDT_1021_0100_qb.png' alt='#30 GLWUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t31'><header class='card-header'><div class='card-title'><span class='trade-no'>#31 · PLTRUSDT · QC · W</span><span class='trade-time'>2026-10-21 01:00 → 10-22 01:00</span></div><div class='card-pnl pnl-win'>+1.96%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 195.87
+stop  189.7  收盤跌破破底K  (−3.15%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  199.7  timeout
+破底 189.7  深度 2.34%  在下 4h
+急殺 2.0% / 3.1ATR  破前低 1.6%
+量比 0.35x  破底量 14.13x  MA25 194.376
+進場 回測 MA25  破底 189.7  彈 194.91  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t31_PLTRUSDT_1021_0100_qc.png' alt='#31 PLTRUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t32'><header class='card-header'><div class='card-title'><span class='trade-no'>#32 · SKHYUSDT · QC · V</span><span class='trade-time'>2026-10-21 01:00 → 10-22 01:00</span></div><div class='card-pnl pnl-win'>+1.78%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 140.75
+stop  135.56  收盤跌破破底K  (−3.69%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  143.26  timeout
+破底 135.56  深度 4.58%  在下 13h
+急殺 6.2% / 4.4ATR  破前低 4.2%
+量比 0.21x  破底量 2.31x  MA25 139.865
+進場 回測 MA25  MA7 139.643  MA14 138.381  MA25 139.865</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t32_SKHYUSDT_1021_0100_qc.png' alt='#32 SKHYUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t33'><header class='card-header'><div class='card-title'><span class='trade-no'>#33 · APLDUSDT · QA · W</span><span class='trade-time'>2026-10-21 04:00 → 10-22 04:00</span></div><div class='card-pnl pnl-win'>+6.85%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 19.85
+stop  18.46  收盤跌破破底K  (−7.00%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  21.21  timeout
+破底 18.46  深度 4.10%  在下 10h
+急殺 2.4% / 2.2ATR  破前低 2.1%
+量比 2.03x  破底量 0.81x  MA25 19.216
+進場 回測 MA25  破底 18.46  彈 19.42  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t33_APLDUSDT_1021_0400_qa.png' alt='#33 APLDUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t34'><header class='card-header'><div class='card-title'><span class='trade-no'>#34 · CIENUSDT · QA · W</span><span class='trade-time'>2026-10-21 04:00 → 10-22 04:00</span></div><div class='card-pnl pnl-win'>+3.99%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 348.83
+stop  329.76  收盤跌破破底K  (−5.47%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  362.75  timeout
+破底 329.76  深度 4.49%  在下 14h
+急殺 3.5% / 3.4ATR  破前低 2.2%
+量比 2.15x  破底量 11.26x  MA25 342.227
+進場 回測 MA25  破底 329.76  彈 344.5  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t34_CIENUSDT_1021_0400_qa.png' alt='#34 CIENUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t35'><header class='card-header'><div class='card-title'><span class='trade-no'>#35 · ZHIPUUSDT · QC · V</span><span class='trade-time'>2026-10-26 19:00 → 10-27 19:00</span></div><div class='card-pnl pnl-win'>+7.81%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QC</span></div><pre class='trade-detail'>entry 65.53
+stop  59.54  收盤跌破破底K  (−9.14%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  70.65  timeout
+破底 59.54  深度 7.23%  在下 5h
+急殺 9.3% / 7.6ATR  破前低 6.2%
+量比 0.18x  破底量 41.14x  MA25 64.5336
+進場 回測 MA25  MA7 64.9029  MA14 64.2329  MA25 64.5336</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t35_ZHIPUUSDT_1026_1900_qc.png' alt='#35 ZHIPUUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t36'><header class='card-header'><div class='card-title'><span class='trade-no'>#36 · CVNAUSDT · QA · W</span><span class='trade-time'>2026-10-27 22:00 → 10-28 22:00</span></div><div class='card-pnl pnl-win'>+3.45%</div></header><div class='tags'><span class='tag tag-time'>timeout</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span></div><pre class='trade-detail'>entry 57.61
+stop  55.98  收盤跌破破底K  (−2.83%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  59.6  timeout
+破底 55.98  深度 3.19%  在下 20h
+急殺 3.6% / 5.2ATR  破前低 2.4%
+量比 0.85x  破底量 3.25x  MA25 56.9488
+進場 回測 MA25  破底 55.98  彈 58.45  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t36_CVNAUSDT_1027_2200_qa.png' alt='#36 CVNAUSDT' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card' id='t37'><header class='card-header'><div class='card-title'><span class='trade-no'>#37 · UVXYUSDT · QA · W</span><span class='trade-time'>2026-10-30 08:00 → 10-31 03:00</span></div><div class='card-pnl pnl-win'>+9.49%</div></header><div class='tags'><span class='tag tag-tp'>m5_neck</span><span class='tag tag-info'>1h + 4h</span><span class='tag tag-info'>QA</span> <span class='tag tag-fresh'>近48h</span></div><pre class='trade-detail'>entry 17.8
+stop  16.74  收盤跌破破底K  (−5.96%)
+出場 五分 M 破頸線（無 2R；停損＝收盤跌破破底；24h）
+exit  19.49  m5_neck  5m 10-31 03:45
+破底 16.74  深度 5.46%  在下 16h
+急殺 5.0% / 4.1ATR  破前低 3.3%
+量比 1.42x  破底量 2.80x  MA25 17.476
+進場 回測 MA25  破底 16.74  彈 17.97  站回後吻均線</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/pofanfan-2m-backtest-opt-1473/docs/pofanfan-1h-ma25-60d-opt/img/t37_UVXYUSDT_1030_0800_qa.png' alt='#37 UVXYUSDT' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div>
+</body></html>
