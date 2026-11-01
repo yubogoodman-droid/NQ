@@ -5,6 +5,7 @@
   01:31 跌破近 4 小時低 30409.25
   02:03 1m 收盤站上 MA200 且 5/10/20/30 多頭
   再等五分 K 也 5>10>20>30（09/29 在 02:20），才進場／通知
+  回測出場 30 分鐘（抱滿 90 分鐘會把利潤吐回去）
 
 用法:
   python3 examples/nq_4h_ma200.py
@@ -390,7 +391,7 @@ def simulate(
     df,
     signals: List[Signal],
     *,
-    max_hold: int = 90,
+    max_hold: int = 30,
     be_after_r: float = 0.70,
     trail_after_r: float = 1.5,
     trail_lock_r: float = 0.5,
@@ -634,7 +635,15 @@ def _trade_img_name(df: pd.DataFrame, trade: TradeResult, trade_no: int, prefix:
     return f"{prefix}{trade_no:02d}_{et.strftime('%m%d_%H%M')}_q{trade.quality.lower()}.png"
 
 
-def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: Path) -> str:
+def _render_trade_cards(
+    df: pd.DataFrame,
+    trades: List[TradeResult],
+    html_path: Path,
+    *,
+    prefix: str = "t",
+    tag: str = "1m+5m",
+    bar_minutes: int = 1,
+) -> str:
     cards: List[str] = []
     for i, t in enumerate(trades, 1):
         et = df.index[t.entry_idx]
@@ -645,7 +654,8 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: 
         risk = t.entry_price - t.stop_price
         r_mult = (t.target_price - t.entry_price) / risk if risk > 0 else 0
         reason_cls = {"target": "tag-tp", "stop": "tag-sl", "be": "tag-time"}.get(t.exit_reason, "tag-time")
-        img_name = _trade_img_name(df, t, i)
+        img_name = _trade_img_name(df, t, i, prefix=prefix)
+        held_min = t.signal.bars_to_entry * bar_minutes
         svg = draw_trade_png(df, t, html_path.parent / "img" / img_name, i)
         ref = ""
         if abs(t.signal.break_low - 30372.25) < 0.3 and et.strftime("%Y-%m-%d") == "2026-09-29":
@@ -660,7 +670,7 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: 
             "</header>"
             "<div class='tags'>"
             f"<span class='tag {reason_cls}'>{escape(t.exit_reason)}</span>"
-            "<span class='tag tag-info'>1m+5m</span>"
+            f"<span class='tag tag-info'>{escape(tag)}</span>"
             f"<span class='tag tag-info'>Q{escape(t.quality)}</span>"
             f"{ref}"
             "</div>"
@@ -670,7 +680,7 @@ def _render_trade_cards(df: pd.DataFrame, trades: List[TradeResult], html_path: 
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破4h {bt.strftime('%H:%M')}  低點 {ft.strftime('%H:%M')} {t.signal.break_low:.2f}\n"
-            f"4h低 {t.signal.four_hr_low:.2f}  距破底 {t.signal.bars_to_entry} 分\n"
+            f"4h低 {t.signal.four_hr_low:.2f}  距破底 {held_min} 分\n"
             f"1m MA5 {t.signal.ma5:.1f} > 10 {t.signal.ma10:.1f} > 20 {t.signal.ma20:.1f} > 30 {t.signal.ma30:.1f}\n"
             f"1m MA200 {t.signal.ma200:.1f}  收盤高出 {t.entry_price - t.signal.ma200:.1f}\n"
             f"5m C {t.signal.m5_close:.1f}  MA5 {t.signal.m5_ma5:.1f} > 10 {t.signal.m5_ma10:.1f} "
@@ -690,6 +700,9 @@ def write_html_report(
     period: str,
     funnel: Optional[Dict[str, int]] = None,
     verdict: str = "",
+    m5_df: Optional[pd.DataFrame] = None,
+    m5_trades: Optional[List[TradeResult]] = None,
+    m5_funnel: Optional[Dict[str, int]] = None,
 ) -> Path:
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
@@ -701,6 +714,7 @@ def write_html_report(
         for old in img_dir.glob("*.png"):
             old.unlink()
     cards = _render_trade_cards(df, trades, out)
+    extra_html = _five_minute_section(m5_df, m5_trades or [], out, m5_funnel or {})
     funnel_line = ""
     if funnel:
         funnel_line = (
@@ -751,7 +765,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(symbol)} 破4小時低 → 1m MA200 + 五分多頭</h1>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">跌破近 4 小時低點後，60 根內 1 分收盤站上 MA200 且 MA5&gt;10&gt;20&gt;30，再等<strong>五分 K 也 5&gt;10&gt;20&gt;30</strong> 才進場。停損在波段低 −12，目標 2R。09/29：01:35 低 30372.25 → 02:03 一分條件到 → 02:20 五分排列後進場。</p>
+<p class="muted">跌破近 4 小時低點後，60 根內 1 分收盤站上 MA200 且 MA5&gt;10&gt;20&gt;30，再等<strong>五分 K 也 5&gt;10&gt;20&gt;30</strong> 才進場。停損在波段低 −12，目標 2R，<strong>30 分鐘出場</strong>。09/29：01:35 低 30372.25 → 02:03 一分條件到 → 02:20 五分排列後進場。</p>
 {verdict_html}
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -764,6 +778,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="equity">{_equity_svg(pnls)}</div>
 </section>
 {cards or "<div class='empty'>這段期間沒有破4h後一小時內站上 MA200 的訊號</div>"}
+{extra_html}
 </div>
 </body></html>
 """
@@ -925,13 +940,74 @@ def scan_once(
     )
 
 
+def df_span(df: pd.DataFrame) -> str:
+    return f"{df.index[0].strftime('%m/%d')}→{df.index[-1].strftime('%m/%d')}"
+
+
+def _load_five_minute(symbol: str) -> Tuple[Optional[pd.DataFrame], List[TradeResult], Dict[str, int]]:
+    """Yahoo 五分最多約 60 天。用同一套規則：4 小時 = 48 根，一小時 = 12 根，出場 6 根。"""
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=59)
+    try:
+        raw = load_yahoo_intraday(symbol, "5m", start, end, chunk_days=30)
+    except Exception as exc:
+        print(f"[5m] {exc}", file=sys.stderr)
+        return None, [], {}
+    if raw is None or raw.empty:
+        print("[5m] empty", file=sys.stderr)
+        return None, [], {}
+    df = to_et(raw)
+    funnel: Dict[str, int] = {}
+    sigs = detect_signals(
+        df,
+        four_hour_bars=48,
+        reclaim_window=12,
+        min_entry_gap=6,
+        funnel=funnel,
+    )
+    trades = simulate(df, sigs, max_hold=6)
+    return df, trades, funnel
+
+
+def _five_minute_section(
+    df: Optional[pd.DataFrame],
+    trades: List[TradeResult],
+    html_path: Path,
+    funnel: Dict[str, int],
+) -> str:
+    if df is None or df.empty:
+        return ""
+    stats = summarize_trades(trades)
+    total_cls = "pnl-win" if stats["total_points"] >= 0 else "pnl-loss"
+    cards = _render_trade_cards(df, trades, html_path, prefix="m", tag="5m", bar_minutes=5)
+    start = df.index[0].strftime("%Y-%m-%d")
+    end = df.index[-1].strftime("%Y-%m-%d")
+    return (
+        "<section class='summary'>"
+        "<h1>五分 K · 同一套，Yahoo 最長約 60 天</h1>"
+        f"<p class='muted'>{escape(start)} → {escape(end)} ET · bars={len(df)}。"
+        "一分和五分都拿不到第三個月；這段是能拉到的最長樣本。"
+        "4 小時 = 48 根五分，一小時內站上 MA200 且 5&gt;10&gt;20&gt;30，出場 6 根（30 分鐘）。</p>"
+        "<div class='cards'>"
+        f"<div class='card'>筆數<b>{stats['count']}</b></div>"
+        f"<div class='card'>勝率<b>{stats['win_rate']:.1f}%</b></div>"
+        f"<div class='card'>總點數<b class='{total_cls}'>{stats['total_points']:+.1f}</b></div>"
+        f"<div class='card'>均筆<b>{stats['avg']:+.1f}</b></div>"
+        "</div>"
+        f"<p class='muted'>漏斗：破4h {funnel.get('break', 0)} → 站上+排列 {funnel.get('taken', 0)}</p>"
+        f"<div class='equity'>{_equity_svg([t.pnl_points for t in trades])}</div>"
+        "</section>"
+        + (cards or "<div class='empty'>這段五分沒有訊號</div>")
+    )
+
+
 def _print_trades(df, trades) -> None:
     for i, t in enumerate(trades, 1):
         print(
             f"  [{i}] Q{t.quality} 破 {df.index[t.signal.break_idx].strftime('%m-%d %H:%M')} "
             f"低 {t.signal.break_low:.2f}  進 {df.index[t.entry_idx].strftime('%H:%M')} "
             f"-> {df.index[t.exit_idx].strftime('%H:%M')} {t.exit_reason} {t.pnl_points:+.1f}  "
-            f"{t.signal.bars_to_entry}分"
+            f"{t.signal.bars_to_entry}根"
         )
 
 
@@ -945,7 +1021,7 @@ def cmd_backtest(args) -> int:
 
     funnel: Dict[str, int] = {}
     sigs = detect_signals(df, funnel=funnel)
-    trades = simulate(df, sigs)
+    trades = simulate(df, sigs, max_hold=30)
     stats = summarize_trades(trades)
     print(
         f"trades={stats['count']} WR={stats['win_rate']:.1f}% "
@@ -954,26 +1030,52 @@ def cmd_backtest(args) -> int:
     print("funnel", funnel)
     _print_trades(df, trades)
 
+    m5_df, m5_trades, m5_funnel = _load_five_minute(args.symbol)
+    span_days = max(1, (df.index[-1] - df.index[0]).days)
+    m5_line = ""
+    if m5_trades:
+        m5_stats = summarize_trades(m5_trades)
+        m5_line = (
+            f"五分K {df_span(m5_df)}：{m5_stats['count']} 筆、"
+            f"勝率 {m5_stats['win_rate']:.1f}%、{m5_stats['total_points']:+.0f} 點。"
+        )
+        print(
+            f"5m trades={m5_stats['count']} WR={m5_stats['win_rate']:.1f}% "
+            f"pnl={m5_stats['total_points']:+.1f}"
+        )
+        print("5m funnel", m5_funnel)
+        _print_trades(m5_df, m5_trades)
     if stats["count"] == 0:
         verdict = "這段樣本有破 4h 低，但一小時內沒等到 1m 站上 MA200 且五分也多頭。"
     elif any(abs(t.signal.break_low - 30372.25) < 0.3 for t in trades):
         verdict = (
-            "抓得到 09/29：01:31 破 4h 低，02:03 一分站上 MA200，02:20 五分 5>10>20>30 才進場。"
-            "五分過濾後勝率比單看一分高。"
+            "抓得到 09/29。出場改 30 分鐘：抱滿 90 分鐘會把先走出來的利潤吐回去。"
         )
-    elif stats["win_rate"] >= 60 and stats["total_points"] > 0:
-        verdict = "五分確認後樣本較少，勝率上來了。通知仍不是保證優勢。"
-    elif stats["total_points"] > 0:
-        verdict = "有訊號，總點數為正。這是通知規則，不是保證優勢。"
     else:
-        verdict = "抓得到型態，但這段回測總點數為負。通知仍可發，倉位自己看。"
+        verdict = (
+            f"Yahoo 一分 K 只留約 30 天，這次實際 {span_days} 天、出場 30 分鐘。"
+            "五分 K 最多約 60 天，沒有第三個月的分鐘資料。"
+        )
+    if m5_line:
+        verdict = f"{verdict} {m5_line}"
     print(f"verdict: {verdict}")
 
     html_path = args.html
     if getattr(args, "pages", False):
         html_path = html_path or str(PAGES_HTML)
     if html_path:
-        out = write_html_report(html_path, df, trades, args.symbol, args.period, funnel=funnel, verdict=verdict)
+        out = write_html_report(
+            html_path,
+            df,
+            trades,
+            args.symbol,
+            args.period,
+            funnel=funnel,
+            verdict=verdict,
+            m5_df=m5_df,
+            m5_trades=m5_trades,
+            m5_funnel=m5_funnel,
+        )
         print(f"html={out}")
         if getattr(args, "pages", False):
             view = write_view_html(out)
