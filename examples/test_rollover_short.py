@@ -279,6 +279,26 @@ def test_inspect_names_the_break_and_the_chase() -> None:
     assert "53.5" in text
 
 
+def test_report_writes_trade_charts() -> None:
+    from rollover.report import write_report
+
+    df5, df1 = _pair(_soxs_top() + [(52.0, 52.40, 49.40, 49.70, 2000)])
+    signals = detect_rollover_shorts(df5, df1)
+    trades = simulate_shorts(df1, signals)
+    out = Path("/tmp/soxs-rollover-report/index.html")
+    stats = write_report(
+        out, df5, df1, trades,
+        symbol="SOXSUSDT", risk_usdt=100, fee_rate=0.0005, cutoff=df1.index[0],
+    )
+    assert stats["count"] == 1
+    assert stats["by_reason"]["target"]["n"] == 1
+    text = out.read_text(encoding="utf-8")
+    assert "起跌放空" in text
+    assert (out.parent / "img" / "equity.png").exists()
+    assert (out.parent / "img" / "overview.png").exists()
+    assert any((out.parent / "img").glob("t01_*.png"))
+
+
 def test_closed_klines_drop_the_forming_bar() -> None:
     import soxs_rollover
 
@@ -351,6 +371,7 @@ def main() -> int:
     test_low_volume_break_allows_one_retest()
     test_rejects_other_timeframes()
     test_inspect_names_the_break_and_the_chase()
+    test_report_writes_trade_charts()
     test_closed_klines_drop_the_forming_bar()
     test_simulate_target_stop_and_same_bar_stop_wins()
     print("ok")

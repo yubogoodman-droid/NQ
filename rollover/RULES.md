@@ -54,6 +54,7 @@
 ```bash
 python3 examples/soxs_rollover.py --demo
 python3 examples/soxs_rollover.py --symbol SOXSUSDT --risk 100
+python3 examples/soxs_rollover.py --backtest --days 30 --risk 100
 python3 examples/test_rollover_short.py
 ```
 

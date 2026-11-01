@@ -73,11 +73,17 @@ def _fetch_host(requests, host: str, symbol: str, interval: str, start_ms: int, 
     session = requests.Session()
     session.headers.update({"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
     while cursor < now_ms:
-        response = session.get(
-            host + "/fapi/v1/klines",
-            params={"symbol": symbol, "interval": interval, "startTime": cursor, "limit": 1500},
-            timeout=20,
-        )
+        response = None
+        for attempt in range(4):
+            response = session.get(
+                host + "/fapi/v1/klines",
+                params={"symbol": symbol, "interval": interval, "startTime": cursor, "limit": 1500},
+                timeout=20,
+            )
+            if response.status_code in (429, 418, 500, 502, 503):
+                time.sleep(0.8 * (attempt + 1))
+                continue
+            break
         response.raise_for_status()
         chunk = response.json()
         if not isinstance(chunk, list) or not chunk:
@@ -212,6 +218,38 @@ def sleep_until_next_close() -> None:
     time.sleep(max(1.0, nxt - now))
 
 
+def run_backtest(symbol: str, days: int, risk: float, html_path: str, fee_rate: float) -> int:
+    from rollover.report import write_report
+    from rollover.strategy import detect_rollover_shorts, simulate_shorts
+
+    hours = days * 24 + 48
+    print(f"抓 {symbol} 近 {days} 天，多留 2 天讓月初的 5 分結構成形", flush=True)
+    df5 = fetch_klines(symbol, "5m", hours)
+    df1 = fetch_klines(symbol, "1m", hours)
+    cutoff = df1.index[-1] - pd.Timedelta(days=days)
+    signals = [sig for sig in detect_rollover_shorts(df5, df1) if sig.timestamp >= cutoff]
+    trades = simulate_shorts(df1, signals)
+    out = Path(html_path)
+    stats = write_report(
+        out,
+        df5,
+        df1,
+        trades,
+        symbol=symbol,
+        risk_usdt=risk,
+        fee_rate=fee_rate,
+        cutoff=cutoff,
+    )
+    print(
+        f"{stats['count']} 筆  勝率 {stats['win_rate']:.1f}%  "
+        f"合計 {stats['total_r']:+.2f}R  "
+        f"毛損益 {stats['gross_usdt']:+.0f} USDT  "
+        f"扣費後 {stats['net_usdt']:+.0f} USDT"
+    )
+    print(f"圖在 {out.resolve()}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="抓 SOXS 永續 5 分結構、1 分起跌。不下單。")
     parser.add_argument("--symbol", default="SOXSUSDT")
@@ -219,7 +257,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--risk", type=float, default=100.0, help="這筆最多虧的 USDT，用來回推張數")
     parser.add_argument("--watch", action="store_true", help="每根 1 分收盤再看一次")
     parser.add_argument("--demo", action="store_true", help="不打網路，用 54.85 那段合成 K 證明抓得到")
+    parser.add_argument("--backtest", action="store_true", help="回測並寫出每筆 K 線圖")
+    parser.add_argument("--days", type=int, default=30, help="回測天數，預設 30")
+    parser.add_argument("--html", default="", help="回測報告路徑")
+    parser.add_argument("--fee", type=float, default=0.0005, help="單邊吃單費率，預設 0.05%")
     args = parser.parse_args(argv)
+
+    if args.backtest:
+        html_path = args.html or f"docs/soxs-rollover-{args.days}d/index.html"
+        return run_backtest(args.symbol, args.days, args.risk, html_path, args.fee)
 
     seen: set[tuple] = set()
     while True:
