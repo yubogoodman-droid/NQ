@@ -109,6 +109,8 @@ python3 examples/watch_tw_1h_reclaim.py --workers 1 --sleep 0.18
 
 半年（2026-05～10）：前半年挑出「1R + 加權 1h 站上 MA20 + 深度 ≥ 10%」。這半年勝率 51.7%→64.5%、平均 +1.58%→+2.70%，但 9 月、10 月沒有比較好，監看預設不變。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-telegram-watcher-935b/docs/tw-1h-reclaim-halfyear-202605-1030/view.html
 
+15 分 K 對照 1 小時 K（Yahoo 15m 最多 60 天，2026-08-04～10-30，拿不到半年）：15m 無濾網 1540 筆平均 +0.20%，8–9 月挑出「深度 ≥ 8%」後 317 筆平均 +0.46%（10 月 −0.46%），扣滿額費稅 0.585% 都轉負，不如 1h。https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-telegram-watcher-935b/docs/tw-15m-vs-1h-20260804-1030/view.html
+
 ```bash
 python3 examples/watch_tw_1h_reclaim.py --dry-run --once --market-filter daily-ma20
 ```
