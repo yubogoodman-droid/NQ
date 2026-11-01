@@ -91,29 +91,46 @@ def signal_at(d: dict, i: int) -> BullSignal | None:
 
 
 def ma200_held(d: dict, start: int, n: int) -> bool:
-    """從 start 起連續 n 根收盤都在各自 MA200 上。"""
+    """從 start 起連續 n 根收盤都在各自 MA200 上，且站上後的 K 線低點也不跌破 MA200。"""
     end = start + n - 1
     if start < 1 or end >= len(d["c"]):
         return False
-    c, m200 = d["c"], d["m200"]
+    c, l, m200 = d["c"], d["l"], d["m200"]
     for k in range(start, end + 1):
         if np.isnan(m200[k]) or float(c[k]) <= float(m200[k]):
+            return False
+        if k > start and float(l[k]) <= float(m200[k]):
             return False
     return True
 
 
-def confirm_reclaim_hold(d: dict, sig: BullSignal, hold_bars: int) -> BullSignal | None:
-    """剛站上 MA200 之後，再連 hold_bars 根收盤都站上；回傳第 hold_bars 根。
+def confirm_reclaim_hold(
+    d: dict,
+    sig: BullSignal,
+    hold_bars: int,
+    *,
+    min_max_vol: float = 1.3,
+) -> BullSignal | None:
+    """剛站上 MA200 之後，再連 hold_bars 根都守在年線上；回傳第 hold_bars 根。
 
-    第 1 根必須是剛站上且 7>25；中間根只要求收盤 > MA200；最後一根仍要 7>25。
+    第 1 根必須是剛站上且 7>25；第 2 根起連低點都不破 MA200；最後一根仍要 7>25；
+    這幾根之中至少一根量比 ≥ min_max_vol。
     """
-    if hold_bars <= 1:
-        return sig if sig.crossed_200 else None
     if not sig.crossed_200:
         return None
+    if hold_bars <= 1:
+        return sig if sig.vol_ratio >= min_max_vol else None
     if not ma200_held(d, sig.idx, hold_bars):
         return None
-    return signal_at(d, sig.idx + hold_bars - 1)
+    end = sig.idx + hold_bars - 1
+    v, v20 = d["v"], d["v20"]
+    peak = max(
+        (float(v[k] / v20[k]) for k in range(sig.idx, end + 1) if v20[k] and not np.isnan(v20[k]) and v20[k] > 0),
+        default=0.0,
+    )
+    if peak < min_max_vol:
+        return None
+    return signal_at(d, end)
 
 
 def rng24_pct(h, l, m200, i: int) -> float:

@@ -147,6 +147,7 @@ TF_SPECS = {
         require_btc_1h=False,
         require_h1_ma25_up=True,
         lookback=80,
+        min_hold_bars=3,
     ),
 }
 
@@ -740,7 +741,8 @@ def write_html(
             htf_rule += "且當時 <strong>1h 收盤 &gt; MA7 &gt; MA25</strong>。"
         if spec.min_hold_bars:
             htf_rule += (
-                f"15m 還要剛站上後<strong>連續 {spec.min_hold_bars} 根收盤都在 MA200 上</strong>。"
+                f"剛站上後還要<strong>連續 {spec.min_hold_bars} 根守在 {html.escape(tf)} MA200 上</strong>"
+                "（第 2～3 根連低點都不跌破年線，且這 3 根至少一根量比 ≥ 1.3×）。"
             )
         if spec.min_below is not None:
             extra = ""
@@ -768,7 +770,8 @@ def write_html(
             hold_txt = ""
             if spec.min_hold_bars:
                 hold_txt = (
-                    f"之後還要連續 <strong>{spec.min_hold_bars} 根</strong>收盤都在 MA200 上才推；"
+                    f"之後還要連續 <strong>{spec.min_hold_bars} 根</strong>守在 MA200 上"
+                    f"（第 2～3 根低點也不破年線、3 根內最大量比 ≥ 1.3×）才推；"
                     f"訊號時間是第 {spec.min_hold_bars} 根，進場用再下一根開盤。"
                 )
             notify_rule = (
@@ -853,13 +856,15 @@ def make_demo_bars() -> dict:
     o = np.roll(px, 1)
     o[0] = 99.00
     o[220] = 99.00
+    v = np.full(n, 1200.0)
+    v[220:223] = 2000.0
     return {
         "t": np.arange(n, dtype=np.int64) * 15 * 60_000,
         "o": o,
         "h": np.maximum(o, px) + 0.05,
         "l": np.minimum(o, px) - 0.02,
         "c": px,
-        "v": np.full(n, 1200.0),
+        "v": v,
     }
 
 

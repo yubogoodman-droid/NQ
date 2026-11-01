@@ -85,7 +85,8 @@ TF_WATCH = {
         "require_h1_ma25_up": True,
         "require_h1_stack": False,
         "lookback": 80,
-        "title": "1h 剛站上 MA200",
+        "min_hold_bars": 3,
+        "title": "1h MA200 上連 3 根",
     },
 }
 
@@ -538,8 +539,8 @@ def main() -> int:
         telegram_send(
             "<b>監看已啟動</b>\n"
             "同一個腳本盯 15m 與 1h，收盤掃一次，符合才推圖。\n"
-            "15m：剛站上年線後連 3 根，且 1h MA25 未下彎、1h 7&gt;25\n"
-            "1h：本根剛站上 1h MA200，且 1h MA25 未下彎"
+            "15m / 1h：剛站上年線後連 3 根守住（第 2～3 根低點不破年線、3 根內最大量比 ≥ 1.3×），\n"
+            "且 1h MA25 未下彎；15m 另要 1h 7&gt;25"
         )
     uni_ts = time.time()
     first = True

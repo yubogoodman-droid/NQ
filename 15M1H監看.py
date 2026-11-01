@@ -12,9 +12,11 @@ PyCharm：
     python 15M1H監看.py --test
     python 15M1H監看.py
 
-15m：剛站上 15m MA200 且收盤 > MA7 > MA25，再連 3 根都在年線上，
+15m：剛站上 15m MA200 且收盤 > MA7 > MA25，再連 3 根守在年線上
+     （第 2～3 根低點不破年線、3 根內最大量比 ≥ 1.3×），
      且 1h MA25 未下彎、1h 收盤 > MA7 > MA25。第 3 根才推。
-1h ：本根剛站上 1h MA200 且收盤 > MA7 > MA25，且 1h MA25 未下彎。
+1h ：剛站上 1h MA200 且收盤 > MA7 > MA25，再連 3 根守在年線上
+     （第 2～3 根低點不破年線、3 根內最大量比 ≥ 1.3×），且 1h MA25 未下彎。
 """
 from __future__ import annotations
 
@@ -69,8 +71,8 @@ TF_WATCH = {
         "require_h1_ma25_up": True,
         "require_h1_stack": False,
         "lookback": 80,
-        "min_hold_bars": None,
-        "title": "1h 剛站上 MA200",
+        "min_hold_bars": 3,
+        "title": "1h MA200 上連 3 根",
     },
 }
 
@@ -246,21 +248,31 @@ def ma200_held(d: dict, start: int, n: int) -> bool:
     end = start + n - 1
     if start < 1 or end >= len(d["c"]):
         return False
-    c, m200 = d["c"], d["m200"]
+    c, l, m200 = d["c"], d["l"], d["m200"]
     for k in range(start, end + 1):
         if np.isnan(m200[k]) or float(c[k]) <= float(m200[k]):
+            return False
+        if k > start and float(l[k]) <= float(m200[k]):
             return False
     return True
 
 
-def confirm_hold(d: dict, sig: Sig, hold_bars: int) -> Sig | None:
+def confirm_hold(d: dict, sig: Sig, hold_bars: int, *, min_max_vol: float = 1.3) -> Sig | None:
     if not sig.crossed_200:
         return None
     if hold_bars <= 1:
-        return sig
+        return sig if sig.vol_ratio >= min_max_vol else None
     if not ma200_held(d, sig.idx, hold_bars):
         return None
-    return signal_at(d, sig.idx + hold_bars - 1)
+    end = sig.idx + hold_bars - 1
+    v, v20 = d["v"], d["v20"]
+    peak = max(
+        (float(v[k] / v20[k]) for k in range(sig.idx, end + 1) if v20[k] and not np.isnan(v20[k]) and v20[k] > 0),
+        default=0.0,
+    )
+    if peak < min_max_vol:
+        return None
+    return signal_at(d, end)
 
 
 def htf_sma_at(d_htf: dict, time_ms: int, last_price: float, bar_ms: int, n: int) -> float | None:
@@ -593,14 +605,14 @@ def main() -> int:
     print("載入標的…", flush=True)
     symbols = universe()
     print(f"同一個腳本監看 {len(symbols)} 個成交額前100：15m + 1h", flush=True)
-    print("  · 15m 剛站上後連 3 根，且 1h MA25 未下彎、1h 7>25", flush=True)
-    print("  · 1h 本根剛站上 MA200，且 1h MA25 未下彎", flush=True)
+    print("  · 15m 剛站上後連 3 根守住（第 2～3 根低點不破年線、最大量比 ≥ 1.3×），且 1h MA25 未下彎、1h 7>25", flush=True)
+    print("  · 1h 剛站上後連 3 根守住（第 2～3 根低點不破年線、最大量比 ≥ 1.3×），且 1h MA25 未下彎", flush=True)
     if not args.once:
         telegram_send(
             "<b>監看已啟動</b>\n"
             "同一個腳本盯 15m 與 1h，收盤掃一次，符合才推圖。\n"
-            "15m：剛站上年線後連 3 根，且 1h MA25 未下彎、1h 7&gt;25\n"
-            "1h：本根剛站上 1h MA200，且 1h MA25 未下彎"
+            "15m / 1h：剛站上年線後連 3 根守住（第 2～3 根低點不破年線、3 根內最大量比 ≥ 1.3×），\n"
+            "且 1h MA25 未下彎；15m 另要 1h 7&gt;25"
         )
     uni_ts = time.time()
     first = True
