@@ -8,3 +8,9 @@ tg_config.env
 tg_alert_state.json
 examples/tg_alert_state.json
 examples/tg_config.env
+docs/story-to-handdrawn-video/assets/fonts/*.ttf
+story_video/__pycache__/
+vendor/story-to-handdrawn-video/node_modules/
+vendor/story-to-handdrawn-video/out/
+vendor/story-to-handdrawn-video/public/assets/generated/
+vendor/story-to-handdrawn-video/.remotion/

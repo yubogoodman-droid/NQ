@@ -1,0 +1,22 @@
+{
+  "id": "ten-years",
+  "title": "十年",
+  "style": "colored-pencil-diary",
+  "styleName": "彩铅日记漫画",
+  "aspect": "3:4",
+  "width": 720,
+  "height": 960,
+  "durationSec": 23.6,
+  "text": "十年\n\n多久沒在拉屎的時候不滑手機了\n十年 可能十五年\n記憶的畫面是在老家 馬桶的顏色還是最流行的iPhone勃根地紅\n蹲著馬桶 看著偷偷帶進廁所的火影漫畫\n那是平凡高中生的假日時光\n可惜讀的是男校 三年時間讓我喪失了跟女生溝通的能力\n少了這個能力 人生好像就沒那麼有趣了",
+  "video": "assets/shinian-preview.mp4",
+  "poster": "assets/shinian-poster.jpg",
+  "pages": [
+    { "id": "01", "kind": "beat", "caption": "多久沒在拉屎的時候不滑手機了" },
+    { "id": "02", "kind": "beat", "caption": "十年 可能十五年" },
+    { "id": "03", "kind": "beat", "caption": "記憶的畫面是在老家 馬桶的顏色還是最流行的iPhone勃根地紅" },
+    { "id": "04", "kind": "beat", "caption": "蹲著馬桶 看著偷偷帶進廁所的火影漫畫" },
+    { "id": "05", "kind": "beat", "caption": "那是平凡高中生的假日時光" },
+    { "id": "06", "kind": "beat", "caption": "可惜讀的是男校 三年時間讓我喪失了跟女生溝通的能力" },
+    { "id": "07", "kind": "beat", "caption": "少了這個能力 人生好像就沒那麼有趣了" }
+  ]
+}
