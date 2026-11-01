@@ -2,7 +2,7 @@
 
 5 分圖負責極點、較低高點、頸線、停損。
 1 分圖負責進場：較低高點確認之後，第一根同時跌破頸線、收在 1 分 MA25 下、
-量能回到前 10 根均量的 1 分收盤。
+量能回到前 10 根均量，而且收盤還在四小時高點附近。
 
 停損放在 5 分較低高點，不放在極點。影線刺破頸線不算。
 量能不夠的那根不進場，只允許之後一次 1 分拉回 MA7–MA25 再收不回去。
@@ -35,6 +35,8 @@ class RolloverParams:
     max_bars_to_lower_high: int = 72  # 5 分根數，約 6 小時
     max_bars_after_lower_high: int = 30  # 5 分根數，約 2.5 小時
     max_entry_extension_pct: float = 0.008
+    four_hour_bars: int = 240  # 1 分根數，4 小時
+    max_below_4h_high_pct: float = 0.02  # 觸發收盤最多比四小時高點低 2%
     retest_bars: int = 15  # 1 分根數
     stop_buffer_pct: float = 0.0
     reward_r: float = 1.5
@@ -57,6 +59,7 @@ class RolloverSignal:
     lower_high: float
     lower_high_idx: int
     off_session: bool
+    four_hour_high: float = 0.0
 
     @property
     def risk_per_unit(self) -> float:
@@ -79,6 +82,7 @@ class RolloverView:
     volume: float
     vol_ma: float | None
     extension: float | None
+    four_hour_high: float | None
     fresh: RolloverSignal | None
 
 
@@ -163,6 +167,7 @@ def inspect_rollover(
     ma_fast = _sma(close, params.ma_fast)
     ma_slow = _sma(close, params.ma_slow)
     vol_ma = _sma_prev(volume, params.vol_ma_len)
+    high_4h = pd.Series(high).rolling(params.four_hour_bars, min_periods=params.four_hour_bars).max().to_numpy(float)
 
     signals: list[RolloverSignal] = []
     step_i = -1
@@ -229,11 +234,15 @@ def inspect_rollover(
                 continue
             ma_ok = not math.isnan(ma_slow[j]) and close[j] < ma_slow[j]
             vol_ok = not math.isnan(vol_ma[j]) and volume[j] >= vol_ma[j]
-            if ma_ok and vol_ok:
-                signals.append(_signal(frame1, params, j, "break", close[j], setup))
+            near_high = _near_4h_high(high_4h[j], close[j], params.max_below_4h_high_pct)
+            if ma_ok and vol_ok and near_high:
+                signals.append(_signal(frame1, params, j, "break", close[j], setup, four_hour_high=float(high_4h[j])))
                 filled_lower = setup.lower_high_idx
                 phase = "cool"
                 note = "這根 1 分收盤是起跌"
+                continue
+            if ma_ok and vol_ok:
+                note = "觸發價離開四小時高點，這根不做"
                 continue
             if ma_ok and not vol_ok:
                 phase = "retest"
@@ -269,13 +278,19 @@ def inspect_rollover(
             tagged = high[j] >= band_lo and low[j] <= band_hi
             back_under = close[j] < band_lo and close[j] < setup.neckline
             extend = (band_lo - close[j]) / band_lo if band_lo else 1.0
-            if tagged and back_under and 0 <= extend <= params.max_entry_extension_pct:
+            near_high = _near_4h_high(high_4h[j], close[j], params.max_below_4h_high_pct)
+            if tagged and back_under and 0 <= extend <= params.max_entry_extension_pct and near_high:
                 signals.append(
-                    _signal(frame1, params, j, "retest", close[j], setup, stop_anchor=bounce_high)
+                    _signal(
+                        frame1, params, j, "retest", close[j], setup,
+                        stop_anchor=bounce_high, four_hour_high=float(high_4h[j]),
+                    )
                 )
                 filled_lower = setup.lower_high_idx
                 phase = "cool"
                 note = "這根 1 分收盤是起跌"
+            elif tagged and back_under and 0 <= extend <= params.max_entry_extension_pct:
+                note = "觸發價離開四小時高點，這根不做"
             else:
                 note = "等價格拉回 1 分 MA7–MA25，再收在均線和頸線下面"
 
@@ -285,6 +300,7 @@ def inspect_rollover(
     extension = ((neck - float(close[last])) / neck) if neck else None
     slow_last = float(ma_slow[last])
     vol_last = float(vol_ma[last])
+    high_last = float(high_4h[last])
     return RolloverView(
         signals=tuple(signals),
         timestamp=frame1.index[last],
@@ -298,6 +314,7 @@ def inspect_rollover(
         volume=float(volume[last]),
         vol_ma=None if math.isnan(vol_last) else vol_last,
         extension=extension,
+        four_hour_high=None if math.isnan(high_last) else high_last,
         fresh=fresh,
     )
 
@@ -436,6 +453,7 @@ def _signal(
     entry: float,
     setup: _Armed,
     stop_anchor: float | None = None,
+    four_hour_high: float = 0.0,
 ) -> RolloverSignal:
     anchor = setup.lower_high if stop_anchor is None else stop_anchor
     stop = anchor * (1 + params.stop_buffer_pct)
@@ -454,7 +472,16 @@ def _signal(
         lower_high=setup.lower_high,
         lower_high_idx=setup.lower_high_idx,
         off_session=not is_us_cash_session(ts),
+        four_hour_high=four_hour_high,
     )
+
+
+def _near_4h_high(high_4h: float, price: float, max_below: float) -> bool:
+    """收盤還在四小時最高價的 max_below 以內。資料不足四小時就不是。"""
+
+    if math.isnan(high_4h) or high_4h <= 0:
+        return False
+    return (high_4h - price) / high_4h <= max_below
 
 
 def _normalize(df: pd.DataFrame) -> pd.DataFrame:

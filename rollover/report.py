@@ -67,6 +67,7 @@ def _trade_row(trade: ShortTrade, risk_usdt: float, fee_rate: float) -> dict:
         "extreme": sig.extreme,
         "neckline": sig.neckline,
         "lower_high": sig.lower_high,
+        "four_hour_high": sig.four_hour_high,
         "r": r_mult,
         "qty": qty,
         "gross": gross,
@@ -132,7 +133,8 @@ def _card(number: int, row: dict, src: str) -> str:
     detail = (
         f"進場 {row['entry']:.4f}  停損 {row['stop']:.4f}  目標 {row['target']:.4f}\n"
         f"出場 {row['exit']:.4f}  {row['reason']}  {row['r']:+.2f}R\n"
-        f"極點 {row['extreme']:.4f}  頸線 {row['neckline']:.4f}  較低高點 {row['lower_high']:.4f}\n"
+        f"極點 {row['extreme']:.4f}  頸線 {row['neckline']:.4f}  較低高點 {row['lower_high']:.4f}  "
+        f"四小時高點 {row['four_hour_high']:.4f}\n"
         f"張數 {row['qty']}  毛損益 {row['gross']:+.2f}  手續費 {row['fee']:.2f}  淨損益 {row['net']:+.2f} USDT"
     )
     return f"""
@@ -294,6 +296,8 @@ def _draw_trade(df5: pd.DataFrame, trade: ShortTrade, row: dict, path: Path, num
     for period, color in ((7, "#ffa726"), (25, "#42a5f5"), (200, "#ab47bc")):
         ma = full_close.rolling(period, min_periods=period).mean().iloc[start : end + 1]
         ax.plot(xs, ma, color=color, lw=1.0, label=f"MA{period}")
+    if sig.four_hour_high > 0:
+        ax.axhline(sig.four_hour_high, color="#8aa193", ls="-.", lw=0.8, label="4小時高")
     ax.axhline(sig.neckline, color="#ffa726", ls="--", lw=0.9, label="頸線")
     ax.axhline(sig.stop, color="#e35d5d", ls=":", lw=1.0, label="停損")
     ax.axhline(sig.target, color="#3dba7a", ls=":", lw=1.0, label="目標")

@@ -59,23 +59,30 @@ def _flat(n: int, price: float, volume: float = 1000.0) -> list[tuple]:
     return [(price, price + 0.10, price - 0.10, price, volume) for _ in range(n)]
 
 
-def _soxs_top(break_volume: float = 4000.0, break_close: float = 52.05) -> list[tuple]:
-    """40 根 5 分橫在 52，再衝 54.85，回檔頸線 52.35，較低高點 53.50，第 47 根嘗試跌破。"""
+def _soxs_top(break_volume: float = 4000.0, break_close: float = 54.05) -> list[tuple]:
+    """橫在 54.40 湊滿四小時，極點 54.85，頸線 54.20，較低高點 54.55。
 
-    rows = _flat(40, 52.0)
+    預設跌破收在 54.05，比四小時高點低 1.46%，算附近。
+    """
+
+    rows = _flat(42, 54.40)
     rows.extend(
         [
-            (53.5, 54.85, 53.40, 54.20, 3000),  # 40 極點
-            (54.0, 54.00, 52.50, 52.70, 2000),  # 41
-            (52.7, 52.80, 52.35, 52.60, 1500),  # 42 頸線
-            (52.6, 53.20, 52.50, 53.00, 1200),  # 43
-            (53.0, 53.50, 52.90, 53.30, 1200),  # 44 較低高點
-            (53.3, 53.20, 52.80, 52.90, 1100),  # 45
-            (52.9, 53.00, 52.70, 52.80, 1100),  # 46 較低高點在這根確認
-            (52.8, 52.70, min(51.90, break_close), break_close, break_volume),  # 47
+            (54.50, 54.85, 54.40, 54.70, 3000),  # 42 極點
+            (54.60, 54.65, 54.30, 54.45, 2000),  # 43
+            (54.40, 54.50, 54.20, 54.35, 1500),  # 44 頸線
+            (54.30, 54.45, 54.25, 54.40, 1200),  # 45
+            (54.40, 54.55, 54.30, 54.48, 1200),  # 46 較低高點
+            (54.48, 54.50, 54.35, 54.42, 1100),  # 47
+            (54.42, 54.45, 54.28, 54.32, 1100),  # 48 較低高點在這根確認
+            (54.30, 54.32, min(54.00, break_close), break_close, break_volume),  # 49
         ]
     )
     return rows
+
+
+def _break_1m(df5: pd.DataFrame) -> int:
+    return (len(df5) - 1) * 5
 
 
 def _set_1m(df1: pd.DataFrame, i: int, *, high: float, low: float, close: float, volume: float) -> None:
@@ -123,24 +130,26 @@ def test_break_close_stops_at_lower_high_not_extreme() -> None:
     assert len(signals) == 1, signals
     sig = signals[0]
     assert sig.kind == "break"
-    assert sig.bar_idx == 47 * 5
-    assert sig.timestamp == df1.index[47 * 5]
-    assert sig.entry == 52.05
-    assert sig.neckline == 52.35
+    assert sig.bar_idx == _break_1m(df5)
+    assert sig.timestamp == df1.index[_break_1m(df5)]
+    assert sig.entry == 54.05
+    assert sig.neckline == 54.20
     assert sig.extreme == 54.85
-    assert sig.lower_high == 53.50
-    assert sig.lower_high_idx == 44
-    assert sig.stop == 53.50
+    assert sig.lower_high == 54.55
+    assert sig.lower_high_idx == 46
+    assert sig.stop == 54.55
+    assert sig.four_hour_high == 54.85
+    assert (sig.four_hour_high - sig.entry) / sig.four_hour_high <= 0.02
     assert sig.stop < sig.extreme
     assert sig.entry < sig.neckline
     assert sig.target < sig.entry
     assert sig.off_session
-    assert qty_for_risk(sig.entry, sig.stop, 145) == 100
+    assert qty_for_risk(sig.entry, sig.stop, 50) == 100
 
 
 def test_weekend_signal_is_off_session_and_cash_session_is_not() -> None:
     weekend = detect_rollover_shorts(*_pair(_soxs_top()))
-    # 5 分第 47 根的第一根 1 分 = 起點 + 235 分。15:05 UTC + 235 分 = 19:00 UTC = 美東 15:00。
+    # 5 分最後一根的第一根 1 分 = 起點 + 245 分。15:05 UTC + 245 分 = 19:10 UTC = 美東 15:10。
     cash = detect_rollover_shorts(*_pair(_soxs_top(), start="2026-10-28 15:05"))
     assert len(weekend) == 1 and weekend[0].off_session
     assert len(cash) == 1 and not cash[0].off_session
@@ -148,7 +157,7 @@ def test_weekend_signal_is_off_session_and_cash_session_is_not() -> None:
 
 def test_wick_through_neckline_does_not_enter() -> None:
     rows = _soxs_top()
-    rows[47] = (52.8, 52.90, 51.90, 52.60, 5000)
+    rows[-1] = (54.30, 54.40, 54.00, 54.30, 5000)
     df5, df1 = _pair(rows)
     assert detect_rollover_shorts(df5, df1) == []
 
@@ -177,7 +186,7 @@ def test_close_above_ma25_does_not_enter() -> None:
 
 def test_do_not_chase_once_price_has_left_the_neckline() -> None:
     rows = _soxs_top(break_close=50.50)
-    rows[47] = (52.2, 52.40, 50.20, 50.50, 5000)
+    rows[-1] = (54.20, 54.30, 50.20, 50.50, 5000)
     rows.append((50.5, 51.20, 50.40, 51.00, 5000))
     df5, df1 = _pair(rows)
     assert detect_rollover_shorts(df5, df1) == []
@@ -187,13 +196,14 @@ def test_higher_bounce_under_the_extreme_lifts_the_stop() -> None:
     """較低高點之後又墊高一截、但仍低於極點，停損跟到新的較低高點，不跟到 54.85。"""
 
     rows = _soxs_top()
-    rows[47] = (53.2, 53.80, 52.80, 53.60, 1000)
+    rows[-1] = (54.40, 54.62, 54.30, 54.50, 1000)
     rows.extend(
         [
-            (53.6, 54.20, 53.00, 54.00, 1000),
-            (54.0, 53.90, 53.20, 53.50, 1000),
-            (53.5, 53.60, 53.00, 53.20, 1000),
-            (53.2, 53.10, 51.90, 52.05, 4000),
+            (54.50, 54.70, 54.40, 54.60, 1000),
+            (54.60, 54.72, 54.45, 54.65, 1000),
+            (54.65, 54.68, 54.40, 54.50, 1000),
+            (54.50, 54.55, 54.35, 54.40, 1000),
+            (54.40, 54.42, 53.90, 53.95, 4000),
         ]
     )
     df5, df1 = _pair(rows)
@@ -201,39 +211,54 @@ def test_higher_bounce_under_the_extreme_lifts_the_stop() -> None:
     assert len(signals) == 1, signals
     sig = signals[0]
     assert sig.kind == "break"
-    assert sig.bar_idx == 51 * 5
-    assert sig.entry == 52.05
-    assert sig.neckline == 52.35
-    assert sig.lower_high == 54.20
-    assert sig.stop == 54.20
+    assert sig.bar_idx == _break_1m(df5)
+    assert sig.entry == 53.95
+    assert sig.neckline == 54.20
+    assert sig.lower_high == 54.72
+    assert sig.stop == 54.72
     assert sig.stop < sig.extreme
+    assert (sig.four_hour_high - sig.entry) / sig.four_hour_high <= 0.02
 
 
 def test_new_high_invalidates_the_lower_high() -> None:
     rows = _soxs_top()
-    rows[47] = (53.2, 55.30, 53.00, 55.00, 5000)
-    rows.append((54.5, 54.60, 51.40, 51.70, 5000))
+    rows[-1] = (54.40, 55.30, 54.00, 55.00, 5000)
+    rows.append((54.5, 54.60, 53.80, 53.90, 5000))
     df5, df1 = _pair(rows)
     assert detect_rollover_shorts(df5, df1) == []
 
 
+def test_trigger_far_below_the_four_hour_high_does_not_enter() -> None:
+    """頸線已經離四小時高點一段，收盤剛跌破頸線、還沒到不追的 0.8%，仍然不做。"""
+
+    rows = _soxs_top(break_close=52.95)
+    rows[44] = (54.40, 54.50, 53.00, 54.35, 1500)
+    rows[-1] = (53.70, 53.80, 52.80, 52.95, 5000)
+    df5, df1 = _pair(rows)
+    view = inspect_rollover(df5, df1)
+    assert view.signals == ()
+    assert view.fresh is None
+    assert "四小時高點" in view.note
+
+
 def test_low_volume_break_allows_one_retest() -> None:
     df5, df1 = _pair(_soxs_top(break_volume=200))
-    entry = 47 * 5
+    entry = _break_1m(df5)
     for i in range(entry - 30, entry):
-        _set_1m(df1, i, high=52.55, low=52.35, close=52.45, volume=200)
-    _set_1m(df1, entry, high=52.20, low=51.95, close=52.05, volume=1)
-    _set_1m(df1, entry + 1, high=52.55, low=52.10, close=52.25, volume=500)
+        _set_1m(df1, i, high=54.45, low=54.25, close=54.35, volume=200)
+    _set_1m(df1, entry, high=54.15, low=53.95, close=54.05, volume=1)
+    _set_1m(df1, entry + 1, high=54.40, low=54.05, close=54.12, volume=500)
     signals = detect_rollover_shorts(df5, df1)
     assert len(signals) == 1, signals
     sig = signals[0]
     assert sig.kind == "retest"
     assert sig.bar_idx == entry + 1
-    assert sig.entry == 52.25
-    assert sig.stop == 52.55
+    assert sig.entry == 54.12
+    assert sig.stop == 54.40
     assert sig.stop < sig.lower_high
     assert sig.extreme == 54.85
     assert sig.entry < sig.neckline
+    assert (sig.four_hour_high - sig.entry) / sig.four_hour_high <= 0.02
 
 
 def test_rejects_other_timeframes() -> None:
@@ -256,14 +281,15 @@ def test_rejects_other_timeframes() -> None:
 
 def test_inspect_names_the_break_and_the_chase() -> None:
     df5, df1 = _pair(_soxs_top())
-    entry = 47 * 5
+    entry = _break_1m(df5)
     caught = inspect_rollover(df5, df1.iloc[: entry + 1])
     assert caught.fresh is not None
     assert caught.fresh.kind == "break"
-    assert caught.fresh.entry == 52.05
+    assert caught.fresh.entry == 54.05
     assert "起跌" in caught.note
     assert caught.extreme == 54.85
-    assert caught.neckline == 52.35
+    assert caught.neckline == 54.20
+    assert caught.four_hour_high == 54.85
 
     chase5, chase1 = _pair(_soxs_top(break_close=50.50) + [(50.5, 51.20, 50.40, 51.00, 5000)])
     missed = inspect_rollover(chase5, chase1)
@@ -275,14 +301,14 @@ def test_inspect_names_the_break_and_the_chase() -> None:
 
     text = soxs_rollover.format_report("SOXSUSDT", caught, 100)
     assert "抓到起跌" in text
-    assert "52.05" in text
-    assert "53.5" in text
+    assert "54.05" in text
+    assert "54.55" in text
 
 
 def test_report_writes_trade_charts() -> None:
     from rollover.report import write_report
 
-    df5, df1 = _pair(_soxs_top() + [(52.0, 52.40, 49.40, 49.70, 2000)])
+    df5, df1 = _pair(_soxs_top() + [(54.00, 54.10, 53.00, 53.20, 2000)])
     signals = detect_rollover_shorts(df5, df1)
     trades = simulate_shorts(df1, signals)
     out = Path("/tmp/soxs-rollover-report/index.html")
@@ -318,8 +344,8 @@ def test_simulate_target_stop_and_same_bar_stop_wins() -> None:
         df5, df1 = _pair(_soxs_top() + [extra])
         return df1, detect_rollover_shorts(df5, df1)
 
-    down_1m, down_sigs = _with_extra((52.0, 52.40, 49.40, 49.70, 2000))
-    up_1m, up_sigs = _with_extra((52.0, 53.80, 51.80, 53.20, 2000))
+    down_1m, down_sigs = _with_extra((54.00, 54.10, 53.00, 53.20, 2000))
+    up_1m, up_sigs = _with_extra((54.00, 54.80, 54.00, 54.40, 2000))
     target_trades = simulate_shorts(down_1m, down_sigs)
     stop_trades = simulate_shorts(up_1m, up_sigs)
     assert len(target_trades) == 1 and target_trades[0].exit_reason == "target"
@@ -368,6 +394,7 @@ def main() -> int:
     test_do_not_chase_once_price_has_left_the_neckline()
     test_higher_bounce_under_the_extreme_lifts_the_stop()
     test_new_high_invalidates_the_lower_high()
+    test_trigger_far_below_the_four_hour_high_does_not_enter()
     test_low_volume_break_allows_one_retest()
     test_rejects_other_timeframes()
     test_inspect_names_the_break_and_the_chase()

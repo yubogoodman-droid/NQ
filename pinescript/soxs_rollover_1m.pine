@@ -2,7 +2,7 @@
 strategy("SOXS 1分起跌（5分結構）", overlay=true, pyramiding=0, process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
 
 // 掛在 1 分圖。5 分只負責極點、較低高點、頸線和停損。
-// 進場是 1 分收盤：跌破頸線、收在 1 分 MA25 下、量能回到均量。
+// 進場是 1 分收盤：跌破頸線、收在 1 分 MA25 下、量能回到均量，而且收盤還在四小時高點 2% 以內。
 // 極點（例如 54.85）不當進場，也不當停損。
 
 if timeframe.period != "1"
@@ -18,6 +18,7 @@ minBounce  = input.float(0.3, "反彈至少離開頸線 (%)", minval=0.0, step=0
 maxSpan    = input.int(72, "極點到較低高點最多幾根 5 分", minval=3, maxval=200)
 maxBars    = input.int(30, "較低高點後最多等幾根 5 分", minval=1)
 maxExtPct  = input.float(0.8, "離開頸線超過 (%) 就不追", minval=0.1, step=0.1) / 100
+maxBelow4h = input.float(2.0, "觸發價最多低於四小時高點 (%)", minval=0.1, step=0.1) / 100
 retestBars = input.int(15, "1分回測最多等幾根", minval=1)
 rewardR    = input.float(1.5, "停利 R 倍", minval=0.5, step=0.1)
 riskUsdt   = input.float(100, "單筆可虧 USDT", minval=1)
@@ -83,6 +84,8 @@ f_structure() =>
 maFast = ta.sma(close, maFastLen)
 maSlow = ta.sma(close, maSlowLen)
 volMa  = ta.sma(volume, volLen)[1]
+high4h = ta.highest(high, 240)
+near4h = bar_index >= 239 and (high4h - close) / high4h <= maxBelow4h
 
 var int   blockedBar = na
 var int   filledBar = na
@@ -106,11 +109,11 @@ if setup and not sameFill and not blocked and not inRetest and close < neck5
     float extension = (neck5 - close) / neck5
     if extension > maxExtPct
         blockedBar := lhBar5
-    else if close < maSlow and volume >= volMa
+    else if close < maSlow and volume >= volMa and near4h
         breakSignal := true
         stopPrice := lh5
         filledBar := lhBar5
-    else if close < maSlow
+    else if close < maSlow and not (volume >= volMa)
         armRetest := true
         retestLeft := retestBars
         bounceHigh := high
@@ -129,7 +132,7 @@ if inRetest and not armRetest and not breakSignal and lhBar5 != filledBar and lh
         bool tagged = high >= bandLo and low <= bandHi
         bool backUnder = close < bandLo and close < neck5
         float extend = (bandLo - close) / bandLo
-        if tagged and backUnder and extend >= 0 and extend <= maxExtPct
+        if tagged and backUnder and extend >= 0 and extend <= maxExtPct and near4h
             retestSignal := true
             stopPrice := bounceHigh
             filledBar := lhBar5
@@ -148,6 +151,7 @@ if enter and qty > 0
 if strategy.position_size < 0 and not na(entryBar) and bar_index - entryBar >= holdBars
     strategy.close("起跌", comment="時間到")
 
+plot(high4h, "四小時高點", color=color.new(color.gray, 30), linewidth=1)
 plot(maFast, "1分 MA7", color=color.new(color.teal, 0), linewidth=1)
 plot(maSlow, "1分 MA25", color=color.new(color.orange, 0), linewidth=1)
 plot(on5 == 1 ? neck5 : na, "5分頸線", color=color.new(color.red, 0), style=plot.style_linebr, linewidth=2)

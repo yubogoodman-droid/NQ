@@ -101,19 +101,19 @@ def _fetch_host(requests, host: str, symbol: str, interval: str, start_ms: int, 
 
 
 def demo_frames() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """離線合成：極點 54.85，較低高點 53.50，頸線 52.35，1 分收盤 52.05 進場。"""
+    """離線合成：極點 54.85，較低高點 54.55，頸線 54.20，1 分收盤 54.05，還在四小時高點附近。"""
 
-    rows: list[tuple] = [(52.0, 52.10, 51.90, 52.0, 1000.0) for _ in range(40)]
+    rows: list[tuple] = [(54.40, 54.50, 54.30, 54.40, 1000.0) for _ in range(42)]
     rows.extend(
         [
-            (53.5, 54.85, 53.40, 54.20, 3000),
-            (54.0, 54.00, 52.50, 52.70, 2000),
-            (52.7, 52.80, 52.35, 52.60, 1500),
-            (52.6, 53.20, 52.50, 53.00, 1200),
-            (53.0, 53.50, 52.90, 53.30, 1200),
-            (53.3, 53.20, 52.80, 52.90, 1100),
-            (52.9, 53.00, 52.70, 52.80, 1100),
-            (52.8, 52.70, 51.90, 52.05, 4000),
+            (54.50, 54.85, 54.40, 54.70, 3000),
+            (54.60, 54.65, 54.30, 54.45, 2000),
+            (54.40, 54.50, 54.20, 54.35, 1500),
+            (54.30, 54.45, 54.25, 54.40, 1200),
+            (54.40, 54.55, 54.30, 54.48, 1200),
+            (54.48, 54.50, 54.35, 54.42, 1100),
+            (54.42, 54.45, 54.28, 54.32, 1100),
+            (54.30, 54.32, 54.00, 54.05, 4000),
         ]
     )
     index5 = pd.date_range("2026-10-31 00:00", periods=len(rows), freq="5min", tz="UTC")
@@ -129,7 +129,7 @@ def demo_frames() -> tuple[pd.DataFrame, pd.DataFrame]:
             records.append((close, close, close, close, vol))
             stamps.append(ts + pd.Timedelta(minutes=k))
     df1 = pd.DataFrame(records, index=pd.DatetimeIndex(stamps), columns=["open", "high", "low", "close", "volume"])
-    entry = 47 * 5
+    entry = (len(df5) - 1) * 5
     return df5, df1.iloc[: entry + 1]
 
 
@@ -156,6 +156,9 @@ def format_report(symbol: str, view: RolloverView, risk: float) -> str:
             lines.append(f"收盤在頸線下 {view.extension * 100:.2f}%")
         else:
             lines.append(f"收盤在頸線上 {abs(view.extension) * 100:.2f}%")
+    if view.four_hour_high is not None and view.four_hour_high > 0:
+        gap = (view.four_hour_high - view.close) / view.four_hour_high
+        lines.append(f"四小時高點 {px(view.four_hour_high)}  收盤在高點下 {gap * 100:.2f}%")
     if view.ma_slow is not None:
         side = "下" if view.close < view.ma_slow else "上"
         lines.append(f"1 分 MA25 {px(view.ma_slow)}  收盤在均線{side}")
