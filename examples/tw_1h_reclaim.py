@@ -72,6 +72,12 @@ class ReclaimParams:
     time_bars: int = 20
     # 停損最多離進場這段%。破底低更遠時改停在進場價下方這段，避免單筆虧 10% 以上。
     stop_cap: Optional[float] = 0.04
+    # 加權 1h 過去 N 根報酬須 >= index_ret_min 才進場。0 表示關閉。
+    index_ret_bars: int = 5
+    index_ret_min: float = 0.0
+
+
+INDEX_SYMBOL = "^TWII"
 
 
 def loose_params(**overrides: Any) -> ReclaimParams:
@@ -455,6 +461,42 @@ def drop_skip_dates(df: pd.DataFrame, skip_dates: Optional[Sequence[str]] = None
     return df.loc[keep].copy()
 
 
+def index_return_map(index_df: pd.DataFrame, bars: int) -> Dict[pd.Timestamp, float]:
+    """每根加權 1h 的 N 根報酬：close[i] / close[i-bars] - 1。鍵是那根 K 的時間。"""
+    if index_df is None or index_df.empty or bars <= 0:
+        return {}
+    close = index_df["Close"].to_numpy(float)
+    out: Dict[pd.Timestamp, float] = {}
+    for i in range(bars, len(index_df)):
+        prev = close[i - bars]
+        if prev:
+            out[index_df.index[i]] = float(close[i] / prev - 1.0)
+    return out
+
+
+def filter_index_return(
+    df: pd.DataFrame,
+    signals: Sequence[Signal],
+    ret_map: Dict[pd.Timestamp, float],
+    min_ret: float,
+    funnel: Optional[Dict[str, int]] = None,
+) -> List[Signal]:
+    """進場那根要對得上加權同一根，且 N 根報酬 >= min_ret。對不到或大盤在跌就丟掉。"""
+    kept: List[Signal] = []
+    for sig in signals:
+        ret = ret_map.get(df.index[sig.entry_idx])
+        if ret is None:
+            if funnel is not None:
+                funnel["index_missing"] = funnel.get("index_missing", 0) + 1
+            continue
+        if ret < min_ret:
+            if funnel is not None:
+                funnel["index_down"] = funnel.get("index_down", 0) + 1
+            continue
+        kept.append(sig)
+    return kept
+
+
 def filter_entry_range(
     df: pd.DataFrame,
     signals: Sequence[Signal],
@@ -766,6 +808,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 · 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 非破底 {fun.get('not_16h_low', 0)}
 · 假站過多 {fun.get('too_many_fakes', 0)} · 逾時 {fun.get('timeout', 0)} · 沒站上均線 {fun.get('entry_timeout', 0)}
 · 同根錘 {fun.get('same_bar', 0)} · 彈太弱 {fun.get('weak_bounce', 0)} · 進場價過高 {fun.get('price_cap', 0)}
+· 大盤在跌 {fun.get('index_down', 0)} · 對不到加權 {fun.get('index_missing', 0)}
 <br/>出場：停利 {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}</p>
 <div class="cards">
@@ -821,6 +864,9 @@ def _params_rules_html(
 彈回 <code>close / 波谷低 − 1 ≥ {params.min_bounce*100:.1f}%</code>。
 本回測模式：{mode}；<code>require_stack={params.require_stack}</code>
 （True 才再要求 MA5&gt;MA10&gt;MA20）。</li>
+<li><b>大盤濾網</b>：進場那根要對上加權 <code>{INDEX_SYMBOL}</code> 同一根 1h。
+過去 {params.index_ret_bars} 根報酬 <code>close / close.shift({params.index_ret_bars}) − 1 ≥ {params.index_ret_min:g}</code> 才留。
+對不到同一根，或加權這段在跌，這筆不進。用的是同一根收盤，沒有看到之後的 K。</li>
 <li><b>進場價</b>：進場那根<strong>收盤價</strong>（<code>Signal.entry_price = close[e]</code>）。</li>
 <li><b>停損</b>：先放在波谷低 <code>wave.trough_low</code>。若進場價 − 停損 ≤ 0，改用進場價 × 0.99。
 {("若這樣離進場仍超過 %.0f%%，停損改收在進場價下方 %.0f%%（<code>stop_cap</code>）。" % (params.stop_cap*100, params.stop_cap*100)) if params.stop_cap else "不另收緊。"}
@@ -947,6 +993,7 @@ code{{font-size:12px;background:#0d1117;padding:1px 4px;border-radius:4px}}
 · 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 非破底 {fun.get('not_16h_low', 0)}
 · 假站過多 {fun.get('too_many_fakes', 0)} · 逾時 {fun.get('timeout', 0)} · 沒站上均線 {fun.get('entry_timeout', 0)}
 · 同根錘 {fun.get('same_bar', 0)} · 彈太弱 {fun.get('weak_bounce', 0)} · 進場價過高 {fun.get('price_cap', 0)}
+· 大盤在跌 {fun.get('index_down', 0)} · 對不到加權 {fun.get('index_missing', 0)}
 <br/>出場：停利 {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}
 <br/>最好一筆：{escape(_hit_label(best_hit))}
@@ -985,6 +1032,7 @@ def scan_symbol(
     start: Optional[str] = None,
     end: Optional[str] = None,
     skip_dates: Optional[Sequence[str]] = None,
+    index_returns: Optional[Dict[pd.Timestamp, float]] = None,
 ) -> tuple[List[TwHit], dict]:
     meta = {**row, "bars": 0, "error": "", "n_sig": 0, "n_trade": 0}
     try:
@@ -1010,6 +1058,8 @@ def scan_symbol(
         if n_hi and funnel is not None:
             funnel["price_cap"] = funnel.get("price_cap", 0) + n_hi
         sigs = [s for s in sigs if s.entry_price < max_price]
+    if params.index_ret_bars > 0 and index_returns is not None:
+        sigs = filter_index_return(df, sigs, index_returns, params.index_ret_min, funnel=funnel)
     trades = simulate(df, sigs, params)
     meta["n_sig"] = len(sigs)
     meta["n_trade"] = len(trades)
@@ -1103,6 +1153,14 @@ def main(argv=None) -> int:
     if not universe:
         print("no universe", file=sys.stderr)
         return 1
+    index_returns: Optional[Dict[pd.Timestamp, float]] = None
+    if params.index_ret_bars > 0:
+        index_df = drop_skip_dates(fetch_yahoo_1h(INDEX_SYMBOL, args.range_), skip_dates)
+        index_returns = index_return_map(index_df, params.index_ret_bars)
+        if len(index_returns) < params.index_ret_bars:
+            print(f"index {INDEX_SYMBOL} too short", file=sys.stderr)
+            return 1
+        print(f"index {INDEX_SYMBOL} bars={len(index_df)} ret{params.index_ret_bars}>={params.index_ret_min:g}")
     print(
         f"keep {len(universe)}  {universe[0]['code']} {universe[0]['name']} "
         f"{universe[0]['amount']/1e8:.1f}億 / {universe[0]['close']} · "
@@ -1124,6 +1182,7 @@ def main(argv=None) -> int:
             start=start,
             end=end,
             skip_dates=skip_dates,
+            index_returns=index_returns,
         )
         scanned += 1
         if meta["error"]:

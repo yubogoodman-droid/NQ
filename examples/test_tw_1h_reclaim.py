@@ -19,6 +19,8 @@ from tw_1h_reclaim import (  # noqa: E402
     drop_skip_dates,
     filter_entry_range,
     filter_entry_window,
+    filter_index_return,
+    index_return_map,
     loose_params,
     simulate,
     sma,
@@ -362,6 +364,27 @@ def test_stop_cap_cuts_wide_trough() -> None:
     assert capped[0].pnl_pct > -0.041
 
 
+def test_index_return_filter() -> None:
+    idx = pd.DataFrame({"Close": [100, 100, 101, 102, 103, 104, 99]}, index=session_index(7))
+    mapped = index_return_map(idx, 5)
+    assert abs(mapped[idx.index[5]] - 0.04) < 1e-9
+    assert mapped[idx.index[6]] < 0
+    closes, lows = valid_closes()
+    df = ohlc_from_close(closes, lows=lows)
+    sigs = detect_signals(df, loose_params())
+    assert sigs
+    up = {df.index[s.entry_idx]: 0.01 for s in sigs}
+    assert filter_index_return(df, sigs, up, 0.0) == list(sigs)
+    down = {df.index[s.entry_idx]: -0.01 for s in sigs}
+    funnel: dict = {}
+    assert filter_index_return(df, sigs, down, 0.0, funnel) == []
+    assert funnel["index_down"] == len(sigs)
+    missing: dict = {}
+    funnel2: dict = {}
+    assert filter_index_return(df, sigs, missing, 0.0, funnel2) == []
+    assert funnel2["index_missing"] == len(sigs)
+
+
 def test_summarize() -> None:
     stats = summarize_trades([])
     assert stats["count"] == 0
@@ -389,6 +412,7 @@ def main() -> int:
     test_same_bar_trough_skipped()
     test_simulate_stop_and_target()
     test_stop_cap_cuts_wide_trough()
+    test_index_return_filter()
     test_filter_entry_window()
     test_filter_entry_range_and_skip()
     test_price_cap_keeps_cheap_entry()
