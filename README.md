@@ -62,7 +62,7 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 ## 台股 1 小時 K 破底翻（元晶型）
 
-1 小時圖，對齊 6443 元晶 2026-09-16 那波：收盤從 MA20 上方跌到下方後，在下面待 6～36 根（不准假站上），相對過程中最高 MA20 深度 ≥ 3.5%，且最低點是近 16 根新低；破底與翻上不能同一根，從低點至少彈回 3%，再站回 MA20 這波才算。破底後 36 根內，第一根收盤同時大於 MA5 / MA10 / MA20 進場。下面天數放寬是為了 6456 GIS-KY 那種先磨再翻。
+1 小時圖，對齊 6443 元晶 2026-09-16 那波：收盤從 MA20 上方跌到下方後，在下面待 6～36 根（不准假站上），相對過程中最高 MA20 深度 ≥ 3.5%，且最低點是近 16 根新低；破底與翻上不能同一根，從低點至少彈回 3%，再站回 MA20 這波才算。破底後 36 根內，第一根收盤同時大於 MA5 / MA10 / MA20 / **MA60** 進場（壓在 MA60 下方的空頭死貓跳不進）。下面天數放寬是為了 6456 GIS-KY 那種先磨再翻。
 
 回測出場：停損放在破底低，但離進場超過 4% 就改停在進場下方 4%；停利 1R；否則 20 根時間停。另外，進場那根加權 `^TWII` 過去 5 根 1h 報酬要 ≥ 0，大盤這一段在跌就不進。
 
@@ -87,7 +87,11 @@ python3 examples/test_tw_1h_reclaim.py
 
 近一週（2026-10-21 → 10-27、成交額前 200、股價 < 1000）：**66 筆**，已平 26 筆（2R 3、停損 23），未平 40。週報：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-7d/view.html
 
-2026-10-17 → 10-30：先把出場改成停利 1R、停損最多 4%（137 筆、勝率 37.2%、平均 −0.97%）。再加上加權過去 5 根 1h 報酬 ≥ 0 之後是 **111 筆、勝率 38.7%、平均 −0.84%**（仍小虧；大盤在跌的 26 筆拿掉）。同一 10/30 前 200 回看 8/26–9/24，平均從 +0.99% 升到 +1.32%。預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261017-1030-idx/view.html
+2026-10-17 → 10-30 逐步優化：
+1. 原始（2R、停在破底）：137 筆、勝率 17.5%、平均 −3.83%。
+2. 出場改 1R、停損最多 4%：137 筆、勝率 37.2%、平均 −0.97%。
+3. 再加加權過去 5 根 1h 報酬 ≥ 0：111 筆、勝率 38.7%、平均 −0.84%。
+4. 再要求進場收盤 > MA60（紫線，排除壓在季線級均線下的死貓跳）：**52 筆、勝率 55.8%、平均 +0.39%、中位數 +2.67%**（停利 26、停損 21、時間 5），同時 5–8 月（649 筆 +0.93%）、8/26–9/24（207 筆 +1.06%）、9/29–10/16（64 筆 +0.14%）四段全部正期望。預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261017-1030-ma60/view.html
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 

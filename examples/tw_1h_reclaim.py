@@ -48,7 +48,7 @@ from scan_tw_ma_reclaim import (  # noqa: E402
 )
 
 PAGES = REPO / "docs" / "tw-1h-reclaim" / "index.html"
-MA_COLORS = {5: "#f0c14b", 10: "#79c0ff", 20: "#f472b6"}
+MA_COLORS = {5: "#f0c14b", 10: "#79c0ff", 20: "#f472b6", 60: "#a78bfa"}
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +75,8 @@ class ReclaimParams:
     # 加權 1h 過去 N 根報酬須 >= index_ret_min 才進場。0 表示關閉。
     index_ret_bars: int = 5
     index_ret_min: float = 0.0
+    # 進場那根收盤也須 > MA(trend_ma)。0 表示不要求；預設 60（約兩週多頭生命線）。
+    trend_ma: int = 60
 
 
 INDEX_SYMBOL = "^TWII"
@@ -178,6 +180,7 @@ def detect_signals(
     ma5 = sma(close, 5)
     ma10 = sma(close, 10)
     ma20 = sma(close, 20)
+    trend = sma(close, p.trend_ma) if p.trend_ma > 0 else None
     n = len(close)
     warmup = max(20, p.lookback)
     signals: List[Signal] = []
@@ -288,6 +291,10 @@ def detect_signals(
                     if bounce < p.min_bounce or bounce > p.max_bounce:
                         fail_entry = "weak_bounce" if bounce < p.min_bounce else "chase"
                         continue
+                    if trend is not None:
+                        if np.isnan(trend[e]) or float(close[e]) <= float(trend[e]):
+                            fail_entry = "below_trend_ma"
+                            continue
                     signals.append(
                         Signal(
                             entry_idx=e,
@@ -300,10 +307,11 @@ def detect_signals(
                     )
                     bump("entry")
                     found = True
+                    i = max(confirmed.reclaim_idx + 1, e + 1)
                     break
         if not found:
             bump(fail_entry)
-        i = confirmed.reclaim_idx + 1
+            i = confirmed.reclaim_idx + 1
 
     return signals
 
@@ -807,7 +815,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <p class="muted">漏斗：跌破 {fun.get('cross_below', 0)} → 成波 {fun.get('wave_ok', 0)} → 進場 {fun.get('entry', 0)}
 · 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 非破底 {fun.get('not_16h_low', 0)}
 · 假站過多 {fun.get('too_many_fakes', 0)} · 逾時 {fun.get('timeout', 0)} · 沒站上均線 {fun.get('entry_timeout', 0)}
-· 同根錘 {fun.get('same_bar', 0)} · 彈太弱 {fun.get('weak_bounce', 0)} · 進場價過高 {fun.get('price_cap', 0)}
+· 同根錘 {fun.get('same_bar', 0)} · 彈太弱 {fun.get('weak_bounce', 0)} · 壓在 MA60 下 {fun.get('below_trend_ma', 0)} · 進場價過高 {fun.get('price_cap', 0)}
 · 大盤在跌 {fun.get('index_down', 0)} · 對不到加權 {fun.get('index_missing', 0)}
 <br/>出場：停利 {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}</p>
@@ -849,7 +857,7 @@ def _params_rules_html(
 <li><b>標的範圍</b>：上市（TWSE MI_INDEX ALLBUT0999）＋上櫃（TPEx 主板報價）四位數字普通股。
 基準日 {escape(date)} 先取成交額前 400，再套 {cap}，最後留成交額前 {universe_n}。
 進場當根收盤 ≥ 股價上限者再剔除（<code>price_cap</code>）。</li>
-<li><b>均線</b>：收盤價簡單移動平均 MA5／MA10／MA20（<code>sma</code>）。熱身 <code>max(20, lookback={params.lookback})</code> 根後才開始找跌破。</li>
+<li><b>均線</b>：收盤價簡單移動平均 MA5／MA10／MA20{f"／MA{params.trend_ma}" if params.trend_ma > 0 else ""}（<code>sma</code>）。熱身 <code>max(20, lookback={params.lookback})</code> 根後才開始找跌破。</li>
 <li><b>波段起點</b>：前一根 <code>close ≥ MA20</code> 且當根 <code>close &lt; MA20</code>。</li>
 <li><b>待在均線下</b>：從跌破根起，<code>close ≤ MA20</code> 計入 <code>bars_below</code>，須 <code>{params.min_below} ≤ bars_below ≤ {params.max_below}</code>。
 超過 {params.max_below} 根仍未成波 → timeout。搜尋跨度 <code>max_below + max_fakes = {params.max_below + params.max_fakes}</code>。</li>
@@ -860,7 +868,7 @@ def _params_rules_html(
 且波谷低 &lt; 前 {params.lookback} 根最低價（16 根新低；波谷 index &lt; {params.lookback} 直接否決）。</li>
 <li><b>破底與翻上不同根</b>：<code>separate_trough={params.separate_trough}</code>，進場根不可等於波谷根（排除單根錘）。</li>
 <li><b>進場</b>：站回後、波谷起 {params.entry_window} 根內（含站回根），第一根同時
-<code>close &gt; MA5</code> 且 <code>close &gt; MA10</code> 且 <code>close &gt; MA20</code>。
+<code>close &gt; MA5</code> 且 <code>close &gt; MA10</code> 且 <code>close &gt; MA20</code>{f" 且 <code>close &gt; MA{params.trend_ma}</code>（季線級生命線之上，排除空頭段死貓跳）" if params.trend_ma > 0 else ""}。
 彈回 <code>close / 波谷低 − 1 ≥ {params.min_bounce*100:.1f}%</code>。
 本回測模式：{mode}；<code>require_stack={params.require_stack}</code>
 （True 才再要求 MA5&gt;MA10&gt;MA20）。</li>
@@ -987,12 +995,12 @@ code{{font-size:12px;background:#0d1117;padding:1px 4px;border-radius:4px}}
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億</p>
 <h2>觸發規則（對齊 repo 程式，不是口頭版）</h2>
 {rules}
-<p class="note">報酬未扣手續費與交易稅。圖：綠虛線＋▲＝進場；黃點線＋×＝出場；粉點＝破底；黃／藍／粉線＝MA5／MA10／MA20；紅點橫線＝停損；綠點橫線＝停利。</p>
+<p class="note">報酬未扣手續費與交易稅。圖：綠虛線＋▲＝進場；黃點線＋×＝出場；粉點＝破底；黃／藍／粉／紫線＝MA5／MA10／MA20／MA60；紅點橫線＝停損；綠點橫線＝停利。</p>
 <h2>回測統計</h2>
 <p class="muted">漏斗：跌破 {fun.get('cross_below', 0)} → 成波 {fun.get('wave_ok', 0)} → 進場 {fun.get('entry', 0)}
 · 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 非破底 {fun.get('not_16h_low', 0)}
 · 假站過多 {fun.get('too_many_fakes', 0)} · 逾時 {fun.get('timeout', 0)} · 沒站上均線 {fun.get('entry_timeout', 0)}
-· 同根錘 {fun.get('same_bar', 0)} · 彈太弱 {fun.get('weak_bounce', 0)} · 進場價過高 {fun.get('price_cap', 0)}
+· 同根錘 {fun.get('same_bar', 0)} · 彈太弱 {fun.get('weak_bounce', 0)} · 壓在 MA60 下 {fun.get('below_trend_ma', 0)} · 進場價過高 {fun.get('price_cap', 0)}
 · 大盤在跌 {fun.get('index_down', 0)} · 對不到加權 {fun.get('index_missing', 0)}
 <br/>出場：停利 {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +1d {fwd1} · +3d {fwd3} · +5d {fwd5}

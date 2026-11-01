@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>台股 1h 破底翻 · 元晶型版 · 2026-10-17–2026-10-30</title>
+<style>
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}
+.page{max-width:720px;margin:0 auto;padding:14px 12px 32px}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+h1{font-size:18px;margin:0 0 6px} h2{font-size:15px;margin:16px 0 8px}
+.muted{color:#8b949e;font-size:13px;line-height:1.55}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:18px;margin-top:4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}
+.card-header{display:flex;justify-content:space-between;gap:10px}
+.trade-no{font-weight:700} .trade-time{font-size:12px;color:#8b949e;display:block}
+.card-pnl{font-weight:700} .pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.tag{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#79c0ff}
+.trade-detail{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}
+.empty{text-align:center;color:#8b949e;padding:40px 12px;border:1px solid #30363d;border-radius:14px}
+.rules{margin:0;padding-left:1.2em;color:#c9d1d9;font-size:13px;line-height:1.65}
+.rules li{margin-bottom:6px}
+code{font-size:12px;background:#0d1117;padding:1px 4px;border-radius:4px}
+.note{margin-top:8px;padding:8px 10px;background:#0d1117;border-radius:8px;color:#f0c14b;font-size:12px}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>台股 1h 破底翻 · 元晶型版 · 成交額前 200</h1>
+<p class="muted">2026-10-17～2026-10-30 · 收盤&gt;MA5/10/20/60、加權5根≥0、1R、停損最多4% · Yahoo 6mo 1h · 略過 2026-10-23 · 股價&lt;1000 · 基準日 20261030 · 200 檔 · 成交額末名約 4.1 億</p>
+<h2>觸發規則（對齊 repo 程式，不是口頭版）</h2>
+
+<ol class="rules">
+<li><b>週期</b>：Yahoo Finance <code>interval=60m</code> 一小時 K；時區 Asia/Taipei。
+<code>_chart_payload_to_df</code> 再套 <code>session_mask</code>：只留 <code>09:00–13:30</code>（含）正規盤，
+<code>includePrePost=false</code>，試搓／盤前集合競價不進資料。</li>
+<li><b>回測窗</b>：進場日 2026-10-17 ～ 2026-10-30（含）。休市日 2026-10-23 的 K 線先刪掉（不計波段根數），週末本來就沒盤。</li>
+<li><b>標的範圍</b>：上市（TWSE MI_INDEX ALLBUT0999）＋上櫃（TPEx 主板報價）四位數字普通股。
+基準日 20261030 先取成交額前 400，再套 收盤價與進場價均須 &lt; 1000，最後留成交額前 200。
+進場當根收盤 ≥ 股價上限者再剔除（<code>price_cap</code>）。</li>
+<li><b>均線</b>：收盤價簡單移動平均 MA5／MA10／MA20／MA60（<code>sma</code>）。熱身 <code>max(20, lookback=16)</code> 根後才開始找跌破。</li>
+<li><b>波段起點</b>：前一根 <code>close ≥ MA20</code> 且當根 <code>close &lt; MA20</code>。</li>
+<li><b>待在均線下</b>：從跌破根起，<code>close ≤ MA20</code> 計入 <code>bars_below</code>，須 <code>6 ≤ bars_below ≤ 36</code>。
+超過 36 根仍未成波 → timeout。搜尋跨度 <code>max_below + max_fakes = 36</code>。</li>
+<li><b>假站上</b>：<code>max_fakes=0</code>。未達成波條件就收盤站上 MA20，計一次假站；超過則失敗
+（太短／不夠深／非 16 根新低／假站過多）。</li>
+<li><b>成波確認</b>：之後第一根 <code>close &gt; MA20</code> 才算站回。同時要
+深度 <code>(過程最高 MA20 − 波谷低) / 過程最高 MA20 ≥ 3.5%</code>，
+且波谷低 &lt; 前 16 根最低價（16 根新低；波谷 index &lt; 16 直接否決）。</li>
+<li><b>破底與翻上不同根</b>：<code>separate_trough=True</code>，進場根不可等於波谷根（排除單根錘）。</li>
+<li><b>進場</b>：站回後、波谷起 36 根內（含站回根），第一根同時
+<code>close &gt; MA5</code> 且 <code>close &gt; MA10</code> 且 <code>close &gt; MA20</code> 且 <code>close &gt; MA60</code>（季線級生命線之上，排除空頭段死貓跳）。
+彈回 <code>close / 波谷低 − 1 ≥ 3.0%</code>。
+本回測模式：元晶型預設（未加 --strict）；<code>require_stack=False</code>
+（True 才再要求 MA5&gt;MA10&gt;MA20）。</li>
+<li><b>大盤濾網</b>：進場那根要對上加權 <code>^TWII</code> 同一根 1h。
+過去 5 根報酬 <code>close / close.shift(5) − 1 ≥ 0</code> 才留。
+對不到同一根，或加權這段在跌，這筆不進。用的是同一根收盤，沒有看到之後的 K。</li>
+<li><b>進場價</b>：進場那根<strong>收盤價</strong>（<code>Signal.entry_price = close[e]</code>）。</li>
+<li><b>停損</b>：先放在波谷低 <code>wave.trough_low</code>。若進場價 − 停損 ≤ 0，改用進場價 × 0.99。
+若這樣離進場仍超過 4%，停損改收在進場價下方 4%（<code>stop_cap</code>）。
+進場後每一根先看 <code>low ≤ 停損</code>，打到則以停損價出場（<code>stop</code>）。</li>
+<li><b>停利</b>：<code>進場價 + 1 × (進場價 − 停損)</code>（1R）。同一根停損沒打到才看
+<code>high ≥ 停利</code>，打到則以停利價出場（<code>target</code>）。</li>
+<li><b>時間出場</b>：從進場根起最多再看 20 根。都沒打到停損／停利，出場價＝該根收盤（<code>time</code>）。
+若資料已到最後一根且尚未滿 20 根，以最後收盤標記未平（<code>open</code>）。</li>
+<li><b>報酬</b>：<code>pnl_pct = 出場價 / 進場價 − 1</code>。未扣手續費、交易稅、滑價。加總％是各筆相加，不是組合複利。</li>
+</ol>
+
+<p class="note">報酬未扣手續費與交易稅。圖：綠虛線＋▲＝進場；黃點線＋×＝出場；粉點＝破底；黃／藍／粉／紫線＝MA5／MA10／MA20／MA60；紅點橫線＝停損；綠點橫線＝停利。</p>
+<h2>回測統計</h2>
+<p class="muted">漏斗：跌破 5297 → 成波 1698 → 進場 1366
+· 太短 2621 · 不夠深 343 · 非破底 307
+· 假站過多 0 · 逾時 328 · 沒站上均線 0
+· 同根錘 0 · 彈太弱 104 · 壓在 MA60 下 228 · 進場價過高 2
+· 大盤在跌 19 · 對不到加權 0
+<br/>出場：停利 26 · 停損 21 · 時間 5 · 未平 0
+· 收盤後 +1d -0.23% · +3d -4.82% · +5d -1.22%
+<br/>最好一筆：1569 濱川 2026-10-20 09:00 +4.00%
+<br/>最差一筆：2409 友達 2026-10-20 09:00 -4.00%</p>
+<div class="cards">
+<div class="card">訊號數<b>52</b></div>
+<div class="card">勝率<b>55.8%</b></div>
+<div class="card">已平勝率<b>55.8%</b></div>
+<div class="card">平均<b class="pnl-win">+0.39%</b></div>
+<div class="card">中位數<b class="pnl-win">+2.67%</b></div>
+<div class="card">最好<b class="pnl-win">+4.00%</b></div>
+<div class="card">最差<b class="pnl-loss">-4.00%</b></div>
+<div class="card">標的<b>48</b></div>
+</div>
+</section>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · 2409 友達</span><span class='trade-time'>2026-10-20 09:00 → 10-22 13:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>2409.TW</span><span class='tag'>stop</span><span class='tag'>深度 14.0%</span><span class='tag'>下面 29 根</span><span class='tag'>彈 9.8%</span></div><pre class='trade-detail'>entry 37.05  stop 35.57 (−1.48)
+target 38.53  exit 35.57 stop  -1.48
+破底 33.75 @ 10-13 10:00  站回 10-14 12:00
+MA5 36.32 / MA10 35.90 / MA20 35.72
+fwd +1d -3.64%  +3d -4.59%  +5d -4.18%</pre><div class='mini-chart'><img src='img/t01_2409_1020_0900.png' alt='2409 友達' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · 1569 濱川</span><span class='trade-time'>2026-10-20 09:00 → 10-21 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>1569.TWO</span><span class='tag'>target</span><span class='tag'>深度 8.7%</span><span class='tag'>下面 7 根</span><span class='tag'>彈 10.9%</span></div><pre class='trade-detail'>entry 81.40  stop 78.14 (−3.26)
+target 84.66  exit 84.66 target  +3.26
+破底 73.40 @ 10-19 10:00  站回 10-20 09:00
+MA5 78.86 / MA10 78.67 / MA20 80.40
+fwd +1d -1.97%  +3d +5.65%  +5d +19.53%</pre><div class='mini-chart'><img src='img/t02_1569_1020_0900.png' alt='1569 濱川' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · 6526 達發</span><span class='trade-time'>2026-10-20 09:00 → 10-21 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>6526.TW</span><span class='tag'>target</span><span class='tag'>深度 5.5%</span><span class='tag'>下面 11 根</span><span class='tag'>彈 8.6%</span></div><pre class='trade-detail'>entry 808.00  stop 775.68 (−32.32)
+target 840.32  exit 840.32 target  +32.32
+破底 744.00 @ 10-19 10:00  站回 10-20 09:00
+MA5 779.80 / MA10 775.40 / MA20 785.55
+fwd +1d -1.24%  +3d -4.33%  +5d -0.99%</pre><div class='mini-chart'><img src='img/t03_6526_1020_0900.png' alt='6526 達發' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · 3693 營邦</span><span class='trade-time'>2026-10-20 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>3693.TWO</span><span class='tag'>stop</span><span class='tag'>深度 8.8%</span><span class='tag'>下面 8 根</span><span class='tag'>彈 12.3%</span></div><pre class='trade-detail'>entry 739.00  stop 709.44 (−29.56)
+target 768.56  exit 709.44 stop  -29.56
+破底 658.00 @ 10-19 09:00  站回 10-20 09:00
+MA5 703.80 / MA10 705.00 / MA20 717.25
+fwd +1d -2.57%  +3d -12.45%  +5d -9.47%</pre><div class='mini-chart'><img src='img/t04_3693_1020_0900.png' alt='3693 營邦' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · 3673 TPK-KY</span><span class='trade-time'>2026-10-20 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3673.TW</span><span class='tag'>target</span><span class='tag'>深度 9.9%</span><span class='tag'>下面 32 根</span><span class='tag'>彈 6.8%</span></div><pre class='trade-detail'>entry 74.30  stop 71.33 (−2.97)
+target 77.27  exit 77.27 target  +2.97
+破底 69.60 @ 10-15 13:00  站回 10-16 09:00
+MA5 71.30 / MA10 71.25 / MA20 71.53
+fwd +1d -2.56%  +3d -2.42%  +5d +0.94%</pre><div class='mini-chart'><img src='img/t05_3673_1020_0900.png' alt='3673 TPK-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · 3231 緯創</span><span class='trade-time'>2026-10-20 10:00 → 10-21 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3231.TW</span><span class='tag'>target</span><span class='tag'>深度 7.7%</span><span class='tag'>下面 18 根</span><span class='tag'>彈 9.2%</span></div><pre class='trade-detail'>entry 189.50  stop 181.92 (−7.58)
+target 197.08  exit 197.08 target  +7.58
+破底 173.50 @ 10-15 12:00  站回 10-20 09:00
+MA5 182.60 / MA10 181.50 / MA20 180.78
+fwd +1d -0.53%  +3d +0.00%  +5d +2.11%</pre><div class='mini-chart'><img src='img/t06_3231_1020_1000.png' alt='3231 緯創' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · 6672 騰輝電子-KY</span><span class='trade-time'>2026-10-20 10:00 → 10-21 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>6672.TW</span><span class='tag'>target</span><span class='tag'>深度 6.9%</span><span class='tag'>下面 6 根</span><span class='tag'>彈 9.2%</span></div><pre class='trade-detail'>entry 581.00  stop 557.76 (−23.24)
+target 604.24  exit 604.24 target  +23.24
+破底 532.00 @ 10-19 09:00  站回 10-20 10:00
+MA5 568.60 / MA10 565.10 / MA20 570.70
+fwd +1d -2.24%  +3d -1.38%  +5d -3.61%</pre><div class='mini-chart'><img src='img/t07_6672_1020_1000.png' alt='6672 騰輝電子-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · 3376 新日興</span><span class='trade-time'>2026-10-20 10:00 → 10-20 13:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>3376.TW</span><span class='tag'>stop</span><span class='tag'>深度 3.7%</span><span class='tag'>下面 6 根</span><span class='tag'>彈 7.0%</span></div><pre class='trade-detail'>entry 182.50  stop 175.20 (−7.30)
+target 189.80  exit 175.20 stop  -7.30
+破底 170.50 @ 10-20 09:00  站回 10-20 10:00
+MA5 175.70 / MA10 175.65 / MA20 176.78
+fwd +1d -3.84%  +3d -5.48%  +5d -12.60%</pre><div class='mini-chart'><img src='img/t08_3376_1020_1000.png' alt='3376 新日興' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · 3147 大綜</span><span class='trade-time'>2026-10-20 10:00 → 10-21 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3147.TWO</span><span class='tag'>target</span><span class='tag'>深度 7.5%</span><span class='tag'>下面 19 根</span><span class='tag'>彈 5.9%</span></div><pre class='trade-detail'>entry 298.00  stop 286.08 (−11.92)
+target 309.92  exit 309.92 target  +11.92
+破底 281.50 @ 10-16 11:00  站回 10-20 10:00
+MA5 295.00 / MA10 292.35 / MA20 294.60
+fwd +1d -0.50%  +3d -1.34%  +5d +5.70%</pre><div class='mini-chart'><img src='img/t09_3147_1020_1000.png' alt='3147 大綜' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · 1303 南亞</span><span class='trade-time'>2026-10-21 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>1303.TW</span><span class='tag'>stop</span><span class='tag'>深度 8.3%</span><span class='tag'>下面 20 根</span><span class='tag'>彈 9.5%</span></div><pre class='trade-detail'>entry 323.00  stop 310.08 (−12.92)
+target 335.92  exit 310.08 stop  -12.92
+破底 295.00 @ 10-20 13:00  站回 10-21 09:00
+MA5 307.30 / MA10 306.55 / MA20 308.95
+fwd +1d -0.93%  +3d -8.20%  +5d -3.25%</pre><div class='mini-chart'><img src='img/t10_1303_1021_0900.png' alt='1303 南亞' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · 3374 精材</span><span class='trade-time'>2026-10-21 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3374.TWO</span><span class='tag'>target</span><span class='tag'>深度 17.7%</span><span class='tag'>下面 20 根</span><span class='tag'>彈 17.9%</span></div><pre class='trade-detail'>entry 470.50  stop 451.68 (−18.82)
+target 489.32  exit 489.32 target  +18.82
+破底 399.00 @ 10-19 09:00  站回 10-21 09:00
+MA5 438.50 / MA10 435.55 / MA20 438.50
+fwd +1d +0.00%  +3d -1.59%  +5d +3.61%</pre><div class='mini-chart'><img src='img/t11_3374_1021_0900.png' alt='3374 精材' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · 6213 聯茂</span><span class='trade-time'>2026-10-21 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>6213.TW</span><span class='tag'>target</span><span class='tag'>深度 10.8%</span><span class='tag'>下面 15 根</span><span class='tag'>彈 14.1%</span></div><pre class='trade-detail'>entry 823.00  stop 790.08 (−32.92)
+target 855.92  exit 855.92 target  +32.92
+破底 721.00 @ 10-19 10:00  站回 10-21 09:00
+MA5 776.40 / MA10 772.50 / MA20 779.20
+fwd +1d +0.00%  +3d -9.60%  +5d -9.60%</pre><div class='mini-chart'><img src='img/t12_6213_1021_0900.png' alt='6213 聯茂' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · 2492 華新科</span><span class='trade-time'>2026-10-21 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>2492.TW</span><span class='tag'>stop</span><span class='tag'>深度 13.3%</span><span class='tag'>下面 14 根</span><span class='tag'>彈 14.1%</span></div><pre class='trade-detail'>entry 405.50  stop 389.28 (−16.22)
+target 421.72  exit 389.28 stop  -16.22
+破底 355.50 @ 10-19 10:00  站回 10-21 09:00
+MA5 378.10 / MA10 372.55 / MA20 387.38
+fwd +1d +0.00%  +3d -8.01%  +5d +4.32%</pre><div class='mini-chart'><img src='img/t13_2492_1021_0900.png' alt='2492 華新科' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · 2317 鴻海</span><span class='trade-time'>2026-10-21 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-win'>+1.01%</div></header><div class='tags'><span class='tag tag-info'>2317.TW</span><span class='tag'>time</span><span class='tag'>深度 6.1%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 3.8%</span></div><pre class='trade-detail'>entry 247.00  stop 238.00 (−9.00)
+target 256.00  exit 249.50 time  +2.50
+破底 238.00 @ 10-15 09:00  站回 10-16 09:00
+MA5 243.20 / MA10 241.65 / MA20 241.95
+fwd +1d +0.81%  +3d +0.20%  +5d +0.61%</pre><div class='mini-chart'><img src='img/t14_2317_1021_0900.png' alt='2317 鴻海' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · 2382 廣達</span><span class='trade-time'>2026-10-21 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-loss'>-1.53%</div></header><div class='tags'><span class='tag tag-info'>2382.TW</span><span class='tag'>time</span><span class='tag'>深度 5.6%</span><span class='tag'>下面 27 根</span><span class='tag'>彈 4.1%</span></div><pre class='trade-detail'>entry 326.50  stop 313.50 (−13.00)
+target 339.50  exit 321.50 time  -5.00
+破底 313.50 @ 10-15 11:00  站回 10-16 11:00
+MA5 322.40 / MA10 319.05 / MA20 318.77
+fwd +1d +0.46%  +3d +0.31%  +5d -2.14%</pre><div class='mini-chart'><img src='img/t15_2382_1021_0900.png' alt='2382 廣達' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · 3026 禾伸堂</span><span class='trade-time'>2026-10-21 09:00 → 10-21 11:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>3026.TW</span><span class='tag'>stop</span><span class='tag'>深度 12.5%</span><span class='tag'>下面 9 根</span><span class='tag'>彈 14.9%</span></div><pre class='trade-detail'>entry 834.00  stop 800.64 (−33.36)
+target 867.36  exit 800.64 stop  -33.36
+破底 726.00 @ 10-19 09:00  站回 10-20 09:00
+MA5 809.00 / MA10 779.20 / MA20 794.60
+fwd +1d -2.76%  +3d -15.35%  +5d -8.15%</pre><div class='mini-chart'><img src='img/t16_3026_1021_0900.png' alt='3026 禾伸堂' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · 3264 欣銓</span><span class='trade-time'>2026-10-21 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3264.TWO</span><span class='tag'>target</span><span class='tag'>深度 10.4%</span><span class='tag'>下面 20 根</span><span class='tag'>彈 7.9%</span></div><pre class='trade-detail'>entry 260.50  stop 250.08 (−10.42)
+target 270.92  exit 270.92 target  +10.42
+破底 241.50 @ 10-19 10:00  站回 10-21 09:00
+MA5 252.80 / MA10 253.95 / MA20 257.52
+fwd +1d +2.50%  +3d -4.22%  +5d -9.02%</pre><div class='mini-chart'><img src='img/t17_3264_1021_0900.png' alt='3264 欣銓' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · 3044 健鼎</span><span class='trade-time'>2026-10-21 09:00 → 10-22 12:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>3044.TW</span><span class='tag'>stop</span><span class='tag'>深度 5.5%</span><span class='tag'>下面 10 根</span><span class='tag'>彈 6.5%</span></div><pre class='trade-detail'>entry 590.00  stop 566.40 (−23.60)
+target 613.60  exit 566.40 stop  -23.60
+破底 554.00 @ 10-19 09:00  站回 10-21 09:00
+MA5 574.60 / MA10 577.10 / MA20 581.25
+fwd +1d -1.69%  +3d -11.53%  +5d -8.98%</pre><div class='mini-chart'><img src='img/t18_3044_1021_0900.png' alt='3044 健鼎' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · 1326 台化</span><span class='trade-time'>2026-10-21 09:00 → 10-22 13:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>1326.TW</span><span class='tag'>stop</span><span class='tag'>深度 7.8%</span><span class='tag'>下面 20 根</span><span class='tag'>彈 4.2%</span></div><pre class='trade-detail'>entry 76.30  stop 73.25 (−3.05)
+target 79.35  exit 73.25 stop  -3.05
+破底 73.20 @ 10-20 13:00  站回 10-21 09:00
+MA5 74.66 / MA10 75.16 / MA20 76.26
+fwd +1d -0.79%  +3d -2.49%  +5d -2.62%</pre><div class='mini-chart'><img src='img/t19_1326_1021_0900.png' alt='1326 台化' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · 3605 宏致</span><span class='trade-time'>2026-10-21 09:00 → 10-22 11:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>3605.TW</span><span class='tag'>stop</span><span class='tag'>深度 10.9%</span><span class='tag'>下面 19 根</span><span class='tag'>彈 11.1%</span></div><pre class='trade-detail'>entry 179.50  stop 172.32 (−7.18)
+target 186.68  exit 172.32 stop  -7.18
+破底 161.50 @ 10-19 09:00  站回 10-21 09:00
+MA5 169.30 / MA10 168.50 / MA20 171.15
+fwd +1d -0.84%  +3d -13.09%  +5d -8.08%</pre><div class='mini-chart'><img src='img/t20_3605_1021_0900.png' alt='3605 宏致' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · 8042 金山電</span><span class='trade-time'>2026-10-21 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>8042.TWO</span><span class='tag'>target</span><span class='tag'>深度 14.1%</span><span class='tag'>下面 13 根</span><span class='tag'>彈 15.1%</span></div><pre class='trade-detail'>entry 148.50  stop 142.56 (−5.94)
+target 154.44  exit 154.44 target  +5.94
+破底 129.00 @ 10-20 09:00  站回 10-21 09:00
+MA5 138.60 / MA10 135.75 / MA20 141.38
+fwd +1d +0.00%  +3d -10.10%  +5d -5.39%</pre><div class='mini-chart'><img src='img/t21_8042_1021_0900.png' alt='8042 金山電' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · 6155 鈞寶</span><span class='trade-time'>2026-10-21 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>6155.TW</span><span class='tag'>target</span><span class='tag'>深度 9.6%</span><span class='tag'>下面 14 根</span><span class='tag'>彈 10.9%</span></div><pre class='trade-detail'>entry 71.30  stop 68.45 (−2.85)
+target 74.15  exit 74.15 target  +2.85
+破底 64.30 @ 10-19 10:00  站回 10-21 09:00
+MA5 67.34 / MA10 66.75 / MA20 68.46
+fwd +1d +0.56%  +3d -7.43%  +5d -1.26%</pre><div class='mini-chart'><img src='img/t22_6155_1021_0900.png' alt='6155 鈞寶' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · 4977 眾達-KY</span><span class='trade-time'>2026-10-21 09:00 → 10-22 10:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>4977.TW</span><span class='tag'>stop</span><span class='tag'>深度 7.8%</span><span class='tag'>下面 13 根</span><span class='tag'>彈 6.5%</span></div><pre class='trade-detail'>entry 181.00  stop 173.76 (−7.24)
+target 188.24  exit 173.76 stop  -7.24
+破底 170.00 @ 10-20 13:00  站回 10-21 09:00
+MA5 173.70 / MA10 174.35 / MA20 179.80
+fwd +1d -0.28%  +3d -6.08%  +5d +0.83%</pre><div class='mini-chart'><img src='img/t23_4977_1021_0900.png' alt='4977 眾達-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#24 · 3715 定穎投控</span><span class='trade-time'>2026-10-21 09:00 → 10-22 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3715.TW</span><span class='tag'>target</span><span class='tag'>深度 7.0%</span><span class='tag'>下面 14 根</span><span class='tag'>彈 10.3%</span></div><pre class='trade-detail'>entry 139.00  stop 133.44 (−5.56)
+target 144.56  exit 144.56 target  +5.56
+破底 126.00 @ 10-19 09:00  站回 10-21 09:00
+MA5 133.00 / MA10 133.45 / MA20 133.10
+fwd +1d -2.88%  +3d -10.07%  +5d -5.04%</pre><div class='mini-chart'><img src='img/t24_3715_1021_0900.png' alt='3715 定穎投控' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#25 · 6933 AMAX-KY</span><span class='trade-time'>2026-10-21 09:00 → 10-21 11:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>6933.TW</span><span class='tag'>stop</span><span class='tag'>深度 7.7%</span><span class='tag'>下面 10 根</span><span class='tag'>彈 7.9%</span></div><pre class='trade-detail'>entry 419.00  stop 402.24 (−16.76)
+target 435.76  exit 402.24 stop  -16.76
+破底 388.50 @ 10-20 13:00  站回 10-21 09:00
+MA5 407.00 / MA10 407.05 / MA20 418.93
+fwd +1d -5.49%  +3d -4.65%  +5d -11.69%</pre><div class='mini-chart'><img src='img/t25_6933_1021_0900.png' alt='6933 AMAX-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#26 · 6456 GIS-KY</span><span class='trade-time'>2026-10-21 10:00 → 10-22 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>6456.TW</span><span class='tag'>target</span><span class='tag'>深度 16.9%</span><span class='tag'>下面 25 根</span><span class='tag'>彈 18.1%</span></div><pre class='trade-detail'>entry 98.40  stop 94.46 (−3.94)
+target 102.34  exit 102.34 target  +3.94
+破底 83.30 @ 10-19 09:00  站回 10-20 09:00
+MA5 92.38 / MA10 90.27 / MA20 89.35
+fwd +1d +0.00%  +3d -1.12%  +5d +4.17%</pre><div class='mini-chart'><img src='img/t26_6456_1021_1000.png' alt='6456 GIS-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#27 · 2880 華南金</span><span class='trade-time'>2026-10-21 10:00 → 10-29 10:00</span></div><div class='card-pnl pnl-win'>+1.62%</div></header><div class='tags'><span class='tag tag-info'>2880.TW</span><span class='tag'>time</span><span class='tag'>深度 3.7%</span><span class='tag'>下面 13 根</span><span class='tag'>彈 4.1%</span></div><pre class='trade-detail'>entry 49.40  stop 47.45 (−1.95)
+target 51.35  exit 50.20 time  +0.80
+破底 47.45 @ 10-20 09:00  站回 10-21 10:00
+MA5 48.39 / MA10 48.34 / MA20 48.82
+fwd +1d +0.30%  +3d +2.02%  +5d +1.62%</pre><div class='mini-chart'><img src='img/t27_2880_1021_1000.png' alt='2880 華南金' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#28 · 6834 天二科技</span><span class='trade-time'>2026-10-21 10:00 → 10-22 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>6834.TW</span><span class='tag'>target</span><span class='tag'>深度 15.9%</span><span class='tag'>下面 21 根</span><span class='tag'>彈 7.8%</span></div><pre class='trade-detail'>entry 138.50  stop 132.96 (−5.54)
+target 144.04  exit 144.04 target  +5.54
+破底 128.50 @ 10-19 10:00  站回 10-21 10:00
+MA5 134.10 / MA10 133.75 / MA20 137.80
+fwd +1d +3.97%  +3d -11.19%  +5d -9.03%</pre><div class='mini-chart'><img src='img/t28_6834_1021_1000.png' alt='6834 天二科技' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#29 · 2465 麗臺</span><span class='trade-time'>2026-10-21 11:00 → 10-22 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>2465.TW</span><span class='tag'>target</span><span class='tag'>深度 4.3%</span><span class='tag'>下面 9 根</span><span class='tag'>彈 5.2%</span></div><pre class='trade-detail'>entry 87.10  stop 83.62 (−3.48)
+target 90.58  exit 90.58 target  +3.48
+破底 82.80 @ 10-15 11:00  站回 10-16 10:00
+MA5 85.60 / MA10 84.76 / MA20 84.76
+fwd +1d +0.69%  +3d +7.23%  +5d +29.74%</pre><div class='mini-chart'><img src='img/t29_2465_1021_1100.png' alt='2465 麗臺' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#30 · 3706 神達</span><span class='trade-time'>2026-10-21 11:00 → 10-29 11:00</span></div><div class='card-pnl pnl-loss'>-1.96%</div></header><div class='tags'><span class='tag tag-info'>3706.TW</span><span class='tag'>time</span><span class='tag'>深度 4.3%</span><span class='tag'>下面 20 根</span><span class='tag'>彈 3.0%</span></div><pre class='trade-detail'>entry 81.60  stop 79.20 (−2.40)
+target 84.00  exit 80.00 time  -1.60
+破底 79.20 @ 10-19 10:00  站回 10-21 09:00
+MA5 81.18 / MA10 81.11 / MA20 81.20
+fwd +1d -0.25%  +3d -1.59%  +5d -2.33%</pre><div class='mini-chart'><img src='img/t30_3706_1021_1100.png' alt='3706 神達' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#31 · 2882 國泰金</span><span class='trade-time'>2026-10-21 12:00 → 10-29 12:00</span></div><div class='card-pnl pnl-win'>+2.19%</div></header><div class='tags'><span class='tag tag-info'>2882.TW</span><span class='tag'>time</span><span class='tag'>深度 3.9%</span><span class='tag'>下面 13 根</span><span class='tag'>彈 3.6%</span></div><pre class='trade-detail'>entry 114.00  stop 110.00 (−4.00)
+target 118.00  exit 116.50 time  +2.50
+破底 110.00 @ 10-20 12:00  站回 10-21 12:00
+MA5 112.70 / MA10 112.30 / MA20 113.58
+fwd +1d -0.88%  +3d +0.88%  +5d +2.63%</pre><div class='mini-chart'><img src='img/t31_2882_1021_1200.png' alt='2882 國泰金' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#32 · 2881 富邦金</span><span class='trade-time'>2026-10-21 12:00 → 10-27 09:00</span></div><div class='card-pnl pnl-win'>+3.15%</div></header><div class='tags'><span class='tag tag-info'>2881.TW</span><span class='tag'>target</span><span class='tag'>深度 3.6%</span><span class='tag'>下面 8 根</span><span class='tag'>彈 3.3%</span></div><pre class='trade-detail'>entry 158.50  stop 153.50 (−5.00)
+target 163.50  exit 163.50 target  +5.00
+破底 153.50 @ 10-20 12:00  站回 10-21 12:00
+MA5 155.80 / MA10 155.55 / MA20 158.05
+fwd +1d -0.63%  +3d +2.21%  +5d +2.52%</pre><div class='mini-chart'><img src='img/t32_2881_1021_1200.png' alt='2881 富邦金' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#33 · 2344 華邦電</span><span class='trade-time'>2026-10-28 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>2344.TW</span><span class='tag'>target</span><span class='tag'>深度 14.6%</span><span class='tag'>下面 24 根</span><span class='tag'>彈 8.5%</span></div><pre class='trade-detail'>entry 166.00  stop 159.36 (−6.64)
+target 172.64  exit 172.64 target  +6.64
+破底 153.00 @ 10-15 12:00  站回 10-16 09:00
+MA5 162.50 / MA10 160.00 / MA20 158.62
+fwd +1d +3.61%  +3d -0.90%  +5d —</pre><div class='mini-chart'><img src='img/t33_2344_1028_0900.png' alt='2344 華邦電' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#34 · 3035 智原</span><span class='trade-time'>2026-10-28 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3035.TW</span><span class='tag'>target</span><span class='tag'>深度 6.2%</span><span class='tag'>下面 13 根</span><span class='tag'>彈 12.0%</span></div><pre class='trade-detail'>entry 210.50  stop 202.08 (−8.42)
+target 218.92  exit 218.92 target  +8.42
+破底 188.00 @ 10-19 09:00  站回 10-21 09:00
+MA5 194.00 / MA10 194.05 / MA20 195.32
+fwd +1d +0.00%  +3d +1.43%  +5d —</pre><div class='mini-chart'><img src='img/t34_3035_1028_0900.png' alt='3035 智原' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#35 · 6147 頎邦</span><span class='trade-time'>2026-10-28 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>6147.TWO</span><span class='tag'>stop</span><span class='tag'>深度 14.0%</span><span class='tag'>下面 20 根</span><span class='tag'>彈 12.1%</span></div><pre class='trade-detail'>entry 218.00  stop 209.28 (−8.72)
+target 226.72  exit 209.28 stop  -8.72
+破底 194.50 @ 10-19 10:00  站回 10-21 09:00
+MA5 208.00 / MA10 207.10 / MA20 208.40
+fwd +1d +2.06%  +3d -10.09%  +5d —</pre><div class='mini-chart'><img src='img/t35_6147_1028_0900.png' alt='6147 頎邦' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#36 · 3260 威剛</span><span class='trade-time'>2026-10-28 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3260.TWO</span><span class='tag'>target</span><span class='tag'>深度 8.9%</span><span class='tag'>下面 25 根</span><span class='tag'>彈 9.3%</span></div><pre class='trade-detail'>entry 357.50  stop 343.20 (−14.30)
+target 371.80  exit 371.80 target  +14.30
+破底 327.00 @ 10-19 10:00  站回 10-28 09:00
+MA5 336.30 / MA10 333.95 / MA20 335.85
+fwd +1d +1.68%  +3d -3.08%  +5d —</pre><div class='mini-chart'><img src='img/t36_3260_1028_0900.png' alt='3260 威剛' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#37 · 2221 大甲</span><span class='trade-time'>2026-10-28 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>2221.TWO</span><span class='tag'>target</span><span class='tag'>深度 41.3%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 31.8%</span></div><pre class='trade-detail'>entry 145.00  stop 139.20 (−5.80)
+target 150.80  exit 150.80 target  +5.80
+破底 110.00 @ 10-19 09:00  站回 10-20 09:00
+MA5 131.70 / MA10 129.10 / MA20 129.38
+fwd +1d +0.00%  +3d +2.41%  +5d —</pre><div class='mini-chart'><img src='img/t37_2221_1028_0900.png' alt='2221 大甲' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#38 · 2376 技嘉</span><span class='trade-time'>2026-10-28 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>2376.TW</span><span class='tag'>stop</span><span class='tag'>深度 8.7%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 4.8%</span></div><pre class='trade-detail'>entry 361.00  stop 346.56 (−14.44)
+target 375.44  exit 346.56 stop  -14.44
+破底 344.50 @ 10-15 12:00  站回 10-16 09:00
+MA5 355.10 / MA10 354.35 / MA20 355.62
+fwd +1d +0.28%  +3d -6.93%  +5d —</pre><div class='mini-chart'><img src='img/t38_2376_1028_0900.png' alt='2376 技嘉' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#39 · 5351 鈺創</span><span class='trade-time'>2026-10-28 09:00 → 10-28 11:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>5351.TWO</span><span class='tag'>target</span><span class='tag'>深度 13.0%</span><span class='tag'>下面 31 根</span><span class='tag'>彈 8.9%</span></div><pre class='trade-detail'>entry 108.50  stop 104.16 (−4.34)
+target 112.84  exit 112.84 target  +4.34
+破底 99.60 @ 10-19 09:00  站回 10-21 09:00
+MA5 105.70 / MA10 104.00 / MA20 103.38
+fwd +1d +5.07%  +3d -0.92%  +5d —</pre><div class='mini-chart'><img src='img/t39_5351_1028_0900.png' alt='5351 鈺創' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#40 · 4977 眾達-KY</span><span class='trade-time'>2026-10-28 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>4977.TW</span><span class='tag'>target</span><span class='tag'>深度 6.8%</span><span class='tag'>下面 10 根</span><span class='tag'>彈 10.3%</span></div><pre class='trade-detail'>entry 182.00  stop 174.72 (−7.28)
+target 189.28  exit 189.28 target  +7.28
+破底 165.00 @ 10-27 10:00  站回 10-28 09:00
+MA5 171.20 / MA10 170.50 / MA20 173.15
+fwd +1d +2.75%  +3d -4.95%  +5d —</pre><div class='mini-chart'><img src='img/t40_4977_1028_0900.png' alt='4977 眾達-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#41 · 6538 倉和</span><span class='trade-time'>2026-10-28 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>6538.TWO</span><span class='tag'>target</span><span class='tag'>深度 15.3%</span><span class='tag'>下面 15 根</span><span class='tag'>彈 21.7%</span></div><pre class='trade-detail'>entry 322.00  stop 309.12 (−12.88)
+target 334.88  exit 334.88 target  +12.88
+破底 264.50 @ 10-19 09:00  站回 10-20 11:00
+MA5 291.30 / MA10 290.10 / MA20 294.40
+fwd +1d +0.00%  +3d -9.78%  +5d —</pre><div class='mini-chart'><img src='img/t41_6538_1028_0900.png' alt='6538 倉和' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#42 · 2355 敬鵬</span><span class='trade-time'>2026-10-28 09:00 → 10-29 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>2355.TW</span><span class='tag'>stop</span><span class='tag'>深度 7.3%</span><span class='tag'>下面 14 根</span><span class='tag'>彈 11.5%</span></div><pre class='trade-detail'>entry 54.50  stop 52.32 (−2.18)
+target 56.68  exit 52.32 stop  -2.18
+破底 48.90 @ 10-27 10:00  站回 10-28 09:00
+MA5 50.47 / MA10 50.74 / MA20 51.61
+fwd +1d +0.00%  +3d -6.42%  +5d —</pre><div class='mini-chart'><img src='img/t42_2355_1028_0900.png' alt='2355 敬鵬' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#43 · 3673 TPK-KY</span><span class='trade-time'>2026-10-28 09:00 → 10-29 11:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>3673.TW</span><span class='tag'>stop</span><span class='tag'>深度 4.1%</span><span class='tag'>下面 6 根</span><span class='tag'>彈 5.8%</span></div><pre class='trade-detail'>entry 74.90  stop 71.90 (−3.00)
+target 77.90  exit 71.90 stop  -3.00
+破底 70.80 @ 10-27 10:00  站回 10-28 09:00
+MA5 71.94 / MA10 72.96 / MA20 73.83
+fwd +1d +0.13%  +3d -10.15%  +5d —</pre><div class='mini-chart'><img src='img/t43_3673_1028_0900.png' alt='3673 TPK-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#44 · 1303 南亞</span><span class='trade-time'>2026-10-28 10:00 → 10-29 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>1303.TW</span><span class='tag'>target</span><span class='tag'>深度 6.2%</span><span class='tag'>下面 9 根</span><span class='tag'>彈 7.6%</span></div><pre class='trade-detail'>entry 312.50  stop 300.00 (−12.50)
+target 325.00  exit 325.00 target  +12.50
+破底 290.50 @ 10-27 10:00  站回 10-28 09:00
+MA5 303.20 / MA10 301.75 / MA20 307.12
+fwd +1d +2.08%  +3d -5.28%  +5d —</pre><div class='mini-chart'><img src='img/t44_1303_1028_1000.png' alt='1303 南亞' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#45 · 2455 全新</span><span class='trade-time'>2026-10-28 10:00 → 10-29 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>2455.TW</span><span class='tag'>target</span><span class='tag'>深度 17.4%</span><span class='tag'>下面 25 根</span><span class='tag'>彈 10.5%</span></div><pre class='trade-detail'>entry 507.00  stop 486.72 (−20.28)
+target 527.28  exit 527.28 target  +20.28
+破底 459.00 @ 10-19 09:00  站回 10-20 09:00
+MA5 482.10 / MA10 476.75 / MA20 483.10
+fwd +1d +0.99%  +3d -11.83%  +5d —</pre><div class='mini-chart'><img src='img/t45_2455_1028_1000.png' alt='2455 全新' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#46 · 6526 達發</span><span class='trade-time'>2026-10-28 10:00 → 10-30 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>6526.TW</span><span class='tag'>stop</span><span class='tag'>深度 7.3%</span><span class='tag'>下面 9 根</span><span class='tag'>彈 7.9%</span></div><pre class='trade-detail'>entry 795.00  stop 763.20 (−31.80)
+target 826.80  exit 763.20 stop  -31.80
+破底 737.00 @ 10-27 13:00  站回 10-28 10:00
+MA5 764.40 / MA10 769.20 / MA20 788.30
+fwd +1d +0.63%  +3d -3.77%  +5d —</pre><div class='mini-chart'><img src='img/t46_6526_1028_1000.png' alt='6526 達發' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#47 · 2408 南亞科</span><span class='trade-time'>2026-10-28 11:00 → 10-29 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>2408.TW</span><span class='tag'>target</span><span class='tag'>深度 20.8%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 12.6%</span></div><pre class='trade-detail'>entry 468.00  stop 449.28 (−18.72)
+target 486.72  exit 486.72 target  +18.72
+破底 415.50 @ 10-19 09:00  站回 10-21 09:00
+MA5 453.70 / MA10 443.00 / MA20 436.93
+fwd +1d +1.82%  +3d -2.88%  +5d —</pre><div class='mini-chart'><img src='img/t47_2408_1028_1100.png' alt='2408 南亞科' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#48 · 1815 富喬</span><span class='trade-time'>2026-10-28 11:00 → 10-29 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>1815.TWO</span><span class='tag'>stop</span><span class='tag'>深度 14.3%</span><span class='tag'>下面 15 根</span><span class='tag'>彈 12.1%</span></div><pre class='trade-detail'>entry 144.00  stop 138.24 (−5.76)
+target 149.76  exit 138.24 stop  -5.76
+破底 128.50 @ 10-27 11:00  站回 10-28 11:00
+MA5 137.30 / MA10 136.35 / MA20 142.05
+fwd +1d +0.00%  +3d -12.15%  +5d —</pre><div class='mini-chart'><img src='img/t48_1815_1028_1100.png' alt='1815 富喬' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#49 · 4927 泰鼎-KY</span><span class='trade-time'>2026-10-28 11:00 → 10-29 13:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>4927.TW</span><span class='tag'>stop</span><span class='tag'>深度 10.2%</span><span class='tag'>下面 14 根</span><span class='tag'>彈 10.4%</span></div><pre class='trade-detail'>entry 56.30  stop 54.05 (−2.25)
+target 58.55  exit 54.05 stop  -2.25
+破底 51.00 @ 10-27 10:00  站回 10-28 09:00
+MA5 53.90 / MA10 53.41 / MA20 54.77
+fwd +1d +0.00%  +3d -11.01%  +5d —</pre><div class='mini-chart'><img src='img/t49_4927_1028_1100.png' alt='4927 泰鼎-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#50 · 1560 中砂</span><span class='trade-time'>2026-10-28 13:00 → 10-30 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>1560.TW</span><span class='tag'>stop</span><span class='tag'>深度 6.6%</span><span class='tag'>下面 13 根</span><span class='tag'>彈 11.9%</span></div><pre class='trade-detail'>entry 915.00  stop 878.40 (−36.60)
+target 951.60  exit 878.40 stop  -36.60
+破底 818.00 @ 10-27 10:00  站回 10-28 09:00
+MA5 900.00 / MA10 866.90 / MA20 866.15
+fwd +1d -2.30%  +3d —  +5d —</pre><div class='mini-chart'><img src='img/t50_1560_1028_1300.png' alt='1560 中砂' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#51 · 2464 盟立</span><span class='trade-time'>2026-10-28 13:00 → 10-30 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>2464.TW</span><span class='tag'>stop</span><span class='tag'>深度 14.2%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 11.5%</span></div><pre class='trade-detail'>entry 179.50  stop 172.32 (−7.18)
+target 186.68  exit 172.32 stop  -7.18
+破底 161.00 @ 10-22 13:00  站回 10-27 09:00
+MA5 176.30 / MA10 175.90 / MA20 171.80
+fwd +1d -1.95%  +3d —  +5d —</pre><div class='mini-chart'><img src='img/t51_2464_1028_1300.png' alt='2464 盟立' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#52 · 3680 家登</span><span class='trade-time'>2026-10-28 13:00 → 10-29 09:00</span></div><div class='card-pnl pnl-loss'>-4.00%</div></header><div class='tags'><span class='tag tag-info'>3680.TWO</span><span class='tag'>stop</span><span class='tag'>深度 13.4%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 8.4%</span></div><pre class='trade-detail'>entry 532.00  stop 510.72 (−21.28)
+target 553.28  exit 510.72 stop  -21.28
+破底 491.00 @ 10-19 09:00  站回 10-21 09:00
+MA5 527.60 / MA10 518.00 / MA20 516.75
+fwd +1d -1.88%  +3d —  +5d —</pre><div class='mini-chart'><img src='img/t52_3680_1028_1300.png' alt='3680 家登' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div></body></html>

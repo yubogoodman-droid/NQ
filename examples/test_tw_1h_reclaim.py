@@ -71,8 +71,8 @@ def ohlc_from_close(closes, lows=None, highs=None) -> pd.DataFrame:
 
 
 def valid_closes():
-    """30 根在 100 上，7 根跌到 96，再站回 101。"""
-    warmup = [100.0] * 30
+    """60 根在 100 上，7 根跌到 96，再站回 101。"""
+    warmup = [100.0] * 60
     below = [98.6, 97.8, 96.9, 96.2, 96.0, 96.4, 96.9]
     reclaim = [101.0, 101.4, 101.8]
     closes = warmup + below + reclaim
@@ -121,7 +121,7 @@ def test_fake_stands_rejected_by_default() -> None:
 
 
 def test_fake_stands_ok_if_allowed() -> None:
-    warmup = [100.0] * 30
+    warmup = [100.0] * 60
     body = [98.5, 97.8, 97.2, 100.2, 97.0, 96.4, 95.9, 96.2, 96.6]
     lows = [c - 0.3 for c in warmup] + [98.1, 97.4, 96.8, 99.6, 96.6, 96.0, 95.3, 95.8, 96.2]
     reclaim = [101.0]
@@ -194,7 +194,7 @@ def test_entry_must_be_within_36_of_trough() -> None:
 
 
 def test_strict_rejects_fake_stand() -> None:
-    warmup = [100.0] * 30
+    warmup = [100.0] * 60
     body = [98.5, 97.8, 97.2, 100.2, 97.0, 96.4, 95.9, 96.2, 96.6]
     lows = [c - 0.3 for c in warmup] + [98.1, 97.4, 96.8, 99.6, 96.6, 96.0, 95.3, 95.8, 96.2]
     df = ohlc_from_close(warmup + body + [101.0], lows=lows + [100.4])
@@ -205,7 +205,7 @@ def test_strict_rejects_fake_stand() -> None:
 
 def test_yuanjing_like_passes() -> None:
     """對齊元晶：9 根下面、深度 ~4.6%、0 假站、隔根翻上、彈 ~3.8%。"""
-    warmup = [100.0] * 30
+    warmup = [97.5] * 30 + [100.0] * 30
     below = [98.8, 98.2, 97.5, 96.9, 96.4, 96.0, 95.8, 95.7, 95.7]
     below_lows = [98.4, 97.8, 97.1, 96.5, 96.0, 95.6, 95.4, 95.6, 95.5]
     reclaim = [99.0]
@@ -224,7 +224,7 @@ def test_yuanjing_like_passes() -> None:
 
 def test_long_grind_still_counts() -> None:
     """GIS-KY 那種：下面磨超過 16 根，36 根內翻上仍算。"""
-    warmup = [100.0] * 30
+    warmup = [97.5] * 30 + [100.0] * 30
     below = [98.8 - i * 0.12 for i in range(20)]
     below_lows = [c - 0.35 for c in below]
     below_lows[-1] = 95.4
@@ -236,6 +236,19 @@ def test_long_grind_still_counts() -> None:
     assert len(sigs) == 1
     assert sigs[0].wave.bars_below == 20
     assert sigs[0].entry_idx > sigs[0].wave.trough_idx
+
+
+def test_below_trend_ma_rejected() -> None:
+    """雖然站上 MA5/10/20，但仍在 MA60 下方（空頭段死貓跳）不進。"""
+    warmup = [105.0] * 40 + [100.0] * 20
+    below = [98.8, 98.2, 97.5, 96.9, 96.4, 96.0, 95.8, 95.7, 95.7]
+    below_lows = [98.4, 97.8, 97.1, 96.5, 96.0, 95.6, 95.4, 95.6, 95.5]
+    reclaim = [99.0]
+    df = ohlc_from_close(warmup + below + reclaim, lows=[c - 0.3 for c in warmup] + below_lows + [97.8])
+    funnel: dict = {}
+    assert detect_signals(df, loose_params(), funnel=funnel) == []
+    assert funnel.get("below_trend_ma", 0) >= 1
+    assert len(detect_signals(df, loose_params(trend_ma=0))) == 1
 
 
 def test_too_long_still_timeout() -> None:
@@ -407,6 +420,7 @@ def main() -> int:
     test_strict_rejects_fake_stand()
     test_yuanjing_like_passes()
     test_long_grind_still_counts()
+    test_below_trend_ma_rejected()
     test_too_long_still_timeout()
     test_bounce_too_small()
     test_same_bar_trough_skipped()
