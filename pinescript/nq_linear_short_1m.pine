@@ -17,6 +17,7 @@ ma200Len = input.int(200, "MA200（停利）")
 lookback4h = input.int(240, "四小時高回看（一分K=240根）", minval=60)
 stopBuf = input.float(0, "停損緩衝（點，加在四小時高上方）", minval=0, step=1)
 minPeakDistMa200 = input.float(100, "創高距MA200至少（點）", minval=0, step=5)
+minRR = input.float(2.5, "進場距MA200至少是停損的幾倍", minval=0, step=0.5)
 nearMa200 = input.float(15, "靠近MA200（點）", minval=1, step=1)
 minLowerWick = input.float(3, "長下影最小長度（點）", minval=1, step=0.5)
 wickBodyRatio = input.float(3.0, "下影／實體 倍數", minval=1, step=0.5)
@@ -95,12 +96,21 @@ if strategy.position_size == 0 and not justClosed
         else
             brokeMa20 = ta.crossunder(close, ma20)
             peakDistOk = not na(peakHigh) and not na(peakMa200) and (peakHigh - peakMa200) >= minPeakDistMa200
-            if brokeMa20 and peakDistOk
+            riskPts = peakHigh + stopBuf - close
+            rewardPts = close - ma200
+            rrOk = riskPts > 0 and rewardPts > 0 and (minRR == 0 or rewardPts / riskPts >= minRR)
+            if brokeMa20 and peakDistOk and rrOk
                 strategy.entry("線性空", strategy.short)
                 strategy.exit("停損", from_entry="線性空", stop=peakHigh + stopBuf)
                 st := 3
             else if brokeMa20 and not peakDistOk
                 // 距離不夠，作廢這次結構
+                st := 0
+                peakHigh := na
+                peakMa200 := na
+                bounceHi := na
+            else if brokeMa20 and not rrOk
+                // 離停利太近或已跌破 MA200，作廢
                 st := 0
                 peakHigh := na
                 peakMa200 := na

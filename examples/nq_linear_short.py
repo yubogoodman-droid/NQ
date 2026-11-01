@@ -2,7 +2,7 @@
 """NQ 一分 K 線性空 — 對齊 pinescript/nq_linear_short_1m.pine。
 
 多頭排列創四小時高 → 回測 MA10 不過高 → 收盤跌破 MA20，
-且峰距 MA200 ≥ 100 點，做空。停損在四小時高；
+且峰距 MA200 ≥ 100 點、進場離 MA200 至少 2.5 倍停損，做空。停損在四小時高；
 停利碰到 MA200，或靠近 MA200 出現長下影。
 
 用法:
@@ -272,6 +272,9 @@ class LinearShortParams:
     stop_buf: float = 0.0
     min_peak_dist: float = 100.0
     near_ma200: float = 15.0
+    min_rr: float = 2.5  # 進場到 MA200 的空間 / 停損距離，0 表示不濾
+    max_risk: float = 0.0  # 停損距離上限，0 表示不濾
+    avoid_premarket: bool = False  # 跳過 05:00–09:30 ET
     min_lower_wick: float = 3.0
     wick_body_ratio: float = 3.0
     wick_range_ratio: float = 0.55
@@ -446,14 +449,30 @@ def run_linear_short(
                                 h1_close=float(h1_close[i]),
                                 h1_ma20=float(h1_ma20[i]),
                             )
-                            if sig.risk > 0:
+                            reward = float(c[i] - ma200[i])
+                            rr = reward / sig.risk if sig.risk > 0 else 0.0
+                            mins = df.index[i].hour * 60 + df.index[i].minute
+                            premarket = 5 * 60 <= mins < 9 * 60 + 30
+                            if sig.risk <= 0:
+                                bump("skip_bad_risk")
+                                st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
+                            elif reward <= 0:
+                                bump("skip_below_ma200")
+                                st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
+                            elif p.max_risk > 0 and sig.risk > p.max_risk:
+                                bump("skip_risk")
+                                st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
+                            elif p.min_rr > 0 and rr < p.min_rr:
+                                bump("skip_rr")
+                                st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
+                            elif p.avoid_premarket and premarket:
+                                bump("skip_premarket")
+                                st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
+                            else:
                                 position = -1
                                 open_sig = sig
                                 st = 3
                                 bump("taken")
-                            else:
-                                bump("skip_bad_risk")
-                                st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
                         else:
                             bump("skip_dist")
                             st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
@@ -1009,6 +1028,8 @@ def write_html_report(
             f"破MA20 {funnel.get('break_ma20', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
             f"（距不夠 {funnel.get('skip_dist', 0)} · "
+            f"空間不夠 {funnel.get('skip_rr', 0)} · "
+            f"已在MA200下 {funnel.get('skip_below_ma200', 0)} · "
             f"破排列取消 {funnel.get('cancel_stack', 0)} · "
             f"再創高取消 {funnel.get('cancel_new_high', 0)}）</p>"
         )
@@ -1060,7 +1081,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <h1>{escape(symbol)} 線性空</h1>
 {note}
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">多頭排列創四小時高 → 回測MA10不過高 → 破MA20做空。峰距MA200至少 100 點。停損四小時高；停利 MA200 / 靠近長下影。</p>
+<p class="muted">多頭排列創四小時高 → 回測MA10不過高 → 破MA20做空。峰距MA200至少 100 點，而且進場離MA200至少是停損的 2.5 倍。停損四小時高；停利 MA200 / 靠近長下影。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1099,6 +1120,9 @@ def cmd_backtest(args) -> int:
         stop_buf=args.stop_buf,
         min_peak_dist=args.min_peak_dist,
         near_ma200=args.near_ma200,
+        min_rr=args.min_rr,
+        max_risk=args.max_risk,
+        avoid_premarket=args.avoid_premarket,
     )
     funnel: Dict[str, int] = {}
     trades = run_linear_short(df, params, funnel=funnel)
@@ -1110,6 +1134,8 @@ def cmd_backtest(args) -> int:
         f"high={funnel.get('made_high', 0)} retest={funnel.get('retest', 0)} "
         f"break={funnel.get('break_ma20', 0)} taken={funnel.get('taken', 0)} "
         f"skip_dist={funnel.get('skip_dist', 0)} "
+        f"skip_rr={funnel.get('skip_rr', 0)} "
+        f"skip_below={funnel.get('skip_below_ma200', 0)} "
         f"cancel_stack={funnel.get('cancel_stack', 0)} "
         f"cancel_hh={funnel.get('cancel_new_high', 0)}"
     )
@@ -1161,6 +1187,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--stop-buf", type=float, default=0.0)
     p.add_argument("--min-peak-dist", type=float, default=100.0)
     p.add_argument("--near-ma200", type=float, default=15.0)
+    p.add_argument("--min-rr", type=float, default=2.5, help="進場到 MA200 至少是停損的幾倍，0 關閉")
+    p.add_argument("--max-risk", type=float, default=0.0, help="停損距離上限，0 關閉")
+    p.add_argument("--avoid-premarket", action="store_true", help="跳過 05:00–09:30 ET")
     return p
 
 

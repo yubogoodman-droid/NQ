@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nq_linear_short import (  # noqa: E402
     ET,
+    LinearShortParams,
     hour_bar_index,
     hour_window,
     long_lower_wick,
@@ -226,6 +227,12 @@ def test_wick_exit() -> None:
     assert trades[0].pnl_points > 0
 
 
+def test_skip_poor_reward_risk() -> None:
+    df = _make_valid_setup(after="ma200")
+    trades = run_linear_short(df, LinearShortParams(min_rr=100))
+    assert not trades
+
+
 def test_skip_small_peak_dist() -> None:
     o, h, l, c = _uptrend(280, step=0.25)
     last = float(c[-1])
@@ -290,6 +297,7 @@ def main() -> int:
     test_entry_and_ma200_tp()
     test_stop_exit()
     test_wick_exit()
+    test_skip_poor_reward_risk()
     test_skip_small_peak_dist()
     test_cancel_on_new_high()
     test_no_same_bar_exit()
