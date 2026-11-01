@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """台股 1h：MA5>MA10>MA20 多頭排列且收盤站上 MA60 → Telegram。
 
-條件（小時 K 收盤）：
+條件（小時 K）：
   • MA5 > MA10 > MA20
-  • 這一根收盤站上 MA60（收盤 > MA60）
   • 上一根收盤還沒站上 MA60
+  • 這一根開盤仍在 MA60 之下（或剛好貼著），收盤才站上
+    跳空開高、開盤已經在 MA60 上的不算
 
 成交額前 200、股價 < 1000（跟 1h 破底翻同一池）。
 每根小時 K 收盤後掃一次；GitHub Actions 在盤中整點代跑。
@@ -122,11 +123,21 @@ def setup_at(
     return stacked_at(i, ma5, ma10, ma20) and above_ma60_at(i, close, ma60)
 
 
+def open_at_or_below_ma60(i: int, open_: np.ndarray, ma60: np.ndarray) -> bool:
+    """這一根開盤還沒站上 MA60。跳空開在均線上的不算穿過去。"""
+    if i < 0 or i >= len(open_) or i >= len(ma60):
+        return False
+    if np.isnan(open_[i]) or np.isnan(ma60[i]):
+        return False
+    return bool(open_[i] <= ma60[i])
+
+
 def detect_signals(df: pd.DataFrame) -> List[Signal]:
-    """本根多頭排列且站上 MA60，上一根收盤還沒站上 MA60。"""
-    if df is None or len(df) < 61:
+    """多頭排列，上一根收盤沒站上 MA60，這一根開盤仍在下、收盤才站上。"""
+    if df is None or len(df) < 61 or "Open" not in df.columns:
         return []
     close = df["Close"].to_numpy(float)
+    open_ = df["Open"].to_numpy(float)
     ma5 = sma(close, 5)
     ma10 = sma(close, 10)
     ma20 = sma(close, 20)
@@ -137,6 +148,7 @@ def detect_signals(df: pd.DataFrame) -> List[Signal]:
             stacked_at(i, ma5, ma10, ma20)
             and above_ma60_at(i, close, ma60)
             and not above_ma60_at(i - 1, close, ma60)
+            and open_at_or_below_ma60(i, open_, ma60)
         ):
             out.append(
                 Signal(
@@ -545,6 +557,10 @@ def dump_hits_json(path: Path, hits: List[Hit], stats: dict, extra: dict) -> Pat
 
 def write_html(path: Path, hits: List[Hit], universe: List[dict], period: str, date: str) -> Path:
     stats = summarize_fwd(hits)
+    img_dir = path.parent / "img"
+    if img_dir.exists():
+        for old in img_dir.glob("*.png"):
+            old.unlink()
     cards: List[str] = []
     for i, hit in enumerate(hits, 1):
         sig = hit.signal
@@ -579,6 +595,7 @@ def write_html(path: Path, hits: List[Hit], universe: List[dict], period: str, d
     cutoff = universe[-1]["amount"] / 1e8 if universe else 0
     avg1 = _fmt_fwd(stats["fwd_1d"])
     avg3 = _fmt_fwd(stats["fwd_3d"])
+    avg5 = _fmt_fwd(stats["fwd_5d"])
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -605,7 +622,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>台股 1h · MA5&gt;MA10&gt;MA20 且站上 MA60</h1>
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億
-<br/>小時 K 收盤：MA5&gt;MA10&gt;MA20，且<strong>上一根還沒站上 MA60、這一根才站上</strong>。
+<br/>MA5&gt;MA10&gt;MA20。上一根收盤還沒站上 MA60，這一根<strong>開盤仍在 MA60 之下、收盤才站上</strong>（跳空開高直接站上的不算）。
 卡片右上是訊號後下一個交易日收盤報酬（還沒走完就顯示站上 MA60 幅度）。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -613,6 +630,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <div class="card">+1d 勝率<b>{stats['fwd_1d_wr']:.0f}%</b></div>
 <div class="card">平均 +1d<b class="{_pnl_cls(stats['fwd_1d'])}">{avg1}</b></div>
 <div class="card">平均 +3d<b class="{_pnl_cls(stats['fwd_3d'])}">{avg3}</b></div>
+<div class="card">平均 +5d<b class="{_pnl_cls(stats['fwd_5d'])}">{avg5}</b></div>
 </div>
 </section>
 {''.join(cards) or "<div class='empty'>這段期間沒有訊號</div>"}
