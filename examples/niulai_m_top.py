@@ -2,7 +2,7 @@
 """牛来 USDT 永續 · 五分 K M 頭跌破 MA200 做空。
 
 對齊幣安 App 截圖：只做牛來那種對稱深 M（雙峰站在 MA200 上方、頸線回測均線），
-收盤同時跌破 MA200 與 MA25 才空。停損在 M 頭高點，目標 2R，或 48 根時間停。
+收盤同時跌破 MA200 與 MA25 才空。停損在 M 頭高點，目標 1.5R，或 48 根時間停。
 
 用法:
   python3 examples/niulai_m_top.py
@@ -107,6 +107,9 @@ def niulai_params(**overrides: Any) -> MTopParams:
         require_close_below_ma25=True,
         min_break_volume_mult=0.0,
         local_high_pad=16,
+        # 2R 約要再跌 10%，幾乎碰不到。1.5R 在 09/01–09/24 與 10/17 之後都比 2R 少虧，
+        # 09/24–10/16 從微賺變成持平。停損仍放在雙頂高點。
+        target_r=1.5,
     )
     data.update(overrides)
     return MTopParams(**data)
@@ -544,6 +547,10 @@ def _dedupe_patterns(patterns: Sequence[MTopPattern]) -> list[MTopPattern]:
     return sorted(by_break.values(), key=lambda p: p.breakout_idx)
 
 
+def _r_label(params: Optional[MTopParams] = None) -> str:
+    return f"{(params or niulai_params()).target_r:g}R"
+
+
 def _round_tick(price: float, tick: float) -> float:
     if tick <= 0:
         return price
@@ -605,7 +612,7 @@ def simulate(
     signals: Sequence[Signal],
     params: Optional[MTopParams] = None,
 ) -> list[TradeResult]:
-    """做空：先碰到停損（高點）或目標（2R），否則時間停。同時只持一筆。"""
+    """做空：先碰到停損（高點）或目標，否則時間停。同時只持一筆。"""
     params = params or default_params()
     highs = df["high"].to_numpy(float)
     lows = df["low"].to_numpy(float)
@@ -1174,7 +1181,7 @@ def write_html_report(
             f"<span class='trade-time'>{escape(shot.signal.timestamp.strftime('%Y-%m-%d %H:%M'))} 跌破 MA200</span>"
             "</div></header>"
             "<p class='muted' style='margin:0 0 10px'>左峰 H1、右峰 H2 在 MA200 上方結成 M 頭，"
-            "收盤跌破紅色 MA200 進場做空（S）。停損在雙頂高點，目標 2R。下面是同一段一小時 K。</p>"
+            f"收盤跌破紅色 MA200 進場做空（S）。停損在雙頂高點，目標 {_r_label()}。下面是同一段一小時 K。</p>"
             "<p class='chart-cap'>五分K</p>"
             "<div class='mini-chart'><img src='img/overview.png' alt='overview' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -1210,7 +1217,7 @@ def write_html_report(
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.5f}  MA200 {t.signal.ma200:.5f}\n"
             f"stop  {t.stop_price:.5f}  （M頭高 −{risk:.5f}）\n"
-            f"target {t.target_price:.5f}  （2R）\n"
+            f"target {t.target_price:.5f}  （{_r_label()}）\n"
             f"exit  {t.exit_price:.5f}  {t.exit_reason}  {t.pnl_pct*100:+.2f}%\n"
             f"H1 {df.index[p.first_high_idx].strftime('%m-%d %H:%M')} {p.first_high:.5f}\n"
             f"H2 {df.index[p.second_high_idx].strftime('%m-%d %H:%M')} {p.second_high:.5f}\n"
@@ -1268,10 +1275,10 @@ h1{{font-size:18px;margin:0 0 6px}}
 <br/>只做「牛來那種」M 頭：雙峰幾乎等高（價差 ≤ 1%、右峰不得明顯更高）、間隔約 1.5～4 小時、
 中間至少跌 4%，兩個峰都明顯站在 MA200 上方（≥ 3%），頸線回測 MA200（不得遠高或深跌穿），
 M 成形期間多數收盤仍在均線上，然後收盤同時跌破 MA200 與 MA25 才空。小振幅、貼均線亂鑽的假 M 不畫。
-停損在雙頂高點、目標 2R、或 48 根時間停。每筆下面附同一段一小時 K。加總％是各筆報酬相加，不是複利。</p>
+停損在雙頂高點、目標 {_r_label()}、或 48 根時間停。每筆下面附同一段一小時 K。加總％是各筆報酬相加，不是複利。</p>
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
-<br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
+<br/>出場：{_r_label()} {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['closed_win_rate']:.1f}%</b></div>
@@ -1385,7 +1392,7 @@ def write_scan_html(
             "<pre class='trade-detail'>"
             f"entry {fmt_px(t.entry_price)}  MA200 {fmt_px(t.signal.ma200)}\n"
             f"stop  {fmt_px(t.stop_price)}  （M頭高 −{fmt_px(risk)}）\n"
-            f"target {fmt_px(t.target_price)}  （2R）\n"
+            f"target {fmt_px(t.target_price)}  （{_r_label()}）\n"
             f"exit  {fmt_px(t.exit_price)}  {t.exit_reason}  {t.pnl_pct*100:+.2f}%\n"
             f"H1 {df.index[p.first_high_idx].strftime('%m-%d %H:%M')} {fmt_px(p.first_high)}\n"
             f"H2 {df.index[p.second_high_idx].strftime('%m-%d %H:%M')} {fmt_px(p.second_high)}\n"
@@ -1446,10 +1453,10 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(title)}</h1>
 <p class="muted">{blurb}
-<br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4%、雙峰明顯站上 MA200、頸線回測均線（不深跌穿）、成形期間多數收盤在均線上，收盤同時跌破 MA200 與 MA25 才空。貼均線亂鑽的小 M 不畫。停損雙頂高點、2R、或 48 根時間停。每筆下面附同一段一小時 K。加總％是各筆報酬相加，不是複利。</p>
+<br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4%、雙峰明顯站上 MA200、頸線回測均線（不深跌穿）、成形期間多數收盤在均線上，收盤同時跌破 MA200 與 MA25 才空。貼均線亂鑽的小 M 不畫。停損雙頂高點、{_r_label()}、或 48 根時間停。每筆下面附同一段一小時 K。加總％是各筆報酬相加，不是複利。</p>
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
-<br/>出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
+<br/>出場：{_r_label()} {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['closed_win_rate']:.1f}%</b></div>
@@ -1564,15 +1571,16 @@ def _distribution(trades: Sequence[TradeResult]) -> dict:
     return stats
 
 
-def _rules_html(limit: int) -> str:
+def _rules_html(limit: int, entry_start: pd.Timestamp, entry_end: pd.Timestamp) -> str:
     p = niulai_params()
+    fetch = entry_start - pd.Timedelta(days=3)
     return f"""
 <section class="summary">
 <h2>觸發規則（照 examples/niulai_m_top.py）</h2>
 <p class="muted">做空。報酬 = (進場價 − 出場價) / 進場價。未扣手續費、資金費率與稅。同一檔在上一筆出場前不再進場；不同檔可以同時持有。進場窗以外的訊號先拿掉，不佔用這段持倉。</p>
 <ul class="rules">
 <li><b>週期</b>：幣安 U 本位永續 <span class="k">5m</span> 已收盤 K。K 線開盤時間轉成 Asia/Shanghai。</li>
-<li><b>標的</b>：<span class="k">quoteAsset=USDT</span>、<span class="k">status=TRADING</span>、<span class="k">contractType=PERPETUAL</span>，排除 <span class="k">underlyingType=INDEX</span>。依<b>跑回測當下</b>的 24h <span class="k">quoteVolume</span> 取前 {limit}。程式沒有歷史排名，所以不是 10/17 當天的成交額前 {limit}。</li>
+<li><b>標的</b>：<span class="k">quoteAsset=USDT</span>、<span class="k">status=TRADING</span>、<span class="k">contractType=PERPETUAL</span>，排除 <span class="k">underlyingType=INDEX</span>。依<b>跑回測當下</b>的 24h <span class="k">quoteVolume</span> 取前 {limit}。程式沒有歷史排名，所以不是進場窗第一天的成交額前 {limit}。</li>
 <li><b>均線</b>：進場用收盤 SMA{p.ma_period}，以及 SMA25。圖上也畫 MA7、MA14、MA99、MA120，這四條不參與進場條件。</li>
 <li><b>波段高</b>：左右各 {p.swing_lookback} 根裡，最高價唯一最大，才算轉折高。</li>
 <li><b>雙峰</b>：兩峰相隔 {p.min_bars_between}～{p.max_bars_between} 根（含）。兩峰價差 / 均價 ≤ {p.high_tolerance_pct:.0%}。右峰不得高過左峰 × {1 + p.second_high_max_overshoot:.3f}。</li>
@@ -1584,7 +1592,7 @@ def _rules_html(limit: int) -> str:
 <li><b>停損</b>：兩峰較高價，同樣四捨五入到 tick。進場後下一根起，若 high ≥ 停損，出場價 = 停損（同一根先看停損、再看停利）。</li>
 <li><b>停利</b>：進場價 − {p.target_r:g} × (停損 − 進場價)，四捨五入到 tick。low ≤ 目標則出場價 = 目標。</li>
 <li><b>時間出場</b>：進場後 {p.time_bars} 根（5 分 K 即 {p.time_bars * 5} 分鐘）都沒碰到停損或停利，用那根收盤出場。資料在第 {p.time_bars} 根之前結束，則停在最後一根已收盤 K，原因記 <span class="k">open</span>（未平）。</li>
-<li><b>這次回測窗</b>：進場時間 2026-10-17 00:00 ≤ t &lt; 2026-10-31 00:00（Asia/Shanghai）。K 線從 2026-10-14 00:00 起抓，讓 MA200 與 M 頭有預熱。只讀公開 K 線，不下單。</li>
+<li><b>這次回測窗</b>：進場時間 {entry_start.strftime('%Y-%m-%d %H:%M')} ≤ t &lt; {entry_end.strftime('%Y-%m-%d %H:%M')}（Asia/Shanghai）。K 線從 {fetch.strftime('%Y-%m-%d %H:%M')} 起抓，讓 MA200 與 M 頭有預熱。只讀公開 K 線，不下單。</li>
 </ul>
 </section>
 """
@@ -1630,6 +1638,7 @@ def write_embedded_range_html(
     entry_start: pd.Timestamp,
     entry_end: pd.Timestamp,
     limit: int,
+    note: str = "",
 ) -> Path:
     trades = [h.trade for h in hits]
     stats = _distribution(trades)
@@ -1661,7 +1670,7 @@ def write_embedded_range_html(
             "<pre class='trade-detail'>"
             f"entry {fmt_px(t.entry_price)}  MA200 {fmt_px(t.signal.ma200)}\n"
             f"stop  {fmt_px(t.stop_price)}\n"
-            f"target {fmt_px(t.target_price)}  （2R）\n"
+            f"target {fmt_px(t.target_price)}  （{_r_label()}）\n"
             f"exit  {fmt_px(t.exit_price)}  {t.exit_reason}  {t.pnl_pct*100:+.2f}%\n"
             f"H1 {df.index[p.first_high_idx].strftime('%m-%d %H:%M')} {fmt_px(p.first_high)}\n"
             f"H2 {df.index[p.second_high_idx].strftime('%m-%d %H:%M')} {fmt_px(p.second_high)}\n"
@@ -1725,9 +1734,10 @@ img{{width:100%;height:auto;display:block;border-radius:10px}}
 <div class="page">
 <section class="summary">
 <h1>幣安成交額前 {limit} · 五分 K · M 頭跌破 MA200 做空</h1>
-<p class="muted">進場窗 {escape(start_s)} → {escape(end_s)}（Asia/Shanghai，含 10/17 與 10/30）。宇宙 {len(universe)} 檔。訊號 {stats['count']}。已平倉勝率 {stats['closed_win_rate']:.1f}%（報酬 &gt; 0；未平倉不計入勝率）。平均 {stats['avg_pct']*100:+.2f}%，中位數 {stats['median_pct']*100:+.2f}%。加總 {stats['total_pct']*100:+.2f}% 是各筆相加，不是複利。未扣手續費、資金費率與稅。</p>
+<p class="muted">進場窗 {escape(start_s)} → {escape(end_s)}（Asia/Shanghai，含首日與末日）。宇宙 {len(universe)} 檔。訊號 {stats['count']}。已平倉勝率 {stats['closed_win_rate']:.1f}%（報酬 &gt; 0；未平倉不計入勝率）。平均 {stats['avg_pct']*100:+.2f}%，中位數 {stats['median_pct']*100:+.2f}%。加總 {stats['total_pct']*100:+.2f}% 是各筆相加，不是複利。未扣手續費、資金費率與稅。</p>
+{note}
 <p class="muted">最好：{escape(_extreme(best, hits))}<br/>最差：{escape(_extreme(worst, hits))}</p>
-<p class="muted">出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
+<p class="muted">出場：{_r_label()} {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
 <div class="cards">
 <div class="card">訊號<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['closed_win_rate']:.1f}%</b></div>
@@ -1736,7 +1746,7 @@ img{{width:100%;height:auto;display:block;border-radius:10px}}
 </div>
 <div class="equity">{_equity_svg([t.pnl_pct for t in trades])}</div>
 </section>
-{_rules_html(limit)}
+{_rules_html(limit, entry_start, entry_end)}
 {''.join(cards) or "<div class='empty'>這段進場窗沒有 M 頭跌破 MA200 訊號</div>"}
 </div></body></html>
 """
