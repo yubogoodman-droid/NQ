@@ -91,6 +91,53 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## 台股 1 小時 K：5/10/20 多頭排列站上 MA60
+
+小時 K 同時滿足 **MA5 > MA10 > MA20**，**上一根收盤還沒站上 MA60**，而且 **這一根開盤仍在 MA60 之下、收盤才站上**，才推 Telegram。已經站在 MA60 上面、只是短均才排好的不算；跳空開高、一開盤就在 MA60 上的也不算。
+
+池子跟破底翻一樣：成交額前 200、股價 < 1000。GitHub Actions 在台北 10:03 / 11:03 / 12:03 / 13:03 / 13:33 代跑；本機也可以自己掛著。
+
+```bash
+# 測 Telegram（憑證放 tg_config.env，勿提交）
+python3 examples/tw_1h_stack_ma60.py --test
+
+# 只掃剛收盤的 1～2 根（盤後 / Actions）
+python3 examples/tw_1h_stack_ma60.py --dry-run --once
+python3 examples/tw_1h_stack_ma60.py --once
+
+# 等到下一根小時 K 收盤再掃
+python3 examples/tw_1h_stack_ma60.py
+
+# 現在已經多頭排列且站上 MA60 的名單
+python3 examples/tw_1h_stack_ma60.py --now
+
+# 近一週 / 近一個月回測（每筆一張圖）
+python3 examples/tw_1h_stack_ma60.py scan --days 7 --pages
+python3 examples/tw_1h_stack_ma60.py scan --days 30 --pages
+
+# 單元測試（不打網路）
+python3 examples/test_tw_1h_stack_ma60.py
+```
+
+同一池（2026-10-30 成交額前 200、股價 < 1000）、Yahoo 1h、2026-05-19 → 10-30。加上「開盤還在 MA60 下」之後，六個月從 909 筆收到 556 筆：
+
+| | 筆數 | +1d 勝率 / 平均 | +3d 勝率 / 平均 | +5d 勝率 / 平均 |
+| --- | --- | --- | --- | --- |
+| 只看收盤站上 | 909 | 51.5% / +0.70% | 56.6% / +1.90% | 60.3% / +2.49% |
+| 開盤在下、收盤才站上 | 556 | 55.9% / +0.86% | 58.9% / +2.01% | 61.0% / +2.39% |
+
++1 日六個月份的平均報酬都比原規則高。+5 日全期平均略低一點（+2.39% 對 +2.49%）。2026-07 這段兩邊都是虧的（優化後 +1d −1.81%、+5d −6.49%），過濾擋不住整個月往下的行情。
+
+2026-10-01 → 10-30 這一個月（圖在月報）：**65 筆、54 檔**。+1d 勝率 **59.4%** 平均 **+1.17%**（64 筆）；+3d 勝率 **74.6%** 平均 **+3.25%**（59 筆）；+5d 勝率 **77.8%** 平均 **+3.67%**（45 筆，10/23 之後的還沒走完）。同一個月、舊規則是 98 筆，+1d 48.5% / +0.43%，+3d 64.4% / +1.87%，+5d 62.9% / +1.64%。
+
+月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma60-20bb/docs/tw-1h-stack-ma60-30d/view.html
+
+近一週（10/27–10/30）：**17 筆、15 檔**。已走完隔日的 16 筆勝率 **50%**、平均 **+0.84%**；+3d 已走完 11 筆勝率 **64%**、平均 **+0.86%**。+5d 還沒走完。
+
+週報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/tw-1h-stack-ma60-20bb/docs/tw-1h-stack-ma60-7d/view.html
+
+排程推播請在 repo 設定 GitHub Secrets：`TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID`（跟 NQ 破底翻同一組即可）。沒填的話 Actions 仍會掃，只印在 log。
+
 ## 幣安黏帶三幕 Telegram
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
