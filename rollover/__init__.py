@@ -1,4 +1,4 @@
-"""15 分 K 起跌（較低高點跌破頸線）放空。"""
+"""5 分結構、1 分進場的起跌放空。"""
 
 from rollover.strategy import (
     RolloverParams,

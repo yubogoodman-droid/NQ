@@ -154,22 +154,22 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
-## SOXS 十五分 K 起跌放空
+## SOXS 起跌放空（5 分結構，1 分進場）
 
-15 分收盤同時跌破「極點之後的回檔低點」、收在 MA25 下、量能回到前 10 根均量，才放空。停損放在較低高點，不放在極點。上漲途中的 S、以及已經離開頸線 0.8% 以上的中段，都不進。
+5 分圖定極點、較低高點和頸線。進場是之後第一根同時跌破頸線、收在 1 分 MA25 下、量能回到前 10 根均量的 1 分收盤。停損放在 5 分較低高點，不放在極點。上漲途中的 S、以及已經離開頸線 0.8% 以上的中段，都不進。
 
-規則在 `rollover/RULES.md`。合成 K 線測試不打網路：
+規則在 `rollover/RULES.md`。合成 5 分和 1 分 K 測試不打網路：
 
 ```bash
 python3 examples/test_rollover_short.py
 ```
 
-TradingView 用 `pinescript/soxs_rollover_15m.pine`，只掛在 15 分圖。
+TradingView 用 `pinescript/soxs_rollover_1m.pine`，掛在 1 分圖。
 
 ## TradingView
 
 `pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
-`pinescript/soxs_rollover_15m.pine` 是 SOXS 式 15 分起跌放空。
+`pinescript/soxs_rollover_1m.pine` 掛在 1 分圖，5 分結構由腳本自己取。
 
 ## 參數調整
 

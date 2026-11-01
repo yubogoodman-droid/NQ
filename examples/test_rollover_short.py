@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""合成 15 分 K 測試起跌放空。不打網路。
+"""合成 5 分 + 1 分 K 測試起跌放空。不打網路。
 
-走勢照 2026-10-31 SOXS 那一段：先墊高，極點 54.85，再以較低高點跌破頸線。
-極點本身不是進場。
+5 分走勢照 2026-10-31 SOXS 那一段：先墊高，極點 54.85，再以較低高點跌破頸線。
+進場落在 1 分收盤。極點本身不是進場。
 """
 
 from __future__ import annotations
@@ -24,9 +24,33 @@ from rollover.strategy import (  # noqa: E402
 )
 
 
-def _frame(rows: list[tuple], start: str = "2026-10-31 00:00") -> pd.DataFrame:
-    index = pd.date_range(start, periods=len(rows), freq="15min", tz="UTC")
+def _frame(rows: list[tuple], start: str, freq: str) -> pd.DataFrame:
+    index = pd.date_range(start, periods=len(rows), freq=freq, tz="UTC")
     return pd.DataFrame(rows, index=index, columns=["open", "high", "low", "close", "volume"])
+
+
+def _expand_1m(df5: pd.DataFrame) -> pd.DataFrame:
+    """每根 5 分拆成 5 根 1 分。第一根帶著這根 5 分的高低收，後面四根收在收盤價。"""
+
+    records = []
+    for ts, row in df5.iterrows():
+        vol = float(row.volume) / 5.0
+        close = float(row.close)
+        records.append((ts, float(row.open), float(row.high), float(row.low), close, vol))
+        for k in range(1, 5):
+            t = ts + pd.Timedelta(minutes=k)
+            records.append((t, close, close, close, close, vol))
+    index = [item[0] for item in records]
+    return pd.DataFrame(
+        [(o, h, low, c, v) for _, o, h, low, c, v in records],
+        index=pd.DatetimeIndex(index),
+        columns=["open", "high", "low", "close", "volume"],
+    )
+
+
+def _pair(rows: list[tuple], start: str = "2026-10-31 00:00") -> tuple[pd.DataFrame, pd.DataFrame]:
+    df5 = _frame(rows, start, "5min")
+    return df5, _expand_1m(df5)
 
 
 def _flat(n: int, price: float, volume: float = 1000.0) -> list[tuple]:
@@ -34,7 +58,7 @@ def _flat(n: int, price: float, volume: float = 1000.0) -> list[tuple]:
 
 
 def _soxs_top(break_volume: float = 4000.0, break_close: float = 52.05) -> list[tuple]:
-    """40 根橫在 52，再衝 54.85，回檔頸線 52.35，較低高點 53.50，第 47 根嘗試跌破。"""
+    """40 根 5 分橫在 52，再衝 54.85，回檔頸線 52.35，較低高點 53.50，第 47 根嘗試跌破。"""
 
     rows = _flat(40, 52.0)
     rows.extend(
@@ -50,6 +74,14 @@ def _soxs_top(break_volume: float = 4000.0, break_close: float = 52.05) -> list[
         ]
     )
     return rows
+
+
+def _set_1m(df1: pd.DataFrame, i: int, *, high: float, low: float, close: float, volume: float) -> None:
+    df1.iloc[i, df1.columns.get_loc("open")] = close
+    df1.iloc[i, df1.columns.get_loc("high")] = high
+    df1.iloc[i, df1.columns.get_loc("low")] = low
+    df1.iloc[i, df1.columns.get_loc("close")] = close
+    df1.iloc[i, df1.columns.get_loc("volume")] = volume
 
 
 def test_us_cash_session() -> None:
@@ -79,20 +111,23 @@ def test_uptrend_sell_marks_do_not_short() -> None:
         volume = 5000.0 if i % 5 == 0 else 800.0
         close = price - 0.20 if i % 5 == 0 else price
         rows.append((price - 0.05, price + 0.12, price - 0.10, close, volume))
-    assert detect_rollover_shorts(_frame(rows)) == []
+    df5, df1 = _pair(rows)
+    assert detect_rollover_shorts(df5, df1) == []
 
 
 def test_break_close_stops_at_lower_high_not_extreme() -> None:
-    df = _frame(_soxs_top())
-    signals = detect_rollover_shorts(df)
+    df5, df1 = _pair(_soxs_top())
+    signals = detect_rollover_shorts(df5, df1)
     assert len(signals) == 1, signals
     sig = signals[0]
     assert sig.kind == "break"
-    assert sig.bar_idx == 47
+    assert sig.bar_idx == 47 * 5
+    assert sig.timestamp == df1.index[47 * 5]
     assert sig.entry == 52.05
     assert sig.neckline == 52.35
     assert sig.extreme == 54.85
     assert sig.lower_high == 53.50
+    assert sig.lower_high_idx == 44
     assert sig.stop == 53.50
     assert sig.stop < sig.extreme
     assert sig.entry < sig.neckline
@@ -102,8 +137,9 @@ def test_break_close_stops_at_lower_high_not_extreme() -> None:
 
 
 def test_weekend_signal_is_off_session_and_cash_session_is_not() -> None:
-    weekend = detect_rollover_shorts(_frame(_soxs_top()))
-    cash = detect_rollover_shorts(_frame(_soxs_top(), start="2026-10-28 07:15"))
+    weekend = detect_rollover_shorts(*_pair(_soxs_top()))
+    # 5 分第 47 根的第一根 1 分 = 起點 + 235 分。15:05 UTC + 235 分 = 19:00 UTC = 美東 15:00。
+    cash = detect_rollover_shorts(*_pair(_soxs_top(), start="2026-10-28 15:05"))
     assert len(weekend) == 1 and weekend[0].off_session
     assert len(cash) == 1 and not cash[0].off_session
 
@@ -111,7 +147,8 @@ def test_weekend_signal_is_off_session_and_cash_session_is_not() -> None:
 def test_wick_through_neckline_does_not_enter() -> None:
     rows = _soxs_top()
     rows[47] = (52.8, 52.90, 51.90, 52.60, 5000)
-    assert detect_rollover_shorts(_frame(rows)) == []
+    df5, df1 = _pair(rows)
+    assert detect_rollover_shorts(df5, df1) == []
 
 
 def test_close_above_ma25_does_not_enter() -> None:
@@ -128,14 +165,20 @@ def test_close_above_ma25_does_not_enter() -> None:
             (53.5, 53.40, 53.00, 53.05, 4000),
         ]
     )
-    assert detect_rollover_shorts(_frame(rows)) == []
+    df5, df1 = _pair(rows)
+    entry = 47 * 5
+    for i in range(entry - 30, entry):
+        _set_1m(df1, i, high=52.10, low=51.90, close=52.00, volume=100)
+    _set_1m(df1, entry, high=53.10, low=52.90, close=53.05, volume=5000)
+    assert detect_rollover_shorts(df5, df1) == []
 
 
 def test_do_not_chase_once_price_has_left_the_neckline() -> None:
     rows = _soxs_top(break_close=50.50)
     rows[47] = (52.2, 52.40, 50.20, 50.50, 5000)
     rows.append((50.5, 51.20, 50.40, 51.00, 5000))
-    assert detect_rollover_shorts(_frame(rows)) == []
+    df5, df1 = _pair(rows)
+    assert detect_rollover_shorts(df5, df1) == []
 
 
 def test_higher_bounce_under_the_extreme_lifts_the_stop() -> None:
@@ -151,11 +194,12 @@ def test_higher_bounce_under_the_extreme_lifts_the_stop() -> None:
             (53.2, 53.10, 51.90, 52.05, 4000),
         ]
     )
-    signals = detect_rollover_shorts(_frame(rows))
+    df5, df1 = _pair(rows)
+    signals = detect_rollover_shorts(df5, df1)
     assert len(signals) == 1, signals
     sig = signals[0]
     assert sig.kind == "break"
-    assert sig.bar_idx == 51
+    assert sig.bar_idx == 51 * 5
     assert sig.entry == 52.05
     assert sig.neckline == 52.35
     assert sig.lower_high == 54.20
@@ -167,49 +211,62 @@ def test_new_high_invalidates_the_lower_high() -> None:
     rows = _soxs_top()
     rows[47] = (53.2, 55.30, 53.00, 55.00, 5000)
     rows.append((54.5, 54.60, 51.40, 51.70, 5000))
-    assert detect_rollover_shorts(_frame(rows)) == []
+    df5, df1 = _pair(rows)
+    assert detect_rollover_shorts(df5, df1) == []
 
 
 def test_low_volume_break_allows_one_retest() -> None:
-    rows = _soxs_top(break_volume=200)
-    rows.append((52.20, 52.55, 52.00, 52.15, 800))
-    rows.append((52.15, 52.40, 51.70, 51.80, 4000))
-    signals = detect_rollover_shorts(_frame(rows))
+    df5, df1 = _pair(_soxs_top(break_volume=200))
+    entry = 47 * 5
+    for i in range(entry - 30, entry):
+        _set_1m(df1, i, high=52.55, low=52.35, close=52.45, volume=200)
+    _set_1m(df1, entry, high=52.20, low=51.95, close=52.05, volume=1)
+    _set_1m(df1, entry + 1, high=52.55, low=52.10, close=52.25, volume=500)
+    signals = detect_rollover_shorts(df5, df1)
     assert len(signals) == 1, signals
     sig = signals[0]
     assert sig.kind == "retest"
-    assert sig.bar_idx == 48
-    assert sig.entry == 52.15
-    assert sig.stop == 52.70
+    assert sig.bar_idx == entry + 1
+    assert sig.entry == 52.25
+    assert sig.stop == 52.55
     assert sig.stop < sig.lower_high
     assert sig.extreme == 54.85
     assert sig.entry < sig.neckline
 
 
-def test_rejects_bars_that_are_not_15m() -> None:
+def test_rejects_other_timeframes() -> None:
     rows = _soxs_top()
-    index = pd.date_range("2026-10-31", periods=len(rows), freq="5min", tz="UTC")
-    df = pd.DataFrame(rows, index=index, columns=["open", "high", "low", "close", "volume"])
+    df5, df1 = _pair(rows)
+    df15 = _frame(rows, "2026-10-31", "15min")
     try:
-        detect_rollover_shorts(df)
+        detect_rollover_shorts(df15, df1)
     except ValueError as exc:
-        assert "15 分" in str(exc)
+        assert "5 分" in str(exc)
     else:
-        raise AssertionError("5 分 K 不該被當成起跌確認")
+        raise AssertionError("15 分不該拿來當結構")
+    try:
+        detect_rollover_shorts(df5, df5)
+    except ValueError as exc:
+        assert "1 分" in str(exc)
+    else:
+        raise AssertionError("5 分不該拿來當進場")
 
 
 def test_simulate_target_stop_and_same_bar_stop_wins() -> None:
-    base = _soxs_top()
-    down = base + [(52.0, 52.40, 49.40, 49.70, 2000)]
-    up = base + [(52.0, 53.80, 51.80, 53.20, 2000)]
-    target_trades = simulate_shorts(_frame(down), detect_rollover_shorts(_frame(down)))
-    stop_trades = simulate_shorts(_frame(up), detect_rollover_shorts(_frame(up)))
+    def _with_extra(extra: tuple) -> tuple[pd.DataFrame, list]:
+        df5, df1 = _pair(_soxs_top() + [extra])
+        return df1, detect_rollover_shorts(df5, df1)
+
+    down_1m, down_sigs = _with_extra((52.0, 52.40, 49.40, 49.70, 2000))
+    up_1m, up_sigs = _with_extra((52.0, 53.80, 51.80, 53.20, 2000))
+    target_trades = simulate_shorts(down_1m, down_sigs)
+    stop_trades = simulate_shorts(up_1m, up_sigs)
     assert len(target_trades) == 1 and target_trades[0].exit_reason == "target"
     assert target_trades[0].pnl_per_unit > 0
     assert len(stop_trades) == 1 and stop_trades[0].exit_reason == "stop"
     assert stop_trades[0].pnl_per_unit < 0
 
-    index = pd.date_range("2026-10-28 14:00", periods=4, freq="15min", tz="UTC")
+    index = pd.date_range("2026-10-28 14:00", periods=4, freq="1min", tz="UTC")
     both = pd.DataFrame(
         {
             "open": [50, 50, 50, 50],
@@ -251,7 +308,7 @@ def main() -> int:
     test_higher_bounce_under_the_extreme_lifts_the_stop()
     test_new_high_invalidates_the_lower_high()
     test_low_volume_break_allows_one_retest()
-    test_rejects_bars_that_are_not_15m()
+    test_rejects_other_timeframes()
     test_simulate_target_stop_and_same_bar_stop_wins()
     print("ok")
     return 0
