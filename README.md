@@ -158,7 +158,17 @@ python3 examples/chart_today.py
 
 5 分圖定極點、較低高點和頸線。進場是之後第一根同時跌破頸線、收在 1 分 MA25 下、量能回到前 10 根均量的 1 分收盤。停損放在 5 分較低高點，不放在極點。上漲途中的 S、以及已經離開頸線 0.8% 以上的中段，都不進。
 
-規則在 `rollover/RULES.md`。合成 5 分和 1 分 K 測試不打網路：
+規則在 `rollover/RULES.md`。抓幣安永續、或離線看 54.85 那段會不會進：
+
+```bash
+python3 examples/soxs_rollover.py --demo
+python3 examples/soxs_rollover.py --symbol SOXSUSDT --risk 100
+python3 examples/soxs_rollover.py --watch
+```
+
+`--demo` 不打網路。正式掃描抓 5 分和 1 分已收盤 K，最後一根同時跌破頸線、收在 1 分 MA25 下、量能夠，就印進場、停損、目標和張數。已經離開頸線 0.8% 的中段會寫不追。腳本不下單。
+
+合成 5 分和 1 分 K 測試：
 
 ```bash
 python3 examples/test_rollover_short.py

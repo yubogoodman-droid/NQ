@@ -64,6 +64,25 @@ class RolloverSignal:
 
 
 @dataclass(frozen=True)
+class RolloverView:
+    """最後一根已收盤 1 分的判斷，以及這段資料裡的全部進場。"""
+
+    signals: tuple[RolloverSignal, ...]
+    timestamp: pd.Timestamp
+    close: float
+    phase: str
+    note: str
+    extreme: float | None
+    lower_high: float | None
+    neckline: float | None
+    ma_slow: float | None
+    volume: float
+    vol_ma: float | None
+    extension: float | None
+    fresh: RolloverSignal | None
+
+
+@dataclass(frozen=True)
 class ShortTrade:
     signal: RolloverSignal
     exit_idx: int
@@ -118,11 +137,23 @@ def detect_rollover_shorts(
 ) -> list[RolloverSignal]:
     """5 分找出較低高點和頸線，1 分收盤進場。同一套較低高點只出一次訊號。"""
 
+    return list(inspect_rollover(df_5m, df_1m, params).signals)
+
+
+def inspect_rollover(
+    df_5m: pd.DataFrame,
+    df_1m: pd.DataFrame,
+    params: RolloverParams | None = None,
+) -> RolloverView:
+    """跟 detect 同一套判斷，多帶最後一根 1 分為什麼進、或為什麼還不進。"""
+
     params = params or RolloverParams()
     frame5 = _normalize(df_5m)
     frame1 = _normalize(df_1m)
     _require_step(frame5.index, 5, "5 分 K")
     _require_step(frame1.index, 1, "1 分 K")
+    if len(frame1) == 0:
+        raise ValueError("1 分 K 是空的")
 
     steps = _arm_5m(frame5, params)
     high = frame1["high"].to_numpy(float)
@@ -136,27 +167,42 @@ def detect_rollover_shorts(
     signals: list[RolloverSignal] = []
     step_i = -1
     phase = "idle"
+    note = "5 分還沒走出較低高點"
     setup: _Armed | None = None
     filled_lower = -1
     killed: set[int] = set()
+    killed_reason: dict[int, str] = {}
     retest_left = 0
     bounce_high = 0.0
+    last_levels: _Armed | None = None
+
+    def kill(idx: int, reason: str) -> None:
+        killed.add(idx)
+        killed_reason[idx] = reason
 
     for j, ts in enumerate(frame1.index):
         while step_i + 1 < len(steps) and steps[step_i + 1][0] <= ts:
             step_i += 1
         armed = steps[step_i][1] if step_i >= 0 else None
+        last_levels = armed
 
         if phase == "cool":
             if armed is None or armed.lower_high_idx != filled_lower:
                 phase = "idle"
                 setup = None
+                note = "5 分還沒走出較低高點" if armed is None else "前一組較低高點已經進過場"
             else:
+                note = "這組較低高點已經進過場"
                 continue
 
         if armed is None or armed.lower_high_idx in killed or ts >= armed.deadline:
             if armed is not None and ts >= armed.deadline:
                 killed.add(armed.lower_high_idx)
+                killed_reason.setdefault(armed.lower_high_idx, "較低高點之後等太久，這組作廢")
+            if armed is None:
+                note = "5 分還沒走出較低高點"
+            else:
+                note = killed_reason.get(armed.lower_high_idx, "這組較低高點已經作廢")
             phase = "idle"
             setup = None
             continue
@@ -164,9 +210,11 @@ def detect_rollover_shorts(
         if setup is None or setup.lower_high_idx != armed.lower_high_idx:
             phase = "watch"
             setup = armed
+            note = "5 分已有較低高點，等 1 分收盤跌破頸線"
 
         if high[j] >= setup.extreme or close[j] > setup.extreme:
-            killed.add(setup.lower_high_idx)
+            kill(setup.lower_high_idx, "1 分碰到極點，這組結構作廢")
+            note = "1 分碰到極點，這組結構作廢"
             phase = "idle"
             setup = None
             continue
@@ -174,7 +222,8 @@ def detect_rollover_shorts(
         if phase == "watch" and close[j] < setup.neckline:
             extension = (setup.neckline - close[j]) / setup.neckline
             if extension > params.max_entry_extension_pct:
-                killed.add(setup.lower_high_idx)
+                kill(setup.lower_high_idx, "收盤離開頸線超過 0.8%，不追")
+                note = "收盤離開頸線超過 0.8%，不追"
                 phase = "idle"
                 setup = None
                 continue
@@ -184,25 +233,36 @@ def detect_rollover_shorts(
                 signals.append(_signal(frame1, params, j, "break", close[j], setup))
                 filled_lower = setup.lower_high_idx
                 phase = "cool"
+                note = "這根 1 分收盤是起跌"
                 continue
             if ma_ok and not vol_ok:
                 phase = "retest"
                 retest_left = params.retest_bars
                 bounce_high = high[j]
+                note = "跌破的量能不夠，等拉回 1 分 MA7–MA25"
                 continue
+            note = "收盤跌破頸線，但還在 1 分 MA25 上面"
+        elif phase == "watch":
+            note = "這根 1 分還沒收在頸線下"
 
         if phase == "retest" and setup is not None:
             bounce_high = max(bounce_high, high[j])
             retest_left -= 1
             failed = retest_left < 0 or bounce_high >= setup.lower_high
             if failed:
-                killed.add(setup.lower_high_idx)
+                if bounce_high >= setup.lower_high:
+                    reason = "回測高點回到較低高點，這組不做"
+                else:
+                    reason = "回測等超過 15 根 1 分，這組不做"
+                kill(setup.lower_high_idx, reason)
+                note = reason
                 phase = "idle"
                 setup = None
                 continue
             fast = ma_fast[j]
             slow = ma_slow[j]
             if math.isnan(fast) or math.isnan(slow):
+                note = "等價格拉回 1 分 MA7–MA25，再收在均線和頸線下面"
                 continue
             band_lo = min(fast, slow)
             band_hi = max(fast, slow)
@@ -215,8 +275,31 @@ def detect_rollover_shorts(
                 )
                 filled_lower = setup.lower_high_idx
                 phase = "cool"
+                note = "這根 1 分收盤是起跌"
+            else:
+                note = "等價格拉回 1 分 MA7–MA25，再收在均線和頸線下面"
 
-    return signals
+    last = len(frame1) - 1
+    fresh = signals[-1] if signals and signals[-1].bar_idx == last else None
+    neck = last_levels.neckline if last_levels is not None else None
+    extension = ((neck - float(close[last])) / neck) if neck else None
+    slow_last = float(ma_slow[last])
+    vol_last = float(vol_ma[last])
+    return RolloverView(
+        signals=tuple(signals),
+        timestamp=frame1.index[last],
+        close=float(close[last]),
+        phase=phase,
+        note=note,
+        extreme=None if last_levels is None else last_levels.extreme,
+        lower_high=None if last_levels is None else last_levels.lower_high,
+        neckline=neck,
+        ma_slow=None if math.isnan(slow_last) else slow_last,
+        volume=float(volume[last]),
+        vol_ma=None if math.isnan(vol_last) else vol_last,
+        extension=extension,
+        fresh=fresh,
+    )
 
 
 def simulate_shorts(

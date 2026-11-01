@@ -47,10 +47,13 @@
 ## 檔案
 
 - `rollover/strategy.py`：5 分結構、1 分進場、張數、放空出場
+- `examples/soxs_rollover.py`：抓幣安 5 分和 1 分，收盤當根印出有沒有起跌。不下單
 - `examples/test_rollover_short.py`：合成 5 分和 1 分 K，不打網路
 - `pinescript/soxs_rollover_1m.pine`：掛在 TradingView 1 分圖，5 分結構由腳本自己取
 
 ```bash
+python3 examples/soxs_rollover.py --demo
+python3 examples/soxs_rollover.py --symbol SOXSUSDT --risk 100
 python3 examples/test_rollover_short.py
 ```
 

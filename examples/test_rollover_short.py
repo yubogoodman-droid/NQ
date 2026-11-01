@@ -13,11 +13,13 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from rollover.strategy import (  # noqa: E402
     RolloverParams,
     RolloverSignal,
     detect_rollover_shorts,
+    inspect_rollover,
     is_us_cash_session,
     qty_for_risk,
     simulate_shorts,
@@ -252,6 +254,45 @@ def test_rejects_other_timeframes() -> None:
         raise AssertionError("5 分不該拿來當進場")
 
 
+def test_inspect_names_the_break_and_the_chase() -> None:
+    df5, df1 = _pair(_soxs_top())
+    entry = 47 * 5
+    caught = inspect_rollover(df5, df1.iloc[: entry + 1])
+    assert caught.fresh is not None
+    assert caught.fresh.kind == "break"
+    assert caught.fresh.entry == 52.05
+    assert "起跌" in caught.note
+    assert caught.extreme == 54.85
+    assert caught.neckline == 52.35
+
+    chase5, chase1 = _pair(_soxs_top(break_close=50.50) + [(50.5, 51.20, 50.40, 51.00, 5000)])
+    missed = inspect_rollover(chase5, chase1)
+    assert missed.fresh is None
+    assert missed.signals == ()
+    assert "不追" in missed.note
+
+    import soxs_rollover
+
+    text = soxs_rollover.format_report("SOXSUSDT", caught, 100)
+    assert "抓到起跌" in text
+    assert "52.05" in text
+    assert "53.5" in text
+
+
+def test_closed_klines_drop_the_forming_bar() -> None:
+    import soxs_rollover
+
+    raw = [
+        [1_700_000_000_000, "10", "11", "9", "10.5", "100"],
+        [1_700_000_060_000, "10.5", "12", "10", "11", "120"],
+    ]
+    frame = soxs_rollover.frame_from_klines(raw, "1m", now_ms=1_700_000_060_000 + 10_000)
+    assert len(frame) == 1
+    assert float(frame.iloc[-1].close) == 10.5
+    kept = soxs_rollover.frame_from_klines(raw, "1m", now_ms=1_700_000_120_000)
+    assert len(kept) == 2
+
+
 def test_simulate_target_stop_and_same_bar_stop_wins() -> None:
     def _with_extra(extra: tuple) -> tuple[pd.DataFrame, list]:
         df5, df1 = _pair(_soxs_top() + [extra])
@@ -309,6 +350,8 @@ def main() -> int:
     test_new_high_invalidates_the_lower_high()
     test_low_volume_break_allows_one_retest()
     test_rejects_other_timeframes()
+    test_inspect_names_the_break_and_the_chase()
+    test_closed_klines_drop_the_forming_bar()
     test_simulate_target_stop_and_same_bar_stop_wins()
     print("ok")
     return 0
