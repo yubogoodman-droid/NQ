@@ -1026,96 +1026,32 @@ def write_backtest_html(
             + f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(sig.symbol)}' style='width:100%;display:block;border-radius:10px'/></div></article>"
         )
 
-    # 第一拍每一筆都出圖（含後來走出第二拍的訊號，進出場以突破棒收盤計算）
-    a_cards_embed: list[str] = []
-    a_cards_rel: list[str] = []
-    for idx_no, rec in enumerate(records, 1):
-        sig = rec["sig"]
-        d = rec["d"]
-        t99 = rec["t_b99"]
-        t60 = rec["t_b60"]
-        t25 = rec["t_b25"]
-        has_ft = rec["t_f99"] is not None
-        ts_slug = t99.entry_time.replace("-", "").replace(":", "").replace(" ", "_")[4:]
-        img_name = f"a{idx_no:02d}_{sig.symbol}_{ts_slug}.png"
-        img_path = img_dir / img_name
-        draw_chart(sig.symbol, d, sig, str(img_path), trade=t99, trade_no=idx_no)
-        b64 = base64.b64encode(img_path.read_bytes()).decode("ascii") if img_path.exists() else ""
-        cls99 = "pnl-win" if t99.pnl_pct >= 0 else "pnl-loss"
-        cls60 = "pnl-win" if t60.pnl_pct >= 0 else "pnl-loss"
-        cls25 = "pnl-win" if t25.pnl_pct >= 0 else "pnl-loss"
-        stage_tag = (
-            "<span class='tag tag-strong'>第一拍 · 後來走出第二拍</span>"
-            if has_ft
-            else "<span class='tag tag-stage1'>第一拍突破即進場</span>"
-        )
-        ft_line = ""
-        if has_ft:
-            tf99 = rec["t_f99"]
-            ft_line = f"\n若改等第二拍再進（MA99）：{tf99.entry_time} 進場 {tf99.entry_price:g} → {tf99.pnl_pct:+.2f}% ({tf99.exit_reason})"
-        card_head = (
-            f"<article class='trade-card' id='a-{idx_no}'>"
-            "<header class='card-header'>"
-            f"<div class='card-title'><span class='trade-no'>#{idx_no} · {escape(sig.symbol)}</span>"
-            f"<span class='trade-time'>第一拍進場 {escape(t99.entry_time)} → MA99出場 {escape(t99.exit_time)} (UTC+8)</span></div>"
-            f"<div class='card-pnl {cls99}'>MA99(1H MA25): {t99.pnl_pct:+.2f}%<br/>"
-            f"<span class='{cls60}' style='font-size:12px'>MA60: {t60.pnl_pct:+.2f}%</span> · "
-            f"<span class='{cls25}' style='font-size:12px'>MA25: {t25.pnl_pct:+.2f}%</span></div>"
-            "</header>"
-            f"<div class='tags'>{stage_tag}"
-            f"<span class='tag'>連紅 {sig.green_streak} 根 (4根 +{sig.mom4_pct:.2f}%)</span>"
-            f"<span class='tag'>7線黏度 {sig.coil_7_120_pct:.2f}%</span>"
-            f"<span class='tag'>碗深空間 {sig.gap_ma200_long_pct:.2f}%</span>"
-            f"<span class='tag'>突破量 {sig.vol_ratio:.1f}x (3h最大量 {sig.vol_vs_12bar_max:.2f}x)</span>"
-            f"<span class='tag'>24h最高 +{t99.max_24h_pct:.1f}%</span>"
-            f"<span class='tag'>48h最高 +{t99.max_48h_pct:.1f}%</span>"
-            f"</div>"
-            "<pre class='trade-detail'>"
-            f"第一拍進場 {t99.entry_price:g} (@ {t99.entry_time})  突破收盤 {sig.breakout_close:g}\n"
-            f"防守停損價 {t99.stop_price:g} (風險 -{t99.risk_pct:.2f}%, MA200下方築底 {sig.bars_below_ma200} 根, 上影線 {sig.upper_wick_ratio*100:.0f}%)\n"
-            f"MA99(1H MA25)停利：{t99.exit_price:g} ({t99.exit_reason}) {t99.pnl_pct:+.2f}%  |  "
-            f"MA60停利：{t60.exit_price:g} ({t60.exit_reason}) {t60.pnl_pct:+.2f}%  |  "
-            f"MA25停利：{t25.exit_price:g} ({t25.exit_reason}) {t25.pnl_pct:+.2f}%"
-            f"{ft_line}"
-            "</pre>"
-        )
-        a_cards_embed.append(
-            card_head
-            + f"<div class='mini-chart'><img src='data:image/png;base64,{b64}' alt='{escape(sig.symbol)}' style='width:100%;display:block;border-radius:10px'/></div></article>"
-        )
-        a_cards_rel.append(
-            card_head
-            + f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='{escape(sig.symbol)}' style='width:100%;display:block;border-radius:10px'/></div></article>"
-        )
-
-    # 全部第一拍突破明細表
+    # 第二拍明細表
     table_rows: list[str] = []
-    for k, rec in enumerate(records, 1):
+    for k, rec in enumerate(f25_records, 1):
         sig = rec["sig"]
-        tb99 = rec["t_b99"]
-        tb60 = rec["t_b60"]
-        tb25 = rec["t_b25"]
-        has_ft = rec["t_f25"] is not None
-        c99 = "pnl-win" if tb99.pnl_pct >= 0 else "pnl-loss"
-        c60 = "pnl-win" if tb60.pnl_pct >= 0 else "pnl-loss"
-        c25 = "pnl-win" if tb25.pnl_pct >= 0 else "pnl-loss"
-        ft_badge = "<span class='badge-ft'>★強確認</span>" if has_ft else "<span class='badge-norm'>第一拍</span>"
+        t99 = rec["t_f99"]
+        t60 = rec["t_f60"]
+        t25 = rec["t_f25"]
+        c99 = "pnl-win" if t99.pnl_pct >= 0 else "pnl-loss"
+        c60 = "pnl-win" if t60.pnl_pct >= 0 else "pnl-loss"
+        c25 = "pnl-win" if t25.pnl_pct >= 0 else "pnl-loss"
         table_rows.append(
             "<tr>"
             f"<td>{k}</td>"
-            f"<td><b><a href='#a-{k}'>{escape(sig.symbol)}</a></b></td>"
+            f"<td><b><a href='#f-{k}'>{escape(sig.symbol)}</a></b></td>"
             f"<td>{escape(sig.breakout_time)}</td>"
-            f"<td>{ft_badge}</td>"
-            f"<td>{sig.breakout_close:g}</td>"
-            f"<td>{sig.stop_price:g} (-{tb60.risk_pct:.2f}%)</td>"
+            f"<td>{escape(t99.entry_time)}</td>"
+            f"<td>{t99.entry_price:g}</td>"
+            f"<td>{t99.stop_price:g} (-{t99.risk_pct:.2f}%)</td>"
             f"<td>+{sig.mom4_pct:.2f}% ({sig.green_streak}連紅)</td>"
             f"<td>{sig.coil_7_120_pct:.2f}% / {sig.gap_ma200_long_pct:.2f}%</td>"
-            f"<td>{sig.vol_ratio:.1f}x ({sig.vol_vs_12bar_max:.1f}x)</td>"
-            f"<td>+{tb60.max_24h_pct:.1f}%</td>"
-            f"<td>+{tb60.max_48h_pct:.1f}%</td>"
-            f"<td class='{c25}'>{tb25.pnl_pct:+.2f}%</td>"
-            f"<td class='{c60}'>{tb60.pnl_pct:+.2f}%</td>"
-            f"<td class='{c99}'><b>{tb99.pnl_pct:+.2f}%</b> <small>({escape(tb99.exit_reason)})</small></td>"
+            f"<td>{sig.vol_ratio:.1f}x ({(sig.follow_vol_ratio or 0):.1f}x)</td>"
+            f"<td>+{t99.max_24h_pct:.1f}%</td>"
+            f"<td>+{t99.max_48h_pct:.1f}%</td>"
+            f"<td class='{c25}'>{t25.pnl_pct:+.2f}%</td>"
+            f"<td class='{c60}'>{t60.pnl_pct:+.2f}%</td>"
+            f"<td class='{c99}'><b>{t99.pnl_pct:+.2f}%</b> <small>({escape(t99.exit_reason)})</small></td>"
             "</tr>"
         )
 
@@ -1135,7 +1071,6 @@ def write_backtest_html(
             "<code>MA25</code> 至少貼在長均簇底 <code>min(MA60, 99, 120)</code>（允許 MA25 仍在簇內）。"
         )
     f_losses = st_f99["count"] - st_f99["wins"]
-    b_losses = st_b99["count"] - st_b99["wins"]
 
     def _pc(v: float) -> str:
         return "pnl-win" if v > 0 else ("pnl-loss" if v < 0 else "pnl-flat")
@@ -1159,25 +1094,18 @@ def write_backtest_html(
 
     strategy_rows = "".join(
         [
-            _strategy_row("策略 B3：第二拍 ★強確認進場 + MA99 (1H MA25) 移動停利", st_f99),
-            _strategy_row("策略 B2：第二拍 ★強確認進場 + MA60 移動停利", st_f60),
-            _strategy_row("策略 B1：第二拍 ★強確認進場 + MA25 移動停利", st_f25),
-            _strategy_row("策略 A3：第一拍突破即進場 + MA99 (1H MA25) 移動停利", st_b99),
-            _strategy_row("策略 A1：第一拍突破即進場 + MA60 移動停利", st_b60),
-            _strategy_row("策略 A2：第一拍突破即進場 + MA25 移動停利", st_b25),
+            _strategy_row("第二拍 ★強確認進場 + MA99 (1H MA25) 移動停利", st_f99),
+            _strategy_row("第二拍 ★強確認進場 + MA60 移動停利", st_f60),
+            _strategy_row("第二拍 ★強確認進場 + MA25 移動停利", st_f25),
         ]
     )
     compare_rows: list[str] = []
     for row in compare or []:
         cur = " class='current'" if row.get("current") else ""
-        s1_loss = row["stage1_n"] - row["stage1_wins"]
         s2_loss = row["stage2_n"] - row["stage2_wins"]
         compare_rows.append(
             f"<tr{cur}>"
             f"<td><b>{escape(row['label'])}</b></td>"
-            f"<td>{row['stage1_n']}</td>"
-            f"<td class='{_pc(row['stage1_wr'] - 50)}'>{row['stage1_wr']:.1f}% ({row['stage1_wins']}勝{s1_loss}敗)</td>"
-            f"<td class='{_pc(row['stage1_pnl'])}'><b>{row['stage1_pnl']:+.2f}%</b></td>"
             f"<td>{row['stage2_n']}</td>"
             f"<td class='{_pc(row['stage2_wr'] - 50)}'>{row['stage2_wr']:.1f}% ({row['stage2_wins']}勝{s2_loss}敗)</td>"
             f"<td class='{_pc(row['stage2_pnl'])}'><b>{row['stage2_pnl']:+.2f}%</b></td>"
@@ -1186,27 +1114,21 @@ def write_backtest_html(
     compare_html = ""
     if compare_rows:
         compare_html = (
-            "<h2>三種模式對照（同一區間、同一標的池，出場皆為 MA99 = 1H MA25）</h2>"
+            "<h2>三種模式的第二拍對照（同一區間、同一標的池，出場皆為 MA99 = 1H MA25）</h2>"
             "<div style='overflow-x:auto'><table class='bt-table'><thead><tr>"
-            "<th>模式</th><th>第一拍筆數</th><th>第一拍勝率</th><th>第一拍累計</th>"
-            "<th>第二拍筆數</th><th>第二拍勝率</th><th>第二拍累計</th>"
+            "<th>模式</th><th>第二拍筆數</th><th>勝率</th><th>累計報酬</th>"
             "</tr></thead><tbody>"
             + "".join(compare_rows)
             + "</tbody></table></div>"
-            "<p class='muted'>標成金框的是這份報告逐筆畫圖的模式。嚴格版圖集仍留在 "
-            "<code>docs/binance-15m-coiled-90d/view.html</code>。</p>"
+            "<p class='muted'>標成金框的是這份報告逐筆畫圖的模式。</p>"
         )
-    strict_preview = (
-        "https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/"
-        f"{_git_branch()}/docs/binance-15m-coiled-90d/view.html"
-    )
 
-    def _build_doc(follow_cards: str, stage1_cards: str) -> str:
+    def _build_doc(follow_cards: str) -> str:
         return f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>幣安 15m 底部七線黏帶突破 MA200 · 近 {days} 天{mode_label}完整報告</title>
+<title>幣安 15m 底部七線黏帶突破 MA200 · 近 {days} 天第二拍報告 · {mode_label}</title>
 <style>
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}}
 .page{{max-width:920px;margin:0 auto;padding:16px 14px 40px}}
@@ -1246,9 +1168,9 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安 15m「底部七線黏帶 · 倍量穿 MA200」近 {days} 天完整報告 · {mode_label}</h1>
-<p class="muted">回測區間：近 {days} 天（約三個月） · 標的池：{universe_n} 檔流動 USDT 永續（24h 成交額 ≥ {min_qv/1e6:.0f}M USDT） · 產出時間：{escape(now_str)} (UTC+8)<br/>{escape(mode_blurb)}</p>
-<p class="toc"><a href="#sec-follow">第二拍逐筆圖</a><a href="#sec-stage1">第一拍逐筆圖</a><a href="#sec-table">明細表</a><a href="{strict_preview}">嚴格版 6 筆圖集</a></p>
+<h1>幣安 15m「底部七線黏帶 · 倍量穿 MA200」近 {days} 天第二拍報告 · {mode_label}</h1>
+<p class="muted">這份只收第二拍「扇形展開」強確認。進場是確認棒收盤，出場沿 MA99（= 1H MA25）。回測區間：近 {days} 天 · 標的池：{universe_n} 檔流動 USDT 永續（24h 成交額 ≥ {min_qv/1e6:.0f}M USDT） · 產出時間：{escape(now_str)} (UTC+8)<br/>{escape(mode_blurb)}</p>
+<p class="toc"><a href="#sec-follow">逐筆 K 線</a><a href="#sec-table">明細表</a></p>
 {compare_html}
 
 <h2>一、圈選起漲點量化規則（對齊 ESPORTSUSDT 10-31 17:30 與 牛来USDT 10-31 23:00 雙標竿）</h2>
@@ -1263,7 +1185,7 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
 </ol>
 <p class="note">圖例說明：黑色橢圓圈＝底部七線黏帶突破起漲區；綠色虛線＋▲＝進場；綠色點線＋×＝MA99(1H MA25)移動停利出場；紅色水平點線＝黏帶下緣停損價；8 條均線顏色完全對齊幣安 App。</p>
 
-<h2>二、六種進出場策略 · 近 {days} 天回測統計對照</h2>
+<h2>二、第二拍三種移動停利 · 近 {days} 天</h2>
 <table class="bt-table">
 <thead>
 <tr>
@@ -1279,31 +1201,25 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
 <div class="card"><span>★強確認訊號數</span><b>{st_f99['count']} 筆</b></div>
 <div class="card"><span>★強確認勝率</span><b class="{_pc(st_f99['total_pct'])}">{st_f99['win_rate']:.1f}% ({st_f99['wins']}勝{f_losses}敗)</b></div>
 <div class="card"><span>★強確認累計 (MA99)</span><b class="{_pc(st_f99['total_pct'])}">{st_f99['total_pct']:+.2f}%</b></div>
-<div class="card"><span>第一拍訊號數</span><b>{st_b99['count']} 筆</b></div>
-<div class="card"><span>第一拍勝率</span><b class="{_pc(st_b99['total_pct'])}">{st_b99['win_rate']:.1f}% ({st_b99['wins']}勝{b_losses}敗)</b></div>
-<div class="card"><span>第一拍 3x 槓桿 (MA99)</span><b class="{_pc(st_b99['u_3x'])}">{st_b99['u_3x']:+.1f} U</b></div>
+<div class="card"><span>MA60 累計</span><b class="{_pc(st_f60['total_pct'])}">{st_f60['total_pct']:+.2f}%</b></div>
+<div class="card"><span>MA25 累計</span><b class="{_pc(st_f25['total_pct'])}">{st_f25['total_pct']:+.2f}%</b></div>
+<div class="card"><span>MA99 3x 槓桿</span><b class="{_pc(st_f99['u_3x'])}">{st_f99['u_3x']:+.1f} U</b></div>
 </div>
 </section>
 
 <section class="summary" id="sec-follow">
-<h2>三、第二拍「★ 扇形展開（強確認）」全部 {len(f25_records)} 筆逐筆 K 線（勝率 {st_f99['win_rate']:.1f}%，{st_f99['wins']}勝{f_losses}敗，MA99 累計 {st_f99['total_pct']:+.2f}%）</h2>
-<p class="muted">進場價是確認棒收盤。圖上綠色 ▲ 是第二拍進場，× 是 MA99 出場。</p>
+<h2>三、第二拍全部 {len(f25_records)} 筆逐筆 K 線（勝率 {st_f99['win_rate']:.1f}%，{st_f99['wins']}勝{f_losses}敗，MA99 累計 {st_f99['total_pct']:+.2f}%）</h2>
+<p class="muted">綠色 ▲ 是第二拍進場，× 是 MA99 出場。</p>
 </section>
 {follow_cards if follow_cards else "<p class='muted'>這個模式沒有第二拍強確認。</p>"}
 
-<section class="summary" id="sec-stage1">
-<h2>四、第一拍「🟢 破帶穿 MA200」全部 {len(records)} 筆逐筆 K 線（勝率 {st_b99['win_rate']:.1f}%，{st_b99['wins']}勝{b_losses}敗，MA99 累計 {st_b99['total_pct']:+.2f}%）</h2>
-<p class="muted">每一筆突破都畫出來，包含後來走出第二拍的標的。進場價是突破棒收盤，出場沿 MA99。</p>
-</section>
-{stage1_cards}
-
 <section class="summary" id="sec-table">
-<h2>五、第一拍全部 {len(records)} 筆明細表</h2>
+<h2>四、第二拍全部 {len(f25_records)} 筆明細表</h2>
 <div style="overflow-x:auto">
 <table class="bt-table">
 <thead>
 <tr>
-<th>#</th><th>標的</th><th>突破時間 (UTC+8)</th><th>階段</th><th>突破價</th><th>防守價 (風險)</th><th>4根動能</th><th>7線黏度 / 碗深</th><th>倍量 (vs 3h最大)</th><th>24h最高</th><th>48h最高</th><th>MA25停利</th><th>MA60停利</th><th>MA99(1H MA25)停利</th>
+<th>#</th><th>標的</th><th>突破時間 (UTC+8)</th><th>第二拍進場 (UTC+8)</th><th>進場價</th><th>防守價 (風險)</th><th>4根動能</th><th>7線黏度 / 碗深</th><th>突破量 / 確認量</th><th>24h最高</th><th>48h最高</th><th>MA25停利</th><th>MA60停利</th><th>MA99(1H MA25)停利</th>
 </tr>
 </thead>
 <tbody>
@@ -1315,8 +1231,8 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
 </div></body></html>
 """
 
-    html_embed = _build_doc("".join(f_cards_embed), "".join(a_cards_embed))
-    html_rel = _build_doc("".join(f_cards_rel), "".join(a_cards_rel))
+    html_embed = _build_doc("".join(f_cards_embed))
+    html_rel = _build_doc("".join(f_cards_rel))
 
     html_path.parent.mkdir(parents=True, exist_ok=True)
     html_path.write_text(html_embed, encoding="utf-8")
@@ -1363,14 +1279,11 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
                 "vol_vs_12bar_max": r["sig"].vol_vs_12bar_max,
                 "follow_time": r["sig"].follow_time,
                 "follow_close": r["sig"].follow_close,
-                "breakout_ma25_pnl_pct": r["t_b25"].pnl_pct,
-                "breakout_ma60_pnl_pct": r["t_b60"].pnl_pct,
-                "breakout_ma99_pnl_pct": r["t_b99"].pnl_pct,
-                "follow_ma25_pnl_pct": r["t_f25"].pnl_pct if r["t_f25"] else None,
-                "follow_ma60_pnl_pct": r["t_f60"].pnl_pct if r["t_f60"] else None,
-                "follow_ma99_pnl_pct": r["t_f99"].pnl_pct if r["t_f99"] else None,
+                "follow_ma25_pnl_pct": r["t_f25"].pnl_pct,
+                "follow_ma60_pnl_pct": r["t_f60"].pnl_pct,
+                "follow_ma99_pnl_pct": r["t_f99"].pnl_pct,
             }
-            for r in records
+            for r in f25_records
         ],
     }
     hits_json.write_text(json.dumps(hits_payload, ensure_ascii=False, indent=2), encoding="utf-8")
