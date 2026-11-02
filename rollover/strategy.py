@@ -37,6 +37,7 @@ class RolloverParams:
     max_entry_extension_pct: float = 0.008
     four_hour_bars: int = 240  # 1 分根數，4 小時
     max_below_4h_high_pct: float = 0.02  # 觸發收盤最多比四小時高點低 2%
+    min_4h_rally_pct: float = 0.04  # 5 分極點至少比極點前 4 小時低點高 4%，濾掉橫盤假頂
     retest_bars: int = 15  # 1 分根數
     stop_buffer_pct: float = 0.0
     reward_r: float = 1.5
@@ -283,7 +284,7 @@ def inspect_rollover(
                 signals.append(
                     _signal(
                         frame1, params, j, "retest", close[j], setup,
-                        stop_anchor=bounce_high, four_hour_high=float(high_4h[j]),
+                        four_hour_high=float(high_4h[j]),
                     )
                 )
                 filled_lower = setup.lower_high_idx
@@ -372,6 +373,8 @@ def _arm_5m(frame: pd.DataFrame, params: RolloverParams) -> list[tuple[pd.Timest
     high = frame["high"].to_numpy(float)
     low = frame["low"].to_numpy(float)
     close = frame["close"].to_numpy(float)
+    bars_4h = max(1, params.four_hour_bars // 5)
+    low_4h = pd.Series(low).rolling(bars_4h, min_periods=1).min().to_numpy(float)
     steps: list[tuple[pd.Timestamp, _Armed | None]] = []
     extreme_i: int | None = None
     extreme_px: float | None = None
@@ -405,7 +408,9 @@ def _arm_5m(frame: pd.DataFrame, params: RolloverParams) -> list[tuple[pd.Timest
                     neck_at = extreme_i + 1 + int(np.argmin(segment))
                     deep = (extreme_px - neck) / extreme_px >= params.min_pullback_pct
                     bounced = px > neck * (1 + params.min_bounce_pct) and neck_at < pivot_i
-                    if deep and bounced:
+                    base_lo = float(low_4h[extreme_i])
+                    rallied = base_lo > 0 and (extreme_px - base_lo) / base_lo >= params.min_4h_rally_pct
+                    if deep and bounced and rallied:
                         lower_i = pivot_i
                         lower_px = px
                         neckline = neck

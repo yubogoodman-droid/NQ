@@ -103,7 +103,8 @@ def _fetch_host(requests, host: str, symbol: str, interval: str, start_ms: int, 
 def demo_frames() -> tuple[pd.DataFrame, pd.DataFrame]:
     """離線合成：極點 54.85，較低高點 54.55，頸線 54.20，1 分收盤 54.05，還在四小時高點附近。"""
 
-    rows: list[tuple] = [(54.40, 54.50, 54.30, 54.40, 1000.0) for _ in range(42)]
+    rows: list[tuple] = [(50.00, 50.10, 49.90, 50.00, 1000.0) for _ in range(2)]
+    rows.extend((54.40, 54.50, 54.30, 54.40, 1000.0) for _ in range(40))
     rows.extend(
         [
             (54.50, 54.85, 54.40, 54.70, 3000),

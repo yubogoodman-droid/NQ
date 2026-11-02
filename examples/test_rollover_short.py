@@ -60,12 +60,12 @@ def _flat(n: int, price: float, volume: float = 1000.0) -> list[tuple]:
 
 
 def _soxs_top(break_volume: float = 4000.0, break_close: float = 54.05) -> list[tuple]:
-    """橫在 54.40 湊滿四小時，極點 54.85，頸線 54.20，較低高點 54.55。
+    """先從 50 墊高到 54.40 湊滿四小時，極點 54.85，頸線 54.20，較低高點 54.55。
 
     預設跌破收在 54.05，比四小時高點低 1.46%，算附近。
     """
 
-    rows = _flat(42, 54.40)
+    rows = _flat(2, 50.00) + _flat(40, 54.40)
     rows.extend(
         [
             (54.50, 54.85, 54.40, 54.70, 3000),  # 42 極點
@@ -241,6 +241,14 @@ def test_trigger_far_below_the_four_hour_high_does_not_enter() -> None:
     assert "四小時高點" in view.note
 
 
+def test_flat_range_high_without_four_hour_rally_does_not_arm() -> None:
+    """橫盤 1% 的小高點雖然貼著四小時最高價，但前四小時沒漲滿 4%，不算真頂。"""
+
+    rows = _flat(42, 54.40) + _soxs_top()[42:]
+    df5, df1 = _pair(rows)
+    assert detect_rollover_shorts(df5, df1) == []
+
+
 def test_low_volume_break_allows_one_retest() -> None:
     df5, df1 = _pair(_soxs_top(break_volume=200))
     entry = _break_1m(df5)
@@ -254,8 +262,8 @@ def test_low_volume_break_allows_one_retest() -> None:
     assert sig.kind == "retest"
     assert sig.bar_idx == entry + 1
     assert sig.entry == 54.12
-    assert sig.stop == 54.40
-    assert sig.stop < sig.lower_high
+    assert sig.stop == 54.55
+    assert sig.stop == sig.lower_high
     assert sig.extreme == 54.85
     assert sig.entry < sig.neckline
     assert (sig.four_hour_high - sig.entry) / sig.four_hour_high <= 0.02
@@ -395,6 +403,7 @@ def main() -> int:
     test_higher_bounce_under_the_extreme_lifts_the_stop()
     test_new_high_invalidates_the_lower_high()
     test_trigger_far_below_the_four_hour_high_does_not_enter()
+    test_flat_range_high_without_four_hour_rally_does_not_arm()
     test_low_volume_break_allows_one_retest()
     test_rejects_other_timeframes()
     test_inspect_names_the_break_and_the_chase()
