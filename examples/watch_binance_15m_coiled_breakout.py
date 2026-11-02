@@ -74,7 +74,7 @@ class CoiledBreakoutParams:
     max_coil_7_120_pct: float = 1.80
     max_coil_long_pct: float = 1.20
     slope_lookback: int = 16
-    min_ma60_slope_pct: float = -0.10
+    min_ma60_slope_pct: float = 0.00
     min_ma200_slope_pct: float = -1.00
     min_ext_ma200_pct: float = 0.10
     max_ext_ma200_pct: float = 3.50
@@ -89,12 +89,17 @@ class CoiledBreakoutParams:
     min_mom4_pct: float = 1.80  # 近 4 根 (1小時) 累計推升動能 >= 1.80%（ESPORTS +3.92%、牛来 +3.49%）
     max_upper_wick_ratio: float = 0.24  # 突破棒上影線佔比 <= 24%（ESPORTS 15%、牛来 3%，排除長上影砸盤）
     min_vol_vs_12bar_max: float = 1.25  # 突破棒成交量須 >= 前 12 根（3小時）最大量的 1.25 倍
+    max_breakout_range_vs_med24: float = 10.5  # 突破棒振幅相對前 24 根(6h)振幅中位數倍數上限（排除死魚盤後單根開盤異常暴抽）
     min_gap_ma200_long_pct: float = 0.50  # MA200 與下方長均簇 (MA60/99/120) 碗型蓄力空間下限
     max_gap_ma200_long_pct: float = 3.20  # MA200 與下方長均簇碗型空間上限（ESPORTS 2.90%、牛来 2.78%）
     follow_min_bars: int = 1
     follow_max_bars: int = 4
     follow_min_ext_ma200_pct: float = 2.20
     follow_min_vol_ratio: float = 2.00
+    follow_require_bull_bar: bool = True  # 第二拍確認當根須為紅 K（c > o）
+    follow_max_upper_wick_ratio: float = 0.35  # 第二拍確認棒上影線佔比 <= 35%（排除確認棒衝高回落）
+    follow_max_red_bars: int = 1  # 突破棒至確認棒之間最多允許 1 根陰線休息
+    follow_hold_low_above_ma200: bool = True  # 突破後至確認棒期間，每根 K 線最低價皆須守在 MA200 之上
 
 
 @dataclass
@@ -455,6 +460,11 @@ def breakout_at(
         return None
     if vol_ratio < params.min_vol_ratio or vol_vs_12bar_max < params.min_vol_vs_12bar_max:
         return None
+    if params.max_breakout_range_vs_med24 < 999.0 and i >= 24:
+        med_rng24 = float(np.median((h[i - 24 : i] - l[i - 24 : i]) / np.maximum(c[i - 24 : i], 1e-12)))
+        b_rng = float((h[i] - l[i]) / max(c[i], 1e-12))
+        if med_rng24 > 0 and b_rng / med_rng24 > params.max_breakout_range_vs_med24:
+            return None
 
     all_vals = [m[n][i] for n in MA_PERIODS]
     all_8_spread_pct = float((max(all_vals) / min(all_vals) - 1.0) * 100.0)
@@ -494,7 +504,7 @@ def follow_through_at(
     i = sig.breakout_idx
     if j - i < params.follow_min_bars or j - i > params.follow_max_bars or j >= len(d["c"]):
         return None
-    c, v, v20 = d["c"], d["v"], d["v20"]
+    c, o, h, l, v, v20 = d["c"], d["o"], d["h"], d["l"], d["v"], d["v20"]
     m7, m14, m25, m30 = d["m7"][j], d["m14"][j], d["m25"][j], d["m30"][j]
     m200 = d["m200"][j]
     m240 = d["m240"][j]  # 15m MA240 == 1H MA60
@@ -502,6 +512,15 @@ def follow_through_at(
         return None
     # 期間不可跌回 MA200 下方
     if any(c[k] <= d["m200"][k] for k in range(i, j + 1)):
+        return None
+    if params.follow_hold_low_above_ma200 and any(l[k] < d["m200"][k] for k in range(i + 1, j + 1)):
+        return None
+    if sum(1 for k in range(i + 1, j + 1) if c[k] < o[k]) > params.follow_max_red_bars:
+        return None
+    if params.follow_require_bull_bar and c[j] <= o[j]:
+        return None
+    f_uwick = float((h[j] - max(c[j], o[j])) / max(h[j] - l[j], 1e-12))
+    if f_uwick > params.follow_max_upper_wick_ratio:
         return None
     if not (m7 > m14 > m25 > m30 > m200 or (m7 > m14 > m25 > m30 and c[j] > sig.breakout_close)):
         return None
@@ -879,14 +898,20 @@ def params_for_mode(mode: str) -> CoiledBreakoutParams:
         return CoiledBreakoutParams(
             clean_first_cross=False,
             require_ma25_above_long_at_cross=True,
+            min_ma60_slope_pct=-0.10,
             min_green_streak=1,
             min_above_ma60_bars=0,
             min_mom4_pct=0.0,
             max_upper_wick_ratio=1.0,
             min_vol_vs_12bar_max=0.0,
+            max_breakout_range_vs_med24=1000.0,
             min_gap_ma200_long_pct=0.0,
             max_gap_ma200_long_pct=100.0,
             follow_min_ext_ma200_pct=2.50,
+            follow_require_bull_bar=False,
+            follow_max_upper_wick_ratio=1.0,
+            follow_max_red_bars=99,
+            follow_hold_low_above_ma200=False,
         )
     return CoiledBreakoutParams()
 
@@ -1179,8 +1204,8 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
 <li><b>七線極致黏帶</b>：突破前 {params.coil_lookback} 根內，<code>MA7 / 14 / 25 / 30 / 60 / 99 / 120</code> 七條均線最大帶寬 <code>≤ {params.max_coil_7_120_pct:.2f}%</code>，且底部長均線簇 <code>MA60 / 99 / 120</code> 帶寬 <code>≤ {params.max_coil_long_pct:.2f}%</code>。</li>
 <li><b>短均與長均簇（{mode_label}）</b>：{stack_rule}</li>
 <li><b>突破前已站穩 MA60 + 連紅階梯墊高（v2 核心優化）</b>：突破前 12 根至少 <code>{params.min_above_ma60_bars} 根</code>已站穩 <code>MA60</code> 之上（排除從 MA60 下方單根亂抽），且突破棒含前根至少 <code>連 {params.min_green_streak} 紅</code>階梯推升、近 4 根（1 小時）累計動能 <code>≥ +{params.min_mom4_pct:.2f}%</code>（ESPORTS 連 7 紅 <code>+3.92%</code>、牛來連 4 紅 <code>+3.49%</code>）。</li>
-<li><b>第一拍「🟢 破帶穿 MA200」（乾淨首根 + 近3h最大量 + 無長上影）</b>：當根必須直接從 <code>MA200</code> 下方收盤貫穿站上 <code>MA200</code>（排除前根偷站無量的遲滯棒），單根漲幅 <code>≥ {params.min_bar_chg_pct:.2f}%</code>、實體佔比 <code>≥ {params.min_body_ratio:.2f}</code>、上影線佔比 <code>≤ {params.max_upper_wick_ratio*100:.0f}%</code>，且成交量 <code>≥ 20 根均量 × {params.min_vol_ratio:.1f}</code> 同時 <code>≥ 前 12 根最大量 × {params.min_vol_vs_12bar_max:.2f}</code>。</li>
-<li><b>第二拍「★ 扇形展開（強確認）」</b>：突破後 <code>{params.follow_min_bars}～{params.follow_max_bars} 根</code>內不跌回 <code>MA200</code>、收盤離 <code>MA200</code> 擴大至 <code>≥ {params.follow_min_ext_ma200_pct:.2f}%</code>、量能 <code>≥ {params.follow_min_vol_ratio:.1f}x</code>，且同步站上 <code>15m MA240</code>（即 <code>1H MA60</code> 多週期共振）。</li>
+<li><b>第一拍「🟢 破帶穿 MA200」（乾淨首根 + 近3h最大量 + 無長上影 + 排除異常跳空棒）</b>：當根必須直接從 <code>MA200</code> 下方收盤貫穿站上 <code>MA200</code>（排除前根偷站無量的遲滯棒），<code>MA60</code> 斜率 <code>≥ {params.min_ma60_slope_pct:+.2f}%</code>（已正式翻正）、單根漲幅 <code>≥ {params.min_bar_chg_pct:.2f}%</code>、實體佔比 <code>≥ {params.min_body_ratio:.2f}</code>、上影線佔比 <code>≤ {params.max_upper_wick_ratio*100:.0f}%</code>、單根振幅不超過前 24 根中位數 <code>{params.max_breakout_range_vs_med24:.1f} 倍</code>（排除死魚盤後單根開盤異常暴抽），且成交量 <code>≥ 20 根均量 × {params.min_vol_ratio:.1f}</code> 同時 <code>≥ 前 12 根最大量 × {params.min_vol_vs_12bar_max:.2f}</code>。</li>
+<li><b>第二拍「★ 扇形展開（強確認）」</b>：突破後 <code>{params.follow_min_bars}～{params.follow_max_bars} 根</code>內每根最低價皆守在 <code>MA200</code> 之上、期間最多 <code>{params.follow_max_red_bars} 根</code>陰線休息；確認當根須為紅 K 且上影線 <code>≤ {params.follow_max_upper_wick_ratio*100:.0f}%</code>、收盤離 <code>MA200</code> 擴大至 <code>≥ {params.follow_min_ext_ma200_pct:.2f}%</code>、量能 <code>≥ {params.follow_min_vol_ratio:.1f}x</code>，並同步站上 <code>15m MA240</code>（即 <code>1H MA60</code> 多週期共振）。</li>
 <li><b>回測出場（新增 15m MA99 = 1H MA25 主升段移動停利）</b>：防守停損設在「黏帶下緣 <code>stop_price</code>」（15m 收盤跌破即停損）；最高價達 <code>1.2R～1.5R</code> 後啟動移動停利。對照 ESPORTS 與牛來 1H 圖，主升段中途洗盤皆精準守住 <code>15m MA99（= 1H MA25）</code>，故同時列出 <code>MA99</code>、<code>MA60</code>、<code>MA25</code> 三種移動停利對照。</li>
 </ol>
 <p class="note">圖例說明：黑色橢圓圈＝底部七線黏帶突破起漲區；綠色虛線＋▲＝進場；綠色點線＋×＝MA99(1H MA25)移動停利出場；紅色水平點線＝黏帶下緣停損價；8 條均線顏色完全對齊幣安 App。</p>
