@@ -83,6 +83,7 @@ class CoiledBreakoutParams:
     min_vol_ratio: float = 2.00
     # v2 對齊 ESPORTSUSDT (10-31 17:30) 與 牛来USDT (10-31 23:00) 共同特徵：
     clean_first_cross: bool = True  # 必須當根直接從 MA200 下方突破站上（排除前根偷站無量的遲滯棒）
+    require_ma25_above_long_at_cross: bool = True  # True=嚴格版(突破當根MA25>長均簇頂)；False=標準版(允許MA25仍在長均簇內、MA7>長均簇頂)
     min_green_streak: int = 2  # 突破棒含前根至少連 2 紅階梯推升（ESPORTS 連7紅、牛来 連4紅）
     min_above_ma60_bars: int = 9  # 突破前 12 根至少 9 根已站穩 MA60 之上（排除從 MA60 下方單根亂抽）
     min_mom4_pct: float = 1.80  # 近 4 根 (1小時) 累計推升動能 >= 1.80%（ESPORTS +3.92%、牛来 +3.49%）
@@ -390,8 +391,12 @@ def breakout_at(
     m60, m99, m120, m200 = m[60][i], m[99][i], m[120][i], m[200][i]
     long_top = max(m60, m99, m120)
     long_bot = min(m60, m99, m120)
-    if not (m7 > m14 > m25 >= m30 and m25 > long_top):
-        return None
+    if params.require_ma25_above_long_at_cross:
+        if not (m7 > m14 > m25 >= m30 and m25 > long_top):
+            return None
+    else:
+        if not (m7 > m14 > m25 and m7 > long_top and m25 >= long_bot):
+            return None
 
     # 3. 突破前 8 根內 MA7..MA120 七線極度糾結（黏帶），且 MA60/99/120 緊密收攏、與 MA200 呈碗底蓄力空間
     coil_candidates = []
@@ -1279,13 +1284,39 @@ def main() -> int:
     p.add_argument("--scan", action="store_true", help="回掃全市場近期 500 根 15m K 線符合的訊號")
     p.add_argument("--backtest-days", type=int, default=0, help="回測全市場近 N 天（例如 90 代表三個月）")
     p.add_argument("--html", type=str, default="", help="輸出回測 HTML 總結報告路徑（配合 --backtest-days）")
+    p.add_argument(
+        "--mode",
+        choices=("strict", "standard", "v1"),
+        default="strict",
+        help="strict=v2雙標竿嚴格版(90天14筆/強確認6筆100%%勝率); standard=標準放寬版(允許突破當根MA25在長均簇內, 90天36筆/強確認15筆); v1=初版(90天58筆/強確認11筆)",
+    )
     p.add_argument("--min-qv", type=float, default=5_000_000, help="24h 最低成交額門檻 (USDT)")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的那一根 15m K 線後結束")
     p.add_argument("--test", action="store_true", help="測試 Telegram 推播")
     args = p.parse_args()
 
     apply_keys()
-    params = CoiledBreakoutParams()
+    if args.mode == "standard":
+        params = CoiledBreakoutParams(
+            require_ma25_above_long_at_cross=False,
+            min_above_ma60_bars=8,
+            min_gap_ma200_long_pct=0.40,
+        )
+    elif args.mode == "v1":
+        params = CoiledBreakoutParams(
+            clean_first_cross=False,
+            require_ma25_above_long_at_cross=True,
+            min_green_streak=1,
+            min_above_ma60_bars=0,
+            min_mom4_pct=0.0,
+            max_upper_wick_ratio=1.0,
+            min_vol_vs_12bar_max=0.0,
+            min_gap_ma200_long_pct=0.0,
+            max_gap_ma200_long_pct=100.0,
+            follow_min_ext_ma200_pct=2.50,
+        )
+    else:
+        params = CoiledBreakoutParams()
 
     if args.test:
         ok = telegram_send("15m 底部七線黏帶突破監看測試：如果你看到這則訊息，Telegram 已連通。")
