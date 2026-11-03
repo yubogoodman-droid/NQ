@@ -5,7 +5,10 @@ lookback    = input.int(48, "破底回看 K 數", minval=12)
 minDropPct  = input.float(2.0, "最小跌幅 %", minval=0.5, step=0.1)
 minBouncePct = input.float(1.0, "最小反彈 %", minval=0.3, step=0.1)
 maxBouncePct = input.float(7.0, "最大反彈 %，超過不追（0=不檢查）", minval=0.0, step=0.5)
-reboundBars = input.int(24, "反彈視窗（根）", minval=6)
+reboundBars = input.int(18, "反彈視窗（根）", minval=6)
+minBaseBars = input.int(10, "最少墊底 K 數（0=不檢查）", minval=0)
+skipAfterHour = input.int(12, "最晚進場時（24=不檢查）", minval=9, maxval=24)
+skipAfterMin  = input.int(55, "最晚進場分", minval=0, maxval=59)
 slopeBars   = input.int(3, "均線上彎回看", minval=1)
 minGap5_10  = input.float(0.15, "MA5-MA10 最小間隔 %", minval=0.0, step=0.025)
 minGap10_20 = input.float(0.12, "MA10-MA20 最小間隔 %", minval=0.0, step=0.025)
@@ -114,6 +117,10 @@ readyNew   = ready and not ready[1]
 bouncePct = not na(trough) and trough > 0 ? (close - trough) / trough * 100 : 0
 bounceVolRatio = upBars > 0 and not na(preBounceVol) ? (upVolSum / upBars) / preBounceVol : na
 skipOpen = hour(time, "Asia/Taipei") == 9 and minute(time, "Asia/Taipei") < 30
+tpeH = hour(time, "Asia/Taipei")
+tpeM = minute(time, "Asia/Taipei")
+skipLate = skipAfterHour < 24 and (tpeH > skipAfterHour or (tpeH == skipAfterHour and tpeM > skipAfterMin))
+baseBarsOk = minBaseBars <= 0 or baseBars >= minBaseBars
 maClear(src) =>
     na(troughBar) or na(src[bar_index - troughBar]) or src[bar_index - troughBar] > trough
 troughClear = not clearTrough or (maClear(ma5) and maClear(ma10) and maClear(ma20) and maClear(ma60) and maClear(ma120) and maClear(ma200) and maClear(ma240))
@@ -127,7 +134,7 @@ lidGap(src) =>
 lid = math.min(nz(lidGap(ma60), 1e9), nz(lidGap(ma120), 1e9), nz(lidGap(ma200), 1e9), nz(lidGap(ma240), 1e9))
 noLid = lid >= 1e8
 lidOk = minLidPct <= 0 or noLid or lid >= minLidPct or dayDrop >= punchDrop
-cand = readyNew and not na(trough) and bouncePct >= minBouncePct and (maxBouncePct <= 0 or bouncePct <= maxBouncePct) and bar_index > troughBar and not skipOpen and troughClear and climaxOk and bounceVolOk and ma60Ok and dayDropOk and ma200Ok
+cand = readyNew and not na(trough) and bouncePct >= minBouncePct and (maxBouncePct <= 0 or bouncePct <= maxBouncePct) and bar_index > troughBar and baseBarsOk and not skipOpen and not skipLate and troughClear and climaxOk and bounceVolOk and ma60Ok and dayDropOk and ma200Ok
 sig = cand and lidOk
 
 if cand and not lidOk

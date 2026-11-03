@@ -41,9 +41,11 @@ from watch_tw_5m_bounce import (  # noqa: E402
 
 
 def detect(df, **kw):
-    """短合成 K 沒有 200MA、也還沒在 20MA 下墊過；單元測試預設關掉這兩項。"""
+    """短合成 K 沒有 200MA、時間也跨過 13:00；單元測試預設關掉這些盤中與長均限制。"""
     kw.setdefault("require_ma200", False)
     kw.setdefault("min_base_under", 0.0)
+    kw.setdefault("min_base_bars", 0)
+    kw.setdefault("skip_after", None)
     return detect_signals(df, **kw)
 
 
@@ -445,6 +447,24 @@ def test_simulate_and_summarize() -> None:
     t = trades[0]
     assert t.exit_idx >= t.entry_idx
     assert t.exit_reason in {"stop", "target", "eod"}
+
+    # 進場在當天最後一根時，simulate 絕不能跨到隔天去算停損
+    next_day = df.iloc[[0]].copy()
+    next_day.index = pd.DatetimeIndex([df.index[-1] + pd.Timedelta(days=1)])
+    next_day["Low"] = 1.0
+    two_days = pd.concat([df.iloc[: sigs[0].entry_idx + 1], next_day])
+    t_last = simulate(two_days, sigs)[0]
+    assert t_last.exit_idx == sigs[0].entry_idx
+    assert t_last.exit_reason == "eod"
+    assert abs(t_last.pnl_pct) < 1e-9
+
+    # min_base_bars 與 skip_after 門檻
+    base_bars = sigs[0].entry_idx - sigs[0].break_idx - 1
+    assert detect(df, min_base_bars=base_bars)
+    assert not detect(df, min_base_bars=base_bars + 1)
+    entry_hm = (df.index[sigs[0].entry_idx].hour, df.index[sigs[0].entry_idx].minute)
+    assert detect(df, skip_after=entry_hm)
+    assert not detect(df, skip_after=(entry_hm[0], entry_hm[1] - 5))
 
 
 def test_signal_key_and_alert_text() -> None:

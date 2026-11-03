@@ -386,12 +386,14 @@ def detect_signals(
     *,
     lookback: int = 48,
     min_drop_pct: float = 0.02,
-    rebound_bars: int = 24,
+    rebound_bars: int = 18,
+    min_base_bars: int = 10,
     min_bounce_pct: float = 0.01,
     slope_bars: int = 3,
     min_entry_gap: int = 12,
     vol_lookback: int = 20,
     skip_before: tuple[int, int] = (9, 30),
+    skip_after: tuple[int, int] | None = (12, 55),
     require_pretty: bool = True,
     min_climax_vol: float = 2.0,
     min_bounce_vol: float = 1.0,
@@ -492,6 +494,10 @@ def detect_signals(
             continue
         ts = df.index[i]
         if skip_before and (ts.hour, ts.minute) < skip_before:
+            continue
+        if skip_after and (ts.hour, ts.minute) > skip_after:
+            continue
+        if min_base_bars > 0 and (i - trough_idx - 1) < min_base_bars:
             continue
         if i - last_entry < min_entry_gap:
             continue
@@ -610,7 +616,10 @@ def simulate(df: pd.DataFrame, sigs: Sequence[BounceSignal]) -> list[BounceTrade
         exit_idx = sig.entry_idx
         exit_px = entry
         reason = "eod"
+        entry_day = idx[sig.entry_idx].date()
         for k in range(sig.entry_idx + 1, len(df)):
+            if idx[k].date() != entry_day:
+                break
             if float(low[k]) <= stop:
                 exit_idx, exit_px, reason = k, stop, "stop"
                 break
@@ -1100,10 +1109,21 @@ def resolve_universe(args) -> list[dict]:
     return merge_universe(universe, extra)
 
 
+def _parse_hhmm(text: str) -> tuple[int, int] | None:
+    raw = (text or "").strip()
+    if not raw or raw in {"0", "none", "off"}:
+        return None
+    h, m = raw.split(":", 1)
+    return int(h), int(m)
+
+
 def detect_kwargs_from_args(args) -> dict[str, Any]:
     """CLI 旗標 → detect_signals 的關鍵字參數。"""
     return {
         "require_pretty": not getattr(args, "loose", False),
+        "rebound_bars": int(getattr(args, "rebound_bars", 18)),
+        "min_base_bars": int(getattr(args, "min_base_bars", 10)),
+        "skip_after": _parse_hhmm(getattr(args, "skip_after", "12:55")),
         "min_climax_vol": float(getattr(args, "min_climax_vol", 2.0)),
         "min_bounce_vol": float(getattr(args, "min_bounce_vol", 1.0)),
         "require_above_ma60": not getattr(args, "no_ma60", False),
@@ -1392,6 +1412,23 @@ def build_parser() -> argparse.ArgumentParser:
             type=float,
             default=7.0,
             help="進場時離破底低點最多彈幾 %%，超過不追（0 = 不檢查）",
+        )
+        sp.add_argument(
+            "--rebound-bars",
+            type=int,
+            default=18,
+            help="破底後幾根 5 分 K 內要進場，超過算鈍化作廢（預設 18）",
+        )
+        sp.add_argument(
+            "--min-base-bars",
+            type=int,
+            default=10,
+            help="破底後到進場前至少要墊幾根 5 分 K（0 = 不檢查；預設 10）",
+        )
+        sp.add_argument(
+            "--skip-after",
+            default="12:55",
+            help="此時間之後不進場 HH:MM（空字串或 0 = 不檢查；預設 12:55）",
         )
 
     s = sub.add_parser("scan", help="回看近幾日並可出 HTML")
