@@ -221,7 +221,7 @@ def test_4h_first_break_keeps_and_rejects() -> None:
 
     shallow = h.copy()
     shallow.loc[shallow.index[pos], "close"] = sig.entry * 1.05
-    shallow.loc[shallow.index[pos], "ma99"] = sig.entry * 0.99
+    shallow.loc[shallow.index[pos], "ma25"] = sig.entry * 0.99
     assert filter_signals_4h([sig], shallow) == []
 
     bull = h.copy()
@@ -270,7 +270,8 @@ def test_kline_limit_covers_month() -> None:
     assert "3d" in pages_html_path(3).as_posix()
     assert "30d" in pages_html_path(30).as_posix()
     assert "60d" in pages_html_path(60).as_posix()
-    assert pages_html_path(3) != pages_html_path(7) != pages_html_path(30) != pages_html_path(60)
+    assert "90d" in pages_html_path(90).as_posix()
+    assert pages_html_path(3) != pages_html_path(7) != pages_html_path(30) != pages_html_path(60) != pages_html_path(90)
 
 
 def test_sequential_equity_skips_overlap() -> None:

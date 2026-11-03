@@ -32,6 +32,7 @@ PAGES = REPO / "docs" / "binance-15m-ma-short" / "index.html"
 PAGES_3D = REPO / "docs" / "binance-15m-ma-short-3d" / "index.html"
 PAGES_30D = REPO / "docs" / "binance-15m-ma-short-30d" / "index.html"
 PAGES_60D = REPO / "docs" / "binance-15m-ma-short-60d" / "index.html"
+PAGES_90D = REPO / "docs" / "binance-15m-ma-short-90d" / "index.html"
 BRANCH_VIEW = "cursor/15m-ma-break-short-9d44"
 
 INTERVAL = "15m"
@@ -44,8 +45,11 @@ MAX_HOLD = 32  # 8 小時
 RR = 2.0
 STOP_BUFFER = 0.001  # 停損在破位 K 高點上方 0.1%
 MIN_BREAK_PCT = 0.8  # 收盤至少低於長均上沿 0.8%，濾掉輕觸
-MIN_SHORT_FAN_PCT = 0.30  # 7/14/25 張開不到這個，要靠放量才算瀑布
-MIN_VOL_IF_TIGHT_FAN = 3.2  # 短均幾乎黏住時，量比至少這麼多
+MIN_SHORT_FAN_PCT = 0.30  # 7/14/25 張開門檻
+MIN_VOL_IF_TIGHT_FAN = 3.2  # 破位大陰線量比至少 3.2x
+MIN_BODY_RATIO = 0.70  # 破位陰線實體至少佔整根 K 振幅 70%
+MAX_LOWER_WICK_RATIO = 0.20  # 下影線不超過整根 K 振幅 20%，濾掉針探支撐
+MAX_RISK_PCT = 0.066  # 單根風險 >6.6% 多半一步到位，不追地板
 MAX_1H_BULL_FAN_PCT = 2.0  # 上根小時仍 7>14>25 且張開≥2%，多半是漲勢回檔
 APPROACH_BARS = 8  # 進場前幾根要多數還在長均之上
 MIN_APPROACH_ABOVE = 4  # 少於這個＝在帶裡穿梭或已經破了再追
@@ -127,7 +131,9 @@ def kline_limit_needed(days: int, interval: str = INTERVAL) -> int:
 
 
 def pages_html_path(days: int) -> Path:
-    """3 日 / 週報 / 月報 / 兩個月報分開寫，避免互相覆蓋。"""
+    """3 日 / 週報 / 月報 / 兩個月 / 三個月分開寫，避免互相覆蓋。"""
+    if days >= 80:
+        return PAGES_90D
     if days >= 50:
         return PAGES_60D
     if days >= 28:
@@ -328,7 +334,61 @@ def filter_signals_4h(
     df_4h: pd.DataFrame,
     funnel: dict[str, int] | None = None,
 ) -> list[Signal]:
-    return filter_signals_htf(signals, df_4h, 4, funnel, tag="4h")
+    """4h 確認（對齊 1h MA99 ≈ 4h MA25 = 100h）：
+
+    上根已收盤 4h 還在 MA25 之上，這根 15m 第一次把 4h 短均（MA7/14/25）全打穿，
+    且上根 4h 不是明顯 7>14>25 多頭張開。
+    """
+    if not signals:
+        return []
+    work = (
+        add_mas(df_4h)
+        if df_4h is not None and not df_4h.empty and "ma25" not in df_4h.columns
+        else df_4h
+    )
+
+    def bump(key: str) -> None:
+        if funnel is not None:
+            funnel[key] = funnel.get(key, 0) + 1
+
+    kept: list[Signal] = []
+    for sig in signals:
+        if work is None or work.empty:
+            bump("skip_4h_data")
+            continue
+        pos = last_closed_htf_idx(work, sig.timestamp, 4)
+        if pos < 0:
+            bump("skip_4h_data")
+            continue
+        row = work.iloc[pos]
+        m7, m14, m25 = row.get("ma7"), row.get("ma14"), row.get("ma25")
+        if m25 is None or pd.isna(m25):
+            bump("skip_4h_data")
+            continue
+        m25_f = float(m25)
+        prev_close = float(row["close"])
+        if prev_close < m25_f:
+            bump("skip_4h_late")
+            continue
+        short_vals = [float(x) for x in (m7, m14, m25) if x is not None and not pd.isna(x)]
+        floor_px = min(short_vals) if short_vals else m25_f
+        if sig.entry >= floor_px:
+            bump("skip_4h_shallow")
+            continue
+        if (
+            m7 is not None
+            and m14 is not None
+            and not (pd.isna(m7) or pd.isna(m14))
+        ):
+            m7_f, m14_f = float(m7), float(m14)
+            if m7_f > m14_f > m25_f and m25_f > 0:
+                h_fan = (m7_f / m25_f - 1.0) * 100.0
+                if h_fan >= MAX_1H_BULL_FAN_PCT:
+                    bump("skip_4h_bull")
+                    continue
+        bump("taken_4h")
+        kept.append(sig)
+    return kept
 
 
 def load_htf_frames(
@@ -462,7 +522,9 @@ def detect_signals(
         return []
     work = add_mas(df) if "ma200" not in df.columns else df
     c = work["close"].to_numpy(float)
+    o = work["open"].to_numpy(float)
     h = work["high"].to_numpy(float)
+    l = work["low"].to_numpy(float)
     m7 = work["ma7"].to_numpy(float)
     m14 = work["ma14"].to_numpy(float)
     m25 = work["ma25"].to_numpy(float)
@@ -505,13 +567,16 @@ def detect_signals(
         entry = float(c[i])
         stop = float(h[i]) * (1.0 + STOP_BUFFER)
         risk = stop - entry
-        if risk <= 0 or risk / entry > 0.18:
+        if risk <= 0 or risk / entry > MAX_RISK_PCT:
             bump("skip_risk")
             continue
         vr = float(vol[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
         fan_pct = (m25[i] / m7[i] - 1.0) * 100.0
-        # 短均黏成一條又沒放量：橫盤輕觸，不像瀑布陰線
-        if fan_pct < MIN_SHORT_FAN_PCT and vr < MIN_VOL_IF_TIGHT_FAN:
+        rng = max(float(h[i] - l[i]), 1e-12)
+        body_ratio = float(o[i] - c[i]) / rng
+        lwick_ratio = float(c[i] - l[i]) / rng
+        # 沒放量、實體不夠飽滿或留長下影線：橫盤輕觸／探底抽腳，不像瀑布大陰線
+        if vr < MIN_VOL_IF_TIGHT_FAN or body_ratio < MIN_BODY_RATIO or lwick_ratio > MAX_LOWER_WICK_RATIO:
             bump("skip_chop")
             continue
         above = 0
@@ -555,6 +620,11 @@ def simulate(df: pd.DataFrame, signals: list[Signal], *, max_hold: int = MAX_HOL
     high = df["high"].to_numpy(float)
     low = df["low"].to_numpy(float)
     close = df["close"].to_numpy(float)
+    ma25 = (
+        df["ma25"].to_numpy(float)
+        if "ma25" in df.columns
+        else df["close"].rolling(25, min_periods=25).mean().to_numpy(float)
+    )
     ma99 = (
         df["ma99"].to_numpy(float)
         if "ma99" in df.columns
@@ -580,7 +650,7 @@ def simulate(df: pd.DataFrame, signals: list[Signal], *, max_hold: int = MAX_HOL
                 exit_price = sig.target
                 reason = "take_profit"
                 break
-            if not np.isnan(ma99[i]) and close[i] > ma99[i]:
+            if (not np.isnan(ma25[i]) and close[i] > ma25[i]) or (not np.isnan(ma99[i]) and close[i] > ma99[i]):
                 exit_idx = i
                 exit_price = float(close[i])
                 reason = "reclaim_ma99"
@@ -1015,7 +1085,7 @@ def _render_cards(
             f"15m MA99 {_fmt_px(sig.ma99)} / MA120 {_fmt_px(sig.ma120)} / MA200 {_fmt_px(sig.ma200)}\n"
             "1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99"
             f"{h_line}\n"
-            "4h 確認：上根 4h 收盤仍在 MA99 上，本 15m 第一次打穿 4h MA99"
+            "4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）"
             f"{h4_line}"
             "</pre>"
             f"{chart_html}"
@@ -1043,17 +1113,17 @@ def write_html_report(
     if funnel:
         funnel_line = (
             f"<p class='muted'>漏斗：從三條之上一次打穿　{funnel.get('break', 0)} → "
-            f"7&lt;14&lt;25　{funnel.get('taken', 0)} → "
+            f"7&lt;14&lt;25＋放量實心K　{funnel.get('taken', 0)} → "
             f"1h 首次打穿 MA99　{funnel.get('taken_1h', 0)} → "
-            f"4h 首次打穿 MA99　{funnel.get('taken_4h', 0)}"
+            f"4h 首次打穿短均　{funnel.get('taken_4h', 0)}"
             f"（淺破 {funnel.get('skip_shallow', 0)} · 短均未排列 {funnel.get('skip_stack', 0)} · "
-            f"橫盤輕觸 {funnel.get('skip_chop', 0)} · 沒騎在黏帶上 {funnel.get('skip_weave', 0)} · "
-            f"風險過大 {funnel.get('skip_risk', 0)} · "
+            f"量弱或留影線 {funnel.get('skip_chop', 0)} · 沒騎在黏帶上 {funnel.get('skip_weave', 0)} · "
+            f"單根過大 {funnel.get('skip_risk', 0)} · "
             f"1h 已破 MA99 太晚 {funnel.get('skip_1h_late', 0)} · "
             f"15m 沒打到 1h MA99 {funnel.get('skip_1h_shallow', 0)} · "
             f"1h 仍多頭張開 {funnel.get('skip_1h_bull', 0)} · "
-            f"4h 已破 MA99 太晚 {funnel.get('skip_4h_late', 0)} · "
-            f"15m 沒打到 4h MA99 {funnel.get('skip_4h_shallow', 0)} · "
+            f"4h 已破 MA25 太晚 {funnel.get('skip_4h_late', 0)} · "
+            f"15m 沒打穿 4h 短均 {funnel.get('skip_4h_shallow', 0)} · "
             f"4h 仍多頭張開 {funnel.get('skip_4h_bull', 0)}）</p>"
         )
     extra = ""
@@ -1118,7 +1188,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="card">總報酬<b class="{total_cls}">{stats['total_pnl']:+.2f}%</b></div>
 <div class="card">勝/負<b>{stats['wins']}/{stats['losses']}</b></div>
 </div>
-<p class="muted">停損＝破位 K 高點 +0.1% · 停利 2R · 收復 MA99 或持倉 {MAX_HOLD} 根（8h）平倉。濾掉短均幾乎黏住又沒放量的橫盤輕觸、進場前沒騎在黏帶上的穿梭／追空，以及上根 1h／4h 仍明顯 7&gt;14&gt;25 的漲勢回檔。高週期過濾：上根已收盤 1h／4h 還在 MA99 之上，這根 15m 收盤第一次跌破該週期 MA99。上圖 15m、中圖 1h、下圖 4h。報酬是單筆價格百分比，未計資金費。</p>
+<p class="muted">停損＝破位 K 高點 +0.1%（單根風險 ≤6.6%）· 停利 2R · 收復 MA25/MA99 或持倉 {MAX_HOLD} 根（8h）平倉。破位 K 需放量 ≥3.2x、實體 ≥70%、下影線 ≤20%，進場前多數收在長均之上。高週期確認：上根 1h 仍在 MA99 上且本 15m 首次打穿 1h MA99；上根 4h 仍在 MA25（100h）上且本 15m 首次把 4h 短均（7/14/25）全打穿，且 1h／4h 上根不是明顯 7&gt;14&gt;25。上圖 15m、中圖 1h、下圖 4h。報酬是單筆價格百分比，未計資金費。</p>
 {funnel_line}
 <div class="equity">{_equity_svg([t.pnl_pct for t in trades])}</div>
 </section>
@@ -1251,7 +1321,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--pages",
         action="store_true",
-        help="寫到 docs/binance-15m-ma-short/（≤4 日寫 3d，28–49 日寫 30d，50 日以上寫 60d）",
+        help="寫到 docs/binance-15m-ma-short/（≤4 日寫 3d，28–49 日寫 30d，50–79 日寫 60d，≥80 日寫 90d）",
     )
     p.add_argument("--embed", action="store_true", help="圖用 base64 嵌進 HTML")
     args = p.parse_args(argv)
@@ -1287,9 +1357,9 @@ def main(argv: list[str] | None = None) -> int:
         title = "15m 同時跌破 99/120/200 做空"
         subtitle = (
             f"{args.days} 日 · {start.strftime('%Y-%m-%d %H:%M')} → {now.strftime('%Y-%m-%d %H:%M')} 台北 · "
-            f"{result.symbols} 檔 15m · 進場＝15m 同時跌破 99/120/200 且 7<14<25，"
-            f"短均黏住要放量、進場前多數還在長均之上，再加 1h／4h：上根已收盤仍在 MA99 上、本 15m 第一次打穿該週期 MA99，"
-            f"且上根不是明顯 7>14>25"
+            f"{result.symbols} 檔 15m · 進場＝15m 同時跌破 99/120/200 且 7<14<25、"
+            f"放量 ≥3.2x 實心大陰線（實體 ≥70%、下影 ≤20%、風險 ≤6.6%），"
+            f"再加 1h 首次打穿 MA99、4h 首次打穿短均（MA25=100h），且上根不是明顯 7>14>25"
         )
         show_mubarak = not args.symbol or "MUBARAK" in args.symbol.upper()
         need_htf = sorted({t.signal.symbol for t in result.trades} | ({"MUBARAKUSDT"} if show_mubarak else set()))
