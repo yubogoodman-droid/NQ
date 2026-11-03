@@ -425,7 +425,22 @@ def test_draw_hourly_png_for_5m_trade() -> None:
 
 
 def test_niulai_target_is_one_and_half_r() -> None:
-    assert niulai_params().target_r == 1.5
+    p = niulai_params()
+    assert p.target_r == 1.5
+    assert p.min_depth_pct == 0.045
+    assert p.ma_slope_lookback == 12
+    assert p.max_ma_slope_pct == 0.0025
+
+
+def test_niulai_params_rejects_steep_rising_ma200() -> None:
+    """MA200 過去 12 根急漲（> 0.25%）時跌破均線，屬於上升趨勢回踩，不進場。"""
+    close, marks = _niulai_like_series()
+    # 只壓低進場前 12 根剛移出 MA200 視窗的那一段 (br-212:br-200)，使 MA200[br] 不變、MA200[br-12] 偏低
+    br = marks["br"]
+    close[br - 212 : br - 200] = 0.0950
+    df = _stamp_m(_ohlc(close), marks, 0.1052, 0.1050, 0.0994)
+    assert detect_m_tops(df, niulai_params(max_ma_slope_pct=1.0)), "放寬斜率時應能抓到 M 頭"
+    assert detect_m_tops(df, niulai_params()) == [], "預設應濾掉 MA200 陡升時的跌破"
 
 
 def test_scan_pages_are_30d() -> None:
@@ -457,6 +472,7 @@ def main() -> int:
         test_idx_at_maps_intrabar_to_hourly,
         test_draw_hourly_png_for_5m_trade,
         test_niulai_target_is_one_and_half_r,
+        test_niulai_params_rejects_steep_rising_ma200,
         test_scan_pages_are_30d,
         test_display_and_fmt,
     ]

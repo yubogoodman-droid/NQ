@@ -82,6 +82,8 @@ class MTopParams:
     require_close_below_ma25: bool = False
     min_break_volume_mult: float = 0.0
     local_high_pad: int = 0
+    ma_slope_lookback: int = 0
+    max_ma_slope_pct: float = 1.0
 
 
 def default_params(**overrides: Any) -> MTopParams:
@@ -99,7 +101,7 @@ def niulai_params(**overrides: Any) -> MTopParams:
         second_high_max_overshoot=0.003,
         min_bars_between=20,
         max_bars_between=48,
-        min_depth_pct=0.04,
+        min_depth_pct=0.045,
         min_peak_above_ma_pct=0.03,
         max_neck_above_ma_pct=0.012,
         max_neck_below_ma_pct=0.02,
@@ -107,8 +109,10 @@ def niulai_params(**overrides: Any) -> MTopParams:
         require_close_below_ma25=True,
         min_break_volume_mult=0.0,
         local_high_pad=16,
-        # 2R 約要再跌 10%，幾乎碰不到。1.5R 在 09/01–09/24 與 10/17 之後都比 2R 少虧，
-        # 09/24–10/16 從微賺變成持平。停損仍放在雙頂高點。
+        # 過濾掉 MA200 仍在陡峭上升時跌破的假破底：過去 12 根（1 小時）MA200 漲幅須 ≤ 0.25%。
+        ma_slope_lookback=12,
+        max_ma_slope_pct=0.0025,
+        # 2R 約要再跌 10%，幾乎碰不到。1.5R 搭配均線走平與 4.5% 深度，三段區間平均報酬皆轉正。
         target_r=1.5,
     )
     data.update(overrides)
@@ -506,6 +510,13 @@ def detect_m_tops(
                     continue
                 if params.require_close_below_ma25 and ma25 is not None:
                     if np.isnan(ma25[k]) or closes[k] >= ma25[k]:
+                        continue
+                if params.ma_slope_lookback > 0 and params.max_ma_slope_pct < 1.0:
+                    prev_ma_idx = k - params.ma_slope_lookback
+                    if prev_ma_idx < 0 or np.isnan(ma200[prev_ma_idx]) or ma200[prev_ma_idx] <= 0:
+                        continue
+                    slope = (ma200[k] - ma200[prev_ma_idx]) / ma200[prev_ma_idx]
+                    if slope > params.max_ma_slope_pct:
                         continue
                 if params.min_break_volume_mult > 0:
                     prev = vols[max(0, k - 20) : k]
@@ -1273,8 +1284,8 @@ h1{{font-size:18px;margin:0 0 6px}}
 <h1>{SYMBOL_TW} 五分K · M頭跌破 MA200 做空</h1>
 <p class="muted">幣安 U 本位永續 · 近 {days} 天 · {escape(start)} → {escape(end)} CST · {len(df)} 根
 <br/>只做「牛來那種」M 頭：雙峰幾乎等高（價差 ≤ 1%、右峰不得明顯更高）、間隔約 1.5～4 小時、
-中間至少跌 4%，兩個峰都明顯站在 MA200 上方（≥ 3%），頸線回測 MA200（不得遠高或深跌穿），
-M 成形期間多數收盤仍在均線上，然後收盤同時跌破 MA200 與 MA25 才空。小振幅、貼均線亂鑽的假 M 不畫。
+中間至少跌 4.5%，兩個峰都明顯站在 MA200 上方（≥ 3%），頸線回測 MA200（不得遠高或深跌穿），
+M 成形期間多數收盤仍在均線上，然後收盤同時跌破 MA200 與 MA25、且 MA200 過去 12 根漲幅 ≤ 0.25%（均線已走平或下彎）才空。小振幅、貼均線亂鑽或急漲趨勢中的假 M 不畫。
 停損在雙頂高點、目標 {_r_label()}、或 48 根時間停。每筆下面附同一段一小時 K。加總％是各筆報酬相加，不是複利。</p>
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
@@ -1453,7 +1464,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <section class="summary">
 <h1>{escape(title)}</h1>
 <p class="muted">{blurb}
-<br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4%、雙峰明顯站上 MA200、頸線回測均線（不深跌穿）、成形期間多數收盤在均線上，收盤同時跌破 MA200 與 MA25 才空。貼均線亂鑽的小 M 不畫。停損雙頂高點、{_r_label()}、或 48 根時間停。每筆下面附同一段一小時 K。加總％是各筆報酬相加，不是複利。</p>
+<br/>只掃「牛來那種」M 頭：雙峰幾乎等高、中間至少跌 4.5%、雙峰明顯站上 MA200、頸線回測均線（不深跌穿）、成形期間多數收盤在均線上，收盤同時跌破 MA200 與 MA25、且 MA200 過去 12 根漲幅 ≤ 0.25% 才空。貼均線亂鑽或均線陡漲中的假 M 不畫。停損雙頂高點、{_r_label()}、或 48 根時間停。每筆下面附同一段一小時 K。加總％是各筆報酬相加，不是複利。</p>
 <p class="muted">漏斗：轉折高 {fun.get('swing_highs', 0)} → 配對 {fun.get('pairs', 0)} → M形 {fun.get('m_shape', 0)}
 → 峰在均線上 {fun.get('above_ma200', 0)} → 跌破 MA200 {fun.get('ma200_break', 0)} → 訊號 {fun.get('signals', 0)}
 <br/>出場：{_r_label()} {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
@@ -1585,9 +1596,9 @@ def _rules_html(limit: int, entry_start: pd.Timestamp, entry_end: pd.Timestamp) 
 <li><b>波段高</b>：左右各 {p.swing_lookback} 根裡，最高價唯一最大，才算轉折高。</li>
 <li><b>雙峰</b>：兩峰相隔 {p.min_bars_between}～{p.max_bars_between} 根（含）。兩峰價差 / 均價 ≤ {p.high_tolerance_pct:.0%}。右峰不得高過左峰 × {1 + p.second_high_max_overshoot:.3f}。</li>
 <li><b>局部高點</b>：左峰前 {p.local_high_pad} 根到右峰確認端，區間最高價不得超過兩峰。</li>
-<li><b>頸線</b>：兩峰之間（各讓出 {p.swing_lookback} 根）最低的 low，而且離兩峰都超過 2 根。深度 (較高峰 − 頸線) / 較高峰 ≥ {p.min_depth_pct:.0%}。</li>
+<li><b>頸線</b>：兩峰之間（各讓出 {p.swing_lookback} 根）最低的 low，而且離兩峰都超過 2 根。深度 (較高峰 − 頸線) / 較高峰 ≥ {p.min_depth_pct:.1%}。</li>
 <li><b>站在 MA200 上</b>：兩峰那根收盤都 &gt; MA200，而且峰的 high ≥ 該根 MA200 × {1 + p.min_peak_above_ma_pct:.2f}。頸線須落在該根 MA200 的 {p.max_neck_below_ma_pct:.1%} 下到 {p.max_neck_above_ma_pct:.1%} 上。H1 到 H2（含）收盤有 ≥ {p.min_frac_closes_above_ma:.0%} 仍在 MA200 上。</li>
-<li><b>跌破進場</b>：右峰再等 {p.swing_lookback} 根確認後，往後最多 {p.max_bars_to_break} 根。某一根前收 ≥ 前一根 MA200、這根收盤 &lt; 這根 MA200，而且收盤 &lt; MA25。不看跌破當根的量（倍數 {p.min_break_volume_mult:g}）。同一根跌破若配到多個 M，留「深度 + 兩峰對稱」分數較高的那個。</li>
+<li><b>跌破進場</b>：右峰再等 {p.swing_lookback} 根確認後，往後最多 {p.max_bars_to_break} 根。某一根前收 ≥ 前一根 MA200、這根收盤 &lt; 這根 MA200，而且收盤 &lt; MA25，同時這根 MA200 相較 {p.ma_slope_lookback} 根前（1 小時）漲幅 ≤ {p.max_ma_slope_pct:.2%}（排除急漲途中回踩 MA200 的假破底）。不看跌破當根的量（倍數 {p.min_break_volume_mult:g}）。同一根跌破若配到多個 M，留「深度 + 兩峰對稱」分數較高的那個。</li>
 <li><b>進場價</b>：跌破那根的收盤，依該合約 <span class="k">PRICE_FILTER.tickSize</span> 四捨五入到 tick。</li>
 <li><b>停損</b>：兩峰較高價，同樣四捨五入到 tick。進場後下一根起，若 high ≥ 停損，出場價 = 停損（同一根先看停損、再看停利）。</li>
 <li><b>停利</b>：進場價 − {p.target_r:g} × (停損 − 進場價)，四捨五入到 tick。low ≤ 目標則出場價 = 目標。</li>
