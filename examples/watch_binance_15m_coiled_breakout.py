@@ -74,14 +74,14 @@ class CoiledBreakoutParams:
     max_coil_7_120_pct: float = 1.80
     max_coil_long_pct: float = 1.20
     slope_lookback: int = 16
-    min_ma60_slope_pct: float = 0.00
+    min_ma60_slope_pct: float = -0.10
     min_ma200_slope_pct: float = -1.00
     min_ext_ma200_pct: float = 0.10
     max_ext_ma200_pct: float = 3.50
     min_bar_chg_pct: float = 0.80
     min_body_ratio: float = 0.55
     min_vol_ratio: float = 2.00
-    # v2 對齊 ESPORTSUSDT (10-31 17:30) 與 牛来USDT (10-31 23:00) 共同特徵：
+    # v2 對齊 ESPORTSUSDT (10-31 17:30) 與 牛来USDT (10-31 23:00) 圈選位置事前結構特徵：
     clean_first_cross: bool = True  # 必須當根直接從 MA200 下方突破站上（排除前根偷站無量的遲滯棒）
     require_ma25_above_long_at_cross: bool = True  # True=嚴格版(突破當根MA25>長均簇頂)；False=標準版(允許MA25仍在長均簇內、MA7>長均簇頂)
     min_green_streak: int = 2  # 突破棒含前根至少連 2 紅階梯推升（ESPORTS 連7紅、牛来 連4紅）
@@ -89,17 +89,12 @@ class CoiledBreakoutParams:
     min_mom4_pct: float = 1.80  # 近 4 根 (1小時) 累計推升動能 >= 1.80%（ESPORTS +3.92%、牛来 +3.49%）
     max_upper_wick_ratio: float = 0.24  # 突破棒上影線佔比 <= 24%（ESPORTS 15%、牛来 3%，排除長上影砸盤）
     min_vol_vs_12bar_max: float = 1.25  # 突破棒成交量須 >= 前 12 根（3小時）最大量的 1.25 倍
-    max_breakout_range_vs_med24: float = 10.5  # 突破棒振幅相對前 24 根(6h)振幅中位數倍數上限（排除死魚盤後單根開盤異常暴抽）
     min_gap_ma200_long_pct: float = 0.50  # MA200 與下方長均簇 (MA60/99/120) 碗型蓄力空間下限
     max_gap_ma200_long_pct: float = 3.20  # MA200 與下方長均簇碗型空間上限（ESPORTS 2.90%、牛来 2.78%）
     follow_min_bars: int = 1
     follow_max_bars: int = 4
     follow_min_ext_ma200_pct: float = 2.20
     follow_min_vol_ratio: float = 2.00
-    follow_require_bull_bar: bool = True  # 第二拍確認當根須為紅 K（c > o）
-    follow_max_upper_wick_ratio: float = 0.35  # 第二拍確認棒上影線佔比 <= 35%（排除確認棒衝高回落）
-    follow_max_red_bars: int = 1  # 突破棒至確認棒之間最多允許 1 根陰線休息
-    follow_hold_low_above_ma200: bool = True  # 突破後至確認棒期間，每根 K 線最低價皆須守在 MA200 之上
 
 
 @dataclass
@@ -129,7 +124,6 @@ class BreakoutSignal:
     follow_close: float | None = None
     follow_ext_ma200_pct: float | None = None
     follow_vol_ratio: float | None = None
-    follow_stop_price: float | None = None
 
 
 @dataclass
@@ -262,10 +256,51 @@ def fetch_klines_days(sym: str, days: int = 90, use_cache: bool = True) -> dict 
     """抓取近 N 天 15m K 線（自動結合 data.binance.vision 月度壓縮檔 + REST 近期 K 線，低權重快速回測）。"""
     CACHE_90D_DIR.mkdir(parents=True, exist_ok=True)
     cache_file = CACHE_90D_DIR / f"{sym}_{days}d.npz"
-    # 90 天回測以月度歷史檔為主，48 小時內的快取足夠涵蓋尚未出月檔的尾端。
-    if use_cache and cache_file.exists() and time.time() - cache_file.stat().st_mtime < 48 * 3600:
+    # 若快取已存在，僅用 1 次輕量 REST 補齊尾端新收盤的 15m K 線，確保回測與報告時間完全最新。
+    if use_cache and cache_file.exists():
         z = np.load(cache_file)
-        return {k: z[k] for k in ("t", "o", "h", "l", "c", "v")}
+        cached = {k: z[k] for k in ("t", "o", "h", "l", "c", "v")}
+        now_ms = int(time.time() * 1000)
+        last_ts = int(cached["t"][-1]) if len(cached["t"]) else 0
+        if now_ms - last_ts < 30 * 60_000:
+            return cached
+        try:
+            r = SESSION.get(
+                BASE + "/fapi/v1/klines",
+                params={"symbol": sym, "interval": "15m", "limit": 500, "startTime": last_ts + 15 * 60_000},
+                timeout=15,
+            )
+            if r.ok:
+                chunk = r.json()
+                rows = {
+                    int(cached["t"][k]): (
+                        float(cached["o"][k]),
+                        float(cached["h"][k]),
+                        float(cached["l"][k]),
+                        float(cached["c"][k]),
+                        float(cached["v"][k]),
+                    )
+                    for k in range(len(cached["t"]))
+                }
+                for x in chunk or []:
+                    ts = int(x[0])
+                    if ts + 15 * 60_000 <= now_ms:
+                        rows[ts] = (float(x[1]), float(x[2]), float(x[3]), float(x[4]), float(x[5]))
+                cutoff_ms = int((datetime.now(timezone.utc) - timedelta(days=days + 4)).timestamp() * 1000)
+                sorted_ts = [ts for ts in sorted(rows.keys()) if ts >= cutoff_ms]
+                if len(sorted_ts) >= 250:
+                    d = {
+                        "t": np.array(sorted_ts, dtype=np.int64),
+                        "o": np.array([rows[ts][0] for ts in sorted_ts], dtype=float),
+                        "h": np.array([rows[ts][1] for ts in sorted_ts], dtype=float),
+                        "l": np.array([rows[ts][2] for ts in sorted_ts], dtype=float),
+                        "c": np.array([rows[ts][3] for ts in sorted_ts], dtype=float),
+                        "v": np.array([rows[ts][4] for ts in sorted_ts], dtype=float),
+                    }
+                    np.savez_compressed(cache_file, **d)
+                    return d
+        except Exception:  # noqa: BLE001
+            return cached
 
     rows_by_ts: dict[int, tuple[float, float, float, float, float]] = {}
     now_dt = datetime.now(timezone.utc)
@@ -461,11 +496,6 @@ def breakout_at(
         return None
     if vol_ratio < params.min_vol_ratio or vol_vs_12bar_max < params.min_vol_vs_12bar_max:
         return None
-    if params.max_breakout_range_vs_med24 < 999.0 and i >= 24:
-        med_rng24 = float(np.median((h[i - 24 : i] - l[i - 24 : i]) / np.maximum(c[i - 24 : i], 1e-12)))
-        b_rng = float((h[i] - l[i]) / max(c[i], 1e-12))
-        if med_rng24 > 0 and b_rng / med_rng24 > params.max_breakout_range_vs_med24:
-            return None
 
     all_vals = [m[n][i] for n in MA_PERIODS]
     all_8_spread_pct = float((max(all_vals) / min(all_vals) - 1.0) * 100.0)
@@ -505,7 +535,7 @@ def follow_through_at(
     i = sig.breakout_idx
     if j - i < params.follow_min_bars or j - i > params.follow_max_bars or j >= len(d["c"]):
         return None
-    c, o, h, l, v, v20 = d["c"], d["o"], d["h"], d["l"], d["v"], d["v20"]
+    c, v, v20 = d["c"], d["v"], d["v20"]
     m7, m14, m25, m30 = d["m7"][j], d["m14"][j], d["m25"][j], d["m30"][j]
     m200 = d["m200"][j]
     m240 = d["m240"][j]  # 15m MA240 == 1H MA60
@@ -513,15 +543,6 @@ def follow_through_at(
         return None
     # 期間不可跌回 MA200 下方
     if any(c[k] <= d["m200"][k] for k in range(i, j + 1)):
-        return None
-    if params.follow_hold_low_above_ma200 and any(l[k] < d["m200"][k] for k in range(i + 1, j + 1)):
-        return None
-    if sum(1 for k in range(i + 1, j + 1) if c[k] < o[k]) > params.follow_max_red_bars:
-        return None
-    if params.follow_require_bull_bar and c[j] <= o[j]:
-        return None
-    f_uwick = float((h[j] - max(c[j], o[j])) / max(h[j] - l[j], 1e-12))
-    if f_uwick > params.follow_max_upper_wick_ratio:
         return None
     if not (m7 > m14 > m25 > m30 > m200 or (m7 > m14 > m25 > m30 and c[j] > sig.breakout_close)):
         return None
@@ -538,7 +559,6 @@ def follow_through_at(
     updated.follow_close = float(c[j])
     updated.follow_ext_ma200_pct = ext200
     updated.follow_vol_ratio = vr
-    updated.follow_stop_price = float(min(l[i : j + 1].min(), m200))
     return updated
 
 
@@ -573,25 +593,18 @@ def simulate_trades(
     trail_ma: str = "m60",
     arm_r: float = 1.5,
     max_hold_bars: int = 288,
-    tight_follow_stop: bool = False,
-    breakeven_r: float | None = None,
-    climax_gain_pct: float | None = None,
-    climax_ext99_pct: float | None = None,
-    climax_trail_ma: str = "m25",
 ) -> list[BacktestTrade]:
     """回測模擬出場（100% 因果無未來函數）：
     - stage="breakout"：在第一拍突破收盤 (breakout_idx) 進場
     - stage="follow"：在第二拍扇形展開確認收盤 (follow_idx) 進場
     - 出場規則：
-      1) 15m 收盤跌破防守價 stop_price → 停損 (stop)；若啟用 breakeven_r 且最高價達標，硬停損自動推到保本價 (+0.20%)
+      1) 15m 收盤跌破黏帶下緣防守價 stop_price → 停損 (stop)
       2) 最高價曾達 >= entry + arm_r * risk 後，15m 收盤跌破 trail_ma → 移動停利
-      3) 若啟用高潮收緊（climax_gain_pct + climax_ext99_pct）：當波段漲幅與離 MA99 乖離同步進入拋物線高潮，
-         移動停利自動從 MA99 收緊為 MA25（climax_m25），在高檔鎖住極值獲利
-      4) 持有滿 max_hold_bars (預設 288 根 = 72h) → 到期出場 (time)
+      3) 持有滿 max_hold_bars (預設 288 根 = 72h) → 到期出場 (time)
     """
     if "m200" not in d:
         d = compute_indicators(d)
-    c, h, l = d["c"], d["h"], d["l"]
+    c, h = d["c"], d["h"]
     ma_arr = d[trail_ma]
     trades: list[BacktestTrade] = []
 
@@ -607,19 +620,11 @@ def simulate_trades(
             entry_px = sig.breakout_close
             entry_time = sig.breakout_time
 
-        orig_stop = sig.stop_price
-        if stage == "follow" and tight_follow_stop:
-            stop_px = sig.follow_stop_price if sig.follow_stop_price is not None else float(
-                min(l[sig.breakout_idx : entry_idx + 1].min(), d["m200"][entry_idx])
-            )
-        else:
-            stop_px = orig_stop
+        stop_px = sig.stop_price
         risk = entry_px - stop_px
-        orig_risk = max(entry_px - orig_stop, risk)
         if risk <= 0 or entry_idx >= len(c) - 1:
             continue
         risk_pct = float(risk / entry_px * 100.0)
-        arm_px = entry_px + max(arm_r * risk, 1.0 * orig_risk) if (stage == "follow" and tight_follow_stop) else (entry_px + arm_r * risk)
 
         end24 = min(len(c), entry_idx + 97)
         end48 = min(len(c), entry_idx + 193)
@@ -627,34 +632,18 @@ def simulate_trades(
         max_48h_pct = float((h[entry_idx + 1 : end48].max() / entry_px - 1.0) * 100.0) if entry_idx + 1 < end48 else 0.0
 
         armed = False
-        climax = False
-        cur_stop = stop_px
         limit = min(len(c) - 1, entry_idx + max_hold_bars)
         exit_idx = limit
         exit_px = float(c[limit])
         exit_reason = "time"
 
         for k in range(entry_idx + 1, limit + 1):
-            if c[k] < cur_stop:
-                exit_idx, exit_px, exit_reason = k, float(c[k]), ("be" if cur_stop > stop_px else "stop")
+            if c[k] < stop_px:
+                exit_idx, exit_px, exit_reason = k, float(c[k]), "stop"
                 break
-            if h[k] >= arm_px:
+            if h[k] >= entry_px + arm_r * risk:
                 armed = True
-            if breakeven_r is not None and h[k] >= entry_px + breakeven_r * risk:
-                cur_stop = max(cur_stop, entry_px * 1.002)
-            if climax_gain_pct is not None and climax_ext99_pct is not None and not np.isnan(d["m99"][k]):
-                gain_h = (h[k] / entry_px - 1.0) * 100.0
-                ext99_h = (h[k] / d["m99"][k] - 1.0) * 100.0
-                if gain_h >= climax_gain_pct and ext99_h >= climax_ext99_pct:
-                    climax = True
-            if not armed:
-                continue
-            if climax:
-                c_arr = d[climax_trail_ma]
-                if not np.isnan(c_arr[k]) and c[k] < c_arr[k]:
-                    exit_idx, exit_px, exit_reason = k, float(c[k]), f"climax_{climax_trail_ma}"
-                    break
-            elif not np.isnan(ma_arr[k]) and c[k] < ma_arr[k]:
+            if armed and not np.isnan(ma_arr[k]) and c[k] < ma_arr[k]:
                 exit_idx, exit_px, exit_reason = k, float(c[k]), f"trail_{trail_ma}"
                 break
 
@@ -835,8 +824,6 @@ def draw_chart(
 def format_breakout_msg(sig: BreakoutSignal, *, stage: str = "breakout") -> str:
     risk_pct = (sig.breakout_close - sig.stop_price) / sig.breakout_close * 100.0 if sig.breakout_close else 0.0
     if stage == "follow" and sig.follow_time is not None and sig.follow_close is not None:
-        f_stop = sig.follow_stop_price if sig.follow_stop_price is not None else sig.stop_price
-        f_risk_pct = (sig.follow_close - f_stop) / sig.follow_close * 100.0 if sig.follow_close else 0.0
         return (
             f"🔥🔥🔥 <b>15m 黏帶穿 MA200 · 扇形展開（強確認）</b>\n"
             f"<b>{sig.symbol}</b>\n"
@@ -844,9 +831,7 @@ def format_breakout_msg(sig: BreakoutSignal, *, stage: str = "breakout") -> str:
             f"突破價：{sig.breakout_close:g} → 現價：{sig.follow_close:g}\n"
             f"7均線黏度(MA7~120)：{sig.coil_7_120_pct:.2f}%　長均簇(60/99/120)：{sig.coil_long_pct:.2f}%\n"
             f"突破倍量：{sig.vol_ratio:.2f}x → 確認量：{sig.follow_vol_ratio:.2f}x\n"
-            f"離 MA200：{sig.follow_ext_ma200_pct:+.2f}%\n"
-            f"上移防守(MA200/突破底)：{f_stop:g} (-{f_risk_pct:.2f}%)　原始黏帶底：{sig.stop_price:g} (-{risk_pct:.2f}%)\n"
-            f"停利規則：+1.8R 推保本 → 沿 15m MA99(1H MA25) 抱主升段 → 漲幅≥+120%且離MA99≥+48% 切 MA25 鎖高潮"
+            f"離 MA200：{sig.follow_ext_ma200_pct:+.2f}%　參考防守（黏帶下緣）：{sig.stop_price:g} (-{risk_pct:.2f}%)"
         )
     return (
         f"🟢 <b>15m 底部七線黏帶 · 倍量突破 MA200</b>\n"
@@ -936,20 +921,14 @@ def params_for_mode(mode: str) -> CoiledBreakoutParams:
         return CoiledBreakoutParams(
             clean_first_cross=False,
             require_ma25_above_long_at_cross=True,
-            min_ma60_slope_pct=-0.10,
             min_green_streak=1,
             min_above_ma60_bars=0,
             min_mom4_pct=0.0,
             max_upper_wick_ratio=1.0,
             min_vol_vs_12bar_max=0.0,
-            max_breakout_range_vs_med24=1000.0,
             min_gap_ma200_long_pct=0.0,
             max_gap_ma200_long_pct=100.0,
             follow_min_ext_ma200_pct=2.50,
-            follow_require_bull_bar=False,
-            follow_max_upper_wick_ratio=1.0,
-            follow_max_red_bars=99,
-            follow_hold_low_above_ma200=False,
         )
     return CoiledBreakoutParams()
 
@@ -1031,12 +1010,10 @@ def write_backtest_html(
     b60_list = [r["t_b60"] for r in records]
     b25_list = [r["t_b25"] for r in records]
     f25_records = [r for r in records if r["t_f25"] is not None]
-    fopt_list = [r["t_fopt"] for r in f25_records]
     f99_list = [r["t_f99"] for r in f25_records]
     f60_list = [r["t_f60"] for r in f25_records]
     f25_list = [r["t_f25"] for r in f25_records]
 
-    st_fopt = trade_stats(fopt_list)
     st_f99 = trade_stats(f99_list)
     st_f60 = trade_stats(f60_list)
     st_f25 = trade_stats(f25_list)
@@ -1053,26 +1030,23 @@ def write_backtest_html(
         t25: BacktestTrade = rec["t_f25"]
         t60: BacktestTrade = rec["t_f60"]
         t99: BacktestTrade = rec["t_f99"]
-        topt: BacktestTrade = rec["t_fopt"]
         tb99: BacktestTrade = rec["t_b99"]
         ts_slug = t25.entry_time.replace("-", "").replace(":", "").replace(" ", "_")[4:]
         img_name = f"f{idx_no:02d}_{sig.symbol}_{ts_slug}.png"
         img_path = img_dir / img_name
-        draw_chart(sig.symbol, d, sig, str(img_path), trade=topt, trade_no=idx_no)
+        draw_chart(sig.symbol, d, sig, str(img_path), trade=t99, trade_no=idx_no)
         b64 = base64.b64encode(img_path.read_bytes()).decode("ascii") if img_path.exists() else ""
 
-        cls_opt = "pnl-win" if topt.pnl_pct >= 0 else "pnl-loss"
         cls99 = "pnl-win" if t99.pnl_pct >= 0 else "pnl-loss"
         cls60 = "pnl-win" if t60.pnl_pct >= 0 else "pnl-loss"
         cls25 = "pnl-win" if t25.pnl_pct >= 0 else "pnl-loss"
-        r_mult_opt = topt.pnl_pct / max(topt.risk_pct, 1e-9)
+        hold_h = (t99.exit_idx - t99.entry_idx) * 0.25
         card_head = (
             f"<article class='trade-card' id='f-{idx_no}'>"
             "<header class='card-header'>"
             f"<div class='card-title'><span class='trade-no'>#{idx_no} · {escape(sig.symbol)}</span>"
-            f"<span class='trade-time'>突破 {escape(sig.breakout_time)} → 強確認進場 {escape(topt.entry_time)} → 優化出場 {escape(topt.exit_time)} (UTC+8)</span></div>"
-            f"<div class='card-pnl {cls_opt}'>優化停利: {topt.pnl_pct:+.2f}% ({r_mult_opt:+.1f}R)<br/>"
-            f"<span class='{cls99}' style='font-size:12px'>純MA99: {t99.pnl_pct:+.2f}%</span> · "
+            f"<span class='trade-time'>突破 {escape(sig.breakout_time)} → 強確認進場 {escape(t99.entry_time)} → MA99出場 {escape(t99.exit_time)} (UTC+8，持倉 {hold_h:.1f}h)</span></div>"
+            f"<div class='card-pnl {cls99}'>MA99(1H MA25): {t99.pnl_pct:+.2f}%<br/>"
             f"<span class='{cls60}' style='font-size:12px'>MA60: {t60.pnl_pct:+.2f}%</span> · "
             f"<span class='{cls25}' style='font-size:12px'>MA25: {t25.pnl_pct:+.2f}%</span></div>"
             "</header>"
@@ -1082,15 +1056,16 @@ def write_backtest_html(
             f"<span class='tag'>7線黏度 {sig.coil_7_120_pct:.2f}%</span>"
             f"<span class='tag'>碗深空間 {sig.gap_ma200_long_pct:.2f}%</span>"
             f"<span class='tag'>突破量 {sig.vol_ratio:.1f}x (3h最大量 {sig.vol_vs_12bar_max:.2f}x)</span>"
-            f"<span class='tag'>24h最高 +{topt.max_24h_pct:.1f}%</span>"
-            f"<span class='tag'>48h最高 +{topt.max_48h_pct:.1f}%</span>"
+            f"<span class='tag'>24h最高 +{t99.max_24h_pct:.1f}%</span>"
+            f"<span class='tag'>48h最高 +{t99.max_48h_pct:.1f}%</span>"
             f"</div>"
             "<pre class='trade-detail'>"
-            f"第一拍突破價 {sig.breakout_close:g} (@ {sig.breakout_time})  |  第二拍確認進場 {topt.entry_price:g} (@ {topt.entry_time})\n"
-            f"上移防守停損 {topt.stop_price:g} (風險 -{topt.risk_pct:.2f}%, 原始黏帶底 {t99.stop_price:g} 風險 -{t99.risk_pct:.2f}%, 築底 {sig.bars_below_ma200} 根)\n"
-            f"優化停利(MA99+高潮切MA25)：{topt.exit_price:g} ({topt.exit_reason}) {topt.pnl_pct:+.2f}% ({r_mult_opt:+.1f}R)  |  "
-            f"純MA99：{t99.exit_price:g} ({t99.exit_reason}) {t99.pnl_pct:+.2f}%  |  "
-            f"MA60：{t60.pnl_pct:+.2f}%  |  MA25：{t25.pnl_pct:+.2f}%"
+            f"第一拍突破價 {sig.breakout_close:g} (@ {sig.breakout_time})  |  第二拍確認進場 {t99.entry_price:g} (@ {t99.entry_time})\n"
+            f"防守停損價   {t99.stop_price:g} (風險 -{t99.risk_pct:.2f}%, MA200下方築底 {sig.bars_below_ma200} 根, 突破上影線 {sig.upper_wick_ratio*100:.0f}%)\n"
+            f"MA99(1H MA25)停利：{t99.exit_price:g} ({t99.exit_reason}) {t99.pnl_pct:+.2f}%  |  "
+            f"MA60停利：{t60.exit_price:g} ({t60.exit_reason}) {t60.pnl_pct:+.2f}%  |  "
+            f"MA25停利：{t25.exit_price:g} ({t25.exit_reason}) {t25.pnl_pct:+.2f}%  |  "
+            f"若第一拍即進(MA99)：{tb99.pnl_pct:+.2f}%"
             "</pre>"
         )
         f_cards_embed.append(
@@ -1106,29 +1081,27 @@ def write_backtest_html(
     table_rows: list[str] = []
     for k, rec in enumerate(f25_records, 1):
         sig = rec["sig"]
-        topt = rec["t_fopt"]
         t99 = rec["t_f99"]
         t60 = rec["t_f60"]
         t25 = rec["t_f25"]
-        copt = "pnl-win" if topt.pnl_pct >= 0 else "pnl-loss"
         c99 = "pnl-win" if t99.pnl_pct >= 0 else "pnl-loss"
         c60 = "pnl-win" if t60.pnl_pct >= 0 else "pnl-loss"
         c25 = "pnl-win" if t25.pnl_pct >= 0 else "pnl-loss"
-        r_mult_opt = topt.pnl_pct / max(topt.risk_pct, 1e-9)
+        hold_h = (t99.exit_idx - t99.entry_idx) * 0.25
         table_rows.append(
             "<tr>"
             f"<td>{k}</td>"
             f"<td><b><a href='#f-{k}'>{escape(sig.symbol)}</a></b></td>"
             f"<td>{escape(sig.breakout_time)}</td>"
-            f"<td>{escape(topt.entry_time)}</td>"
-            f"<td>{topt.entry_price:g}</td>"
-            f"<td>{topt.stop_price:g} (-{topt.risk_pct:.2f}%) <small style='color:#8b949e'>原-{t99.risk_pct:.2f}%</small></td>"
+            f"<td>{escape(t99.entry_time)}</td>"
+            f"<td>{hold_h:.1f}h</td>"
+            f"<td>{t99.entry_price:g}</td>"
+            f"<td>{t99.stop_price:g} (-{t99.risk_pct:.2f}%)</td>"
             f"<td>+{sig.mom4_pct:.2f}% ({sig.green_streak}連紅)</td>"
-            f"<td>+{topt.max_24h_pct:.1f}% / +{topt.max_48h_pct:.1f}%</td>"
+            f"<td>+{t99.max_24h_pct:.1f}% / +{t99.max_48h_pct:.1f}%</td>"
             f"<td class='{c25}'>{t25.pnl_pct:+.2f}%</td>"
             f"<td class='{c60}'>{t60.pnl_pct:+.2f}%</td>"
-            f"<td class='{c99}'>{t99.pnl_pct:+.2f}%</td>"
-            f"<td class='{copt}'><b>{topt.pnl_pct:+.2f}% ({r_mult_opt:+.1f}R)</b> <small>({escape(topt.exit_reason)})</small></td>"
+            f"<td class='{c99}'><b>{t99.pnl_pct:+.2f}%</b> <small>({escape(t99.exit_reason)})</small></td>"
             "</tr>"
         )
 
@@ -1147,7 +1120,7 @@ def write_backtest_html(
             "<code>MA7</code> 已穿出長均簇頂 <code>max(MA60, 99, 120)</code>，"
             "<code>MA25</code> 至少貼在長均簇底 <code>min(MA60, 99, 120)</code>（允許 MA25 仍在簇內）。"
         )
-    f_losses = st_fopt["count"] - st_fopt["wins"]
+    f_losses = st_f99["count"] - st_f99["wins"]
 
     def _pc(v: float) -> str:
         return "pnl-win" if v > 0 else ("pnl-loss" if v < 0 else "pnl-flat")
@@ -1160,10 +1133,9 @@ def write_backtest_html(
             f"<td><b>{name}</b></td>"
             f"<td><b>{st['count']}</b></td>"
             f"<td class='{wr_cls}'><b>{st['win_rate']:.1f}% ({st['wins']}勝{losses}敗)</b></td>"
-            f"<td>-{st['avg_risk_pct']:.2f}%</td>"
             f"<td class='{_pc(st['total_pct'])}'><b>{st['total_pct']:+.2f}%</b></td>"
             f"<td class='{_pc(st['avg_pct'])}'><b>{st['avg_pct']:+.2f}%</b></td>"
-            f"<td class='{_pc(st['total_r'])}'><b>{st['total_r']:+.1f} R (均 {st['avg_r']:+.1f}R)</b></td>"
+            f"<td class='{_pc(st['median_pct'])}'>{st['median_pct']:+.2f}%</td>"
             f"<td class='{_pc(st['u_3x'])}'><b>{st['u_3x']:+.1f} U</b></td>"
             f"<td>+{st['m24_avg']:.2f}% / +{st['m48_avg']:.2f}%</td>"
             "</tr>"
@@ -1171,10 +1143,9 @@ def write_backtest_html(
 
     strategy_rows = "".join(
         [
-            _strategy_row("★ 優化停損停利：上移MA200停損 + 1.8R保本 + MA99主升段 + 高潮切MA25鎖利", st_fopt),
-            _strategy_row("純 MA99 (1H MA25) 移動停利（原始黏帶底停損）", st_f99),
-            _strategy_row("純 MA60 移動停利（原始黏帶底停損）", st_f60),
-            _strategy_row("純 MA25 移動停利（原始黏帶底停損）", st_f25),
+            _strategy_row("第二拍 ★強確認進場 + MA99 (1H MA25) 移動停利", st_f99),
+            _strategy_row("第二拍 ★強確認進場 + MA60 移動停利", st_f60),
+            _strategy_row("第二拍 ★強確認進場 + MA25 移動停利", st_f25),
         ]
     )
     compare_rows: list[str] = []
@@ -1257,23 +1228,17 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
 <li><b>七線極致黏帶</b>：突破前 {params.coil_lookback} 根內，<code>MA7 / 14 / 25 / 30 / 60 / 99 / 120</code> 七條均線最大帶寬 <code>≤ {params.max_coil_7_120_pct:.2f}%</code>，且底部長均線簇 <code>MA60 / 99 / 120</code> 帶寬 <code>≤ {params.max_coil_long_pct:.2f}%</code>。</li>
 <li><b>短均與長均簇（{mode_label}）</b>：{stack_rule}</li>
 <li><b>突破前已站穩 MA60 + 連紅階梯墊高（v2 核心優化）</b>：突破前 12 根至少 <code>{params.min_above_ma60_bars} 根</code>已站穩 <code>MA60</code> 之上（排除從 MA60 下方單根亂抽），且突破棒含前根至少 <code>連 {params.min_green_streak} 紅</code>階梯推升、近 4 根（1 小時）累計動能 <code>≥ +{params.min_mom4_pct:.2f}%</code>（ESPORTS 連 7 紅 <code>+3.92%</code>、牛來連 4 紅 <code>+3.49%</code>）。</li>
-<li><b>第一拍「🟢 破帶穿 MA200」（乾淨首根 + 近3h最大量 + 無長上影 + 排除異常跳空棒）</b>：當根必須直接從 <code>MA200</code> 下方收盤貫穿站上 <code>MA200</code>（排除前根偷站無量的遲滯棒），<code>MA60</code> 斜率 <code>≥ {params.min_ma60_slope_pct:+.2f}%</code>（已正式翻正）、單根漲幅 <code>≥ {params.min_bar_chg_pct:.2f}%</code>、實體佔比 <code>≥ {params.min_body_ratio:.2f}</code>、上影線佔比 <code>≤ {params.max_upper_wick_ratio*100:.0f}%</code>、單根振幅不超過前 24 根中位數 <code>{params.max_breakout_range_vs_med24:.1f} 倍</code>（排除死魚盤後單根開盤異常暴抽），且成交量 <code>≥ 20 根均量 × {params.min_vol_ratio:.1f}</code> 同時 <code>≥ 前 12 根最大量 × {params.min_vol_vs_12bar_max:.2f}</code>。</li>
-<li><b>第二拍「★ 扇形展開（強確認）」</b>：突破後 <code>{params.follow_min_bars}～{params.follow_max_bars} 根</code>內每根最低價皆守在 <code>MA200</code> 之上、期間最多 <code>{params.follow_max_red_bars} 根</code>陰線休息；確認當根須為紅 K 且上影線 <code>≤ {params.follow_max_upper_wick_ratio*100:.0f}%</code>、收盤離 <code>MA200</code> 擴大至 <code>≥ {params.follow_min_ext_ma200_pct:.2f}%</code>、量能 <code>≥ {params.follow_min_vol_ratio:.1f}x</code>，並同步站上 <code>15m MA240</code>（即 <code>1H MA60</code> 多週期共振）。</li>
-<li><b>三段式停損停利優化（上移結構停損 ＋ 保本推進 ＋ MA99 主升段抱波段 ＋ 拋物線高潮切 MA25 鎖極值）</b>：
-  <ul>
-    <li><b>① 第二拍上移結構停損</b>：第二拍確認進場時已站穩 <code>MA200</code> 之上，防守停損從原始黏帶底上移至 <code>min(突破棒至確認棒最低價, 確認當下 MA200)</code>，平均初始停損風險由 <code>-5.23%</code> 壓縮至 <code>-3.88%</code>（且完全不影響勝率）。</li>
-    <li><b>② +1.8R 自動推保本</b>：進場後最高價達 <code>+1.8R</code>，硬停損自動上推至 <code>進場價 +0.20%</code>（含手續費保本），杜絕已衝出獲利後倒賠出場。</li>
-    <li><b>③ 15m MA99（= 1H MA25）主升段移動停利 ＋ 拋物線高潮自動切 MA25</b>：常態沿 <code>15m MA99</code> 抱住完整主升段（中途回踩 <code>MA25/MA60</code> 不被洗掉，如 <code>ESPORTSUSDT +103.19%</code>）；一旦波段最高漲幅 <code>≥ +120%</code> 且離 <code>MA99</code> 正乖離 <code>≥ +48%</code>（進入拋物線噴出高潮），移動停利自動收緊為 <code>15m MA25</code>，在噴出尾端提前鎖住極值獲利（如 <code>RLCUSDT</code> 從 <code>+107.82%</code> 提升至 <code>+141.10%</code>）。</li>
-  </ul>
-</li>
+<li><b>第一拍「🟢 破帶穿 MA200」（乾淨首根 + 近3h最大量 + 無長上影）</b>：當根必須直接從 <code>MA200</code> 下方收盤貫穿站上 <code>MA200</code>（排除前根偷站無量的遲滯棒），單根漲幅 <code>≥ {params.min_bar_chg_pct:.2f}%</code>、實體佔比 <code>≥ {params.min_body_ratio:.2f}</code>、上影線佔比 <code>≤ {params.max_upper_wick_ratio*100:.0f}%</code>，且成交量 <code>≥ 20 根均量 × {params.min_vol_ratio:.1f}</code> 同時 <code>≥ 前 12 根最大量 × {params.min_vol_vs_12bar_max:.2f}</code>。</li>
+<li><b>第二拍「★ 扇形展開（強確認）」</b>：突破後 <code>{params.follow_min_bars}～{params.follow_max_bars} 根</code>內不跌回 <code>MA200</code>、收盤離 <code>MA200</code> 擴大至 <code>≥ {params.follow_min_ext_ma200_pct:.2f}%</code>、量能 <code>≥ {params.follow_min_vol_ratio:.1f}x</code>，且同步站上 <code>15m MA240</code>（即 <code>1H MA60</code> 多週期共振）。</li>
+<li><b>回測出場（無未來函數、無樣本內事後調參，純均線移動停利）</b>：防守停損統一設在「黏帶下緣 <code>stop_price</code>」（15m 收盤跌破即停損）；最高價達 <code>1.2R</code> 後啟動移動停利，收盤跌破對應均線（<code>MA99 = 1H MA25</code>、<code>MA60</code>、<code>MA25</code>）即出場，最長持有 72 小時（288 根）。</li>
 </ol>
-<p class="note">圖例說明：黑色橢圓圈＝底部七線黏帶突破起漲區；綠色虛線＋▲＝進場；綠色點線＋×＝優化停利出場；紅色水平點線＝上移後結構停損價；8 條均線顏色完全對齊幣安 App。</p>
+<p class="note">圖例說明：黑色橢圓圈＝底部七線黏帶突破起漲區；綠色虛線＋▲＝進場；綠色點線＋× / 紅色點線＋×＝MA99(1H MA25)出場；紅色水平點線＝黏帶下緣停損價；8 條均線顏色完全對齊幣安 App。</p>
 
-<h2>二、第二拍四種停損停利模式對照 · 近 {days} 天</h2>
+<h2>二、第二拍三種移動停利 · 近 {days} 天（無樣本內微調）</h2>
 <table class="bt-table">
 <thead>
 <tr>
-<th>停損停利模式</th><th>筆數</th><th>勝率</th><th>平均初始風險(1R)</th><th>累計報酬 (1x)</th><th>平均每筆</th><th>累計風報比 (R)</th><th>100U×3x槓桿(單利)</th><th>24h/48h最大漲幅</th>
+<th>策略模式</th><th>筆數</th><th>勝率</th><th>累計報酬 (1x)</th><th>平均每筆</th><th>中位數</th><th>100U×3x槓桿(單利)</th><th>24h/48h最大漲幅</th>
 </tr>
 </thead>
 <tbody>
@@ -1282,18 +1247,18 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
 </table>
 
 <div class="cards">
-<div class="card"><span>★強確認訊號數</span><b>{st_fopt['count']} 筆</b></div>
-<div class="card"><span>★強確認勝率</span><b class="{_pc(st_fopt['total_pct'])}">{st_fopt['win_rate']:.1f}% ({st_fopt['wins']}勝{f_losses}敗)</b></div>
-<div class="card"><span>★優化停利累計</span><b class="{_pc(st_fopt['total_pct'])}">{st_fopt['total_pct']:+.2f}%</b></div>
-<div class="card"><span>★優化累計風報比</span><b class="{_pc(st_fopt['total_r'])}">{st_fopt['total_r']:+.1f} R</b></div>
-<div class="card"><span>純 MA99 累計</span><b class="{_pc(st_f99['total_pct'])}">{st_f99['total_pct']:+.2f}% ({st_f99['total_r']:+.1f}R)</b></div>
-<div class="card"><span>優化 3x 槓桿</span><b class="{_pc(st_fopt['u_3x'])}">{st_fopt['u_3x']:+.1f} U</b></div>
+<div class="card"><span>★強確認訊號數</span><b>{st_f99['count']} 筆</b></div>
+<div class="card"><span>★強確認勝率</span><b class="{_pc(st_f99['total_pct'])}">{st_f99['win_rate']:.1f}% ({st_f99['wins']}勝{f_losses}敗)</b></div>
+<div class="card"><span>★強確認累計 (MA99)</span><b class="{_pc(st_f99['total_pct'])}">{st_f99['total_pct']:+.2f}%</b></div>
+<div class="card"><span>MA60 累計</span><b class="{_pc(st_f60['total_pct'])}">{st_f60['total_pct']:+.2f}%</b></div>
+<div class="card"><span>MA25 累計</span><b class="{_pc(st_f25['total_pct'])}">{st_f25['total_pct']:+.2f}%</b></div>
+<div class="card"><span>MA99 3x 槓桿</span><b class="{_pc(st_f99['u_3x'])}">{st_f99['u_3x']:+.1f} U</b></div>
 </div>
 </section>
 
 <section class="summary" id="sec-follow">
-<h2>三、第二拍全部 {len(f25_records)} 筆逐筆 K 線（勝率 {st_fopt['win_rate']:.1f}%，{st_fopt['wins']}勝{f_losses}敗，優化停利累計 {st_fopt['total_pct']:+.2f}% / {st_fopt['total_r']:+.1f}R）</h2>
-<p class="muted">綠色 ▲ 是第二拍進場，× 是優化停利出場（常態 MA99，高潮切 MA25），紅色點線是上移後的結構停損。</p>
+<h2>三、第二拍全部 {len(f25_records)} 筆逐筆 K 線（勝率 {st_f99['win_rate']:.1f}%，{st_f99['wins']}勝{f_losses}敗，MA99 累計 {st_f99['total_pct']:+.2f}%）</h2>
+<p class="muted">綠色 ▲ 是第二拍進場，× 是 MA99 出場（不加任何事後高潮切換或人為過濾，真實呈現勝敗）。</p>
 </section>
 {follow_cards if follow_cards else "<p class='muted'>這個模式沒有第二拍強確認。</p>"}
 
@@ -1303,7 +1268,7 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
 <table class="bt-table">
 <thead>
 <tr>
-<th>#</th><th>標的</th><th>突破時間 (UTC+8)</th><th>第二拍進場 (UTC+8)</th><th>進場價</th><th>上移停損 (風險)</th><th>4根動能</th><th>24h / 48h最高</th><th>MA25停利</th><th>MA60停利</th><th>純MA99停利</th><th>★優化停利 (風報比)</th>
+<th>#</th><th>標的</th><th>突破時間 (UTC+8)</th><th>第二拍進場 (UTC+8)</th><th>持倉</th><th>進場價</th><th>防守價 (風險)</th><th>4根動能</th><th>24h / 48h最高</th><th>MA25停利</th><th>MA60停利</th><th>MA99(1H MA25)停利</th>
 </tr>
 </thead>
 <tbody>
@@ -1341,7 +1306,6 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
         "universe_count": universe_n,
         "compare": compare or [],
         "stats": {
-            "follow_opt": st_fopt,
             "follow_ma99": st_f99,
             "follow_ma60": st_f60,
             "follow_ma25": st_f25,
@@ -1355,8 +1319,6 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
                 "breakout_time": r["sig"].breakout_time,
                 "breakout_close": r["sig"].breakout_close,
                 "stop_price": r["sig"].stop_price,
-                "follow_stop_price": r["t_fopt"].stop_price,
-                "follow_risk_pct": r["t_fopt"].risk_pct,
                 "coil_7_120_pct": r["sig"].coil_7_120_pct,
                 "coil_long_pct": r["sig"].coil_long_pct,
                 "gap_ma200_long_pct": r["sig"].gap_ma200_long_pct,
@@ -1369,8 +1331,6 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
                 "follow_ma25_pnl_pct": r["t_f25"].pnl_pct,
                 "follow_ma60_pnl_pct": r["t_f60"].pnl_pct,
                 "follow_ma99_pnl_pct": r["t_f99"].pnl_pct,
-                "follow_opt_pnl_pct": r["t_fopt"].pnl_pct,
-                "follow_opt_r_mult": r["t_fopt"].pnl_pct / max(r["t_fopt"].risk_pct, 1e-9),
             }
             for r in f25_records
         ],
@@ -1507,34 +1467,20 @@ def main() -> int:
         trades_b_m99: list[BacktestTrade] = []
         trades_b_m60: list[BacktestTrade] = []
         trades_b_m25: list[BacktestTrade] = []
-        trades_f_opt: list[BacktestTrade] = []
         trades_f_m99: list[BacktestTrade] = []
         trades_f_m60: list[BacktestTrade] = []
         trades_f_m25: list[BacktestTrade] = []
         records: list[dict] = []
         compare_bucket: dict[str, list[dict]] = {name: [] for name in ("strict", "standard", "v1")}
 
-        def _pack_signals(d: dict, sigs: list[BreakoutSignal], *, keep_bars: bool) -> tuple[list, list, list, list, list, list, list, list]:
+        def _pack_signals(d: dict, sigs: list[BreakoutSignal], *, keep_bars: bool) -> tuple[list, list, list, list, list, list, list]:
             recs: list[dict] = []
             b99_all, b60_all, b25_all = [], [], []
-            fopt_all, f99_all, f60_all, f25_all = [], [], [], []
+            f99_all, f60_all, f25_all = [], [], []
             for sig in sigs:
                 tb99 = simulate_trades(d, [sig], stage="breakout", trail_ma="m99", arm_r=1.5, max_hold_bars=288)
                 tb60 = simulate_trades(d, [sig], stage="breakout", trail_ma="m60", arm_r=1.5, max_hold_bars=288)
                 tb25 = simulate_trades(d, [sig], stage="breakout", trail_ma="m25", arm_r=1.5, max_hold_bars=192)
-                tfopt = simulate_trades(
-                    d,
-                    [sig],
-                    stage="follow",
-                    trail_ma="m99",
-                    arm_r=1.2,
-                    max_hold_bars=288,
-                    tight_follow_stop=True,
-                    breakeven_r=1.8,
-                    climax_gain_pct=120.0,
-                    climax_ext99_pct=48.0,
-                    climax_trail_ma="m25",
-                )
                 tf99 = simulate_trades(d, [sig], stage="follow", trail_ma="m99", arm_r=1.2, max_hold_bars=288)
                 tf60 = simulate_trades(d, [sig], stage="follow", trail_ma="m60", arm_r=1.2, max_hold_bars=288)
                 tf25 = simulate_trades(d, [sig], stage="follow", trail_ma="m25", arm_r=1.2, max_hold_bars=192)
@@ -1543,7 +1489,6 @@ def main() -> int:
                 b99_all.extend(tb99)
                 b60_all.extend(tb60)
                 b25_all.extend(tb25)
-                fopt_all.extend(tfopt)
                 f99_all.extend(tf99)
                 f60_all.extend(tf60)
                 f25_all.extend(tf25)
@@ -1554,22 +1499,21 @@ def main() -> int:
                         "t_b99": tb99[0],
                         "t_b60": tb60[0],
                         "t_b25": tb25[0],
-                        "t_fopt": tfopt[0] if tfopt else None,
                         "t_f99": tf99[0] if tf99 else None,
                         "t_f60": tf60[0] if tf60 else None,
                         "t_f25": tf25[0] if tf25 else None,
                     }
                 )
-            return b99_all, b60_all, b25_all, fopt_all, f99_all, f60_all, f25_all, recs
+            return b99_all, b60_all, b25_all, f99_all, f60_all, f25_all, recs
 
         def _bt_worker(s: str):
-            empty = ([], [], [], [], [], [], [], [], {})
+            empty = ([], [], [], [], [], [], [], {})
             raw = fetch_klines_days(s, days=days, use_cache=True)
             if raw is None:
                 return empty
             d = compute_indicators(raw)
             sigs = detect_signals(d, symbol=s, params=params)
-            packed = _pack_signals(d, sigs, keep_bars=True) if sigs else ([], [], [], [], [], [], [], [])
+            packed = _pack_signals(d, sigs, keep_bars=True) if sigs else ([], [], [], [], [], [], [])
             extras: dict[str, list[dict]] = {}
             if args.html:
                 for mode_name in ("strict", "standard", "v1"):
@@ -1582,11 +1526,10 @@ def main() -> int:
             return (*packed, extras)
 
         with ThreadPoolExecutor(6) as ex:
-            for b99, b60, b25, fopt, f99, f60, f25, recs, extras in ex.map(_bt_worker, syms):
+            for b99, b60, b25, f99, f60, f25, recs, extras in ex.map(_bt_worker, syms):
                 trades_b_m99.extend(b99)
                 trades_b_m60.extend(b60)
                 trades_b_m25.extend(b25)
-                trades_f_opt.extend(fopt)
                 trades_f_m99.extend(f99)
                 trades_f_m60.extend(f60)
                 trades_f_m25.extend(f25)
@@ -1599,19 +1542,17 @@ def main() -> int:
         trades_b_m99.sort(key=lambda x: (x.entry_time, x.symbol))
         trades_b_m60.sort(key=lambda x: (x.entry_time, x.symbol))
         trades_b_m25.sort(key=lambda x: (x.entry_time, x.symbol))
-        trades_f_opt.sort(key=lambda x: (x.entry_time, x.symbol))
         trades_f_m99.sort(key=lambda x: (x.entry_time, x.symbol))
         trades_f_m60.sort(key=lambda x: (x.entry_time, x.symbol))
         trades_f_m25.sort(key=lambda x: (x.entry_time, x.symbol))
 
         print(f"\n=== 【二階段 ★強確認進場】明細（近 {days} 天，共 {len(trades_f_m25)} 筆）===")
-        for t25, t60, t99, topt in zip(trades_f_m25, trades_f_m60, trades_f_m99, trades_f_opt):
-            r_opt = topt.pnl_pct / max(topt.risk_pct, 1e-9)
+        for t25, t60, t99 in zip(trades_f_m25, trades_f_m60, trades_f_m99):
+            hold_h = (t99.exit_idx - t99.entry_idx) * 0.25
             print(
-                f"  {topt.entry_time} | {topt.symbol:14s} | 進:{topt.entry_price:<9g} 上移防守:{topt.stop_price:<9g} "
-                f"(風險 -{topt.risk_pct:.2f}% vs 原 -{t99.risk_pct:.2f}%) | 48h最高:+{topt.max_48h_pct:5.1f}% | "
-                f"MA25:{t25.pnl_pct:+6.2f}% | MA60:{t60.pnl_pct:+6.2f}% | 純MA99:{t99.pnl_pct:+6.2f}% | "
-                f"★優化停利:{topt.pnl_pct:+6.2f}%({r_opt:+.1f}R,{topt.exit_reason})"
+                f"  {t25.entry_time} | {t25.symbol:14s} | 持倉:{hold_h:5.1f}h | 進:{t25.entry_price:<9g} 防守:{t25.stop_price:<9g} "
+                f"(風險 {t25.risk_pct:.2f}%) | 48h最高:+{t25.max_48h_pct:5.1f}% | "
+                f"MA25:{t25.pnl_pct:+6.2f}% | MA60:{t60.pnl_pct:+6.2f}% | MA99(1H MA25):{t99.pnl_pct:+6.2f}%({t99.exit_reason})"
             )
 
         def _print_summary(title: str, trs: list[BacktestTrade]) -> None:
@@ -1620,18 +1561,16 @@ def main() -> int:
             st = trade_stats(trs)
             print(f"\n📊 {title}（共 {st['count']} 筆）")
             print(
-                f"  • 勝率：{st['wins']}/{st['count']} ({st['win_rate']:.1f}%) | 平均初始風險：-{st['avg_risk_pct']:.2f}% | "
-                f"累計報酬：{st['total_pct']:+.2f}% | 平均每筆：{st['avg_pct']:+.2f}% | "
-                f"累計風報比：{st['total_r']:+.1f}R（平均 {st['avg_r']:+.1f}R） | "
-                f"100U×3x 單利 = {st['u_3x']:+.1f}U"
+                f"  • 勝率：{st['wins']}/{st['count']} ({st['win_rate']:.1f}%) | "
+                f"累計報酬：{st['total_pct']:+.2f}% | 平均每筆：{st['avg_pct']:+.2f}% "
+                f"（100U 保證金 × 3x 槓桿單利 = {st['u_3x']:+.1f}U）"
             )
             print(
                 f"  • 爆發力：24h 最大漲幅平均 +{st['m24_avg']:.2f}%（中位數 +{st['m24_med']:.2f}%） | "
                 f"48h 最大漲幅平均 +{st['m48_avg']:.2f}%（中位數 +{st['m48_med']:.2f}%）"
             )
 
-        _print_summary("策略 B4（★優化停損停利）：上移MA200停損 + 1.8R保本 + MA99主升段 + 高潮切MA25鎖利", trades_f_opt)
-        _print_summary("策略 B3：第二拍 ★強確認進場 + 純 MA99 (1H MA25) 移動停利", trades_f_m99)
+        _print_summary("策略 B3：第二拍 ★強確認進場 + MA99 (1H MA25) 移動停利", trades_f_m99)
         _print_summary("策略 B2：第二拍 ★強確認進場 + MA60 移動停利", trades_f_m60)
         _print_summary("策略 B1：第二拍 ★強確認進場 + MA25 移動停利", trades_f_m25)
         _print_summary("策略 A3：第一拍突破即進場 + MA99 (1H MA25) 移動停利", trades_b_m99)
@@ -1643,7 +1582,7 @@ def main() -> int:
             for mode_name in ("strict", "standard", "v1"):
                 bucket = compare_bucket[mode_name]
                 bstat = trade_stats([r["t_b99"] for r in bucket])
-                fstat = trade_stats([r["t_fopt"] for r in bucket if r["t_fopt"] is not None])
+                fstat = trade_stats([r["t_f99"] for r in bucket if r["t_f99"] is not None])
                 label = MODE_META[mode_name]["label"]
                 if mode_name == args.mode:
                     label += "（本報告）"
