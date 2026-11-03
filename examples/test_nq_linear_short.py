@@ -158,9 +158,9 @@ def _make_valid_setup(*, after: str = "ma200") -> pd.DataFrame:
     o, h, l, c = _append(o, h, l, c, last, last, last - 10.0, last - 4.0)
     mid = float(c[-1])
     o, h, l, c = _append(o, h, l, c, mid, mid + 0.3, mid - 8.0, mid - 6.0)
-    # 明確跌破 MA20
+    # 明確跌破 MA20（但收在 MA30 上）
     br = float(c[-1])
-    o, h, l, c = _append(o, h, l, c, br, br + 0.2, br - 14.0, br - 12.0)
+    o, h, l, c = _append(o, h, l, c, br, br + 0.2, br - 9.0, br - 8.0)
 
     if after == "ma200":
         px = float(c[-1])
@@ -233,6 +233,37 @@ def test_skip_poor_reward_risk() -> None:
     assert not trades
 
 
+def test_skip_pierce_ma30_and_be_at_ma120() -> None:
+    # 破 MA20 當根同時灌穿 MA30：預設跳過
+    o, h, l, c = _uptrend(280, step=1.6)
+    last = float(c[-1])
+    o, h, l, c = _append(o, h, l, c, last, last, last - 10.0, last - 4.0)
+    mid = float(c[-1])
+    o, h, l, c = _append(o, h, l, c, mid, mid + 0.3, mid - 8.0, mid - 6.0)
+    br = float(c[-1])
+    o, h, l, c = _append(o, h, l, c, br, br + 0.2, br - 30.0, br - 28.0)
+    deep = _df_from_ohlc(o, h, l, c)
+    funnel: dict = {}
+    assert not run_linear_short(deep, funnel=funnel)
+    assert funnel.get("skip_pierce_ma30", 0) >= 1
+
+    # 摸到 MA120 後反彈超過進場價：以保本 be 出場，不打原停損
+    df = _make_valid_setup(after="flat")
+    t0 = run_linear_short(df)[0]
+    entry = t0.entry_idx
+    df2 = df.copy()
+    ma120 = float(df2["Close"].rolling(120).mean().iloc[entry + 1])
+    ma200 = float(df2["Close"].rolling(200).mean().iloc[entry + 1])
+    touch = max(ma120 - 1.0, ma200 + 25.0)
+    df2.iat[entry + 1, df2.columns.get_loc("Low")] = touch
+    df2.iat[entry + 1, df2.columns.get_loc("Close")] = touch + 5.0
+    df2.iat[entry + 2, df2.columns.get_loc("High")] = t0.entry_price + 4.0
+    trades = run_linear_short(df2)
+    assert trades
+    assert trades[0].exit_reason == "be"
+    assert abs(trades[0].pnl_points) < 1e-9
+
+
 def test_skip_small_peak_dist() -> None:
     o, h, l, c = _uptrend(280, step=0.25)
     last = float(c[-1])
@@ -298,6 +329,7 @@ def main() -> int:
     test_stop_exit()
     test_wick_exit()
     test_skip_poor_reward_risk()
+    test_skip_pierce_ma30_and_be_at_ma120()
     test_skip_small_peak_dist()
     test_cancel_on_new_high()
     test_no_same_bar_exit()

@@ -17,7 +17,9 @@ ma200Len = input.int(200, "MA200（停利）")
 lookback4h = input.int(240, "四小時高回看（一分K=240根）", minval=60)
 stopBuf = input.float(0, "停損緩衝（點，加在四小時高上方）", minval=0, step=1)
 minPeakDistMa200 = input.float(100, "創高距MA200至少（點）", minval=0, step=5)
-minRR = input.float(2.5, "進場距MA200至少是停損的幾倍", minval=0, step=0.5)
+holdMa30OnBreak = input.bool(true, "破MA20當根不灌穿MA30（避開急殺追底）")
+beAtMa120 = input.bool(true, "低點摸到MA120後停損移保本")
+minRR = input.float(0.0, "進場距MA200至少是停損的幾倍（0=不濾）", minval=0, step=0.5)
 nearMa200 = input.float(15, "靠近MA200（點）", minval=1, step=1)
 minLowerWick = input.float(3, "長下影最小長度（點）", minval=1, step=0.5)
 wickBodyRatio = input.float(3.0, "下影／實體 倍數", minval=1, step=0.5)
@@ -59,6 +61,7 @@ var int   st        = 0
 var float peakHigh  = na
 var float peakMa200 = na
 var float bounceHi  = na
+var bool  hitMa120  = false
 
 justClosed = strategy.position_size == 0 and strategy.position_size[1] < 0
 if justClosed
@@ -66,6 +69,7 @@ if justClosed
     peakHigh := na
     peakMa200 := na
     bounceHi := na
+    hitMa120 := false
 
 if strategy.position_size == 0 and not justClosed
     if st == 0
@@ -96,21 +100,17 @@ if strategy.position_size == 0 and not justClosed
         else
             brokeMa20 = ta.crossunder(close, ma20)
             peakDistOk = not na(peakHigh) and not na(peakMa200) and (peakHigh - peakMa200) >= minPeakDistMa200
+            ma30Ok = not holdMa30OnBreak or close >= ma30
             riskPts = peakHigh + stopBuf - close
             rewardPts = close - ma200
             rrOk = riskPts > 0 and rewardPts > 0 and (minRR == 0 or rewardPts / riskPts >= minRR)
-            if brokeMa20 and peakDistOk and rrOk
+            if brokeMa20 and peakDistOk and ma30Ok and rrOk
                 strategy.entry("線性空", strategy.short)
                 strategy.exit("停損", from_entry="線性空", stop=peakHigh + stopBuf)
+                hitMa120 := false
                 st := 3
-            else if brokeMa20 and not peakDistOk
-                // 距離不夠，作廢這次結構
-                st := 0
-                peakHigh := na
-                peakMa200 := na
-                bounceHi := na
-            else if brokeMa20 and not rrOk
-                // 離停利太近或已跌破 MA200，作廢
+            else if brokeMa20
+                // 距離不夠、一根灌穿 MA30、或空間不夠，作廢這次結構
                 st := 0
                 peakHigh := na
                 peakMa200 := na
@@ -127,6 +127,9 @@ nearBand = low >= ma200 and (low - ma200) <= nearMa200
 exitWick = false
 exitMa200 = false
 if strategy.position_size < 0
+    if beAtMa120 and not hitMa120 and low <= ma120
+        hitMa120 := true
+        strategy.exit("停損", from_entry="線性空", stop=math.min(peakHigh + stopBuf, strategy.position_avg_price))
     if low <= ma200
         strategy.close("線性空", comment="停利MA200")
         exitMa200 := true

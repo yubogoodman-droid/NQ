@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """NQ 一分 K 線性空 — 對齊 pinescript/nq_linear_short_1m.pine。
 
-多頭排列創四小時高 → 回測 MA10 不過高 → 收盤跌破 MA20，
-且峰距 MA200 ≥ 100 點、進場離 MA200 至少 2.5 倍停損，做空。停損在四小時高；
+多頭排列創四小時高 → 回測 MA10 不過高 → 收盤跌破 MA20（但不一根灌穿 MA30），
+且峰距 MA200 ≥ 100 點，做空。停損在四小時高；摸到 MA120 後停損移到成本；
 停利碰到 MA200，或靠近 MA200 出現長下影。
 
 用法:
@@ -272,7 +272,9 @@ class LinearShortParams:
     stop_buf: float = 0.0
     min_peak_dist: float = 100.0
     near_ma200: float = 15.0
-    min_rr: float = 2.5  # 進場到 MA200 的空間 / 停損距離，0 表示不濾
+    hold_ma30_on_break: bool = True  # 破 MA20 當根收盤仍在 MA30 上，避免長黑直接追底
+    be_at_ma120: bool = True  # 低點摸到 MA120 後，下一根起停損移到進場價
+    min_rr: float = 0.0  # 進場到 MA200 的空間 / 停損距離，0 表示不濾
     max_risk: float = 0.0  # 停損距離上限，0 表示不濾
     avoid_premarket: bool = False  # 跳過 05:00–09:30 ET
     min_lower_wick: float = 3.0
@@ -374,6 +376,7 @@ def run_linear_short(
     retest_idx = -1
     position = 0
     just_closed = False
+    hit_ma120 = False
     open_sig: Optional[Signal] = None
     trades: List[TradeResult] = []
     warmup = max(p.ma200, p.lookback4h)
@@ -382,6 +385,7 @@ def run_linear_short(
         if just_closed:
             st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
             just_closed = False
+            hit_ma120 = False
             continue
 
         if position == 0:
@@ -459,6 +463,9 @@ def run_linear_short(
                             elif reward <= 0:
                                 bump("skip_below_ma200")
                                 st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
+                            elif p.hold_ma30_on_break and c[i] < ma30[i]:
+                                bump("skip_pierce_ma30")
+                                st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
                             elif p.max_risk > 0 and sig.risk > p.max_risk:
                                 bump("skip_risk")
                                 st, peak_high, peak_ma200, bounce_hi, peak_idx, retest_idx = reset_setup()
@@ -471,6 +478,7 @@ def run_linear_short(
                             else:
                                 position = -1
                                 open_sig = sig
+                                hit_ma120 = False
                                 st = 3
                                 bump("taken")
                         else:
@@ -480,11 +488,19 @@ def run_linear_short(
 
         # 持倉中：進場當根不檢查（對齊 Pine position_size 仍為 0）
         assert open_sig is not None
-        stop = open_sig.stop_price
+        stop = (
+            min(open_sig.stop_price, open_sig.entry_price)
+            if (p.be_at_ma120 and hit_ma120)
+            else open_sig.stop_price
+        )
         reason = ""
         exit_price = float(c[i])
         if h[i] >= stop:
-            reason = "stop"
+            reason = (
+                "be"
+                if (p.be_at_ma120 and hit_ma120 and stop <= open_sig.entry_price + 1e-9)
+                else "stop"
+            )
             exit_price = float(stop)
         elif l[i] <= ma200[i]:
             reason = "ma200"
@@ -498,6 +514,9 @@ def run_linear_short(
             reason = "wick"
             exit_price = float(c[i])
 
+        if not np.isnan(ma120[i]) and l[i] <= ma120[i]:
+            hit_ma120 = True
+
         if not reason:
             continue
 
@@ -509,7 +528,7 @@ def run_linear_short(
                 exit_idx=i,
                 entry_price=open_sig.entry_price,
                 exit_price=exit_price,
-                stop_price=stop,
+                stop_price=open_sig.stop_price,
                 pnl_points=float(open_sig.entry_price - exit_price),
                 exit_reason=reason,
             )
@@ -966,6 +985,7 @@ def write_html_report(
         reason_cls = {
             "ma200": "tag-tp",
             "wick": "tag-tp",
+            "be": "tag-time",
             "stop": "tag-sl",
         }.get(t.exit_reason, "tag-time")
         name_1m = _trade_img_name(df, t, i, "1m")
@@ -1028,8 +1048,7 @@ def write_html_report(
             f"破MA20 {funnel.get('break_ma20', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
             f"（距不夠 {funnel.get('skip_dist', 0)} · "
-            f"空間不夠 {funnel.get('skip_rr', 0)} · "
-            f"已在MA200下 {funnel.get('skip_below_ma200', 0)} · "
+            f"長黑穿MA30 {funnel.get('skip_pierce_ma30', 0)} · "
             f"破排列取消 {funnel.get('cancel_stack', 0)} · "
             f"再創高取消 {funnel.get('cancel_new_high', 0)}）</p>"
         )
@@ -1081,7 +1100,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <h1>{escape(symbol)} 線性空</h1>
 {note}
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
-<p class="muted">多頭排列創四小時高 → 回測MA10不過高 → 破MA20做空。峰距MA200至少 100 點，而且進場離MA200至少是停損的 2.5 倍。停損四小時高；停利 MA200 / 靠近長下影。</p>
+<p class="muted">多頭排列創四小時高 → 回測MA10不過高 → 破MA20做空（不追一根灌穿MA30的長黑）。峰距MA200至少 100 點。停損四小時高，摸到MA120移保本；停利 MA200 / 靠近長下影。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1120,6 +1139,8 @@ def cmd_backtest(args) -> int:
         stop_buf=args.stop_buf,
         min_peak_dist=args.min_peak_dist,
         near_ma200=args.near_ma200,
+        hold_ma30_on_break=not args.allow_pierce_ma30,
+        be_at_ma120=not args.no_be_ma120,
         min_rr=args.min_rr,
         max_risk=args.max_risk,
         avoid_premarket=args.avoid_premarket,
@@ -1134,8 +1155,8 @@ def cmd_backtest(args) -> int:
         f"high={funnel.get('made_high', 0)} retest={funnel.get('retest', 0)} "
         f"break={funnel.get('break_ma20', 0)} taken={funnel.get('taken', 0)} "
         f"skip_dist={funnel.get('skip_dist', 0)} "
+        f"skip_ma30={funnel.get('skip_pierce_ma30', 0)} "
         f"skip_rr={funnel.get('skip_rr', 0)} "
-        f"skip_below={funnel.get('skip_below_ma200', 0)} "
         f"cancel_stack={funnel.get('cancel_stack', 0)} "
         f"cancel_hh={funnel.get('cancel_new_high', 0)}"
     )
@@ -1187,7 +1208,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--stop-buf", type=float, default=0.0)
     p.add_argument("--min-peak-dist", type=float, default=100.0)
     p.add_argument("--near-ma200", type=float, default=15.0)
-    p.add_argument("--min-rr", type=float, default=2.5, help="進場到 MA200 至少是停損的幾倍，0 關閉")
+    p.add_argument("--allow-pierce-ma30", action="store_true", help="允許破 MA20 當根同時跌破 MA30")
+    p.add_argument("--no-be-ma120", action="store_true", help="關閉摸到 MA120 移保本")
+    p.add_argument("--min-rr", type=float, default=0.0, help="進場到 MA200 至少是停損的幾倍，0 關閉")
     p.add_argument("--max-risk", type=float, default=0.0, help="停損距離上限，0 關閉")
     p.add_argument("--avoid-premarket", action="store_true", help="跳過 05:00–09:30 ET")
     return p
