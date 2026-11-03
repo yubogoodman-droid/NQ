@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>NQ=F 線性空</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}
+.page{max-width:560px;margin:0 auto;padding:14px 12px 32px}
+h1{font-size:18px;margin:0 0 6px}
+.muted{color:#8b949e;font-size:13px;line-height:1.5}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.equity{margin:10px 0 4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}
+.trade-no{font-size:15px;font-weight:700}
+.trade-time{font-size:12px;color:#8b949e}
+.card-pnl{font-size:16px;font-weight:700;white-space:nowrap}
+.pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}
+.tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
+.tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
+.tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.tag-info{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}
+.trade-detail{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}
+.chart-label{margin:12px 0 6px;font-size:13px;font-weight:700;color:#e6edf3}
+.chart-block{margin:0 -6px 10px}
+.mini-chart{margin:0 -6px -4px;border-radius:10px;overflow:hidden}
+.empty{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>NQ=F 線性空</h1>
+<p class='muted'>每筆交易兩張圖：上面一分K，下面一小時K（Yahoo 原生、整點對齊、不切半根）。一分圖灰線是已收盤小時收盤。</p>
+<p class="muted">30d · 2026-10-04 18:10 → 2026-11-03 11:22 ET · bars=29661</p>
+<p class="muted">多頭排列創四小時高 → 回測MA10不過高 → 破MA20做空（不追一根灌穿MA30的長黑）。峰距MA200至少 100 點。停損四小時高，摸到MA120移保本；停利 MA200 / 靠近長下影。</p>
+<div class="cards">
+<div class="card">筆數<b>23</b></div>
+<div class="card">勝率<b>69.6%</b></div>
+<div class="card">總點數<b class="pnl-win">+892.0</b></div>
+<div class="card">勝/負<b>16/7</b></div>
+</div>
+<p class="muted">be 1筆 +0.0 · ma200 8筆 +679.8 · stop 6筆 -249.5 · wick 8筆 +461.8 · 1 口約 +17725 USD（含來回佣 5）</p>
+<p class='muted'>漏斗：創4H高 132 → 回測MA10 132 → 破MA20 83 → 進場 23（距不夠 53 · 長黑穿MA30 6 · 破排列取消 0 · 再創高取消 49）</p>
+<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="143.7" x2="720" y2="143.7" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,143.7 31.3,152.3 62.6,157.6 93.9,162.6 125.2,162.6 156.5,152.4 187.8,143.7 219.1,135.1 250.4,125.3 281.7,130.0 313.0,113.4 344.3,95.7 375.7,86.4 407.0,83.4 438.3,74.3 469.6,58.0 500.9,45.0 532.2,50.6 563.5,42.7 594.8,48.9 626.1,40.3 657.4,37.8 688.7,26.6 720.0,17.4"/></svg></div>
+</section>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · 空</span><span class='trade-time'>2026-10-05 09:52 → 10-05 10:22</span></div><div class='card-pnl pnl-loss'>-60.8 pts</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 211</span></div><pre class='trade-detail'>entry 31168.75
+stop  31229.50  （風險 60.8 pts）
+exit  31229.50  stop
+4H高 31229.50 @ 10-05 09:45  MA200當時 31018.89
+回測MA10 @ 10-05 09:46
+進場 MA5 31173.3 / MA10 31181.2 / MA20 31175.3
+MA60 31070.1 / MA200 31025.7
+1H 30995.50  /  1H MA20 —</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t01_1005_0952_1m.png' alt='#1 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t01_1005_0952_1h.png' alt='#1 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · 空</span><span class='trade-time'>2026-10-05 10:31 → 10-05 10:57</span></div><div class='card-pnl pnl-loss'>-36.8 pts</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 190</span></div><pre class='trade-detail'>entry 31211.00
+stop  31247.75  （風險 36.8 pts）
+exit  31247.75  stop
+4H高 31247.75 @ 10-05 10:26  MA200當時 31057.98
+回測MA10 @ 10-05 10:28
+進場 MA5 31223.2 / MA10 31227.7 / MA20 31213.6
+MA60 31181.8 / MA200 31063.8
+1H 31155.50  /  1H MA20 —</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t02_1005_1031_1m.png' alt='#2 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t02_1005_1031_1h.png' alt='#2 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · 空</span><span class='trade-time'>2026-10-06 07:36 → 10-06 08:16</span></div><div class='card-pnl pnl-loss'>-35.5 pts</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 115</span></div><pre class='trade-detail'>entry 31500.25
+stop  31535.75  （風險 35.5 pts）
+exit  31535.75  stop
+4H高 31535.75 @ 10-06 07:26  MA200當時 31420.38
+回測MA10 @ 10-06 07:28
+進場 MA5 31509.5 / MA10 31510.8 / MA20 31511.3
+MA60 31471.8 / MA200 31426.2
+1H 31443.25  /  1H MA20 31342.66</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t03_1006_0736_1m.png' alt='#3 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t03_1006_0736_1h.png' alt='#3 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · 空</span><span class='trade-time'>2026-10-07 11:56 → 10-07 13:02</span></div><div class='card-pnl pnl-flat'>+0.0 pts</div></header><div class='tags'><span class='tag tag-time'>be</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 119</span></div><pre class='trade-detail'>entry 31346.00
+stop  31373.00  （風險 27.0 pts）
+exit  31346.00  be
+4H高 31373.00 @ 10-07 11:52  MA200當時 31253.83
+回測MA10 @ 10-07 11:53
+進場 MA5 31354.9 / MA10 31358.2 / MA20 31348.0
+MA60 31297.9 / MA200 31256.0
+1H 31253.50  /  1H MA20 31414.97</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t04_1007_1156_1m.png' alt='#4 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t04_1007_1156_1h.png' alt='#4 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · 空</span><span class='trade-time'>2026-10-08 10:39 → 10-08 11:07</span></div><div class='card-pnl pnl-win'>+72.0 pts</div></header><div class='tags'><span class='tag tag-tp'>wick</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 162</span></div><pre class='trade-detail'>entry 31318.50
+stop  31369.75  （風險 51.2 pts）
+exit  31246.50  wick
+4H高 31369.75 @ 10-08 10:29  MA200當時 31207.88
+回測MA10 @ 10-08 10:31
+進場 MA5 31331.4 / MA10 31336.5 / MA20 31330.7
+MA60 31261.3 / MA200 31217.3
+1H 31191.75  /  1H MA20 31318.16</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t05_1008_1039_1m.png' alt='#5 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t05_1008_1039_1h.png' alt='#5 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · 空</span><span class='trade-time'>2026-10-11 19:45 → 10-11 20:52</span></div><div class='card-pnl pnl-win'>+61.2 pts</div></header><div class='tags'><span class='tag tag-tp'>ma200</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 136</span></div><pre class='trade-detail'>entry 31264.75
+stop  31289.25  （風險 24.5 pts）
+exit  31203.50  ma200
+4H高 31289.25 @ 10-11 19:34  MA200當時 31152.97
+回測MA10 @ 10-11 19:40
+進場 MA5 31272.3 / MA10 31275.6 / MA20 31272.0
+MA60 31226.7 / MA200 31161.9
+1H 31185.75  /  1H MA20 31142.96</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t06_1011_1945_1m.png' alt='#6 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t06_1011_1945_1h.png' alt='#6 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · 空</span><span class='trade-time'>2026-10-15 11:23 → 10-15 12:53</span></div><div class='card-pnl pnl-win'>+60.5 pts</div></header><div class='tags'><span class='tag tag-tp'>wick</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 239</span></div><pre class='trade-detail'>entry 29998.00
+stop  30061.75  （風險 63.8 pts）
+exit  29937.50  wick
+4H高 30061.75 @ 10-15 11:15  MA200當時 29823.06
+回測MA10 @ 10-15 11:18
+進場 MA5 30014.8 / MA10 30025.3 / MA20 30009.2
+MA60 29923.6 / MA200 29831.3
+1H 29970.75  /  1H MA20 29906.24</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t07_1015_1123_1m.png' alt='#7 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t07_1015_1123_1h.png' alt='#7 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · 空</span><span class='trade-time'>2026-10-15 13:53 → 10-15 14:04</span></div><div class='card-pnl pnl-win'>+69.2 pts</div></header><div class='tags'><span class='tag tag-tp'>ma200</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 140</span></div><pre class='trade-detail'>entry 30060.00
+stop  30102.25  （風險 42.2 pts）
+exit  29990.75  ma200
+4H高 30102.25 @ 10-15 13:42  MA200當時 29962.31
+回測MA10 @ 10-15 13:47
+進場 MA5 30066.2 / MA10 30069.5 / MA20 30062.7
+MA60 30010.1 / MA200 29976.2
+1H 29961.75  /  1H MA20 29889.12</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t08_1015_1353_1m.png' alt='#8 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t08_1015_1353_1h.png' alt='#8 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · 空</span><span class='trade-time'>2026-10-18 19:39 → 10-18 19:45</span></div><div class='card-pnl pnl-loss'>-33.2 pts</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 185</span></div><pre class='trade-detail'>entry 29603.25
+stop  29636.50  （風險 33.2 pts）
+exit  29636.50  stop
+4H高 29636.50 @ 10-18 19:30  MA200當時 29451.30
+回測MA10 @ 10-18 19:33
+進場 MA5 29605.2 / MA10 29610.3 / MA20 29603.7
+MA60 29597.8 / MA200 29464.5
+1H 29616.50  /  1H MA20 29883.25</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t09_1018_1939_1m.png' alt='#9 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t09_1018_1939_1h.png' alt='#9 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · 空</span><span class='trade-time'>2026-10-19 11:46 → 10-19 12:30</span></div><div class='card-pnl pnl-win'>+117.5 pts</div></header><div class='tags'><span class='tag tag-tp'>ma200</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 183</span></div><pre class='trade-detail'>entry 29956.00
+stop  29983.50  （風險 27.5 pts）
+exit  29838.50  ma200
+4H高 29983.50 @ 10-19 11:37  MA200當時 29800.21
+回測MA10 @ 10-19 11:40
+進場 MA5 29964.0 / MA10 29968.4 / MA20 29960.3
+MA60 29902.3 / MA200 29809.6
+1H 29841.75  /  1H MA20 29672.47</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t10_1019_1146_1m.png' alt='#10 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t10_1019_1146_1h.png' alt='#10 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · 空</span><span class='trade-time'>2026-10-20 10:47 → 10-20 12:18</span></div><div class='card-pnl pnl-win'>+125.2 pts</div></header><div class='tags'><span class='tag tag-tp'>ma200</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 326</span></div><pre class='trade-detail'>entry 29838.00
+stop  29903.50  （風險 65.5 pts）
+exit  29712.75  ma200
+4H高 29903.50 @ 10-20 10:30  MA200當時 29577.96
+回測MA10 @ 10-20 10:33
+進場 MA5 29849.4 / MA10 29849.2 / MA20 29850.9
+MA60 29733.5 / MA200 29602.9
+1H 29627.25  /  1H MA20 29678.17</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t11_1020_1047_1m.png' alt='#11 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t11_1020_1047_1h.png' alt='#11 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · 空</span><span class='trade-time'>2026-10-20 20:47 → 10-20 20:57</span></div><div class='card-pnl pnl-win'>+65.8 pts</div></header><div class='tags'><span class='tag tag-tp'>ma200</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 113</span></div><pre class='trade-detail'>entry 29984.00
+stop  30010.25  （風險 26.2 pts）
+exit  29918.25  ma200
+4H高 30010.25 @ 10-20 20:41  MA200當時 29897.00
+回測MA10 @ 10-20 20:43
+進場 MA5 29991.7 / MA10 29995.2 / MA20 29990.6
+MA60 29943.5 / MA200 29905.2
+1H 29905.25  /  1H MA20 29706.17</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t12_1020_2047_1m.png' alt='#12 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t12_1020_2047_1h.png' alt='#12 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · 空</span><span class='trade-time'>2026-10-21 13:24 → 10-21 14:46</span></div><div class='card-pnl pnl-win'>+20.8 pts</div></header><div class='tags'><span class='tag tag-tp'>wick</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 135</span></div><pre class='trade-detail'>entry 30089.75
+stop  30113.00  （風險 23.2 pts）
+exit  30069.00  wick
+4H高 30113.00 @ 10-21 13:21  MA200當時 29977.93
+回測MA10 @ 10-21 13:22
+進場 MA5 30101.4 / MA10 30101.3 / MA20 30094.6
+MA60 30060.8 / MA200 29980.7
+1H 30069.25  /  1H MA20 29897.88</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t13_1021_1324_1m.png' alt='#13 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t13_1021_1324_1h.png' alt='#13 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · 空</span><span class='trade-time'>2026-10-23 11:01 → 10-23 12:26</span></div><div class='card-pnl pnl-win'>+64.2 pts</div></header><div class='tags'><span class='tag tag-tp'>wick</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 216</span></div><pre class='trade-detail'>entry 29280.00
+stop  29326.00  （風險 46.0 pts）
+exit  29215.75  wick
+4H高 29326.00 @ 10-23 10:53  MA200當時 29110.17
+回測MA10 @ 10-23 10:55
+進場 MA5 29285.2 / MA10 29295.2 / MA20 29281.5
+MA60 29199.5 / MA200 29117.7
+1H 29291.25  /  1H MA20 29145.03</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t14_1023_1101_1m.png' alt='#14 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t14_1023_1101_1h.png' alt='#14 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · 空</span><span class='trade-time'>2026-10-25 18:52 → 10-25 19:18</span></div><div class='card-pnl pnl-win'>+115.5 pts</div></header><div class='tags'><span class='tag tag-tp'>ma200</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 169</span></div><pre class='trade-detail'>entry 29307.75
+stop  29345.00  （風險 37.2 pts）
+exit  29192.25  ma200
+4H高 29345.00 @ 10-25 18:45  MA200當時 29176.05
+回測MA10 @ 10-25 18:50
+進場 MA5 29321.4 / MA10 29324.7 / MA20 29310.2
+MA60 29250.3 / MA200 29180.9
+1H 29117.75  /  1H MA20 29164.22</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t15_1025_1852_1m.png' alt='#15 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t15_1025_1852_1h.png' alt='#15 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · 空</span><span class='trade-time'>2026-10-26 11:09 → 10-26 12:43</span></div><div class='card-pnl pnl-win'>+91.8 pts</div></header><div class='tags'><span class='tag tag-tp'>wick</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 267</span></div><pre class='trade-detail'>entry 29522.25
+stop  29572.00  （風險 49.8 pts）
+exit  29430.50  wick
+4H高 29572.00 @ 10-26 11:02  MA200當時 29304.59
+回測MA10 @ 10-26 11:04
+進場 MA5 29532.7 / MA10 29541.3 / MA20 29523.7
+MA60 29414.0 / MA200 29315.9
+1H 29521.75  /  1H MA20 29176.29</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t16_1026_1109_1m.png' alt='#16 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t16_1026_1109_1h.png' alt='#16 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · 空</span><span class='trade-time'>2026-10-27 05:14 → 10-27 05:23</span></div><div class='card-pnl pnl-loss'>-39.8 pts</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 119</span></div><pre class='trade-detail'>entry 29431.50
+stop  29471.25  （風險 39.8 pts）
+exit  29471.25  stop
+4H高 29471.25 @ 10-27 05:08  MA200當時 29352.16
+回測MA10 @ 10-27 05:12
+進場 MA5 29452.3 / MA10 29452.8 / MA20 29438.1
+MA60 29398.4 / MA200 29354.7
+1H 29432.75  /  1H MA20 29433.62</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t17_1027_0514_1m.png' alt='#17 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t17_1027_0514_1h.png' alt='#17 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · 空</span><span class='trade-time'>2026-10-27 06:02 → 10-27 06:16</span></div><div class='card-pnl pnl-win'>+55.5 pts</div></header><div class='tags'><span class='tag tag-tp'>wick</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 102</span></div><pre class='trade-detail'>entry 29459.50
+stop  29479.00  （風險 19.5 pts）
+exit  29404.00  wick
+4H高 29479.00 @ 10-27 05:59  MA200當時 29377.14
+回測MA10 @ 10-27 06:01
+進場 MA5 29469.5 / MA10 29470.2 / MA20 29464.0
+MA60 29455.6 / MA200 29379.0
+1H 29478.25  /  1H MA20 29443.38</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t18_1027_0602_1m.png' alt='#18 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t18_1027_0602_1h.png' alt='#18 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · 空</span><span class='trade-time'>2026-10-27 07:14 → 10-27 08:25</span></div><div class='card-pnl pnl-loss'>-43.5 pts</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 206</span></div><pre class='trade-detail'>entry 29569.50
+stop  29613.00  （風險 43.5 pts）
+exit  29613.00  stop
+4H高 29613.00 @ 10-27 06:47  MA200當時 29406.80
+回測MA10 @ 10-27 06:48
+進場 MA5 29588.2 / MA10 29591.7 / MA20 29570.6
+MA60 29496.2 / MA200 29438.6
+1H 29527.25  /  1H MA20 29459.31</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t19_1027_0714_1m.png' alt='#19 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t19_1027_0714_1h.png' alt='#19 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · 空</span><span class='trade-time'>2026-10-27 12:10 → 10-27 13:56</span></div><div class='card-pnl pnl-win'>+60.8 pts</div></header><div class='tags'><span class='tag tag-tp'>ma200</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 229</span></div><pre class='trade-detail'>entry 29841.00
+stop  29875.50  （風險 34.5 pts）
+exit  29780.25  ma200
+4H高 29875.50 @ 10-27 12:00  MA200當時 29646.78
+回測MA10 @ 10-27 12:06
+進場 MA5 29848.9 / MA10 29851.7 / MA20 29843.2
+MA60 29793.2 / MA200 29659.6
+1H 29842.25  /  1H MA20 29500.40</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t20_1027_1210_1m.png' alt='#20 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t20_1027_1210_1h.png' alt='#20 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · 空</span><span class='trade-time'>2026-10-28 14:45 → 10-28 14:53</span></div><div class='card-pnl pnl-win'>+17.2 pts</div></header><div class='tags'><span class='tag tag-tp'>wick</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 158</span></div><pre class='trade-detail'>entry 29903.75
+stop  30009.00  （風險 105.2 pts）
+exit  29886.50  wick
+4H高 30009.00 @ 10-28 14:43  MA200當時 29850.66
+回測MA10 @ 10-28 14:44
+進場 MA5 29963.2 / MA10 29955.0 / MA20 29909.9
+MA60 29860.6 / MA200 29851.5
+1H 29864.25  /  1H MA20 29892.84</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t21_1028_1445_1m.png' alt='#21 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t21_1028_1445_1h.png' alt='#21 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · 空</span><span class='trade-time'>2026-10-29 01:26 → 10-29 02:33</span></div><div class='card-pnl pnl-win'>+79.8 pts</div></header><div class='tags'><span class='tag tag-tp'>wick</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 189</span></div><pre class='trade-detail'>entry 29727.75
+stop  29764.25  （風險 36.5 pts）
+exit  29648.00  wick
+4H高 29764.25 @ 10-29 01:19  MA200當時 29575.25
+回測MA10 @ 10-29 01:20
+進場 MA5 29734.6 / MA10 29741.3 / MA20 29730.3
+MA60 29659.7 / MA200 29581.0
+1H 29642.00  /  1H MA20 29798.26</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t22_1029_0126_1m.png' alt='#22 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t22_1029_0126_1h.png' alt='#22 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · 空</span><span class='trade-time'>2026-11-03 11:10 → 11-03 11:22</span></div><div class='card-pnl pnl-win'>+64.5 pts</div></header><div class='tags'><span class='tag tag-tp'>ma200</span><span class='tag tag-info'>1m</span><span class='tag tag-info'>1h</span><span class='tag tag-info'>峰距 138</span></div><pre class='trade-detail'>entry 28388.00
+stop  28443.50  （風險 55.5 pts）
+exit  28323.50  ma200
+4H高 28443.50 @ 11-03 11:04  MA200當時 28305.27
+回測MA10 @ 11-03 11:05
+進場 MA5 28407.8 / MA10 28417.1 / MA20 28400.6
+MA60 28355.3 / MA200 28310.9
+1H 28417.50  /  1H MA20 28213.51</pre><div class='mini-chart'><div class='chart-block'><p class='chart-label'>一分K</p><img src='img/t23_1103_1110_1m.png' alt='#23 一分K' style='width:100%;display:block;border-radius:10px'/></div><div class='chart-block'><p class='chart-label'>一小時K（整點對齊，完整小時棒）</p><img src='img/t23_1103_1110_1h.png' alt='#23 一小時K' style='width:100%;display:block;border-radius:10px'/></div></div></article>
+</div>
+</body></html>
