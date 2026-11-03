@@ -2,13 +2,15 @@
 indicator("1h MA25 下破底再站上", overlay=true, max_labels_count=50)
 
 // 預設寬鬆：跌破 MA25 至少 4 根、深度 1.8%，再站回。
-// 排列進場還要品質 A：深度≥2.5%、放量≥1.35 倍、粗略 W，三項至少中兩項。
+// 排列進場還要：進場當根放量≥1.5 倍、MA25 上彎，且品質 A（深度≥2.5% 或粗略 W 至少中一項）。
 // 勾「截圖急殺」才加上 4 根急殺 / ATR / 破前低。
 maLen        = input.int(25, "均線", minval=5)
 minBelow     = input.int(4, "在均線下至少幾根", minval=2)
 maxBelow     = input.int(36, "在均線下最多幾根", minval=6)
 minDepthPct  = input.float(1.8, "相對 MA25 最低深度 %", minval=0.3, step=0.1) / 100
 useQuality   = input.bool(true, "只要品質 A")
+minVolMult   = input.float(1.5, "進場放量倍數", minval=0.0, step=0.05)
+reqMaUp      = input.bool(true, "進場要求 MA25 上彎")
 useFlush     = input.bool(false, "截圖急殺（嚴）")
 minImpulse   = input.float(2.3, "4 根急殺 %", minval=0.5, step=0.1) / 100
 minUndercut  = input.float(1.4, "破前低 %", minval=0.3, step=0.1) / 100
@@ -79,10 +81,13 @@ aligned = close > ma7 and ma7 > ma14 and ma14 > ma25
 firstAlign = aligned and not aligned[1]
 sinceReclaim = ta.barssince(reclaim)
 volBase = ta.sma(volume, 20)
-volOk = volBase > 0 and volume / volBase >= 1.35
+volRatio = volBase > 0 ? volume / volBase : 0.0
+volOk = volRatio >= 1.35
+volGateOk = volRatio >= minVolMult
+maUpOk = not reqMaUp or ma25 > ma25[1]
 qScore = (depthAt >= 0.025 ? 1 : 0) + (volOk ? 1 : 0) + (wAt ? 1 : 0)
 qualityOk = not useQuality or qScore >= 2
-stackIn = firstAlign and qualityOk and not na(sinceReclaim) and sinceReclaim >= 0 and sinceReclaim <= 36
+stackIn = firstAlign and qualityOk and volGateOk and maUpOk and not na(sinceReclaim) and sinceReclaim >= 0 and sinceReclaim <= 36
 
 plotshape(stackIn, title="7/14/25 多頭排列", style=shape.triangleup, location=location.belowbar, color=color.new(#00e676, 0), size=size.small)
 bgcolor(below and barsBelow >= minBelow ? color.new(#d28cff, 92) : na)

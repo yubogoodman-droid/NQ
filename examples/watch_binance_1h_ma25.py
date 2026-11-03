@@ -243,6 +243,8 @@ def detect_kw(args) -> dict:
             min_bars_below=args.min_bars,
             max_bars_below=args.max_bars,
             min_depth_pct=args.min_depth / 100.0,
+            min_vol_ratio=getattr(args, "min_vol", 1.5),
+            require_ma25_rising=not getattr(args, "allow_falling_ma25", False),
         )
     kw["min_quality"] = "A"
     return kw
@@ -393,6 +395,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-bars", type=int, default=4)
     p.add_argument("--max-bars", type=int, default=36)
     p.add_argument("--min-depth", type=float, default=1.8)
+    p.add_argument("--min-vol", type=float, default=1.5)
+    p.add_argument("--allow-falling-ma25", action="store_true")
     p.add_argument("--lookback-hours", type=float, default=8, help="只推這幾小時內的新訊號")
     p.add_argument("--interval", type=int, default=0, help="秒；0=等下一根 1h 收盤再掃")
     return p

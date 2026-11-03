@@ -223,6 +223,20 @@ def test_min_quality_keeps_only_a() -> None:
         assert not only_a
 
 
+def test_vol_and_ma25_rising_gates() -> None:
+    df = _make_reclaim_bars()
+    base = detect_signals(df, min_quality="C")
+    assert base
+    sig = base[0]
+    df.iloc[sig.entry_idx, df.columns.get_loc("Volume")] = 300.0
+    funnel_vol: dict = {}
+    blocked_vol = detect_signals(df, min_quality="C", min_vol_ratio=99.0, funnel=funnel_vol)
+    assert not blocked_vol
+    assert funnel_vol.get("low_vol", 0) >= 1
+    passed = detect_signals(df, min_quality="C", min_vol_ratio=1.5, require_ma25_rising=True)
+    assert passed and all(s.vol_ratio >= 1.5 for s in passed)
+
+
 def test_bull_stack() -> None:
     c = np.array([10.5, 10.2])
     m7 = np.array([10.3, 10.1])
@@ -433,6 +447,7 @@ def main() -> int:
     test_slow_grind_rejected()
     test_drawn_w_ok_avgo_like()
     test_min_quality_keeps_only_a()
+    test_vol_and_ma25_rising_gates()
     test_bull_stack()
     test_strict_requires_drawn_w()
     test_still_below_no_signal()
