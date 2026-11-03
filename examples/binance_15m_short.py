@@ -49,7 +49,7 @@ UA = "Mozilla/5.0"
 MAX_1H_MA99_DIST = 0.20
 MIN_1H_MA120_DIST = 0.02
 MIN_1H_MA_SPREAD = 0.04
-MIN_15M_MA_SPREAD = 0.015
+MIN_15M_MA_SPREAD = 0.025
 MIN_15M_MA200_OPEN = 0.04
 MIN_15M_MA200_ATTACK_GAP = 0.50
 MIN_15M_MA200_ATTACK_BODY = 0.03
@@ -79,7 +79,7 @@ class ShortParams:
     min_risk_pct: float = 0.005
     max_risk_pct: float = 0.06
     require_red: bool = True
-    min_break_pct: float = 0.003
+    min_break_pct: float = 0.007
     min_body_pct: float = 0.008
     min_vol_ratio: float = 1.5
 
@@ -1459,13 +1459,13 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>幣安 15m · 7/14/25/99 空頭排列跌破 MA200 做空</h1>
 <p class="muted">{escape(period)} · 掃 {len(symbols)} 檔 U 本位永續
-<br/>進場：收盤 <b>MA7&lt;MA14&lt;MA25&lt;MA99</b>，上一根還沒低於 MA200、這一根紅 K 收盤跌破 <b>MA200</b>，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 <b>15m 的 MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_15m_ma_spread*100:.1f}%，ZEN/XMR 那種中均黏成麵條不空），且進場 K 若還在 <b>15m MA200 上方</b>則開盤須高於 200 至少 <b>{min_15m_ma200_open*100:.0f}%</b>（貼著 200 沒肉不空；已跌破 200 仍可）{attack_clause}{sit_clause}{support_clause}，且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破 MA200 的 0.3%。訊號以<b>收盤確認</b>，下一根才決定進不進；均線距離只看這根收盤，不偷看後面。
+<br/>進場：收盤 <b>MA7&lt;MA14&lt;MA25&lt;MA99</b>，上一根還沒低於 MA200、這一根紅 K 收盤跌破 <b>MA200</b>，且進場價在 <b>1h MA25 下方</b>、還不能掉到 <b>1h MA200 下面</b>，與 <b>1h MA99 距離 ≤ {max_1h_ma99_dist*100:.0f}%</b>，離 <b>1h MA120 ≥ {min_1h_ma120_dist*100:.0f}%</b>（貼在 120 上如 MORPHO 不空），且 <b>15m 的 MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_15m_ma_spread*100:.1f}%，ZEN/XMR/PHA 那種中均黏成麵條不空），且進場 K 若還在 <b>15m MA200 上方</b>則開盤須高於 200 至少 <b>{min_15m_ma200_open*100:.0f}%</b>（貼著 200 沒肉不空；已跌破 200 仍可）{attack_clause}{sit_clause}{support_clause}，且 1h 的 <b>MA7/14/25/99/120 不能糾結</b>（張開 ≥ {min_1h_ma_spread*100:.0f}%，FLOCK 那種五線疊一起不空）。對齊急殺：實體 ≥ 0.8%、量 ≥ 1.5×MA20、至少跌破 MA200 的 0.7%（PONS/REZ 剛穿一點就拉回不空）。訊號以<b>收盤確認</b>，下一根才決定進不進；均線距離只看這根收盤，不偷看後面。
 <br/>出場：停在跌破 K 高點與 <b>MA200</b> 的較高者、目標 2R、或 32 根（8 小時）時間停。做空報酬＝(進−出)/進。加總％不是組合複利，也沒扣手續費與稅。
 <br/>每筆下面附同一時刻的 <b>1h K</b> 對照（1h 均線是 1 小時圖自己的 7/14/25/99/120/200）。卡片 <b>虧損在前</b>（虧最多先看），賺錢的按進場時間。股票／ETF 永續預設不掃。</p>
 <ol class="muted" style="padding-left:18px;margin:8px 0 0">
 <li>週期：幣安 U 永續 <b>15m</b> 訊號；<b>1h</b> 只做過濾。均線皆為收盤 SMA。</li>
 <li>標的：USDT、TRADING、永續／TradFi 永續、非指數、非股票／ETF，24h 成交額 ≥ 1000 萬；CLOUSDT 固定納入。</li>
-<li>進場（當根收盤確認，進場價＝該根收盤）：MA7&lt;14&lt;25&lt;99，上一根還沒收在 MA200 下、這一根紅 K 收盤跌破 MA200 至少 0.3%，實體 ≥ 0.8%，量 ≥ 1.5×量 SMA20。</li>
+<li>進場（當根收盤確認，進場價＝該根收盤）：MA7&lt;14&lt;25&lt;99，上一根還沒收在 MA200 下、這一根紅 K 收盤跌破 MA200 至少 0.7%，實體 ≥ 0.8%，量 ≥ 1.5×量 SMA20，15m 五條均線張開 ≥ 2.5%。</li>
 <li>停損＝max(訊號 K 高點, MA200)，風險須在 0.5%–6%（超過 6% 的急殺停太遠，Q／DOOD／BR 那種不空）；停利＝進場 − 2×風險。從<b>下一根</b>起算，同一根先停損再停利；最多 32 根（8 小時）用該根收盤時間停。同標的同時只一筆。</li>
 </ol>
 <p class="muted">漏斗：有均線 {fun.get('ready', 0)} → 7&lt;14&lt;25&lt;99 {fun.get('stack', 0)} → 跌破MA200 {fun.get('cross', 0)}
@@ -1781,7 +1781,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--min-15m-ma-spread",
         type=float,
         default=MIN_15M_MA_SPREAD,
-        help="15m MA7/14/25/99/120 最小張開（0.015=1.5%%；0 關閉）",
+        help="15m MA7/14/25/99/120 最小張開（0.025=2.5%%；0 關閉）",
     )
     p.add_argument(
         "--min-15m-ma200-open",
