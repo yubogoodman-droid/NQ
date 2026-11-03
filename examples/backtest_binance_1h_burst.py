@@ -55,6 +55,8 @@ class Trade:
     pnl_pct: float
     reason: str
     vol_ratio: float
+    vol_ma_ratio: float
+    body_ratio: float
     ext_ma25: float
     short_fan: float
     green: bool
@@ -115,6 +117,8 @@ def simulate_trade(
         pnl_pct=(float(exit_px) / entry - 1.0) if entry else 0.0,
         reason=reason,
         vol_ratio=float(hit["vol_ratio"]),
+        vol_ma_ratio=float(hit.get("vol_ma_ratio") or 0.0),
+        body_ratio=float(hit.get("body_ratio") or 0.0),
         ext_ma25=float(hit.get("ext_ma25") or 0.0),
         short_fan=float(hit.get("short_fan") or 0.0),
         green=float(hit["close"]) >= float(hit["open"]),
@@ -180,6 +184,7 @@ def backtest_symbol(
     allow_overlap: bool,
     max_ext_ma25: float | None = MAX_EXT_MA25,
     require_fan: bool = False,
+    require_quality: bool = True,
 ) -> tuple[list[Trade], int]:
     need = 200 + days * 24 + time_bars + 30
     raw = fetch_klines(sym, limit=max(280, need))
@@ -196,6 +201,7 @@ def backtest_symbol(
         green_only=green_only,
         max_ext_ma25=max_ext_ma25,
         require_fan=require_fan,
+        require_quality=require_quality,
     )
     trades = [simulate_trade(d, hit, target_r=target_r, time_bars=time_bars) for hit in hits]
     for t in trades:
@@ -323,8 +329,8 @@ def write_html(path: Path, trades: list[Trade], stats: dict, extra: dict, max_ch
             f"<div class='card-pnl {cls}'>{t.pnl_pct * 100:+.2f}%</div>"
             "</header>"
             f"<div class='tags'><span class='tag tag-info'>{escape(t.reason)}</span>"
-            f"<span class='tag'>{side}</span>"
-            f"<span class='tag'>量 {t.vol_ratio:.2f}×</span>"
+            f"<span class='tag'>{side} 實體{t.body_ratio*100:.0f}%</span>"
+            f"<span class='tag'>量 {t.vol_ratio:.2f}×（20均 {t.vol_ma_ratio:.2f}×）</span>"
             f"<span class='tag'>離MA25 {t.ext_ma25*100:+.2f}%</span>"
             f"<span class='tag'>短均散 {t.short_fan*100:+.2f}%</span></div>"
             "<pre class='trade-detail'>"
@@ -364,7 +370,7 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>幣安 1h 多頭爆發 · 近 {extra['days']} 天</h1>
 <p class="muted">USDT 永續 · MA7&gt;14&gt;25&gt;99&gt;120&gt;200 且收盤量 &gt; 前一根 × {extra['vol_mult']:g}
-· 只要收漲陽線（收盤 &gt; 開盤）{" · 離 MA25 ≤ "+str(extra['max_ext_ma25']*100)+"%（像 BNB）" if extra.get("max_ext_ma25") else ""}{" · 短均有點發散" if extra.get("require_fan") else ""}
+· 只要收漲陽線（收盤 &gt; 開盤）{" · 實體≥60% · 收破前12高 · 前根陽線守MA7 · 量&gt;20均×2.5且創10根新高" if extra.get("require_quality", True) else ""}{" · 離 MA25 ≤ "+str(extra['max_ext_ma25']*100)+"%（像 BNB）" if extra.get("max_ext_ma25") else ""}{" · 短均有點發散" if extra.get("require_fan") else ""}
 <br/>收盤進場；停在訊號 K 低（太窄則 0.5%）、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。
 同標的重疊訊號預設不重做。加總％是各筆相加，不是組合複利。
 <br/>掃 {extra['scanned']} 檔 · 原始訊號 {extra['raw_hits']} · 進場 {stats['count']}
@@ -402,6 +408,8 @@ def dump_hits(path: Path, trades: list[Trade], stats: dict, extra: dict) -> Path
                 "pnl_pct": t.pnl_pct,
                 "reason": t.reason,
                 "vol_ratio": t.vol_ratio,
+                "vol_ma_ratio": t.vol_ma_ratio,
+                "body_ratio": t.body_ratio,
                 "ext_ma25": t.ext_ma25,
                 "short_fan": t.short_fan,
                 "green": t.green,
@@ -425,6 +433,7 @@ def main(argv=None) -> int:
     p.add_argument("--vol-mult", type=float, default=VOL_MULT)
     p.add_argument("--allow-red", action="store_true", help="連陰線也做（預設只要收漲陽線）")
     p.add_argument("--fan", action="store_true", help="再要求短均有點發散（像 BNB）")
+    p.add_argument("--loose", action="store_true", help="關掉突破品質過濾（只看排列+2×量+陽線）")
     p.add_argument("--overlap", action="store_true", help="同標的重疊訊號也做")
     p.add_argument("--time-bars", type=int, default=TIME_BARS)
     p.add_argument("--target-r", type=float, default=TARGET_R)
@@ -448,6 +457,7 @@ def main(argv=None) -> int:
         f"{args.time_bars} 根 / {args.target_r:g}R"
         + (f" · 離MA25≤{args.max_ext_ma25*100:g}%" if args.max_ext_ma25 > 0 else "")
         + (" · 只要收漲陽線" if not args.allow_red else "")
+        + (" · 突破品質過濾" if not args.loose else "")
         + (" · 短均發散" if args.fan else ""),
         flush=True,
     )
@@ -467,6 +477,7 @@ def main(argv=None) -> int:
                 args.overlap,
                 args.max_ext_ma25,
                 args.fan,
+                not args.loose,
             ): s
             for s in symbols
         }
@@ -509,6 +520,7 @@ def main(argv=None) -> int:
         "target_r": args.target_r,
         "max_ext_ma25": args.max_ext_ma25,
         "require_fan": args.fan,
+        "require_quality": not args.loose,
         "min_short_fan": MIN_SHORT_FAN,
         "max_short_fan": MAX_SHORT_FAN,
         "scanned": len(symbols),

@@ -32,8 +32,8 @@ from watch_binance_1h_burst import (  # noqa: E402
 def _uptrend(n: int = 240, start: float = 100.0, step: float = 0.12) -> dict:
     c = start + step * np.arange(n, dtype=float)
     o = c - 0.15
-    h = c + 0.20
-    l = c - 0.25
+    h = c + 0.03
+    l = c - 0.18
     v = np.full(n, 100.0)
     t = np.arange(n, dtype=np.int64) * 3_600_000
     return {"t": t, "o": o, "h": h, "l": l, "c": c, "v": v}
@@ -58,12 +58,40 @@ def test_uptrend_is_bull_align() -> None:
 def test_burst_hits_on_double_volume() -> None:
     raw = _uptrend()
     raw["v"][-2] = 80.0
-    raw["v"][-1] = 161.0  # 2.0125×
+    raw["v"][-1] = 260.0  # > 2× prev and > 2.5× 20-bar avg
     d = indicators(raw)
     hit = burst_at(d, len(d["c"]) - 1, require_fan=False)
     assert hit is not None
     assert hit["vol_ratio"] > 2.0
+    assert hit["vol_ma_ratio"] >= 2.5
+    assert hit["body_ratio"] >= 0.60
     assert hit["close"] == raw["c"][-1]
+
+
+def test_burst_rejects_upper_wick_and_fake_double_vol() -> None:
+    raw = _uptrend()
+    raw["v"][-2] = 80.0
+    raw["v"][-1] = 161.0  # 2.01× prev, but only ~1.63× 20-bar avg
+    d = indicators(raw)
+    i = len(d["c"]) - 1
+    assert burst_at(d, i) is None
+    assert burst_at(d, i, require_quality=False) is not None
+
+    # Long upper wick (body < 60% of range) is rejected by default
+    raw2 = _uptrend()
+    raw2["v"][-1] = 260.0
+    raw2["h"][-1] = raw2["c"][-1] + 0.40
+    d2 = indicators(raw2)
+    assert burst_at(d2, i) is None
+    assert burst_at(d2, i, require_quality=False) is not None
+
+    # Previous candle red is rejected by default
+    raw3 = _uptrend()
+    raw3["v"][-1] = 260.0
+    raw3["o"][-2] = raw3["c"][-2] + 0.10
+    d3 = indicators(raw3)
+    assert burst_at(d3, i) is None
+    assert burst_at(d3, i, require_quality=False) is not None
 
 
 def test_burst_rejects_exact_double() -> None:
@@ -131,12 +159,12 @@ def _fan_bars(n: int = 240, grind: float = 1.00015, accel: float = 1.0012, acc_b
         c[i] = c[i - 1] * grind
     for i in range(n - acc_bars, n):
         c[i] = c[i - 1] * accel
-    o = c - 0.05
+    o = c - 0.12
     return {
         "t": np.arange(n, dtype=np.int64) * 3_600_000,
         "o": o,
-        "h": c + 0.08,
-        "l": c - 0.08,
+        "h": c + 0.02,
+        "l": c - 0.15,
         "c": c,
         "v": np.full(n, 100.0),
     }
@@ -168,7 +196,7 @@ def test_rejects_red_bar() -> None:
     d = indicators(raw)
     i = len(d["c"]) - 1
     assert burst_at(d, i) is None
-    assert burst_at(d, i, green_only=False, require_fan=False) is not None
+    assert burst_at(d, i, green_only=False, require_fan=False, require_quality=False) is not None
 
 
 def test_burst_rejects_early_bar() -> None:
@@ -195,7 +223,7 @@ def test_bars_from_raw_needs_ma200() -> None:
 def test_find_bursts_window() -> None:
     raw = _uptrend()
     raw["v"][-3] = 80.0
-    raw["v"][-2] = 170.0
+    raw["v"][-2] = 260.0
     raw["v"][-1] = 90.0
     d = indicators(raw)
     n = len(d["c"])
@@ -207,7 +235,7 @@ def test_find_bursts_window() -> None:
 def test_simulate_hits_target() -> None:
     raw = _uptrend()
     raw["v"][-20] = 80.0
-    raw["v"][-19] = 200.0
+    raw["v"][-19] = 260.0
     d = indicators(raw)
     i = len(d["c"]) - 19
     hit = burst_at(d, i, require_fan=False)
@@ -222,7 +250,7 @@ def test_simulate_hits_target() -> None:
 def test_simulate_hits_stop() -> None:
     raw = _uptrend()
     raw["v"][-12] = 80.0
-    raw["v"][-11] = 200.0
+    raw["v"][-11] = 260.0
     d = indicators(raw)
     i = len(d["c"]) - 11
     hit = burst_at(d, i, require_fan=False)
@@ -279,6 +307,7 @@ def main() -> int:
         test_sma,
         test_uptrend_is_bull_align,
         test_burst_hits_on_double_volume,
+        test_burst_rejects_upper_wick_and_fake_double_vol,
         test_burst_rejects_exact_double,
         test_burst_rejects_low_volume,
         test_burst_rejects_bear_stack,

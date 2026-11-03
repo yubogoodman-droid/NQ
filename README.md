@@ -97,19 +97,25 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 ## 幣安 1 小時 K 多頭爆發 Telegram
 
-1 小時圖：`MA7 > MA14 > MA25 > MA99 > MA120 > MA200` 多頭排列，剛收盤那根成交量 **大於前一根一倍以上**（量 > 前一根 × 2），且必須是 **收漲陽線**（收盤 > 開盤）。推 Telegram（帶圖）。同一根 K 不會重發。不限制離 MA25 多遠、也不要求短均發散（要像 BNB 再加 `--fan --max-ext-ma25 0.015`）。
+1 小時圖：`MA7 > MA14 > MA25 > MA99 > MA120 > MA200` 多頭排列，剛收盤那根成交量 **大於前一根一倍以上**（量 > 前一根 × 2），且為 **收漲陽線**。預設再加上四條突破品質過濾（排除假倍量與長上影誘多）：
+- **實體飽滿**：實體佔整根振幅 **≥ 60%**（少上影線）
+- **真突破箱體**：收盤突破 **前 12 根最高價**
+- **連紅推進**：前一根也是守在 **MA7 上方** 的陽線
+- **真放量**：成交量同時 **> 近 20 根均量 × 2.5** 且創 **近 10 根最大量**
+
+推 Telegram（帶圖），同一根 K 不重發。不限制離 MA25 多遠（要像 BNB 再加 `--fan --max-ext-ma25 0.015`；要關掉突破品質過濾加 `--loose`）。
 
 憑證同樣放 `tg_config.env`，或寫在 `examples/watch_binance_1h_burst.py` 最上面。
 
 ```bash
 python3 examples/watch_binance_1h_burst.py --test                    # 先測通不通
 python3 examples/watch_binance_1h_burst.py --once --dry-run          # 只掃剛收盤、不送
-python3 examples/watch_binance_1h_burst.py                           # 每根 1h 收盤掃一次（只要收漲陽線）
+python3 examples/watch_binance_1h_burst.py                           # 每根 1h 收盤掃一次
 python3 examples/backtest_binance_1h_burst.py --days 7 --pages        # 近一週回測 + HTML
 python3 examples/test_watch_binance_1h_burst.py                      # 單元測試（不打網路）
 ```
 
-近一週（09-12 → 09-19）：進場 **170** 筆（81 檔），已平 157 筆勝率 **39.5%**，平均 **+0.45%**。收盤後 +24h 平均 **+5.16%**。RAYSOL 09-12 05:00 那根 2R **+4.05%**。要像 BNB 再加 `--fan --max-ext-ma25 0.015`。
+近一週（10-28 → 11-04）：優化前 129 筆（勝率 32.0%、平均 −0.28%），加上突破品質過濾後進場 **14** 筆（12 檔），已平 13 筆勝率 **76.9%**（10 勝 3 敗），平均 **+5.41%**（2R 6 · 時間 4 · 停損 3 · 未平 1）。收盤後 +1h 平均 **+4.50%**、+24h 平均 **+3.96%**。近兩週 32 筆勝率 **71.0%**、平均 **+7.20%**；近 30 天 92 筆勝率 **57.1%**、平均 **+3.18%**。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/binance-1h-bull-burst-ee86/docs/binance-1h-burst/view.html
 
