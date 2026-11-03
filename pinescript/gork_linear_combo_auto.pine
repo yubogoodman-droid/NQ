@@ -40,7 +40,7 @@ wickRangeRatio   = input.float(0.55, "下影／振幅 比例", minval=0.3, step=
 f15SlopeMax = input.float(120, "15m MA10 − MA10[5] 超過不做（0=關）", minval=0, step=5, group=gL15)
 f15DistMin  = input.float(120, "15m close − MA60 低於不做（0=關）", minval=0, step=5, group=gL15)
 
-gorkDeep        = input.float(50, "跌破 MA200 至少（點）", minval=1, step=5, group=gGk)
+gorkDeep        = input.float(70, "★ 跌破 MA200 至少（點，原 50）", minval=1, step=5, group=gGk)
 gorkWindow      = input.int(60, "跌破後可進場（根）", minval=1, group=gGk)
 gorkStreak      = input.int(3, "站上 MA200 連幾根", minval=1, group=gGk)
 gorkMaxDist     = input.float(30, "進場距 MA200 上限（點）", minval=1, step=1, group=gGk)
@@ -50,8 +50,10 @@ gorkTp          = input.float(100, "停利（點）", minval=1, step=5, group=gG
 gorkBeAfter     = input.float(60, "浮盈幾點改保本", minval=0, step=5, group=gGk)
 
 // ★ 新增門檻
-linMaxRisk         = input.float(55, "★ 線性空進場風險上限（peakHigh − 進場，點，0=關）", minval=0, step=1, group=gNew)
-gorkMa200SlopeBars = input.int(30, "★ Gork：MA200 需低於幾根前（0=關）", minval=0, group=gNew)
+linMaxRisk          = input.float(65, "★ 線性空進場風險上限（peakHigh − 進場，點，0=關）", minval=0, step=1, group=gNew)
+gorkM15DistMax      = input.float(25, "★ Gork：close − 15m MA60 上限（點，999=關）", step=5, group=gNew)
+gorkM15SlopeMax     = input.float(0, "★ Gork：15m MA60 − MA60[4] 上限（點，999=關）", step=1, group=gNew)
+gorkMa200SlopeBars  = input.int(0, "Gork：1m MA200 需低於幾根前（0=關）", minval=0, group=gNew)
 
 // ---------------------------------------------------------------------------
 // 均線與時段
@@ -73,12 +75,14 @@ etMins = hour(time, "America/New_York") * 60 + minute(time, "America/New_York")
 noEntryHour = (etMins >= 16 * 60 and etMins < 17 * 60) or (etMins >= 18 * 60 and etMins < 19 * 60)
 
 // 已收盤 15m（[1]），不偷看
-m15Close    = request.security(syminfo.tickerid, "15", close[1], barmerge.gaps_off, barmerge.lookahead_off)
-m15Ma10     = request.security(syminfo.tickerid, "15", ta.sma(close, 10)[1], barmerge.gaps_off, barmerge.lookahead_off)
-m15Ma10Prev = request.security(syminfo.tickerid, "15", ta.sma(close, 10)[6], barmerge.gaps_off, barmerge.lookahead_off)
-m15Ma60     = request.security(syminfo.tickerid, "15", ta.sma(close, 60)[1], barmerge.gaps_off, barmerge.lookahead_off)
-m15Slope    = m15Ma10 - m15Ma10Prev
-m15Dist     = m15Close - m15Ma60
+m15Close     = request.security(syminfo.tickerid, "15", close[1], barmerge.gaps_off, barmerge.lookahead_off)
+m15Ma10      = request.security(syminfo.tickerid, "15", ta.sma(close, 10)[1], barmerge.gaps_off, barmerge.lookahead_off)
+m15Ma10Prev  = request.security(syminfo.tickerid, "15", ta.sma(close, 10)[6], barmerge.gaps_off, barmerge.lookahead_off)
+m15Ma60      = request.security(syminfo.tickerid, "15", ta.sma(close, 60)[1], barmerge.gaps_off, barmerge.lookahead_off)
+m15Ma60Prev4 = request.security(syminfo.tickerid, "15", ta.sma(close, 60)[5], barmerge.gaps_off, barmerge.lookahead_off)
+m15Slope     = m15Ma10 - m15Ma10Prev
+m15Dist      = m15Close - m15Ma60
+m15Ma60Slope = m15Ma60 - m15Ma60Prev4
 
 flat = strategy.position_size == 0
 lastExitBar = strategy.closedtrades > 0 ? strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) : -100000
@@ -182,10 +186,12 @@ for k = 1 to 60
         runUnder := 0
 underOk = maxUnder >= gorkUnderNeed
 
-// ★ MA200 還在走平／上升，代表那 50 點只是一根針，不是洗盤；跳過
+// ★ 15m 破底翻均值回歸過濾：避免在 15m MA60 上方過遠追高，或 15m MA60 上彎時假跌破接刀
 ma200FallingOk = gorkMa200SlopeBars <= 0 or ma200 < ma200[gorkMa200SlopeBars]
+gorkM15DistOk  = gorkM15DistMax >= 999 or (close - m15Ma60) <= gorkM15DistMax
+gorkM15SlopeOk = gorkM15SlopeMax >= 999 or m15Ma60Slope <= gorkM15SlopeMax
 
-gorkEnter = canEnter and not linEnter and inWindow and aboveStreak and stackOk and close > ma60 and distOk and underOk and ma200FallingOk
+gorkEnter = canEnter and not linEnter and inWindow and aboveStreak and stackOk and close > ma60 and distOk and underOk and ma200FallingOk and gorkM15DistOk and gorkM15SlopeOk
 
 var float gorkEntry = na
 var float gorkStop  = na

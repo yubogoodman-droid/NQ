@@ -41,9 +41,15 @@ BASE: Dict = dict(
     # Gork
     gork_deep=50, gork_window=60, gork_streak=3, gork_max_dist=30, gork_under_need=15,
     gork_sl_below=10, gork_tp=100, gork_be_after=60,
-    gork_ma200_slope=0,
+    gork_ma200_slope=0, gork_m15_dist_max=999.0, gork_m15_slope_max=999.0,
 )
-OPTIMIZED: Dict = dict(BASE, lin_max_risk=55, gork_ma200_slope=30)
+OPTIMIZED: Dict = dict(
+    BASE,
+    lin_max_risk=65,
+    gork_deep=70,
+    gork_m15_dist_max=25.0,
+    gork_m15_slope_max=0.0,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +121,7 @@ def htf_15m(df: pd.DataFrame) -> pd.DataFrame:
     c = df.close.resample("15min", label="right", closed="left").last().dropna()
     out = pd.DataFrame({"c": c, "ma10": sma(c, 10), "ma60": sma(c, 60)})
     out["ma10_5"] = out.ma10.shift(5)
+    out["ma60_4"] = out.ma60.shift(4)
     out = out.reindex(out.index.union(df.index)).sort_index().ffill().reindex(df.index)
     return out
 
@@ -136,6 +143,8 @@ def run(df: pd.DataFrame, P: Dict):
     made4h = (h >= hi4) & (h > np.r_[np.nan, h[:-1]])
     m15_slope = (h15.ma10 - h15.ma10_5).values
     m15_dist = (h15.c - h15.ma60).values
+    m15_ma60 = h15.ma60.values
+    m15_ma60_s4 = (h15.ma60 - h15.ma60_4).values
 
     trades: List[Dict] = []
     blocks: List[Dict] = []
@@ -227,12 +236,20 @@ def run(df: pd.DataFrame, P: Dict):
                 run_u += 1; mxu = max(mxu, run_u)
             else:
                 run_u = 0
-        meta = dict(dist200=dist, m15dist60=m15_dist[i], maxunder=mxu, ma200slope=ma[200][i] - ma[200][i - 30])
+        meta = dict(
+            dist200=dist,
+            m15dist60=c[i] - m15_ma60[i],
+            m15ma60s4=m15_ma60_s4[i],
+            maxunder=mxu,
+            ma200slope=ma[200][i] - ma[200][i - 30],
+        )
         why = None
         if not can_enter: why = "cooldown/hours"
         elif dist > P["gork_max_dist"]: why = "far"
         elif mxu < P["gork_under_need"]: why = "under"
         elif P["gork_ma200_slope"] > 0 and ma[200][i] >= ma[200][i - P["gork_ma200_slope"]]: why = "ma200_not_falling"
+        elif P["gork_m15_dist_max"] < 999 and (c[i] - m15_ma60[i]) > P["gork_m15_dist_max"]: why = "15m_dist_high"
+        elif P["gork_m15_slope_max"] < 999 and m15_ma60_s4[i] > P["gork_m15_slope_max"]: why = "15m_ma60_rising"
         if why:
             blocks.append(dict(side="L", i=i, t=t[i], why=why, px=c[i], **meta))
         else:
@@ -284,6 +301,9 @@ def main() -> None:
     ap.add_argument("--baseline", action="store_true", help="關閉兩個新門檻")
     ap.add_argument("--compare", action="store_true", help="基準 vs 優化")
     ap.add_argument("--lin-max-risk", type=float, default=OPTIMIZED["lin_max_risk"])
+    ap.add_argument("--gork-deep", type=float, default=OPTIMIZED["gork_deep"])
+    ap.add_argument("--gork-m15-dist-max", type=float, default=OPTIMIZED["gork_m15_dist_max"])
+    ap.add_argument("--gork-m15-slope-max", type=float, default=OPTIMIZED["gork_m15_slope_max"])
     ap.add_argument("--gork-ma200-slope", type=int, default=OPTIMIZED["gork_ma200_slope"])
     args = ap.parse_args()
 
@@ -292,7 +312,14 @@ def main() -> None:
     print(f"bars={len(df)}  {df.index.min()} → {df.index.max()} ET", file=sys.stderr)
     pd.set_option("display.width", 220)
 
-    opt = dict(BASE, lin_max_risk=args.lin_max_risk, gork_ma200_slope=args.gork_ma200_slope)
+    opt = dict(
+        BASE,
+        lin_max_risk=args.lin_max_risk,
+        gork_deep=args.gork_deep,
+        gork_m15_dist_max=args.gork_m15_dist_max,
+        gork_m15_slope_max=args.gork_m15_slope_max,
+        gork_ma200_slope=args.gork_ma200_slope,
+    )
     if args.compare:
         tb, bb = run(df, BASE)
         to, bo = run(df, opt)
