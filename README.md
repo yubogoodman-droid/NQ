@@ -62,15 +62,16 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 ## 幣安 15 分 K 同時跌破 99/120/200 做空
 
-一根 15 分 K **從 MA99/120/200 之上一次打穿到三條之下**，且 **MA7 < MA14 < MA25 空頭排列**，進場做空。短均幾乎黏住時要放量，否則當成橫盤輕觸。進場前 8 根裡至少 4 根還收在長均之上，否則當成在帶裡穿梭或已經破了再追。再加 **1h／4h 確認**：上一根已收盤還在該週期 MA99 之上，這根 15m 第一次打穿；上根若仍明顯 7>14>25，當成漲勢回檔濾掉。報告每筆上圖 15m、中圖 1h、下圖 4h。
+一根 15 分 K **從 MA99/120/200 之上一次打穿到三條之下**，且 **MA7 < MA14 < MA25 空頭排列**，進場做空。破位 K 需為**放量實心大陰線**（量比 ≥ 3.2x、實體 ≥ 70%、下影線 ≤ 20%、單根風險 ≤ 6.6%），濾掉無量輕觸、探底留長下影線與一步到位的追空。進場前 8 根裡至少 4 根收在長均之上。再加 **1h／4h 確認**：上根已收盤 1h 還在 1h MA99 之上且本 15m 首次打穿 1h MA99；上根已收盤 4h 還在 4h MA25（100h，對齊 1h MA99）之上且本 15m 首次把 4h 短均（7/14/25）全打穿；上根若仍明顯 7>14>25，當成漲勢回檔濾掉。報告每筆上圖 15m、中圖 1h、下圖 4h。
 
-停損在破位 K 高點上方 0.1%；停利 2R；收復 MA99 或持倉 32 根（8 小時）平倉。預設掃流動 USDT 永續一週。
+停損在破位 K 高點上方 0.1%；停利 2R；收復 MA25/MA99 或持倉 32 根（8 小時）平倉。預設掃流動 USDT 永續一週。
 
 ```bash
 python3 examples/binance_15m_ma_break_short.py --pages
 python3 examples/binance_15m_ma_break_short.py --pages --days 3
 python3 examples/binance_15m_ma_break_short.py --pages --days 30
 python3 examples/binance_15m_ma_break_short.py --pages --days 60
+python3 examples/binance_15m_ma_break_short.py --pages --days 90
 python3 examples/binance_15m_ma_break_short.py --symbol MUBARAKUSDT
 ```
 
@@ -78,12 +79,13 @@ python3 examples/binance_15m_ma_break_short.py --symbol MUBARAKUSDT
 近一週（2026-08-28 → 09-04，265 檔，含 1h／4h）：**0 筆**。漏斗 15m 打穿 150 → 空頭排列 30 → 1h 首次打穿 6 → 4h 首次打穿 0。  
 近一個月（2026-08-31 → 09-30，287 檔，含 1h／4h）：**2 筆、勝率 0%、單筆加總 −2.17%**（TRUMP −0.49、LITE −1.68）。100 USDT × 3 倍、同時只能一單，約 **94 USDT**。  
 近兩個月（2026-06-30 → 08-29，241 檔，含 1h／4h）：**6 筆、勝率 50%、單筆加總 −3.0%**。100 USDT × 3 倍、同時只能一單，約 **89 USDT**。  
-截圖那檔 **MUBARAK 08-25 16:00** 過不了 4h MA99，不進場。
+近三個月（2026-08-06 → 11-04，253 檔，優化後含 1h／4h）：**34 筆、勝率 64.7%（22 勝 12 負）、單筆加總 +43.98%、平均 +1.29%**。100 USDT × 3 倍、同時只能一單（做 26 筆、略過 8 筆），滾到 **210.55 USDT（+110.55）**。截圖標的 **MUBARAK 08-25 16:00（+12.14%）** 保留。
 
 三日：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-3d/view.html  
 週報：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short/view.html  
 月報：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-30d/view.html  
-兩個月：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-60d/view.html
+兩個月：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-60d/view.html  
+三個月：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/view.html
 
 ## 幣安黏帶三幕 Telegram
 

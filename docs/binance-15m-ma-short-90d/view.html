@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>15m 同時跌破 99/120/200 做空</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}
+.page{max-width:560px;margin:0 auto;padding:14px 12px 32px}
+h1{font-size:18px;margin:0 0 6px}
+.muted{color:#8b949e;font-size:13px;line-height:1.55}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.equity{margin:10px 0 4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}
+.card-header{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}
+.trade-no{font-size:15px;font-weight:700}
+.trade-time{font-size:12px;color:#8b949e}
+.card-pnl{font-size:16px;font-weight:700;white-space:nowrap}
+.pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}
+.tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
+.tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
+.tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.tag-info{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}
+.trade-detail{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}
+.mini-chart{margin:0 -6px -4px;border-radius:10px;overflow:hidden}
+.empty{text-align:center;color:#8b949e;padding:40px 16px;background:#161b22;border-radius:14px;border:1px solid #30363d}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>15m 同時跌破 99/120/200 做空</h1>
+<p class="muted">90 日 · 2026-08-06 01:07 → 2026-11-04 01:07 台北 · 253 檔 15m · 進場＝15m 同時跌破 99/120/200 且 7&lt;14&lt;25、放量 ≥3.2x 實心大陰線（實體 ≥70%、下影 ≤20%、風險 ≤6.6%），再加 1h 首次打穿 MA99、4h 首次打穿短均（MA25=100h），且上根不是明顯 7&gt;14&gt;25</p>
+<div class="cards">
+<div class="card">筆數<b>34</b></div>
+<div class="card">勝率<b>64.7%</b></div>
+<div class="card">總報酬<b class="pnl-win">+43.98%</b></div>
+<div class="card">勝/負<b>22/12</b></div>
+</div>
+<p class="muted">停損＝破位 K 高點 +0.1%（單根風險 ≤6.6%）· 停利 2R · 收復 MA25/MA99 或持倉 32 根（8h）平倉。破位 K 需放量 ≥3.2x、實體 ≥70%、下影線 ≤20%，進場前多數收在長均之上。高週期確認：上根 1h 仍在 MA99 上且本 15m 首次打穿 1h MA99；上根 4h 仍在 MA25（100h）上且本 15m 首次把 4h 短均（7/14/25）全打穿，且 1h／4h 上根不是明顯 7&gt;14&gt;25。上圖 15m、中圖 1h、下圖 4h。報酬是單筆價格百分比，未計資金費。</p>
+<p class='muted'>漏斗：從三條之上一次打穿　1810 → 7&lt;14&lt;25＋放量實心K　120 → 1h 首次打穿 MA99　43 → 4h 首次打穿短均　34（淺破 4827 · 短均未排列 1196 · 量弱或留影線 412 · 沒騎在黏帶上 31 · 單根過大 51 · 1h 已破 MA99 太晚 32 · 15m 沒打到 1h MA99 36 · 1h 仍多頭張開 8 · 4h 已破 MA25 太晚 2 · 15m 沒打穿 4h 短均 1 · 4h 仍多頭張開 6）</p>
+<div class="equity"><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="164.0" x2="720" y2="164.0" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,164.0 21.2,161.9 42.4,151.1 63.5,148.8 84.7,151.7 105.9,154.4 127.1,142.8 148.2,131.6 169.4,123.9 190.6,113.8 211.8,97.8 232.9,84.0 254.1,79.8 275.3,39.0 296.5,31.4 317.6,25.2 338.8,26.7 360.0,29.5 381.2,31.1 402.4,29.4 423.5,35.2 444.7,41.5 465.9,30.3 487.1,38.0 508.2,44.2 529.4,42.8 550.6,47.3 571.8,40.1 592.9,44.1 614.1,44.5 635.3,35.5 656.5,32.0 677.6,23.6 698.8,17.7 720.0,16.0"/></svg></div>
+</section>
+<section class='summary'><h1>MUBARAKUSDT（截圖標的）</h1><p class='muted'>同一套規則，只看圖上那檔。</p><div class='cards'><div class='card'>筆數<b>1</b></div><div class='card'>勝率<b>100.0%</b></div><div class='card'>總報酬<b class='pnl-win'>+12.14%</b></div><div class='card'>勝/負<b>1/0</b></div></div><div class='equity'><svg viewBox="0 0 720 180" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="164.0" x2="720" y2="164.0" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,164.0 720.0,16.0"/></svg></div></section><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · MUBARAKUSDT</span><span class='trade-time'>2026-08-25 16:00 → 08-26 00:00 台北</span></div><div class='card-pnl pnl-win'>+12.14%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 8.2x</span></div><pre class='trade-detail'>entry 0.02257
+stop  0.024024  (風險 6.44%)
+target 0.019662  (2.0R)
+exit  0.01983  time_stop
+打穿長均 4.95%  cluster 0.023716–0.023747
+15m MA7 0.024006 < MA14 0.024065 < MA25 0.024098  張開 0.38%
+15m MA99 0.023727 / MA120 0.023716 / MA200 0.023747
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-25 16:00
+1h MA7 0.023821 / MA14 0.0238 / MA25 0.023624  短均未空頭
+1h MA99 0.023453 / MA120 0.022764 / MA200 0.020878
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-25 16:00
+4h MA7 0.023263 / MA14 0.023501 / MA25 0.023412  短均未空頭
+4h MA99 0.019545 / MA120 0.018514 / MA200 0.015767</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/m01_MUBARAKUSDT_0825_1600.png' alt='#1 MUBARAKUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · AAPLUSDT</span><span class='trade-time'>2026-08-10 18:30 → 08-11 02:30 台北</span></div><div class='card-pnl pnl-win'>+0.62%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 9.3x</span></div><pre class='trade-detail'>entry 309.08
+stop  314.24  (風險 1.67%)
+target 298.75  (2.0R)
+exit  307.17  time_stop
+打穿長均 1.26%  cluster 312.80–313.04
+15m MA7 313.30 < MA14 313.35 < MA25 313.43  張開 0.04%
+15m MA99 313.04 / MA120 313.02 / MA200 312.80
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-10 18:00
+1h MA7 313.08 / MA14 313.07 / MA25 312.96  短均未空頭
+1h MA99 312.82 / MA120 312.60 / MA200 310.99
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-10 16:00
+4h MA7 312.56 / MA14 312.57 / MA25 312.63  7<14<25
+4h MA99 319.57 / MA120 320.67 / MA200 321.26</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t01_AAPLUSDT_0810_1830.png' alt='#1 AAPLUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · ZHIPUUSDT</span><span class='trade-time'>2026-08-11 09:30 → 08-11 17:30 台北</span></div><div class='card-pnl pnl-win'>+3.21%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 15.1x</span></div><pre class='trade-detail'>entry 157.45
+stop  164.54  (風險 4.51%)
+target 143.26  (2.0R)
+exit  152.40  time_stop
+打穿長均 2.98%  cluster 161.06–162.28
+15m MA7 162.56 < MA14 162.66 < MA25 162.98  張開 0.26%
+15m MA99 161.06 / MA120 161.27 / MA200 162.28
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-11 09:00
+1h MA7 162.32 / MA14 162.29 / MA25 161.06  短均未空頭
+1h MA99 161.16 / MA120 156.93 / MA200 145.20
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-11 08:00
+4h MA7 160.56 / MA14 161.82 / MA25 161.65  短均未空頭
+4h MA99 139.73 / MA120 142.23</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t02_ZHIPUUSDT_0811_0930.png' alt='#2 ZHIPUUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · TSLAUSDT</span><span class='trade-time'>2026-08-12 21:30 → 08-13 03:00 台北</span></div><div class='card-pnl pnl-win'>+0.69%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 11.5x</span></div><pre class='trade-detail'>entry 329.83
+stop  336.21  (風險 1.93%)
+target 317.08  (2.0R)
+exit  327.54  reclaim_ma99
+打穿長均 1.06%  cluster 332.17–333.36
+15m MA7 333.98 < MA14 334.18 < MA25 334.23  張開 0.07%
+15m MA99 333.36 / MA120 333.14 / MA200 332.17
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-12 21:00
+1h MA7 333.43 / MA14 333.33 / MA25 333.24  短均未空頭
+1h MA99 331.72 / MA120 331.29 / MA200 328.08
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-12 20:00
+4h MA7 332.43 / MA14 331.99 / MA25 331.72  短均未空頭
+4h MA99 319.43 / MA120 318.75 / MA200 346.63</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t03_TSLAUSDT_0812_2130.png' alt='#3 TSLAUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · DELLUSDT</span><span class='trade-time'>2026-08-17 21:30 → 08-18 02:45 台北</span></div><div class='card-pnl pnl-loss'>-0.87%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 11.2x</span></div><pre class='trade-detail'>entry 479.58
+stop  499.50  (風險 4.15%)
+target 439.74  (2.0R)
+exit  483.74  reclaim_ma99
+打穿長均 3.23%  cluster 493.85–495.58
+15m MA7 494.23 < MA14 497.26 < MA25 499.77  張開 1.12%
+15m MA99 495.58 / MA120 494.73 / MA200 493.85
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-17 21:00
+1h MA7 497.38 / MA14 497.82 / MA25 495.08  短均未空頭
+1h MA99 493.96 / MA120 492.74 / MA200 477.37
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-17 20:00
+4h MA7 493.48 / MA14 492.85 / MA25 493.25  短均未空頭
+4h MA99 458.76 / MA120 447.14 / MA200 434.79</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t04_DELLUSDT_0817_2130.png' alt='#4 DELLUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · RSRUSDT</span><span class='trade-time'>2026-08-18 10:45 → 08-18 14:30 台北</span></div><div class='card-pnl pnl-loss'>-0.79%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 6.0x</span></div><pre class='trade-detail'>entry 0.001135
+stop  0.001155  (風險 1.78%)
+target 0.001095  (2.0R)
+exit  0.001144  reclaim_ma99
+打穿長均 1.19%  cluster 0.001144–0.001149
+15m MA7 0.001153 < MA14 0.001159 < MA25 0.001159  張開 0.49%
+15m MA99 0.001149 / MA120 0.001144 / MA200 0.001147
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-18 10:00
+1h MA7 0.001157 / MA14 0.001156 / MA25 0.001149  短均未空頭
+1h MA99 0.001148 / MA120 0.001152 / MA200 0.001183
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-18 08:00
+4h MA7 0.001147 / MA14 0.001147 / MA25 0.001148  7<14<25
+4h MA99 0.001213 / MA120 0.001217 / MA200 0.001225</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t05_RSRUSDT_0818_1045.png' alt='#5 RSRUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · NBISUSDT</span><span class='trade-time'>2026-08-24 08:00 → 08-24 11:00 台北</span></div><div class='card-pnl pnl-win'>+3.44%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 10.0x</span></div><pre class='trade-detail'>entry 219.73
+stop  223.51  (風險 1.72%)
+target 212.16  (2.0R)
+exit  212.16  take_profit
+打穿長均 1.28%  cluster 221.00–222.59
+15m MA7 222.98 < MA14 223.37 < MA25 223.56  張開 0.26%
+15m MA99 222.59 / MA120 222.08 / MA200 221.00
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-24 08:00
+1h MA7 223.03 / MA14 223.14 / MA25 222.57  短均未空頭
+1h MA99 222.35 / MA120 224.68 / MA200 243.32
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-24 08:00
+4h MA7 220.94 / MA14 220.23 / MA25 221.66  短均未空頭
+4h MA99 232.00 / MA120 228.45 / MA200 214.83</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t06_NBISUSDT_0824_0800.png' alt='#6 NBISUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · SAMSUNGUSDT</span><span class='trade-time'>2026-08-24 08:00 → 08-24 16:00 台北</span></div><div class='card-pnl pnl-win'>+3.33%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 9.3x</span></div><pre class='trade-detail'>entry 192.49
+stop  196.39  (風險 2.02%)
+target 184.70  (2.0R)
+exit  186.08  time_stop
+打穿長均 1.61%  cluster 194.69–195.63
+15m MA7 196.35 < MA14 196.94 < MA25 197.32  張開 0.49%
+15m MA99 195.63 / MA120 195.26 / MA200 194.69
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-24 08:00
+1h MA7 196.60 / MA14 196.31 / MA25 195.58  短均未空頭
+1h MA99 194.66 / MA120 192.57 / MA200 192.33
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-24 08:00
+4h MA7 194.48 / MA14 194.16 / MA25 194.58  短均未空頭
+4h MA99 184.78 / MA120 182.02 / MA200 176.09</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t07_SAMSUNGUSDT_0824_0800.png' alt='#7 SAMSUNGUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · GLWUSDT</span><span class='trade-time'>2026-08-24 08:15 → 08-24 11:30 台北</span></div><div class='card-pnl pnl-win'>+2.29%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 5.6x</span></div><pre class='trade-detail'>entry 148.78
+stop  150.48  (風險 1.14%)
+target 145.38  (2.0R)
+exit  145.38  take_profit
+打穿長均 0.82%  cluster 149.92–150.01
+15m MA7 150.48 < MA14 150.52 < MA25 150.56  張開 0.05%
+15m MA99 149.98 / MA120 149.92 / MA200 150.01
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-24 08:00
+1h MA7 150.56 / MA14 150.26 / MA25 149.99  短均未空頭
+1h MA99 151.23 / MA120 152.10 / MA200 158.21
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-24 08:00
+4h MA7 149.54 / MA14 149.75 / MA25 150.88  7<14<25
+4h MA99 161.23 / MA120 160.83 / MA200 153.67</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t08_GLWUSDT_0824_0815.png' alt='#8 GLWUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · LITEUSDT</span><span class='trade-time'>2026-08-24 08:15 → 08-24 14:00 台北</span></div><div class='card-pnl pnl-win'>+3.00%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 6.2x</span></div><pre class='trade-detail'>entry 854.10
+stop  866.93  (風險 1.50%)
+target 828.45  (2.0R)
+exit  828.45  take_profit
+打穿長均 0.93%  cluster 858.82–862.14
+15m MA7 865.31 < MA14 866.11 < MA25 867.42  張開 0.24%
+15m MA99 862.14 / MA120 860.91 / MA200 858.82
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-24 08:00
+1h MA7 867.39 / MA14 865.54 / MA25 862.27  短均未空頭
+1h MA99 862.17 / MA120 861.34 / MA200 889.38
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-24 08:00
+4h MA7 858.77 / MA14 857.35 / MA25 861.73  短均未空頭
+4h MA99 890.37 / MA120 883.32 / MA200 827.09</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t09_LITEUSDT_0824_0815.png' alt='#9 LITEUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · MUUUSDT</span><span class='trade-time'>2026-08-24 08:15 → 08-24 16:00 台北</span></div><div class='card-pnl pnl-win'>+4.76%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 4.7x</span></div><pre class='trade-detail'>entry 30.7500
+stop  31.4814  (風險 2.38%)
+target 29.2871  (2.0R)
+exit  29.2871  take_profit
+打穿長均 2.10%  cluster 31.2930–31.4104
+15m MA7 31.4014 < MA14 31.4136 < MA25 31.5488  張開 0.47%
+15m MA99 31.4104 / MA120 31.3533 / MA200 31.2930
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-24 08:00
+1h MA7 31.5514 / MA14 31.5307 / MA25 31.4244  短均未空頭
+1h MA99 31.3715 / MA120 31.1010 / MA200 31.8534
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-24 08:00
+4h MA7 31.2329 / MA14 31.2150 / MA25 31.3660  短均未空頭
+4h MA99 30.1681 / MA120 29.6292 / MA200 29.1343</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t10_MUUUSDT_0824_0815.png' alt='#10 MUUUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · SNXXUSDT</span><span class='trade-time'>2026-08-24 08:15 → 08-24 10:45 台北</span></div><div class='card-pnl pnl-win'>+4.10%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 4.1x</span></div><pre class='trade-detail'>entry 14.8700
+stop  15.1752  (風險 2.05%)
+target 14.2597  (2.0R)
+exit  14.2597  take_profit
+打穿長均 1.50%  cluster 15.0474–15.0968
+15m MA7 15.3271 < MA14 15.3386 < MA25 15.3648  張開 0.25%
+15m MA99 15.0968 / MA120 15.0749 / MA200 15.0474
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-24 08:00
+1h MA7 15.3500 / MA14 15.2329 / MA25 15.1032  短均未空頭
+1h MA99 15.0547 / MA120 15.0772 / MA200 15.8814
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-24 08:00
+4h MA7 14.9843 / MA14 14.9850 / MA25 15.0100  7<14<25
+4h MA99 13.6819 / MA120 13.2045 / MA200 12.8450</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t11_SNXXUSDT_0824_0815.png' alt='#11 SNXXUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · GIGADEVUSDT</span><span class='trade-time'>2026-08-24 09:30 → 08-24 17:00 台北</span></div><div class='card-pnl pnl-win'>+1.22%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 14.0x</span></div><pre class='trade-detail'>entry 61.2500
+stop  63.7237  (風險 4.04%)
+target 56.3027  (2.0R)
+exit  60.5000  reclaim_ma99
+打穿長均 3.14%  cluster 62.9077–63.2375
+15m MA7 63.4629 < MA14 63.7364 < MA25 63.8880  張開 0.67%
+15m MA99 63.2375 / MA120 63.1307 / MA200 62.9077
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-24 09:00
+1h MA7 63.5914 / MA14 63.5086 / MA25 63.1744  短均未空頭
+1h MA99 62.7924 / MA120 62.6143 / MA200 64.4174
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-24 08:00
+4h MA7 62.9514 / MA14 62.7850 / MA25 62.7416  短均未空頭
+4h MA99 65.0124 / MA120 64.5385</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t12_GIGADEVUSDT_0824_0930.png' alt='#12 GIGADEVUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · MUBARAKUSDT</span><span class='trade-time'>2026-08-25 16:00 → 08-26 00:00 台北</span></div><div class='card-pnl pnl-win'>+12.14%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 8.2x</span></div><pre class='trade-detail'>entry 0.02257
+stop  0.024024  (風險 6.44%)
+target 0.019662  (2.0R)
+exit  0.01983  time_stop
+打穿長均 4.95%  cluster 0.023716–0.023747
+15m MA7 0.024006 < MA14 0.024065 < MA25 0.024098  張開 0.38%
+15m MA99 0.023727 / MA120 0.023716 / MA200 0.023747
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-25 16:00
+1h MA7 0.023821 / MA14 0.0238 / MA25 0.023624  短均未空頭
+1h MA99 0.023453 / MA120 0.022764 / MA200 0.020878
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-25 16:00
+4h MA7 0.023263 / MA14 0.023501 / MA25 0.023412  短均未空頭
+4h MA99 0.019545 / MA120 0.018514 / MA200 0.015767</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t13_MUBARAKUSDT_0825_1600.png' alt='#13 MUBARAKUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · MUUSDT</span><span class='trade-time'>2026-08-27 21:30 → 08-28 03:30 台北</span></div><div class='card-pnl pnl-win'>+2.25%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 12.3x</span></div><pre class='trade-detail'>entry 940.18
+stop  970.48  (風險 3.22%)
+target 879.58  (2.0R)
+exit  919.02  reclaim_ma99
+打穿長均 2.16%  cluster 945.38–960.90
+15m MA7 969.67 < MA14 973.74 < MA25 975.62  張開 0.61%
+15m MA99 960.90 / MA120 955.12 / MA200 945.38
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 08-27 21:00
+1h MA7 969.31 / MA14 968.49 / MA25 960.39  短均未空頭
+1h MA99 940.75 / MA120 944.33 / MA200 950.26
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 08-27 20:00
+4h MA7 955.00 / MA14 943.03 / MA25 939.53  短均未空頭
+4h MA99 950.81 / MA120 938.15 / MA200 907.72</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t14_MUUSDT_0827_2130.png' alt='#14 MUUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · GRAMUSDT</span><span class='trade-time'>2026-09-01 16:45 → 09-02 00:45 台北</span></div><div class='card-pnl pnl-win'>+1.84%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 6.3x</span></div><pre class='trade-detail'>entry 1.3560
+stop  1.3804  (風險 1.80%)
+target 1.3072  (2.0R)
+exit  1.3310  time_stop
+打穿長均 1.25%  cluster 1.3655–1.3732
+15m MA7 1.3800 < MA14 1.3836 < MA25 1.3880  張開 0.58%
+15m MA99 1.3732 / MA120 1.3686 / MA200 1.3655
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 09-01 16:00
+1h MA7 1.3846 / MA14 1.3879 / MA25 1.3725  短均未空頭
+1h MA99 1.3666 / MA120 1.3753 / MA200 1.4030
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 09-01 16:00
+4h MA7 1.3677 / MA14 1.3624 / MA25 1.3637  短均未空頭
+4h MA99 1.3955 / MA120 1.3851 / MA200 1.3812</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t15_GRAMUSDT_0901_1645.png' alt='#15 GRAMUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · XMRUSDT</span><span class='trade-time'>2026-09-04 09:45 → 09-04 14:15 台北</span></div><div class='card-pnl pnl-loss'>-0.43%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 4.5x</span></div><pre class='trade-detail'>entry 508.93
+stop  519.55  (風險 2.09%)
+target 487.69  (2.0R)
+exit  511.11  reclaim_ma99
+打穿長均 1.59%  cluster 514.70–517.14
+15m MA7 517.49 < MA14 519.42 < MA25 521.48  張開 0.77%
+15m MA99 517.14 / MA120 514.70 / MA200 515.55
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 09-04 09:00
+1h MA7 520.79 / MA14 520.34 / MA25 516.86  短均未空頭
+1h MA99 515.05 / MA120 510.47 / MA200 490.81
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 09-04 08:00
+4h MA7 516.75 / MA14 513.95 / MA25 516.38  短均未空頭
+4h MA99 459.76 / MA120 451.54 / MA200 422.58</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t16_XMRUSDT_0904_0945.png' alt='#16 XMRUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · XAGUSDT</span><span class='trade-time'>2026-09-04 20:30 → 09-05 02:15 台北</span></div><div class='card-pnl pnl-loss'>-0.84%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 13.5x</span></div><pre class='trade-detail'>entry 65.4800
+stop  67.2872  (風險 2.76%)
+target 61.8656  (2.0R)
+exit  66.0300  reclaim_ma99
+打穿長均 2.09%  cluster 66.1628–66.8769
+15m MA7 66.7429 < MA14 66.7957 < MA25 66.8600  張開 0.18%
+15m MA99 66.8769 / MA120 66.7007 / MA200 66.1628
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 09-04 20:00
+1h MA7 66.7086 / MA14 66.8007 / MA25 66.8744  7<14<25
+1h MA99 65.7772 / MA120 65.9488 / MA200 66.6977
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 09-04 20:00
+4h MA7 66.8843 / MA14 66.1907 / MA25 65.8356  短均未空頭
+4h MA99 67.5411 / MA120 67.1032 / MA200 65.4787</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t17_XAGUSDT_0904_2030.png' alt='#17 XAGUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · ZKUSDT</span><span class='trade-time'>2026-09-14 06:00 → 09-14 09:45 台北</span></div><div class='card-pnl pnl-loss'>-0.49%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 4.2x</span></div><pre class='trade-detail'>entry 0.009483
+stop  0.009653  (風險 1.79%)
+target 0.009144  (2.0R)
+exit  0.009529  reclaim_ma99
+打穿長均 1.40%  cluster 0.009601–0.009617
+15m MA7 0.00963 < MA14 0.009647 < MA25 0.009679  張開 0.51%
+15m MA99 0.009612 / MA120 0.009617 / MA200 0.009601
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 09-14 06:00
+1h MA7 0.009646 / MA14 0.009593 / MA25 0.009605  短均未空頭
+1h MA99 0.0096 / MA120 0.009749 / MA200 0.010086
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 09-14 04:00
+4h MA7 0.009582 / MA14 0.009578 / MA25 0.009569  短均未空頭
+4h MA99 0.009546 / MA120 0.009396 / MA200 0.008855</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t18_ZKUSDT_0914_0600.png' alt='#18 ZKUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · XPTUSDT</span><span class='trade-time'>2026-09-17 02:00 → 09-17 07:15 台北</span></div><div class='card-pnl pnl-win'>+0.52%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 7.4x</span></div><pre class='trade-detail'>entry 1773.67
+stop  1798.94  (風險 1.42%)
+target 1723.14  (2.0R)
+exit  1764.50  reclaim_ma99
+打穿長均 0.83%  cluster 1779.01–1788.55
+15m MA7 1785.80 < MA14 1789.75 < MA25 1791.22  張開 0.30%
+15m MA99 1788.55 / MA120 1785.88 / MA200 1779.01
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 09-17 02:00
+1h MA7 1788.03 / MA14 1789.09 / MA25 1787.64  短均未空頭
+1h MA99 1784.20 / MA120 1786.79 / MA200 1807.47
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 09-17 00:00
+4h MA7 1783.92 / MA14 1775.76 / MA25 1782.17  短均未空頭
+4h MA99 1804.66 / MA120 1811.05 / MA200 1814.73</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t19_XPTUSDT_0917_0200.png' alt='#19 XPTUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · PLTRUSDT</span><span class='trade-time'>2026-09-18 21:30 → 09-18 23:15 台北</span></div><div class='card-pnl pnl-loss'>-1.73%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 10.1x</span></div><pre class='trade-detail'>entry 172.95
+stop  178.12  (風險 2.99%)
+target 162.61  (2.0R)
+exit  175.95  reclaim_ma99
+打穿長均 1.72%  cluster 175.13–175.98
+15m MA7 175.93 < MA14 176.05 < MA25 176.07  張開 0.08%
+15m MA99 175.98 / MA120 175.91 / MA200 175.13
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 09-18 21:00
+1h MA7 175.92 / MA14 175.96 / MA25 175.95  短均未空頭
+1h MA99 173.70 / MA120 172.37 / MA200 170.36
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 09-18 20:00
+4h MA7 176.27 / MA14 175.36 / MA25 174.02  短均未空頭
+4h MA99 172.53 / MA120 174.65 / MA200 175.72</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t20_PLTRUSDT_0918_2130.png' alt='#20 PLTRUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · ASTERUSDT</span><span class='trade-time'>2026-09-21 23:15 → 09-21 23:30 台北</span></div><div class='card-pnl pnl-loss'>-1.88%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 4.6x</span></div><pre class='trade-detail'>entry 0.736
+stop  0.761761  (風險 3.50%)
+target 0.684478  (2.0R)
+exit  0.7498  reclaim_ma99
+打穿長均 1.48%  cluster 0.742122–0.747065
+15m MA7 0.753757 < MA14 0.7563 < MA25 0.758128  張開 0.58%
+15m MA99 0.744304 / MA120 0.742122 / MA200 0.747065
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 09-21 23:00
+1h MA7 0.756986 / MA14 0.748957 / MA25 0.7447  短均未空頭
+1h MA99 0.750709 / MA120 0.744232 / MA200 0.722513
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 09-21 20:00
+4h MA7 0.7426 / MA14 0.748164 / MA25 0.75058  7<14<25
+4h MA99 0.730618 / MA120 0.72918 / MA200 0.712318</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t21_ASTERUSDT_0921_2315.png' alt='#21 ASTERUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · MRNAUSDT</span><span class='trade-time'>2026-09-30 17:00 → 10-01 00:45 台北</span></div><div class='card-pnl pnl-win'>+3.34%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 9.4x</span></div><pre class='trade-detail'>entry 196.27
+stop  203.79  (風險 3.83%)
+target 181.22  (2.0R)
+exit  189.72  reclaim_ma99
+打穿長均 2.46%  cluster 198.47–201.22
+15m MA7 203.82 < MA14 204.70 < MA25 204.76  張開 0.46%
+15m MA99 201.22 / MA120 200.32 / MA200 198.47
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 09-30 17:00
+1h MA7 203.46 / MA14 203.28 / MA25 201.24  短均未空頭
+1h MA99 198.69 / MA120 198.47 / MA200 192.52
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 09-30 16:00
+4h MA7 200.30 / MA14 198.21 / MA25 198.59  短均未空頭
+4h MA99 173.09 / MA120 167.71 / MA200 157.74</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t22_MRNAUSDT_0930_1700.png' alt='#22 MRNAUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · ALABUSDT</span><span class='trade-time'>2026-10-01 21:30 → 10-01 21:45 台北</span></div><div class='card-pnl pnl-loss'>-2.30%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 5.4x</span></div><pre class='trade-detail'>entry 353.35
+stop  361.46  (風險 2.30%)
+target 337.13  (2.0R)
+exit  361.46  stop_loss
+打穿長均 1.32%  cluster 357.74–358.09
+15m MA7 359.46 < MA14 360.48 < MA25 361.58  張開 0.59%
+15m MA99 358.09 / MA120 357.74 / MA200 358.03
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-01 21:00
+1h MA7 362.14 / MA14 362.42 / MA25 358.38  短均未空頭
+1h MA99 357.33 / MA120 359.13 / MA200 360.06
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-01 20:00
+4h MA7 358.57 / MA14 358.23 / MA25 357.04  短均未空頭
+4h MA99 330.46 / MA120 321.71 / MA200 310.61</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t23_ALABUSDT_1001_2130.png' alt='#23 ALABUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#24 · SPXUSDT</span><span class='trade-time'>2026-10-04 10:45 → 10-04 14:45 台北</span></div><div class='card-pnl pnl-loss'>-1.85%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 12.4x</span></div><pre class='trade-detail'>entry 0.4324
+stop  0.444044  (風險 2.69%)
+target 0.409113  (2.0R)
+exit  0.4404  reclaim_ma99
+打穿長均 1.27%  cluster 0.435055–0.437977
+15m MA7 0.440957 < MA14 0.442814 < MA25 0.4441  張開 0.71%
+15m MA99 0.437436 / MA120 0.435055 / MA200 0.437977
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-04 10:00
+1h MA7 0.442843 / MA14 0.441779 / MA25 0.437192  短均未空頭
+1h MA99 0.437387 / MA120 0.433219 / MA200 0.437008
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-04 08:00
+4h MA7 0.436743 / MA14 0.437607 / MA25 0.436892  短均未空頭
+4h MA99 0.457361 / MA120 0.460757 / MA200 0.492527</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t24_SPXUSDT_1004_1045.png' alt='#24 SPXUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#25 · IRENUSDT</span><span class='trade-time'>2026-10-05 21:30 → 10-06 03:00 台北</span></div><div class='card-pnl pnl-win'>+0.44%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 9.3x</span></div><pre class='trade-detail'>entry 40.7600
+stop  42.2722  (風險 3.71%)
+target 37.7355  (2.0R)
+exit  40.5800  reclaim_ma99
+打穿長均 2.84%  cluster 41.7144–41.9529
+15m MA7 41.8471 < MA14 41.9086 < MA25 41.9404  張開 0.22%
+15m MA99 41.9529 / MA120 41.9063 / MA200 41.7144
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-05 21:00
+1h MA7 41.7414 / MA14 41.9721 / MA25 41.8944  短均未空頭
+1h MA99 41.4776 / MA120 41.4676 / MA200 41.9695
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-05 20:00
+4h MA7 41.7129 / MA14 41.6014 / MA25 41.4356  短均未空頭
+4h MA99 44.1012 / MA120 44.0515 / MA200 43.7659</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t25_IRENUSDT_1005_2130.png' alt='#25 IRENUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#26 · MSTRUSDT</span><span class='trade-time'>2026-10-05 21:30 → 10-05 21:45 台北</span></div><div class='card-pnl pnl-loss'>-1.36%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 10.2x</span></div><pre class='trade-detail'>entry 162.08
+stop  165.50  (風險 2.11%)
+target 155.25  (2.0R)
+exit  164.28  reclaim_ma99
+打穿長均 1.16%  cluster 163.65–163.98
+15m MA7 163.84 < MA14 164.16 < MA25 164.39  張開 0.33%
+15m MA99 163.97 / MA120 163.98 / MA200 163.65
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-05 21:00
+1h MA7 164.53 / MA14 164.45 / MA25 164.00  短均未空頭
+1h MA99 162.39 / MA120 160.97 / MA200 159.69
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-05 20:00
+4h MA7 163.79 / MA14 163.50 / MA25 162.58  短均未空頭
+4h MA99 160.45 / MA120 155.95 / MA200 147.76</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t26_MSTRUSDT_1005_2130.png' alt='#26 MSTRUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#27 · KORUUSDT</span><span class='trade-time'>2026-10-06 08:00 → 10-06 15:30 台北</span></div><div class='card-pnl pnl-win'>+2.15%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 7.4x</span></div><pre class='trade-detail'>entry 22.3300
+stop  22.8728  (風險 2.43%)
+target 21.2443  (2.0R)
+exit  21.8500  reclaim_ma99
+打穿長均 2.04%  cluster 22.7086–22.7959
+15m MA7 22.8729 < MA14 22.8779 < MA25 22.8824  張開 0.04%
+15m MA99 22.7959 / MA120 22.7690 / MA200 22.7086
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-06 08:00
+1h MA7 22.7957 / MA14 22.8221 / MA25 22.7684  短均未空頭
+1h MA99 22.5227 / MA120 22.1883 / MA200 21.6161
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-06 08:00
+4h MA7 22.6257 / MA14 22.6300 / MA25 22.5420  短均未空頭
+4h MA99 21.4994 / MA120 21.1757 / MA200 21.6203</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t27_KORUUSDT_1006_0800.png' alt='#27 KORUUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#28 · ZECUSDT</span><span class='trade-time'>2026-10-06 14:00 → 10-06 15:45 台北</span></div><div class='card-pnl pnl-loss'>-1.18%</div></header><div class='tags'><span class='tag tag-sl'>stop_loss</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 3.8x</span></div><pre class='trade-detail'>entry 1319.28
+stop  1334.85  (風險 1.18%)
+target 1288.13  (2.0R)
+exit  1334.85  stop_loss
+打穿長均 0.93%  cluster 1330.25–1331.69
+15m MA7 1335.26 < MA14 1337.50 < MA25 1341.41  張開 0.46%
+15m MA99 1330.25 / MA120 1331.40 / MA200 1331.69
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-06 14:00
+1h MA7 1339.71 / MA14 1338.32 / MA25 1330.33  短均未空頭
+1h MA99 1330.14 / MA120 1335.80 / MA200 1383.98
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-06 12:00
+4h MA7 1328.68 / MA14 1329.40 / MA25 1328.02  短均未空頭
+4h MA99 1459.07 / MA120 1455.94 / MA200 1318.84</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t28_ZECUSDT_1006_1400.png' alt='#28 ZECUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#29 · HK1810USDT</span><span class='trade-time'>2026-10-07 09:30 → 10-07 15:15 台北</span></div><div class='card-pnl pnl-loss'>-0.13%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 12.4x</span></div><pre class='trade-detail'>entry 23.9500
+stop  24.3143  (風險 1.52%)
+target 23.2214  (2.0R)
+exit  23.9800  reclaim_ma99
+打穿長均 1.20%  cluster 24.1143–24.2402
+15m MA7 24.2514 < MA14 24.2657 < MA25 24.2820  張開 0.13%
+15m MA99 24.2402 / MA120 24.2155 / MA200 24.1143
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-07 09:00
+1h MA7 24.2343 / MA14 24.2379 / MA25 24.2272  短均未空頭
+1h MA99 24.1864 / MA120 24.1881 / MA200 24.6189
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-07 08:00
+4h MA7 24.2043 / MA14 24.1036 / MA25 24.1808  短均未空頭
+4h MA99 25.5095 / MA120 25.6513 / MA200 26.1955</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t29_HK1810USDT_1007_0930.png' alt='#29 HK1810USDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#30 · CXMTUSDT</span><span class='trade-time'>2026-10-12 08:45 → 10-12 09:45 台北</span></div><div class='card-pnl pnl-win'>+2.66%</div></header><div class='tags'><span class='tag tag-tp'>take_profit</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 8.4x</span></div><pre class='trade-detail'>entry 7.5620
+stop  7.6627  (風險 1.33%)
+target 7.3607  (2.0R)
+exit  7.3607  take_profit
+打穿長均 1.01%  cluster 7.6233–7.6392
+15m MA7 7.6511 < MA14 7.6544 < MA25 7.6598  張開 0.11%
+15m MA99 7.6392 / MA120 7.6382 / MA200 7.6233
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-12 08:00
+1h MA7 7.6513 / MA14 7.6458 / MA25 7.6362  短均未空頭
+1h MA99 7.5899 / MA120 7.7077 / MA200 7.9788
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-12 08:00
+4h MA7 7.6051 / MA14 7.6058 / MA25 7.5540  短均未空頭
+4h MA99 8.2022 / MA120 8.2730 / MA200 8.2792</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t30_CXMTUSDT_1012_0845.png' alt='#30 CXMTUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#31 · QCOMUSDT</span><span class='trade-time'>2026-10-14 20:30 → 10-15 03:15 台北</span></div><div class='card-pnl pnl-win'>+1.04%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 6.1x</span></div><pre class='trade-detail'>entry 174.82
+stop  177.26  (風險 1.39%)
+target 169.95  (2.0R)
+exit  173.00  reclaim_ma99
+打穿長均 1.18%  cluster 175.18–176.91
+15m MA7 176.29 < MA14 176.50 < MA25 176.61  張開 0.18%
+15m MA99 176.91 / MA120 176.15 / MA200 175.18
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-14 20:00
+1h MA7 176.30 / MA14 176.85 / MA25 176.87  7<14<25
+1h MA99 175.83 / MA120 175.75 / MA200 176.78
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-14 20:00
+4h MA7 176.38 / MA14 174.98 / MA25 175.67  短均未空頭
+4h MA99 181.33 / MA120 184.80 / MA200 184.99</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t31_QCOMUSDT_1014_2030.png' alt='#31 QCOMUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#32 · USARUSDT</span><span class='trade-time'>2026-10-19 21:30 → 10-20 05:30 台北</span></div><div class='card-pnl pnl-win'>+2.50%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 13.6x</span></div><pre class='trade-detail'>entry 10.4200
+stop  10.8308  (風險 3.94%)
+target 9.5984  (2.0R)
+exit  10.1600  time_stop
+打穿長均 2.47%  cluster 10.6123–10.6841
+15m MA7 10.7814 < MA14 10.7986 < MA25 10.8100  張開 0.27%
+15m MA99 10.6841 / MA120 10.6629 / MA200 10.6123
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-19 21:00
+1h MA7 10.7557 / MA14 10.7821 / MA25 10.6700  短均未空頭
+1h MA99 10.7218 / MA120 10.6448 / MA200 11.1855
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-19 20:00
+4h MA7 10.6371 / MA14 10.6043 / MA25 10.7288  短均未空頭
+4h MA99 12.2107 / MA120 12.5252 / MA200 13.7617</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t32_USARUSDT_1019_2130.png' alt='#32 USARUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#33 · HK1810USDT</span><span class='trade-time'>2026-10-27 09:30 → 10-27 17:30 台北</span></div><div class='card-pnl pnl-win'>+1.76%</div></header><div class='tags'><span class='tag tag-time'>time_stop</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 10.7x</span></div><pre class='trade-detail'>entry 26.1600
+stop  27.0871  (風險 3.54%)
+target 24.3059  (2.0R)
+exit  25.7000  time_stop
+打穿長均 2.30%  cluster 26.7123–26.7758
+15m MA7 26.7757 < MA14 26.7836 < MA25 26.7852  張開 0.04%
+15m MA99 26.7758 / MA120 26.7525 / MA200 26.7123
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-27 09:00
+1h MA7 26.7214 / MA14 26.7414 / MA25 26.7612  7<14<25
+1h MA99 26.7011 / MA120 26.5326 / MA200 26.6780
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-27 08:00
+4h MA7 26.6643 / MA14 26.6600 / MA25 26.6924  短均未空頭
+4h MA99 26.3500 / MA120 26.0526 / MA200 25.6882</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t33_HK1810USDT_1027_0930.png' alt='#33 HK1810USDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#34 · ASTERUSDT</span><span class='trade-time'>2026-10-30 04:30 → 10-30 10:30 台北</span></div><div class='card-pnl pnl-win'>+0.51%</div></header><div class='tags'><span class='tag tag-time'>reclaim_ma99</span><span class='tag tag-info'>15m 做空</span><span class='tag tag-info'>1h 對照</span><span class='tag tag-info'>4h 對照</span><span class='tag tag-info'>量比 6.3x</span></div><pre class='trade-detail'>entry 0.69
+stop  0.711311  (風險 3.09%)
+target 0.647379  (2.0R)
+exit  0.6865  reclaim_ma99
+打穿長均 2.44%  cluster 0.705139–0.707264
+15m MA7 0.708986 < MA14 0.710521 < MA25 0.714184  張開 0.73%
+15m MA99 0.705355 / MA120 0.705139 / MA200 0.707264
+1h 確認：上根小時收盤仍在 MA99 上，本 15m 第一次打穿 1h MA99
+1h 10-30 04:00
+1h MA7 0.7108 / MA14 0.706621 / MA25 0.704712  短均未空頭
+1h MA99 0.70724 / MA120 0.707067 / MA200 0.705739
+4h 確認：上根 4h 收盤仍在 MA25 上，本 15m 第一次打穿 4h 短均（7/14/25）
+4h 10-30 04:00
+4h MA7 0.704314 / MA14 0.707036 / MA25 0.707564  7<14<25
+4h MA99 0.704942 / MA120 0.70532 / MA200 0.712355</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/15m-ma-break-short-9d44/docs/binance-15m-ma-short-90d/img/t34_ASTERUSDT_1030_0430.png' alt='#34 ASTERUSDT 15m+1h+4h' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div>
+</body></html>
