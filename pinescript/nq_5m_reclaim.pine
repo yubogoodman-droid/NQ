@@ -6,11 +6,13 @@ reclaimBars  = input.int(12, "站回時限（根）= 1 小時", minval=1)
 minDepth     = input.float(12.0, "最少破底點數")
 stopBuf      = input.float(8.0, "停損緩衝")
 targetR      = input.float(2.0, "目標 R")
-maxRisk      = input.float(150.0, "單筆最大風險")
+maxRisk      = input.float(90.0, "單筆最大風險")
+minRibbon    = input.float(12.0, "MA5−MA20 最小帶寬")
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
 ma20 = ta.sma(close, 20)
+ma30 = ta.sma(close, 30)
 twoHrLow = ta.lowest(low, twoHourBars)[1]
 broke = not na(twoHrLow) and low < twoHrLow
 depth = broke ? twoHrLow - low : na
@@ -31,8 +33,8 @@ late = armed and not na(barsSince) and barsSince >= reclaimBars
 if late
     armed := false
 
-stood = close > ma5 and close > ma10 and close > ma20
-stacked = ma5 > ma10 and ma10 > ma20
+stood = close > ma5 and close > ma10 and close > ma20 and close > ma30
+stacked = ma5 > ma10 and ma10 > ma20 and (ma5 - ma20) >= minRibbon
 longSignal = armed and stood and stacked and not na(breakLow)
 if longSignal
     risk = close - (breakLow - stopBuf)

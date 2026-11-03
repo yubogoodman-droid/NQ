@@ -16,19 +16,18 @@ from nq_5m_reclaim import detect_signals  # noqa: E402
 
 
 def _bars(*, lift_delay: int = 1, n: int = 90) -> pd.DataFrame:
-    """Flat 2h, one deep spike through the floor, then a fast lift that fans 5/10/20."""
+    """Slide down, undercut the 2h floor, then lift so 5/10/20 fan with risk <= 90."""
     close = np.full(n, 20000.0)
-    for i in range(1, 50):
-        close[i] = 20000.0 + (0.3 if i % 2 == 0 else -0.2)
-    close[50] = 19955.0
+    close[:50] = np.linspace(20025.0, 19980.0, 50)
+    close[50] = 19964.0
     for k, i in enumerate(range(51, n)):
         if k < lift_delay:
-            close[i] = 19960.0
+            close[i] = 19966.0
         else:
-            close[i] = 20020.0 + 12.0 * (k - lift_delay)
-    high = close + 3.0
-    low = close - 3.0
-    low[50] = 19948.0
+            close[i] = 19995.0 + 7.5 * (k - lift_delay)
+    high = close + 2.0
+    low = close - 2.0
+    low[50] = 19962.0
     open_ = np.r_[close[0], close[:-1]]
     idx = pd.date_range("2026-09-01 09:00", periods=n, freq="5min", tz=ET)
     return pd.DataFrame(
@@ -42,9 +41,17 @@ def test_reclaim_stack_within_30m() -> None:
     sigs = detect_signals(df)
     assert sigs, "should take a 5/10/20 stack reclaim inside 1 hour"
     assert sigs[0].entry_idx - sigs[0].dump_idx <= 12
-    assert sigs[0].entry_price > sigs[0].ma5
+    assert sigs[0].entry_price > sigs[0].ma30
     assert sigs[0].ma5 > sigs[0].ma10 > sigs[0].ma20
+    assert sigs[0].ribbon >= 12.0
+    assert sigs[0].entry_price - sigs[0].stop_price <= 90.0
     assert simulate(df, sigs)
+
+
+def test_wide_risk_or_knot_rejected() -> None:
+    df = _bars(lift_delay=1)
+    assert not detect_signals(df, max_risk=30.0), "wide stop should be skipped"
+    assert not detect_signals(df, min_ribbon=80.0), "tight ribbon should be skipped"
 
 
 def test_late_reclaim_rejected() -> None:
@@ -92,6 +99,7 @@ def test_no_break_no_trade() -> None:
 
 def main() -> int:
     test_reclaim_stack_within_30m()
+    test_wide_risk_or_knot_rejected()
     test_late_reclaim_rejected()
     test_close_above_mas_without_stack_rejected()
     test_no_break_no_trade()

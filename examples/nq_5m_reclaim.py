@@ -35,9 +35,17 @@ from nq_5m_base_stack import (  # noqa: E402
 )
 
 PAGES_HTML = REPO_ROOT / "docs" / "nq-5m-reclaim" / "index.html"
+LOOSE_DETECT = dict(
+    max_risk=150.0,
+    min_ribbon=0.0,
+    require_above_ma30=False,
+)
 BLURB = (
-    "五分 K 跌破近 2 小時低點後，1 小時內（12 根）收盤站回且 MA5>MA10>MA20 多排才做多。"
-    "停損在破底低下方，目標 2R。"
+    "五分 K 跌破近 2 小時低點後，1 小時內（12 根）收盤站回 MA5/10/20/30 且 5/10/20 多排、"
+    "帶寬 MA5−MA20 ≥ 12、單筆風險 ≤ 90 才做多。停損破底低下方，目標 2R。"
+)
+LOOSE_BLURB = (
+    "未優化原版：1 小時內站上 5/10/20 且多排就進（風險放寬到 150、不看 MA30 與帶寬）。"
 )
 
 
@@ -76,12 +84,14 @@ def detect_signals(
     min_break_depth: float = 12.0,
     stop_buffer: float = 8.0,
     target_r: float = 2.0,
-    max_risk: float = 150.0,
+    max_risk: float = 90.0,
+    min_ribbon: float = 12.0,
     min_entry_gap: int = 6,
     require_stack: bool = True,
+    require_above_ma30: bool = True,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
-    """破近 2 小時低點後，reclaim_window 根內收盤站上 MA5/10/20 且多排。"""
+    """破近 2 小時低點後，reclaim_window 根內收盤站上 MA5/10/20(/30)、5/10/20 多排且帶寬夠。"""
     close = df["Close"].to_numpy(float)
     low = df["Low"].to_numpy(float)
     ma5 = sma(close, 5)
@@ -146,6 +156,15 @@ def detect_signals(
             continue
         if require_stack and not stacked:
             bump("skip_no_stack")
+            i += 1
+            continue
+        if require_above_ma30 and not np.isnan(ma30[i]) and float(close[i]) <= float(ma30[i]):
+            bump("skip_below_ma30")
+            i += 1
+            continue
+        ribbon = float(ma5[i] - ma20[i])
+        if min_ribbon > 0 and ribbon < min_ribbon:
+            bump("skip_knot")
             i += 1
             continue
         bump("reclaim")
@@ -237,8 +256,8 @@ def _render_trade_cards(df, trades, html_path: Path, prefix: str = "t") -> str:
             f"target {t.target_price:.2f}  ({r_mult:.1f}R)\n"
             f"exit  {t.exit_price:.2f}  {t.exit_reason}\n"
             f"破底 {t.signal.base_low:.2f} ← 兩小時低 {t.signal.two_hr_low:.2f}  (−{t.signal.drop_pts:.1f})\n"
-            f"{wait} 根後站回且 5/10/20 多排\n"
-            f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f}"
+            f"{wait} 根後站回且 5/10/20 多排 · 帶寬 {t.signal.ribbon:.1f}\n"
+            f"MA5 {t.signal.ma5:.1f} > MA10 {t.signal.ma10:.1f} > MA20 {t.signal.ma20:.1f} · 距 MA30 {t.entry_price - t.signal.ma30:+.1f}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{escape(img_name)}' alt='#{i}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -261,6 +280,10 @@ def write_html_report(
     stats = summarize_trades(trades)
     pnls = [t.pnl_points for t in trades]
     out = Path(path)
+    img_dir = out.parent / "img"
+    if img_dir.exists():
+        for old in img_dir.glob("*.png"):
+            old.unlink()
     cards = _render_trade_cards(df, trades, out)
     funnel_line = ""
     if funnel:
@@ -270,7 +293,8 @@ def write_html_report(
             f"站回 {funnel.get('reclaim', 0)} → "
             f"進場 {funnel.get('taken', 0)}"
             f"（太淺 {funnel.get('skip_shallow', 0)} · 1小時內沒站回 {funnel.get('skip_no_reclaim', 0)} · "
-            f"風險 {funnel.get('skip_max_risk', 0)}）</p>"
+            f"沒過MA30 {funnel.get('skip_below_ma30', 0)} · 黏帶 {funnel.get('skip_knot', 0)} · "
+            f"風險>90 {funnel.get('skip_max_risk', 0)}）</p>"
         )
     start = df.index[0].strftime("%Y-%m-%d %H:%M")
     end = df.index[-1].strftime("%Y-%m-%d %H:%M")
@@ -358,8 +382,10 @@ def cmd_backtest(args) -> int:
         print("no data", file=sys.stderr)
         return 1
     print(f"bars={len(df)} {df.index[0]} → {df.index[-1]}", file=sys.stderr)
+    loose = bool(getattr(args, "loose", False))
+    kw = dict(LOOSE_DETECT) if loose else {}
     funnel: Dict[str, int] = {}
-    sigs = detect_signals(df, funnel=funnel, require_stack=not bool(getattr(args, "no_stack", False)))
+    sigs = detect_signals(df, funnel=funnel, require_stack=not bool(getattr(args, "no_stack", False)), **kw)
     trades = simulate(df, sigs)
     stats = summarize_trades(trades)
     print(
@@ -375,15 +401,26 @@ def cmd_backtest(args) -> int:
     if getattr(args, "pages", False):
         html_path = html_path or str(PAGES_HTML)
     if html_path:
-        out = write_html_report(html_path, df, trades, args.symbol, args.period, funnel=funnel, verdict=verdict)
+        out = write_html_report(
+            html_path,
+            df,
+            trades,
+            args.symbol,
+            args.period,
+            funnel=funnel,
+            verdict=verdict,
+            blurb=LOOSE_BLURB if loose else BLURB,
+        )
         print(f"html={out}")
         if getattr(args, "pages", False):
             period = str(getattr(args, "period", ""))
             dest = "view.html"
             if period.startswith("7"):
-                dest = "one-week-1h.html"
+                dest = "one-week-opt.html"
             elif period.startswith("30"):
-                dest = "one-month-1h.html"
+                dest = "one-month-opt.html"
+            elif period.startswith("60"):
+                dest = "two-month-opt.html"
             view = write_view_html(out, branch=VIEW_BRANCH, dest_name=dest)
             print(f"preview={view}")
     return 0
@@ -398,12 +435,14 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--html", default="")
     b.add_argument("--pages", action="store_true")
     b.add_argument("--no-stack", action="store_true", help="不要求 MA5>MA10>MA20（只站上三條）")
+    b.add_argument("--loose", action="store_true", help="未優化原版（風險≤150、不看 MA30 與帶寬）")
     b.set_defaults(func=cmd_backtest)
     p.add_argument("--symbol", default="NQ=F")
     p.add_argument("--period", default="7d")
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true")
     p.add_argument("--no-stack", action="store_true")
+    p.add_argument("--loose", action="store_true")
     return p
 
 

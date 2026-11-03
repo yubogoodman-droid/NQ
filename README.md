@@ -49,21 +49,20 @@ TradingView：`pinescript/nq_5m_base_stack.pine`
 
 ## NQ 五分 K 破兩小時低後 1 小時內 5/10/20 多排
 
-五分鐘圖：跌破近 **2 小時低點**後，**1 小時內**（12 根）收盤站回且 **MA5>MA10>MA20 多排**才做多。  
+五分鐘圖：跌破近 **2 小時低點**後，**1 小時內**（12 根）收盤站回 **MA5/10/20/30**、**MA5>MA10>MA20 多排**、帶寬 **MA5−MA20 ≥ 12**、且**單筆風險 ≤ 90** 才做多。  
 停損破底低下方 −8；目標 2R（保本 / 移動 / 12 根後跌破 MA20）。
 
-近一週 Yahoo 5m（08-28 → 09-04）：**4 筆、勝率 75%、+102**。  
-近一個月（08-02 → 09-04）：**26 筆、勝率 46%、+300、均 +12**。  
-破底夠深 96 → 站回但沒多排 252 → 風險太大 39 → 進場 26。
+近一個月 Yahoo 5m（09-30 → 11-03）：優化後 **9 筆、勝率 44%、+375、均 +42**（未優化 `--loose` 29 筆、−377）。  
+近兩個月（08-25 → 11-03）：優化後 **21 筆、勝率 43%、+707、均 +34**（未優化 57 筆、+397）。  
+近一週：優化後 **0 筆**（濾掉未優化的 6 筆、−157）。
 
 ```bash
-python3 examples/nq_5m_reclaim.py backtest --period 7d --pages
 python3 examples/nq_5m_reclaim.py backtest --period 30d --pages
+python3 examples/nq_5m_reclaim.py backtest --period 60d
+python3 examples/nq_5m_reclaim.py backtest --period 30d --loose
 ```
 
-預覽（一個月）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-month-1h.html
-
-預覽（一週）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-week-1h.html
+預覽（一個月優化版）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-5m-base-stack-95d5/docs/nq-5m-reclaim/one-month-opt.html
 
 TradingView：`pinescript/nq_5m_reclaim.pine`
 
