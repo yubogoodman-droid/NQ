@@ -203,7 +203,7 @@ def test_higher_bounce_under_the_extreme_lifts_the_stop() -> None:
             (54.60, 54.72, 54.45, 54.65, 1000),
             (54.65, 54.68, 54.40, 54.50, 1000),
             (54.50, 54.55, 54.35, 54.40, 1000),
-            (54.40, 54.42, 53.90, 53.95, 4000),
+            (54.40, 54.42, 54.05, 54.15, 4000),
         ]
     )
     df5, df1 = _pair(rows)
@@ -212,7 +212,7 @@ def test_higher_bounce_under_the_extreme_lifts_the_stop() -> None:
     sig = signals[0]
     assert sig.kind == "break"
     assert sig.bar_idx == _break_1m(df5)
-    assert sig.entry == 53.95
+    assert sig.entry == 54.15
     assert sig.neckline == 54.20
     assert sig.lower_high == 54.72
     assert sig.stop == 54.72
@@ -233,8 +233,11 @@ def test_trigger_far_below_the_four_hour_high_does_not_enter() -> None:
 
     rows = _soxs_top(break_close=52.95)
     rows[44] = (54.40, 54.50, 53.00, 54.35, 1500)
-    rows[-1] = (53.70, 53.80, 52.80, 52.95, 5000)
+    rows[-1] = (53.10, 53.20, 52.80, 52.95, 5000)
     df5, df1 = _pair(rows)
+    entry = _break_1m(df5)
+    for i in range(entry - 25, entry):
+        _set_1m(df1, i, high=53.15, low=53.05, close=53.10, volume=200)
     view = inspect_rollover(df5, df1)
     assert view.signals == ()
     assert view.fresh is None
@@ -347,6 +350,47 @@ def test_closed_klines_drop_the_forming_bar() -> None:
     assert len(kept) == 2
 
 
+def test_breakeven_lock_and_stale_top_and_ma25_extension() -> None:
+    """測試：1) 極點後拖超過 20 根 5m 作廢；2) 離 1m MA25 > 0.75% 不追；3) 順向 0.85R 啟動 +0.15R 鎖利。"""
+
+    # 1) 極點到進場超過 20 根 5 分 K -> 不進場
+    stale_rows = _soxs_top()[:-1] + _flat(15, 54.35) + [(54.30, 54.32, 54.00, 54.05, 4000)]
+    df5_s, df1_s = _pair(stale_rows)
+    assert detect_rollover_shorts(df5_s, df1_s) == []
+
+    # 2) 收盤雖只破頸線一點，但離 1 分 MA25 乖離 > 0.75% -> 不追
+    df5_m, df1_m = _pair(_soxs_top())
+    entry = _break_1m(df5_m)
+    for i in range(entry - 25, entry):
+        _set_1m(df1_m, i, high=54.60, low=54.50, close=54.55, volume=200)
+    _set_1m(df1_m, entry, high=54.25, low=54.00, close=54.05, volume=4000)
+    view_m = inspect_rollover(df5_m, df1_m.iloc[: entry + 1])
+    assert view_m.signals == ()
+    assert "MA25" in view_m.note
+
+    # 3) 順向跌超過 0.85R 後反彈，觸發 +0.15R 鎖利出場（reason == "lock"）
+    index = pd.date_range("2026-10-28 14:00", periods=4, freq="1min", tz="UTC")
+    path = pd.DataFrame(
+        {
+            "open": [50.0, 50.0, 49.2, 49.8],
+            "high": [50.1, 50.0, 49.9, 49.9],
+            "low": [49.9, 49.1, 49.2, 49.7],
+            "close": [50.0, 49.2, 49.88, 49.8],
+            "volume": [1, 1, 1, 1],
+        },
+        index=index,
+    )
+    sig = RolloverSignal(
+        timestamp=index[0], bar_idx=0, kind="break",
+        entry=50.0, stop=51.0, target=48.5,
+        extreme=52.0, extreme_idx=0, neckline=50.1, lower_high=51.0, lower_high_idx=0, off_session=False,
+    )
+    locked_trades = simulate_shorts(path, [sig])
+    assert len(locked_trades) == 1
+    assert locked_trades[0].exit_reason == "lock"
+    assert abs(locked_trades[0].pnl_per_unit - 0.15) < 1e-9
+
+
 def test_simulate_target_stop_and_same_bar_stop_wins() -> None:
     def _with_extra(extra: tuple) -> tuple[pd.DataFrame, list]:
         df5, df1 = _pair(_soxs_top() + [extra])
@@ -409,6 +453,7 @@ def main() -> int:
     test_inspect_names_the_break_and_the_chase()
     test_report_writes_trade_charts()
     test_closed_klines_drop_the_forming_bar()
+    test_breakeven_lock_and_stale_top_and_ma25_extension()
     test_simulate_target_stop_and_same_bar_stop_wins()
     print("ok")
     return 0

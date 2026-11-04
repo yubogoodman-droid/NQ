@@ -12,7 +12,7 @@ from rollover.strategy import ShortTrade, qty_for_risk
 
 TPE = "Asia/Taipei"
 KIND = {"break": "跌破", "retest": "回測"}
-REASON = {"stop": "停損", "target": "停利", "time": "時間到"}
+REASON = {"stop": "停損", "target": "停利", "lock": "鎖利", "time": "時間到"}
 
 
 def write_report(
@@ -84,11 +84,11 @@ def _stats(rows: list[dict], month5: pd.DataFrame) -> dict:
     wins = sum(1 for row in rows if row["r"] > 0)
     gross = sum(row["gross"] for row in rows)
     net = sum(row["net"] for row in rows)
-    equity = np.cumsum([row["net"] for row in rows]) if rows else np.array([0.0])
+    equity = np.cumsum([0.0] + [row["net"] for row in rows])
     peak = np.maximum.accumulate(equity)
     max_dd = float((equity - peak).min()) if len(equity) else 0.0
     by_reason: dict[str, dict] = {}
-    for key in ("target", "stop", "time"):
+    for key in ("target", "lock", "stop", "time"):
         picked = [row for row in rows if row["reason_key"] == key]
         by_reason[key] = {
             "n": len(picked),
@@ -127,7 +127,7 @@ def _stats(rows: list[dict], month5: pd.DataFrame) -> dict:
 
 def _card(number: int, row: dict, src: str) -> str:
     pnl_cls = "pnl-win" if row["net"] >= 0 else "pnl-loss"
-    reason_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(row["reason_key"], "tag-time")
+    reason_cls = {"target": "tag-tp", "lock": "tag-tp", "stop": "tag-sl"}.get(row["reason_key"], "tag-time")
     session = "現貨休市" if row["off_session"] else "現貨時段"
     session_cls = "tag-off" if row["off_session"] else "tag-info"
     detail = (
@@ -161,7 +161,7 @@ def _page(symbol: str, stats: dict, cards: list[str], risk_usdt: float, fee_rate
     net_cls = "pnl-win" if stats["net_usdt"] >= 0 else "pnl-loss"
     reasons = " · ".join(
         f"{REASON[key]} {stats['by_reason'][key]['n']} 筆 {stats['by_reason'][key]['r']:+.1f}R"
-        for key in ("target", "stop", "time")
+        for key in ("target", "lock", "stop", "time")
         if stats["by_reason"][key]["n"]
     )
     cash, off = stats["cash"], stats["off"]

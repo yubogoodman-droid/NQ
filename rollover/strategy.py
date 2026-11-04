@@ -34,13 +34,18 @@ class RolloverParams:
     min_bounce_pct: float = 0.003
     max_bars_to_lower_high: int = 72  # 5 分根數，約 6 小時
     max_bars_after_lower_high: int = 30  # 5 分根數，約 2.5 小時
+    max_bars_from_extreme: int = 20  # 極點到跌破進場最多 20 根 5 分（100 分鐘），高檔橫太久不做
     max_entry_extension_pct: float = 0.008
+    max_ma25_extension_pct: float = 0.0075  # 1 分進場收盤最多比 1 分 MA25 低 0.75%，急殺過深不追
+    min_stop_distance_pct: float = 0.0065  # 停損距離至少 0.65%，過窄的次高結構易被雜訊掃且放大手續費
     four_hour_bars: int = 240  # 1 分根數，4 小時
     max_below_4h_high_pct: float = 0.02  # 觸發收盤最多比四小時高點低 2%
     min_4h_rally_pct: float = 0.04  # 5 分極點至少比極點前 4 小時低點高 4%，濾掉橫盤假頂
     retest_bars: int = 15  # 1 分根數
     stop_buffer_pct: float = 0.0
     reward_r: float = 1.5
+    breakeven_trigger_r: float = 0.85  # 順向浮盈達 0.85R 時，停損下移鎖利
+    breakeven_lock_r: float = 0.15  # 鎖住 +0.15R（蓋過雙邊手續費並保留微利）
     max_hold_bars: int = 120  # 1 分根數，約 2 小時
 
 
@@ -234,18 +239,33 @@ def inspect_rollover(
                 setup = None
                 continue
             ma_ok = not math.isnan(ma_slow[j]) and close[j] < ma_slow[j]
+            ma_ext_ok = (
+                ma_ok
+                and ma_slow[j] > 0
+                and (ma_slow[j] - close[j]) / ma_slow[j] <= params.max_ma25_extension_pct
+            )
             vol_ok = not math.isnan(vol_ma[j]) and volume[j] >= vol_ma[j]
             near_high = _near_4h_high(high_4h[j], close[j], params.max_below_4h_high_pct)
-            if ma_ok and vol_ok and near_high:
+            stop_ok = (setup.lower_high - close[j]) / close[j] >= params.min_stop_distance_pct
+            if ma_ok and not ma_ext_ok:
+                kill(setup.lower_high_idx, "收盤離 1 分 MA25 乖離超過 0.75%，急殺不追")
+                note = "收盤離 1 分 MA25 乖離超過 0.75%，急殺不追"
+                phase = "idle"
+                setup = None
+                continue
+            if ma_ext_ok and vol_ok and near_high and not stop_ok:
+                note = "停損距離小於 0.65%，結構太窄不做"
+                continue
+            if ma_ext_ok and vol_ok and near_high and stop_ok:
                 signals.append(_signal(frame1, params, j, "break", close[j], setup, four_hour_high=float(high_4h[j])))
                 filled_lower = setup.lower_high_idx
                 phase = "cool"
                 note = "這根 1 分收盤是起跌"
                 continue
-            if ma_ok and vol_ok:
+            if ma_ext_ok and vol_ok:
                 note = "觸發價離開四小時高點，這根不做"
                 continue
-            if ma_ok and not vol_ok:
+            if ma_ext_ok and not vol_ok:
                 phase = "retest"
                 retest_left = params.retest_bars
                 bounce_high = high[j]
@@ -279,8 +299,17 @@ def inspect_rollover(
             tagged = high[j] >= band_lo and low[j] <= band_hi
             back_under = close[j] < band_lo and close[j] < setup.neckline
             extend = (band_lo - close[j]) / band_lo if band_lo else 1.0
+            ma25_ext = (slow - close[j]) / slow if slow else 1.0
             near_high = _near_4h_high(high_4h[j], close[j], params.max_below_4h_high_pct)
-            if tagged and back_under and 0 <= extend <= params.max_entry_extension_pct and near_high:
+            stop_ok = (setup.lower_high - close[j]) / close[j] >= params.min_stop_distance_pct
+            if (
+                tagged
+                and back_under
+                and 0 <= extend <= params.max_entry_extension_pct
+                and ma25_ext <= params.max_ma25_extension_pct
+                and near_high
+                and stop_ok
+            ):
                 signals.append(
                     _signal(
                         frame1, params, j, "retest", close[j], setup,
@@ -342,17 +371,28 @@ def simulate_shorts(
         exit_idx = last
         exit_price = float(close[last])
         reason = "time"
+        risk = sig.risk_per_unit
+        active_stop = sig.stop
+        locked = False
         for i in range(sig.bar_idx + 1, last + 1):
-            if high[i] >= sig.stop:
+            if high[i] >= active_stop:
                 exit_idx = i
-                exit_price = sig.stop
-                reason = "stop"
+                exit_price = active_stop
+                reason = "lock" if locked else "stop"
                 break
             if low[i] <= sig.target:
                 exit_idx = i
                 exit_price = sig.target
                 reason = "target"
                 break
+            if (
+                not locked
+                and params.breakeven_trigger_r > 0
+                and risk > 0
+                and (sig.entry - low[i]) >= params.breakeven_trigger_r * risk
+            ):
+                active_stop = sig.entry - params.breakeven_lock_r * risk
+                locked = True
         busy_until = exit_idx
         trades.append(
             ShortTrade(
@@ -434,8 +474,10 @@ def _arm_5m(frame: pd.DataFrame, params: RolloverParams) -> list[tuple[pd.Timest
                 neckline=neckline,
                 lower_high=lower_px,
                 lower_high_idx=lower_i,
-                deadline=frame.index[lower_i]
-                + pd.Timedelta(minutes=5 * (params.max_bars_after_lower_high + 1)),
+                deadline=min(
+                    frame.index[lower_i] + pd.Timedelta(minutes=5 * (params.max_bars_after_lower_high + 1)),
+                    frame.index[extreme_i] + pd.Timedelta(minutes=5 * (params.max_bars_from_extreme + 1)),
+                ),
             )
         elif phase == "watch":
             phase = "seek"
