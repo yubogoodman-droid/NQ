@@ -1,0 +1,190 @@
+//@version=5
+strategy("SOXS 1分起跌（5分結構）", overlay=true, pyramiding=0, process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=10000)
+
+// 掛在 1 分圖。5 分只負責極點、較低高點、頸線和停損。
+// 進場是 1 分收盤：跌破頸線、收在 1 分 MA25 下、量能回到均量，而且收盤還在四小時高點 2% 以內。
+// 極點（例如 54.85）不當進場，也不當停損。
+
+if timeframe.period != "1"
+    runtime.error("掛在 1 分圖。5 分結構由腳本自己取")
+
+swingLen   = input.int(2, "5分轉折確認 K 數", minval=1)
+maFastLen  = input.int(7, "1分 MA 快", minval=1)
+maSlowLen  = input.int(25, "1分 MA 慢", minval=1)
+volLen     = input.int(10, "1分量能均線", minval=1)
+minPullPct = input.float(0.8, "回檔至少 (%)", minval=0.1, step=0.1) / 100
+minGapPct  = input.float(0.1, "較低高點至少低於極點 (%)", minval=0.0, step=0.1) / 100
+minBounce  = input.float(0.3, "反彈至少離開頸線 (%)", minval=0.0, step=0.1) / 100
+maxSpan    = input.int(72, "極點到較低高點最多幾根 5 分", minval=3, maxval=200)
+maxBars    = input.int(30, "較低高點後最多等幾根 5 分", minval=1)
+maxFromExt = input.int(20, "極點到跌破最多幾根 5 分", minval=3)
+maxExtPct  = input.float(0.8, "離開頸線超過 (%) 就不追", minval=0.1, step=0.1) / 100
+maxMa25Ext = input.float(0.75, "離開 1 分 MA25 超過 (%) 就不追", minval=0.1, step=0.05) / 100
+minStopPct = input.float(0.65, "停損距離至少 (%)", minval=0.1, step=0.05) / 100
+maxBelow4h = input.float(2.0, "觸發價最多低於四小時高點 (%)", minval=0.1, step=0.1) / 100
+minRally4h = input.float(4.0, "5分極點前四小時至少漲 (%)", minval=0.0, step=0.5) / 100
+retestBars = input.int(15, "1分回測最多等幾根", minval=1)
+rewardR    = input.float(1.5, "停利 R 倍", minval=0.5, step=0.1)
+beTriggerR = input.float(0.85, "順向達幾 R 啟動鎖利", minval=0.0, step=0.05)
+beLockR    = input.float(0.15, "鎖利停損設在進場下幾 R", minval=0.0, step=0.05)
+riskUsdt   = input.float(100, "單筆可虧 USDT", minval=1)
+holdBars   = input.int(120, "最多持有 1 分 K 數", minval=1)
+
+f_structure() =>
+    ph = ta.pivothigh(high, swingLen, swingLen)
+    lo4h = ta.lowest(low, 48)[swingLen]
+    var float extremePx = na
+    var int   extremeBar = na
+    var float extremeLo4h = na
+    var float lowerPx = na
+    var int   lowerBar = na
+    var float neck = na
+    var int   phase = 0  // 0 尋找, 1 等 1 分跌破
+    var lows = array.new_float()
+    array.push(lows, low)
+    if array.size(lows) > 500
+        array.shift(lows)
+
+    if not na(ph)
+        int pivotBar = bar_index - swingLen
+        if na(extremePx) or ph >= extremePx
+            extremePx := ph
+            extremeBar := pivotBar
+            extremeLo4h := lo4h
+            lowerPx := na
+            lowerBar := na
+            neck := na
+            phase := 0
+        else if not na(extremeBar) and pivotBar > extremeBar and pivotBar <= extremeBar + maxSpan and ph < extremePx * (1 - minGapPct) and (na(lowerPx) or ph > lowerPx)
+            int span = pivotBar - extremeBar
+            int newest = array.size(lows) - 1 - swingLen
+            int oldest = newest - (span - 1)
+            float lo = na
+            bool earlier = false
+            if span >= 2 and oldest >= 0 and newest < array.size(lows)
+                lo := array.get(lows, newest)
+                if oldest < newest
+                    for j = oldest to newest - 1
+                        float back = array.get(lows, j)
+                        if back <= lo
+                            earlier := true
+                        lo := math.min(lo, back)
+            bool deep = not na(lo) and (extremePx - lo) / extremePx >= minPullPct
+            bool pivotNotLower = array.size(lows) > swingLen and array.get(lows, array.size(lows) - 1 - swingLen) >= lo
+            bool bounced = earlier and pivotNotLower and ph > lo * (1 + minBounce)
+            bool rallied = not na(extremeLo4h) and extremeLo4h > 0 and (extremePx - extremeLo4h) / extremeLo4h >= minRally4h
+            if deep and bounced and rallied
+                lowerPx := ph
+                lowerBar := pivotBar
+                neck := lo
+                phase := 1
+
+    if phase == 1 and not na(lowerBar)
+        if bar_index - lowerBar > maxBars or high >= extremePx or close > extremePx
+            phase := 0
+            extremePx := na
+            lowerPx := na
+            neck := na
+
+    int on = (phase == 1 and not na(extremeBar) and bar_index - extremeBar <= maxFromExt) ? 1 : 0
+    [extremePx, lowerPx, neck, lowerBar, on]
+
+[ext5, lh5, neck5, lhBar5, on5] = request.security(syminfo.tickerid, "5", f_structure(), barmerge.gaps_off, barmerge.lookahead_off)
+
+maFast = ta.sma(close, maFastLen)
+maSlow = ta.sma(close, maSlowLen)
+volMa  = ta.sma(volume, volLen)[1]
+high4h = ta.highest(high, 240)
+near4h = bar_index >= 239 and (high4h - close) / high4h <= maxBelow4h
+
+var int   blockedBar = na
+var int   filledBar = na
+var int   retestLeft = 0
+var float bounceHigh = na
+var int   entryBar = na
+bool armRetest = false
+bool breakSignal = false
+bool retestSignal = false
+float stopPrice = na
+
+bool setup = on5 == 1 and not na(neck5) and not na(lh5) and not na(ext5)
+bool sameFill = setup and not na(filledBar) and lhBar5 == filledBar
+bool blocked = setup and not na(blockedBar) and lhBar5 == blockedBar
+bool inRetest = not na(bounceHigh)
+
+if setup and not sameFill and not blocked and (high >= ext5 or close > ext5)
+    blockedBar := lhBar5
+
+if setup and not sameFill and not blocked and not inRetest and close < neck5
+    float extension = (neck5 - close) / neck5
+    float ma25Ext = (maSlow - close) / maSlow
+    bool  stopOk = (lh5 - close) / close >= minStopPct
+    if extension > maxExtPct or (close < maSlow and ma25Ext > maxMa25Ext)
+        blockedBar := lhBar5
+    else if close < maSlow and volume >= volMa and near4h and stopOk
+        breakSignal := true
+        stopPrice := lh5
+        filledBar := lhBar5
+    else if close < maSlow and not (volume >= volMa) and stopOk
+        armRetest := true
+        retestLeft := retestBars
+        bounceHigh := high
+
+// 量能不夠的那根只負責掛上回測，不當回測進場。
+if inRetest and not armRetest and not breakSignal and lhBar5 != filledBar and lhBar5 != blockedBar
+    bounceHigh := math.max(bounceHigh, high)
+    retestLeft -= 1
+    bool failed = retestLeft < 0 or bounceHigh >= lh5 or high >= ext5
+    if failed
+        blockedBar := lhBar5
+        bounceHigh := na
+    else
+        float bandLo = math.min(maFast, maSlow)
+        float bandHi = math.max(maFast, maSlow)
+        bool tagged = high >= bandLo and low <= bandHi
+        bool backUnder = close < bandLo and close < neck5
+        float extend = (bandLo - close) / bandLo
+        float ma25Ext = (maSlow - close) / maSlow
+        bool  stopOk = (lh5 - close) / close >= minStopPct
+        if tagged and backUnder and extend >= 0 and extend <= maxExtPct and ma25Ext <= maxMa25Ext and near4h and stopOk
+            retestSignal := true
+            stopPrice := lh5
+            filledBar := lhBar5
+            bounceHigh := na
+
+bool enter = (breakSignal or retestSignal) and not na(stopPrice) and stopPrice > close
+float risk = enter ? stopPrice - close : na
+int qty = enter ? int(math.floor(riskUsdt / risk)) : 0
+float target = enter ? close - rewardR * risk : na
+
+var float activeStop = na
+var float activeTarget = na
+var float activeEntry = na
+var float activeRisk = na
+var bool  beLocked = false
+
+if enter and qty > 0
+    entryBar := bar_index
+    activeEntry := close
+    activeStop := stopPrice
+    activeTarget := target
+    activeRisk := risk
+    beLocked := false
+    strategy.entry("起跌", strategy.short, qty=qty)
+    strategy.exit("出場", from_entry="起跌", stop=activeStop, limit=activeTarget, comment_loss="停損", comment_profit="停利")
+
+if strategy.position_size < 0 and not beLocked and beTriggerR > 0 and not na(activeRisk) and (activeEntry - low) >= beTriggerR * activeRisk
+    activeStop := activeEntry - beLockR * activeRisk
+    beLocked := true
+    strategy.exit("出場", from_entry="起跌", stop=activeStop, limit=activeTarget, comment_loss="鎖利", comment_profit="停利")
+
+if strategy.position_size < 0 and not na(entryBar) and bar_index - entryBar >= holdBars
+    strategy.close("起跌", comment="時間到")
+
+plot(high4h, "四小時高點", color=color.new(color.gray, 30), linewidth=1)
+plot(maFast, "1分 MA7", color=color.new(color.teal, 0), linewidth=1)
+plot(maSlow, "1分 MA25", color=color.new(color.orange, 0), linewidth=1)
+plot(on5 == 1 ? neck5 : na, "5分頸線", color=color.new(color.red, 0), style=plot.style_linebr, linewidth=2)
+plot(on5 == 1 ? lh5 : na, "5分較低高點", color=color.new(color.yellow, 0), style=plot.style_linebr)
+plotshape(breakSignal, title="起跌", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, text="起跌")
+plotshape(retestSignal, title="回測", style=shape.triangledown, location=location.abovebar, color=color.orange, size=size.tiny, text="回測")
