@@ -1,0 +1,22 @@
+[raw] ACEUSDT.html signals=2
+[raw] BICOUSDT.html signals=2
+[raw] BLESSUSDT.html signals=2
+[raw] COOKIEUSDT.html signals=1
+[raw] CYSUSDT.html signals=3
+[raw] HEIUSDT.html signals=1
+[raw] PUMPUSDT.html signals=1
+Traceback (most recent call last):
+  File "/workspace/scripts/generate_signal_charts.py", line 603, in <module>
+    main()
+  File "/workspace/scripts/generate_signal_charts.py", line 557, in main
+    baseline_n, _ = generate_set(
+                    ^^^^^^^^^^^^^
+  File "/workspace/scripts/generate_signal_charts.py", line 480, in generate_set
+    data = chart_payload(symbol, g[need_cols])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scripts/generate_signal_charts.py", line 89, in chart_payload
+    df = load_ohlcv(sym)
+         ^^^^^^^^^^^^^^^
+  File "/workspace/scripts/generate_signal_charts.py", line 35, in load_ohlcv
+    raise FileNotFoundError(f"No klines for {sym} in {CACHE} ({HIST}/{DAY})")
+FileNotFoundError: No klines for 龙虾USDT in /tmp/bingx_um_klines (2026-08-10/2026-08-11)

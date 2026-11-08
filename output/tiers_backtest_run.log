@@ -1,0 +1,228 @@
+
+=== volume (vol≥1.5×) ===
+{
+  "n": 16,
+  "symbols": 11,
+  "reclaim_3_rate": 31.2,
+  "by_horizon": {
+    "15m": {
+      "n": 16,
+      "win_rate": 50.0,
+      "avg": -0.872,
+      "median": 0.04
+    },
+    "30m": {
+      "n": 16,
+      "win_rate": 50.0,
+      "avg": -1.24,
+      "median": 0.266
+    },
+    "1h": {
+      "n": 15,
+      "win_rate": 46.7,
+      "avg": -2.5,
+      "median": -0.76
+    },
+    "2h": {
+      "n": 15,
+      "win_rate": 33.3,
+      "avg": -2.28,
+      "median": -1.326
+    },
+    "4h": {
+      "n": 13,
+      "win_rate": 38.5,
+      "avg": -3.464,
+      "median": -3.4
+    },
+    "8h": {
+      "n": 13,
+      "win_rate": 53.8,
+      "avg": -3.066,
+      "median": 2.244
+    },
+    "12h": {
+      "n": 12,
+      "win_rate": 50.0,
+      "avg": -1.787,
+      "median": -2.0
+    }
+  },
+  "symbols_list": [
+    "BEAT/USDT",
+    "BICO/USDT",
+    "BLESS/USDT",
+    "COOKIE/USDT",
+    "CYS/USDT",
+    "IOTX/USDT",
+    "MUBARAK/USDT",
+    "PUMP/USDT",
+    "SKYAI/USDT",
+    "US/USDT",
+    "XAN/USDT"
+  ]
+}
+        time_utc       symbol  vol_ratio  bias     pnl_1h
+2026-08-09 00:45    IOTX/USDT       1.52 10.22 -45.269506
+2026-08-09 00:50 MUBARAK/USDT       1.93  7.52  -3.225806
+2026-08-09 01:05  COOKIE/USDT       2.34 29.60   3.950538
+2026-08-09 01:35      US/USDT       1.69  7.67  -1.771796
+2026-08-09 03:20   SKYAI/USDT       1.70 14.24   5.638367
+2026-08-09 03:55    BEAT/USDT       2.48 19.87  -6.362329
+2026-08-09 05:55     XAN/USDT       3.60  8.16  -4.079878
+2026-08-09 06:25      US/USDT       1.96  6.21  -3.682656
+2026-08-09 08:00    BICO/USDT       1.97 43.49  17.097416
+2026-08-09 08:00   SKYAI/USDT       1.83 19.47   1.271284
+2026-08-09 08:50    PUMP/USDT       1.97  5.80  -0.760000
+2026-08-09 09:00   BLESS/USDT       2.32  8.20  -4.113388
+2026-08-09 13:10     XAN/USDT       1.85 32.00   2.560616
+2026-08-09 21:00    PUMP/USDT       1.71  5.75   0.186498
+2026-08-09 21:00     XAN/USDT       1.53 16.88   1.055577
+2026-08-09 23:10     CYS/USDT       1.79 25.51        NaN
+
+=== balanced (vol≥1.5×) ===
+{
+  "n": 16,
+  "symbols": 11,
+  "reclaim_3_rate": 31.2,
+  "by_horizon": {
+    "15m": {
+      "n": 16,
+      "win_rate": 50.0,
+      "avg": -0.872,
+      "median": 0.04
+    },
+    "30m": {
+      "n": 16,
+      "win_rate": 50.0,
+      "avg": -1.24,
+      "median": 0.266
+    },
+    "1h": {
+      "n": 15,
+      "win_rate": 46.7,
+      "avg": -2.5,
+      "median": -0.76
+    },
+    "2h": {
+      "n": 15,
+      "win_rate": 33.3,
+      "avg": -2.28,
+      "median": -1.326
+    },
+    "4h": {
+      "n": 13,
+      "win_rate": 38.5,
+      "avg": -3.464,
+      "median": -3.4
+    },
+    "8h": {
+      "n": 13,
+      "win_rate": 53.8,
+      "avg": -3.066,
+      "median": 2.244
+    },
+    "12h": {
+      "n": 12,
+      "win_rate": 50.0,
+      "avg": -1.787,
+      "median": -2.0
+    }
+  },
+  "symbols_list": [
+    "BEAT/USDT",
+    "BICO/USDT",
+    "BLESS/USDT",
+    "COOKIE/USDT",
+    "CYS/USDT",
+    "IOTX/USDT",
+    "MUBARAK/USDT",
+    "PUMP/USDT",
+    "SKYAI/USDT",
+    "US/USDT",
+    "XAN/USDT"
+  ]
+}
+        time_utc       symbol  vol_ratio  bias     pnl_1h
+2026-08-09 00:45    IOTX/USDT       1.52 10.22 -45.269506
+2026-08-09 00:50 MUBARAK/USDT       1.93  7.52  -3.225806
+2026-08-09 01:05  COOKIE/USDT       2.34 29.60   3.950538
+2026-08-09 01:35      US/USDT       1.69  7.67  -1.771796
+2026-08-09 03:20   SKYAI/USDT       1.70 14.24   5.638367
+2026-08-09 03:55    BEAT/USDT       2.48 19.87  -6.362329
+2026-08-09 05:55     XAN/USDT       3.60  8.16  -4.079878
+2026-08-09 06:25      US/USDT       1.96  6.21  -3.682656
+2026-08-09 08:00    BICO/USDT       1.97 43.49  17.097416
+2026-08-09 08:00   SKYAI/USDT       1.83 19.47   1.271284
+2026-08-09 08:50    PUMP/USDT       1.97  5.80  -0.760000
+2026-08-09 09:00   BLESS/USDT       2.32  8.20  -4.113388
+2026-08-09 13:10     XAN/USDT       1.85 32.00   2.560616
+2026-08-09 21:00    PUMP/USDT       1.71  5.75   0.186498
+2026-08-09 21:00     XAN/USDT       1.53 16.88   1.055577
+2026-08-09 23:10     CYS/USDT       1.79 25.51        NaN
+
+=== strict (vol≥2.0×) ===
+{
+  "n": 5,
+  "symbols": 5,
+  "reclaim_3_rate": 20.0,
+  "by_horizon": {
+    "15m": {
+      "n": 5,
+      "win_rate": 20.0,
+      "avg": -1.795,
+      "median": -1.64
+    },
+    "30m": {
+      "n": 5,
+      "win_rate": 20.0,
+      "avg": -0.938,
+      "median": -1.263
+    },
+    "1h": {
+      "n": 5,
+      "win_rate": 20.0,
+      "avg": -2.46,
+      "median": -4.08
+    },
+    "2h": {
+      "n": 5,
+      "win_rate": 20.0,
+      "avg": -4.98,
+      "median": -4.645
+    },
+    "4h": {
+      "n": 4,
+      "win_rate": 25.0,
+      "avg": -6.99,
+      "median": -8.056
+    },
+    "8h": {
+      "n": 4,
+      "win_rate": 50.0,
+      "avg": -5.88,
+      "median": -5.982
+    },
+    "12h": {
+      "n": 4,
+      "win_rate": 25.0,
+      "avg": -13.74,
+      "median": -15.447
+    }
+  },
+  "symbols_list": [
+    "BEAT/USDT",
+    "BLESS/USDT",
+    "COOKIE/USDT",
+    "PUMP/USDT",
+    "XAN/USDT"
+  ]
+}
+        time_utc      symbol  vol_ratio  bias    pnl_1h
+2026-08-09 01:05 COOKIE/USDT       2.34 29.60  3.950538
+2026-08-09 03:55   BEAT/USDT       2.48 19.87 -6.362329
+2026-08-09 05:55    XAN/USDT       3.60  8.16 -4.079878
+2026-08-09 09:00  BLESS/USDT       2.32  8.20 -4.113388
+2026-08-09 21:05   PUMP/USDT       3.59  5.75 -1.695554
+
+=== rawcheck n=76 baseline=76 ===

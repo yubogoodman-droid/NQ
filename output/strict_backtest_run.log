@@ -1,0 +1,98 @@
+{
+  "day": "2026-08-09",
+  "params": {
+    "min_span": 12,
+    "max_span": 60,
+    "shoulder_sym": 0.1,
+    "min_bias": 0.05,
+    "max_bias": 1.5,
+    "min_close_break_pct": 0.008,
+    "require_red": true,
+    "require_prev_close_below": true,
+    "require_sma25_break": true,
+    "require_sma14_lt_sma25": true,
+    "max_chg24": 0.6,
+    "cooldown_min": 150
+  },
+  "baseline": {
+    "n": 76,
+    "symbols": 22,
+    "reclaim_3_rate": null,
+    "pnl_1h_win": 47.9,
+    "pnl_1h_avg": -1.064,
+    "pnl_1h_median": -0.384
+  },
+  "strict": {
+    "n": 11,
+    "symbols": 10,
+    "reclaim_3_rate": 0.0,
+    "by_horizon": {
+      "15m": {
+        "n": 11,
+        "win_rate": 63.6,
+        "avg": 2.145,
+        "median": 0.447
+      },
+      "30m": {
+        "n": 11,
+        "win_rate": 36.4,
+        "avg": 1.399,
+        "median": -0.423
+      },
+      "1h": {
+        "n": 11,
+        "win_rate": 54.5,
+        "avg": 2.78,
+        "median": 0.941
+      },
+      "2h": {
+        "n": 10,
+        "win_rate": 60.0,
+        "avg": 2.477,
+        "median": 1.385
+      },
+      "4h": {
+        "n": 10,
+        "win_rate": 40.0,
+        "avg": 0.027,
+        "median": -2.982
+      },
+      "8h": {
+        "n": 10,
+        "win_rate": 30.0,
+        "avg": -5.087,
+        "median": -10.438
+      },
+      "12h": {
+        "n": 7,
+        "win_rate": 28.6,
+        "avg": -12.778,
+        "median": -22.214
+      }
+    },
+    "symbols_list": [
+      "BANK/USDT",
+      "BEAT/USDT",
+      "BICO/USDT",
+      "BTW/USDT",
+      "COOKIE/USDT",
+      "MUBARAK/USDT",
+      "PUMP/USDT",
+      "SAGA/USDT",
+      "XAN/USDT",
+      "龙虾/USDT"
+    ]
+  }
+}
+      symbol         time_utc  bias  close_break_pct  chg24   pnl_15m    pnl_1h     pnl_4h  reclaim_3
+   BANK/USDT 2026-08-09 14:00 18.48             1.41   8.66 -0.470256  0.940513   6.042793      False
+   BEAT/USDT 2026-08-09 03:55 19.87             9.24  30.58 -5.104242 -6.362329 -16.714594      False
+   BICO/USDT 2026-08-09 08:25 43.49            18.57  21.36 21.196970 25.045455  33.651515      False
+    BTW/USDT 2026-08-09 08:40 14.36             7.27  17.64  5.488493  2.995262  -3.948556      False
+ COOKIE/USDT 2026-08-09 07:15 16.84             2.68  18.33 -0.413045 -2.788056 -13.682127      False
+ COOKIE/USDT 2026-08-09 12:45 16.54             3.73  41.78  0.447361  4.249925   4.853862      False
+MUBARAK/USDT 2026-08-09 11:00 28.65             5.60  33.88  1.128784 -0.820934  -4.463828      False
+   PUMP/USDT 2026-08-09 08:15  5.80             0.80   8.86  0.402901 -0.886382  -2.014504      False
+   SAGA/USDT 2026-08-09 06:20 39.65             4.37  28.00  0.520833  6.423611   6.655093      False
+    XAN/USDT 2026-08-09 13:15 32.00            11.13  18.76  0.766710 -1.463186 -10.107691      False
+     龙虾/USDT 2026-08-09 22:55 15.38             4.31  -9.40 -0.372208  3.243531        NaN      False
