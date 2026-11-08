@@ -1,0 +1,105 @@
+//@version=5
+strategy("NQ 一分K 站上季線", overlay=true, default_qty_type=strategy.fixed, default_qty_value=1, initial_capital=50000, pyramiding=0, calc_on_every_tick=false)
+
+// 季線 = 1 分圖 SMA60。對齊 HTML #25：先殺深，五分仍遠低於五分季線，再開盤時段陽線站上一分季線。
+
+// === 參數 ===
+ma60Len        = input.int(60, "季線週期", minval=10)
+minBelowBars   = input.int(40, "站上前至少在季線下方幾根", minval=1)
+maxStandPts    = input.float(40.0, "站上距離上限（點）", minval=1.0, step=1.0, tooltip="收盤超過季線太多視為追價，不進")
+minStandPts    = input.float(1.0, "最少站上距離（點）", minval=0.0, step=0.25)
+useCluster     = input.bool(false, "季線帶確認（MA60/100/120 黏在一起且收盤穿過帶）")
+clusterPts     = input.float(40.0, "季線帶最大寬度（點）", minval=5.0, step=1.0)
+touchPts       = input.float(22.0, "低點須靠近季線（點）", minval=0.0, step=1.0)
+useStack       = input.bool(true, "短均轉多（MA5>MA10）")
+useMacd        = input.bool(true, "MACD 柱翻綠")
+useMacdCross   = input.bool(false, "還要 DIF>DEA")
+sessStart      = input.int(10, "只做 ET 幾點之後", minval=0, maxval=23)
+sessEnd        = input.int(16, "只做 ET 幾點之前", minval=1, maxval=24)
+m5MaxDist      = input.float(-60.0, "五分須低於五分季線（點）", step=5.0, tooltip="負值＝五分還在季線下多少點。設 999 可關掉")
+minDropPts     = input.float(60.0, "近 60 根最少回撤（點）")
+dropLookback   = input.int(60, "回撤回看根數", minval=10)
+macdFast       = input.int(12, "MACD 快線", minval=2)
+macdSlow       = input.int(26, "MACD 慢線", minval=5)
+macdSig        = input.int(9, "MACD 訊號", minval=2)
+useVol         = input.bool(true, "放量確認")
+volLen         = input.int(20, "成交量均線", minval=5)
+volMult        = input.float(1.2, "量能倍數", minval=0.5, step=0.1)
+useSlope       = input.bool(true, "季線不可明顯下彎")
+slopeBars      = input.int(5, "季線斜率回看", minval=2)
+minSlope       = input.float(-6.0, "季線 5 根最少斜率（點）")
+cooldown       = input.int(20, "兩筆最少間隔（根）", minval=1)
+stopBuffer     = input.float(12.0, "停損緩衝（點）", minval=0.0, step=0.25)
+targetR        = input.float(2.0, "目標 R 倍數", minval=0.5, step=0.5)
+maxRisk        = input.float(80.0, "最大風險（點）", minval=5.0)
+showCluster    = input.bool(true, "畫 MA100 / MA120")
+
+// === 均線 / MACD / 量 ===
+ma5   = ta.sma(close, 5)
+ma10  = ta.sma(close, 10)
+ma20  = ta.sma(close, 20)
+ma60  = ta.sma(close, ma60Len)
+ma100 = ta.sma(close, 100)
+ma120 = ta.sma(close, 120)
+
+[dif, dea, hist] = ta.macd(close, macdFast, macdSlow, macdSig)
+volMa = ta.sma(volume, volLen)
+slope60 = ma60 - ma60[slopeBars]
+m5Close = request.security(syminfo.tickerid, "5", close, lookahead=barmerge.lookahead_off)
+m5Ma60  = request.security(syminfo.tickerid, "5", ta.sma(close, 60), lookahead=barmerge.lookahead_off)
+dropHigh = ta.highest(high, dropLookback)
+dropPts  = dropHigh - low
+
+// 連續在季線下方的根數（不含本根）
+var int belowRun = 0
+if close <= ma60
+    belowRun += 1
+else
+    belowRun := 0
+belowPrev = belowRun[1]
+
+stoodUp   = close[1] <= ma60[1] and close > ma60
+bullBar   = close > open
+distAbove = close - ma60
+nearStand = distAbove >= minStandPts and distAbove <= maxStandPts
+touchOk   = touchPts <= 0 or low <= ma60 + touchPts
+bandHi    = math.max(ma60, math.max(ma100, ma120))
+bandLo    = math.min(ma60, math.min(ma100, ma120))
+clusterOk = not useCluster or (not na(ma100) and not na(ma120) and (bandHi - bandLo) <= clusterPts and close > bandHi)
+enoughBelow = belowPrev >= minBelowBars
+stackOk   = not useStack or (ma5 > ma10)
+macdOk    = not useMacd or (not na(hist) and hist > 0)
+macdCrossOk = not useMacdCross or (not na(dif) and not na(dea) and dif > dea)
+volOk     = not useVol or (not na(volMa) and volMa > 0 and volume >= volMa * volMult)
+sessOk    = hour(time, "America/New_York") >= sessStart and hour(time, "America/New_York") < sessEnd
+dropOk    = minDropPts <= 0 or dropPts >= minDropPts
+m5Dist    = m5Close - m5Ma60
+m5Ok      = na(m5Ma60) ? false : m5Dist <= m5MaxDist
+slopeOk   = not useSlope or na(slope60) or slope60 >= minSlope
+var int lastExitBar = na
+if strategy.closedtrades > 0
+    lastExitBar := strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1)
+cooled = strategy.position_size == 0 and (na(lastExitBar) or bar_index - lastExitBar >= cooldown)
+
+longSignal = stoodUp and bullBar and nearStand and touchOk and clusterOk and enoughBelow and stackOk and macdOk and macdCrossOk and volOk and slopeOk and sessOk and dropOk and m5Ok and cooled and strategy.position_size == 0
+
+stopLevel = math.min(low, ma60) - stopBuffer
+risk      = close - stopLevel
+riskOk    = risk > 0 and risk <= maxRisk
+targetLevel = close + risk * targetR
+
+if longSignal and riskOk
+    strategy.entry("站上季線", strategy.long)
+    strategy.exit("站上季線出場", "站上季線", stop=stopLevel, limit=targetLevel)
+
+// === 視覺 ===
+plot(ma5,   "MA5",   color=color.new(#ff9800, 20), linewidth=1)
+plot(ma10,  "MA10",  color=color.new(#81d4fa, 25), linewidth=1)
+plot(ma20,  "MA20",  color=color.new(#ab47bc, 30), linewidth=1)
+plot(ma60,  "季線 MA60", color=color.new(#26a69a, 0), linewidth=2)
+plot(showCluster ? ma100 : na, "MA100", color=color.new(#ffeb3b, 20), linewidth=1)
+plot(showCluster ? ma120 : na, "MA120", color=color.new(#ef5350, 20), linewidth=1)
+
+plotshape(longSignal and riskOk, title="站上季線進場", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.small, text="站上季線")
+
+alertcondition(longSignal and riskOk, title="站上 1分K 季線", message="NQ 1m 收盤站上季線，做多")
