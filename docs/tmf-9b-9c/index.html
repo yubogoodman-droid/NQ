@@ -36,6 +36,12 @@ tr:last-child td { border-bottom:0; }
 .mini { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:12px 14px; }
 .mini b { display:block; margin-bottom:6px; }
 .mini p { margin:0; color:#c9d1d9; font-size:13px; line-height:1.55; }
+.peaks { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.peak { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:10px 12px; }
+.peak-h { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+.peak-h b { font-size:14px; }
+.peak-h span { color:#8b949e; font-size:13px; }
+.peak p { margin:4px 0 0; color:#c9d1d9; font-size:13px; line-height:1.5; }
 details { margin-top:10px; }
 summary { cursor:pointer; color:#79c0ff; font-size:13px; }
 ul { margin:8px 0 0; padding-left:18px; color:#c9d1d9; font-size:13px; line-height:1.6; }
@@ -302,6 +308,29 @@ ul { margin:8px 0 0; padding-left:18px; color:#c9d1d9; font-size:13px; line-heig
 <div class="mini"><b>9c 全期 · 滑價 2</b><p>有部位 72.3%　Core 與 B1 同時持有 9.6%　成交 993 列，開 398、平 398、加 105、減 92。再平衡加碼 56 次。有已實現損益的 490 列，勝率 54.3%。 終值比 9b 多 45.34 萬。</p></div>
 </div>
 <p class="note">滑價改成 5 點後，9b CAGR 19.76%、9c CAGR 19.93%。</p>
+
+<h2>崩盤前訊號</h2>
+<p class="muted">策略內建的高檔雷達，要 VIX／VIX3M 至少 1.03，再配上信用利差或 ADR 折價、或澳幣日圓 5 日跌 2.5%，而且現貨還在 20 日高點 5% 以內、站在季線上。旗標只用當天以前已完成的收盤。下表是同一套因果計算，對照加權指數的大高點。</p>
+<div class="callout warn"><b>亮燈沒有領先這些高點</b><p>2007 年以後雷達亮過 24 次，約占可計算日子的 3.4%。亮燈後 20 個交易日，指數平均 +1.89%，24 次裡 16 次收高；只有 2 次在 20 天內再跌超過 8%。隨機交易日的 20 日平均是 +0.95%，左尾沒有被這 24 次挑出來。大跌前 15 個交易日，VIX 期限結構一次都沒有倒掛，golden 組合也是 0。</p></div>
+<div class="cards">
+<div class="card"><span>雷達亮燈次數</span><b>24</b></div>
+<div class="card"><span>亮後 20 日平均</span><b>+1.89%</b></div>
+<div class="card"><span>20 日內跌超 8%</span><b>2 / 24</b></div>
+<div class="card"><span>高點前 VIX 倒掛</span><b>0 次</b></div>
+</div>
+<div class="peaks">
+<div class="peak"><div class="peak-h"><b>2018-01-23</b><span>比值 0.85</span></div><p>升到 1.03 是第 10 天，跌破季線也是第 10 天，當時現貨 −7.5%。</p></div>
+<div class="peak"><div class="peak-h"><b>2020-01-14</b><span>比值 0.84</span></div><p>季線第 5 天就破，現貨 −6.2%。比值要到第 23 天才過 1.03。</p></div>
+<div class="peak"><div class="peak-h"><b>2022-01-04</b><span>比值 0.77</span></div><p>季線第 15 天跌破，現貨 −4.5%。其後 40 天比值都沒有到 1.03。</p></div>
+<div class="peak"><div class="peak-h"><b>2024-07-11</b><span>比值 0.89</span></div><p>季線第 9 天跌破，現貨 −9.3%。比值第 16 天才過 1.03。</p></div>
+<div class="peak"><div class="peak-h"><b>2026-10-06</b><span>比值 0.86</span></div><p>季線第 11 天跌破，現貨 −7.6%。比值第 20 天才過 1.03。</p></div>
+</div>
+<p class="note">天數從高點往後數。高點前 40 個交易日的比值高點：2018 年 0.90、2020 年 0.92、2022 年 1.01、2024 年 0.93、2026 年 0.90。2015-04-27 前 15 日同樣沒有 golden，當天比值 0.81。</p>
+<div class="split">
+<div class="mini"><b>2024-07-11 · 9b 槓桿 1.81 倍</b><p>防守旗標關著，Core 31 口、沒有 B1，期貨收盤 24,366。其後 7 個交易日現貨跌向 −8% 時仍在季線上，雷達 0 天。接下來 20 個交易日權益 −19.3%，最深 −24.9%。</p></div>
+<div class="mini"><b>2026-10-06 · 9b 槓桿 0.68 倍</b><p>防守旗標開著，Core 16 口，期貨收盤 50,060。比值仍是 0.86。到資料截止 2026-11-06，現貨自高點 −20.3%，這段權益 −16.1%。</p></div>
+</div>
+<p class="note">真正在減碼的是跌破季線，通常落在高點後 5 到 15 個交易日，現貨已經少 4% 到 9%。VIX 比值是跌勢裡才升過 1.03，有時跟季線同一天，有時更晚。單看 ADR 或澳幣日圓會先閃一下，但規則要求配對，單項不會亮燈。</p>
 
 <h2>已知限制</h2>
 <div class="callout warn"><b>沿用 V4 的口徑</b>
