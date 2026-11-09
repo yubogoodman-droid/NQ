@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>9b／9c 與 Combo9 V4 詳細審查報告｜阿彰台指期</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Noto Sans TC', sans-serif; background: #0b0f17; color: #e2e8f0; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .card { background: rgba(17, 24, 39, 0.92); border: 1px solid rgba(51, 65, 85, 0.75); border-radius: 0.85rem; }
+    table { border-collapse: collapse; }
+    th, td { white-space: nowrap; }
+    td.wrap, th.wrap { white-space: normal; }
+    a { color: #93c5fd; }
+  </style>
+</head>
+<body class="min-h-screen pb-20">
+  <header class="border-b border-slate-800 bg-slate-950/95 sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+      <div>
+        <div class="text-xs text-blue-300">離線重現 · 2026-11-09 · 未下單</div>
+        <h1 class="text-xl sm:text-2xl font-bold text-white">9b／9c 與原始 Combo9 V4 詳細審查</h1>
+      </div>
+      <div class="text-xs text-slate-400">資料截止 2026-11-06 · 本金 25 萬 · 手續費單邊 12 元</div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 mt-6 space-y-6">
+    <section class="card p-5 border-l-4 border-l-emerald-500 space-y-3">
+      <h2 class="text-lg font-bold text-white">可以重現。不能拿這次回測直接實盤。</h2>
+      <p class="text-sm text-slate-300 leading-relaxed">40 個檔的 SHA256 全部相符。<code class="mono text-amber-200">verify_exports.py</code> 六組逐日權益與逐筆成交都通過。原稿路徑搜尋看不到包內的 <code class="mono">data/</code>，工作目錄只加了資料夾捷徑，沒有改策略碼。接上之後，三張 reference 表逐格相同，9b、9c 的全期 2 點權益與成交也和匯出腳本、reference 三份一致。全期 4,749 個交易日。</p>
+      <p class="text-sm text-slate-300 leading-relaxed">這包裡若只留一版對照，9b 的收盤回撤較淺、成交較少，期末比 9c 少約 45 萬。完整 Combo9 賺得最多，收盤與 OHLC 回撤都過 31%。不把 9b 或 9c 換成 E1 的實盤候選：夜盤用的是同日標籤，SafeB1 也沒有全帳戶 1.25 倍硬頂。</p>
+    </section>
+
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <article class="card p-4">
+        <div class="text-xs text-slate-400">9b 全期 · 滑價 2 點</div>
+        <div class="text-2xl font-bold text-white mono mt-1">995.92 萬</div>
+        <div class="text-sm text-slate-300 mt-2">年化 21.00% · 收盤 MDD −28.34% · OHLC −29.99% · Sharpe 0.913</div>
+      </article>
+      <article class="card p-4">
+        <div class="text-xs text-slate-400">9c 全期 · 滑價 2 點</div>
+        <div class="text-2xl font-bold text-white mono mt-1">1,041.26 萬</div>
+        <div class="text-sm text-slate-300 mt-2">年化 21.28% · 收盤 MDD −28.61% · OHLC −29.67% · Sharpe 0.911</div>
+      </article>
+      <article class="card p-4">
+        <div class="text-xs text-slate-400">完整 Combo9 · 滑價 2 點</div>
+        <div class="text-2xl font-bold text-white mono mt-1">1,185.87 萬</div>
+        <div class="text-sm text-slate-300 mt-2">年化 22.10% · 收盤 MDD −31.28% · OHLC −31.79% · Sharpe 0.921</div>
+      </article>
+    </section>
+
+    <nav class="flex flex-wrap gap-2 text-xs">
+      <a class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700" href="#rules">規則</a>
+      <a class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700" href="#numbers">數字</a>
+      <a class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700" href="#dd">回撤</a>
+      <a class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700" href="#years">逐年</a>
+      <a class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700" href="#fills">成交</a>
+      <a class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700" href="#e1">和 E1</a>
+      <a class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700" href="#risk">風險</a>
+    </nav>
+
+    <section id="rules" class="card p-5 space-y-3">
+      <h2 class="text-base font-bold text-white">這包在做什麼</h2>
+      <p class="text-sm text-slate-300 leading-relaxed">這是 Combo9 V4 的凍結研究包，不是下單程式。三份程式是 <span class="mono text-slate-200">tmf_9b_safeb1_strategy.py</span>、<span class="mono text-slate-200">tmf_9c_fastreb_strategy.py</span>，以及完整原稿 <span class="mono text-slate-200">source/original_combo9_v4.py</span>。微台指每點 10 元，單邊手續費 12 元，期交稅是成交價乘 10 再乘 0.00002 後四捨五入。全期 2007-07-10 至 2026-11-06，本金 25 萬。另一窗是 2014-11-03 至 2026-11-06，本金 914,075，用來對 00631L。換月是結算日前 5 個交易日的開盤價。<span class="mono">202611</span> 到期日寫死 2026-11-18。</p>
+      <p class="text-sm text-slate-300 leading-relaxed">現貨訊號用前一日收盤。Core 正常目標 2.0 倍；收盤跌破 MA60 且 RSI5 至少 28，或雷達防守，目標降到 0.70 倍。總曝險上限 2.2 倍。沒有空單。9b 和 9c 都開著淨額換月，都沒有開箱型解鎖。</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <article class="rounded-lg border border-slate-700 p-4 bg-slate-950/40">
+          <h3 class="font-semibold text-emerald-300">9b · SafeB1</h3>
+          <p class="text-sm text-slate-300 mt-2 leading-relaxed">只改 B1。進場仍要前一日收盤高於 MA120。箱型或收盤低於 MA60 時，超賣門檻改成 RSI5 小於 24，目標 0.55 倍；其餘仍是 RSI5 小於 32、目標 1.10 倍。箱型或低於 MA60 時用 MA5 出場，其他用 MA10。再平衡仍是 20 個持倉日，補倉門檻仍是目標口數的 80%。</p>
+        </article>
+        <article class="rounded-lg border border-slate-700 p-4 bg-slate-950/40">
+          <h3 class="font-semibold text-blue-300">9c · FastReb</h3>
+          <p class="text-sm text-slate-300 mt-2 leading-relaxed">不改 B1。強多、且不是箱型、也不是雷達防守時，再平衡從 20 日縮成 10 日，補倉門檻從 80% 提高到 88%。其他情況仍是 20 日、80%。這是較頻繁補回曝險，不代表保證降低回撤。</p>
+        </article>
+      </div>
+      <p class="text-sm text-slate-400 leading-relaxed">完整 Combo9 是箱型解鎖、SafeB1、快速再平衡三項一起開。9b 同時改了門檻、口數和出場，9c 同時改了週期和補倉閾值，兩邊又都比 Combo6 多了淨額換月。和 Combo6 的差額不能說成單一開關的效果。</p>
+    </section>
+
+    <section id="numbers" class="card p-5 space-y-4">
+      <h2 class="text-base font-bold text-white">全期與壓力測試</h2>
+      <h3 class="text-sm font-semibold text-slate-200">全期，滑價 2 點，手續費 12 元</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+          <thead class="text-xs text-slate-400 border-b border-slate-700">
+            <tr>
+              <th class="py-2 pr-3">版本</th><th class="py-2 pr-3 text-right">期末</th><th class="py-2 pr-3 text-right">CAGR</th><th class="py-2 pr-3 text-right">收盤 MDD</th><th class="py-2 pr-3 text-right">OHLC MDD</th><th class="py-2 pr-3 text-right">Sharpe</th><th class="py-2 pr-3 text-right">成交</th><th class="py-2 pr-3 text-right">手續費</th><th class="py-2 pr-3 text-right">期交稅</th><th class="py-2 text-right">滑價</th>
+            </tr>
+          </thead>
+          <tbody class="text-slate-200">
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">Combo6</td><td class="py-2 pr-3 text-right mono">9,957,156</td><td class="py-2 pr-3 text-right mono">21.00%</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.58%</td><td class="py-2 pr-3 text-right mono text-rose-300">−29.45%</td><td class="py-2 pr-3 text-right mono">0.906</td><td class="py-2 pr-3 text-right mono">1,013</td><td class="py-2 pr-3 text-right mono">90,864</td><td class="py-2 pr-3 text-right mono">27,220</td><td class="py-2 text-right mono">151,440</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3 text-emerald-300">9b</td><td class="py-2 pr-3 text-right mono">9,959,204</td><td class="py-2 pr-3 text-right mono">21.00%</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.34%</td><td class="py-2 pr-3 text-right mono text-rose-300">−29.99%</td><td class="py-2 pr-3 text-right mono">0.913</td><td class="py-2 pr-3 text-right mono">967</td><td class="py-2 pr-3 text-right mono">87,792</td><td class="py-2 pr-3 text-right mono">26,474</td><td class="py-2 text-right mono">146,320</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3 text-blue-300">9c</td><td class="py-2 pr-3 text-right mono">10,412,622</td><td class="py-2 pr-3 text-right mono">21.28%</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.61%</td><td class="py-2 pr-3 text-right mono text-rose-300">−29.67%</td><td class="py-2 pr-3 text-right mono">0.911</td><td class="py-2 pr-3 text-right mono">993</td><td class="py-2 pr-3 text-right mono">92,232</td><td class="py-2 pr-3 text-right mono">28,046</td><td class="py-2 text-right mono">153,720</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">完整 Combo9</td><td class="py-2 pr-3 text-right mono">11,858,744</td><td class="py-2 pr-3 text-right mono">22.10%</td><td class="py-2 pr-3 text-right mono text-rose-300">−31.28%</td><td class="py-2 pr-3 text-right mono text-rose-300">−31.79%</td><td class="py-2 pr-3 text-right mono">0.921</td><td class="py-2 pr-3 text-right mono">1,064</td><td class="py-2 pr-3 text-right mono">115,944</td><td class="py-2 pr-3 text-right mono">36,882</td><td class="py-2 text-right mono">193,240</td></tr>
+            <tr><td class="py-2 pr-3 text-slate-400">1 倍含息持有</td><td class="py-2 pr-3 text-right mono">2,121,300</td><td class="py-2 pr-3 text-right mono">11.70%</td><td class="py-2 pr-3 text-right mono text-rose-300">−56.02%</td><td class="py-2 pr-3 text-right mono">—</td><td class="py-2 pr-3 text-right mono">0.682</td><td class="py-2 pr-3 text-right mono">—</td><td class="py-2 pr-3 text-right mono">—</td><td class="py-2 pr-3 text-right mono">—</td><td class="py-2 text-right mono">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-slate-500">9b 和 Combo6 的期末幾乎一樣。9b 少 46 筆成交，收盤回撤淺 0.24 個百分點，OHLC 回撤卻深 0.54 個百分點。9c 比 9b 多約 45.3 萬。完整 Combo9 再多約 144.6 萬。</p>
+
+      <h3 class="text-sm font-semibold text-slate-200">全期，滑價 5 點</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-slate-400 border-b border-slate-700"><tr><th class="py-2 pr-3 text-left">版本</th><th class="py-2 pr-3 text-right">期末</th><th class="py-2 pr-3 text-right">CAGR</th><th class="py-2 pr-3 text-right">收盤 MDD</th><th class="py-2 pr-3 text-right">OHLC MDD</th><th class="py-2 pr-3 text-right">Sharpe</th><th class="py-2 text-right">滑價</th></tr></thead>
+          <tbody>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">9b</td><td class="py-2 pr-3 text-right mono">8,157,092</td><td class="py-2 pr-3 text-right mono">19.76%</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.62%</td><td class="py-2 pr-3 text-right mono text-rose-300">−29.43%</td><td class="py-2 pr-3 text-right mono">0.872</td><td class="py-2 text-right mono">316,000</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">9c</td><td class="py-2 pr-3 text-right mono">8,382,573</td><td class="py-2 pr-3 text-right mono">19.93%</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.61%</td><td class="py-2 pr-3 text-right mono text-rose-300">−29.44%</td><td class="py-2 pr-3 text-right mono">0.866</td><td class="py-2 text-right mono">331,700</td></tr>
+            <tr><td class="py-2 pr-3">完整 Combo9</td><td class="py-2 pr-3 text-right mono">9,428,654</td><td class="py-2 pr-3 text-right mono">20.66%</td><td class="py-2 pr-3 text-right mono text-rose-300">−31.31%</td><td class="py-2 pr-3 text-right mono text-rose-300">−31.83%</td><td class="py-2 pr-3 text-right mono">0.877</td><td class="py-2 text-right mono">406,300</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-slate-500">滑價從 2 點加到 5 點，9b 期末少約 180 萬，9c 少約 203 萬。回撤幾乎沒有變淺。成本上升吃掉的是報酬。</p>
+
+      <h3 class="text-sm font-semibold text-slate-200">2014-11-03 起，本金 914,075，滑價 2 點</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-slate-400 border-b border-slate-700"><tr><th class="py-2 pr-3 text-left">版本</th><th class="py-2 pr-3 text-right">期末</th><th class="py-2 pr-3 text-right">CAGR</th><th class="py-2 pr-3 text-right">收盤 MDD</th><th class="py-2 pr-3 text-right">OHLC MDD</th><th class="py-2 pr-3 text-right">Sharpe</th><th class="py-2 text-right">成交</th></tr></thead>
+          <tbody>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">9b</td><td class="py-2 pr-3 text-right mono">19,739,484</td><td class="py-2 pr-3 text-right mono">29.16%</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.74%</td><td class="py-2 pr-3 text-right mono text-rose-300">−29.85%</td><td class="py-2 pr-3 text-right mono">1.138</td><td class="py-2 text-right mono">690</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">9c</td><td class="py-2 pr-3 text-right mono">20,289,487</td><td class="py-2 pr-3 text-right mono">29.45%</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.86%</td><td class="py-2 pr-3 text-right mono text-rose-300">−29.86%</td><td class="py-2 pr-3 text-right mono">1.128</td><td class="py-2 text-right mono">732</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">完整 Combo9</td><td class="py-2 pr-3 text-right mono">19,779,240</td><td class="py-2 pr-3 text-right mono">29.18%</td><td class="py-2 pr-3 text-right mono text-rose-300">−31.25%</td><td class="py-2 pr-3 text-right mono text-rose-300">−31.76%</td><td class="py-2 pr-3 text-right mono">1.116</td><td class="py-2 text-right mono">748</td></tr>
+            <tr><td class="py-2 pr-3 text-slate-400">00631L 市價含稅費</td><td class="py-2 pr-3 text-right mono">26,081,200</td><td class="py-2 pr-3 text-right mono">32.16%</td><td class="py-2 pr-3 text-right mono text-rose-300">−55.14%</td><td class="py-2 pr-3 text-right mono">—</td><td class="py-2 pr-3 text-right mono">0.947</td><td class="py-2 text-right mono">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-slate-500">這段是大多頭。9c 年化仍低於 00631L，回撤約只有它的一半。00631L 是槓桿 ETF，不是這支期貨的同口數複製。</p>
+    </section>
+
+    <section id="dd" class="card p-5 space-y-3">
+      <h2 class="text-base font-bold text-white">回撤發生在什麼時候</h2>
+      <p class="text-sm text-slate-300 leading-relaxed">9b、9c、完整 Combo9 的全期收盤最深回撤是同一段：2024-07-11 高點到 2025-06-02，日曆 326 天。收盤 MDD 和 OHLC MDD 不是同一次下跌。</p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-slate-400 border-b border-slate-700"><tr><th class="py-2 pr-3 text-left">版本</th><th class="py-2 pr-3 text-right">高點</th><th class="py-2 pr-3 text-right">谷底</th><th class="py-2 pr-3 text-right">收盤 MDD</th><th class="py-2 pr-3 text-left">OHLC 最深日</th><th class="py-2 text-right">OHLC MDD</th></tr></thead>
+          <tbody>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">9b</td><td class="py-2 pr-3 text-right mono">4,173,811</td><td class="py-2 pr-3 text-right mono">2,990,855</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.34%</td><td class="py-2 pr-3">2021-05-12</td><td class="py-2 text-right mono text-rose-300">−29.99%</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">9c</td><td class="py-2 pr-3 text-right mono">4,291,555</td><td class="py-2 pr-3 text-right mono">3,063,799</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.61%</td><td class="py-2 pr-3">2026-07-29</td><td class="py-2 text-right mono text-rose-300">−29.67%</td></tr>
+            <tr><td class="py-2 pr-3">完整 Combo9</td><td class="py-2 pr-3 text-right mono">5,509,240</td><td class="py-2 pr-3 text-right mono">3,785,999</td><td class="py-2 pr-3 text-right mono text-rose-300">−31.28%</td><td class="py-2 pr-3">2025-06-02</td><td class="py-2 text-right mono text-rose-300">−31.79%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="text-sm font-semibold text-slate-200">2026 年收到 11 月 6 日</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-slate-400 border-b border-slate-700"><tr><th class="py-2 pr-3 text-left">版本</th><th class="py-2 pr-3 text-right">2025 年底</th><th class="py-2 pr-3 text-right">6 月 22 日高點</th><th class="py-2 pr-3 text-right">11 月 6 日</th><th class="py-2 pr-3 text-right">今年</th><th class="py-2 text-right">從高點回落</th></tr></thead>
+          <tbody>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">9b</td><td class="py-2 pr-3 text-right mono">5,352,737</td><td class="py-2 pr-3 text-right mono">12,768,577</td><td class="py-2 pr-3 text-right mono">9,959,204</td><td class="py-2 pr-3 text-right mono text-emerald-300">+86.06%</td><td class="py-2 text-right mono text-rose-300">−22.00%</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">9c</td><td class="py-2 pr-3 text-right mono">5,534,030</td><td class="py-2 pr-3 text-right mono">13,276,424</td><td class="py-2 pr-3 text-right mono">10,412,622</td><td class="py-2 pr-3 text-right mono text-emerald-300">+88.16%</td><td class="py-2 text-right mono text-rose-300">−21.57%</td></tr>
+            <tr><td class="py-2 pr-3">完整 Combo9</td><td class="py-2 pr-3 text-right mono">6,863,445</td><td class="py-2 pr-3 text-right mono">16,446,726</td><td class="py-2 pr-3 text-right mono">11,858,744</td><td class="py-2 pr-3 text-right mono text-emerald-300">+72.78%</td><td class="py-2 text-right mono text-rose-300">−27.90%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-slate-500">今年仍是賺的。從 6 月高點回落的幅度，還沒有超過全期收盤 MDD。</p>
+    </section>
+
+    <section id="years" class="card p-5 space-y-3">
+      <h2 class="text-base font-bold text-white">逐年報酬與當年 OHLC 回撤</h2>
+      <p class="text-xs text-slate-500">儲存格是報酬，括號是當年 OHLC 回撤。00631L 從 2015 才有。1 倍含息是現貨基準。</p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-slate-400 border-b border-slate-700"><tr><th class="py-2 pr-3 text-left">年</th><th class="py-2 pr-3 text-right">9b</th><th class="py-2 pr-3 text-right">9c</th><th class="py-2 pr-3 text-right">Combo9</th><th class="py-2 pr-3 text-right">1 倍含息</th><th class="py-2 text-right">00631L</th></tr></thead>
+          <tbody class="mono text-slate-200">
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2007</td><td class="py-1.5 pr-3 text-right">−0.6（9.9）</td><td class="py-1.5 pr-3 text-right">−1.4（13.6）</td><td class="py-1.5 pr-3 text-right">−4.6（15.1）</td><td class="py-1.5 pr-3 text-right">−7.0</td><td class="py-1.5 text-right">—</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2008</td><td class="py-1.5 pr-3 text-right">−4.7（17.5）</td><td class="py-1.5 pr-3 text-right">−4.5（17.7）</td><td class="py-1.5 pr-3 text-right">−0.2（15.6）</td><td class="py-1.5 pr-3 text-right">−43.1</td><td class="py-1.5 text-right">—</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2009</td><td class="py-1.5 pr-3 text-right">+71.9（24.1）</td><td class="py-1.5 pr-3 text-right">+69.8（23.5）</td><td class="py-1.5 pr-3 text-right">+102.2（24.3）</td><td class="py-1.5 pr-3 text-right">+83.3</td><td class="py-1.5 text-right">—</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2010</td><td class="py-1.5 pr-3 text-right">+4.5（23.9）</td><td class="py-1.5 pr-3 text-right">+5.9（24.5）</td><td class="py-1.5 pr-3 text-right">+3.5（25.4）</td><td class="py-1.5 pr-3 text-right">+13.6</td><td class="py-1.5 text-right">—</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2011</td><td class="py-1.5 pr-3 text-right">−20.9（24.0）</td><td class="py-1.5 pr-3 text-right">−20.5（23.7）</td><td class="py-1.5 pr-3 text-right">−20.5（23.8）</td><td class="py-1.5 pr-3 text-right">−18.0</td><td class="py-1.5 text-right">—</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2012</td><td class="py-1.5 pr-3 text-right">+20.7（15.7）</td><td class="py-1.5 pr-3 text-right">+20.4（16.1）</td><td class="py-1.5 pr-3 text-right">+19.8（15.3）</td><td class="py-1.5 pr-3 text-right">+12.9</td><td class="py-1.5 text-right">—</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2013</td><td class="py-1.5 pr-3 text-right">+1.9（12.8）</td><td class="py-1.5 pr-3 text-right">+1.6（13.1）</td><td class="py-1.5 pr-3 text-right">+5.1（17.4）</td><td class="py-1.5 pr-3 text-right">+15.1</td><td class="py-1.5 text-right">—</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2014</td><td class="py-1.5 pr-3 text-right">+15.0（9.6）</td><td class="py-1.5 pr-3 text-right">+14.7（10.3）</td><td class="py-1.5 pr-3 text-right">+13.0（9.9）</td><td class="py-1.5 pr-3 text-right">+11.4</td><td class="py-1.5 text-right">—</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2015</td><td class="py-1.5 pr-3 text-right">−3.8（16.3）</td><td class="py-1.5 pr-3 text-right">−2.9（15.6）</td><td class="py-1.5 pr-3 text-right">−4.0（16.6）</td><td class="py-1.5 pr-3 text-right">−6.9</td><td class="py-1.5 text-right">−16.5</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2016</td><td class="py-1.5 pr-3 text-right">+25.9（14.0）</td><td class="py-1.5 pr-3 text-right">+28.1（14.6）</td><td class="py-1.5 pr-3 text-right">+24.9（15.1）</td><td class="py-1.5 pr-3 text-right">+15.6</td><td class="py-1.5 text-right">+39.2</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2017</td><td class="py-1.5 pr-3 text-right">+21.7（19.8）</td><td class="py-1.5 pr-3 text-right">+19.9（19.4）</td><td class="py-1.5 pr-3 text-right">+23.4（19.3）</td><td class="py-1.5 pr-3 text-right">+19.5</td><td class="py-1.5 text-right">+39.8</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2018</td><td class="py-1.5 pr-3 text-right">−11.7（16.1）</td><td class="py-1.5 pr-3 text-right">−11.7（16.0）</td><td class="py-1.5 pr-3 text-right">−10.9（17.5）</td><td class="py-1.5 pr-3 text-right">−4.8</td><td class="py-1.5 text-right">−10.4</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2019</td><td class="py-1.5 pr-3 text-right">+41.8（15.9）</td><td class="py-1.5 pr-3 text-right">+39.2（16.7）</td><td class="py-1.5 pr-3 text-right">+43.4（15.3）</td><td class="py-1.5 pr-3 text-right">+28.9</td><td class="py-1.5 text-right">+70.9</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2020</td><td class="py-1.5 pr-3 text-right">+76.7（14.0）</td><td class="py-1.5 pr-3 text-right">+78.3（14.2）</td><td class="py-1.5 pr-3 text-right">+77.4（13.9）</td><td class="py-1.5 pr-3 text-right">+27.1</td><td class="py-1.5 text-right">+68.1</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2021</td><td class="py-1.5 pr-3 text-right text-rose-300">+28.0（30.0）</td><td class="py-1.5 pr-3 text-right">+31.4（28.9）</td><td class="py-1.5 pr-3 text-right">+29.9（29.6）</td><td class="py-1.5 pr-3 text-right">+27.1</td><td class="py-1.5 text-right">+62.2</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2022</td><td class="py-1.5 pr-3 text-right">−8.7（15.3）</td><td class="py-1.5 pr-3 text-right">−8.8（15.3）</td><td class="py-1.5 pr-3 text-right">−9.0（15.6）</td><td class="py-1.5 pr-3 text-right">−18.7</td><td class="py-1.5 text-right">−36.4</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2023</td><td class="py-1.5 pr-3 text-right">+26.1（12.6）</td><td class="py-1.5 pr-3 text-right">+26.2（12.2）</td><td class="py-1.5 pr-3 text-right">+34.7（12.8）</td><td class="py-1.5 pr-3 text-right">+31.5</td><td class="py-1.5 text-right">+62.9</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2024</td><td class="py-1.5 pr-3 text-right">+39.1（28.4）</td><td class="py-1.5 pr-3 text-right">+39.0（28.9）</td><td class="py-1.5 pr-3 text-right">+39.3（28.5）</td><td class="py-1.5 pr-3 text-right">+31.7</td><td class="py-1.5 text-right">+59.0</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">2025</td><td class="py-1.5 pr-3 text-right">+68.5（14.7）</td><td class="py-1.5 pr-3 text-right">+70.4（14.6）</td><td class="py-1.5 pr-3 text-right">+63.9（15.0）</td><td class="py-1.5 pr-3 text-right">+29.5</td><td class="py-1.5 text-right">+51.0</td></tr>
+            <tr><td class="py-1.5 pr-3">2026</td><td class="py-1.5 pr-3 text-right">+86.1（25.9）</td><td class="py-1.5 pr-3 text-right">+88.2（29.7）</td><td class="py-1.5 pr-3 text-right">+72.8（30.4）</td><td class="py-1.5 pr-3 text-right">+39.3</td><td class="py-1.5 text-right">+59.1</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-sm text-slate-300 leading-relaxed">2008 年 9b 只跌 4.7%，同年現貨含息跌 43%。2011 年 9b 跌 20.9%，和現貨同一級。2021 年 9b 的當年 OHLC 回撤 30%，是這張年表裡它最深的一年，也對上全期 OHLC 落在 2021-05-12。</p>
+      <p class="text-sm text-slate-300 leading-relaxed">口數會跟著權益變大。9b 最大 Core 50 口、最大 B1 13 口，防守狀態 915 天。9c 最大 Core 53 口、最大 B1 27 口。完整 Combo9 最大 Core 66 口、最大 B1 16 口，防守狀態 670 天。</p>
+    </section>
+
+    <section id="fills" class="card p-5 space-y-3">
+      <h2 class="text-base font-bold text-white">成交結構</h2>
+      <p class="text-sm text-slate-300">全期滑價 2 點。口數都是正整數，方向只有多單。沒有 <span class="mono">gap_or_unmet_margin_call</span>。</p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-slate-400 border-b border-slate-700"><tr><th class="py-2 pr-3 text-left">原因</th><th class="py-2 pr-3 text-right">9b</th><th class="py-2 text-right">9c</th></tr></thead>
+          <tbody>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">訊號進出</td><td class="py-1.5 pr-3 text-right mono">203</td><td class="py-1.5 text-right mono">212</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">換月平倉</td><td class="py-1.5 pr-3 text-right mono">200</td><td class="py-1.5 text-right mono">201</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">換月淨額再開</td><td class="py-1.5 pr-3 text-right mono">187</td><td class="py-1.5 text-right mono">186</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">B1 停利或到期</td><td class="py-1.5 pr-3 text-right mono">116</td><td class="py-1.5 text-right mono">121</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">再平衡加倉</td><td class="py-1.5 pr-3 text-right mono">49</td><td class="py-1.5 text-right mono">56</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">恢復 2 倍</td><td class="py-1.5 pr-3 text-right mono">46</td><td class="py-1.5 text-right mono">49</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">訊號平到 0</td><td class="py-1.5 pr-3 text-right mono">37</td><td class="py-1.5 text-right mono">37</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">B1 的 ATR 出場</td><td class="py-1.5 pr-3 text-right mono">33</td><td class="py-1.5 text-right mono">34</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">總槓桿上限縮倉</td><td class="py-1.5 pr-3 text-right mono">32</td><td class="py-1.5 text-right mono">28</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">MA60 降檔</td><td class="py-1.5 pr-3 text-right mono">31</td><td class="py-1.5 text-right mono">32</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">雷達降檔</td><td class="py-1.5 pr-3 text-right mono">23</td><td class="py-1.5 text-right mono">22</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">再平衡減倉</td><td class="py-1.5 pr-3 text-right mono">9</td><td class="py-1.5 text-right mono">14</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-1.5 pr-3">期末平倉</td><td class="py-1.5 pr-3 text-right mono">1</td><td class="py-1.5 text-right mono">1</td></tr>
+            <tr><td class="py-1.5 pr-3 font-semibold">合計</td><td class="py-1.5 pr-3 text-right mono font-semibold">967</td><td class="py-1.5 text-right mono font-semibold">993</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-slate-500">換月平倉多於再開，是因為有些換月日舊倉沒有接回去。9b 有 172 個不同的換月平倉日。15% 原始保證金和 25% 門檻這次回測沒有打出斷頭成交，不代表券商保證金已被核過。</p>
+    </section>
+
+    <section id="e1" class="card p-5 space-y-3">
+      <h2 class="text-base font-bold text-white">和 E1／E2／E3 並排</h2>
+      <p class="text-sm text-slate-300 leading-relaxed">同一段日期、同樣 25 萬、同樣滑價 2 點、同樣每點 10 元。除此以外不是同一套測試。9 系手續費 12 元，E 組 8 元。9 系沒有空單，E1 有。9 系的 OHLC 用同日標籤的夜盤，E1 的夜盤 MDD 用下一個交易日的夜盤。9 系季線降檔目標是 0.70 倍，E1 防守時約收到 1 倍，並且不再加 B1。</p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-xs text-slate-400 border-b border-slate-700"><tr><th class="py-2 pr-3 text-left">版本</th><th class="py-2 pr-3 text-right">期末</th><th class="py-2 pr-3 text-right">CAGR</th><th class="py-2 pr-3 text-right">收盤 MDD</th><th class="py-2 pr-3 text-right">另一種回撤</th><th class="py-2 pr-3 text-right">Sharpe</th><th class="py-2 pr-3 text-right">成交</th><th class="py-2 pr-3 text-right">費稅</th><th class="py-2 text-right">滑價</th></tr></thead>
+          <tbody>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">9b</td><td class="py-2 pr-3 text-right mono">9,959,204</td><td class="py-2 pr-3 text-right mono">21.00%</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.34%</td><td class="py-2 pr-3 text-right mono">OHLC −29.99%</td><td class="py-2 pr-3 text-right mono">0.913</td><td class="py-2 pr-3 text-right mono">967</td><td class="py-2 pr-3 text-right mono">114,266</td><td class="py-2 text-right mono">146,320</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">9c</td><td class="py-2 pr-3 text-right mono">10,412,622</td><td class="py-2 pr-3 text-right mono">21.28%</td><td class="py-2 pr-3 text-right mono text-rose-300">−28.61%</td><td class="py-2 pr-3 text-right mono">OHLC −29.67%</td><td class="py-2 pr-3 text-right mono">0.911</td><td class="py-2 pr-3 text-right mono">993</td><td class="py-2 pr-3 text-right mono">120,278</td><td class="py-2 text-right mono">153,720</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">完整 Combo9</td><td class="py-2 pr-3 text-right mono">11,858,744</td><td class="py-2 pr-3 text-right mono">22.10%</td><td class="py-2 pr-3 text-right mono text-rose-300">−31.28%</td><td class="py-2 pr-3 text-right mono">OHLC −31.79%</td><td class="py-2 pr-3 text-right mono">0.921</td><td class="py-2 pr-3 text-right mono">1,064</td><td class="py-2 pr-3 text-right mono">152,826</td><td class="py-2 text-right mono">193,240</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">E1</td><td class="py-2 pr-3 text-right mono">6,006,856</td><td class="py-2 pr-3 text-right mono">17.88%</td><td class="py-2 pr-3 text-right mono text-rose-300">−32.87%</td><td class="py-2 pr-3 text-right mono">次日夜盤 −33.10%</td><td class="py-2 pr-3 text-right mono">0.783</td><td class="py-2 pr-3 text-right mono">1,074</td><td class="py-2 pr-3 text-right mono">87,174</td><td class="py-2 text-right mono">151,600</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-3">E2</td><td class="py-2 pr-3 text-right mono">6,687,667</td><td class="py-2 pr-3 text-right mono">18.54%</td><td class="py-2 pr-3 text-right mono text-rose-300">−34.43%</td><td class="py-2 pr-3 text-right mono">次日夜盤 −34.43%</td><td class="py-2 pr-3 text-right mono">0.802</td><td class="py-2 pr-3 text-right mono">1,159</td><td class="py-2 pr-3 text-right mono">100,443</td><td class="py-2 text-right mono">172,560</td></tr>
+            <tr><td class="py-2 pr-3">E3</td><td class="py-2 pr-3 text-right mono">6,710,537</td><td class="py-2 pr-3 text-right mono">18.56%</td><td class="py-2 pr-3 text-right mono text-rose-300">−32.95%</td><td class="py-2 pr-3 text-right mono">次日夜盤 −32.95%</td><td class="py-2 pr-3 text-right mono">0.792</td><td class="py-2 pr-3 text-right mono">1,175</td><td class="py-2 pr-3 text-right mono">97,853</td><td class="py-2 text-right mono">168,400</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-sm text-slate-300 leading-relaxed">9 系付了更高的手續費，期末仍然較高。這只說明兩套規則在各自成本下的歷史帳，不是 9c 已經打贏 E1 的實盤證明。重疊期那組 29% 年化沒有用同樣的 914,075 重跑 E 組，所以不和 E1 的全期 17.88% 放在一起比。</p>
+    </section>
+
+    <section id="risk" class="card p-5 space-y-3">
+      <h2 class="text-base font-bold text-white">時間、資料與風險</h2>
+      <ul class="text-sm text-slate-300 space-y-2 list-disc pl-5 leading-relaxed">
+        <li>交易決策用前一日現貨。沒有看到用當天收盤價決定當天開盤。雷達旗標掛在執行日，但現貨高點用前一日，總經只用嚴格早於當日的最後一筆。</li>
+        <li>USDTWD 在 4,749 天裡有 13 天資料年齡超過 7 天，最長 26 天：2008-08-25 用到 2008-07-30。AUDJPY、VIX、HYG、IEF、TSM 最長 5 天。沒有自造發布時間。</li>
+        <li>夜盤標籤不是下一夜。2017-05-16 之後同時有日盤和盤後的 12,921 列裡，夜盤收盤離同日日盤開盤的價差中位數是 27 點，離次日開盤是 102 點。同日標籤比較像開盤前已經走完的夜盤。腳本卻在日盤做完之後用這個價格估當天持倉。OHLC MDD 不是收盤之後的夜盤風險。</li>
+        <li>SafeB1 沒有全帳戶 1.25 倍硬頂。9b 仍有 5 天進場總槓桿高於 1.25，最高約 2.20：2009-11-30、2013-07-22、2019-06-27、2024-01-18、2025-01-03。前四天 RSI5 都低於 28，Core 不會因為跌破 MA60 而降到 0.70 倍。</li>
+        <li>B1 的 1.6 ATR 是前一日收盤判斷、下一期貨開盤出場，不是盤中停損。</li>
+      </ul>
+    </section>
+
+    <section class="card p-5 border-l-4 border-l-amber-400 space-y-2">
+      <h2 class="text-base font-bold text-white">建議</h2>
+      <p class="text-sm text-slate-300 leading-relaxed">帳可以重現，可以留在研究對照，不能依這次回測直接實盤。樣本全部已經看過，不是新的樣本外。</p>
+      <p class="text-sm text-slate-300 leading-relaxed">若只在這包裡留一版：9b 的收盤回撤較淺、成交較少，期末比 9c 少約 45 萬。9c 的 OHLC 回撤略淺，但最深點在 2026 年 7 月。完整 Combo9 賺得最多，回撤也深過 31%，2026 年從高點回落 27.90%。</p>
+      <p class="text-sm text-slate-300 leading-relaxed">不把 9b 或 9c 換成 E1 的實盤候選。要先另建新版本處理兩件事：夜盤改成真正的下一夜再重算 MDD，以及若要限制總風險，就要有全帳戶上限，而不是只把 B1 目標改成 0.55 倍。這兩件都不應覆寫這次的凍結檔。</p>
+    </section>
+  </main>
+</body>
+</html>
