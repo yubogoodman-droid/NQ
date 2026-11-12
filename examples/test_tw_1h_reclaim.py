@@ -398,6 +398,19 @@ def test_index_return_filter() -> None:
     assert funnel2["index_missing"] == len(sigs)
 
 
+def test_upper_wick_rejected() -> None:
+    """第一根站上均線卻留長上影線（收在當根振幅下緣），整波放棄不追。"""
+    closes, lows = valid_closes()
+    highs = [c + 0.3 for c in closes]
+    # 倒數第 3 根是 reclaim（101.0, low 100.4），拉高 high 到 103.0 讓上影線占 > 75%
+    highs[-3] = 103.0
+    df = ohlc_from_close(closes, lows=lows, highs=highs)
+    funnel: dict = {}
+    assert detect_signals(df, loose_params(), funnel=funnel) == []
+    assert funnel.get("upper_wick", 0) == 1
+    assert len(detect_signals(df, loose_params(min_close_pos=0.0))) == 1
+
+
 def test_summarize() -> None:
     stats = summarize_trades([])
     assert stats["count"] == 0
@@ -427,6 +440,7 @@ def main() -> int:
     test_simulate_stop_and_target()
     test_stop_cap_cuts_wide_trough()
     test_index_return_filter()
+    test_upper_wick_rejected()
     test_filter_entry_window()
     test_filter_entry_range_and_skip()
     test_price_cap_keeps_cheap_entry()
