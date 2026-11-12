@@ -113,6 +113,19 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## SOXS 一分 K 假突破做空
+
+幣安 `SOXSUSDT` 1 分 K。價格刺過近 120 根前高、超漲不超過 3.5%，接著收盤跌破 MA25 與 MA30，且 MA7 已跌破 MA14。下一到十根內，前一根收盤還在 MA25 下，就在前一根 MA14／MA25 掛空。停損放在假突破高點上方 0.1%，停利 2.5R，最長拿 60 根。只在台北時間週一到週五 20:00–隔日 05:00 進場。來回扣 0.06%，未扣資金費。
+
+```bash
+python3 examples/soxs_fake_breakout.py --days 30 --pages
+python3 examples/test_soxs_fake_breakout.py
+```
+
+2026-10-14 → 11-13（台北時間）：**31 筆、勝率 38.7%、淨報酬 +14.21%、合計 +6.19R**。2026-11-12 22:26 空在 50.20，假高 50.78，22:33 停利 48.62（+3.08%、+2.50R）。同一套認定若改成全時段，淨報酬只剩 +2.27%，合計 R 轉負。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-fake-breakout-backtest-274a/docs/soxs-fake-breakout-30d/view.html
+
 ## 快速開始
 
 ```bash

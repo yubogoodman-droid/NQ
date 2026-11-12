@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SOXSUSDT 假突破做空 · 30 天</title>
+<style>
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}
+.page{max-width:720px;margin:0 auto;padding:14px 12px 32px}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+h1{font-size:18px;margin:0 0 6px} h2{font-size:15px;margin:16px 0 8px}
+.muted{color:#8b949e;font-size:13px;line-height:1.55}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:18px;margin-top:4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}
+.card-header{display:flex;justify-content:space-between;gap:10px}
+.trade-no{font-weight:700} .trade-time{font-size:12px;color:#8b949e;display:block}
+.card-pnl{font-weight:700} .pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.tag{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#79c0ff}
+.tag-tp{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}
+.tag-sl{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}
+.tag-time{background:rgba(255,193,7,0.12);color:#f0c14b;border-color:rgba(255,193,7,0.3)}
+.trade-detail{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}
+.rules{margin:0;padding-left:1.2em;color:#c9d1d9;font-size:13px;line-height:1.65}
+.rules li{margin-bottom:6px}
+code{font-size:12px;background:#0d1117;padding:1px 4px;border-radius:4px}
+.note{margin-top:8px;padding:8px 10px;background:#0d1117;border-radius:8px;color:#f0c14b;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+th,td{border-bottom:1px solid #21262d;padding:6px 4px;text-align:right}
+th:first-child,td:first-child{text-align:left}
+.empty{text-align:center;color:#8b949e;padding:40px 12px;border:1px solid #30363d;border-radius:14px}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>SOXSUSDT 1 分 K 假突破做空</h1>
+<p class="muted">進場 2026-10-14 00:53 → 2026-11-13 00:53 台北時間 · K 線熱身從 2026-10-12 00:05 · 46129 根 · 進場模式 limit · 時段 tpe_us</p>
+<h2>觸發規則（對齊程式）</h2>
+
+<ol class="rules">
+<li><b>資料</b>：幣安 U 本位 <code>SOXSUSDT</code> 1 分 K，時區 Asia/Taipei。未收盤的當根先丟掉。</li>
+<li><b>回測窗</b>：只統計最後一根往前 30 天內進場的單。MA 用更早的 K 熱身。</li>
+<li><b>時段</b>：只在台北時間週一至週五 20:00–隔日 05:00 尋找與進場（約美東正規盤加開盤前兩小時；冬令時對得上 07:00–16:00 ET，夏令時會晚一小時）。</li>
+<li><b>前高</b>：當根往前第 15～120 根的最高價，而且這段之後到當根之前都沒再摸到該高點。前高之後、突破之前，收盤曾經低於 MA25。</li>
+<li><b>假突破</b>：高點刺過前高，往後 25 根內的最高超漲要落在 0.2%～3.5%。超過上限當成真突破，整段放棄。</li>
+<li><b>跌破</b>：超漲達標之後，第一根同時收盤 &lt; MA25、收盤 &lt; MA30、收盤 &lt; 前高，而且 MA7 &lt; MA14。</li>
+<li><b>進場</b>：跌破後 1～10 根內，前一根收盤仍在 MA25 下方，才掛空單。掛單價＝前一根 MA14 與 MA25 中價、以及前一根 MA25，取較低者；若這個價低於前一根收盤，就改掛在前一根收盤上方 0.02%，避免變成追空。當根最高價碰到掛單才成交；開盤價已高於掛單時，以開盤價賣出。進場那根若最高價已經碰到停損，這筆不算。</li>
+<li><b>停損</b>：假突破最高價 × 1.001。停損距離不到 0.2% 或超過 3.5% 就不做。</li>
+<li><b>出場</b>：停利 2.5R。進場那根只允許被停損，停利從下一根才算；同一根先算停損。最長 60 根，否則用該根收盤出場。</li>
+<li><b>成本與持倉</b>：來回扣 0.06%（掛單 maker 0.02% + 出場 taker 0.04%），未扣資金費率。同一時間只留一筆。</li>
+</ol>
+<p class="note">價格報酬是永續合約本身的漲跌，不是再乘保證金槓桿。SOXS 現貨本來就是 3 倍反向半導體；這裡沒有再疊一層槓桿，也沒有模擬強平。</p>
+
+<h2>回測統計</h2>
+<p class="muted">漏斗：刺破前高 91 → 超漲過大放棄 7 → 跌破 MA25/30 41 → 進場 31
+（風險不合 10）
+<br/>出場：停利 5 · 停損 15 · 時間 11 · 未走完 0</p>
+<div class="cards">
+<div class="card">筆數<b>31</b></div>
+<div class="card">勝率<b>38.7%</b></div>
+<div class="card">淨報酬<b class="pnl-win">+14.21%</b></div>
+<div class="card">合計 R<b class="pnl-win">+6.19R</b></div>
+<div class="card">平均<b class="pnl-win">+0.46%</b></div>
+<div class="card">中位數<b>-0.53%</b></div>
+<div class="card">最好<b class="pnl-win">+5.36%</b></div>
+<div class="card">最差<b class="pnl-loss">-1.92%</b></div>
+</div>
+<div class="equity"><svg viewBox="0 0 520 120" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="83.5" x2="520" y2="83.5" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,83.5 16.8,88.2 33.5,94.1 50.3,98.7 67.1,108.4 83.9,87.9 100.6,90.6 117.4,90.7 134.2,82.4 151.0,84.1 167.7,70.6 184.5,73.2 201.3,76.9 218.1,82.1 234.8,87.8 251.6,85.8 268.4,58.7 285.2,45.9 301.9,49.2 318.7,40.1 335.5,42.8 352.3,51.0 369.0,44.6 385.8,47.3 402.6,35.4 419.4,40.9 436.1,47.7 452.9,26.6 469.7,33.3 486.5,23.0 503.2,27.2 520.0,11.6"/></svg></div>
+<h2>同資料對照</h2>
+<table>
+<tr><th>版本</th><th>筆數</th><th>勝率</th><th>淨報酬</th><th>合計 R</th></tr>
+<tr><td>主策略 limit / tpe_us</td><td>31</td><td>38.7%</td><td class='pnl-win'>+14.21%</td><td>+6.19R</td></tr><tr><td>回測掛單 / 美東 07:00–16:00</td><td>32</td><td>34.4%</td><td class='pnl-win'>+10.58%</td><td>+1.69R</td></tr><tr><td>回測掛單 / 全時段</td><td>68</td><td>30.9%</td><td class='pnl-win'>+2.27%</td><td>-7.03R</td></tr><tr><td>跌破下一根開盤 / tpe_us</td><td>37</td><td>40.5%</td><td class='pnl-win'>+15.30%</td><td>+4.14R</td></tr>
+</table>
+<p class="note">上面每一張圖是主策略。對照列用同一段 K 線、同一套假突破認定，只換進場方式或時段。紅虛線是停損，綠虛線是停利，灰虛線是被刺破的前高。</p>
+</section>
+<article class='trade-card'><header class='card-header'><div><span class='trade-no'>#1 · SOXSUSDT</span><span class='trade-time'>2026-10-14 21:32 → 10-14 21:32</span></div><div class='card-pnl pnl-loss'>-0.93%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 40.01</span><span class='tag'>假高 40.20</span></div><pre class='trade-detail'>entry 39.89  stop 40.24  (+0.35)
+target 39.02  exit 40.24  stop
+前高 10-14 20:59 40.01  假突破 10-14 21:29 40.20
+跌破 10-14 21:30  MA7 39.93 / MA14 39.96 / MA25 39.90 / MA30 39.89</pre><div class='mini-chart'><img src='img/t01_1014_2132.png' alt='#1' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#2 · SOXSUSDT</span><span class='trade-time'>2026-10-14 22:21 → 10-14 23:06</span></div><div class='card-pnl pnl-loss'>-1.18%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 40.37</span><span class='tag'>假高 40.63</span></div><pre class='trade-detail'>entry 40.22  stop 40.67  (+0.45)
+target 39.10  exit 40.67  stop
+前高 10-14 21:37 40.37  假突破 10-14 21:59 40.63
+跌破 10-14 22:17  MA7 40.10 / MA14 40.18 / MA25 40.26 / MA30 40.24</pre><div class='mini-chart'><img src='img/t02_1014_2221.png' alt='#2' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#3 · SOXSUSDT</span><span class='trade-time'>2026-10-15 02:04 → 10-15 03:02</span></div><div class='card-pnl pnl-loss'>-0.90%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 42.48</span><span class='tag'>假高 42.71</span></div><pre class='trade-detail'>entry 42.40  stop 42.75  (+0.36)
+target 41.51  exit 42.75  stop
+前高 10-15 00:31 42.48  假突破 10-15 02:01 42.71
+跌破 10-15 02:03  MA7 42.47 / MA14 42.49 / MA25 42.40 / MA30 42.37</pre><div class='mini-chart'><img src='img/t03_1015_0204.png' alt='#3' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#4 · SOXSUSDT</span><span class='trade-time'>2026-10-15 20:44 → 10-15 21:27</span></div><div class='card-pnl pnl-loss'>-1.92%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 47.00</span><span class='tag'>假高 47.11</span></div><pre class='trade-detail'>entry 46.30  stop 47.16  (+0.86)
+target 44.15  exit 47.16  stop
+前高 10-15 19:06 47.00  假突破 10-15 20:31 47.11
+跌破 10-15 20:43  MA7 46.30 / MA14 46.40 / MA25 46.30 / MA30 46.29</pre><div class='mini-chart'><img src='img/t04_1015_2044.png' alt='#4' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#5 · SOXSUSDT</span><span class='trade-time'>2026-10-15 22:09 → 10-15 23:09</span></div><div class='card-pnl pnl-win'>+4.05%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>+1.78R</span><span class='tag'>前高 48.06</span><span class='tag'>假高 48.43</span></div><pre class='trade-detail'>entry 47.39  stop 48.48  (+1.09)
+target 44.65  exit 45.44  time
+前高 10-15 21:36 48.06  假突破 10-15 21:57 48.43
+跌破 10-15 22:08  MA7 47.30 / MA14 47.54 / MA25 47.44 / MA30 47.22</pre><div class='mini-chart'><img src='img/t05_1015_2209.png' alt='#5' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#6 · SOXSUSDT</span><span class='trade-time'>2026-10-16 21:15 → 10-16 21:18</span></div><div class='card-pnl pnl-loss'>-0.54%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 45.72</span><span class='tag'>假高 45.95</span></div><pre class='trade-detail'>entry 45.78  stop 46.00  (+0.22)
+target 45.23  exit 46.00  stop
+前高 10-16 19:42 45.72  假突破 10-16 20:58 45.95
+跌破 10-16 21:10  MA7 45.67 / MA14 45.75 / MA25 45.80 / MA30 45.79</pre><div class='mini-chart'><img src='img/t06_1016_2115.png' alt='#6' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#7 · SOXSUSDT</span><span class='trade-time'>2026-10-16 22:04 → 10-16 23:04</span></div><div class='card-pnl pnl-loss'>-0.00%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>+0.03R</span><span class='tag'>前高 47.21</span><span class='tag'>假高 47.32</span></div><pre class='trade-detail'>entry 46.53  stop 47.37  (+0.84)
+target 44.42  exit 46.50  time
+前高 10-16 21:36 47.21  假突破 10-16 21:56 47.32
+跌破 10-16 22:03  MA7 46.60 / MA14 46.76 / MA25 46.53 / MA30 46.57</pre><div class='mini-chart'><img src='img/t07_1016_2204.png' alt='#7' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#8 · SOXSUSDT</span><span class='trade-time'>2026-10-20 20:20 → 10-20 20:42</span></div><div class='card-pnl pnl-win'>+1.63%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag'>+2.50R</span><span class='tag'>前高 49.40</span><span class='tag'>假高 49.61</span></div><pre class='trade-detail'>entry 49.33  stop 49.66  (+0.33)
+target 48.49  exit 48.49  target
+前高 10-20 19:49 49.40  假突破 10-20 20:14 49.61
+跌破 10-20 20:18  MA7 49.34 / MA14 49.39 / MA25 49.33 / MA30 49.31</pre><div class='mini-chart'><img src='img/t08_1020_2020.png' alt='#8' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#9 · SOXSUSDT</span><span class='trade-time'>2026-10-21 02:53 → 10-21 03:53</span></div><div class='card-pnl pnl-loss'>-0.34%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>-0.29R</span><span class='tag'>前高 46.69</span><span class='tag'>假高 46.87</span></div><pre class='trade-detail'>entry 46.47  stop 46.92  (+0.45)
+target 45.35  exit 46.60  time
+前高 10-21 01:01 46.69  假突破 10-21 02:43 46.87
+跌破 10-21 02:51  MA7 46.43 / MA14 46.55 / MA25 46.48 / MA30 46.45</pre><div class='mini-chart'><img src='img/t09_1021_0253.png' alt='#9' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#10 · SOXSUSDT</span><span class='trade-time'>2026-10-21 04:20 → 10-21 04:51</span></div><div class='card-pnl pnl-win'>+2.68%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag'>+2.50R</span><span class='tag'>前高 46.87</span><span class='tag'>假高 47.26</span></div><pre class='trade-detail'>entry 46.79  stop 47.31  (+0.51)
+target 45.51  exit 45.51  target
+前高 10-21 02:43 46.87  假突破 10-21 03:59 47.26
+跌破 10-21 04:10  MA7 46.76 / MA14 46.73 / MA25 46.85 / MA30 46.81</pre><div class='mini-chart'><img src='img/t10_1021_0420.png' alt='#10' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#11 · SOXSUSDT</span><span class='trade-time'>2026-10-23 01:00 → 10-23 02:00</span></div><div class='card-pnl pnl-loss'>-0.51%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>-0.30R</span><span class='tag'>前高 52.95</span><span class='tag'>假高 53.44</span></div><pre class='trade-detail'>entry 52.70  stop 53.49  (+0.79)
+target 50.73  exit 52.94  time
+前高 10-22 23:14 52.95  假突破 10-23 00:50 53.44
+跌破 10-23 00:58  MA7 52.72 / MA14 52.92 / MA25 52.72 / MA30 52.63</pre><div class='mini-chart'><img src='img/t11_1023_0100.png' alt='#11' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#12 · SOXSUSDT</span><span class='trade-time'>2026-10-23 03:15 → 10-23 03:34</span></div><div class='card-pnl pnl-loss'>-0.74%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 53.35</span><span class='tag'>假高 53.71</span></div><pre class='trade-detail'>entry 53.40  stop 53.76  (+0.36)
+target 52.50  exit 53.76  stop
+前高 10-23 02:02 53.35  假突破 10-23 03:02 53.71
+跌破 10-23 03:13  MA7 53.44 / MA14 53.50 / MA25 53.42 / MA30 53.37</pre><div class='mini-chart'><img src='img/t12_1023_0315.png' alt='#12' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#13 · SOXSUSDT</span><span class='trade-time'>2026-10-23 20:27 → 10-23 20:36</span></div><div class='card-pnl pnl-loss'>-1.04%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 52.87</span><span class='tag'>假高 53.18</span></div><pre class='trade-detail'>entry 52.72  stop 53.23  (+0.52)
+target 51.43  exit 53.23  stop
+前高 10-23 19:01 52.87  假突破 10-23 20:11 53.18
+跌破 10-23 20:20  MA7 52.63 / MA14 52.70 / MA25 52.73 / MA30 52.68</pre><div class='mini-chart'><img src='img/t13_1023_2027.png' alt='#13' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#14 · SOXSUSDT</span><span class='trade-time'>2026-10-23 21:24 → 10-23 21:29</span></div><div class='card-pnl pnl-loss'>-1.12%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 53.53</span><span class='tag'>假高 53.72</span></div><pre class='trade-detail'>entry 53.21  stop 53.77  (+0.57)
+target 51.80  exit 53.77  stop
+前高 10-23 20:54 53.53  假突破 10-23 21:17 53.72
+跌破 10-23 21:23  MA7 53.26 / MA14 53.33 / MA25 53.20 / MA30 53.21</pre><div class='mini-chart'><img src='img/t14_1023_2124.png' alt='#14' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#15 · SOXSUSDT</span><span class='trade-time'>2026-10-24 01:22 → 10-24 02:22</span></div><div class='card-pnl pnl-win'>+0.40%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>+0.62R</span><span class='tag'>前高 52.12</span><span class='tag'>假高 52.50</span></div><pre class='trade-detail'>entry 52.16  stop 52.55  (+0.39)
+target 51.18  exit 51.92  time
+前高 10-23 23:24 52.12  假突破 10-24 01:15 52.50
+跌破 10-24 01:21  MA7 52.18 / MA14 52.24 / MA25 52.16 / MA30 52.15</pre><div class='mini-chart'><img src='img/t15_1024_0122.png' alt='#15' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#16 · SOXSUSDT</span><span class='trade-time'>2026-10-26 22:25 → 10-26 23:00</span></div><div class='card-pnl pnl-win'>+5.36%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag'>+2.50R</span><span class='tag'>前高 51.75</span><span class='tag'>假高 52.13</span></div><pre class='trade-detail'>entry 51.07  stop 52.18  (+1.11)
+target 48.31  exit 48.31  target
+前高 10-26 21:30 51.75  假突破 10-26 22:08 52.13
+跌破 10-26 22:16  MA7 50.82 / MA14 50.91 / MA25 51.22 / MA30 51.21</pre><div class='mini-chart'><img src='img/t16_1026_2225.png' alt='#16' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#17 · SOXSUSDT</span><span class='trade-time'>2026-10-29 22:10 → 10-29 23:10</span></div><div class='card-pnl pnl-win'>+2.53%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>+1.10R</span><span class='tag'>前高 43.06</span><span class='tag'>假高 43.40</span></div><pre class='trade-detail'>entry 42.44  stop 43.44  (+1.00)
+target 39.93  exit 41.34  time
+前高 10-29 20:40 43.06  假突破 10-29 21:55 43.40
+跌破 10-29 22:00  MA7 42.18 / MA14 42.26 / MA25 42.58 / MA30 42.55</pre><div class='mini-chart'><img src='img/t17_1029_2210.png' alt='#17' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#18 · SOXSUSDT</span><span class='trade-time'>2026-10-30 01:30 → 10-30 01:47</span></div><div class='card-pnl pnl-loss'>-0.66%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 41.92</span><span class='tag'>假高 42.13</span></div><pre class='trade-detail'>entry 41.92  stop 42.17  (+0.25)
+target 41.29  exit 42.17  stop
+前高 10-30 00:33 41.92  假突破 10-30 01:15 42.13
+跌破 10-30 01:27  MA7 41.88 / MA14 41.95 / MA25 41.93 / MA30 41.88</pre><div class='mini-chart'><img src='img/t18_1030_0130.png' alt='#18' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#19 · SOXSUSDT</span><span class='trade-time'>2026-10-30 03:00 → 10-30 03:50</span></div><div class='card-pnl pnl-win'>+1.80%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag'>+2.50R</span><span class='tag'>前高 42.71</span><span class='tag'>假高 42.98</span></div><pre class='trade-detail'>entry 42.70  stop 43.02  (+0.32)
+target 41.91  exit 41.91  target
+前高 10-30 02:13 42.71  假突破 10-30 02:36 42.98
+跌破 10-30 02:51  MA7 42.64 / MA14 42.66 / MA25 42.73 / MA30 42.75</pre><div class='mini-chart'><img src='img/t19_1030_0300.png' alt='#19' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#20 · SOXSUSDT</span><span class='trade-time'>2026-10-30 21:28 → 10-30 21:35</span></div><div class='card-pnl pnl-loss'>-0.53%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 50.36</span><span class='tag'>假高 50.54</span></div><pre class='trade-detail'>entry 50.35  stop 50.59  (+0.24)
+target 49.76  exit 50.59  stop
+前高 10-30 20:44 50.36  假突破 10-30 21:13 50.54
+跌破 10-30 21:25  MA7 50.29 / MA14 50.35 / MA25 50.35 / MA30 50.31</pre><div class='mini-chart'><img src='img/t20_1030_2128.png' alt='#20' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#21 · SOXSUSDT</span><span class='trade-time'>2026-10-30 22:46 → 10-30 23:13</span></div><div class='card-pnl pnl-loss'>-1.62%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 50.85</span><span class='tag'>假高 51.61</span></div><pre class='trade-detail'>entry 50.87  stop 51.66  (+0.80)
+target 48.88  exit 51.66  stop
+前高 10-30 21:48 50.85  假突破 10-30 22:25 51.61
+跌破 10-30 22:37  MA7 50.57 / MA14 50.70 / MA25 50.99 / MA30 50.98</pre><div class='mini-chart'><img src='img/t21_1030_2246.png' alt='#21' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#22 · SOXSUSDT</span><span class='trade-time'>2026-11-03 04:50 → 11-03 05:50</span></div><div class='card-pnl pnl-win'>+1.26%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>+0.86R</span><span class='tag'>前高 58.12</span><span class='tag'>假高 58.60</span></div><pre class='trade-detail'>entry 57.76  stop 58.66  (+0.89)
+target 55.53  exit 57.00  time
+前高 11-03 03:50 58.12  假突破 11-03 04:40 58.60
+跌破 11-03 04:48  MA7 57.66 / MA14 57.96 / MA25 57.81 / MA30 57.60</pre><div class='mini-chart'><img src='img/t22_1103_0450.png' alt='#22' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#23 · SOXSUSDT</span><span class='trade-time'>2026-11-03 22:38 → 11-03 23:38</span></div><div class='card-pnl pnl-loss'>-0.53%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>-0.14R</span><span class='tag'>前高 53.57</span><span class='tag'>假高 54.41</span></div><pre class='trade-detail'>entry 52.64  stop 54.46  (+1.82)
+target 48.09  exit 52.89  time
+前高 11-03 20:36 53.57  假突破 11-03 22:31 54.41
+跌破 11-03 22:37  MA7 52.66 / MA14 52.97 / MA25 52.67 / MA30 52.56</pre><div class='mini-chart'><img src='img/t23_1103_2238.png' alt='#23' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#24 · SOXSUSDT</span><span class='trade-time'>2026-11-05 04:51 → 11-05 05:51</span></div><div class='card-pnl pnl-win'>+2.35%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>+1.78R</span><span class='tag'>前高 60.11</span><span class='tag'>假高 60.51</span></div><pre class='trade-detail'>entry 59.76  stop 60.57  (+0.81)
+target 57.74  exit 58.32  time
+前高 11-05 04:10 60.11  假突破 11-05 04:39 60.51
+跌破 11-05 04:49  MA7 59.74 / MA14 59.94 / MA25 59.77 / MA30 59.76</pre><div class='mini-chart'><img src='img/t24_1105_0451.png' alt='#24' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#25 · SOXSUSDT</span><span class='trade-time'>2026-11-05 21:42 → 11-05 22:01</span></div><div class='card-pnl pnl-loss'>-1.09%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 65.94</span><span class='tag'>假高 66.14</span></div><pre class='trade-detail'>entry 65.53  stop 66.21  (+0.68)
+target 63.84  exit 66.21  stop
+前高 11-05 21:01 65.94  假突破 11-05 21:31 66.14
+跌破 11-05 21:39  MA7 65.48 / MA14 65.65 / MA25 65.53 / MA30 65.53</pre><div class='mini-chart'><img src='img/t25_1105_2142.png' alt='#25' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#26 · SOXSUSDT</span><span class='trade-time'>2026-11-06 04:29 → 11-06 04:30</span></div><div class='card-pnl pnl-loss'>-1.36%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 78.30</span><span class='tag'>假高 78.67</span></div><pre class='trade-detail'>entry 77.74  stop 78.75  (+1.01)
+target 75.22  exit 78.75  stop
+前高 11-06 02:23 78.30  假突破 11-06 04:12 78.67
+跌破 11-06 04:27  MA7 77.67 / MA14 77.78 / MA25 77.80 / MA30 77.54</pre><div class='mini-chart'><img src='img/t26_1106_0429.png' alt='#26' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#27 · SOXSUSDT</span><span class='trade-time'>2026-11-07 02:00 → 11-07 03:00</span></div><div class='card-pnl pnl-win'>+4.18%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>+1.96R</span><span class='tag'>前高 75.02</span><span class='tag'>假高 76.08</span></div><pre class='trade-detail'>entry 74.54  stop 76.16  (+1.62)
+target 70.50  exit 71.38  time
+前高 11-06 23:39 75.02  假突破 11-07 01:53 76.08
+跌破 11-07 01:58  MA7 74.47 / MA14 74.86 / MA25 74.62 / MA30 74.23</pre><div class='mini-chart'><img src='img/t27_1107_0200.png' alt='#27' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#28 · SOXSUSDT</span><span class='trade-time'>2026-11-10 21:30 → 11-10 21:30</span></div><div class='card-pnl pnl-loss'>-1.34%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 57.99</span><span class='tag'>假高 58.22</span></div><pre class='trade-detail'>entry 57.54  stop 58.28  (+0.73)
+target 55.71  exit 58.28  stop
+前高 11-10 20:47 57.99  假突破 11-10 21:16 58.22
+跌破 11-10 21:23  MA7 57.57 / MA14 57.60 / MA25 57.63 / MA30 57.60</pre><div class='mini-chart'><img src='img/t28_1110_2130.png' alt='#28' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#29 · SOXSUSDT</span><span class='trade-time'>2026-11-11 01:50 → 11-11 02:50</span></div><div class='card-pnl pnl-win'>+2.05%</div></header><div class='tags'><span class='tag tag-time'>time</span><span class='tag'>+1.29R</span><span class='tag'>前高 58.95</span><span class='tag'>假高 59.24</span></div><pre class='trade-detail'>entry 58.34  stop 59.30  (+0.96)
+target 55.95  exit 57.11  time
+前高 11-11 01:00 58.95  假突破 11-11 01:41 59.24
+跌破 11-11 01:49  MA7 58.43 / MA14 58.63 / MA25 58.34 / MA30 58.31</pre><div class='mini-chart'><img src='img/t29_1111_0150.png' alt='#29' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#30 · SOXSUSDT</span><span class='trade-time'>2026-11-12 20:57 → 11-12 21:00</span></div><div class='card-pnl pnl-loss'>-0.84%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 48.85</span><span class='tag'>假高 49.00</span></div><pre class='trade-detail'>entry 48.67  stop 49.05  (+0.38)
+target 47.73  exit 49.05  stop
+前高 11-12 19:30 48.85  假突破 11-12 20:48 49.00
+跌破 11-12 20:55  MA7 48.62 / MA14 48.67 / MA25 48.68 / MA30 48.67</pre><div class='mini-chart'><img src='img/t30_1112_2057.png' alt='#30' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div><span class='trade-no'>#31 · SOXSUSDT</span><span class='trade-time'>2026-11-12 22:26 → 11-12 22:33</span></div><div class='card-pnl pnl-win'>+3.08%</div></header><div class='tags'><span class='tag tag-tp'>target</span><span class='tag'>+2.50R</span><span class='tag'>前高 50.19</span><span class='tag'>假高 50.78</span></div><pre class='trade-detail'>entry 50.20  stop 50.83  (+0.63)
+target 48.62  exit 48.62  target
+前高 11-12 21:17 50.19  假突破 11-12 22:14 50.78
+跌破 11-12 22:25  MA7 50.24 / MA14 50.33 / MA25 50.20 / MA30 50.12</pre><div class='mini-chart'><img src='img/t31_1112_2226.png' alt='#31' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div></body></html>
