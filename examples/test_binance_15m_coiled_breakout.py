@@ -9,6 +9,8 @@ from examples.watch_binance_15m_coiled_breakout import (
     detect_signals,
     follow_through_at,
     simulate_trades,
+    trade_stats,
+    universe,
 )
 
 
@@ -88,3 +90,44 @@ def test_simulate_trades_breakout_and_follow():
     assert len(trades_f) == 1
     assert trades_b[0].pnl_pct > 0
     assert trades_f[0].pnl_pct > 0
+    st = trade_stats(trades_f)
+    assert st["profit_factor"] > 1.0
+    assert st["max_dd_pct"] == 0.0
+
+
+def test_follow_rejects_bearish_or_lower_close_and_late_4th_bar():
+    d = _make_synthetic_esports_data()
+    params = CoiledBreakoutParams()
+    sig = breakout_at(d, 235, symbol="ESPORTSUSDT", params=params)
+    assert sig is not None
+
+    # 確認棒若為黑 K（開高走低 c <= o），即使仍高於 MA200 +2.2% 也應拒絕
+    d_bear = dict(d)
+    d_bear["o"] = d["o"].copy()
+    d_bear["o"][236] = 0.00760  # c[236]=0.00752 < o[236]=0.00760
+    assert follow_through_at(d_bear, sig, 236, params=params) is None
+
+    # 超過 follow_max_bars=3（第 4 根 j=239）不應觸發強確認
+    assert follow_through_at(d, sig, 239, params=params) is None
+
+
+def test_universe_excludes_tradfi_by_default(monkeypatch):
+    import examples.watch_binance_15m_coiled_breakout as mod
+
+    def fake_get_json(path, params=None, retries=5):
+        if path == "/fapi/v1/exchangeInfo":
+            return {
+                "symbols": [
+                    {"symbol": "BTCUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "PERPETUAL"},
+                    {"symbol": "PLTRUSDT", "quoteAsset": "USDT", "status": "TRADING", "contractType": "TRADIFI_PERPETUAL"},
+                ]
+            }
+        return [
+            {"symbol": "BTCUSDT", "quoteVolume": "50000000"},
+            {"symbol": "PLTRUSDT", "quoteVolume": "20000000"},
+        ]
+
+    monkeypatch.setattr(mod, "get_json", fake_get_json)
+    assert universe(5_000_000) == ["BTCUSDT"]
+    assert universe(5_000_000, include_tradfi=True) == ["BTCUSDT", "PLTRUSDT"]
+

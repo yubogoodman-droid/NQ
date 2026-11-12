@@ -5,15 +5,16 @@
   1. 長時間壓在 MA200 下方築底：突破前連續 >= 35 根 15m K 線收在 MA200 下方（約 9 小時以上）。
   2. 七線極致糾結（黏帶）：突破前 8 根內，MA7/14/25/30/60/99/120 七條均線最大帶寬 <= 1.80%，
      且底部長均線簇 MA60/99/120 帶寬 <= 1.20%。
-  3. 長均走平翻揚：MA60 近 16 根（4 小時）斜率 >= -0.10%（已止跌走平或翻揚），
+  3. 長均走平翻揚：MA60 近 16 根（4 小時）斜率 >= 0.00%（已止跌走平或翻揚），
      MA200 近 16 根斜率 >= -1.00%（下彎趨緩走平）。
   4. 短均多頭疊在長均簇之上：MA7 > MA14 > MA25 >= MA30，且 MA25 > max(MA60, MA99, MA120)。
   5. 第一拍「破帶穿 MA200」（圈內起漲點，如 ESPORTSUSDT 10-31 17:30）：
      當根收實體紅 K（漲幅 >= 0.80%、實體佔振幅 >= 0.55），收盤正式突破站上 MA200
      （離 MA200 乖離介於 0.10% ~ 3.50%，排除單根過度暴衝衰竭），且成交量 >= 20 根均量 × 2.0。
-  6. 第二拍「扇形展開（強確認）」（突破後 1~4 根內，如 ESPORTSUSDT 10-31 17:45~18:15）：
-     收盤續創突破後新高、離 MA200 擴大至 >= 2.50%，短均扇形張開，且 1H 等價均線（15m MA240 = 1H MA60）
-     同步被站上（多週期共振）。
+  6. 第二拍「扇形展開（強確認）」（突破後 1~3 根 = 45 分鐘內立即展開，如 ESPORTSUSDT 10-31 17:45）：
+     確認棒本身收紅 K 且收盤續創突破棒收盤新高、離 MA200 擴大至 >= 2.20%，短均扇形張開，
+     且 1H 等價均線（15m MA240 = 1H MA60）同步被站上（多週期共振）。
+  7. 標的池預設僅掃描 24/7 連續交易之原生加密貨幣永續合約（PERPETUAL），排除美股開盤跳空失真的 TRADIFI_PERPETUAL。
 
 用法：
   # 驗證單一標的並畫出圈選起漲圖
@@ -74,7 +75,7 @@ class CoiledBreakoutParams:
     max_coil_7_120_pct: float = 1.80
     max_coil_long_pct: float = 1.20
     slope_lookback: int = 16
-    min_ma60_slope_pct: float = -0.10
+    min_ma60_slope_pct: float = 0.00
     min_ma200_slope_pct: float = -1.00
     min_ext_ma200_pct: float = 0.10
     max_ext_ma200_pct: float = 3.50
@@ -92,9 +93,10 @@ class CoiledBreakoutParams:
     min_gap_ma200_long_pct: float = 0.50  # MA200 與下方長均簇 (MA60/99/120) 碗型蓄力空間下限
     max_gap_ma200_long_pct: float = 3.20  # MA200 與下方長均簇碗型空間上限（ESPORTS 2.90%、牛来 2.78%）
     follow_min_bars: int = 1
-    follow_max_bars: int = 4
+    follow_max_bars: int = 3
     follow_min_ext_ma200_pct: float = 2.20
     follow_min_vol_ratio: float = 2.00
+    follow_require_bull_new_high: bool = True  # 第二拍確認棒本身須收紅 K 且收盤高於第一拍突破收盤價
 
 
 @dataclass
@@ -193,16 +195,17 @@ def get_json(path: str, params: dict | None = None, retries: int = 5):
     raise RuntimeError(f"GET {path} failed: {last}")
 
 
-def universe(min_quote_vol: float = 5_000_000) -> list[str]:
+def universe(min_quote_vol: float = 5_000_000, *, include_tradfi: bool = False) -> list[str]:
     info = get_json("/fapi/v1/exchangeInfo")
     tickers = {t["symbol"]: t for t in get_json("/fapi/v1/ticker/24hr")}
+    allowed_types = ("PERPETUAL", "TRADIFI_PERPETUAL") if include_tradfi else ("PERPETUAL",)
     out: list[tuple[float, str]] = []
     for s in info["symbols"]:
         if s.get("quoteAsset") != "USDT":
             continue
         if s.get("status") != "TRADING":
             continue
-        if s.get("contractType") not in ("PERPETUAL", "TRADIFI_PERPETUAL"):
+        if s.get("contractType") not in allowed_types:
             continue
         if s.get("underlyingType") == "INDEX":
             continue
@@ -531,11 +534,11 @@ def follow_through_at(
     j: int,
     params: CoiledBreakoutParams = CoiledBreakoutParams(),
 ) -> BreakoutSignal | None:
-    """檢查突破後第 1~4 根是否形成「扇形展開」強確認（對應圈內右上段 + 1H 站上 MA60）。"""
+    """檢查突破後第 1~N 根是否形成「扇形展開」強確認（對應圈內右上段 + 1H 站上 MA60）。"""
     i = sig.breakout_idx
     if j - i < params.follow_min_bars or j - i > params.follow_max_bars or j >= len(d["c"]):
         return None
-    c, v, v20 = d["c"], d["v"], d["v20"]
+    c, o, v, v20 = d["c"], d["o"], d["v"], d["v20"]
     m7, m14, m25, m30 = d["m7"][j], d["m14"][j], d["m25"][j], d["m30"][j]
     m200 = d["m200"][j]
     m240 = d["m240"][j]  # 15m MA240 == 1H MA60
@@ -543,6 +546,8 @@ def follow_through_at(
         return None
     # 期間不可跌回 MA200 下方
     if any(c[k] <= d["m200"][k] for k in range(i, j + 1)):
+        return None
+    if params.follow_require_bull_new_high and not (c[j] > o[j] and c[j] > sig.breakout_close):
         return None
     if not (m7 > m14 > m25 > m30 > m200 or (m7 > m14 > m25 > m30 and c[j] > sig.breakout_close)):
         return None
@@ -571,8 +576,15 @@ def detect_signals(
     if "m200" not in d:
         d = compute_indicators(d)
     signals: list[BreakoutSignal] = []
-    n = len(d["c"])
-    for i in range(210, n):
+    c, m200 = d["c"], d["m200"]
+    n = len(c)
+    if n <= 210:
+        return signals
+    valid = ~np.isnan(m200[210:])
+    cross_mask = valid & (c[210:] > m200[210:]) & ((c[209:-1] <= m200[209:-1]) | (c[208:-2] <= m200[208:-2]))
+    cand_indices = np.flatnonzero(cross_mask) + 210
+    for idx in cand_indices:
+        i = int(idx)
         sig = breakout_at(d, i, symbol=symbol, params=params)
         if sig is None:
             continue
@@ -822,8 +834,8 @@ def draw_chart(
 
 
 def format_breakout_msg(sig: BreakoutSignal, *, stage: str = "breakout") -> str:
-    risk_pct = (sig.breakout_close - sig.stop_price) / sig.breakout_close * 100.0 if sig.breakout_close else 0.0
     if stage == "follow" and sig.follow_time is not None and sig.follow_close is not None:
+        f_risk_pct = (sig.follow_close - sig.stop_price) / sig.follow_close * 100.0 if sig.follow_close else 0.0
         return (
             f"🔥🔥🔥 <b>15m 黏帶穿 MA200 · 扇形展開（強確認）</b>\n"
             f"<b>{sig.symbol}</b>\n"
@@ -831,8 +843,9 @@ def format_breakout_msg(sig: BreakoutSignal, *, stage: str = "breakout") -> str:
             f"突破價：{sig.breakout_close:g} → 現價：{sig.follow_close:g}\n"
             f"7均線黏度(MA7~120)：{sig.coil_7_120_pct:.2f}%　長均簇(60/99/120)：{sig.coil_long_pct:.2f}%\n"
             f"突破倍量：{sig.vol_ratio:.2f}x → 確認量：{sig.follow_vol_ratio:.2f}x\n"
-            f"離 MA200：{sig.follow_ext_ma200_pct:+.2f}%　參考防守（黏帶下緣）：{sig.stop_price:g} (-{risk_pct:.2f}%)"
+            f"離 MA200：{sig.follow_ext_ma200_pct:+.2f}%　參考防守（黏帶下緣）：{sig.stop_price:g} (-{f_risk_pct:.2f}%)"
         )
+    risk_pct = (sig.breakout_close - sig.stop_price) / sig.breakout_close * 100.0 if sig.breakout_close else 0.0
     return (
         f"🟢 <b>15m 底部七線黏帶 · 倍量突破 MA200</b>\n"
         f"<b>{sig.symbol}</b>\n"
@@ -896,21 +909,21 @@ def save_seen(seen: set[str]) -> None:
 MODE_META: dict[str, dict[str, str]] = {
     "strict": {
         "label": "嚴格版",
-        "blurb": "突破當根 MA25 必須已站上長均簇頂 max(MA60, 99, 120)；近 12 根至少 9 根站上 MA60；碗深 ≥ 0.50%。",
+        "blurb": "突破當根 MA25 必須已站上長均簇頂 max(MA60, 99, 120)；MA60 斜率 ≥ 0%；近 12 根至少 9 根站上 MA60；碗深 ≥ 0.50%；第二拍 1~3 根內紅 K 創高確認。",
     },
     "standard": {
-        "label": "標準完整版",
-        "blurb": "乾淨首穿、連紅、4 根動能、上影、近 3 小時最大量、黏帶與斜率維持嚴格版；允許突破當根 MA25 仍在長均簇內，只要 MA7 已穿出簇頂且 MA25 至少貼在簇底。近 12 根站上 MA60 為 8 根，碗深下限 0.40%。",
+        "label": "標準完整版（Walk-Forward 優化）",
+        "blurb": "僅掃描 24/7 原生加密永續（排除 TradFi 美股合約失真）；MA60 斜率 ≥ 0%（真正止跌走平翻揚）；允許突破當根 MA25 在長均簇內（MA7 > 簇頂、MA25 ≥ 簇底）；第二拍須於 1~3 根（45 分鐘）內收紅 K 且收盤創突破棒新高。",
     },
     "v1": {
-        "label": "初版",
-        "blurb": "只保留黏帶、斜率、倍量與實體紅 K；不要求乾淨首穿、連紅階梯、站穩 MA60、4 根動能、上影與近 3 小時最大量。",
+        "label": "初版（寬鬆基準）",
+        "blurb": "只保留黏帶、斜率 ≥ -0.10%、倍量與實體紅 K，第二拍放寬為 1~4 根；不要求乾淨首穿、連紅階梯、站穩 MA60、4 根動能、上影與近 3 小時最大量。",
     },
 }
 
 
 def params_for_mode(mode: str) -> CoiledBreakoutParams:
-    """strict＝雙標竿嚴格版；standard＝完整報告用的標準放寬；v1＝初版寬濾網。"""
+    """strict＝雙標竿嚴格版；standard＝Walk-Forward 驗證通過之標準版；v1＝初版寬濾網。"""
     if mode == "standard":
         return CoiledBreakoutParams(
             require_ma25_above_long_at_cross=False,
@@ -919,6 +932,7 @@ def params_for_mode(mode: str) -> CoiledBreakoutParams:
         )
     if mode == "v1":
         return CoiledBreakoutParams(
+            min_ma60_slope_pct=-0.10,
             clean_first_cross=False,
             require_ma25_above_long_at_cross=True,
             min_green_streak=1,
@@ -928,7 +942,9 @@ def params_for_mode(mode: str) -> CoiledBreakoutParams:
             min_vol_vs_12bar_max=0.0,
             min_gap_ma200_long_pct=0.0,
             max_gap_ma200_long_pct=100.0,
+            follow_max_bars=4,
             follow_min_ext_ma200_pct=2.50,
+            follow_require_bull_new_high=False,
         )
     return CoiledBreakoutParams()
 
@@ -948,6 +964,8 @@ def trade_stats(trs: list[BacktestTrade]) -> dict:
             "avg_risk_pct": 0.0,
             "total_r": 0.0,
             "avg_r": 0.0,
+            "profit_factor": 0.0,
+            "max_dd_pct": 0.0,
             "m24_avg": 0.0,
             "m24_med": 0.0,
             "m48_avg": 0.0,
@@ -957,6 +975,14 @@ def trade_stats(trs: list[BacktestTrade]) -> dict:
     risks = [max(t.risk_pct, 1e-9) for t in trs]
     rs = [p / r for p, r in zip(pnls, risks)]
     wins = sum(1 for p in pnls if p > 0)
+    gross_win = sum(p for p in pnls if p > 0)
+    gross_loss = sum(-p for p in pnls if p <= 0)
+    pf = float(gross_win / gross_loss) if gross_loss > 0 else (99.99 if gross_win > 0 else 0.0)
+    eq = peak = max_dd = 0.0
+    for p in pnls:
+        eq += p
+        peak = max(peak, eq)
+        max_dd = max(max_dd, peak - eq)
     m24 = [t.max_24h_pct for t in trs]
     m48 = [t.max_48h_pct for t in trs]
     return {
@@ -972,6 +998,8 @@ def trade_stats(trs: list[BacktestTrade]) -> dict:
         "avg_risk_pct": float(np.mean(risks)),
         "total_r": float(sum(rs)),
         "avg_r": float(np.mean(rs)),
+        "profit_factor": pf,
+        "max_dd_pct": float(max_dd),
         "m24_avg": float(np.mean(m24)),
         "m24_med": float(np.median(m24)),
         "m48_avg": float(np.mean(m48)),
@@ -997,6 +1025,7 @@ def write_backtest_html(
     records: list[dict],
     mode: str = "strict",
     compare: list[dict] | None = None,
+    oos_split: str = "",
 ) -> Path:
     """輸出近 N 天回測 HTML 總結（同時產生 index.html 內嵌圖、pages.html 相對路徑圖、view.html GitHub raw 圖與 hits.json）。"""
     out_dir = html_path.resolve().parent
@@ -1041,6 +1070,12 @@ def write_backtest_html(
         cls60 = "pnl-win" if t60.pnl_pct >= 0 else "pnl-loss"
         cls25 = "pnl-win" if t25.pnl_pct >= 0 else "pnl-loss"
         hold_h = (t99.exit_idx - t99.entry_idx) * 0.25
+        split_tag = ""
+        if oos_split:
+            if t99.entry_time >= oos_split:
+                split_tag = "<span class='tag' style='border-color:#2ebd85;color:#2ebd85;font-weight:600'>樣本外盲測 OOS</span>"
+            else:
+                split_tag = "<span class='tag' style='border-color:#8b949e;color:#8b949e'>前段訓練期 Train</span>"
         card_head = (
             f"<article class='trade-card' id='f-{idx_no}'>"
             "<header class='card-header'>"
@@ -1052,9 +1087,11 @@ def write_backtest_html(
             "</header>"
             f"<div class='tags'>"
             f"<span class='tag tag-strong'>★ 第二拍強確認</span>"
+            f"{split_tag}"
             f"<span class='tag'>連紅 {sig.green_streak} 根 (4根 +{sig.mom4_pct:.2f}%)</span>"
             f"<span class='tag'>7線黏度 {sig.coil_7_120_pct:.2f}%</span>"
             f"<span class='tag'>碗深空間 {sig.gap_ma200_long_pct:.2f}%</span>"
+            f"<span class='tag'>MA60斜率 {sig.ma60_slope_pct:+.2f}%</span>"
             f"<span class='tag'>突破量 {sig.vol_ratio:.1f}x (3h最大量 {sig.vol_vs_12bar_max:.2f}x)</span>"
             f"<span class='tag'>24h最高 +{t99.max_24h_pct:.1f}%</span>"
             f"<span class='tag'>48h最高 +{t99.max_48h_pct:.1f}%</span>"
@@ -1135,9 +1172,9 @@ def write_backtest_html(
             f"<td class='{wr_cls}'><b>{st['win_rate']:.1f}% ({st['wins']}勝{losses}敗)</b></td>"
             f"<td class='{_pc(st['total_pct'])}'><b>{st['total_pct']:+.2f}%</b></td>"
             f"<td class='{_pc(st['avg_pct'])}'><b>{st['avg_pct']:+.2f}%</b></td>"
-            f"<td class='{_pc(st['median_pct'])}'>{st['median_pct']:+.2f}%</td>"
+            f"<td><b>{st['profit_factor']:.2f}</b></td>"
+            f"<td class='pnl-loss'>-{st['max_dd_pct']:.2f}%</td>"
             f"<td class='{_pc(st['u_3x'])}'><b>{st['u_3x']:+.1f} U</b></td>"
-            f"<td>+{st['m24_avg']:.2f}% / +{st['m48_avg']:.2f}%</td>"
             "</tr>"
         )
 
@@ -1148,6 +1185,44 @@ def write_backtest_html(
             _strategy_row("第二拍 ★強確認進場 + MA25 移動停利", st_f25),
         ]
     )
+    wf_html = ""
+    if oos_split and f99_list:
+        tr_train = [t for t in f99_list if t.entry_time < oos_split]
+        tr_oos = [t for t in f99_list if t.entry_time >= oos_split]
+        cutoff_90_str = (datetime.now(TZ) - timedelta(days=90)).strftime("%Y-%m-%d %H:%M")
+        tr_90d = [t for t in f99_list if t.entry_time >= cutoff_90_str]
+        st_tr = trade_stats(tr_train)
+        st_os = trade_stats(tr_oos)
+        st_90 = trade_stats(tr_90d)
+
+        def _wf_row(lbl: str, st: dict, highlight: bool = False) -> str:
+            ls = st["count"] - st["wins"]
+            cls = " class='current'" if highlight else ""
+            return (
+                f"<tr{cls}>"
+                f"<td><b>{escape(lbl)}</b></td>"
+                f"<td>{st['count']}</td>"
+                f"<td class='{_pc(st['win_rate'] - 50)}'><b>{st['win_rate']:.1f}% ({st['wins']}勝{ls}敗)</b></td>"
+                f"<td class='{_pc(st['total_pct'])}'><b>{st['total_pct']:+.2f}%</b></td>"
+                f"<td class='{_pc(st['avg_pct'])}'>{st['avg_pct']:+.2f}%</td>"
+                f"<td><b>{st['profit_factor']:.2f}</b></td>"
+                f"<td class='pnl-loss'>-{st['max_dd_pct']:.2f}%</td>"
+                "</tr>"
+            )
+
+        wf_html = (
+            f"<h2>Walk-Forward 無偷看時間切分驗證（切分點：{escape(oos_split)} UTC+8，出場皆為 MA99）</h2>"
+            "<div style='overflow-x:auto'><table class='bt-table'><thead><tr>"
+            "<th>驗證區間</th><th>筆數</th><th>勝率</th><th>累計報酬 (1x)</th><th>平均每筆</th><th>獲利因子 PF</th><th>最大回撤</th>"
+            "</tr></thead><tbody>"
+            + _wf_row(f"前段訓練期（< {oos_split[:10]}，僅用此段挑選規則）", st_tr)
+            + _wf_row(f"後段樣本外盲測（≥ {oos_split[:10]}，完全未偷看）", st_os, highlight=True)
+            + _wf_row("近 90 天滾動視窗", st_90)
+            + _wf_row(f"完整 {days} 天合計", st_f99)
+            + "</tbody></table></div>"
+            "<p class='muted'>規則僅於前段訓練期定案後，一次套用至後段樣本外盲測集驗證，杜絕事後看答案調參。</p>"
+        )
+
     compare_rows: list[str] = []
     for row in compare or []:
         cur = " class='current'" if row.get("current") else ""
@@ -1158,14 +1233,16 @@ def write_backtest_html(
             f"<td>{row['stage2_n']}</td>"
             f"<td class='{_pc(row['stage2_wr'] - 50)}'>{row['stage2_wr']:.1f}% ({row['stage2_wins']}勝{s2_loss}敗)</td>"
             f"<td class='{_pc(row['stage2_pnl'])}'><b>{row['stage2_pnl']:+.2f}%</b></td>"
+            f"<td><b>{row.get('stage2_pf', 0.0):.2f}</b></td>"
+            f"<td class='pnl-loss'>-{row.get('stage2_dd', 0.0):.2f}%</td>"
             "</tr>"
         )
     compare_html = ""
     if compare_rows:
         compare_html = (
-            "<h2>三種模式的第二拍對照（同一區間、同一標的池，出場皆為 MA99 = 1H MA25）</h2>"
+            "<h2>三種模式的第二拍對照（同一區間、同一原生加密永續池，出場皆為 MA99 = 1H MA25）</h2>"
             "<div style='overflow-x:auto'><table class='bt-table'><thead><tr>"
-            "<th>模式</th><th>第二拍筆數</th><th>勝率</th><th>累計報酬</th>"
+            "<th>模式</th><th>第二拍筆數</th><th>勝率</th><th>累計報酬</th><th>獲利因子 PF</th><th>最大回撤</th>"
             "</tr></thead><tbody>"
             + "".join(compare_rows)
             + "</tbody></table></div>"
@@ -1220,25 +1297,27 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
 <h1>幣安 15m「底部七線黏帶 · 倍量穿 MA200」近 {days} 天第二拍報告 · {mode_label}</h1>
 <p class="muted">這份只收第二拍「扇形展開」強確認。進場是確認棒收盤，出場沿 MA99（= 1H MA25）。回測區間：近 {days} 天 · 標的池：{universe_n} 檔流動 USDT 永續（24h 成交額 ≥ {min_qv/1e6:.0f}M USDT） · 產出時間：{escape(now_str)} (UTC+8)<br/>{escape(mode_blurb)}</p>
 <p class="toc"><a href="#sec-follow">逐筆 K 線</a><a href="#sec-table">明細表</a></p>
+{wf_html}
 {compare_html}
 
-<h2>一、圈選起漲點量化規則（對齊 ESPORTSUSDT 10-31 17:30 與 牛来USDT 10-31 23:00 雙標竿）</h2>
+<h2>一、圈選起漲點量化規則（Walk-Forward 訓練集定案、樣本外盲測驗證）</h2>
 <ol class="rules">
-<li><b>長壓築底 + 碗底蓄力空間</b>：突破前連續 <code>≥ {params.min_bars_below_ma200} 根</code> 15m K 線收在 <code>MA200</code> 下方；且突破時 <code>MA200</code> 與下方長均簇 <code>max(MA60, 99, 120)</code> 保持 <code>{params.min_gap_ma200_long_pct:.2f}% ～ {params.max_gap_ma200_long_pct:.2f}%</code> 的碗型蓄力空間（ESPORTS 為 <code>2.90%</code>、牛來為 <code>2.78%</code>）。</li>
+<li><b>原生加密永續標的池</b>：預設僅掃描 24/7 連續交易之 <code>PERPETUAL</code> 原生加密永續合約，排除美股休市橫盤與 21:30 開盤跳空造成均線/均量失真的 <code>TRADIFI_PERPETUAL</code>。</li>
+<li><b>長壓築底 + 碗底蓄力空間 + MA60 走平翻揚</b>：突破前連續 <code>≥ {params.min_bars_below_ma200} 根</code> 15m K 線收在 <code>MA200</code> 下方；<code>MA60</code> 近 16 根斜率 <code>≥ {params.min_ma60_slope_pct:+.2f}%</code>（已止跌走平或翻揚）；且突破時 <code>MA200</code> 與下方長均簇 <code>max(MA60, 99, 120)</code> 保持 <code>{params.min_gap_ma200_long_pct:.2f}% ～ {params.max_gap_ma200_long_pct:.2f}%</code> 的碗型蓄力空間。</li>
 <li><b>七線極致黏帶</b>：突破前 {params.coil_lookback} 根內，<code>MA7 / 14 / 25 / 30 / 60 / 99 / 120</code> 七條均線最大帶寬 <code>≤ {params.max_coil_7_120_pct:.2f}%</code>，且底部長均線簇 <code>MA60 / 99 / 120</code> 帶寬 <code>≤ {params.max_coil_long_pct:.2f}%</code>。</li>
 <li><b>短均與長均簇（{mode_label}）</b>：{stack_rule}</li>
-<li><b>突破前已站穩 MA60 + 連紅階梯墊高（v2 核心優化）</b>：突破前 12 根至少 <code>{params.min_above_ma60_bars} 根</code>已站穩 <code>MA60</code> 之上（排除從 MA60 下方單根亂抽），且突破棒含前根至少 <code>連 {params.min_green_streak} 紅</code>階梯推升、近 4 根（1 小時）累計動能 <code>≥ +{params.min_mom4_pct:.2f}%</code>（ESPORTS 連 7 紅 <code>+3.92%</code>、牛來連 4 紅 <code>+3.49%</code>）。</li>
-<li><b>第一拍「🟢 破帶穿 MA200」（乾淨首根 + 近3h最大量 + 無長上影）</b>：當根必須直接從 <code>MA200</code> 下方收盤貫穿站上 <code>MA200</code>（排除前根偷站無量的遲滯棒），單根漲幅 <code>≥ {params.min_bar_chg_pct:.2f}%</code>、實體佔比 <code>≥ {params.min_body_ratio:.2f}</code>、上影線佔比 <code>≤ {params.max_upper_wick_ratio*100:.0f}%</code>，且成交量 <code>≥ 20 根均量 × {params.min_vol_ratio:.1f}</code> 同時 <code>≥ 前 12 根最大量 × {params.min_vol_vs_12bar_max:.2f}</code>。</li>
-<li><b>第二拍「★ 扇形展開（強確認）」</b>：突破後 <code>{params.follow_min_bars}～{params.follow_max_bars} 根</code>內不跌回 <code>MA200</code>、收盤離 <code>MA200</code> 擴大至 <code>≥ {params.follow_min_ext_ma200_pct:.2f}%</code>、量能 <code>≥ {params.follow_min_vol_ratio:.1f}x</code>，且同步站上 <code>15m MA240</code>（即 <code>1H MA60</code> 多週期共振）。</li>
-<li><b>回測出場（無未來函數、無樣本內事後調參，純均線移動停利）</b>：防守停損統一設在「黏帶下緣 <code>stop_price</code>」（15m 收盤跌破即停損）；最高價達 <code>1.2R</code> 後啟動移動停利，收盤跌破對應均線（<code>MA99 = 1H MA25</code>、<code>MA60</code>、<code>MA25</code>）即出場，最長持有 72 小時（288 根）。</li>
+<li><b>突破前已站穩 MA60 + 連紅階梯墊高</b>：突破前 12 根至少 <code>{params.min_above_ma60_bars} 根</code>已站穩 <code>MA60</code> 之上，且突破棒含前根至少 <code>連 {params.min_green_streak} 紅</code>階梯推升、近 4 根（1 小時）累計動能 <code>≥ +{params.min_mom4_pct:.2f}%</code>。</li>
+<li><b>第一拍「🟢 破帶穿 MA200」（乾淨首根 + 近3h最大量 + 無長上影）</b>：當根必須直接從 <code>MA200</code> 下方收盤貫穿站上 <code>MA200</code>，單根漲幅 <code>≥ {params.min_bar_chg_pct:.2f}%</code>、實體佔比 <code>≥ {params.min_body_ratio:.2f}</code>、上影線佔比 <code>≤ {params.max_upper_wick_ratio*100:.0f}%</code>，且成交量 <code>≥ 20 根均量 × {params.min_vol_ratio:.1f}</code> 同時 <code>≥ 前 12 根最大量 × {params.min_vol_vs_12bar_max:.2f}</code>。</li>
+<li><b>第二拍「★ 扇形展開（強確認）」</b>：突破後 <code>{params.follow_min_bars}～{params.follow_max_bars} 根</code>（45 分鐘）內不跌回 <code>MA200</code>、{"確認棒本身收紅 K 且收盤高於第一拍突破收盤價、" if params.follow_require_bull_new_high else ""}收盤離 <code>MA200</code> 擴大至 <code>≥ {params.follow_min_ext_ma200_pct:.2f}%</code>、量能 <code>≥ {params.follow_min_vol_ratio:.1f}x</code>，且同步站上 <code>15m MA240</code>（即 <code>1H MA60</code> 多週期共振）。</li>
+<li><b>回測出場（100% 因果無未來函數，純均線移動停利）</b>：防守停損統一設在「黏帶下緣 <code>stop_price</code>」（15m 收盤跌破即停損）；最高價達 <code>1.2R</code> 後啟動移動停利，收盤跌破對應均線（<code>MA99 = 1H MA25</code>、<code>MA60</code>、<code>MA25</code>）即出場，最長持有 72 小時（288 根）。</li>
 </ol>
 <p class="note">圖例說明：黑色橢圓圈＝底部七線黏帶突破起漲區；綠色虛線＋▲＝進場；綠色點線＋× / 紅色點線＋×＝MA99(1H MA25)出場；紅色水平點線＝黏帶下緣停損價；8 條均線顏色完全對齊幣安 App。</p>
 
-<h2>二、第二拍三種移動停利 · 近 {days} 天（無樣本內微調）</h2>
+<h2>二、第二拍三種移動停利 · 近 {days} 天</h2>
 <table class="bt-table">
 <thead>
 <tr>
-<th>策略模式</th><th>筆數</th><th>勝率</th><th>累計報酬 (1x)</th><th>平均每筆</th><th>中位數</th><th>100U×3x槓桿(單利)</th><th>24h/48h最大漲幅</th>
+<th>策略模式</th><th>筆數</th><th>勝率</th><th>累計報酬 (1x)</th><th>平均每筆</th><th>獲利因子 PF</th><th>最大回撤</th><th>100U×3x槓桿(單利)</th>
 </tr>
 </thead>
 <tbody>
@@ -1250,8 +1329,8 @@ table.bt-table th{{background:#161b22;color:#8b949e;font-weight:600}}
 <div class="card"><span>★強確認訊號數</span><b>{st_f99['count']} 筆</b></div>
 <div class="card"><span>★強確認勝率</span><b class="{_pc(st_f99['total_pct'])}">{st_f99['win_rate']:.1f}% ({st_f99['wins']}勝{f_losses}敗)</b></div>
 <div class="card"><span>★強確認累計 (MA99)</span><b class="{_pc(st_f99['total_pct'])}">{st_f99['total_pct']:+.2f}%</b></div>
-<div class="card"><span>MA60 累計</span><b class="{_pc(st_f60['total_pct'])}">{st_f60['total_pct']:+.2f}%</b></div>
-<div class="card"><span>MA25 累計</span><b class="{_pc(st_f25['total_pct'])}">{st_f25['total_pct']:+.2f}%</b></div>
+<div class="card"><span>獲利因子 PF</span><b class="pnl-win">{st_f99['profit_factor']:.2f}</b></div>
+<div class="card"><span>最大回撤</span><b class="pnl-loss">-{st_f99['max_dd_pct']:.2f}%</b></div>
 <div class="card"><span>MA99 3x 槓桿</span><b class="{_pc(st_f99['u_3x'])}">{st_f99['u_3x']:+.1f} U</b></div>
 </div>
 </section>
@@ -1390,9 +1469,11 @@ def main() -> int:
         "--mode",
         choices=("strict", "standard", "v1"),
         default="strict",
-        help="strict=v2雙標竿嚴格版(90天14筆/強確認6筆100%%勝率); standard=標準放寬版(允許突破當根MA25在長均簇內, 90天36筆/強確認15筆); v1=初版(90天58筆/強確認11筆)",
+        help="strict=雙標竿嚴格版; standard=Walk-Forward驗證通過之標準版; v1=初版寬濾網",
     )
     p.add_argument("--min-qv", type=float, default=5_000_000, help="24h 最低成交額門檻 (USDT)")
+    p.add_argument("--include-tradfi", action="store_true", help="納入 TRADIFI_PERPETUAL 美股/傳統金融永續（預設僅掃描原生加密 PERPETUAL）")
+    p.add_argument("--oos-split", type=str, default="", help="Walk-Forward 盲測切分時間 (UTC+8，如 '2026-09-01 00:00')")
     p.add_argument("--once", action="store_true", help="只掃剛收盤的那一根 15m K 線後結束")
     p.add_argument("--test", action="store_true", help="測試 Telegram 推播")
     args = p.parse_args()
@@ -1425,7 +1506,7 @@ def main() -> int:
         return 0
 
     if args.scan:
-        syms = universe(args.min_qv)
+        syms = universe(args.min_qv, include_tradfi=args.include_tradfi)
         print(f"回掃 {len(syms)} 檔永續合約（近 500 根 15m K 線）…", flush=True)
         found: list[ tuple[BreakoutSignal, dict, float] ] = []
 
@@ -1462,7 +1543,7 @@ def main() -> int:
 
     if args.backtest_days > 0:
         days = args.backtest_days
-        syms = universe(args.min_qv)
+        syms = universe(args.min_qv, include_tradfi=args.include_tradfi)
         print(f"回測全市場 {len(syms)} 檔 USDT 永續（近 {days} 天 15m K 線）…", flush=True)
         trades_b_m99: list[BacktestTrade] = []
         trades_b_m60: list[BacktestTrade] = []
@@ -1562,7 +1643,8 @@ def main() -> int:
             print(f"\n📊 {title}（共 {st['count']} 筆）")
             print(
                 f"  • 勝率：{st['wins']}/{st['count']} ({st['win_rate']:.1f}%) | "
-                f"累計報酬：{st['total_pct']:+.2f}% | 平均每筆：{st['avg_pct']:+.2f}% "
+                f"累計報酬：{st['total_pct']:+.2f}% | 平均每筆：{st['avg_pct']:+.2f}% | "
+                f"PF：{st['profit_factor']:.2f} | 最大回撤：-{st['max_dd_pct']:.2f}% "
                 f"（100U 保證金 × 3x 槓桿單利 = {st['u_3x']:+.1f}U）"
             )
             print(
@@ -1599,11 +1681,13 @@ def main() -> int:
                         "stage2_wins": fstat["wins"],
                         "stage2_wr": fstat["win_rate"],
                         "stage2_pnl": fstat["total_pct"],
+                        "stage2_pf": fstat["profit_factor"],
+                        "stage2_dd": fstat["max_dd_pct"],
                     }
                 )
                 print(
                     f"對照 {label}: 第一拍 {bstat['count']} 筆 {bstat['total_pct']:+.2f}% / "
-                    f"第二拍 {fstat['count']} 筆 {fstat['total_pct']:+.2f}%"
+                    f"第二拍 {fstat['count']} 筆 {fstat['total_pct']:+.2f}% (PF {fstat['profit_factor']:.2f})"
                 )
             out_html = write_backtest_html(
                 Path(args.html),
@@ -1614,12 +1698,13 @@ def main() -> int:
                 records=records,
                 mode=args.mode,
                 compare=compare_rows_payload,
+                oos_split=args.oos_split,
             )
             print(f"\n已輸出 HTML 總結報告：{out_html}")
         return 0
 
     seen = load_seen()
-    symbols = universe(args.min_qv)
+    symbols = universe(args.min_qv, include_tradfi=args.include_tradfi)
     print(f"監看 {len(symbols)} 檔 USDT 永續（每 15m 收盤掃描，Ctrl+C 停止）…", flush=True)
 
     def round_once() -> None:
