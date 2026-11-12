@@ -66,12 +66,20 @@ th:first-child,td:first-child{text-align:left}
 <div class="card">最差<b class="pnl-loss">-1.92%</b></div>
 </div>
 <div class="equity"><svg viewBox="0 0 520 120" width="100%" style="background:#0f172a;border-radius:8px"><line x1="0" y1="83.5" x2="520" y2="83.5" stroke="#334155" stroke-dasharray="4 4"/><polyline fill="none" stroke="#16a34a" stroke-width="2" points="0.0,83.5 16.8,88.2 33.5,94.1 50.3,98.7 67.1,108.4 83.9,87.9 100.6,90.6 117.4,90.7 134.2,82.4 151.0,84.1 167.7,70.6 184.5,73.2 201.3,76.9 218.1,82.1 234.8,87.8 251.6,85.8 268.4,58.7 285.2,45.9 301.9,49.2 318.7,40.1 335.5,42.8 352.3,51.0 369.0,44.6 385.8,47.3 402.6,35.4 419.4,40.9 436.1,47.7 452.9,26.6 469.7,33.3 486.5,23.0 503.2,27.2 520.0,11.6"/></svg></div>
+<h2>半小時勝率</h2>
+<p class="muted">同一 31 筆進場，只看到第 30 根。先碰到停損 12 筆、先碰到停利 2 筆、時間到用收盤 17 筆。</p>
+<div class="cards">
+<div class="card">半小時筆數<b>31</b></div>
+<div class="card">半小時勝率<b>45.2%</b></div>
+<div class="card">半小時淨報酬<b class="pnl-win">+8.60%</b></div>
+<div class="card">半小時勝/負<b>14/17</b></div>
+</div>
 <h2>同資料對照</h2>
 <table>
 <tr><th>版本</th><th>筆數</th><th>勝率</th><th>淨報酬</th><th>合計 R</th></tr>
 <tr><td>主策略 limit / tpe_us</td><td>31</td><td>38.7%</td><td class='pnl-win'>+14.21%</td><td>+6.19R</td></tr><tr><td>回測掛單 / 美東 07:00–16:00</td><td>32</td><td>34.4%</td><td class='pnl-win'>+10.58%</td><td>+1.69R</td></tr><tr><td>回測掛單 / 全時段</td><td>68</td><td>30.9%</td><td class='pnl-win'>+2.27%</td><td>-7.03R</td></tr><tr><td>跌破下一根開盤 / tpe_us</td><td>37</td><td>40.5%</td><td class='pnl-win'>+15.30%</td><td>+4.14R</td></tr>
 </table>
-<p class="note">上面每一張圖是主策略。對照列用同一段 K 線、同一套假突破認定，只換進場方式或時段。紅虛線是停損，綠虛線是停利，灰虛線是被刺破的前高。</p>
+<p class="note">上面每一張圖是主策略，出場可以拿到 60 分鐘。半小時勝率用同一批進場，30 分鐘內先碰到停損或停利就結算，否則用第 30 根收盤。紅虛線是停損，綠虛線是停利，灰虛線是被刺破的前高。</p>
 </section>
 <article class='trade-card'><header class='card-header'><div><span class='trade-no'>#1 · SOXSUSDT</span><span class='trade-time'>2026-10-14 21:32 → 10-14 21:32</span></div><div class='card-pnl pnl-loss'>-0.93%</div></header><div class='tags'><span class='tag tag-sl'>stop</span><span class='tag'>-1.00R</span><span class='tag'>前高 40.01</span><span class='tag'>假高 40.20</span></div><pre class='trade-detail'>entry 39.89  stop 40.24  (+0.35)
 target 39.02  exit 40.24  stop

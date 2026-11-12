@@ -353,6 +353,38 @@ def summarize(trades: Sequence[Trade]) -> dict:
     }
 
 
+def score_window(df: pd.DataFrame, trades: Sequence[Trade], minutes: int, fee_pct: float) -> dict:
+    """同一批進場，只看到進場後 minutes 根。先碰到停損或停利就用那個價。"""
+    high = df["High"].to_numpy(float)
+    low = df["Low"].to_numpy(float)
+    close = df["Close"].to_numpy(float)
+    nets: List[float] = []
+    reasons: Dict[str, int] = {}
+    for trade in trades:
+        _, exit_px, reason = simulate_exit(
+            high,
+            low,
+            close,
+            trade.entry_idx,
+            trade.entry_price,
+            trade.stop_price,
+            trade.target_price,
+            minutes,
+        )
+        nets.append((trade.entry_price - exit_px) / trade.entry_price - fee_pct)
+        reasons[reason] = reasons.get(reason, 0) + 1
+    n = len(nets)
+    wins = sum(1 for pnl in nets if pnl > 0)
+    return {
+        "minutes": minutes,
+        "count": n,
+        "wins": wins,
+        "win_rate": 100.0 * wins / n if n else 0.0,
+        "net_pct": float(sum(nets) * 100.0),
+        "reasons": reasons,
+    }
+
+
 def fetch_klines(symbol: str, days: int) -> pd.DataFrame:
     """拉幣安 U 本位 1 分 K。多抓 2 天給 MA200 熱身，未收盤的當根丟掉。"""
     bar_ms = 60_000
@@ -573,6 +605,7 @@ def write_html(
     params: Params,
     symbol: str,
     comparisons: Sequence[Tuple[str, dict]],
+    window_stats: Optional[dict] = None,
 ) -> Path:
     stats = summarize(trades)
     cards: List[str] = []
@@ -623,6 +656,21 @@ def write_html(
         for name, info in comparisons
     )
     reasons = stats["reasons"]
+    window_line = ""
+    if window_stats and window_stats.get("count"):
+        wreasons = window_stats.get("reasons") or {}
+        window_line = (
+            f"<h2>半小時勝率</h2>"
+            f"<p class='muted'>同一 {window_stats['count']} 筆進場，只看到第 {window_stats['minutes']} 根。"
+            f"先碰到停損 {wreasons.get('stop', 0)} 筆、先碰到停利 {wreasons.get('target', 0)} 筆、"
+            f"時間到用收盤 {wreasons.get('time', 0)} 筆。</p>"
+            f"<div class='cards'>"
+            f"<div class='card'>半小時筆數<b>{window_stats['count']}</b></div>"
+            f"<div class='card'>半小時勝率<b>{window_stats['win_rate']:.1f}%</b></div>"
+            f"<div class='card'>半小時淨報酬<b class='{'pnl-win' if window_stats['net_pct']>=0 else 'pnl-loss'}'>{window_stats['net_pct']:+.2f}%</b></div>"
+            f"<div class='card'>半小時勝/負<b>{window_stats['wins']}/{window_stats['count']-window_stats['wins']}</b></div>"
+            f"</div>"
+        )
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
@@ -682,7 +730,8 @@ th:first-child,td:first-child{{text-align:left}}
 <tr><th>版本</th><th>筆數</th><th>勝率</th><th>淨報酬</th><th>合計 R</th></tr>
 {cmp_rows}
 </table>
-<p class="note">上面每一張圖是主策略。對照列用同一段 K 線、同一套假突破認定，只換進場方式或時段。紅虛線是停損，綠虛線是停利，灰虛線是被刺破的前高。</p>
+<p class="note">上面每一張圖是主策略，出場可以拿到 {params.max_hold} 分鐘。半小時勝率用同一批進場，30 分鐘內先碰到停損或停利就結算，否則用第 30 根收盤。紅虛線是停損，綠虛線是停利，灰虛線是被刺破的前高。</p>
+{window_line}
 </section>
 {''.join(cards) or "<div class='empty'>這段期間沒有假突破空單</div>"}
 </div></body></html>
@@ -751,6 +800,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description="SOXSUSDT 1 分 K 假突破做空回測")
     p.add_argument("--symbol", default="SOXSUSDT")
     p.add_argument("--days", type=int, default=30)
+    p.add_argument("--max-hold", type=int, default=60, help="圖上與主統計的最長持有分鐘")
+    p.add_argument("--score-minutes", type=int, default=30, help="另算這個時間內的勝率")
     p.add_argument("--mode", choices=("limit", "breakdown"), default="limit")
     p.add_argument("--session", choices=("tpe_us", "ny", "all"), default="tpe_us")
     p.add_argument("--html", default="")
@@ -758,7 +809,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--branch", default="cursor/soxs-fake-breakout-backtest-274a")
     args = p.parse_args(argv)
 
-    params = Params(days=args.days, mode=args.mode, session=args.session)
+    params = Params(days=args.days, mode=args.mode, session=args.session, max_hold=args.max_hold)
     print(f"fetch {args.symbol} 1m days={args.days + 2}")
     df = fetch_klines(args.symbol, args.days)
     if len(df) < 400:
@@ -768,6 +819,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     trades, funnel = run_backtest(df, params)
     stats = _print_stats(f"{args.symbol} {args.mode}/{args.session}", trades, funnel)
+    window = score_window(df, trades, args.score_minutes, params.fee_pct)
+    print(
+        f"within {window['minutes']}m WR={window['win_rate']:.1f}% "
+        f"({window['wins']}/{window['count']}) net={window['net_pct']:+.2f}% reasons={window['reasons']}"
+    )
     for i, t in enumerate(trades, 1):
         et = df.index[t.entry_idx].tz_convert(TPE)
         xt = df.index[t.exit_idx].tz_convert(TPE)
@@ -785,7 +841,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ):
         if mode == args.mode and session == args.session:
             continue
-        alt, _ = run_backtest(df, Params(days=args.days, mode=mode, session=session))
+        alt, _ = run_backtest(df, Params(days=args.days, mode=mode, session=session, max_hold=args.max_hold))
         info = _print_stats(name, alt)
         comparisons.append((name, info))
 
@@ -793,7 +849,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if html_path is None and args.pages:
         html_path = PAGES
     if html_path:
-        out = write_html(html_path, df, trades, funnel, params, args.symbol, comparisons)
+        out = write_html(
+            html_path, df, trades, funnel, params, args.symbol, comparisons, window_stats=window
+        )
         view = write_view_html(out, args.branch)
         dump_hits(out.with_name("hits.json"), df, trades, stats, funnel, params)
         print(f"html={out}")

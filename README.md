@@ -122,7 +122,7 @@ python3 examples/soxs_fake_breakout.py --days 30 --pages
 python3 examples/test_soxs_fake_breakout.py
 ```
 
-2026-10-14 → 11-13（台北時間）：**31 筆、勝率 38.7%、淨報酬 +14.21%、合計 +6.19R**。2026-11-12 22:26 空在 50.20，假高 50.78，22:33 停利 48.62（+3.08%、+2.50R）。同一套認定若改成全時段，淨報酬只剩 +2.27%，合計 R 轉負。
+2026-10-14 → 11-13（台北時間）同一 31 筆，只算進場後 30 分鐘：**勝率 45.2%（14/31）**，淨報酬 +8.60%。30 分鐘內先碰到停損算輸、先碰到 2.5R 算贏，否則用第 30 根收盤。2026-11-12 22:26 那筆 7 分鐘就停利，算在裡面。放到 60 分鐘的話，勝率是 38.7%、淨報酬 +14.21%、合計 +6.19R。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-fake-breakout-backtest-274a/docs/soxs-fake-breakout-30d/view.html
 

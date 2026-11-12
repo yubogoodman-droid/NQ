@@ -15,6 +15,7 @@ from soxs_fake_breakout import (  # noqa: E402
     Params,
     in_session,
     run_backtest,
+    score_window,
     simulate_exit,
 )
 
@@ -129,6 +130,22 @@ def test_runaway_overshoot_is_skipped() -> None:
     assert trades == []
     assert funnel["entered"] == 0
     assert funnel["runaway"] >= 1
+
+
+def test_half_hour_score_ignores_later_target() -> None:
+    df = _plant_fakeout()
+    # 把 7 分鐘後的停利移到第 40 根之後，半小時結算不該算贏在停利。
+    df.iloc[43, df.columns.get_loc("Low")] = 100.4
+    df.iloc[43, df.columns.get_loc("Close")] = 100.5
+    df.iloc[75, df.columns.get_loc("Low")] = 90.0
+    df.iloc[75, df.columns.get_loc("Close")] = 91.0
+    trades, _ = run_backtest(df, _params())
+    assert len(trades) == 1
+    early = score_window(df, trades, 30, fee_pct=0.0006)
+    assert early["count"] == 1
+    assert early["reasons"].get("target", 0) == 0
+    later = score_window(df, trades, 60, fee_pct=0.0006)
+    assert later["reasons"].get("target", 0) == 1
 
 
 def test_outside_session_is_ignored() -> None:
