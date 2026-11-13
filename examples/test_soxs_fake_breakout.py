@@ -61,6 +61,9 @@ def _params(**overrides) -> Params:
         break_window=10,
         retest_window=6,
         max_hold=8,
+        min_gap_ma99=0.0,
+        min_risk=0.002,
+        max_risk=0.035,
         days=0,
         session="all",
         mode="limit",
@@ -70,21 +73,27 @@ def _params(**overrides) -> Params:
 
 
 def test_session_windows() -> None:
-    hit = pd.Timestamp("2026-11-12 22:26", tz="Asia/Taipei")
+    hit = pd.Timestamp("2026-11-12 22:26", tz="Asia/Taipei")  # 09:26 ET
+    pre_wave = pd.Timestamp("2026-11-12 22:10", tz="Asia/Taipei")  # 09:10 ET
     midday = pd.Timestamp("2026-11-12 12:00", tz="Asia/Taipei")
     early = pd.Timestamp("2026-11-12 18:00", tz="Asia/Taipei")
     friday_rth = pd.Timestamp("2026-11-13 04:30", tz="Asia/Taipei")
     saturday = pd.Timestamp("2026-11-14 22:00", tz="Asia/Taipei")
     assert in_session(hit, "tpe_us")
     assert in_session(hit, "ny")
+    assert in_session(hit, "ny_open")
+    assert in_session(pre_wave, "ny_open", for_wave=True)
+    assert not in_session(pre_wave, "ny_open", for_wave=False)
     assert not in_session(midday, "tpe_us")
     assert not in_session(midday, "ny")
     assert not in_session(early, "tpe_us")
     assert not in_session(early, "ny")
     assert in_session(friday_rth, "tpe_us")
     assert in_session(friday_rth, "ny")
+    assert in_session(friday_rth, "ny_open")
     assert not in_session(saturday, "tpe_us")
     assert not in_session(saturday, "ny")
+    assert not in_session(saturday, "ny_open")
     assert in_session(saturday, "all")
 
 
@@ -148,6 +157,36 @@ def test_half_hour_score_ignores_later_target() -> None:
     assert later["reasons"].get("target", 0) == 1
 
 
+def test_ma99_gap_filter() -> None:
+    # 拉長到 150 根以熱身 MA99：前 100 根在 100.0，拉升後掛單約 101.65，距離 MA99 (~100.5) 約 +1.1%
+    idx = pd.date_range("2026-11-12 20:30", periods=150, freq="min", tz="Asia/Taipei")
+    c = np.full(150, 100.0)
+    c[100:126] = 102.2
+    c[126:130] = 100.4
+    c[130] = 101.6
+    c[131] = 100.2
+    c[132] = 100.7
+    c[133] = 97.0
+    h = c + 0.15
+    l = c - 0.15
+    o = np.r_[c[0], c[:-1]]
+    h[118] = 103.0
+    h[119:130] = np.minimum(h[119:130], 102.4)
+    h[130], l[130], o[130] = 103.35, 101.2, 101.0
+    h[131], l[131], o[131] = 101.2, 100.0, 101.4
+    o[132], h[132], l[132] = 100.4, 102.3, 100.2
+    o[133], h[133], l[133] = 100.6, 100.8, 96.0
+    df = pd.DataFrame({"Open": o, "High": h, "Low": l, "Close": c, "Volume": 1000.0}, index=idx)
+
+    ok_trades, _ = run_backtest(df, _params(min_gap_ma99=0.008))
+    assert len(ok_trades) == 1
+    assert ok_trades[0].gap_ma99_pct >= 0.008
+
+    blocked, funnel = run_backtest(df, _params(min_gap_ma99=0.03))
+    assert blocked == []
+    assert funnel["gap_skip"] >= 1
+
+
 def test_outside_session_is_ignored() -> None:
     df = _plant_fakeout(start="2026-11-14 21:00")
     trades, funnel = run_backtest(df, _params(session="tpe_us"))
@@ -160,5 +199,7 @@ if __name__ == "__main__":
     test_limit_retest_hits_target_without_future_bars()
     test_same_bar_stop_beats_target()
     test_runaway_overshoot_is_skipped()
+    test_half_hour_score_ignores_later_target()
+    test_ma99_gap_filter()
     test_outside_session_is_ignored()
     print("ok")

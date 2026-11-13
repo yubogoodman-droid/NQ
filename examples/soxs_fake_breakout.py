@@ -51,7 +51,7 @@ MA_WIDTH = {7: 1.15, 14: 1.05, 25: 2.05, 30: 1.15, 60: 1.05, 99: 1.15, 120: 1.05
 
 @dataclass(frozen=True)
 class Params:
-    """假突破做空參數。預設對齊 2026-11-12 22:26 那筆回測空單。"""
+    """假突破做空參數。預設為優化版（對齊 2026-11-12 22:26 均線中空帶 + 開盤時段）。"""
 
     lookback: int = 120
     min_sep: int = 15
@@ -60,14 +60,16 @@ class Params:
     break_window: int = 25
     retest_window: int = 10
     target_r: float = 2.5
-    max_hold: int = 60
-    max_risk: float = 0.035
-    min_risk: float = 0.002
+    max_hold: int = 30
+    max_risk: float = 0.025
+    min_risk: float = 0.006
+    # 掛單價距離下方 MA99 至少留出這段下跌空間（0 表示不檢查）。
+    min_gap_ma99: float = 0.008
     stop_buffer: float = 0.001
     # limit：回測掛單 maker 0.02% + 出場 taker 0.04%。breakdown 在 run 裡改 0.08%。
     fee_pct: float = 0.0006
     mode: str = "limit"  # limit | breakdown
-    session: str = "tpe_us"  # tpe_us | ny | all
+    session: str = "ny_open"  # ny_open | tpe_us | ny | all
     days: int = 30
 
 
@@ -93,14 +95,16 @@ class Trade:
     ma14: float
     ma25: float
     ma30: float
+    ma99: float = 0.0
+    gap_ma99_pct: float = 0.0
 
 
 def sma(arr: np.ndarray, n: int) -> np.ndarray:
     return pd.Series(arr, dtype=float).rolling(n, min_periods=n).mean().to_numpy(float)
 
 
-def in_session(ts: pd.Timestamp, session: str) -> bool:
-    """美股相關時段。tpe_us 是這次回測用的台北 20:00–05:00 窗。"""
+def in_session(ts: pd.Timestamp, session: str, *, for_wave: bool = False) -> bool:
+    """美股相關時段。ny_open 允許開盤前 45 分鐘開始築頂，09:20–16:00 ET 才正式掛單進場。"""
     if session == "all":
         return True
     if ts.tzinfo is None:
@@ -109,12 +113,15 @@ def in_session(ts: pd.Timestamp, session: str) -> bool:
         local = ts.tz_convert(TPE)
         wd, hr = local.weekday(), local.hour
         return (wd in (0, 1, 2, 3, 4) and hr >= 20) or (wd in (1, 2, 3, 4, 5) and hr < 5)
-    if session == "ny":
+    if session in ("ny", "ny_open"):
         local = ts.tz_convert(NY)
         if local.weekday() >= 5:
             return False
         minutes = local.hour * 60 + local.minute
-        return 7 * 60 <= minutes < 16 * 60
+        if session == "ny":
+            return 7 * 60 <= minutes < 16 * 60
+        start_min = (8 * 60 + 35) if for_wave else (9 * 60 + 20)
+        return start_min <= minutes < 16 * 60
     raise ValueError(f"unknown session: {session}")
 
 
@@ -126,10 +133,8 @@ def _limit_price(prev_close: float, ma14: float, ma25: float) -> float:
 
 def _stop_price(peak_high: float, entry: float, params: Params) -> Optional[float]:
     stop = peak_high * (1.0 + params.stop_buffer)
-    if stop <= entry * (1.0 + params.min_risk):
-        stop = entry * (1.0 + params.min_risk * 2.0)
     risk = (stop - entry) / entry
-    if risk <= params.min_risk or risk > params.max_risk:
+    if risk < params.min_risk or risk > params.max_risk:
         return None
     return stop
 
@@ -169,11 +174,13 @@ def run_backtest(
     ma14 = sma(c, 14)
     ma25 = sma(c, 25)
     ma30 = sma(c, 30)
+    ma99 = sma(c, 99)
     n = len(df)
     funnel = {
         "breakout": 0,
         "runaway": 0,
         "breakdown": 0,
+        "gap_skip": 0,
         "risk_skip": 0,
         "entered": 0,
     }
@@ -183,10 +190,11 @@ def run_backtest(
         cutoff = df.index[0] if n else pd.Timestamp("1970-01-01", tz=TPE)
 
     trades: List[Trade] = []
-    i = max(params.lookback + 1, 30)
+    warmup = max(params.lookback + 1, 100 if params.min_gap_ma99 > 0 else 30)
+    i = warmup
     busy_until = -1
     while i < n:
-        if i <= busy_until or df.index[i] < cutoff or not in_session(df.index[i], params.session):
+        if i <= busy_until or df.index[i] < cutoff or not in_session(df.index[i], params.session, for_wave=True):
             i += 1
             continue
         if np.isnan(ma30[i]) or np.isnan(ma25[i]):
@@ -245,21 +253,30 @@ def run_backtest(
         entry_idx: Optional[int] = None
         entry_px = 0.0
         stop_px = 0.0
+        gap_ma99 = 0.0
         if params.mode == "breakdown":
             fill_i = bd_idx + 1
             if fill_i < n and in_session(df.index[fill_i], params.session):
                 px = float(o[fill_i])
-                if (ma25[bd_idx] - c[bd_idx]) / ma25[bd_idx] <= 0.025:
+                prev_m99 = float(ma99[bd_idx]) if not np.isnan(ma99[bd_idx]) else np.nan
+                gap_ok = True
+                if params.min_gap_ma99 > 0:
+                    gap_ok = not np.isnan(prev_m99) and (px - prev_m99) / px >= params.min_gap_ma99
+                if not gap_ok:
+                    funnel["gap_skip"] += 1
+                elif (ma25[bd_idx] - c[bd_idx]) / ma25[bd_idx] <= 0.025:
                     stop = _stop_price(peak_h, px, params)
                     if stop is None:
                         funnel["risk_skip"] += 1
                     elif h[fill_i] < stop:
                         entry_idx, entry_px, stop_px = fill_i, px, stop
+                        gap_ma99 = 0.0 if np.isnan(prev_m99) else (px - prev_m99) / px
                     else:
                         # 開盤那根已經打到停損，視為沒做成。
                         funnel["risk_skip"] += 1
         elif params.mode == "limit":
             last_k = min(n - 1, bd_idx + params.retest_window)
+            saw_gap_skip = False
             for k in range(bd_idx + 1, last_k + 1):
                 prev_c = float(c[k - 1])
                 if np.isnan(ma25[k - 1]) or np.isnan(ma14[k - 1]):
@@ -269,6 +286,11 @@ def run_backtest(
                         break
                     continue
                 lim = _limit_price(prev_c, float(ma14[k - 1]), float(ma25[k - 1]))
+                prev_m99 = float(ma99[k - 1]) if not np.isnan(ma99[k - 1]) else np.nan
+                if params.min_gap_ma99 > 0:
+                    if np.isnan(prev_m99) or (lim - prev_m99) / lim < params.min_gap_ma99:
+                        saw_gap_skip = True
+                        continue
                 stop = _stop_price(peak_h, lim, params)
                 if stop is None:
                     funnel["risk_skip"] += 1
@@ -283,7 +305,10 @@ def run_backtest(
                     funnel["risk_skip"] += 1
                     break
                 entry_idx, entry_px, stop_px = k, fill, stop
+                gap_ma99 = 0.0 if np.isnan(prev_m99) else (fill - prev_m99) / fill
                 break
+            if entry_idx is None and saw_gap_skip:
+                funnel["gap_skip"] += 1
         else:
             raise ValueError(f"unknown mode: {params.mode}")
 
@@ -322,6 +347,8 @@ def run_backtest(
                 ma14=float(ma14[entry_idx]),
                 ma25=float(ma25[entry_idx]),
                 ma30=float(ma30[entry_idx]),
+                ma99=0.0 if np.isnan(ma99[entry_idx]) else float(ma99[entry_idx]),
+                gap_ma99_pct=float(gap_ma99),
             )
         )
         funnel["entered"] += 1
@@ -567,6 +594,7 @@ def draw_trade_png(df: pd.DataFrame, trade: Trade, path: Path, trade_no: int, sy
 
 def _rules_html(params: Params, symbol: str) -> str:
     session = {
+        "ny_open": "美東週一至週五 08:35 ET 起允許築頂，只在 09:20–16:00 ET（開盤前 10 分鐘至收盤，冬令對應台北 22:20–隔日 05:00）掛單進場。",
         "tpe_us": "只在台北時間週一至週五 20:00–隔日 05:00 尋找與進場（約美東正規盤加開盤前兩小時；冬令時對得上 07:00–16:00 ET，夏令時會晚一小時）。",
         "ny": "只在美東週一至週五 07:00–16:00 尋找與進場。",
         "all": "全時段都做，不限美股開盤。",
@@ -579,6 +607,11 @@ def _rules_html(params: Params, symbol: str) -> str:
         if params.mode == "limit"
         else "跌破那根的下一根，以開盤價直接空。跌破當根收盤離 MA25 超過 2.5% 就不追。"
     )
+    gap_rule = (
+        f"<li><b>均線中空帶</b>：掛單價距離前一根 MA99 下方空間須 ≥ {params.min_gap_ma99 * 100:.1f}%，確保短均跌破後往下有空間、不會立刻撞上長均支撐。</li>"
+        if params.min_gap_ma99 > 0
+        else ""
+    )
     fee = "0.06%（掛單 maker 0.02% + 出場 taker 0.04%）" if params.mode == "limit" else "0.08%（進出都算 taker）"
     return f"""
 <ol class="rules">
@@ -588,9 +621,10 @@ def _rules_html(params: Params, symbol: str) -> str:
 <li><b>前高</b>：當根往前第 {params.min_sep}～{params.lookback} 根的最高價，而且這段之後到當根之前都沒再摸到該高點。前高之後、突破之前，收盤曾經低於 MA25。</li>
 <li><b>假突破</b>：高點刺過前高，往後 {params.break_window} 根內的最高超漲要落在 {params.min_overshoot * 100:.1f}%～{params.max_overshoot * 100:.1f}%。超過上限當成真突破，整段放棄。</li>
 <li><b>跌破</b>：超漲達標之後，第一根同時收盤 &lt; MA25、收盤 &lt; MA30、收盤 &lt; 前高，而且 MA7 &lt; MA14。</li>
-<li><b>進場</b>：{escape(entry)}進場那根若最高價已經碰到停損，這筆不算。</li>
+<li><b>進場</b>：{escape(entry)}進場那根若開盤價已高於停損，這筆不算。</li>
+{gap_rule}
 <li><b>停損</b>：假突破最高價 × {1 + params.stop_buffer:.3f}。停損距離不到 {params.min_risk * 100:.1f}% 或超過 {params.max_risk * 100:.1f}% 就不做。</li>
-<li><b>出場</b>：停利 {params.target_r:g}R。進場那根只允許被停損，停利從下一根才算；同一根先算停損。最長 {params.max_hold} 根，否則用該根收盤出場。</li>
+<li><b>出場</b>：停利 {params.target_r:g}R。進場那根只允許被停損，停利從下一根才算；同一根先算停損。最長 {params.max_hold} 根（半小時結算），否則用該根收盤出場。</li>
 <li><b>成本與持倉</b>：來回扣 {escape(fee)}，未扣資金費率。同一時間只留一筆。</li>
 </ol>
 <p class="note">價格報酬是永續合約本身的漲跌，不是再乘保證金槓桿。SOXS 現貨本來就是 3 倍反向半導體；這裡沒有再疊一層槓桿，也沒有模擬強平。</p>
@@ -610,6 +644,9 @@ def write_html(
     stats = summarize(trades)
     cards: List[str] = []
     img_dir = path.parent / "img"
+    if img_dir.exists():
+        for old_png in img_dir.glob("*.png"):
+            old_png.unlink()
     for i, t in enumerate(trades, 1):
         et = df.index[t.entry_idx].tz_convert(TPE)
         xt = df.index[t.exit_idx].tz_convert(TPE)
@@ -630,6 +667,7 @@ def write_html(
             f"<span class='tag'>{t.r_multiple:+.2f}R</span>"
             f"<span class='tag'>前高 {t.prev_high:.2f}</span>"
             f"<span class='tag'>假高 {t.peak_high:.2f}</span>"
+            f"<span class='tag'>離MA99 {t.gap_ma99_pct * 100:+.2f}%</span>"
             "</div>"
             "<pre class='trade-detail'>"
             f"entry {t.entry_price:.2f}  stop {t.stop_price:.2f}  (+{risk:.2f})\n"
@@ -637,7 +675,7 @@ def write_html(
             f"前高 {_fmt_ts(df.index[t.prev_idx], False)} {t.prev_high:.2f}  "
             f"假突破 {_fmt_ts(df.index[t.peak_idx], False)} {t.peak_high:.2f}\n"
             f"跌破 {_fmt_ts(df.index[t.bd_idx], False)}  "
-            f"MA7 {t.ma7:.2f} / MA14 {t.ma14:.2f} / MA25 {t.ma25:.2f} / MA30 {t.ma30:.2f}"
+            f"MA7 {t.ma7:.2f} / MA14 {t.ma14:.2f} / MA25 {t.ma25:.2f} / MA99 {t.ma99:.2f}"
             "</pre>"
             f"<div class='mini-chart'><img src='img/{img_name}' alt='#{i}' "
             "style='width:100%;display:block;border-radius:10px'/></div>"
@@ -657,18 +695,19 @@ def write_html(
     )
     reasons = stats["reasons"]
     window_line = ""
-    if window_stats and window_stats.get("count"):
+    if window_stats and window_stats.get("count") and window_stats.get("minutes") != params.max_hold:
         wreasons = window_stats.get("reasons") or {}
+        mins = window_stats["minutes"]
         window_line = (
-            f"<h2>半小時勝率</h2>"
-            f"<p class='muted'>同一 {window_stats['count']} 筆進場，只看到第 {window_stats['minutes']} 根。"
+            f"<h2>延伸至 {mins} 分鐘對照</h2>"
+            f"<p class='muted'>同一 {window_stats['count']} 筆進場，若拿到第 {mins} 根："
             f"先碰到停損 {wreasons.get('stop', 0)} 筆、先碰到停利 {wreasons.get('target', 0)} 筆、"
             f"時間到用收盤 {wreasons.get('time', 0)} 筆。</p>"
             f"<div class='cards'>"
-            f"<div class='card'>半小時筆數<b>{window_stats['count']}</b></div>"
-            f"<div class='card'>半小時勝率<b>{window_stats['win_rate']:.1f}%</b></div>"
-            f"<div class='card'>半小時淨報酬<b class='{'pnl-win' if window_stats['net_pct']>=0 else 'pnl-loss'}'>{window_stats['net_pct']:+.2f}%</b></div>"
-            f"<div class='card'>半小時勝/負<b>{window_stats['wins']}/{window_stats['count']-window_stats['wins']}</b></div>"
+            f"<div class='card'>{mins}m 筆數<b>{window_stats['count']}</b></div>"
+            f"<div class='card'>{mins}m 勝率<b>{window_stats['win_rate']:.1f}%</b></div>"
+            f"<div class='card'>{mins}m 淨報酬<b class='{'pnl-win' if window_stats['net_pct']>=0 else 'pnl-loss'}'>{window_stats['net_pct']:+.2f}%</b></div>"
+            f"<div class='card'>{mins}m 勝/負<b>{window_stats['wins']}/{window_stats['count']-window_stats['wins']}</b></div>"
             f"</div>"
         )
     html = f"""<!DOCTYPE html>
@@ -712,7 +751,7 @@ th:first-child,td:first-child{{text-align:left}}
 {_rules_html(params, symbol)}
 <h2>回測統計</h2>
 <p class="muted">漏斗：刺破前高 {funnel.get('breakout', 0)} → 超漲過大放棄 {funnel.get('runaway', 0)} → 跌破 MA25/30 {funnel.get('breakdown', 0)} → 進場 {funnel.get('entered', 0)}
-（風險不合 {funnel.get('risk_skip', 0)}）
+（離 MA99 太近 {funnel.get('gap_skip', 0)} · 風險不合 {funnel.get('risk_skip', 0)}）
 <br/>出場：停利 {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未走完 {reasons.get('open', 0)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -730,7 +769,7 @@ th:first-child,td:first-child{{text-align:left}}
 <tr><th>版本</th><th>筆數</th><th>勝率</th><th>淨報酬</th><th>合計 R</th></tr>
 {cmp_rows}
 </table>
-<p class="note">上面每一張圖是主策略，出場可以拿到 {params.max_hold} 分鐘。半小時勝率用同一批進場，30 分鐘內先碰到停損或停利就結算，否則用第 30 根收盤。紅虛線是停損，綠虛線是停利，灰虛線是被刺破的前高。</p>
+<p class="note">上面每一張圖是優化主策略（{params.max_hold} 分鐘內結算：先碰到停損或停利就出，否則用第 {params.max_hold} 根收盤）。紅虛線是停損，綠虛線是停利，灰虛線是被刺破的前高。</p>
 {window_line}
 </section>
 {''.join(cards) or "<div class='empty'>這段期間沒有假突破空單</div>"}
@@ -800,16 +839,35 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description="SOXSUSDT 1 分 K 假突破做空回測")
     p.add_argument("--symbol", default="SOXSUSDT")
     p.add_argument("--days", type=int, default=30)
-    p.add_argument("--max-hold", type=int, default=60, help="圖上與主統計的最長持有分鐘")
-    p.add_argument("--score-minutes", type=int, default=30, help="另算這個時間內的勝率")
+    p.add_argument("--max-hold", type=int, default=30, help="最長持有分鐘（預設半小時 30 根）")
+    p.add_argument("--score-minutes", type=int, default=60, help="另算這個時間內的延伸表現")
+    p.add_argument("--min-gap-ma99", type=float, default=0.008, help="掛單價高於前一根 MA99 的最小比例")
     p.add_argument("--mode", choices=("limit", "breakdown"), default="limit")
-    p.add_argument("--session", choices=("tpe_us", "ny", "all"), default="tpe_us")
+    p.add_argument("--session", choices=("ny_open", "tpe_us", "ny", "all"), default="ny_open")
+    p.add_argument("--loose", action="store_true", help="退回初版寬鬆參數（tpe_us、不看 MA99 空間、停損 0.2%–3.5%）")
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true", help="寫到 docs/soxs-fake-breakout-30d/index.html")
     p.add_argument("--branch", default="cursor/soxs-fake-breakout-backtest-274a")
     args = p.parse_args(argv)
 
-    params = Params(days=args.days, mode=args.mode, session=args.session, max_hold=args.max_hold)
+    if args.loose:
+        params = Params(
+            days=args.days,
+            mode=args.mode,
+            session="tpe_us",
+            max_hold=args.max_hold,
+            min_gap_ma99=0.0,
+            min_risk=0.002,
+            max_risk=0.035,
+        )
+    else:
+        params = Params(
+            days=args.days,
+            mode=args.mode,
+            session=args.session,
+            max_hold=args.max_hold,
+            min_gap_ma99=args.min_gap_ma99,
+        )
     print(f"fetch {args.symbol} 1m days={args.days + 2}")
     df = fetch_klines(args.symbol, args.days)
     if len(df) < 400:
@@ -833,15 +891,46 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             f"{t.exit_reason} {t.net_pct * 100:+.2f}% ({t.r_multiple:+.2f}R) peak={t.peak_high:.2f}"
         )
 
-    comparisons = [(f"主策略 {args.mode} / {args.session}", stats)]
-    for mode, session, name in (
-        ("limit", "ny", "回測掛單 / 美東 07:00–16:00"),
-        ("limit", "all", "回測掛單 / 全時段"),
-        ("breakdown", args.session, f"跌破下一根開盤 / {args.session}"),
+    comparisons = [(f"優化主策略 ({params.session}, 離MA99≥{params.min_gap_ma99*100:.1f}%, {params.max_hold}m)", stats)]
+    for alt_params, name in (
+        (
+            Params(
+                days=args.days,
+                mode="limit",
+                session="ny_open",
+                max_hold=args.max_hold,
+                min_gap_ma99=0.0,
+                min_risk=0.002,
+                max_risk=0.035,
+            ),
+            f"只改美股開盤窗 (09:20–16:00 ET, {args.max_hold}m)",
+        ),
+        (
+            Params(
+                days=args.days,
+                mode="limit",
+                session="tpe_us",
+                max_hold=args.max_hold,
+                min_gap_ma99=0.0,
+                min_risk=0.002,
+                max_risk=0.035,
+            ),
+            f"初版寬鬆設定 (tpe_us, 不限MA99, {args.max_hold}m)",
+        ),
+        (
+            Params(
+                days=args.days,
+                mode="limit",
+                session="all",
+                max_hold=args.max_hold,
+                min_gap_ma99=0.0,
+                min_risk=0.002,
+                max_risk=0.035,
+            ),
+            f"全時段無過濾 (all, {args.max_hold}m)",
+        ),
     ):
-        if mode == args.mode and session == args.session:
-            continue
-        alt, _ = run_backtest(df, Params(days=args.days, mode=mode, session=session, max_hold=args.max_hold))
+        alt, _ = run_backtest(df, alt_params)
         info = _print_stats(name, alt)
         comparisons.append((name, info))
 
