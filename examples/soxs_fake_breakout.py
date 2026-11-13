@@ -65,6 +65,10 @@ class Params:
     min_risk: float = 0.006
     # 掛單價距離下方 MA99 至少留出這段下跌空間（0 表示不檢查）。
     min_gap_ma99: float = 0.008
+    # S 級大賺狙擊條件（預設 0 關閉；--sniper 或 watch_soxs_big_win_tg.py 開啟）
+    min_pump45_pct: float = 0.0
+    min_peak_ext60_pct: float = 0.0
+    max_peak_vol_ratio: float = 0.0
     stop_buffer: float = 0.001
     # limit：回測掛單 maker 0.02% + 出場 taker 0.04%。breakdown 在 run 裡改 0.08%。
     fee_pct: float = 0.0006
@@ -97,6 +101,9 @@ class Trade:
     ma30: float
     ma99: float = 0.0
     gap_ma99_pct: float = 0.0
+    pump45_pct: float = 0.0
+    peak_ext60_pct: float = 0.0
+    peak_vol_ratio: float = 0.0
 
 
 def sma(arr: np.ndarray, n: int) -> np.ndarray:
@@ -170,16 +177,19 @@ def run_backtest(
     h = df["High"].to_numpy(float)
     l = df["Low"].to_numpy(float)
     c = df["Close"].to_numpy(float)
+    v = df["Volume"].to_numpy(float) if "Volume" in df.columns else np.ones(len(df), dtype=float)
     ma7 = sma(c, 7)
     ma14 = sma(c, 14)
     ma25 = sma(c, 25)
     ma30 = sma(c, 30)
+    ma60 = sma(c, 60)
     ma99 = sma(c, 99)
     n = len(df)
     funnel = {
         "breakout": 0,
         "runaway": 0,
         "breakdown": 0,
+        "sniper_skip": 0,
         "gap_skip": 0,
         "risk_skip": 0,
         "entered": 0,
@@ -249,6 +259,20 @@ def run_backtest(
             i += 1
             continue
         funnel["breakdown"] += 1
+
+        low45 = float(np.min(l[max(0, peak_idx - 45) : peak_idx + 1]))
+        pump45 = (peak_h / low45 - 1.0) if low45 > 0 else 0.0
+        pk_ext60 = (peak_h / float(ma60[peak_idx]) - 1.0) if not np.isnan(ma60[peak_idx]) else 0.0
+        pump_max_v = float(np.max(v[max(0, peak_idx - 35) : peak_idx])) if peak_idx > 0 else float(v[peak_idx])
+        pk_vol_ratio = (float(v[peak_idx]) / pump_max_v) if pump_max_v > 0 else 1.0
+        if (
+            (params.min_pump45_pct > 0 and pump45 < params.min_pump45_pct)
+            or (params.min_peak_ext60_pct > 0 and (np.isnan(ma60[peak_idx]) or pk_ext60 < params.min_peak_ext60_pct))
+            or (params.max_peak_vol_ratio > 0 and pk_vol_ratio > params.max_peak_vol_ratio)
+        ):
+            funnel["sniper_skip"] += 1
+            i = bd_idx + 1
+            continue
 
         entry_idx: Optional[int] = None
         entry_px = 0.0
@@ -349,6 +373,9 @@ def run_backtest(
                 ma30=float(ma30[entry_idx]),
                 ma99=0.0 if np.isnan(ma99[entry_idx]) else float(ma99[entry_idx]),
                 gap_ma99_pct=float(gap_ma99),
+                pump45_pct=float(pump45),
+                peak_ext60_pct=float(pk_ext60),
+                peak_vol_ratio=float(pk_vol_ratio),
             )
         )
         funnel["entered"] += 1
@@ -612,6 +639,13 @@ def _rules_html(params: Params, symbol: str) -> str:
         if params.min_gap_ma99 > 0
         else ""
     )
+    sniper_rule = (
+        f"<li><b>S 級大賺狙擊過濾</b>：假高相對前 45 分鐘低點漲幅 ≥ {params.min_pump45_pct * 100:.1f}%、"
+        f"假高乖離 MA60 ≥ {params.min_peak_ext60_pct * 100:.1f}%、"
+        f"且創高當根成交量 ≤ 前 35 分鐘起漲最大量的 {params.max_peak_vol_ratio * 100:.0f}%（量縮背離）。</li>"
+        if (params.min_pump45_pct > 0 or params.min_peak_ext60_pct > 0 or params.max_peak_vol_ratio > 0)
+        else ""
+    )
     fee = "0.06%（掛單 maker 0.02% + 出場 taker 0.04%）" if params.mode == "limit" else "0.08%（進出都算 taker）"
     return f"""
 <ol class="rules">
@@ -623,6 +657,7 @@ def _rules_html(params: Params, symbol: str) -> str:
 <li><b>跌破</b>：超漲達標之後，第一根同時收盤 &lt; MA25、收盤 &lt; MA30、收盤 &lt; 前高，而且 MA7 &lt; MA14。</li>
 <li><b>進場</b>：{escape(entry)}進場那根若開盤價已高於停損，這筆不算。</li>
 {gap_rule}
+{sniper_rule}
 <li><b>停損</b>：假突破最高價 × {1 + params.stop_buffer:.3f}。停損距離不到 {params.min_risk * 100:.1f}% 或超過 {params.max_risk * 100:.1f}% 就不做。</li>
 <li><b>出場</b>：停利 {params.target_r:g}R。進場那根只允許被停損，停利從下一根才算；同一根先算停損。最長 {params.max_hold} 根（半小時結算），否則用該根收盤出場。</li>
 <li><b>成本與持倉</b>：來回扣 {escape(fee)}，未扣資金費率。同一時間只留一筆。</li>
@@ -751,7 +786,7 @@ th:first-child,td:first-child{{text-align:left}}
 {_rules_html(params, symbol)}
 <h2>回測統計</h2>
 <p class="muted">漏斗：刺破前高 {funnel.get('breakout', 0)} → 超漲過大放棄 {funnel.get('runaway', 0)} → 跌破 MA25/30 {funnel.get('breakdown', 0)} → 進場 {funnel.get('entered', 0)}
-（離 MA99 太近 {funnel.get('gap_skip', 0)} · 風險不合 {funnel.get('risk_skip', 0)}）
+（非大賺結構 {funnel.get('sniper_skip', 0)} · 離 MA99 太近 {funnel.get('gap_skip', 0)} · 風險不合 {funnel.get('risk_skip', 0)}）
 <br/>出場：停利 {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未走完 {reasons.get('open', 0)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
@@ -844,6 +879,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--min-gap-ma99", type=float, default=0.008, help="掛單價高於前一根 MA99 的最小比例")
     p.add_argument("--mode", choices=("limit", "breakdown"), default="limit")
     p.add_argument("--session", choices=("ny_open", "tpe_us", "ny", "all"), default="ny_open")
+    p.add_argument("--sniper", action="store_true", help="只抓 S 級大賺單（前45m急拉≥3%、假高離MA60≥2%、創高縮量≤65%）")
     p.add_argument("--loose", action="store_true", help="退回初版寬鬆參數（tpe_us、不看 MA99 空間、停損 0.2%–3.5%）")
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true", help="寫到 docs/soxs-fake-breakout-30d/index.html")
@@ -859,6 +895,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             min_gap_ma99=0.0,
             min_risk=0.002,
             max_risk=0.035,
+        )
+    elif args.sniper:
+        params = Params(
+            days=args.days,
+            mode=args.mode,
+            session=args.session,
+            max_hold=args.max_hold,
+            min_gap_ma99=args.min_gap_ma99,
+            min_pump45_pct=0.030,
+            min_peak_ext60_pct=0.020,
+            max_peak_vol_ratio=0.65,
         )
     else:
         params = Params(

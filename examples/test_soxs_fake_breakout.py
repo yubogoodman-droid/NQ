@@ -18,6 +18,11 @@ from soxs_fake_breakout import (  # noqa: E402
     score_window,
     simulate_exit,
 )
+from watch_soxs_big_win_tg import (  # noqa: E402
+    SNIPER_PARAMS,
+    detect_live_setups,
+    format_setup_message,
+)
 
 
 def _plant_fakeout(n: int = 80, start: str = "2026-11-12 21:00", peak: float = 103.35) -> pd.DataFrame:
@@ -187,6 +192,49 @@ def test_ma99_gap_filter() -> None:
     assert funnel["gap_skip"] >= 1
 
 
+def test_sniper_big_win_detector_arm_and_fill() -> None:
+    idx = pd.date_range("2026-11-12 20:10", periods=145, freq="min", tz="Asia/Taipei")
+    c = np.full(145, 48.0)
+    # 21:55..22:21 拉升墊高短均，使假高 50.78 相對前 45m 低點 (~48.0) > +5.5%、離 MA60 > +2.5%
+    c[105:131] = 50.15
+    c[131:135] = 49.30
+    c[135] = 50.10  # 22:25 刺破前高
+    c[136] = 49.85  # 22:26 跌破 MA25/30 -> arm
+    c[137] = 50.00  # 22:27 回測觸價 -> fill
+    c[138] = 48.20
+    h = c + 0.10
+    l = c - 0.10
+    o = np.r_[c[0], c[:-1]]
+    v = np.full(145, 2000.0)
+    v[110] = 15000.0  # 起漲爆量
+    v[135] = 2500.0   # 創高縮量 (16.7% <= 65%)
+    h[120] = 50.35    # 前高
+    h[121:135] = np.minimum(h[121:135], 50.20)
+    h[135], l[135], o[135] = 50.78, 49.90, 50.00
+    h[136], l[136], o[136] = 50.05, 49.75, 50.05
+    o[137], h[137], l[137] = 49.90, 50.25, 49.80
+    df = pd.DataFrame({"Open": o, "High": h, "Low": l, "Close": c, "Volume": v}, index=idx)
+
+    # 切在跌破剛收盤（bar 136 = 22:26 TPE = 09:26 ET）：應發出 arm 預掛單訊號
+    arm_df = df.iloc[:137].copy()
+    arm_hits = detect_live_setups("SOXSUSDT", arm_df, SNIPER_PARAMS, recent_bars=2)
+    assert any(s.kind == "arm" for s in arm_hits)
+
+    # 切在下一根回測觸價（bar 137 = 22:27 TPE）：應發出 fill 進場訊號
+    fill_df = df.iloc[:138].copy()
+    fill_hits = detect_live_setups("SOXSUSDT", fill_df, SNIPER_PARAMS, recent_bars=2)
+    fills = [s for s in fill_hits if s.kind == "fill"]
+    assert len(fills) == 1
+    msg = format_setup_message(fill_df, fills[0])
+    assert "S級大賺狙擊" in msg
+    assert "SOXSUSDT" in msg
+
+    # 若創高爆巨量（無量縮背離），大賺狙擊器必須擋掉
+    df_noisy = fill_df.copy()
+    df_noisy.iloc[135, df_noisy.columns.get_loc("Volume")] = 20000.0
+    assert detect_live_setups("SOXSUSDT", df_noisy, SNIPER_PARAMS, recent_bars=3) == []
+
+
 def test_outside_session_is_ignored() -> None:
     df = _plant_fakeout(start="2026-11-14 21:00")
     trades, funnel = run_backtest(df, _params(session="tpe_us"))
@@ -201,5 +249,6 @@ if __name__ == "__main__":
     test_runaway_overshoot_is_skipped()
     test_half_hour_score_ignores_later_target()
     test_ma99_gap_filter()
+    test_sniper_big_win_detector_arm_and_fill()
     test_outside_session_is_ignored()
     print("ok")
