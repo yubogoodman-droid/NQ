@@ -393,7 +393,11 @@ def draw_5m_at_entry_png(
     o, h, l, c = window["Open"], window["High"], window["Low"], window["Close"]
     vol = window["Volume"] if "Volume" in window.columns else None
     close_full = df_5m["Close"].astype(float)
-    ma20_5 = float(close_full.rolling(20, min_periods=20).mean().iloc[i_entry])
+    ma20_5 = (
+        float(sig.ma20_5m)
+        if sig.ma20_5m > 0
+        else float(close_full.rolling(20, min_periods=20).mean().iloc[i_entry])
+    )
 
     fig, (ax, axv) = plt.subplots(
         2,
@@ -698,7 +702,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>{escape(symbol)} {escape(interval)} 破底翻 · 右肩在 MA20 上</h1>
-<p class="muted">只做日盤 09:30–15:45 ET。破底翻 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後右肩踩回 MA20 進場。停損在{'右肩低點' if interval == '1m' else '破底'}下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內），或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下（45 點內），或遠低於下彎的 5m MA20（超過 45 點），則略過。五分 MA20 下跌時，追在它上方超過 35 點、或壓在斜率比 −15 更負的蓋子下，整波不進。五分粉紅剛上彎、綠線還下彎、兩條差不到 25 點且收盤已在綠線上（均線糾結），整波不進。{pullback_note}{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
+<p class="muted">只做日盤 09:30–15:45 ET。破底翻 → 收復粉紅 MA20（{escape(ma20_note)}）→ 離開後右肩踩回 MA20 進場。停損在{'右肩低點' if interval == '1m' else '破底'}下方，目標 1.5R；持有滿 {ma_exit_after} 根若收破 MA20 出場。進場若貼著下彎的 5m MA60（40 點內），或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下（45 點內），或遠低於下彎的 5m MA20（超過 45 點），則略過。五分 MA20 明確下彎（斜率低於 −5）時，追在它上方超過 35 點、或壓在斜率比 −15 更負的蓋子下，整波不進；即使上彎，噴離 5m MA20 超過 120 點也不再當右肩。五分粉紅剛上彎、綠線還下彎、兩條差不到 25 點且收盤已在綠線上（均線糾結），整波不進。{pullback_note}{" 每筆附進場當下五分 K 對照。" if interval == "1m" else ""}</p>
 <p class="muted">{escape(period)} · {escape(start)} → {escape(end)} ET · bars={len(df)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>

@@ -89,16 +89,11 @@ def align_5m_ma(
     slope5 = ma5 - ma5.shift(slope_bars)
     ma_out = np.full(n, np.nan, dtype=float)
     slope_out = np.full(n, np.nan, dtype=float)
-    m5_idx = ma5.index
-    ma_vals = ma5.to_numpy(float)
-    sl_vals = slope5.to_numpy(float)
-    j = 0
-    for i, ts in enumerate(idx):
-        while j + 1 < len(m5_idx) and m5_idx[j + 1] <= ts:
-            j += 1
-        if j < len(m5_idx) and m5_idx[j] <= ts:
-            ma_out[i] = ma_vals[j]
-            slope_out[i] = sl_vals[j]
+    if len(m5):
+        pos = m5.index.searchsorted(idx, side="right") - 1
+        valid = pos >= 0
+        ma_out[valid] = ma5.to_numpy(float)[pos[valid]]
+        slope_out[valid] = slope5.to_numpy(float)[pos[valid]]
     return ma_out, slope_out
 
 
@@ -179,21 +174,30 @@ def falling_5m_ma20_location(
     *,
     chase_above: float,
     lid_slope: float,
+    flat_slope: float = -5.0,
+    max_above: float = 0.0,
 ) -> str:
-    """五分 MA20 下跌時的位置：'' / chase / lid。
+    """五分 MA20 位置：'' / chase / lid。
 
-    chase：收盤高均線太多。這波作廢，不要再拖 80 分鐘等五分均線翻過來
-    （08-19 11:05 追價，11:44 才進，不是右肩）。
-    lid：壓在陡降均線下，這波破底翻作廢（否則 4 分鐘後又買到更差的肩）。
+    max_above：即使五分 MA20 上彎，噴出均線上方超過 max_above 也不再當右肩
+    （10-20 10:38 已高過五分 MA20 達 204 點，是主升段中繼不是破底翻右肩）。
+    flat_slope：斜率在 [flat_slope, 0) 視為走平（10-27 斜率 −2.1、5m MA60 上彎），不算下彎追價。
+    chase：五分 MA20 明確下彎且收盤高均線太多 → 整波作廢（08-19 11:05）。
+    lid：壓在陡降均線下 → 整波作廢（08-05 / 08-07 / 08-11）。
 
-    圈起來的三筆都是 ''：08-03 五分 MA20 往上；08-24 只高 26 點；
+    圈起來的三筆都是 ''：08-03 五分 MA20 往上 +14 點；08-24 只高 26 點；
     08-28 在均線下 10 點但斜率只有 −11，還不到蓋子。
     """
-    if np.isnan(ma20_5m) or np.isnan(slope20) or float(slope20) >= 0.0:
+    if np.isnan(ma20_5m) or np.isnan(slope20):
         return ""
-    if chase_above > 0 and (float(entry) - float(ma20_5m)) > float(chase_above):
+    diff = float(entry) - float(ma20_5m)
+    if max_above > 0 and diff > float(max_above):
         return "chase"
-    if lid_slope < 0 and float(slope20) < float(lid_slope) and float(entry) < float(ma20_5m):
+    if float(slope20) >= float(flat_slope):
+        return ""
+    if chase_above > 0 and diff > float(chase_above):
+        return "chase"
+    if lid_slope < 0 and float(slope20) < float(lid_slope) and diff < 0:
         return "lid"
     return ""
 
@@ -232,6 +236,8 @@ def falling_5m_ma20_bad_location(
     *,
     chase_above: float,
     lid_slope: float,
+    flat_slope: float = -5.0,
+    max_above: float = 0.0,
 ) -> bool:
     return bool(
         falling_5m_ma20_location(
@@ -240,6 +246,8 @@ def falling_5m_ma20_bad_location(
             slope20,
             chase_above=chase_above,
             lid_slope=lid_slope,
+            flat_slope=flat_slope,
+            max_above=max_above,
         )
     )
 
@@ -349,6 +357,8 @@ INTERVAL_DETECT = {
         ma20_5m_near=45.0,
         ma20_5m_below=45.0,
         ma20_5m_chase=35.0,
+        ma20_5m_max_above=120.0,
+        ma20_5m_flat_slope=-5.0,
         ma20_5m_lid_slope=-15.0,
         ma20_5m_tangle=25.0,
         min_pullback=25.0,
@@ -410,6 +420,8 @@ def detect_signals(
     ma20_5m_near: float = 45.0,
     ma20_5m_below: float = 0.0,
     ma20_5m_chase: float = 0.0,
+    ma20_5m_max_above: float = 0.0,
+    ma20_5m_flat_slope: float = -5.0,
     ma20_5m_lid_slope: float = 0.0,
     ma20_5m_tangle: float = 0.0,
     min_pullback: float = 0.0,
@@ -447,6 +459,13 @@ def detect_signals(
     floor = rolling_min_prev(low, lookback)
 
     n = len(close)
+    idx_minutes = (df.index.hour * 60 + df.index.minute).to_numpy(int) if n else np.array([], dtype=int)
+    if session == "rth":
+        in_sess = (idx_minutes >= (9 * 60 + 30)) & (idx_minutes <= (15 * 60 + 45))
+    elif session == "day":
+        in_sess = (idx_minutes >= (8 * 60)) & (idx_minutes <= (16 * 60))
+    else:
+        in_sess = np.ones(n, dtype=bool)
     warmup = max(lookback, 60, ma20_len)
     signals: List[Signal] = []
     last_entry = int(last_entry_idx)
@@ -465,7 +484,7 @@ def detect_signals(
             continue
         # 日盤策略：夜盤破底不當 破底翻（08-12 08:30 / 08-20 08:36 那種，
         # 09:30 一開盤就當成右肩，其實只是隔夜彈完）。
-        if not _in_session(df.index[i], session):
+        if not in_sess[i]:
             bump("skip_session")
             i += 1
             continue
@@ -601,12 +620,11 @@ def detect_signals(
             # 右肩候選：過濾不通過就繼續掃同一波，不要整段放棄
             # （08-28 10:13 破底 29505，09:49 那筆的 60 根間隔擋掉 10:27 首踩，
             #  11:23 才是圖上那肩；舊邏輯 skip_gap 後從 10:28 重找破底，右肩就沒了。）
-            ts = df.index[t]
-            if not _in_session(ts, session):
+            if not in_sess[t]:
                 bump("skip_session")
                 continue
             # 08-06 13:10 / 08-28 14:31：收復後拖到午後，貼著下彎長均的假右肩。
-            if entry_until > 0 and (int(ts.hour) * 60 + int(ts.minute)) >= int(entry_until):
+            if entry_until > 0 and int(idx_minutes[t]) >= int(entry_until):
                 bump("skip_late")
                 continue
             if t - last_entry < min_entry_gap:
@@ -661,6 +679,8 @@ def detect_signals(
                 m20_5_s,
                 chase_above=ma20_5m_chase,
                 lid_slope=ma20_5m_lid_slope,
+                flat_slope=ma20_5m_flat_slope,
+                max_above=ma20_5m_max_above,
             )
             if loc5 == "lid":
                 # 08-05 12:34 蓋子若只跳過當根，12:38 又買到 −45。

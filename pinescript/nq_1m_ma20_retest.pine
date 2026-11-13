@@ -27,7 +27,9 @@ maxHold       = input.int(180, "最長持有根數", minval=10)
 ma60Near      = input.float(40.0, "避開下彎 5m MA60（點，0=關）", minval=0)
 ma20Near      = input.float(45.0, "避開下彎 5m MA20/MA30 蓋頭（點，0=關）", minval=0)
 ma20Below     = input.float(45.0, "避開遠低於下彎 5m MA20（點，0=關）", minval=0)
-ma20Chase     = input.float(35.0, "5m MA20 下跌時，收盤高它這麼多 → 追價跳過", minval=0)
+ma20Chase     = input.float(35.0, "5m MA20 下彎時，收盤高它這麼多 → 追價跳過", minval=0)
+ma20MaxAbove  = input.float(120.0, "進場高於 5m MA20 上限（點，0=關；噴太遠不算右肩）", minval=0)
+ma20FlatSlope = input.float(-5.0, "5m MA20 斜率高於這值視為走平（不算下彎追價）")
 ma20LidSlope  = input.float(-15.0, "5m MA20 斜率比這更負、且收盤在它下 → 蓋子跳過")
 ma20Tangle    = input.float(25.0, "5m MA20 上彎、MA60 下彎且兩條差這麼近、收盤已在綠線上 → 糾結跳過", minval=0)
 ma60SlopeBars = input.int(6, "5m MA60 斜率回看（5分K根數）", minval=1)
@@ -37,17 +39,21 @@ maxDumpBody   = input.float(30.0, "進場棒大陰實體上限（點，0=關；�
 dumpSkipBody  = input.float(20.0, "大陰線踩 MA20 不進、等下一根（點，0=關）", minval=0)
 maxPrevAbove  = input.float(50.0, "前一根收盤高於 MA20 上限（點，0=關）", minval=0)
 minRetestBars = input.int(8, "收復後至少再過 N 根才進", minval=0)
+beAfterR      = input.float(0.8, "達幾 R 後停損推保本（0=關）", minval=0, step=0.1)
+trailAfterR   = input.float(1.2, "達幾 R 後推移動停利（0=關）", minval=0, step=0.1)
+trailLockR    = input.float(0.4, "移動停利鎖住幾 R", minval=0, step=0.1)
 
 ma5  = ta.sma(close, 5)
 ma10 = ta.sma(close, 10)
 ma20 = ta.sma(close, maLen)
 ma60 = ta.sma(close, 60)
-ma60_5 = request.security(syminfo.tickerid, "5", ta.sma(close, 60), barmerge.gaps_off, barmerge.lookahead_off)
-ma60_5_prev = request.security(syminfo.tickerid, "5", ta.sma(close, 60)[ma60SlopeBars], barmerge.gaps_off, barmerge.lookahead_off)
-ma20_5 = request.security(syminfo.tickerid, "5", ta.sma(close, 20), barmerge.gaps_off, barmerge.lookahead_off)
-ma20_5_prev = request.security(syminfo.tickerid, "5", ta.sma(close, 20)[ma60SlopeBars], barmerge.gaps_off, barmerge.lookahead_off)
-ma30_5 = request.security(syminfo.tickerid, "5", ta.sma(close, 30), barmerge.gaps_off, barmerge.lookahead_off)
-ma30_5_prev = request.security(syminfo.tickerid, "5", ta.sma(close, 30)[ma60SlopeBars], barmerge.gaps_off, barmerge.lookahead_off)
+[ma20_5, ma20_5_prev, ma30_5, ma30_5_prev, ma60_5, ma60_5_prev] = request.security(
+    syminfo.tickerid,
+    "5",
+    [ta.sma(close, 20), ta.sma(close, 20)[ma60SlopeBars], ta.sma(close, 30), ta.sma(close, 30)[ma60SlopeBars], ta.sma(close, 60), ta.sma(close, 60)[ma60SlopeBars]],
+    barmerge.gaps_off,
+    barmerge.lookahead_off
+)
 floor = ta.lowest(low, lookback)[1]
 
 inRth() =>
@@ -64,6 +70,11 @@ var int   lastEntryBar = na
 var float bounceHigh = na
 var float shoulderLow = na
 var bool  pulledOk = false
+var float tradeEntry = na
+var float tradeStop  = na
+var float tradeTarget = na
+var float tradeRisk  = na
+var float tradeMfe   = 0.0
 
 newBreak = not inSetup and not na(floor) and low < floor and (floor - low) >= minDepth and inRth()
 
@@ -131,9 +142,11 @@ if inSetup
             ma60FallingNear = ma60Near > 0 and not na(ma60_5) and not na(ma60_5_prev) and ma60_5 < ma60_5_prev and math.abs(close - ma60_5) <= ma60Near and (na(ma20_5) or na(ma20_5_prev) or ma20_5 < ma20_5_prev)
             ma20_30FallingNear = ma20Near > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma30_5) and not na(ma30_5_prev) and not na(ma60_5) and not na(ma60_5_prev) and ma20_5 < ma20_5_prev and ma30_5 < ma30_5_prev and ma60_5 < ma60_5_prev and close < ma20_5 and close < ma30_5 and ma20_5 < ma30_5 and ma30_5 < ma60_5 and (ma20_5 - close) <= ma20Near and (ma30_5 - close) <= ma20Near
             farBelow5mMa20 = ma20Below > 0 and not na(ma20_5) and not na(ma20_5_prev) and ma20_5 < ma20_5_prev and (ma20_5 - close) > ma20Below
-            falling5 = not na(ma20_5) and not na(ma20_5_prev) and ma20_5 < ma20_5_prev
-            chase5 = ma20Chase > 0 and falling5 and (close - ma20_5) > ma20Chase
-            lid5 = ma20LidSlope < 0 and falling5 and (ma20_5 - ma20_5_prev) < ma20LidSlope and close < ma20_5
+            slope20_5 = not na(ma20_5) and not na(ma20_5_prev) ? (ma20_5 - ma20_5_prev) : na
+            falling5 = not na(slope20_5) and slope20_5 < ma20FlatSlope
+            runaway5 = ma20MaxAbove > 0 and not na(ma20_5) and (close - ma20_5) > ma20MaxAbove
+            chase5 = runaway5 or (ma20Chase > 0 and falling5 and (close - ma20_5) > ma20Chase)
+            lid5 = ma20LidSlope < 0 and falling5 and slope20_5 < ma20LidSlope and close < ma20_5
             tangle5 = ma20Tangle > 0 and not na(ma20_5) and not na(ma20_5_prev) and not na(ma60_5) and not na(ma60_5_prev) and ma20_5 > ma20_5_prev and ma60_5 < ma60_5_prev and math.abs(ma60_5 - ma20_5) <= ma20Tangle and close >= ma60_5
             gapOk = na(lastEntryBar) or (bar_index - lastEntryBar >= minEntryGap)
             nyHour = hour(time, "America/New_York")
@@ -156,6 +169,11 @@ if inSetup
                 inSetup := false
             else if touch and nearPrev and oldEnough and inRth() and notLate and risk >= minRisk and risk <= maxRisk and not ma60FallingNear and not ma20_30FallingNear and not farBelow5mMa20 and not chase5 and not lid5 and not tangle5 and strategy.position_size == 0 and gapOk
                 tgt = close + risk * tgtR
+                tradeEntry := close
+                tradeStop := stopLevel
+                tradeTarget := tgt
+                tradeRisk := risk
+                tradeMfe := 0.0
                 strategy.entry("破翻回踩", strategy.long)
                 strategy.exit("破翻出場", "破翻回踩", stop=stopLevel, limit=tgt)
                 lastEntryBar := bar_index
@@ -163,6 +181,14 @@ if inSetup
 
 if strategy.position_size > 0
     held = bar_index - strategy.opentrades.entry_bar_index(0)
+    if held >= 1 and not na(tradeEntry) and tradeRisk > 0
+        // 收盤後更新 MFE，下一根才生效（避免同一根高低先推保本再掃停損）
+        tradeMfe := math.max(tradeMfe, high - tradeEntry)
+        if beAfterR > 0 and tradeMfe / tradeRisk >= beAfterR
+            tradeStop := math.max(tradeStop, tradeEntry)
+        if trailAfterR > 0 and tradeMfe / tradeRisk >= trailAfterR
+            tradeStop := math.max(tradeStop, tradeEntry + trailLockR * tradeRisk)
+        strategy.exit("破翻出場", "破翻回踩", stop=tradeStop, limit=tradeTarget)
     if held >= maExitAfter and close < ma20
         strategy.close("破翻回踩", comment="ma20")
     if held >= maxHold

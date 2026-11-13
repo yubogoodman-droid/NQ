@@ -134,6 +134,27 @@ def test_falling_5m_ma20_keeps_circled_and_drops_chase_or_lid() -> None:
     assert falling_5m_ma20_bad_location(
         29577.75, 29602.6, -38.8, chase_above=35.0, lid_slope=-15.0
     )
+    # 10-27 10:44：五分 MA20 斜率只有 −2.1（走平），不算下彎追價
+    assert (
+        falling_5m_ma20_location(
+            29635.75, 29576.0, -2.1, chase_above=35.0, lid_slope=-15.0, flat_slope=-5.0, max_above=120.0
+        )
+        == ""
+    )
+    # 10-20 10:38：即使五分 MA20 上彎，已噴離均線 +203.5 點，不再當右肩
+    assert (
+        falling_5m_ma20_location(
+            29840.75, 29637.3, 72.0, chase_above=35.0, lid_slope=-15.0, flat_slope=-5.0, max_above=120.0
+        )
+        == "chase"
+    )
+    # 08-06 10:01：高 101.6 點仍在 120 上限內，保留
+    assert (
+        falling_5m_ma20_location(
+            29518.50, 29416.9, 11.3, chase_above=35.0, lid_slope=-15.0, flat_slope=-5.0, max_above=120.0
+        )
+        == ""
+    )
 
 
 def test_tangled_5m_drops_0827_keeps_circled() -> None:
@@ -443,6 +464,8 @@ def test_detect_kwargs_intervals() -> None:
     assert d1["max_close_above"] == 20.0
     assert d1["ma20_5m_below"] == 45.0
     assert d1["ma20_5m_chase"] == 35.0
+    assert d1["ma20_5m_max_above"] == 120.0
+    assert d1["ma20_5m_flat_slope"] == -5.0
     assert d1["ma20_5m_lid_slope"] == -15.0
     assert d1["ma20_5m_tangle"] == 25.0
     assert d1["entry_until"] == 13 * 60
@@ -567,6 +590,7 @@ def test_skips_close_far_above_ma20() -> None:
             "1m",
             session="day",
             ma20_5m_chase=0.0,
+            ma20_5m_max_above=0.0,
             ma20_5m_lid_slope=0.0,
         ),
     )
@@ -625,6 +649,7 @@ def test_1m_fills_early_right_shoulder() -> None:
             session="day",
             ma20_5m_below=0.0,
             ma20_5m_chase=0.0,
+            ma20_5m_max_above=0.0,
             ma20_5m_lid_slope=0.0,
         ),
     )
