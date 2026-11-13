@@ -16,7 +16,8 @@
 0.8R 後停損拉到進場；同一根 K 的高點不能用來掃這根的低點
 13:00 ET 後不進（午餐後／尾盤假右肩）
 過濾：貼著下彎 5m MA60，或夾在下彎空頭排列的 5m MA20/MA30 蓋頭底下，或遠低於下彎 5m MA20（瀑布後假破底），則略過
-五分 MA20 下跌時：追在它上方超過 35 點、或壓在斜率比 −15 更負的蓋子下 → 整波不進
+五分 MA20 明確下彎（斜率 < −5）時：追在它上方超過 35 點、或壓在斜率比 −15 更負的蓋子下 → 整波不進
+即使五分 MA20 上彎，進場噴離 5m MA20 超過 120 點（主升段中繼，不再是破底翻右肩）→ 整波不進
 五分粉紅剛上彎、綠線還下彎、兩條差不到 25 點且價已在綠線上（均線糾結）→ 整波不進
 ```
 
@@ -31,16 +32,19 @@
 近一週 Yahoo 1m（2026-08-28 → 09-04，日盤）：**2 筆、勝率 50%、+50.2 點**。  
 08-28 10:28 圈裡那筆 +50.2（與 30 天最後一天重疊）；**09-01 10:05 保本 0**（這週新的一筆）。08-31 / 09-02 / 09-03 沒進場。09-04 日盤尚未走完。
 
+樣本外近一個月 Yahoo 1m（2026-10-15 → 11-13，日盤）：**2 筆、勝率 100%、+112.1 點**（10-21 09:55 **+66.0**、10-27 10:44 **+46.1**；10-20 已噴離五分 MA20 達 204 點的過高回踩已濾掉）。
+
 ```bash
 python3 examples/nq_5m_ma20_retest.py --interval 1m --period 30d --pages
 python3 examples/nq_5m_ma20_retest.py --interval 1m --period 7d --html docs/nq-1m-ma20-retest-7d/index.html
 python3 examples/test_nq_5m_ma20_retest.py
 ```
 
-報告每筆附 **進場當下的五分 K**（粉紅線是 5m MA20）。TradingView：`pinescript/nq_1m_ma20_retest.pine`。
+報告每筆附 **進場當下的五分 K**（粉紅線是 5m MA20）。TradingView：`pinescript/nq_1m_ma20_retest.pine`（已同步內建 0.8R 保本／1.2R 鎖 0.4R 移動停利）。
 
-現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest/view.html  
-近一週：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest-7d/view.html
+現在先看圖（8 月）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest/view.html  
+近一週（8/28–9/04）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest-7d/view.html  
+樣本外（10/15–11/13）：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/1m-right-shoulder-ma20-d3c2/docs/nq-1m-ma20-retest-octnov/view.html
 
 ## 型態定義
 
