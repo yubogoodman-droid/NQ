@@ -661,13 +661,13 @@ def draw_trade_png(
     if 0 <= rx < len(window):
         ax.axvline(rx, color="#79c0ff", ls=":", lw=0.8, alpha=0.7)
     if 0 <= ex < len(window):
-        ax.axvline(ex, color="#3dba7a", ls="--", lw=0.9)
+        ax.axvline(ex, color="#ff9f1a", ls="--", lw=0.9)
         ax.scatter(
             [ex],
             [trade.entry_price],
             s=260,
             facecolors="none",
-            edgecolors="#00e676",
+            edgecolors="#ff9f1a",
             linewidths=2.1,
             marker="o",
             zorder=6,
@@ -678,13 +678,13 @@ def draw_trade_png(
             textcoords="offset points",
             xytext=(0, 10),
             ha="center",
-            color="#00e676",
+            color="#ff9f1a",
             fontsize=8,
             fontweight="bold",
         )
     if 0 <= xx < len(window):
         exit_col = "#00c805" if trade.pnl_points > 0 else "#ff5252"
-        ax.axvline(xx, color="#f0c14b", ls=":", lw=0.9)
+        ax.axvline(xx, color=exit_col, ls=":", lw=0.9)
         ax.scatter(
             [xx],
             [trade.exit_price],
@@ -1037,7 +1037,7 @@ code{{font-size:12px;background:#0d1117;padding:1px 4px;border-radius:4px}}
 <p class="muted">{escape(period)} · 基準日 {escape(date)} · {len(universe)} 檔 · 成交額末名約 {cutoff:.1f} 億</p>
 <h2>觸發規則（對齊 repo 程式，不是口頭版）</h2>
 {rules}
-<p class="note">報酬未扣手續費與交易稅。圖：綠圈「進」＝進場；綠圈或紅圈「出」＝出場；粉點＝破底；黃／藍／粉／紫線＝MA5／MA10／MA20／MA60；紅點橫線＝停損；綠點橫線＝停利。</p>
+<p class="note">報酬未扣手續費與交易稅。圖：橘圈「進」＝進場；綠圈「出」＝獲利出場、紅圈「出」＝虧損出場；粉點＝破底；黃／藍／粉／紫線＝MA5／MA10／MA20／MA60；紅點橫線＝停損；綠點橫線＝停利。</p>
 <h2>回測統計</h2>
 <p class="muted">漏斗：跌破 {fun.get('cross_below', 0)} → 成波 {fun.get('wave_ok', 0)} → 進場 {fun.get('entry', 0)}
 · 太短 {fun.get('too_short', 0)} · 不夠深 {fun.get('shallow', 0)} · 非破底 {fun.get('not_16h_low', 0)}
