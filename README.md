@@ -96,6 +96,59 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
+## HBAR 1h 假突破跌破 MA25 Telegram
+
+對齊 2026-09-29 14:00 那波（箱體後直拉、高點離 MA25 ~23%、隔 12 根陰線剛跌破）：
+
+- 伸 15%～40%，回落 8%～18%，隔 6～18 根
+- 相對拉升前箱體再高出 ≥ 22%（HBAR 約 32%）
+- 右肩壓制：連 4 根收在 MA14 下、近 2 根連上影都不過 MA14 +0.5%、MA14 已下彎、且 MA7 比 MA14 低 ≥ 1%
+- 尖峰到跌破中間沒提前跌破過 MA25，且下方離 MA99 還有 ≥ 7% 空間
+- 陰線第一根跌破 MA25（離均線 ≤ 2.5%），MA25 仍上、尖峰放量 ≥ 1.8×、且跌破當根量 ≥ 0.35× 均量（不能無量死魚滑落）
+- **雙層停損／出場**：① **盤中硬停損** `min(假突破高點, 進場價 + 12%)`（截斷二次主升浪妖幣爆拉，不等 +17%～+21% 天頂）；② **結構軟停損／動態移動出場**：進場後**連 3 根 1h K 收盤站回 MA14 上方**即出場（與進場「連 4 根收在 MA14 下」對稱；虧損時提早認賠、下跌後順著下壓的 MA14 鎖住獲利），否則 2R 停利或 24h 時間停
+
+同一根 K 不重發。沒填 token 時只印在終端。
+
+```bash
+python3 examples/test_watch_hbar_1h_ma25.py
+python3 examples/watch_hbar_1h_ma25.py --test
+python3 examples/watch_hbar_1h_ma25.py --once --dry-run
+python3 examples/watch_hbar_1h_ma25.py                 # 每根 1h 收盤掃 HBAR
+python3 examples/watch_hbar_1h_ma25.py --lookback 48 --once   # 把 09-29 那筆也掃出來
+python3 examples/watch_hbar_1h_ma25.py --backtest --days 60 --pages
+python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
+python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 30 --pages
+python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 180 --pages
+python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 365 --pages
+python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 730 --pages
+```
+
+憑證放 `tg_config.env`，或在 `examples/watch_hbar_1h_ma25.py` 最上面填 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`。
+
+近 60 天 HBAR（08-01 → 09-30）：只剩 **09-29 14:00** 一筆，時間停 **+11.10%**（08-22 那種 11% 輕觸、2 根就破的已濾掉）。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/hbar-1h-ma25/view.html
+
+全幣種近 1 週（流動 USDT 永續 282 檔，09-23 → 09-30）：一年版收斂後只留最純的 **HBAR 1 筆**，時間停 **+11.10%**（勝率 100%、停損 0 筆）。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-7d/view.html
+
+全幣種近 1 個月（同一套、08-31 23:00 → 09-30 23:00）：**5 筆 / 5 檔**，平均 **+4.52%**，加總 +22.62%，PF **2.59**（IOST 在 −2.19% 就被 MA14 軟停損救出，不必扛到 −13.37%）。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-30d/view.html
+
+全幣種近半年（同一套、04-03 23:00 → 09-30 23:00）：**15 筆 / 14 檔**，半年只有 **1 筆硬停損**，勝率 **73.3%**，平均 **+6.06%**，加總 **+90.96%**，PF **5.05**。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-180d/view.html
+
+全幣種近 1 年（同一套、2025-09-30 23:00 → 2026-09-30 23:00，掃 282 檔 × 9000 根 1h）：**27 筆 / 25 檔**，整年只有 **2 筆硬停損**（MA14 結構出場 15、時間停 9、2R 1、硬停損 2），勝率 **70.4%**，平均 **+4.40%**，加總 **+118.81%**，PF **4.17**。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-365d/view.html
+
+全幣種近 2 年（2024-09-30 23:00 → 2026-09-30 23:00，掃 282 檔 × 17740 根 1h）：換上「12% 硬上限 + 連 3 根收上 MA14」雙層停損後，**44 筆 / 39 檔**，兩年只有 **3 筆硬停損**，勝率 **65.9%**，單筆平均從 +3.79% 升到 **+4.08%**，加總從 +166.96% 升到 **+179.40%**，PF 從 2.72 跳升到 **3.68**，最大單筆虧損壓在 **−12.00%**；純樣本外前一年（2024-10 → 2025-09）平均從 +2.23% 升到 **+3.56%**（PF 從 1.69 升到 **3.05**）；最新兩年（2024-11-14 → 2026-11-14，248 檔 42 筆）平均 **+3.93%**、加總 **+165.07%**、PF **3.33**（3x 滾倉從 $3,620 升至 **$13,528**、最大回撤從 −69.5% 壓低至 **−44.8%**）。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-730d/view.html
+
 ## 幣安黏帶三幕 Telegram（活盤優化版）
 
 1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開。預設啟用**零未來函數優化濾網**，推播時附上 K 線圖、過高觸價進場價與圓底停損價：
