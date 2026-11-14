@@ -87,6 +87,8 @@ MIN_MA7_BELOW_MA14 = 0.01
 MA14_HIGH_BARS = 2
 MAX_HIGH_ABOVE_MA14 = 0.005
 MIN_ROOM_MA99 = 0.07
+MAX_STOP_PCT = 0.12
+MA14_EXIT_BARS = 3
 TARGET_R = 2.0
 TIME_BARS = 24
 
@@ -134,6 +136,8 @@ class Params:
     max_high_above_ma14: float = MAX_HIGH_ABOVE_MA14
     require_clean_ma25: bool = True
     min_room_ma99: float = MIN_ROOM_MA99
+    max_stop_pct: float = MAX_STOP_PCT
+    ma14_exit_bars: int = MA14_EXIT_BARS
     target_r: float = TARGET_R
     time_bars: int = TIME_BARS
 
@@ -642,26 +646,41 @@ def simulate(d: dict, sigs: list[Signal], p: Params | None = None, symbol: str =
     for sig in sigs:
         i = sig.i
         entry = float(d["c"][i])
-        stop = float(sig.peak_high)
-        risk = stop - entry
-        if risk <= 0 or entry <= 0:
+        if entry <= 0:
             continue
-        target = entry - p.target_r * risk
+        stop = float(sig.peak_high)
+        if p.max_stop_pct > 0:
+            stop = min(stop, entry * (1.0 + p.max_stop_pct))
+        risk = stop - entry
+        if risk <= 0:
+            continue
+        target = entry - p.target_r * risk if p.target_r > 0 else 0.0
         reason = "open"
         exit_idx = len(d["c"]) - 1
         exit_px = float(d["c"][exit_idx])
         last = min(len(d["c"]) - 1, i + p.time_bars)
+        m14_streak = 0
         for j in range(i + 1, last + 1):
             if float(d["h"][j]) >= stop:
                 reason = "stop"
                 exit_idx = j
                 exit_px = stop
                 break
-            if float(d["l"][j]) <= target:
+            if p.target_r > 0 and float(d["l"][j]) <= target:
                 reason = "target"
                 exit_idx = j
                 exit_px = target
                 break
+            if p.ma14_exit_bars > 0 and "m14" in d and not np.isnan(d["m14"][j]):
+                if float(d["c"][j]) > float(d["m14"][j]):
+                    m14_streak += 1
+                    if m14_streak >= p.ma14_exit_bars:
+                        reason = "m14"
+                        exit_idx = j
+                        exit_px = float(d["c"][j])
+                        break
+                else:
+                    m14_streak = 0
         else:
             if last > i and last < len(d["c"]):
                 if last == i + p.time_bars or last == len(d["c"]) - 1:
@@ -851,6 +870,8 @@ def format_alert(sym: str, d: dict, sig: Signal) -> str:
     ts = hm(int(d["t"][sig.i]))
     pk = hm(int(d["t"][sig.peak_i]))
     o, h, l, c = float(d["o"][sig.i]), float(d["h"][sig.i]), float(d["l"][sig.i]), sig.close
+    hard_stop = min(sig.peak_high, c * (1.0 + MAX_STOP_PCT)) if MAX_STOP_PCT > 0 else sig.peak_high
+    stop_pct = (hard_stop - c) / c * 100
     return (
         f"🔻 <b>1h 箱體假突破跌破 MA25</b>\n"
         f"<b>{sym}</b>  收盤 {ts}（台北）\n"
@@ -858,7 +879,7 @@ def format_alert(sym: str, d: dict, sig: Signal) -> str:
         f"MA25 {sig.ma25:g}　剛跌破 {sig.close_below * 100:.2f}%　陰線\n"
         f"假突破高 {pk}  {sig.peak_high:g}　伸 {sig.ext * 100:.1f}%　箱體假突破 {sig.range_break * 100:.1f}%\n"
         f"從高點回落 {sig.fail * 100:.1f}%　隔 {sig.bars_after} 根　量 {sig.vol_ratio:.1f}×\n"
-        f"空：停在假突破高、目標 {TARGET_R:g}R（對照用）"
+        f"空：硬停損 {hard_stop:g}（+{stop_pct:.1f}%）或連 {MA14_EXIT_BARS} 根收上 MA14｜目標 {TARGET_R:g}R / {TIME_BARS}h"
     )
 
 
@@ -1027,9 +1048,9 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <p class="muted">對齊 2026-09-29 HBAR 箱體假突破：高點離 MA25 {extra['min_ext']*100:g}～{extra.get('max_ext', 0.4)*100:g}%，
 從箱體再高出 ≥ {extra.get('min_range_break', 0.22)*100:g}%，回落 {extra['min_fail']*100:g}～{extra.get('max_fail', 0.18)*100:g}% 後，
 隔 6～18 根、右肩連 4 根壓在 MA14 下（近 2 根上影不過 MA14 +0.5%、MA14 下彎、MA7 死叉 MA14 ≥ 1%），離 MA99 ≥ 7% 且跌破量 ≥ 0.35× 均量，陰線第一次跌破 MA25（離均線 ≤ 2.5%）才算。
-<br/>收盤空；停在假突破高、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。同標的重疊不重做。加總％是各筆相加。
+<br/>收盤空；雙層停損＝盤中硬停損 min(假突破高, +{extra.get('max_stop_pct', MAX_STOP_PCT)*100:g}%) ＋ 連 {extra.get('ma14_exit_bars', MA14_EXIT_BARS)} 根收上 MA14 結構出場；目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。同標的重疊不重做。加總％是各筆相加。
 <br/>{scanned_line}進場 {stats['count']} · 標的 {stats.get('symbols', extra.get('symbol', ''))}
-· 出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)}
+· 出場：2R {reasons.get('target', 0)} · MA14出場 {reasons.get('m14', 0)} · 硬停損 {reasons.get('stop', 0)}
 · 時間 {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}
 · 收盤後 +4h {_fmt_fwd(stats.get('fwd_4h'))} · +8h {_fmt_fwd(stats.get('fwd_8h'))}
 · +24h {_fmt_fwd(stats.get('fwd_24h'))}</p>
@@ -1110,6 +1131,8 @@ def cmd_backtest(args) -> int:
         min_fail=args.min_fail,
         max_fail=args.max_fail,
         min_range_break=args.min_range_break,
+        max_stop_pct=args.max_stop_pct,
+        ma14_exit_bars=args.ma14_exit_bars,
         target_r=args.target_r,
         time_bars=args.time_bars,
     )
@@ -1163,6 +1186,8 @@ def cmd_backtest(args) -> int:
         "min_fail": p.min_fail,
         "max_fail": p.max_fail,
         "min_range_break": p.min_range_break,
+        "max_stop_pct": p.max_stop_pct,
+        "ma14_exit_bars": p.ma14_exit_bars,
         "target_r": p.target_r,
         "time_bars": p.time_bars,
         "scanned": scanned or len(symbols),
@@ -1278,6 +1303,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--html", default="")
     p.add_argument("--pages", action="store_true", help="寫到 docs/…/index.html")
     p.add_argument("--symbol", default=DEFAULT_SYMBOL, help="回測代號（沒開 --universe 時）")
+    p.add_argument("--max-stop-pct", type=float, default=MAX_STOP_PCT, help="盤中硬停損上限（0=只守假突破高）")
+    p.add_argument("--ma14-exit-bars", type=int, default=MA14_EXIT_BARS, help="連幾根 1h 收上 MA14 結構出場（0=關閉）")
     p.add_argument("--target-r", type=float, default=TARGET_R)
     p.add_argument("--time-bars", type=int, default=TIME_BARS)
     p.add_argument("--max-charts", type=int, default=MAX_CHARTS)

@@ -203,9 +203,11 @@ def test_simulate_short_and_html(tmp_path: Path | None = None) -> None:
     assert trades
     t = trades[0]
     assert t.entry == sigs[0].close
-    assert t.stop == sigs[0].peak_high
+    assert abs(t.stop - min(sigs[0].peak_high, t.entry * 1.12)) < 1e-9
     assert t.stop > t.entry
     assert t.target < t.entry
+    raw_peak = simulate(d, sigs, p=Params(max_stop_pct=0.0), symbol="HBARUSDT")[0]
+    assert raw_peak.stop == sigs[0].peak_high
     stats = summarize(trades)
     assert stats["count"] == 1
     text = format_alert("HBARUSDT", d, sigs[0])
@@ -305,6 +307,40 @@ def test_skip_overlap_and_chart_pick() -> None:
     assert pages_path(universe=True, days=730, symbol="HBARUSDT").as_posix().endswith("binance-1h-fake-ma25-730d/index.html")
 
 
+def test_two_layer_stop_ma14_and_cap() -> None:
+    # 1. 單根或兩根站上 MA14 不會被洗掉
+    d1 = fake_break_then_fail()
+    sig = detect_signals(d1)[0]
+    i = sig.i
+    d1["c"][i + 1] = 1.14
+    d1["h"][i + 1] = 1.15
+    d1["c"][i + 2] = 1.14
+    d1["h"][i + 2] = 1.15
+    d1 = indicators(d1)
+    t1 = simulate(d1, [sig])[0]
+    assert t1.reason != "m14"
+
+    # 2. 連 3 根 1h 收上 MA14 → 結構軟停損提早出場，不等摸到硬停損
+    d2 = fake_break_then_fail()
+    for k in (1, 2, 3):
+        d2["c"][i + k] = 1.14
+        d2["h"][i + k] = 1.15
+        d2["l"][i + k] = 1.12
+    d2 = indicators(d2)
+    t2 = simulate(d2, [sig])[0]
+    assert t2.reason == "m14"
+    assert t2.exit_idx == i + 3
+    assert t2.pnl_pct > -0.12
+
+    # 3. 單根爆拉超過 +12% → 觸發 12% 硬停損上限（不等 +17% 假突破頂）
+    d3 = fake_break_then_fail()
+    d3["h"][i + 1] = sig.close * 1.15
+    d3 = indicators(d3)
+    t3 = simulate(d3, [sig])[0]
+    assert t3.reason == "stop"
+    assert abs(t3.pnl_pct - (-0.12)) < 1e-9
+
+
 def main() -> int:
     test_sma()
     test_drop_unclosed()
@@ -317,6 +353,7 @@ def main() -> int:
     test_rejects_without_ma99_room()
     test_rejects_dead_volume_breakdown()
     test_simulate_short_and_html()
+    test_two_layer_stop_ma14_and_cap()
     test_filter_universe_keeps_liquid_and_hbar()
     test_skip_overlap_and_chart_pick()
     print("ok")

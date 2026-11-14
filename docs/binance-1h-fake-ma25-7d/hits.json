@@ -23,6 +23,8 @@
     "min_fail": 0.08,
     "max_fail": 0.18,
     "min_range_break": 0.22,
+    "max_stop_pct": 0.12,
+    "ma14_exit_bars": 3,
     "target_r": 2.0,
     "time_bars": 24,
     "scanned": 282,
