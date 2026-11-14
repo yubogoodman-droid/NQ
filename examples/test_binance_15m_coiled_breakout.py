@@ -20,18 +20,18 @@ def _make_synthetic_esports_data() -> dict:
     t0 = 1761868800000  # 2026-10-31 08:00 UTC+8
     t = np.array([t0 + k * 15 * 60_000 for k in range(n)], dtype=np.int64)
 
-    # 前 100 根在 0.0076，之後跌到 0.0070 並長時間橫盤在 0.00710 附近讓 MA7~120 糾結，MA200 緩降到 0.00729
+    # 前段緩跌後長時間橫盤在 0.00710 附近讓 MA7~120 糾結，MA200 緩降走平至 ~0.00722（斜率約 -0.34%）
     c = np.full(n, 0.00710, dtype=float)
-    c[:60] = 0.00780
-    c[60:95] = np.linspace(0.00780, 0.00685, 35)
-    c[95:235] = 0.00710
-    # 230~234 微幅墊高讓 MA7 > MA14 > MA25 > MA30 > MA60/99/120，且第 234 根仍在 MA200 (~0.007228) 下方
+    c[:35] = 0.00745
+    c[35:115] = 0.00740
+    c[115:235] = 0.00710
+    # 230~234 微幅墊高讓 MA7 > MA14 > MA25 > MA30 > MA60/99/120，且第 234 根仍在 MA200 (~0.007222) 下方
     c[230] = 0.00712
     c[231] = 0.00714
     c[232] = 0.00716
     c[233] = 0.00719
-    c[234] = 0.00722
-    # 第 235 根帶倍量直接從下方突破站上 MA200 (~0.007226)
+    c[234] = 0.00721
+    # 第 235 根帶倍量直接從下方突破站上 MA200 (~0.007222)
     c[235] = 0.00740
     # 第 236~238 根扇形展開續攻
     c[236] = 0.00752
@@ -41,7 +41,7 @@ def _make_synthetic_esports_data() -> dict:
     o = c.copy()
     o[233] = 0.00716
     o[234] = 0.00719
-    o[235] = 0.00722
+    o[235] = 0.00721
     o[236] = 0.00740
     o[237] = 0.00752
 
@@ -109,6 +109,34 @@ def test_follow_rejects_bearish_or_lower_close_and_late_4th_bar():
 
     # 超過 follow_max_bars=3（第 4 根 j=239）不應觸發強確認
     assert follow_through_at(d, sig, 239, params=params) is None
+
+    # 第二拍確認棒若帶有 >30% 長上影線（衝高被砸避雷針）應拒絕
+    d_wick = dict(d)
+    d_wick["h"] = d["h"].copy()
+    d_wick["h"][236] = 0.00765  # o=0.00740, c=0.00752, l=0.00738 => upper wick = 0.00013 / 0.00027 = 48.1% > 30%
+    assert follow_through_at(d_wick, sig, 236, params=params) is None
+
+
+def test_hard_stop_and_rolling_stats():
+    d = _make_synthetic_esports_data()
+    sigs = detect_signals(d, symbol="ESPORTSUSDT")
+    assert len(sigs) == 1
+    # 模擬進場後第 2 根閃崩插針跌破 stop_price，觸價硬停損應限制在 stop_price 出場
+    d_crash = dict(d)
+    d_crash["l"] = d["l"].copy()
+    d_crash["c"] = d["c"].copy()
+    j = sigs[0].follow_idx
+    assert j is not None
+    d_crash["l"][j + 1] = sigs[0].stop_price * 0.90
+    d_crash["c"][j + 1] = sigs[0].stop_price * 0.92
+    trs = simulate_trades(d_crash, sigs, stage="follow", trail_ma="m99", arm_r=1.2, hard_stop=True)
+    assert len(trs) == 1
+    assert trs[0].exit_reason == "stop"
+    assert abs(trs[0].exit_price - sigs[0].stop_price) < 1e-12
+    st = trade_stats(trs)
+    assert st["roll_taken"] == 1
+    assert st["roll_1k_3x_end"] < 1000.0
+
 
 
 def test_universe_excludes_tradfi_by_default(monkeypatch):
