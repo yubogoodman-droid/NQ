@@ -29,6 +29,7 @@ from watch_hbar_1h_ma25 import (  # noqa: E402
     sma,
     summarize,
     write_html,
+    write_view_html,
 )
 
 
@@ -228,6 +229,8 @@ def test_simulate_short_and_html(tmp_path: Path | None = None) -> None:
     assert "假突破跌破 MA25" in html
     assert "<img src='img/" in html
     assert any((path.parent / "img").glob("t01_*.png"))
+    vpath = write_view_html(path)
+    assert vpath.exists()
 
 
 def test_filter_universe_keeps_liquid_and_hbar() -> None:
@@ -299,6 +302,7 @@ def test_skip_overlap_and_chart_pick() -> None:
     assert safe_name("HBARUSDT") == "HBARUSDT"
     assert "_" in safe_name("A/B")
     assert pages_path(universe=True, days=7, symbol="HBARUSDT").as_posix().endswith("binance-1h-fake-ma25-7d/index.html")
+    assert pages_path(universe=True, days=730, symbol="HBARUSDT").as_posix().endswith("binance-1h-fake-ma25-730d/index.html")
 
 
 def main() -> int:

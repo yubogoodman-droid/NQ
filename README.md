@@ -119,6 +119,7 @@ python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
 python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 30 --pages
 python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 180 --pages
 python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 365 --pages
+python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 730 --pages
 ```
 
 憑證放 `tg_config.env`，或在 `examples/watch_hbar_1h_ma25.py` 最上面填 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`。
@@ -142,6 +143,10 @@ python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 365 --pages
 全幣種近 1 年（同一套、2025-09-30 23:00 → 2026-09-30 23:00，掃 282 檔 × 9000 根 1h）：把箱體突破從 18% 拉高到 **≥ 22%** 並要求**跌破當根量 ≥ 0.35× 均量**後，整年從 60 筆（8 停損、勝率 61.7%、平均 +1.02%）壓到 **27 筆 / 25 檔**，整年只有 **2 筆停損**（25 筆時間停、2 筆停損），勝率 **74.1%**，平均 **+4.78%**，加總 **+129.04%**（訊號後 +24h 平均 +4.49%；前後半年都賺）。最好 MARSCOIN +24.09%、PROM +18.47%、JTO 01-29 +15.51%、EDGE +14.10%、LSK +13.92%、RUNE +12.15%、HBAR +11.10%、XPL +11.09%。
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-365d/view.html
+
+全幣種近 2 年（同一套不改參數、2024-09-30 23:00 → 2026-09-30 23:00，掃 282 檔 × 17740 根 1h）：**44 筆 / 39 檔**，兩年只有 **4 筆停損**（40 筆時間停、4 筆停損），勝率 **68.2%**，平均 **+3.79%**，加總 **+166.96%**，PF **2.72**。其中完全沒參與調參的前一年（2024-10 → 2025-09，跨 2024 底大牛市）**17 筆**勝率 **58.8%**、平均 **+2.23%**、加總 **+37.92%**（PF 1.69、僅 2 停損）；若直接拉到最新（2024-11-14 → 2026-11-14，248 檔）為 **42 筆**、勝率 **69.0%**、平均 **+3.63%**、加總 **+152.42%**（PF 2.52、3 停損，10～11 月樣本外 4 筆 3 勝 1 敗）。
+
+預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-730d/view.html
 
 ## 幣安黏帶三幕 Telegram（活盤優化版）
 

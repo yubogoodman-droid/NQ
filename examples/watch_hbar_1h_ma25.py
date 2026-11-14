@@ -25,15 +25,20 @@
   python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 30 --pages
   python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 180 --pages
   python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 365 --pages
+  python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 730 --pages
   python3 examples/test_watch_hbar_1h_ma25.py
 """
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
 import os
 import subprocess
+import threading
 import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -50,6 +55,8 @@ TELEGRAM_CHAT_ID = ""
 
 TZ = timezone(timedelta(hours=8))
 BASE = "https://www.binance.com"
+VISION_BASE = "https://data.binance.vision/data/futures/um/monthly/klines"
+VISION_CACHE = Path("/tmp/binance_vision_1h")
 INTERVAL = "1h"
 INTERVAL_MS = 3_600_000
 MA_PERIODS = (7, 14, 25, 99, 120, 200)
@@ -92,6 +99,11 @@ if not CONFIG_ENV.exists():
 
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accept": "application/json"})
+_ADAPTER = requests.adapters.HTTPAdapter(pool_connections=24, pool_maxsize=24)
+SESSION.mount("https://", _ADAPTER)
+SESSION.mount("http://", _ADAPTER)
+_WEIGHT_LOCK = threading.Lock()
+_WEIGHT_PAUSE_UNTIL = 0.0
 
 MA_COLORS = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
 
@@ -192,13 +204,24 @@ def sma(a: np.ndarray, n: int) -> np.ndarray:
 
 
 def get_json(path: str, params=None, retries: int = 5):
+    global _WEIGHT_PAUSE_UNTIL
     last: Exception | None = None
     for i in range(retries):
+        wait = _WEIGHT_PAUSE_UNTIL - time.time()
+        if wait > 0:
+            time.sleep(wait)
         try:
             r = SESSION.get(BASE + path, params=params, timeout=20)
-            if r.status_code == 429:
-                last = RuntimeError("HTTP 429")
-                time.sleep(1.3 * (i + 1))
+            used = int(r.headers.get("x-mbx-used-weight-1m") or 0)
+            if used >= 2050:
+                with _WEIGHT_LOCK:
+                    now = time.time()
+                    if _WEIGHT_PAUSE_UNTIL <= now:
+                        _WEIGHT_PAUSE_UNTIL = (int(now) // 60 + 1) * 60 + 1.5
+            if r.status_code in (429, 418):
+                last = RuntimeError(f"HTTP {r.status_code}")
+                with _WEIGHT_LOCK:
+                    _WEIGHT_PAUSE_UNTIL = max(_WEIGHT_PAUSE_UNTIL, time.time() + 8.0 * (i + 1))
                 continue
             r.raise_for_status()
             return r.json()
@@ -206,6 +229,48 @@ def get_json(path: str, params=None, retries: int = 5):
             last = e
             time.sleep(0.4 * (i + 1))
     raise last or RuntimeError("get_json failed")
+
+
+def fetch_vision_month(sym: str, year: int, month: int) -> list | None:
+    VISION_CACHE.mkdir(parents=True, exist_ok=True)
+    tag = f"{sym}-{year:04d}-{month:02d}"
+    zpath = VISION_CACHE / f"{tag}.zip"
+    miss = VISION_CACHE / f"{tag}.404"
+    if miss.exists():
+        return None
+    blob: bytes | None = None
+    if zpath.exists():
+        try:
+            blob = zpath.read_bytes()
+        except Exception:
+            blob = None
+    if blob is None:
+        url = f"{VISION_BASE}/{sym}/{INTERVAL}/{sym}-{INTERVAL}-{year:04d}-{month:02d}.zip"
+        for i in range(3):
+            try:
+                r = SESSION.get(url, timeout=20)
+                if r.status_code == 404:
+                    now_utc = datetime.now(timezone.utc)
+                    age_months = (now_utc.year - year) * 12 + (now_utc.month - month)
+                    if age_months >= 2:
+                        miss.touch()
+                    return None
+                r.raise_for_status()
+                blob = r.content
+                tmp = VISION_CACHE / f"{tag}.{threading.get_ident()}.tmp"
+                tmp.write_bytes(blob)
+                tmp.replace(zpath)
+                break
+            except Exception:
+                time.sleep(0.4 * (i + 1))
+        if blob is None:
+            return None
+    try:
+        with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+            text = zf.read(zf.namelist()[0]).decode("utf-8", errors="replace")
+        return [row[:8] for row in csv.reader(io.StringIO(text)) if row and row[0].isdigit()]
+    except Exception:
+        return None
 
 
 def drop_unclosed(raw: list, now_ms: int | None = None) -> list:
@@ -240,30 +305,56 @@ def fetch_klines(
     rem = max(1, limit)
     cur_end = end_ms
     chunks: list[list] = []
-    while rem > 0:
-        req = min(1500, rem)
-        params: dict[str, Any] = {"symbol": sym, "interval": INTERVAL, "limit": req}
-        if cur_end is not None:
-            params["endTime"] = cur_end
-        raw = get_json("/fapi/v1/klines", params=params)
-        if not raw:
-            break
-        if cur_end is None:
-            raw = drop_unclosed(raw)
-        if not raw:
-            break
-        if not chunks and min_quote_vol > 0 and sym not in KEEP:
-            if len(raw) < 24 or sum(float(x[7]) for x in raw[-24:]) < min_quote_vol:
-                return None
-        chunks.append(raw)
-        rem -= len(raw)
-        if len(raw) < req - 10:
-            break
-        cur_end = int(raw[0][0]) - 1
-    if not chunks:
+    first_req = min(1000 if limit > 1500 else 1500, rem)
+    params: dict[str, Any] = {"symbol": sym, "interval": INTERVAL, "limit": first_req}
+    if cur_end is not None:
+        params["endTime"] = cur_end
+    raw = get_json("/fapi/v1/klines", params=params)
+    if not raw:
         return None
+    if cur_end is None:
+        raw = drop_unclosed(raw)
+    if not raw:
+        return None
+    if min_quote_vol > 0 and sym not in KEEP:
+        if len(raw) < 24 or sum(float(x[7]) for x in raw[-24:]) < min_quote_vol:
+            return None
+    chunks.append(raw)
+    rem -= len(raw)
+    if len(raw) < first_req - 10:
+        rem = 0
+    else:
+        cur_end = int(raw[0][0]) - 1
+    now_utc = datetime.now(timezone.utc)
+    while rem > 0 and cur_end is not None:
+        dt = datetime.fromtimestamp(cur_end / 1000, timezone.utc)
+        if (dt.year, dt.month) < (now_utc.year, now_utc.month):
+            m_rows = fetch_vision_month(sym, dt.year, dt.month)
+            if m_rows:
+                y, m = dt.year, dt.month
+                while m_rows and rem > 0:
+                    sliced = [r for r in m_rows if int(r[0]) <= cur_end]
+                    if sliced:
+                        chunks.append(sliced)
+                        rem -= len(sliced)
+                    if rem <= 0:
+                        break
+                    m -= 1
+                    if m == 0:
+                        y, m = y - 1, 12
+                    m_rows = fetch_vision_month(sym, y, m)
+                break
+        req = min(1000, rem)
+        more = get_json("/fapi/v1/klines", params={"symbol": sym, "interval": INTERVAL, "limit": req, "endTime": cur_end})
+        if not more:
+            break
+        chunks.append(more)
+        rem -= len(more)
+        if len(more) < req - 10:
+            break
+        cur_end = int(more[0][0]) - 1
     if len(chunks) == 1:
-        return bars_from_raw(chunks[0])
+        return bars_from_raw(chunks[0][-limit:])
     merged = []
     seen = set()
     for ch in reversed(chunks):
@@ -272,6 +363,8 @@ def fetch_klines(
             if t0 not in seen:
                 seen.add(t0)
                 merged.append(r)
+    if len(merged) > limit:
+        merged = merged[-limit:]
     return bars_from_raw(merged)
 
 
@@ -830,10 +923,14 @@ def _git_branch() -> str:
 
 
 def write_view_html(src: Path) -> Path:
-    rel = src.parent.relative_to(REPO).as_posix()
-    base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{_git_branch()}/{rel}/"
-    text = src.read_text(encoding="utf-8").replace("src='img/", f"src='{base}img/")
     out = src.with_name("view.html")
+    text = src.read_text(encoding="utf-8")
+    try:
+        rel = src.resolve().parent.relative_to(REPO.resolve()).as_posix()
+        base = f"https://raw.githubusercontent.com/yubogoodman-droid/NQ/{_git_branch()}/{rel}/"
+        text = text.replace("src='img/", f"src='{base}img/")
+    except ValueError:
+        pass
     out.write_text(text, encoding="utf-8")
     return out
 
@@ -1034,7 +1131,7 @@ def cmd_backtest(args) -> int:
     scanned = 0
     span = ""
     t0 = time.time()
-    workers = 1 if len(symbols) == 1 else (3 if limit > 4500 else (5 if limit > 1500 else 8))
+    workers = 1 if len(symbols) == 1 else (10 if limit > 1500 else 8)
     hist_qv = args.min_quote_vol if (args.universe and end_ms is not None) else 0.0
     with ThreadPoolExecutor(workers) as ex:
         futs = {ex.submit(backtest_one, s, args.days, p, limit, end_ms, hist_qv): s for s in symbols}
@@ -1075,7 +1172,7 @@ def cmd_backtest(args) -> int:
         "end": span.split(" → ")[-1] if span else "",
     }
     print(
-        f"{extra['symbol']} {args.days}d scanned={len(symbols)} raw={raw_hits} "
+        f"{extra['symbol']} {args.days}d scanned={extra['scanned']} raw={raw_hits} "
         f"taken={stats['count']} (drop overlap {extra['overlap_dropped']}) "
         f"{extra['start']} → {extra['end']}",
         flush=True,
@@ -1086,10 +1183,12 @@ def cmd_backtest(args) -> int:
         f"{stats['reasons']}",
         flush=True,
     )
+    wy = args.days > 200
     show = trades[:40]
     for i, t in enumerate(show, 1):
         print(
-            f"[{i}] {t.symbol} {hm(int(t.d['t'][t.entry_idx]))} peak {hm(int(t.d['t'][t.signal.peak_i]))} "
+            f"[{i}] {t.symbol} {hm(int(t.d['t'][t.entry_idx]), with_year=wy)} "
+            f"peak {hm(int(t.d['t'][t.signal.peak_i]), with_year=wy)} "
             f"{t.reason} {t.pnl_pct*100:+.2f}% ext={t.signal.ext*100:.1f}% fail={t.signal.fail*100:.1f}%",
             flush=True,
         )
