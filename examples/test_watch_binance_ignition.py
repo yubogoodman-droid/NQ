@@ -10,10 +10,12 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from watch_binance_ignition import (  # noqa: E402
+    TZ,
     evaluate_trade_from,
     ignition_plan_at,
     indicators,
     raw_breakout_at,
+    render_html_report,
     rolling_max_prev,
     rolling_min_prev,
     simulate_symbol,
@@ -124,11 +126,27 @@ def test_filters_reject_wick_trap_climax_sell_and_wide_box() -> None:
 
 
 def test_cooldown_and_simulate_symbol() -> None:
+    import tempfile
+    from datetime import datetime
+
     raw = make_evaa_like_series(parabolic_gain_pct=18.0)
-    trades = simulate_symbol(raw, int(raw["t"][365]), int(raw["t"][-1]))
-    assert len(trades) == 1
-    assert trades[0]["sig_i"] == 370
-    assert trades[0]["net"] > 8.0
+    with tempfile.TemporaryDirectory() as tmp:
+        tdir = Path(tmp)
+        trades = simulate_symbol(raw, int(raw["t"][365]), int(raw["t"][-1]), sym="EVAAUSDT", chart_dir=tdir / "img")
+        assert len(trades) == 1
+        assert trades[0]["sig_i"] == 370
+        assert trades[0]["net"] > 8.0
+        assert trades[0].get("img_name")
+        out_html = render_html_report(
+            trades,
+            start_dt=datetime.fromtimestamp(int(raw["t"][0]) / 1000, TZ),
+            end_dt=datetime.fromtimestamp(int(raw["t"][-1]) / 1000, TZ),
+            days=180,
+            symbol_count=368,
+            out_path=tdir / "index.html",
+        )
+        html_txt = out_html.read_text(encoding="utf-8")
+        assert "EVAAUSDT" in html_txt and "<svg" in html_txt
 
 
 if __name__ == "__main__":

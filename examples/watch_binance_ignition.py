@@ -38,6 +38,7 @@ TELEGRAM_CHAT_ID = ""    # 你的 chat id，數字
 TZ = timezone(timedelta(hours=8))
 BASE = "https://www.binance.com"
 VISION_DAILY = "https://data.binance.vision/data/futures/um/daily/klines"
+VISION_MONTHLY = "https://data.binance.vision/data/futures/um/monthly/klines"
 SEEN_PATH = Path(__file__).resolve().parents[1] / "output" / "binance_ignition_seen.json"
 OUT_DIR = Path(__file__).resolve().parents[1] / "output"
 
@@ -688,39 +689,85 @@ def notify(ev: dict) -> None:
             print("  → Telegram 送出失敗，檢查 token 與 chat id")
 
 
-def _parse_vision_zip(content: bytes) -> list[list[float]]:
+def _parse_vision_zip(content: bytes, min_ms: int = 0, max_ms: int = 9_999_999_999_999) -> list[tuple]:
     zf = zipfile.ZipFile(io.BytesIO(content))
-    lines = zf.read(zf.namelist()[0]).decode().splitlines()
-    if lines and lines[0][0].isalpha():
-        lines = lines[1:]
-    rows: list[list[float]] = []
-    for ln in lines:
-        if not ln:
+    raw_bytes = zf.read(zf.namelist()[0])
+    rows: list[tuple] = []
+    for ln in raw_bytes.decode("ascii", errors="ignore").splitlines():
+        if not ln or ln[0].isalpha():
             continue
         p = ln.split(",")
-        rows.append([int(p[0]), float(p[1]), float(p[2]), float(p[3]), float(p[4]), 0.0, 0, float(p[7]), 0, 0.0, float(p[10])])
+        ts = int(p[0])
+        if ts < min_ms or ts >= max_ms:
+            continue
+        rows.append((ts, float(p[1]), float(p[2]), float(p[3]), float(p[4]), float(p[7]), float(p[10])))
     return rows
 
 
+def _compact_rows_to_dict(rows: list[tuple]) -> dict:
+    arr = np.array(rows, dtype=np.float64)
+    return {
+        "t": arr[:, 0].astype(np.int64),
+        "o": arr[:, 1],
+        "h": arr[:, 2],
+        "l": arr[:, 3],
+        "c": arr[:, 4],
+        "qv": arr[:, 5],
+        "tbq": arr[:, 6],
+    }
+
+
+def _month_end_date(year: int, month: int):
+    if month == 12:
+        return datetime(year + 1, 1, 1, tzinfo=timezone.utc).date() - timedelta(days=1)
+    return datetime(year, month + 1, 1, tzinfo=timezone.utc).date() - timedelta(days=1)
+
+
 def fetch_history_fast(sym: str, start_ms: int, end_ms: int) -> dict | None:
-    """優先從 data.binance.vision 下載日檔 zip（零 API 權重），缺漏或當日尾段再用 REST 補齊。"""
+    """優先使用 data.binance.vision 月檔 zip + 日檔 zip（零 API 權重），當日尾段再用 REST 補齊。"""
     warmup_ms = start_ms - 400 * 60_000
+    max_open_ms = end_ms - 60_000 + 1
     d0 = datetime.fromtimestamp(warmup_ms / 1000, timezone.utc).date()
     d1 = datetime.fromtimestamp(end_ms / 1000, timezone.utc).date()
     today_utc = datetime.now(timezone.utc).date()
+    first_of_this_month = today_utc.replace(day=1)
 
-    all_rows: list = []
+    all_rows: list[tuple] = []
     missing_from_ms: int | None = None
     sess = get_session()
     cur_d = d0
+
     while cur_d <= d1:
+        # 若整個過往月份落在查詢範圍內（或跨月回測），一次抓整月 zip（比抓 30 個日檔快 10 倍）
+        m_start = cur_d.replace(day=1)
+        m_end = _month_end_date(cur_d.year, cur_d.month)
+        if m_end < first_of_this_month and (d1 - cur_d).days >= 10:
+            ym = cur_d.strftime("%Y-%m")
+            m_url = f"{VISION_MONTHLY}/{sym}/1m/{sym}-1m-{ym}.zip"
+            try:
+                r = sess.get(m_url, timeout=25)
+                if r.status_code == 200:
+                    all_rows.extend(_parse_vision_zip(r.content, warmup_ms, max_open_ms))
+                    cur_d = m_end + timedelta(days=1)
+                    continue
+                if r.status_code == 404:
+                    # 該幣在這個月份尚未上架永續合約，直接跳到下個月
+                    cur_d = m_end + timedelta(days=1)
+                    continue
+            except requests.RequestException:
+                pass
+
         day_start_ms = int(datetime(cur_d.year, cur_d.month, cur_d.day, tzinfo=timezone.utc).timestamp() * 1000)
         if cur_d < today_utc:
             url = f"{VISION_DAILY}/{sym}/1m/{sym}-1m-{cur_d.strftime('%Y-%m-%d')}.zip"
             try:
                 r = sess.get(url, timeout=15)
                 if r.status_code == 200:
-                    all_rows.extend(_parse_vision_zip(r.content))
+                    all_rows.extend(_parse_vision_zip(r.content, warmup_ms, max_open_ms))
+                    cur_d += timedelta(days=1)
+                    continue
+                if r.status_code == 404 and (today_utc - cur_d).days > 2:
+                    # 舊日期無日檔代表當時尚未上架，不觸發 REST 回補以免耗盡權重
                     cur_d += timedelta(days=1)
                     continue
             except requests.RequestException:
@@ -739,21 +786,31 @@ def fetch_history_fast(sym: str, start_ms: int, end_ms: int) -> dict | None:
             )
             if not raw:
                 break
-            all_rows.extend(raw)
+            for x in raw:
+                ts = int(x[0])
+                if warmup_ms <= ts < max_open_ms:
+                    all_rows.append((ts, float(x[1]), float(x[2]), float(x[3]), float(x[4]), float(x[7]), float(x[10])))
             last_open = int(raw[-1][0])
             if len(raw) < 499:
                 break
             cur = last_open + 60_000
 
-    dedup = {int(x[0]): x for x in all_rows if warmup_ms <= int(x[0]) and int(x[0]) + 60_000 <= end_ms}
+    dedup = {r[0]: r for r in all_rows}
     if len(dedup) < 420:
         return None
     ordered = [dedup[k] for k in sorted(dedup)]
-    return _rows_to_dict(ordered)
+    return _compact_rows_to_dict(ordered)
 
 
-def simulate_symbol(raw: dict, t0_ms: int, t1_ms: int) -> list[dict]:
-    """對單一標的執行零未來函數回測。"""
+def simulate_symbol(
+    raw: dict,
+    t0_ms: int,
+    t1_ms: int,
+    *,
+    sym: str = "",
+    chart_dir: Path | None = None,
+) -> list[dict]:
+    """對單一標的執行零未來函數回測；若提供 chart_dir 則為每筆成交繪製 K 線圖。"""
     d = indicators(raw)
     hits = valid_ignitions(d, start_i=360, end_i=len(d["c"]) - 5, raw_mode=False)
     trades: list[dict] = []
@@ -763,8 +820,24 @@ def simulate_symbol(raw: dict, t0_ms: int, t1_ms: int) -> list[dict]:
             continue
         tr = evaluate_trade_from(d, sig_i, plan)
         if tr is not None:
+            tr["symbol"] = sym
             tr["vr20"] = plan["vr20"]
+            tr["vr120"] = plan["vr120"]
             tr["box120"] = plan["box120"]
+            tr["box360"] = plan["box360"]
+            tr["clr_pct"] = plan["clr_pct"]
+            tr["bar_pct"] = plan["bar_pct"]
+            tr["close_pos"] = plan["close_pos"]
+            tr["qv"] = plan["qv"]
+            tr["tbr"] = plan["tbr"]
+            tr["s200"] = plan["s200"]
+            tr["risk_pct"] = plan["risk_pct"]
+            if chart_dir is not None and sym:
+                stamp = datetime.fromtimestamp(ts / 1000, TZ).strftime("%Y%m%d_%H%M")
+                fname = f"{sym}_{stamp}.png"
+                saved = draw_chart(sym, d, sig_i, str(chart_dir / fname), plan, trade=tr)
+                if saved:
+                    tr["img_name"] = fname
             trades.append(tr)
     return trades
 
@@ -813,7 +886,418 @@ def run_replay_cli(sym: str, lookback_min: int, raw_mode: bool = False) -> int:
     return 0
 
 
-def run_backtest_cli(days: int) -> int:
+def ymd_hm(ms: int) -> str:
+    return datetime.fromtimestamp(ms / 1000, TZ).strftime("%Y-%m-%d %H:%M")
+
+
+def _build_equity_svg(trades: list[dict]) -> str:
+    if not trades:
+        return ""
+    eq = np.concatenate([[0.0], np.cumsum([float(x["net"]) for x in trades])])
+    peaks = np.maximum.accumulate(eq)
+    dd = eq - peaks
+    w, h = 920, 250
+    pad_l, pad_r, pad_t, pad_b = 52, 20, 18, 30
+    pw, ph = w - pad_l - pad_r, h - pad_t - pad_b
+    ymin, ymax = float(min(np.min(eq), -2.0)), float(max(np.max(eq), 5.0))
+    span = max(ymax - ymin, 1e-6)
+    ymin -= span * 0.06
+    ymax += span * 0.08
+    span = ymax - ymin
+
+    def xy(idx: int, val: float) -> tuple[float, float]:
+        x = pad_l + (idx / max(len(eq) - 1, 1)) * pw
+        y = pad_t + (1.0 - (val - ymin) / span) * ph
+        return x, y
+
+    pts = " ".join(f"{xy(i, float(v))[0]:.1f},{xy(i, float(v))[1]:.1f}" for i, v in enumerate(eq))
+    x0, y_zero = xy(0, 0.0)
+    x_end, y_end = xy(len(eq) - 1, float(eq[-1]))
+    area = f"{x0:.1f},{y_zero:.1f} {pts} {x_end:.1f},{y_zero:.1f}"
+
+    grid_lines = []
+    for frac in (0.0, 0.25, 0.5, 0.75, 1.0):
+        gv = ymin + frac * span
+        gy = pad_t + (1.0 - frac) * ph
+        grid_lines.append(
+            f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{w - pad_r}" y2="{gy:.1f}" stroke="#23322b" stroke-width="1"/>'
+            f'<text x="{pad_l - 8}" y="{gy + 4:.1f}" text-anchor="end" fill="#8aa193" font-size="11">{gv:+.0f}%</text>'
+        )
+
+    max_dd = float(np.min(dd))
+    return (
+        f'<svg viewBox="0 0 {w} {h}" style="width:100%;height:auto;display:block;background:#101814;border-radius:10px;border:1px solid #24352d">'
+        + "".join(grid_lines)
+        + f'<line x1="{pad_l}" y1="{y_zero:.1f}" x2="{w - pad_r}" y2="{y_zero:.1f}" stroke="#465c52" stroke-dasharray="4,4" stroke-width="1"/>'
+        + f'<polygon points="{area}" fill="#3dba7a22"/>'
+        + f'<polyline points="{pts}" fill="none" stroke="#3dba7a" stroke-width="2.2"/>'
+        + f'<circle cx="{x_end:.1f}" cy="{y_end:.1f}" r="4.2" fill="#3dba7a"/>'
+        + f'<text x="{pad_l + 8}" y="{pad_t + 16}" fill="#c8d5cc" font-size="12">'
+        + f'單利累計淨報酬：{eq[-1]:+.2f}%（最大回撤 {max_dd:.2f}% · 共 {len(trades)} 筆）</text>'
+        + "</svg>"
+    )
+
+
+def render_html_report(
+    trades: list[dict],
+    *,
+    start_dt: datetime,
+    end_dt: datetime,
+    days: int,
+    symbol_count: int,
+    out_path: Path,
+    img_prefix: str = "./img/",
+) -> Path:
+    import html as _html
+
+    nets = np.array([float(x["net"]) for x in trades], dtype=np.float64) if trades else np.array([], dtype=np.float64)
+    mfes = np.array([float(x["mfe_pct"]) for x in trades], dtype=np.float64) if trades else np.array([], dtype=np.float64)
+    n = len(trades)
+    win_rate = float(100.0 * np.mean(nets > 0)) if n else 0.0
+    mfe5_rate = float(100.0 * np.mean(mfes >= 5.0)) if n else 0.0
+    mfe8_rate = float(100.0 * np.mean(mfes >= 8.0)) if n else 0.0
+    avg_net = float(np.mean(nets)) if n else 0.0
+    sum_net = float(np.sum(nets)) if n else 0.0
+    pf = float(np.sum(nets[nets > 0]) / max(-np.sum(nets[nets <= 0]), 1e-9)) if n else 0.0
+    eq = np.concatenate([[0.0], np.cumsum(nets)]) if n else np.array([0.0])
+    max_dd = float(np.min(eq - np.maximum.accumulate(eq))) if n else 0.0
+    uniq_syms = len({x["symbol"] for x in trades})
+
+    # 月度統計表
+    by_month: dict[str, list[dict]] = {}
+    for tr in trades:
+        ym = datetime.fromtimestamp(tr["sig_ms"] / 1000, TZ).strftime("%Y-%m")
+        by_month.setdefault(ym, []).append(tr)
+
+    month_rows = []
+    for ym in sorted(by_month.keys()):
+        ms_list = by_month[ym]
+        ma = np.array([float(x["net"]) for x in ms_list], dtype=np.float64)
+        mm = np.array([float(x["mfe_pct"]) for x in ms_list], dtype=np.float64)
+        mpf = float(np.sum(ma[ma > 0]) / max(-np.sum(ma[ma <= 0]), 1e-9))
+        best = max(ms_list, key=lambda z: z["net"])
+        cls = "pos" if np.sum(ma) >= 0 else "neg"
+        month_rows.append(
+            f"<tr>"
+            f"<td><b>{ym}</b></td>"
+            f"<td>{len(ma)}</td>"
+            f"<td>{100*np.mean(ma>0):.1f}%</td>"
+            f"<td>{100*np.mean(mm>=5.0):.1f}%</td>"
+            f"<td>{mpf:.2f}</td>"
+            f"<td class='{cls}'>{np.mean(ma):+.2f}%</td>"
+            f"<td class='{cls}'><b>{np.sum(ma):+.2f}%</b></td>"
+            f"<td class='muted'>{_html.escape(best['symbol'])} ({best['net']:+.1f}%)</td>"
+            f"</tr>"
+        )
+
+    # 逐筆交易卡片（最新在最前，方便直接檢視近期如 EVAAUSDT，支援切換排序與篩選）
+    cards_html = []
+    for idx, tr in enumerate(trades, 1):
+        sym = _html.escape(tr["symbol"])
+        net = float(tr["net"])
+        mfe = float(tr["mfe_pct"])
+        p_cls = "pos" if net > 0 else "neg"
+        reason = _html.escape(tr["reason"])
+        sig_s = ymd_hm(tr["sig_ms"])
+        fill_s = hm(tr["fill_ms"])
+        exit_s = hm(tr["exit_ms"])
+        ym = sig_s[:7]
+        t5 = hm(tr["hit_5_ms"]) if tr.get("hit_5_ms") else "—"
+        t8 = hm(tr["hit_8_ms"]) if tr.get("hit_8_ms") else "—"
+        img_tag = ""
+        if tr.get("img_name"):
+            src = f"{img_prefix}{tr['img_name']}"
+            img_tag = f"<div class='chart-box'><img loading='lazy' src='{_html.escape(src)}' alt='{sym} {sig_s}'/></div>"
+        cards_html.append(
+            f"<article class='trade-card' data-idx='{idx}' data-net='{net:.4f}' data-mfe='{mfe:.4f}' "
+            f"data-ym='{ym}' data-win='{1 if net > 0 else 0}' data-sym='{sym}'>"
+            f"<header class='card-hd'>"
+            f"<div><span class='t-no'>#{idx}</span> <b class='t-sym'>{sym}</b> "
+            f"<span class='t-time'>{sig_s} 起漲 → {fill_s} 進 → {exit_s} 出 ({reason}) · UTC+8</span></div>"
+            f"<div class='t-pnl {p_cls}'>{net:+.2f}%</div>"
+            f"</header>"
+            f"<div class='tags'>"
+            f"<span class='tag'>2h箱體 {tr.get('box120', 0):.1f}%</span>"
+            f"<span class='tag'>6h振幅 {tr.get('box360', 0):.1f}%</span>"
+            f"<span class='tag'>點火量 {tr.get('vr20', 0):.1f}x ({tr.get('qv', 0)/1e3:.0f}k U)</span>"
+            f"<span class='tag'>主動買 {tr.get('tbr', 0)*100:.0f}%</span>"
+            f"<span class='tag'>當根 +{tr.get('bar_pct', 0):.2f}% (收高 {tr.get('close_pos', 0)*100:.0f}%)</span>"
+            f"<span class='tag hi'>最高浮盈 +{mfe:.1f}%</span>"
+            f"</div>"
+            f"<div class='detail'>"
+            f"觸價進場 <b>{tr['epx']:.6g}</b> ｜ 初始停損 <b>{tr['sl_px']:.6g}</b> (-{tr.get('risk_pct', 0):.2f}%) ｜ "
+            f"出場價 <b>{tr['exit_px']:.6g}</b> ({reason}) ｜ 觸 +5%：{t5} ｜ 觸 +8%：{t8}"
+            f"</div>"
+            f"{img_tag}"
+            f"</article>"
+        )
+
+    svg_block = _build_equity_svg(trades)
+    sum_cls = "pos" if sum_net >= 0 else "neg"
+    avg_cls = "pos" if avg_net >= 0 else "neg"
+    month_opts = "".join(f"<option value='{ym}'>{ym} ({len(by_month[ym])} 筆)</option>" for ym in sorted(by_month.keys(), reverse=True))
+
+    doc = f"""<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>幣安 1m 橫盤壓縮爆量起漲點 · 近 {days} 天全市場回測報告</title>
+<style>
+  :root {{
+    --bg: #0b110e;
+    --panel: #131d18;
+    --panel2: #0e1612;
+    --border: #24362d;
+    --text: #e8f0ea;
+    --muted: #8aa193;
+    --green: #3dba7a;
+    --red: #e35d5d;
+    --amber: #f59e0b;
+    --cyan: #38bdf8;
+  }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.55;
+  }}
+  .wrap {{ max-width: 1080px; margin: 0 auto; padding: 22px 14px 64px; }}
+  .hero {{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }}
+  h1 {{ font-size: 22px; margin: 0 0 6px; }}
+  h2 {{ font-size: 16px; margin: 0 0 10px; color: #d5e3d9; }}
+  .sub {{ color: var(--muted); font-size: 13.5px; margin: 0 0 14px; }}
+  .pos {{ color: var(--green); }}
+  .neg {{ color: var(--red); }}
+  .muted {{ color: var(--muted); }}
+  .kpis {{
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 14px 0;
+  }}
+  @media (max-width: 720px) {{ .kpis {{ grid-template-columns: repeat(2, 1fr); }} }}
+  .kpi {{
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }}
+  .kpi .k {{ color: var(--muted); font-size: 12px; }}
+  .kpi .v {{ font-size: 21px; font-weight: 700; margin-top: 3px; }}
+  .rules {{
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #c9d7ce;
+    margin-top: 12px;
+  }}
+  .rules ul {{ margin: 6px 0 0; padding-left: 18px; }}
+  .rules li {{ margin-bottom: 4px; }}
+  .sec {{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }}
+  .tbl-wrap {{ overflow-x: auto; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 13.5px; }}
+  th, td {{ padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }}
+  th:first-child, td:first-child, th:last-child, td:last-child {{ text-align: left; }}
+  th {{ color: var(--muted); font-weight: 600; background: var(--panel2); }}
+  .toolbar {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }}
+  .toolbar .controls {{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }}
+  select, input, button {{
+    background: var(--panel2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }}
+  button {{ cursor: pointer; }}
+  button.active {{ border-color: var(--green); color: var(--green); font-weight: 600; }}
+  .trade-card {{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }}
+  .card-hd {{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }}
+  .t-no {{ color: var(--muted); font-size: 13px; }}
+  .t-sym {{ font-size: 16px; color: #fff; margin-right: 6px; }}
+  .t-time {{ color: var(--muted); font-size: 12.5px; }}
+  .t-pnl {{ font-size: 19px; font-weight: 700; }}
+  .tags {{ display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0; }}
+  .tag {{
+    font-size: 11.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    color: #b7c9be;
+  }}
+  .tag.hi {{ color: var(--cyan); border-color: #1e4b63; }}
+  .detail {{
+    background: var(--panel2);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12.5px;
+    color: #c8d5cc;
+    margin-bottom: 10px;
+  }}
+  .chart-box img {{
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+    border: 1px solid #1f2e27;
+    background: #101814;
+  }}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <h1>🚀 幣安 1m 橫盤壓縮爆量起漲點 · 近 {days} 天全市場回測</h1>
+    <p class="sub">
+      回測區間：{start_dt.strftime('%Y-%m-%d %H:%M')} ~ {end_dt.strftime('%Y-%m-%d %H:%M')} (台北時間 UTC+8) ｜
+      掃描標的：{symbol_count} 檔純加密貨幣 USDT 永續合約（排除美股 TRADIFI 與 BTC/ETH/SOL/BNB/XRP/DOGE）｜
+      每筆已扣來回 {FEE_PCT:.2f}% 手續費與滑價、同根 K 線保守先判停損（零未來函數）
+    </p>
+    <div class="kpis">
+      <div class="kpi"><div class="k">成交總筆數（觸發幣數）</div><div class="v">{n} <span style="font-size:13px;color:var(--muted);font-weight:400">({uniq_syms} 檔)</span></div></div>
+      <div class="kpi"><div class="k">勝率 ／ 獲利因子 (PF)</div><div class="v">{win_rate:.1f}% <span style="font-size:14px;color:var(--amber)">PF {pf:.2f}</span></div></div>
+      <div class="kpi"><div class="k">單筆平均淨利（扣費）</div><div class="v {avg_cls}">{avg_net:+.2f}%</div></div>
+      <div class="kpi"><div class="k">單利累計淨利（最大回撤）</div><div class="v {sum_cls}">{sum_net:+.1f}% <span style="font-size:13px;color:var(--muted);font-weight:400">({max_dd:.1f}%)</span></div></div>
+      <div class="kpi"><div class="k">盤中觸及 +5% 比例</div><div class="v" style="color:var(--cyan)">{mfe5_rate:.1f}%</div></div>
+      <div class="kpi"><div class="k">盤中觸及 +8% 比例</div><div class="v" style="color:var(--cyan)">{mfe8_rate:.1f}%</div></div>
+      <div class="kpi"><div class="k">單筆最大獲利</div><div class="v pos">{(float(np.max(nets)) if n else 0.0):+.2f}%</div></div>
+      <div class="kpi"><div class="k">單筆最大虧損（含費）</div><div class="v neg">{(float(np.min(nets)) if n else 0.0):+.2f}%</div></div>
+    </div>
+    {svg_block}
+    <div class="rules">
+      <b>策略進出場規則（<code>examples/watch_binance_ignition.py</code>）：</b>
+      <ul>
+        <li><b>窄箱壓縮未追高</b>：前 2 小時高低振幅 <code>2.0%–6.5%</code>、前 6 小時振幅 <code>≤ 12.0%</code>、前 2 小時每分鐘均量 <code>≤ 8 萬 USDT</code>。</li>
+        <li><b>實體突破棒</b>：1m 收盤高出前 2h 箱頂 <code>≥ 0.60%</code>、收在當根振幅上緣 <code>≥ 72%</code>（排除長上影假針）、單根漲幅 <code>1.5%–7.0%</code>。</li>
+        <li><b>點火量能與主動買盤</b>：當根成交額 <code>≥ 15 萬 USDT</code>、相對前 20m 均量 <code>7.5x–55x</code>（排除 &gt;55x 極端消息倒貨針）、主動吃單買盤 <code>≥ 56%</code>、<code>收盤 &gt; MA200</code>、<code>MA25 &gt; MA99</code>、<code>MA200</code> 近 1h 斜率 <code>≥ 0</code>。</li>
+        <li><b>觸價進場與保本吊燈出場</b>：4 分鐘內突破起漲棒高點觸價進場（先跌回箱頂下緣取消）；初始停損守起漲棒低點（上限 <code>-3.0%</code>）；浮盈達 <code>+4.5%</code> 停損推至保本 <code>+1.0%</code>；浮盈達 <code>+10%</code> 改守最高價回撤 <code>7.5%</code> 吊燈停利，最長持有 60 分鐘。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2>📅 月度績效拆解</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>月份</th><th>筆數</th><th>勝率</th><th>觸 +5% 率</th><th>PF</th><th>平均淨利</th><th>單月合計</th><th>當月代表作</th></tr>
+        </thead>
+        <tbody>
+          {"".join(month_rows)}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sec" style="background:transparent;border:none;padding:0">
+    <div class="toolbar">
+      <h2 style="margin:0">📈 逐筆起漲點明細與 K 線圖（顯示 <span id="shownCount">{n}</span> / {n} 筆）</h2>
+      <div class="controls">
+        <input id="symFilter" type="search" placeholder="搜尋幣種 (如 EVAA)..." oninput="applyFilter()"/>
+        <select id="ymFilter" onchange="applyFilter()">
+          <option value="">全部月份</option>
+          {month_opts}
+        </select>
+        <select id="resFilter" onchange="applyFilter()">
+          <option value="all">全部結果</option>
+          <option value="win">只看獲利 (&gt;0%)</option>
+          <option value="big">只看大噴發 (最高 ≥+10%)</option>
+          <option value="loss">只看停損/小虧 (≤0%)</option>
+        </select>
+        <select id="sortOrder" onchange="applyFilter()">
+          <option value="newest">最新 → 最舊</option>
+          <option value="net_desc">淨利最高 → 最低</option>
+          <option value="mfe_desc">最高浮盈 → 最低</option>
+          <option value="oldest">最舊 → 最新</option>
+        </select>
+      </div>
+    </div>
+    <div id="cardContainer">
+      {"".join(reversed(cards_html))}
+    </div>
+  </section>
+</div>
+<script>
+function applyFilter() {{
+  const q = document.getElementById('symFilter').value.trim().toUpperCase();
+  const ym = document.getElementById('ymFilter').value;
+  const res = document.getElementById('resFilter').value;
+  const sort = document.getElementById('sortOrder').value;
+  const box = document.getElementById('cardContainer');
+  const cards = Array.from(box.querySelectorAll('.trade-card'));
+  let shown = 0;
+  for (const c of cards) {{
+    const sym = c.dataset.sym;
+    const cym = c.dataset.ym;
+    const net = parseFloat(c.dataset.net);
+    const mfe = parseFloat(c.dataset.mfe);
+    let ok = true;
+    if (q && !sym.includes(q)) ok = false;
+    if (ym && cym !== ym) ok = false;
+    if (res === 'win' && !(net > 0)) ok = false;
+    if (res === 'big' && !(mfe >= 10)) ok = false;
+    if (res === 'loss' && !(net <= 0)) ok = false;
+    c.style.display = ok ? '' : 'none';
+    if (ok) shown++;
+  }}
+  cards.sort((a, b) => {{
+    if (sort === 'newest') return parseInt(b.dataset.idx) - parseInt(a.dataset.idx);
+    if (sort === 'oldest') return parseInt(a.dataset.idx) - parseInt(b.dataset.idx);
+    if (sort === 'net_desc') return parseFloat(b.dataset.net) - parseFloat(a.dataset.net);
+    if (sort === 'mfe_desc') return parseFloat(b.dataset.mfe) - parseFloat(a.dataset.mfe);
+    return 0;
+  }});
+  for (const c of cards) box.appendChild(c);
+  document.getElementById('shownCount').textContent = shown;
+}}
+</script>
+</body>
+</html>
+"""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(doc, encoding="utf-8")
+    return out_path
+
+
+def run_backtest_cli(days: int, *, html_path: str = "", raw_img_base: str = "") -> int:
     now_dt = datetime.now(TZ).replace(second=0, microsecond=0)
     start_dt = (now_dt - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
     t0_ms, t1_ms = int(start_dt.timestamp() * 1000), int(now_dt.timestamp() * 1000)
@@ -823,22 +1307,30 @@ def run_backtest_cli(days: int) -> int:
         flush=True,
     )
 
+    out_html = Path(html_path) if html_path else None
+    chart_dir = (out_html.parent / "img") if out_html is not None else None
+    if chart_dir is not None:
+        chart_dir.mkdir(parents=True, exist_ok=True)
+
+    def _worker(sym: str) -> list[dict]:
+        raw = fetch_history_fast(sym, t0_ms, t1_ms)
+        if raw is None:
+            return []
+        return simulate_symbol(raw, t0_ms, t1_ms, sym=sym, chart_dir=chart_dir)
+
     all_trades: list[dict] = []
     done = 0
-    with ThreadPoolExecutor(10) as ex:
-        futs = {ex.submit(fetch_history_fast, s, t0_ms, t1_ms): s for s in symbols}
+    workers = 14 if days >= 45 else 10
+    with ThreadPoolExecutor(workers) as ex:
+        futs = {ex.submit(_worker, s): s for s in symbols}
         for fut in as_completed(futs):
             sym = futs[fut]
             done += 1
             try:
-                raw = fut.result()
-                if raw is not None:
-                    for tr in simulate_symbol(raw, t0_ms, t1_ms):
-                        tr["symbol"] = sym
-                        all_trades.append(tr)
+                all_trades.extend(fut.result())
             except Exception as e:
                 print(f"  err {sym}: {e}", flush=True)
-            if done % 60 == 0 or done == len(symbols):
+            if done % 40 == 0 or done == len(symbols):
                 print(f"  進度 {done}/{len(symbols)}｜累積成交 {len(all_trades)} 筆", flush=True)
 
     all_trades.sort(key=lambda x: x["sig_ms"])
@@ -854,11 +1346,35 @@ def run_backtest_cli(days: int) -> int:
         f"筆數={len(nets)}｜勝率={100*np.mean(nets>0):.1f}%｜觸及+5%率={100*np.mean(mfes>=5.0):.1f}%｜"
         f"平均={np.mean(nets):+.3f}%｜PF={pf:.2f}｜累計={np.sum(nets):+.2f}%"
     )
-    for x in all_trades:
+    for x in all_trades[-30:]:
         print(
-            f"  {hm(x['sig_ms'])} {x['symbol']:15s} 進 {x['epx']:<9.5g} 量 {x['vr20']:4.1f}x "
+            f"  {ymd_hm(x['sig_ms'])} {x['symbol']:15s} 進 {x['epx']:<9.5g} 量 {x['vr20']:4.1f}x "
             f"箱體 {x['box120']:4.1f}% 最高 +{x['mfe_pct']:5.1f}% → {x['reason']:3s} {x['net']:+6.2f}%"
         )
+
+    if out_html is not None:
+        render_html_report(
+            all_trades,
+            start_dt=start_dt,
+            end_dt=now_dt,
+            days=days,
+            symbol_count=len(symbols),
+            out_path=out_html,
+            img_prefix="./img/",
+        )
+        print(f"\nHTML 報告已輸出：{out_html}")
+        if raw_img_base:
+            view_path = out_html.parent / "view.html"
+            render_html_report(
+                all_trades,
+                start_dt=start_dt,
+                end_dt=now_dt,
+                days=days,
+                symbol_count=len(symbols),
+                out_path=view_path,
+                img_prefix=raw_img_base.rstrip("/") + "/",
+            )
+            print(f"HTML Preview 版已輸出：{view_path}")
     return 0
 
 
@@ -885,6 +1401,8 @@ def main() -> int:
     p.add_argument("--symbol", type=str, default="", help="指定單一幣別（搭配 --replay 回放驗證）")
     p.add_argument("--replay", type=int, default=0, metavar="MINUTES", help="回放單一幣別近 MINUTES 分鐘抓起漲點並存圖")
     p.add_argument("--backtest", type=int, default=0, metavar="DAYS", help="回測近 DAYS 天全市場表現")
+    p.add_argument("--html", type=str, default="", metavar="PATH", help="搭配 --backtest 輸出互動式 HTML 報告（含逐筆 K 線圖）")
+    p.add_argument("--raw-img-base", type=str, default="", help="額外產出 view.html 時使用的絕對圖片網址前綴")
     p.add_argument("--min-qv", type=float, default=1_500_000.0, help="24h 最低成交額門檻（預設 150 萬 USDT）")
     args = p.parse_args()
 
@@ -894,7 +1412,7 @@ def main() -> int:
     if args.symbol and args.replay > 0:
         return run_replay_cli(args.symbol, args.replay, raw_mode=args.raw)
     if args.backtest > 0:
-        return run_backtest_cli(args.backtest)
+        return run_backtest_cli(args.backtest, html_path=args.html, raw_img_base=args.raw_img_base)
 
     seen = load_seen()
     cache: dict[str, dict] = {}
