@@ -113,6 +113,19 @@ python3 examples/watch_binance_ribbon.py --test   # 先測通不通
 python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```
 
+## 幣安 5m 均線糾結爆量起漲（AKE 型）
+
+5 分鐘圖：4 小時箱體壓縮（振幅 ≤ 10%）＋八條均線（`MA7/14/25/30/60/99/120/200`）糾結 ≤ 5%，當根爆量（≥ 7 倍均量、≥ 20 萬 U）實體紅 K 貫穿全均線破箱體、超額漲幅跑贏 BTC 且 5m 持倉量（OI）同步增加時，推播**點火起漲**；後續 2～6 根縮量守住 `MA25` 與點火低點、短均多頭散開收紅時，再推**回踩續攻確認（強訊號附圖）**。
+
+憑證可填 `examples/watch_binance_breakout.py` 上方或放 `tg_config.env`：
+
+```bash
+python3 examples/watch_binance_breakout.py --test   # 測試 Telegram
+python3 examples/watch_binance_breakout.py          # 每根 5m 收盤自動掃全市場
+python3 examples/watch_binance_breakout.py --scan --days 3.5 --html output/binance_breakout.html
+python3 examples/watch_binance_breakout.py --scan --symbols AKEUSDT,SHELLUSDT --days 4
+```
+
 ## 快速開始
 
 ```bash
