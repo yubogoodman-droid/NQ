@@ -16,7 +16,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tw_1h_reclaim import (  # noqa: E402
     TPE,
     detect_signals,
+    drop_skip_dates,
+    filter_entry_range,
     filter_entry_window,
+    filter_index_return,
+    index_return_map,
     loose_params,
     simulate,
     sma,
@@ -67,8 +71,8 @@ def ohlc_from_close(closes, lows=None, highs=None) -> pd.DataFrame:
 
 
 def valid_closes():
-    """30 根在 100 上，7 根跌到 96，再站回 101。"""
-    warmup = [100.0] * 30
+    """60 根在 100 上，7 根跌到 96，再站回 101。"""
+    warmup = [100.0] * 60
     below = [98.6, 97.8, 96.9, 96.2, 96.0, 96.4, 96.9]
     reclaim = [101.0, 101.4, 101.8]
     closes = warmup + below + reclaim
@@ -117,7 +121,7 @@ def test_fake_stands_rejected_by_default() -> None:
 
 
 def test_fake_stands_ok_if_allowed() -> None:
-    warmup = [100.0] * 30
+    warmup = [100.0] * 60
     body = [98.5, 97.8, 97.2, 100.2, 97.0, 96.4, 95.9, 96.2, 96.6]
     lows = [c - 0.3 for c in warmup] + [98.1, 97.4, 96.8, 99.6, 96.6, 96.0, 95.3, 95.8, 96.2]
     reclaim = [101.0]
@@ -190,7 +194,7 @@ def test_entry_must_be_within_36_of_trough() -> None:
 
 
 def test_strict_rejects_fake_stand() -> None:
-    warmup = [100.0] * 30
+    warmup = [100.0] * 60
     body = [98.5, 97.8, 97.2, 100.2, 97.0, 96.4, 95.9, 96.2, 96.6]
     lows = [c - 0.3 for c in warmup] + [98.1, 97.4, 96.8, 99.6, 96.6, 96.0, 95.3, 95.8, 96.2]
     df = ohlc_from_close(warmup + body + [101.0], lows=lows + [100.4])
@@ -201,7 +205,7 @@ def test_strict_rejects_fake_stand() -> None:
 
 def test_yuanjing_like_passes() -> None:
     """對齊元晶：9 根下面、深度 ~4.6%、0 假站、隔根翻上、彈 ~3.8%。"""
-    warmup = [100.0] * 30
+    warmup = [97.5] * 30 + [100.0] * 30
     below = [98.8, 98.2, 97.5, 96.9, 96.4, 96.0, 95.8, 95.7, 95.7]
     below_lows = [98.4, 97.8, 97.1, 96.5, 96.0, 95.6, 95.4, 95.6, 95.5]
     reclaim = [99.0]
@@ -220,7 +224,7 @@ def test_yuanjing_like_passes() -> None:
 
 def test_long_grind_still_counts() -> None:
     """GIS-KY 那種：下面磨超過 16 根，36 根內翻上仍算。"""
-    warmup = [100.0] * 30
+    warmup = [97.5] * 30 + [100.0] * 30
     below = [98.8 - i * 0.12 for i in range(20)]
     below_lows = [c - 0.35 for c in below]
     below_lows[-1] = 95.4
@@ -232,6 +236,19 @@ def test_long_grind_still_counts() -> None:
     assert len(sigs) == 1
     assert sigs[0].wave.bars_below == 20
     assert sigs[0].entry_idx > sigs[0].wave.trough_idx
+
+
+def test_below_trend_ma_rejected() -> None:
+    """雖然站上 MA5/10/20，但仍在 MA60 下方（空頭段死貓跳）不進。"""
+    warmup = [105.0] * 40 + [100.0] * 20
+    below = [98.8, 98.2, 97.5, 96.9, 96.4, 96.0, 95.8, 95.7, 95.7]
+    below_lows = [98.4, 97.8, 97.1, 96.5, 96.0, 95.6, 95.4, 95.6, 95.5]
+    reclaim = [99.0]
+    df = ohlc_from_close(warmup + below + reclaim, lows=[c - 0.3 for c in warmup] + below_lows + [97.8])
+    funnel: dict = {}
+    assert detect_signals(df, loose_params(), funnel=funnel) == []
+    assert funnel.get("below_trend_ma", 0) >= 1
+    assert len(detect_signals(df, loose_params(trend_ma=0))) == 1
 
 
 def test_too_long_still_timeout() -> None:
@@ -316,6 +333,25 @@ def test_filter_entry_window() -> None:
     assert filter_entry_window(df, sigs, 0) == list(sigs)
 
 
+def test_filter_entry_range_and_skip() -> None:
+    closes, lows = valid_closes()
+    df = ohlc_from_close(closes, lows=lows)
+    sigs = detect_signals(df, loose_params())
+    assert sigs
+    entry_day = df.index[sigs[0].entry_idx].strftime("%Y-%m-%d")
+    # 合成資料從 2026-06-01 起
+    assert filter_entry_range(df, sigs, start="2026-06-01", end="2026-06-30")
+    assert filter_entry_range(df, sigs, start="2026-10-17", end="2026-10-30") == []
+    skipped = filter_entry_range(
+        df, sigs, start="2026-06-01", end="2026-06-30", skip_dates=[entry_day]
+    )
+    assert skipped == []
+    n_before = len(df)
+    dropped = drop_skip_dates(df, [entry_day])
+    assert len(dropped) < n_before
+    assert all(ts.strftime("%Y-%m-%d") != entry_day for ts in dropped.index)
+
+
 def test_price_cap_keeps_cheap_entry() -> None:
     closes, lows = valid_closes()
     df = ohlc_from_close(closes, lows=lows)
@@ -325,10 +361,63 @@ def test_price_cap_keeps_cheap_entry() -> None:
     assert [s for s in sigs if s.entry_price >= 50] == sigs
 
 
+def test_stop_cap_cuts_wide_trough() -> None:
+    closes, lows = valid_closes()
+    # 進場約 101，破底 95.4（風險 > 4%）。下一根低點 96.5 還沒摸到破底，但已跌超過 4%。
+    closes = list(closes) + [100.0, 100.5]
+    lows = list(lows) + [96.5, 99.0]
+    df = ohlc_from_close(closes, lows=lows)
+    sigs = detect_signals(df, loose_params())
+    assert len(sigs) == 1
+    wide = simulate(df, sigs, loose_params(time_bars=8, stop_cap=None, target_r=2.0))
+    assert wide[0].exit_reason != "stop"
+    capped = simulate(df, sigs, loose_params(time_bars=8, stop_cap=0.04, target_r=1.0))
+    assert capped[0].exit_reason == "stop"
+    assert abs(capped[0].stop_price - capped[0].entry_price * 0.96) < 1e-6
+    assert capped[0].pnl_pct > -0.041
+
+
+def test_index_return_filter() -> None:
+    idx = pd.DataFrame({"Close": [100, 100, 101, 102, 103, 104, 99]}, index=session_index(7))
+    mapped = index_return_map(idx, 5)
+    assert abs(mapped[idx.index[5]] - 0.04) < 1e-9
+    assert mapped[idx.index[6]] < 0
+    closes, lows = valid_closes()
+    df = ohlc_from_close(closes, lows=lows)
+    sigs = detect_signals(df, loose_params())
+    assert sigs
+    up = {df.index[s.entry_idx]: 0.01 for s in sigs}
+    assert filter_index_return(df, sigs, up, 0.0) == list(sigs)
+    down = {df.index[s.entry_idx]: -0.01 for s in sigs}
+    funnel: dict = {}
+    assert filter_index_return(df, sigs, down, 0.0, funnel) == []
+    assert funnel["index_down"] == len(sigs)
+    missing: dict = {}
+    funnel2: dict = {}
+    assert filter_index_return(df, sigs, missing, 0.0, funnel2) == []
+    assert funnel2["index_missing"] == len(sigs)
+
+
+def test_upper_wick_rejected() -> None:
+    """第一根站上均線卻留長上影線（收在當根振幅下緣），整波放棄不追。"""
+    closes, lows = valid_closes()
+    highs = [c + 0.3 for c in closes]
+    # 倒數第 3 根是 reclaim（101.0, low 100.4），拉高 high 到 103.0 讓上影線占 > 75%
+    highs[-3] = 103.0
+    df = ohlc_from_close(closes, lows=lows, highs=highs)
+    funnel: dict = {}
+    assert detect_signals(df, loose_params(), funnel=funnel) == []
+    assert funnel.get("upper_wick", 0) == 1
+    assert len(detect_signals(df, loose_params(min_close_pos=0.0))) == 1
+
+
 def test_summarize() -> None:
     stats = summarize_trades([])
     assert stats["count"] == 0
     assert stats["win_rate"] == 0.0
+    assert stats["median_pct"] == 0.0
+    assert stats["best_pct"] == 0.0
+    assert stats["worst_pct"] == 0.0
 
 
 def main() -> int:
@@ -344,11 +433,16 @@ def main() -> int:
     test_strict_rejects_fake_stand()
     test_yuanjing_like_passes()
     test_long_grind_still_counts()
+    test_below_trend_ma_rejected()
     test_too_long_still_timeout()
     test_bounce_too_small()
     test_same_bar_trough_skipped()
     test_simulate_stop_and_target()
+    test_stop_cap_cuts_wide_trough()
+    test_index_return_filter()
+    test_upper_wick_rejected()
     test_filter_entry_window()
+    test_filter_entry_range_and_skip()
     test_price_cap_keeps_cheap_entry()
     test_summarize()
     print("ok")

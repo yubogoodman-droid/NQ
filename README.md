@@ -62,11 +62,14 @@ python3 examples/scan_tw_ma_reclaim.py --days 30 --max-price 600 --limit 100 --p
 
 ## 台股 1 小時 K 破底翻（元晶型）
 
-1 小時圖，對齊 6443 元晶 2026-09-16 那波：收盤從 MA20 上方跌到下方後，在下面待 6～36 根（不准假站上），相對過程中最高 MA20 深度 ≥ 3.5%，且最低點是近 16 根新低；破底與翻上不能同一根，從低點至少彈回 3%，再站回 MA20 這波才算。破底後 36 根內，第一根收盤同時大於 MA5 / MA10 / MA20 進場。下面天數放寬是為了 6456 GIS-KY 那種先磨再翻。
+1 小時圖，對齊 6443 元晶 2026-09-16 那波：收盤從 MA20 上方跌到下方後，在下面待 6～36 根（不准假站上），相對過程中最高 MA20 深度 ≥ 3.5%，且最低點是近 16 根新低；破底與翻上不能同一根，從低點至少彈回 3%，再站回 MA20 這波才算。破底後 36 根內，第一根收盤同時大於 MA5 / MA10 / MA20 / **MA60**、且該根 K 棒收在當根振幅上緣 ≥ **65%** 進場（預設取成交額前 **100**、留超過 35% 長上影的衝高倒貨棒整波放棄）。下面天數放寬是為了 6456 GIS-KY 那種先磨再翻。
 
-回測出場（方便看兩個禮拜成績）：停在破底低、目標 2R、或 20 根時間停。
+回測出場：停損放在破底低，但離進場超過 5% 就改停在進場下方 5%；停利 0.8R；否則 20 根時間停。另外，進場那根加權 `^TWII` 過去 5 根 1h 報酬要 ≥ 0，大盤這一段在跌就不進。
 
 ```bash
+# 成交額前 200、近一週
+python3 examples/tw_1h_reclaim.py --days 7 --range 2mo --html docs/tw-1h-reclaim-7d/index.html
+
 # 成交額前 200、近一個月；預設元晶型、股價 1000 以上刪掉
 python3 examples/tw_1h_reclaim.py --days 30 --range 2mo --pages --html docs/tw-1h-reclaim-30d/index.html
 
@@ -81,6 +84,15 @@ python3 examples/test_tw_1h_reclaim.py
 ```
 
 2026-08-26 → 09-24、成交額前 200 且**股價 < 1000**：元晶型 **149 筆、104 檔**。已平 142 筆勝率 **50.7%**，平均 **+1.30%**；2R 16 筆平均 +12.7%，停損 39 筆平均 −4.8%。6443 元晶 9/16 進場，次日 2R +5.98%。
+
+近一週（2026-10-21 → 10-27、成交額前 200、股價 < 1000）：**66 筆**，已平 26 筆（2R 3、停損 23），未平 40。週報：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-7d/view.html
+
+2026-10-17 → 10-30 逐步優化：
+1. 原始（2R、停在破底）：137 筆、勝率 17.5%、平均 −3.83%。
+2. 出場改 1R、停損最多 4%：137 筆、勝率 37.2%、平均 −0.97%。
+3. 再加加權過去 5 根 1h 報酬 ≥ 0：111 筆、勝率 38.7%、平均 −0.84%。
+4. 再要求進場收盤 > MA60（紫線，排除壓在季線級均線下的死貓跳）：**52 筆、勝率 55.8%、平均 +0.39%、中位數 +2.67%**（停利 26、停損 21、時間 5），同時 5–8 月（649 筆 +0.93%）、8/26–9/24（207 筆 +1.06%）、9/29–10/16（64 筆 +0.14%）四段全部正期望。預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261017-1030-ma60/view.html
+5. 勝率強化版（2026-11-12 全 6 個月驗證：成交額前 100 + 突破 K 收在當根振幅 ≥ 65% 不留長上影 + 停損最多 5% / 停利 0.8R）：全 6 個月 **388 筆、已平勝率 67.3%（全體 66.8%）、平均 +1.00%**；最新兩週 2026-10-30 → 11-12 **31 筆、已平勝率 80.0%（全體 71.0%）、平均 +1.44%**（停利 20、停損 5、未平 6）。預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/view.html
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
@@ -131,10 +143,17 @@ python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 365 --pages
 
 預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/hbar-1h-fake-ma25-8c5a/docs/binance-1h-fake-ma25-365d/view.html
 
-## 幣安黏帶三幕 Telegram
+## 幣安黏帶三幕 Telegram（活盤優化版）
 
-1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
-約 15–25 分鐘後若走出「長均更黏、短均被帶走」（NBIS 那種），會再推一則**強訊號**（帶圖）。
+1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開。預設啟用**零未來函數優化濾網**，推播時附上 K 線圖、過高觸價進場價與圓底停損價：
+- 離開 K 收在當根振幅上緣 ≥ 70%（不留長上影倒貨）且收過吻後高點
+- 前 2 小時高低跌幅 ≥ 1.2%（排除死魚橫盤）、MA200 斜率開始拐頭向上、量能 `1.8x–6.0x`（排除極端爆量針）
+- 大盤 `BTCUSDT` 1m 收盤在 `MA25` 之上
+- 執行：離開後 4 分鐘內突破離開 K 高點觸價進場（先跌破黏帶則取消），停損守圓底 40 根低點（上限 1.6%），不設緊停利、抱滿 60 分鐘收盤出場。
+
+跨兩段共 51 天驗證（已扣 0.08% 來回手續費、同根 K 先判停損）：
+- 原始離開（30m 無停損）：8/15–9/05 樣本外 182 筆平均 `-0.006%`（PF `0.98`）、10/15–11/14 近一個月 199 筆平均 `+0.067%`。
+- 優化過高進 + 圓底停損 + 60m：8/15–9/05 樣本外 **42 筆、平均 `+0.304%`、PF `2.03`**；10/15–11/14 近一個月 **53 筆、平均 `+0.317%`、PF `2.08`**（51 天合計 **95 筆、平均 `+0.311%`、PF `2.06`、累計 `+29.55%`**）。
 
 在 `examples/watch_binance_ribbon.py` 最上面填：
 
@@ -144,8 +163,11 @@ TELEGRAM_CHAT_ID = "..."
 ```
 
 ```bash
-python3 examples/watch_binance_ribbon.py --test   # 先測通不通
-python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
+python3 examples/watch_binance_ribbon.py --test         # 先測通不通
+python3 examples/watch_binance_ribbon.py                # 每根 1m 收盤掃一次（預設優化版）
+python3 examples/watch_binance_ribbon.py --raw          # 舊版未過濾離開全推
+python3 examples/watch_binance_ribbon.py --backtest 7   # 回測近 7 天（原始 vs 優化版）
+python3 examples/test_watch_binance_ribbon.py           # 離線單元測試
 ```
 
 ## 快速開始

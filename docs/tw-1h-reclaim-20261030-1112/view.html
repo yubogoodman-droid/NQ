@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>台股 1h 破底翻 · 元晶型版 · 2026-10-30–2026-11-12</title>
+<style>
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}
+.page{max-width:720px;margin:0 auto;padding:14px 12px 32px}
+.summary{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+h1{font-size:18px;margin:0 0 6px} h2{font-size:15px;margin:16px 0 8px}
+.muted{color:#8b949e;font-size:13px;line-height:1.55}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}
+.card b{display:block;font-size:18px;margin-top:4px}
+.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}
+.card-header{display:flex;justify-content:space-between;gap:10px}
+.trade-no{font-weight:700} .trade-time{font-size:12px;color:#8b949e;display:block}
+.card-pnl{font-weight:700} .pnl-win{color:#00c805} .pnl-loss{color:#ff5252} .pnl-flat{color:#8b949e}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.tag{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#79c0ff}
+.trade-detail{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}
+.empty{text-align:center;color:#8b949e;padding:40px 12px;border:1px solid #30363d;border-radius:14px}
+.rules{margin:0;padding-left:1.2em;color:#c9d1d9;font-size:13px;line-height:1.65}
+.rules li{margin-bottom:6px}
+code{font-size:12px;background:#0d1117;padding:1px 4px;border-radius:4px}
+.note{margin-top:8px;padding:8px 10px;background:#0d1117;border-radius:8px;color:#f0c14b;font-size:12px}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>台股 1h 破底翻 · 元晶型版 · 成交額前 100</h1>
+<p class="muted">2026-10-30～2026-11-12 · 成交額前100、收盤&gt;MA5/10/20/60、K棒收高≥65%、加權5根≥0、0.8R、停損最多5% · Yahoo 6mo 1h · 股價&lt;1000 · 基準日 20261112 · 100 檔 · 成交額末名約 14.5 億</p>
+<h2>觸發規則（對齊 repo 程式，不是口頭版）</h2>
+
+<ol class="rules">
+<li><b>週期</b>：Yahoo Finance <code>interval=60m</code> 一小時 K；時區 Asia/Taipei。
+<code>_chart_payload_to_df</code> 再套 <code>session_mask</code>：只留 <code>09:00–13:30</code>（含）正規盤，
+<code>includePrePost=false</code>，試搓／盤前集合競價不進資料。</li>
+<li><b>回測窗</b>：進場日 2026-10-30 ～ 2026-11-12（含）。休市日 2026-10-23 的 K 線先刪掉（不計波段根數），週末本來就沒盤。</li>
+<li><b>標的範圍</b>：上市（TWSE MI_INDEX ALLBUT0999）＋上櫃（TPEx 主板報價）四位數字普通股。
+基準日 20261112 先取成交額前 400，再套 收盤價與進場價均須 &lt; 1000，最後留成交額前 100。
+進場當根收盤 ≥ 股價上限者再剔除（<code>price_cap</code>）。</li>
+<li><b>均線</b>：收盤價簡單移動平均 MA5／MA10／MA20／MA60（<code>sma</code>）。熱身 <code>max(20, lookback=16)</code> 根後才開始找跌破。</li>
+<li><b>波段起點</b>：前一根 <code>close ≥ MA20</code> 且當根 <code>close &lt; MA20</code>。</li>
+<li><b>待在均線下</b>：從跌破根起，<code>close ≤ MA20</code> 計入 <code>bars_below</code>，須 <code>6 ≤ bars_below ≤ 36</code>。
+超過 36 根仍未成波 → timeout。搜尋跨度 <code>max_below + max_fakes = 36</code>。</li>
+<li><b>假站上</b>：<code>max_fakes=0</code>。未達成波條件就收盤站上 MA20，計一次假站；超過則失敗
+（太短／不夠深／非 16 根新低／假站過多）。</li>
+<li><b>成波確認</b>：之後第一根 <code>close &gt; MA20</code> 才算站回。同時要
+深度 <code>(過程最高 MA20 − 波谷低) / 過程最高 MA20 ≥ 3.5%</code>，
+且波谷低 &lt; 前 16 根最低價（16 根新低；波谷 index &lt; 16 直接否決）。</li>
+<li><b>破底與翻上不同根</b>：<code>separate_trough=True</code>，進場根不可等於波谷根（排除單根錘）。</li>
+<li><b>進場</b>：站回後、波谷起 36 根內（含站回根），第一根同時
+<code>close &gt; MA5</code> 且 <code>close &gt; MA10</code> 且 <code>close &gt; MA20</code> 且 <code>close &gt; MA60</code>（季線級生命線之上，排除空頭段死貓跳）。
+彈回 <code>close / 波谷低 − 1 ≥ 3.0%</code>。 且該根收盤位置 <code>(close − low) / (high − low) ≥ 65%</code>（上影線不超過 35%；若第一根留長上影倒貨則整波放棄不追）。
+本回測模式：元晶型預設（未加 --strict）；<code>require_stack=False</code>
+（True 才再要求 MA5&gt;MA10&gt;MA20）。</li>
+<li><b>大盤濾網</b>：進場那根要對上加權 <code>^TWII</code> 同一根 1h。
+過去 5 根報酬 <code>close / close.shift(5) − 1 ≥ 0</code> 才留。
+對不到同一根，或加權這段在跌，這筆不進。用的是同一根收盤，沒有看到之後的 K。</li>
+<li><b>進場價</b>：進場那根<strong>收盤價</strong>（<code>Signal.entry_price = close[e]</code>）。</li>
+<li><b>停損</b>：先放在波谷低 <code>wave.trough_low</code>。若進場價 − 停損 ≤ 0，改用進場價 × 0.99。
+若這樣離進場仍超過 5%，停損改收在進場價下方 5%（<code>stop_cap</code>）。
+進場後每一根先看 <code>low ≤ 停損</code>，打到則以停損價出場（<code>stop</code>）。</li>
+<li><b>停利</b>：<code>進場價 + 0.8 × (進場價 − 停損)</code>（0.8R）。同一根停損沒打到才看
+<code>high ≥ 停利</code>，打到則以停利價出場（<code>target</code>）。</li>
+<li><b>時間出場</b>：從進場根起最多再看 20 根。都沒打到停損／停利，出場價＝該根收盤（<code>time</code>）。
+若資料已到最後一根且尚未滿 20 根，以最後收盤標記未平（<code>open</code>）。</li>
+<li><b>報酬</b>：<code>pnl_pct = 出場價 / 進場價 − 1</code>。未扣手續費、交易稅、滑價。加總％是各筆相加，不是組合複利。</li>
+</ol>
+
+<p class="note">報酬未扣手續費與交易稅。圖：橘圈「進」＝進場；綠圈「出」＝獲利出場、紅圈「出」＝虧損出場；粉點＝破底；黃／藍／粉／紫線＝MA5／MA10／MA20／MA60；紅點橫線＝停損；綠點橫線＝停利。</p>
+<h2>回測統計</h2>
+<p class="muted">漏斗：跌破 2629 → 成波 938 → 進場 571
+· 太短 1287 · 不夠深 92 · 非破底 136
+· 假站過多 0 · 逾時 176 · 沒站上均線 0
+· 同根錘 0 · 彈太弱 40 · 壓在 MA60 下 135 · 長上影 192 · 進場價過高 0
+· 大盤在跌 11 · 對不到加權 0
+<br/>出場：停利 20 · 停損 5 · 時間 0 · 未平 6
+· 收盤後 +1d -1.40% · +3d +4.44% · +5d —
+<br/>最好一筆：5340 建榮 2026-11-09 09:00 +4.00%
+<br/>最差一筆：4526 東台 2026-11-10 09:00 -5.00%</p>
+<div class="cards">
+<div class="card">訊號數<b>31</b></div>
+<div class="card">勝率<b>71.0%</b></div>
+<div class="card">已平勝率<b>80.0%</b></div>
+<div class="card">平均<b class="pnl-win">+1.44%</b></div>
+<div class="card">中位數<b class="pnl-win">+4.00%</b></div>
+<div class="card">最好<b class="pnl-win">+4.00%</b></div>
+<div class="card">最差<b class="pnl-loss">-5.00%</b></div>
+<div class="card">標的<b>31</b></div>
+</div>
+</section>
+<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#1 · 5340 建榮</span><span class='trade-time'>2026-11-09 09:00 → 11-10 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>5340.TWO</span><span class='tag'>target</span><span class='tag'>深度 14.4%</span><span class='tag'>下面 8 根</span><span class='tag'>彈 21.9%</span></div><pre class='trade-detail'>entry 91.20  stop 86.64 (−4.56)
+target 94.85  exit 94.85 target  +3.65
+破底 74.80 @ 11-06 09:00  站回 11-09 09:00
+MA5 85.50 / MA10 84.85 / MA20 86.66
+fwd +1d -2.30%  +3d +5.70%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t01_5340_1109_0900_v3.png' alt='5340 建榮' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#2 · 4977 眾達-KY</span><span class='trade-time'>2026-11-09 09:00 → 11-10 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>4977.TW</span><span class='tag'>target</span><span class='tag'>深度 10.3%</span><span class='tag'>下面 6 根</span><span class='tag'>彈 12.6%</span></div><pre class='trade-detail'>entry 178.50  stop 169.57 (−8.93)
+target 185.64  exit 185.64 target  +7.14
+破底 158.50 @ 11-06 11:00  站回 11-09 09:00
+MA5 166.90 / MA10 172.35 / MA20 172.85
+fwd +1d +0.28%  +3d +3.92%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t02_4977_1109_0900_v3.png' alt='4977 眾達-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#3 · 1303 南亞</span><span class='trade-time'>2026-11-10 09:00 → 11-11 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>1303.TW</span><span class='tag'>target</span><span class='tag'>深度 26.8%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 28.7%</span></div><pre class='trade-detail'>entry 289.00  stop 274.55 (−14.45)
+target 300.56  exit 300.56 target  +11.56
+破底 224.50 @ 11-06 09:00  站回 11-09 09:00
+MA5 268.20 / MA10 257.45 / MA20 257.38
+fwd +1d +0.00%  +3d +1.38%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t03_1303_1110_0900_v3.png' alt='1303 南亞' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#4 · 1802 台玻</span><span class='trade-time'>2026-11-10 09:00 → 11-11 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>1802.TW</span><span class='tag'>target</span><span class='tag'>深度 16.6%</span><span class='tag'>下面 10 根</span><span class='tag'>彈 29.0%</span></div><pre class='trade-detail'>entry 69.80  stop 66.31 (−3.49)
+target 72.59  exit 72.59 target  +2.79
+破底 54.10 @ 11-06 09:00  站回 11-09 09:00
+MA5 64.76 / MA10 61.88 / MA20 61.98
+fwd +1d +0.00%  +3d +17.05%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t04_1802_1110_0900_v3.png' alt='1802 台玻' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#5 · 4526 東台</span><span class='trade-time'>2026-11-10 09:00 → 11-11 09:00</span></div><div class='card-pnl pnl-loss'>-5.00%</div></header><div class='tags'><span class='tag tag-info'>4526.TW</span><span class='tag'>stop</span><span class='tag'>深度 12.8%</span><span class='tag'>下面 12 根</span><span class='tag'>彈 21.5%</span></div><pre class='trade-detail'>entry 59.60  stop 56.62 (−2.98)
+target 61.98  exit 56.62 stop  -2.98
+破底 49.05 @ 11-06 09:00  站回 11-10 09:00
+MA5 55.16 / MA10 52.66 / MA20 54.55
+fwd +1d +0.00%  +3d -4.36%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t05_4526_1110_0900_v3.png' alt='4526 東台' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#6 · 4927 泰鼎-KY</span><span class='trade-time'>2026-11-10 09:00 → 11-11 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>4927.TW</span><span class='tag'>target</span><span class='tag'>深度 15.2%</span><span class='tag'>下面 21 根</span><span class='tag'>彈 17.7%</span></div><pre class='trade-detail'>entry 54.20  stop 51.49 (−2.71)
+target 56.37  exit 56.37 target  +2.17
+破底 46.05 @ 11-04 11:00  站回 11-04 13:00
+MA5 50.28 / MA10 47.82 / MA20 47.41
+fwd +1d -0.37%  +3d +7.56%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t06_4927_1110_0900_v3.png' alt='4927 泰鼎-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#7 · 2301 光寶科</span><span class='trade-time'>2026-11-10 09:00 → 11-12 13:30</span></div><div class='card-pnl pnl-loss'>-4.60%</div></header><div class='tags'><span class='tag tag-info'>2301.TW</span><span class='tag'>open</span><span class='tag'>深度 26.1%</span><span class='tag'>下面 36 根</span><span class='tag'>彈 25.5%</span></div><pre class='trade-detail'>entry 239.00  stop 227.05 (−11.95)
+target 248.56  exit 228.00 open  -11.00
+破底 190.50 @ 11-06 09:00  站回 11-09 10:00
+MA5 221.80 / MA10 212.30 / MA20 213.85
+fwd +1d -2.72%  +3d -4.60%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t07_2301_1110_0900_v3.png' alt='2301 光寶科' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#8 · 6269 台郡</span><span class='trade-time'>2026-11-10 09:00 → 11-12 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>6269.TW</span><span class='tag'>target</span><span class='tag'>深度 16.2%</span><span class='tag'>下面 10 根</span><span class='tag'>彈 34.4%</span></div><pre class='trade-detail'>entry 78.60  stop 74.67 (−3.93)
+target 81.74  exit 81.74 target  +3.14
+破底 58.50 @ 11-06 09:00  站回 11-09 09:00
+MA5 72.92 / MA10 69.25 / MA20 68.08
+fwd +1d +0.00%  +3d -2.67%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t08_6269_1110_0900_v3.png' alt='6269 台郡' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#9 · 3693 營邦</span><span class='trade-time'>2026-11-10 09:00 → 11-11 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3693.TWO</span><span class='tag'>target</span><span class='tag'>深度 17.9%</span><span class='tag'>下面 10 根</span><span class='tag'>彈 26.8%</span></div><pre class='trade-detail'>entry 620.00  stop 589.00 (−31.00)
+target 644.80  exit 644.80 target  +24.80
+破底 489.00 @ 11-06 09:00  站回 11-09 09:00
+MA5 575.20 / MA10 549.60 / MA20 555.20
+fwd +1d +0.00%  +3d +10.81%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t09_3693_1110_0900_v3.png' alt='3693 營邦' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#10 · 1569 濱川</span><span class='trade-time'>2026-11-10 09:00 → 11-11 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>1569.TWO</span><span class='tag'>target</span><span class='tag'>深度 20.1%</span><span class='tag'>下面 15 根</span><span class='tag'>彈 31.0%</span></div><pre class='trade-detail'>entry 95.00  stop 90.25 (−4.75)
+target 98.80  exit 98.80 target  +3.80
+破底 72.50 @ 11-06 09:00  站回 11-09 10:00
+MA5 87.80 / MA10 84.07 / MA20 84.13
+fwd +1d +0.00%  +3d +7.89%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t10_1569_1110_0900_v3.png' alt='1569 濱川' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#11 · 1301 台塑</span><span class='trade-time'>2026-11-10 09:00 → 11-11 09:00</span></div><div class='card-pnl pnl-loss'>-5.00%</div></header><div class='tags'><span class='tag tag-info'>1301.TW</span><span class='tag'>stop</span><span class='tag'>深度 21.6%</span><span class='tag'>下面 35 根</span><span class='tag'>彈 21.9%</span></div><pre class='trade-detail'>entry 71.80  stop 68.21 (−3.59)
+target 74.67  exit 68.21 stop  -3.59
+破底 58.90 @ 11-06 09:00  站回 11-09 09:00
+MA5 69.48 / MA10 66.90 / MA20 66.77
+fwd +1d -2.79%  +3d -4.87%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t11_1301_1110_0900_v3.png' alt='1301 台塑' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#12 · 6271 同欣電</span><span class='trade-time'>2026-11-10 09:00 → 11-11 09:00</span></div><div class='card-pnl pnl-win'>+3.54%</div></header><div class='tags'><span class='tag tag-info'>6271.TW</span><span class='tag'>target</span><span class='tag'>深度 14.4%</span><span class='tag'>下面 24 根</span><span class='tag'>彈 4.6%</span></div><pre class='trade-detail'>entry 203.50  stop 194.50 (−9.00)
+target 210.70  exit 210.70 target  +7.20
+破底 194.50 @ 10-30 10:00  站回 11-02 09:00
+MA5 188.70 / MA10 180.75 / MA20 185.05
+fwd +1d +0.00%  +3d +5.65%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t12_6271_1110_0900_v3.png' alt='6271 同欣電' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#13 · 1326 台化</span><span class='trade-time'>2026-11-10 09:00 → 11-12 13:30</span></div><div class='card-pnl pnl-loss'>-2.20%</div></header><div class='tags'><span class='tag tag-info'>1326.TW</span><span class='tag'>open</span><span class='tag'>深度 21.1%</span><span class='tag'>下面 32 根</span><span class='tag'>彈 23.6%</span></div><pre class='trade-detail'>entry 72.80  stop 69.16 (−3.64)
+target 75.71  exit 71.20 open  -1.60
+破底 58.90 @ 11-06 09:00  站回 11-09 09:00
+MA5 69.68 / MA10 67.17 / MA20 66.93
+fwd +1d -1.92%  +3d -2.20%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t13_1326_1110_0900_v3.png' alt='1326 台化' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#14 · 1528 恩德</span><span class='trade-time'>2026-11-10 09:00 → 11-11 10:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>1528.TW</span><span class='tag'>target</span><span class='tag'>深度 14.2%</span><span class='tag'>下面 11 根</span><span class='tag'>彈 19.4%</span></div><pre class='trade-detail'>entry 26.80  stop 25.46 (−1.34)
+target 27.87  exit 27.87 target  +1.07
+破底 22.45 @ 11-06 09:00  站回 11-09 10:00
+MA5 25.50 / MA10 24.68 / MA20 25.29
+fwd +1d -4.29%  +3d +4.48%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t14_1528_1110_0900_v3.png' alt='1528 恩德' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#15 · 3701 大眾控</span><span class='trade-time'>2026-11-10 09:00 → 11-11 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3701.TW</span><span class='tag'>target</span><span class='tag'>深度 11.5%</span><span class='tag'>下面 6 根</span><span class='tag'>彈 21.8%</span></div><pre class='trade-detail'>entry 57.50  stop 54.62 (−2.88)
+target 59.80  exit 59.80 target  +2.30
+破底 47.20 @ 11-06 09:00  站回 11-09 09:00
+MA5 53.34 / MA10 51.12 / MA20 52.41
+fwd +1d +0.00%  +3d +20.87%  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t15_3701_1110_0900_v3.png' alt='3701 大眾控' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#16 · 3044 健鼎</span><span class='trade-time'>2026-11-11 09:00 → 11-12 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3044.TW</span><span class='tag'>target</span><span class='tag'>深度 25.3%</span><span class='tag'>下面 25 根</span><span class='tag'>彈 31.6%</span></div><pre class='trade-detail'>entry 520.00  stop 494.00 (−26.00)
+target 540.80  exit 540.80 target  +20.80
+破底 395.00 @ 11-06 09:00  站回 11-09 13:00
+MA5 482.70 / MA10 467.45 / MA20 446.85
+fwd +1d +0.00%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t16_3044_1111_0900_v3.png' alt='3044 健鼎' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#17 · 3715 定穎投控</span><span class='trade-time'>2026-11-11 09:00 → 11-12 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3715.TW</span><span class='tag'>target</span><span class='tag'>深度 28.7%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 40.0%</span></div><pre class='trade-detail'>entry 130.50  stop 123.97 (−6.53)
+target 135.72  exit 135.72 target  +5.22
+破底 93.20 @ 11-06 09:00  站回 11-09 09:00
+MA5 121.30 / MA10 115.95 / MA20 108.38
+fwd +1d +0.00%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t17_3715_1111_0900_v3.png' alt='3715 定穎投控' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#18 · 6456 GIS-KY</span><span class='trade-time'>2026-11-11 10:00 → 11-12 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>6456.TW</span><span class='tag'>target</span><span class='tag'>深度 18.4%</span><span class='tag'>下面 18 根</span><span class='tag'>彈 22.8%</span></div><pre class='trade-detail'>entry 92.60  stop 87.97 (−4.63)
+target 96.30  exit 96.30 target  +3.70
+破底 75.40 @ 11-09 09:00  站回 11-10 12:00
+MA5 87.56 / MA10 83.73 / MA20 83.63
+fwd +1d +0.00%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t18_6456_1111_1000_v3.png' alt='6456 GIS-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#19 · 3105 穩懋</span><span class='trade-time'>2026-11-11 11:00 → 11-12 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3105.TWO</span><span class='tag'>target</span><span class='tag'>深度 29.5%</span><span class='tag'>下面 25 根</span><span class='tag'>彈 28.9%</span></div><pre class='trade-detail'>entry 520.00  stop 494.00 (−26.00)
+target 540.80  exit 540.80 target  +20.80
+破底 403.50 @ 11-09 09:00  站回 11-10 09:00
+MA5 492.50 / MA10 481.05 / MA20 454.23
+fwd +1d -0.58%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t19_3105_1111_1100_v3.png' alt='3105 穩懋' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#20 · 3374 精材</span><span class='trade-time'>2026-11-11 11:00 → 11-12 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>3374.TWO</span><span class='tag'>target</span><span class='tag'>深度 25.3%</span><span class='tag'>下面 26 根</span><span class='tag'>彈 28.7%</span></div><pre class='trade-detail'>entry 466.50  stop 443.17 (−23.33)
+target 485.16  exit 485.16 target  +18.66
+破底 362.50 @ 11-06 09:00  站回 11-09 10:00
+MA5 430.60 / MA10 420.75 / MA20 402.18
+fwd +1d +0.00%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t20_3374_1111_1100_v3.png' alt='3374 精材' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#21 · 6672 騰輝電子-KY</span><span class='trade-time'>2026-11-11 11:00 → 11-12 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>6672.TW</span><span class='tag'>target</span><span class='tag'>深度 12.0%</span><span class='tag'>下面 15 根</span><span class='tag'>彈 9.4%</span></div><pre class='trade-detail'>entry 540.00  stop 513.00 (−27.00)
+target 561.60  exit 561.60 target  +21.60
+破底 493.50 @ 11-03 12:00  站回 11-04 09:00
+MA5 511.60 / MA10 508.45 / MA20 488.07
+fwd +1d -2.96%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t21_6672_1111_1100_v3.png' alt='6672 騰輝電子-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#22 · 4960 誠美材</span><span class='trade-time'>2026-11-11 11:00 → 11-12 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>4960.TW</span><span class='tag'>target</span><span class='tag'>深度 13.5%</span><span class='tag'>下面 8 根</span><span class='tag'>彈 19.1%</span></div><pre class='trade-detail'>entry 31.80  stop 30.21 (−1.59)
+target 33.07  exit 33.07 target  +1.27
+破底 26.70 @ 11-06 09:00  站回 11-09 09:00
+MA5 30.12 / MA10 30.21 / MA20 29.37
+fwd +1d +0.00%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t22_4960_1111_1100_v3.png' alt='4960 誠美材' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#23 · 2049 上銀</span><span class='trade-time'>2026-11-11 11:00 → 11-12 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>2049.TW</span><span class='tag'>target</span><span class='tag'>深度 22.6%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 22.6%</span></div><pre class='trade-detail'>entry 314.50  stop 298.77 (−15.73)
+target 327.08  exit 327.08 target  +12.58
+破底 256.50 @ 11-06 09:00  站回 11-09 09:00
+MA5 302.60 / MA10 297.30 / MA20 289.98
+fwd +1d -0.64%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t23_2049_1111_1100_v3.png' alt='2049 上銀' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#24 · 8021 尖點</span><span class='trade-time'>2026-11-11 12:00 → 11-12 09:00</span></div><div class='card-pnl pnl-win'>+4.00%</div></header><div class='tags'><span class='tag tag-info'>8021.TW</span><span class='tag'>target</span><span class='tag'>深度 27.9%</span><span class='tag'>下面 25 根</span><span class='tag'>彈 29.0%</span></div><pre class='trade-detail'>entry 395.50  stop 375.72 (−19.78)
+target 411.32  exit 411.32 target  +15.82
+破底 306.50 @ 11-06 09:00  站回 11-10 09:00
+MA5 380.70 / MA10 372.50 / MA20 348.20
+fwd +1d -0.25%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t24_8021_1111_1200_v3.png' alt='8021 尖點' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#25 · 2881 富邦金</span><span class='trade-time'>2026-11-11 12:00 → 11-12 13:30</span></div><div class='card-pnl pnl-win'>+0.95%</div></header><div class='tags'><span class='tag tag-info'>2881.TW</span><span class='tag'>open</span><span class='tag'>深度 5.7%</span><span class='tag'>下面 15 根</span><span class='tag'>彈 3.6%</span></div><pre class='trade-detail'>entry 157.50  stop 152.00 (−5.50)
+target 161.90  exit 159.00 open  +1.50
+破底 152.00 @ 11-04 09:00  站回 11-05 09:00
+MA5 154.70 / MA10 153.95 / MA20 152.68
+fwd +1d +0.00%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t25_2881_1111_1200_v3.png' alt='2881 富邦金' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#26 · 2885 元大金</span><span class='trade-time'>2026-11-11 13:00 → 11-12 13:30</span></div><div class='card-pnl pnl-win'>+1.41%</div></header><div class='tags'><span class='tag tag-info'>2885.TW</span><span class='tag'>open</span><span class='tag'>深度 14.7%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 14.0%</span></div><pre class='trade-detail'>entry 70.90  stop 67.36 (−3.55)
+target 73.74  exit 71.90 open  +1.00
+破底 62.20 @ 11-06 09:00  站回 11-09 09:00
+MA5 70.08 / MA10 69.66 / MA20 69.12
+fwd +1d +1.41%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t26_2885_1111_1300_v3.png' alt='2885 元大金' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#27 · 6415 矽力*-KY</span><span class='trade-time'>2026-11-11 13:00 → 11-12 12:00</span></div><div class='card-pnl pnl-loss'>-5.00%</div></header><div class='tags'><span class='tag tag-info'>6415.TW</span><span class='tag'>stop</span><span class='tag'>深度 27.3%</span><span class='tag'>下面 30 根</span><span class='tag'>彈 26.0%</span></div><pre class='trade-detail'>entry 467.50  stop 444.12 (−23.38)
+target 486.20  exit 444.12 stop  -23.38
+破底 371.00 @ 11-06 09:00  站回 11-09 12:00
+MA5 454.90 / MA10 448.40 / MA20 429.32
+fwd +1d -6.52%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t27_6415_1111_1300_v3.png' alt='6415 矽力*-KY' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#28 · 3481 群創</span><span class='trade-time'>2026-11-12 09:00 → 11-12 11:00</span></div><div class='card-pnl pnl-loss'>-5.00%</div></header><div class='tags'><span class='tag tag-info'>3481.TW</span><span class='tag'>stop</span><span class='tag'>深度 28.4%</span><span class='tag'>下面 35 根</span><span class='tag'>彈 24.1%</span></div><pre class='trade-detail'>entry 42.45  stop 40.33 (−2.12)
+target 44.15  exit 40.33 stop  -2.12
+破底 34.20 @ 11-06 09:00  站回 11-09 09:00
+MA5 40.62 / MA10 39.92 / MA20 39.19
+fwd +1d -8.48%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t28_3481_1112_0900_v3.png' alt='3481 群創' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#29 · 3231 緯創</span><span class='trade-time'>2026-11-12 09:00 → 11-12 12:00</span></div><div class='card-pnl pnl-loss'>-5.00%</div></header><div class='tags'><span class='tag tag-info'>3231.TW</span><span class='tag'>stop</span><span class='tag'>深度 20.9%</span><span class='tag'>下面 35 根</span><span class='tag'>彈 18.8%</span></div><pre class='trade-detail'>entry 180.50  stop 171.47 (−9.03)
+target 187.72  exit 171.47 stop  -9.03
+破底 152.00 @ 11-06 09:00  站回 11-09 09:00
+MA5 174.60 / MA10 172.25 / MA20 169.65
+fwd +1d -5.82%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t29_3231_1112_0900_v3.png' alt='3231 緯創' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#30 · 6239 力成</span><span class='trade-time'>2026-11-12 09:00 → 11-12 13:30</span></div><div class='card-pnl pnl-loss'>-4.56%</div></header><div class='tags'><span class='tag tag-info'>6239.TW</span><span class='tag'>open</span><span class='tag'>深度 24.9%</span><span class='tag'>下面 32 根</span><span class='tag'>彈 27.3%</span></div><pre class='trade-detail'>entry 252.00  stop 239.40 (−12.60)
+target 262.08  exit 240.50 open  -11.50
+破底 198.00 @ 11-06 09:00  站回 11-09 11:00
+MA5 242.40 / MA10 236.30 / MA20 226.60
+fwd +1d -4.56%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t30_6239_1112_0900_v3.png' alt='6239 力成' style='width:100%;display:block;border-radius:10px'/></div></article><article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#31 · 2882 國泰金</span><span class='trade-time'>2026-11-12 09:00 → 11-12 13:30</span></div><div class='card-pnl pnl-loss'>-0.88%</div></header><div class='tags'><span class='tag tag-info'>2882.TW</span><span class='tag'>open</span><span class='tag'>深度 12.9%</span><span class='tag'>下面 21 根</span><span class='tag'>彈 11.9%</span></div><pre class='trade-detail'>entry 113.00  stop 107.35 (−5.65)
+target 117.52  exit 112.00 open  -1.00
+破底 101.00 @ 11-06 09:00  站回 11-09 09:00
+MA5 111.40 / MA10 110.75 / MA20 110.40
+fwd +1d -0.88%  +3d —  +5d —</pre><div class='mini-chart'><img src='https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-20261030-1112/img/t31_2882_1112_0900_v3.png' alt='2882 國泰金' style='width:100%;display:block;border-radius:10px'/></div></article>
+</div></body></html>
