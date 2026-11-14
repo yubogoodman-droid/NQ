@@ -22,9 +22,11 @@ entryWin     = input.int(16, "確認後進場視窗", minval=1, group="進場")
 minBreak     = input.float(8.0, "收盤低於 MA60 至少（點）", minval=0.0, group="進場")
 ribbonMin    = input.float(28.0, "MA5/10/20/30/60 帶寬下限", minval=0.0, group="進場")
 useSandwich  = input.bool(true, "收盤夾在 MA120/MA200 中間不空", group="5m過濾")
+ma200Cushion = input.float(25.0, "MA200 地板緩衝（點）", minval=0.0, group="5m過濾")
 maxAbove200  = input.float(150.0, "遠 MA200 上限（且 1h 已破）", minval=0.0, group="5m過濾")
 htfGap       = input.float(200.0, "1h MA60 未測最小距離", minval=0.0, group="5m過濾")
 ma60SlopeN   = input.int(6, "MA60 斜率回看（根）", minval=1, group="5m過濾")
+minRiskAtr   = input.float(5.0, "最小風險 / ATR14 倍數", minval=0.0, step=0.1, group="5m過濾")
 stopBuf      = input.float(36.0, "停損 = 頭頂 +", minval=0.0, group="出場")
 minRisk      = input.float(50.0, "最小風險（點）", minval=1.0, group="出場")
 maxRisk      = input.float(220.0, "最大風險（點）", minval=10.0, group="出場")
@@ -48,6 +50,7 @@ sma30  = ta.sma(close, 30)
 sma60  = ta.sma(close, 60)
 sma120 = ta.sma(close, 120)
 sma200 = ta.sma(close, 200)
+atr14  = ta.sma(ta.tr(true), 14)
 
 // 已收盤 1h MA60（不偷看當根未收的小時 K），對齊 overlay_htf_ma60 的 shift(1)+ffill
 htfMa60 = request.security(syminfo.tickerid, "60", ta.sma(close, 60), barmerge.gaps_off, barmerge.lookahead_off)
@@ -61,6 +64,9 @@ inSandwich(c, a, b) =>
     lo = math.min(a, b)
     hi = math.max(a, b)
     lo < c and c < hi
+
+nearMa200Floor(c, m200) =>
+    ma200Cushion > 0 and not na(c) and not na(m200) and (c - m200) >= 0 and (c - m200) < ma200Cushion
 
 farAboveMa200(c, m200, htf) =>
     maxAbove200 > 0 and not na(c) and not na(m200) and not na(htf) and c >= m200 + maxAbove200 and c <= htf - minBreak
@@ -167,7 +173,7 @@ if armed and strategy.position_size == 0
             skip = false
             if useSandwich and not na(sma120) and not na(sma200)
                 loSlow = math.min(sma120, sma200)
-                if inSandwich(close, sma120, sma200)
+                if inSandwich(close, sma120, sma200) or nearMa200Floor(close, sma200)
                     sawSandwich := true
                     skip := true
                 else if sawSandwich and close > loSlow - minBreak
@@ -183,7 +189,8 @@ if armed and strategy.position_size == 0
                 ent = roundTick(close)
                 risk = stopCand - ent
                 tgt = roundTick(ent - risk * targetR)
-                if risk >= minRisk and risk <= maxRisk and tgt < ent
+                atrOk = minRiskAtr <= 0 or na(atr14) or atr14 <= 0 or risk >= minRiskAtr * atr14
+                if risk >= minRisk and risk <= maxRisk and atrOk and tgt < ent
                     shortNow := true
                     origStop := stopCand
                     trailStop := stopCand
@@ -195,7 +202,7 @@ if armed and strategy.position_size == 0
                     strategy.entry("M頭空", strategy.short)
                     strategy.exit("M頭出場", from_entry="M頭空", stop=stopCand, limit=tgt)
                     alert("M頭右肩破五分k60 做空 @ " + str.tostring(ent) + " 停損 " + str.tostring(stopCand) + " 目標 " + str.tostring(tgt), alert.freq_once_per_bar_close)
-                    armed := false
+                armed := false
 
 if strategy.position_size < 0
     if not na(pendingLock)
@@ -227,10 +234,10 @@ alertcondition(shortNow, title="M頭右肩破五分k60", message="M頭右肩破�
 // ---------------------------------------------------------------------------
 // 規則（對齊 TF_PRESETS["5m"]，不是 1m）
 // - 轉折 3、雙頂 4–48、高檔回看 24、進場窗 16、帶寬 28、持倉 48
-// - 收盤 < 頸線 且 ≤ MA60−8；夾在 MA120/MA200 中間不空，進過夾心後須收盤跌出慢均 −8
+// - 收盤 < 頸線 且 ≤ MA60−8；夾在 MA120/MA200 中間、或正貼在 MA200 上方 25 點內不空，進過後須收盤跌出慢均 −8
 // - 收盤仍在 MA200 上方超過 150 且 1h MA60 已破：不空
 // - 已破 MA200、1h MA60 還在下面超過 200、且 5m MA60 近 6 根仍往上：不空
-// - 停損頭頂 +36；2R；0.75R 鎖 0.5R / 1.2R 鎖 0.9R / 1.6R 鎖 1.2R（下一根）
+// - 停損頭頂 +36，且風險須 ≥ 5 倍 5m ATR14（SMA）；2R；0.75R 鎖 0.5R / 1.2R 鎖 0.9R / 1.6R 鎖 1.2R（下一根）
 //
 // 與 Python 的差異：
 // 1) 擺動高只留最近約 24 個樞軸配對；Python 全歷史兩兩掃描後依右肩去重。

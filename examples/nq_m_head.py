@@ -78,9 +78,11 @@ TF_PRESETS = {
         "trail_steps": TRAIL_STEPS_5M,
         "stop_buffer": 36.0,  # 避開 #6 那種頭頂 +8 被軋空掃掉
         "skip_slow_sandwich": True,  # 收盤夾在 MA120/MA200 中間不空（#4 假跌破）
+        "ma200_cushion": 25.0,  # 收盤貼在 MA200 上方 25 點內視同慢均地板，等破慢均再空
         "max_above_ma200": 150.0,  # #5：MA200 還在下面太遠，且 1h 已破
         "untested_htf_gap": 200.0,  # #8：破 MA200 但 1h 還沒測到、MA60 仍往上
         "ma60_slope_bars": 6,  # 5m 30 分鐘看 MA60 有沒有轉
+        "min_risk_atr": 5.0,  # 停損距離不足 5 倍 ATR14 屬巨幅震盪噪音，不空
     },
     "1h": {
         "swing_lookback": 2,  # 2 小時確認
@@ -172,8 +174,8 @@ def load_bars(symbol: str, interval: str, period: str) -> pd.DataFrame:
         end = datetime.now(timezone.utc)
         start = end - timedelta(days=days)
         if interval == "1m":
-            # Yahoo 1m 實際只能回看約 30 天，起點再早會整段空掉
-            min_start = end - timedelta(days=29, hours=18)
+            # Yahoo 1m 實際只能回看約 30 天，起點再早會把第一週整段空掉
+            min_start = end - timedelta(days=29, hours=12)
             if start < min_start:
                 start = min_start
         elif interval == "5m":
@@ -206,6 +208,18 @@ def sma(arr, n: int) -> np.ndarray:
     return s.rolling(n, min_periods=n).mean().to_numpy(float)
 
 
+def atr(df: pd.DataFrame, n: int = 14) -> np.ndarray:
+    """True Range 的簡單移動平均（與全專案一致用 SMA，不用 EMA/RMA）。"""
+    c = df["close"].to_numpy(float)
+    h = df["high"].to_numpy(float)
+    l = df["low"].to_numpy(float)
+    if len(c) == 0:
+        return np.array([], dtype=float)
+    prev_c = np.r_[c[0], c[:-1]]
+    tr = np.maximum(h - l, np.maximum(np.abs(h - prev_c), np.abs(l - prev_c)))
+    return sma(tr, n)
+
+
 def ribbon_spread(*values: float) -> float:
     """MA5/10/20/30/60 帶寬：max − min。任一缺值回傳 nan。"""
     arr = np.asarray(values, dtype=float)
@@ -226,6 +240,13 @@ def slow_ma_sandwich(close: float, ma120: float, ma200: float) -> bool:
         return False
     lo, hi = (ma120, ma200) if ma120 <= ma200 else (ma200, ma120)
     return bool(lo < close < hi)
+
+
+def near_ma200_support(close: float, ma200: float, cushion: float) -> bool:
+    """收盤剛貼在 MA200 上方 cushion 點內：慢均就在腳下，不直接撞地板做空。"""
+    if cushion <= 0 or np.isnan(close) or np.isnan(ma200):
+        return False
+    return bool(0.0 <= (close - ma200) < cushion)
 
 
 def far_above_ma200(
@@ -390,9 +411,12 @@ def generate_signals(
     timeframe: str = "1m",
     min_ribbon_spread: float = 28.0,
     skip_slow_sandwich: bool = False,
+    ma200_cushion: float = 0.0,
     max_above_ma200: float = 0.0,
     untested_htf_gap: float = 0.0,
     ma60_slope_bars: int = 6,
+    min_risk_atr: float = 0.0,
+    atr_period: int = 14,
     funnel: Optional[Dict[str, int]] = None,
 ) -> List[Signal]:
     """高檔 M 頭確認後，收盤跌破 MA60 做空；均線還糾結就先等打開。"""
@@ -420,6 +444,7 @@ def generate_signals(
     ma60 = sma(close, 60)
     ma120 = sma(close, 120)
     ma200 = sma(close, 200)
+    atr_arr = atr(df, atr_period) if min_risk_atr > 0 else None
     htf_col = df["ma60_1h"].to_numpy(float) if "ma60_1h" in df.columns else None
     n = len(df)
     signals: List[Signal] = []
@@ -473,10 +498,13 @@ def generate_signals(
                 min_spread=min_ribbon_spread,
             ):
                 continue
-            # 夾在 MA120/MA200 中間先不進；一旦進過夾心，必須收盤跌出慢均下方才算真破。
+            # 夾在 MA120/MA200 中間，或正貼在 MA200 上方 cushion 點內，先不撞地板做空；
+            # 一旦進過慢均支撐區，必須收盤跌出慢均下方才算真破。
             if skip_slow_sandwich:
                 lo_slow = min(float(ma120[k]), float(ma200[k]))
-                if slow_ma_sandwich(float(close[k]), float(ma120[k]), float(ma200[k])):
+                if slow_ma_sandwich(float(close[k]), float(ma120[k]), float(ma200[k])) or near_ma200_support(
+                    float(close[k]), float(ma200[k]), ma200_cushion
+                ):
                     saw_sandwich = True
                     continue
                 if saw_sandwich and close[k] > lo_slow - min_break_pts:
@@ -534,6 +562,11 @@ def generate_signals(
         if risk > max_risk:
             bump("skip_wide_risk")
             continue
+        if atr_arr is not None:
+            atr_v = float(atr_arr[entry_idx])
+            if not np.isnan(atr_v) and atr_v > 0 and risk < min_risk_atr * atr_v:
+                bump("skip_low_r_atr")
+                continue
 
         measured = round_tick(p.target)
         r_target = round_tick(entry - risk * target_r)
@@ -972,6 +1005,7 @@ def _funnel_html(funnel: Optional[Dict[str, int]]) -> str:
         f"MA200太遠 {funnel.get('skip_far_ma200', 0)} · "
         f"1h未測 {funnel.get('skip_htf_gap', 0)} · "
         f"破高失效 {funnel.get('skip_invalidated', 0)} · "
+        f"波動過劇 {funnel.get('skip_low_r_atr', 0)} · "
         f"風險過窄 {funnel.get('skip_tiny_risk', 0)} · "
         f"風險過寬 {funnel.get('skip_wide_risk', 0)}）</p>"
     )
@@ -1054,7 +1088,7 @@ def write_html_report(
 <section class="summary">
 <h1>五分K 對照 · 同一套高檔M頭跌破MA60</h1>
 <p class="muted">5m · {escape(m5_start)} → {escape(m5_end)} ET · bars={len(m5_df)}</p>
-<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間不空。收盤還在 MA200 上方超過 150 點且 1h 已破，不空。已破 MA200 但 1h MA60 還在下面超過 200 點、且 MA60 仍往上，也不空。停損頭頂 +36。0.75R 鎖 0.5R、1.2R 鎖 0.9R、1.6R 鎖 1.2R。鎖利下一根生效。無破底翻平空、無硬虧 +60。</p>
+<p class="muted">轉折確認 3 根（15 分）、雙頂間隔 4–48 根（20 分–4 小時）、近 2 小時高點、2R。帶寬未滿 28 點不進。收盤夾在 MA120/MA200 中間、或正貼在 MA200 上方 25 點內不直接撞地板做空（等跌破慢均 −8）。收盤還在 MA200 上方超過 150 點且 1h 已破，不空。已破 MA200 但 1h MA60 還在下面超過 200 點、且 MA60 仍往上，也不空。停損頭頂 +36，且停損距離須 ≥ 5 倍 5m ATR14（濾掉大 K 巨幅震盪噪音）。0.75R 鎖 0.5R、1.2R 鎖 0.9R、1.6R 鎖 1.2R。鎖利下一根生效。</p>
 {_stats_cards(m5_stats)}
 {_funnel_html(m5_funnel)}
 <div class="equity">{_equity_svg([t.pnl_points for t in m5_trades])}</div>
@@ -1220,6 +1254,7 @@ def cmd_backtest(args) -> int:
             f"sandwich={m5_funnel.get('skip_sandwich', 0)} "
             f"far200={m5_funnel.get('skip_far_ma200', 0)} "
             f"htfgap={m5_funnel.get('skip_htf_gap', 0)} "
+            f"lowratr={m5_funnel.get('skip_low_r_atr', 0)} "
             f"invalid={m5_funnel.get('skip_invalidated', 0)}"
         )
         for i, t in enumerate(m5_trades, 1):

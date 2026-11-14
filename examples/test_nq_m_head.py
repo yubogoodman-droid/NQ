@@ -26,8 +26,10 @@ from nq_m_head import (  # noqa: E402
     ribbon_spread,
     ribbon_tangled,
     slow_ma_sandwich,
+    near_ma200_support,
     far_above_ma200,
     untested_htf_support,
+    atr,
     run_backtest,
     run_tf_backtest,
     sma,
@@ -314,6 +316,11 @@ def test_slow_ma_sandwich() -> None:
     assert slow_ma_sandwich(29326.0, 29318.0, 29334.0)
     assert not slow_ma_sandwich(29900.0, 29874.0, 29824.0)
     assert not slow_ma_sandwich(29155.0, 29256.0, 29310.0)
+    # MA200 地板緩衝：10-11 (+9.2) / 10-20 (+5.9) 貼著 MA200 擋掉；08-05 (+76.5) / 08-21 (+81) 放過
+    assert near_ma200_support(31167.75, 31158.50, 25.0)
+    assert near_ma200_support(29673.00, 29667.14, 25.0)
+    assert not near_ma200_support(29900.50, 29824.00, 25.0)
+    assert not near_ma200_support(29155.50, 29310.00, 25.0)
 
 
 def test_far_above_ma200() -> None:
@@ -358,8 +365,12 @@ def test_tf_presets() -> None:
     assert TF_PRESETS["5m"]["trail_steps"][2] == (1.6, 1.2)
     assert TF_PRESETS["5m"]["stop_buffer"] == 36.0
     assert TF_PRESETS["5m"]["skip_slow_sandwich"] is True
+    assert TF_PRESETS["5m"]["ma200_cushion"] == 25.0
     assert TF_PRESETS["5m"]["max_above_ma200"] == 150.0
     assert TF_PRESETS["5m"]["untested_htf_gap"] == 200.0
+    assert TF_PRESETS["5m"]["min_risk_atr"] == 5.0
+    assert "min_risk_atr" not in TF_PRESETS["1m"]
+    assert "ma200_cushion" not in TF_PRESETS["1m"]
     assert "reclaim_exit" not in TF_PRESETS["5m"]
     assert "hard_stop_pts" not in TF_PRESETS["5m"]
     assert "reclaim_exit" not in TF_PRESETS["1m"]
@@ -477,6 +488,29 @@ def test_five_m_075r_arms_but_074_does_not() -> None:
     assert abs(hit.pnl_points - 50.0) < 0.26
 
 
+def test_min_risk_atr_skips_whipsaw() -> None:
+    """高波動大 K 棒下，M 頭停損距離不足 N 倍 ATR14 應濾掉；正常波動仍進場。"""
+    df = _make_m_head_bars()
+    atr_arr = atr(df, 14)
+    assert np.isnan(atr_arr[12])
+    assert atr_arr[50] > 0
+
+    funnel_ok: dict = {}
+    sigs_ok = generate_signals(df, funnel=funnel_ok, min_risk_atr=5.0)
+    assert sigs_ok, f"normal volatility M-head should pass 5x ATR, funnel={funnel_ok}"
+
+    # 在右肩確認後（244 之後）放大 K 棒下影線模擬巨幅震盪，不改雙頂與頸線幾何
+    noisy = df.copy()
+    low = noisy["low"].to_numpy(copy=True)
+    for i in range(244, len(noisy)):
+        low[i] = float(noisy["close"].iloc[i]) - 90.0
+    noisy["low"] = low
+    funnel_skip: dict = {}
+    sigs_skip = generate_signals(noisy, funnel=funnel_skip, min_risk_atr=5.0)
+    assert not sigs_skip, f"whipsaw bars should be filtered by min_risk_atr, got {sigs_skip}"
+    assert funnel_skip.get("skip_low_r_atr", 0) >= 1
+
+
 def test_5m_preset_still_fires() -> None:
     df = _make_m_head_bars()
     _, trades, funnel = run_tf_backtest(df, "5m")
@@ -520,6 +554,7 @@ def main() -> int:
     test_overlay_htf_ma60_no_peek()
     test_squeeze_then_two_r()
     test_five_m_075r_arms_but_074_does_not()
+    test_min_risk_atr_skips_whipsaw()
     test_5m_preset_still_fires()
     test_write_html_report()
     print("ok")
