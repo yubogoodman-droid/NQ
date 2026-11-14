@@ -45,6 +45,26 @@ python3 examples/nq_ma_reclaim.py alert
 外網（合併後）：https://yubogoodman-droid.github.io/NQ/nq-ma-reclaim/  
 現在先看圖：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/nq-1m-ma-reclaim-2484/docs/nq-ma-reclaim/view.html
 
+## NQ 一分 K Gork多＋線性空｜自動版（v2 雙月驗證門檻）
+
+`pinescript/gork_linear_combo_auto.pine` 掛 NQ1! / MNQ1! 一分圖；`examples/nq_gork_linear_combo.py` 同一套規則的 Yahoo 1m 回測。  
+綜合 9/8–10/2 與 10/5–11/3 兩個月樣本，預設優化門檻（Pine 內標 ★，各有 input 可開關）：
+
+- **Gork 15m 破底翻位置與方向過濾**：`close − 15m MA60 > 25` 或 `15m MA60 − MA60[4] > 0` 就跳過。Gork 本質是洗盤後的均值回歸，所有 +100 停利單都發生在 15m MA60 下彎且價格不高於 15m MA60+25 點時。
+- **Gork 跌破深度拉高至 70 點**（原 50 點）：50–70 點的淺跌破在近一個月全數停損或保本，0 筆停利；拉到 70 點保留全部 +100 贏單。
+- **線性空進場風險上限放寬至 65 點**（原 55 點）：`peakHigh − 進場收盤 > 65` 才跳過，保留 10/15（風險 63.75、+60.5）與 11/4（風險 55.5、+62.97）兩筆贏單，同時擋掉 >65 的極端寬停損。
+
+```bash
+python3 examples/nq_gork_linear_combo.py --compare      # 基準 vs 優化，逐筆／逐日
+python3 examples/nq_gork_linear_combo.py --baseline     # 原規則
+python3 examples/nq_gork_linear_combo.py --csv my_1m.csv --lin-max-risk 65 --gork-deep 70
+```
+
+Yahoo 1m 最新一個月（2026-10-05 → 11-03 ET，28,555 根）：
+- **基準**：65 筆 **+203.08**（最大回撤 −400.47）｜Gork 54 筆 −265.47（6 停利 / 7 保本 / 41 停損）｜線性空 11 筆 +468.55（9 贏 / 2 停損）
+- **優化 v2**：37 筆 **+689.46**（最大回撤 −155.20）｜Gork 26 筆 +220.91（6 停利 / 4 保本 / 16 停損）｜線性空 11 筆 +468.55（9 贏 / 2 停損）
+- 擋掉 25 筆 Gork 停損（合計省下 +486.38 點）與 3 筆保本，**6 筆 Gork +100 與 9 筆線性空贏單全數保留（0 誤殺）**。前半月（10/6–10/19）從 −224.5 轉正為 +24.8，後半月（10/20–11/4）從 +427.6 提升至 +664.7。
+
 ## 台股成交額前 100 · 同一套破底翻（一週）
 
 ```bash
