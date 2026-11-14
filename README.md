@@ -123,6 +123,31 @@ python3 examples/watch_binance_ribbon.py --backtest 7   # 回測近 7 天（原�
 python3 examples/test_watch_binance_ribbon.py           # 離線單元測試
 ```
 
+## SOXS 一分 K 假突破做空
+
+幣安 `SOXSUSDT` 1 分 K。價格刺過近 120 根前高、超漲不超過 3.5%，接著收盤跌破 MA25 與 MA30，且 MA7 已跌破 MA14。下一到十根內，前一根收盤還在 MA25 下，就在前一根 MA14／MA25 掛空。優化版只抓大賺結構：**掛單價距離下方 MA99 至少留出 0.8% 下跌空間（均線中空帶）**、停損距離 0.6%–2.5%、且只在**美東 09:20–16:00（開盤前 10 分鐘至收盤）**掛單進場，最長拿 30 分鐘（半小時結算，2.5R 停利）。來回扣 0.06%，未扣資金費。
+
+```bash
+python3 examples/soxs_fake_breakout.py --days 30 --pages
+python3 examples/soxs_fake_breakout.py --days 30 --sniper --html docs/soxs-sniper-30d/index.html
+python3 examples/soxs_fake_breakout.py --days 30 --loose   # 初版寬鬆對照
+python3 examples/test_soxs_fake_breakout.py
+
+# 專門抓 S 級大賺單（回測 + 每分鐘即時監看推播 Telegram）
+python3 examples/watch_soxs_big_win_tg.py --backtest --days 30
+python3 examples/watch_soxs_big_win_tg.py --test
+python3 examples/watch_soxs_big_win_tg.py
+```
+
+2026-10-14 → 11-13（台北時間）半小時結算：
+1. 初版寬鬆（台北 20:00–05:00、不看 MA99 空間）：32 筆、半小時勝率 43.8%、淨報酬 +6.83%。
+2. 只收斂至美東 09:20–16:00（避開早盤前清淡誘空）：24 筆、半小時勝率 50.0%、淨報酬 +8.43%。
+3. 優化版（再加掛單離 MA99 ≥ 0.8% 均線中空帶 + 停損 0.6%–2.5%）：近 30 天 **12 筆、半小時勝率 75.0%（9 勝 3 負）、淨報酬 +11.20%、合計 +6.24R**（拉長到 60 分鐘淨報酬 +16.69%）；全 90 天 **17 筆、半小時勝率 76.5%、淨報酬 +13.44%**。
+4. **S 級大賺狙擊版**（`watch_soxs_big_win_tg.py` / `--sniper`：再鎖定前 45m 急拉 ≥ 3.0%、假高乖離 MA60 ≥ 2.0%、創高量縮 ≤ 起漲最大量 65%）：近 30 天 **8 筆、半小時勝率 87.5%（7 勝 1 負）、平均每筆 +1.42%、淨報酬 +11.36%、合計 +6.51R**（延伸 60 分鐘 **+16.06%**）；全 90 天 **11 筆、半小時勝率 81.8%（9 勝 2 負）**。2026-11-12 22:26（50.20 → 48.62，+3.08%）與 10-26 22:25（51.07 → 48.88，+4.24%）等大肉單全部命中。
+
+- 優化版預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-fake-breakout-backtest-274a/docs/soxs-fake-breakout-30d/view.html
+- S 級大賺狙擊預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-fake-breakout-backtest-274a/docs/soxs-sniper-30d/view.html
+
 ## 快速開始
 
 ```bash
