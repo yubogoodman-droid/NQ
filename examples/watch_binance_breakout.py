@@ -834,7 +834,7 @@ def format_ignition(ev: dict) -> str:
     oi_txt = f"{ev['oi_change_pct']:+.2f}%" if ev.get("oi_change_pct") is not None else "n/a"
     risk_pct = (ign["entry_price"] - ign["stop_price"]) / ign["entry_price"] * 100.0
     return (
-        f"🚀 <b>點火起漲（5m 破箱體）</b>  <b>{sym}</b>\n"
+        f"<b>[點火起漲 · 5m 破箱體]</b>  <b>{sym}</b>\n"
         f"時間：{hm(ign['ts'])} (UTC+8)\n"
         f"點火收盤：<b>{ign['entry_price']:.6g}</b>（+{ign['bar_gain_pct']:.1f}%）\n"
         f"建議觀察回踩區：{ign['box_hi']:.6g} ～ {ign['entry_price']:.6g}\n"
@@ -852,7 +852,7 @@ def format_confirm(ev: dict) -> str:
     oi_txt = f"{ev['oi_change_pct']:+.2f}%" if ev.get("oi_change_pct") is not None else "n/a"
     risk_pct = (conf["confirm_price"] - ign["stop_price"]) / conf["confirm_price"] * 100.0
     return (
-        f"🔥🔥🔥 <b>回踩續攻確認（強）</b>\n"
+        f"<b>[強訊號 · 回踩續攻確認]</b>\n"
         f"<b>{sym}</b>  5m\n"
         f"點火 {hm(ign['ts'])} ({ign['entry_price']:.6g}) → 確認 {hm(conf['confirm_ts'])} (<b>{conf['confirm_price']:.6g}</b>)\n"
         f"回踩最低：{conf['pullback_low']:.6g}（未破箱體頂 {ign['box_hi']:.6g} / MA25）\n"
