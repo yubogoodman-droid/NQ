@@ -139,19 +139,19 @@ def apply_keys() -> None:
         os.environ.setdefault("TELEGRAM_CHAT_ID", TELEGRAM_CHAT_ID.strip())
 
 
-def get_json(path: str, params: dict | None = None, retries: int = 4):
+def get_json(path: str, params: dict | None = None, retries: int = 5):
     last_err: Exception | None = None
     for attempt in range(retries):
         try:
             r = SESSION.get(BASE + path, params=params, timeout=20)
-            if r.status_code == 429:
-                time.sleep(1.2 * (attempt + 1))
+            if r.status_code in (418, 429):
+                time.sleep(2.5 * (attempt + 1))
                 continue
             r.raise_for_status()
             return r.json()
         except Exception as exc:  # noqa: BLE001
             last_err = exc
-            time.sleep(0.4 * (attempt + 1))
+            time.sleep(0.6 * (attempt + 1))
     assert last_err is not None
     raise last_err
 
@@ -397,6 +397,56 @@ def detect_signals(
     return results
 
 
+# 回測出場：停損放在點火低點，但最多離進場 8%；進場 3 根後收盤跌破 MA99 出場；最長持有 24h。
+STOP_CAP = 0.08
+TRAIL_ARM_BARS = 3
+MAX_HOLD_BARS = 288
+
+
+def simulate_trade(d: dict, rec: dict) -> dict | None:
+    """回踩確認收盤進場。停損先看點火低，離進場超過 8% 就改停在進場下方 8%。
+
+    進場後每一根先看最低價是否打到停損；沒有，且已過 3 根，收盤跌破 MA99 就用該收盤出場。
+    24 小時（288 根 5m）都沒出場，用該根收盤時間出場。資料在期限前結束則標未平。
+    """
+    conf = rec.get("confirm")
+    if not conf:
+        return None
+    c = d["c"]
+    h = d["h"]
+    l = d["l"]
+    m99 = d["m99"]
+    e_idx = int(conf["confirm_idx"])
+    entry = float(conf["confirm_price"])
+    if e_idx >= len(c) - 1 or entry <= 0:
+        return None
+    stop = max(float(rec["stop_price"]), entry * (1.0 - STOP_CAP))
+    if stop >= entry:
+        stop = entry * (1.0 - STOP_CAP)
+    last_i = min(len(c) - 1, e_idx + MAX_HOLD_BARS)
+    data_ended = e_idx + MAX_HOLD_BARS > len(c) - 1
+    ex_i = last_i
+    ex_p = float(c[ex_i])
+    reason = "open" if data_ended else "time"
+    for j in range(e_idx + 1, last_i + 1):
+        if float(l[j]) <= stop:
+            ex_i, ex_p, reason = j, stop, "stop"
+            break
+        if j >= e_idx + TRAIL_ARM_BARS and float(c[j]) < float(m99[j]):
+            ex_i, ex_p, reason = j, float(c[j]), "ma99"
+            break
+    return {
+        "entry_idx": e_idx,
+        "exit_idx": int(ex_i),
+        "entry_price": entry,
+        "exit_price": float(ex_p),
+        "stop_price": float(stop),
+        "pnl_pct": (float(ex_p) / entry - 1.0) * 100.0,
+        "reason": reason,
+        "hold_bars": int(ex_i - e_idx),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Binance Data Fetching
 # ---------------------------------------------------------------------------
@@ -514,6 +564,11 @@ def render_chart_bytes(
     ign_i: int,
     box_hi: float,
     conf_i: int | None = None,
+    exit_i: int | None = None,
+    stop_price: float | None = None,
+    entry_price: float | None = None,
+    exit_price: float | None = None,
+    title: str | None = None,
 ) -> bytes | None:
     try:
         import matplotlib
@@ -534,8 +589,9 @@ def render_chart_bytes(
     except Exception:  # noqa: BLE001
         return None
 
-    a0 = max(0, ign_i - 55)
-    a1 = min(len(d["c"]), ign_i + 40)
+    end_i = exit_i if exit_i is not None else ign_i
+    a0 = max(0, ign_i - 36)
+    a1 = min(len(d["c"]), max(ign_i + 40, end_i + 8))
     sl = slice(a0, a1)
     xs = np.arange(a1 - a0)
     o, h, l, c, qv = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl], d["qv"][sl] / 1e6
@@ -574,26 +630,32 @@ def render_chart_bytes(
         arr = d[key][sl] if key in d else sma(d["c"], n)[sl]
         ax.plot(xs, arr, color=MA_COLORS[n], lw=1.05, label=f"MA{n}")
 
-    ax.axhline(box_hi, color="#8aa193", ls=":", lw=0.9, alpha=0.8, label="Box Top")
+    ax.axhline(box_hi, color="#8aa193", ls=":", lw=0.9, alpha=0.8)
+    if stop_price is not None:
+        ax.axhline(stop_price, color="#e35d5d", ls=":", lw=1.0, alpha=0.9)
 
-    x_ign = ign_i - a0
-    if 0 <= x_ign < len(c):
-        ax.axvline(x_ign, color="#ff9800", ls="--", lw=0.95, alpha=0.85)
-        ax.scatter([x_ign], [c[x_ign]], s=55, facecolors="none", edgecolors="#ff9800", linewidths=1.8, zorder=6, label="Ignition")
+    def _mark(idx: int | None, price: float | None, color: str, text: str) -> None:
+        if idx is None:
+            return
+        x = idx - a0
+        if not (0 <= x < len(c)):
+            return
+        y = float(c[x] if price is None else price)
+        ax.scatter([x], [y], s=220, facecolors="none", edgecolors=color, linewidths=1.8, zorder=6)
+        ax.annotate(text, (x, y), textcoords="offset points", xytext=(0, 9), ha="center", color=color, fontsize=8)
 
-    if conf_i is not None:
-        x_conf = conf_i - a0
-        if 0 <= x_conf < len(c):
-            ax.axvline(x_conf, color="#00e676", ls="--", lw=0.95, alpha=0.85)
-            ax.scatter([x_conf], [c[x_conf]], s=55, facecolors="none", edgecolors="#00e676", linewidths=1.8, zorder=6, label="Confirm")
+    _mark(ign_i, None, "#ff9800", "點火")
+    _mark(conf_i, entry_price, "#ff9f1a", "進")
+    exit_col = "#00c805" if (exit_price is not None and entry_price is not None and exit_price >= entry_price) else "#ff5252"
+    _mark(exit_i, exit_price, exit_col, "出")
 
     tick_step = max(1, len(xs) // 7)
     tick_idx = list(range(0, len(xs), tick_step))
     axv.set_xticks(tick_idx)
     axv.set_xticklabels([hm(int(ts_arr[k])) for k in tick_idx], color="#8aa193", fontsize=8)
 
-    ax.set_title(f"{sym}  5m  ({hm(int(d['t'][ign_i]))} UTC+8)", color="#e8f0ea", fontsize=12)
-    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=5)
+    ax.set_title(title or f"{sym}  5m  ({hm(int(d['t'][ign_i]))} UTC+8)", color="#e8f0ea", fontsize=11)
+    ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=4)
     fig.tight_layout(pad=0.5)
 
     buf = io.BytesIO()
@@ -609,6 +671,179 @@ def draw_chart(sym: str, d: dict, ign_i: int, box_hi: float, path: str, conf_i: 
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     Path(path).write_bytes(raw)
     return path
+
+
+def _equity_svg(pnls: list[float]) -> str:
+    if not pnls:
+        return ""
+    cum = np.cumsum(np.asarray(pnls, dtype=float))
+    width, height = 720, 160
+    lo = float(min(0.0, cum.min()))
+    hi = float(max(0.0, cum.max()))
+    span = (hi - lo) or 1.0
+    pts = []
+    for i, v in enumerate(cum):
+        x = 0.0 if len(cum) == 1 else i * width / (len(cum) - 1)
+        y = height - 10 - (float(v) - lo) / span * (height - 20)
+        pts.append(f"{x:.1f},{y:.1f}")
+    zero_y = height - 10 - (0.0 - lo) / span * (height - 20)
+    color = "#00c805" if float(cum[-1]) >= 0 else "#ff5252"
+    return (
+        f'<svg viewBox="0 0 {width} {height}" width="100%" style="background:#0d1117;border-radius:10px">'
+        f'<line x1="0" y1="{zero_y:.1f}" x2="{width}" y2="{zero_y:.1f}" stroke="#334155" stroke-dasharray="4 4"/>'
+        f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{" ".join(pts)}"/></svg>'
+    )
+
+
+def write_backtest_html(records: list[dict], out_path: Path, days: float, n_symbols: int) -> Path:
+    """回踩確認進場的回測頁。圖嵌在同一個 HTML，手機直接開。"""
+    reason_label = {"stop": "停損", "ma99": "收盤跌破 MA99", "time": "持有 24h", "open": "未平"}
+    trades: list[dict] = []
+    for rec in records:
+        trade = simulate_trade(rec["d"], rec)
+        if trade is None:
+            continue
+        row = dict(rec)
+        row["trade"] = trade
+        trades.append(row)
+    trades.sort(key=lambda r: r["confirm"]["confirm_ts"])
+
+    pnls = [t["trade"]["pnl_pct"] for t in trades]
+    closed = [t for t in trades if t["trade"]["reason"] != "open"]
+    wins = [p for p in pnls if p > 0]
+    closed_pnls = [t["trade"]["pnl_pct"] for t in closed]
+    closed_wins = [p for p in closed_pnls if p > 0]
+    reasons: dict[str, int] = {}
+    for t in trades:
+        reasons[t["trade"]["reason"]] = reasons.get(t["trade"]["reason"], 0) + 1
+
+    def _avg(xs: list[float]) -> float:
+        return float(np.mean(xs)) if xs else 0.0
+
+    def _med(xs: list[float]) -> float:
+        return float(np.median(xs)) if xs else 0.0
+
+    cards: list[str] = []
+    for i, rec in enumerate(trades, 1):
+        tr = rec["trade"]
+        conf = rec["confirm"]
+        pnl = tr["pnl_pct"]
+        cls = "pnl-win" if pnl > 0 else ("pnl-flat" if pnl == 0 else "pnl-loss")
+        title = (
+            f"#{i}  {rec['symbol']}  {hm(conf['confirm_ts'])} → {hm(int(rec['d']['t'][tr['exit_idx']]))}  "
+            f"{reason_label.get(tr['reason'], tr['reason'])}  {pnl:+.2f}%"
+        )
+        png = render_chart_bytes(
+            rec["symbol"],
+            rec["d"],
+            rec["idx"],
+            rec["box_hi"],
+            conf_i=conf["confirm_idx"],
+            exit_i=tr["exit_idx"],
+            stop_price=tr["stop_price"],
+            entry_price=tr["entry_price"],
+            exit_price=tr["exit_price"],
+            title=title,
+        )
+        img = ""
+        if png:
+            img = (
+                "<img src='data:image/png;base64,"
+                + base64.b64encode(png).decode("ascii")
+                + f"' alt='{escape(rec['symbol'])}'/>"
+            )
+        oi_txt = f"{rec['oi_change_pct']:+.2f}%" if rec.get("oi_change_pct") is not None else "n/a"
+        risk = (tr["entry_price"] - tr["stop_price"]) / tr["entry_price"] * 100.0
+        cards.append(
+            "<article class='trade-card'>"
+            "<header class='card-header'>"
+            f"<div><span class='trade-no'>#{i} · {escape(rec['symbol'])}</span>"
+            f"<span class='trade-time'>{hm(conf['confirm_ts'])} → {hm(int(rec['d']['t'][tr['exit_idx']]))} UTC+8</span></div>"
+            f"<div class='card-pnl {cls}'>{pnl:+.2f}%</div></header>"
+            f"<div class='tags'><span class='tag'>{escape(reason_label.get(tr['reason'], tr['reason']))}</span>"
+            f"<span class='tag'>爆量 {rec['vol_ratio']:.1f}x</span>"
+            f"<span class='tag'>OI {oi_txt}</span>"
+            f"<span class='tag'>持有 {tr['hold_bars'] * 5} 分</span></div>"
+            "<pre class='trade-detail'>"
+            f"進場 {tr['entry_price']:.6g}  @ {hm(conf['confirm_ts'])}\n"
+            f"停損 {tr['stop_price']:.6g}  （-{risk:.2f}%）\n"
+            f"出場 {tr['exit_price']:.6g}  {reason_label.get(tr['reason'], tr['reason'])}\n"
+            f"點火 {hm(rec['ts'])} {rec['entry_price']:.6g}（+{rec['bar_gain_pct']:.1f}%）"
+            f"  箱體 {rec['box_range_pct']:.2f}%  均線糾結 {rec['ma_spread_pct']:.2f}%"
+            "</pre>"
+            f"<div class='mini-chart'>{img}</div></article>"
+        )
+
+    ign_only = len(records) - len(trades)
+    gen_ts = datetime.now(TZ).strftime("%Y-%m-%d %H:%M UTC+8")
+    total = float(sum(pnls))
+    avg = _avg(pnls)
+    med = _med(pnls)
+    best = max(pnls) if pnls else 0.0
+    worst = min(pnls) if pnls else 0.0
+    win_rate = (len(wins) / len(pnls) * 100.0) if pnls else 0.0
+    closed_rate = (len(closed_wins) / len(closed_pnls) * 100.0) if closed_pnls else 0.0
+    avg_cls = "pnl-win" if avg >= 0 else "pnl-loss"
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>幣安 5m 起漲回測 · 近 {days:g} 天</title>
+<style>
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,"Noto Sans TC",sans-serif}}
+.page{{max-width:720px;margin:0 auto;padding:14px 12px 40px}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
+h1{{font-size:18px;margin:0 0 6px}} h2{{font-size:15px;margin:16px 0 8px}}
+.muted{{color:#8b949e;font-size:13px;line-height:1.55}}
+.cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
+.card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:92px;border:1px solid #21262d}}
+.card b{{display:block;font-size:18px;margin-top:4px}}
+.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}}
+.card-header{{display:flex;justify-content:space-between;gap:10px}}
+.trade-no{{font-weight:700}} .trade-time{{font-size:12px;color:#8b949e;display:block}}
+.card-pnl{{font-weight:700}} .pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}} .pnl-flat{{color:#8b949e}}
+.tags{{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}}
+.tag{{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid #30363d;color:#79c0ff}}
+.trade-detail{{background:#0d1117;padding:10px;border-radius:10px;font-size:12px;white-space:pre-wrap}}
+.rules{{margin:0;padding-left:1.2em;color:#c9d1d9;font-size:13px;line-height:1.65}}
+.note{{margin-top:8px;padding:8px 10px;background:#0d1117;border-radius:8px;color:#f0c14b;font-size:12px}}
+img{{width:100%;display:block;border-radius:10px}}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>幣安 5m 均線糾結爆量起漲 · 回測</h1>
+<p class="muted">近 {days:g} 天 · 24h 成交額 ≥ 1,000 萬 USDT 的永續 · {n_symbols} 檔 · 產出 {escape(gen_ts)}</p>
+<h2>進出場規則</h2>
+<ol class="rules">
+<li>標的：幣安 USDT 永續，排除 BTC／ETH／SOL／BNB／XRP／DOGE／ADA／TRX 與反向 ETF。24h 成交額要到 1,000 萬 USDT。</li>
+<li>點火：前一根八條均線（MA7／14／25／30／60／99／120／200）糾結 ≤ 5%，過去 4 小時箱體振幅 ≤ 10%。當根收盤站上全部均線並突破箱體，單根漲 2.8%～16%，比同一根 BTC 多漲至少 2.5%，成交額 ≥ 7 倍均量且 ≥ 20 萬 USDT，收在當根振幅上緣 ≥ 70%，5 分鐘持倉量增加 ≥ 0.5%。</li>
+<li>進場：點火後第 2～6 根，收盤沒有跌破 MA25、最低沒有跌破點火低點，而且 MA7 &gt; MA14 &gt; MA25、收紅站回箱體上緣。進場價＝這根收盤。沒有確認的點火不進場。</li>
+<li>停損：點火那根最低價。若離進場超過 8%，改停在進場價下方 8%。先看最低價打到停損。</li>
+<li>出場：進場 3 根之後，5 分鐘收盤跌破 MA99，用該收盤價出場。都沒有就持有滿 24 小時，用收盤價出場。資料還沒走完的標未平。</li>
+<li>報酬：出場價 / 進場價 − 1。未扣手續費與滑價。下面的加總是每一筆報酬相加，不是複利。</li>
+</ol>
+<p class="note">橘字「點火」＝爆量破箱體。橘圈「進」＝回踩確認收盤進場。綠圈或紅圈「出」＝出場。紅虛線＝停損。黃／青／粉／藍／綠／紫／淺綠／紅線＝MA7／14／25／30／60／99／120／200。</p>
+<h2>回測統計</h2>
+<p class="muted">點火 {len(records)} 筆，通過回踩確認進場 {len(trades)} 筆，點火後沒確認 {ign_only} 筆（不進場）。
+<br/>出場：收盤跌破 MA99 {reasons.get('ma99', 0)} · 停損 {reasons.get('stop', 0)} · 持有 24h {reasons.get('time', 0)} · 未平 {reasons.get('open', 0)}</p>
+<div class="cards">
+<div class="card">筆數<b>{len(trades)}</b></div>
+<div class="card">勝率<b>{win_rate:.1f}%</b></div>
+<div class="card">已平勝率<b>{closed_rate:.1f}%</b></div>
+<div class="card">加總<b class="{avg_cls}">{total:+.1f}%</b></div>
+<div class="card">平均<b class="{avg_cls}">{avg:+.2f}%</b></div>
+<div class="card">中位數<b class="{'pnl-win' if med>=0 else 'pnl-loss'}">{med:+.2f}%</b></div>
+<div class="card">最好<b class="pnl-win">{best:+.1f}%</b></div>
+<div class="card">最差<b class="pnl-loss">{worst:+.1f}%</b></div>
+</div>
+{_equity_svg(pnls)}
+</section>
+{''.join(cards) or "<p class='muted'>這段期間沒有通過回踩確認的進場。</p>"}
+</div></body></html>
+"""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(html, encoding="utf-8")
+    return out_path
 
 
 def write_html_report(records: list[dict], out_path: Path, days: float, n_symbols: int) -> Path:
@@ -940,13 +1175,17 @@ def run_scan(
     print(f"掃描 {len(symbols)} 檔標的…", flush=True)
     t0 = time.time()
     records: list[dict] = []
-    with ThreadPoolExecutor(8) as ex:
+    done = 0
+    with ThreadPoolExecutor(4) as ex:
         futs = {ex.submit(_worker, s): s for s in symbols}
         for fut in as_completed(futs):
+            done += 1
             try:
                 records.extend(fut.result())
             except Exception as exc:  # noqa: BLE001
                 print(f"  [略過] {futs[fut]}: {exc}", flush=True)
+            if done % 25 == 0 or done == len(symbols):
+                print(f"  進度 {done}/{len(symbols)}", flush=True)
 
     records.sort(key=lambda r: r["ts"])
     elapsed = time.time() - t0
@@ -979,7 +1218,7 @@ def run_scan(
             )
 
     if html_out is not None:
-        saved = write_html_report(records, html_out, days=days, n_symbols=len(symbols))
+        saved = write_backtest_html(records, html_out, days=days, n_symbols=len(symbols))
         print(f"\nHTML 圖表報告已輸出：{saved}", flush=True)
     return records
 

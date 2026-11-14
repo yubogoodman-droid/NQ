@@ -122,9 +122,11 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 ```bash
 python3 examples/watch_binance_breakout.py --test   # 測試 Telegram
 python3 examples/watch_binance_breakout.py          # 每根 5m 收盤自動掃全市場
-python3 examples/watch_binance_breakout.py --scan --days 3.5 --html output/binance_breakout.html
+python3 examples/watch_binance_breakout.py --scan --days 28 --min-qv 10000000 --html docs/binance-5m-breakout/index.html
 python3 examples/watch_binance_breakout.py --scan --symbols AKEUSDT,SHELLUSDT --days 4
 ```
+
+近 28 天、24h 成交額 ≥ 1,000 萬 USDT：點火 44、回踩確認進場 36。停損放在點火低（最多 -8%），收盤跌破 MA99 出場。36 筆勝率 36.1%、加總 +344.5%、平均 +9.57%（未扣手續費；加總是各筆相加）。單檔頁：`docs/binance-5m-breakout/index.html`
 
 ## 快速開始
 
