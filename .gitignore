@@ -8,3 +8,5 @@ tg_config.env
 tg_alert_state.json
 examples/tg_alert_state.json
 examples/tg_config.env
+examples/tw_5m_fade_state.json
+output/tw_5m_fade_seen.json
