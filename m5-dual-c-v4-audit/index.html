@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M5 Dual-C V4.1 外部審查</title>
+<style>
+  :root {
+    --paper: #f3f0e8;
+    --sheet: #fbfaf6;
+    --ink: #1c1915;
+    --muted: #6f6a60;
+    --line: #e4dfd4;
+    --line-strong: #cfc8ba;
+    --green: #1f4d3a;
+    --red: #6e2c2c;
+    --amber: #8a5a12;
+    --blue: #3d4f66;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--paper); }
+  body {
+    margin: 0 auto;
+    max-width: 980px;
+    padding: 40px 28px 72px;
+    color: var(--ink);
+    background: var(--sheet);
+    font: 16.5px/1.65 "PingFang TC", "Noto Sans CJK TC", "Microsoft JhengHei", "Heiti TC", "WenQuanYi Micro Hei", sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  header.mast {
+    border-top: 3px solid var(--ink);
+    padding-top: 18px;
+    margin-bottom: 28px;
+  }
+  .kicker {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 0 0 10px;
+    font-size: 34px;
+    line-height: 1.2;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+  }
+  .dek { margin: 0; color: var(--muted); max-width: 68ch; }
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin: 22px 0 8px;
+    font-size: 14px;
+  }
+  nav a { color: var(--ink); text-underline-offset: 3px; }
+  h2 {
+    margin: 42px 0 12px;
+    font-size: 22px;
+    line-height: 1.3;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+  }
+  h3 { margin: 22px 0 8px; font-size: 17px; font-weight: 650; }
+  p { margin: 0 0 12px; max-width: 72ch; }
+  a { color: var(--blue); }
+  .verdict {
+    border-left: 4px solid var(--amber);
+    background: #f7f1e4;
+    padding: 14px 16px 4px;
+    margin: 8px 0 22px;
+  }
+  .verdict strong { font-weight: 650; }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 8px 0 6px;
+  }
+  .stat {
+    border-top: 1px solid var(--ink);
+    padding-top: 8px;
+  }
+  .stat b {
+    display: block;
+    font-size: 26px;
+    line-height: 1.15;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+  }
+  .stat span { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; margin-top: 4px; }
+  .tablewrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin: 8px 0 6px;
+  }
+  .tablewrap table { min-width: 760px; }
+  th, td {
+    text-align: right;
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th:first-child, td:first-child { text-align: left; }
+  thead th {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line-strong);
+  }
+  tbody th { font-weight: 600; }
+  tr.decision { background: #eef3ef; }
+  .note { color: var(--muted); font-size: 13px; max-width: 78ch; }
+  .legend { display: flex; gap: 18px; font-size: 13px; color: var(--muted); margin: 4px 0 8px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; }
+  figure { margin: 8px 0 4px; }
+  figure svg { width: 100%; height: auto; display: block; border: 1px solid var(--line); }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .yeartables {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    margin-top: 16px;
+  }
+  table.years td, table.years th { padding: 5px 8px; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .stack {
+    display: flex;
+    height: 22px;
+    width: 100%;
+    margin: 8px 0 6px;
+    border: 1px solid var(--line-strong);
+  }
+  .stack span { display: block; height: 100%; }
+  article.finding {
+    border-top: 1px solid var(--line);
+    padding: 14px 0 6px;
+  }
+  .tag {
+    display: inline-block;
+    min-width: 2.2em;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-right: 8px;
+  }
+  .p0 { color: var(--red); }
+  .p1 { color: var(--amber); }
+  .p2 { color: var(--blue); }
+  ol.follow { padding-left: 1.2em; max-width: 72ch; }
+  ol.follow li { margin: 0 0 8px; }
+  footer {
+    margin-top: 42px;
+    padding-top: 14px;
+    border-top: 1px solid var(--ink);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.92em;
+  }
+  @media (max-width: 800px) {
+    body { padding: 24px 16px 48px; }
+    h1 { font-size: 28px; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .yeartables { grid-template-columns: 1fr; gap: 0; }
+  }
+  @media print {
+    body { max-width: none; background: white; }
+    a { color: inherit; text-decoration: none; }
+    nav { display: none; }
+  }
+</style>
+</head>
+<body>
+<header class="mast">
+  <p class="kicker">外部審查備忘 · 台北 2026-11-14</p>
+  <h1>M5 Dual-C V4.1<br>自籌資帳本審查</h1>
+  <p class="dek">對象是 <code>m5_dual_c_v4_audit_pack_remote.zip</code>：獨立腳本、審查說明、以及作者附上的 2006–2026 實測 JSON。合成模式已在審查環境重跑。本地 Parquet 不在包內，全期倍數未經重算。</p>
+  <nav>
+    <a href="#verdict">判決</a>
+    <a href="#perf">績效</a>
+    <a href="#years">逐年</a>
+    <a href="#stress">壓力測試</a>
+    <a href="#findings">問題</a>
+    <a href="#holds">已核對</a>
+    <a href="#next">下一步</a>
+  </nav>
+</header>
+
+<section id="verdict">
+  <div class="verdict">
+    <p><strong>判決。</strong>未來列偷看與隔夜跳空歸屬，在這支腳本裡站得住：合成 T1–T9 為 9/9 通過，截斷後淨值差為 0。這份包不足以簽「零前瞻，而且會計與實盤完整」。連續部位 26.12% 年化是作者那份樣本的結果；對數財富的 53.7% 來自 2017、2023、2025 與 2026 年至 11 月 6 日。</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>9/9</b><span>合成單元測試，本次重跑</span></div>
+    <div class="stat"><b>24.99%</b><span>張數取整全期 CAGR，實盤該看的數字</span></div>
+    <div class="stat"><b>53.7%</b><span>四個多頭年佔連續部位對數財富</span></div>
+    <div class="stat"><b>0</b><span>實測強平次數，兩袖套合計</span></div>
+  </div>
+  <p class="note">檔案 40,639 bytes，擁有者 zxc50275，上傳 2026-11-14 17:45（台北）。評估窗 2007-01-02 至 2026-11-06，19.25 個 252 日年。Sharpe 的無風險利率是程式內的 1.5%。</p>
+</section>
+
+<section id="perf">
+  <h2>樣本內績效</h2>
+  <p>逐年報酬連乘、以及 H1 倍數乘 H2 倍數，都等於下表的全期倍數。說明書上的四捨五入與 JSON 一致。OpenKing 與 AutoMega 在 2007–2015 年報酬相同，2016 年之後才分開，和「權王剔除要等個股期貨資格」一致。</p>
+  <div class="tablewrap"><table>
+    <thead>
+      <tr><th>模型</th><th>倍數</th><th>CAGR</th><th>MDD</th><th>Sharpe</th><th>Sortino</th><th>Calmar</th><th>H1 CAGR</th><th>H2 CAGR</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>OpenKing 連續 1,000 萬</th><td>87.04x</td><td>26.12%</td><td>25.13%</td><td>1.08</td><td>1.58</td><td>1.04</td><td>12.67%</td><td>41.65%</td></tr>
+      <tr class="decision"><th>OpenKing 兩戶各 500 萬、張數取整</th><td>73.21x</td><td>24.99%</td><td>23.37%</td><td>1.07</td><td>1.58</td><td>1.07</td><td>11.40%</td><td>40.71%</td></tr>
+      <tr><th>AutoMega 連續</th><td>83.91x</td><td>25.88%</td><td>25.20%</td><td>1.06</td><td>1.56</td><td>1.03</td><td>12.67%</td><td>41.10%</td></tr>
+      <tr><th>AutoMega 張數取整</th><td>69.82x</td><td>24.68%</td><td>23.67%</td><td>1.05</td><td>1.55</td><td>1.04</td><td>11.25%</td><td>40.21%</td></tr>
+      <tr><th>加權股價報酬指數</th><td>10.26x</td><td>12.86%</td><td>56.02%</td><td>0.65</td><td>0.90</td><td>0.23</td><td>5.62%</td><td>20.83%</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">標底色的那一列含現股 1,000 股與個股期貨 2,000 股的整數張。連續部位是同一規則的上界。H1 為 2007–2016，H2 為 2017–2026。H1 的 Sharpe 約 0.70，H2 約 1.36。</p>
+  <p>同一支程式在合成市場（2017-01-03 至 2022-10-03，60 檔，固定種子）的連續部位是 1.66 倍、CAGR 8.92%、MDD 19.87%、Sharpe 0.61。26% 是作者那份台股樣本印出來的數字。</p>
+</section>
+
+<section id="years">
+  <h2>逐年報酬</h2>
+  <div class="legend">
+    <span><i class="swatch" style="background:#1f4d3a"></i>M5 OpenKing 連續部位</span>
+    <span><i class="swatch" style="background:#a39e92"></i>加權股價報酬指數</span>
+  </div>
+  <figure>
+    <svg viewBox="0 0 960 360" role="img" aria-label="2007 至 2026 年報酬，M5 OpenKing 連續部位與加權股價報酬指數">
+<rect width="100%" height="100%" fill="#fbfaf6"/>
+<line x1="46" y1="33.0" x2="948" y2="33.0" stroke="#e4dfd4" stroke-width="1"/>
+<text x="38" y="36.0" text-anchor="end" font-size="11" fill="#6f6a60">100</text>
+<line x1="46" y1="128.0" x2="948" y2="128.0" stroke="#e4dfd4" stroke-width="1"/>
+<text x="38" y="131.0" text-anchor="end" font-size="11" fill="#6f6a60">50</text>
+<line x1="46" y1="223.0" x2="948" y2="223.0" stroke="#e4dfd4" stroke-width="1"/>
+<text x="38" y="226.0" text-anchor="end" font-size="11" fill="#6f6a60">0</text>
+<line x1="46" y1="299.0" x2="948" y2="299.0" stroke="#e4dfd4" stroke-width="1"/>
+<text x="38" y="302.0" text-anchor="end" font-size="11" fill="#6f6a60">-40</text>
+<line x1="46" y1="223.0" x2="948" y2="223.0" stroke="#1c1915" stroke-width="1"/>
+<rect x="54.35" y="154.30" width="13.0" height="68.70" fill="#1f4d3a"/>
+<rect x="69.75" y="199.26" width="13.0" height="23.74" fill="#a39e92"/>
+<text x="68.5" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">07</text>
+<rect x="99.45" y="223.00" width="13.0" height="12.10" fill="#1f4d3a"/>
+<rect x="114.85" y="223.00" width="13.0" height="81.83" fill="#a39e92"/>
+<text x="113.6" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">08</text>
+<rect x="144.55" y="124.15" width="13.0" height="98.85" fill="#1f4d3a"/>
+<rect x="159.95" y="64.64" width="13.0" height="158.36" fill="#a39e92"/>
+<text x="158.8" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">09</text>
+<rect x="189.65" y="223.00" width="13.0" height="6.13" fill="#1f4d3a"/>
+<rect x="205.05" y="197.21" width="13.0" height="25.79" fill="#a39e92"/>
+<text x="203.9" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">10</text>
+<rect x="234.75" y="223.00" width="13.0" height="10.36" fill="#1f4d3a"/>
+<rect x="250.15" y="223.00" width="13.0" height="34.16" fill="#a39e92"/>
+<text x="249.0" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">11</text>
+<rect x="279.85" y="205.66" width="13.0" height="17.34" fill="#1f4d3a"/>
+<rect x="295.25" y="198.41" width="13.0" height="24.59" fill="#a39e92"/>
+<text x="294.1" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">12</text>
+<rect x="324.95" y="184.78" width="13.0" height="38.22" fill="#1f4d3a"/>
+<rect x="340.35" y="194.23" width="13.0" height="28.77" fill="#a39e92"/>
+<text x="339.2" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">13</text>
+<rect x="370.05" y="192.40" width="13.0" height="30.60" fill="#1f4d3a"/>
+<rect x="385.45" y="201.36" width="13.0" height="21.64" fill="#a39e92"/>
+<text x="384.2" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">14</text>
+<rect x="415.15" y="192.59" width="13.0" height="30.41" fill="#1f4d3a"/>
+<rect x="430.55" y="223.00" width="13.0" height="13.06" fill="#a39e92"/>
+<text x="429.4" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">15</text>
+<rect x="460.25" y="218.58" width="13.0" height="4.42" fill="#1f4d3a"/>
+<rect x="475.65" y="193.38" width="13.0" height="29.62" fill="#a39e92"/>
+<text x="474.5" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">16</text>
+<rect x="505.35" y="77.57" width="13.0" height="145.43" fill="#1f4d3a"/>
+<rect x="520.75" y="185.91" width="13.0" height="37.09" fill="#a39e92"/>
+<text x="519.5" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">17</text>
+<rect x="550.45" y="223.00" width="13.0" height="5.05" fill="#1f4d3a"/>
+<rect x="565.85" y="223.00" width="13.0" height="9.17" fill="#a39e92"/>
+<text x="564.6" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">18</text>
+<rect x="595.55" y="158.56" width="13.0" height="64.44" fill="#1f4d3a"/>
+<rect x="610.95" y="168.05" width="13.0" height="54.95" fill="#a39e92"/>
+<text x="609.8" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">19</text>
+<rect x="640.65" y="161.91" width="13.0" height="61.09" fill="#1f4d3a"/>
+<rect x="656.05" y="171.47" width="13.0" height="51.53" fill="#a39e92"/>
+<text x="654.9" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">20</text>
+<rect x="685.75" y="152.82" width="13.0" height="70.18" fill="#1f4d3a"/>
+<rect x="701.15" y="171.58" width="13.0" height="51.42" fill="#a39e92"/>
+<text x="699.9" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">21</text>
+<rect x="730.85" y="223.00" width="13.0" height="33.81" fill="#1f4d3a"/>
+<rect x="746.25" y="223.00" width="13.0" height="35.49" fill="#a39e92"/>
+<text x="745.0" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">22</text>
+<rect x="775.95" y="83.82" width="13.0" height="139.18" fill="#1f4d3a"/>
+<rect x="791.35" y="163.18" width="13.0" height="59.82" fill="#a39e92"/>
+<text x="790.1" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">23</text>
+<rect x="821.05" y="170.92" width="13.0" height="52.08" fill="#1f4d3a"/>
+<rect x="836.45" y="162.71" width="13.0" height="60.29" fill="#a39e92"/>
+<text x="835.2" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">24</text>
+<rect x="866.15" y="68.29" width="13.0" height="154.71" fill="#1f4d3a"/>
+<rect x="881.55" y="167.00" width="13.0" height="56.00" fill="#a39e92"/>
+<text x="880.4" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">25</text>
+<rect x="911.25" y="36.52" width="13.0" height="186.48" fill="#1f4d3a"/>
+<rect x="926.65" y="148.33" width="13.0" height="74.67" fill="#a39e92"/>
+<text x="925.4" y="344" text-anchor="middle" font-size="11" fill="#6f6a60">26*</text>
+</svg>
+    <figcaption>縱軸是該曆年簡單報酬（%）。橫軸為西元末兩碼。2026* 只到 2026-11-06，未年化。來源：v4_verified_audit_results.json 的 M5_OpenKing_10M_Continuous 與 TAIEX_Total_Return_BH。</figcaption>
+  </figure>
+  <div class="yeartables">
+    <table class='years'><thead><tr><th>年</th><th>策略</th><th>指數</th></tr></thead><tbody><tr><th>2007</th><td class='pos'>+36.16%</td><td class='pos'>+12.50%</td></tr>
+<tr><th>2008</th><td class='neg'>-6.37%</td><td class='neg'>-43.07%</td></tr>
+<tr><th>2009</th><td class='pos'>+52.03%</td><td class='pos'>+83.34%</td></tr>
+<tr><th>2010</th><td class='neg'>-3.22%</td><td class='pos'>+13.57%</td></tr>
+<tr><th>2011</th><td class='neg'>-5.45%</td><td class='neg'>-17.98%</td></tr>
+<tr><th>2012</th><td class='pos'>+9.13%</td><td class='pos'>+12.94%</td></tr>
+<tr><th>2013</th><td class='pos'>+20.12%</td><td class='pos'>+15.14%</td></tr>
+<tr><th>2014</th><td class='pos'>+16.10%</td><td class='pos'>+11.39%</td></tr>
+<tr><th>2015</th><td class='pos'>+16.01%</td><td class='neg'>-6.87%</td></tr>
+<tr><th>2016</th><td class='pos'>+2.32%</td><td class='pos'>+15.59%</td></tr></tbody></table>
+    <table class='years'><thead><tr><th>年</th><th>策略</th><th>指數</th></tr></thead><tbody><tr><th>2017</th><td class='pos'>+76.54%</td><td class='pos'>+19.52%</td></tr>
+<tr><th>2018</th><td class='neg'>-2.66%</td><td class='neg'>-4.83%</td></tr>
+<tr><th>2019</th><td class='pos'>+33.91%</td><td class='pos'>+28.92%</td></tr>
+<tr><th>2020</th><td class='pos'>+32.15%</td><td class='pos'>+27.12%</td></tr>
+<tr><th>2021</th><td class='pos'>+36.93%</td><td class='pos'>+27.06%</td></tr>
+<tr><th>2022</th><td class='neg'>-17.79%</td><td class='neg'>-18.68%</td></tr>
+<tr><th>2023</th><td class='pos'>+73.25%</td><td class='pos'>+31.48%</td></tr>
+<tr><th>2024</th><td class='pos'>+27.41%</td><td class='pos'>+31.73%</td></tr>
+<tr><th>2025</th><td class='pos'>+81.43%</td><td class='pos'>+29.47%</td></tr>
+<tr><th>2026*</th><td class='pos'>+98.15%</td><td class='pos'>+39.30%</td></tr></tbody></table>
+  </div>
+  <h3>對數財富從哪裡來</h3>
+  <p>連續部位 87.04 倍的 log(1+r) 裡，四個年份合計 53.7%。把這四年換成同期加權報酬指數，全期約 22.4 倍、CAGR 約 17.5%。</p>
+  <div class="stack" aria-hidden="true"><span style="width:15.3112%;background:#6e2c2c" title="2026* 15.3%"></span><span style="width:13.3371%;background:#8a5a12" title="2025 13.3%"></span><span style="width:12.7262%;background:#1f4d3a" title="2017 12.7%"></span><span style="width:12.3050%;background:#3d4f66" title="2023 12.3%"></span><span style="width:46.3204%;background:#d9d3c7" title="其餘 16 年 46.3%"></span></div>
+  <p class="note">2026* 15.3% · 2025 13.3% · 2017 12.7% · 2023 12.3% · 其餘 16 年 46.3%。深色四段是 2026、2025、2017、2023，依對數貢獻由大到小。</p>
+</section>
+
+<section id="stress">
+  <h2>台積電 −75% 壓力測試</h2>
+  <p>2023-01-03 至 2026-11-06，2330 收盤被平滑打到起點的 1/4：425.47 收到 106.37。作者以固定權重 35% 調整加權指數的日報酬。四種架構的 2330 持股天數與最大權重都是 0%。</p>
+  <div class="tablewrap"><table>
+    <thead>
+      <tr><th>架構</th><th>持有日</th><th>現金日</th><th>平均曝險</th><th>CAGR</th><th>MDD</th><th>Sharpe</th><th>2330 權重</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>M1 只看台指 · OpenKing</th><td>63.3%</td><td>36.7%</td><td>58.9%</td><td>59.63%</td><td>18.62%</td><td>1.86</td><td>0</td></tr>
+      <tr><th>M5 Dual-C · OpenKing</th><td>77.1%</td><td>22.9%</td><td>71.0%</td><td>61.51%</td><td>19.65%</td><td>1.79</td><td>0</td></tr>
+      <tr><th>M1 只看台指 · AutoMega</th><td>63.3%</td><td>36.7%</td><td>58.9%</td><td>59.93%</td><td>18.68%</td><td>1.86</td><td>0</td></tr>
+      <tr><th>M5 Dual-C · AutoMega</th><td>77.1%</td><td>22.9%</td><td>71.0%</td><td>61.89%</td><td>19.69%</td><td>1.80</td><td>0</td></tr>
+    </tbody>
+  </table></div>
+  <p>進場條件要求 60 日與 120 日報酬為正、收盤在 60 日均線之上，一條往下的路徑進不了池。ExKing 指數在建構時剔除動態權王，所以這段 −75% 留在第二條腿之外。M5 取 <code>max(C(台指), 0.90 × C(ExKing))</code>。權王下跌時，ExKing 仍用其餘股票的真實路徑。M5 在這段的持有日高於只看台指的 M1，CAGR 也更高。這組數字說明第二條腿看不到權王崩盤。</p>
+  <p class="note">同期加權報酬指數是 3.12 倍。連續部位策略在真實路徑的 2023–2026 是 7.94 倍。JSON 沒有寫出衝擊後的真實台指終值，也沒有基準路徑的 2330 權重。</p>
+</section>
+
+<section id="findings">
+  <h2>問題</h2>
+
+  <article class="finding">
+    <h3><span class="tag p0">P0</span>壓力測試沒有打到組合</h3>
+    <p>2330 持股為 0，ExKing 剔除權王，M5 在權王下跌時改靠另一條腿。61% 的壓力年化是其餘股票在 2023–2026 真實多頭裡的報酬，加上部位疊加。把它讀成「諾基亞情境下組合還在」會高估這條規則的防護。</p>
+  </article>
+
+  <article class="finding">
+    <h3><span class="tag p1">P1</span>淨值對帳是同一條式子</h3>
+    <p><code>nav_close</code> 與 <code>reconciled</code> 都是銀行現金 + 期貨保證金現金 + 現股市值。<code>nav_reconcile_max_err = 0</code> 由此而來。現金未出現負值，那個檢查是有效的，對帳數字本身沒有獨立資訊。</p>
+  </article>
+
+  <article class="finding">
+    <h3><span class="tag p1">P1</span>財報過期後，基本面濾網重新放行</h3>
+    <p>超過 190 個日曆日的營業利益率被改成缺值。<code>opm_ok</code> 把缺值當成通過。最後一季為負、或停止申報的公司，過期後可以再買。正常季報間隔短於 190 日，所以準時申報的公司不會被這條誤殺；漏報的公司會。</p>
+  </article>
+
+  <article class="finding">
+    <h3><span class="tag p1">P1</span>用的是法定截止日，不是公告時間</h3>
+    <p>2013 年之後大約是 Q1 的 5 月 17 日、Q2 的 8 月 16 日、Q3 的 11 月 16 日、年報的次年 4 月 2 日。KY 自 2021 年第二季起，Q2 改到 9 月 1 日。準時公告時，截止日略晚於法規，方向偏保守。逾期公告會在市場看到數字之前進信號。包內沒有公告時間戳，這條的幅度無法在此量化。</p>
+  </article>
+
+  <article class="finding">
+    <h3><span class="tag p1">P1</span>個股期貨用現股開盤價成交</h3>
+    <p>帳本把期貨的跳空、開倉與平倉都記在現股 <code>Open[t]</code>。夜盤、08:45 開盤與基差沒有進模型。隔夜損益因此等於現股跳空。</p>
+  </article>
+
+  <article class="finding">
+    <h3><span class="tag p1">P1</span>漲跌停閘門只用前收</h3>
+    <p>2015-06-01 之前 6.8%，之後 9.5%，比較基準是前一日收盤。除權息參考價與處置股較窄的漲跌幅沒有分開。處置股禁止加碼，減碼仍假設能在開盤價成交。帳本沒有讀當日最高價，下午 <code>H = L</code> 的解鎖不會被拿來放行早盤。</p>
+  </article>
+
+  <article class="finding">
+    <h3><span class="tag p1">P1</span>六次下市都走健康併購</h3>
+    <p>連續部位 OpenKing 的下市事件是 6，健康併購減記也是 6。條件是最後價高於 60 日均線、距 52 週高 20% 以內、價格至少 20 元，然後按最後收盤扣證交稅與手續費出場。動能持股很容易整段命中。張數取整版本是 4 次，同樣全部記成健康。盤中風險指標強平與收盤維持保證金強平在實測都是 0。T7 要把期貨目標槓桿調到 3.33 倍才打得到維持保證金那條分支；正式上限是現股 1.0 倍、期貨 1.25 倍、保證金緩衝 30%。</p>
+  </article>
+
+  <article class="finding">
+    <h3><span class="tag p1">P1</span>存活者偏差與復權，這份包證明不了</h3>
+    <p>腳本本身不會刪股票。5,097 個交易日 × 2,142 檔、以及「含下市櫃」是作者對資料庫的聲明。前復權是否含息、成交量有沒有跟著調整，也要看沒有附上的 Parquet。</p>
+  </article>
+
+  <article class="finding">
+    <h3><span class="tag p2">P2</span>Jensen 那段只涵蓋 ATR</h3>
+    <p>成分股日內高點的橫斷面平均，大於等於等權籃子的同步高點。等號可以成立。ATR 因此偏高，只在價格乖離 60 日均線超過 4%、且動作不是 restore 時，把多頭槓桿調低。另一個方向更大：ExKing 是每日再平衡的等權平均，再平衡有溢酬；當天缺少完整 OHLC 的股票會被移出平均。這兩項把 ExKing 的收盤墊高，C(ExKing) 更容易留在多頭。</p>
+  </article>
+
+  <article class="finding">
+    <h3><span class="tag p2">P2</span>缺值報酬先填 0，再算下行波動</h3>
+    <p><code>pct_change</code> 之後 <code>fillna(0)</code>。停牌日變成零報酬，下行波動被壓低，逆波動權重偏高。上漲日占比不會把 0 算成上漲日。</p>
+  </article>
+
+  <article class="finding">
+    <h3><span class="tag p2">P2</span>參數密度與樣本切分</h3>
+    <p>池寬、八檔、分數權重、持有遲滯、C-Route 的一組常數、ExKing 的 0.90、現貨 1.0 與期貨 1.25，都進了同一條樣本。H1 的 CAGR 是 12.67%，H2 是 41.65%。2008 年策略 −6.37%、指數 −43.07%，2009 年策略 +52.03%、指數 +83.34%，這兩年看起來像趨勢濾網。H2 的斜率需要一段沒碰過的樣本才能再相信。</p>
+  </article>
+</section>
+
+<section id="holds">
+  <h2>程式裡核對過、站得住的部分</h2>
+  <p>選股分數用到 t 日收盤，下單讀 t−1 列，在 <code>Open[t]</code> 成交。C-Route-A 的曝險在迴圈裡讀前一根指標。ExKing 的成分是前一日已確認的流動池。漲停買進與跌停賣出只看 09:00 開盤對前收。雙週週三與第三次週三轉倉只依賴當日與前一日曆，月中截斷不變。</p>
+  <p>現貨先賣後買。買進依賣出後的現金，以及 30% 名目的期貨保證金緩衝縮放。利息只計未占用的銀行現金，期貨保證金專戶不計息。個股期貨損益留在保證金現金，淨值不加期貨名目。轉倉成本按說明書的 0.28%（價差 0.10% 加上雙邊稅、手續費與滑價）。2010-01-25 之前的期貨名目在診斷裡必須為 0，測試有查。</p>
+  <p>T1 的 252 日冷卻、T2 的 2009Q4 與 2010Q1 撞在 2010-05-03 並保留較新的一季、KY 在 2021-08-16 仍是舊值而 2021-09-01 才換成 Q2、T3 與 T4 的當日 ±50% 衝擊、T5 的隔夜 +5% 不進當日報酬、T8 要滿 15 根缺收盤才結算、T9 的整條管線截斷，測的都是它們標題上的那件事。T6 的斷言比較鬆，只要求計數器為 0、以及跌停那天報酬為正。T7 的強平用的是正式參數之外的 3.33 倍。</p>
+  <p class="note">本地模式 JSON 寫著 2020-06-30 真實資料截斷的淨值差也是 0。那一行是作者跑完存下來的，這次沒有資料可重跑。</p>
+</section>
+
+<section id="next">
+  <h2>若要再簽一輪，先做這三件</h2>
+  <ol class="follow">
+    <li>營業利益率改接實際公告日。過期改成拒絕，而不是把缺值放行進場。</li>
+    <li>壓力測試讓權王留在指數與持股裡，並把其餘股票的路徑一起縮放。同時交出基準路徑的 2330 權重與衝擊後的台指終值。</li>
+    <li>淨值改由期初現金，加上現貨損益、期貨損益、稅費、轉倉與利息回推。容許誤差用金額，和帳上淨值比。</li>
+  </ol>
+</section>
+
+<footer>
+  <p>審查依據：壓縮檔內 <code>m5_dual_c_v4_standalone_audit.py</code>（2,184 行）、<code>AUDIT_DOSSIER_REMOTE_AI.md</code>、<code>v4_verified_audit_results.json</code>。合成命令 <code>python m5_dual_c_v4_standalone_audit.py --mode synthetic</code>，9/9 通過，耗時約 5 秒。本頁數字除合成重跑外，全期與壓力測試引自該 JSON，並已核對連乘與 CAGR。</p>
+  <p>本頁是單一 HTML，無外部腳本、字型或圖片。列印時導覽列會隱藏。</p>
+</footer>
+</body>
+</html>
