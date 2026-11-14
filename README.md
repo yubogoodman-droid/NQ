@@ -123,6 +123,27 @@ python3 examples/watch_binance_ribbon.py --backtest 7   # 回測近 7 天（原�
 python3 examples/test_watch_binance_ribbon.py           # 離線單元測試
 ```
 
+## 幣安橫盤壓縮爆量起漲點 Telegram（`watch_binance_ignition.py`）
+
+1 分鐘圖：專抓死魚窄幅橫盤後**第一根實體爆量收穿平台**的起漲點（例如 `EVAAUSDT` 2026-11-14 22:10 從 `1.154` 收穿 `1.1698`、下一根 `1.2075` 觸價進場），排除長上影假突破針與高位追高：
+- **橫盤壓縮未追高**：前 2 小時高低振幅 `2.0%–6.5%`、前 6 小時振幅 `≤ 12%`、前 2 小時均量 `≤ 8 萬 USDT/m`（排除高位寬幅震盪與權值幣）
+- **真突破實體棒**：收盤高出前 2 小時箱頂 `≥ 0.60%`、收在當根振幅上緣 `≥ 72%`、當根漲幅 `1.5%–7.0%`
+- **黃金點火量能與主動買盤**：當根成交額 `≥ 15 萬 USDT`、相對前 20m 均量 `7.5x–55x`（排除 `>55x` 單根消息面極端倒貨針）、主動吃單買盤佔比 `≥ 56%`
+- **均線墊高與執行**：`收盤 > MA200`、`MA25 > MA99`、`MA200` 近 1 小時斜率 `≥ 0`；4 分鐘內突破起漲棒高點觸價進場（先跌回箱頂下緣則取消），初始停損守起漲棒低點（上限 `3.0%`），漲滿 `+4.5%` 停損推保本 `+1.0%`、漲滿 `+10%` 改守高點回撤 `7.5%` 吊燈移動停利（最長 60 分鐘）。
+
+實證驗證（已扣 `0.10%` 來回手續費與滑價、同根 K 先判停損）：
+- 跨 45 天（10 月訓練 31 天 `PF 1.70`、11/01–11/14 樣本外 14 天 `PF 3.83`）：合計 **48 筆、平均 `+1.945%`、PF `2.27`、累計 `+93.34%`**。
+- 全市場 368 檔純幣永續近 7 天（2026-11-07 → 11-14）：**14 筆、勝率 `50.0%`、平均 `+4.11%`、PF `3.97`、累計 `+57.54%`**（含 `EVAAUSDT` `22:10` 起漲進 `1.2075` → `+55.08%`、`CYBERUSDT` `+12.38%`）。
+
+```bash
+python3 examples/watch_binance_ignition.py --test                         # 測試 Telegram 通不通
+python3 examples/watch_binance_ignition.py                                # 每根 1m 收盤監看（增量快取）
+python3 examples/watch_binance_ignition.py --once                         # 只掃剛收盤這一分
+python3 examples/watch_binance_ignition.py --symbol EVAAUSDT --replay 240 # 回放單幣抓起漲點並輸出 K 線圖
+python3 examples/watch_binance_ignition.py --backtest 7                   # 回測近 7 天全市場表現
+python3 examples/test_watch_binance_ignition.py                          # 離線單元測試
+```
+
 ## 快速開始
 
 ```bash
