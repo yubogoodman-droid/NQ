@@ -96,10 +96,17 @@ python3 examples/test_tw_1h_reclaim.py
 
 月報預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/tw-1h-reclaim-30d/view.html
 
-## 幣安黏帶三幕 Telegram
+## 幣安黏帶三幕 Telegram（活盤優化版）
 
-1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開，會推 Telegram。  
-約 15–25 分鐘後若走出「長均更黏、短均被帶走」（NBIS 那種），會再推一則**強訊號**（帶圖）。
+1 分鐘圖：圓 U 吻上 MA99/120/200 黏帶後放量離開。預設啟用**零未來函數優化濾網**，推播時附上 K 線圖、過高觸價進場價與圓底停損價：
+- 離開 K 收在當根振幅上緣 ≥ 70%（不留長上影倒貨）且收過吻後高點
+- 前 2 小時高低跌幅 ≥ 1.2%（排除死魚橫盤）、MA200 斜率開始拐頭向上、量能 `1.8x–6.0x`（排除極端爆量針）
+- 大盤 `BTCUSDT` 1m 收盤在 `MA25` 之上
+- 執行：離開後 4 分鐘內突破離開 K 高點觸價進場（先跌破黏帶則取消），停損守圓底 40 根低點（上限 1.6%），不設緊停利、抱滿 60 分鐘收盤出場。
+
+跨兩段共 51 天驗證（已扣 0.08% 來回手續費、同根 K 先判停損）：
+- 原始離開（30m 無停損）：8/15–9/05 樣本外 182 筆平均 `-0.006%`（PF `0.98`）、10/15–11/14 近一個月 199 筆平均 `+0.067%`。
+- 優化過高進 + 圓底停損 + 60m：8/15–9/05 樣本外 **42 筆、平均 `+0.304%`、PF `2.03`**；10/15–11/14 近一個月 **53 筆、平均 `+0.317%`、PF `2.08`**（51 天合計 **95 筆、平均 `+0.311%`、PF `2.06`、累計 `+29.55%`**）。
 
 在 `examples/watch_binance_ribbon.py` 最上面填：
 
@@ -109,8 +116,11 @@ TELEGRAM_CHAT_ID = "..."
 ```
 
 ```bash
-python3 examples/watch_binance_ribbon.py --test   # 先測通不通
-python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
+python3 examples/watch_binance_ribbon.py --test         # 先測通不通
+python3 examples/watch_binance_ribbon.py                # 每根 1m 收盤掃一次（預設優化版）
+python3 examples/watch_binance_ribbon.py --raw          # 舊版未過濾離開全推
+python3 examples/watch_binance_ribbon.py --backtest 7   # 回測近 7 天（原始 vs 優化版）
+python3 examples/test_watch_binance_ribbon.py           # 離線單元測試
 ```
 
 ## 快速開始
