@@ -1,0 +1,96 @@
+//@version=5
+indicator("NQ 一分K 起漲點（糾結後連兩根站上MA200）", overlay=true, max_labels_count=200)
+
+// 模板：08-19 08:15。下跌後短均線收成一束，近 12 根還在窄箱，
+// 5>10>20>30，連兩根收在 MA200 上，且 100/120 都在 200 下面。
+// 第一根站上還不進。不要追已經噴遠或放量長綠。
+
+maxWick       = input.float(15.0, "下影修剪（點，0=不修）", minval=0, step=1)
+maxBody       = input.float(20.0, "進場 K 最大實體（點，0=不限）", minval=0, step=1)
+maxRibbon     = input.float(20.0, "短均線最大帶寬（MA5–MA60）", minval=0, step=2)
+maxExt        = input.float(15.0, "收盤最多高出 MA200（點）", minval=0, step=1)
+boxBars       = input.int(12, "盤整回看 K 數", minval=4, maxval=30)
+minBox        = input.float(10.0, "盤整最小區間（點）", minval=0, step=1)
+maxBox        = input.float(40.0, "盤整最大區間（點）", minval=5, step=2)
+requireFalling = input.bool(false, "MA200 近 20 根仍在往下")
+minDrop       = input.float(0.0, "近 60 根至少先跌（點，0=不限）", minval=0, step=5)
+minBelow      = input.int(0, "進場前至少幾根收在 MA200 下（0=不限）", minval=0, maxval=20)
+minHug        = input.int(0, "近 12 根至少幾根貼著 MA200（0=不限）", minval=0, maxval=12)
+hugDist       = input.float(8.0, "貼著 MA200 的距離（點）", minval=1, step=1)
+stopLookback  = input.int(20, "停損回看 K 數", minval=5, maxval=60)
+stopBuffer    = input.float(5.0, "停損低於回看低點（點）", minval=0, step=1)
+targetR       = input.float(2.0, "目標 R 倍數", minval=1.0, step=0.5)
+trailAfterR   = input.float(1.0, "移動停利啟動（R）", minval=0, step=0.1)
+trailLockR    = input.float(0.3, "移動後鎖利（R）", minval=0, step=0.1)
+requireLongBelow = input.bool(true, "MA100 與 MA120 都要在 MA200 下方")
+requireM5        = input.bool(true, "5分當時要站上 MA20 與 MA30")
+maxM5Below       = input.float(25.0, "5分最多低於 MA200（點，<0=不限）", step=5)
+
+ma5   = ta.sma(close, 5)
+ma10  = ta.sma(close, 10)
+ma20  = ta.sma(close, 20)
+ma30  = ta.sma(close, 30)
+ma60  = ta.sma(close, 60)
+ma100 = ta.sma(close, 100)
+ma120 = ta.sma(close, 120)
+ma200 = ta.sma(close, 200)
+
+body = close - open
+bodyLo = math.min(open, close)
+effLow = maxWick > 0 and (bodyLo - low > maxWick) ? bodyLo : low
+bodyOk = maxBody <= 0 or math.abs(body) <= maxBody
+stackOk = ma5 > ma10 and ma10 > ma20 and ma20 > ma30
+hold = stackOk and close > ma200
+longBelow = not requireLongBelow or (ma100 < ma200 and ma120 < ma200)
+fresh = na(ma200[2]) or close[2] <= ma200[2]
+ribbon = math.max(ma5, math.max(ma10, math.max(ma20, math.max(ma30, ma60)))) - math.min(ma5, math.min(ma10, math.min(ma20, math.min(ma30, ma60))))
+ribbonOk = maxRibbon <= 0 or ribbon <= maxRibbon
+extOk = maxExt <= 0 or (close - ma200) <= maxExt
+boxHi = ta.highest(high[1], boxBars)
+boxLo = ta.lowest(effLow[1], boxBars)
+boxRng = boxHi - boxLo
+boxOk = boxRng >= minBox and boxRng <= maxBox
+fallingOk = not requireFalling or ma200 < ma200[20]
+dropOk = minDrop <= 0 or (ta.highest(high[1], 60) - ta.lowest(low[1], 60) >= minDrop)
+belowCnt = 0
+for k = 2 to 40
+    if close[k] <= ma200[k]
+        belowCnt += 1
+    else
+        break
+belowOk = minBelow <= 0 or belowCnt >= minBelow
+hugN = 0
+for k = 1 to 12
+    hugN += math.abs(close[k] - ma200[k]) <= hugDist ? 1 : 0
+hugOk = hugN >= minHug
+[m5c, m5ma20, m5ma30, m5ma200] = request.security(syminfo.tickerid, "5", [close, ta.sma(close, 20), ta.sma(close, 30), ta.sma(close, 200)], lookahead=barmerge.lookahead_off)
+m5maOk = not requireM5 or ((na(m5ma20) or m5c > m5ma20) and (na(m5ma30) or m5c > m5ma30))
+m5deepOk = maxM5Below < 0 or na(m5ma200) or (m5c - m5ma200) > -maxM5Below
+breakout = hold and hold[1] and fresh and bodyOk and longBelow and longBelow[1] and ribbonOk and extOk and boxOk and fallingOk and dropOk and belowOk and hugOk and m5maOk and m5deepOk
+
+plot(ma5,   "MA5",   color=#ffa726, linewidth=1)
+plot(ma10,  "MA10",  color=#42a5f5, linewidth=1)
+plot(ma20,  "MA20",  color=#ec407a, linewidth=1)
+plot(ma30,  "MA30",  color=#26c6da, linewidth=1)
+plot(ma60,  "MA60",  color=#66bb6a, linewidth=1)
+plot(ma100, "MA100", color=#ffeb3b, linewidth=1)
+plot(ma120, "MA120", color=#ef5350, linewidth=1)
+plot(ma200, "MA200", color=#26a69a, linewidth=2)
+
+plotshape(breakout, title="起漲點", style=shape.triangleup, location=location.belowbar, color=color.new(#00e676, 0), size=size.small, text="起漲")
+
+var float stopLevel = na
+var float tgtLevel  = na
+var float trailLevel = na
+if breakout
+    swingLow = ta.lowest(effLow[1], stopLookback)
+    stopLevel := swingLow - stopBuffer
+    risk = close - stopLevel
+    tgtLevel := close + risk * targetR
+    trailLevel := trailAfterR > 0 ? close + risk * trailLockR : na
+
+plot(breakout ? stopLevel : na, "停損", color=color.red, style=plot.style_circles, linewidth=2)
+plot(breakout ? trailLevel : na, "移動鎖利", color=color.orange, style=plot.style_circles, linewidth=2)
+plot(breakout ? tgtLevel : na, "目標", color=color.lime, style=plot.style_circles, linewidth=2)
+
+alertcondition(breakout, title="NQ 起漲點", message="NQ 1分 糾結後連兩根站上MA200")
