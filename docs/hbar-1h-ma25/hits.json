@@ -22,7 +22,7 @@
     "max_ext": 0.4,
     "min_fail": 0.08,
     "max_fail": 0.18,
-    "min_range_break": 0.18,
+    "min_range_break": 0.22,
     "target_r": 2.0,
     "time_bars": 24,
     "scanned": 1,

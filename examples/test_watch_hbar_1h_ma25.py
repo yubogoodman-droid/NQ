@@ -76,14 +76,14 @@ def fake_break_then_fail(n: int = 150) -> dict:
     c[50:90] = 1.00
     h = c + 0.003
     l = c - 0.003
-    pump = [1.03, 1.07, 1.11, 1.15, 1.18, 1.17]
-    pump_h = [1.04, 1.09, 1.13, 1.17, 1.21, 1.18]
+    pump = [1.03, 1.08, 1.13, 1.17, 1.20, 1.18]
+    pump_h = [1.04, 1.10, 1.15, 1.19, 1.24, 1.20]
     a = 90
     for k, px in enumerate(pump):
         c[a + k] = px
         h[a + k] = pump_h[k]
         l[a + k] = px - 0.01
-    fade = [1.15, 1.13, 1.105, 1.09, 1.085, 1.08, 1.078, 1.075, 1.072, 1.055]
+    fade = [1.16, 1.14, 1.11, 1.095, 1.09, 1.085, 1.082, 1.078, 1.074, 1.060]
     fade_h = [x + 0.006 for x in fade]
     for k, px in enumerate(fade):
         c[a + 6 + k] = px
@@ -128,9 +128,10 @@ def test_detects_hbar_style_dump() -> None:
     assert sig.fail >= 0.05
     assert 1 <= sig.bars_after <= 36
     assert sig.peak_high >= 1.19
-    assert sig.range_break >= 0.18
+    assert sig.range_break >= 0.22
     assert sig.close_below <= 0.025
     assert sig.vol_ratio >= 1.8
+    assert sig.break_vol_ratio >= 0.35
     assert sig.ma7_below_ma14 >= 0.01
     assert sig.room_ma99 >= 0.07
     assert 0.15 <= sig.ext <= 0.40
@@ -184,6 +185,14 @@ def test_rejects_without_ma14_cap() -> None:
 def test_rejects_without_ma99_room() -> None:
     d = fake_break_then_fail()
     assert detect_signals(d, p=Params(min_room_ma99=0.35)) == []
+
+
+def test_rejects_dead_volume_breakdown() -> None:
+    d = fake_break_then_fail()
+    sig = detect_signals(d)[0]
+    d["v"][sig.i] = 100.0
+    d = indicators(d)
+    assert detect_signals(d) == []
 
 
 def test_simulate_short_and_html(tmp_path: Path | None = None) -> None:
@@ -302,6 +311,7 @@ def main() -> int:
     test_rejects_meme_extension()
     test_rejects_without_ma14_cap()
     test_rejects_without_ma99_room()
+    test_rejects_dead_volume_breakdown()
     test_simulate_short_and_html()
     test_filter_universe_keeps_liquid_and_hbar()
     test_skip_overlap_and_chart_pick()

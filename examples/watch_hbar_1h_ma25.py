@@ -10,9 +10,9 @@
   3. 高點相對當根 MA25 伸 15%～40%（HBAR 約 23%；不要 8% 輕觸，也不要 100% 妖幣）
   4. 從高點回落 8%～18%（HBAR 約 10%；剛失守，不是已經崩完）
   5. 隔 6～18 根才跌破（HBAR 12 根；要有一段派發）
-  6. 相對拉升前箱體（高點往前 48 根、扣掉最後 10 根尖峰）再高出 ≥ 18%
+  6. 相對拉升前箱體（高點往前 48 根、扣掉最後 10 根尖峰）再高出 ≥ 22%（HBAR 約 32%）
   7. 收盤離 MA25 不超過 2.5%（第一根跌破，不要追低）
-  8. MA25 仍在上（近 6 根至少 +1%），尖峰附近量能 ≥ 均量 1.8 倍
+  8. MA25 仍在上（近 6 根至少 +1%），尖峰附近量能 ≥ 均量 1.8 倍，跌破當根量能 ≥ 均量 0.35 倍（不能無量死魚滑落）
   9. 右肩已被短均壓住：MA7 比 MA14 低至少 1%、MA14 已下彎、連 4 根收在 MA14 下且近 2 根連上影都不過 MA14 +0.5%
  10. 尖峰到跌破中間沒提前跌破過 MA25，且下方離 MA99 還有 ≥ 7% 空間
 
@@ -24,6 +24,7 @@
   python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 7 --pages
   python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 30 --pages
   python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 180 --pages
+  python3 examples/watch_hbar_1h_ma25.py --backtest --universe --days 365 --pages
   python3 examples/test_watch_hbar_1h_ma25.py
 """
 from __future__ import annotations
@@ -66,13 +67,14 @@ MIN_FAIL = 0.08
 MAX_FAIL = 0.18
 MIN_BARS_AFTER = 6
 MAX_BARS_AFTER = 18
-MIN_RANGE_BREAK = 0.18
+MIN_RANGE_BREAK = 0.22
 RANGE_BASE_SKIP = 10
 MAX_CLOSE_BELOW = 0.025
 MIN_MA25_SLOPE = 0.01
 MA25_SLOPE_BARS = 6
 MIN_VOL_RATIO = 1.8
 VOL_LOOKBACK = 12
+MIN_BREAK_VOL_RATIO = 0.35
 MIN_MA14_STREAK = 4
 MIN_MA7_BELOW_MA14 = 0.01
 MA14_HIGH_BARS = 2
@@ -112,6 +114,7 @@ class Params:
     require_red: bool = True
     min_vol_ratio: float = MIN_VOL_RATIO
     vol_lookback: int = VOL_LOOKBACK
+    min_break_vol_ratio: float = MIN_BREAK_VOL_RATIO
     min_ma14_streak: int = MIN_MA14_STREAK
     min_ma7_below_ma14: float = MIN_MA7_BELOW_MA14
     require_ma14_falling: bool = True
@@ -137,6 +140,7 @@ class Signal:
     range_break: float = 0.0
     close_below: float = 0.0
     vol_ratio: float = 0.0
+    break_vol_ratio: float = 0.0
     ma7_below_ma14: float = 0.0
     room_ma99: float = 0.0
 
@@ -488,6 +492,14 @@ def detect_at(d: dict, i: int, p: Params | None = None) -> Signal | None:
     vr = _vol_ratio(d, peak, p)
     if vr is None or vr < p.min_vol_ratio:
         return None
+    break_vol_ratio = 0.0
+    if p.min_break_vol_ratio > 0:
+        v20_i = float(d["v20"][i]) if "v20" in d else float("nan")
+        if np.isnan(v20_i) or v20_i <= 0:
+            return None
+        break_vol_ratio = float(d["v"][i]) / v20_i
+        if break_vol_ratio < p.min_break_vol_ratio:
+            return None
     peak_high = float(d["h"][peak])
     peak_ma25 = float(d["m25"][peak])
     return Signal(
@@ -503,6 +515,7 @@ def detect_at(d: dict, i: int, p: Params | None = None) -> Signal | None:
         range_break=rb,
         close_below=close_below,
         vol_ratio=vr,
+        break_vol_ratio=break_vol_ratio,
         ma7_below_ma14=ma7_below_ma14,
         room_ma99=room_ma99,
     )
@@ -613,8 +626,9 @@ def summarize(trades: list[Trade]) -> dict:
     }
 
 
-def hm(ms: int) -> str:
-    return datetime.fromtimestamp(ms / 1000, TZ).strftime("%m-%d %H:%M")
+def hm(ms: int, with_year: bool = False) -> str:
+    fmt = "%Y-%m-%d %H:%M" if with_year else "%m-%d %H:%M"
+    return datetime.fromtimestamp(ms / 1000, TZ).strftime(fmt)
 
 
 def load_seen() -> set[str]:
@@ -844,10 +858,11 @@ def write_html(
             old.unlink()
     chart_ix = pick_chart_indices(trades, max_charts=max_charts)
     pad = 3 if len(trades) >= 100 else 2
+    wy = int(extra.get("days") or 0) > 200
     for i, t in enumerate(trades, 1):
-        et = hm(int(t.d["t"][t.entry_idx]))
-        xt = hm(int(t.d["t"][t.exit_idx]))
-        pk = hm(int(t.d["t"][t.signal.peak_i]))
+        et = hm(int(t.d["t"][t.entry_idx]), with_year=wy)
+        xt = hm(int(t.d["t"][t.exit_idx]), with_year=wy)
+        pk = hm(int(t.d["t"][t.signal.peak_i]), with_year=wy)
         cls = "pnl-win" if t.pnl_pct > 0 else ("pnl-flat" if t.pnl_pct == 0 else "pnl-loss")
         img_html = ""
         if (i - 1) in chart_ix:
@@ -913,8 +928,8 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 <section class="summary">
 <h1>{escape(str(title_scope))} 1h 假突破跌破 MA25 · 近 {extra['days']} 天</h1>
 <p class="muted">對齊 2026-09-29 HBAR 箱體假突破：高點離 MA25 {extra['min_ext']*100:g}～{extra.get('max_ext', 0.4)*100:g}%，
-從箱體再高出 ≥ {extra.get('min_range_break', 0.18)*100:g}%，回落 {extra['min_fail']*100:g}～{extra.get('max_fail', 0.18)*100:g}% 後，
-隔 6～18 根、右肩連 4 根壓在 MA14 下（近 2 根上影不過 MA14 +0.5%、MA14 下彎、MA7 死叉 MA14 ≥ 1%），且離 MA99 ≥ 7%，陰線第一次跌破 MA25（離均線 ≤ 2.5%）才算。
+從箱體再高出 ≥ {extra.get('min_range_break', 0.22)*100:g}%，回落 {extra['min_fail']*100:g}～{extra.get('max_fail', 0.18)*100:g}% 後，
+隔 6～18 根、右肩連 4 根壓在 MA14 下（近 2 根上影不過 MA14 +0.5%、MA14 下彎、MA7 死叉 MA14 ≥ 1%），離 MA99 ≥ 7% 且跌破量 ≥ 0.35× 均量，陰線第一次跌破 MA25（離均線 ≤ 2.5%）才算。
 <br/>收盤空；停在假突破高、目標 {extra['target_r']:g}R、或 {extra['time_bars']} 根時間停。同標的重疊不重做。加總％是各筆相加。
 <br/>{scanned_line}進場 {stats['count']} · 標的 {stats.get('symbols', extra.get('symbol', ''))}
 · 出場：2R {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)}
@@ -938,13 +953,14 @@ h1{{font-size:18px;margin:0 0 6px}} .muted{{color:#8b949e;font-size:13px;line-he
 
 def dump_hits(path: Path, trades: list[Trade], stats: dict, extra: dict) -> Path:
     rows = []
+    wy = int(extra.get("days") or 0) > 200
     for t in trades:
         rows.append(
             {
                 "symbol": t.symbol,
-                "entry_time": hm(int(t.d["t"][t.entry_idx])),
-                "exit_time": hm(int(t.d["t"][t.exit_idx])),
-                "peak_time": hm(int(t.d["t"][t.signal.peak_i])),
+                "entry_time": hm(int(t.d["t"][t.entry_idx]), with_year=wy),
+                "exit_time": hm(int(t.d["t"][t.exit_idx]), with_year=wy),
+                "peak_time": hm(int(t.d["t"][t.signal.peak_i]), with_year=wy),
                 "entry": t.entry,
                 "exit": t.exit,
                 "stop": t.stop,
@@ -986,7 +1002,8 @@ def backtest_one(
     start = next((i for i, ts in enumerate(d["t"]) if int(ts) >= cutoff), 0)
     sigs = detect_signals(d, start=start, p=p)
     trades = simulate(d, sigs, p=p, symbol=sym)
-    return sym, trades, len(sigs), hm(int(d["t"][start])) + " → " + hm(int(d["t"][-1])), True
+    wy = days > 200
+    return sym, trades, len(sigs), hm(int(d["t"][start]), with_year=wy) + " → " + hm(int(d["t"][-1]), with_year=wy), True
 
 
 def cmd_backtest(args) -> int:
@@ -1017,7 +1034,7 @@ def cmd_backtest(args) -> int:
     scanned = 0
     span = ""
     t0 = time.time()
-    workers = 1 if len(symbols) == 1 else (5 if limit > 1500 else 8)
+    workers = 1 if len(symbols) == 1 else (3 if limit > 4500 else (5 if limit > 1500 else 8))
     hist_qv = args.min_quote_vol if (args.universe and end_ms is not None) else 0.0
     with ThreadPoolExecutor(workers) as ex:
         futs = {ex.submit(backtest_one, s, args.days, p, limit, end_ms, hist_qv): s for s in symbols}
