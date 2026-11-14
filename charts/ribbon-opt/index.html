@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>幣安 1m 黏帶三幕：活盤優化版（51天跨期驗證）</title>
+<style>
+body{margin:0;background:#0c1210;color:#e8f0ea;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 14px 56px}
+h1{font-size:22px;margin:0 0 8px}
+h2{font-size:15.5px;margin:0 0 10px}
+.sub{color:#8aa193;line-height:1.65;margin:0 0 16px}
+.card{background:#14201b;border:1px solid rgba(232,240,234,.12);border-radius:12px;padding:14px;margin-bottom:16px}
+img{width:100%;height:auto;display:block;border-radius:8px;background:#101814}
+.note{color:#8aa193;font-size:13px;margin:8px 0 0;line-height:1.5}
+.pos{color:#3dba7a}.neg{color:#e35d5d}.mark{color:#c9a227}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}
+.kpi{border:1px solid rgba(232,240,234,.12);border-radius:10px;padding:10px;background:#14201b}
+.kpi .k{color:#8aa193;font-size:12px} .kpi .v{font-size:18px;margin-top:4px;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0 22px;background:#14201b;border-radius:10px;overflow:hidden}
+th,td{border-bottom:1px solid rgba(232,240,234,.09);padding:8px 8px;text-align:left}
+th{color:#8aa193;font-weight:500}
+@media(max-width:720px){.kpis{grid-template-columns:1fr 1fr} table{font-size:12px}}
+</style></head>
+<body>
+<div class="wrap">
+  <h1>幣安 1m 黏帶三幕：零未來函數活盤優化版</h1>
+  <p class="sub">全部扣除 0.08% 來回手續費、同根 K 先判停損再判停利。跨兩段獨立行情驗證：8/15–9/05（21天樣本外，原始規則虧損期）＋ 10/15–11/14（近30天）。</p>
+  <div class="kpis">
+    <div class="kpi"><div class="k">51天優化成交</div><div class="v">95 筆</div></div>
+    <div class="kpi"><div class="k">扣費單筆平均</div><div class="v pos">+0.311%</div></div>
+    <div class="kpi"><div class="k">扣費獲利因子 PF</div><div class="v" style="color:#3dba7a">2.06</div></div>
+    <div class="kpi"><div class="k">近7天（11/07–11/14）</div><div class="v" style="color:#3dba7a">7筆 / +7.46%</div></div>
+  </div>
+
+  <table>
+    <tr><th>逐步優化階段（全數零未來函數、已扣 0.08% 費）</th><th>8/15–9/05 (21d 樣本外)</th><th>10/15–11/14 (近30d)</th><th>51天合計 / PF</th></tr>
+    <tr><td>0. 原始離開（30m 無停損）</td><td class="neg">182筆 · 平均 -0.006%</td><td>199筆 · 平均 +0.067%</td><td>+12.31% · PF 1.12</td></tr>
+    <tr><td>1. 改抱 60m + 圓底40根低點停損（上限1.6%）</td><td class="neg">182筆 · 平均 -0.027%</td><td>199筆 · 平均 +0.125%</td><td>+19.92% · PF 1.14</td></tr>
+    <tr><td>2. + 離開K收高 ≥70% 不留長上影 & 收過吻後高</td><td class="pos">100筆 · 平均 +0.108%</td><td class="pos">105筆 · 平均 +0.150%</td><td class="pos">+26.51% · PF 1.37</td></tr>
+    <tr><td>3. + 前2h跌幅 ≥1.2% + MA200拐頭 + 量≤6x + BTC&gt;MA25（收盤進）</td><td class="pos">55筆 · 平均 +0.180%</td><td class="pos">63筆 · 平均 +0.258%</td><td class="pos">+26.19% · PF 1.69</td></tr>
+    <tr><td><b>4. + 過離開K高點觸價進場（4m有效，跌破黏帶取消）</b></td><td class="pos"><b>42筆 · 平均 +0.304% (PF 2.03)</b></td><td class="pos"><b>53筆 · 平均 +0.317% (PF 2.08)</b></td><td class="pos"><b>+29.55% · PF 2.06</b></td></tr>
+  </table>
+
+  <h1>最新 16 筆優化成交實圖（橘點進、紅虛線圓底停損、60m 出場）</h1>
+  <p class="sub">前 7 張為最近一週（11/07–11/14，同期原始未過濾 41 筆扣費合計 -4.81%，優化版 7 筆合計 +7.46%）。</p>
+  <div class="card">
+    <h2>STX 11-14 · 02:49吻 → 03:03離開過高進 · 60m到點 <span class="pos">+0.15%</span><span class="mark"> · 近7天</span></h2>
+    <img src="./01_STX_1114_0303.png?v=1" alt="STX 11-14"/>
+    <p class="note">離開量 2.54x · 突破K收高 93% · 前2h跌幅 1.47% · 圓底停損距離 -1.43% · 毛報酬 +0.23%（扣0.08%手續費後 +0.15%）</p>
+  </div>
+  <div class="card">
+    <h2>RIVER 11-14 · 01:26吻 → 01:36離開過高進 · 60m到點 <span class="pos">+1.03%</span><span class="mark"> · 近7天</span></h2>
+    <img src="./02_RIVER_1114_0136.png?v=1" alt="RIVER 11-14"/>
+    <p class="note">離開量 2.11x · 突破K收高 93% · 前2h跌幅 2.72% · 圓底停損距離 -1.60% · 毛報酬 +1.11%（扣0.08%手續費後 +1.03%）</p>
+  </div>
+  <div class="card">
+    <h2>CAP 11-13 · 18:01吻 → 18:13離開過高進 · 60m到點 <span class="pos">+5.36%</span><span class="mark"> · 近7天</span></h2>
+    <img src="./03_CAP_1113_1813.png?v=1" alt="CAP 11-13"/>
+    <p class="note">離開量 1.86x · 突破K收高 77% · 前2h跌幅 2.33% · 圓底停損距離 -1.60% · 毛報酬 +5.44%（扣0.08%手續費後 +5.36%）</p>
+  </div>
+  <div class="card">
+    <h2>FIL 11-13 · 23:51吻 → 00:05離開過高進 · 停損 <span class="neg">-1.68%</span><span class="mark"> · 近7天</span></h2>
+    <img src="./04_FIL_1113_0005.png?v=1" alt="FIL 11-13"/>
+    <p class="note">離開量 1.90x · 突破K收高 91% · 前2h跌幅 2.10% · 圓底停損距離 -1.60% · 毛報酬 -1.60%（扣0.08%手續費後 -1.68%）</p>
+  </div>
+  <div class="card">
+    <h2>DOS 11-09 · 02:05吻 → 02:10離開過高進 · 60m到點 <span class="neg">-0.79%</span><span class="mark"> · 近7天</span></h2>
+    <img src="./05_DOS_1109_0210.png?v=1" alt="DOS 11-09"/>
+    <p class="note">離開量 2.65x · 突破K收高 75% · 前2h跌幅 2.40% · 圓底停損距離 -1.60% · 毛報酬 -0.71%（扣0.08%手續費後 -0.79%）</p>
+  </div>
+  <div class="card">
+    <h2>CYBER 11-09 · 01:30吻 → 01:40離開過高進 · 60m到點 <span class="pos">+3.48%</span><span class="mark"> · 近7天</span></h2>
+    <img src="./06_CYBER_1109_0140.png?v=1" alt="CYBER 11-09"/>
+    <p class="note">離開量 2.64x · 突破K收高 89% · 前2h跌幅 2.10% · 圓底停損距離 -1.60% · 毛報酬 +3.56%（扣0.08%手續費後 +3.48%）</p>
+  </div>
+  <div class="card">
+    <h2>RENDER 11-08 · 01:13吻 → 01:24離開過高進 · 60m到點 <span class="neg">-0.09%</span><span class="mark"> · 近7天</span></h2>
+    <img src="./07_RENDER_1108_0124.png?v=1" alt="RENDER 11-08"/>
+    <p class="note">離開量 2.01x · 突破K收高 100% · 前2h跌幅 1.28% · 圓底停損距離 -1.21% · 毛報酬 -0.01%（扣0.08%手續費後 -0.09%）</p>
+  </div>
+  <div class="card">
+    <h2>BABY 11-07 · 02:19吻 → 02:33離開過高進 · 停損 <span class="neg">-1.36%</span></h2>
+    <img src="./08_BABY_1107_0233.png?v=1" alt="BABY 11-07"/>
+    <p class="note">離開量 4.40x · 突破K收高 100% · 前2h跌幅 1.40% · 圓底停損距離 -1.28% · 毛報酬 -1.28%（扣0.08%手續費後 -1.36%）</p>
+  </div>
+  <div class="card">
+    <h2>GRAM 11-06 · 22:30吻 → 22:37離開過高進 · 60m到點 <span class="neg">-0.82%</span></h2>
+    <img src="./09_GRAM_1106_2237.png?v=1" alt="GRAM 11-06"/>
+    <p class="note">離開量 2.59x · 突破K收高 100% · 前2h跌幅 1.45% · 圓底停損距離 -1.24% · 毛報酬 -0.74%（扣0.08%手續費後 -0.82%）</p>
+  </div>
+  <div class="card">
+    <h2>SYRUP 11-06 · 13:38吻 → 13:48離開過高進 · 60m到點 <span class="neg">-0.63%</span></h2>
+    <img src="./10_SYRUP_1106_1348.png?v=1" alt="SYRUP 11-06"/>
+    <p class="note">離開量 4.03x · 突破K收高 100% · 前2h跌幅 1.82% · 圓底停損距離 -1.60% · 毛報酬 -0.55%（扣0.08%手續費後 -0.63%）</p>
+  </div>
+  <div class="card">
+    <h2>ZEN 11-05 · 16:24吻 → 16:32離開過高進 · 60m到點 <span class="pos">+0.17%</span></h2>
+    <img src="./11_ZEN_1105_1632.png?v=1" alt="ZEN 11-05"/>
+    <p class="note">離開量 2.31x · 突破K收高 91% · 前2h跌幅 1.27% · 圓底停損距離 -1.29% · 毛報酬 +0.25%（扣0.08%手續費後 +0.17%）</p>
+  </div>
+  <div class="card">
+    <h2>PUMP 11-05 · 16:19吻 → 16:24離開過高進 · 60m到點 <span class="neg">-0.64%</span></h2>
+    <img src="./12_PUMP_1105_1624.png?v=1" alt="PUMP 11-05"/>
+    <p class="note">離開量 2.51x · 突破K收高 83% · 前2h跌幅 1.72% · 圓底停損距離 -1.38% · 毛報酬 -0.56%（扣0.08%手續費後 -0.64%）</p>
+  </div>
+  <div class="card">
+    <h2>1000PEPE 11-05 · 16:17吻 → 16:21離開過高進 · 60m到點 <span class="pos">+0.16%</span></h2>
+    <img src="./13_1000PEPE_1105_1621.png?v=1" alt="1000PEPE 11-05"/>
+    <p class="note">離開量 2.71x · 突破K收高 87% · 前2h跌幅 1.49% · 圓底停損距離 -1.20% · 毛報酬 +0.24%（扣0.08%手續費後 +0.16%）</p>
+  </div>
+  <div class="card">
+    <h2>1000PEPE 11-04 · 05:02吻 → 05:16離開過高進 · 60m到點 <span class="pos">+0.63%</span></h2>
+    <img src="./14_1000PEPE_1104_0516.png?v=1" alt="1000PEPE 11-04"/>
+    <p class="note">離開量 2.35x · 突破K收高 74% · 前2h跌幅 1.28% · 圓底停損距離 -1.23% · 毛報酬 +0.71%（扣0.08%手續費後 +0.63%）</p>
+  </div>
+  <div class="card">
+    <h2>POL 11-03 · 22:32吻 → 22:42離開過高進 · 60m到點 <span class="pos">+3.50%</span></h2>
+    <img src="./15_POL_1103_2242.png?v=1" alt="POL 11-03"/>
+    <p class="note">離開量 2.12x · 突破K收高 79% · 前2h跌幅 2.21% · 圓底停損距離 -1.50% · 毛報酬 +3.58%（扣0.08%手續費後 +3.50%）</p>
+  </div>
+  <div class="card">
+    <h2>FIL 11-03 · 17:02吻 → 17:11離開過高進 · 60m到點 <span class="neg">-0.12%</span></h2>
+    <img src="./16_FIL_1103_1711.png?v=1" alt="FIL 11-03"/>
+    <p class="note">離開量 2.24x · 突破K收高 100% · 前2h跌幅 1.83% · 圓底停損距離 -1.39% · 毛報酬 -0.04%（扣0.08%手續費後 -0.12%）</p>
+  </div>
+</div>
+</body>
+</html>
