@@ -67,6 +67,8 @@ def _params(**overrides) -> Params:
         retest_window=6,
         max_hold=8,
         min_gap_ma99=0.0,
+        max_gap_ma99=0.0,
+        max_ret_24h=0.0,
         min_risk=0.002,
         max_risk=0.035,
         days=0,
@@ -111,7 +113,7 @@ def test_limit_retest_hits_target_without_future_bars() -> None:
     assert t.entry_idx == 42
     assert t.peak_high == 103.35
     assert t.exit_reason == "target"
-    assert abs(t.r_multiple - 2.5) < 1e-9
+    assert abs(t.r_multiple - Params().target_r) < 1e-9
     assert t.net_pct > 0
 
     cut = df.iloc[:43].copy()
@@ -191,6 +193,77 @@ def test_ma99_gap_filter() -> None:
     assert blocked == []
     assert funnel["gap_skip"] >= 1
 
+    # 測試防暴衝上限 max_gap_ma99：目前離 MA99 約 +1.1%，上限設 0.5% 必須擋掉
+    capped, cap_funnel = run_backtest(df, _params(min_gap_ma99=0.005, max_gap_ma99=0.006))
+    assert capped == []
+    assert cap_funnel["gap_skip"] >= 1
+
+
+def test_max_ret_24h_crash_day_guard_is_causal() -> None:
+    # 1520 根 1m（> 24h），前 100 根在 80、之後拉升到 100（+25% 超過 20% 熔斷上限），接著做出假突破
+    n = 1520
+    idx = pd.date_range("2026-11-11 20:00", periods=n, freq="min", tz="Asia/Taipei")
+    c = np.full(n, 100.0)
+    c[:100] = 80.0
+    base = 1470
+    c[base : base + 26] = 102.2
+    c[base + 26 : base + 30] = 100.4
+    c[base + 30] = 101.6
+    c[base + 31] = 100.2
+    c[base + 32] = 100.7
+    c[base + 33] = 97.0
+    h = c + 0.15
+    l = c - 0.15
+    o = np.r_[c[0], c[:-1]]
+    h[base + 18] = 103.0
+    h[base + 19 : base + 30] = np.minimum(h[base + 19 : base + 30], 102.4)
+    h[base + 30], l[base + 30], o[base + 30] = 103.35, 101.2, 101.0
+    h[base + 31], l[base + 31], o[base + 31] = 101.2, 100.0, 101.4
+    o[base + 32], h[base + 32], l[base + 32] = 100.4, 102.3, 100.2
+    o[base + 33], h[base + 33], l[base + 33] = 100.6, 100.8, 96.0
+    df = pd.DataFrame({"Open": o, "High": h, "Low": l, "Close": c, "Volume": 1000.0}, index=idx)
+
+    # 24h 漲幅 +25% > 20%：應被 regime_skip 擋掉
+    blocked, funnel = run_backtest(df, _params(max_ret_24h=0.20))
+    assert blocked == []
+    assert funnel["regime_skip"] >= 1
+
+    # 上限放寬到 35%：應正常進場，且 ret_24h_pct 精準反映 +25%
+    ok, _ = run_backtest(df, _params(max_ret_24h=0.35))
+    assert len(ok) == 1
+    assert ok[0].ret_24h_pct > 0.24
+
+
+def test_require_ma14_lt_25_filter() -> None:
+    # 1) 預設 _plant_fakeout() 在 bar 41 時 MA14 已小於 MA25，因此開啟後仍應通過
+    df_bear = _plant_fakeout()
+    ok, _ = run_backtest(df_bear, _params(require_ma14_lt_25=True))
+    assert len(ok) == 1
+
+    # 2) 拉高近期均價使 bar 41 時 MA14 > MA25，開啟 require_ma14_lt_25 必須擋掉
+    idx = pd.date_range("2026-11-12 21:00", periods=80, freq="min", tz="Asia/Taipei")
+    c = np.full(80, 99.0)
+    c[28:39] = 102.3
+    c[39] = 100.5
+    c[40] = 101.8
+    c[41] = 100.2
+    c[42] = 100.8
+    c[43] = 97.0
+    h = c + 0.15
+    l = c - 0.15
+    o = np.r_[c[0], c[:-1]]
+    h[30] = 103.0
+    h[31:40] = np.minimum(h[31:40], 102.5)
+    h[40], l[40], o[40] = 103.35, 101.2, 101.0
+    h[41], l[41], o[41] = 101.2, 100.0, 101.4
+    o[42], h[42], l[42] = 100.5, 102.4, 100.2
+    df_bull_ma = pd.DataFrame({"Open": o, "High": h, "Low": l, "Close": c, "Volume": 1000.0}, index=idx)
+    unfiltered, _ = run_backtest(df_bull_ma, _params(require_ma14_lt_25=False))
+    assert len(unfiltered) == 1
+    blocked, funnel = run_backtest(df_bull_ma, _params(require_ma14_lt_25=True))
+    assert blocked == []
+    assert funnel["ma14_skip"] >= 1
+
 
 def test_sniper_big_win_detector_arm_and_fill() -> None:
     idx = pd.date_range("2026-11-12 20:10", periods=145, freq="min", tz="Asia/Taipei")
@@ -249,6 +322,8 @@ if __name__ == "__main__":
     test_runaway_overshoot_is_skipped()
     test_half_hour_score_ignores_later_target()
     test_ma99_gap_filter()
+    test_max_ret_24h_crash_day_guard_is_causal()
+    test_require_ma14_lt_25_filter()
     test_sniper_big_win_detector_arm_and_fill()
     test_outside_session_is_ignored()
     print("ok")
