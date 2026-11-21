@@ -409,33 +409,76 @@ def draw_trade(
     plt.close(fig)
 
 
+def _png_name(n: int, when: str) -> str:
+    stamp = when.replace("-", "").replace(" ", "_").replace(":", "")
+    return f"t{n:02d}_{stamp}.png"
+
+
 def write_gallery(rows: list[dict], img_dir: Path, page: Path) -> None:
+    """手機寬度的卡片頁，跟其他回測 view.html 同一套。"""
+    del img_dir
+    wins = sum(1 for r in rows if r["scale_net"] > 0)
+    losses = len(rows) - wins
+    net = sum(r["scale_net"] for r in rows)
+    net_cls = "pnl-win" if net > 0 else "pnl-loss" if net < 0 else "pnl-flat"
     cards = []
     for n, r in enumerate(rows, 1):
-        name = f"t{n:02d}_{r['time'].replace(' ', '_').replace('-', '')}.png"
-        border = "#00c853" if r["scale_net"] > 0 else "#ff5252"
+        name = _png_name(n, r["time"])
+        cls = "pnl-win" if r["scale_net"] > 0 else "pnl-loss" if r["scale_net"] < 0 else "pnl-flat"
+        tag = "tag-tp" if r["scalp_reason"] == "+1" else "tag-sl"
         cards.append(
-            f'<a href="img/{name}"><figure style="border-color:{border}">'
-            f'<img src="img/{name}" alt="{r["time"]}">'
-            f'<figcaption>#{n} {r["time"]}  整筆 {r["scalp_net"]:+.2f}　一半 {r["scale_net"]:+.2f}</figcaption>'
-            f"</figure></a>"
+            f"""<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#{n}</span><span class='trade-time'>{r['time']} 台北</span></div><div class='card-pnl {cls}'>{r['scale_net']:+.2f}</div></header><div class='tags'><span class='tag {tag}'>{r['scalp_reason']}</span><span class='tag tag-info'>一半 {r['scale_reason']}</span></div><pre class='trade-detail'>進場 {r['entry']:.2f}
+停損 {r['stop']:.2f}  風險 {r['risk']:.2f}
+整筆 {r['scalp_pts']:+.2f}  扣費 {r['scalp_net']:+.2f}  {r['hold']} 分
+一半 {r['scale_pts']:+.2f}  扣費 {r['scale_net']:+.2f}  {r['scale_hold']} 分
+最大浮盈 {r['mfe']:.2f}</pre><div class='mini-chart'><img src='img/{name}' alt='#{n} {r['time']}' style='width:100%;display:block;border-radius:10px'/></div></article>"""
         )
-    html = f"""<!doctype html>
-<meta charset="utf-8">
+    html = f"""<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <title>SOXS 一分 K MA200 撥開</title>
 <style>
-body {{ font-family: "WenQuanYi Micro Hei", sans-serif; background:#f7f7f5; color:#263238; margin:24px; }}
-h1 {{ font-size:20px; }}
-.grid {{ display:grid; grid-template-columns:1fr; gap:18px; }}
-figure {{ margin:0; background:#fff; border:3px solid #ccc; border-radius:10px; padding:8px; }}
-img {{ width:100%; height:auto; display:block; }}
-figcaption {{ padding:8px 4px 2px; font-size:14px; }}
-</style>
-<h1>SOXSUSDT 一分 K，MA200 束剛撥開，近 30 天 {len(rows)} 筆</h1>
-<p>綠框是一半抱到跌回之後還賺錢的。進場圈在撥開那根。紅叉是收盤跌回 MA200。</p>
-<div class="grid">{''.join(cards)}</div>
+*{{box-sizing:border-box}}
+body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
+.page{{max-width:560px;margin:0 auto;padding:14px 12px 32px}}
+h1{{font-size:18px;margin:0 0 6px}}
+.muted{{color:#8b949e;font-size:13px;line-height:1.55}}
+.summary{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 16px;margin-bottom:14px}}
+.cards{{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}}
+.card{{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:96px;border:1px solid #21262d}}
+.card b{{display:block;font-size:20px;margin-top:4px}}
+.trade-card{{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px 14px 10px;margin-bottom:14px;overflow:hidden}}
+.card-header{{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}}
+.trade-no{{font-size:15px;font-weight:700}}
+.trade-time{{font-size:12px;color:#8b949e}}
+.card-pnl{{font-size:16px;font-weight:700;white-space:nowrap}}
+.pnl-win{{color:#00c805}} .pnl-loss{{color:#ff5252}} .pnl-flat{{color:#8b949e}}
+.tags{{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}}
+.tag{{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent}}
+.tag-tp{{background:rgba(0,200,5,0.15);color:#3ddc68;border-color:rgba(0,200,5,0.35)}}
+.tag-sl{{background:rgba(255,82,82,0.15);color:#ff7b72;border-color:rgba(255,82,82,0.35)}}
+.tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
+.trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
+.mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>SOXSUSDT 一分 K，MA200 束剛撥開</h1>
+<p class="muted">台北 2026-10-23 01:28 → 11-22 01:27。黃 MA7、青 MA14、粉 MA25、紫 MA99、綠 MA120、酒紅 MA200。橘圈是進場，綠虛線 +1，紅虛線停損，紅叉是收盤跌回。卡片上的點數是一半先拿 1 點、一半抱到跌回，已扣來回 0.08%。</p>
+<div class="cards">
+<div class="card">筆數<b>{len(rows)}</b></div>
+<div class="card">賺/虧<b>{wins}/{losses}</b></div>
+<div class="card">一半扣費<b class="{net_cls}">{net:+.2f}</b></div>
+<div class="card">整筆扣費<b class="pnl-loss">{sum(r['scalp_net'] for r in rows):+.2f}</b></div>
+</div>
+</section>
+{''.join(cards)}
+</div></body></html>
 """
     page.write_text(html, encoding="utf-8")
+    if page.name == "index.html":
+        (page.parent / "view.html").write_text(html, encoding="utf-8")
 
 
 def hm(ms: int) -> str:
@@ -478,7 +521,7 @@ def run(symbol: str = "SOXSUSDT", days: int = 30, charts: Path | None = None) ->
         img = charts / "img"
         img.mkdir(parents=True, exist_ok=True)
         for n, r in enumerate(rows, 1):
-            name = f"t{n:02d}_{r['time'].replace(' ', '_').replace('-', '')}.png"
+            name = _png_name(n, r["time"])
             draw_trade(img / name, d, mas, r, n)
         write_gallery(rows, img, charts / "index.html")
         print(f"圖：{charts / 'index.html'}")
