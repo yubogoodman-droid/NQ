@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import numpy as np
 import requests
@@ -290,30 +291,172 @@ def fetch_klines(symbol: str, start_ms: int, end_ms: int) -> dict:
     kl = [seen[k] for k in sorted(seen)]
     return {
         "t": np.array([int(x[0]) for x in kl], np.int64),
+        "o": np.array([float(x[1]) for x in kl], np.float64),
         "h": np.array([float(x[2]) for x in kl], np.float64),
         "l": np.array([float(x[3]) for x in kl], np.float64),
         "c": np.array([float(x[4]) for x in kl], np.float64),
     }
 
 
+MA_COLORS = {
+    7: "#f0b90b",
+    14: "#4dd0e1",
+    25: "#d28cff",
+    99: "#7e57c2",
+    120: "#66bb6a",
+    200: "#c62828",
+}
+
+
+def _cjk_font():
+    from matplotlib import font_manager
+
+    path = "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"
+    if Path(path).is_file():
+        font_manager.fontManager.addfont(path)
+        return font_manager.FontProperties(fname=path)
+    return None
+
+
+def draw_trade(
+    path: Path,
+    d: dict,
+    mas: dict[int, np.ndarray],
+    trade: dict,
+    trade_no: int,
+) -> None:
+    """進場前後的一分 K。黃 MA7、青 MA14、粉 MA25、紫 MA99、綠 MA120、酒紅 MA200。"""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+
+    font = _cjk_font()
+    if font is not None:
+        plt.rcParams["font.family"] = font.get_name()
+    i = int(trade["i"])
+    n = len(d["c"])
+    a0 = max(0, i - 80)
+    a1 = min(n - 1, i + max(50, min(int(trade["scale_hold"]) + 12, 150)))
+    sl = slice(a0, a1 + 1)
+    o, h, l, c = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl]
+    xs = np.arange(len(c))
+    fig, ax = plt.subplots(figsize=(11.6, 6.2), facecolor="#ffffff")
+    ax.set_facecolor("#ffffff")
+    ax.grid(True, color="#eceff1", lw=0.6)
+    for sp in ax.spines.values():
+        sp.set_color("#cfd8dc")
+    up = c >= o
+    for k in range(len(c)):
+        col = "#00c853" if up[k] else "#ff5252"
+        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.7, zorder=2)
+        y0, y1 = min(o[k], c[k]), max(o[k], c[k])
+        if y1 == y0:
+            y1 = y0 + max(float(h[k] - l[k]), 1e-6) * 0.15
+        ax.add_patch(Rectangle((xs[k] - 0.32, y0), 0.64, y1 - y0, facecolor=col, edgecolor=col, lw=0.4, zorder=3))
+    for nlen, col in MA_COLORS.items():
+        ax.plot(xs, mas[nlen][sl], color=col, lw=1.35 if nlen == 200 else 1.05, label=f"MA{nlen}", zorder=4)
+
+    ex = i - a0
+    entry = float(trade["entry"])
+    stop = float(trade["stop"])
+    y_lo = float(np.nanmin(l))
+    y_hi = float(np.nanmax(h))
+    for nlen in MA_COLORS:
+        seg = mas[nlen][sl]
+        if np.isfinite(seg).any():
+            y_lo = min(y_lo, float(np.nanmin(seg)))
+            y_hi = max(y_hi, float(np.nanmax(seg)))
+    pad = max((y_hi - y_lo) * 0.06, 0.05)
+    ax.set_ylim(y_lo - pad, y_hi + pad)
+    if y_lo - pad <= stop <= y_hi + pad:
+        ax.axhline(stop, color="#e35d5d", ls=":", lw=1.0, alpha=0.85, label="停損")
+    tgt = entry + TARGET_PTS
+    if y_lo - pad <= tgt <= y_hi + pad:
+        ax.axhline(tgt, color="#00c853", ls=":", lw=1.0, alpha=0.8, label="+1")
+    ax.axvline(ex, color="#fb8c00", ls="--", lw=0.8, alpha=0.9)
+    ax.scatter([ex], [entry], s=54, color="#00c853", marker="^", zorder=6)
+    ax.scatter([ex], [entry], s=220, facecolors="none", edgecolors="#fb8c00", linewidths=2.0, zorder=7)
+    kw = {"fontproperties": font} if font else {}
+    ax.annotate("進", (ex, entry), textcoords="offset points", xytext=(8, 10), color="#e65100", fontsize=11, fontweight="bold", **kw)
+
+    sx = ex + int(trade["hold"])
+    if 0 <= sx < len(c) and trade["scalp_reason"] != "+1":
+        ax.scatter([sx], [c[sx]], s=36, color="#ff5252", marker="x", zorder=6)
+        ax.annotate("跌回", (sx, c[sx]), textcoords="offset points", xytext=(6, -12), color="#c62828", fontsize=8, **kw)
+    hx = ex + int(trade["scale_hold"])
+    if trade["scale_reason"].startswith("一半") and 0 <= hx < len(c) and hx != sx:
+        ax.scatter([hx], [c[hx]], s=36, color="#1565c0", marker="x", zorder=6)
+        ax.annotate("半出", (hx, c[hx]), textcoords="offset points", xytext=(6, 8), color="#1565c0", fontsize=8, **kw)
+
+    title = (
+        f"#{trade_no}  {trade['time']}  進 {entry:.2f}  "
+        f"整筆 {trade['scalp_reason']} {trade['scalp_net']:+.2f}  "
+        f"一半 {trade['scale_net']:+.2f}  最大 {trade['mfe']:.2f}"
+    )
+    ax.set_title(title, color="#263238", fontsize=12, loc="left", **kw)
+    ax.legend(loc="upper left", frameon=False, ncol=8, fontsize=8)
+    step = max(1, len(xs) // 6)
+    ticks = list(range(0, len(xs), step))
+    labels = [datetime.fromtimestamp(int(d["t"][a0 + k]) / 1000, TZ).strftime("%m-%d %H:%M") for k in ticks]
+    ax.set_xticks(ticks)
+    ax.set_xticklabels(labels, color="#546e7a", fontsize=8)
+    ax.tick_params(colors="#546e7a")
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=120, facecolor=fig.get_facecolor())
+    plt.close(fig)
+
+
+def write_gallery(rows: list[dict], img_dir: Path, page: Path) -> None:
+    cards = []
+    for n, r in enumerate(rows, 1):
+        name = f"t{n:02d}_{r['time'].replace(' ', '_').replace('-', '')}.png"
+        border = "#00c853" if r["scale_net"] > 0 else "#ff5252"
+        cards.append(
+            f'<a href="img/{name}"><figure style="border-color:{border}">'
+            f'<img src="img/{name}" alt="{r["time"]}">'
+            f'<figcaption>#{n} {r["time"]}  整筆 {r["scalp_net"]:+.2f}　一半 {r["scale_net"]:+.2f}</figcaption>'
+            f"</figure></a>"
+        )
+    html = f"""<!doctype html>
+<meta charset="utf-8">
+<title>SOXS 一分 K MA200 撥開</title>
+<style>
+body {{ font-family: "WenQuanYi Micro Hei", sans-serif; background:#f7f7f5; color:#263238; margin:24px; }}
+h1 {{ font-size:20px; }}
+.grid {{ display:grid; grid-template-columns:1fr; gap:18px; }}
+figure {{ margin:0; background:#fff; border:3px solid #ccc; border-radius:10px; padding:8px; }}
+img {{ width:100%; height:auto; display:block; }}
+figcaption {{ padding:8px 4px 2px; font-size:14px; }}
+</style>
+<h1>SOXSUSDT 一分 K，MA200 束剛撥開，近 30 天 {len(rows)} 筆</h1>
+<p>綠框是一半抱到跌回之後還賺錢的。進場圈在撥開那根。紅叉是收盤跌回 MA200。</p>
+<div class="grid">{''.join(cards)}</div>
+"""
+    page.write_text(html, encoding="utf-8")
+
+
 def hm(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, TZ).strftime("%m-%d %H:%M")
 
 
-def run(symbol: str = "SOXSUSDT", days: int = 30) -> list[dict]:
+def run(symbol: str = "SOXSUSDT", days: int = 30, charts: Path | None = None) -> list[dict]:
     now = datetime.now(TZ).replace(second=0, microsecond=0)
     end_ms = int(now.timestamp() * 1000)
     win_start = now - timedelta(days=days)
     fetch_start = win_start - timedelta(days=2)
     d = fetch_klines(symbol, int(fetch_start.timestamp() * 1000), end_ms)
     c = d["c"]
-    m7, m14, m25 = sma(c, 7), sma(c, 14), sma(c, 25)
-    m99, m120, m200 = sma(c, 99), sma(c, 120), sma(c, 200)
+    mas = {7: sma(c, 7), 14: sma(c, 14), 25: sma(c, 25), 99: sma(c, 99), 120: sma(c, 120), 200: sma(c, 200)}
+    m7, m14, m25, m99, m120, m200 = (mas[n] for n in (7, 14, 25, 99, 120, 200))
     t_min = int(win_start.timestamp() * 1000)
     idxs = entry_indices(c, d["l"], m7, m14, m25, m99, m120, m200, d["t"], t_min)
     rows = []
     for i in idxs:
         tr = simulate(i, d["h"], d["l"], c, m200)
+        tr["i"] = i
         tr["time"] = hm(int(d["t"][i]))
         tr["ms"] = int(d["t"][i])
         rows.append(tr)
@@ -331,6 +474,14 @@ def run(symbol: str = "SOXSUSDT", days: int = 30) -> list[dict]:
             f"{r['scale_reason']:8} {r['scale_pts']:+6.2f} {r['scale_net']:+6.2f}  "
             f"{r['hold']:>3}/{r['scale_hold']:<3} {r['mfe']:5.2f}"
         )
+    if charts is not None:
+        img = charts / "img"
+        img.mkdir(parents=True, exist_ok=True)
+        for n, r in enumerate(rows, 1):
+            name = f"t{n:02d}_{r['time'].replace(' ', '_').replace('-', '')}.png"
+            draw_trade(img / name, d, mas, r, n)
+        write_gallery(rows, img, charts / "index.html")
+        print(f"圖：{charts / 'index.html'}")
     return rows
 
 
@@ -340,5 +491,6 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="SOXS 一分 K，MA200 束剛撥開，回測")
     p.add_argument("--days", type=int, default=30)
     p.add_argument("--symbol", default="SOXSUSDT")
+    p.add_argument("--charts", type=Path, default=None, help="每筆一張圖，寫到這個資料夾")
     args = p.parse_args()
-    run(args.symbol, args.days)
+    run(args.symbol, args.days, args.charts)
