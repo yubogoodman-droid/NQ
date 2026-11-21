@@ -66,6 +66,11 @@ def test_peel_bar_passes_and_invalid_shapes_fail() -> None:
     m120b[55] = 100.2
     assert not is_peel(55, c, m7, m14, m25, m30, m99, m120b, m200)
 
+    # MA25 還躺平（10 根斜率不到 0.25%）
+    m25b = m25.copy()
+    m25b[45] = 99.45
+    assert not is_peel(55, c, m7, m14, m25b, m30, m99, m120, m200)
+
     # MA200 末端已經上弧
     m200b = m200.copy()
     m200b[55] = 100.30

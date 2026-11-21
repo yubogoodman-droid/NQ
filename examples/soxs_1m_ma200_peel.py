@@ -5,6 +5,7 @@
 - 長均線空頭排列收平：MA200 > MA120 > MA99，整束緊，MA200 走平或緩跌、末端沒上弧
 - 先前乖乖待在 MA200 下方（前段至少 32/41 根收在 MA200 下）
 - 短中均線撥開扇形往上：MA7 > MA14 > MA25 > MA30，5 根斜率由陡到緩且都往上，MA14 已跨過 MA120
+- 粉線 MA25 要明顯抬頭：10 根斜率至少 +0.25%（只靠 MA7 拉上去、MA25 還躺平的多半是假突破）
 - MA7 近 3 根內剛上穿 MA200，收盤 > MA7 > MA200，且連續至少 4 根收在 MA200 上方
 - 離 MA200 不超過 1%，避免追在高點
 
@@ -30,6 +31,7 @@ MA_PERIODS = (7, 14, 25, 30, 60, 99, 120, 200)
 
 # 斜率、價差都是百分比。
 S7_MIN = 0.25
+S25_10_MIN = 0.25
 M200_BODY_MIN = -0.85
 M200_BODY_MAX = 0.05
 M200_TIP_MAX = 0.05
@@ -118,6 +120,9 @@ def is_peel(
     if None in (s7, s14, s25, s30, body, tip):
         return False
     if not (s7 > s14 > s25 > 0 and s7 >= S7_MIN and s30 >= 0):
+        return False
+    s25_10 = slope_pct(m25, i, 10)
+    if s25_10 is None or s25_10 < S25_10_MIN:
         return False
     if not (M200_BODY_MIN <= body <= M200_BODY_MAX and tip <= M200_TIP_MAX):
         return False
@@ -491,7 +496,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>SOXSUSDT 一分 K，MA200 束撥開站上</h1>
-<p class="muted">{win_str}完整 8 條均線：黃 MA7、青 MA14、粉 MA25、藍 MA30、深綠 MA60、紫 MA99、淺綠 MA120、酒紅 MA200。長均線 MA200 &gt; MA120 &gt; MA99 收平，MA7 剛上穿 MA200 且站穩 4 根進場；收盤跌破 MA200 超過 0.3% 算跌回。橘圈是進場，綠星是 +1，紅叉是跌回。</p>
+<p class="muted">{win_str}完整 8 條均線：黃 MA7、青 MA14、粉 MA25、藍 MA30、深綠 MA60、紫 MA99、淺綠 MA120、酒紅 MA200。長均線 MA200 &gt; MA120 &gt; MA99 收平，MA7 剛上穿 MA200 且站穩 4 根、粉線 MA25 10 根斜率 ≥ 0.25% 才進場；收盤跌破 MA200 超過 0.3% 算跌回。橘圈是進場，綠星是 +1，紅叉是跌回。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(rows)}</b></div>
 <div class="card">拿到 +1<b>{hit1}/{len(rows)}</b></div>
