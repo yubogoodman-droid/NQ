@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """SOXS 1 分 K「大賺型」假突破做空狙擊器（即時監看 + 預掛單推播 + 回測驗證）。
 
-專門鎖定高期望值、低回撤的 S 級假突破空單（v2 升級版）：
+專門鎖定高期望值、低回撤的 S 級假突破空單（v3 升級版）：
   1. 美股流動性窗：08:35 ET 起允許盤前築頂，只在 09:20–16:00 ET（冬令台北 22:20–05:00）掛單／進場
   2. 先急拉累積多頭停損燃料：假高相對前 45 分鐘低點漲幅 ≥ 3.0%，且假高乖離 MA60 ≥ 2.0%
   3. 創高量縮背離：假高當根成交量 ≤ 前 35 分鐘起漲最大量的 65%（買盤枯竭）
   4. 合理均線中空帶 + 防暴衝熔斷：掛單價高於前一根 MA99 須落在 0.8%～3.5%，且 24h 漲幅 ≤ +20%（避開單日崩盤暴衝）
-  5. 防掃停損 + 務實停利：停損在假高上方 0.2%，停利 2.0R（對齊 30 分鐘窗）
+  5. 過濾 1 根針刺假跌破：假高至跌破至少隔 2 根（min_peak_to_bd=2），避開開盤 1 分鐘插針洗盤
+  6. 條件式瀑布續抱出場：停損在假高上方 0.2%、停利放寬至 4.0R；第 30 分鐘若仍在 MA25 下方且浮盈 ≥ +0.8R，停損移至 +0.3R 續抱瀑布最長至 60 分鐘（收盤站回 MA25 即落袋），其餘第 30 分鐘準時結算
 
 另外支援 `--strict`（極穩空排確認模式）：改用 `MA14 < MA25` 空頭排列確認，不依賴急拉/量比門檻，四個月回測 0 停損、四段全正報酬。
 
 兩種推播時機（同一波只各推一次，帶 1m K 線圖）：
-  • 【預掛空單準備】：剛收盤確認跌破 MA25/30 且符合大賺結構 → 馬上給出下一根 MA14/MA25 建議限價空單、停損、2.0R 目標價
+  • 【預掛空單準備】：剛收盤確認跌破 MA25/30 且符合大賺結構 → 馬上給出下一根 MA14/MA25 建議限價空單、停損、4.0R 目標價與 30→60m 瀑布規則
   • 【掛單觸價進場】：1～10 根內反抽碰到 MA14/MA25 掛單帶正式進場 → 推播進場確認卡
 
 用法：
@@ -77,9 +78,13 @@ SNIPER_PARAMS = Params(
     min_overshoot=0.002,
     max_overshoot=0.035,
     break_window=25,
+    min_peak_to_bd=2,
     retest_window=10,
-    target_r=2.0,
+    target_r=4.0,
     max_hold=30,
+    runner_max_hold=60,
+    runner_min_r=0.8,
+    runner_lock_r=0.3,
     min_risk=0.006,
     max_risk=0.025,
     min_gap_ma99=0.008,
@@ -100,9 +105,13 @@ STRICT_PARAMS = Params(
     min_overshoot=0.002,
     max_overshoot=0.035,
     break_window=25,
+    min_peak_to_bd=2,
     retest_window=10,
-    target_r=2.0,
+    target_r=4.0,
     max_hold=30,
+    runner_max_hold=60,
+    runner_min_r=0.8,
+    runner_lock_r=0.3,
     min_risk=0.006,
     max_risk=0.025,
     min_gap_ma99=0.008,
@@ -264,6 +273,9 @@ def detect_live_setups(
         if bd_idx is None:
             i += 1
             continue
+        if (bd_idx - peak_idx) < params.min_peak_to_bd:
+            i = bd_idx + 1
+            continue
 
         low45 = float(np.min(l[max(0, peak_idx - 45) : peak_idx + 1]))
         pump45 = (peak_h / low45 - 1.0) if low45 > 0 else 0.0
@@ -395,8 +407,8 @@ def format_setup_message(df: pd.DataFrame, s: SniperSetup) -> str:
         f"時間：{ts_tpe} 台北（{ts_ny}）\n"
         f"{action_line}\n"
         f"停損價：<b>{s.stop_price:.3f}</b>（+{risk_pct:.2f}%，假高 {s.peak_high:.2f} @ {pk_tpe}）\n"
-        f"停利價：<b>{s.target_price:.3f}</b>（-{tp_pct:.2f}%，2.0R / 最長拿 30 分鐘）\n"
-        f"—— 大賺結構檢核（v2 防暴衝）——\n"
+        f"停利價：<b>{s.target_price:.3f}</b>（-{tp_pct:.2f}%，4.0R；30m 仍在 MA25 下且 ≥+0.8R 移損 +0.3R 續抱瀑布至 60m）\n"
+        f"—— 大賺結構檢核（v3 瀑布續抱）——\n"
         f"• 均線中空帶：離 MA99（{s.ma99:.2f}）空間 <b>+{s.gap_ma99_pct * 100:.2f}%</b>（安全帶 0.8–3.5%）\n"
         f"• 24h 漲幅：<b>{s.ret_24h_pct * 100:+.1f}%</b>（熔斷上限 +20%）\n"
         f"• 前 45m 急拉：<b>+{s.pump45_pct * 100:.2f}%</b>（過前高 {s.prev_high:.2f}）\n"
@@ -552,21 +564,21 @@ def wait_next_minute_close() -> None:
 
 
 def run_sniper_backtest(symbols: Sequence[str], days: int, base_params: Params = SNIPER_PARAMS) -> int:
-    mode_name = "極穩空排（MA14<MA25）" if base_params.require_ma14_lt_25 else "S 級大賺狙擊 v2"
+    mode_name = "極穩空排 v3（MA14<MA25）" if base_params.require_ma14_lt_25 else "S 級大賺狙擊 v3"
     for sym in symbols:
         print(f"=== {sym} {mode_name}回測（近 {days} 天） ===", flush=True)
         df = fetch_klines(sym, days)
         params = Params(**{**base_params.__dict__, "days": days})
         trades, funnel = run_backtest(df, params)
-        s30 = summarize(trades)
-        w60 = score_window(df, trades, 60, params.fee_pct)
+        s_main = summarize(trades)
+        w30 = score_window(df, trades, 30, params.fee_pct)
         print(
-            f"30m 結算：筆數={s30['count']}  勝率={s30['win_rate']:.1f}% ({s30['wins']}/{s30['count']})  "
-            f"淨報酬={s30['net_pct']:+.2f}%  平均={s30['avg_pct']:+.2f}%  合計={s30['sum_r']:+.2f}R  出場={s30['reasons']}"
+            f"主策略（30→60m 瀑布）：筆數={s_main['count']}  勝率={s_main['win_rate']:.1f}% ({s_main['wins']}/{s_main['count']})  "
+            f"淨報酬={s_main['net_pct']:+.2f}%  平均={s_main['avg_pct']:+.2f}%  合計={s_main['sum_r']:+.2f}R  出場={s_main['reasons']}"
         )
         print(
-            f"60m 延伸：勝率={w60['win_rate']:.1f}% ({w60['wins']}/{w60['count']})  "
-            f"淨報酬={w60['net_pct']:+.2f}%  出場={w60['reasons']}"
+            f"固定 30m 對照：勝率={w30['win_rate']:.1f}% ({w30['wins']}/{w30['count']})  "
+            f"淨報酬={w30['net_pct']:+.2f}%  出場={w30['reasons']}"
         )
         print(f"漏斗：{funnel}")
         for idx, t in enumerate(trades, 1):
@@ -574,7 +586,7 @@ def run_sniper_backtest(symbols: Sequence[str], days: int, base_params: Params =
             xt = df.index[t.exit_idx].tz_convert(TPE).strftime("%H:%M")
             print(
                 f"  [{idx:02d}] {et} -> {xt}  空={t.entry_price:.2f} 停損={t.stop_price:.2f} 出={t.exit_price:.2f} "
-                f"{t.exit_reason:6s} {t.net_pct * 100:+.2f}% ({t.r_multiple:+.2f}R) | "
+                f"{t.exit_reason:11s} {t.net_pct * 100:+.2f}% ({t.r_multiple:+.2f}R) | "
                 f"離MA99={t.gap_ma99_pct * 100:+.2f}% 24h={t.ret_24h_pct * 100:+.1f}% "
                 f"急拉={t.pump45_pct * 100:.1f}% 乖離MA60={t.peak_ext60_pct * 100:.1f}% 量比={t.peak_vol_ratio * 100:.0f}%"
             )
@@ -599,14 +611,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.test:
         now_tpe = datetime.now(TPE).strftime("%Y-%m-%d %H:%M:%S")
-        ok = tg_send(f"✅ <b>SOXS S級大賺狙擊器 v2</b> 連線測試成功\n台北時間：{now_tpe}", dry_run=args.dry_run)
+        ok = tg_send(f"✅ <b>SOXS S級大賺狙擊器 v3</b> 連線測試成功\n台北時間：{now_tpe}", dry_run=args.dry_run)
         return 0 if ok else 1
 
     if args.backtest:
         return run_sniper_backtest(symbols, args.days, base_params=active_params)
 
     seen = load_seen()
-    mode_tag = "極穩空排 MA14<MA25" if args.strict else "S級大賺狙擊 v2"
+    mode_tag = "極穩空排 v3 (MA14<MA25)" if args.strict else "S級大賺狙擊 v3"
     print(f"啟動 {mode_tag} 監看：{', '.join(symbols)}（美東 09:20–16:00 進場窗）", flush=True)
 
     def scan_round() -> None:

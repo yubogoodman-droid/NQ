@@ -64,8 +64,11 @@ def _params(**overrides) -> Params:
         lookback=20,
         min_sep=5,
         break_window=10,
+        min_peak_to_bd=1,
         retest_window=6,
+        target_r=2.0,
         max_hold=8,
+        runner_max_hold=0,
         min_gap_ma99=0.0,
         max_gap_ma99=0.0,
         max_ret_24h=0.0,
@@ -113,7 +116,7 @@ def test_limit_retest_hits_target_without_future_bars() -> None:
     assert t.entry_idx == 42
     assert t.peak_high == 103.35
     assert t.exit_reason == "target"
-    assert abs(t.r_multiple - Params().target_r) < 1e-9
+    assert abs(t.r_multiple - 2.0) < 1e-9
     assert t.net_pct > 0
 
     cut = df.iloc[:43].copy()
@@ -265,36 +268,88 @@ def test_require_ma14_lt_25_filter() -> None:
     assert funnel["ma14_skip"] >= 1
 
 
+def test_min_peak_to_bd_filters_one_bar_whipsaw() -> None:
+    # _plant_fakeout() 的假高在 40、跌破在 41（相隔 1 根）：開啟 min_peak_to_bd=2 應過濾掉
+    df = _plant_fakeout()
+    t1, _ = run_backtest(df, _params(min_peak_to_bd=1))
+    assert len(t1) == 1
+    t2, _ = run_backtest(df, _params(min_peak_to_bd=2))
+    assert t2 == []
+
+
+def test_waterfall_runner_exit_modes() -> None:
+    # entry=100, stop=102 (risk=2), target=92 (4R), max_hold=3, runner_max_hold=6, min_r=0.8 (<=98.4), lock_r=0.3 (99.4)
+    # 1) 不達條件（bar 3 收 99.0 = +0.5R < 0.8R）：準時在第 3 根結算
+    h = np.array([100.5, 100.5, 100.0, 99.5, 96.0, 95.0, 94.0])
+    l = np.array([99.5, 99.5, 99.0, 98.8, 95.0, 94.0, 93.0])
+    c = np.array([100.0, 99.8, 99.2, 99.0, 95.5, 94.5, 93.5])
+    ma25 = np.full(7, 99.6)
+    idx, px, reason = simulate_exit(h, l, c, 0, 100.0, 102.0, 92.0, 3, ma25=ma25, runner_max_hold=6)
+    assert (idx, px, reason) == (3, 99.0, "time")
+
+    # 2) 達條件（bar 3 收 98.0 = +1.0R >= 0.8R 且 < ma25=99.6）：續抱至 bar 5 收盤站回 MA25
+    h2 = np.array([100.5, 100.5, 99.5, 98.8, 97.5, 99.2, 99.0])
+    l2 = np.array([99.5, 99.0, 98.5, 97.8, 96.0, 97.0, 98.0])
+    c2 = np.array([100.0, 99.2, 98.8, 98.0, 96.5, 99.0, 98.5])
+    ma25_2 = np.array([100.0, 99.8, 99.7, 99.6, 99.2, 98.8, 98.6])
+    idx, px, reason = simulate_exit(h2, l2, c2, 0, 100.0, 102.0, 92.0, 3, ma25=ma25_2, runner_max_hold=6)
+    assert (idx, px, reason) == (5, 99.0, "runner_ma25")
+
+    # 3) 續抱啟動後反彈打到保本保護停損（entry - 0.3 * risk = 99.4）
+    h3 = np.array([100.5, 100.5, 99.5, 98.8, 99.5, 96.0, 95.0])
+    l3 = np.array([99.5, 99.0, 98.5, 97.8, 97.5, 95.0, 94.0])
+    c3 = np.array([100.0, 99.2, 98.8, 98.0, 98.0, 95.5, 94.5])
+    idx, px, reason = simulate_exit(h3, l3, c3, 0, 100.0, 102.0, 92.0, 3, ma25=ma25_2, runner_max_hold=6)
+    assert (idx, px, reason) == (4, 99.4, "runner_stop")
+
+    # 4) 續抱期間全程壓在 MA25 下方直到第 6 根時間到（runner_time）
+    h4 = np.array([100.5, 100.5, 99.5, 98.8, 97.5, 96.8, 95.5])
+    l4 = np.array([99.5, 99.0, 98.5, 97.8, 96.2, 95.2, 94.2])
+    c4 = np.array([100.0, 99.2, 98.8, 98.0, 96.8, 95.8, 94.5])
+    idx, px, reason = simulate_exit(h4, l4, c4, 0, 100.0, 102.0, 92.0, 3, ma25=ma25_2, runner_max_hold=6)
+    assert (idx, px, reason) == (6, 94.5, "runner_time")
+
+    # 5) 續抱期間打到 4.0R 大瀑布停利（target=92.0）
+    h5 = h4.copy()
+    l5 = l4.copy()
+    c5 = c4.copy()
+    l5[5] = 91.5
+    idx, px, reason = simulate_exit(h5, l5, c5, 0, 100.0, 102.0, 92.0, 3, ma25=ma25_2, runner_max_hold=6)
+    assert (idx, px, reason) == (5, 92.0, "target")
+
+
 def test_sniper_big_win_detector_arm_and_fill() -> None:
-    idx = pd.date_range("2026-11-12 20:10", periods=145, freq="min", tz="Asia/Taipei")
-    c = np.full(145, 48.0)
+    idx = pd.date_range("2026-11-12 20:10", periods=146, freq="min", tz="Asia/Taipei")
+    c = np.full(146, 48.0)
     # 21:55..22:21 拉升墊高短均，使假高 50.78 相對前 45m 低點 (~48.0) > +5.5%、離 MA60 > +2.5%
     c[105:131] = 50.15
     c[131:135] = 49.30
-    c[135] = 50.10  # 22:25 刺破前高
-    c[136] = 49.85  # 22:26 跌破 MA25/30 -> arm
-    c[137] = 50.00  # 22:27 回測觸價 -> fill
-    c[138] = 48.20
+    c[135] = 50.10  # 22:25 刺破前高 (peak_idx=135)
+    c[136] = 50.08  # 22:26 高檔頓挫仍在 MA25 上方，讓 bd_idx - peak_idx == 2
+    c[137] = 49.80  # 22:27 跌破 MA25/30 -> arm
+    c[138] = 50.00  # 22:28 回測觸價 -> fill
+    c[139] = 48.20
     h = c + 0.10
     l = c - 0.10
     o = np.r_[c[0], c[:-1]]
-    v = np.full(145, 2000.0)
+    v = np.full(146, 2000.0)
     v[110] = 15000.0  # 起漲爆量
     v[135] = 2500.0   # 創高縮量 (16.7% <= 65%)
     h[120] = 50.35    # 前高
     h[121:135] = np.minimum(h[121:135], 50.20)
     h[135], l[135], o[135] = 50.78, 49.90, 50.00
-    h[136], l[136], o[136] = 50.05, 49.75, 50.05
-    o[137], h[137], l[137] = 49.90, 50.25, 49.80
+    h[136], l[136], o[136] = 50.25, 49.95, 50.10
+    h[137], l[137], o[137] = 50.05, 49.70, 50.05
+    o[138], h[138], l[138] = 49.90, 50.25, 49.80
     df = pd.DataFrame({"Open": o, "High": h, "Low": l, "Close": c, "Volume": v}, index=idx)
 
-    # 切在跌破剛收盤（bar 136 = 22:26 TPE = 09:26 ET）：應發出 arm 預掛單訊號
-    arm_df = df.iloc[:137].copy()
+    # 切在跌破剛收盤（bar 137 = 22:27 TPE = 09:27 ET）：應發出 arm 預掛單訊號
+    arm_df = df.iloc[:138].copy()
     arm_hits = detect_live_setups("SOXSUSDT", arm_df, SNIPER_PARAMS, recent_bars=2)
     assert any(s.kind == "arm" for s in arm_hits)
 
-    # 切在下一根回測觸價（bar 137 = 22:27 TPE）：應發出 fill 進場訊號
-    fill_df = df.iloc[:138].copy()
+    # 切在下一根回測觸價（bar 138 = 22:28 TPE）：應發出 fill 進場訊號
+    fill_df = df.iloc[:139].copy()
     fill_hits = detect_live_setups("SOXSUSDT", fill_df, SNIPER_PARAMS, recent_bars=2)
     fills = [s for s in fill_hits if s.kind == "fill"]
     assert len(fills) == 1
@@ -324,6 +379,8 @@ if __name__ == "__main__":
     test_ma99_gap_filter()
     test_max_ret_24h_crash_day_guard_is_causal()
     test_require_ma14_lt_25_filter()
+    test_min_peak_to_bd_filters_one_bar_whipsaw()
+    test_waterfall_runner_exit_modes()
     test_sniper_big_win_detector_arm_and_fill()
     test_outside_session_is_ignored()
     print("ok")

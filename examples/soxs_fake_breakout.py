@@ -51,16 +51,23 @@ MA_WIDTH = {7: 1.15, 14: 1.05, 25: 2.05, 30: 1.15, 60: 1.05, 99: 1.15, 120: 1.05
 
 @dataclass(frozen=True)
 class Params:
-    """假突破做空參數。預設為 v2 優化版（均線中空帶 0.8%–3.5% + 防單日暴衝熔斷 + 2R 務實停利）。"""
+    """假突破做空參數。預設為 v3 優化版（均線中空帶 0.8–3.5% + 24h 暴衝熔斷 + 瀑布續抱移動出場）。"""
 
     lookback: int = 120
     min_sep: int = 15
     min_overshoot: float = 0.002
     max_overshoot: float = 0.035
     break_window: int = 25
+    # 假高到跌破至少間隔幾根 K（2 可過濾開盤 1 根針刺反轉假訊號，1 表示不限制）。
+    min_peak_to_bd: int = 2
     retest_window: int = 10
-    target_r: float = 2.0
+    target_r: float = 4.0
     max_hold: int = 30
+    # 瀑布續抱移動出場：第 max_hold 根收盤若仍在 MA25 下方且浮盈 ≥ runner_min_r，
+    # 將保護停損移至進場下方 runner_lock_r，續抱至收盤站回 MA25 或最長 runner_max_hold（設 0 關閉）。
+    runner_max_hold: int = 60
+    runner_min_r: float = 0.8
+    runner_lock_r: float = 0.3
     max_risk: float = 0.025
     min_risk: float = 0.006
     # 掛單價距離下方 MA99 須落在 [min_gap_ma99, max_gap_ma99] 合理中空帶（0 表示不檢查該端）。
@@ -173,17 +180,49 @@ def simulate_exit(
     stop_price: float,
     target_price: float,
     max_hold: int,
+    *,
+    ma25: Optional[np.ndarray] = None,
+    runner_max_hold: int = 0,
+    runner_min_r: float = 0.8,
+    runner_lock_r: float = 0.3,
 ) -> Tuple[int, float, str]:
-    """進場那根只認停損；停利從下一根開始。同一根先算停損。"""
+    """進場那根只認停損；停利從下一根開始。同一根先算停損。
+
+    若啟用 runner_max_hold > max_hold 且提供 ma25：
+    第 max_hold 根收盤仍在 MA25 下方且浮盈 ≥ runner_min_r 時，
+    自下一根起將停損移至 entry - runner_lock_r * risk 保護獲利，
+    續抱至收盤站回 MA25、碰到目標價、碰到保護停損或達 runner_max_hold。
+    """
     last = len(close) - 1
-    end = min(last, entry_idx + max_hold)
-    for m in range(entry_idx, end + 1):
-        if high[m] >= stop_price:
-            return m, stop_price, "stop"
-        if m > entry_idx and low[m] <= target_price:
+    end_primary = min(last, entry_idx + max_hold)
+    use_runner = runner_max_hold > max_hold and ma25 is not None
+    end_limit = min(last, entry_idx + runner_max_hold) if use_runner else end_primary
+    risk = stop_price - entry_price
+    cur_stop = stop_price
+    extended = False
+    for m in range(entry_idx, end_limit + 1):
+        if high[m] >= cur_stop:
+            return m, cur_stop, ("runner_stop" if extended else "stop")
+        if m > entry_idx and target_price > 0 and low[m] <= target_price:
             return m, target_price, "target"
-    reason = "time" if end == entry_idx + max_hold else "open"
-    return end, float(close[end]), reason
+        if m == end_primary and not extended:
+            if m < entry_idx + max_hold:
+                return m, float(close[m]), "open"
+            if use_runner and risk > 0 and not np.isnan(ma25[m]):
+                cur_r = (entry_price - float(close[m])) / risk
+                if float(close[m]) < float(ma25[m]) and cur_r >= runner_min_r:
+                    extended = True
+                    cur_stop = min(cur_stop, entry_price - runner_lock_r * risk)
+                    continue
+            return m, float(close[m]), "time"
+        if extended:
+            if not np.isnan(ma25[m]) and float(close[m]) > float(ma25[m]):
+                return m, float(close[m]), "runner_ma25"
+            if m == end_limit:
+                reason = "runner_time" if end_limit == entry_idx + runner_max_hold else "open"
+                return m, float(close[m]), reason
+    reason = "time" if end_primary == entry_idx + max_hold else "open"
+    return end_primary, float(close[end_primary]), reason
 
 
 def run_backtest(
@@ -279,6 +318,9 @@ def run_backtest(
             funnel["runaway"] += 1
         if bd_idx is None:
             i += 1
+            continue
+        if (bd_idx - peak_idx) < params.min_peak_to_bd:
+            i = bd_idx + 1
             continue
         funnel["breakdown"] += 1
 
@@ -393,9 +435,20 @@ def run_backtest(
             continue
 
         risk = stop_px - entry_px
-        target = entry_px - params.target_r * risk
+        target = entry_px - params.target_r * risk if params.target_r > 0 else 0.0
         exit_idx, exit_px, reason = simulate_exit(
-            h, l, c, entry_idx, entry_px, stop_px, target, params.max_hold
+            h,
+            l,
+            c,
+            entry_idx,
+            entry_px,
+            stop_px,
+            target,
+            params.max_hold,
+            ma25=ma25,
+            runner_max_hold=params.runner_max_hold,
+            runner_min_r=params.runner_min_r,
+            runner_lock_r=params.runner_lock_r,
         )
         gross = (entry_px - exit_px) / entry_px
         fee = params.fee_pct
@@ -715,6 +768,13 @@ def _rules_html(params: Params, symbol: str) -> str:
         if (params.min_pump45_pct > 0 or params.min_peak_ext60_pct > 0 or params.max_peak_vol_ratio > 0)
         else ""
     )
+    runner_rule = (
+        f"第 {params.max_hold} 根若收盤仍在 MA25 下方且浮盈 ≥ +{params.runner_min_r:g}R，則將保護停損移至 +{params.runner_lock_r:g}R 續抱瀑布，"
+        f"直到收盤站回 MA25、打到 {params.target_r:g}R 目標或最長 {params.runner_max_hold} 根；其餘第 {params.max_hold} 根直接收盤結算。"
+        if params.runner_max_hold > params.max_hold
+        else f"最長 {params.max_hold} 根（半小時結算），否則用該根收盤出場。"
+    )
+    whipsaw_note = f"（假高至跌破至少隔 {params.min_peak_to_bd} 根，過濾 1 根針刺反轉）" if params.min_peak_to_bd > 1 else ""
     fee = "0.06%（掛單 maker 0.02% + 出場 taker 0.04%）" if params.mode == "limit" else "0.08%（進出都算 taker）"
     return f"""
 <ol class="rules">
@@ -723,14 +783,14 @@ def _rules_html(params: Params, symbol: str) -> str:
 <li><b>時段</b>：{escape(session)}</li>
 <li><b>前高</b>：當根往前第 {params.min_sep}～{params.lookback} 根的最高價，而且這段之後到當根之前都沒再摸到該高點。前高之後、突破之前，收盤曾經低於 MA25。</li>
 <li><b>假突破</b>：高點刺過前高，往後 {params.break_window} 根內的最高超漲要落在 {params.min_overshoot * 100:.1f}%～{params.max_overshoot * 100:.1f}%。超過上限當成真突破，整段放棄。</li>
-<li><b>跌破</b>：超漲達標之後，第一根同時收盤 &lt; MA25、收盤 &lt; MA30、收盤 &lt; 前高，而且 MA7 &lt; MA14。</li>
+<li><b>跌破</b>：超漲達標之後，第一根同時收盤 &lt; MA25、收盤 &lt; MA30、收盤 &lt; 前高，而且 MA7 &lt; MA14{escape(whipsaw_note)}。</li>
 <li><b>進場</b>：{escape(entry)}進場那根若開盤價已高於停損，這筆不算。</li>
 {gap_rule}
 {regime_rule}
 {ma14_rule}
 {sniper_rule}
 <li><b>停損</b>：假突破最高價 × {1 + params.stop_buffer:.3f}。停損距離不到 {params.min_risk * 100:.1f}% 或超過 {params.max_risk * 100:.1f}% 就不做。</li>
-<li><b>出場</b>：停利 {params.target_r:g}R。進場那根只允許被停損，停利從下一根才算；同一根先算停損。最長 {params.max_hold} 根（半小時結算），否則用該根收盤出場。</li>
+<li><b>出場</b>：停利 {params.target_r:g}R。進場那根只允許被停損，停利從下一根才算；同一根先算停損。{escape(runner_rule)}</li>
 <li><b>成本與持倉</b>：來回扣 {escape(fee)}，未扣資金費率。同一時間只留一筆。</li>
 </ol>
 <p class="note">價格報酬是永續合約本身的漲跌，不是再乘保證金槓桿。SOXS 現貨本來就是 3 倍反向半導體；這裡沒有再疊一層槓桿，也沒有模擬強平。</p>
@@ -759,7 +819,13 @@ def write_html(
         img_name = f"t{i:02d}_{et.strftime('%m%d_%H%M')}.png"
         draw_trade_png(df, t, img_dir / img_name, i, symbol)
         cls = "pnl-win" if t.net_pct > 0 else ("pnl-flat" if t.net_pct == 0 else "pnl-loss")
-        tag_cls = {"target": "tag-tp", "stop": "tag-sl"}.get(t.exit_reason, "tag-time")
+        tag_cls = {
+            "target": "tag-tp",
+            "runner_ma25": "tag-tp",
+            "runner_time": "tag-tp",
+            "runner_stop": "tag-tp",
+            "stop": "tag-sl",
+        }.get(t.exit_reason, "tag-time")
         risk = t.stop_price - t.entry_price
         cards.append(
             "<article class='trade-card'>"
@@ -859,7 +925,7 @@ th:first-child,td:first-child{{text-align:left}}
 <h2>回測統計</h2>
 <p class="muted">漏斗：刺破前高 {funnel.get('breakout', 0)} → 超漲過大放棄 {funnel.get('runaway', 0)} → 跌破 MA25/30 {funnel.get('breakdown', 0)} → 進場 {funnel.get('entered', 0)}
 （非大賺結構 {funnel.get('sniper_skip', 0)} · MA99 空間不合 {funnel.get('gap_skip', 0)} · 24h 暴衝熔斷 {funnel.get('regime_skip', 0)} · 未空排 {funnel.get('ma14_skip', 0)} · 風險不合 {funnel.get('risk_skip', 0)}）
-<br/>出場：停利 {reasons.get('target', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未走完 {reasons.get('open', 0)}</p>
+<br/>出場：停利 {reasons.get('target', 0)} · 瀑布續抱 {reasons.get('runner_ma25', 0) + reasons.get('runner_time', 0) + reasons.get('runner_stop', 0)} · 停損 {reasons.get('stop', 0)} · 時間 {reasons.get('time', 0)} · 未走完 {reasons.get('open', 0)}</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -948,8 +1014,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description="SOXSUSDT 1 分 K 假突破做空回測")
     p.add_argument("--symbol", default="SOXSUSDT")
     p.add_argument("--days", type=int, default=30)
-    p.add_argument("--max-hold", type=int, default=30, help="最長持有分鐘（預設半小時 30 根）")
-    p.add_argument("--score-minutes", type=int, default=60, help="另算這個時間內的延伸表現")
+    p.add_argument("--max-hold", type=int, default=30, help="主要檢核持有分鐘（預設半小時 30 根）")
+    p.add_argument("--runner-max-hold", type=int, default=60, help="瀑布續抱最長分鐘（設 0 關閉續抱、固定 30m 結算）")
+    p.add_argument("--score-minutes", type=int, default=60, help="另算這個時間內的固定持有對照表現")
     p.add_argument("--min-gap-ma99", type=float, default=0.008, help="掛單價高於前一根 MA99 的最小比例")
     p.add_argument("--max-gap-ma99", type=float, default=0.035, help="掛單價高於前一根 MA99 的最大比例（防垂直暴衝，0 關閉）")
     p.add_argument("--max-ret-24h", type=float, default=0.20, help="前一根相對 24 小時漲幅上限（防崩盤日逆勢，0 關閉）")
@@ -969,6 +1036,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             mode=args.mode,
             session="tpe_us",
             max_hold=args.max_hold,
+            runner_max_hold=0,
+            min_peak_to_bd=1,
             target_r=2.5,
             stop_buffer=0.001,
             min_gap_ma99=0.0,
@@ -983,6 +1052,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             mode=args.mode,
             session=args.session,
             max_hold=args.max_hold,
+            runner_max_hold=args.runner_max_hold,
             min_gap_ma99=args.min_gap_ma99,
             max_gap_ma99=args.max_gap_ma99,
             max_ret_24h=args.max_ret_24h,
@@ -997,6 +1067,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             mode=args.mode,
             session=args.session,
             max_hold=args.max_hold,
+            runner_max_hold=args.runner_max_hold,
             min_gap_ma99=args.min_gap_ma99,
             max_gap_ma99=args.max_gap_ma99,
             max_ret_24h=args.max_ret_24h,
@@ -1026,12 +1097,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
 
     main_label = (
-        f"S級大賺狙擊 v2 (離MA99 {params.min_gap_ma99*100:.1f}–{params.max_gap_ma99*100:.1f}%, 24h≤{params.max_ret_24h*100:.0f}%, {params.max_hold}m)"
+        f"S級大賺狙擊 v3 (瀑布續抱 30→{params.runner_max_hold}m, TP {params.target_r:g}R)"
         if args.sniper
         else (
-            f"極穩空排 v2 (MA14<MA25, {params.max_hold}m)"
+            f"極穩空排 v3 (MA14<MA25, 瀑布續抱 30→{params.runner_max_hold}m)"
             if args.ma14_below_ma25
-            else f"優化主策略 v2 (離MA99 {params.min_gap_ma99*100:.1f}–{params.max_gap_ma99*100:.1f}%, 24h≤{params.max_ret_24h*100:.0f}%, TP 2R, {params.max_hold}m)"
+            else f"優化主策略 v3 (瀑布續抱 30→{params.runner_max_hold}m, TP {params.target_r:g}R)"
         )
     )
     comparisons = [(main_label, stats)]
@@ -1042,9 +1113,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 mode="limit",
                 session="ny_open",
                 max_hold=args.max_hold,
+                runner_max_hold=args.runner_max_hold,
                 require_ma14_lt_25=True,
             ),
-            f"極穩空排確認 v2 (MA14<MA25, {args.max_hold}m)",
+            f"極穩空排確認 v3 (MA14<MA25, 瀑布續抱)",
         ),
         (
             Params(
@@ -1052,13 +1124,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 mode="limit",
                 session="ny_open",
                 max_hold=args.max_hold,
+                runner_max_hold=0,
+                min_peak_to_bd=1,
+                target_r=2.0,
+            ),
+            f"舊版優化 v2 (固定 30m, TP 2.0R)",
+        ),
+        (
+            Params(
+                days=args.days,
+                mode="limit",
+                session="ny_open",
+                max_hold=args.max_hold,
+                runner_max_hold=0,
+                min_peak_to_bd=1,
                 target_r=2.5,
                 stop_buffer=0.001,
                 min_gap_ma99=0.008,
                 max_gap_ma99=0.0,
                 max_ret_24h=0.0,
             ),
-            f"舊版優化 v1 (無暴衝上限/無24h熔斷, TP 2.5R, {args.max_hold}m)",
+            f"舊版優化 v1 (無暴衝上限/無24h熔斷, TP 2.5R)",
         ),
         (
             Params(
@@ -1066,6 +1152,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 mode="limit",
                 session="tpe_us",
                 max_hold=args.max_hold,
+                runner_max_hold=0,
+                min_peak_to_bd=1,
                 target_r=2.5,
                 stop_buffer=0.001,
                 min_gap_ma99=0.0,
@@ -1074,7 +1162,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 min_risk=0.002,
                 max_risk=0.035,
             ),
-            f"初版寬鬆設定 (tpe_us, 不限MA99, {args.max_hold}m)",
+            f"初版寬鬆設定 (tpe_us, 不限MA99, 30m)",
         ),
     ):
         alt, _ = run_backtest(df, alt_params)
