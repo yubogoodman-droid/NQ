@@ -286,14 +286,24 @@ def _fee(entry: float) -> float:
     return entry * FEE_PCT / 100.0
 
 
-def simulate(i: int, h: np.ndarray, l: np.ndarray, c: np.ndarray, m200: np.ndarray) -> dict:
+def simulate(
+    i: int,
+    h: np.ndarray,
+    l: np.ndarray,
+    c: np.ndarray,
+    m200: np.ndarray,
+    target_pts: float | None = None,
+) -> dict:
     """停損＝前 40 根最低。跌回＝收盤跌破 MA200 超過 0.3%。
 
-    scalp 整筆先碰到 +1、跌回或停損就出。
-    scale 先拿一半 +1，另一半抱到收盤跌回 MA200（超過 0.3%）或停損。
-    同一根先碰到停損就算停損，+1 不算數。
+    scalp 整筆先碰到目標、跌回或停損就出。
+    scale 先拿一半目標，另一半抱到收盤跌回 MA200（超過 0.3%）或停損。
+    同一根先碰到停損就算停損，目標不算數。
+    target_pts 不傳時用固定 +1 點。
     """
     entry = float(c[i])
+    target = TARGET_PTS if target_pts is None else float(target_pts)
+    hit_name = "+1" if target_pts is None else "目標"
     stop = float(np.min(l[i - BASE_BARS : i]))
     risk = entry - stop
     fee = _fee(entry)
@@ -312,14 +322,14 @@ def simulate(i: int, h: np.ndarray, l: np.ndarray, c: np.ndarray, m200: np.ndarr
         hold = k - i
         mfe = max(mfe, float(h[k]) - entry)
         hit_stop = l[k] <= stop
-        hit_tgt = h[k] >= entry + TARGET_PTS
+        hit_tgt = h[k] >= entry + target
         lost = bool(np.isfinite(m200[k]) and c[k] < m200[k] * buf_mult)
 
         if scalp_px is None:
             if hit_stop:
                 scalp_px, scalp_reason, scalp_hold = stop, "停損", hold
             elif hit_tgt:
-                scalp_px, scalp_reason, scalp_hold = entry + TARGET_PTS, "+1", hold
+                scalp_px, scalp_reason, scalp_hold = entry + target, hit_name, hold
             elif lost:
                 scalp_px, scalp_reason, scalp_hold = float(c[k]), "跌回", hold
 
@@ -329,7 +339,7 @@ def simulate(i: int, h: np.ndarray, l: np.ndarray, c: np.ndarray, m200: np.ndarr
             scale_reason = "停損" if not half else "一半後停損"
             break
         if not half and hit_tgt:
-            scale_pnl += 0.5 * TARGET_PTS
+            scale_pnl += 0.5 * target
             half = True
         if lost:
             weight = 0.5 if half else 1.0
@@ -513,6 +523,9 @@ def draw_trade(
     ex = i - a0
     entry = float(trade["entry"])
     stop = float(trade["stop"])
+    mark = str(trade.get("mark", "+1"))
+    unit = str(trade.get("unit", ""))
+    tgt = entry + float(trade.get("target_pts", TARGET_PTS))
     y_lo = float(np.nanmin(l))
     y_hi = float(np.nanmax(h))
     for nlen in MA_COLORS:
@@ -524,9 +537,8 @@ def draw_trade(
     ax.set_ylim(y_lo - pad, y_hi + pad)
     if y_lo - pad <= stop <= y_hi + pad:
         ax.axhline(stop, color="#e35d5d", ls=":", lw=1.0, alpha=0.85, label="停損")
-    tgt = entry + TARGET_PTS
     if y_lo - pad <= tgt <= y_hi + pad:
-        ax.axhline(tgt, color="#00c853", ls=":", lw=1.0, alpha=0.8, label="+1")
+        ax.axhline(tgt, color="#00c853", ls=":", lw=1.0, alpha=0.8, label=mark)
     ax.axvline(ex, color="#fb8c00", ls="--", lw=0.8, alpha=0.9)
     ax.scatter([ex], [entry], s=54, color="#00c853", marker="^", zorder=6)
     ax.scatter([ex], [entry], s=220, facecolors="none", edgecolors="#fb8c00", linewidths=2.0, zorder=7)
@@ -535,13 +547,13 @@ def draw_trade(
 
     sx = _idx_at(d["t"], entry_ms + hold_min * 60_000) - a0
     if 0 <= sx < len(c):
-        if trade["scalp_reason"] == "+1":
+        if trade["scalp_reason"] in ("+1", "目標"):
             ax.scatter([sx], [tgt], s=70, color="#00c853", marker="*", zorder=7)
-            ax.annotate("+1", (sx, tgt), textcoords="offset points", xytext=(6, 6), color="#00a152", fontsize=9, fontweight="bold", **kw)
+            ax.annotate(mark, (sx, tgt), textcoords="offset points", xytext=(6, 6), color="#00a152", fontsize=9, fontweight="bold", **kw)
         elif trade["scalp_reason"] in ("跌回", "停損"):
-            mark = stop if trade["scalp_reason"] == "停損" else float(c[sx])
-            ax.scatter([sx], [mark], s=36, color="#ff5252", marker="x", zorder=6)
-            ax.annotate(trade["scalp_reason"], (sx, mark), textcoords="offset points", xytext=(6, -12), color="#c62828", fontsize=8, **kw)
+            px = stop if trade["scalp_reason"] == "停損" else float(c[sx])
+            ax.scatter([sx], [px], s=36, color="#ff5252", marker="x", zorder=6)
+            ax.annotate(trade["scalp_reason"], (sx, px), textcoords="offset points", xytext=(6, -12), color="#c62828", fontsize=8, **kw)
     hx = _idx_at(d["t"], entry_ms + scale_min * 60_000) - a0
     if trade["scale_reason"].startswith("一半") and 0 <= hx < len(c) and hx != sx:
         ax.scatter([hx], [c[hx]], s=36, color="#1565c0", marker="x", zorder=6)
@@ -549,8 +561,8 @@ def draw_trade(
 
     title = (
         f"{tf_label}  #{trade_no}  {trade['time']}  進 {entry:.2f}  "
-        f"整筆 {trade['scalp_reason']} {trade['scalp_net']:+.2f}  "
-        f"一半 {trade['scale_net']:+.2f}  最大 {trade['mfe']:.2f}"
+        f"整筆 {trade['scalp_reason']} {trade['scalp_net']:+.2f}{unit}  "
+        f"一半 {trade['scale_net']:+.2f}{unit}  最大 {trade['mfe']:.2f}{unit}"
     )
     title_color = "#e65100" if bar_ms != 60_000 else "#263238"
     ax.set_title(title, color=title_color, fontsize=13, loc="left", fontweight="bold", **kw)
