@@ -367,14 +367,21 @@ def _cjk_font():
     return None
 
 
+def _idx_at(t: np.ndarray, ms: int) -> int:
+    return int(np.searchsorted(t, ms, side="right")) - 1
+
+
 def draw_trade(
     path: Path,
     d: dict,
     mas: dict[int, np.ndarray],
     trade: dict,
     trade_no: int,
+    *,
+    tf_label: str = "1分K",
+    bar_ms: int = 60_000,
 ) -> None:
-    """進場前後的一分 K，8 條均線跟幣安原圖同色。"""
+    """進場前後的 K 線，8 條均線跟幣安原圖同色。1 分 K、5 分 K 都走這支。"""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -384,10 +391,20 @@ def draw_trade(
     font = _cjk_font()
     if font is not None:
         plt.rcParams["font.family"] = font.get_name()
-    i = int(trade["i"])
+    entry_ms = int(trade["ms"])
+    i = _idx_at(d["t"], entry_ms) if bar_ms != 60_000 else int(trade["i"])
+    if i < 0:
+        i = 0
     n = len(d["c"])
-    a0 = max(0, i - 45)
-    after = max(60, min(int(trade["hold"]) + 25, 115))
+    hold_min = int(trade["hold"])
+    scale_min = int(trade["scale_hold"])
+    if bar_ms == 60_000:
+        before, after = 45, max(60, min(hold_min + 25, 115))
+    else:
+        # 5 分 K 看得比 1 分 K 寬：進場前約 4 小時，並蓋住這筆持有。
+        need = max(hold_min, scale_min) // (bar_ms // 60_000) + 12
+        before, after = 48, max(36, min(need, 90))
+    a0 = max(0, i - before)
     a1 = min(n - 1, i + after)
     sl = slice(a0, a1 + 1)
     o, h, l, c = d["o"][sl], d["h"][sl], d["l"][sl], d["c"][sl]
@@ -431,21 +448,22 @@ def draw_trade(
     kw = {"fontproperties": font} if font else {}
     ax.annotate("進", (ex, entry), textcoords="offset points", xytext=(8, 10), color="#e65100", fontsize=11, fontweight="bold", **kw)
 
-    sx = ex + int(trade["hold"])
+    sx = _idx_at(d["t"], entry_ms + hold_min * 60_000) - a0
     if 0 <= sx < len(c):
         if trade["scalp_reason"] == "+1":
             ax.scatter([sx], [tgt], s=70, color="#00c853", marker="*", zorder=7)
             ax.annotate("+1", (sx, tgt), textcoords="offset points", xytext=(6, 6), color="#00a152", fontsize=9, fontweight="bold", **kw)
         elif trade["scalp_reason"] in ("跌回", "停損"):
-            ax.scatter([sx], [c[sx]], s=36, color="#ff5252", marker="x", zorder=6)
-            ax.annotate(trade["scalp_reason"], (sx, c[sx]), textcoords="offset points", xytext=(6, -12), color="#c62828", fontsize=8, **kw)
-    hx = ex + int(trade["scale_hold"])
+            mark = stop if trade["scalp_reason"] == "停損" else float(c[sx])
+            ax.scatter([sx], [mark], s=36, color="#ff5252", marker="x", zorder=6)
+            ax.annotate(trade["scalp_reason"], (sx, mark), textcoords="offset points", xytext=(6, -12), color="#c62828", fontsize=8, **kw)
+    hx = _idx_at(d["t"], entry_ms + scale_min * 60_000) - a0
     if trade["scale_reason"].startswith("一半") and 0 <= hx < len(c) and hx != sx:
         ax.scatter([hx], [c[hx]], s=36, color="#1565c0", marker="x", zorder=6)
         ax.annotate("半出", (hx, c[hx]), textcoords="offset points", xytext=(6, 8), color="#1565c0", fontsize=8, **kw)
 
     title = (
-        f"#{trade_no}  {trade['time']}  進 {entry:.2f}  "
+        f"{tf_label}  #{trade_no}  {trade['time']}  進 {entry:.2f}  "
         f"整筆 {trade['scalp_reason']} {trade['scalp_net']:+.2f}  "
         f"一半 {trade['scale_net']:+.2f}  最大 {trade['mfe']:.2f}"
     )
@@ -463,9 +481,10 @@ def draw_trade(
     plt.close(fig)
 
 
-def _png_name(n: int, when: str) -> str:
+def _png_name(n: int, when: str, suffix: str = "") -> str:
     stamp = when.replace("-", "").replace(" ", "_").replace(":", "")
-    return f"t{n:02d}_{stamp}.png"
+    extra = f"_{suffix}" if suffix else ""
+    return f"t{n:02d}_{stamp}{extra}.png"
 
 
 def write_gallery(rows: list[dict], img_dir: Path, page: Path, window_label: str = "") -> None:
@@ -479,6 +498,7 @@ def write_gallery(rows: list[dict], img_dir: Path, page: Path, window_label: str
     cards = []
     for n, r in enumerate(rows, 1):
         name = _png_name(n, r["time"])
+        name5 = _png_name(n, r["time"], "5m")
         cls = "pnl-win" if r["scale_net"] > 0 else "pnl-loss" if r["scale_net"] < 0 else "pnl-flat"
         tag = "tag-tp" if r["scalp_reason"] == "+1" else "tag-sl"
         htf_line = ""
@@ -489,7 +509,7 @@ def write_gallery(rows: list[dict], img_dir: Path, page: Path, window_label: str
 停損 {r['stop']:.2f}  風險 {r['risk']:.2f}
 整筆 {r['scalp_pts']:+.2f}  扣費 {r['scalp_net']:+.2f}  {r['hold']} 分
 一半 {r['scale_pts']:+.2f}  扣費 {r['scale_net']:+.2f}  {r['scale_hold']} 分
-最大浮盈 {r['mfe']:.2f}{htf_line}</pre><div class='mini-chart'><img src='img/{name}' alt='#{n} {r['time']}' style='width:100%;display:block;border-radius:10px'/></div></article>"""
+最大浮盈 {r['mfe']:.2f}{htf_line}</pre><div class='mini-chart'><div class='chart-label'>1 分 K</div><img src='img/{name}' alt='#{n} {r['time']} 1分K' style='width:100%;display:block;border-radius:10px'/><div class='chart-label'>5 分 K</div><img src='img/{name5}' alt='#{n} {r['time']} 5分K' style='width:100%;display:block;border-radius:10px'/></div></article>"""
         )
     win_str = f"台北 {window_label}。" if window_label else ""
     html = f"""<!DOCTYPE html>
@@ -520,11 +540,13 @@ h1{{font-size:18px;margin:0 0 6px}}
 .tag-info{{background:rgba(88,166,255,0.12);color:#79c0ff;border-color:rgba(88,166,255,0.28)}}
 .trade-detail{{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;border:1px solid #21262d;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap}}
 .mini-chart{{margin:0 -6px -4px;border-radius:10px;overflow:hidden}}
+.chart-label{{font-size:12px;font-weight:700;color:#8b949e;padding:8px 8px 4px}}
+.chart-label + img{{margin-bottom:4px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
 <h1>SOXSUSDT 1m＋5m＋15m，MA200 束撥開</h1>
-<p class="muted">{win_str}1 分 K：MA200 &gt; MA120 &gt; MA99 收平，MA7 剛上穿 MA200 且站穩 4 根；同步確認已收線 5 分 K MA7 &gt; MA14、15 分 K MA200 沒急跌（10 根斜率 ≥ -0.20%）。收盤跌破 1m MA200 超過 0.3% 算跌回。橘圈是進場，綠星是 +1，紅叉是跌回。</p>
+<p class="muted">{win_str}1 分 K：MA200 &gt; MA120 &gt; MA99 收平，MA7 剛上穿 MA200 且站穩 4 根；同步確認已收線 5 分 K MA7 &gt; MA14、15 分 K MA200 沒急跌（10 根斜率 ≥ -0.20%）。每筆下面先是當時的 1 分 K，再是同一時間的 5 分 K。收盤跌破 1m MA200 超過 0.3% 算跌回。橘圈是進場，綠星是 +1，紅叉是跌回。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(rows)}</b></div>
 <div class="card">拿到 +1<b>{hit1}/{len(rows)}</b></div>
@@ -555,7 +577,8 @@ def run(symbol: str = "SOXSUSDT", days: int = 30, charts: Path | None = None) ->
     c = d["c"]
     mas = {n: sma(c, n) for n in MA_PERIODS}
     m7, m14, m25, m30, m99, m120, m200 = (mas[n] for n in (7, 14, 25, 30, 99, 120, 200))
-    m5_7, m5_14 = sma(d5["c"], 7), sma(d5["c"], 14)
+    mas5 = {n: sma(d5["c"], n) for n in MA_PERIODS}
+    m5_7, m5_14 = mas5[7], mas5[14]
     m15_200 = sma(d15["c"], 200)
     htf = (d5["t"], m5_7, m5_14, d15["t"], m15_200)
 
@@ -593,8 +616,16 @@ def run(symbol: str = "SOXSUSDT", days: int = 30, charts: Path | None = None) ->
         for old in img.glob("*.png"):
             old.unlink()
         for n, r in enumerate(rows, 1):
-            name = _png_name(n, r["time"])
-            draw_trade(img / name, d, mas, r, n)
+            draw_trade(img / _png_name(n, r["time"]), d, mas, r, n)
+            draw_trade(
+                img / _png_name(n, r["time"], "5m"),
+                d5,
+                mas5,
+                r,
+                n,
+                tf_label="5分K",
+                bar_ms=INTERVAL_MS["5m"],
+            )
         write_gallery(rows, img, charts / "index.html", window_label=window_label)
         print(f"圖：{charts / 'index.html'}")
     return rows
