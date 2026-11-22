@@ -92,19 +92,28 @@ def test_htf_alignment_and_no_lookahead() -> None:
     t5_big = np.arange(800, dtype=np.int64) * 300_000
     m5_7b = np.full(800, 101.0)
     m5_14b = np.full(800, 100.0)
-    ok, gap5, s15 = htf_aligned(int(t15[220]) + 14 * 60_000, t5_big, m5_7b, m5_14b, t15, m15_200)
+    m5_99 = np.full(800, 100.0)
+    m5_120 = np.full(800, 102.0)
+    m5_200 = np.full(800, 101.0)
+    t_ok = int(t15[220]) + 14 * 60_000
+    ok, gap5, s15 = htf_aligned(t_ok, t5_big, m5_7b, m5_14b, m5_99, m5_120, m5_200, t15, m15_200)
     assert ok and gap5 is not None and gap5 > 0 and s15 == 0.0
 
     # 5m MA7 <= MA14 -> reject
     m5_7c = np.full(800, 99.5)
-    ok2, _, _ = htf_aligned(int(t15[220]) + 14 * 60_000, t5_big, m5_7c, m5_14b, t15, m15_200)
+    ok2, _, _ = htf_aligned(t_ok, t5_big, m5_7c, m5_14b, m5_99, m5_120, m5_200, t15, m15_200)
     assert not ok2
 
     # 15m MA200 plunging (-0.5% over 10 bars) -> reject
     m15_down = np.full(250, 100.0)
     m15_down[220] = 99.5
-    ok3, _, _ = htf_aligned(int(t15[220]) + 14 * 60_000, t5_big, m5_7b, m5_14b, t15, m15_down)
+    ok3, _, _ = htf_aligned(t_ok, t5_big, m5_7b, m5_14b, m5_99, m5_120, m5_200, t15, m15_down)
     assert not ok3
+
+    # 5m 長均線不是 120 > 200 > 99 -> reject
+    m5_120_under = np.full(800, 100.5)
+    ok4, _, _ = htf_aligned(t_ok, t5_big, m5_7b, m5_14b, m5_99, m5_120_under, m5_200, t15, m15_200)
+    assert not ok4
 
 
 def test_one_shot_and_rearm_after_25_under() -> None:

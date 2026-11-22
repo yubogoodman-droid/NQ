@@ -7,6 +7,7 @@
 - 1 分 K 短中均線撥開扇形往上：MA7 > MA14 > MA25 > MA30，5 根斜率由陡到緩且都往上，MA14 已跨過 MA120
 - 1 分 K MA7 近 3 根內剛上穿 MA200，收盤 > MA7 > MA200，連續至少 4 根收在 MA200 上方，離 MA200 不超過 1%
 - 5 分 K 短均線已翻多：已收線的 5m MA7 > MA14
+- 5 分 K 長均線剛開始翻、還沒排成多頭：已收線的 5m MA120 > MA200 > MA99
 - 15 分 K 大趨勢不在急跌：已收線的 15m MA200 近 10 根斜率 >= -0.20%
 
 出場：停損放前 40 根最低；收盤跌破 1m MA200 超過 0.3% 算跌回（留一點正常回踩空間）。
@@ -153,20 +154,24 @@ def htf_aligned(
     t5: np.ndarray,
     m5_7: np.ndarray,
     m5_14: np.ndarray,
+    m5_99: np.ndarray,
+    m5_120: np.ndarray,
+    m5_200: np.ndarray,
     t15: np.ndarray,
     m15_200: np.ndarray,
 ) -> tuple[bool, float | None, float | None]:
-    """檢查 5m MA7 > MA14 且 15m MA200 沒有急跌（近 10 根斜率 >= -0.20%）。"""
+    """5m 短均線已翻多，且長均線是 MA120 > MA200 > MA99；15m MA200 沒有急跌。"""
     j5 = last_closed_idx(t5, INTERVAL_MS["5m"], t1_open_ms)
     j15 = last_closed_idx(t15, INTERVAL_MS["15m"], t1_open_ms)
-    if j5 < 14 or j15 < 209:
+    if j5 < 199 or j15 < 209:
         return False, None, None
     v5_7, v5_14 = float(m5_7[j5]), float(m5_14[j5])
+    v99, v120, v200 = float(m5_99[j5]), float(m5_120[j5]), float(m5_200[j5])
     s15_200 = slope_pct(m15_200, j15, 10)
-    if not np.isfinite([v5_7, v5_14]).all() or s15_200 is None or v5_14 <= 0:
+    if not np.isfinite([v5_7, v5_14, v99, v120, v200]).all() or s15_200 is None or v5_14 <= 0:
         return False, None, s15_200
     gap5 = (v5_7 - v5_14) / v5_14 * 100.0
-    ok = (v5_7 > v5_14) and (s15_200 >= M15_M200_SLOPE_MIN)
+    ok = (v5_7 > v5_14) and (v120 > v200 > v99) and (s15_200 >= M15_M200_SLOPE_MIN)
     return ok, gap5, s15_200
 
 
@@ -181,7 +186,7 @@ def entry_indices(
     m200: np.ndarray,
     t: np.ndarray,
     t_min: int,
-    htf: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None,
+    htf: tuple[np.ndarray, ...] | None = None,
 ) -> list[int]:
     """每個撥開只進第一根；有傳 htf 時同步驗證 5m/15m。之後要 25 根收在 MA200 下才重裝。"""
     armed = False
@@ -194,8 +199,10 @@ def entry_indices(
             armed = True
         if int(t[i]) >= t_min and armed and is_peel(i, c, m7, m14, m25, m30, m99, m120, m200):
             if htf is not None:
-                t5, m5_7, m5_14, t15, m15_200 = htf
-                ok, _, _ = htf_aligned(int(t[i]), t5, m5_7, m5_14, t15, m15_200)
+                t5, m5_7, m5_14, m5_99, m5_120, m5_200, t15, m15_200 = htf
+                ok, _, _ = htf_aligned(
+                    int(t[i]), t5, m5_7, m5_14, m5_99, m5_120, m5_200, t15, m15_200
+                )
                 if not ok:
                     continue
             out.append(i)
@@ -589,7 +596,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>SOXSUSDT 1m＋5m＋15m，MA200 束撥開</h1>
-<p class="muted">{win_str}1 分 K：MA200 &gt; MA120 &gt; MA99 收平，MA7 剛上穿 MA200 且站穩 4 根；同步確認已收線 5 分 K MA7 &gt; MA14、15 分 K MA200 沒急跌（10 根斜率 ≥ -0.20%）。每張圖上面是 1 分 K，下面橘標題是當時的 5 分 K。收盤跌破 1m MA200 超過 0.3% 算跌回。橘圈是進場，綠星是 +1，紅叉是跌回。</p>
+<p class="muted">{win_str}1 分 K：MA200 &gt; MA120 &gt; MA99 收平，MA7 剛上穿 MA200 且站穩 4 根。5 分 K 還要 MA7 &gt; MA14，而且長均線是 MA120 &gt; MA200 &gt; MA99。15 分 K MA200 沒急跌（10 根斜率 ≥ -0.20%）。每張圖上面是 1 分 K，下面橘標題是當時的 5 分 K。收盤跌破 1m MA200 超過 0.3% 算跌回。橘圈是進場，綠星是 +1，紅叉是跌回。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(rows)}</b></div>
 <div class="card">拿到 +1<b>{hit1}/{len(rows)}</b></div>
@@ -624,7 +631,7 @@ def run(symbol: str = "SOXSUSDT", days: int = 30, charts: Path | None = None) ->
     mas5 = {n: sma(d5["c"], n) for n in MA_PERIODS}
     m5_7, m5_14 = mas5[7], mas5[14]
     m15_200 = sma(d15["c"], 200)
-    htf = (d5["t"], m5_7, m5_14, d15["t"], m15_200)
+    htf = (d5["t"], m5_7, m5_14, mas5[99], mas5[120], mas5[200], d15["t"], m15_200)
 
     t_min = int(win_start.timestamp() * 1000)
     idxs = entry_indices(c, m7, m14, m25, m30, m99, m120, m200, d["t"], t_min, htf=htf)
