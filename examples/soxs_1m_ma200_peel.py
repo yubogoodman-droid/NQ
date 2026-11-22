@@ -8,6 +8,7 @@
 - 1 分 K MA7 近 3 根內剛上穿 MA200，收盤 > MA7 > MA200，連續至少 4 根收在 MA200 上方，離 MA200 不超過 1%
 - 5 分 K 短均線已翻多：已收線的 5m MA7 > MA14
 - 5 分 K 長均線剛開始翻、還沒排成多頭：已收線的 5m MA120 > MA200 > MA99
+- 5 分 K 先跌破四小時低點，之後收盤站回 MA60；五分 MA60 離一分 MA200 不超過 1%
 - 15 分 K 大趨勢不在急跌：已收線的 15m MA200 近 10 根斜率 >= -0.20%
 
 出場：停損放前 40 根最低；收盤跌破 1m MA200 超過 0.3% 算跌回（留一點正常回踩空間）。
@@ -47,6 +48,10 @@ BASE_BARS = 40
 TARGET_PTS = 1.0
 EXIT_BUF_PCT = 0.30
 M15_M200_SLOPE_MIN = -0.20
+SWEEP_BARS = 48          # 四小時的五分 K
+MA60_NEAR_MAX = 1.00     # 五分 MA60 離一分 MA200 的上限，%
+RECLAIM_EXT_MAX = 1.50   # 站回 MA60 那根一分 K，收盤離 MA200 的上限，%
+RECLAIM_WAIT = 90        # 撥開之後最多再等幾根一分 K，等五分 K 站回 MA60
 
 
 def sma(a: np.ndarray, n: int) -> np.ndarray:
@@ -175,6 +180,38 @@ def htf_aligned(
     return ok, gap5, s15_200
 
 
+def ma60_reclaim(
+    t1_open_ms: int,
+    t5: np.ndarray,
+    l5: np.ndarray,
+    c5: np.ndarray,
+    m5_60: np.ndarray,
+    m200_now: float,
+) -> tuple[bool, float | None]:
+    """五分 K 在四小時內跌破過四小時低點，而且最新已收盤的五分 K 站回 MA60。
+
+    回傳 (是否成立, 五分 MA60 離當根一分 MA200 的百分比)。
+    """
+    j = last_closed_idx(t5, INTERVAL_MS["5m"], t1_open_ms)
+    if j < 48 + 60 or not np.isfinite(m200_now) or m200_now <= 0:
+        return False, None
+    sweep = None
+    for k in range(j, j - SWEEP_BARS - 1, -1):
+        if k < 48:
+            break
+        if float(l5[k]) < float(np.min(l5[k - 48 : k])):
+            sweep = k
+            break
+    if sweep is None:
+        return False, None
+    ma = float(m5_60[j])
+    px = float(c5[j])
+    if not np.isfinite(ma) or ma <= 0 or not (px > ma):
+        return False, None
+    dist = (ma - float(m200_now)) / float(m200_now) * 100.0
+    return abs(dist) <= MA60_NEAR_MAX, dist
+
+
 def entry_indices(
     c: np.ndarray,
     m7: np.ndarray,
@@ -188,27 +225,61 @@ def entry_indices(
     t_min: int,
     htf: tuple[np.ndarray, ...] | None = None,
 ) -> list[int]:
-    """每個撥開只進第一根；有傳 htf 時同步驗證 5m/15m。之後要 25 根收在 MA200 下才重裝。"""
+    """每個撥開只進一次。有五分 K 時，要等它跌破四小時低點後收盤站回 MA60 才進。
+
+    之後要 25 根收在 MA200 下才重裝。
+    """
     armed = False
     under = 0
+    pending: int | None = None
     out: list[int] = []
     for i in range(len(c)):
         below = bool(np.isfinite(m200[i]) and c[i] < m200[i])
         under = under + 1 if below else 0
         if under >= REARM_UNDER:
             armed = True
-        if int(t[i]) >= t_min and armed and is_peel(i, c, m7, m14, m25, m30, m99, m120, m200):
+        if pending is not None:
+            lost = bool(np.isfinite(m200[i]) and c[i] < m200[i] * (1.0 - EXIT_BUF_PCT / 100.0))
+            if i - pending > RECLAIM_WAIT or lost:
+                pending = None
+            elif _reclaim_entry(int(t[i]), c[i], m200[i], htf):
+                out.append(i)
+                pending = None
+                armed = False
+                under = 0
+                continue
+        if pending is None and int(t[i]) >= t_min and armed and is_peel(i, c, m7, m14, m25, m30, m99, m120, m200):
             if htf is not None:
-                t5, m5_7, m5_14, m5_99, m5_120, m5_200, t15, m15_200 = htf
+                t5, _l5, _c5, m5_7, m5_14, _m60, m5_99, m5_120, m5_200, t15, m15_200 = htf
                 ok, _, _ = htf_aligned(
                     int(t[i]), t5, m5_7, m5_14, m5_99, m5_120, m5_200, t15, m15_200
                 )
                 if not ok:
                     continue
-            out.append(i)
-            armed = False
-            under = 0
+                if _reclaim_entry(int(t[i]), c[i], m200[i], htf):
+                    out.append(i)
+                    armed = False
+                    under = 0
+                else:
+                    pending = i
+                    armed = False
+                    under = 0
+            else:
+                out.append(i)
+                armed = False
+                under = 0
     return out
+
+
+def _reclaim_entry(t1: int, px: float, m200_now: float, htf: tuple[np.ndarray, ...] | None) -> bool:
+    if htf is None or not np.isfinite(m200_now) or m200_now <= 0:
+        return False
+    t5, l5, c5, _m7, _m14, m60, _m99, _m120, _m200, _t15, _m15 = htf
+    ok, _dist = ma60_reclaim(t1, t5, l5, c5, m60, float(m200_now))
+    if not ok:
+        return False
+    ext = (float(px) - float(m200_now)) / float(m200_now) * 100.0
+    return 0.0 <= ext <= RECLAIM_EXT_MAX
 
 
 def _fee(entry: float) -> float:
@@ -554,7 +625,10 @@ def write_gallery(rows: list[dict], img_dir: Path, page: Path, window_label: str
         tag = "tag-tp" if r["scalp_reason"] == "+1" else "tag-sl"
         htf_line = ""
         if r.get("gap5") is not None and r.get("s15_200") is not None:
-            htf_line = f"\n5m 7-14 {r['gap5']:+.2f}%  15m MA200斜率 {r['s15_200']:+.2f}%"
+            near = ""
+            if r.get("ma60_dist") is not None:
+                near = f"  5m MA60離1m MA200 {r['ma60_dist']:+.2f}%"
+            htf_line = f"\n5m 7-14 {r['gap5']:+.2f}%  15m MA200斜率 {r['s15_200']:+.2f}%{near}"
         cards.append(
             f"""<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#{n}</span><span class='trade-time'>{r['time']} 台北</span></div><div class='card-pnl {cls}'>{r['scale_net']:+.2f}</div></header><div class='tags'><span class='tag {tag}'>{r['scalp_reason']}</span><span class='tag tag-info'>一半 {r['scale_reason']}</span></div><pre class='trade-detail'>進場 {r['entry']:.2f}
 停損 {r['stop']:.2f}  風險 {r['risk']:.2f}
@@ -596,7 +670,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>SOXSUSDT 1m＋5m＋15m，MA200 束撥開</h1>
-<p class="muted">{win_str}1 分 K：MA200 &gt; MA120 &gt; MA99 收平，MA7 剛上穿 MA200 且站穩 4 根。5 分 K 還要 MA7 &gt; MA14，而且長均線是 MA120 &gt; MA200 &gt; MA99。15 分 K MA200 沒急跌（10 根斜率 ≥ -0.20%）。每張圖上面是 1 分 K，下面橘標題是當時的 5 分 K。收盤跌破 1m MA200 超過 0.3% 算跌回。橘圈是進場，綠星是 +1，紅叉是跌回。</p>
+<p class="muted">{win_str}1 分 K 先撥開。5 分 K 要在四小時內跌破過四小時低點，再收盤站回 MA60，而且這條 MA60 離 1 分 K 的 MA200 不超過 1%。每張圖上面是 1 分 K，下面橘標題是當時的 5 分 K。橘圈是進場，綠星是 +1，紅叉是跌回。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(rows)}</b></div>
 <div class="card">拿到 +1<b>{hit1}/{len(rows)}</b></div>
@@ -632,19 +706,24 @@ def run(symbol: str = "SOXSUSDT", days: int = 30, charts: Path | None = None) ->
     mas5 = {n: sma(d5["c"], n) for n in MA_PERIODS}
     m5_7, m5_14 = mas5[7], mas5[14]
     m15_200 = sma(d15["c"], 200)
-    htf = (d5["t"], m5_7, m5_14, mas5[99], mas5[120], mas5[200], d15["t"], m15_200)
+    htf = (d5["t"], d5["l"], d5["c"], m5_7, m5_14, mas5[60], mas5[99], mas5[120], mas5[200], d15["t"], m15_200)
 
     t_min = int(win_start.timestamp() * 1000)
     idxs = entry_indices(c, m7, m14, m25, m30, m99, m120, m200, d["t"], t_min, htf=htf)
     rows = []
     for i in idxs:
         tr = simulate(i, d["h"], d["l"], c, m200)
-        _, gap5, s15_200 = htf_aligned(int(d["t"][i]), *htf)
+        t5, _l5, _c5, m5_7, m5_14, m5_60, m5_99, m5_120, m5_200, t15, m15_200 = htf
+        _, gap5, s15_200 = htf_aligned(
+            int(d["t"][i]), t5, m5_7, m5_14, m5_99, m5_120, m5_200, t15, m15_200
+        )
+        _ok, ma60_dist = ma60_reclaim(int(d["t"][i]), t5, _l5, _c5, m5_60, float(m200[i]))
         tr["i"] = i
         tr["time"] = hm(int(d["t"][i]))
         tr["ms"] = int(d["t"][i])
         tr["gap5"] = gap5
         tr["s15_200"] = s15_200
+        tr["ma60_dist"] = ma60_dist
         rows.append(tr)
     window_label = f"{win_start.strftime('%Y-%m-%d %H:%M')} → {hm(int(d['t'][-1]))}"
     print(

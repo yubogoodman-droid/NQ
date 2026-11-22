@@ -14,6 +14,7 @@ from soxs_1m_ma200_peel import (  # noqa: E402
     htf_aligned,
     is_peel,
     last_closed_idx,
+    ma60_reclaim,
     simulate,
 )
 
@@ -116,6 +117,32 @@ def test_htf_alignment_and_no_lookahead() -> None:
     assert not ok4
 
 
+def test_ma60_reclaim_needs_a_4h_break_then_a_close_back_above() -> None:
+    n = 160
+    t5 = np.arange(n, dtype=np.int64) * 300_000
+    c5 = np.full(n, 100.0)
+    l5 = np.full(n, 99.8)
+    m60 = np.full(n, 100.0)
+    # bar 120 breaks the prior 48-bar low and closes under MA60
+    l5[120] = 97.0
+    c5[120] = 98.0
+    # bar 130 is the first close back above MA60
+    c5[121:130] = 99.0
+    l5[121:130] = 98.8
+    c5[130] = 100.4
+    l5[130] = 100.1
+    # decision at the close of bar 130
+    t1 = int(t5[130]) + 4 * 60_000
+    ok, dist = ma60_reclaim(t1, t5, l5, c5, m60, 100.0)
+    assert ok and dist is not None and abs(dist) < 1e-9
+    # one bar earlier the 5m close is still under MA60
+    ok_early, _ = ma60_reclaim(int(t5[129]) + 4 * 60_000, t5, l5, c5, m60, 100.0)
+    assert not ok_early
+    # MA60 1.5% away from the 1m MA200 is too far
+    ok_far, dist_far = ma60_reclaim(t1, t5, l5, c5, m60, 98.0)
+    assert not ok_far and dist_far is not None and dist_far > 1.0
+
+
 def test_one_shot_and_rearm_after_25_under() -> None:
     c, h, l, m7, m14, m25, m30, m99, m120, m200, t = _base_arrays(160)
     _plant_peel(c, h, l, m7, m14, m25, m30, m99, m120, m200, 55)
@@ -170,6 +197,7 @@ def test_exits_buffer_stop_and_scale() -> None:
 if __name__ == "__main__":
     test_peel_bar_passes_and_invalid_shapes_fail()
     test_htf_alignment_and_no_lookahead()
+    test_ma60_reclaim_needs_a_4h_break_then_a_close_back_above()
     test_one_shot_and_rearm_after_25_under()
     test_exits_buffer_stop_and_scale()
     print("ALL TESTS PASSED")
