@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""SOXS 一分 K：8 條均線空頭收平後，MA7 剛撥開站上 MA200，做多。
+"""SOXS 一分 K ＋ 五分 K ＋ 十五分 K：MA200 束撥開站上，做多。
 
-長相（對齊 2026-11-04 19:38 起漲，完整 8 條均線）：
-- 長均線空頭排列收平：MA200 > MA120 > MA99，整束緊，MA200 走平或緩跌、末端沒上弧
-- 先前乖乖待在 MA200 下方（前段至少 32/41 根收在 MA200 下）
-- 短中均線撥開扇形往上：MA7 > MA14 > MA25 > MA30，5 根斜率由陡到緩且都往上，MA14 已跨過 MA120
-- 粉線 MA25 要明顯抬頭：10 根斜率至少 +0.25%（只靠 MA7 拉上去、MA25 還躺平的多半是假突破）
-- MA7 近 3 根內剛上穿 MA200，收盤 > MA7 > MA200，且連續至少 4 根收在 MA200 上方
-- 離 MA200 不超過 1%，避免追在高點
+三週期條件（對齊 2026-11-04 19:38 起漲；5m/15m 只用已收完的 K 線，不偷看未來）：
+- 1 分 K 長均線空頭收平：MA200 > MA120 > MA99，整束緊，MA200 走平或緩跌、末端沒上弧
+- 1 分 K 先前乖乖待在 MA200 下方（前段至少 32/41 根收在 MA200 下）
+- 1 分 K 短中均線撥開扇形往上：MA7 > MA14 > MA25 > MA30，5 根斜率由陡到緩且都往上，MA14 已跨過 MA120
+- 1 分 K MA7 近 3 根內剛上穿 MA200，收盤 > MA7 > MA200，連續至少 4 根收在 MA200 上方，離 MA200 不超過 1%
+- 5 分 K 短均線已翻多：已收線的 5m MA7 > MA14
+- 15 分 K 大趨勢不在急跌：已收線的 15m MA200 近 10 根斜率 >= -0.20%
 
-出場：停損放前 40 根最低；收盤跌破 MA200 超過 0.3% 算跌回（留一點正常回踩空間）。
+出場：停損放前 40 根最低；收盤跌破 1m MA200 超過 0.3% 算跌回（留一點正常回踩空間）。
 兩種一起算：整筆碰到 +1 或跌回/停損就全出；另一種先出一半 +1，剩下一半抱到跌回或停損。
 
-    python3 examples/soxs_1m_ma200_peel.py --days 30
+    python3 examples/soxs_1m_ma200_peel.py --days 30 --charts docs/soxs-1m-ma200-peel
 """
 from __future__ import annotations
 
@@ -28,10 +28,10 @@ BASE = "https://www.binance.com"
 FEE_PCT = 0.08  # 來回，跟黏帶回測同一個假設
 
 MA_PERIODS = (7, 14, 25, 30, 60, 99, 120, 200)
+INTERVAL_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000}
 
 # 斜率、價差都是百分比。
 S7_MIN = 0.25
-S25_10_MIN = 0.25
 M200_BODY_MIN = -0.85
 M200_BODY_MAX = 0.05
 M200_TIP_MAX = 0.05
@@ -45,6 +45,7 @@ REARM_UNDER = 25
 BASE_BARS = 40
 TARGET_PTS = 1.0
 EXIT_BUF_PCT = 0.30
+M15_M200_SLOPE_MIN = -0.20
 
 
 def sma(a: np.ndarray, n: int) -> np.ndarray:
@@ -65,6 +66,11 @@ def slope_pct(arr: np.ndarray, i: int, n: int) -> float | None:
     return (cur - prev) / prev * 100.0
 
 
+def last_closed_idx(t_htf: np.ndarray, step_ms: int, t1_open_ms: int) -> int:
+    """回傳在 1m 收盤當下（t1_open_ms + 60_000）已經收完的最新高週期 K 線索引。"""
+    return int(np.searchsorted(t_htf + step_ms, t1_open_ms + 60_000, side="right")) - 1
+
+
 def is_peel(
     i: int,
     c: np.ndarray,
@@ -76,7 +82,7 @@ def is_peel(
     m120: np.ndarray,
     m200: np.ndarray,
 ) -> bool:
-    """這一根是不是「長均線收平、MA7 剛撥開站上 MA200」。"""
+    """這一根 1m 是不是「長均線收平、MA7 剛撥開站上 MA200」。"""
     if i < max(BASE_BARS, PRIOR_WINDOW, 40):
         return False
     vals = (
@@ -98,7 +104,6 @@ def is_peel(
     if not np.isfinite(vals).all() or c[i] <= 0 or m200[i] <= 0:
         return False
 
-    # MA7 剛上穿 MA200，價格站在 MA7 之上
     if not (c[i] > m7[i] > m200[i]):
         return False
     if not any(
@@ -107,7 +112,6 @@ def is_peel(
     ):
         return False
 
-    # 短中均線多頭扇形，MA14 已跨過 MA120
     if not (m7[i] > m14[i] > m25[i] > m30[i] and m14[i] > m120[i]):
         return False
 
@@ -121,19 +125,14 @@ def is_peel(
         return False
     if not (s7 > s14 > s25 > 0 and s7 >= S7_MIN and s30 >= 0):
         return False
-    s25_10 = slope_pct(m25, i, 10)
-    if s25_10 is None or s25_10 < S25_10_MIN:
-        return False
     if not (M200_BODY_MIN <= body <= M200_BODY_MAX and tip <= M200_TIP_MAX):
         return False
 
-    # 長均線空頭收平：MA200 > MA120 > MA99 且整束夠緊
     if not (m200[i] > m120[i] > m99[i]):
         return False
     if (m200[i] - m99[i]) / m200[i] * 100.0 > BUNDLE_MAX:
         return False
 
-    # 連續站穩在 MA200 上方，且還沒拉太遠
     seg_hold = slice(i - HOLD_ABOVE + 1, i + 1)
     if not np.isfinite(m200[seg_hold]).all() or np.any(c[seg_hold] < m200[seg_hold]):
         return False
@@ -141,13 +140,34 @@ def is_peel(
     if not (0.0 <= ext <= EXT_MAX):
         return False
 
-    # 突破前一段時間乖乖待在 MA200 下方，濾掉來回洗盤
     seg_prior = slice(i - PRIOR_WINDOW, i - HOLD_ABOVE)
     if not np.isfinite(m200[seg_prior]).all():
         return False
     if int(np.sum(c[seg_prior] < m200[seg_prior])) < PRIOR_UNDER_MIN:
         return False
     return True
+
+
+def htf_aligned(
+    t1_open_ms: int,
+    t5: np.ndarray,
+    m5_7: np.ndarray,
+    m5_14: np.ndarray,
+    t15: np.ndarray,
+    m15_200: np.ndarray,
+) -> tuple[bool, float | None, float | None]:
+    """檢查 5m MA7 > MA14 且 15m MA200 沒有急跌（近 10 根斜率 >= -0.20%）。"""
+    j5 = last_closed_idx(t5, INTERVAL_MS["5m"], t1_open_ms)
+    j15 = last_closed_idx(t15, INTERVAL_MS["15m"], t1_open_ms)
+    if j5 < 14 or j15 < 209:
+        return False, None, None
+    v5_7, v5_14 = float(m5_7[j5]), float(m5_14[j5])
+    s15_200 = slope_pct(m15_200, j15, 10)
+    if not np.isfinite([v5_7, v5_14]).all() or s15_200 is None or v5_14 <= 0:
+        return False, None, s15_200
+    gap5 = (v5_7 - v5_14) / v5_14 * 100.0
+    ok = (v5_7 > v5_14) and (s15_200 >= M15_M200_SLOPE_MIN)
+    return ok, gap5, s15_200
 
 
 def entry_indices(
@@ -161,8 +181,9 @@ def entry_indices(
     m200: np.ndarray,
     t: np.ndarray,
     t_min: int,
+    htf: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None,
 ) -> list[int]:
-    """每個撥開只進第一根。之後要先有 25 根收盤回到 MA200 下，才看下一次。"""
+    """每個撥開只進第一根；有傳 htf 時同步驗證 5m/15m。之後要 25 根收在 MA200 下才重裝。"""
     armed = False
     under = 0
     out: list[int] = []
@@ -172,6 +193,11 @@ def entry_indices(
         if under >= REARM_UNDER:
             armed = True
         if int(t[i]) >= t_min and armed and is_peel(i, c, m7, m14, m25, m30, m99, m120, m200):
+            if htf is not None:
+                t5, m5_7, m5_14, t15, m15_200 = htf
+                ok, _, _ = htf_aligned(int(t[i]), t5, m5_7, m5_14, t15, m15_200)
+                if not ok:
+                    continue
             out.append(i)
             armed = False
             under = 0
@@ -267,9 +293,10 @@ def summarize(rows: list[dict], key_pts: str, key_net: str) -> str:
     )
 
 
-def fetch_klines(symbol: str, start_ms: int, end_ms: int) -> dict:
+def fetch_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "1m") -> dict:
     sess = requests.Session()
     sess.headers.update({"User-Agent": "Mozilla/5.0", "Clienttype": "web"})
+    step = INTERVAL_MS[interval]
     cur = start_ms
     rows: list = []
     while cur < end_ms:
@@ -280,7 +307,7 @@ def fetch_klines(symbol: str, start_ms: int, end_ms: int) -> dict:
                 BASE + "/fapi/v1/klines",
                 params={
                     "symbol": symbol,
-                    "interval": "1m",
+                    "interval": interval,
                     "startTime": cur,
                     "endTime": end_ms - 1,
                     "limit": 1500,
@@ -298,16 +325,16 @@ def fetch_klines(symbol: str, start_ms: int, end_ms: int) -> dict:
                 last_err = exc
                 time.sleep(0.4 * (attempt + 1))
         if raw is None:
-            raise RuntimeError(f"klines failed: {last_err}")
+            raise RuntimeError(f"klines ({interval}) failed: {last_err}")
         if not raw:
             break
         rows.extend(raw)
         last = int(raw[-1][0])
         if len(raw) < 1500:
             break
-        cur = last + 60_000
+        cur = last + step
         time.sleep(0.05)
-    seen = {int(x[0]): x for x in rows if int(x[0]) + 60_000 <= end_ms}
+    seen = {int(x[0]): x for x in rows if int(x[0]) + step <= end_ms}
     kl = [seen[k] for k in sorted(seen)]
     return {
         "t": np.array([int(x[0]) for x in kl], np.int64),
@@ -444,8 +471,6 @@ def _png_name(n: int, when: str) -> str:
 def write_gallery(rows: list[dict], img_dir: Path, page: Path, window_label: str = "") -> None:
     """手機寬度的卡片頁，跟其他回測 view.html 同一套。"""
     del img_dir
-    wins = sum(1 for r in rows if r["scale_net"] > 0)
-    losses = len(rows) - wins
     hit1 = sum(1 for r in rows if r["scalp_reason"] == "+1")
     net = sum(r["scale_net"] for r in rows)
     scalp_net = sum(r["scalp_net"] for r in rows)
@@ -456,19 +481,22 @@ def write_gallery(rows: list[dict], img_dir: Path, page: Path, window_label: str
         name = _png_name(n, r["time"])
         cls = "pnl-win" if r["scale_net"] > 0 else "pnl-loss" if r["scale_net"] < 0 else "pnl-flat"
         tag = "tag-tp" if r["scalp_reason"] == "+1" else "tag-sl"
+        htf_line = ""
+        if r.get("gap5") is not None and r.get("s15_200") is not None:
+            htf_line = f"\n5m 7-14 {r['gap5']:+.2f}%  15m MA200斜率 {r['s15_200']:+.2f}%"
         cards.append(
             f"""<article class='trade-card'><header class='card-header'><div class='card-title'><span class='trade-no'>#{n}</span><span class='trade-time'>{r['time']} 台北</span></div><div class='card-pnl {cls}'>{r['scale_net']:+.2f}</div></header><div class='tags'><span class='tag {tag}'>{r['scalp_reason']}</span><span class='tag tag-info'>一半 {r['scale_reason']}</span></div><pre class='trade-detail'>進場 {r['entry']:.2f}
 停損 {r['stop']:.2f}  風險 {r['risk']:.2f}
 整筆 {r['scalp_pts']:+.2f}  扣費 {r['scalp_net']:+.2f}  {r['hold']} 分
 一半 {r['scale_pts']:+.2f}  扣費 {r['scale_net']:+.2f}  {r['scale_hold']} 分
-最大浮盈 {r['mfe']:.2f}</pre><div class='mini-chart'><img src='img/{name}' alt='#{n} {r['time']}' style='width:100%;display:block;border-radius:10px'/></div></article>"""
+最大浮盈 {r['mfe']:.2f}{htf_line}</pre><div class='mini-chart'><img src='img/{name}' alt='#{n} {r['time']}' style='width:100%;display:block;border-radius:10px'/></div></article>"""
         )
     win_str = f"台北 {window_label}。" if window_label else ""
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>SOXS 一分 K MA200 撥開</title>
+<title>SOXS 1m＋5m＋15m MA200 撥開</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -495,8 +523,8 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>SOXSUSDT 一分 K，MA200 束撥開站上</h1>
-<p class="muted">{win_str}完整 8 條均線：黃 MA7、青 MA14、粉 MA25、藍 MA30、深綠 MA60、紫 MA99、淺綠 MA120、酒紅 MA200。長均線 MA200 &gt; MA120 &gt; MA99 收平，MA7 剛上穿 MA200 且站穩 4 根、粉線 MA25 10 根斜率 ≥ 0.25% 才進場；收盤跌破 MA200 超過 0.3% 算跌回。橘圈是進場，綠星是 +1，紅叉是跌回。</p>
+<h1>SOXSUSDT 1m＋5m＋15m，MA200 束撥開</h1>
+<p class="muted">{win_str}1 分 K：MA200 &gt; MA120 &gt; MA99 收平，MA7 剛上穿 MA200 且站穩 4 根；同步確認已收線 5 分 K MA7 &gt; MA14、15 分 K MA200 沒急跌（10 根斜率 ≥ -0.20%）。收盤跌破 1m MA200 超過 0.3% 算跌回。橘圈是進場，綠星是 +1，紅叉是跌回。</p>
 <div class="cards">
 <div class="card">筆數<b>{len(rows)}</b></div>
 <div class="card">拿到 +1<b>{hit1}/{len(rows)}</b></div>
@@ -520,34 +548,44 @@ def run(symbol: str = "SOXSUSDT", days: int = 30, charts: Path | None = None) ->
     now = datetime.now(TZ).replace(second=0, microsecond=0)
     end_ms = int(now.timestamp() * 1000)
     win_start = now - timedelta(days=days)
-    fetch_start = win_start - timedelta(days=2)
-    d = fetch_klines(symbol, int(fetch_start.timestamp() * 1000), end_ms)
+    d = fetch_klines(symbol, int((win_start - timedelta(days=2)).timestamp() * 1000), end_ms, "1m")
+    d5 = fetch_klines(symbol, int((win_start - timedelta(days=5)).timestamp() * 1000), end_ms, "5m")
+    d15 = fetch_klines(symbol, int((win_start - timedelta(days=5)).timestamp() * 1000), end_ms, "15m")
+
     c = d["c"]
     mas = {n: sma(c, n) for n in MA_PERIODS}
     m7, m14, m25, m30, m99, m120, m200 = (mas[n] for n in (7, 14, 25, 30, 99, 120, 200))
+    m5_7, m5_14 = sma(d5["c"], 7), sma(d5["c"], 14)
+    m15_200 = sma(d15["c"], 200)
+    htf = (d5["t"], m5_7, m5_14, d15["t"], m15_200)
+
     t_min = int(win_start.timestamp() * 1000)
-    idxs = entry_indices(c, m7, m14, m25, m30, m99, m120, m200, d["t"], t_min)
+    idxs = entry_indices(c, m7, m14, m25, m30, m99, m120, m200, d["t"], t_min, htf=htf)
     rows = []
     for i in idxs:
         tr = simulate(i, d["h"], d["l"], c, m200)
+        _, gap5, s15_200 = htf_aligned(int(d["t"][i]), *htf)
         tr["i"] = i
         tr["time"] = hm(int(d["t"][i]))
         tr["ms"] = int(d["t"][i])
+        tr["gap5"] = gap5
+        tr["s15_200"] = s15_200
         rows.append(tr)
     window_label = f"{win_start.strftime('%Y-%m-%d %H:%M')} → {hm(int(d['t'][-1]))}"
     print(
-        f"{symbol} 1 分 K  {hm(int(d['t'][0]))} 暖機 → 統計 {win_start.strftime('%m-%d %H:%M')} ～ {hm(int(d['t'][-1]))}（台北）"
+        f"{symbol} 1m+5m+15m  統計 {win_start.strftime('%m-%d %H:%M')} ～ {hm(int(d['t'][-1]))}（台北）"
     )
-    print(f"K 線 {len(c)} 根")
+    print(f"K 線 1m={len(c)}  5m={len(d5['c'])}  15m={len(d15['c'])}")
     print("整筆碰到 1 點或跌回就出：", summarize(rows, "scalp_pts", "scalp_net"))
     print("一半 1 點、一半抱到跌回：", summarize(rows, "scale_pts", "scale_net"))
-    print("時間                進場    停損   風險  整筆      扣費   一半          扣費  持有     最大")
+    print("時間                進場    停損   風險  整筆      扣費   一半          扣費  持有     最大   5m7-14  15m200")
     for r in rows:
         print(
             f"{r['time']:16} {r['entry']:7.2f} {r['stop']:7.2f} {r['risk']:5.2f}  "
             f"{r['scalp_reason']:4} {r['scalp_pts']:+6.2f} {r['scalp_net']:+6.2f}  "
             f"{r['scale_reason']:8} {r['scale_pts']:+6.2f} {r['scale_net']:+6.2f}  "
-            f"{r['hold']:>3}/{r['scale_hold']:<3} {r['mfe']:5.2f}"
+            f"{r['hold']:>3}/{r['scale_hold']:<3} {r['mfe']:5.2f}  "
+            f"{r['gap5']:+6.2f}% {r['s15_200']:+6.2f}%"
         )
     if charts is not None:
         img = charts / "img"
@@ -565,7 +603,7 @@ def run(symbol: str = "SOXSUSDT", days: int = 30, charts: Path | None = None) ->
 if __name__ == "__main__":
     import argparse
 
-    p = argparse.ArgumentParser(description="SOXS 一分 K，MA200 束撥開站上，回測")
+    p = argparse.ArgumentParser(description="SOXS 1m+5m+15m，MA200 束撥開站上，回測")
     p.add_argument("--days", type=int, default=30)
     p.add_argument("--symbol", default="SOXSUSDT")
     p.add_argument("--charts", type=Path, default=None, help="每筆一張圖，寫到這個資料夾")

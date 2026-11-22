@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SOXS 一分 K 撥開進場的離線測試。不打幣安。"""
+"""SOXS 1m+5m+15m 撥開進場的離線測試。不打幣安。"""
 from __future__ import annotations
 
 import sys
@@ -11,7 +11,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from soxs_1m_ma200_peel import (  # noqa: E402
     entry_indices,
+    htf_aligned,
     is_peel,
+    last_closed_idx,
     simulate,
 )
 
@@ -66,11 +68,6 @@ def test_peel_bar_passes_and_invalid_shapes_fail() -> None:
     m120b[55] = 100.2
     assert not is_peel(55, c, m7, m14, m25, m30, m99, m120b, m200)
 
-    # MA25 還躺平（10 根斜率不到 0.25%）
-    m25b = m25.copy()
-    m25b[45] = 99.45
-    assert not is_peel(55, c, m7, m14, m25b, m30, m99, m120, m200)
-
     # MA200 末端已經上弧
     m200b = m200.copy()
     m200b[55] = 100.30
@@ -78,17 +75,47 @@ def test_peel_bar_passes_and_invalid_shapes_fail() -> None:
     assert not is_peel(55, c, m7, m14, m25, m30, m99, m120, m200b)
 
 
+def test_htf_alignment_and_no_lookahead() -> None:
+    # 5m bars at 0, 5, 10, ... min; 15m bars at 0, 15, 30, ... min
+    t5 = np.arange(300, dtype=np.int64) * 300_000
+    t15 = np.arange(250, dtype=np.int64) * 900_000
+    # 1m bar opening at 219*15m + 3m (closes at +4m): 219th 15m bar is NOT closed yet, must use 218
+    t1_open = int(t15[219]) + 3 * 60_000
+    assert last_closed_idx(t15, 900_000, t1_open) == 218
+    # 1m bar opening at 219*15m + 14m (closes at +15m): 219th 15m bar JUST closed
+    assert last_closed_idx(t15, 900_000, int(t15[219]) + 14 * 60_000) == 219
+
+    m5_7 = np.full(300, 101.0)
+    m5_14 = np.full(300, 100.0)
+    m15_200 = np.full(250, 100.0)
+    # Use a timestamp well after bar 220 of 15m (i.e. >= 3300 min)
+    t5_big = np.arange(800, dtype=np.int64) * 300_000
+    m5_7b = np.full(800, 101.0)
+    m5_14b = np.full(800, 100.0)
+    ok, gap5, s15 = htf_aligned(int(t15[220]) + 14 * 60_000, t5_big, m5_7b, m5_14b, t15, m15_200)
+    assert ok and gap5 is not None and gap5 > 0 and s15 == 0.0
+
+    # 5m MA7 <= MA14 -> reject
+    m5_7c = np.full(800, 99.5)
+    ok2, _, _ = htf_aligned(int(t15[220]) + 14 * 60_000, t5_big, m5_7c, m5_14b, t15, m15_200)
+    assert not ok2
+
+    # 15m MA200 plunging (-0.5% over 10 bars) -> reject
+    m15_down = np.full(250, 100.0)
+    m15_down[220] = 99.5
+    ok3, _, _ = htf_aligned(int(t15[220]) + 14 * 60_000, t5_big, m5_7b, m5_14b, t15, m15_down)
+    assert not ok3
+
+
 def test_one_shot_and_rearm_after_25_under() -> None:
     c, h, l, m7, m14, m25, m30, m99, m120, m200, t = _base_arrays(160)
     _plant_peel(c, h, l, m7, m14, m25, m30, m99, m120, m200, 55)
-    # 56 根就算也符合，也不該連進
     _plant_peel(c, h, l, m7, m14, m25, m30, m99, m120, m200, 56)
     c[52:57] = [100.10, 100.15, 100.25, 100.40, 100.45]
     m7[54] = 99.95
     m7[55] = 100.15
     m7[56] = 100.20
 
-    # 57..115 都在 MA200 下（遠超 25 根）後，120 才准下一筆
     c[57:117] = 99.0
     _plant_peel(c, h, l, m7, m14, m25, m30, m99, m120, m200, 120)
     idxs = entry_indices(c, m7, m14, m25, m30, m99, m120, m200, t, t_min=0)
@@ -100,10 +127,9 @@ def test_exits_buffer_stop_and_scale() -> None:
     h = np.full(55, 100.05)
     l = np.full(55, 99.9)
     m200 = np.full(55, 100.0)
-    l[:40] = 99.0  # 停損 99.0
+    l[:40] = 99.0
     i = 40
     c[i] = 100.3
-    # 同一根同時打到停損和 +1：算停損
     l[41] = 98.5
     h[41] = 101.5
     c[41] = 100.0
@@ -112,7 +138,6 @@ def test_exits_buffer_stop_and_scale() -> None:
     assert tr["scale_reason"] == "停損"
     assert abs(tr["scalp_pts"] - (99.0 - 100.3)) < 1e-9
 
-    # 輕踩 MA200 下方 0.15% 不會被洗掉，接著碰到 +1，之後收盤跌破 MA200 超過 0.3% 才出場
     c2 = np.full(55, 100.3)
     h2 = np.full(55, 100.4)
     l2 = np.full(55, 99.6)
@@ -128,7 +153,6 @@ def test_exits_buffer_stop_and_scale() -> None:
     assert tr2["scalp_reason"] == "+1"
     assert abs(tr2["scalp_pts"] - 1.0) < 1e-9
     assert tr2["scale_reason"] == "一半後跌回"
-    # 0.5*1 + 0.5*(99.6-100.3) = 0.5 - 0.35 = 0.15
     assert abs(tr2["scale_pts"] - 0.15) < 1e-9
     assert tr2["hold"] == 2
     assert tr2["scale_hold"] == 4
@@ -136,6 +160,7 @@ def test_exits_buffer_stop_and_scale() -> None:
 
 if __name__ == "__main__":
     test_peel_bar_passes_and_invalid_shapes_fail()
+    test_htf_alignment_and_no_lookahead()
     test_one_shot_and_rearm_after_25_under()
     test_exits_buffer_stop_and_scale()
     print("ALL TESTS PASSED")
