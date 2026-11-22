@@ -16,6 +16,7 @@ from watch_binance_breakdown import (  # noqa: E402
     detect_breakdowns,
     hm,
     path_after,
+    write_report_html,
 )
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "amdusdt_5m_20261119.json"
@@ -83,6 +84,21 @@ def test_synthetic_breakdown_and_a_plain_dip() -> None:
     assert detect_breakdowns(plain) == []
 
 
+def test_html_report_marks_the_amd_bar(tmp: Path | None = None) -> None:
+    d = load_fixture()
+    sig = detect_breakdowns(d)[0]
+    path = path_after(d, sig, bars=5)
+    out = tmp or Path("/tmp/amd_breakdown_report.html")
+    write_report_html(out, [("AMDUSDT", sig, path, d)], "fixture", 1)
+    text = out.read_text(encoding="utf-8")
+    assert "AMDUSDT" in text
+    assert "11-19 23:10" in text
+    assert "536.07" in text
+    assert "547.24" in text
+    assert "<svg" in text
+    assert text.count("<article") == 1
+
+
 def test_reclaim_of_the_spike_cancels() -> None:
     d = make_breakdown()
     # 回抽收過衝高收盤，這波沒有失敗
@@ -94,5 +110,6 @@ def test_reclaim_of_the_spike_cancels() -> None:
 if __name__ == "__main__":
     test_amd_fixture_hits_2310_not_the_waterfall()
     test_synthetic_breakdown_and_a_plain_dip()
+    test_html_report_marks_the_amd_bar()
     test_reclaim_of_the_spike_cancels()
     print("ALL TESTS PASSED")
