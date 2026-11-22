@@ -611,6 +611,7 @@ h1{{font-size:18px;margin:0 0 6px}}
     if page.name == "index.html":
         (page.parent / "view.html").write_text(html, encoding="utf-8")
         (page.parent / "5m.html").write_text(html, encoding="utf-8")
+        (page.parent / "only4.html").write_text(html, encoding="utf-8")
 
 
 def hm(ms: int) -> str:
