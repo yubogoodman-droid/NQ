@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """SOXS 1 分 K「大賺型」假突破做空狙擊器（即時監看 + 預掛單推播 + 回測驗證）。
 
-專門鎖定高期望值、低回撤的 S 級假突破空單（v3 升級版）：
-  1. 美股流動性窗：08:35 ET 起允許盤前築頂，只在 09:20–16:00 ET（冬令台北 22:20–05:00）掛單／進場
-  2. 先急拉累積多頭停損燃料：假高相對前 45 分鐘低點漲幅 ≥ 3.0%，且假高乖離 MA60 ≥ 2.0%
-  3. 創高量縮背離：假高當根成交量 ≤ 前 35 分鐘起漲最大量的 65%（買盤枯竭）
-  4. 合理均線中空帶 + 防暴衝熔斷：掛單價高於前一根 MA99 須落在 0.8%～3.5%，且 24h 漲幅 ≤ +20%（避開單日崩盤暴衝）
-  5. 過濾 1 根針刺假跌破：假高至跌破至少隔 2 根（min_peak_to_bd=2），避開開盤 1 分鐘插針洗盤
-  6. 條件式瀑布續抱出場：停損在假高上方 0.2%、停利放寬至 4.0R；第 30 分鐘若仍在 MA25 下方且浮盈 ≥ +0.8R，停損移至 +0.3R 續抱瀑布最長至 60 分鐘（收盤站回 MA25 即落袋），其餘第 30 分鐘準時結算
+專門鎖定高期望值、低回撤的 S 級假突破空單（v4 精選早盤瀑布版）：
+  1. 美股早盤瀑布窗：08:35 ET 起允許盤前築頂，只在 09:20–12:00 ET（冬令台北 22:20–隔日 01:00）掛單／進場，徹底砍掉午盤／尾盤磨蹭震盪單
+  2. MA25 降速走平確認：前一根 MA25 相對 3 根前漲幅 ≤ +0.10%，不逆勢空強多頭陡升均線中的小回檔
+  3. 先急拉累積多頭停損燃料：假高相對前 45 分鐘低點漲幅 ≥ 3.0%，且假高乖離 MA60 ≥ 2.0%
+  4. 創高量縮背離：假高當根成交量 ≤ 前 35 分鐘起漲最大量的 65%（買盤枯竭）
+  5. 合理均線中空帶 + 防暴衝熔斷：掛單價高於前一根 MA99 須落在 0.8%～3.5%，且 24h 漲幅 ≤ +20%（避開單日崩盤暴衝）
+  6. 過濾 1 根針刺假跌破：假高至跌破至少隔 2 根（min_peak_to_bd=2），避開開盤 1 分鐘插針洗盤
+  7. 條件式瀑布續抱出場：停損在假高上方 0.2%、停利放寬至 4.0R；第 30 分鐘若仍在 MA25 下方且浮盈 ≥ +0.8R，停損移至 +0.3R 續抱瀑布最長至 60 分鐘（收盤站回 MA25 即落袋），其餘第 30 分鐘準時結算
 
-另外支援 `--strict`（極穩空排確認模式）：改用 `MA14 < MA25` 空頭排列確認，不依賴急拉/量比門檻，四個月回測 0 停損、四段全正報酬。
+另外支援 `--strict`（極穩空排確認模式）：改用 `MA14 < MA25` 空頭排列確認，不依賴急拉/量比門檻，四個月回測 5/5 全勝、0 停損。
 
 兩種推播時機（同一波只各推一次，帶 1m K 線圖）：
   • 【預掛空單準備】：剛收盤確認跌破 MA25/30 且符合大賺結構 → 馬上給出下一根 MA14/MA25 建議限價空單、停損、4.0R 目標價與 30→60m 瀑布規則
@@ -17,7 +18,7 @@
 
 用法：
   python3 examples/watch_soxs_big_win_tg.py --backtest --days 30           # 近 30 天大賺狙擊回測
-  python3 examples/watch_soxs_big_win_tg.py --backtest --days 140 --strict # 全期極穩空排回測
+  python3 examples/watch_soxs_big_win_tg.py --backtest --days 145 --strict # 全期極穩空排回測
   python3 examples/watch_soxs_big_win_tg.py --test                         # 測試 Telegram 通不通
   python3 examples/watch_soxs_big_win_tg.py --once --dry-run               # 單次掃描剛收盤 1m（印在終端機）
   python3 examples/watch_soxs_big_win_tg.py                                # 持續每根 1m 收盤監看並推 Telegram
@@ -90,11 +91,12 @@ SNIPER_PARAMS = Params(
     min_gap_ma99=0.008,
     max_gap_ma99=0.035,
     max_ret_24h=0.20,
+    max_ma25_slope3=0.0010,
     stop_buffer=0.002,
     min_pump45_pct=0.030,
     min_peak_ext60_pct=0.020,
     max_peak_vol_ratio=0.65,
-    session="ny_open",
+    session="ny_morning",
     mode="limit",
     days=30,
 )
@@ -117,9 +119,10 @@ STRICT_PARAMS = Params(
     min_gap_ma99=0.008,
     max_gap_ma99=0.035,
     max_ret_24h=0.20,
+    max_ma25_slope3=0.0010,
     require_ma14_lt_25=True,
     stop_buffer=0.002,
-    session="ny_open",
+    session="ny_morning",
     mode="limit",
     days=30,
 )
@@ -300,14 +303,25 @@ def detect_live_setups(
             gap_ok = gap99 >= params.min_gap_ma99 and (params.max_gap_ma99 <= 0 or gap99 <= params.max_gap_ma99)
             regime_ok = not (params.max_ret_24h > 0 and not np.isnan(r24_now) and r24_now > params.max_ret_24h)
             ma14_ok = (not params.require_ma14_lt_25) or (ma14[bd_idx] < ma25[bd_idx])
+            slope_ok = True
+            if (
+                params.max_ma25_slope3 > 0
+                and bd_idx >= 3
+                and not np.isnan(ma25[bd_idx - 3])
+                and ma25[bd_idx - 3] > 0
+            ):
+                slope_ok = (ma25[bd_idx] / ma25[bd_idx - 3] - 1.0) <= params.max_ma25_slope3
             stop = _stop_price(peak_h, lim, params)
-            # 允許 09:10 ET 後提早 10 分鐘推播預掛提醒，或已在 ny_open 進場窗內
+            # 允許 09:10 ET 後提早 10 分鐘推播預掛提醒，或已在早盤／正規盤進場窗內
             ny_ts = df.index[bd_idx].tz_convert(NY)
             ny_min = ny_ts.hour * 60 + ny_ts.minute
+            end_et = 12 * 60 if params.session == "ny_morning" else 16 * 60
             arm_time_ok = in_session(df.index[bd_idx], params.session) or (
-                params.session == "ny_open" and ny_ts.weekday() < 5 and (9 * 60 + 10) <= ny_min < 16 * 60
+                params.session in ("ny_open", "ny_morning")
+                and ny_ts.weekday() < 5
+                and (9 * 60 + 10) <= ny_min < end_et
             )
-            if stop is not None and gap_ok and regime_ok and ma14_ok and arm_time_ok:
+            if stop is not None and gap_ok and regime_ok and ma14_ok and slope_ok and arm_time_ok:
                 risk = stop - lim
                 out.append(
                     SniperSetup(
@@ -340,6 +354,14 @@ def detect_live_setups(
                     break
                 continue
             if params.require_ma14_lt_25 and not (ma14[k - 1] < ma25[k - 1]):
+                continue
+            if (
+                params.max_ma25_slope3 > 0
+                and k >= 4
+                and not np.isnan(ma25[k - 4])
+                and ma25[k - 4] > 0
+                and (ma25[k - 1] / ma25[k - 4] - 1.0) > params.max_ma25_slope3
+            ):
                 continue
             lim = _limit_price(prev_c, float(ma14[k - 1]), float(ma25[k - 1]))
             prev_m99 = float(ma99[k - 1])
@@ -408,7 +430,7 @@ def format_setup_message(df: pd.DataFrame, s: SniperSetup) -> str:
         f"{action_line}\n"
         f"停損價：<b>{s.stop_price:.3f}</b>（+{risk_pct:.2f}%，假高 {s.peak_high:.2f} @ {pk_tpe}）\n"
         f"停利價：<b>{s.target_price:.3f}</b>（-{tp_pct:.2f}%，4.0R；30m 仍在 MA25 下且 ≥+0.8R 移損 +0.3R 續抱瀑布至 60m）\n"
-        f"—— 大賺結構檢核（v3 瀑布續抱）——\n"
+        f"—— 大賺結構檢核（v4 早盤瀑布＋MA25走平）——\n"
         f"• 均線中空帶：離 MA99（{s.ma99:.2f}）空間 <b>+{s.gap_ma99_pct * 100:.2f}%</b>（安全帶 0.8–3.5%）\n"
         f"• 24h 漲幅：<b>{s.ret_24h_pct * 100:+.1f}%</b>（熔斷上限 +20%）\n"
         f"• 前 45m 急拉：<b>+{s.pump45_pct * 100:.2f}%</b>（過前高 {s.prev_high:.2f}）\n"
@@ -564,7 +586,7 @@ def wait_next_minute_close() -> None:
 
 
 def run_sniper_backtest(symbols: Sequence[str], days: int, base_params: Params = SNIPER_PARAMS) -> int:
-    mode_name = "極穩空排 v3（MA14<MA25）" if base_params.require_ma14_lt_25 else "S 級大賺狙擊 v3"
+    mode_name = "極穩空排 v4（早盤+MA25走平+MA14<MA25）" if base_params.require_ma14_lt_25 else "S 級大賺狙擊 v4"
     for sym in symbols:
         print(f"=== {sym} {mode_name}回測（近 {days} 天） ===", flush=True)
         df = fetch_klines(sym, days)
@@ -611,15 +633,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.test:
         now_tpe = datetime.now(TPE).strftime("%Y-%m-%d %H:%M:%S")
-        ok = tg_send(f"✅ <b>SOXS S級大賺狙擊器 v3</b> 連線測試成功\n台北時間：{now_tpe}", dry_run=args.dry_run)
+        ok = tg_send(f"✅ <b>SOXS S級大賺狙擊器 v4</b> 連線測試成功\n台北時間：{now_tpe}", dry_run=args.dry_run)
         return 0 if ok else 1
 
     if args.backtest:
         return run_sniper_backtest(symbols, args.days, base_params=active_params)
 
     seen = load_seen()
-    mode_tag = "極穩空排 v3 (MA14<MA25)" if args.strict else "S級大賺狙擊 v3"
-    print(f"啟動 {mode_tag} 監看：{', '.join(symbols)}（美東 09:20–16:00 進場窗）", flush=True)
+    mode_tag = "極穩空排 v4 (早盤+MA25走平+MA14<MA25)" if args.strict else "S級大賺狙擊 v4"
+    print(f"啟動 {mode_tag} 監看：{', '.join(symbols)}（美東早盤 09:20–12:00 進場窗）", flush=True)
 
     def scan_round() -> None:
         now_tpe = datetime.now(TPE)

@@ -115,37 +115,39 @@ python3 examples/watch_binance_ribbon.py          # 每根 1m 收盤掃一次
 
 ## SOXS 一分 K 假突破做空
 
-幣安 `SOXSUSDT` 1 分 K。價格刺過近 120 根前高、超漲不超過 3.5%，接著收盤跌破 MA25 與 MA30，且 MA7 已跌破 MA14。下一到十根內，前一根收盤還在 MA25 下，就在前一根 MA14／MA25 掛空。v3 優化版在 v2 防暴衝基礎上再加入兩項跨 4 檔反向／波動率 ETF（`SOXS` + 外樣本 `SQQQ` / `UVXY` / `TZA`）驗證通過的結構升級：
+幣安 `SOXSUSDT` 1 分 K。價格刺過近 120 根前高、超漲不超過 3.5%，接著收盤跌破 MA25 與 MA30，且 MA7 已跌破 MA14。下一到十根內，前一根收盤還在 MA25 下，就在前一根 MA14／MA25 掛空。v4 精選早盤瀑布版經由 **4 檔獨立反向／波動率 ETF**（`SOXS` + 外樣本 `SQQQ` / `UVXY` / `TZA`，近 80 萬根 1 分 K）驗證：
 
-- **v2 防暴衝與防掃損**：掛單價離下方 MA99 須落在 **0.8%–3.5%** 合理中空帶、前一根 24h 漲幅 **> +20%** 熔斷暫停做空、停損緩衝放寬至假高上方 **0.2%**。
-- **v3 過濾 1 根針刺反轉**：假高至跌破至少隔 **2 根**（`min_peak_to_bd=2`），過濾開盤 1 分鐘插針洗盤。
-- **v3 條件式瀑布續抱出場**：停利放寬至 **4.0R**；第 30 分鐘檢核時，若收盤仍在 MA25 下方且浮盈 **≥ +0.8R**，則把保護停損移至 **+0.3R** 續抱瀑布（收盤站回 MA25 即落袋、最長至 60 分鐘），其餘盤整單第 30 分鐘準時結算。
-
-只在**美東 09:20–16:00**（冬令台北 22:20–隔日 05:00）掛單進場，停損距離 0.6%–2.5%，來回扣 0.06%，未扣資金費。
+- **v4 鎖定美股早盤瀑布窗（`ny_morning`：`09:20–12:00 ET`）**：冬令對應台北 `22:20–隔日 01:00`（夏令 `21:20–00:00`），徹底砍掉午盤與尾盤（`12:00–16:00 ET` 在 3 檔外樣本 ETF 實際虧損 `-3.55%`）的磨蹭震盪單。
+- **v4 MA25 降速走平確認（`max_ma25_slope3 = 0.0010`）**：掛單前要求前一根 MA25 相對 3 根前漲幅 `≤ +0.10%`，不逆勢空強多頭陡升均線中的小回檔（直接避開像 `11-17 23:25` 類型的強勢多頭停損單）。
+- **v3 過濾 1 根針刺反轉 + 條件式瀑布續抱**：假高至跌破至少隔 2 根（`min_peak_to_bd=2`）；停利放寬至 **4.0R**；第 30 分鐘若收盤仍在 MA25 下方且浮盈 **≥ +0.8R**，保護停損移至 **+0.3R** 續抱瀑布至收盤站回 MA25 或最長 60 分鐘。
+- **v2 防暴衝與防掃損**：掛單價離下方 MA99 須落在 **0.8%–3.5%** 合理中空帶、前一根 24h 漲幅 **> +20%** 熔斷暫停做空、停損在假高上方 **0.2%**（停損距離 0.6%–2.5%，來回扣 0.06%，未扣資金費）。
 
 ```bash
 python3 examples/soxs_fake_breakout.py --days 30 --pages
+python3 examples/soxs_fake_breakout.py --days 145 --html docs/soxs-fake-breakout-all/index.html
 python3 examples/soxs_fake_breakout.py --days 30 --sniper --html docs/soxs-sniper-30d/index.html
-python3 examples/soxs_fake_breakout.py --days 140 --ma14-below-ma25   # 極穩空排確認模式（MA14 < MA25）
+python3 examples/soxs_fake_breakout.py --days 145 --ma14-below-ma25   # 極穩空排確認模式（MA14 < MA25）
 python3 examples/soxs_fake_breakout.py --days 30 --loose              # 初版寬鬆對照
 python3 examples/test_soxs_fake_breakout.py
 
 # 專門抓 S 級大賺單（回測 + 每分鐘即時監看推播 Telegram）
 python3 examples/watch_soxs_big_win_tg.py --backtest --days 30
-python3 examples/watch_soxs_big_win_tg.py --backtest --days 140 --strict
+python3 examples/watch_soxs_big_win_tg.py --backtest --days 145 --strict
 python3 examples/watch_soxs_big_win_tg.py --test
 python3 examples/watch_soxs_big_win_tg.py
 ```
 
-全上市 4 個多月實測（2026-07-16 → 11-22 台北時間，184,784 根 1 分 K，含 11/13–11/22 真實前進測）＋ 3 檔外樣本 ETF（`SQQQUSDT`、`UVXYUSDT`、`TZAUSDT` 共 59.4 萬根 1 分 K）：
-1. 舊版優化 v1（無 MA99 上限／無 24h 熔斷、停損 +0.1%、TP 2.5R、固定 30m）：SOXS 全期 30 筆、勝率 60.0%、淨報酬 +7.96%、+4.17R（PF 1.52、MaxDD 5.03%）；近 30 天 12 筆 +4.31%。
-2. 舊版優化 v2（加防暴衝＋停損 +0.2%、TP 2.0R、固定 30m）：SOXS 全期 26 筆、勝率 69.2%、淨報酬 +17.86%、+9.70R（PF 3.56、MaxDD 2.02%）；外樣本 3 ETF 共 26 筆 +4.15%（+5.74R、PF 1.33）。
-3. **新版優化主策略 v3**（+ 過濾 1 根針刺 + 30→60m 瀑布續抱 + TP 4.0R）：SOXS 全期 **25 筆、勝率 72.0%、淨報酬 +22.70%、+12.95R**（PF **4.82**、MaxDD 維持 **2.02%**）；近 30 天（10/23–11/22）**9 筆、勝率 77.8%（7 勝 2 負）、淨報酬 +15.13%、+9.07R**；外樣本 3 ETF 共 **26 筆、勝率 57.7%、+9.16%、+11.22R**（PF **1.72**，`SQQQ +2.37%`、`UVXY +6.25%`、`TZA +0.54%` 四檔全正報酬）。
-4. **S 級大賺狙擊 v3**（`watch_soxs_big_win_tg.py` / `--sniper`）：SOXS 全期 **15 筆、勝率 80.0%（12 勝 3 負）、淨報酬 +20.07%、+11.54R**（PF **6.33**、MaxDD **2.02%**）；近 30 天 **6 筆、勝率 83.3%（5 勝 1 負）、淨報酬 +14.06%、+8.18R**。
-5. **極穩空排確認 v3**（`--ma14-below-ma25` / `--strict`：進場前要求 `MA14 < MA25`）：SOXS 全期 **11 筆、勝率 81.8%（9 勝 2 負、0 筆打到停損）、淨報酬 +18.70%、+9.89R**（PF **21.21**、MaxDD **0.93%**，5/5 時段全正報酬）；外樣本 3 ETF **11 筆、+6.26%、+5.54R**（PF **2.12**）；近 30 天 **3 筆、勝率 100.0%、+9.18%**。
+全上市 4 個半月實測（2026-07-16 → 11-23 台北時間，187,476 根 1 分 K）＋ 3 檔外樣本 ETF（`SQQQUSDT`、`UVXYUSDT`、`TZAUSDT` 共 61 萬根 1 分 K）：
+1. 舊版 v1（無防暴衝、固定 30m）：SOXS 全期 30 筆、勝率 60.0%、+7.96%（+4.17R、PF 1.52、MaxDD 5.03%）。
+2. 舊版 v2（防暴衝、固定 30m / 2R）：SOXS 全期 26 筆、勝率 69.2%、+17.86%（+9.70R、PF 3.56、MaxDD 2.02%）。
+3. 上一版 v3（全美盤 09:20–16:00、瀑布續抱）：SOXS 全期 25 筆、勝率 72.0%、+22.70%（+12.95R、PF 4.82、MaxDD 2.02%）；外樣本 3 ETF 27 筆 +8.37%（+10.22R、PF 1.62、MaxDD 5.89%）。
+4. **新版精選主策略 v4（美股早盤 `09:20–12:00 ET` + `MA25` 走平確認）**：SOXS 全期 **12 筆、勝率 83.3%（10 勝 2 負）、淨報酬 +22.70%（單筆平均 +1.89%）、+12.44R、PF 10.00、MaxDD 1.62%**；近 30 天（10/24–11/23）**2 筆全勝 +13.22%（+7.49R，砍掉全部 7 筆盤中磨蹭與停損單）**；外樣本 3 ETF **13 筆、勝率 69.2%、淨報酬 +14.43%（+14.60R）、PF 4.74、MaxDD 1.83%**（`SQQQ 4/4 +2.91%`、`UVXY 4/6 +10.98%`、`TZA +0.54%`，四檔合計 25 筆 **+37.13% / +27.04R**）。
+5. **S 級大賺狙擊 v4**（`watch_soxs_big_win_tg.py` / `--sniper`）：SOXS 全期 **8 筆、勝率 87.5%（7 勝 1 負）、淨報酬 +19.99%（單筆平均 +2.50%）、+10.90R、PF 13.33、MaxDD 1.62%**。
+6. **極穩空排確認 v4**（`--ma14-below-ma25` / `--strict`）：SOXS 全期 **5 筆、勝率 100.0%（5 勝 0 負）、淨報酬 +15.33%（單筆平均 +3.07%）、+7.75R、MaxDD 0.00%**；外樣本 3 ETF **7 筆、勝率 71.4%、+8.70%、+7.00R、PF 6.34**。
 
-- 優化版預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-fake-breakout-backtest-274a/docs/soxs-fake-breakout-30d/view.html
-- S 級大賺狙擊預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-fake-breakout-backtest-274a/docs/soxs-sniper-30d/view.html
+- 全上市 4.5 個月（全部 12 筆）圖表預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-fake-breakout-backtest-274a/docs/soxs-fake-breakout-all/view.html
+- 近 30 天主策略預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-fake-breakout-backtest-274a/docs/soxs-fake-breakout-30d/view.html
+- 近 30 天 S 級狙擊預覽：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-fake-breakout-backtest-274a/docs/soxs-sniper-30d/view.html
 
 ## 快速開始
 

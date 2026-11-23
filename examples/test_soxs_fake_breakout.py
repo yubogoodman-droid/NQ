@@ -72,6 +72,7 @@ def _params(**overrides) -> Params:
         min_gap_ma99=0.0,
         max_gap_ma99=0.0,
         max_ret_24h=0.0,
+        max_ma25_slope3=0.0,
         min_risk=0.002,
         max_risk=0.035,
         days=0,
@@ -85,6 +86,7 @@ def _params(**overrides) -> Params:
 def test_session_windows() -> None:
     hit = pd.Timestamp("2026-11-12 22:26", tz="Asia/Taipei")  # 09:26 ET
     pre_wave = pd.Timestamp("2026-11-12 22:10", tz="Asia/Taipei")  # 09:10 ET
+    afternoon = pd.Timestamp("2026-11-13 02:00", tz="Asia/Taipei")  # 13:00 ET
     midday = pd.Timestamp("2026-11-12 12:00", tz="Asia/Taipei")
     early = pd.Timestamp("2026-11-12 18:00", tz="Asia/Taipei")
     friday_rth = pd.Timestamp("2026-11-13 04:30", tz="Asia/Taipei")
@@ -92,8 +94,13 @@ def test_session_windows() -> None:
     assert in_session(hit, "tpe_us")
     assert in_session(hit, "ny")
     assert in_session(hit, "ny_open")
+    assert in_session(hit, "ny_morning")
     assert in_session(pre_wave, "ny_open", for_wave=True)
     assert not in_session(pre_wave, "ny_open", for_wave=False)
+    assert in_session(pre_wave, "ny_morning", for_wave=True)
+    assert not in_session(pre_wave, "ny_morning", for_wave=False)
+    assert in_session(afternoon, "ny_open")
+    assert not in_session(afternoon, "ny_morning")
     assert not in_session(midday, "tpe_us")
     assert not in_session(midday, "ny")
     assert not in_session(early, "tpe_us")
@@ -101,9 +108,11 @@ def test_session_windows() -> None:
     assert in_session(friday_rth, "tpe_us")
     assert in_session(friday_rth, "ny")
     assert in_session(friday_rth, "ny_open")
+    assert not in_session(friday_rth, "ny_morning")
     assert not in_session(saturday, "tpe_us")
     assert not in_session(saturday, "ny")
     assert not in_session(saturday, "ny_open")
+    assert not in_session(saturday, "ny_morning")
     assert in_session(saturday, "all")
 
 
@@ -277,6 +286,19 @@ def test_min_peak_to_bd_filters_one_bar_whipsaw() -> None:
     assert t2 == []
 
 
+def test_ma25_slope3_blocks_steep_uptrend_dip() -> None:
+    # 以標準假突破為底，把更早的均價壓低使 bar 41 的 MA25 3 根斜率陡升 (> +0.5%)：開啟 max_ma25_slope3 必須擋掉
+    df = _plant_fakeout()
+    for col in ("Open", "High", "Low", "Close"):
+        df.iloc[:17, df.columns.get_loc(col)] -= 8.0
+
+    unfiltered, _ = run_backtest(df, _params(max_ma25_slope3=0.0))
+    assert len(unfiltered) == 1
+    blocked, funnel = run_backtest(df, _params(max_ma25_slope3=0.0010))
+    assert blocked == []
+    assert funnel["slope_skip"] >= 1
+
+
 def test_waterfall_runner_exit_modes() -> None:
     # entry=100, stop=102 (risk=2), target=92 (4R), max_hold=3, runner_max_hold=6, min_r=0.8 (<=98.4), lock_r=0.3 (99.4)
     # 1) 不達條件（bar 3 收 99.0 = +0.5R < 0.8R）：準時在第 3 根結算
@@ -380,6 +402,7 @@ if __name__ == "__main__":
     test_max_ret_24h_crash_day_guard_is_causal()
     test_require_ma14_lt_25_filter()
     test_min_peak_to_bd_filters_one_bar_whipsaw()
+    test_ma25_slope3_blocks_steep_uptrend_dip()
     test_waterfall_runner_exit_modes()
     test_sniper_big_win_detector_arm_and_fill()
     test_outside_session_is_ignored()
