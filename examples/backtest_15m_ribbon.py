@@ -258,22 +258,22 @@ def draw_marked_chart(
         a.tick_params(colors="#8aa193", labelsize=8)
         for sp in a.spines.values():
             sp.set_color("#2a3a33")
+    x = i - a0
+    ax.axvline(x, color="#c9a227", ls="--", lw=0.85, alpha=0.45, zorder=1)
     colors_v = []
     for k in range(len(c)):
         up = c[k] >= o[k]
         col = "#3dba7a" if up else "#e35d5d"
-        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.7)
+        ax.vlines(xs[k], l[k], h[k], color=col, lw=0.9, zorder=3)
         y0, y1 = min(o[k], c[k]), max(o[k], c[k])
         if y1 == y0:
             y1 = y0 + max(h[k] - l[k], 1e-12) * 0.02
-        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3))
+        ax.add_patch(Rectangle((xs[k] - 0.35, y0), 0.7, y1 - y0, facecolor=col, edgecolor=col, lw=0.3, zorder=3))
         colors_v.append("#3dba7a99" if up else "#e35d5d99")
     axv.bar(xs, v, width=0.8, color=colors_v, linewidth=0)
     for n, col in PAL.items():
-        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.05, label=f"MA{n}")
-    x = i - a0
-    ax.axvline(x, color="#c9a227", ls="--", lw=0.95)
-    ax.scatter([x], [c[x]], s=36, color="#c9a227", zorder=5)
+        ax.plot(xs, sma(d["c"], n)[sl], color=col, lw=1.05, label=f"MA{n}", zorder=4)
+    ax.scatter([x], [c[x]], s=28, color="#c9a227", zorder=5)
     ax.set_title(title, color="#e8f0ea", fontsize=12)
     ax.legend(loc="upper left", fontsize=7, frameon=False, labelcolor="#c8d5cc", ncol=6)
     fig.tight_layout(pad=0.5)
@@ -332,12 +332,17 @@ def filter_stats(rows: list[SignalRow]) -> list[dict]:
 def pick_gallery(rows: list[SignalRow], limit: int = 24, *, summary_h: int = 16) -> list[SignalRow]:
     body = apply_filter(rows, body=True) or rows
 
+    def has_ret(r: SignalRow) -> bool:
+        m = r.moves.get(summary_h)
+        return bool(m and m.ret_pct is not None)
+
     def rsum(r: SignalRow) -> float:
         m = r.moves.get(summary_h)
         return m.ret_pct if m and m.ret_pct is not None else -1e9
 
-    ranked = sorted(body, key=rsum, reverse=True)
-    tight = sorted(apply_filter(body, max_width=0.4), key=rsum, reverse=True)
+    settled = [r for r in body if has_ret(r)] or body
+    ranked = sorted(settled, key=rsum, reverse=True)
+    tight = sorted([r for r in apply_filter(body, max_width=0.4) if has_ret(r)], key=rsum, reverse=True)
     n_best = min(8, len(ranked))
     n_worst = min(8, max(0, len(ranked) - n_best))
     chosen = ranked[:n_best] + ranked[-n_worst:] if n_worst else ranked[:n_best]
@@ -467,7 +472,7 @@ def gallery_html(
     for row, rel15, rel1h in items:
         r4 = row.moves.get(summary_h)
         ret = r4.ret_pct if r4 else None
-        cls = "pos" if ret and ret > 0 else "neg"
+        cls = "pos" if (ret is not None and ret > 0) else ("neg" if (ret is not None and ret < 0) else "")
         ret_s = f"{ret:+.2f}%" if ret is not None else "—"
         ret24_s = f"{row.ret24h_pct:+.1f}%" if row.ret24h_pct is not None else "—"
         m200_s = "MA200上方" if row.ma200_aligned else "MA200下方"
@@ -515,18 +520,26 @@ def write_html(
     rows: list[SignalRow],
     stats: list[dict],
     gallery: list[tuple[SignalRow, str, str | None]],
+    optimized: bool = False,
 ) -> None:
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     first = datetime.fromtimestamp(min(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
     last = datetime.fromtimestamp(max(r.time_ms for r in rows) / 1000, TZ).strftime("%m-%d") if rows else "—"
+    opt_suffix = "（優化過濾）" if optimized else ""
     if asset == "stocks":
-        page_title = f"近{days}天 15分K 股票 同時站上 7/14/25/99/120"
-        heading = f"近 {days} 天 · 股票：一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120"
+        page_title = f"近{days}天 15分K 股票 同時站上 7/14/25/99/120{opt_suffix}"
+        heading = f"近 {days} 天 · 股票：一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120{opt_suffix}"
         nav = '<b>只要股票</b> · <a href="./ma-ribbon-15m.html">全部流動盤</a>'
     else:
-        page_title = f"近{days}天 15分K 同時站上 7/14/25/99/120"
-        heading = f"近 {days} 天 · 一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120"
+        page_title = f"近{days}天 15分K 同時站上 7/14/25/99/120{opt_suffix}"
+        heading = f"近 {days} 天 · 一根 15 分 K 同時站上 7 / 14 / 25 / 99 / 120{opt_suffix}"
         nav = '<b>全部流動盤</b> · <a href="./ma-ribbon-15m-stocks.html">只要股票</a>'
+    gallery_sub = (
+        "僅顯示優化過關訊號（站上 MA200 + 前 24h 漲 + 寬度 ≤ 1% + 上影 ≤ 25% + 同幣雙向 8h 冷卻）；黃虛線為訊號 15 分與對應 1 小時 K。"
+        if optimized
+        else "黃虛線：15 分圖是同時站上 7/14/25/99/120 的那根；1 小時圖是這根 15 分所在的小時 K。"
+    )
+    table_heading = "優化訊號表（依 4h 報酬排序，最多 80 筆）" if optimized else "訊號表（依 4h 報酬排序，最多 80 筆）"
     page = f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -569,7 +582,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     {kpi_block(stats, summary_h=16)}
   </div>
   <h1>圖例</h1>
-  <p class="sub">黃虛線：15 分圖是同時站上 7/14/25/99/120 的那根；1 小時圖是這根 15 分所在的小時 K。</p>
+  <p class="sub">{html.escape(gallery_sub)}</p>
   {gallery_html(gallery)}
   <div class="card">
     <h2>過濾對照</h2>
@@ -579,7 +592,7 @@ th{{color:#8aa193;font-size:11px;letter-spacing:.03em}}
     <p class="note">寬度 =（最高均線 / 最低均線 − 1）× 100%，用突破前一根的均線。假突破 = 進場那根 15 分收盤又跌回最高均線下方。</p>
   </div>
   <div class="card">
-    <h2>訊號表（依 4h 報酬排序，最多 80 筆）</h2>
+    <h2>{html.escape(table_heading)}</h2>
     <div class="table-wrap">
       {signal_table(rows)}
     </div>
@@ -765,6 +778,7 @@ def main() -> int:
         rows=display_rows,
         stats=stats,
         gallery=gallery,
+        optimized=args.optimized,
     )
     Path("output").mkdir(exist_ok=True)
     Path("output/ribbon15_summary.json").write_text(
