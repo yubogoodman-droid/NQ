@@ -3,8 +3,10 @@
 
 在下面填 Telegram 後執行：
 
-    python 小米15分K.py                 # 流動盤全掃（加密+股票）
-    python 小米15分K.py --asset stocks  # 只要股票
+    python 小米15分K.py                       # 流動盤全掃（加密+股票）
+    python 小米15分K.py --optimized           # 只推優化過關訊號（MA200上方 + 前24h漲 + 寬度≤1% + 上影≤25% + 8h冷卻）
+    python 小米15分K.py --optimized --side both  # 多空雙向順勢優化
+    python 小米15分K.py --asset stocks        # 只要股票
 
 Ctrl+C 結束。同一根 K 不會重發。
 """
@@ -129,8 +131,25 @@ def indicators(d: dict) -> dict:
     return d
 
 
+def _break_context(d: dict, i: int, *, side: str) -> tuple[bool, float | None, float]:
+    c, o, h, l = d["c"], d["o"], d["h"], d["l"]
+    m200 = d.get("m200")
+    ma200_ok = False
+    if m200 is not None and not np.isnan(m200[i]):
+        ma200_ok = bool(c[i] > m200[i]) if side == "long" else bool(c[i] < m200[i])
+    ret24h = float((c[i - 1] / c[i - 97] - 1.0) * 100.0) if i >= 97 and c[i - 97] > 0 else None
+    span = float(h[i] - l[i])
+    if span <= 0:
+        wick = 0.0
+    elif side == "long":
+        wick = float((h[i] - max(o[i], c[i])) / span)
+    else:
+        wick = float((min(o[i], c[i]) - l[i]) / span)
+    return ma200_ok, ret24h, wick
+
+
 def detect_long_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) -> list:
-    """前一根收在指定均線下方，這一根收盤同時站上。預設 7/14/25/99/120。"""
+    """做多：前一根收在指定均線下方，這一根收盤同時站上。預設 7/14/25/99/120。"""
     c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
     v20 = d["v20"]
     out = []
@@ -148,6 +167,7 @@ def detect_long_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) ->
             continue
         width = (hi_p / lo_p - 1.0) * 100.0 if lo_p > 0 else float("inf")
         vr = float(v[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
+        ma200_ok, ret24h, wick = _break_context(d, i, side="long")
         out.append(
             SimpleNamespace(
                 idx=i,
@@ -158,6 +178,49 @@ def detect_long_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) ->
                 width_pct=width,
                 vol_ratio=vr,
                 body_through=bool(o[i] < lo_p and c[i] > hi_c),
+                side="long",
+                ma200_aligned=ma200_ok,
+                ret24h_pct=ret24h,
+                wick_ratio=wick,
+            )
+        )
+    return out
+
+
+def detect_short_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) -> list:
+    """做空：前一根收在指定均線上方，這一根收盤同時跌破。預設 7/14/25/99/120。"""
+    c, o, h, l, v = d["c"], d["o"], d["h"], d["l"], d["v"]
+    v20 = d["v20"]
+    out = []
+    start = max(periods) + 1
+    for i in range(start, len(c)):
+        prev = np.array([d[f"m{n}"][i - 1] for n in periods], dtype=float)
+        curr = np.array([d[f"m{n}"][i] for n in periods], dtype=float)
+        if np.isnan(prev).any() or np.isnan(curr).any():
+            continue
+        lo_p, hi_p = float(prev.min()), float(prev.max())
+        lo_c, hi_c = float(curr.min()), float(curr.max())
+        if not (c[i - 1] > hi_p and c[i] < lo_c):
+            continue
+        if h[i] < hi_p:
+            continue
+        width = (hi_p / lo_p - 1.0) * 100.0 if lo_p > 0 else float("inf")
+        vr = float(v[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
+        ma200_ok, ret24h, wick = _break_context(d, i, side="short")
+        out.append(
+            SimpleNamespace(
+                idx=i,
+                open=float(o[i]),
+                high=float(h[i]),
+                low=float(l[i]),
+                close=float(c[i]),
+                width_pct=width,
+                vol_ratio=vr,
+                body_through=bool(o[i] > hi_p and c[i] < lo_c),
+                side="short",
+                ma200_aligned=ma200_ok,
+                ret24h_pct=ret24h,
+                wick_ratio=wick,
             )
         )
     return out
@@ -340,18 +403,42 @@ def scan_symbol(sym: str) -> list[dict]:
     return events
 
 
-def scan_symbol_15m(sym: str) -> list[dict]:
-    raw = fetch_klines(sym, interval="15m", limit=250)
+def is_optimized_break(br, *, cooldown_ok: bool) -> bool:
+    if not cooldown_ok or not br.ma200_aligned or br.ret24h_pct is None:
+        return False
+    if br.width_pct > 1.0 or br.wick_ratio > 0.25:
+        return False
+    return br.ret24h_pct > 0 if br.side == "long" else br.ret24h_pct < 0
+
+
+def scan_symbol_15m(
+    sym: str,
+    *,
+    optimized: bool = False,
+    cooldown_hours: float = 8.0,
+    side: str = "long",
+) -> list[dict]:
+    raw = fetch_klines(sym, interval="15m", limit=320)
     if raw is None:
         return []
     d = indicators(raw)
-    hits = detect_long_breaks(d)
     n = len(d["c"])
+    cd_bars = max(1, int(round(cooldown_hours * 4)))
+    # 同時看多空穿越計算「同幣任一方向冷卻」，避免盤整來回雙巴
+    all_hits = sorted(detect_long_breaks(d) + detect_short_breaks(d), key=lambda b: b.idx)
     events = []
-    for br in hits:
+    prev_any_idx: int | None = None
+    for br in all_hits:
+        cd_ok = prev_any_idx is None or (br.idx - prev_any_idx) >= cd_bars
+        prev_any_idx = br.idx
+        if side == "long" and br.side != "long":
+            continue
         if br.idx not in (n - 1, n - 2):
             continue
-        events.append({"kind": "m15", "symbol": sym, "break": br, "d": d})
+        opt_ok = is_optimized_break(br, cooldown_ok=cd_ok)
+        if optimized and not opt_ok:
+            continue
+        events.append({"kind": "m15", "symbol": sym, "break": br, "d": d, "opt_ok": opt_ok, "cd_ok": cd_ok})
     return events
 
 
@@ -390,19 +477,38 @@ def format_m15(ev: dict) -> str:
     d, br, sym = ev["d"], ev["break"], ev["symbol"]
     ts = hm(int(d["t"][br.idx]))
     body = "是" if br.body_through else "否"
+    is_short = br.side == "short"
+    title = "15分 做空 同時跌破 7/14/25/99/120" if is_short else "15分 同時站上 7/14/25/99/120"
+    tag = " [優化過關]" if ev.get("opt_ok") else ""
+    m200 = ("下方" if br.ma200_aligned else "上方") if is_short else ("上方" if br.ma200_aligned else "下方")
+    ret24 = f"{br.ret24h_pct:+.1f}%" if br.ret24h_pct is not None else "—"
+    wick_lbl = "下影" if is_short else "上影"
+    tail = (
+        f"收 {br.close:g}　開 {br.open:g}　高 {br.high:g}"
+        if is_short
+        else f"收 {br.close:g}　開 {br.open:g}　低 {br.low:g}"
+    )
+    hint = (
+        "前一根收在五條均線上方，這一根收盤同時跌破。"
+        if is_short
+        else "前一根收在五條均線下方，這一根收盤同時站上。"
+    )
     return (
-        f"<b>15分 同時站上 7/14/25/99/120</b>\n"
+        f"<b>{title}{tag}</b>\n"
         f"<b>{html_label(sym)}</b>\n"
         f"時間 {ts}（GMT+8）\n"
-        f"收 {br.close:g}　開 {br.open:g}　低 {br.low:g}\n"
+        f"{tail}\n"
         f"帶子寬度 {br.width_pct:.2f}%　量比 {br.vol_ratio:.2f}×　實體穿越 {body}\n"
-        f"<i>前一根收在五條均線下方，這一根收盤同時站上。不必過 MA200。</i>"
+        f"MA200 {m200}　前24h {ret24}　{wick_lbl} {br.wick_ratio * 100:.0f}%\n"
+        f"<i>{hint}</i>"
     )
 
 
 def key_of(ev: dict) -> str:
     if ev["kind"] == "m15":
-        return f"15m:{ev['symbol']}:{int(ev['d']['t'][ev['break'].idx])}"
+        side = getattr(ev["break"], "side", "long")
+        prefix = "15m" if side == "long" else f"15m:{side}"
+        return f"{prefix}:{ev['symbol']}:{int(ev['d']['t'][ev['break'].idx])}"
     return f"{ev['symbol']}:{int(ev['d']['t'][ev['kiss_i']])}:{ev['kind']}"
 
 
@@ -504,6 +610,13 @@ def main() -> int:
     p.add_argument("--test", action="store_true", help="只測 Telegram 通不通")
     p.add_argument("--demo", action="store_true", help="只用合成 15 分 K 驗證偵測")
     p.add_argument("--asset", choices=("stocks", "all"), default="all", help="15 分掃描範圍，預設全掃流動盤")
+    p.add_argument(
+        "--optimized",
+        action="store_true",
+        help="只推優化過關訊號（同側MA200 + 前24h順勢 + 寬度≤1% + 影線≤25% + 同幣雙向冷卻）",
+    )
+    p.add_argument("--side", choices=("long", "both"), default="long", help="15 分監看方向：long=只做多；both=多空雙向")
+    p.add_argument("--cooldown-hours", type=float, default=8.0, help="優化模式同幣冷卻小時數（預設 8）")
     p.add_argument("--also-1m", action="store_true", help="順便跑原本的 1m 黏帶離開/強訊號")
     args = p.parse_args()
     apply_keys()
@@ -517,13 +630,23 @@ def main() -> int:
     symbols_15m = universe(asset=args.asset)
     symbols_1m = universe(asset="all") if args.also_1m else []
     label = "股票永續" if args.asset == "stocks" else "流動永續（加密+股票）"
+    mode_tag = f"（優化過濾，冷卻 {args.cooldown_hours:g}h）" if args.optimized else "（原始全部）"
+    side_tag = "多空雙向" if args.side == "both" else "做多"
     print(
-        f"15 分同時站上 7/14/25/99/120：監看 {len(symbols_15m)} 個{label}。",
+        f"15 分 {side_tag} 7/14/25/99/120{mode_tag}：監看 {len(symbols_15m)} 個{label}。",
         flush=True,
     )
     if args.also_1m:
         print(f"另外監看 {len(symbols_1m)} 個 1m 黏帶。", flush=True)
     uni_ts = time.time()
+
+    def scan_15m_one(sym: str) -> list[dict]:
+        return scan_symbol_15m(
+            sym,
+            optimized=args.optimized,
+            cooldown_hours=args.cooldown_hours,
+            side=args.side,
+        )
 
     def round_once(*, force_15m: bool = False) -> None:
         nonlocal symbols_15m, symbols_1m, uni_ts
@@ -542,7 +665,7 @@ def main() -> int:
             events.extend(one)
             scanned.append("1m")
         if force_15m or should_scan_15m():
-            events.extend(scan_all(symbols_15m, scan_symbol_15m))
+            events.extend(scan_all(symbols_15m, scan_15m_one))
             scanned.append("15m")
         new = [e for e in events if key_of(e) not in seen]
         tag = "+".join(scanned) if scanned else "idle"

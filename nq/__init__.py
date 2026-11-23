@@ -2,7 +2,7 @@
 
 from nq.patterns import WBottomPattern, detect_w_bottoms
 from nq.report import save_report_html
-from nq.ribbon15 import RibbonBreak, detect_long_breaks
+from nq.ribbon15 import RibbonBreak, detect_all_breaks, detect_long_breaks, detect_short_breaks
 from nq.strategy import NQWBottomStrategy, Signal
 
 __all__ = [
@@ -12,5 +12,7 @@ __all__ = [
     "Signal",
     "save_report_html",
     "RibbonBreak",
+    "detect_all_breaks",
     "detect_long_breaks",
+    "detect_short_breaks",
 ]

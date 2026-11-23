@@ -46,14 +46,28 @@ SESSION.headers.update({"User-Agent": "Mozilla/5.0", "Clienttype": "web", "Accep
 
 PAL = {7: "#f0c14a", 14: "#ff8a4c", 25: "#d28cff", 99: "#42a5f5", 120: "#26c6da", 200: "#ffffff"}
 FILTERS = (
-    ("原始：一根K從帶下收到帶上", {"body": None, "max_width": None, "min_width": None, "min_vol": None}),
-    ("實體穿越（開在帶下、收在帶上）", {"body": True, "max_width": None, "min_width": None, "min_vol": None}),
-    ("帶子寬度 ≤ 1.0%", {"body": None, "max_width": 1.0, "min_width": None, "min_vol": None}),
-    ("帶子寬度 ≤ 0.4%", {"body": None, "max_width": 0.4, "min_width": None, "min_vol": None}),
-    ("帶子寬度 > 1.0%", {"body": None, "max_width": None, "min_width": 1.0, "min_vol": None}),
-    ("放量 ≥ 1.5×", {"body": None, "max_width": None, "min_width": None, "min_vol": 1.5}),
-    ("實體 + 寬度≤1% + 放量≥1.5×", {"body": True, "max_width": 1.0, "min_width": None, "min_vol": 1.5}),
+    ("原始：一根K從帶下收到帶上", {}),
+    ("實體穿越（開在帶下、收在帶上）", {"body": True}),
+    ("帶子寬度 ≤ 1.0%", {"max_width": 1.0}),
+    ("帶子寬度 ≤ 0.4%", {"max_width": 0.4}),
+    ("帶子寬度 > 1.0%", {"min_width": 1.0}),
+    ("放量 ≥ 1.5×", {"min_vol": 1.5}),
+    ("實體 + 寬度≤1% + 放量≥1.5×", {"body": True, "max_width": 1.0, "min_vol": 1.5}),
+    ("站上 MA200", {"ma200_aligned": True}),
+    ("優化：站上MA200 + 前24h漲 + 8h冷卻", {"ma200_aligned": True, "trend_24h": True, "cooldown_hours": 8.0}),
+    (
+        "優化(推薦)：同上 + 寬度≤1% + 上影≤25%",
+        {"ma200_aligned": True, "trend_24h": True, "max_width": 1.0, "max_wick": 0.25, "cooldown_hours": 8.0},
+    ),
 )
+OPT_FILTER_NAME = "優化(推薦)：同上 + 寬度≤1% + 上影≤25%"
+OPT_FILTER_KW = {
+    "ma200_aligned": True,
+    "trend_24h": True,
+    "max_width": 1.0,
+    "max_wick": 0.25,
+    "cooldown_hours": 8.0,
+}
 HORIZON_LABEL = {1: "15m", 2: "30m", 4: "1h", 8: "2h", 16: "4h", 32: "8h"}
 BARS_PER_DAY = {"15m": 96, "5m": 288, "1m": 1440, "1h": 24}
 INTERVAL_MS = {"15m": 15 * 60_000, "5m": 5 * 60_000, "1m": 60_000, "1h": 60 * 60_000}
@@ -347,27 +361,29 @@ def kpi_block(stats: list[dict], *, summary_h: int = 16) -> str:
         return ""
     by = {s["name"]: s for s in stats}
     raw = stats[0]
-    tight = by.get("帶子寬度 ≤ 1.0%", stats[min(2, len(stats) - 1)])
-    wide = by.get("帶子寬度 > 1.0%", raw)
+    opt = by.get(OPT_FILTER_NAME, raw)
     h = raw[f"h{summary_h}"]
+    ho = opt[f"h{summary_h}"]
     cards = [
         ("原始筆數", str(raw["count"])),
-        ("4h 勝率", f"{h['wr']:.1f}%"),
-        ("4h 平均", f"{h['avg']:+.2f}%"),
-        ("4h 中位", f"{h['med']:+.2f}%"),
-        ("寬度≤1%", str(tight["count"])),
-        ("寬度>1% 4h均", f"{wide[f'h{summary_h}']['avg']:+.2f}%"),
+        ("原始 4h 勝率", f"{h['wr']:.1f}%"),
+        ("原始 4h 平均", f"{h['avg']:+.2f}%"),
+        ("優化筆數", str(opt["count"])),
+        ("優化 4h 勝率", f"{ho['wr']:.1f}%" if ho["n"] else "—"),
+        ("優化 4h 平均", f"{ho['avg']:+.2f}%" if ho["n"] else "—"),
     ]
     html_cards = []
     for k, v in cards:
         cls = ""
-        if k in ("4h 平均", "4h 中位", "寬度>1% 4h均"):
+        if k in ("原始 4h 平均", "優化 4h 平均") and v != "—":
             try:
                 cls = "pos" if float(v.strip("%").replace("+", "")) > 0 else "neg"
             except ValueError:
                 cls = ""
-        if k == "4h 勝率":
+        if k == "原始 4h 勝率":
             cls = "pos" if h["wr"] >= 50 else "neg"
+        if k == "優化 4h 勝率" and ho["n"]:
+            cls = "pos" if ho["wr"] >= 50 else "neg"
         html_cards.append(f'<div class="kpi"><div class="k">{html.escape(k)}</div><div class="v {cls}">{html.escape(v)}</div></div>')
     return "\n".join(html_cards)
 
@@ -408,18 +424,22 @@ def signal_table(
         key=lambda r: (r.moves.get(summary_h).ret_pct if r.moves.get(summary_h) and r.moves[summary_h].ret_pct is not None else -1e9),
         reverse=True,
     )[:limit]
-    heads = ["時間", "標的", "進場", "寬度", "量比", "實體"] + [labels[h] for h in table_hs]
+    heads = ["時間", "標的", "進場", "寬度", "量比", "MA200", "前24h", "上影"] + [labels[h] for h in table_hs]
     thead = "".join(f"<th>{x}</th>" for x in heads)
     body = []
     for r in ranked:
-        body_tag = "是" if r.body_through else ""
+        m200_tag = "上方" if r.ma200_aligned else "下方"
+        ret24 = f"{r.ret24h_pct:+.1f}%" if r.ret24h_pct is not None else "—"
+        wick = f"{r.wick_ratio * 100:.0f}%"
         tds = [
             hm(r.time_ms),
             html.escape(sym_label(r.symbol)),
             f"{r.entry:g}",
             f"{r.width_pct:.2f}%",
             f"{r.vol_ratio:.2f}×",
-            body_tag,
+            m200_tag,
+            ret24,
+            wick,
         ]
         for h in table_hs:
             tds.append(pct(r.moves.get(h).ret_pct if r.moves.get(h) else None))
@@ -449,7 +469,10 @@ def gallery_html(
         ret = r4.ret_pct if r4 else None
         cls = "pos" if ret and ret > 0 else "neg"
         ret_s = f"{ret:+.2f}%" if ret is not None else "—"
+        ret24_s = f"{row.ret24h_pct:+.1f}%" if row.ret24h_pct is not None else "—"
+        m200_s = "MA200上方" if row.ma200_aligned else "MA200下方"
         note = (
+            f"{m200_s} · 前24h {ret24_s} · 上影 {row.wick_ratio * 100:.0f}% · "
             f"寬度 {row.width_pct:.3f}% · 量比 {row.vol_ratio:.2f}× · "
             f"{note_keys}："
             + " / ".join(_plain(row, h) for h in table_hs)
@@ -638,6 +661,7 @@ def main() -> int:
     p.add_argument("--asset", choices=("all", "stocks"), default="all", help="all=加密+股票流動盤；stocks=只要股票永續")
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--pages", action="store_true", help="寫入 docs/binance 報告（全部或股票各一頁）")
+    p.add_argument("--optimized", action="store_true", help="圖例與訊號表只顯示優化過濾後的訊號（對照表仍保留全部）")
     p.add_argument("-o", "--output", help="HTML 輸出路徑")
     p.add_argument("--limit-symbols", type=int, default=0, help="除錯用，只掃前 N 個幣")
     args = p.parse_args()
@@ -656,6 +680,7 @@ def main() -> int:
     print(f"掃描 {len(symbols)} 個 15m {uni_label}，近 {args.days} 天", flush=True)
     rows, data = scan_interval(symbols, args.days, "15m", args.workers)
     stats = filter_stats(rows)
+    display_rows = apply_filter(rows, **OPT_FILTER_KW) if args.optimized else rows
     print("\n=== 15 分 過濾對照 ===")
     for s in stats:
         h = s["h16"]
@@ -673,7 +698,7 @@ def main() -> int:
     img1h.mkdir(parents=True, exist_ok=True)
     for old in list(img15.glob("*.png")) + list(img1h.glob("*.png")):
         old.unlink()
-    gallery_rows = pick_gallery(rows, summary_h=16)
+    gallery_rows = pick_gallery(display_rows, summary_h=16)
     need_1h = sorted({r.symbol for r in gallery_rows})
     data_1h: dict[str, dict] = {}
     print(f"補抓 {len(need_1h)} 個 1h 圖用 K 線…", flush=True)
@@ -737,7 +762,7 @@ def main() -> int:
         universe_n=len(symbols),
         universe_label=uni_label,
         asset=args.asset,
-        rows=rows,
+        rows=display_rows,
         stats=stats,
         gallery=gallery,
     )

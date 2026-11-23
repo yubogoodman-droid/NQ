@@ -36,7 +36,7 @@ def _mas_at(d: dict, i: int, periods: tuple[int, ...] = MA_PERIODS) -> np.ndarra
 
 @dataclass(frozen=True)
 class RibbonBreak:
-    """一根 K 從帶子下方收到帶子上方。"""
+    """一根 K 穿過指定均線帶（做多由下往上、做空由上往下）。"""
 
     idx: int
     open: float
@@ -52,11 +52,33 @@ class RibbonBreak:
     vol_ratio: float
     body_through: bool
     range_pct: float
+    side: str = "long"
+    ma200_aligned: bool = False
+    ret24h_pct: float | None = None
+    wick_ratio: float = 0.0
+    bars_since_any_break: int | None = None
 
 
-def detect_long_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) -> list[RibbonBreak]:
+def _break_context(d: dict, i: int, *, side: str) -> tuple[bool, float | None, float]:
+    c, o, h, l = d["c"], d["o"], d["h"], d["l"]
+    m200 = d.get("m200")
+    ma200_ok = False
+    if m200 is not None and not np.isnan(m200[i]):
+        ma200_ok = bool(c[i] > m200[i]) if side == "long" else bool(c[i] < m200[i])
+    ret24h = float((c[i - 1] / c[i - 97] - 1.0) * 100.0) if i >= 97 and c[i - 97] > 0 else None
+    span = float(h[i] - l[i])
+    if span <= 0:
+        wick = 0.0
+    elif side == "long":
+        wick = float((h[i] - max(o[i], c[i])) / span)
+    else:
+        wick = float((min(o[i], c[i]) - l[i]) / span)
+    return ma200_ok, ret24h, wick
+
+
+def detect_all_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) -> list[RibbonBreak]:
     """
-    做多：前一根收盤完全在指定均線下方，這一根收盤完全站上這些均線。
+    同時偵測多空穿越，並記錄距離同幣前一次任一方向穿越的 K 棒數（避免盤整雙巴）。
 
     預設五條：MA7 / 14 / 25 / 99 / 120（不必過 MA200）。
     """
@@ -64,6 +86,7 @@ def detect_long_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) ->
     v20 = d["v20"]
     out: list[RibbonBreak] = []
     start = max(periods) + 1
+    last_any_idx: int | None = None
     for i in range(start, len(c)):
         prev = _mas_at(d, i - 1, periods)
         curr = _mas_at(d, i, periods)
@@ -71,15 +94,20 @@ def detect_long_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) ->
             continue
         lo_p, hi_p = float(prev.min()), float(prev.max())
         lo_c, hi_c = float(curr.min()), float(curr.max())
-        if not (c[i - 1] < lo_p and c[i] > hi_c):
-            continue
-        if l[i] > lo_p:
-            # 跳空越過帶子，不算「這根 K 穿過」
+        side: str | None = None
+        if c[i - 1] < lo_p and c[i] > hi_c and l[i] <= lo_p:
+            side = "long"
+        elif c[i - 1] > hi_p and c[i] < lo_c and h[i] >= hi_p:
+            side = "short"
+        if side is None:
             continue
         width = (hi_p / lo_p - 1.0) * 100.0 if lo_p > 0 else float("inf")
         vr = float(v[i] / v20[i]) if v20[i] and not np.isnan(v20[i]) and v20[i] > 0 else 0.0
-        body = o[i] < lo_p and c[i] > hi_c
+        body = bool(o[i] < lo_p and c[i] > hi_c) if side == "long" else bool(o[i] > hi_p and c[i] < lo_c)
         rng = (h[i] / l[i] - 1.0) * 100.0 if l[i] > 0 else 0.0
+        ma200_ok, ret24h, wick = _break_context(d, i, side=side)
+        bars_since = (i - last_any_idx) if last_any_idx is not None else None
+        last_any_idx = i
         out.append(
             RibbonBreak(
                 idx=i,
@@ -96,9 +124,32 @@ def detect_long_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) ->
                 vol_ratio=vr,
                 body_through=body,
                 range_pct=rng,
+                side=side,
+                ma200_aligned=ma200_ok,
+                ret24h_pct=ret24h,
+                wick_ratio=wick,
+                bars_since_any_break=bars_since,
             )
         )
     return out
+
+
+def detect_long_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) -> list[RibbonBreak]:
+    """
+    做多：前一根收盤完全在指定均線下方，這一根收盤完全站上這些均線。
+
+    預設五條：MA7 / 14 / 25 / 99 / 120（不必過 MA200）。
+    """
+    return [br for br in detect_all_breaks(d, periods=periods) if br.side == "long"]
+
+
+def detect_short_breaks(d: dict, periods: tuple[int, ...] = SIGNAL_MA_PERIODS) -> list[RibbonBreak]:
+    """
+    做空：前一根收盤完全在指定均線上方，這一根收盤完全跌破這些均線。
+
+    預設五條：MA7 / 14 / 25 / 99 / 120（不必破 MA200）。
+    """
+    return [br for br in detect_all_breaks(d, periods=periods) if br.side == "short"]
 
 
 @dataclass
@@ -130,14 +181,27 @@ class SignalRow:
     def vol_ratio(self) -> float:
         return self.break_.vol_ratio
 
+    @property
+    def ma200_aligned(self) -> bool:
+        return self.break_.ma200_aligned
+
+    @property
+    def ret24h_pct(self) -> float | None:
+        return self.break_.ret24h_pct
+
+    @property
+    def wick_ratio(self) -> float:
+        return self.break_.wick_ratio
+
 
 def forward_moves(d: dict, br: RibbonBreak, horizons: tuple[int, ...] = HORIZONS) -> tuple[float, dict[int, ForwardMove]]:
-    """進場用訊號下一根開盤；假突破 = 下一根收盤又跌回最高均線下方。"""
+    """進場用訊號下一根開盤；假突破 = 下一根收盤又退回帶子內（多看 ma_max、空看 ma_min）。"""
     i = br.idx
     nxt = i + 1
     if nxt >= len(d["c"]):
         return float("nan"), {h: ForwardMove(h, None, None, None, None) for h in horizons}
     entry = float(d["o"][nxt])
+    is_short = br.side == "short"
     moves: dict[int, ForwardMove] = {}
     for h in horizons:
         j = nxt + h - 1
@@ -147,12 +211,16 @@ def forward_moves(d: dict, br: RibbonBreak, horizons: tuple[int, ...] = HORIZONS
         last = float(d["c"][j])
         hi = float(d["h"][nxt : j + 1].max())
         lo = float(d["l"][nxt : j + 1].min())
-        ret = (last / entry - 1.0) * 100.0
-        mfe = (hi / entry - 1.0) * 100.0
-        mae = (lo / entry - 1.0) * 100.0
-        failed = None
-        if h == 1:
-            failed = float(d["c"][nxt]) < br.ma_max
+        if is_short:
+            ret = (1.0 - last / entry) * 100.0
+            mfe = (1.0 - lo / entry) * 100.0
+            mae = (1.0 - hi / entry) * 100.0
+            failed = float(d["c"][nxt]) > br.ma_min if h == 1 else None
+        else:
+            ret = (last / entry - 1.0) * 100.0
+            mfe = (hi / entry - 1.0) * 100.0
+            mae = (lo / entry - 1.0) * 100.0
+            failed = float(d["c"][nxt]) < br.ma_max if h == 1 else None
         moves[h] = ForwardMove(h, ret, mfe, mae, failed)
     return entry, moves
 
@@ -189,8 +257,27 @@ def apply_filter(
     max_width: float | None = None,
     min_width: float | None = None,
     min_vol: float | None = None,
+    ma200_aligned: bool | None = None,
+    trend_24h: bool | None = None,
+    max_wick: float | None = None,
+    cooldown_hours: float | None = None,
 ) -> list[SignalRow]:
     out = rows
+    if cooldown_hours is not None and cooldown_hours > 0:
+        cd_bars = int(round(cooldown_hours * 4))
+        cd_ms = int(cooldown_hours * 3600 * 1000)
+        # 優先用偵測期紀錄的「距任一方向前次穿越根數」去重，同時備援 timestamp 去重
+        last_by_sym: dict[str, int] = {}
+        kept: set[tuple[str, str, int]] = set()
+        for r in sorted(rows, key=lambda x: x.time_ms):
+            prev = last_by_sym.get(r.symbol)
+            ts_ok = prev is None or (r.time_ms - prev) >= cd_ms
+            bar_gap = r.break_.bars_since_any_break
+            bars_ok = bar_gap is None or bar_gap >= cd_bars
+            if ts_ok and bars_ok:
+                kept.add((r.symbol, r.break_.side, r.time_ms))
+            last_by_sym[r.symbol] = r.time_ms
+        out = [r for r in out if (r.symbol, r.break_.side, r.time_ms) in kept]
     if body:
         out = [r for r in out if r.body_through]
     if max_width is not None:
@@ -199,4 +286,15 @@ def apply_filter(
         out = [r for r in out if r.width_pct > min_width]
     if min_vol is not None:
         out = [r for r in out if r.vol_ratio >= min_vol]
+    if ma200_aligned:
+        out = [r for r in out if r.ma200_aligned]
+    if trend_24h:
+        out = [
+            r
+            for r in out
+            if r.ret24h_pct is not None
+            and (r.ret24h_pct > 0 if r.break_.side == "long" else r.ret24h_pct < 0)
+        ]
+    if max_wick is not None:
+        out = [r for r in out if r.wick_ratio <= max_wick]
     return out
