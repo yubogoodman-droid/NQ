@@ -114,6 +114,13 @@ def run(start: datetime, end: datetime) -> tuple[list[dict], dict[str, dict], li
     trades = S.drop_market_cluster(trades)
     if before != len(trades):
         print(f"大盤集群濾掉 {before - len(trades)} 筆", flush=True)
+    btc_d = data.get(S.BTC_SYMBOL)
+    if btc_d is None:
+        _, btc_d, _ = one_symbol(S.BTC_SYMBOL, start_ms, end_ms)
+    before_btc = len(trades)
+    trades = S.filter_btc_regime(trades, btc_d)
+    if before_btc != len(trades):
+        print(f"BTC 空頭濾掉 {before_btc - len(trades)} 筆", flush=True)
     return trades, data, symbols
 
 
@@ -157,6 +164,7 @@ def rules_html() -> str:
 </li>
 <li><b>去重</b>：同一檔以記號時間 ÷ {S.ALERT_BUCKET_MS // 3600000} 小時分桶，一桶只留時間序第一根（<code>select_alerts</code>）。</li>
 <li><b>大盤叢集</b>：同一根 15m 記號 ≥ {S.MAX_SAME_MARK} 檔就整批不進，之後 {S.CLUSTER_COOLDOWN_MS // 3600000} 小時的跟風也不進。ETH 09-03 22:45 那晚是 14 檔，低於這個門檻，仍會進。</li>
+<li><b>BTC 大盤濾網</b>：記號當下 BTCUSDT 15m MA200 近 {S.BTC_SLOPE_BARS} 根（{S.BTC_SLOPE_BARS * 15 // 60} 小時）斜率 ≥ {S.MIN_BTC_MA200_SLOPE * 100:.2f}%，且 BTC 收盤離自家 MA200 ≥ {S.MIN_BTC_VS_MA200 * 100:.1f}%，擋掉 BTC 空頭加速段的逆勢假突破。</li>
 <li><b>進場價</b>：擴張棒收完，<b>下一根 15m 開盤</b>做多。沒有下一根就不做。</li>
 <li><b>停損</b>：沒有掛價停損。持有期間若某根 <b>收盤跌破當根 MA200</b>，以該根收盤出場（reason=<code>ma_break</code>）。記號棒的 MA200 只拿來算 R，不是實際停損價。</li>
 <li><b>停利</b>：<b>沒有</b>。<code>TARGET_R</code>／<code>MAX_RISK</code> 寫在檔頭但 <code>simulate_trade</code> 沒用到。</li>

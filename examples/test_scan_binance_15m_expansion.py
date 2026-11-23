@@ -16,9 +16,11 @@ from scan_binance_15m_expansion import (  # noqa: E402
     MAX_SAME_MARK,
     TZ,
     bar_index_at,
+    btc_regime_ok,
     collapse_hits,
     detect_expansion,
     drop_market_cluster,
+    filter_btc_regime,
     indicators,
     rsi_sma,
     select_alerts,
@@ -230,6 +232,38 @@ def test_bar_index_at() -> None:
     assert bar_index_at(d, int(d["t"][0]) - 1) is None
 
 
+def test_btc_regime_flat_or_rising_allows() -> None:
+    btc = indicators(_bars(260, np.linspace(100.0, 102.0, 260)))
+    ts = int(btc["t"][-1])
+    assert btc_regime_ok(btc, ts)
+    items = [{"t_mark": ts, "symbol": "ETHUSDT"}]
+    assert filter_btc_regime(items, btc) == items
+
+
+def test_btc_regime_falling_slope_blocks() -> None:
+    # 先平盤再緩跌 6%，讓 MA200 4h 斜率明顯低於 -0.10%
+    close = np.concatenate([np.full(210, 100.0), np.linspace(100.0, 94.0, 50)])
+    btc = indicators(_bars(len(close), close))
+    ts = int(btc["t"][-1])
+    assert not btc_regime_ok(btc, ts)
+    items = [{"t_mark": ts, "symbol": "ALTUSDT"}]
+    assert filter_btc_regime(items, btc) == []
+
+
+def test_btc_regime_deep_below_ma200_blocks() -> None:
+    # 均線本身平，但當下剛跳水 2% 到 MA200 下方，應該擋掉
+    close = np.full(250, 100.0)
+    close[-1] = 98.0
+    btc = indicators(_bars(len(close), close))
+    ts = int(btc["t"][-1])
+    assert not btc_regime_ok(btc, ts)
+
+
+def test_filter_btc_regime_none_passthrough() -> None:
+    items = [{"t_mark": 1_000, "symbol": "ETHUSDT"}]
+    assert filter_btc_regime(items, None) == items
+
+
 def main() -> int:
     test_sma()
     test_rsi_sma_all_up()
@@ -249,7 +283,12 @@ def main() -> int:
     test_summarize_empty()
     test_market_cluster_drops_huge_pack()
     test_small_pack_kept()
+    test_eth_night_sized_pack_kept()
     test_bar_index_at()
+    test_btc_regime_flat_or_rising_allows()
+    test_btc_regime_falling_slope_blocks()
+    test_btc_regime_deep_below_ma200_blocks()
+    test_filter_btc_regime_none_passthrough()
     print("ok")
     return 0
 

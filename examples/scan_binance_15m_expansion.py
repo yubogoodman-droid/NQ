@@ -64,6 +64,12 @@ SESSION_HOURS = range(0, 24)
 # ETH 09-03 22:45 那晚是 14 檔，門檻要留在那之上，那根才不會被濾掉。
 MAX_SAME_MARK = 20
 CLUSTER_COOLDOWN_MS = 3 * 3600 * 1000
+# BTC 大盤濾網：BTC 15m MA200 近 4 小時沒在急彎向下，且收盤未深跌破 MA200 才做多。
+# 四張基準圖當時 BTC 4h MA200 斜率在 -0.012%～+0.126%、離 MA200 在 -0.37%～+3.94%。
+BTC_SYMBOL = "BTCUSDT"
+BTC_SLOPE_BARS = 16
+MIN_BTC_MA200_SLOPE = -0.001
+MIN_BTC_VS_MA200 = -0.01
 MIN_BARS = 220
 KLINE_LIMIT = 500
 BAR_MS = {"1m": 60_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000}
@@ -436,6 +442,39 @@ def drop_market_cluster(items: list[dict], extra_crowded: list[int] | None = Non
     return kept
 
 
+def btc_regime_stats(btc_d: dict | None, ts_ms: int) -> tuple[float | None, float | None]:
+    """回傳該時間點 BTC 15m 的 (MA200 近 BTC_SLOPE_BARS 根斜率, 收盤離 MA200 比例)。"""
+    if btc_d is None:
+        return None, None
+    i = bar_index_at(btc_d, ts_ms)
+    if i is None or i < BTC_SLOPE_BARS:
+        return None, None
+    m200 = btc_d["m200"]
+    c = btc_d["c"]
+    cur_m = float(m200[i])
+    prev_m = float(m200[i - BTC_SLOPE_BARS])
+    if np.isnan(cur_m) or np.isnan(prev_m) or prev_m <= 0 or cur_m <= 0:
+        return None, None
+    return cur_m / prev_m - 1.0, float(c[i]) / cur_m - 1.0
+
+
+def btc_regime_ok(btc_d: dict | None, ts_ms: int) -> bool:
+    """BTC 15m MA200 近 4h 沒在急彎向下且收盤未深跌破 MA200 才做多。"""
+    if btc_d is None:
+        return True
+    slope, vs_200 = btc_regime_stats(btc_d, ts_ms)
+    if slope is None or vs_200 is None:
+        return False
+    return slope >= MIN_BTC_MA200_SLOPE and vs_200 >= MIN_BTC_VS_MA200
+
+
+def filter_btc_regime(items: list[dict], btc_d: dict | None) -> list[dict]:
+    """濾掉 BTC 空頭加速段的逆勢假突破。"""
+    if btc_d is None or not items:
+        return items
+    return [x for x in items if btc_regime_ok(btc_d, item_mark_ms(x))]
+
+
 def collapse_hits(hits: list[dict]) -> list[dict]:
     """連續命中合成一段，留分數最高的那根。"""
     if not hits:
@@ -611,6 +650,7 @@ def scan_all(
     last_bars: int | None = 2,
     extra_crowded: list[int] | None = None,
     crowded_out: list[int] | None = None,
+    btc_d: dict | None = None,
 ) -> list[dict]:
     events = []
     with ThreadPoolExecutor(8) as ex:
@@ -623,7 +663,12 @@ def scan_all(
     events.sort(key=lambda e: (-e["hit"]["score"], e["symbol"]))
     if crowded_out is not None:
         crowded_out.extend(crowded_mark_times(events))
-    return drop_market_cluster(events, extra_crowded=extra_crowded)
+    events = drop_market_cluster(events, extra_crowded=extra_crowded)
+    if events and btc_d is None:
+        raw_btc = fetch_klines(BTC_SYMBOL)
+        if raw_btc is not None:
+            btc_d = indicators(raw_btc)
+    return filter_btc_regime(events, btc_d)
 
 
 def notify(ev: dict) -> None:
@@ -1051,6 +1096,17 @@ def run_backtest(symbols: list[str], days: int = 7) -> tuple[list[dict], dict[st
     trades = drop_market_cluster(trades)
     if before != len(trades):
         print(f"大盤集群濾掉 {before - len(trades)} 筆（同一根記號 ≥{MAX_SAME_MARK} 檔）", flush=True)
+    btc_d = data.get(BTC_SYMBOL)
+    if btc_d is None:
+        _, btc_d, _ = backtest_symbol(BTC_SYMBOL, start_ms, end_ms)
+    before_btc = len(trades)
+    trades = filter_btc_regime(trades, btc_d)
+    if before_btc != len(trades):
+        print(
+            f"BTC 空頭濾掉 {before_btc - len(trades)} 筆"
+            f"（4h MA200 斜率 <{MIN_BTC_MA200_SLOPE * 100:.2f}% 或離 MA200 <{MIN_BTC_VS_MA200 * 100:.1f}%）",
+            flush=True,
+        )
     return trades, data
 
 
@@ -1186,7 +1242,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 15m MA200 附近擴張</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。基準是 ETH 09-03 <strong>22:45 那根長陽要進</strong>：先在 MA200 附近盤整，再放量長陽（實體 ≥{MIN_BODY:.1%}、振幅 ≥{MIN_RANGE_ATR:.1f}×ATR、量比 ≥{MIN_VOL_RATIO:.1f}×、收在棒子上方 {MIN_CLOSE_POS:.0%}、創 20 根新高）。離 200 可以到 {MAX_MARK_EXT:.0%}（ETH 那根約 +3.5%）。下一根開盤做多，<strong>收盤跌破 MA200</strong> 出場，最多 4 小時。</p>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。基準是 ETH 09-03 <strong>22:45 那根長陽要進</strong>：近 4h ≥{MIN_NEAR_200_BARS} 根貼 MA200（1% 內）盤整、長均線 MA99/120/200 帶寬 ≤{MAX_LONG_RIBBON:.1%}，再放量長陽（實體 ≥{MIN_BODY:.1%}、振幅 ≥{MIN_RANGE_ATR:.1f}×ATR、量比 ≥{MIN_VOL_RATIO:.1f}×、收在棒子上方 {MIN_CLOSE_POS:.0%}、創 20 根新高），離 200 ≤{MAX_MARK_EXT:.0%}。大盤濾網：同根 &lt;{MAX_SAME_MARK} 檔，且 BTC 15m MA200 近 4h 斜率 ≥{MIN_BTC_MA200_SLOPE * 100:.2f}%、收盤離 MA200 ≥{MIN_BTC_VS_MA200 * 100:.1f}%。下一根開盤做多，<strong>收盤跌破 MA200</strong> 出場，最多 4 小時。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
@@ -1258,19 +1314,27 @@ def verify_four() -> int:
             failed.append(sym)
             continue
         d = indicators(d0)
+        btc0 = fetch_klines_range(BTC_SYMBOL, parse_tw(case["fetch_start"]), parse_tw(case["fetch_end"]))
+        btc_d = indicators(btc0) if btc0 is not None else None
         hits = collapse_hits(detect_expansion(d))
         a = int(parse_tw(case["expect_start"]).timestamp() * 1000)
         b = int(parse_tw(case["expect_end"]).timestamp() * 1000)
-        matched = [h for h in hits if a <= int(d["t"][h["i"]]) <= b]
+        matched = [
+            h
+            for h in hits
+            if a <= int(d["t"][h["i"]]) <= b and btc_regime_ok(btc_d, int(d["t"][h["mark_i"]]))
+        ]
         if matched:
             h = max(matched, key=lambda x: x["score"])
             entry_i = h["i"] + 1
             entry_s = hm(int(d["t"][entry_i])) if entry_i < len(d["t"]) else "—"
+            sl, vs = btc_regime_stats(btc_d, int(d["t"][h["mark_i"]]))
+            btc_s = f"BTC斜率 {sl * 100:+.3f}% 離200 {vs * 100:+.2f}%" if sl is not None and vs is not None else ""
             print(
                 f"PASS  {sym}  {case['title']}  "
                 f"擴張 {hm(int(d['t'][h['mark_i']]))} 實體 {h.get('body', 0)*100:+.2f}%  "
                 f"{h.get('range_atr', 0):.1f}×ATR  量 {h['vol_ratio']:.1f}×  "
-                f"進場 {entry_s}",
+                f"進場 {entry_s}  {btc_s}",
                 flush=True,
             )
         else:
