@@ -148,17 +148,17 @@ def rules_html() -> str:
 <li><b>進場條件（同一根 15m 擴張棒，全部成立才算）</b>：
   <ul>
     <li>至少 200 根 K，MA7/14/25/99/120/200、成交量 MA20、前一根 ATR20 都有值。</li>
-    <li>陽線：收盤 &gt; 開盤；振幅 &gt; 0。</li>
+    <li>陽線：收盤 &gt; 開盤；振幅 &gt; 0；前一根也要收陽（緩推點火，擋掉大黑洗盤後的反抽吞噬）。</li>
     <li>收盤位置 (C−L)/(H−L) ≥ {S.MIN_CLOSE_POS:.2f}。</li>
     <li>實體 (C/O−1) ≥ {S.MIN_BODY:.3f}（{S.MIN_BODY * 100:.1f}%）。</li>
     <li>振幅 / 前一根 ATR20 ≥ {S.MIN_RANGE_ATR:.2f}。</li>
-    <li>前一根 ATR20 / 前收 ≤ {S.MAX_PRIOR_ATR_PCT:.3f}（前面不能已經在噴）。</li>
-    <li>量比 本根量 / 量MA20 ≥ {S.MIN_VOL_RATIO:.2f}，且本根量 ≥ 前根量 × {S.MIN_MARK_VOL_VS_PREV:.1f}。</li>
+    <li>前一根 ATR20 / 前收介於 {S.MIN_PRIOR_ATR_PCT * 100:.2f}%～{S.MAX_PRIOR_ATR_PCT * 100:.1f}%（擋掉黃金／白銀等幾乎不動的標的，也不能前面已經在噴）。</li>
+    <li>量比 本根量 / 量MA20 ≥ {S.MIN_VOL_RATIO:.2f}，且本根量 ≥ 前根量 × {S.MIN_MARK_VOL_VS_PREV:.1f}，且本根量 ≥ 前 {S.VOL_BREAK_LOOKBACK} 根最大量 × {S.MIN_VOL_VS_MAX:.1f}（近 6 小時真正創天量，非餘波）。</li>
     <li>收盤創近 {S.LOOKBACK_BREAK} 根最高價新高（比前 {S.LOOKBACK_BREAK} 根的 high 最大值還高）。</li>
     <li>MA7 &gt; MA14 &gt; MA25；MA7/MA14−1 ≥ {S.MIN_STACK_7_14:.3f}；MA7/MA25−1 ≥ {S.MIN_STACK_7_25:.3f}。</li>
     <li>收盤站上整疊均線 max(MA7,14,25,99,120,200)。</li>
     <li>近 {S.SQUEEZE_LOOKBACK} 根裡，六條均線帶寬 min(max/min−1) ≤ {S.MAX_SQUEEZE_RIBBON:.2f}（曾經擠過）；且當根長均線 MA99/120/200 帶寬 ≤ {S.MAX_LONG_RIBBON * 100:.1f}%（像 GTC 那樣長均線收緊，不是大空頭剛反彈）。</li>
-    <li>收盤 &gt; MA200，且離 MA200 ≤ {S.MAX_MARK_EXT:.0%}。</li>
+    <li>收盤 &gt; MA200，開盤離 MA200 ≤ {S.MAX_OPEN_EXT * 100:.1f}%，收盤離 MA200 ≤ {S.MAX_MARK_EXT:.0%}。</li>
     <li>近 {S.NEAR_200_LOOKBACK} 根（4 小時）內，至少 <b>{S.MIN_NEAR_200_BARS} 根</b>收盤 ≤ MA200 × {1 + S.NEAR_200_BAND:.2f}（在 200 附近盤過才出去，不是高檔插一根針就跑）。</li>
   </ul>
 </li>

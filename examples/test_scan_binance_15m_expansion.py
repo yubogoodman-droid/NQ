@@ -30,12 +30,17 @@ from scan_binance_15m_expansion import (  # noqa: E402
 )
 
 
-def _bars(n: int, close: np.ndarray, vol: np.ndarray | None = None) -> dict:
+def _bars(
+    n: int,
+    close: np.ndarray,
+    vol: np.ndarray | None = None,
+    wick_pct: float = 0.0022,
+) -> dict:
     close = np.asarray(close, float)
-    rng = np.maximum(np.abs(np.diff(close, prepend=close[0])) * 0.35, close * 0.001)
+    rng = np.maximum(np.abs(np.diff(close, prepend=close[0])) * 0.35, close * wick_pct)
     o = np.concatenate([[close[0]], close[:-1]])
-    h = np.maximum(o, close) + rng * 0.25
-    l = np.minimum(o, close) - rng * 0.25
+    h = np.maximum(o, close) + rng * 0.75
+    l = np.minimum(o, close) - rng * 0.75
     v = vol if vol is not None else np.full(n, 1000.0)
     t0 = int(datetime(2026, 8, 21, 12, 0, tzinfo=TZ).timestamp() * 1000)
     t = t0 + np.arange(n, dtype=np.int64) * 900_000
@@ -44,16 +49,26 @@ def _bars(n: int, close: np.ndarray, vol: np.ndarray | None = None) -> dict:
 
 def _series(
     *,
-    rocket: float = 102.9,
+    rocket: float = 103.1,
     vol_signal: float = 4_000.0,
     grind: bool = True,
     tail: np.ndarray | None = None,
     prev_vol: float | None = None,
+    earlier_vol_spike: float | None = None,
+    prev_red: bool = False,
+    wick_pct: float = 0.0022,
 ) -> dict:
-    """長盤整（均線黏、ATR 小）→ 幾根緩推 → 一根爆量長陽。"""
+    """長盤整（均線黏、ATR 適中）→ 幾根緩推 → 一根爆量長陽。"""
     n_coil = 270
     coil = 100.0 * (1.0 + 0.0008 * np.sin(np.arange(n_coil) / 4.0))
-    grind_px = np.array([100.2, 100.4, 100.6, 100.75, 100.9, 101.05]) if grind else np.array([])
+    if grind:
+        grind_px = (
+            np.array([100.2, 100.4, 100.6, 100.85, 101.05, 100.90])
+            if prev_red
+            else np.array([100.2, 100.4, 100.6, 100.75, 100.9, 101.05])
+        )
+    else:
+        grind_px = np.array([])
     parts = [coil, grind_px, np.array([rocket])]
     if tail is not None:
         parts.append(np.asarray(tail, float))
@@ -62,10 +77,16 @@ def _series(
     rocket_i = n_coil + len(grind_px)
     if grind:
         vol[n_coil:rocket_i] = 1_600.0
+    if earlier_vol_spike is not None:
+        vol[rocket_i - 10] = earlier_vol_spike
     vol[rocket_i] = vol_signal
     if prev_vol is not None:
         vol[rocket_i - 1] = prev_vol
-    return indicators(_bars(len(close), close, vol))
+    bars = _bars(len(close), close, vol, wick_pct=wick_pct)
+    # 讓擴張棒收在最上方（跟 ETH 22:45 一樣幾乎無上影線）
+    bars["h"][rocket_i] = close[rocket_i] + 0.05
+    bars["l"][rocket_i] = bars["o"][rocket_i] - 0.05
+    return indicators(bars)
 
 
 def test_sma() -> None:
@@ -119,6 +140,40 @@ def test_no_grind_skips() -> None:
 def test_too_far_from_ma200_skips() -> None:
     """離 MA200 超過 5%，連 ETH 22:45 那種都過了，不再追。"""
     d = _series(rocket=106.0, tail=np.full(3, 106.2))
+    assert detect_expansion(d) == []
+
+
+def test_prev_red_bar_skips() -> None:
+    """前一根收黑（反抽吞噬而非緩推點火）不進。"""
+    d = _series(prev_red=True, tail=np.full(3, 103.2))
+    assert detect_expansion(d) == []
+
+
+def test_echo_volume_after_bigger_spike_skips() -> None:
+    """近 24 根裡早已出過更大天量，本根只是餘波，不進。"""
+    d = _series(vol_signal=4_000.0, earlier_vol_spike=4_500.0, tail=np.full(3, 103.2))
+    assert detect_expansion(d) == []
+
+
+def test_ultra_low_atr_asset_skips() -> None:
+    """像黃金／白銀那種前段 ATR <0.35% 幾乎不動的標的，不進。"""
+    d = _series(wick_pct=0.0005, tail=np.full(3, 103.2))
+    assert detect_expansion(d) == []
+
+
+def test_open_already_extended_skips() -> None:
+    """開盤時已經離 MA200 超過 2.5%（追高第二段），不進。"""
+    n_coil = 270
+    coil = 100.0 * (1.0 + 0.0008 * np.sin(np.arange(n_coil) / 4.0))
+    grind_px = np.array([100.5, 101.0, 101.5, 102.0, 102.4, 102.8])
+    close = np.concatenate([coil, grind_px, np.array([104.6, 104.7, 104.7])])
+    vol = np.full(len(close), 1_000.0)
+    rocket_i = n_coil + len(grind_px)
+    vol[rocket_i] = 4_000.0
+    bars = _bars(len(close), close, vol)
+    bars["h"][rocket_i] = close[rocket_i] + 0.05
+    bars["l"][rocket_i] = bars["o"][rocket_i] - 0.05
+    d = indicators(bars)
     assert detect_expansion(d) == []
 
 
@@ -273,6 +328,10 @@ def main() -> int:
     test_pre_pump_volume_skips()
     test_no_grind_skips()
     test_too_far_from_ma200_skips()
+    test_prev_red_bar_skips()
+    test_echo_volume_after_bigger_spike_skips()
+    test_ultra_low_atr_asset_skips()
+    test_open_already_extended_skips()
     test_single_wick_near_200_skips()
     test_chop_does_not_hit()
     test_collapse_keeps_best_of_run()

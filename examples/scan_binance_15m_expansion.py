@@ -45,15 +45,20 @@ PRE_BARS = 12
 CONFIRM_BARS = 0         # 擴張棒本身就是訊號，下一根開盤進
 MIN_VOL_RATIO = 2.50     # ETH 22:45 約 3.7×；21:30 那根較早但不是基準圖
 MIN_MARK_VOL_VS_PREV = 1.0
+VOL_BREAK_LOOKBACK = 24  # 近 6 小時（24 根）最大量，確認是真正的新量起爆而不是餘波
+MIN_VOL_VS_MAX = 1.20    # ETH 1.38×、FIL 1.59×、CRCL 1.32×、GTC 1.55×、IRYS 2.73×、PIPPIN 4.31×
+REQUIRE_PREV_GREEN = True  # 前一根也要收陽（緩推點火，擋掉大黑洗盤後的反抽吞噬）
 MIN_BODY = 0.007         # ETH 22:45 +1.32%；FIL 19:45 +0.77%；ETH 21:30 +0.62% 不夠
 MIN_RANGE_ATR = 2.50     # ETH 22:45 約 3.5×；21:30 約 2.38× 不夠
 MIN_CLOSE_POS = 0.78     # ETH 22:45 0.98；FIL 0.79
 LOOKBACK_BREAK = 20      # 收盤創近 20 根新高
 MAX_MARK_EXT = 0.05      # 允許 ETH 22:45 (+3.45%)、GTC (+4.84%) 那種離開 200 的長陽
+MAX_OPEN_EXT = 0.025     # 擴張棒起跑開盤離 MA200 ≤2.5%（ETH +2.10%、IRYS +2.34%、PIPPIN +0.55%）
 NEAR_200_LOOKBACK = 16   # 近 4 小時內要在 200 附近盤過，不是只插一根針就跑
 NEAR_200_BAND = 0.01
 MIN_NEAR_200_BARS = 6    # GTC 14/16、ETH 12/16、FIL 16/16、CRCL 16/16；擋掉高檔跌下來只碰一下的假反彈
 MAX_LONG_RIBBON = 0.018  # MA99/120/200 帶寬 ≤1.8%（GTC 0.75%、ETH 0.39%、FIL 1.00%、CRCL 1.53%）
+MIN_PRIOR_ATR_PCT = 0.0035  # 擋掉黃金／白銀等幾乎不動的低波動標的（四張基準圖全 ≥0.39%）
 MAX_PRIOR_ATR_PCT = 0.012
 SQUEEZE_LOOKBACK = 24
 MAX_SQUEEZE_RIBBON = 0.05
@@ -291,7 +296,7 @@ def _hit_at(d: dict, i: int) -> dict | None:
     m7, m14, m25 = d["m7"], d["m14"], d["m25"]
     m99, m120, m200 = d["m99"], d["m120"], d["m200"]
     v20, r6, atr20 = d["v20"], d["rsi6"], d["atr20"]
-    need = max(200, LOOKBACK_BREAK, SQUEEZE_LOOKBACK, 21)
+    need = max(200, LOOKBACK_BREAK, SQUEEZE_LOOKBACK, VOL_BREAK_LOOKBACK, 21)
     if i < need or i >= len(c):
         return None
     vals = [m7[i], m14[i], m25[i], m99[i], m120[i], m200[i], v20[i], atr20[i - 1]]
@@ -301,6 +306,8 @@ def _hit_at(d: dict, i: int) -> dict | None:
     if hour not in SESSION_HOURS:
         return None
     if c[i] <= o[i]:
+        return None
+    if REQUIRE_PREV_GREEN and float(c[i - 1]) < float(o[i - 1]):
         return None
     bar_rng = float(h[i] - l[i])
     if bar_rng <= 0:
@@ -317,13 +324,19 @@ def _hit_at(d: dict, i: int) -> dict | None:
     range_atr = bar_rng / atr_prev
     if range_atr < MIN_RANGE_ATR:
         return None
-    if float(c[i - 1]) <= 0 or atr_prev / float(c[i - 1]) > MAX_PRIOR_ATR_PCT:
+    if float(c[i - 1]) <= 0:
+        return None
+    prior_atr_pct = atr_prev / float(c[i - 1])
+    if prior_atr_pct < MIN_PRIOR_ATR_PCT or prior_atr_pct > MAX_PRIOR_ATR_PCT:
         return None
     vr = float(v[i] / v20[i]) if v20[i] > 0 else 0.0
     if vr < MIN_VOL_RATIO:
         return None
     prev_vol = float(v[i - 1])
     if prev_vol > 0 and float(v[i]) < prev_vol * MIN_MARK_VOL_VS_PREV:
+        return None
+    prior_max_vol = float(np.max(v[i - VOL_BREAK_LOOKBACK : i]))
+    if prior_max_vol > 0 and float(v[i]) < prior_max_vol * MIN_VOL_VS_MAX:
         return None
     if float(c[i]) <= float(np.max(h[i - LOOKBACK_BREAK : i])):
         return None
@@ -350,6 +363,9 @@ def _hit_at(d: dict, i: int) -> dict | None:
         return None
     ext = float(c[i] / m200[i] - 1.0)
     if ext > MAX_MARK_EXT:
+        return None
+    open_ext = float(o[i] / m200[i] - 1.0)
+    if open_ext > MAX_OPEN_EXT:
         return None
     near_200 = 0
     lo = max(0, i - NEAR_200_LOOKBACK)
@@ -1242,7 +1258,7 @@ h1{{font-size:18px;margin:0 0 6px}}
 <div class="page">
 <section class="summary">
 <h1>幣安 15m MA200 附近擴張</h1>
-<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。基準是 ETH 09-03 <strong>22:45 那根長陽要進</strong>：近 4h ≥{MIN_NEAR_200_BARS} 根貼 MA200（1% 內）盤整、長均線 MA99/120/200 帶寬 ≤{MAX_LONG_RIBBON:.1%}，再放量長陽（實體 ≥{MIN_BODY:.1%}、振幅 ≥{MIN_RANGE_ATR:.1f}×ATR、量比 ≥{MIN_VOL_RATIO:.1f}×、收在棒子上方 {MIN_CLOSE_POS:.0%}、創 20 根新高），離 200 ≤{MAX_MARK_EXT:.0%}。大盤濾網：同根 &lt;{MAX_SAME_MARK} 檔，且 BTC 15m MA200 近 4h 斜率 ≥{MIN_BTC_MA200_SLOPE * 100:.2f}%、收盤離 MA200 ≥{MIN_BTC_VS_MA200 * 100:.1f}%。下一根開盤做多，<strong>收盤跌破 MA200</strong> 出場，最多 4 小時。</p>
+<p class="muted">近 {days} 天 · {escape(start)} → {escape(end)} · 掃 {n_symbols} 檔永續。基準是 ETH 09-03 <strong>22:45 那根長陽要進</strong>：近 4h ≥{MIN_NEAR_200_BARS} 根貼 MA200（1% 內）盤整、長均線 MA99/120/200 帶寬 ≤{MAX_LONG_RIBBON:.1%}、前根 ATR 介於 {MIN_PRIOR_ATR_PCT:.2%}–{MAX_PRIOR_ATR_PCT:.1%} 且前根收陽緩推，再放量長陽（實體 ≥{MIN_BODY:.1%}、振幅 ≥{MIN_RANGE_ATR:.1f}×ATR、量比 ≥{MIN_VOL_RATIO:.1f}× 且 ≥近 {VOL_BREAK_LOOKBACK} 根最大量 {MIN_VOL_VS_MAX:.1f}×、收在棒子上方 {MIN_CLOSE_POS:.0%}、創 20 根新高），開盤離 200 ≤{MAX_OPEN_EXT:.1%}、收盤離 200 ≤{MAX_MARK_EXT:.0%}。大盤濾網：同根 &lt;{MAX_SAME_MARK} 檔，且 BTC 15m MA200 近 4h 斜率 ≥{MIN_BTC_MA200_SLOPE * 100:.2f}%、收盤離 MA200 ≥{MIN_BTC_VS_MA200 * 100:.1f}%。下一根開盤做多，<strong>收盤跌破 MA200</strong> 出場，最多 4 小時。</p>
 <div class="cards">
 <div class="card">筆數<b>{stats['count']}</b></div>
 <div class="card">勝率<b>{stats['win_rate']:.1f}%</b></div>
