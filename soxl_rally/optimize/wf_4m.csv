@@ -1,0 +1,8 @@
+kind,train,test,spearman_is_oos,top1_params,tr_n,tr_tot,oos_top1_n,oos_top1_tot,oos_top5pct_mean_tot,oos_base_n,oos_base_tot
+expanding_wf,M1_08,M2_09,0.191,"lb=90,hl=0.0,b=0.015,above,htf=0,cap=0.02,tp=0.025,mb=120",9,4.23,12,-3.82,-2.76,15,-5.52
+expanding_wf,M1_08+M2_09,M3_10,0.229,"lb=60,hl=0.0,b=0.015,above,htf=0,cap=0.0,tp=0.025,mb=90",19,2.59,15,11.83,9.25,19,11.94
+expanding_wf,M1_08+M2_09+M3_10,M4_11,-0.039,"lb=60,hl=0.0005,b=0.01,above,htf=0,cap=0.0,tp=0.03,mb=90",22,14.04,6,-10.21,-0.36,11,-14.13
+lomo_cv,M2_09+M3_10+M4_11,M1_08,-0.225,"lb=60,hl=0.0,b=0.01,above,htf=600,cap=0.0,tp=0.025,mb=90",15,17.3,3,-1.62,-1.83,14,-5.87
+lomo_cv,M1_08+M3_10+M4_11,M2_09,0.53,"lb=60,hl=0.0,b=0.01,above,htf=600,cap=0.02,tp=0.025,mb=90",12,14.39,6,1.88,0.4,15,-5.52
+lomo_cv,M1_08+M2_09+M4_11,M3_10,0.002,"lb=60,hl=0.0,b=0.01,above,htf=600,cap=0.02,tp=0.025,mb=90",12,8.05,6,8.22,6.86,19,11.94
+lomo_cv,M1_08+M2_09+M3_10,M4_11,-0.039,"lb=60,hl=0.0005,b=0.01,above,htf=0,cap=0.0,tp=0.03,mb=90",22,14.04,6,-10.21,-0.36,11,-14.13

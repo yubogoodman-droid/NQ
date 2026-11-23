@@ -27,6 +27,8 @@ class Params:
     l2_ma_buf: float = 0.015    # L2 >= MA200[l2] * (1 - l2_ma_buf)
     band: float = 0.01          # |close / MA200 - 1| <= band
     band_side: str = "both"     # "both" | "above" (close >= MA200) | "below" (close <= MA200)
+    htf_ma: int = 0             # if > 0, require close >= rolling MA(htf_ma) (e.g. 600 ≈ 5m MA120)
+    max_sl_skip: float = 0.0    # if > 0, skip signal when swing SL distance > max_sl_skip (e.g. 0.025)
     cool: int = 30              # minutes between accepted signals
     session: str = "us"         # "us" = weekday TPE 21:30-04:00 (live); "all"; "us_early" 21:30-01:00; "us_late" 01:00-04:00
     tp: float = 0.03            # take profit (fraction of entry)
@@ -34,7 +36,9 @@ class Params:
     sl_bars: int = 30
     sl_pad: float = 0.001
     sl_pct: float = 0.01
+    sl_cap: float = 0.0         # if > 0, cap stop loss at entry * (1 - sl_cap) when sl_mode == "swing"
     max_bars: int = 120         # time exit after this many bars
+    fee_pct: float = FEE_PCT    # round-trip fee + slippage (%)
 
 
 DEFAULT = Params()
@@ -60,6 +64,22 @@ def load(path=RAW):
 
 
 _STRUCT_CACHE = {}
+_MA_CACHE = {}
+_SWING_CACHE = {}
+
+
+def _rolling_ma(df, n):
+    key = (id(df), n)
+    if key not in _MA_CACHE:
+        _MA_CACHE[key] = df.close.rolling(n).mean().values
+    return _MA_CACHE[key]
+
+
+def _rolling_swing(df, n):
+    key = (id(df), n)
+    if key not in _SWING_CACHE:
+        _SWING_CACHE[key] = df.low.rolling(n).min().values
+    return _SWING_CACHE[key]
 
 
 def structure(df, lookback):
@@ -106,6 +126,14 @@ def signals(df, p=DEFAULT, start=None, end=None):
                 & band_ok & ~np.isnan(ma))
     if p.session != "all":
         cand &= df[p.session].values
+    if p.htf_ma > 0:
+        hma = _rolling_ma(df, p.htf_ma)
+        with np.errstate(invalid="ignore"):
+            cand &= ~np.isnan(hma) & (cl >= hma)
+    if p.max_sl_skip > 0:
+        sw = _rolling_swing(df, p.sl_bars) * (1 - p.sl_pad)
+        with np.errstate(invalid="ignore"):
+            cand &= ~np.isnan(sw) & ((1 - sw / cl) <= p.max_sl_skip)
     t = df.t.values
     acc, last = [], -10**18
     for i in np.where(cand)[0]:
@@ -126,12 +154,14 @@ def simulate(df, idx, p=DEFAULT):
     cl, lo, hi = df.close.values, df.low.values, df.high.values
     n = len(df)
     s = structure(df, p.lookback) if p.sl_mode == "l2" else None
-    swing = pd.Series(lo).rolling(p.sl_bars).min().values if p.sl_mode == "swing" else None
+    swing = _rolling_swing(df, p.sl_bars) if p.sl_mode == "swing" else None
     rows = []
     for i in idx:
         e = cl[i]
         if p.sl_mode == "swing":
             sl = swing[i] * (1 - p.sl_pad)
+            if p.sl_cap > 0:
+                sl = max(sl, e * (1 - p.sl_cap))
         elif p.sl_mode == "pct":
             sl = e * (1 - p.sl_pct)
         else:
@@ -145,7 +175,7 @@ def simulate(df, idx, p=DEFAULT):
         if ret is None:
             k = min(i + p.max_bars, n - 1); ret, why = cl[k] / e - 1, "時間出場"
         rows.append(dict(i=int(i), time=df.dt.iat[i].strftime("%Y-%m-%d %H:%M"), night=df.night.iat[i],
-                         entry=e, sl=sl, exit_reason=why, hold_min=k - i, net_pct=ret * 100 - FEE_PCT,
+                         entry=e, sl=sl, exit_reason=why, hold_min=k - i, net_pct=ret * 100 - p.fee_pct,
                          complete=i + p.max_bars < n))
     return pd.DataFrame(rows, columns=["i", "time", "night", "entry", "sl", "exit_reason", "hold_min", "net_pct", "complete"])
 
