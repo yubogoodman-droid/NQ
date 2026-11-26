@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SOXSUSDT 起跌放空 近三個月</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}
+.page{max-width:760px;margin:0 auto;padding:16px 12px 40px}
+h1{font-size:20px;margin:0 0 6px}
+h2{font-size:16px;margin:18px 0 8px}
+.muted{color:#8b949e;font-size:13px;line-height:1.55}
+.summary,.trade-card{background:#161b22;border:1px solid #30363d;border-radius:14px;padding:14px;margin-bottom:14px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.card{background:#0d1117;padding:10px 12px;border-radius:10px;min-width:108px;border:1px solid #21262d}
+.card b{display:block;font-size:20px;margin-top:4px}
+.card-header{display:flex;justify-content:space-between;gap:10px}
+.trade-no{font-weight:700}
+.trade-time{color:#8b949e;font-size:12px;margin-top:3px}
+.card-pnl{font-weight:700;white-space:nowrap}
+.pnl-win{color:#3ddc68} .pnl-loss{color:#ff7b72}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px}
+.tag-tp{background:rgba(0,200,5,.15);color:#3ddc68}
+.tag-sl{background:rgba(255,82,82,.15);color:#ff7b72}
+.tag-time{background:rgba(255,193,7,.12);color:#f0c14b}
+.tag-info{background:rgba(88,166,255,.12);color:#79c0ff}
+.tag-off{background:rgba(180,180,180,.12);color:#c9d1d9}
+.trade-detail{margin:0 0 10px;padding:10px 12px;background:#0d1117;border-radius:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;white-space:pre-wrap}
+img{width:100%;display:block;border-radius:10px}
+</style></head><body>
+<div class="page">
+<section class="summary">
+<h1>SOXSUSDT 起跌放空 · 近三個月</h1>
+<p class="muted">2026-08-29 00:45 台北 → 2026-11-27 00:40 台北<br/>
+5 分定極點、較低高點、頸線。1 分收盤跌破頸線、收在 MA25 下、量能回到前 10 根均量才放空。每筆風險預算 100 USDT。單邊費率 0.050%，進出各計一次。張數是整數。</p>
+<div class="cards">
+<div class="card">筆數<b>32</b></div>
+<div class="card">勝率<b>75.0%</b></div>
+<div class="card">合計<b>+14.76R</b></div>
+<div class="card">淨損益<b class="pnl-win">+1148</b></div>
+</div>
+<p class="muted">毛損益 +1473 USDT，手續費 325，淨值最大回撤 -222 USDT。<br/>
+停利 13 筆 +19.5R · 鎖利 8 筆 +1.2R · 停損 7 筆 -7.0R · 時間到 4 筆 +1.1R<br/>
+現貨時段 5 筆、勝率 80%、+307 USDT。休市 27 筆、勝率 74%、+842 USDT。</p>
+<h2>淨損益曲線</h2>
+<img src="img/equity.png" alt="每筆累計淨損益"/>
+<h2>近三個月的 5 分收盤和進場點</h2>
+<img src="img/overview.png" alt="5 分收盤與放空進場"/>
+</section>
+
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#1 · 跌破</div>
+          <div class="trade-time">2026-08-31 20:07 台北 → 2026-08-31 20:22 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+2 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">鎖利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+0.15R</span>
+      </div>
+      <pre class="trade-detail">進場 49.1400  停損 49.5200  目標 48.5700
+出場 49.0830  鎖利  +0.15R
+極點 49.6400  頸線 49.1900  較低高點 49.5200  四小時高點 49.6400
+張數 263  毛損益 +14.99  手續費 12.92  淨損益 +2.07 USDT</pre>
+      <img src="img/t01_0831_2007.png" alt="第 1 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#2 · 回測</div>
+          <div class="trade-time">2026-09-08 15:23 台北 → 2026-09-08 15:38 台北</div>
+        </div>
+        <div class="card-pnl pnl-loss">-110 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-sl">停損</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">-1.00R</span>
+      </div>
+      <pre class="trade-detail">進場 44.1800  停損 44.5900  目標 43.5650
+出場 44.5900  停損  -1.00R
+極點 44.9300  頸線 44.2100  較低高點 44.5900  四小時高點 44.9300
+張數 243  毛損益 -99.63  手續費 10.79  淨損益 -110.42 USDT</pre>
+      <img src="img/t02_0908_1523.png" alt="第 2 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#3 · 跌破</div>
+          <div class="trade-time">2026-09-08 17:09 台北 → 2026-09-08 17:39 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+139 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 45.2000  停損 45.6000  目標 44.6000
+出場 44.6000  停利  +1.50R
+極點 46.1100  頸線 45.2100  較低高點 45.6000  四小時高點 46.1100
+張數 250  毛損益 +150.00  手續費 11.23  淨損益 +138.77 USDT</pre>
+      <img src="img/t03_0908_1709.png" alt="第 3 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#4 · 跌破</div>
+          <div class="trade-time">2026-09-09 19:49 台北 → 2026-09-09 20:05 台北</div>
+        </div>
+        <div class="card-pnl pnl-loss">-107 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-sl">停損</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">-1.00R</span>
+      </div>
+      <pre class="trade-detail">進場 45.1600  停損 45.7500  目標 44.2750
+出場 45.7500  停損  -1.00R
+極點 45.8200  頸線 45.2200  較低高點 45.7500  四小時高點 45.8200
+張數 169  毛損益 -99.71  手續費 7.68  淨損益 -107.39 USDT</pre>
+      <img src="img/t04_0909_1949.png" alt="第 4 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#5 · 跌破</div>
+          <div class="trade-time">2026-09-09 21:18 台北 → 2026-09-09 21:29 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+137 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 45.3400  停損 45.6800  目標 44.8300
+出場 44.8300  停利  +1.50R
+極點 45.9700  頸線 45.4100  較低高點 45.6800  四小時高點 45.9700
+張數 294  毛損益 +149.94  手續費 13.25  淨損益 +136.69 USDT</pre>
+      <img src="img/t05_0909_2118.png" alt="第 5 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#6 · 回測</div>
+          <div class="trade-time">2026-09-10 11:01 台北 → 2026-09-10 13:31 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+137 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 43.9800  停損 44.3200  目標 43.4700
+出場 43.4700  停利  +1.50R
+極點 44.5000  頸線 43.9900  較低高點 44.3200  四小時高點 44.5000
+張數 294  毛損益 +149.94  手續費 12.86  淨損益 +137.08 USDT</pre>
+      <img src="img/t06_0910_1101.png" alt="第 6 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#7 · 跌破</div>
+          <div class="trade-time">2026-09-16 01:56 台北 → 2026-09-16 04:56 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+91 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-time">時間到</span>
+        <span class="tag tag-info">現貨時段</span>
+        <span class="tag tag-info">+1.02R</span>
+      </div>
+      <pre class="trade-detail">進場 51.2800  停損 51.7200  目標 50.6200
+出場 50.8300  時間到  +1.02R
+極點 51.7900  頸線 51.3200  較低高點 51.7200  四小時高點 51.7900
+張數 227  毛損益 +102.15  手續費 11.59  淨損益 +90.56 USDT</pre>
+      <img src="img/t07_0916_0156.png" alt="第 7 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#8 · 跌破</div>
+          <div class="trade-time">2026-09-23 21:21 台北 → 2026-09-23 21:30 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+140 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 33.3800  停損 33.7100  目標 32.8850
+出場 32.8850  停利  +1.50R
+極點 33.9300  頸線 33.3900  較低高點 33.7100  四小時高點 33.9300
+張數 303  毛損益 +149.98  手續費 10.04  淨損益 +139.95 USDT</pre>
+      <img src="img/t08_0923_2121.png" alt="第 8 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#9 · 回測</div>
+          <div class="trade-time">2026-09-24 18:46 台北 → 2026-09-24 21:45 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+143 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 35.6400  停損 36.1400  目標 34.8900
+出場 34.8900  停利  +1.50R
+極點 36.3200  頸線 35.8600  較低高點 36.1400  四小時高點 36.3200
+張數 200  毛損益 +150.00  手續費 7.05  淨損益 +142.95 USDT</pre>
+      <img src="img/t09_0924_1846.png" alt="第 9 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#10 · 跌破</div>
+          <div class="trade-time">2026-09-28 16:14 台北 → 2026-09-28 16:39 台北</div>
+        </div>
+        <div class="card-pnl pnl-loss">-109 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-sl">停損</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">-1.00R</span>
+      </div>
+      <pre class="trade-detail">進場 34.5000  停損 34.8600  目標 33.9600
+出場 34.8600  停損  -1.00R
+極點 34.9200  頸線 34.5400  較低高點 34.8600  四小時高點 34.9200
+張數 277  毛損益 -99.72  手續費 9.61  淨損益 -109.33 USDT</pre>
+      <img src="img/t10_0928_1614.png" alt="第 10 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#11 · 跌破</div>
+          <div class="trade-time">2026-09-28 18:52 台北 → 2026-09-28 19:07 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+4 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">鎖利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+0.15R</span>
+      </div>
+      <pre class="trade-detail">進場 34.5600  停損 34.8800  目標 34.0800
+出場 34.5120  鎖利  +0.15R
+極點 35.1600  頸線 34.6000  較低高點 34.8800  四小時高點 35.1600
+張數 312  毛損益 +14.98  手續費 10.78  淨損益 +4.20 USDT</pre>
+      <img src="img/t11_0928_1852.png" alt="第 11 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#12 · 跌破</div>
+          <div class="trade-time">2026-09-28 23:36 台北 → 2026-09-29 00:20 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+143 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-info">現貨時段</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 35.3700  停損 35.9200  目標 34.5450
+出場 34.5450  停利  +1.50R
+極點 35.9800  頸線 35.4600  較低高點 35.9200  四小時高點 35.9800
+張數 181  毛損益 +149.33  手續費 6.33  淨損益 +143.00 USDT</pre>
+      <img src="img/t12_0928_2336.png" alt="第 12 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#13 · 跌破</div>
+          <div class="trade-time">2026-10-03 02:55 台北 → 2026-10-03 05:55 台北</div>
+        </div>
+        <div class="card-pnl pnl-loss">-65 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-time">時間到</span>
+        <span class="tag tag-info">現貨時段</span>
+        <span class="tag tag-info">-0.57R</span>
+      </div>
+      <pre class="trade-detail">進場 29.5700  停損 29.9400  目標 29.0150
+出場 29.7800  時間到  -0.57R
+極點 30.0000  頸線 29.6000  較低高點 29.9400  四小時高點 30.0000
+張數 270  毛損益 -56.70  手續費 8.01  淨損益 -64.71 USDT</pre>
+      <img src="img/t13_1003_0255.png" alt="第 13 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#14 · 跌破</div>
+          <div class="trade-time">2026-10-07 11:34 台北 → 2026-10-07 14:34 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+40 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-time">時間到</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+0.55R</span>
+      </div>
+      <pre class="trade-detail">進場 29.8800  停損 30.0800  目標 29.5800
+出場 29.7700  時間到  +0.55R
+極點 30.2600  頸線 29.8900  較低高點 30.0800  四小時高點 30.2600
+張數 500  毛損益 +55.00  手續費 14.91  淨損益 +40.09 USDT</pre>
+      <img src="img/t14_1007_1134.png" alt="第 14 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#15 · 跌破</div>
+          <div class="trade-time">2026-10-08 19:45 台北 → 2026-10-08 21:40 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+5 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">鎖利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+0.15R</span>
+      </div>
+      <pre class="trade-detail">進場 32.3600  停損 32.6700  目標 31.8950
+出場 32.3135  鎖利  +0.15R
+極點 32.7200  頸線 32.4600  較低高點 32.6700  四小時高點 32.7200
+張數 322  毛損益 +14.97  手續費 10.41  淨損益 +4.56 USDT</pre>
+      <img src="img/t15_1008_1945.png" alt="第 15 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#16 · 跌破</div>
+          <div class="trade-time">2026-10-10 01:27 台北 → 2026-10-10 04:27 台北</div>
+        </div>
+        <div class="card-pnl pnl-loss">-4 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-time">時間到</span>
+        <span class="tag tag-info">現貨時段</span>
+        <span class="tag tag-info">+0.05R</span>
+      </div>
+      <pre class="trade-detail">進場 34.5100  停損 34.9000  目標 33.9250
+出場 34.4900  時間到  +0.05R
+極點 34.9500  頸線 34.5300  較低高點 34.9000  四小時高點 34.9500
+張數 256  毛損益 +5.12  手續費 8.83  淨損益 -3.71 USDT</pre>
+      <img src="img/t16_1010_0127.png" alt="第 16 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#17 · 跌破</div>
+          <div class="trade-time">2026-10-13 15:40 台北 → 2026-10-13 16:25 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+140 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 39.3300  停損 39.7300  目標 38.7300
+出場 38.7300  停利  +1.50R
+極點 39.8700  頸線 39.4300  較低高點 39.7300  四小時高點 39.8700
+張數 250  毛損益 +150.00  手續費 9.76  淨損益 +140.24 USDT</pre>
+      <img src="img/t17_1013_1540.png" alt="第 17 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#18 · 跌破</div>
+          <div class="trade-time">2026-10-13 20:05 台北 → 2026-10-13 20:32 台北</div>
+        </div>
+        <div class="card-pnl pnl-loss">-112 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-sl">停損</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">-1.00R</span>
+      </div>
+      <pre class="trade-detail">進場 39.3200  停損 39.6400  目標 38.8400
+出場 39.6400  停損  -1.00R
+極點 39.8700  頸線 39.3800  較低高點 39.6400  四小時高點 39.8700
+張數 312  毛損益 -99.84  手續費 12.32  淨損益 -112.16 USDT</pre>
+      <img src="img/t18_1013_2005.png" alt="第 18 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#19 · 跌破</div>
+          <div class="trade-time">2026-10-14 19:58 台北 → 2026-10-14 20:16 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+136 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 38.4900  停損 38.7600  目標 38.0850
+出場 38.0850  停利  +1.50R
+極點 38.9200  頸線 38.5100  較低高點 38.7600  四小時高點 38.9200
+張數 370  毛損益 +149.85  手續費 14.17  淨損益 +135.68 USDT</pre>
+      <img src="img/t19_1014_1958.png" alt="第 19 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#20 · 回測</div>
+          <div class="trade-time">2026-10-16 18:44 台北 → 2026-10-16 18:53 台北</div>
+        </div>
+        <div class="card-pnl pnl-loss">-113 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-sl">停損</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">-1.00R</span>
+      </div>
+      <pre class="trade-detail">進場 44.7900  停損 45.1300  目標 44.2800
+出場 45.1300  停損  -1.00R
+極點 45.3200  頸線 44.8400  較低高點 45.1300  四小時高點 45.3200
+張數 294  毛損益 -99.96  手續費 13.22  淨損益 -113.18 USDT</pre>
+      <img src="img/t20_1016_1844.png" alt="第 20 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#21 · 回測</div>
+          <div class="trade-time">2026-10-20 18:18 台北 → 2026-10-20 18:45 台北</div>
+        </div>
+        <div class="card-pnl pnl-loss">-108 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-sl">停損</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">-1.00R</span>
+      </div>
+      <pre class="trade-detail">進場 48.2900  停損 48.8500  目標 47.4500
+出場 48.8500  停損  -1.00R
+極點 49.1900  頸線 48.3500  較低高點 48.8500  四小時高點 49.1900
+張數 178  毛損益 -99.68  手續費 8.65  淨損益 -108.33 USDT</pre>
+      <img src="img/t21_1020_1818.png" alt="第 21 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#22 · 跌破</div>
+          <div class="trade-time">2026-10-26 12:15 台北 → 2026-10-26 13:55 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+9 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">鎖利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+0.15R</span>
+      </div>
+      <pre class="trade-detail">進場 52.6400  停損 53.5200  目標 51.3200
+出場 52.5080  鎖利  +0.15R
+極點 53.6700  頸線 52.6700  較低高點 53.5200  四小時高點 53.6700
+張數 113  毛損益 +14.92  手續費 5.94  淨損益 +8.98 USDT</pre>
+      <img src="img/t22_1026_1215.png" alt="第 22 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#23 · 跌破</div>
+          <div class="trade-time">2026-10-27 15:50 台北 → 2026-10-27 16:05 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+137 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 49.1700  停損 49.5400  目標 48.6150
+出場 48.6150  停利  +1.50R
+極點 49.7700  頸線 49.3300  較低高點 49.5400  四小時高點 49.7700
+張數 270  毛損益 +149.85  手續費 13.20  淨損益 +136.65 USDT</pre>
+      <img src="img/t23_1027_1550.png" alt="第 23 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#24 · 回測</div>
+          <div class="trade-time">2026-10-28 05:38 台北 → 2026-10-28 07:32 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+1 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">鎖利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+0.15R</span>
+      </div>
+      <pre class="trade-detail">進場 43.4200  停損 43.7300  目標 42.9550
+出場 43.3735  鎖利  +0.15R
+極點 43.8300  頸線 43.4800  較低高點 43.7300  四小時高點 43.8300
+張數 322  毛損益 +14.97  手續費 13.97  淨損益 +1.00 USDT</pre>
+      <img src="img/t24_1028_0538.png" alt="第 24 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#25 · 跌破</div>
+          <div class="trade-time">2026-10-28 18:20 台北 → 2026-10-28 19:06 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+8 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">鎖利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+0.15R</span>
+      </div>
+      <pre class="trade-detail">進場 41.3000  停損 41.8600  目標 40.4600
+出場 41.2160  鎖利  +0.15R
+極點 42.0100  頸線 41.3500  較低高點 41.8600  四小時高點 42.0100
+張數 178  毛損益 +14.95  手續費 7.34  淨損益 +7.61 USDT</pre>
+      <img src="img/t25_1028_1820.png" alt="第 25 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#26 · 跌破</div>
+          <div class="trade-time">2026-10-29 11:49 台北 → 2026-10-29 12:55 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+141 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 43.4600  停損 43.9600  目標 42.7100
+出場 42.7100  停利  +1.50R
+極點 44.1900  頸線 43.4900  較低高點 43.9600  四小時高點 44.1900
+張數 200  毛損益 +150.00  手續費 8.62  淨損益 +141.38 USDT</pre>
+      <img src="img/t26_1029_1149.png" alt="第 26 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#27 · 跌破</div>
+          <div class="trade-time">2026-10-30 10:24 台北 → 2026-10-30 12:51 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+143 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 48.8100  停損 49.4800  目標 47.8050
+出場 47.8050  停利  +1.50R
+極點 49.6100  頸線 48.8200  較低高點 49.4800  四小時高點 49.6100
+張數 149  毛損益 +149.74  手續費 7.20  淨損益 +142.55 USDT</pre>
+      <img src="img/t27_1030_1024.png" alt="第 27 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#28 · 回測</div>
+          <div class="trade-time">2026-10-31 03:06 台北 → 2026-10-31 03:50 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+142 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-info">現貨時段</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 53.9900  停損 54.7200  目標 52.8950
+出場 52.8950  停利  +1.50R
+極點 54.8500  頸線 54.1900  較低高點 54.7200  四小時高點 54.8500
+張數 136  毛損益 +148.92  手續費 7.27  淨損益 +141.65 USDT</pre>
+      <img src="img/t28_1031_0306.png" alt="第 28 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#29 · 跌破</div>
+          <div class="trade-time">2026-11-02 16:35 台北 → 2026-11-02 17:35 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+2 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">鎖利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+0.15R</span>
+      </div>
+      <pre class="trade-detail">進場 49.2100  停損 49.5900  目標 48.6400
+出場 49.1530  鎖利  +0.15R
+極點 49.8000  頸線 49.2200  較低高點 49.5900  四小時高點 49.8000
+張數 263  毛損益 +14.99  手續費 12.93  淨損益 +2.06 USDT</pre>
+      <img src="img/t29_1102_1635.png" alt="第 29 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#30 · 跌破</div>
+          <div class="trade-time">2026-11-15 07:42 台北 → 2026-11-15 08:31 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+6 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">鎖利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+0.15R</span>
+      </div>
+      <pre class="trade-detail">進場 54.8100  停損 55.4000  目標 53.9250
+出場 54.7215  鎖利  +0.15R
+極點 55.5800  頸線 54.8400  較低高點 55.4000  四小時高點 55.5800
+張數 169  毛損益 +14.96  手續費 9.26  淨損益 +5.70 USDT</pre>
+      <img src="img/t30_1115_0742.png" alt="第 30 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#31 · 回測</div>
+          <div class="trade-time">2026-11-17 05:18 台北 → 2026-11-17 05:54 台北</div>
+        </div>
+        <div class="card-pnl pnl-loss">-105 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-sl">停損</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">-1.00R</span>
+      </div>
+      <pre class="trade-detail">進場 58.3100  停損 59.4300  目標 56.6300
+出場 59.4300  停損  -1.00R
+極點 59.5000  頸線 58.4300  較低高點 59.4300  四小時高點 59.5000
+張數 89  毛損益 -99.68  手續費 5.24  淨損益 -104.92 USDT</pre>
+      <img src="img/t31_1117_0518.png" alt="第 31 筆 5 分 K"/>
+    </article>
+    
+    <article class="trade-card">
+      <header class="card-header">
+        <div>
+          <div class="trade-no">#32 · 跌破</div>
+          <div class="trade-time">2026-11-21 19:15 台北 → 2026-11-21 19:32 台北</div>
+        </div>
+        <div class="card-pnl pnl-win">+139 USDT</div>
+      </header>
+      <div class="tags">
+        <span class="tag tag-tp">停利</span>
+        <span class="tag tag-off">現貨休市</span>
+        <span class="tag tag-info">+1.50R</span>
+      </div>
+      <pre class="trade-detail">進場 81.3800  停損 82.2000  目標 80.1500
+出場 80.1500  停利  +1.50R
+極點 82.2900  頸線 81.6500  較低高點 82.2000  四小時高點 82.2900
+張數 121  毛損益 +148.83  手續費 9.77  淨損益 +139.06 USDT</pre>
+      <img src="img/t32_1121_1915.png" alt="第 32 筆 5 分 K"/>
+    </article>
+    
+</div></body></html>

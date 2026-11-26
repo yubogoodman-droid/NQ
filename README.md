@@ -169,9 +169,38 @@ python3 examples/chart_today.py
 2. **HTML Preview（免部署）**  
    https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/main/docs/index.html
 
+## SOXS 起跌放空（5 分結構，1 分進場）
+
+5 分圖定極點、較低高點和頸線：極點本身需創過去 4 小時（48 根 5 分）新高且比 4 小時最低點至少高 2.5%（濾掉窄幅橫盤與半山腰假頂）；舊極點超過 6 小時（72 根 5 分）沒走出次高就自動放掉重抓，極點回檔頸線至少 0.6%，且從極點到跌破進場必須在 20 根 5 分 K（100 分鐘）內完成（高檔橫盤太久不做）。進場是之後第一根同時跌破頸線、收在 1 分 MA25 下（且離 1 分 MA25 乖離不超過 0.75%，急殺過深不追）、量能回到前 10 根均量、收盤還在四小時高點 2% 以內的 1 分收盤；量能不夠時允許一次拉回 MA7–MA25 並收黑（`close < open`）掉回均線與頸線下方。停損一律放在 5 分較低高點（停損距離至少 0.65%，避免過窄停損放大張數與手續費）；順向浮盈達 0.85R 時，停損自動下移鎖住 +0.15R；最長持有 180 根 1 分 K（3 小時）。
+
+規則在 `rollover/RULES.md`。抓幣安永續、或離線看 54.85 那段會不會進：
+
+```bash
+python3 examples/soxs_rollover.py --demo
+python3 examples/soxs_rollover.py --symbol SOXSUSDT --risk 100
+python3 examples/soxs_rollover.py --watch
+python3 examples/soxs_rollover.py --backtest --days 30 --risk 100
+python3 examples/soxs_rollover.py --backtest --days 90 --risk 100
+```
+
+近 30 天（2026-10-28 → 11-27，台北時間）：**9 筆、勝率 88.9%、合計 +5.60R**。每筆風險 100 USDT、單邊費率 0.05% 之後，毛損益 **+558 USDT**、手續費 **82 USDT**、淨損益 **+476 USDT**（最大回撤 -105 USDT）。每筆 5 分 K 在 `docs/soxs-rollover-30d/index.html`，手機直接開：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-rollover-short-e039/docs/soxs-rollover-30d/view.html 。
+
+近 90 天（2026-08-29 → 11-27，台北時間）：**32 筆、勝率 75.0%、合計 +14.76R**。同樣預算與費率，毛損益 **+1,473 USDT**、手續費 **325 USDT**、淨損益 **+1,148 USDT**（最大回撤 -222 USDT）。圖在 `docs/soxs-rollover-90d/index.html`，手機直接開：https://htmlpreview.github.io/?https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-rollover-short-e039/docs/soxs-rollover-90d/view.html 。
+
+`--demo` 不打網路。正式掃描抓 5 分和 1 分已收盤 K，最後一根同時跌破頸線、收在 1 分 MA25 下、量能夠，就印進場、停損、目標和張數。已經離開頸線 0.8% 的中段會寫不追。腳本不下單。
+
+合成 5 分和 1 分 K 測試：
+
+```bash
+python3 examples/test_rollover_short.py
+```
+
+TradingView 用 `pinescript/soxs_rollover_1m.pine`，掛在 1 分圖。
+
 ## TradingView
 
-`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。
+`pinescript/nq_w_bottom_5m.pine` 可直接貼入 TradingView Pine Editor，套用至 NQ1! 或 MNQ1! 五分圖。  
+`pinescript/soxs_rollover_1m.pine` 掛在 1 分圖，5 分結構由腳本自己取。
 
 ## 參數調整
 
