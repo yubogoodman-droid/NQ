@@ -29,10 +29,10 @@ class RolloverParams:
     ma_fast: int = 7
     ma_slow: int = 25
     vol_ma_len: int = 10
-    min_pullback_pct: float = 0.008
+    min_pullback_pct: float = 0.006
     min_lower_high_gap_pct: float = 0.001
     min_bounce_pct: float = 0.003
-    max_bars_to_lower_high: int = 72  # 5 分根數，約 6 小時
+    max_bars_to_lower_high: int = 72  # 5 分根數，約 6 小時；超過沒次高就放掉舊極點
     max_bars_after_lower_high: int = 30  # 5 分根數，約 2.5 小時
     max_bars_from_extreme: int = 20  # 極點到跌破進場最多 20 根 5 分（100 分鐘），高檔橫太久不做
     max_entry_extension_pct: float = 0.008
@@ -40,13 +40,13 @@ class RolloverParams:
     min_stop_distance_pct: float = 0.0065  # 停損距離至少 0.65%，過窄的次高結構易被雜訊掃且放大手續費
     four_hour_bars: int = 240  # 1 分根數，4 小時
     max_below_4h_high_pct: float = 0.02  # 觸發收盤最多比四小時高點低 2%
-    min_4h_rally_pct: float = 0.04  # 5 分極點至少比極點前 4 小時低點高 4%，濾掉橫盤假頂
+    min_4h_rally_pct: float = 0.025  # 5 分極點本身需創四小時新高，且比前 4 小時低點至少高 2.5%
     retest_bars: int = 15  # 1 分根數
     stop_buffer_pct: float = 0.0
     reward_r: float = 1.5
     breakeven_trigger_r: float = 0.85  # 順向浮盈達 0.85R 時，停損下移鎖利
     breakeven_lock_r: float = 0.15  # 鎖住 +0.15R（蓋過雙邊手續費並保留微利）
-    max_hold_bars: int = 120  # 1 分根數，約 2 小時
+    max_hold_bars: int = 180  # 1 分根數，3 小時
 
 
 @dataclass(frozen=True)
@@ -166,6 +166,7 @@ def inspect_rollover(
         raise ValueError("1 分 K 是空的")
 
     steps = _arm_5m(frame5, params)
+    open_ = frame1["open"].to_numpy(float)
     high = frame1["high"].to_numpy(float)
     low = frame1["low"].to_numpy(float)
     close = frame1["close"].to_numpy(float)
@@ -297,7 +298,7 @@ def inspect_rollover(
             band_lo = min(fast, slow)
             band_hi = max(fast, slow)
             tagged = high[j] >= band_lo and low[j] <= band_hi
-            back_under = close[j] < band_lo and close[j] < setup.neckline
+            back_under = close[j] < band_lo and close[j] < setup.neckline and close[j] < open_[j]
             extend = (band_lo - close[j]) / band_lo if band_lo else 1.0
             ma25_ext = (slow - close[j]) / slow if slow else 1.0
             near_high = _near_4h_high(high_4h[j], close[j], params.max_below_4h_high_pct)
@@ -415,6 +416,7 @@ def _arm_5m(frame: pd.DataFrame, params: RolloverParams) -> list[tuple[pd.Timest
     close = frame["close"].to_numpy(float)
     bars_4h = max(1, params.four_hour_bars // 5)
     low_4h = pd.Series(low).rolling(bars_4h, min_periods=1).min().to_numpy(float)
+    high_4h = pd.Series(high).rolling(bars_4h, min_periods=1).max().to_numpy(float)
     steps: list[tuple[pd.Timestamp, _Armed | None]] = []
     extreme_i: int | None = None
     extreme_px: float | None = None
@@ -425,6 +427,9 @@ def _arm_5m(frame: pd.DataFrame, params: RolloverParams) -> list[tuple[pd.Timest
     left = params.swing_lookback
 
     for t in range(len(frame)):
+        if phase == "seek" and extreme_i is not None and t - extreme_i > params.max_bars_to_lower_high:
+            extreme_i = None
+            extreme_px = None
         pivot_i = t - left
         if pivot_i >= left and _is_pivot_high(high, pivot_i, left):
             px = float(high[pivot_i])
@@ -450,7 +455,8 @@ def _arm_5m(frame: pd.DataFrame, params: RolloverParams) -> list[tuple[pd.Timest
                     bounced = px > neck * (1 + params.min_bounce_pct) and neck_at < pivot_i
                     base_lo = float(low_4h[extreme_i])
                     rallied = base_lo > 0 and (extreme_px - base_lo) / base_lo >= params.min_4h_rally_pct
-                    if deep and bounced and rallied:
+                    top_4h = extreme_px >= float(high_4h[extreme_i])
+                    if deep and bounced and rallied and top_4h:
                         lower_i = pivot_i
                         lower_px = px
                         neckline = neck

@@ -85,8 +85,17 @@ def _break_1m(df5: pd.DataFrame) -> int:
     return (len(df5) - 1) * 5
 
 
-def _set_1m(df1: pd.DataFrame, i: int, *, high: float, low: float, close: float, volume: float) -> None:
-    df1.iloc[i, df1.columns.get_loc("open")] = close
+def _set_1m(
+    df1: pd.DataFrame,
+    i: int,
+    *,
+    high: float,
+    low: float,
+    close: float,
+    volume: float,
+    open_: float | None = None,
+) -> None:
+    df1.iloc[i, df1.columns.get_loc("open")] = close if open_ is None else open_
     df1.iloc[i, df1.columns.get_loc("high")] = high
     df1.iloc[i, df1.columns.get_loc("low")] = low
     df1.iloc[i, df1.columns.get_loc("close")] = close
@@ -245,9 +254,31 @@ def test_trigger_far_below_the_four_hour_high_does_not_enter() -> None:
 
 
 def test_flat_range_high_without_four_hour_rally_does_not_arm() -> None:
-    """橫盤 1% 的小高點雖然貼著四小時最高價，但前四小時沒漲滿 4%，不算真頂。"""
+    """橫盤 1% 的小高點雖然貼著四小時最高價，但前四小時沒漲滿 2.5%，不算真頂。"""
 
     rows = _flat(42, 54.40) + _soxs_top()[42:]
+    df5, df1 = _pair(rows)
+    assert detect_rollover_shorts(df5, df1) == []
+
+
+def test_stale_extreme_expires_so_later_lower_top_still_fires() -> None:
+    """舊極點超過 72 根 5 分沒走出次高，要放掉；之後更低的新波段四小時高點照樣能觸發。"""
+
+    earlier_spike = _flat(10, 60.0) + [(60.0, 68.00, 59.5, 61.0, 4000)] + _flat(75, 50.0)
+    rows = earlier_spike + _soxs_top()
+    df5, df1 = _pair(rows)
+    signals = detect_rollover_shorts(df5, df1)
+    assert len(signals) == 1, signals
+    assert signals[0].extreme == 54.85
+    assert signals[0].entry == 54.05
+
+
+def test_extreme_below_four_hour_high_does_not_arm() -> None:
+    """5 分極點本身低於過去四小時高點時（例如區間內次波反彈），不當新頭部。"""
+
+    rows = _soxs_top()
+    # 極點前四小時內有更高的 55.20，但後面回落後極點只到 54.85
+    rows[10] = (54.40, 55.20, 54.30, 54.40, 1000.0)
     df5, df1 = _pair(rows)
     assert detect_rollover_shorts(df5, df1) == []
 
@@ -258,12 +289,15 @@ def test_low_volume_break_allows_one_retest() -> None:
     for i in range(entry - 30, entry):
         _set_1m(df1, i, high=54.45, low=54.25, close=54.35, volume=200)
     _set_1m(df1, entry, high=54.15, low=53.95, close=54.05, volume=1)
-    _set_1m(df1, entry + 1, high=54.40, low=54.05, close=54.12, volume=500)
+    # 紅 K / 平盤回測不算拒絕，必須收黑才進場
+    _set_1m(df1, entry + 1, open_=54.10, high=54.40, low=54.05, close=54.12, volume=500)
+    assert detect_rollover_shorts(df5, df1.iloc[: entry + 2]) == []
+    _set_1m(df1, entry + 2, open_=54.32, high=54.40, low=54.05, close=54.12, volume=500)
     signals = detect_rollover_shorts(df5, df1)
     assert len(signals) == 1, signals
     sig = signals[0]
     assert sig.kind == "retest"
-    assert sig.bar_idx == entry + 1
+    assert sig.bar_idx == entry + 2
     assert sig.entry == 54.12
     assert sig.stop == 54.55
     assert sig.stop == sig.lower_high
@@ -448,6 +482,8 @@ def main() -> int:
     test_new_high_invalidates_the_lower_high()
     test_trigger_far_below_the_four_hour_high_does_not_enter()
     test_flat_range_high_without_four_hour_rally_does_not_arm()
+    test_stale_extreme_expires_so_later_lower_top_still_fires()
+    test_extreme_below_four_hour_high_does_not_arm()
     test_low_volume_break_allows_one_retest()
     test_rejects_other_timeframes()
     test_inspect_names_the_break_and_the_chase()
