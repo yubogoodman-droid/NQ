@@ -260,10 +260,20 @@
       to { opacity: 1; transform: rotate(14deg) scale(1); }
     }
 
+    .pw {
+      display: block;
+      width: 168px;
+      height: 28px;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      pointer-events: none;
+    }
+
     .actions {
       width: min(440px, 100%);
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 10px;
     }
 
@@ -390,7 +400,7 @@
             </div>
             <div class="row">
               <span>密碼</span>
-              <span class="v" id="password">xxxxxxx</span>
+              <canvas id="password-view" class="pw" aria-hidden="true"></canvas>
             </div>
           </div>
           <div class="rule"></div>
@@ -407,14 +417,13 @@
         <div class="track"><div id="fill"></div></div>
       </div>
       <div class="perf" aria-hidden="true"></div>
-      <p class="foot" id="foot">按住塗層拖曳。刮開大約一半，整張就會揭曉。</p>
+      <p class="foot" id="foot">按住塗層拖曳。刮開大約一半，整張就會揭曉。密碼不能複製。</p>
     </article>
 
     <div class="actions" id="actions" hidden>
       <button class="btn" id="copy-serial" type="button">複製序號</button>
-      <button class="btn" id="copy-password" type="button">複製密碼</button>
     </div>
-    <p class="after" id="after" hidden>序號和密碼可以複製。</p>
+    <p class="after" id="after" hidden>序號可以複製。密碼請照畫面輸入，不能複製。</p>
     <div class="links">
       <button class="text-btn" id="reveal" type="button">直接揭曉</button>
       <button class="text-btn" id="reset" type="button">重新覆蓋</button>
@@ -435,7 +444,8 @@
     const revealBtn = document.getElementById("reveal");
     const live = document.getElementById("live");
     const serialEl = document.getElementById("serial");
-    const passwordEl = document.getElementById("password");
+    const passwordView = document.getElementById("password-view");
+    const PASSWORD = "xxxxxxx";
 
     let ctx = null;
     let dpr = 1;
@@ -447,6 +457,22 @@
     let lastMeasure = 0;
     let measureQueued = false;
     let toastTimer = 0;
+
+    function drawPassword() {
+      const d = Math.min(window.devicePixelRatio || 1, 2);
+      const cssW = 168;
+      const cssH = 28;
+      passwordView.width = Math.round(cssW * d);
+      passwordView.height = Math.round(cssH * d);
+      const g = passwordView.getContext("2d");
+      g.setTransform(d, 0, 0, d, 0, 0);
+      g.clearRect(0, 0, cssW, cssH);
+      g.fillStyle = "#f4f4f4";
+      g.font = '600 16px "IBM Plex Mono", ui-monospace, monospace';
+      g.textAlign = "right";
+      g.textBaseline = "middle";
+      g.fillText(PASSWORD, cssW - 1, cssH / 2 + 1);
+    }
 
     function brushWidth() {
       return Math.max(34 * dpr, foil.width * 0.12);
@@ -641,9 +667,10 @@
         slip.setAttribute("aria-hidden", "false");
         ticket.classList.add("won");
         actions.hidden = false;
+        after.hidden = false;
         revealBtn.hidden = true;
-        foot.textContent = "序號和密碼可以複製。";
-        live.textContent = "揭曉了。序號 " + serialEl.textContent.trim() + "。密碼 " + passwordEl.textContent.trim() + "。";
+        foot.textContent = "序號可以複製。密碼請照畫面輸入。";
+        live.textContent = "揭曉了。序號 " + serialEl.textContent.trim() + "。密碼已顯示在畫面上，不能複製。";
         if (!reduce) confetti();
       }, reduce ? 0 : 460);
     }
@@ -664,7 +691,7 @@
       actions.hidden = true;
       after.hidden = true;
       revealBtn.hidden = false;
-      foot.textContent = "按住塗層拖曳。刮開大約一半，整張就會揭曉。";
+      foot.textContent = "按住塗層拖曳。刮開大約一半，整張就會揭曉。密碼不能複製。";
       live.textContent = "";
       updateProgress(0);
       layout(true);
@@ -697,6 +724,10 @@
 
     async function copyFrom(el, label) {
       const text = el.textContent.trim();
+      if (!text || text === PASSWORD) {
+        toast("密碼不能複製");
+        return;
+      }
       try {
         await copyText(text);
         toast(label + "已複製");
@@ -709,6 +740,16 @@
         toast("請手動複製已選取的文字");
       }
     }
+
+    document.addEventListener("copy", (e) => {
+      const selected = (document.getSelection() && document.getSelection().toString()) || "";
+      if (!selected.includes(PASSWORD)) return;
+      e.preventDefault();
+      e.clipboardData.setData("text/plain", selected.split(PASSWORD).join(""));
+    });
+    document.addEventListener("contextmenu", (e) => {
+      if (e.target === passwordView) e.preventDefault();
+    });
 
     foil.addEventListener("pointerdown", (e) => {
       if (won) return;
@@ -735,14 +776,17 @@
     foil.addEventListener("pointercancel", stopDraw);
 
     document.getElementById("copy-serial").addEventListener("click", () => copyFrom(serialEl, "序號"));
-    document.getElementById("copy-password").addEventListener("click", () => copyFrom(passwordEl, "密碼"));
     revealBtn.addEventListener("click", finish);
     document.getElementById("reset").addEventListener("click", resetCard);
 
     new ResizeObserver(() => layout(false)).observe(wrap);
     layout(true);
+    drawPassword();
     if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(() => { if (!dirty) paintFoil(); });
+      document.fonts.ready.then(() => {
+        drawPassword();
+        if (!dirty) paintFoil();
+      });
     }
   </script>
 </body>
