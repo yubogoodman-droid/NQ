@@ -222,6 +222,13 @@ def sleep_until_next_close() -> None:
     time.sleep(max(1.0, nxt - now))
 
 
+PHONE_RAW = "https://raw.githubusercontent.com/yubogoodman-droid/NQ/cursor/soxs-rollover-short-e039"
+
+
+def _phone_asset_base(report_dir: Path) -> str:
+    return f"{PHONE_RAW}/{report_dir.as_posix()}"
+
+
 def _span_label(days: int) -> str:
     if days == 30:
         return "近一個月"
@@ -252,6 +259,7 @@ def run_backtest(symbol: str, days: int, risk: float, html_path: str, fee_rate: 
         fee_rate=fee_rate,
         cutoff=cutoff,
         span_label=_span_label(days),
+        phone_asset_base=_phone_asset_base(out.parent),
     )
     print(
         f"{stats['count']} 筆  勝率 {stats['win_rate']:.1f}%  "

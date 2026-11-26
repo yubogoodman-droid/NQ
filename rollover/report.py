@@ -26,6 +26,7 @@ def write_report(
     fee_rate: float,
     cutoff: pd.Timestamp,
     span_label: str = "近一個月",
+    phone_asset_base: str = "",
 ) -> dict:
     """寫出摘要、權益曲線，以及每筆交易一張 5 分 K。回傳統計。"""
 
@@ -46,7 +47,22 @@ def write_report(
     page = _page(symbol, stats, cards, risk_usdt, fee_rate, span_label)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")
+    if phone_asset_base:
+        view = _phone_view(page, phone_asset_base.rstrip("/"))
+        (out.parent / "view.html").write_text(view, encoding="utf-8")
     return stats
+
+
+def _phone_view(page: str, asset_base: str) -> str:
+    """手機用 htmlpreview 開。圖改成 GitHub 原始檔網址，相對路徑在預覽站載不到。"""
+
+    view = page.replace('src="img/', f'src="{asset_base}/img/')
+    view = view.replace(".page{max-width:760px;", ".page{max-width:560px;")
+    view = view.replace(
+        "body{margin:0;",
+        "body{margin:0;-webkit-text-size-adjust:100%;",
+    )
+    return view
 
 
 def _trade_row(trade: ShortTrade, risk_usdt: float, fee_rate: float) -> dict:
