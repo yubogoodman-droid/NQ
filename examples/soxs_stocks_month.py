@@ -210,7 +210,17 @@ def scan_symbol(symbol: str, d: dict, t_min: int) -> list[dict]:
     return rows
 
 
-def write_page(rows: list[dict], scanned: int, skipped: list[str], window: str, page: Path) -> None:
+def write_page(
+    rows: list[dict],
+    scanned: int,
+    skipped: list[str],
+    window: str,
+    page: Path,
+    *,
+    title: str = "幣安股票永續，同一套撥開，近 30 天",
+    blurb: str | None = None,
+    quiet_names: list[str] | None = None,
+) -> None:
     by_sym: dict[str, list[dict]] = {}
     for r in rows:
         by_sym.setdefault(r["symbol"], []).append(r)
@@ -237,19 +247,32 @@ def write_page(rows: list[dict], scanned: int, skipped: list[str], window: str, 
         for r in xs:
             img = f"img/{sym.lower()}_{r['time'].replace('-', '').replace(' ', '_').replace(':', '')}.png"
             rcls = "pnl-win" if r["scale_pct"] > 0 else "pnl-loss"
+            pt_line = ""
+            if "pt_scale" in r:
+                pt_line = f"\n固定 +1 點  整筆 {r['pt_scalp']:+.2f}  一半 {r['pt_scale']:+.2f}"
             body.append(
                 f"<pre class='trade-detail'>{r['time']}  進 {r['entry']:.4g}\n"
                 f"整筆 {r['scalp_reason']} {r['scalp_pct']:+.2f}%   一半 {r['scale_pct']:+.2f}%  "
-                f"<span class='{rcls}'>最大 {r['mfe_pct']:.2f}%</span></pre>"
+                f"<span class='{rcls}'>最大 {r['mfe_pct']:.2f}%</span>{pt_line}</pre>"
                 f"<div class='mini-chart'><img src='{img}' alt='{sym} {r['time']}' style='width:100%;display:block;border-radius:10px'/></div>"
             )
         body.append("</article>")
+    for sym in quiet_names or []:
+        if sym in by_sym or sym in skipped:
+            continue
+        tag = "反向" if sym in INVERSE else ""
+        body.append(
+            f"<article class='trade-card'><header class='card-header'><div class='card-title'>"
+            f"<span class='trade-no'>{sym}</span> <span class='trade-time'>{tag}</span></div>"
+            f"<div class='card-pnl pnl-flat'>沒進場</div></header>"
+            f"<pre class='trade-detail'>這 30 天沒有同時滿足進場條件的 K 棒。</pre></article>"
+        )
     quiet = scanned - len(by_sym) - len(skipped)
     html = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>幣安股票永續 30 天</title>
+<title>{title}</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif}}
@@ -271,8 +294,8 @@ h1{{font-size:18px;margin:0 0 6px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>幣安股票永續，同一套撥開，近 30 天</h1>
-<p class="muted">台北 {window}。美股、港股、韓股、陸股 USDT 永續共 {scanned} 檔。進場跟 SOXS 同一套。表上的百分比是等比例 +2% 目標、扣來回 {FEE_PCT:.2f}% 手續費。固定 +1 點只在 SOXS 那種價位有意義，這裡不拿來跨股票比。</p>
+<h1>{title}</h1>
+<p class="muted">{blurb if blurb is not None else f"台北 {window}。美股、港股、韓股、陸股 USDT 永續共 {scanned} 檔。進場跟 SOXS 同一套。表上的百分比是等比例 +2% 目標、扣來回 {FEE_PCT:.2f}% 手續費。固定 +1 點只在 SOXS 那種價位有意義，這裡不拿來跨股票比。"}</p>
 <div class="cards">
 <div class="card">有進場<b>{len(by_sym)}</b></div>
 <div class="card">筆數<b>{n}</b></div>
@@ -452,8 +475,109 @@ def rebuild_cached() -> None:
     )
 
 
+def _norm_symbol(name: str) -> str:
+    s = name.strip().upper()
+    return s if s.endswith("USDT") else s + "USDT"
+
+
+def run_named(names: list[str]) -> None:
+    """同一套進場，只回測指定的股票永續。"""
+    syms = [_norm_symbol(n) for n in names]
+    now = datetime.now(TZ).replace(second=0, microsecond=0)
+    end_ms = int(now.timestamp() * 1000)
+    win_start = now - timedelta(days=30)
+    t_min = int(win_start.timestamp() * 1000)
+    fetch_start = int((win_start - timedelta(days=6)).timestamp() * 1000)
+    out = Path("docs/soxs-soxl-ma200-peel")
+    print(f"{' '.join(syms)}  {win_start.strftime('%m-%d %H:%M')} ～ {now.strftime('%m-%d %H:%M')}", flush=True)
+    limiter = Limiter(150)
+    rows: list[dict] = []
+    skipped: list[str] = []
+    scanned: list[str] = []
+    chart_src: list[tuple] = []
+    for sym in syms:
+        d = fetch_1m(sym, fetch_start, end_ms, limiter)
+        if d is None or len(d["c"]) < 500:
+            skipped.append(sym)
+            print(f"跳過 {sym}", flush=True)
+            continue
+        scanned.append(sym)
+        got = scan_symbol(sym, d, t_min)
+        if not got:
+            print(f"{sym} 0 筆", flush=True)
+            continue
+        d5 = resample(d, 5)
+        mas = {n: sma(d["c"], n) for n in MA_PERIODS}
+        mas5 = {n: sma(d5["c"], n) for n in MA_PERIODS}
+        for r in got:
+            r["pack_i"] = len(chart_src)
+            rows.append(r)
+        chart_src.append((d, mas, d5, mas5))
+        print(
+            f"{sym} {len(got)} 筆  +2%一半 {sum(x['scale_pct'] for x in got):+.2f}%  "
+            f"+1點一半 {sum(x['pt_scale'] for x in got):+.2f}",
+            flush=True,
+        )
+    img = out / "img"
+    img.mkdir(parents=True, exist_ok=True)
+    for old in img.glob("*.png"):
+        old.unlink()
+    for r in rows:
+        d, mas, d5, mas5 = chart_src[r["pack_i"]]
+        stamp = r["time"].replace("-", "").replace(" ", "_").replace(":", "")
+        trade = {
+            "i": r["i"],
+            "ms": r["ms"],
+            "time": r["time"],
+            "entry": r["entry"],
+            "stop": r["stop"],
+            "hold": r["hold"],
+            "scale_hold": r["scale_hold"],
+            "scalp_reason": r["scalp_reason"],
+            "scalp_net": r["scalp_pct"],
+            "scale_reason": r["scale_reason"],
+            "scale_net": r["scale_pct"],
+            "mfe": r["mfe_pct"],
+            "target_pts": r["entry"] * PCT_TARGET,
+            "mark": "+2%",
+            "unit": "%",
+        }
+        draw_stacked(img / f"{r['symbol'].lower()}_{stamp}.png", d, mas, d5, mas5, trade, 1)
+    window = f"{win_start.strftime('%Y-%m-%d %H:%M')} → {now.strftime('%m-%d %H:%M')}"
+    slim = [{k: v for k, v in r.items() if k != "pack_i"} for r in rows]
+    (out / "trades.json").write_text(
+        json.dumps({"window": window, "symbols": syms, "skipped": skipped, "trades": slim}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    shown = "、".join(s.removesuffix("USDT") for s in syms)
+    blurb = (
+        f"台北 {window}。只跑 {shown}。進場條件跟全股票那次相同。"
+        f"百分比是等比例 +2%、扣來回 {FEE_PCT:.2f}% 手續費。固定 +1 點寫在每一筆下面。"
+    )
+    write_page(
+        slim,
+        len(syms),
+        skipped,
+        window,
+        out / "pair.html",
+        title="SOXS 跟 SOXL，同一套撥開，近 30 天",
+        blurb=blurb,
+        quiet_names=scanned,
+    )
+    hit = sum(1 for r in slim if r["scalp_reason"] == "目標")
+    print(
+        f"完成 筆數 {len(slim)}  打到+2% {hit}  "
+        f"+2%一半 {sum(r['scale_pct'] for r in slim):+.2f}%  "
+        f"+1點一半 {sum(r['pt_scale'] for r in slim):+.2f}",
+        flush=True,
+    )
+    print(f"圖：{out / 'pair.html'}", flush=True)
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "cache":
         rebuild_cached()
+    elif len(sys.argv) > 1:
+        run_named(sys.argv[1:])
     else:
         main()
