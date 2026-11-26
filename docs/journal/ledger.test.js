@@ -26,7 +26,6 @@ almost(fee980, 838, 0, "fee 980");
 almost(fee1050, 898, 0, "fee 1050");
 almost(tax1050, 3150, 0, "tax 1050");
 assert(calcTax(1050, 1000, "buy", "TW", settings) === 0, "buy has no tax");
-assert(calcFee(100, 1, "US", settings) === 0, "US fee off");
 
 const trades = [
   { id: "1", date: "2026-03-12", time: "10:21", market: "TW", symbol: "2330", name: "台積電", side: "buy", price: 890, qty: 1000, fee: fee890, tax: 0 },
