@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="description" content="刮開塗層，查看序號與密碼。" />
+  <meta name="theme-color" content="#16110e" />
+  <title>刮刮樂</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #241c16;
+      --paper: #f3eadc;
+      --muted: #8a7562;
+      --seal: #b4332a;
+      --gold: #e7b15a;
+      --table: #16110e;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { margin: 0; padding: 0; }
+
+    body {
+      min-height: 100dvh;
+      color: var(--ink);
+      font-family: "Noto Sans TC", "PingFang TC", sans-serif;
+      background:
+        radial-gradient(ellipse 70% 42% at 50% -8%, rgba(231, 177, 90, 0.22), transparent 58%),
+        radial-gradient(ellipse 50% 36% at 100% 100%, rgba(180, 51, 42, 0.16), transparent 60%),
+        var(--table);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    main {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: max(24px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+    }
+
+    .ticket {
+      position: relative;
+      width: min(440px, 100%);
+      background: var(--paper);
+      border-radius: 18px;
+      padding: 18px 18px 16px;
+      box-shadow: 0 22px 50px rgba(0, 0, 0, 0.38);
+    }
+
+    .ticket.won {
+      box-shadow:
+        0 0 0 1px rgba(231, 177, 90, 0.85),
+        0 22px 50px rgba(0, 0, 0, 0.38),
+        0 0 36px rgba(231, 177, 90, 0.28);
+    }
+
+    .ticket-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding-right: 4px;
+    }
+
+    .kicker {
+      margin: 0 0 2px;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      color: var(--muted);
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "Noto Serif TC", "Songti TC", serif;
+      font-size: 40px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 0.08em;
+    }
+
+    .face {
+      margin: 0 0 4px;
+      border: 1.5px solid var(--seal);
+      color: var(--seal);
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+    }
+
+    .scratch-wrap {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #c5cad2;
+      box-shadow: inset 0 0 0 1px rgba(60, 48, 36, 0.28);
+      touch-action: none;
+    }
+
+    .scratch-wrap:not(.ready) .slip { opacity: 0; }
+
+    .slip {
+      min-height: 268px;
+      padding: 16px 18px 18px;
+      background: #141414;
+      color: #f4f4f4;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .rule { height: 1px; background: rgba(255, 255, 255, 0.42); }
+
+    .rows {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      padding: 18px 2px;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      font-size: 1.05rem;
+      font-weight: 500;
+    }
+
+    .title { font-weight: 700; letter-spacing: 0.02em; }
+
+    .v {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-weight: 600;
+      font-size: clamp(0.84rem, 3.7vw, 1.02rem);
+      letter-spacing: 0.03em;
+      text-align: right;
+    }
+
+    .ticket.won .v {
+      user-select: text;
+      -webkit-user-select: text;
+    }
+
+    #foil {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+      z-index: 1;
+    }
+
+    #foil:active { cursor: grabbing; }
+
+    .coach {
+      position: absolute;
+      left: 14%;
+      right: 14%;
+      top: 64%;
+      height: 32px;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .scratch-wrap.started .coach { display: none; }
+
+    .coin {
+      position: absolute;
+      top: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fff6dc, #e7b15a 46%, #8d6428);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+      animation: swipe 1.7s ease-in-out infinite;
+    }
+
+    @keyframes swipe {
+      0% { left: 0; opacity: 0; }
+      14% { opacity: 1; }
+      78% { opacity: 1; }
+      100% { left: calc(100% - 28px); opacity: 0; }
+    }
+
+    .meter { margin-top: 14px; }
+
+    .meter-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .track {
+      height: 8px;
+      border-radius: 99px;
+      background: rgba(36, 28, 22, 0.1);
+      overflow: hidden;
+    }
+
+    #fill {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #c4a574, var(--gold));
+    }
+
+    .perf {
+      margin: 14px 6px 10px;
+      border-top: 1px dashed rgba(36, 28, 22, 0.28);
+    }
+
+    .foot {
+      margin: 0;
+      text-align: center;
+      color: #6d5c4c;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .stamp {
+      position: absolute;
+      top: 108px;
+      right: 30px;
+      width: 68px;
+      height: 68px;
+      border: 3px solid var(--seal);
+      color: var(--seal);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 18px;
+      letter-spacing: 0.12em;
+      transform: rotate(14deg) scale(0.4);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .ticket.won .stamp {
+      animation: stamp-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+    }
+
+    @keyframes stamp-in {
+      to { opacity: 1; transform: rotate(14deg) scale(1); }
+    }
+
+    .pw {
+      display: block;
+      width: 168px;
+      height: 28px;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      pointer-events: none;
+    }
+
+    .actions {
+      width: min(440px, 100%);
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .actions[hidden],
+    .after[hidden] { display: none !important; }
+
+    button {
+      font-family: inherit;
+      border: 0;
+      cursor: pointer;
+    }
+
+    .btn {
+      background: var(--paper);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 13px 12px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .links {
+      display: flex;
+      gap: 18px;
+    }
+
+    .text-btn {
+      background: transparent;
+      color: #d9cbb8;
+      font-size: 14px;
+      padding: 4px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .after {
+      width: min(440px, 100%);
+      margin: 0;
+      text-align: center;
+      color: #d9cbb8;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      transform: translateX(-50%) translateY(8px);
+      background: #f3eadc;
+      color: #241c16;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .bit {
+      position: fixed;
+      top: 42%;
+      width: 8px;
+      height: 8px;
+      pointer-events: none;
+      z-index: 5;
+      animation: burst linear forwards;
+    }
+
+    @keyframes burst {
+      to { transform: translate(var(--dx), var(--dy)) rotate(180deg); opacity: 0; }
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    @media (max-height: 740px) {
+      main { justify-content: flex-start; }
+      h1 { font-size: 34px; }
+      .slip { min-height: 236px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .coin, .ticket.won .stamp, .bit { animation: none; }
+      .ticket.won .stamp { opacity: 1; transform: rotate(14deg) scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <article class="ticket" id="ticket">
+      <div class="stamp" aria-hidden="true">中獎</div>
+      <div class="ticket-head">
+        <div>
+          <p class="kicker">SCRATCH CARD</p>
+          <h1>刮刮樂</h1>
+        </div>
+        <p class="face">點數卡</p>
+      </div>
+
+      <div class="scratch-wrap" id="wrap">
+        <div class="slip" id="slip" aria-hidden="true">
+          <div class="rule"></div>
+          <div class="rows">
+            <div class="row">
+              <span>序號</span>
+              <span class="v" id="serial">MFRMUV005094</span>
+            </div>
+            <div class="row">
+              <span>密碼</span>
+              <canvas id="password-view" class="pw" aria-hidden="true"></canvas>
+            </div>
+          </div>
+          <div class="rule"></div>
+        </div>
+        <canvas id="foil" aria-label="刮刮樂塗層，按住並拖曳可以刮開"></canvas>
+        <div class="coach" id="coach" aria-hidden="true"><span class="coin"></span></div>
+      </div>
+
+      <div class="meter" aria-hidden="true">
+        <div class="meter-row">
+          <span>刮開進度</span>
+          <span id="pct">0%</span>
+        </div>
+        <div class="track"><div id="fill"></div></div>
+      </div>
+      <div class="perf" aria-hidden="true"></div>
+      <p class="foot" id="foot">按住塗層拖曳。刮開大約一半，整張就會揭曉。密碼不能複製。</p>
+    </article>
+
+    <div class="actions" id="actions" hidden>
+      <button class="btn" id="copy-serial" type="button">複製序號</button>
+    </div>
+    <p class="after" id="after" hidden>序號可以複製。密碼請照畫面輸入，不能複製。</p>
+    <div class="links">
+      <button class="text-btn" id="reveal" type="button">直接揭曉</button>
+      <button class="text-btn" id="reset" type="button">重新覆蓋</button>
+    </div>
+    <p id="live" class="sr-only" aria-live="polite"></p>
+  </main>
+  <div id="toast" role="status"></div>
+  <noscript><p style="color:#f3eadc;text-align:center">這個刮刮樂需要開啟 JavaScript。</p></noscript>
+
+  <script>
+    const wrap = document.getElementById("wrap");
+    const foil = document.getElementById("foil");
+    const slip = document.getElementById("slip");
+    const ticket = document.getElementById("ticket");
+    const foot = document.getElementById("foot");
+    const actions = document.getElementById("actions");
+    const after = document.getElementById("after");
+    const revealBtn = document.getElementById("reveal");
+    const live = document.getElementById("live");
+    const serialEl = document.getElementById("serial");
+    const passwordView = document.getElementById("password-view");
+    const PASSWORD = "xxxxxxx";
+
+    let ctx = null;
+    let dpr = 1;
+    let dirty = false;
+    let won = false;
+    let drawing = false;
+    let last = null;
+    let epoch = 0;
+    let lastMeasure = 0;
+    let measureQueued = false;
+    let toastTimer = 0;
+
+    function drawPassword() {
+      const d = Math.min(window.devicePixelRatio || 1, 2);
+      const cssW = 168;
+      const cssH = 28;
+      passwordView.width = Math.round(cssW * d);
+      passwordView.height = Math.round(cssH * d);
+      const g = passwordView.getContext("2d");
+      g.setTransform(d, 0, 0, d, 0, 0);
+      g.clearRect(0, 0, cssW, cssH);
+      g.fillStyle = "#f4f4f4";
+      g.font = '600 16px "IBM Plex Mono", ui-monospace, monospace';
+      g.textAlign = "right";
+      g.textBaseline = "middle";
+      g.fillText(PASSWORD, cssW - 1, cssH / 2 + 1);
+    }
+
+    function brushWidth() {
+      return Math.max(34 * dpr, foil.width * 0.12);
+    }
+
+    function paintFoil() {
+      if (!ctx || !foil.width) return;
+      const w = foil.width;
+      const h = foil.height;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+      const g = ctx.createLinearGradient(0, 0, w, h);
+      g.addColorStop(0, "#d7dbe3");
+      g.addColorStop(0.28, "#f7f8fb");
+      g.addColorStop(0.48, "#aeb4bf");
+      g.addColorStop(0.62, "#f4f5f8");
+      g.addColorStop(0.82, "#9aa1ad");
+      g.addColorStop(1, "#c8ced6");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.save();
+      ctx.globalAlpha = 0.16;
+      ctx.strokeStyle = "#5c6370";
+      ctx.lineWidth = Math.max(1, dpr);
+      const step = 14 * dpr;
+      for (let x = -h; x < w; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + h, h);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(-0.32);
+      ctx.globalAlpha = 0.09;
+      ctx.fillStyle = "#1c1c1c";
+      ctx.font = `700 ${12 * dpr}px "Noto Sans TC", sans-serif`;
+      ctx.textAlign = "center";
+      const band = "刮刮樂 · ".repeat(8);
+      for (let row = -5; row <= 5; row++) ctx.fillText(band, 0, row * 28 * dpr);
+      ctx.restore();
+
+      const cx = w / 2;
+      const cy = h / 2 - 6 * dpr;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 58 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.34)";
+      ctx.fill();
+      ctx.lineWidth = 2 * dpr;
+      ctx.strokeStyle = "rgba(50, 40, 28, 0.38)";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, 50 * dpr, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = "#2c261f";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = `900 ${24 * dpr}px "Noto Serif TC", serif`;
+      ctx.fillText("刮開有獎", cx, cy - 8 * dpr);
+      ctx.font = `500 ${13 * dpr}px "Noto Sans TC", sans-serif`;
+      ctx.fillStyle = "#5c5348";
+      ctx.fillText("按住往旁邊拖", cx, cy + 20 * dpr);
+
+      ctx.font = `700 ${12 * dpr}px "Noto Sans TC", sans-serif`;
+      ctx.fillStyle = "rgba(40, 34, 28, 0.55)";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText("MYCARD", 14 * dpr, 12 * dpr);
+      ctx.textAlign = "right";
+      ctx.fillText("點數卡", w - 14 * dpr, 12 * dpr);
+    }
+
+    function layout(force) {
+      const rect = wrap.getBoundingClientRect();
+      if (rect.width < 20 || rect.height < 20) return;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = Math.round(rect.width * dpr);
+      const h = Math.round(rect.height * dpr);
+      if (!force && dirty) return;
+      if (!force && foil.width === w && foil.height === h) return;
+      foil.width = w;
+      foil.height = h;
+      ctx = foil.getContext("2d", { willReadFrequently: true });
+      paintFoil();
+      wrap.classList.add("ready");
+    }
+
+    function point(e) {
+      const r = foil.getBoundingClientRect();
+      return {
+        x: (e.clientX - r.left) * (foil.width / r.width),
+        y: (e.clientY - r.top) * (foil.height / r.height),
+      };
+    }
+
+    function eraseLine(x1, y1, x2, y2) {
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = brushWidth();
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function scratchedRatio() {
+      if (!ctx || !foil.width) return 0;
+      const w = foil.width;
+      const h = foil.height;
+      const step = Math.max(4, Math.round(6 * dpr));
+      const data = ctx.getImageData(0, 0, w, h).data;
+      let clear = 0;
+      let total = 0;
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+          total++;
+          if (data[(y * w + x) * 4 + 3] < 80) clear++;
+        }
+      }
+      return total ? clear / total : 0;
+    }
+
+    function updateProgress(ratio) {
+      const pct = Math.round(Math.min(1, Math.max(0, ratio)) * 100);
+      document.getElementById("pct").textContent = pct + "%";
+      document.getElementById("fill").style.width = pct + "%";
+    }
+
+    function measure() {
+      lastMeasure = performance.now();
+      if (won) return;
+      const ratio = scratchedRatio();
+      updateProgress(ratio);
+      if (ratio >= 0.46) finish();
+    }
+
+    function scheduleMeasure() {
+      const now = performance.now();
+      if (now - lastMeasure < 90) {
+        if (!measureQueued) {
+          measureQueued = true;
+          setTimeout(() => {
+            measureQueued = false;
+            measure();
+          }, 100);
+        }
+        return;
+      }
+      measure();
+    }
+
+    function confetti() {
+      const colors = ["#f3eadc", "#e7b15a", "#b4332a", "#ffffff", "#d5dae2"];
+      for (let i = 0; i < 36; i++) {
+        const el = document.createElement("i");
+        el.className = "bit";
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 80 + Math.random() * 160;
+        el.style.left = 42 + Math.random() * 16 + "%";
+        el.style.background = colors[i % colors.length];
+        el.style.setProperty("--dx", Math.cos(angle) * dist + "px");
+        el.style.setProperty("--dy", Math.sin(angle) * dist - 40 + "px");
+        el.style.animationDuration = 0.7 + Math.random() * 0.6 + "s";
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1500);
+      }
+    }
+
+    function finish() {
+      if (won) return;
+      won = true;
+      dirty = true;
+      drawing = false;
+      updateProgress(1);
+      wrap.classList.add("started");
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const token = ++epoch;
+      foil.style.transition = reduce ? "none" : "opacity .45s ease";
+      foil.style.opacity = "0";
+      foil.style.pointerEvents = "none";
+      window.setTimeout(() => {
+        if (token !== epoch) return;
+        foil.style.display = "none";
+        slip.setAttribute("aria-hidden", "false");
+        ticket.classList.add("won");
+        actions.hidden = false;
+        after.hidden = false;
+        revealBtn.hidden = true;
+        foot.textContent = "序號可以複製。密碼請照畫面輸入。";
+        live.textContent = "揭曉了。序號 " + serialEl.textContent.trim() + "。密碼已顯示在畫面上，不能複製。";
+        if (!reduce) confetti();
+      }, reduce ? 0 : 460);
+    }
+
+    function resetCard() {
+      epoch++;
+      won = false;
+      dirty = false;
+      drawing = false;
+      last = null;
+      foil.style.transition = "none";
+      foil.style.opacity = "1";
+      foil.style.pointerEvents = "";
+      foil.style.display = "";
+      slip.setAttribute("aria-hidden", "true");
+      ticket.classList.remove("won");
+      wrap.classList.remove("started");
+      actions.hidden = true;
+      after.hidden = true;
+      revealBtn.hidden = false;
+      foot.textContent = "按住塗層拖曳。刮開大約一半，整張就會揭曉。密碼不能複製。";
+      live.textContent = "";
+      updateProgress(0);
+      layout(true);
+    }
+
+    function toast(text) {
+      const el = document.getElementById("toast");
+      el.textContent = text;
+      el.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove("show"), 1600);
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      if (!ok) throw new Error("copy failed");
+    }
+
+    async function copyFrom(el, label) {
+      const text = el.textContent.trim();
+      if (!text || text === PASSWORD) {
+        toast("密碼不能複製");
+        return;
+      }
+      try {
+        await copyText(text);
+        toast(label + "已複製");
+      } catch {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        toast("請手動複製已選取的文字");
+      }
+    }
+
+    document.addEventListener("copy", (e) => {
+      const selected = (document.getSelection() && document.getSelection().toString()) || "";
+      if (!selected.includes(PASSWORD)) return;
+      e.preventDefault();
+      e.clipboardData.setData("text/plain", selected.split(PASSWORD).join(""));
+    });
+    document.addEventListener("contextmenu", (e) => {
+      if (e.target === passwordView) e.preventDefault();
+    });
+
+    foil.addEventListener("pointerdown", (e) => {
+      if (won) return;
+      drawing = true;
+      dirty = true;
+      wrap.classList.add("started");
+      foil.setPointerCapture(e.pointerId);
+      last = point(e);
+      eraseLine(last.x, last.y, last.x + 0.01, last.y);
+      scheduleMeasure();
+      e.preventDefault();
+    });
+
+    foil.addEventListener("pointermove", (e) => {
+      if (!drawing || won) return;
+      const p = point(e);
+      eraseLine(last.x, last.y, p.x, p.y);
+      last = p;
+      scheduleMeasure();
+    });
+
+    function stopDraw() { drawing = false; }
+    foil.addEventListener("pointerup", stopDraw);
+    foil.addEventListener("pointercancel", stopDraw);
+
+    document.getElementById("copy-serial").addEventListener("click", () => copyFrom(serialEl, "序號"));
+    revealBtn.addEventListener("click", finish);
+    document.getElementById("reset").addEventListener("click", resetCard);
+
+    new ResizeObserver(() => layout(false)).observe(wrap);
+    layout(true);
+    drawPassword();
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        drawPassword();
+        if (!dirty) paintFoil();
+      });
+    }
+  </script>
+</body>
+</html>
