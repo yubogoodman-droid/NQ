@@ -165,9 +165,12 @@ python3 examples/soxs_rollover.py --demo
 python3 examples/soxs_rollover.py --symbol SOXSUSDT --risk 100
 python3 examples/soxs_rollover.py --watch
 python3 examples/soxs_rollover.py --backtest --days 30 --risk 100
+python3 examples/soxs_rollover.py --backtest --days 90 --risk 100
 ```
 
 近 30 天（2026-10-03 → 11-01，台北時間）：**6 筆、勝率 100.0%、合計 +6.16R**。每筆風險 100 USDT、單邊費率 0.05% 之後，毛損益 **+614 USDT**、手續費 **57 USDT**、淨損益 **+557 USDT**（最大回撤 0 USDT）。每筆 5 分 K 在 `docs/soxs-rollover-30d/index.html`。
+
+近 90 天（2026-08-29 → 11-27，台北時間）：**4 筆、勝率 100.0%、合計 +4.19R**。同樣預算與費率，毛損益 **+418 USDT**、手續費 **34 USDT**、淨損益 **+384 USDT**。圖在 `docs/soxs-rollover-90d/index.html`。9 月初那波急跌之後極點卡在前高，9 月到 10 月中沒有新進場。
 
 `--demo` 不打網路。正式掃描抓 5 分和 1 分已收盤 K，最後一根同時跌破頸線、收在 1 分 MA25 下、量能夠，就印進場、停損、目標和張數。已經離開頸線 0.8% 的中段會寫不追。腳本不下單。
 

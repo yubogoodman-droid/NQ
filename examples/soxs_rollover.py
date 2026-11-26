@@ -222,6 +222,14 @@ def sleep_until_next_close() -> None:
     time.sleep(max(1.0, nxt - now))
 
 
+def _span_label(days: int) -> str:
+    if days == 30:
+        return "近一個月"
+    if days == 90:
+        return "近三個月"
+    return f"近 {days} 天"
+
+
 def run_backtest(symbol: str, days: int, risk: float, html_path: str, fee_rate: float) -> int:
     from rollover.report import write_report
     from rollover.strategy import detect_rollover_shorts, simulate_shorts
@@ -243,6 +251,7 @@ def run_backtest(symbol: str, days: int, risk: float, html_path: str, fee_rate: 
         risk_usdt=risk,
         fee_rate=fee_rate,
         cutoff=cutoff,
+        span_label=_span_label(days),
     )
     print(
         f"{stats['count']} 筆  勝率 {stats['win_rate']:.1f}%  "

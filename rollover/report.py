@@ -25,6 +25,7 @@ def write_report(
     risk_usdt: float,
     fee_rate: float,
     cutoff: pd.Timestamp,
+    span_label: str = "近一個月",
 ) -> dict:
     """寫出摘要、權益曲線，以及每筆交易一張 5 分 K。回傳統計。"""
 
@@ -42,7 +43,7 @@ def write_report(
         name = f"t{i:02d}_{_stamp(trade.signal.timestamp).strftime('%m%d_%H%M')}.png"
         _draw_trade(frame5, trade, row, img_dir / name, i)
         cards.append(_card(i, row, f"img/{name}"))
-    page = _page(symbol, stats, cards, risk_usdt, fee_rate)
+    page = _page(symbol, stats, cards, risk_usdt, fee_rate, span_label)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")
     return stats
@@ -157,7 +158,7 @@ def _card(number: int, row: dict, src: str) -> str:
     """
 
 
-def _page(symbol: str, stats: dict, cards: list[str], risk_usdt: float, fee_rate: float) -> str:
+def _page(symbol: str, stats: dict, cards: list[str], risk_usdt: float, fee_rate: float, span_label: str) -> str:
     net_cls = "pnl-win" if stats["net_usdt"] >= 0 else "pnl-loss"
     reasons = " · ".join(
         f"{REASON[key]} {stats['by_reason'][key]['n']} 筆 {stats['by_reason'][key]['r']:+.1f}R"
@@ -169,7 +170,7 @@ def _page(symbol: str, stats: dict, cards: list[str], risk_usdt: float, fee_rate
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>{html.escape(symbol)} 起跌放空 一個月</title>
+<title>{html.escape(symbol)} 起跌放空 {html.escape(span_label)}</title>
 <style>
 *{{box-sizing:border-box}}
 body{{margin:0;background:#0b0e11;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}}
@@ -198,7 +199,7 @@ img{{width:100%;display:block;border-radius:10px}}
 </style></head><body>
 <div class="page">
 <section class="summary">
-<h1>{html.escape(symbol)} 起跌放空 · 近一個月</h1>
+<h1>{html.escape(symbol)} 起跌放空 · {html.escape(span_label)}</h1>
 <p class="muted">{html.escape(stats['start'])} → {html.escape(stats['end'])}<br/>
 5 分定極點、較低高點、頸線。1 分收盤跌破頸線、收在 MA25 下、量能回到前 10 根均量才放空。每筆風險預算 {risk_usdt:.0f} USDT。單邊費率 {fee_rate * 100:.3f}%，進出各計一次。張數是整數。</p>
 <div class="cards">
@@ -212,10 +213,10 @@ img{{width:100%;display:block;border-radius:10px}}
 現貨時段 {cash['n']} 筆、勝率 {cash['win_rate']:.0f}%、{cash['net']:+.0f} USDT。休市 {off['n']} 筆、勝率 {off['win_rate']:.0f}%、{off['net']:+.0f} USDT。</p>
 <h2>淨損益曲線</h2>
 <img src="img/equity.png" alt="每筆累計淨損益"/>
-<h2>這一個月的 5 分收盤和進場點</h2>
+<h2>{html.escape(span_label)}的 5 分收盤和進場點</h2>
 <img src="img/overview.png" alt="5 分收盤與放空進場"/>
 </section>
-{''.join(cards) if cards else '<p class="muted">這一個月沒有進場。</p>'}
+{''.join(cards) if cards else f'<p class="muted">{html.escape(span_label)}沒有進場。</p>'}
 </div></body></html>
 """
 
